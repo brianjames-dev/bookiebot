@@ -96,8 +96,8 @@ def write_to_sheet(data, message):
         print("Using Initial hannerish assignment")
         data["person"] = "Hannah"
 
-    elif discord_user == "deebers":
-        print("Using deebers assignment")
+    elif discord_user == ".deebers":
+        print("Using .deebers assignment")
         # Ask Deebers which card they used
         pending_data_by_user[discord_user] = {
             "data": data,
