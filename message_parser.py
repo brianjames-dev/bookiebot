@@ -1,10 +1,10 @@
-from openai import OpenAI
+import openai
 import os
 from datetime import date
 from dotenv import load_dotenv
 
 load_dotenv()
-client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
+openai.api_key = os.getenv("OPENAI_API_KEY")
 
 def parse_message_llm(user_message):
     today = date.today().isoformat()
@@ -35,8 +35,9 @@ Return ONLY a valid JSON object with the correct keys and values. Do not explain
 \"\"\"{user_message}\"\"\"
 """
 
+
     try:
-        response = client.chat.completions.create(
+        response = openai.ChatCompletion.create(
             model="gpt-3.5-turbo",
             messages=[
                 {"role": "system", "content": system_prompt},

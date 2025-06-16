@@ -1,5 +1,5 @@
 discord.py==2.3.2
-openai==1.18.0
+openai==0.28
 gspread==6.2.1
 oauth2client==4.1.3
 python-dotenv==1.0.1
