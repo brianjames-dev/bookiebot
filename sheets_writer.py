@@ -92,9 +92,11 @@ def write_to_sheet(data, message):
 
     # Determine person based on sender
     if discord_user == "hannerish":
+        print("Using Initial hannerish assignment")
         data["person"] = "Hannah"
 
     elif discord_user == "deebers":
+        print("Using deebers assignment")
         # Ask Deebers which card they used
         pending_data_by_user[discord_user] = {
             "data": data,
@@ -121,6 +123,7 @@ def write_to_sheet(data, message):
 
     else:
         # Fallback person assignment if needed
+        print("Using fallback person assignment")
         data["person"] = "Hannah"
 
     log_category_row(data, worksheet, category)
