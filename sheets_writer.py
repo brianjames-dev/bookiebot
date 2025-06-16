@@ -87,6 +87,9 @@ def write_to_sheet(data, message):
 
     discord_user = message.author.name.lower()
 
+    # Overwrite any LLM-provided person (this is the fix)
+    data["person"] = None
+
     # Determine person based on sender
     if discord_user == "hannerish":
         data["person"] = "Hannah"
