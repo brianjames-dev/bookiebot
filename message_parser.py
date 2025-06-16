@@ -21,6 +21,8 @@ If it's an EXPENSE, also include:
 - store: where it was bought (e.g., Trader Joe's, Shell, Ulta)
 - category: one of ["grocery", "gas", "food", "shopping"]
 
+❗Do NOT include a "person" field in the output. The person will be determined by the bot based on who sent the message.
+
 Categorize based on:
 - "grocery" = food or essentials from grocery stores (Trader Joe’s, Costco, Safeway)
 - "gas" = fuel purchases (Shell, Chevron, etc.)
@@ -34,6 +36,7 @@ If it's INCOME, also include:
 Return ONLY a valid JSON object with the correct keys and values. Do not explain anything. Now parse this:
 \"\"\"{user_message}\"\"\"
 """
+
 
 
     try:

@@ -86,39 +86,39 @@ def write_to_sheet(data, message):
         return
 
     discord_user = message.author.name.lower()
-    person = data.get("person", "").strip()
 
-    if not person:
-        if discord_user == "hannerish":
-            person = "Hannah"
-            data["person"] = person
-        elif discord_user == "deebers":
-            # Need confirmation for which card
-            pending_data_by_user[discord_user] = {
-                "data": data,
-                "worksheet": worksheet
-            }
+    # Determine person based on sender
+    if discord_user == "hannerish":
+        data["person"] = "Hannah"
 
-            async def handle_selection(interaction, selected_card):
-                stored = pending_data_by_user.pop(discord_user, None)
-                if not stored:
-                    await interaction.response.send_message("Session expired.")
-                    return
-                stored["data"]["person"] = selected_card
-                log_category_row(stored["data"], stored["worksheet"], category)
-                await interaction.response.send_message(
-                    f"Logged {category} expense: ${stored['data']['amount']} using {selected_card}"
-                )
+    elif discord_user == "deebers":
+        # Ask Deebers which card they used
+        pending_data_by_user[discord_user] = {
+            "data": data,
+            "worksheet": worksheet
+        }
 
-            view = CardSelectView(handle_selection)
-            asyncio.create_task(message.channel.send(
-                f"{message.author.mention}, which card did you use?",
-                view=view
-            ))
-            return
-        else:
-            person = "Hannah"  # Default fallback
-            data["person"] = person
+        async def handle_selection(interaction, selected_card):
+            stored = pending_data_by_user.pop(discord_user, None)
+            if not stored:
+                await interaction.response.send_message("Session expired.")
+                return
+            stored["data"]["person"] = selected_card
+            log_category_row(stored["data"], stored["worksheet"], category)
+            await interaction.response.send_message(
+                f"Logged {category} expense: ${stored['data']['amount']} using {selected_card}"
+            )
+
+        view = CardSelectView(handle_selection)
+        asyncio.create_task(message.channel.send(
+            f"{message.author.mention}, which card did you use?",
+            view=view
+        ))
+        return
+
+    else:
+        # Fallback person assignment if needed
+        data["person"] = "Hannah"
 
     log_category_row(data, worksheet, category)
 
