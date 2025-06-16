@@ -199,6 +199,8 @@ def write_income_to_sheet(data):
 
 
 def log_category_row(values, worksheet, category):
+    print(f"[DEBUG] VALUES passed to log_category_row(): {values}")
+
     config = CATEGORY_COLUMNS[category]
     row_start = config["start_row"]
     columns = config["columns"]
@@ -211,8 +213,10 @@ def log_category_row(values, worksheet, category):
 
     for field, col_letter in columns.items():
         value = values.get(field)
-        if value:
+        print(f"[DEBUG] Field: {field}, Column: {col_letter}, Value: '{value}'")
+        if value is not None:
             col_index = column_index_from_string(col_letter)
+            print(f"[DEBUG] Writing '{value}' to row {first_empty_row}, col {col_index} ({col_letter})")
             worksheet.update_cell(first_empty_row, col_index, value)
 
     print(f"Wrote to {category} row {first_empty_row}")
