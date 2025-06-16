@@ -130,7 +130,12 @@ async def write_to_sheet(data, message):
         "amount": float(data.get("amount") or 0),
         "location": (data.get("store") or data.get("location") or "").strip(),
         "person": (data.get("person") or "").strip(),
-        "item": (data.get("item") or data.get("food") or "").strip()
+        "item": (
+            data.get("item") or
+            data.get("food") or
+            (data.get("store") if data["category"] == "food" else "") or
+            ""
+        ).strip()
     }
 
     # Define required fields for validation
