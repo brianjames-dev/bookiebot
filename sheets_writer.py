@@ -107,7 +107,15 @@ async def write_to_sheet(data, message):
                 await interaction.response.send_message("Session expired.")
                 return
             stored["data"]["person"] = selected_card
-            log_category_row(stored["data"], stored["worksheet"], category)
+            # Normalize and validate again for dropdown flow
+            values_to_write = {
+                "date": datetime.now().strftime("%-m/%-d/%Y"),
+                "amount": float(data.get("amount") or 0),
+                "location": (data.get("store") or data.get("location") or "").strip(),
+                "person": selected_card.strip(),
+                "item": (data.get("item") or data.get("food") or "").strip()
+            }
+            log_category_row(values_to_write, stored["worksheet"], category)
             await interaction.response.send_message(
                 f"Logged {category} expense: ${stored['data']['amount']} using {selected_card}"
             )
