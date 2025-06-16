@@ -3,3 +3,4 @@ openai==1.18.0
 gspread==6.2.1
 oauth2client==4.1.3
 python-dotenv==1.0.1
+openpyxl
