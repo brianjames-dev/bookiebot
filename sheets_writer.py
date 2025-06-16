@@ -1,10 +1,21 @@
 import asyncio
 import gspread
+import json
+import os
 from datetime import datetime
 from openpyxl.utils import column_index_from_string
 from card_ui import CardSelectView
+from google.oauth2.service_account import Credentials
 
-gc = gspread.service_account(filename="service_account.json")
+# Load service account credentials from environment variable
+service_account_info = json.loads(os.getenv("GOOGLE_SERVICE_ACCOUNT_JSON"))
+
+# Define the required Google Sheets scope
+scopes = ["https://www.googleapis.com/auth/spreadsheets"]
+
+# Create credentials and authorize gspread client
+creds = Credentials.from_service_account_info(service_account_info, scopes=scopes)
+gc = gspread.authorize(creds)
 
 # Temporary memory for user interactions (used for dropdown callbacks)
 pending_data_by_user = {}
@@ -147,7 +158,7 @@ def write_income_to_sheet(data):
         print("Could not find any existing income entries.")
         return
 
-    insert_row_index = last_entry_row  # ✅ Insert AFTER last income row
+    insert_row_index = last_entry_row  # Insert AFTER last income row
 
     # Compose row
     description = f"{data.get('source', '')} {data.get('label', '')}".strip()
