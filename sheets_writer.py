@@ -113,10 +113,10 @@ async def write_to_sheet(data, message):
             )
 
         view = CardSelectView(handle_selection)
-        asyncio.create_task(message.channel.send(
+        await message.channel.send(
             f"{message.author.mention}, which card did you use?",
             view=view
-        ))
+        )
         return
 
     else:
@@ -142,15 +142,15 @@ async def write_to_sheet(data, message):
         msg = f"Could not log entry — missing required field(s): {reason}."
         print(msg)
         if message:
-            asyncio.create_task(message.channel.send(msg))
+            await message.channel.send(msg)
         return
 
     log_category_row(values_to_write, worksheet, category)
 
     if message:
-        asyncio.create_task(message.channel.send(
+        await message.channel.send(
             f"{category.capitalize()} expense logged: ${data.get('amount')} for {data['person']}"
-        ))
+        )
 
 
 def write_income_to_sheet(data):
