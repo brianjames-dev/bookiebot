@@ -86,6 +86,7 @@ def write_to_sheet(data, message):
         return
 
     discord_user = message.author.name.lower()
+    print(f"[DEBUG] Discord user from message.author: {discord_user}")
 
     # Overwrite any LLM-provided person (this is the fix)
     data["person"] = None
