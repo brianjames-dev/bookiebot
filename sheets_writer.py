@@ -61,13 +61,13 @@ CATEGORY_COLUMNS = {
     }
 }
 
-def write_to_sheet(data, message):
+async def write_to_sheet(data, message):
     if data["type"] == "income":
         write_income_to_sheet(data)
         if message:
-            asyncio.create_task(message.channel.send(
+            await message.channel.send(
                 f"Income logged: ${data.get('amount')} from {data.get('source')}"
-            ))
+            )
         return
 
     # Expense handling starts here
@@ -87,9 +87,6 @@ def write_to_sheet(data, message):
 
     discord_user = message.author.name.lower()
     print(f"[DEBUG] Discord user from message.author: {discord_user}")
-
-    # Overwrite any LLM-provided person (this is the fix)
-    data["person"] = None
 
     # Determine person based on sender
     if discord_user == "hannerish":
@@ -127,7 +124,28 @@ def write_to_sheet(data, message):
         print("Using fallback person assignment")
         data["person"] = "Hannah"
 
-    log_category_row(data, worksheet, category)
+    # Normalize and validate required fields
+    values_to_write = {
+        "date": datetime.now().strftime("%-m/%-d/%Y"),
+        "amount": float(data.get("amount") or 0),
+        "location": (data.get("store") or data.get("location") or "").strip(),
+        "person": (data.get("person") or "").strip(),
+        "item": (data.get("item") or data.get("food") or "").strip()
+    }
+
+    # Define required fields for validation
+    required_fields = ["amount", "person", "item"]
+    missing = [field for field in required_fields if not values_to_write[field]]
+
+    if missing:
+        reason = ", ".join(missing)
+        msg = f"Could not log entry — missing required field(s): {reason}."
+        print(msg)
+        if message:
+            asyncio.create_task(message.channel.send(msg))
+        return
+
+    log_category_row(values_to_write, worksheet, category)
 
     if message:
         asyncio.create_task(message.channel.send(
@@ -176,28 +194,19 @@ def write_income_to_sheet(data):
     print(f"Income logged: {description} - ${amount} into row {insert_row_index}")
 
 
-def log_category_row(data, worksheet, category):
+def log_category_row(values, worksheet, category):
     config = CATEGORY_COLUMNS[category]
     row_start = config["start_row"]
     columns = config["columns"]
 
-    today = datetime.now().strftime("%-m/%-d/%Y")  # Format: 6/15/2025
-
+    # Choose the reference column (e.g., "amount") to find the next empty row
     ref_col_letter = columns.get("amount") or list(columns.values())[0]
     ref_col_index = column_index_from_string(ref_col_letter)
     col_values = worksheet.col_values(ref_col_index)[row_start - 1:]
     first_empty_row = len(col_values) + row_start
 
-    values_to_write = {
-        "date": today,
-        "amount": data.get("amount"),
-        "location": data.get("store", data.get("location", "")).strip(),
-        "person": data.get("person", "").strip(),
-        "item": data.get("item", data.get("food", "")).strip()
-    }
-
     for field, col_letter in columns.items():
-        value = values_to_write.get(field)
+        value = values.get(field)
         if value:
             col_index = column_index_from_string(col_letter)
             worksheet.update_cell(first_empty_row, col_index, value)
