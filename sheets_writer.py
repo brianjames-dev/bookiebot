@@ -133,7 +133,6 @@ async def write_to_sheet(data, message):
         "item": (
             data.get("item") or
             data.get("food") or
-            (data.get("store") if data["category"] == "food" else "") or
             ""
         ).strip()
     }
