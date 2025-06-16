@@ -111,7 +111,7 @@ async def write_to_sheet(data, message):
             values_to_write = {
                 "date": datetime.now().strftime("%-m/%-d/%Y"),
                 "amount": float(data.get("amount") or 0),
-                "location": (data.get("store") or data.get("location") or "").strip(),
+                "location": (data.get("location") or "").strip(),
                 "person": selected_card.strip(),
                 "item": (data.get("item") or data.get("food") or "").strip()
             }
@@ -136,7 +136,7 @@ async def write_to_sheet(data, message):
     values_to_write = {
         "date": datetime.now().strftime("%-m/%-d/%Y"),
         "amount": float(data.get("amount") or 0),
-        "location": (data.get("store") or data.get("location") or "").strip(),
+        "location": (data.get("location") or "").strip(),
         "person": (data.get("person") or "").strip(),
         "item": (
             data.get("item") or
