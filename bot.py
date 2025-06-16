@@ -34,7 +34,7 @@ async def on_message(message):
             try:
                 data = json.loads(parsed)
                 print("Parsed:", data)
-                write_to_sheet(data, message)
+                await write_to_sheet(data, message)
             except json.JSONDecodeError:
                 print("JSON parsing failed.")
         else:
