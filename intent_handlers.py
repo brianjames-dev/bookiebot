@@ -157,7 +157,7 @@ async def query_expense_breakdown_handler(message):
     # Cutie Pie Chart 🎂
     fig, ax = plt.subplots(figsize=(6, 6))
     colors = plt.get_cmap('Pastel1').colors
-    explode = [0.05] * len(amounts)  # slightly "pop out" each slice
+    explode = [0.08] * len(amounts)  # slightly "pop out" each slice
 
     wedges, texts, autotexts = ax.pie(
         amounts,
@@ -175,7 +175,13 @@ async def query_expense_breakdown_handler(message):
         autotext.set_fontsize(11)
         autotext.set_fontweight('bold')
 
-    ax.set_title(f"Expense Breakdown — Total: ${grand_total:.2f}", fontsize=14, fontweight='bold')
+    # Set title closer to the pie
+    ax.set_title(
+        f"Expense Breakdown — Total: ${grand_total:.2f}",
+        fontsize=14,
+        fontweight='bold',
+        pad=10  # default is ~25-30, lower brings it closer
+    )    
     ax.axis('equal')  # ensures it’s a perfect circle
 
     plt.tight_layout()
