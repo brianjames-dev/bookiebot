@@ -103,10 +103,11 @@ async def check_student_loan_paid():
     return False, 0.0
 
 
-async def total_spent_at_store(store):
+async def total_spent_at_store(store, top_n=5):
     ws = get_expense_worksheet()
     today = datetime.today()
     total = 0.0
+    matches = []
 
     store_norm = store.lower().replace(" ", "")  # normalize query
 
@@ -141,17 +142,26 @@ async def total_spent_at_store(store):
             try:
                 date_obj = datetime.strptime(date_str, "%m/%d/%Y")
                 if date_obj.month == today.month and date_obj.year == today.year:
-                    # Fuzzy match
                     similarity = fuzz.partial_ratio(store_norm, location_str)
-                    if similarity >= 80:  # you can adjust the threshold (0–100)
+                    if similarity >= 80:  # adjustable
                         amt = clean_money(amount_str)
                         total += amt
-                        print(f"[MATCH] {location_str} ({similarity}%) → +${amt:.2f}")
+                        matches.append((
+                            date_obj,              # datetime
+                            row[location_idx],     # original location string
+                            amt,                   # amount
+                            category               # optional: category
+                        ))
+                        print(f"[MATCH] {date_obj.date()} | {row[location_idx]} | ${amt:.2f} | sim: {similarity}%")
             except Exception as e:
                 print(f"[WARN] Skipping row: {e}")
                 continue
 
-    return total
+    # Sort matches by date (newest first), you can change to amount if you prefer
+    matches.sort(key=lambda x: x[0], reverse=True)
+
+    # Return total & top N matches
+    return total, matches[:top_n]
 
 
 async def highest_expense_category():

@@ -107,8 +107,18 @@ async def query_student_loan_paid_handler(message):
 
 async def query_total_spent_at_store_handler(entities, message):
     store = entities.get("store")
-    amount = await su.total_spent_at_store(store)
-    await message.channel.send(f"You’ve spent ${amount:.2f} at {store} this month.")
+    total, matches = await su.total_spent_at_store(store)
+
+    response = f"💰 You’ve spent **${total:.2f}** at *{store}* this month.\n"
+    if matches:
+        response += "\n**Top transactions:**\n"
+        for date_obj, location, amount, category in matches:
+            date_str = date_obj.strftime("%m/%d")
+            response += f"- {date_str}: ${amount:.2f} at {location} ({category})\n"
+    else:
+        response += "\n*(No transactions found this month.)*"
+
+    await message.channel.send(response)
 
 
 async def query_highest_expense_category_handler(message):
