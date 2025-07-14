@@ -129,16 +129,21 @@ async def query_average_daily_spend_handler(message):
 
 ## DEBUG THESE:
 async def query_expense_breakdown_handler(message):
-    breakdown = await su.expense_breakdown_percentages()
-    if not breakdown:
+    result = await su.expense_breakdown_percentages()
+    if not result:
         await message.channel.send("❌ Could not calculate expense breakdown.")
         return
 
+    categories = result["categories"]
+    grand_total = result["grand_total"]
+
     lines = []
-    for category, info in breakdown.items():
-        amt = info.get("amount", 0.0)
-        pct = info.get("percentage", 0.0)
+    for category, info in categories.items():
+        amt = info["amount"]
+        pct = info["percentage"]
         lines.append(f"{category.capitalize()}: ${amt:.2f} ({pct:.2f}%)")
+
+    lines.append(f"\n💰 Grand total: ${grand_total:.2f}")
 
     text = "\n".join(lines)
     await message.channel.send(f"📊 Expense breakdown:\n{text}")
