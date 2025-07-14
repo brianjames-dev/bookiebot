@@ -154,26 +154,41 @@ async def query_expense_breakdown_handler(message):
     text = "\n".join(lines)
     text = f"📊 Expense breakdown:\n{text}\n\n💵 Grand total: ${grand_total:.2f}"
 
-    # Create pie chart
-    fig, ax = plt.subplots()
+    # Cutie Pie Chart 🎂
+    fig, ax = plt.subplots(figsize=(6, 6))
+    colors = plt.get_cmap('Pastel1').colors
+    explode = [0.05] * len(amounts)  # slightly "pop out" each slice
+
     wedges, texts, autotexts = ax.pie(
         amounts,
-        labels=labels,             # category + amount OUTSIDE
-        autopct='%1.1f%%',        # percentage INSIDE
-        startangle=140
+        labels=labels,
+        autopct='%1.1f%%',
+        startangle=140,
+        shadow=True,
+        colors=colors,
+        explode=explode,
+        textprops={'fontsize': 10}
     )
-    ax.set_title(f"Expense Breakdown — Total: ${grand_total:.2f}")
+
+    # Make percentages bold & bigger
+    for autotext in autotexts:
+        autotext.set_fontsize(11)
+        autotext.set_fontweight('bold')
+
+    ax.set_title(f"Expense Breakdown — Total: ${grand_total:.2f}", fontsize=14, fontweight='bold')
+    ax.axis('equal')  # ensures it’s a perfect circle
+
     plt.tight_layout()
 
-    # Save chart to memory
+    # Save to buffer
     buf = io.BytesIO()
-    plt.savefig(buf, format='png')
+    plt.savefig(buf, format='png', dpi=150)
     buf.seek(0)
     plt.close(fig)
 
     file = discord.File(fp=buf, filename="expense_breakdown.png")
 
-    # Send text + image
+    # Send text + chart
     await message.channel.send(content=text, file=file)
 
 async def query_total_for_category_handler(entities, message):
