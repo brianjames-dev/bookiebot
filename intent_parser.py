@@ -72,14 +72,17 @@ If the message is a QUERY (not logging), return:
 - intent: one of the query intents from the list above
 - entities: JSON with any useful parameters (e.g., "store" for a store query, "category", "n" for top-n queries), or empty if none.
 
-❗ Do NOT explain anything — respond only with a JSON object.
-❗ Do NOT say you don’t have access — always assume you can retrieve the information.
+❗ Do NOT explain or apologize — only return JSON.
+❗ Do NOT say you cannot access data — always return the intent & store as provided.
 ❗ Do NOT leave "item" blank — if unsure, infer based on the location or context (e.g., "coffee" for Starbucks).
 ❗ Do NOT include a "person" field — the bot determines the person based on Discord user.
+❗ Always assume any store name the user provides is valid — even if you do not recognize it.
 
 Examples of the kind of JSON you should produce:
 - Log Expense: {{ "intent": "log_expense", "entities": {{ "type": "expense", "amount": 15.0, "date": "{today}", "item": "coffee", "location": "Starbucks", "category": "food" }} }}
 - Query Store: {{ "intent": "query_total_spent_at_store", "entities": {{ "store": "In N Out" }} }}
+- Query Store: {{ "intent": "query_total_spent_at_store", "entities": {{ "store": "Russian River" }} }}
+- Query Store: {{ "intent": "query_total_spent_at_store", "entities": {{ "store": "Mom's Deli" }} }}
 - Query Category: {{ "intent": "query_total_for_category", "entities": {{ "category": "food" }} }}
 - Query Top N: {{ "intent": "query_top_n_expenses", "entities": {{ "n": 5 }} }}
 - Query Burn Rate: {{ "intent": "query_burn_rate", "entities": {{}} }}
