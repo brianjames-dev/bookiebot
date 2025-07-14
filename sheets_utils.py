@@ -427,29 +427,48 @@ async def spent_this_week():
 async def projected_spending():
     today = datetime.today()
     ws = get_expense_worksheet()
-    rows = ws.get_all_values()[2:]
-
     total_so_far = 0.0
-    amount_cols = [column_index_from_string(c) - 1 for c in ['B', 'I', 'P', 'X']]
 
-    for row in rows:
-        try:
-            date_str = row[0]
-            date_obj = datetime.strptime(date_str, "%m/%d/%Y")
-            if date_obj.month == today.month and date_obj.year == today.year:
-                for idx in amount_cols:
-                    if idx >= len(row):
-                        continue
-                    try:
-                        total_so_far += clean_money(row[idx])
-                    except:
-                        continue
-        except:
-            continue
+    category_columns = get_category_columns  # or get_category_columns() if function
 
-    days_in_month = (datetime(today.year, today.month % 12 + 1, 1) - timedelta(days=1)).day
+    for category, config in category_columns.items():
+        start_row = config["start_row"]
+        date_col_letter = config["columns"]["date"]
+        amount_col_letter = config["columns"]["amount"]
+
+        date_idx = column_index_from_string(date_col_letter) - 1
+        amount_idx = column_index_from_string(amount_col_letter) - 1
+
+        rows = ws.get_all_values()[start_row - 1:]
+
+        for row in rows:
+            if max(date_idx, amount_idx) >= len(row):
+                continue
+
+            date_str = row[date_idx].strip()
+            amount_str = row[amount_idx].strip()
+
+            if not date_str or not amount_str:
+                continue
+
+            try:
+                date_obj = datetime.strptime(date_str, "%m/%d/%Y")
+                if date_obj.month == today.month and date_obj.year == today.year:
+                    amt = clean_money(amount_str)
+                    total_so_far += amt
+            except Exception as e:
+                print(f"[WARN] Skipping row: {e}")
+                continue
+
+    # Project to end of month
+    if today.month == 12:
+        next_month = datetime(today.year + 1, 1, 1)
+    else:
+        next_month = datetime(today.year, today.month + 1, 1)
+
+    days_in_month = (next_month - timedelta(days=1)).day
     days_passed = today.day
-    daily_avg = total_so_far / days_passed
+    daily_avg = total_so_far / days_passed if days_passed else 0.0
     projected = daily_avg * days_in_month
     return projected
 
