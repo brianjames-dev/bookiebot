@@ -51,26 +51,41 @@ If the message does NOT clearly match any available intent, return:
   "entities": {{}}
 }}
 
-For logging expense or income:
+If the message is about logging an expense or income:
 - intent: "log_expense" or "log_income"
 - entities: JSON with:
     - type: "expense" or "income"
-    - amount: float (without $)
-    - date: use today: {today}
-    - for expense: also include "item", "location", "category"
-    - for income: also include "source", "label"
+    - amount: float (do not include $)
+    - date: always use today's date: {today}
 
-Always return a valid JSON object like:
-{{
-  "intent": "<intent_name>",
-  "entities": {{
-    ...
-  }}
-}}
+If it's an EXPENSE, also include:
+    - item: short label for what was bought (e.g., "coffee", "gas", "groceries", or "Starbucks reload")
+    - location: where it was bought (e.g., Trader Joe's, Shell, Ulta)
+    - category: one of ["grocery", "gas", "food", "shopping"]
 
-Do not explain anything. Now parse this:
+❗ Do not leave "item" blank — if unsure, infer based on the location or context (e.g., "coffee" for Starbucks).
+❗ Do NOT include a "person" field — the bot determines the person based on Discord user.
+
+Categorize EXPENSE as:
+- "grocery" = food or essentials from grocery stores (Trader Joe’s, Costco, Safeway). If the word "groceries" is mentioned, always choose "grocery".
+- "gas" = fuel purchases (Shell, Chevron, etc.)
+- "food" = restaurants, cafes, or fast food (Chipotle, Starbucks, etc.) — if not explicitly "groceries", but clearly food-related
+- "shopping" = all other non-food, non-grocery, non-gas purchases (clothes, gifts, household items)
+
+If the message is about logging INCOME, also include:
+    - source: who sent the money (e.g., Acme Corp, IRS, Mom)
+    - label: reason or description (e.g., paycheck, birthday gift, tax refund)
+
+If the message is a QUERY (not logging), return:
+- intent: one of the query intents from the list above
+- entities: JSON with any useful parameters (e.g., "store" for a store query, "category", "vendor", "n" for top-n queries), or empty if none.
+
+Always return ONLY a valid JSON object with the correct keys and values. Do not explain anything.  
+
+Now parse this:
 \"\"\"{user_message}\"\"\"
 """
+
 
     try:
         response = openai.ChatCompletion.create(
