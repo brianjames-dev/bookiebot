@@ -144,7 +144,7 @@ async def query_expense_breakdown_handler(message):
     for category, info in breakdown["categories"].items():
         amt = info["amount"]
         pct = info["percentage"]
-        labels.append(f"{category.capitalize()} (${amt:.2f})")
+        labels.append(f"{category.capitalize()}\n(${amt:.2f})")
         amounts.append(amt)
         lines.append(f"{category.capitalize()}: ${amt:.2f} ({pct:.2f}%)")
 
@@ -170,6 +170,7 @@ async def query_expense_breakdown_handler(message):
         shadow=True,
         colors=colors,
         explode=explode,
+        radius=1.0,
         textprops={'fontsize': 10}
     )
 
