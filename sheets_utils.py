@@ -24,19 +24,31 @@ def clean_money(value: str) -> float:
 async def calculate_burn_rate():
     ws = get_income_worksheet()
     try:
-        # find the cell that contains '🔥 Burn rate:'
-        cell = ws.find("🔥 Burn rate: ")
-        
-        # example cell.value: "🔥 Burn rate: $2.63/day"
-        val_text = cell.value
-        
-        # extract value after the colon
-        burn_rate_val = val_text.split(":")[1].strip()
-        
-        # also grab the description two cells to the right
-        desc = ws.cell(cell.row, cell.col + 2).value
-        
-        return burn_rate_val, desc
+        # get all cell values
+        all_cells = ws.get_all_values()
+
+        # search manually for a row with 'burn rate' in any cell
+        for r, row in enumerate(all_cells, 1):
+            for c, cell in enumerate(row, 1):
+                if "burn rate" in cell.lower():
+                    val_text = cell.strip()
+                    print(f"[DEBUG] Found burn rate cell: '{val_text}' at ({r},{c})")
+
+                    parts = val_text.split(":")
+                    if len(parts) < 2:
+                        print(f"[ERROR] Unexpected format in burn rate cell: {val_text}")
+                        return None, None
+
+                    burn_rate_val = parts[1].strip()
+                    desc = ""
+                    # try to get description 2 columns to the right if it exists
+                    if c + 2 <= len(row):
+                        desc = row[c + 1].strip()
+                    return burn_rate_val, desc
+
+        print("[ERROR] Could not find any cell containing 'burn rate'")
+        return None, None
+
     except Exception as e:
         print(f"[ERROR] Failed to fetch burn rate: {e}")
         return None, None
