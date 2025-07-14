@@ -4,6 +4,7 @@ from datetime import datetime, timedelta
 import re
 from sheets_writer import get_category_columns
 from dateutil import parser as dateparser
+from rapidfuzz import fuzz
 
 # HELPER FUNCTIONS
 def _sum_column(ws, col_letter, start_row=3):
@@ -104,38 +105,51 @@ async def check_student_loan_paid():
 
 async def total_spent_at_store(store):
     ws = get_expense_worksheet()
-    rows = ws.get_all_values()[2:]  # skip header
+    today = datetime.today()
     total = 0.0
-    store = store.lower()
 
-    # Food: columns P (amount) and Q (location)
-    # Shopping: columns X (amount) and Y (location)
-    # Get column indices for P, Q, X, Y
-    food_amount_idx = column_index_from_string('P') - 1
-    food_location_idx = column_index_from_string('Q') - 1
-    shop_amount_idx = column_index_from_string('X') - 1
-    shop_location_idx = column_index_from_string('Y') - 1
+    store_norm = store.lower().replace(" ", "")  # normalize query
 
-    for row in rows:
-        # Check Food section
-        if len(row) > max(food_amount_idx, food_location_idx):
-            location_val = row[food_location_idx].lower()
-            if store in location_val:
-                try:
-                    total += clean_money(row[food_amount_idx])
-                    continue
-                except ValueError:
-                    pass
+    category_columns = get_category_columns  # or get_category_columns() if function
 
-        # Check Shopping section
-        if len(row) > max(shop_amount_idx, shop_location_idx):
-            location_val = row[shop_location_idx].lower()
-            if store in location_val:
-                try:
-                    total += clean_money(row[shop_amount_idx])
-                    continue
-                except ValueError:
-                    pass
+    for category, config in category_columns.items():
+        start_row = config["start_row"]
+        date_col_letter = config["columns"]["date"]
+        amount_col_letter = config["columns"]["amount"]
+        location_col_letter = config["columns"].get("location")
+
+        if not location_col_letter:
+            continue  # skip categories without a 'location' column
+
+        date_idx = column_index_from_string(date_col_letter) - 1
+        amount_idx = column_index_from_string(amount_col_letter) - 1
+        location_idx = column_index_from_string(location_col_letter) - 1
+
+        rows = ws.get_all_values()[start_row - 1:]
+
+        for row in rows:
+            if max(date_idx, amount_idx, location_idx) >= len(row):
+                continue
+
+            date_str = row[date_idx].strip()
+            amount_str = row[amount_idx].strip()
+            location_str = row[location_idx].strip().lower().replace(" ", "")
+
+            if not date_str or not amount_str or not location_str:
+                continue
+
+            try:
+                date_obj = datetime.strptime(date_str, "%m/%d/%Y")
+                if date_obj.month == today.month and date_obj.year == today.year:
+                    # Fuzzy match
+                    similarity = fuzz.partial_ratio(store_norm, location_str)
+                    if similarity >= 80:  # you can adjust the threshold (0–100)
+                        amt = clean_money(amount_str)
+                        total += amt
+                        print(f"[MATCH] {location_str} ({similarity}%) → +${amt:.2f}")
+            except Exception as e:
+                print(f"[WARN] Skipping row: {e}")
+                continue
 
     return total
 

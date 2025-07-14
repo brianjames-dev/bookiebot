@@ -14,7 +14,7 @@ INTENT_HANDLERS = {
     "query_rent_paid":                      lambda e, m: query_rent_paid_handler(m),
     "query_utilities_paid":                 lambda e, m: query_utilities_paid_handler(m),
     "query_student_loans_paid":             lambda e, m: query_student_loan_paid_handler(m),
-    "query_total_spent_at_store":           lambda e, m: query_total_spent_at_store_handler(e, m),
+    "query_total_spent_at_store":           lambda e, m: query_total_spent_at_store_handler(e, m), # fix
     "query_highest_expense_category":       lambda e, m: query_highest_expense_category_handler(m),
     "query_total_income":                   lambda e, m: query_total_income_handler(m),
     "query_remaining_budget":               lambda e, m: query_remaining_budget_handler(m),
@@ -24,9 +24,9 @@ INTENT_HANDLERS = {
     "query_largest_single_expense":         lambda e, m: query_largest_single_expense_handler(m),
     "query_top_n_expenses":                 lambda e, m: query_top_n_expenses_handler(e, m),
     "query_spent_this_week":                lambda e, m: query_spent_this_week_handler(m),
-    "query_projected_spending":             lambda e, m: query_projected_spending_handler(m), # bugged
-    "query_weekend_vs_weekday":             lambda e, m: query_weekend_vs_weekday_handler(m), # bugged? check
-    "query_no_spend_days":                  lambda e, m: query_no_spend_days_handler(m), # bugged
+    "query_projected_spending":             lambda e, m: query_projected_spending_handler(m),
+    "query_weekend_vs_weekday":             lambda e, m: query_weekend_vs_weekday_handler(m),
+    "query_no_spend_days":                  lambda e, m: query_no_spend_days_handler(m),
 }
 
 
