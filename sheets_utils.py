@@ -172,7 +172,7 @@ async def remaining_budget():
         return 0.0
 
 async def average_daily_spend():
-    ws = get_income_worksheet()
+    ws = get_expense_worksheet()
     try:
         today = datetime.today()
         day_of_month = today.day
@@ -194,7 +194,6 @@ async def average_daily_spend():
     except Exception as e:
         print(f"[ERROR] Failed to compute average daily spend: {e}")
         return None
-
 
 ## DEBUG THESE
 async def expense_breakdown_percentages():

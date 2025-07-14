@@ -127,15 +127,21 @@ async def query_average_daily_spend_handler(message):
     avg = await su.average_daily_spend()
     await message.channel.send(f"Average daily spend this month: ${avg:.2f}.")
 
-
 ## DEBUG THESE:
 async def query_expense_breakdown_handler(message):
     breakdown = await su.expense_breakdown_percentages()
-    if breakdown:
-        text = "\n".join(f"{k}: {v:.2f}%" for k, v in breakdown.items())
-        await message.channel.send(f"📊 Expense breakdown:\n{text}")
-    else:
+    if not breakdown:
         await message.channel.send("❌ Could not calculate expense breakdown.")
+        return
+
+    lines = []
+    for category, info in breakdown.items():
+        amt = info.get("amount", 0.0)
+        pct = info.get("percentage", 0.0)
+        lines.append(f"{category.capitalize()}: ${amt:.2f} ({pct:.2f}%)")
+
+    text = "\n".join(lines)
+    await message.channel.send(f"📊 Expense breakdown:\n{text}")
 
 async def query_total_for_category_handler(entities, message):
     category = entities.get("category")
