@@ -211,11 +211,16 @@ async def query_total_for_category_handler(entities, message):
     await message.channel.send(f"💰 You spent ${total:.2f} on {category} this month.")
 
 async def query_largest_single_expense_handler(message):
-    amount, row = await su.largest_single_expense()
-    if row:
-        await message.channel.send(f"💸 Largest single expense: ${amount:.2f} — details: {row}")
+    result = await su.largest_single_expense()
+    if result:
+        await message.channel.send(
+            f"💸 Largest single expense: ${result['amount']:.2f} — "
+            f"{result['item']} at {result['location']} on {result['date']} "
+            f"({result['category']})"
+        )
     else:
         await message.channel.send("❌ Could not find any expenses.")
+
 
 async def query_top_n_expenses_handler(entities, message):
     n = int(entities.get("n", 5))
