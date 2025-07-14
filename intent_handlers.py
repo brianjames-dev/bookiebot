@@ -2,37 +2,68 @@
 
 from sheets_writer import write_to_sheet
 import sheets_utils as su
+import openai
 
 INTENT_HANDLERS = {
-    "log_expense":                      lambda e, m: write_to_sheet(e, m),
-    "log_income":                       lambda e, m: write_to_sheet(e, m),
-    "query_burn_rate":                  lambda e, m: query_burn_rate_handler(m),
-    "query_rent_paid":                  lambda e, m: query_rent_paid_handler(m),
-    "query_utilities_paid":             lambda e, m: query_utilities_paid_handler(m),
-    "query_student_loans_paid":         lambda e, m: query_student_loan_paid_handler(m),
-    "query_total_spent_at_store":       lambda e, m: query_total_spent_at_store_handler(e, m),
-    "query_highest_expense_category":   lambda e, m: query_highest_expense_category_handler(m),
-    "query_total_income":               lambda e, m: query_total_income_handler(m),
-    "query_remaining_budget":           lambda e, m: query_remaining_budget_handler(m),
-    "query_average_daily_spend":        lambda e, m: query_average_daily_spend_handler(m),
-
-    "query_expense_breakdown_percentages": lambda e, m: query_expense_breakdown_handler(m),
-    "query_total_for_category":            lambda e, m: query_total_for_category_handler(e, m),
-    "query_last_payment_to":               lambda e, m: query_last_payment_to_handler(e, m),
-    "query_largest_single_expense":        lambda e, m: query_largest_single_expense_handler(m),
-    "query_top_n_expenses":                lambda e, m: query_top_n_expenses_handler(e, m),
-    "query_spent_this_week":               lambda e, m: query_spent_this_week_handler(m),
-    "query_projected_spending":            lambda e, m: query_projected_spending_handler(m),
-    "query_weekend_vs_weekday":            lambda e, m: query_weekend_vs_weekday_handler(m),
-    "query_no_spend_days":                 lambda e, m: query_no_spend_days_handler(m),
+    "log_expense":                          lambda e, m: write_to_sheet(e, m),
+    "log_income":                           lambda e, m: write_to_sheet(e, m),
+    "query_burn_rate":                      lambda e, m: query_burn_rate_handler(m),
+    "query_rent_paid":                      lambda e, m: query_rent_paid_handler(m),
+    "query_utilities_paid":                 lambda e, m: query_utilities_paid_handler(m),
+    "query_student_loans_paid":             lambda e, m: query_student_loan_paid_handler(m),
+    "query_total_spent_at_store":           lambda e, m: query_total_spent_at_store_handler(e, m),
+    "query_highest_expense_category":       lambda e, m: query_highest_expense_category_handler(m),
+    "query_total_income":                   lambda e, m: query_total_income_handler(m),
+    "query_remaining_budget":               lambda e, m: query_remaining_budget_handler(m),
+    "query_average_daily_spend":            lambda e, m: query_average_daily_spend_handler(m),
+    "query_expense_breakdown_percentages":  lambda e, m: query_expense_breakdown_handler(m),
+    "query_total_for_category":             lambda e, m: query_total_for_category_handler(e, m),
+    "query_last_payment_to":                lambda e, m: query_last_payment_to_handler(e, m),
+    "query_largest_single_expense":         lambda e, m: query_largest_single_expense_handler(m),
+    "query_top_n_expenses":                 lambda e, m: query_top_n_expenses_handler(e, m),
+    "query_spent_this_week":                lambda e, m: query_spent_this_week_handler(m),
+    "query_projected_spending":             lambda e, m: query_projected_spending_handler(m),
+    "query_weekend_vs_weekday":             lambda e, m: query_weekend_vs_weekday_handler(m),
+    "query_no_spend_days":                  lambda e, m: query_no_spend_days_handler(m),
 }
 
-async def handle_intent(intent, entities, message):
+# INTENT HANDLER
+async def handle_intent(intent, entities, message, last_context=None):
     handler = INTENT_HANDLERS.get(intent)
-    if not handler:
-        await message.channel.send("Sorry, I couldn’t understand your request.")
+    if not handler or intent == "fallback":
+        await fallback_handler(message.content, message, context=last_context)
         return
     await handler(entities, message)
+
+# FALLBACK HANDLER
+async def fallback_handler(user_message, message, context=None):
+    """
+    If no intent matched, use GPT to generate a general helpful response.
+    Optionally include context from last output.
+    """
+    prompt = f"""
+You are a helpful financial assistant. The user previously saw this context (if any):
+\"\"\"{context}\"\"\"
+
+Now the user asks:
+\"\"\"{user_message}\"\"\"
+
+Please respond helpfully and clearly.
+"""
+    try:
+        response = openai.ChatCompletion.create(
+            model="gpt-3.5-turbo",
+            messages=[
+                {"role": "system", "content": "You are a financial assistant chatbot."},
+                {"role": "user", "content": prompt}
+            ],
+            temperature=0.5
+        )
+        reply = response.choices[0].message.content
+        await message.channel.send(reply)
+    except Exception as e:
+        print("[ERROR] fallback_handler failed:", e)
+        await message.channel.send("❌ Sorry, I couldn't process your request.")
 
 # QUERY HANDLERS
 async def query_burn_rate_handler(message):
