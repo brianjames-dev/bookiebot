@@ -92,6 +92,7 @@ INTENTS_WITH_EXAMPLES = {
 
 INTENTS = list(INTENTS_WITH_EXAMPLES.keys())
 
+
 def parse_message_llm(user_message):
     today = date.today().isoformat()
 
@@ -99,10 +100,41 @@ def parse_message_llm(user_message):
     for intent, examples in INTENTS_WITH_EXAMPLES.items():
         examples_text += f"\nIntent: {intent}\n"
         for ex in examples:
-            examples_text += f'User: "{ex}"\n→ {{"intent": "{intent}", "entities": {{...}}}}\n'
+            # Default fallback
+            entities = {}
+            if intent == "query_total_spent_at_store":
+                store_name = ex.split("at")[-1].strip("? .")
+                entities = {"store": store_name}
+            elif intent == "query_total_for_category":
+                category = ex.split("on")[-1].strip("? .")
+                entities = {"category": category}
+            elif intent == "log_expense":
+                entities = {
+                    "type": "expense",
+                    "amount": 50.0,
+                    "date": today,
+                    "item": "example item",
+                    "location": "Example Store",
+                    "category": "shopping"
+                }
+            elif intent == "log_income":
+                entities = {
+                    "type": "income",
+                    "amount": 100.0,
+                    "date": today,
+                    "source": "Example Corp",
+                    "label": "paycheck"
+                }
+            else:
+                # all others just have empty entities
+                entities = {}
+
+            examples_text += (
+                f'User: "{ex}"\n→ {{"intent": "{intent}", "entities": {json.dumps(entities)}}}\n'
+            )
 
     system_prompt = f"""
-You are a financial assistant. Given a message, identify the user's intent and extract entities if necessary.
+You are a financial assistant named BookieBot. Given a message, identify the user's intent and extract entities if necessary.
 
 Available intents:
 {INTENTS}
