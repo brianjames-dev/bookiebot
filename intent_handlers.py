@@ -18,7 +18,6 @@ INTENT_HANDLERS = {
     "query_average_daily_spend":            lambda e, m: query_average_daily_spend_handler(m),
     "query_expense_breakdown_percentages":  lambda e, m: query_expense_breakdown_handler(m),
     "query_total_for_category":             lambda e, m: query_total_for_category_handler(e, m),
-    "query_last_payment_to":                lambda e, m: query_last_payment_to_handler(e, m),
     "query_largest_single_expense":         lambda e, m: query_largest_single_expense_handler(m),
     "query_top_n_expenses":                 lambda e, m: query_top_n_expenses_handler(e, m),
     "query_spent_this_week":                lambda e, m: query_spent_this_week_handler(m),
@@ -145,17 +144,6 @@ async def query_total_for_category_handler(entities, message):
         return
     total = await su.total_for_category(category)
     await message.channel.send(f"💰 You spent ${total:.2f} on {category} this month.")
-
-async def query_last_payment_to_handler(entities, message):
-    target = entities.get("vendor_or_category")
-    if not target:
-        await message.channel.send("❌ Please specify a vendor or category.")
-        return
-    last_date = await su.last_payment_to(target)
-    if last_date:
-        await message.channel.send(f"📅 Last payment to {target}: {last_date}")
-    else:
-        await message.channel.send(f"❌ No payments found for {target} this month.")
 
 async def query_largest_single_expense_handler(message):
     amount, row = await su.largest_single_expense()

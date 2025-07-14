@@ -210,36 +210,21 @@ async def total_for_category(category):
         return 0.0
     return _sum_column(ws, col)
 
-async def last_payment_to(vendor_or_category):
-    ws = get_expense_worksheet()
-    rows = ws.get_all_values()[2:]  # skip header
-
-    last_date = None
-    vendor_or_category = vendor_or_category.lower()
-
-    for row in rows:
-        try:
-            date_str = row[0]  # assuming first column is date
-            date_obj = datetime.strptime(date_str, "%m/%d/%Y")
-        except Exception:
-            continue
-
-        if any(vendor_or_category in (cell or "").lower() for cell in row):
-            if not last_date or date_obj > last_date:
-                last_date = date_obj
-
-    return last_date.strftime("%m/%d/%Y") if last_date else None
-
 async def largest_single_expense():
     ws = get_expense_worksheet()
     rows = ws.get_all_values()[2:]
     max_val = 0.0
     max_row = None
 
+    # define which columns we expect amounts in
+    amount_cols = [column_index_from_string(c) - 1 for c in ['B', 'I', 'P', 'X']]
+
     for row in rows:
-        for cell in row:
+        for idx in amount_cols:
+            if idx >= len(row):
+                continue
             try:
-                amt = clean_money(cell)
+                amt = clean_money(row[idx])
                 if amt > max_val:
                     max_val = amt
                     max_row = row
@@ -253,10 +238,14 @@ async def top_n_expenses(n=5):
     rows = ws.get_all_values()[2:]
     expenses = []
 
+    amount_cols = [column_index_from_string(c) - 1 for c in ['B', 'I', 'P', 'X']]
+
     for row in rows:
-        for cell in row:
+        for idx in amount_cols:
+            if idx >= len(row):
+                continue
             try:
-                amt = clean_money(cell)
+                amt = clean_money(row[idx])
                 expenses.append((amt, row))
             except:
                 continue
@@ -276,9 +265,12 @@ async def spent_this_week():
             date_str = row[0]
             date_obj = datetime.strptime(date_str, "%m/%d/%Y")
             if date_obj >= start_of_week:
-                for cell in row[1:]:
+                amount_cols = [column_index_from_string(c) - 1 for c in ['B', 'I', 'P', 'X']]
+                for idx in amount_cols:
+                    if idx >= len(row):
+                        continue
                     try:
-                        total += clean_money(cell)
+                        total += clean_money(row[idx])
                     except:
                         continue
         except:
@@ -291,14 +283,18 @@ async def projected_spending():
     rows = ws.get_all_values()[2:]
 
     total_so_far = 0.0
+    amount_cols = [column_index_from_string(c) - 1 for c in ['B', 'I', 'P', 'X']]
+
     for row in rows:
         try:
             date_str = row[0]
             date_obj = datetime.strptime(date_str, "%m/%d/%Y")
             if date_obj.month == today.month and date_obj.year == today.year:
-                for cell in row[1:]:
+                for idx in amount_cols:
+                    if idx >= len(row):
+                        continue
                     try:
-                        total_so_far += clean_money(cell)
+                        total_so_far += clean_money(row[idx])
                     except:
                         continue
         except:
@@ -315,21 +311,25 @@ async def weekend_vs_weekday():
     rows = ws.get_all_values()[2:]
     weekend = 0.0
     weekday = 0.0
+    amount_cols = [column_index_from_string(c) - 1 for c in ['B', 'I', 'P', 'X']]
 
     for row in rows:
         try:
             date_str = row[0]
             date_obj = datetime.strptime(date_str, "%m/%d/%Y")
             is_weekend = date_obj.weekday() >= 5
-            for cell in row[1:]:
+            for idx in amount_cols:
+                if idx >= len(row):
+                    continue
                 try:
-                    amt = clean_money(cell)
+                    amt = clean_money(row[idx])
                     if is_weekend:
                         weekend += amt
                     else:
                         weekday += amt
                 except:
                     continue
+
         except:
             continue
     return weekend, weekday
