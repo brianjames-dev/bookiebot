@@ -109,7 +109,7 @@ async def query_total_spent_at_store_handler(entities, message):
     store = entities.get("store")
     total, matches = await su.total_spent_at_store(store)
 
-    response = f"💰 You’ve spent **${total:.2f}** at *{store}* this month.\n"
+    response = f"💰 You’ve spent ${total:.2f} at {store} this month.\n"
     if matches:
         response += "\n**Top transactions:**\n"
         for date_obj, location, amount, category in matches:
