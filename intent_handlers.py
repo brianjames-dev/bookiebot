@@ -1,4 +1,4 @@
-# all intent handlers and stuff
+# all intent handlers
 
 from sheets_writer import write_to_sheet
 import sheets_utils as su
@@ -180,10 +180,10 @@ async def query_expense_breakdown_handler(message):
 
     # Set title closer to the pie
     ax.set_title(
-        f"Expense Breakdown — Total: ${grand_total:.2f}",
-        fontsize=14,
+        f"Expense Breakdown\nTotal: ${grand_total:.2f}",
+        fontsize=16,
         fontweight='bold',
-        pad=20
+        pad=10
     )
 
     ax.axis('equal')  # perfect circle
