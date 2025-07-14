@@ -387,7 +387,7 @@ async def spent_this_week():
     start_of_week = today - timedelta(days=today.weekday())  # Monday
     total = 0.0
 
-    category_columns = get_category_columns  # or get_category_columns() if it’s a function
+    category_columns = get_category_columns  # or get_category_columns() if a function
 
     for category, config in category_columns.items():
         start_row = config["start_row"]
@@ -397,7 +397,7 @@ async def spent_this_week():
         date_idx = column_index_from_string(date_col_letter) - 1
         amount_idx = column_index_from_string(amount_col_letter) - 1
 
-        rows = ws.get_all_values()[start_row - 1:]  # skip header
+        rows = ws.get_all_values()[start_row - 1:]
 
         for row in rows:
             if max(date_idx, amount_idx) >= len(row):
@@ -410,13 +410,15 @@ async def spent_this_week():
                 continue
 
             try:
-                # robust date parse
                 date_obj = dateparser.parse(date_str, dayfirst=False, yearfirst=False)
-                if date_obj >= start_of_week:
+                if date_obj.date() >= start_of_week.date():
                     amt = clean_money(amount_str)
+                    print(f"[MATCH] {date_obj.date()} ${amt:.2f}")
                     total += amt
+                else:
+                    print(f"[SKIP] {date_obj.date()} before start of week {start_of_week.date()}")
             except Exception as e:
-                print(f"[WARN] Skipping row due to error: {e}")
+                print(f"[WARN] Skipping row: {e}")
                 continue
 
     return total
