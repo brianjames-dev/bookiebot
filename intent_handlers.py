@@ -68,9 +68,9 @@ Please respond helpfully and clearly.
 async def query_burn_rate_handler(message):
     burn_rate, desc = await su.calculate_burn_rate()
     if burn_rate and desc:
-        await message.channel.send(f"🔥 Burn rate:\n You are allowed to spend {burn_rate} per day.\n ({desc})")
+        await message.channel.send(f"🔥 Burn rate:\n You are allowed to spend {burn_rate}\n\n ({desc})")
     elif burn_rate:
-        await message.channel.send(f"🔥 Burn rate:\n You are allowed to spend {burn_rate} per day.")
+        await message.channel.send(f"🔥 Burn rate:\n You are allowed to spend {burn_rate}")
     else:
         await message.channel.send("❌ Could not determine burn rate.")
 
