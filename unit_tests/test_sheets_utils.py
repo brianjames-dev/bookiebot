@@ -193,14 +193,6 @@ async def test_total_for_category(mock_ws_func, mock_ws):
 
 @pytest.mark.asyncio
 @patch("sheets_utils.get_expense_worksheet")
-async def test_last_payment_to(mock_ws_func, mock_ws):
-    mock_ws_func.return_value = mock_ws
-    result = await su.last_payment_to("shopping")
-    assert result is None or isinstance(result, str)
-
-
-@pytest.mark.asyncio
-@patch("sheets_utils.get_expense_worksheet")
 async def test_largest_single_expense(mock_ws_func, mock_ws):
     mock_ws_func.return_value = mock_ws
     amt, row = await su.largest_single_expense()

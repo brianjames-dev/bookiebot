@@ -25,7 +25,7 @@ async def calculate_burn_rate():
     ws = get_income_worksheet()
     try:
         # find the cell that contains '🔥 Burn rate:'
-        cell = ws.find("🔥 Burn rate:")
+        cell = ws.find("🔥 Burn rate: ")
         
         # example cell.value: "🔥 Burn rate: $2.63/day"
         val_text = cell.value
