@@ -14,7 +14,7 @@ INTENT_HANDLERS = {
     "query_rent_paid":                      lambda e, m: query_rent_paid_handler(m),
     "query_utilities_paid":                 lambda e, m: query_utilities_paid_handler(m),
     "query_student_loans_paid":             lambda e, m: query_student_loan_paid_handler(m),
-    "query_total_spent_at_store":           lambda e, m: query_total_spent_at_store_handler(e, m), # fix
+    "query_total_for_store":                lambda e, m: query_total_for_store_handler(e, m), # fix
     "query_highest_expense_category":       lambda e, m: query_highest_expense_category_handler(m),
     "query_total_income":                   lambda e, m: query_total_income_handler(m),
     "query_remaining_budget":               lambda e, m: query_remaining_budget_handler(m),
@@ -105,7 +105,7 @@ async def query_student_loan_paid_handler(message):
         await message.channel.send("❌ You have NOT made a student loan payment yet this month.")
 
 
-async def query_total_spent_at_store_handler(entities, message):
+async def query_total_for_store_handler(entities, message):
     store = entities.get("store")
     total, matches = await su.total_spent_at_store(store)
 
