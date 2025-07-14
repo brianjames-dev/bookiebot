@@ -3,6 +3,7 @@ from openpyxl.utils import column_index_from_string
 from datetime import datetime, timedelta
 import re
 from sheets_writer import get_category_columns
+from dateutil import parser as dateparser
 
 # HELPER FUNCTIONS
 def _sum_column(ws, col_letter, start_row=3):
@@ -386,8 +387,9 @@ async def spent_this_week():
     start_of_week = today - timedelta(days=today.weekday())  # Monday
     total = 0.0
 
+    category_columns = get_category_columns  # or get_category_columns() if it’s a function
 
-    for category, config in get_category_columns.items():
+    for category, config in category_columns.items():
         start_row = config["start_row"]
         date_col_letter = config["columns"]["date"]
         amount_col_letter = config["columns"]["amount"]
@@ -395,20 +397,26 @@ async def spent_this_week():
         date_idx = column_index_from_string(date_col_letter) - 1
         amount_idx = column_index_from_string(amount_col_letter) - 1
 
-        rows = ws.get_all_values()[start_row - 1:]  # 0-based
+        rows = ws.get_all_values()[start_row - 1:]  # skip header
 
         for row in rows:
             if max(date_idx, amount_idx) >= len(row):
                 continue
 
-            date_str = row[date_idx]
-            amount_str = row[amount_idx]
+            date_str = row[date_idx].strip()
+            amount_str = row[amount_idx].strip()
+
+            if not date_str or not amount_str:
+                continue
 
             try:
-                date_obj = datetime.strptime(date_str, "%m/%d/%Y")
+                # robust date parse
+                date_obj = dateparser.parse(date_str, dayfirst=False, yearfirst=False)
                 if date_obj >= start_of_week:
-                    total += clean_money(amount_str)
-            except Exception:
+                    amt = clean_money(amount_str)
+                    total += amt
+            except Exception as e:
+                print(f"[WARN] Skipping row due to error: {e}")
                 continue
 
     return total

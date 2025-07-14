@@ -6,7 +6,7 @@ from sheets_auth import get_expense_worksheet, get_income_worksheet
 from card_ui import CardSelectView
 import asyncio
 
-# category column map (same as before)
+# category column map
 get_category_columns = {
     "grocery": {
         "start_row": 3,
