@@ -475,48 +475,82 @@ async def projected_spending():
 
 async def weekend_vs_weekday():
     ws = get_expense_worksheet()
-    rows = ws.get_all_values()[2:]
     weekend = 0.0
     weekday = 0.0
-    amount_cols = [column_index_from_string(c) - 1 for c in ['B', 'I', 'P', 'X']]
 
-    for row in rows:
-        try:
-            date_str = row[0]
-            date_obj = datetime.strptime(date_str, "%m/%d/%Y")
-            is_weekend = date_obj.weekday() >= 5
-            for idx in amount_cols:
-                if idx >= len(row):
-                    continue
-                try:
-                    amt = clean_money(row[idx])
-                    if is_weekend:
-                        weekend += amt
-                    else:
-                        weekday += amt
-                except:
-                    continue
+    category_columns = get_category_columns  # or get_category_columns() if a function
 
-        except:
-            continue
+    for category, config in category_columns.items():
+        start_row = config["start_row"]
+        date_col_letter = config["columns"]["date"]
+        amount_col_letter = config["columns"]["amount"]
+
+        date_idx = column_index_from_string(date_col_letter) - 1
+        amount_idx = column_index_from_string(amount_col_letter) - 1
+
+        rows = ws.get_all_values()[start_row - 1:]
+
+        for row in rows:
+            if max(date_idx, amount_idx) >= len(row):
+                continue
+
+            date_str = row[date_idx].strip()
+            amount_str = row[amount_idx].strip()
+
+            if not date_str or not amount_str:
+                continue
+
+            try:
+                date_obj = datetime.strptime(date_str, "%m/%d/%Y")
+                amt = clean_money(amount_str)
+
+                if date_obj.weekday() >= 5:
+                    weekend += amt
+                else:
+                    weekday += amt
+
+            except Exception as e:
+                print(f"[WARN] Skipping row: {e}")
+                continue
+
     return weekend, weekday
 
 
 async def no_spend_days():
     ws = get_expense_worksheet()
-    rows = ws.get_all_values()[2:]
     today = datetime.today()
     days_with_expense = set()
 
-    for row in rows:
-        try:
-            date_str = row[0]
-            date_obj = datetime.strptime(date_str, "%m/%d/%Y")
-            if date_obj.month == today.month and date_obj.year == today.year:
-                days_with_expense.add(date_obj.day)
-        except:
-            continue
+    category_columns = get_category_columns  # or get_category_columns() if function
 
-    days_in_month = (datetime(today.year, today.month % 12 + 1, 1) - timedelta(days=1)).day
-    no_spend = [day for day in range(1, today.day + 1) if day not in days_with_expense]
+    for category, config in category_columns.items():
+        start_row = config["start_row"]
+        date_col_letter = config["columns"]["date"]
+        amount_col_letter = config["columns"]["amount"]
+
+        date_idx = column_index_from_string(date_col_letter) - 1
+        amount_idx = column_index_from_string(amount_col_letter) - 1
+
+        rows = ws.get_all_values()[start_row - 1:]
+
+        for row in rows:
+            if max(date_idx, amount_idx) >= len(row):
+                continue
+
+            date_str = row[date_idx].strip()
+            amount_str = row[amount_idx].strip()
+
+            if not date_str or not amount_str:
+                continue
+
+            try:
+                date_obj = datetime.strptime(date_str, "%m/%d/%Y")
+                if date_obj.month == today.month and date_obj.year == today.year:
+                    days_with_expense.add(date_obj.day)
+            except Exception as e:
+                print(f"[WARN] Skipping row: {e}")
+                continue
+
+    all_days = set(range(1, today.day + 1))
+    no_spend = sorted(all_days - days_with_expense)
     return len(no_spend), no_spend
