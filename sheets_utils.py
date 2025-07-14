@@ -15,7 +15,10 @@ def clean_money(value: str) -> float:
     """
     Remove $ and , then convert to float.
     Example: '$1,250.00' -> 1250.00
+    Empty or invalid strings return 0.0.
     """
+    if not value or value.strip() == "":
+        return 0.0
     try:
         return float(value.replace('$', '').replace(',', '').strip())
     except Exception as e:
