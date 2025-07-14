@@ -3,11 +3,24 @@ from openpyxl.utils import column_index_from_string
 from datetime import datetime, timedelta
 import re
 
+# HELPER FUNCTIONS
 def _sum_column(ws, col_letter, start_row=3):
     col_idx = column_index_from_string(col_letter)
     values = ws.col_values(col_idx)[start_row - 1:]
-    return float(sum(float(v) for v in values if v.strip()))
+    return sum(clean_money(v) for v in values if v.strip())
 
+def clean_money(value: str) -> float:
+    """
+    Remove $ and , then convert to float.
+    Example: '$1,250.00' -> 1250.00
+    """
+    try:
+        return float(value.replace('$', '').replace(',', '').strip())
+    except Exception as e:
+        print(f"[WARN] Failed to clean money value: {value} ({e})")
+        return 0.0
+
+# QUERY FUNCTIONS
 async def calculate_burn_rate():
     ws = get_income_worksheet()
     try:
@@ -34,8 +47,10 @@ async def check_rent_paid():
     try:
         cell = ws.find("Rent")
         amount_cell = ws.cell(cell.row, cell.col + 1).value
-        if amount_cell and float(amount_cell) > 0:
-            return True, float(amount_cell)
+        if amount_cell:
+            cleaned = clean_money(amount_cell)
+            if cleaned > 0:
+                return True, cleaned
     except Exception as e:
         print(f"[ERROR] Failed to check rent paid: {e}")
     return False, 0.0
@@ -45,8 +60,10 @@ async def check_utilities_paid():
     try:
         cell = ws.find("SMUD")
         amount_cell = ws.cell(cell.row, cell.col + 1).value
-        if amount_cell and float(amount_cell) > 0:
-            return True, float(amount_cell)
+        if amount_cell:
+            cleaned = clean_money(amount_cell)
+            if cleaned > 0:
+                return True, cleaned
     except Exception as e:
         print(f"[ERROR] Failed to check utilities paid: {e}")
     return False, 0.0
@@ -56,8 +73,10 @@ async def check_student_loan_paid():
     try:
         cell = ws.find("Student Loan Payment")
         amount_cell = ws.cell(cell.row, cell.col + 1).value
-        if amount_cell and float(amount_cell) > 0:
-            return True, float(amount_cell)
+        if amount_cell:
+            cleaned = clean_money(amount_cell)
+            if cleaned > 0:
+                return True, cleaned
     except Exception as e:
         print(f"[ERROR] Failed to check student loan paid: {e}")
     return False, 0.0
@@ -82,7 +101,7 @@ async def total_spent_at_store(store):
             location_val = row[food_location_idx].lower()
             if store in location_val:
                 try:
-                    total += float(row[food_amount_idx])
+                    total += clean_money(row[food_amount_idx])
                     continue
                 except ValueError:
                     pass
@@ -92,7 +111,7 @@ async def total_spent_at_store(store):
             location_val = row[shop_location_idx].lower()
             if store in location_val:
                 try:
-                    total += float(row[shop_amount_idx])
+                    total += clean_money(row[shop_amount_idx])
                     continue
                 except ValueError:
                     pass
@@ -121,7 +140,7 @@ async def total_income():
         income_val = income_val.strip()
 
         # Try to convert to float if possible
-        return float(income_val.replace(',', '').replace('$', ''))
+        return clean_money(income_val)
     except (AttributeError, ValueError) as e:
         print(f"[WARN] Income value is missing or invalid: {e}")
         return 0.0
@@ -134,7 +153,7 @@ async def remaining_budget():
     try:
         cell = ws.find("Margins:")
         val = ws.cell(cell.row, cell.col + 2).value
-        remaining_budget = float(val.strip())
+        remaining_budget = clean_money(val)
         return remaining_budget
     except Exception as e:
         print(f"[ERROR] Failed to get remaining budget: {e}")
@@ -220,7 +239,7 @@ async def largest_single_expense():
     for row in rows:
         for cell in row:
             try:
-                amt = float(cell)
+                amt = clean_money(cell)
                 if amt > max_val:
                     max_val = amt
                     max_row = row
@@ -237,7 +256,7 @@ async def top_n_expenses(n=5):
     for row in rows:
         for cell in row:
             try:
-                amt = float(cell)
+                amt = clean_money(cell)
                 expenses.append((amt, row))
             except:
                 continue
@@ -259,7 +278,7 @@ async def spent_this_week():
             if date_obj >= start_of_week:
                 for cell in row[1:]:
                     try:
-                        total += float(cell)
+                        total += clean_money(cell)
                     except:
                         continue
         except:
@@ -279,7 +298,7 @@ async def projected_spending():
             if date_obj.month == today.month and date_obj.year == today.year:
                 for cell in row[1:]:
                     try:
-                        total_so_far += float(cell)
+                        total_so_far += clean_money(cell)
                     except:
                         continue
         except:
@@ -304,7 +323,7 @@ async def weekend_vs_weekday():
             is_weekend = date_obj.weekday() >= 5
             for cell in row[1:]:
                 try:
-                    amt = float(cell)
+                    amt = clean_money(cell)
                     if is_weekend:
                         weekend += amt
                     else:
