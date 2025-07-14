@@ -21,12 +21,12 @@ INTENT_HANDLERS = {
     "query_average_daily_spend":            lambda e, m: query_average_daily_spend_handler(m),
     "query_expense_breakdown_percentages":  lambda e, m: query_expense_breakdown_handler(m),
     "query_total_for_category":             lambda e, m: query_total_for_category_handler(e, m),
-    "query_largest_single_expense":         lambda e, m: query_largest_single_expense_handler(m),
+    "query_largest_single_expense":         lambda e, m: query_largest_single_expense_handler(m), # bugged
     "query_top_n_expenses":                 lambda e, m: query_top_n_expenses_handler(e, m),
-    "query_spent_this_week":                lambda e, m: query_spent_this_week_handler(m),
-    "query_projected_spending":             lambda e, m: query_projected_spending_handler(m),
-    "query_weekend_vs_weekday":             lambda e, m: query_weekend_vs_weekday_handler(m),
-    "query_no_spend_days":                  lambda e, m: query_no_spend_days_handler(m),
+    "query_spent_this_week":                lambda e, m: query_spent_this_week_handler(m), # bugged
+    "query_projected_spending":             lambda e, m: query_projected_spending_handler(m), # bugged
+    "query_weekend_vs_weekday":             lambda e, m: query_weekend_vs_weekday_handler(m), # bugged? check
+    "query_no_spend_days":                  lambda e, m: query_no_spend_days_handler(m), # bugged
 }
 
 # INTENT HANDLER
@@ -170,7 +170,7 @@ async def query_expense_breakdown_handler(message):
         shadow=True,
         colors=colors,
         explode=explode,
-        radius=1.0,
+        radius=0.9,
         textprops={'fontsize': 10}
     )
 

@@ -21,7 +21,6 @@ INTENTS = [
     "query_average_daily_spend",
     "query_expense_breakdown_percentages",
     "query_total_for_category",
-    "query_last_payment_to",
     "query_largest_single_expense",
     "query_top_n_expenses",
     "query_spent_this_week",

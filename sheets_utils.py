@@ -2,12 +2,14 @@ from sheets_auth import get_expense_worksheet, get_income_worksheet
 from openpyxl.utils import column_index_from_string
 from datetime import datetime, timedelta
 import re
+from sheets_writer import get_category_columns
 
 # HELPER FUNCTIONS
 def _sum_column(ws, col_letter, start_row=3):
     col_idx = column_index_from_string(col_letter)
     values = ws.col_values(col_idx)[start_row - 1:]
     return sum(clean_money(v) for v in values if v.strip())
+
 
 def clean_money(value: str) -> float:
     """
@@ -19,6 +21,7 @@ def clean_money(value: str) -> float:
     except Exception as e:
         print(f"[WARN] Failed to clean money value: {value} ({e})")
         return 0.0
+
 
 # QUERY FUNCTIONS
 async def calculate_burn_rate():
@@ -67,6 +70,7 @@ async def check_rent_paid():
         print(f"[ERROR] Failed to check rent paid: {e}")
     return False, 0.0
 
+
 async def check_utilities_paid():
     ws = get_income_worksheet()
     try:
@@ -92,6 +96,7 @@ async def check_student_loan_paid():
     except Exception as e:
         print(f"[ERROR] Failed to check student loan paid: {e}")
     return False, 0.0
+
 
 async def total_spent_at_store(store):
     ws = get_expense_worksheet()
@@ -130,6 +135,7 @@ async def total_spent_at_store(store):
 
     return total
 
+
 async def highest_expense_category():
     ws = get_expense_worksheet()
     category_totals = {}
@@ -143,6 +149,7 @@ async def highest_expense_category():
         category_totals[category] = _sum_column(ws, col)
     highest = max(category_totals.items(), key=lambda x: x[1])
     return highest  # (category, amount)
+
 
 async def total_income():
     ws = get_income_worksheet()
@@ -160,6 +167,7 @@ async def total_income():
         print(f"[ERROR] Failed to fetch income: {e}")
         return 0.0
 
+
 async def remaining_budget():
     ws = get_income_worksheet()
     try:
@@ -170,6 +178,7 @@ async def remaining_budget():
     except Exception as e:
         print(f"[ERROR] Failed to get remaining budget: {e}")
         return 0.0
+
 
 async def average_daily_spend():
     ws = get_expense_worksheet()
@@ -195,7 +204,7 @@ async def average_daily_spend():
         print(f"[ERROR] Failed to compute average daily spend: {e}")
         return None
 
-## DEBUG THESE
+
 async def expense_breakdown_percentages():
     ws = get_expense_worksheet()
     category_amounts = {}
@@ -240,6 +249,7 @@ async def expense_breakdown_percentages():
 
     return result
 
+
 async def total_for_category(category):
     ws = get_expense_worksheet()
     categories = {
@@ -253,7 +263,8 @@ async def total_for_category(category):
         return 0.0
     return _sum_column(ws, col)
 
-async def highest_shopping_or_food_expense():
+
+async def largest_single_expense():
     ws = get_expense_worksheet()
     rows = ws.get_all_values()[2:]  # skip header rows
 
@@ -309,6 +320,7 @@ async def highest_shopping_or_food_expense():
         return result
     else:
         return None
+
 
 async def top_n_expenses_food_and_shopping(n=5):
     ws = get_expense_worksheet()
@@ -367,27 +379,37 @@ async def top_n_expenses_food_and_shopping(n=5):
 
 async def spent_this_week():
     ws = get_expense_worksheet()
-    rows = ws.get_all_values()[2:]
-    total = 0.0
     today = datetime.today()
     start_of_week = today - timedelta(days=today.weekday())  # Monday
+    total = 0.0
 
-    for row in rows:
-        try:
-            date_str = row[0]
-            date_obj = datetime.strptime(date_str, "%m/%d/%Y")
-            if date_obj >= start_of_week:
-                amount_cols = [column_index_from_string(c) - 1 for c in ['B', 'I', 'P', 'X']]
-                for idx in amount_cols:
-                    if idx >= len(row):
-                        continue
-                    try:
-                        total += clean_money(row[idx])
-                    except:
-                        continue
-        except:
-            continue
+
+    for category, config in get_category_columns.items():
+        start_row = config["start_row"]
+        date_col_letter = config["columns"]["date"]
+        amount_col_letter = config["columns"]["amount"]
+
+        date_idx = column_index_from_string(date_col_letter) - 1
+        amount_idx = column_index_from_string(amount_col_letter) - 1
+
+        rows = ws.get_all_values()[start_row - 1:]  # 0-based
+
+        for row in rows:
+            if max(date_idx, amount_idx) >= len(row):
+                continue
+
+            date_str = row[date_idx]
+            amount_str = row[amount_idx]
+
+            try:
+                date_obj = datetime.strptime(date_str, "%m/%d/%Y")
+                if date_obj >= start_of_week:
+                    total += clean_money(amount_str)
+            except Exception:
+                continue
+
     return total
+
 
 async def projected_spending():
     today = datetime.today()
@@ -418,6 +440,7 @@ async def projected_spending():
     projected = daily_avg * days_in_month
     return projected
 
+
 async def weekend_vs_weekday():
     ws = get_expense_worksheet()
     rows = ws.get_all_values()[2:]
@@ -445,6 +468,7 @@ async def weekend_vs_weekday():
         except:
             continue
     return weekend, weekday
+
 
 async def no_spend_days():
     ws = get_expense_worksheet()

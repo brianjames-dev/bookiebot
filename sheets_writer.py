@@ -7,7 +7,7 @@ from card_ui import CardSelectView
 import asyncio
 
 # category column map (same as before)
-CATEGORY_COLUMNS = {
+get_category_columns = {
     "grocery": {
         "start_row": 3,
         "columns": {
@@ -102,7 +102,7 @@ async def write_income_to_sheet(data, message):
 
 async def write_expense_to_sheet(data, message):
     category = data["category"].lower()
-    if category not in CATEGORY_COLUMNS:
+    if category not in get_category_columns:
         await message.channel.send(f"Unknown category: {category}")
         return
 
@@ -177,7 +177,7 @@ def normalize_expense_data(data, person):
 def log_category_row(values, worksheet, category):
     print(f"[DEBUG] VALUES passed to log_category_row(): {values}")
 
-    config = CATEGORY_COLUMNS[category]
+    config = get_category_columns[category]
     row_start = config["start_row"]
     columns = config["columns"]
 
