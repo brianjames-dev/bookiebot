@@ -3,6 +3,9 @@
 from sheets_writer import write_to_sheet
 import sheets_utils as su
 import openai
+import matplotlib.pyplot as plt
+import io
+import discord
 
 INTENT_HANDLERS = {
     "log_expense":                          lambda e, m: write_to_sheet(e, m),
@@ -128,25 +131,51 @@ async def query_average_daily_spend_handler(message):
     await message.channel.send(f"Average daily spend this month: ${avg:.2f}.")
 
 ## DEBUG THESE:
+import matplotlib.pyplot as plt
+import io
+import discord
+
 async def query_expense_breakdown_handler(message):
-    result = await su.expense_breakdown_percentages()
-    if not result:
+    breakdown = await su.expense_breakdown_percentages()
+    if not breakdown:
         await message.channel.send("❌ Could not calculate expense breakdown.")
         return
 
-    categories = result["categories"]
-    grand_total = result["grand_total"]
+    # Prepare data
+    labels = []
+    amounts = []
+    percents = []
+    for category, info in breakdown["categories"].items():
+        labels.append(f"{category.capitalize()} ({info['percentage']}%)")
+        amounts.append(info["amount"])
+        percents.append(info["percentage"])
 
-    lines = []
-    for category, info in categories.items():
-        amt = info["amount"]
-        pct = info["percentage"]
-        lines.append(f"{category.capitalize()}: ${amt:.2f} ({pct:.2f}%)")
+    grand_total = breakdown["grand_total"]
 
-    lines.append(f"\n💰 Grand total: ${grand_total:.2f}")
+    # Create pie chart
+    fig, ax = plt.subplots()
+    wedges, texts, autotexts = ax.pie(
+        amounts,
+        labels=labels,
+        autopct='%1.1f%%',
+        startangle=140
+    )
+    ax.set_title(f"📊 Expense Breakdown — Total: ${grand_total:.2f}")
+    plt.tight_layout()
 
-    text = "\n".join(lines)
-    await message.channel.send(f"📊 Expense breakdown:\n{text}")
+    # Save chart to in-memory file
+    buf = io.BytesIO()
+    plt.savefig(buf, format='png')
+    buf.seek(0)
+    plt.close(fig)
+
+    # Send chart to Discord
+    file = discord.File(fp=buf, filename="expense_breakdown.png")
+    await message.channel.send(
+        "📊 Here’s your expense breakdown:", 
+        file=file
+    )
+
 
 async def query_total_for_category_handler(entities, message):
     category = entities.get("category")
