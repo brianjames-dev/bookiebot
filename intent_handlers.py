@@ -154,12 +154,24 @@ async def query_largest_single_expense_handler(message):
 
 async def query_top_n_expenses_handler(entities, message):
     n = int(entities.get("n", 5))
-    top_expenses = await su.top_n_expenses(n)
-    if top_expenses:
-        text = "\n".join([f"{i+1}. ${amt:.2f} — {row}" for i, (amt, row) in enumerate(top_expenses)])
-        await message.channel.send(f"🔝 Top {n} expenses:\n{text}")
-    else:
-        await message.channel.send("❌ Could not find expenses.")
+    top_expenses = await su.top_n_expenses_food_and_shopping(n)
+
+    if not top_expenses:
+        await message.channel.send("❌ Could not find any expenses.")
+        return
+
+    # Build message
+    lines = []
+    for i, expense in enumerate(top_expenses, 1):
+        lines.append(
+            f"{i}. ${expense['amount']:.2f} — {expense['item']} "
+            f"at {expense['location']} on {expense['date']} "
+            f"({expense['category']})"
+        )
+
+    text = "\n".join(lines)
+    await message.channel.send(f"🔝 Top {n} expenses:\n{text}")
+
 
 async def query_spent_this_week_handler(message):
     total = await su.spent_this_week()

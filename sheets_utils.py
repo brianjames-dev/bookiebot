@@ -174,40 +174,72 @@ async def remaining_budget():
 async def average_daily_spend():
     ws = get_income_worksheet()
     try:
-        cell = ws.find("🔥 Burn rate:")
-        val_text = cell.value  # e.g., "🔥 Burn rate: $2.63/day"
-        burn_rate_val = val_text.split(":", 1)[1].strip()
-        return burn_rate_val
+        today = datetime.today()
+        day_of_month = today.day
+
+        # Grab T7 and AB7
+        shopping_cell = ws.cell(7, column_index_from_string("T")).value
+        food_cell = ws.cell(7, column_index_from_string("AB")).value
+
+        # Clean values
+        shopping_total = clean_money(shopping_cell)
+        food_total = clean_money(food_cell)
+
+        # Compute total spend in these categories
+        total_spent = shopping_total + food_total
+
+        avg_daily_spend = total_spent / day_of_month
+        return round(avg_daily_spend, 2)
+
     except Exception as e:
-        print(f"[ERROR] Failed to fetch average daily spend: {e}")
+        print(f"[ERROR] Failed to compute average daily spend: {e}")
         return None
 
 
 ## DEBUG THESE
 async def expense_breakdown_percentages():
     ws = get_expense_worksheet()
-    category_totals = {}
+    category_amounts = {}
     categories = {
-        'grocery': 'B',
-        'gas': 'I',
-        'food': 'P',
-        'shopping': 'X'
+        'grocery': 'F7',
+        'gas': 'L7',
+        'food': 'T7',
+        'shopping': 'AB7'
     }
-    total_expense = 0.0
 
-    for category, col in categories.items():
-        amt = _sum_column(ws, col)
-        category_totals[category] = amt
-        total_expense += amt
+    # Get grand total from AE35
+    grand_row = 35
+    grand_col = column_index_from_string("AE")
+    grand_total_val = ws.cell(grand_row, grand_col).value
+    grand_total = clean_money(grand_total_val)
 
-    if total_expense == 0:
+    if grand_total == 0:
+        print("[WARN] Grand total in AE35 is 0. Cannot calculate breakdown.")
         return {}
 
-    percentages = {
-        cat: round(amt / total_expense * 100, 2)
-        for cat, amt in category_totals.items()
+    # Fetch category amounts from respective cells
+    for category, cell_ref in categories.items():
+        row = int(re.sub(r'\D', '', cell_ref))
+        col = column_index_from_string(re.sub(r'\d', '', cell_ref))
+        val = ws.cell(row, col).value
+        amount = clean_money(val)
+        category_amounts[category] = amount
+
+    # Build result
+    breakdown = {}
+    for cat, amt in category_amounts.items():
+        pct = round(amt / grand_total * 100, 2)
+        breakdown[cat] = {
+            "amount": round(amt, 2),
+            "percentage": pct
+        }
+
+    result = {
+        "categories": breakdown,
+        "grand_total": round(grand_total, 2)
     }
-    return percentages
+
+    return result
 
 async def total_for_category(category):
     ws = get_expense_worksheet()
@@ -222,48 +254,117 @@ async def total_for_category(category):
         return 0.0
     return _sum_column(ws, col)
 
-async def largest_single_expense():
+async def highest_shopping_or_food_expense():
     ws = get_expense_worksheet()
-    rows = ws.get_all_values()[2:]
-    max_val = 0.0
-    max_row = None
+    rows = ws.get_all_values()[2:]  # skip header rows
 
-    # define which columns we expect amounts in
-    amount_cols = [column_index_from_string(c) - 1 for c in ['B', 'I', 'P', 'X']]
+    # Indices for Food
+    food_date_idx = column_index_from_string('N') - 1
+    food_item_idx = column_index_from_string('O') - 1
+    food_amount_idx = column_index_from_string('P') - 1
+    food_location_idx = column_index_from_string('Q') - 1
+
+    # Indices for Shopping
+    shop_date_idx = column_index_from_string('V') - 1
+    shop_item_idx = column_index_from_string('W') - 1
+    shop_amount_idx = column_index_from_string('X') - 1
+    shop_location_idx = column_index_from_string('Y') - 1
+
+    max_amount = 0.0
+    result = {}
 
     for row in rows:
-        for idx in amount_cols:
-            if idx >= len(row):
-                continue
+        # Check Food
+        if len(row) > max(food_location_idx, food_amount_idx):
             try:
-                amt = clean_money(row[idx])
-                if amt > max_val:
-                    max_val = amt
-                    max_row = row
-            except:
-                continue
+                amt = clean_money(row[food_amount_idx])
+                if amt > max_amount:
+                    max_amount = amt
+                    result = {
+                        "category": "food",
+                        "amount": round(amt, 2),
+                        "date": row[food_date_idx],
+                        "item": row[food_item_idx],
+                        "location": row[food_location_idx]
+                    }
+            except Exception:
+                pass
 
-    return max_val, max_row
+        # Check Shopping
+        if len(row) > max(shop_location_idx, shop_amount_idx):
+            try:
+                amt = clean_money(row[shop_amount_idx])
+                if amt > max_amount:
+                    max_amount = amt
+                    result = {
+                        "category": "shopping",
+                        "amount": round(amt, 2),
+                        "date": row[shop_date_idx],
+                        "item": row[shop_item_idx],
+                        "location": row[shop_location_idx]
+                    }
+            except Exception:
+                pass
 
-async def top_n_expenses(n=5):
+    if result:
+        return result
+    else:
+        return None
+
+async def top_n_expenses_food_and_shopping(n=5):
     ws = get_expense_worksheet()
-    rows = ws.get_all_values()[2:]
+    rows = ws.get_all_values()[2:]  # skip header
+
+    # Food indices
+    food_date_idx = column_index_from_string('N') - 1
+    food_item_idx = column_index_from_string('O') - 1
+    food_amount_idx = column_index_from_string('P') - 1
+    food_location_idx = column_index_from_string('Q') - 1
+
+    # Shopping indices
+    shop_date_idx = column_index_from_string('V') - 1
+    shop_item_idx = column_index_from_string('W') - 1
+    shop_amount_idx = column_index_from_string('X') - 1
+    shop_location_idx = column_index_from_string('Y') - 1
+
     expenses = []
 
-    amount_cols = [column_index_from_string(c) - 1 for c in ['B', 'I', 'P', 'X']]
-
     for row in rows:
-        for idx in amount_cols:
-            if idx >= len(row):
-                continue
+        # Food
+        if len(row) > max(food_location_idx, food_amount_idx):
             try:
-                amt = clean_money(row[idx])
-                expenses.append((amt, row))
-            except:
-                continue
+                amt = clean_money(row[food_amount_idx])
+                if amt > 0:
+                    expenses.append({
+                        "category": "food",
+                        "amount": round(amt, 2),
+                        "date": row[food_date_idx],
+                        "item": row[food_item_idx],
+                        "location": row[food_location_idx]
+                    })
+            except Exception:
+                pass
 
-    expenses.sort(reverse=True, key=lambda x: x[0])
+        # Shopping
+        if len(row) > max(shop_location_idx, shop_amount_idx):
+            try:
+                amt = clean_money(row[shop_amount_idx])
+                if amt > 0:
+                    expenses.append({
+                        "category": "shopping",
+                        "amount": round(amt, 2),
+                        "date": row[shop_date_idx],
+                        "item": row[shop_item_idx],
+                        "location": row[shop_location_idx]
+                    })
+            except Exception:
+                pass
+
+    # Sort by amount descending
+    expenses.sort(key=lambda x: x["amount"], reverse=True)
+
     return expenses[:n]
+
 
 async def spent_this_week():
     ws = get_expense_worksheet()
