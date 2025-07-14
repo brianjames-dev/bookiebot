@@ -1,15 +1,17 @@
 import discord
 import os
-from dotenv import load_dotenv
-from message_parser import parse_message_llm
-from sheets_writer import write_to_sheet
 import json
+from dotenv import load_dotenv
+from intent_parser import parse_message_llm
+from intent_handlers import handle_intent
 
 print("Starting bot...")
 
 load_dotenv()
 TOKEN = os.getenv("DISCORD_TOKEN")
 print("Loaded token:", TOKEN)
+
+CHANNEL_NAME = "babys-books"
 
 intents = discord.Intents.default()
 intents.messages = True
@@ -26,19 +28,16 @@ async def on_message(message):
     if message.author == client.user:
         return
 
-    if message.channel.name == "babys-books":
+    if message.channel.name == CHANNEL_NAME:
         print(f"New message: {message.content}")
-        parsed = parse_message_llm(message.content)
+        intent, entities = await parse_message_llm(message.content.strip())
+        print(f"Detected intent: {intent}, Entities: {entities}")
 
-        if parsed:
-            try:
-                data = json.loads(parsed)
-                print("Parsed:", data)
-                await write_to_sheet(data, message)
-            except json.JSONDecodeError:
-                print("JSON parsing failed.")
-        else:
-            print("Could not parse the message.")
+        if not intent:
+            await message.channel.send("Sorry, I couldn’t understand your request.")
+            return
+
+        await handle_intent(intent, entities, message)
 
 try:
     client.run(TOKEN)

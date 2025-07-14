@@ -1,2 +1,41 @@
+# Environment variables
 .env
-service_account.json
+
+# Byte-compiled / cache
+__pycache__/
+*.py[cod]
+*$py.class
+
+# pytest cache
+.pytest_cache/
+
+# VS Code settings (optional, if you use it)
+.vscode/
+
+# MacOS system files (optional)
+.DS_Store
+
+# Virtual environments
+venv/
+.env/
+env/
+.venv/
+
+# Logs (optional)
+*.log
+
+# Test results (optional)
+.coverage
+htmlcov/
+*.cover
+
+# Build artifacts (optional)
+build/
+dist/
+*.egg-info/
+
+# PyInstaller artifacts
+*.spec
+
+# Jupyter Notebook checkpoints (if any)
+.ipynb_checkpoints/
