@@ -578,3 +578,62 @@ async def no_spend_days():
     all_days = set(range(1, today.day + 1))
     no_spend = sorted(all_days - days_with_expense)
     return len(no_spend), no_spend
+
+
+async def total_spent_on_item(item, top_n=5):
+    ws = get_expense_worksheet()
+    today = datetime.today()
+    total = 0.0
+    matches = []
+
+    item_norm = item.lower().replace(" ", "")  # normalize query
+
+    category_columns = get_category_columns
+
+    for category, config in category_columns.items():
+        start_row = config["start_row"]
+        date_col_letter = config["columns"]["date"]
+        amount_col_letter = config["columns"]["amount"]
+        item_col_letter = config["columns"].get("item")  # <- note: we need the "item" column here
+
+        if not item_col_letter:
+            continue  # skip categories without an item column
+
+        date_idx = column_index_from_string(date_col_letter) - 1
+        amount_idx = column_index_from_string(amount_col_letter) - 1
+        item_idx = column_index_from_string(item_col_letter) - 1
+
+        rows = ws.get_all_values()[start_row - 1:]
+
+        for row in rows:
+            if max(date_idx, amount_idx, item_idx) >= len(row):
+                continue
+
+            date_str = row[date_idx].strip()
+            amount_str = row[amount_idx].strip()
+            item_str = row[item_idx].strip().lower().replace(" ", "")
+
+            if not date_str or not amount_str or not item_str:
+                continue
+
+            try:
+                date_obj = datetime.strptime(date_str, "%m/%d/%Y")
+                if date_obj.month == today.month and date_obj.year == today.year:
+                    similarity = fuzz.partial_ratio(item_norm, item_str)
+                    if similarity >= 80:  # adjustable
+                        amt = clean_money(amount_str)
+                        total += amt
+                        matches.append((
+                            date_obj,
+                            row[item_idx],
+                            amt,
+                            category
+                        ))
+                        print(f"[MATCH] {date_obj.date()} | {row[item_idx]} | ${amt:.2f} | sim: {similarity}%")
+            except Exception as e:
+                print(f"[WARN] Skipping row: {e}")
+                continue
+
+    matches.sort(key=lambda x: x[0], reverse=True)
+
+    return total, matches[:top_n]
