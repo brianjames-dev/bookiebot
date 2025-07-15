@@ -36,6 +36,7 @@ INTENT_HANDLERS = {
     "query_longest_no_spend_streak":        lambda e, m: query_longest_no_spend_streak_handler(m),
     "query_days_budget_lasts":              lambda e, m: query_days_budget_lasts_handler(m),
     "query_most_frequent_purchases":        lambda e, m: query_most_frequent_purchases_handler(e, m),
+    "query_expenses_on_day":                lambda e, m: query_expenses_on_day_handler(e, m),
 }
 
 
@@ -387,3 +388,24 @@ async def query_most_frequent_purchases_handler(entities, message):
 
     await message.channel.send(response)
 
+
+async def query_expenses_on_day_handler(entities, message):
+    day_str = entities.get("date")
+    if not day_str:
+        await message.channel.send("❌ Please specify a date (MM/DD or MM/DD/YYYY).")
+        return
+
+    entries, total = await su.expenses_on_day(day_str)
+
+    if not entries:
+        await message.channel.send(f"📆 No expenses found on {day_str}.")
+        return
+
+    response_lines = [f"📆 Expenses on {day_str} (total ${total:.2f}):"]
+    for e in entries:
+        response_lines.append(
+            f"- ${e['amount']:.2f} — {e['item']} @ {e['location']} ({e['category']})"
+        )
+
+    response = "\n".join(response_lines)
+    await message.channel.send(response)

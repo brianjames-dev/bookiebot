@@ -904,3 +904,69 @@ async def most_frequent_purchases(n=3):
         })
 
     return result
+
+
+async def expenses_on_day(day_str):
+    """
+    Find all expenses on a specific day this month.
+    `day_str` is expected in MM/DD/YYYY or MM/DD format.
+    """
+    try:
+        # Try parsing day_str
+        try:
+            target_date = datetime.strptime(day_str, "%m/%d/%Y")
+        except ValueError:
+            # If year omitted, assume current year
+            target_date = datetime.strptime(f"{day_str}/{datetime.today().year}", "%m/%d/%Y")
+    except Exception as e:
+        print(f"[ERROR] Failed to parse date: {day_str} — {e}")
+        return None, None
+
+    ws = get_expense_worksheet()
+    entries = []
+    total = 0.0
+
+    category_columns = get_category_columns
+
+    for category, config in category_columns.items():
+        start_row = config["start_row"]
+        date_col_letter = config["columns"]["date"]
+        amount_col_letter = config["columns"]["amount"]
+        item_col_letter = config["columns"].get("item")
+        location_col_letter = config["columns"].get("location")
+
+        date_idx = column_index_from_string(date_col_letter) - 1
+        amount_idx = column_index_from_string(amount_col_letter) - 1
+        item_idx = column_index_from_string(item_col_letter) - 1 if item_col_letter else None
+        location_idx = column_index_from_string(location_col_letter) - 1 if location_col_letter else None
+
+        rows = ws.get_all_values()[start_row - 1:]
+
+        for row in rows:
+            if max(date_idx, amount_idx) >= len(row):
+                continue
+
+            date_str = row[date_idx].strip()
+            amount_str = row[amount_idx].strip()
+            item_str = row[item_idx].strip() if item_idx and len(row) > item_idx else ""
+            location_str = row[location_idx].strip() if location_idx and len(row) > location_idx else ""
+
+            if not date_str or not amount_str:
+                continue
+
+            try:
+                date_obj = datetime.strptime(date_str, "%m/%d/%Y")
+                if date_obj.date() == target_date.date():
+                    amt = clean_money(amount_str)
+                    total += amt
+                    entries.append({
+                        "category": category,
+                        "item": item_str,
+                        "location": location_str,
+                        "amount": round(amt, 2)
+                    })
+            except Exception as e:
+                print(f"[WARN] Skipping row: {e}")
+                continue
+
+    return entries, round(total, 2)
