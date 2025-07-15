@@ -966,3 +966,52 @@ async def expenses_on_day(day_str):
                 continue
 
     return entries, round(total, 2)
+
+
+async def list_subscriptions():
+    ws = get_income_worksheet("Subscriptions")  # adjust if your helper uses this
+    needs = []
+    wants = []
+    needs_total = 0.0
+    wants_total = 0.0
+
+    # Read all rows
+    rows = ws.get_all_values()
+
+    # Find starting rows for Needs and Wants
+    needs_start = None
+    wants_start = None
+
+    for idx, row in enumerate(rows):
+        if any("Needs" in cell for cell in row):
+            needs_start = idx + 2  # skip header rows
+        if any("Wants" in cell for cell in row):
+            wants_start = idx + 2
+
+    # Parse Needs
+    for row in rows[needs_start:]:
+        if not row or not row[0].strip():
+            break  # stop at blank row
+        name = row[0].strip()
+        amount = row[1].strip().replace("$", "")
+        try:
+            amt = float(amount)
+            needs.append((name, amt))
+            needs_total += amt
+        except:
+            continue
+
+    # Parse Wants
+    for row in rows[wants_start:]:
+        if not row or not row[0].strip():
+            break  # stop at blank row
+        name = row[0].strip()
+        amount = row[1].strip().replace("$", "")
+        try:
+            amt = float(amount)
+            wants.append((name, amt))
+            wants_total += amt
+        except:
+            continue
+
+    return needs, needs_total, wants, wants_total

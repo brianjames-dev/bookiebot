@@ -30,7 +30,7 @@ INTENT_HANDLERS = {
     "query_no_spend_days":                  lambda e, m: query_no_spend_days_handler(m),
     "query_total_for_item":                 lambda e, m: query_total_for_item_handler(e, m),
 
-    # "query_subscriptions":                  lambda e, m: query_subscriptions_handler(m),
+    "query_subscriptions":                  lambda e, m: query_subscriptions_handler(m),
     "query_daily_spending_calendar":        lambda e, m: query_daily_spending_calendar_handler(m),
     "query_best_worst_day_of_week":         lambda e, m: query_best_worst_day_of_week_handler(m),
     "query_longest_no_spend_streak":        lambda e, m: query_longest_no_spend_streak_handler(m),
@@ -409,6 +409,30 @@ async def query_expenses_on_day_handler(entities, message):
         response_lines.append(
             f"- ${e['amount']:.2f} — {e['item']} @ {e['location']} ({e['category']})"
         )
+
+    response = "\n".join(response_lines)
+    await message.channel.send(response)
+
+
+async def query_subscriptions_handler(message):
+    needs, needs_total, wants, wants_total = await su.list_subscriptions()
+
+    if not needs and not wants:
+        await message.channel.send("❌ No subscriptions found.")
+        return
+
+    response_lines = []
+
+    if needs:
+        response_lines.append(f"📌 **Needs Subscriptions** (total: ${needs_total:.2f}):")
+        for name, amt in needs:
+            response_lines.append(f"- {name}: ${amt:.2f}")
+        response_lines.append("")
+
+    if wants:
+        response_lines.append(f"📌 **Wants Subscriptions** (total: ${wants_total:.2f}):")
+        for name, amt in wants:
+            response_lines.append(f"- {name}: ${amt:.2f}")
 
     response = "\n".join(response_lines)
     await message.channel.send(response)
