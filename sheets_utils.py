@@ -773,3 +773,137 @@ async def best_worst_day_of_week():
         "best": (weekday_names[best_day[0]], round(best_day[1], 2)),
         "worst": (weekday_names[worst_day[0]], round(worst_day[1], 2)),
     }
+
+
+async def longest_no_spend_streak():
+    ws = get_expense_worksheet()
+    today = datetime.today()
+    daily_totals = {day: 0.0 for day in range(1, today.day + 1)}
+
+    category_columns = get_category_columns
+
+    for category, config in category_columns.items():
+        start_row = config["start_row"]
+        date_col_letter = config["columns"]["date"]
+        amount_col_letter = config["columns"]["amount"]
+
+        date_idx = column_index_from_string(date_col_letter) - 1
+        amount_idx = column_index_from_string(amount_col_letter) - 1
+
+        rows = ws.get_all_values()[start_row - 1:]
+
+        for row in rows:
+            if max(date_idx, amount_idx) >= len(row):
+                continue
+
+            date_str = row[date_idx].strip()
+            amount_str = row[amount_idx].strip()
+
+            if not date_str or not amount_str:
+                continue
+
+            try:
+                date_obj = datetime.strptime(date_str, "%m/%d/%Y")
+                if date_obj.month == today.month and date_obj.year == today.year:
+                    amt = clean_money(amount_str)
+                    daily_totals[date_obj.day] += amt
+            except Exception as e:
+                print(f"[WARN] Skipping row: {e}")
+                continue
+
+    # Find longest streak
+    longest = 0
+    current = 0
+    start = None
+    best_start = None
+    best_end = None
+
+    for day in range(1, today.day + 1):
+        if daily_totals[day] == 0.0:
+            if current == 0:
+                start = day
+            current += 1
+            if current > longest:
+                longest = current
+                best_start = start
+                best_end = day
+        else:
+            current = 0
+
+    if longest == 0:
+        return None  # no streak found
+
+    # Return as a tuple: (length, start_day, end_day)
+    return (longest, best_start, best_end)
+
+
+async def days_budget_lasts():
+    # Reuse your existing helpers
+    remaining = await remaining_budget()
+    avg_daily = await average_daily_spend()
+
+    if avg_daily == 0:
+        return None  # avoid division by 0
+
+    estimated_days = remaining / avg_daily
+
+    return max(0, round(estimated_days, 1))  # never negative
+
+
+async def most_frequent_purchase():
+    from collections import defaultdict, Counter
+
+    ws = get_expense_worksheet()
+    today = datetime.today()
+    item_counts = Counter()
+    item_totals = defaultdict(float)
+
+    category_columns = get_category_columns
+
+    for category, config in category_columns.items():
+        start_row = config["start_row"]
+        date_col_letter = config["columns"]["date"]
+        amount_col_letter = config["columns"]["amount"]
+        item_col_letter = config["columns"].get("item")
+
+        if not item_col_letter:
+            continue  # skip if no item column
+
+        date_idx = column_index_from_string(date_col_letter) - 1
+        amount_idx = column_index_from_string(amount_col_letter) - 1
+        item_idx = column_index_from_string(item_col_letter) - 1
+
+        rows = ws.get_all_values()[start_row - 1:]
+
+        for row in rows:
+            if max(date_idx, amount_idx, item_idx) >= len(row):
+                continue
+
+            date_str = row[date_idx].strip()
+            amount_str = row[amount_idx].strip()
+            item_str = row[item_idx].strip().lower()
+
+            if not date_str or not amount_str or not item_str:
+                continue
+
+            try:
+                date_obj = datetime.strptime(date_str, "%m/%d/%Y")
+                if date_obj.month == today.month and date_obj.year == today.year:
+                    amt = clean_money(amount_str)
+                    item_counts[item_str] += 1
+                    item_totals[item_str] += amt
+            except Exception as e:
+                print(f"[WARN] Skipping row: {e}")
+                continue
+
+    if not item_counts:
+        return None
+
+    most_common_item, count = item_counts.most_common(1)[0]
+    total_spent = round(item_totals[most_common_item], 2)
+
+    return {
+        "item": most_common_item,
+        "count": count,
+        "total": total_spent
+    }

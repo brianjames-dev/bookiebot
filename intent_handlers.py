@@ -6,6 +6,7 @@ import openai
 import matplotlib.pyplot as plt
 import io
 import discord
+import datetime
 
 INTENT_HANDLERS = {
     "log_expense":                          lambda e, m: write_to_sheet(e, m),
@@ -32,9 +33,9 @@ INTENT_HANDLERS = {
     # "query_subscriptions":                  lambda e, m: query_subscriptions_handler(m),
     "query_daily_spending_calendar":        lambda e, m: query_daily_spending_calendar_handler(m),
     "query_best_worst_day_of_week":         lambda e, m: query_best_worst_day_of_week_handler(m),
-    # "query_longest_no_spend_streak":        lambda e, m: query_longest_no_spend_streak_handler(m),
-    # "query_days_budget_lasts":              lambda e, m: query_days_budget_lasts_handler(m),
-    # "query_most_frequent_purchase":         lambda e, m: query_most_frequent_purchase_handler(m),
+    "query_longest_no_spend_streak":        lambda e, m: query_longest_no_spend_streak_handler(m),
+    "query_days_budget_lasts":              lambda e, m: query_days_budget_lasts_handler(m),
+    "query_most_frequent_purchases":         lambda e, m: query_most_frequent_purchases_handler(m),
 }
 
 
@@ -335,3 +336,54 @@ async def query_best_worst_day_of_week_handler(message):
     )
 
     await message.channel.send(response)
+
+
+async def query_longest_no_spend_streak_handler(message):
+    result = await su.longest_no_spend_streak()
+    if result is None:
+        await message.channel.send("💸 No no-spend streaks found this month.")
+        return
+
+    length, start_day, end_day = result
+    today = datetime.today()
+    month_year = today.strftime("%B %Y")
+    response = (
+        f"🚫 Longest no-spend streak: {length} days "
+        f"({month_year} {start_day}–{end_day})"
+    )
+
+    await message.channel.send(response)
+
+
+async def query_days_budget_lasts_handler(message):
+    estimated_days = await su.days_budget_lasts()
+
+    if estimated_days is None:
+        await message.channel.send(
+            "❌ Could not calculate how long your budget will last."
+        )
+        return
+
+    await message.channel.send(
+        f"📈 At your current pace, your budget will last ~{estimated_days} more days this month."
+    )
+
+
+async def query_most_frequent_purchases_handler(entities, message):
+    n = int(entities.get("n", 3))
+    results = await su.most_frequent_purchases(n)
+
+    if not results:
+        await message.channel.send("❌ Could not find any purchases this month.")
+        return
+
+    response_lines = [f"🔂 Top {n} most frequent purchases this month:"]
+    for i, r in enumerate(results, 1):
+        response_lines.append(
+            f"{i}. {r['item'].capitalize()} — {r['count']} times (${r['total']:.2f} total)"
+        )
+
+    response = "\n".join(response_lines)
+
+    await message.channel.send(response)
+
