@@ -6,7 +6,7 @@ import openai
 import matplotlib.pyplot as plt
 import io
 import discord
-import datetime
+from datetime import datetime
 
 INTENT_HANDLERS = {
     "log_expense":                          lambda e, m: write_to_sheet(e, m),
@@ -35,7 +35,7 @@ INTENT_HANDLERS = {
     "query_best_worst_day_of_week":         lambda e, m: query_best_worst_day_of_week_handler(m),
     "query_longest_no_spend_streak":        lambda e, m: query_longest_no_spend_streak_handler(m),
     "query_days_budget_lasts":              lambda e, m: query_days_budget_lasts_handler(m),
-    "query_most_frequent_purchases":         lambda e, m: query_most_frequent_purchases_handler(m),
+    "query_most_frequent_purchases":        lambda e, m: query_most_frequent_purchases_handler(e, m),
 }
 
 
