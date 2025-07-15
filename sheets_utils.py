@@ -975,43 +975,30 @@ async def list_subscriptions():
     needs_total = 0.0
     wants_total = 0.0
 
-    # Read all rows
     rows = ws.get_all_values()
 
-    # Find starting rows for Needs and Wants
-    needs_start = None
-    wants_start = None
+    # Needs and Wants start at row 7 (0-based index = 6)
+    for row in rows[6:]:
+        # Needs
+        name_needs = row[1].strip() if len(row) > 1 else ""
+        amount_needs = row[2].strip() if len(row) > 2 else ""
+        if name_needs and amount_needs:
+            try:
+                amt = float(amount_needs.replace("$", ""))
+                needs.append((name_needs, amt))
+                needs_total += amt
+            except:
+                pass
 
-    for idx, row in enumerate(rows):
-        if any("Needs" in cell for cell in row):
-            needs_start = idx + 2  # skip header rows
-        if any("Wants" in cell for cell in row):
-            wants_start = idx + 2
+        # Wants
+        name_wants = row[4].strip() if len(row) > 4 else ""
+        amount_wants = row[5].strip() if len(row) > 5 else ""
+        if name_wants and amount_wants:
+            try:
+                amt = float(amount_wants.replace("$", ""))
+                wants.append((name_wants, amt))
+                wants_total += amt
+            except:
+                pass
 
-    # Parse Needs
-    for row in rows[needs_start:]:
-        if not row or not row[0].strip():
-            break  # stop at blank row
-        name = row[0].strip()
-        amount = row[1].strip().replace("$", "")
-        try:
-            amt = float(amount)
-            needs.append((name, amt))
-            needs_total += amt
-        except:
-            continue
-
-    # Parse Wants
-    for row in rows[wants_start:]:
-        if not row or not row[0].strip():
-            break  # stop at blank row
-        name = row[0].strip()
-        amount = row[1].strip().replace("$", "")
-        try:
-            amt = float(amount)
-            wants.append((name, amt))
-            wants_total += amt
-        except:
-            continue
-
-    return needs, needs_total, wants, wants_total
+    return needs, round(needs_total, 2), wants, round(wants_total, 2)
