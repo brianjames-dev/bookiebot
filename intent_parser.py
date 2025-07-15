@@ -14,7 +14,7 @@ INTENTS = [
     "query_rent_paid",
     "query_utilities_paid",
     "query_student_loans_paid",
-    "query_total_spent_at_store",
+    "query_total_for_store",
     "query_highest_expense_category",
     "query_total_income",
     "query_remaining_budget",
@@ -70,6 +70,8 @@ Categorize EXPENSE as:
 - "gas" = fuel purchases (Shell, Chevron, etc.)
 - "food" = restaurants, cafes, or fast food (Chipotle, Starbucks, etc.) — if not explicitly "groceries", but clearly food-related
 - "shopping" = all other non-food, non-grocery, non-gas purchases (clothes, gifts, household items)
+
+If the location or description does NOT clearly match one of the 4 categories ["grocery", "gas", "food", "shopping"], assume it refers to a specific store or vendor, and extract it as the 'store' entity.
 
 If the message is about logging INCOME, also include:
     - source: who sent the money (e.g., Acme Corp, IRS, Mom)
