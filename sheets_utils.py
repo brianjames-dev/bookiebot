@@ -81,7 +81,7 @@ async def check_rent_paid():
     return False, 0.0
 
 
-async def check_utilities_paid():
+async def check_smud_paid():
     ws = get_income_worksheet()
     try:
         cell = ws.find("SMUD")
@@ -91,7 +91,7 @@ async def check_utilities_paid():
             if cleaned > 0:
                 return True, cleaned
     except Exception as e:
-        print(f"[ERROR] Failed to check utilities paid: {e}")
+        print(f"[ERROR] Failed to check SMUD paid: {e}")
     return False, 0.0
 
 async def check_student_loan_paid():

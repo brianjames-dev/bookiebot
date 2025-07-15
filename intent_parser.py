@@ -10,9 +10,13 @@ openai.api_key = os.getenv("OPENAI_API_KEY")
 INTENTS = [
     "log_expense",
     "log_income",
+    "log_rent_paid",
+    "log_smud_paid",
+    "log_student_loan_paid",
+
     "query_burn_rate",
     "query_rent_paid",
-    "query_utilities_paid",
+    "query_smud_paid",
     "query_student_loans_paid",
     "query_total_for_store",
     "query_highest_expense_category",
@@ -28,7 +32,6 @@ INTENTS = [
     "query_weekend_vs_weekday",
     "query_no_spend_days",
     "query_total_for_item",
-
     "query_subscriptions",
     "query_daily_spending_calendar",
     "query_best_worst_day_of_week",
@@ -58,6 +61,16 @@ If the message does NOT clearly match any available intent, return:
   "intent": "fallback",
   "entities": {{}}
 }}
+
+If the message is about logging a payment for **rent**, **SMUD**, or **student loan**, use the specific intents:
+- "log_rent_paid" → when paying rent
+- "log_smud_paid" → when paying SMUD (utilities)
+- "log_student_loan_paid" → when paying a student loan
+
+For these intents, extract the amount paid as:
+- entities: { "amount": <float> }
+
+Do NOT treat these payments as generic expenses. Do NOT assign them a category. Do NOT include item, location, or store — only use the amount and the correct intent.
 
 If the message is about logging an expense or income:
 - intent: "log_expense" or "log_income"
@@ -95,7 +108,6 @@ Always return ONLY a valid JSON object with the correct keys and values. Do not 
 Now parse this:
 \"\"\"{user_message}\"\"\"
 """
-
 
     try:
         response = openai.ChatCompletion.create(

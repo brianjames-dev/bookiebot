@@ -19,7 +19,7 @@ INTENT_HANDLERS = {
     # Query handlers
     "query_burn_rate":                      lambda e, m: query_burn_rate_handler(m),
     "query_rent_paid":                      lambda e, m: query_rent_paid_handler(m),
-    "query_utilities_paid":                 lambda e, m: query_utilities_paid_handler(m),
+    "query_smud_paid":                      lambda e, m: query_smud_paid_handler(m),
     "query_student_loans_paid":             lambda e, m: query_student_loan_paid_handler(m),
     "query_total_for_store":                lambda e, m: query_total_for_store_handler(e, m), # fix
     "query_highest_expense_category":       lambda e, m: query_highest_expense_category_handler(m),
@@ -104,12 +104,12 @@ async def query_rent_paid_handler(message):
         await message.channel.send("❌ You have NOT paid rent yet this month.")
 
 
-async def query_utilities_paid_handler(message):
-    paid, amount = await su.check_utilities_paid()
+async def query_smud_paid_handler(message):
+    paid, amount = await su.check_smud_paid()
     if paid:
-        await message.channel.send(f"✅ You paid ${amount:.2f} for utilities this month.")
+        await message.channel.send(f"✅ You paid ${amount:.2f} for SMUD this month.")
     else:
-        await message.channel.send("❌ You have NOT paid utilities yet this month.")
+        await message.channel.send("❌ You have NOT paid SMUD yet this month.")
 
 
 async def query_student_loan_paid_handler(message):
