@@ -26,14 +26,15 @@ INTENTS = [
     "query_spent_this_week",
     "query_projected_spending",
     "query_weekend_vs_weekday",
-    "query_no_spend_days"
+    "query_no_spend_days",
+    "query_total_for_item"
 ]
 
 def parse_message_llm(user_message):
     today = date.today().isoformat()
 
     system_prompt = f"""
-You are a financial assistant. Given a message, identify the user's intent and extract entities if necessary.
+You are a financial assistant named BookieBot. Given a message, identify the user's intent and extract entities if necessary.
 
 Available intents:
 {INTENTS}

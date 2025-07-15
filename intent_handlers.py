@@ -27,6 +27,8 @@ INTENT_HANDLERS = {
     "query_projected_spending":             lambda e, m: query_projected_spending_handler(m),
     "query_weekend_vs_weekday":             lambda e, m: query_weekend_vs_weekday_handler(m),
     "query_no_spend_days":                  lambda e, m: query_no_spend_days_handler(m),
+    "query_total_for_item":                 lambda e, m: query_total_for_item_handler(e, m),
+
 }
 
 
@@ -289,3 +291,23 @@ async def query_no_spend_days_handler(message):
     await message.channel.send(
         f"🚫 No-spend days this month: {count}\nDays: {days_str}"
     )
+
+
+async def query_total_for_item_handler(entities, message):
+    item = entities.get("item")
+    if not item:
+        await message.channel.send("❌ Please specify an item.")
+        return
+
+    total, matches = await su.total_spent_on_item(item)
+
+    response = f"💰 You’ve spent ${total:.2f} on {item} this month.\n"
+    if matches:
+        response += "\n**Top transactions:**\n"
+        for date_obj, item_name, amount, category in matches:
+            date_str = date_obj.strftime("%m/%d")
+            response += f"- {date_str}: ${amount:.2f} for {item_name} ({category})\n"
+    else:
+        response += "\n*(No transactions found this month.)*"
+
+    await message.channel.send(response)
