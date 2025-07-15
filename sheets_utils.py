@@ -908,16 +908,12 @@ async def most_frequent_purchases(n=3):
 
 async def expenses_on_day(day_str):
     """
-    Find all expenses on a specific day this month.
-    `day_str` is expected in MM/DD/YYYY or MM/DD format.
+    Find all expenses on a specific day.
+    Supports: MM/DD, MM/DD/YYYY, YYYY-MM-DD, or natural language dates.
     """
     try:
-        # Try parsing day_str
-        try:
-            target_date = datetime.strptime(day_str, "%m/%d/%Y")
-        except ValueError:
-            # If year omitted, assume current year
-            target_date = datetime.strptime(f"{day_str}/{datetime.today().year}", "%m/%d/%Y")
+        # Robustly parse the input date string
+        target_date = dateparser.parse(day_str)
     except Exception as e:
         print(f"[ERROR] Failed to parse date: {day_str} — {e}")
         return None, None
