@@ -38,18 +38,31 @@ def get_local_today():
     return datetime.now(timezone("America/Los_Angeles"))
 
 
+def find_cell_by_partial_text(ws, text):
+    """
+    Searches column B for a cell containing `text` (case-insensitive, stripped).
+    Returns the cell if found, else None.
+    """
+    col_b = ws.col_values(2)
+    for idx, val in enumerate(col_b, start=1):
+        if val and text.lower().strip() in val.lower().strip():
+            return ws.cell(idx, 2)
+    return None
+
+
 def extract_amount_from_text(text):
     """
     Extracts the first dollar amount from a string like 'IDEAL = $49.15'
     """
     if not text:
         return 0.0
-    match = re.search(r"\$?([\d,.]+)", text)
+    match = re.search(r"[-]?\$?([\d,]+(?:\.\d{1,2})?)", text)
     if match:
         try:
             return float(match.group(1).replace(",", ""))
-        except:
-            pass
+        except Exception as e:
+            print(f"[WARN] Failed to parse amount from '{text}': {e}")
+            return 0.0
     return 0.0
 
 
@@ -1064,21 +1077,24 @@ def log_student_loan_paid(amount):
 async def check_1st_savings_deposited():
     ws = get_income_worksheet()
     try:
-        # Locate the reference cell in Column B
-        cell = ws.find("Enter 1st Paycheck Deposit")
+        # robust text match
+        cell = find_cell_by_partial_text(ws, "Enter 1st Paycheck Deposit")
+        if not cell:
+            raise ValueError("Could not find 'Enter 1st Paycheck Deposit'")
+
         row, col = cell.row, cell.col
 
-        # actual amount → 3 cells to the right
-        actual_cell_val = ws.cell(row, col + 3).value
-        actual_amount = clean_money(actual_cell_val)
+        # actual = 3 right
+        actual_val = ws.cell(row, col + 3).value
+        actual_amount = clean_money(actual_val)
 
-        # ideal amount → 1 cell to the right
-        ideal_cell_val = ws.cell(row, col + 1).value
-        ideal_amount = extract_amount_from_text(ideal_cell_val)
+        # ideal = 1 right
+        ideal_val = ws.cell(row, col + 1).value
+        ideal_amount = extract_amount_from_text(ideal_val)
 
-        # minimum amount → 1 right & 1 down
-        minimum_cell_val = ws.cell(row + 1, col + 1).value
-        minimum_amount = extract_amount_from_text(minimum_cell_val)
+        # minimum = 1 right & 1 down
+        min_val = ws.cell(row + 1, col + 1).value
+        minimum_amount = extract_amount_from_text(min_val)
 
         deposited = actual_amount > 0
 
@@ -1102,21 +1118,23 @@ async def check_1st_savings_deposited():
 async def check_2nd_savings_deposited():
     ws = get_income_worksheet()
     try:
-        # Locate the reference cell in Column B
-        cell = ws.find("Enter 2nd Paycheck Deposit")
+        cell = find_cell_by_partial_text(ws, "Enter 2nd Paycheck Deposit")
+        if not cell:
+            raise ValueError("Could not find 'Enter 2nd Paycheck Deposit'")
+
         row, col = cell.row, cell.col
 
-        # actual amount → 3 cells to the right (same row)
-        actual_cell_val = ws.cell(row, col + 3).value
-        actual_amount = clean_money(actual_cell_val)
+        # actual = 3 right
+        actual_val = ws.cell(row, col + 3).value
+        actual_amount = clean_money(actual_val)
 
-        # ideal amount → 1 right & 1 up
-        ideal_cell_val = ws.cell(row - 1, col + 1).value
-        ideal_amount = extract_amount_from_text(ideal_cell_val)
+        # ideal = 1 right & 1 up
+        ideal_val = ws.cell(row - 1, col + 1).value
+        ideal_amount = extract_amount_from_text(ideal_val)
 
-        # minimum amount → 1 right (same row)
-        minimum_cell_val = ws.cell(row, col + 1).value
-        minimum_amount = extract_amount_from_text(minimum_cell_val)
+        # minimum = 1 right
+        min_val = ws.cell(row, col + 1).value
+        minimum_amount = extract_amount_from_text(min_val)
 
         deposited = actual_amount > 0
 
@@ -1140,15 +1158,15 @@ async def check_2nd_savings_deposited():
 def log_1st_savings(amount):
     """
     Logs the 1st savings deposit amount by writing it 3 columns to the right
-    of the cell containing 'Enter 1st Paycheck Deposit             ➡️'.
+    of the cell containing 'Enter 1st Paycheck Deposit'.
     """
     ws = get_income_worksheet()
     try:
-        # find reference cell
-        cell = ws.find("Enter 1st Paycheck Deposit")
-        row, col = cell.row, cell.col
+        cell = find_cell_by_partial_text(ws, "Enter 1st Paycheck Deposit")
+        if not cell:
+            raise ValueError("Could not find 'Enter 1st Paycheck Deposit'")
 
-        # target cell is 3 columns to the right
+        row, col = cell.row, cell.col
         target_cell = gspread.utils.rowcol_to_a1(row, col + 3)
 
         ws.update_acell(target_cell, str(amount))
@@ -1163,15 +1181,15 @@ def log_1st_savings(amount):
 def log_2nd_savings(amount):
     """
     Logs the 2nd savings deposit amount by writing it 3 columns to the right
-    of the cell containing 'Enter 2nd Paycheck Deposit             ➡️'.
+    of the cell containing 'Enter 2nd Paycheck Deposit'.
     """
     ws = get_income_worksheet()
     try:
-        # find reference cell
-        cell = ws.find("Enter 2nd Paycheck Deposit")
-        row, col = cell.row, cell.col
+        cell = find_cell_by_partial_text(ws, "Enter 2nd Paycheck Deposit")
+        if not cell:
+            raise ValueError("Could not find 'Enter 2nd Paycheck Deposit'")
 
-        # target cell is 3 columns to the right
+        row, col = cell.row, cell.col
         target_cell = gspread.utils.rowcol_to_a1(row, col + 3)
 
         ws.update_acell(target_cell, str(amount))
