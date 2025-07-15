@@ -637,3 +637,79 @@ async def total_spent_on_item(item, top_n=5):
     matches.sort(key=lambda x: x[0], reverse=True)
 
     return total, matches[:top_n]
+
+
+async def daily_spending_calendar():
+    from collections import defaultdict
+    import matplotlib.pyplot as plt
+    import io
+    import discord
+
+    ws = get_expense_worksheet()
+    today = datetime.today()
+    daily_totals = defaultdict(float)
+
+    category_columns = get_category_columns
+
+    for category, config in category_columns.items():
+        start_row = config["start_row"]
+        date_col_letter = config["columns"]["date"]
+        amount_col_letter = config["columns"]["amount"]
+
+        date_idx = column_index_from_string(date_col_letter) - 1
+        amount_idx = column_index_from_string(amount_col_letter) - 1
+
+        rows = ws.get_all_values()[start_row - 1:]
+
+        for row in rows:
+            if max(date_idx, amount_idx) >= len(row):
+                continue
+
+            date_str = row[date_idx].strip()
+            amount_str = row[amount_idx].strip()
+
+            if not date_str or not amount_str:
+                continue
+
+            try:
+                date_obj = datetime.strptime(date_str, "%m/%d/%Y")
+                if date_obj.month == today.month and date_obj.year == today.year:
+                    amt = clean_money(amount_str)
+                    daily_totals[date_obj.day] += amt
+            except Exception as e:
+                print(f"[WARN] Skipping row: {e}")
+                continue
+
+    # Fill missing days with 0
+    for day in range(1, today.day + 1):
+        daily_totals.setdefault(day, 0.0)
+
+    # Prepare sorted list
+    sorted_days = sorted(daily_totals.items())
+
+    # Text summary
+    text_lines = [f"{today.strftime('%B %Y')} Daily Spending:"]
+    for day, amt in sorted_days:
+        text_lines.append(f"{day:02d}: ${amt:.2f}")
+    text_summary = "\n".join(text_lines)
+
+    # Plot
+    days = [day for day, _ in sorted_days]
+    amounts = [amt for _, amt in sorted_days]
+
+    fig, ax = plt.subplots(figsize=(10, 5))
+    ax.bar(days, amounts, color='skyblue')
+    ax.set_xlabel("Day of Month")
+    ax.set_ylabel("Amount Spent ($)")
+    ax.set_title(f"Daily Spending — {today.strftime('%B %Y')}")
+    ax.set_xticks(days)
+    plt.tight_layout()
+
+    buf = io.BytesIO()
+    plt.savefig(buf, format='png', dpi=150)
+    buf.seek(0)
+    plt.close(fig)
+
+    chart_file = discord.File(fp=buf, filename="daily_spending_calendar.png")
+
+    return text_summary, chart_file
