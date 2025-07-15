@@ -3,7 +3,7 @@ import os
 import json
 from datetime import date
 from dotenv import load_dotenv
-from intent_parser import INTENTS
+from intent_explorer import INTENTS
 
 load_dotenv()
 openai.api_key = os.getenv("OPENAI_API_KEY")
