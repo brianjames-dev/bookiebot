@@ -68,7 +68,7 @@ If the message is about logging a payment for **rent**, **SMUD**, or **student l
 - "log_student_loan_paid" → when paying a student loan
 
 For these intents, extract the amount paid as:
-- entities: { "amount": <float> }
+- entities: {{ "amount": <float> }}
 
 Do NOT treat these payments as generic expenses. Do NOT assign them a category. Do NOT include item, location, or store — only use the amount and the correct intent.
 
