@@ -9,49 +9,6 @@ load_dotenv()
 openai.api_key = os.getenv("OPENAI_API_KEY")
 
 
-# === Intents & Details ===
-INTENTS = [
-    # Logging Intents
-    "log_expense",
-    "log_income",
-    "log_rent_paid",
-    "log_smud_paid",
-    "log_student_loan_paid",
-    "log_1st_savings",
-    "log_2nd_savings",
-    "log_need_expense",
-
-    # Query Intents
-    "query_burn_rate",
-    "query_rent_paid",
-    "query_smud_paid",
-    "query_student_loans_paid",
-    "query_total_for_store",
-    "query_highest_expense_category",
-    "query_total_income",
-    "query_remaining_budget",
-    "query_average_daily_spend",
-    "query_expense_breakdown_percentages",
-    "query_total_for_category",
-    "query_largest_single_expense",
-    "query_top_n_expenses",
-    "query_spent_this_week",
-    "query_projected_spending",
-    "query_weekend_vs_weekday",
-    "query_no_spend_days",
-    "query_total_for_item",
-    "query_subscriptions",
-    "query_daily_spending_calendar",
-    "query_best_worst_day_of_week",
-    "query_longest_no_spend_streak",
-    "query_days_budget_lasts",
-    "query_most_frequent_purchases",
-    "query_expenses_on_day",
-    "query_1st_savings",
-    "query_2nd_savings"
-]
-
-
 def parse_message_llm(user_message):
     today = date.today().isoformat()
 

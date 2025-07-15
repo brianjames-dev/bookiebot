@@ -1,5 +1,4 @@
 import time
-from intent_parser import INTENTS
 
 
 # === Friendly display names ===
@@ -220,6 +219,10 @@ INTENT_GROUPS = [
         "query_weekend_vs_weekday", "query_best_worst_day_of_week"
     ])
 ]
+
+
+# flattened list of intents
+INTENTS = [intent for _, group in INTENT_GROUPS for intent in group]
 
 
 # === Functions ===
