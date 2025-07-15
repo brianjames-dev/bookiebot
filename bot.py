@@ -3,6 +3,7 @@ import os
 from dotenv import load_dotenv
 from intent_parser import parse_message_llm
 from intent_handlers import handle_intent
+import intent_explorer
 
 print("🚀 Starting bot...")
 
@@ -21,9 +22,11 @@ intents.message_content = True
 
 client = discord.Client(intents=intents)
 
+
 @client.event
 async def on_ready():
     print(f"✅ Logged in as {client.user}")
+
 
 @client.event
 async def on_message(message):
@@ -35,11 +38,24 @@ async def on_message(message):
     if message.channel.name != CHANNEL_NAME:
         return
 
-    print(f"📩 New message: {message.content}")
+    content = message.content.strip()
+    print(f"📩 New message: {content}")
 
-    # Parse message with LLM
+    # === INTENT LIST COMMANDS ===
+    if content.lower() == "list":
+        output = intent_explorer.list_intents()
+        await message.channel.send(output)
+        return
+
+    if content.isdigit():
+        idx = int(content)
+        output = intent_explorer.describe_intent(idx)
+        await message.channel.send(output)
+        return
+
+    # === REGULAR BOT FLOW ===
     try:
-        intent_data = parse_message_llm(message.content.strip())
+        intent_data = parse_message_llm(content)
         intent = intent_data.get("intent")
         entities = intent_data.get("entities", {})
         print(f"🤖 Detected intent: {intent}, Entities: {entities}")
@@ -52,12 +68,12 @@ async def on_message(message):
         await message.channel.send("❌ Sorry, I couldn’t understand your request.")
         return
 
-    # Handle intent
     try:
         await handle_intent(intent, entities, message)
     except Exception as e:
         print(f"[ERROR] Failed to handle intent: {e}")
         await message.channel.send("❌ Something went wrong while processing your request.")
+
 
 try:
     client.run(TOKEN)
