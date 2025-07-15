@@ -57,6 +57,7 @@ async def write_to_sheet(data, message):
 
     await write_expense_to_sheet(data, message)
 
+
 async def write_income_to_sheet(data, message):
     ws = get_income_worksheet()
     month_name = datetime.now().strftime("%B")
@@ -99,6 +100,7 @@ async def write_income_to_sheet(data, message):
         await message.channel.send(
             f"Income logged: ${amount} from {data.get('source')}"
         )
+
 
 async def write_expense_to_sheet(data, message):
     category = data["category"].lower()
@@ -161,6 +163,7 @@ async def write_expense_to_sheet(data, message):
             f"{category.capitalize()} expense logged: ${data.get('amount')} for {data['person']}"
         )
 
+
 def normalize_expense_data(data, person):
     return {
         "date": datetime.now().strftime("%-m/%-d/%Y"),
@@ -173,6 +176,7 @@ def normalize_expense_data(data, person):
             ""
         ).strip()
     }
+
 
 def log_category_row(values, worksheet, category):
     print(f"[DEBUG] VALUES passed to log_category_row(): {values}")

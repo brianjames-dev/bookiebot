@@ -9,6 +9,7 @@ from collections import defaultdict, Counter
 import matplotlib.pyplot as plt
 import io
 import discord
+import gspread
 
 # HELPER FUNCTIONS
 def _sum_column(ws, col_letter, start_row=3):
@@ -1002,3 +1003,39 @@ async def list_subscriptions():
                 pass
 
     return needs, round(needs_total, 2), wants, round(wants_total, 2)
+
+
+def log_payment(category_label, amount):
+    """
+    Finds the row where column B matches category_label (case-insensitive),
+    and writes the amount to column C of that row.
+    """
+    ws = get_income_worksheet()
+    rows = ws.get_all_values()
+
+    for row_idx, row in enumerate(rows):
+        if len(row) < 2:
+            continue
+
+        label_cell = row[1].strip().lower()  # Column B
+        if label_cell.startswith(category_label.lower()):
+            # Write to column C (3)
+            cell_to_update = gspread.utils.rowcol_to_a1(row_idx + 1, 3)
+            ws.update_acell(cell_to_update, str(amount))
+            print(f"[INFO] Logged ${amount} for {category_label} at {cell_to_update}")
+            return True
+
+    print(f"[ERROR] Could not find category '{category_label}' in income sheet.")
+    return False
+
+
+def log_rent_paid(amount):
+    return log_payment("rent", amount)
+
+
+def log_smud_paid(amount):
+    return log_payment("smud", amount)
+
+
+def log_student_loan_paid(amount):
+    return log_payment("student loan payment", amount)

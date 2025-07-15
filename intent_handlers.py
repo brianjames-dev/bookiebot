@@ -9,8 +9,14 @@ import discord
 from datetime import datetime
 
 INTENT_HANDLERS = {
+    # Logging handlers
     "log_expense":                          lambda e, m: write_to_sheet(e, m),
     "log_income":                           lambda e, m: write_to_sheet(e, m),
+    "log_rent_paid":                        lambda e, m: log_rent_paid_handler(e, m),
+    "log_smud_paid":                        lambda e, m: log_smud_paid_handler(e, m),
+    "log_student_loan_paid":                lambda e, m: log_student_loan_paid_handler(e, m),
+
+    # Query handlers
     "query_burn_rate":                      lambda e, m: query_burn_rate_handler(m),
     "query_rent_paid":                      lambda e, m: query_rent_paid_handler(m),
     "query_utilities_paid":                 lambda e, m: query_utilities_paid_handler(m),
@@ -29,7 +35,6 @@ INTENT_HANDLERS = {
     "query_weekend_vs_weekday":             lambda e, m: query_weekend_vs_weekday_handler(m),
     "query_no_spend_days":                  lambda e, m: query_no_spend_days_handler(m),
     "query_total_for_item":                 lambda e, m: query_total_for_item_handler(e, m),
-
     "query_subscriptions":                  lambda e, m: query_subscriptions_handler(m),
     "query_daily_spending_calendar":        lambda e, m: query_daily_spending_calendar_handler(m),
     "query_best_worst_day_of_week":         lambda e, m: query_best_worst_day_of_week_handler(m),
@@ -436,3 +441,42 @@ async def query_subscriptions_handler(message):
 
     response = "\n".join(response_lines)
     await message.channel.send(response)
+
+
+async def log_rent_paid_handler(entities, message):
+    amount = entities.get("amount")
+    if amount is None:
+        await message.channel.send("❌ Please specify the amount you paid for rent.")
+        return
+
+    success = su.log_rent_paid(amount)
+    if success:
+        await message.channel.send(f"✅ Logged rent as paid: ${amount:.2f}")
+    else:
+        await message.channel.send("❌ Could not find the Rent row to log payment.")
+
+
+async def log_smud_paid_handler(entities, message):
+    amount = entities.get("amount")
+    if amount is None:
+        await message.channel.send("❌ Please specify the amount you paid for SMUD.")
+        return
+
+    success = su.log_smud_paid(amount)
+    if success:
+        await message.channel.send(f"✅ Logged SMUD as paid: ${amount:.2f}")
+    else:
+        await message.channel.send("❌ Could not find the SMUD row to log payment.")
+
+
+async def log_student_loan_paid_handler(entities, message):
+    amount = entities.get("amount")
+    if amount is None:
+        await message.channel.send("❌ Please specify the amount you paid for your student loan.")
+        return
+
+    success = su.log_student_loan_paid(amount)
+    if success:
+        await message.channel.send(f"✅ Logged student loan as paid: ${amount:.2f}")
+    else:
+        await message.channel.send("❌ Could not find the Student Loan row to log payment.")
