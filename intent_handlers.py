@@ -392,7 +392,7 @@ async def query_most_frequent_purchases_handler(entities, message):
 async def query_expenses_on_day_handler(entities, message):
     day_str = entities.get("date")
     if not day_str:
-        await message.channel.send("❌ Please specify a date (MM/DD or MM/DD/YYYY).")
+        await message.channel.send("❌ Please specify a date (e.g., MM/DD, MM/DD/YYYY, or YYYY-MM-DD).")
         return
 
     entries, total = await su.expenses_on_day(day_str)
@@ -400,6 +400,9 @@ async def query_expenses_on_day_handler(entities, message):
     if not entries:
         await message.channel.send(f"📆 No expenses found on {day_str}.")
         return
+
+    # sort entries by amount (descending)
+    entries.sort(key=lambda e: e["amount"], reverse=True)
 
     response_lines = [f"📆 Expenses on {day_str} (total ${total:.2f}):"]
     for e in entries:
