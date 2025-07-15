@@ -10,6 +10,7 @@ import matplotlib.pyplot as plt
 import io
 import discord
 import gspread
+from pytz import timezone
 
 # HELPER FUNCTIONS
 def _sum_column(ws, col_letter, start_row=3):
@@ -31,6 +32,25 @@ def clean_money(value: str) -> float:
     except Exception as e:
         print(f"[WARN] Failed to clean money value: {value} ({e})")
         return 0.0
+
+
+def get_local_today():
+    return datetime.now(timezone("America/Los_Angeles"))
+
+
+def extract_amount_from_text(text):
+    """
+    Extracts the first dollar amount from a string like 'IDEAL = $49.15'
+    """
+    if not text:
+        return 0.0
+    match = re.search(r"\$?([\d,.]+)", text)
+    if match:
+        try:
+            return float(match.group(1).replace(",", ""))
+        except:
+            pass
+    return 0.0
 
 
 # QUERY FUNCTIONS
@@ -110,7 +130,7 @@ async def check_student_loan_paid():
 
 async def total_spent_at_store(store, top_n=5):
     ws = get_expense_worksheet()
-    today = datetime.today()
+    today = get_local_today()
     total = 0.0
     matches = []
 
@@ -216,7 +236,7 @@ async def remaining_budget():
 async def average_daily_spend():
     ws = get_expense_worksheet()
     try:
-        today = datetime.today()
+        today = get_local_today()
         day_of_month = today.day
 
         # Grab T7 and AB7
@@ -412,7 +432,7 @@ async def top_n_expenses_food_and_shopping(n=5):
 
 async def spent_this_week():
     ws = get_expense_worksheet()
-    today = datetime.today()
+    today = get_local_today()
     start_of_week = today - timedelta(days=today.weekday())  # Monday
     total = 0.0
 
@@ -454,7 +474,7 @@ async def spent_this_week():
 
 
 async def projected_spending():
-    today = datetime.today()
+    today = get_local_today()
     ws = get_expense_worksheet()
     total_so_far = 0.0
 
@@ -547,7 +567,7 @@ async def weekend_vs_weekday():
 
 async def no_spend_days():
     ws = get_expense_worksheet()
-    today = datetime.today()
+    today = get_local_today()
     days_with_expense = set()
 
     category_columns = get_category_columns  # or get_category_columns() if function
@@ -587,7 +607,7 @@ async def no_spend_days():
 
 async def total_spent_on_item(item, top_n=5):
     ws = get_expense_worksheet()
-    today = datetime.today()
+    today = get_local_today()
     total = 0.0
     matches = []
 
@@ -646,7 +666,7 @@ async def total_spent_on_item(item, top_n=5):
 
 async def daily_spending_calendar():
     ws = get_expense_worksheet()
-    today = datetime.today()
+    today = get_local_today()
     daily_totals = defaultdict(float)
 
     category_columns = get_category_columns
@@ -717,7 +737,7 @@ async def daily_spending_calendar():
 
 async def best_worst_day_of_week():
     ws = get_expense_worksheet()
-    today = datetime.today()
+    today = get_local_today()
     weekday_totals = defaultdict(float)
     weekday_counts = defaultdict(int)
 
@@ -775,7 +795,7 @@ async def best_worst_day_of_week():
 
 async def longest_no_spend_streak():
     ws = get_expense_worksheet()
-    today = datetime.today()
+    today = get_local_today()
     daily_totals = {day: 0.0 for day in range(1, today.day + 1)}
 
     category_columns = get_category_columns
@@ -850,7 +870,7 @@ async def days_budget_lasts():
 
 async def most_frequent_purchases(n=3):
     ws = get_expense_worksheet()
-    today = datetime.today()
+    today = get_local_today()
     item_counts = Counter()
     item_totals = defaultdict(float)
 
@@ -1039,3 +1059,152 @@ def log_smud_paid(amount):
 
 def log_student_loan_paid(amount):
     return log_payment("student loan payment", amount)
+
+
+async def check_1st_savings_deposited():
+    ws = get_income_worksheet()
+    try:
+        # Locate the reference cell in Column B
+        cell = ws.find("Enter 1st Paycheck Deposit")
+        row, col = cell.row, cell.col
+
+        # actual amount → 3 cells to the right
+        actual_cell_val = ws.cell(row, col + 3).value
+        actual_amount = clean_money(actual_cell_val)
+
+        # ideal amount → 1 cell to the right
+        ideal_cell_val = ws.cell(row, col + 1).value
+        ideal_amount = extract_amount_from_text(ideal_cell_val)
+
+        # minimum amount → 1 right & 1 down
+        minimum_cell_val = ws.cell(row + 1, col + 1).value
+        minimum_amount = extract_amount_from_text(minimum_cell_val)
+
+        deposited = actual_amount > 0
+
+        return {
+            "deposited": deposited,
+            "actual": actual_amount,
+            "ideal": ideal_amount,
+            "minimum": minimum_amount
+        }
+
+    except Exception as e:
+        print(f"[ERROR] Failed to check 1st savings deposited: {e}")
+        return {
+            "deposited": False,
+            "actual": 0.0,
+            "ideal": 0.0,
+            "minimum": 0.0
+        }
+
+
+async def check_2nd_savings_deposited():
+    ws = get_income_worksheet()
+    try:
+        # Locate the reference cell in Column B
+        cell = ws.find("Enter 2nd Paycheck Deposit")
+        row, col = cell.row, cell.col
+
+        # actual amount → 3 cells to the right (same row)
+        actual_cell_val = ws.cell(row, col + 3).value
+        actual_amount = clean_money(actual_cell_val)
+
+        # ideal amount → 1 right & 1 up
+        ideal_cell_val = ws.cell(row - 1, col + 1).value
+        ideal_amount = extract_amount_from_text(ideal_cell_val)
+
+        # minimum amount → 1 right (same row)
+        minimum_cell_val = ws.cell(row, col + 1).value
+        minimum_amount = extract_amount_from_text(minimum_cell_val)
+
+        deposited = actual_amount > 0
+
+        return {
+            "deposited": deposited,
+            "actual": actual_amount,
+            "ideal": ideal_amount,
+            "minimum": minimum_amount
+        }
+
+    except Exception as e:
+        print(f"[ERROR] Failed to check 2nd savings deposited: {e}")
+        return {
+            "deposited": False,
+            "actual": 0.0,
+            "ideal": 0.0,
+            "minimum": 0.0
+        }
+
+
+def log_1st_savings(amount):
+    """
+    Logs the 1st savings deposit amount by writing it 3 columns to the right
+    of the cell containing 'Enter 1st Paycheck Deposit             ➡️'.
+    """
+    ws = get_income_worksheet()
+    try:
+        # find reference cell
+        cell = ws.find("Enter 1st Paycheck Deposit")
+        row, col = cell.row, cell.col
+
+        # target cell is 3 columns to the right
+        target_cell = gspread.utils.rowcol_to_a1(row, col + 3)
+
+        ws.update_acell(target_cell, str(amount))
+        print(f"[INFO] Logged 1st savings deposit: ${amount} at {target_cell}")
+        return True
+
+    except Exception as e:
+        print(f"[ERROR] Failed to log 1st savings deposit: {e}")
+        return False
+
+
+def log_2nd_savings(amount):
+    """
+    Logs the 2nd savings deposit amount by writing it 3 columns to the right
+    of the cell containing 'Enter 2nd Paycheck Deposit             ➡️'.
+    """
+    ws = get_income_worksheet()
+    try:
+        # find reference cell
+        cell = ws.find("Enter 2nd Paycheck Deposit")
+        row, col = cell.row, cell.col
+
+        # target cell is 3 columns to the right
+        target_cell = gspread.utils.rowcol_to_a1(row, col + 3)
+
+        ws.update_acell(target_cell, str(amount))
+        print(f"[INFO] Logged 2nd savings deposit: ${amount} at {target_cell}")
+        return True
+
+    except Exception as e:
+        print(f"[ERROR] Failed to log 2nd savings deposit: {e}")
+        return False
+
+
+def log_need_expense(description, amount):
+    """
+    Logs a Need expense by inserting a row above the <Enter Transaction> marker
+    in the Needs section of the income sheet.
+    Writes description in column B and amount in column C.
+    """
+    ws = get_income_worksheet()
+    try:
+        # find the <Enter Transaction> marker
+        cell = ws.find("<Enter Transaction>")
+        insert_row_idx = cell.row
+
+        # insert a blank row above
+        ws.insert_row([], index=insert_row_idx)
+
+        # write description and amount
+        ws.update_acell(f"B{insert_row_idx}", description)
+        ws.update_acell(f"C{insert_row_idx}", str(amount))
+
+        print(f"[INFO] Logged Need expense: '{description}' - ${amount} at row {insert_row_idx}")
+        return True
+
+    except Exception as e:
+        print(f"[ERROR] Failed to log Need expense: {e}")
+        return False

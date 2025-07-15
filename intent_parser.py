@@ -13,6 +13,9 @@ INTENTS = [
     "log_rent_paid",
     "log_smud_paid",
     "log_student_loan_paid",
+    "log_1st_savings",
+    "log_2nd_savings",
+    "log_need_expense",
 
     "query_burn_rate",
     "query_rent_paid",
@@ -38,7 +41,9 @@ INTENTS = [
     "query_longest_no_spend_streak",
     "query_days_budget_lasts",
     "query_most_frequent_purchases",
-    "query_expenses_on_day"
+    "query_expenses_on_day",
+    "query_1st_savings",
+    "query_2nd_savings"
 ]
 
 def parse_message_llm(user_message):

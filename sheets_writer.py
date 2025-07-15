@@ -5,6 +5,7 @@ from openpyxl.utils import column_index_from_string
 from sheets_auth import get_expense_worksheet, get_income_worksheet
 from card_ui import CardSelectView
 import asyncio
+import pytz
 
 # category column map
 get_category_columns = {
@@ -165,8 +166,10 @@ async def write_expense_to_sheet(data, message):
 
 
 def normalize_expense_data(data, person):
+    tz = pytz.timezone("America/Los_Angeles")  # or whatever timezone you’re in
+    local_now = datetime.now(tz)
     return {
-        "date": datetime.now().strftime("%-m/%-d/%Y"),
+        "date": local_now.strftime("%-m/%-d/%Y"),
         "amount": float(data.get("amount") or 0),
         "location": (data.get("location") or "").strip(),
         "person": person.strip(),

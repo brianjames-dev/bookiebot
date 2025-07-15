@@ -15,7 +15,10 @@ INTENT_HANDLERS = {
     "log_rent_paid":                        lambda e, m: log_rent_paid_handler(e, m),
     "log_smud_paid":                        lambda e, m: log_smud_paid_handler(e, m),
     "log_student_loan_paid":                lambda e, m: log_student_loan_paid_handler(e, m),
-
+    "log_1st_savings":                      lambda e, m: log_1st_savings_handler(e, m),
+    "log_2nd_savings":                      lambda e, m: log_2nd_savings_handler(e, m),
+    "log_need_expense":                     lambda e, m: log_need_expense_handler(e, m),
+    
     # Query handlers
     "query_burn_rate":                      lambda e, m: query_burn_rate_handler(m),
     "query_rent_paid":                      lambda e, m: query_rent_paid_handler(m),
@@ -42,6 +45,8 @@ INTENT_HANDLERS = {
     "query_days_budget_lasts":              lambda e, m: query_days_budget_lasts_handler(m),
     "query_most_frequent_purchases":        lambda e, m: query_most_frequent_purchases_handler(e, m),
     "query_expenses_on_day":                lambda e, m: query_expenses_on_day_handler(e, m),
+    "query_1st_savings":                    lambda e, m: query_1st_savings_handler(e, m),
+    "query_2nd_savings":                    lambda e, m: query_2nd_savings_handler(e, m),
 }
 
 
@@ -480,3 +485,70 @@ async def log_student_loan_paid_handler(entities, message):
         await message.channel.send(f"✅ Logged student loan as paid: ${amount:.2f}")
     else:
         await message.channel.send("❌ Could not find the Student Loan row to log payment.")
+
+
+async def query_1st_savings_handler(entities, message):
+    result = await su.check_1st_savings_deposited()
+    if result["deposited"]:
+        response = (
+            f"✅ 1st savings deposited: ${result['actual']:.2f}\n"
+            f"💡 Ideal: ${result['ideal']:.2f} | Minimum: ${result['minimum']:.2f}"
+        )
+    else:
+        response = (
+            f"❌ 1st savings not deposited.\n"
+            f"💡 Ideal: ${result['ideal']:.2f} | Minimum: ${result['minimum']:.2f}"
+        )
+    await message.channel.send(response)
+
+
+async def query_2nd_savings_handler(entities, message):
+    result = await su.check_2nd_savings_deposited()
+    if result["deposited"]:
+        response = (
+            f"✅ 2nd savings deposited: ${result['actual']:.2f}\n"
+            f"💡 Ideal: ${result['ideal']:.2f} | Minimum: ${result['minimum']:.2f}"
+        )
+    else:
+        response = (
+            f"❌ 2nd savings not deposited.\n"
+            f"💡 Ideal: ${result['ideal']:.2f} | Minimum: ${result['minimum']:.2f}"
+        )
+    await message.channel.send(response)
+
+
+async def log_1st_savings_handler(entities, message):
+    amount = entities.get("amount")
+    if amount is None:
+        await message.channel.send("❌ Please specify the amount for 1st savings.")
+        return
+    success = su.log_1st_savings(amount)
+    if success:
+        await message.channel.send(f"✅ Logged 1st savings: ${amount:.2f}")
+    else:
+        await message.channel.send("❌ Failed to log 1st savings.")
+
+
+async def log_2nd_savings_handler(entities, message):
+    amount = entities.get("amount")
+    if amount is None:
+        await message.channel.send("❌ Please specify the amount for 2nd savings.")
+        return
+    success = su.log_2nd_savings(amount)
+    if success:
+        await message.channel.send(f"✅ Logged 2nd savings: ${amount:.2f}")
+    else:
+        await message.channel.send("❌ Failed to log 2nd savings.")
+
+
+async def log_need_expense_handler(entities, message):
+    description = entities.get("description")
+    amount = entities.get("amount")
+    if not description or amount is None:
+        await message.channel.send("❌ Please specify both a description and an amount for the Need expense.")
+        return
+    success = su.log_need_expense(description, amount)
+    if success:
+        await message.channel.send(f"✅ Logged Need expense: '{description}' - ${amount:.2f}")
+    else:
+        await message.channel.send("❌ Failed to log Need expense.")
