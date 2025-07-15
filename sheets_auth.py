@@ -33,3 +33,7 @@ def get_income_worksheet():
     sheet = gc.open_by_key(INCOME_SHEET_KEY)
     month_name = datetime.now().strftime("%B")
     return sheet.worksheet(month_name)
+
+def get_subscriptions_worksheet():
+    sheet = gc.open_by_key(INCOME_SHEET_KEY)
+    return sheet.worksheet("Subscriptions")

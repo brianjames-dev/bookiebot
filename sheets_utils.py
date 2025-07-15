@@ -1,4 +1,4 @@
-from sheets_auth import get_expense_worksheet, get_income_worksheet
+from sheets_auth import get_expense_worksheet, get_income_worksheet, get_subscriptions_worksheet
 from openpyxl.utils import column_index_from_string
 from datetime import datetime, timedelta
 import re
@@ -969,7 +969,7 @@ async def expenses_on_day(day_str):
 
 
 async def list_subscriptions():
-    ws = get_income_worksheet("Subscriptions")  # adjust if your helper uses this
+    ws = get_subscriptions_worksheet()
     needs = []
     wants = []
     needs_total = 0.0
