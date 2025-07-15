@@ -112,9 +112,9 @@ Always return ONLY a valid JSON object with the correct keys and values. Do not 
 
 If the message is about logging a Need expense, only include the description of the expense and the amount.
 Do NOT include item, category, location, or other fields. Use the following format:User: "Need expense 45 for bus ticket"
-→ { "intent": "log_need_expense", "entities": { "description": "bus ticket", "amount": 45 } }
+→ {{ "intent": "log_need_expense", "entities": {{ "description": "bus ticket", "amount": 45 }} }}
 User: "Add a Need expense of 75 for car repair"
-→ { "intent": "log_need_expense", "entities": { "description": "car repair", "amount": 75 } }
+→ {{ "intent": "log_need_expense", "entities": {{ "description": "car repair", "amount": 75 }} }}
 
 Now parse this:
 \"\"\"{user_message}\"\"\"
