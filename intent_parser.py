@@ -77,6 +77,12 @@ For these intents, extract the amount paid as:
 
 Do NOT treat these payments as generic expenses. Do NOT assign them a category. Do NOT include item, location, or store — only use the amount and the correct intent.
 
+If the message is about logging a Need expense, only include the description of the expense and the amount.
+Do NOT include item, category, location, or other fields. Use the following format:User: "Need expense 45 for bus ticket"
+→ {{ "intent": "log_need_expense", "entities": {{ "description": "bus ticket", "amount": 45 }} }}
+User: "Add a Need expense of 75 for car repair"
+→ {{ "intent": "log_need_expense", "entities": {{ "description": "car repair", "amount": 75 }} }}
+
 If the message is about logging an expense or income:
 - intent: "log_expense" or "log_income"
 - entities: JSON with:
@@ -109,12 +115,6 @@ If the message is a QUERY (not logging), return:
 - entities: JSON with any useful parameters (e.g., "store" for a store query, "category", "vendor", "n" for top-n queries), or empty if none.
 
 Always return ONLY a valid JSON object with the correct keys and values. Do not explain anything.  
-
-If the message is about logging a Need expense, only include the description of the expense and the amount.
-Do NOT include item, category, location, or other fields. Use the following format:User: "Need expense 45 for bus ticket"
-→ {{ "intent": "log_need_expense", "entities": {{ "description": "bus ticket", "amount": 45 }} }}
-User: "Add a Need expense of 75 for car repair"
-→ {{ "intent": "log_need_expense", "entities": {{ "description": "car repair", "amount": 75 }} }}
 
 Now parse this:
 \"\"\"{user_message}\"\"\"
