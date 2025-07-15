@@ -29,6 +29,12 @@ INTENT_HANDLERS = {
     "query_no_spend_days":                  lambda e, m: query_no_spend_days_handler(m),
     "query_total_for_item":                 lambda e, m: query_total_for_item_handler(e, m),
 
+    "query_subscriptions":                  lambda e, m: query_subscriptions_handler(m),
+    "query_daily_spending_calendar":        lambda e, m: query_daily_spending_calendar_handler(m),
+    "query_best_worst_day_of_week":         lambda e, m: query_best_worst_day_of_week_handler(m),
+    "query_longest_no_spend_streak":        lambda e, m: query_longest_no_spend_streak_handler(m),
+    "query_days_budget_lasts":              lambda e, m: query_days_budget_lasts_handler(m),
+    "query_most_frequent_purchase":         lambda e, m: query_most_frequent_purchase_handler(m),
 }
 
 
@@ -311,3 +317,5 @@ async def query_total_for_item_handler(entities, message):
         response += "\n*(No transactions found this month.)*"
 
     await message.channel.send(response)
+
+

@@ -27,7 +27,14 @@ INTENTS = [
     "query_projected_spending",
     "query_weekend_vs_weekday",
     "query_no_spend_days",
-    "query_total_for_item"
+    "query_total_for_item",
+
+    "query_subscriptions",
+    "query_daily_spending_calendar",
+    "query_best_worst_day_of_week",
+    "query_longest_no_spend_streak",
+    "query_days_budget_lasts",
+    "query_most_frequent_purchase"
 ]
 
 def parse_message_llm(user_message):
