@@ -34,7 +34,8 @@ INTENTS = [
     "query_best_worst_day_of_week",
     "query_longest_no_spend_streak",
     "query_days_budget_lasts",
-    "query_most_frequent_purchases"
+    "query_most_frequent_purchases",
+    "query_expenses_on_day"
 ]
 
 def parse_message_llm(user_message):
