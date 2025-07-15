@@ -5,6 +5,10 @@ import re
 from sheets_writer import get_category_columns
 from dateutil import parser as dateparser
 from rapidfuzz import fuzz
+from collections import defaultdict, Counter
+import matplotlib.pyplot as plt
+import io
+import discord
 
 # HELPER FUNCTIONS
 def _sum_column(ws, col_letter, start_row=3):
@@ -640,11 +644,6 @@ async def total_spent_on_item(item, top_n=5):
 
 
 async def daily_spending_calendar():
-    from collections import defaultdict
-    import matplotlib.pyplot as plt
-    import io
-    import discord
-
     ws = get_expense_worksheet()
     today = datetime.today()
     daily_totals = defaultdict(float)
@@ -716,8 +715,6 @@ async def daily_spending_calendar():
 
 
 async def best_worst_day_of_week():
-    from collections import defaultdict
-
     ws = get_expense_worksheet()
     today = datetime.today()
     weekday_totals = defaultdict(float)
@@ -850,9 +847,7 @@ async def days_budget_lasts():
     return max(0, round(estimated_days, 1))  # never negative
 
 
-async def most_frequent_purchase():
-    from collections import defaultdict, Counter
-
+async def most_frequent_purchases(n=3):
     ws = get_expense_worksheet()
     today = datetime.today()
     item_counts = Counter()
@@ -897,13 +892,15 @@ async def most_frequent_purchase():
                 continue
 
     if not item_counts:
-        return None
+        return []
 
-    most_common_item, count = item_counts.most_common(1)[0]
-    total_spent = round(item_totals[most_common_item], 2)
+    most_common = item_counts.most_common(n)
+    result = []
+    for item_name, count in most_common:
+        result.append({
+            "item": item_name,
+            "count": count,
+            "total": round(item_totals[item_name], 2)
+        })
 
-    return {
-        "item": most_common_item,
-        "count": count,
-        "total": total_spent
-    }
+    return result
