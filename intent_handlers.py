@@ -31,7 +31,7 @@ INTENT_HANDLERS = {
 
     # "query_subscriptions":                  lambda e, m: query_subscriptions_handler(m),
     "query_daily_spending_calendar":        lambda e, m: query_daily_spending_calendar_handler(m),
-    # "query_best_worst_day_of_week":         lambda e, m: query_best_worst_day_of_week_handler(m),
+    "query_best_worst_day_of_week":         lambda e, m: query_best_worst_day_of_week_handler(m),
     # "query_longest_no_spend_streak":        lambda e, m: query_longest_no_spend_streak_handler(m),
     # "query_days_budget_lasts":              lambda e, m: query_days_budget_lasts_handler(m),
     # "query_most_frequent_purchase":         lambda e, m: query_most_frequent_purchase_handler(m),
@@ -323,3 +323,15 @@ async def query_daily_spending_calendar_handler(message):
     text_summary, chart_file = await su.daily_spending_calendar()
     await message.channel.send(content=f"📆 Here is your daily spending calendar:\n\n{text_summary}", file=chart_file)
 
+
+async def query_best_worst_day_of_week_handler(message):
+    result = await su.best_worst_day_of_week()
+    best_day, best_avg = result["best"]
+    worst_day, worst_avg = result["worst"]
+
+    response = (
+        f"📅 Best (lowest) day: {best_day} — ${best_avg:.2f} avg\n"
+        f"💸 Worst (highest) day: {worst_day} — ${worst_avg:.2f} avg"
+    )
+
+    await message.channel.send(response)

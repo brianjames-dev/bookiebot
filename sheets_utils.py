@@ -713,3 +713,63 @@ async def daily_spending_calendar():
     chart_file = discord.File(fp=buf, filename="daily_spending_calendar.png")
 
     return text_summary, chart_file
+
+
+async def best_worst_day_of_week():
+    from collections import defaultdict
+
+    ws = get_expense_worksheet()
+    today = datetime.today()
+    weekday_totals = defaultdict(float)
+    weekday_counts = defaultdict(int)
+
+    category_columns = get_category_columns
+
+    for category, config in category_columns.items():
+        start_row = config["start_row"]
+        date_col_letter = config["columns"]["date"]
+        amount_col_letter = config["columns"]["amount"]
+
+        date_idx = column_index_from_string(date_col_letter) - 1
+        amount_idx = column_index_from_string(amount_col_letter) - 1
+
+        rows = ws.get_all_values()[start_row - 1:]
+
+        for row in rows:
+            if max(date_idx, amount_idx) >= len(row):
+                continue
+
+            date_str = row[date_idx].strip()
+            amount_str = row[amount_idx].strip()
+
+            if not date_str or not amount_str:
+                continue
+
+            try:
+                date_obj = datetime.strptime(date_str, "%m/%d/%Y")
+                if date_obj.month == today.month and date_obj.year == today.year:
+                    weekday = date_obj.weekday()  # 0=Monday, 6=Sunday
+                    amt = clean_money(amount_str)
+                    weekday_totals[weekday] += amt
+                    weekday_counts[weekday] += 1
+            except Exception as e:
+                print(f"[WARN] Skipping row: {e}")
+                continue
+
+    averages = {}
+    for wd in range(7):
+        if weekday_counts[wd] > 0:
+            averages[wd] = weekday_totals[wd] / weekday_counts[wd]
+        else:
+            averages[wd] = 0.0
+
+    best_day = min(averages.items(), key=lambda x: x[1])
+    worst_day = max(averages.items(), key=lambda x: x[1])
+
+    # Map weekday numbers to names
+    weekday_names = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"]
+
+    return {
+        "best": (weekday_names[best_day[0]], round(best_day[1], 2)),
+        "worst": (weekday_names[worst_day[0]], round(worst_day[1], 2)),
+    }
