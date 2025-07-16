@@ -2,52 +2,13 @@
 
 from datetime import datetime
 from openpyxl.utils import column_index_from_string
-from sheets_auth import get_expense_worksheet, get_income_worksheet
 from card_ui import CardSelectView
 import asyncio
 import pytz
+from sheets_auth import get_expense_worksheet, get_income_worksheet
+from sheets_config import get_category_columns
 from sheets_utils import resolve_query_persons
 
-# category column map
-get_category_columns = {
-    "grocery": {
-        "start_row": 3,
-        "columns": {
-            "date": "A",
-            "amount": "B",
-            "location": "C",
-            "person": "D"
-        }
-    },
-    "gas": {
-        "start_row": 3,
-        "columns": {
-            "date": "H",
-            "amount": "I",
-            "person": "J"
-        }
-    },
-    "food": {
-        "start_row": 3,
-        "columns": {
-            "date": "N",
-            "item": "O",
-            "amount": "P",
-            "location": "Q",
-            "person": "R"
-        }
-    },
-    "shopping": {
-        "start_row": 3,
-        "columns": {
-            "date": "V",
-            "item": "W",
-            "amount": "X",
-            "location": "Y",
-            "person": "Z"
-        }
-    }
-}
 
 # Temporary memory for user interactions (used for dropdown callbacks)
 pending_data_by_user = {}

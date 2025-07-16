@@ -2,7 +2,7 @@ from sheets_auth import get_expense_worksheet, get_income_worksheet, get_subscri
 from openpyxl.utils import column_index_from_string
 from datetime import datetime, timedelta
 import re
-from sheets_writer import get_category_columns
+from sheets_config import get_category_columns
 from dateutil import parser as dateparser
 from rapidfuzz import fuzz
 from collections import defaultdict, Counter
