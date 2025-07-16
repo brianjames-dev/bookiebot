@@ -1026,7 +1026,7 @@ async def best_worst_day_of_week(persons):
     }
 
 
-async def longest_no_spend_streak():
+async def longest_no_spend_streak(persons):
     ws = get_expense_worksheet()
     today = get_local_today()
     daily_totals = {day: 0.0 for day in range(1, today.day + 1)}
@@ -1037,20 +1037,29 @@ async def longest_no_spend_streak():
         start_row = config["start_row"]
         date_col_letter = config["columns"]["date"]
         amount_col_letter = config["columns"]["amount"]
+        person_col_letter = config["columns"].get("person")
+
+        if not person_col_letter:
+            continue
 
         date_idx = column_index_from_string(date_col_letter) - 1
         amount_idx = column_index_from_string(amount_col_letter) - 1
+        person_idx = column_index_from_string(person_col_letter) - 1
 
         rows = ws.get_all_values()[start_row - 1:]
 
         for row in rows:
-            if max(date_idx, amount_idx) >= len(row):
+            if max(date_idx, amount_idx, person_idx) >= len(row):
                 continue
 
             date_str = row[date_idx].strip()
             amount_str = row[amount_idx].strip()
+            person_str = row[person_idx].strip()
 
-            if not date_str or not amount_str:
+            if not date_str or not amount_str or not person_str:
+                continue
+
+            if person_str not in persons:
                 continue
 
             try:
@@ -1062,7 +1071,7 @@ async def longest_no_spend_streak():
                 print(f"[WARN] Skipping row: {e}")
                 continue
 
-    # Find longest streak
+    # Find longest streak of 0.0
     longest = 0
     current = 0
     start = None
@@ -1082,9 +1091,8 @@ async def longest_no_spend_streak():
             current = 0
 
     if longest == 0:
-        return None  # no streak found
+        return None
 
-    # Return as a tuple: (length, start_day, end_day)
     return (longest, best_start, best_end)
 
 

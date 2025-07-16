@@ -457,8 +457,13 @@ async def query_best_worst_day_of_week_handler(entities, message):
     await message.channel.send(response)
 
 
-async def query_longest_no_spend_streak_handler(message):
-    result = await su.longest_no_spend_streak()
+async def query_longest_no_spend_streak_handler(entities, message):
+    persons = entities.get("persons")
+    if not persons:
+        await message.channel.send("❌ Could not determine person(s) to query.")
+        return
+
+    result = await su.longest_no_spend_streak(persons)
     if result is None:
         await message.channel.send("💸 No no-spend streaks found this month.")
         return
