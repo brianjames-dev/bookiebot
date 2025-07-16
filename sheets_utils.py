@@ -711,38 +711,47 @@ async def projected_spending(persons):
     return round(projected, 2)
 
 
-async def weekend_vs_weekday():
+async def weekend_vs_weekday(persons):
     ws = get_expense_worksheet()
     weekend = 0.0
     weekday = 0.0
 
-    category_columns = get_category_columns  # or get_category_columns() if a function
+    category_columns = get_category_columns
 
     for category, config in category_columns.items():
         start_row = config["start_row"]
         date_col_letter = config["columns"]["date"]
         amount_col_letter = config["columns"]["amount"]
+        person_col_letter = config["columns"].get("person")
+
+        if not person_col_letter:
+            continue  # skip categories without a person column
 
         date_idx = column_index_from_string(date_col_letter) - 1
         amount_idx = column_index_from_string(amount_col_letter) - 1
+        person_idx = column_index_from_string(person_col_letter) - 1
 
         rows = ws.get_all_values()[start_row - 1:]
 
         for row in rows:
-            if max(date_idx, amount_idx) >= len(row):
+            if max(date_idx, amount_idx, person_idx) >= len(row):
                 continue
 
             date_str = row[date_idx].strip()
             amount_str = row[amount_idx].strip()
+            person_str = row[person_idx].strip()
 
-            if not date_str or not amount_str:
+            if not date_str or not amount_str or not person_str:
+                continue
+
+            if person_str not in persons:
                 continue
 
             try:
                 date_obj = datetime.strptime(date_str, "%m/%d/%Y")
                 amt = clean_money(amount_str)
 
-                if date_obj.weekday() >= 5:
+                if date_obj.weekday() >= 5:  # Saturday or Sunday
                     weekend += amt
                 else:
                     weekday += amt
@@ -751,7 +760,7 @@ async def weekend_vs_weekday():
                 print(f"[WARN] Skipping row: {e}")
                 continue
 
-    return weekend, weekday
+    return round(weekend, 2), round(weekday, 2)
 
 
 async def no_spend_days():

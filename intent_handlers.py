@@ -376,8 +376,13 @@ async def query_projected_spending_handler(entities, message):
     await message.channel.send(f"📈 Projected spending for this month: ${projected:,.2f}")
 
 
-async def query_weekend_vs_weekday_handler(message):
-    weekend, weekday = await su.weekend_vs_weekday()
+async def query_weekend_vs_weekday_handler(entities, message):
+    persons = entities.get("persons")
+    if not persons:
+        await message.channel.send("❌ Could not determine person(s) to query.")
+        return
+
+    weekend, weekday = await su.weekend_vs_weekday(persons)
     await message.channel.send(
         f"🌞 Weekends: ${weekend:.2f}\n📅 Weekdays: ${weekday:.2f}"
     )
