@@ -332,7 +332,12 @@ async def query_largest_single_expense_handler(entities, message):
 
 async def query_top_n_expenses_handler(entities, message):
     n = int(entities.get("n", 5))
-    top_expenses = await su.top_n_expenses_food_and_shopping(n)
+    persons = entities.get("persons")
+    if not persons:
+        await message.channel.send("❌ Could not determine person(s) to query.")
+        return
+
+    top_expenses = await su.top_n_expenses_all_categories(persons, n)
 
     if not top_expenses:
         await message.channel.send("❌ Could not find any expenses.")

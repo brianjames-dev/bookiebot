@@ -534,54 +534,64 @@ async def largest_single_expense(persons):
     return result
 
 
-async def top_n_expenses_food_and_shopping(n=5):
+async def top_n_expenses_all_categories(persons, n=5):
     ws = get_expense_worksheet()
     rows = ws.get_all_values()[2:]  # skip header
 
-    # Food indices
-    food_date_idx = column_index_from_string('N') - 1
-    food_item_idx = column_index_from_string('O') - 1
-    food_amount_idx = column_index_from_string('P') - 1
-    food_location_idx = column_index_from_string('Q') - 1
-
-    # Shopping indices
-    shop_date_idx = column_index_from_string('V') - 1
-    shop_item_idx = column_index_from_string('W') - 1
-    shop_amount_idx = column_index_from_string('X') - 1
-    shop_location_idx = column_index_from_string('Y') - 1
+    configs = {
+        "grocery": {
+            "date": "A", "item": None, "amount": "B", "location": "C", "person": "D"
+        },
+        "gas": {
+            "date": "H", "item": None, "amount": "I", "location": None, "person": "J"
+        },
+        "food": {
+            "date": "N", "item": "O", "amount": "P", "location": "Q", "person": "R"
+        },
+        "shopping": {
+            "date": "V", "item": "W", "amount": "X", "location": "Y", "person": "Z"
+        }
+    }
 
     expenses = []
 
     for row in rows:
-        # Food
-        if len(row) > max(food_location_idx, food_amount_idx):
+        for category, cols in configs.items():
             try:
-                amt = clean_money(row[food_amount_idx])
-                if amt > 0:
-                    expenses.append({
-                        "category": "food",
-                        "amount": round(amt, 2),
-                        "date": row[food_date_idx],
-                        "item": row[food_item_idx],
-                        "location": row[food_location_idx]
-                    })
-            except Exception:
-                pass
+                date_idx = column_index_from_string(cols["date"]) - 1
+                amount_idx = column_index_from_string(cols["amount"]) - 1
+                person_idx = column_index_from_string(cols["person"]) - 1
 
-        # Shopping
-        if len(row) > max(shop_location_idx, shop_amount_idx):
-            try:
-                amt = clean_money(row[shop_amount_idx])
-                if amt > 0:
-                    expenses.append({
-                        "category": "shopping",
-                        "amount": round(amt, 2),
-                        "date": row[shop_date_idx],
-                        "item": row[shop_item_idx],
-                        "location": row[shop_location_idx]
-                    })
-            except Exception:
-                pass
+                item_idx = column_index_from_string(cols["item"]) - 1 if cols["item"] else None
+                location_idx = column_index_from_string(cols["location"]) - 1 if cols["location"] else None
+
+                if max(date_idx, amount_idx, person_idx, *(i for i in [item_idx, location_idx] if i is not None)) >= len(row):
+                    continue
+
+                person_str = row[person_idx].strip()
+                if person_str not in persons:
+                    continue
+
+                amount_str = row[amount_idx].strip()
+                if not amount_str:
+                    continue
+
+                amt = clean_money(amount_str)
+                if amt <= 0:
+                    continue
+
+                expense = {
+                    "category": category,
+                    "amount": round(amt, 2),
+                    "date": row[date_idx],
+                    "item": row[item_idx] if item_idx is not None and item_idx < len(row) else "",
+                    "location": row[location_idx] if location_idx is not None and location_idx < len(row) else ""
+                }
+                expenses.append(expense)
+
+            except Exception as e:
+                print(f"[WARN] Skipping row: {e}")
+                continue
 
     # Sort by amount descending
     expenses.sort(key=lambda x: x["amount"], reverse=True)
