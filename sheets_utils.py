@@ -74,12 +74,11 @@ def resolve_query_persons(discord_user: str, person: str | None) -> list[str]:
     person = (person or "").strip()
 
     if not person:
-        if discord_user == "hannah":
-            return ["Hannah"]
-        elif discord_user == "brian":
-            return ["Brian (BofA)", "Brian (AL)"]
-        else:
-            return []  # or raise an error if unexpected
+        mapping = {
+            "hannerish": ["Hannah"],
+            ".deebers": ["Brian (BofA)", "Brian (AL)"]
+        }
+        return mapping.get(discord_user, [])
 
     if person.lower() == "brian":
         return ["Brian (BofA)", "Brian (AL)"]
