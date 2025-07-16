@@ -26,7 +26,7 @@ INTENT_HANDLERS = {
     "query_smud_paid":                      lambda e, m: query_smud_paid_handler(m),
     "query_student_loans_paid":             lambda e, m: query_student_loan_paid_handler(m),
     "query_total_for_store":                lambda e, m: query_total_for_store_handler(e, m),
-    "query_highest_expense_category":       lambda e, m: query_highest_expense_category_handler(m),
+    "query_highest_expense_category":       lambda e, m: query_highest_expense_category_handler(e, m), #
     "query_total_income":                   lambda e, m: query_total_income_handler(m),
     "query_remaining_budget":               lambda e, m: query_remaining_budget_handler(m),
     "query_average_daily_spend":            lambda e, m: query_average_daily_spend_handler(m),
