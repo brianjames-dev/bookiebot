@@ -35,7 +35,7 @@ INTENT_HANDLERS = {
     "query_largest_single_expense":         lambda e, m: query_largest_single_expense_handler(e, m),
     "query_top_n_expenses":                 lambda e, m: query_top_n_expenses_handler(e, m),
     "query_spent_this_week":                lambda e, m: query_spent_this_week_handler(e, m),
-    "query_projected_spending":             lambda e, m: query_projected_spending_handler(m),
+    "query_projected_spending":             lambda e, m: query_projected_spending_handler(e, m),
     "query_weekend_vs_weekday":             lambda e, m: query_weekend_vs_weekday_handler(m),
     "query_no_spend_days":                  lambda e, m: query_no_spend_days_handler(m),
     "query_total_for_item":                 lambda e, m: query_total_for_item_handler(e, m),
@@ -366,8 +366,13 @@ async def query_spent_this_week_handler(entities, message):
     await message.channel.send(f"📆 You’ve spent ${total:.2f} so far this week.")
 
 
-async def query_projected_spending_handler(message):
-    projected = await su.projected_spending()
+async def query_projected_spending_handler(entities, message):
+    persons = entities.get("persons")
+    if not persons:
+        await message.channel.send("❌ Could not determine person(s) to query.")
+        return
+
+    projected = await su.projected_spending(persons)
     await message.channel.send(f"📈 Projected spending for this month: ${projected:,.2f}")
 
 
