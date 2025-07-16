@@ -32,7 +32,7 @@ INTENT_HANDLERS = {
     "query_average_daily_spend":            lambda e, m: query_average_daily_spend_handler(e, m),
     "query_expense_breakdown_percentages":  lambda e, m: query_expense_breakdown_handler(e, m),
     "query_total_for_category":             lambda e, m: query_total_for_category_handler(e, m),
-    "query_largest_single_expense":         lambda e, m: query_largest_single_expense_handler(m),
+    "query_largest_single_expense":         lambda e, m: query_largest_single_expense_handler(e, m),
     "query_top_n_expenses":                 lambda e, m: query_top_n_expenses_handler(e, m),
     "query_spent_this_week":                lambda e, m: query_spent_this_week_handler(m),
     "query_projected_spending":             lambda e, m: query_projected_spending_handler(m),
