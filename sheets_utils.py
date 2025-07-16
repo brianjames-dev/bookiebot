@@ -359,53 +359,56 @@ async def average_daily_spend(persons):
         return None
 
 
-async def expense_breakdown_percentages(person):
+async def expense_breakdown_percentages(persons: list[str]):
     ws = get_expense_worksheet()
-    category_amounts = {}
+    category_amounts = {'grocery': 0.0, 'gas': 0.0, 'food': 0.0, 'shopping': 0.0}
+    grand_total = 0.0
 
-    # per-person cell map
+    # per-person row and total cell maps
     person_row_map = {
         "Brian (AL)": 3,
         "Brian (BofA)": 4,
         "Hannah": 5
     }
 
-    row = person_row_map.get(person)
-    if not row:
-        print(f"[ERROR] Unknown person: {person}")
-        return {}
-
-    categories = {
-        'grocery': f'F{row}',
-        'gas': f'L{row}',
-        'food': f'T{row}',
-        'shopping': f'AB{row}'
-    }
-
-    # Get total for this person
     total_cell_map = {
         "Brian (AL)": "AE27",
         "Brian (BofA)": "AE28",
         "Hannah": "AE31"
     }
 
-    total_cell = total_cell_map.get(person)
-    total_val = ws.acell(total_cell).value
-    grand_total = clean_money(total_val)
+    category_cells = {
+        'grocery': 'F{}',
+        'gas': 'L{}',
+        'food': 'T{}',
+        'shopping': 'AB{}'
+    }
+
+    # sum categories & total over all persons
+    for person in persons:
+        row = person_row_map.get(person)
+        total_cell = total_cell_map.get(person)
+
+        if not row or not total_cell:
+            print(f"[ERROR] Unknown person: {person}")
+            continue
+
+        total_val = ws.acell(total_cell).value
+        grand_total += clean_money(total_val)
+
+        for category, cell_fmt in category_cells.items():
+            cell_ref = cell_fmt.format(row)
+            c_row = int(re.sub(r'\D', '', cell_ref))
+            c_col = column_index_from_string(re.sub(r'\d', '', cell_ref))
+            val = ws.cell(c_row, c_col).value
+            amount = clean_money(val)
+            category_amounts[category] += amount
 
     if grand_total == 0:
-        print(f"[WARN] Total for {person} is 0. Cannot calculate breakdown.")
+        print(f"[WARN] Combined total for {persons} is 0. Cannot calculate breakdown.")
         return {}
 
-    # Fetch category amounts
-    for category, cell_ref in categories.items():
-        c_row = int(re.sub(r'\D', '', cell_ref))
-        c_col = column_index_from_string(re.sub(r'\d', '', cell_ref))
-        val = ws.cell(c_row, c_col).value
-        amount = clean_money(val)
-        category_amounts[category] = amount
-
-    # Build result
+    # build result
     breakdown = {}
     for cat, amt in category_amounts.items():
         pct = round(amt / grand_total * 100, 2) if grand_total > 0 else 0

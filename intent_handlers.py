@@ -223,13 +223,7 @@ async def query_expense_breakdown_handler(entities, message):
         await message.channel.send("❌ Could not determine person(s) to query.")
         return
 
-    # for now we only handle single-person breakdown
-    if len(persons) > 1:
-        await message.channel.send("❌ Please specify a single person for breakdown.")
-        return
-
-    person = persons[0]
-    breakdown = await su.expense_breakdown_percentages(person)
+    breakdown = await su.expense_breakdown_percentages(persons)
 
     if not breakdown:
         await message.channel.send("❌ Could not calculate expense breakdown.")
@@ -251,13 +245,14 @@ async def query_expense_breakdown_handler(entities, message):
         amounts.append(amt)
         lines.append(f"{category.capitalize()}: ${amt:.2f} ({pct:.2f}%)")
 
+    people_str = ", ".join(persons)
     grand_total = breakdown["grand_total"]
 
     # Build text breakdown
     text = "\n".join(lines)
-    text = f"📊 Expense breakdown for {person}:\n{text}\n\n💵 Total: ${grand_total:.2f}"
+    text = f"📊 Expense breakdown for {people_str}:\n{text}\n\n💵 Total: ${grand_total:.2f}"
 
-    # Cutie Pie Chart 🎂
+    # Pie Chart
     fig, ax = plt.subplots(figsize=(6, 6))
     colors = plt.get_cmap('Pastel1').colors
 
@@ -287,11 +282,10 @@ async def query_expense_breakdown_handler(entities, message):
         pad=10
     )
 
-    ax.axis('equal')  # perfect circle
+    ax.axis('equal')
 
     plt.tight_layout()
 
-    # Save to buffer
     buf = io.BytesIO()
     plt.savefig(buf, format='png', dpi=150)
     buf.seek(0)
