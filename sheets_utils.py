@@ -359,72 +359,56 @@ async def average_daily_spend(persons):
         return None
 
 
-async def expense_breakdown_percentages(persons):
+async def expense_breakdown_percentages(person):
     ws = get_expense_worksheet()
+    category_amounts = {}
 
-    # Map person → their grand total cell & category cells
-    person_config = {
-        "Brian (AL)": {
-            "grand_total_cell": "AE27",
-            "categories": {
-                'grocery': 'F3',
-                'gas': 'L3',
-                'food': 'T3',
-                'shopping': 'AB3'
-            }
-        },
-        "Brian (BofA)": {
-            "grand_total_cell": "AE28",
-            "categories": {
-                'grocery': 'F4',
-                'gas': 'L4',
-                'food': 'T4',
-                'shopping': 'AB4'
-            }
-        },
-        "Hannah": {
-            "grand_total_cell": "AE31",
-            "categories": {
-                'grocery': 'F5',
-                'gas': 'L5',
-                'food': 'T5',
-                'shopping': 'AB5'
-            }
-        }
+    # per-person cell map
+    person_row_map = {
+        "Brian (AL)": 3,
+        "Brian (BofA)": 4,
+        "Hannah": 5
     }
 
-    # Accumulators
-    grand_total = 0.0
-    category_amounts = {'grocery': 0.0, 'gas': 0.0, 'food': 0.0, 'shopping': 0.0}
-
-    # Sum over all persons being queried
-    for person in persons:
-        config = person_config.get(person)
-        if not config:
-            print(f"[WARN] No config for person: {person}")
-            continue
-
-        # Add to grand total
-        row, col = int(config['grand_total_cell'][2:]), column_index_from_string(config['grand_total_cell'][:2])
-        val = ws.cell(row, col).value
-        grand_total += clean_money(val)
-
-        # Add to categories
-        for category, cell_ref in config['categories'].items():
-            r = int(re.sub(r'\D', '', cell_ref))
-            c = column_index_from_string(re.sub(r'\d', '', cell_ref))
-            v = ws.cell(r, c).value
-            amt = clean_money(v)
-            category_amounts[category] += amt
-
-    if grand_total == 0:
-        print("[WARN] Grand total is 0. Cannot calculate breakdown.")
+    row = person_row_map.get(person)
+    if not row:
+        print(f"[ERROR] Unknown person: {person}")
         return {}
 
-    # Build breakdown
+    categories = {
+        'grocery': f'F{row}',
+        'gas': f'L{row}',
+        'food': f'T{row}',
+        'shopping': f'AB{row}'
+    }
+
+    # Get total for this person
+    total_cell_map = {
+        "Brian (AL)": "AE27",
+        "Brian (BofA)": "AE28",
+        "Hannah": "AE31"
+    }
+
+    total_cell = total_cell_map.get(person)
+    total_val = ws.acell(total_cell).value
+    grand_total = clean_money(total_val)
+
+    if grand_total == 0:
+        print(f"[WARN] Total for {person} is 0. Cannot calculate breakdown.")
+        return {}
+
+    # Fetch category amounts
+    for category, cell_ref in categories.items():
+        c_row = int(re.sub(r'\D', '', cell_ref))
+        c_col = column_index_from_string(re.sub(r'\d', '', cell_ref))
+        val = ws.cell(c_row, c_col).value
+        amount = clean_money(val)
+        category_amounts[category] = amount
+
+    # Build result
     breakdown = {}
     for cat, amt in category_amounts.items():
-        pct = round(amt / grand_total * 100, 2)
+        pct = round(amt / grand_total * 100, 2) if grand_total > 0 else 0
         breakdown[cat] = {
             "amount": round(amt, 2),
             "percentage": pct
@@ -435,7 +419,6 @@ async def expense_breakdown_percentages(persons):
         "grand_total": round(grand_total, 2)
     }
 
-    print(f"[DEBUG] Breakdown result: {result}")
     return result
 
 

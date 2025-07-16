@@ -223,7 +223,14 @@ async def query_expense_breakdown_handler(entities, message):
         await message.channel.send("❌ Could not determine person(s) to query.")
         return
 
-    breakdown = await su.expense_breakdown_percentages(persons)
+    # for now we only handle single-person breakdown
+    if len(persons) > 1:
+        await message.channel.send("❌ Please specify a single person for breakdown.")
+        return
+
+    person = persons[0]
+    breakdown = await su.expense_breakdown_percentages(person)
+
     if not breakdown:
         await message.channel.send("❌ Could not calculate expense breakdown.")
         return
@@ -232,19 +239,25 @@ async def query_expense_breakdown_handler(entities, message):
     labels = []
     amounts = []
     lines = []
+
     for category, info in breakdown["categories"].items():
         amt = info["amount"]
         pct = info["percentage"]
+
+        if amt == 0:
+            continue  # 🚨 skip 0 categories
+
         labels.append(f"{category.capitalize()}\n(${amt:.2f})")
         amounts.append(amt)
         lines.append(f"{category.capitalize()}: ${amt:.2f} ({pct:.2f}%)")
 
     grand_total = breakdown["grand_total"]
 
+    # Build text breakdown
     text = "\n".join(lines)
-    text = f"📊 Expense breakdown:\n{text}\n\n💵 Grand total: ${grand_total:.2f}"
+    text = f"📊 Expense breakdown for {person}:\n{text}\n\n💵 Total: ${grand_total:.2f}"
 
-    # Pie chart
+    # Cutie Pie Chart 🎂
     fig, ax = plt.subplots(figsize=(6, 6))
     colors = plt.get_cmap('Pastel1').colors
 
@@ -274,15 +287,18 @@ async def query_expense_breakdown_handler(entities, message):
         pad=10
     )
 
-    ax.axis('equal')
+    ax.axis('equal')  # perfect circle
+
     plt.tight_layout()
 
+    # Save to buffer
     buf = io.BytesIO()
     plt.savefig(buf, format='png', dpi=150)
     buf.seek(0)
     plt.close(fig)
 
     file = discord.File(fp=buf, filename="expense_breakdown.png")
+
     await message.channel.send(content=text, file=file)
 
 
