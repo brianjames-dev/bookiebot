@@ -37,7 +37,7 @@ INTENT_HANDLERS = {
     "query_spent_this_week":                lambda e, m: query_spent_this_week_handler(e, m),
     "query_projected_spending":             lambda e, m: query_projected_spending_handler(e, m),
     "query_weekend_vs_weekday":             lambda e, m: query_weekend_vs_weekday_handler(e, m),
-    "query_no_spend_days":                  lambda e, m: query_no_spend_days_handler(m),
+    "query_no_spend_days":                  lambda e, m: query_no_spend_days_handler(e, m),
     "query_total_for_item":                 lambda e, m: query_total_for_item_handler(e, m),
     "query_subscriptions":                  lambda e, m: query_subscriptions_handler(m),
     "query_daily_spending_calendar":        lambda e, m: query_daily_spending_calendar_handler(m),
@@ -388,8 +388,13 @@ async def query_weekend_vs_weekday_handler(entities, message):
     )
 
 
-async def query_no_spend_days_handler(message):
-    count, days = await su.no_spend_days()
+async def query_no_spend_days_handler(entities, message):
+    persons = entities.get("persons")
+    if not persons:
+        await message.channel.send("❌ Could not determine person(s) to query.")
+        return
+
+    count, days = await su.no_spend_days(persons)
     days_str = ", ".join(str(d) for d in days)
     await message.channel.send(
         f"🚫 No-spend days this month: {count}\nDays: {days_str}"
