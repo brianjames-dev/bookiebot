@@ -495,7 +495,12 @@ async def query_days_budget_lasts_handler(message):
 
 async def query_most_frequent_purchases_handler(entities, message):
     n = int(entities.get("n", 3))
-    results = await su.most_frequent_purchases(n)
+    persons = entities.get("persons")
+    if not persons:
+        await message.channel.send("❌ Could not determine person(s) to query.")
+        return
+
+    results = await su.most_frequent_purchases(persons, n)
 
     if not results:
         await message.channel.send("❌ Could not find any purchases this month.")
@@ -514,11 +519,15 @@ async def query_most_frequent_purchases_handler(entities, message):
 
 async def query_expenses_on_day_handler(entities, message):
     day_str = entities.get("date")
+    persons = entities.get("persons")
     if not day_str:
         await message.channel.send("❌ Please specify a date (e.g., MM/DD, MM/DD/YYYY, or YYYY-MM-DD).")
         return
+    if not persons:
+        await message.channel.send("❌ Could not determine person(s) to query.")
+        return
 
-    entries, total = await su.expenses_on_day(day_str)
+    entries, total = await su.expenses_on_day(day_str, persons)
 
     if not entries:
         await message.channel.send(f"📆 No expenses found on {day_str}.")

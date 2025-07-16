@@ -1109,7 +1109,7 @@ async def days_budget_lasts():
     return max(0, round(estimated_days, 1))  # never negative
 
 
-async def most_frequent_purchases(n=3):
+async def most_frequent_purchases(persons, n=3):
     ws = get_expense_worksheet()
     today = get_local_today()
     item_counts = Counter()
@@ -1122,25 +1122,31 @@ async def most_frequent_purchases(n=3):
         date_col_letter = config["columns"]["date"]
         amount_col_letter = config["columns"]["amount"]
         item_col_letter = config["columns"].get("item")
+        person_col_letter = config["columns"].get("person")
 
-        if not item_col_letter:
-            continue  # skip if no item column
+        if not item_col_letter or not person_col_letter:
+            continue  # skip if no item or person column
 
         date_idx = column_index_from_string(date_col_letter) - 1
         amount_idx = column_index_from_string(amount_col_letter) - 1
         item_idx = column_index_from_string(item_col_letter) - 1
+        person_idx = column_index_from_string(person_col_letter) - 1
 
         rows = ws.get_all_values()[start_row - 1:]
 
         for row in rows:
-            if max(date_idx, amount_idx, item_idx) >= len(row):
+            if max(date_idx, amount_idx, item_idx, person_idx) >= len(row):
                 continue
 
             date_str = row[date_idx].strip()
             amount_str = row[amount_idx].strip()
             item_str = row[item_idx].strip().lower()
+            person_str = row[person_idx].strip()
 
-            if not date_str or not amount_str or not item_str:
+            if not date_str or not amount_str or not item_str or not person_str:
+                continue
+
+            if person_str not in persons:
                 continue
 
             try:
@@ -1168,9 +1174,9 @@ async def most_frequent_purchases(n=3):
     return result
 
 
-async def expenses_on_day(day_str):
+async def expenses_on_day(day_str, persons):
     """
-    Find all expenses on a specific day.
+    Find all expenses on a specific day for specified persons.
     Supports: MM/DD, MM/DD/YYYY, YYYY-MM-DD, or natural language dates.
     """
     try:
@@ -1192,24 +1198,33 @@ async def expenses_on_day(day_str):
         amount_col_letter = config["columns"]["amount"]
         item_col_letter = config["columns"].get("item")
         location_col_letter = config["columns"].get("location")
+        person_col_letter = config["columns"].get("person")
+
+        if not person_col_letter:
+            continue
 
         date_idx = column_index_from_string(date_col_letter) - 1
         amount_idx = column_index_from_string(amount_col_letter) - 1
+        person_idx = column_index_from_string(person_col_letter) - 1
         item_idx = column_index_from_string(item_col_letter) - 1 if item_col_letter else None
         location_idx = column_index_from_string(location_col_letter) - 1 if location_col_letter else None
 
         rows = ws.get_all_values()[start_row - 1:]
 
         for row in rows:
-            if max(date_idx, amount_idx) >= len(row):
+            if max(date_idx, amount_idx, person_idx) >= len(row):
                 continue
 
             date_str = row[date_idx].strip()
             amount_str = row[amount_idx].strip()
+            person_str = row[person_idx].strip()
             item_str = row[item_idx].strip() if item_idx and len(row) > item_idx else ""
             location_str = row[location_idx].strip() if location_idx and len(row) > location_idx else ""
 
-            if not date_str or not amount_str:
+            if not date_str or not amount_str or not person_str:
+                continue
+
+            if person_str not in persons:
                 continue
 
             try:
