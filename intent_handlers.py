@@ -520,12 +520,25 @@ async def query_most_frequent_purchases_handler(entities, message):
 async def query_expenses_on_day_handler(entities, message):
     day_str = entities.get("date")
     persons = entities.get("persons")
-    if not day_str:
-        await message.channel.send("❌ Please specify a date (e.g., MM/DD, MM/DD/YYYY, or YYYY-MM-DD).")
-        return
+
     if not persons:
         await message.channel.send("❌ Could not determine person(s) to query.")
         return
+
+    # Try fallback if no date extracted
+    if not day_str:
+        # naive fallback: extract number from message
+        import re
+        m = re.search(r"\b(\d{1,2})(st|nd|rd|th)?\b", message.content)
+        if m:
+            day_str = m.group(1)  # just the number
+            # prepend month/year
+            today = get_local_today()
+            day_str = f"{today.month}/{int(day_str)}/{today.year}"
+            print(f"[INFO] Fallback parsed date: {day_str}")
+        else:
+            await message.channel.send("❌ Please specify a date (e.g., MM/DD, MM/DD/YYYY, or YYYY-MM-DD).")
+            return
 
     entries, total = await su.expenses_on_day(day_str, persons)
 
