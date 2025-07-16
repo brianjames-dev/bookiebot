@@ -26,10 +26,10 @@ INTENT_HANDLERS = {
     "query_smud_paid":                      lambda e, m: query_smud_paid_handler(m),
     "query_student_loans_paid":             lambda e, m: query_student_loan_paid_handler(m),
     "query_total_for_store":                lambda e, m: query_total_for_store_handler(e, m),
-    "query_highest_expense_category":       lambda e, m: query_highest_expense_category_handler(e, m), #
+    "query_highest_expense_category":       lambda e, m: query_highest_expense_category_handler(e, m),
     "query_total_income":                   lambda e, m: query_total_income_handler(m),
-    "query_remaining_budget":               lambda e, m: query_remaining_budget_handler(m),
-    "query_average_daily_spend":            lambda e, m: query_average_daily_spend_handler(m),
+    "query_remaining_budget":               lambda e, m: query_remaining_budget_handler(m), 
+    "query_average_daily_spend":            lambda e, m: query_average_daily_spend_handler(e, m),
     "query_expense_breakdown_percentages":  lambda e, m: query_expense_breakdown_handler(m),
     "query_total_for_category":             lambda e, m: query_total_for_category_handler(e, m),
     "query_largest_single_expense":         lambda e, m: query_largest_single_expense_handler(m),
@@ -204,9 +204,17 @@ async def query_remaining_budget_handler(message):
         )
 
 
-async def query_average_daily_spend_handler(message):
-    avg = await su.average_daily_spend()
-    await message.channel.send(f"Average daily spend this month: ${avg:.2f}.")
+async def query_average_daily_spend_handler(entities, message):
+    persons = entities.get("persons")
+    if not persons:
+        await message.channel.send("❌ Could not determine person(s) to query.")
+        return
+
+    avg = await su.average_daily_spend(persons)
+    if avg is not None:
+        await message.channel.send(f"📊 Average daily spend this month: ${avg:.2f}.")
+    else:
+        await message.channel.send("❌ Could not calculate average daily spend.")
 
 
 async def query_expense_breakdown_handler(message):

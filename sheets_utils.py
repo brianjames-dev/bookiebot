@@ -305,24 +305,53 @@ async def remaining_budget():
         return 0.0
 
 
-async def average_daily_spend():
+async def average_daily_spend(persons):
     ws = get_expense_worksheet()
     try:
         today = get_local_today()
         day_of_month = today.day
 
-        # Grab T7 and AB7
-        shopping_cell = ws.cell(7, column_index_from_string("T")).value
-        food_cell = ws.cell(7, column_index_from_string("AB")).value
+        shopping_total = 0.0
+        food_total = 0.0
 
-        # Clean values
-        shopping_total = clean_money(shopping_cell)
-        food_total = clean_money(food_cell)
+        rows = ws.get_all_values()[2:]  # skip header rows
 
-        # Compute total spend in these categories
+        # Indices for Shopping & Food
+        shop_date_idx = column_index_from_string('V') - 1
+        shop_amount_idx = column_index_from_string('X') - 1
+        shop_person_idx = column_index_from_string('Z') - 1
+
+        food_date_idx = column_index_from_string('N') - 1
+        food_amount_idx = column_index_from_string('P') - 1
+        food_person_idx = column_index_from_string('R') - 1
+
+        for row in rows:
+            # Shopping
+            if len(row) > max(shop_date_idx, shop_amount_idx, shop_person_idx):
+                date_str = row[shop_date_idx].strip()
+                amount_str = row[shop_amount_idx].strip()
+                person_str = row[shop_person_idx].strip()
+
+                if date_str and amount_str and person_str in persons:
+                    date_obj = datetime.strptime(date_str, "%m/%d/%Y")
+                    if date_obj.month == today.month and date_obj.year == today.year:
+                        amt = clean_money(amount_str)
+                        shopping_total += amt
+
+            # Food
+            if len(row) > max(food_date_idx, food_amount_idx, food_person_idx):
+                date_str = row[food_date_idx].strip()
+                amount_str = row[food_amount_idx].strip()
+                person_str = row[food_person_idx].strip()
+
+                if date_str and amount_str and person_str in persons:
+                    date_obj = datetime.strptime(date_str, "%m/%d/%Y")
+                    if date_obj.month == today.month and date_obj.year == today.year:
+                        amt = clean_money(amount_str)
+                        food_total += amt
+
         total_spent = shopping_total + food_total
-
-        avg_daily_spend = total_spent / day_of_month
+        avg_daily_spend = total_spent / day_of_month if day_of_month else 0.0
         return round(avg_daily_spend, 2)
 
     except Exception as e:
