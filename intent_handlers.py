@@ -356,8 +356,13 @@ async def query_top_n_expenses_handler(entities, message):
     await message.channel.send(f"🔝 Top {n} expenses:\n{text}")
 
 
-async def query_spent_this_week_handler(message):
-    total = await su.spent_this_week()
+async def query_spent_this_week_handler(entities, message):
+    persons = entities.get("persons")
+    if not persons:
+        await message.channel.send("❌ Could not determine person(s) to query.")
+        return
+
+    total = await su.spent_this_week(persons)
     await message.channel.send(f"📆 You’ve spent ${total:.2f} so far this week.")
 
 
