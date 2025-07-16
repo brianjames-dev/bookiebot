@@ -471,62 +471,67 @@ async def total_for_category(category, persons):
     return round(total, 2)
 
 
-async def largest_single_expense():
+async def largest_single_expense(persons):
     ws = get_expense_worksheet()
     rows = ws.get_all_values()[2:]  # skip header rows
 
-    # Indices for Food
-    food_date_idx = column_index_from_string('N') - 1
-    food_item_idx = column_index_from_string('O') - 1
-    food_amount_idx = column_index_from_string('P') - 1
-    food_location_idx = column_index_from_string('Q') - 1
-
-    # Indices for Shopping
-    shop_date_idx = column_index_from_string('V') - 1
-    shop_item_idx = column_index_from_string('W') - 1
-    shop_amount_idx = column_index_from_string('X') - 1
-    shop_location_idx = column_index_from_string('Y') - 1
+    configs = {
+        "food": {
+            "date": "N",
+            "item": "O",
+            "amount": "P",
+            "location": "Q",
+            "person": "R"
+        },
+        "shopping": {
+            "date": "V",
+            "item": "W",
+            "amount": "X",
+            "location": "Y",
+            "person": "Z"
+        }
+    }
 
     max_amount = 0.0
-    result = {}
+    result = None
 
     for row in rows:
-        # Check Food
-        if len(row) > max(food_location_idx, food_amount_idx):
+        for category, cols in configs.items():
             try:
-                amt = clean_money(row[food_amount_idx])
+                date_idx = column_index_from_string(cols["date"]) - 1
+                item_idx = column_index_from_string(cols["item"]) - 1
+                amount_idx = column_index_from_string(cols["amount"]) - 1
+                location_idx = column_index_from_string(cols["location"]) - 1
+                person_idx = column_index_from_string(cols["person"]) - 1
+
+                if max(date_idx, item_idx, amount_idx, location_idx, person_idx) >= len(row):
+                    continue
+
+                person_str = row[person_idx].strip()
+                if person_str not in persons:
+                    continue
+
+                amount_str = row[amount_idx].strip()
+                if not amount_str:
+                    continue
+
+                amt = clean_money(amount_str)
+
                 if amt > max_amount:
                     max_amount = amt
                     result = {
-                        "category": "food",
+                        "category": category,
                         "amount": round(amt, 2),
-                        "date": row[food_date_idx],
-                        "item": row[food_item_idx],
-                        "location": row[food_location_idx]
+                        "date": row[date_idx],
+                        "item": row[item_idx],
+                        "location": row[location_idx]
                     }
-            except Exception:
-                pass
 
-        # Check Shopping
-        if len(row) > max(shop_location_idx, shop_amount_idx):
-            try:
-                amt = clean_money(row[shop_amount_idx])
-                if amt > max_amount:
-                    max_amount = amt
-                    result = {
-                        "category": "shopping",
-                        "amount": round(amt, 2),
-                        "date": row[shop_date_idx],
-                        "item": row[shop_item_idx],
-                        "location": row[shop_location_idx]
-                    }
-            except Exception:
-                pass
+            except Exception as e:
+                print(f"[WARN] Skipping row: {e}")
+                continue
 
-    if result:
-        return result
-    else:
-        return None
+    return result
 
 
 async def top_n_expenses_food_and_shopping(n=5):

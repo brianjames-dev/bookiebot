@@ -313,8 +313,13 @@ async def query_total_for_category_handler(entities, message):
     )
 
 
-async def query_largest_single_expense_handler(message):
-    result = await su.largest_single_expense()
+async def query_largest_single_expense_handler(entities, message):
+    persons = entities.get("persons")
+    if not persons:
+        await message.channel.send("❌ Could not determine person(s) to query.")
+        return
+
+    result = await su.largest_single_expense(persons)
     if result:
         await message.channel.send(
             f"💸 Largest single expense: ${result['amount']:.2f} — "
