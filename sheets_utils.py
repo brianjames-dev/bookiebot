@@ -812,13 +812,13 @@ async def no_spend_days(persons):
     return len(no_spend), no_spend
 
 
-async def total_spent_on_item(item, top_n=5):
+async def total_spent_on_item(item, persons, top_n=5):
     ws = get_expense_worksheet()
     today = get_local_today()
     total = 0.0
     matches = []
 
-    item_norm = item.lower().replace(" ", "")  # normalize query
+    item_norm = item.lower().replace(" ", "")
 
     category_columns = get_category_columns
 
@@ -826,42 +826,49 @@ async def total_spent_on_item(item, top_n=5):
         start_row = config["start_row"]
         date_col_letter = config["columns"]["date"]
         amount_col_letter = config["columns"]["amount"]
-        item_col_letter = config["columns"].get("item")  # <- note: we need the "item" column here
+        item_col_letter = config["columns"].get("item")
+        person_col_letter = config["columns"].get("person")
 
-        if not item_col_letter:
-            continue  # skip categories without an item column
+        if not item_col_letter or not person_col_letter:
+            continue  # skip if either is missing
 
         date_idx = column_index_from_string(date_col_letter) - 1
         amount_idx = column_index_from_string(amount_col_letter) - 1
         item_idx = column_index_from_string(item_col_letter) - 1
+        person_idx = column_index_from_string(person_col_letter) - 1
 
         rows = ws.get_all_values()[start_row - 1:]
 
         for row in rows:
-            if max(date_idx, amount_idx, item_idx) >= len(row):
+            if max(date_idx, amount_idx, item_idx, person_idx) >= len(row):
                 continue
 
             date_str = row[date_idx].strip()
             amount_str = row[amount_idx].strip()
             item_str = row[item_idx].strip().lower().replace(" ", "")
+            person_str = row[person_idx].strip()
 
-            if not date_str or not amount_str or not item_str:
+            if not date_str or not amount_str or not item_str or not person_str:
+                continue
+
+            if person_str not in persons:
                 continue
 
             try:
                 date_obj = datetime.strptime(date_str, "%m/%d/%Y")
                 if date_obj.month == today.month and date_obj.year == today.year:
                     similarity = fuzz.partial_ratio(item_norm, item_str)
-                    if similarity >= 80:  # adjustable
+                    if similarity >= 80:
                         amt = clean_money(amount_str)
                         total += amt
                         matches.append((
                             date_obj,
                             row[item_idx],
                             amt,
-                            category
+                            category,
+                            person_str
                         ))
-                        print(f"[MATCH] {date_obj.date()} | {row[item_idx]} | ${amt:.2f} | sim: {similarity}%")
+                        print(f"[MATCH] {date_obj.date()} | {row[item_idx]} | ${amt:.2f} | sim: {similarity}% | {person_str}")
             except Exception as e:
                 print(f"[WARN] Skipping row: {e}")
                 continue

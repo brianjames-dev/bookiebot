@@ -403,18 +403,23 @@ async def query_no_spend_days_handler(entities, message):
 
 async def query_total_for_item_handler(entities, message):
     item = entities.get("item")
+    persons = entities.get("persons")
+
     if not item:
         await message.channel.send("❌ Please specify an item.")
         return
+    if not persons:
+        await message.channel.send("❌ Could not determine person(s) to query.")
+        return
 
-    total, matches = await su.total_spent_on_item(item)
+    total, matches = await su.total_spent_on_item(item, persons)
 
     response = f"💰 You’ve spent ${total:.2f} on {item} this month.\n"
     if matches:
         response += "\n**Top transactions:**\n"
-        for date_obj, item_name, amount, category in matches:
+        for date_obj, item_name, amount, category, person in matches:
             date_str = date_obj.strftime("%m/%d")
-            response += f"- {date_str}: ${amount:.2f} for {item_name} ({category})\n"
+            response += f"- {date_str}: ${amount:.2f} for {item_name} ({category}, {person})\n"
     else:
         response += "\n*(No transactions found this month.)*"
 
