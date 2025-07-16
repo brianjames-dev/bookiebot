@@ -41,7 +41,7 @@ INTENT_HANDLERS = {
     "query_total_for_item":                 lambda e, m: query_total_for_item_handler(e, m),
     "query_subscriptions":                  lambda e, m: query_subscriptions_handler(m),
     "query_daily_spending_calendar":        lambda e, m: query_daily_spending_calendar_handler(e, m),
-    "query_best_worst_day_of_week":         lambda e, m: query_best_worst_day_of_week_handler(m),
+    "query_best_worst_day_of_week":         lambda e, m: query_best_worst_day_of_week_handler(e, m),
     "query_longest_no_spend_streak":        lambda e, m: query_longest_no_spend_streak_handler(m),
     "query_days_budget_lasts":              lambda e, m: query_days_budget_lasts_handler(m),
     "query_most_frequent_purchases":        lambda e, m: query_most_frequent_purchases_handler(e, m),
@@ -439,8 +439,13 @@ async def query_daily_spending_calendar_handler(entities, message):
     )
 
 
-async def query_best_worst_day_of_week_handler(message):
-    result = await su.best_worst_day_of_week()
+async def query_best_worst_day_of_week_handler(entities, message):
+    persons = entities.get("persons")
+    if not persons:
+        await message.channel.send("❌ Could not determine person(s) to query.")
+        return
+
+    result = await su.best_worst_day_of_week(persons)
     best_day, best_avg = result["best"]
     worst_day, worst_avg = result["worst"]
 
