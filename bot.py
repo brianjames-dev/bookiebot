@@ -70,8 +70,8 @@ async def on_message(message):
 
     # Add default `person` if not explicitly specified
     if "person" not in entities or not entities["person"]:
-        entities["person"] = message.author.name
-        print(f"👤 Default person set to: {entities['person']}")
+        entities["person"] = None
+        print(f"👤 No person specified, letting resolver handle Discord user: {message.author.name}")
 
     try:
         await handle_intent(intent, entities, message)

@@ -6,6 +6,7 @@ from sheets_auth import get_expense_worksheet, get_income_worksheet
 from card_ui import CardSelectView
 import asyncio
 import pytz
+from sheets_utils import resolve_query_persons
 
 # category column map
 get_category_columns = {
@@ -106,13 +107,13 @@ async def write_income_to_sheet(data, message):
 async def write_expense_to_sheet(data, message):
     category = data["category"].lower()
     if category not in get_category_columns:
-        await message.channel.send(f"Unknown category: {category}")
+        await message.channel.send(f"❌ Unknown category: {category}")
         return
 
     try:
         ws = get_expense_worksheet()
     except Exception as e:
-        print(f"Could not access expense sheet: {e}")
+        print(f"❌ Could not access expense sheet: {e}")
         if message:
             await message.channel.send("Error accessing expense sheet.")
         return
@@ -120,27 +121,29 @@ async def write_expense_to_sheet(data, message):
     discord_user = message.author.name.lower()
     print(f"[DEBUG] Discord user: {discord_user}")
 
-    # If no person detected, fallback to discord user
+    # Determine `person(s)` to log
     person = (data.get("person") or "").strip()
     if not person:
-        if discord_user == "brian":
-            person = "Brian"  # ambiguous, need to resolve below
-        elif discord_user == "hannah":
-            person = "Hannah"
-        else:
-            # fallback or raise error if discord user is unknown
+        persons_to_log = resolve_query_persons(discord_user, None)
+        print(f"[DEBUG] Resolved persons: {persons_to_log}")
+        if not persons_to_log:
             await message.channel.send("❌ Could not determine person for logging.")
             return
+    else:
+        persons_to_log = resolve_query_persons(discord_user, person)
+        print(f"[DEBUG] Resolved explicit person: {persons_to_log}")
+        if not persons_to_log:
+            await message.channel.send(f"❌ Could not resolve specified person: {person}")
+            return
 
-    # If ambiguous Brian, prompt for card
-    if discord_user == "brian" and (person.lower() == "brian"):
-        # store pending state for callback
+    # If multiple (ambiguous Brian), ask which card
+    if len(persons_to_log) > 1:
         pending_data_by_user[discord_user] = {"data": data, "worksheet": ws, "category": category}
 
         async def handle_selection(interaction, selected_card):
             stored = pending_data_by_user.pop(discord_user, None)
             if not stored:
-                await interaction.response.send_message("Session expired.")
+                await interaction.response.send_message("❌ Session expired.")
                 return
 
             stored["data"]["person"] = selected_card
@@ -158,9 +161,10 @@ async def write_expense_to_sheet(data, message):
         )
         return
 
-    # If person explicitly specified (e.g., Brian (BofA), Brian (AL), Hannah)
-    data["person"] = person
-    values_to_write = normalize_expense_data(data, person)
+    # Otherwise only one person
+    selected_person = persons_to_log[0]
+    data["person"] = selected_person
+    values_to_write = normalize_expense_data(data, selected_person)
 
     # Validate required fields
     required_fields = ["amount", "person", "item"]
@@ -176,7 +180,7 @@ async def write_expense_to_sheet(data, message):
 
     if message:
         await message.channel.send(
-            f"✅ {category.capitalize()} expense logged: ${data.get('amount')} for {person}"
+            f"✅ {category.capitalize()} expense logged: ${data.get('amount')} for {selected_person}"
         )
 
 
