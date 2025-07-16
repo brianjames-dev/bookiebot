@@ -58,10 +58,9 @@ async def handle_intent(intent, entities, message, last_context=None):
         await fallback_handler(message.content, message, context=last_context)
         return
 
-    # Add default `person` if not explicitly specified
     if "person" not in entities or not entities["person"]:
-        entities["person"] = message.author.name
-        print(f"👤 Default person set to: {entities['person']}")
+        print(f"👤 No person specified, letting resolver handle Discord user: {message.author.name}")
+        entities["person"] = None
 
     # For query intents, resolve to actual list of person(s)
     if intent.startswith("query_"):  # <-- adjust this prefix if needed
