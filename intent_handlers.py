@@ -171,9 +171,16 @@ async def query_total_for_store_handler(entities, message):
 
 
 
-async def query_highest_expense_category_handler(message):
-    category, amount = await su.highest_expense_category()
-    await message.channel.send(f"Highest expense category: {category} (${amount:.2f}).")
+async def query_highest_expense_category_handler(entities, message):
+    discord_user = message.author.name.lower()
+    persons_to_query = resolve_query_persons(discord_user, entities.get("person"))
+
+    if not persons_to_query:
+        await message.channel.send("❌ Could not resolve person(s) to query.")
+        return
+
+    category, amount = await su.highest_expense_category(persons_to_query)
+    await message.channel.send(f"📊 Highest expense category: {category} (${amount:.2f}).")
 
 
 async def query_total_income_handler(message):

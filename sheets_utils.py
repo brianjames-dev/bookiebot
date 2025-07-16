@@ -228,17 +228,50 @@ async def total_spent_at_store(store, persons, top_n=5):
     return total, matches[:top_n]
 
 
-async def highest_expense_category():
+async def highest_expense_category(persons):
     ws = get_expense_worksheet()
     category_totals = {}
+    today = get_local_today()
+
     categories = {
-        'grocery': 'B',
-        'gas': 'I',
-        'food': 'P',
-        'shopping': 'X'
+        'grocery': {'amount': 'B', 'person': 'D'},
+        'gas': {'amount': 'I', 'person': 'J'},
+        'food': {'amount': 'P', 'person': 'R'},
+        'shopping': {'amount': 'X', 'person': 'Z'}
     }
-    for category, col in categories.items():
-        category_totals[category] = _sum_column(ws, col)
+
+    for category, cols in categories.items():
+        amount_col_idx = column_index_from_string(cols['amount']) - 1
+        person_col_idx = column_index_from_string(cols['person']) - 1
+
+        rows = ws.get_all_values()[2:]  # skip header
+
+        total = 0.0
+        for row in rows:
+            if max(amount_col_idx, person_col_idx) >= len(row):
+                continue
+
+            amount_str = row[amount_col_idx].strip()
+            person_str = row[person_col_idx].strip()
+
+            if not amount_str or not person_str:
+                continue
+
+            if person_str not in persons:
+                continue
+
+            try:
+                amt = clean_money(amount_str)
+                total += amt
+            except Exception as e:
+                print(f"[WARN] Failed to parse row: {e}")
+                continue
+
+        category_totals[category] = total
+
+    if not category_totals:
+        return None, 0.0
+
     highest = max(category_totals.items(), key=lambda x: x[1])
     return highest  # (category, amount)
 
