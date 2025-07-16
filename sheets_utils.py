@@ -359,7 +359,7 @@ async def average_daily_spend(persons):
         return None
 
 
-async def expense_breakdown_percentages():
+async def expense_breakdown_percentages(persons):
     ws = get_expense_worksheet()
     category_amounts = {}
     categories = {
@@ -369,17 +369,28 @@ async def expense_breakdown_percentages():
         'shopping': 'AB7'
     }
 
-    # Get grand total from AE35
-    grand_row = 35
+    # Resolve grand total cell based on person
+    if set(persons) == {"Brian (AL)"}:
+        grand_row = 27
+    elif set(persons) == {"Brian (BofA)"}:
+        grand_row = 28
+    elif set(persons) == {"Brian (BofA)", "Brian (AL)"}:
+        grand_row = 30
+    elif set(persons) == {"Hannah"}:
+        grand_row = 31
+    else:
+        print(f"[WARN] Unhandled person(s): {persons}")
+        return {}
+
     grand_col = column_index_from_string("AE")
     grand_total_val = ws.cell(grand_row, grand_col).value
     grand_total = clean_money(grand_total_val)
 
     if grand_total == 0:
-        print("[WARN] Grand total in AE35 is 0. Cannot calculate breakdown.")
+        print(f"[WARN] Grand total in AE{grand_row} is 0. Cannot calculate breakdown.")
         return {}
 
-    # Fetch category amounts from respective cells
+    # Fetch category amounts from their respective summary cells
     for category, cell_ref in categories.items():
         row = int(re.sub(r'\D', '', cell_ref))
         col = column_index_from_string(re.sub(r'\d', '', cell_ref))
@@ -390,7 +401,7 @@ async def expense_breakdown_percentages():
     # Build result
     breakdown = {}
     for cat, amt in category_amounts.items():
-        pct = round(amt / grand_total * 100, 2)
+        pct = round(amt / grand_total * 100, 2) if grand_total else 0.0
         breakdown[cat] = {
             "amount": round(amt, 2),
             "percentage": pct

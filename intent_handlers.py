@@ -30,7 +30,7 @@ INTENT_HANDLERS = {
     "query_total_income":                   lambda e, m: query_total_income_handler(m),
     "query_remaining_budget":               lambda e, m: query_remaining_budget_handler(m), 
     "query_average_daily_spend":            lambda e, m: query_average_daily_spend_handler(e, m),
-    "query_expense_breakdown_percentages":  lambda e, m: query_expense_breakdown_handler(m),
+    "query_expense_breakdown_percentages":  lambda e, m: query_expense_breakdown_handler(e, m),
     "query_total_for_category":             lambda e, m: query_total_for_category_handler(e, m),
     "query_largest_single_expense":         lambda e, m: query_largest_single_expense_handler(m),
     "query_top_n_expenses":                 lambda e, m: query_top_n_expenses_handler(e, m),
@@ -217,8 +217,13 @@ async def query_average_daily_spend_handler(entities, message):
         await message.channel.send("❌ Could not calculate average daily spend.")
 
 
-async def query_expense_breakdown_handler(message):
-    breakdown = await su.expense_breakdown_percentages()
+async def query_expense_breakdown_handler(entities, message):
+    persons = entities.get("persons")
+    if not persons:
+        await message.channel.send("❌ Could not determine person(s) to query.")
+        return
+
+    breakdown = await su.expense_breakdown_percentages(persons)
     if not breakdown:
         await message.channel.send("❌ Could not calculate expense breakdown.")
         return
@@ -236,15 +241,13 @@ async def query_expense_breakdown_handler(message):
 
     grand_total = breakdown["grand_total"]
 
-    # Build text breakdown
     text = "\n".join(lines)
     text = f"📊 Expense breakdown:\n{text}\n\n💵 Grand total: ${grand_total:.2f}"
 
-    # Cutie Pie Chart 🎂
+    # Pie chart
     fig, ax = plt.subplots(figsize=(6, 6))
     colors = plt.get_cmap('Pastel1').colors
 
-    # explode only the largest slice
     largest_idx = amounts.index(max(amounts))
     explode = [0.1 if i == largest_idx else 0 for i in range(len(amounts))]
 
@@ -260,12 +263,10 @@ async def query_expense_breakdown_handler(message):
         textprops={'fontsize': 10}
     )
 
-    # Make percentages bold & bigger
     for autotext in autotexts:
         autotext.set_fontsize(11)
         autotext.set_fontweight('bold')
 
-    # Set title closer to the pie
     ax.set_title(
         f"Expense Breakdown\nTotal: ${grand_total:.2f}",
         fontsize=16,
@@ -273,19 +274,15 @@ async def query_expense_breakdown_handler(message):
         pad=10
     )
 
-    ax.axis('equal')  # perfect circle
-
+    ax.axis('equal')
     plt.tight_layout()
 
-    # Save to buffer
     buf = io.BytesIO()
     plt.savefig(buf, format='png', dpi=150)
     buf.seek(0)
     plt.close(fig)
 
     file = discord.File(fp=buf, filename="expense_breakdown.png")
-
-    # Send text + chart
     await message.channel.send(content=text, file=file)
 
 
