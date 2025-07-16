@@ -66,6 +66,30 @@ def extract_amount_from_text(text):
     return 0.0
 
 
+def resolve_query_persons(discord_user: str, person: str | None) -> list[str]:
+    """
+    Given discord_user and optional person, return a list of person(s) to query.
+    """
+    discord_user = (discord_user or "").strip().lower()
+    person = (person or "").strip()
+
+    if not person:
+        if discord_user == "hannah":
+            return ["Hannah"]
+        elif discord_user == "brian":
+            return ["Brian (BofA)", "Brian (AL)"]
+        else:
+            return []  # or raise an error if unexpected
+
+    if person.lower() == "brian":
+        return ["Brian (BofA)", "Brian (AL)"]
+
+    if person in ["Brian (BofA)", "Brian (AL)", "Hannah"]:
+        return [person]
+
+    return []  # fallback
+
+
 # QUERY FUNCTIONS
 async def calculate_burn_rate():
     ws = get_income_worksheet()
@@ -141,64 +165,67 @@ async def check_student_loan_paid():
     return False, 0.0
 
 
-async def total_spent_at_store(store, top_n=5):
+async def total_spent_at_store(store, persons, top_n=5):
     ws = get_expense_worksheet()
     today = get_local_today()
     total = 0.0
     matches = []
 
-    store_norm = store.lower().replace(" ", "")  # normalize query
-
-    category_columns = get_category_columns  # or get_category_columns() if function
+    store_norm = store.lower().replace(" ", "")
+    category_columns = get_category_columns
 
     for category, config in category_columns.items():
         start_row = config["start_row"]
         date_col_letter = config["columns"]["date"]
         amount_col_letter = config["columns"]["amount"]
         location_col_letter = config["columns"].get("location")
+        person_col_letter = config["columns"].get("person")
 
-        if not location_col_letter:
-            continue  # skip categories without a 'location' column
+        if not location_col_letter or not person_col_letter:
+            continue  # skip if either missing
 
         date_idx = column_index_from_string(date_col_letter) - 1
         amount_idx = column_index_from_string(amount_col_letter) - 1
         location_idx = column_index_from_string(location_col_letter) - 1
+        person_idx = column_index_from_string(person_col_letter) - 1
 
         rows = ws.get_all_values()[start_row - 1:]
 
         for row in rows:
-            if max(date_idx, amount_idx, location_idx) >= len(row):
+            if max(date_idx, amount_idx, location_idx, person_idx) >= len(row):
                 continue
 
             date_str = row[date_idx].strip()
             amount_str = row[amount_idx].strip()
             location_str = row[location_idx].strip().lower().replace(" ", "")
+            person_str = row[person_idx].strip()
 
-            if not date_str or not amount_str or not location_str:
+            if not date_str or not amount_str or not location_str or not person_str:
                 continue
+
+            if person_str not in persons:
+                continue  # skip if this person isn’t one of the queried
 
             try:
                 date_obj = datetime.strptime(date_str, "%m/%d/%Y")
                 if date_obj.month == today.month and date_obj.year == today.year:
                     similarity = fuzz.partial_ratio(store_norm, location_str)
-                    if similarity >= 80:  # adjustable
+                    if similarity >= 80:
                         amt = clean_money(amount_str)
                         total += amt
                         matches.append((
-                            date_obj,              # datetime
-                            row[location_idx],     # original location string
-                            amt,                   # amount
-                            category               # optional: category
+                            date_obj,
+                            row[location_idx],
+                            amt,
+                            category
                         ))
-                        print(f"[MATCH] {date_obj.date()} | {row[location_idx]} | ${amt:.2f} | sim: {similarity}%")
+                        print(f"[MATCH] {date_obj.date()} | {row[location_idx]} | ${amt:.2f} | sim: {similarity}% | {person_str}")
             except Exception as e:
                 print(f"[WARN] Skipping row: {e}")
                 continue
 
-    # Sort matches by date (newest first), you can change to amount if you prefer
     matches.sort(key=lambda x: x[0], reverse=True)
 
-    # Return total & top N matches
     return total, matches[:top_n]
 
 

@@ -7,6 +7,7 @@ import matplotlib.pyplot as plt
 import io
 import discord
 from datetime import datetime
+from sheets_utils import resolve_query_persons
 
 INTENT_HANDLERS = {
     # Logging handlers
@@ -18,13 +19,13 @@ INTENT_HANDLERS = {
     "log_1st_savings":                      lambda e, m: log_1st_savings_handler(e, m),
     "log_2nd_savings":                      lambda e, m: log_2nd_savings_handler(e, m),
     "log_need_expense":                     lambda e, m: log_need_expense_handler(e, m),
-    
+
     # Query handlers
     "query_burn_rate":                      lambda e, m: query_burn_rate_handler(m),
     "query_rent_paid":                      lambda e, m: query_rent_paid_handler(m),
     "query_smud_paid":                      lambda e, m: query_smud_paid_handler(m),
     "query_student_loans_paid":             lambda e, m: query_student_loan_paid_handler(m),
-    "query_total_for_store":                lambda e, m: query_total_for_store_handler(e, m), # fix
+    "query_total_for_store":                lambda e, m: query_total_for_store_handler(e, m),
     "query_highest_expense_category":       lambda e, m: query_highest_expense_category_handler(m),
     "query_total_income":                   lambda e, m: query_total_income_handler(m),
     "query_remaining_budget":               lambda e, m: query_remaining_budget_handler(m),
@@ -56,6 +57,26 @@ async def handle_intent(intent, entities, message, last_context=None):
     if not handler or intent == "fallback":
         await fallback_handler(message.content, message, context=last_context)
         return
+
+    # Add default `person` if not explicitly specified
+    if "person" not in entities or not entities["person"]:
+        entities["person"] = message.author.name
+        print(f"👤 Default person set to: {entities['person']}")
+
+    # For query intents, resolve to actual list of person(s)
+    if intent.startswith("query_"):  # <-- adjust this prefix if needed
+        discord_user = message.author.name.lower()
+        person = entities.get("person")
+        persons_to_query = resolve_query_persons(discord_user, person)
+
+        if not persons_to_query:
+            await message.channel.send("❌ Could not resolve person(s) to query.")
+            return
+
+        # overwrite person in entities with resolved list
+        entities["persons"] = persons_to_query
+        print(f"🔎 Resolved persons for query: {persons_to_query}")
+
     await handler(entities, message)
 
 
@@ -127,7 +148,17 @@ async def query_student_loan_paid_handler(message):
 
 async def query_total_for_store_handler(entities, message):
     store = entities.get("store")
-    total, matches = await su.total_spent_at_store(store)
+    discord_user = message.author.name.lower()
+    persons_to_query = resolve_query_persons(discord_user, entities.get("person"))
+
+    if not store:
+        await message.channel.send("❌ Please specify a store.")
+        return
+    if not persons_to_query:
+        await message.channel.send("❌ Could not determine person(s) to query.")
+        return
+
+    total, matches = await su.total_spent_at_store(store, persons_to_query)
 
     response = f"💰 You’ve spent ${total:.2f} at {store} this month.\n"
     if matches:

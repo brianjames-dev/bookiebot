@@ -58,8 +58,19 @@ If it's an EXPENSE, also include:
     - location: where it was bought (e.g., Trader Joe's, Shell, Ulta)
     - category: one of ["grocery", "gas", "food", "shopping"]
 
-❗ Do not leave "item" blank — if unsure, infer based on the location or context (e.g., "coffee" for Starbucks).
-❗ Do NOT include a "person" field — the bot determines the person based on Discord user.
+❗ Do NOT leave "item" blank — if unsure, infer based on the location or context (e.g., "coffee" for Starbucks).
+
+Valid options for the "person" field are:
+- "Hannah"
+- "Brian (BofA)"
+- "Brian (AL)"
+- "TOTAL" (for combined totals)
+
+If the message clearly mentions one of these names or "TOTAL", include it as `"person": "<name>"` in the entities.
+If the message mentions "Brian", assume it refers to **both of Brian’s accounts combined** — leave `"person": "Brian"` to signal this, and the downstream code will sum both `"Brian (BofA)"` and `"Brian (AL)"`.
+If the message specifically mentions **“on my AL card”** or **“on my Alaska card”**, set `"person": "Brian (AL)"`.
+If the message specifically mentions **“on my BofA card”**, set `"person": "Brian (BofA)"`.
+If no name is specified, and no "TOTAL" is mentioned, leave out `"person"` and default to the Discord user’s name.If no name or "TOTAL" is explicitly mentioned in the message, leave "person" out of entities.
 
 Categorize EXPENSE as:
 - "grocery" = food or essentials from grocery stores (Trader Joe’s, Costco, Safeway). If the word "groceries" is mentioned, always choose "grocery".

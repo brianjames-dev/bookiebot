@@ -120,8 +120,22 @@ async def write_expense_to_sheet(data, message):
     discord_user = message.author.name.lower()
     print(f"[DEBUG] Discord user: {discord_user}")
 
-    if discord_user == ".deebers":
-        pending_data_by_user[discord_user] = { "data": data, "worksheet": ws }
+    # If no person detected, fallback to discord user
+    person = (data.get("person") or "").strip()
+    if not person:
+        if discord_user == "brian":
+            person = "Brian"  # ambiguous, need to resolve below
+        elif discord_user == "hannah":
+            person = "Hannah"
+        else:
+            # fallback or raise error if discord user is unknown
+            await message.channel.send("❌ Could not determine person for logging.")
+            return
+
+    # If ambiguous Brian, prompt for card
+    if discord_user == "brian" and (person.lower() == "brian"):
+        # store pending state for callback
+        pending_data_by_user[discord_user] = {"data": data, "worksheet": ws, "category": category}
 
         async def handle_selection(interaction, selected_card):
             stored = pending_data_by_user.pop(discord_user, None)
@@ -134,7 +148,7 @@ async def write_expense_to_sheet(data, message):
             log_category_row(values, ws, category)
 
             await interaction.response.send_message(
-                f"Logged {category} expense: ${stored['data']['amount']} using {selected_card}"
+                f"✅ Logged {category} expense: ${stored['data']['amount']} for {selected_card}"
             )
 
         view = CardSelectView(handle_selection)
@@ -144,14 +158,15 @@ async def write_expense_to_sheet(data, message):
         )
         return
 
-    data["person"] = "Hannah"
-    values_to_write = normalize_expense_data(data, data["person"])
+    # If person explicitly specified (e.g., Brian (BofA), Brian (AL), Hannah)
+    data["person"] = person
+    values_to_write = normalize_expense_data(data, person)
 
     # Validate required fields
     required_fields = ["amount", "person", "item"]
-    missing = [f for f in required_fields if not values_to_write[f]]
+    missing = [f for f in required_fields if not values_to_write.get(f)]
     if missing:
-        msg = f"Could not log entry — missing: {', '.join(missing)}."
+        msg = f"❌ Could not log entry — missing: {', '.join(missing)}."
         print(msg)
         if message:
             await message.channel.send(msg)
@@ -161,7 +176,7 @@ async def write_expense_to_sheet(data, message):
 
     if message:
         await message.channel.send(
-            f"{category.capitalize()} expense logged: ${data.get('amount')} for {data['person']}"
+            f"✅ {category.capitalize()} expense logged: ${data.get('amount')} for {person}"
         )
 
 
