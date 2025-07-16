@@ -298,11 +298,19 @@ async def query_expense_breakdown_handler(entities, message):
 
 async def query_total_for_category_handler(entities, message):
     category = entities.get("category")
+    persons = entities.get("persons")
+
     if not category:
         await message.channel.send("❌ Please specify a category.")
         return
-    total = await su.total_for_category(category)
-    await message.channel.send(f"💰 You spent ${total:.2f} on {category} this month.")
+    if not persons:
+        await message.channel.send("❌ Could not determine person(s) to query.")
+        return
+
+    total = await su.total_for_category(category, persons)
+    await message.channel.send(
+        f"💰 Total spent on **{category.capitalize()}** this month: ${total:.2f}."
+    )
 
 
 async def query_largest_single_expense_handler(message):

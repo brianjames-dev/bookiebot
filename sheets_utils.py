@@ -425,18 +425,50 @@ async def expense_breakdown_percentages(persons: list[str]):
     return result
 
 
-async def total_for_category(category):
+async def total_for_category(category, persons):
     ws = get_expense_worksheet()
-    categories = {
-        'grocery': 'B',
-        'gas': 'I',
-        'food': 'P',
-        'shopping': 'X'
+    today = get_local_today()
+
+    category = category.lower()
+    config = {
+        'grocery': {'amount': 'B', 'person': 'D', 'start_row': 3},
+        'gas': {'amount': 'I', 'person': 'J', 'start_row': 3},
+        'food': {'amount': 'P', 'person': 'R', 'start_row': 3},
+        'shopping': {'amount': 'X', 'person': 'Z', 'start_row': 3}
     }
-    col = categories.get(category.lower())
-    if not col:
+
+    if category not in config:
+        print(f"[ERROR] Unknown category: {category}")
         return 0.0
-    return _sum_column(ws, col)
+
+    cols = config[category]
+    amount_idx = column_index_from_string(cols['amount']) - 1
+    person_idx = column_index_from_string(cols['person']) - 1
+
+    rows = ws.get_all_values()[cols['start_row'] - 1:]
+    total = 0.0
+
+    for row in rows:
+        if max(amount_idx, person_idx) >= len(row):
+            continue
+
+        amount_str = row[amount_idx].strip()
+        person_str = row[person_idx].strip()
+
+        if not amount_str or not person_str:
+            continue
+
+        if person_str not in persons:
+            continue
+
+        try:
+            amt = clean_money(amount_str)
+            total += amt
+        except Exception as e:
+            print(f"[WARN] Failed to parse row: {e}")
+            continue
+
+    return round(total, 2)
 
 
 async def largest_single_expense():
