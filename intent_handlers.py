@@ -7,7 +7,7 @@ import matplotlib.pyplot as plt
 import io
 import discord
 from datetime import datetime
-from sheets_utils import resolve_query_persons
+from sheets_utils import resolve_query_persons, get_local_today
 
 INTENT_HANDLERS = {
     # Logging handlers
