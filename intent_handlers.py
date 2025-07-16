@@ -36,7 +36,7 @@ INTENT_HANDLERS = {
     "query_top_n_expenses":                 lambda e, m: query_top_n_expenses_handler(e, m),
     "query_spent_this_week":                lambda e, m: query_spent_this_week_handler(e, m),
     "query_projected_spending":             lambda e, m: query_projected_spending_handler(e, m),
-    "query_weekend_vs_weekday":             lambda e, m: query_weekend_vs_weekday_handler(m),
+    "query_weekend_vs_weekday":             lambda e, m: query_weekend_vs_weekday_handler(e, m),
     "query_no_spend_days":                  lambda e, m: query_no_spend_days_handler(m),
     "query_total_for_item":                 lambda e, m: query_total_for_item_handler(e, m),
     "query_subscriptions":                  lambda e, m: query_subscriptions_handler(m),
