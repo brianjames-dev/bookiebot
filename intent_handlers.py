@@ -148,8 +148,7 @@ async def query_student_loan_paid_handler(message):
 
 async def query_total_for_store_handler(entities, message):
     store = entities.get("store")
-    discord_user = message.author.name.lower()
-    persons_to_query = resolve_query_persons(discord_user, entities.get("person"))
+    persons_to_query = entities.get("persons")  # <-- already resolved in handle_intent
 
     if not store:
         await message.channel.send("❌ Please specify a store.")
@@ -170,6 +169,7 @@ async def query_total_for_store_handler(entities, message):
         response += "\n*(No transactions found this month.)*"
 
     await message.channel.send(response)
+
 
 
 async def query_highest_expense_category_handler(message):
