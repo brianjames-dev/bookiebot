@@ -63,7 +63,7 @@ async def handle_intent(intent, entities, message, last_context=None):
         entities["person"] = None
 
     # For query intents, resolve to actual list of person(s)
-    if intent.startswith("query_"):  # <-- adjust this prefix if needed
+    if intent.startswith("query_"):
         discord_user = message.author.name.lower()
         person = entities.get("person")
         persons_to_query = resolve_query_persons(discord_user, person)
