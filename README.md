@@ -45,19 +45,19 @@ Here are the rest of the LLM intent possibilities.
 
 Intent Description + Sample Query:
 An example of how BookieBot interprets a user message and maps it to a structured command with parameters for downstream processing.
-![Intent Desc+Example](intent-desc+example.png)
+![Intent Desc+Example](assets/intent-desc+example.png)
 
 Expense Breakdown:
 BookieBot responding with a categorical breakdown of expenses, grouped by user-defined tags such as food, gas, groceries, and shopping.
-![Expense Breakdown](expense-breakdown.png)
+![Expense Breakdown](assets/expense-breakdown.png)
 
 Spending Calendar View:
 BookieBot visualizes daily spending across a calendar, highlighting spikes or gaps to help users spot trends or missed logs.
-![Spending Calendar](intent-desc+example.png)
+![Spending Calendar](assets/intent-desc+example.png)
 
 Expenses on a Specific Day:
 Shows how BookieBot retrieves all expenses logged for a specific day, including vendor, category, and total spent.
-![Specific Day Expenses](spending-calendar.png)
+![Specific Day Expenses](assets/spending-calendar.png)
 
 Food Log Snapshot:
 A sample of a bot-logged food-related expense, showcasing detailed tracking by location and participant.
@@ -65,7 +65,7 @@ A sample of a bot-logged food-related expense, showcasing detailed tracking by l
 
 Autonomous Logging:
 An annotated Google Sheet pointing to a row logged automatically by BookieBot, confirming autonomous expense tracking throughout the month.
-![Autonomous Logging](expense-sheet-proof.png)
+![Autonomous Logging](assets/expense-sheet-proof.png)
 
 ## 📄 License
 
