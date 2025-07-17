@@ -5,8 +5,6 @@
 BookieBot is an intelligent Discord bot designed to help you track personal expenses and income directly from Discord.\
 It leverages an agentic AI to understand natural language commands, update a Google Sheet, and provide insightful budget analytics — all in real time.
 
----
-
 ## 🚀 Features
 
 - Log expenses, income, rent, utilities, savings, and more via natural language (e.g., *"I spent \$25 on groceries today"*).
@@ -14,8 +12,6 @@ It leverages an agentic AI to understand natural language commands, update a Goo
 - Supports dozens of intents including burn rate calculation, category breakdowns, and daily/weekly insights.
 - Fully integrated with Google Sheets for persistent, transparent data storage.
 - Asynchronous and scalable, with clear error handling and feedback messages.
-
----
 
 ## 🛠️ Tech Stack
 
@@ -25,8 +21,6 @@ It leverages an agentic AI to understand natural language commands, update a Goo
 - **OpenAI API** — natural language understanding
 - **AsyncIO** — asynchronous event loop and I/O
 - **Railway** — deployment platform
-
----
 
 ## 📄 Example Commands
 
@@ -38,8 +32,6 @@ It leverages an agentic AI to understand natural language commands, update a Goo
 
 > 💬 *"Show me my top 3 expenses this month"*\
 > 📝 Bot fetches and lists your largest expenses.
-
----
 
 ## 📷 Screenshots
 
@@ -74,9 +66,6 @@ A sample of a bot-logged food-related expense, showcasing detailed tracking by l
 Autonomous Logging:
 An annotated Google Sheet pointing to a row logged automatically by BookieBot, confirming autonomous expense tracking throughout the month.
 ![Autonomous Logging](expense-sheet-proof.png)
-
-
----
 
 ## 📄 License
 
