@@ -65,7 +65,7 @@ It leverages an agentic AI to understand natural language commands, update a Goo
 ### Spending Calendar View
 **BookieBot visualizes daily spending across a calendar, highlighting spikes or gaps to help users spot trends or missed logs.**
 
-<img src="assets/spending-calender.png" alt="Spending Calendar" width="600"/>
+<img src="assets/spending-calendar.png" alt="Spending Calendar" width="600"/>
 
 ---
 
@@ -77,7 +77,7 @@ It leverages an agentic AI to understand natural language commands, update a Goo
 ---
 
 ### Food Log Snapshot
-**A sample of a bot-logged food-related expense, showcasing detailed tracking by location and participant.**
+**A sample of a bot-logged food-related expense, showcasing detailed tracking by location and participant as well as payment selection.**
 
 <img src="assets/logged-food-expense.png" alt="Logged Food" width="600"/>
 
