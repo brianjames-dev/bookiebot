@@ -65,14 +65,14 @@ It leverages an agentic AI to understand natural language commands, update a Goo
 ### Spending Calendar View
 **BookieBot visualizes daily spending across a calendar, highlighting spikes or gaps to help users spot trends or missed logs.**
 
-<img src="assets/intent-desc+example.png" alt="Spending Calendar" width="600"/>
+<img src="assets/spending-calender.png" alt="Spending Calendar" width="600"/>
 
 ---
 
 ### Expenses on a Specific Day
 **Shows how BookieBot retrieves all expenses logged for a specific day, including vendor, category, and total spent.**
 
-<img src="assets/spending-calendar.png" alt="Specific Day Expenses" width="600"/>
+<img src="assets/specific-day-expenses.png" alt="Specific Day Expenses" width="600"/>
 
 ---
 
