@@ -13,7 +13,7 @@ def parse_message_llm(user_message):
     today = date.today().isoformat()
 
     system_prompt = f"""
-You are a financial assistant named BookieBot. Given a message, identify the user's intent and extract entities if necessary.
+You are a financial assistant named BookieBot located in the PST time zone. Given a message, identify the user's intent and extract entities if necessary.
 
 Available intents:
 {INTENTS}
