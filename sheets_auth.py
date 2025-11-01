@@ -2,9 +2,15 @@ import os
 import json
 import gspread
 from datetime import datetime
+from zoneinfo import ZoneInfo
 from google.oauth2.service_account import Credentials
 from dotenv import load_dotenv
 load_dotenv()
+
+PACIFIC_TZ = ZoneInfo("America/Los_Angeles")
+
+def _now_pacific():
+    return datetime.now(PACIFIC_TZ)
 
 # Read the JSON string directly from .env
 service_account_json = os.getenv("GOOGLE_SERVICE_ACCOUNT_JSON")
@@ -26,12 +32,12 @@ if not EXPENSE_SHEET_KEY or not INCOME_SHEET_KEY:
 
 def get_expense_worksheet():
     sheet = gc.open_by_key(EXPENSE_SHEET_KEY)
-    month_name = datetime.now().strftime("%B")
+    month_name = _now_pacific().strftime("%B")  # e.g., "October" or "November" in PACIFIC TIME
     return sheet.worksheet(month_name)
 
 def get_income_worksheet():
     sheet = gc.open_by_key(INCOME_SHEET_KEY)
-    month_name = datetime.now().strftime("%B")
+    month_name = _now_pacific().strftime("%B")
     return sheet.worksheet(month_name)
 
 def get_subscriptions_worksheet():
