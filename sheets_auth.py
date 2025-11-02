@@ -32,7 +32,7 @@ if not EXPENSE_SHEET_KEY or not INCOME_SHEET_KEY:
 
 def get_expense_worksheet():
     sheet = gc.open_by_key(EXPENSE_SHEET_KEY)
-    month_name = _now_pacific().strftime("%B")  # e.g., "October" or "November" in PACIFIC TIME
+    month_name = _now_pacific().strftime("%B")
     return sheet.worksheet(month_name)
 
 def get_income_worksheet():
