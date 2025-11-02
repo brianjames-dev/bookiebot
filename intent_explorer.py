@@ -282,4 +282,4 @@ def run_navigation_loop():
         else:
             print("⚠️ Invalid input. Type 'list', a number, or 'quit'.")
 
-        print("\n💡 Reminder: Type 'list' to see intents again.")
+        print("\n💡 Reminder: Type 'list' to see intents.")
