@@ -1,4 +1,4 @@
-import time
+from typing import Optional
 
 
 # === Friendly display names ===
@@ -262,24 +262,83 @@ def describe_intent(number: int) -> str:
     return output
 
 
+class IntentExplorerSession:
+    """Encapsulates the conversational guidance used by the Discord explorer."""
+
+    def __init__(self):
+        self._last_selection: Optional[int] = None
+
+    def start_message(self) -> str:
+        return (
+            "👋 BookieBot explorer ready!\n"
+            "• Send `list` any time for the full catalog.\n"
+            "• Reply with a number (e.g., `4`) to dive into a specific intent.\n"
+            "• Say `repeat` to revisit the last intent.\n"
+            "• Type `help` if you need a reminder of the quick commands."
+        )
+
+    def help_message(self) -> str:
+        """Small command reference that mirrors what we would DM to a user."""
+
+        return (
+            "💡 **Explorer tips**\n"
+            "• `list` — Show every intent grouped by theme.\n"
+            "• `<number>` — e.g., `4` to see details for that intent.\n"
+            "• `repeat` — Resend the description you just viewed.\n"
+            "• `help` — Show this guide again."
+        )
+
+    def handle_message(self, message: str) -> str:
+        """Return the response a Discord conversation would send."""
+
+        normalized = message.strip().lower()
+
+        if not normalized:
+            return "⚠️ I didn't catch that. Try `list` or pick an intent number."
+
+        if normalized in {"list", "menu", "catalog"}:
+            return list_intents()
+
+        if normalized in {"help", "options", "?"}:
+            return self.help_message()
+
+        if normalized in {"repeat", "again"}:
+            if self._last_selection is None:
+                return "⚠️ I haven't shared an intent yet. Pick a number first."
+
+            return describe_intent(self._last_selection)
+
+        if message.strip().isdigit():
+            selection = int(message.strip())
+            response = describe_intent(selection)
+
+            if not response.startswith("⚠️"):
+                self._last_selection = selection
+
+            return response
+
+        return (
+            "⚠️ I can show the `list` of intents or explain one if you send its"
+            " number. Try `help` for a quick refresher."
+        )
+
+
 def run_navigation_loop():
     """Optional interactive CLI navigation loop"""
-    print("📒 BookieBot ready! Type 'list' to see available intents.")
 
-    while True:
-        user_input = input("\nType 'list' to see intents\nType a number to learn more\nType 'quit' to exit:\n> ").strip()
+    session = IntentExplorerSession()
+    print(session.start_message())
 
-        if user_input.lower() == "quit":
-            print("👋 Goodbye!")
-            break
+    try:
+        while True:
+            user_input = input(
+                "\nType `list` for the menu or reply with a number to explore:\n> "
+            )
+            print(session.handle_message(user_input))
+    except KeyboardInterrupt:
+        # Mirror Discord persistence: the session simply stops responding.
+        print("\n👋 Ending local explorer session.")
 
-        elif user_input.lower() == "list":
-            print(list_intents())
 
-        elif user_input.isdigit():
-            print(describe_intent(int(user_input)))
-
-        else:
-            print("⚠️ Invalid input. Type 'list', a number, or 'quit'.")
-
-        print("\n💡 Reminder: Type 'list' to see intents.")
+if __name__ == "__main__":
+    run_navigation_loop()
