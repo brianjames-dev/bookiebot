@@ -1,0 +1,6 @@
+{
+  "intent": "query_total_for_store",
+  "entities": {
+    "store": "Trader Joe's"
+  }
+}

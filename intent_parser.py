@@ -1,15 +1,26 @@
-import openai
-import os
 import json
 from datetime import date
+from typing import Any, Dict, Optional
+
 from dotenv import load_dotenv
+
 from intent_explorer import INTENTS
+from llm_client import LLMClient, OpenAIClient
 
 load_dotenv()
-openai.api_key = os.getenv("OPENAI_API_KEY")
+
+_DEFAULT_LLM_CLIENT: Optional[LLMClient] = None
 
 
-def parse_message_llm(user_message):
+def _get_default_client() -> LLMClient:
+    global _DEFAULT_LLM_CLIENT
+    if _DEFAULT_LLM_CLIENT is None:
+        _DEFAULT_LLM_CLIENT = OpenAIClient()
+    return _DEFAULT_LLM_CLIENT
+
+
+async def parse_message_llm(user_message: str, *, llm_client: Optional[LLMClient] = None) -> Dict[str, Any]:
+    client = llm_client or _get_default_client()
     today = date.today().isoformat()
 
     system_prompt = f"""
@@ -95,16 +106,19 @@ def parse_message_llm(user_message):
     """
 
     try:
-        response = openai.ChatCompletion.create(
-            model="gpt-3.5-turbo",
+        raw_response = await client.complete(
             messages=[
                 {"role": "system", "content": system_prompt},
-                {"role": "user", "content": user_message}
+                {"role": "user", "content": user_message},
             ],
-            temperature=0
+            temperature=0,
         )
-        result = response.choices[0].message.content
-        parsed = json.loads(result)
+        if isinstance(raw_response, str):
+            parsed = json.loads(raw_response)
+        elif isinstance(raw_response, dict):
+            parsed = raw_response
+        else:
+            raise ValueError("LLM response must be JSON string or dict.")
         return parsed
     except Exception as e:
         print("[ERROR] Parsing error:", e)

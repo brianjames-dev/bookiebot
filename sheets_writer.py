@@ -5,9 +5,9 @@ from openpyxl.utils import column_index_from_string
 from card_ui import CardSelectView
 import asyncio
 import pytz
-from sheets_auth import get_expense_worksheet, get_income_worksheet
 from sheets_config import get_category_columns
 from sheets_utils import resolve_query_persons
+from sheets_repo import get_sheets_repo
 
 
 # Temporary memory for user interactions (used for dropdown callbacks)
@@ -22,11 +22,8 @@ async def write_to_sheet(data, message):
 
 
 async def write_income_to_sheet(data, message):
-    ws = get_income_worksheet()
-    month_name = datetime.now().strftime("%B")
-
     try:
-        ws = get_income_worksheet()
+        ws = get_sheets_repo().income_sheet()
     except Exception as e:
         print(f"Could not access income sheet: {e}")
         if message:
@@ -72,7 +69,7 @@ async def write_expense_to_sheet(data, message):
         return
 
     try:
-        ws = get_expense_worksheet()
+        ws = get_sheets_repo().expense_sheet()
     except Exception as e:
         print(f"❌ Could not access expense sheet: {e}")
         if message:

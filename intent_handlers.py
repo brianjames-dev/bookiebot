@@ -5,9 +5,19 @@ import sheets_utils as su
 import openai
 import matplotlib.pyplot as plt
 import io
-import discord
 from datetime import datetime
 from sheets_utils import resolve_query_persons, get_local_today
+
+try:
+    import discord
+except ImportError:  # pragma: no cover - fallback for tests without discord.py
+    class _Discord:
+        class File:
+            def __init__(self, fp, filename):
+                self.fp = fp
+                self.filename = filename
+
+    discord = _Discord()
 
 INTENT_HANDLERS = {
     # Logging handlers

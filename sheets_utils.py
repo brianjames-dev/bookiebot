@@ -1,16 +1,41 @@
-from sheets_auth import get_expense_worksheet, get_income_worksheet, get_subscriptions_worksheet
 from openpyxl.utils import column_index_from_string
 from datetime import datetime, timedelta
 import re
 from sheets_config import get_category_columns
 from dateutil import parser as dateparser
-from rapidfuzz import fuzz
 from collections import defaultdict, Counter
 import matplotlib.pyplot as plt
 import io
-import discord
+try:
+    import discord
+except ImportError:  # pragma: no cover - fallback for tests
+    class _Discord:
+        class File:
+            def __init__(self, fp, filename):
+                self.fp = fp
+                self.filename = filename
+
+    discord = _Discord()
+
 import gspread
 from pytz import timezone
+from sheets_repo import get_sheets_repo
+
+try:
+    from rapidfuzz import fuzz
+except ImportError:  # pragma: no cover - fallback for tests
+    class _Fuzz:
+        @staticmethod
+        def partial_ratio(a, b):
+            a_norm = (a or "").lower()
+            b_norm = (b or "").lower()
+            if not a_norm or not b_norm:
+                return 0.0
+            if a_norm == b_norm or a_norm in b_norm or b_norm in a_norm:
+                return 100.0
+            return 0.0
+
+    fuzz = _Fuzz()
 
 # HELPER FUNCTIONS
 def _sum_column(ws, col_letter, start_row=3):
@@ -36,6 +61,18 @@ def clean_money(value: str) -> float:
 
 def get_local_today():
     return datetime.now(timezone("America/Los_Angeles"))
+
+
+def _expense_ws():
+    return get_sheets_repo().expense_sheet()
+
+
+def _income_ws():
+    return get_sheets_repo().income_sheet()
+
+
+def _subscriptions_ws():
+    return get_sheets_repo().subscriptions_sheet()
 
 
 def find_cell_by_partial_text(ws, text):
@@ -91,7 +128,7 @@ def resolve_query_persons(discord_user: str, person: str | None) -> list[str]:
 
 # QUERY FUNCTIONS
 async def calculate_burn_rate():
-    ws = get_income_worksheet()
+    ws = _income_ws()
     try:
         # get all cell values
         all_cells = ws.get_all_values()
@@ -124,7 +161,7 @@ async def calculate_burn_rate():
 
 
 async def check_rent_paid():
-    ws = get_income_worksheet()
+    ws = _income_ws()
     try:
         cell = ws.find("Rent")
         amount_cell = ws.cell(cell.row, cell.col + 1).value
@@ -138,7 +175,7 @@ async def check_rent_paid():
 
 
 async def check_smud_paid():
-    ws = get_income_worksheet()
+    ws = _income_ws()
     try:
         cell = ws.find("SMUD")
         amount_cell = ws.cell(cell.row, cell.col + 1).value
@@ -151,7 +188,7 @@ async def check_smud_paid():
     return False, 0.0
 
 async def check_student_loan_paid():
-    ws = get_income_worksheet()
+    ws = _income_ws()
     try:
         cell = ws.find("Student Loan Payment")
         amount_cell = ws.cell(cell.row, cell.col + 1).value
@@ -165,7 +202,7 @@ async def check_student_loan_paid():
 
 
 async def total_spent_at_store(store, persons, top_n=5):
-    ws = get_expense_worksheet()
+    ws = _expense_ws()
     today = get_local_today()
     total = 0.0
     matches = []
@@ -229,7 +266,7 @@ async def total_spent_at_store(store, persons, top_n=5):
 
 
 async def highest_expense_category(persons):
-    ws = get_expense_worksheet()
+    ws = _expense_ws()
     category_totals = {}
     today = get_local_today()
 
@@ -277,7 +314,7 @@ async def highest_expense_category(persons):
 
 
 async def total_income():
-    ws = get_income_worksheet()
+    ws = _income_ws()
     try:
         cell = ws.find("Monthly Income:")
         income_val = ws.cell(cell.row, cell.col + 1).value
@@ -294,7 +331,7 @@ async def total_income():
 
 
 async def remaining_budget():
-    ws = get_income_worksheet()
+    ws = _income_ws()
     try:
         cell = ws.find("Margins:")
         val = ws.cell(cell.row, cell.col + 2).value
@@ -306,7 +343,7 @@ async def remaining_budget():
 
 
 async def average_daily_spend(persons):
-    ws = get_expense_worksheet()
+    ws = _expense_ws()
     try:
         today = get_local_today()
         day_of_month = today.day
@@ -360,7 +397,7 @@ async def average_daily_spend(persons):
 
 
 async def expense_breakdown_percentages(persons: list[str]):
-    ws = get_expense_worksheet()
+    ws = _expense_ws()
     category_amounts = {'grocery': 0.0, 'gas': 0.0, 'food': 0.0, 'shopping': 0.0}
     grand_total = 0.0
 
@@ -426,7 +463,7 @@ async def expense_breakdown_percentages(persons: list[str]):
 
 
 async def total_for_category(category, persons):
-    ws = get_expense_worksheet()
+    ws = _expense_ws()
     today = get_local_today()
 
     category = category.lower()
@@ -472,7 +509,7 @@ async def total_for_category(category, persons):
 
 
 async def largest_single_expense(persons):
-    ws = get_expense_worksheet()
+    ws = _expense_ws()
     rows = ws.get_all_values()[2:]  # skip header rows
 
     configs = {
@@ -535,7 +572,7 @@ async def largest_single_expense(persons):
 
 
 async def top_n_expenses_all_categories(persons, n=5):
-    ws = get_expense_worksheet()
+    ws = _expense_ws()
     rows = ws.get_all_values()[2:]  # skip header
 
     configs = {
@@ -600,7 +637,7 @@ async def top_n_expenses_all_categories(persons, n=5):
 
 
 async def spent_this_week(persons):
-    ws = get_expense_worksheet()
+    ws = _expense_ws()
     today = get_local_today()
     start_of_week = today - timedelta(days=today.weekday())  # Monday
     total = 0.0
@@ -654,7 +691,7 @@ async def spent_this_week(persons):
 
 async def projected_spending(persons):
     today = get_local_today()
-    ws = get_expense_worksheet()
+    ws = _expense_ws()
     total_so_far = 0.0
 
     category_columns = get_category_columns
@@ -712,7 +749,7 @@ async def projected_spending(persons):
 
 
 async def weekend_vs_weekday(persons):
-    ws = get_expense_worksheet()
+    ws = _expense_ws()
     weekend = 0.0
     weekday = 0.0
 
@@ -764,7 +801,7 @@ async def weekend_vs_weekday(persons):
 
 
 async def no_spend_days(persons):
-    ws = get_expense_worksheet()
+    ws = _expense_ws()
     today = get_local_today()
     days_with_expense = set()
 
@@ -813,7 +850,7 @@ async def no_spend_days(persons):
 
 
 async def total_spent_on_item(item, persons, top_n=5):
-    ws = get_expense_worksheet()
+    ws = _expense_ws()
     today = get_local_today()
     total = 0.0
     matches = []
@@ -879,7 +916,7 @@ async def total_spent_on_item(item, persons, top_n=5):
 
 
 async def daily_spending_calendar(persons):
-    ws = get_expense_worksheet()
+    ws = _expense_ws()
     today = get_local_today()
     daily_totals = defaultdict(float)
 
@@ -960,7 +997,7 @@ async def daily_spending_calendar(persons):
 
 
 async def best_worst_day_of_week(persons):
-    ws = get_expense_worksheet()
+    ws = _expense_ws()
     today = get_local_today()
     weekday_totals = defaultdict(float)
     weekday_counts = defaultdict(int)
@@ -1027,7 +1064,7 @@ async def best_worst_day_of_week(persons):
 
 
 async def longest_no_spend_streak(persons):
-    ws = get_expense_worksheet()
+    ws = _expense_ws()
     today = get_local_today()
     daily_totals = {day: 0.0 for day in range(1, today.day + 1)}
 
@@ -1110,7 +1147,7 @@ async def days_budget_lasts():
 
 
 async def most_frequent_purchases(persons, n=3):
-    ws = get_expense_worksheet()
+    ws = _expense_ws()
     today = get_local_today()
     item_counts = Counter()
     item_totals = defaultdict(float)
@@ -1186,7 +1223,7 @@ async def expenses_on_day(day_str, persons):
         print(f"[ERROR] Failed to parse date: {day_str} — {e}")
         return None, None
 
-    ws = get_expense_worksheet()
+    ws = _expense_ws()
     entries = []
     total = 0.0
 
@@ -1246,7 +1283,7 @@ async def expenses_on_day(day_str, persons):
 
 
 async def list_subscriptions():
-    ws = get_subscriptions_worksheet()
+    ws = _subscriptions_ws()
     needs = []
     wants = []
     needs_total = 0.0
@@ -1286,7 +1323,7 @@ def log_payment(category_label, amount):
     Finds the row where column B matches category_label (case-insensitive),
     and writes the amount to column C of that row.
     """
-    ws = get_income_worksheet()
+    ws = _income_ws()
     rows = ws.get_all_values()
 
     for row_idx, row in enumerate(rows):
@@ -1318,7 +1355,7 @@ def log_student_loan_paid(amount):
 
 
 async def check_1st_savings_deposited():
-    ws = get_income_worksheet()
+    ws = _income_ws()
     try:
         # robust text match
         cell = find_cell_by_partial_text(ws, "Enter 1st Paycheck Deposit")
@@ -1359,7 +1396,7 @@ async def check_1st_savings_deposited():
 
 
 async def check_2nd_savings_deposited():
-    ws = get_income_worksheet()
+    ws = _income_ws()
     try:
         cell = find_cell_by_partial_text(ws, "Enter 2nd Paycheck Deposit")
         if not cell:
@@ -1403,7 +1440,7 @@ def log_1st_savings(amount):
     Logs the 1st savings deposit amount by writing it 3 columns to the right
     of the cell containing 'Enter 1st Paycheck Deposit'.
     """
-    ws = get_income_worksheet()
+    ws = _income_ws()
     try:
         cell = find_cell_by_partial_text(ws, "Enter 1st Paycheck Deposit")
         if not cell:
@@ -1426,7 +1463,7 @@ def log_2nd_savings(amount):
     Logs the 2nd savings deposit amount by writing it 3 columns to the right
     of the cell containing 'Enter 2nd Paycheck Deposit'.
     """
-    ws = get_income_worksheet()
+    ws = _income_ws()
     try:
         cell = find_cell_by_partial_text(ws, "Enter 2nd Paycheck Deposit")
         if not cell:
@@ -1450,7 +1487,7 @@ def log_need_expense(description, amount):
     in the Needs section of the income sheet.
     Writes description in column B and amount in column C.
     """
-    ws = get_income_worksheet()
+    ws = _income_ws()
     try:
         # find the <Enter Transaction> marker
         cell = ws.find("<Enter Transaction>")

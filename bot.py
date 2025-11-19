@@ -55,7 +55,7 @@ async def on_message(message):
 
     # === REGULAR BOT FLOW ===
     try:
-        intent_data = parse_message_llm(content)
+        intent_data = await parse_message_llm(content)
         intent = intent_data.get("intent")
         entities = intent_data.get("entities", {})
         print(f"🤖 Detected intent: {intent}, Entities: {entities}")
