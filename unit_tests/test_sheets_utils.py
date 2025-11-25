@@ -1,13 +1,27 @@
 import pytest
 from unittest.mock import MagicMock, patch
-import sys, os
-
-# Add parent folder to sys.path so we can import sheets_utils
-sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
+from datetime import datetime
 
 import sheets_utils as su
-from dotenv import load_dotenv
-load_dotenv()
+
+
+@pytest.fixture(autouse=True)
+def _freeze_today(monkeypatch):
+    monkeypatch.setattr(su, "get_local_today", lambda: datetime(2025, 5, 15))
+    yield
+
+
+@pytest.fixture
+def persons():
+    return ["Hannah", "Brian (BofA)"]
+
+
+def _food_row(date_str, amount, person):
+    row = [""] * 26  # enough columns through Z
+    row[su.column_index_from_string("N") - 1] = date_str
+    row[su.column_index_from_string("P") - 1] = str(amount)
+    row[su.column_index_from_string("R") - 1] = person
+    return row
 
 @pytest.fixture
 def mock_ws():
@@ -60,8 +74,15 @@ async def test_check_rent_paid(mock_get_income_worksheet):
 
 
 @pytest.mark.asyncio
+@pytest.mark.parametrize(
+    ("store", "expected_total"),
+    [
+        ("Starbucks", 35),
+        ("Subway", 15),
+    ],
+)
 @patch("sheets_utils.get_expense_worksheet")
-async def test_total_spent_at_store(mock_get_expense_worksheet):
+async def test_total_spent_at_store(mock_get_expense_worksheet, store, expected_total):
     mock_ws = MagicMock()
     mock_get_expense_worksheet.return_value = mock_ws
 
@@ -70,18 +91,15 @@ async def test_total_spent_at_store(mock_get_expense_worksheet):
         ['header1', 'header2', 'header3'],
         ['header4', 'header5', 'header6'],
         # Food section — cols P/Q (indices 15/16)
-        ['']*15 + ['10', 'Starbucks'] + ['']*8,   # Food, Starbucks, $10
-        ['']*15 + ['5', 'Starbucks'] + ['']*8,    # Food, Starbucks, $5
+        [''] * 15 + ['10', 'Starbucks'] + [''] * 8,   # Food, Starbucks, $10
+        [''] * 15 + ['5', 'Starbucks'] + [''] * 8,    # Food, Starbucks, $5
         # Shopping section — cols X/Y (indices 23/24)
-        ['']*23 + ['20', 'Starbucks'] + ['']*1,   # Shopping, Starbucks, $20
-        ['']*23 + ['15', 'Subway'] + ['']*1       # Shopping, not Starbucks
+        [''] * 23 + ['20', 'Starbucks'] + [''] * 1,   # Shopping, Starbucks, $20
+        [''] * 23 + ['15', 'Subway'] + [''] * 1       # Shopping, not Starbucks
     ]
 
-    total = await su.total_spent_at_store("Starbucks")
-    assert total == 10 + 5 + 20  # Only rows matching "Starbucks" in Q or Y
-
-    total_subway = await su.total_spent_at_store("Subway")
-    assert total_subway == 15
+    total = await su.total_spent_at_store(store)
+    assert total == expected_total
 
 
 @pytest.mark.asyncio
@@ -185,10 +203,17 @@ async def test_expense_breakdown_percentages(mock_ws_func, mock_ws):
 
 @pytest.mark.asyncio
 @patch("sheets_utils.get_expense_worksheet")
-async def test_total_for_category(mock_ws_func, mock_ws):
+async def test_total_for_category(mock_ws_func, mock_ws, persons):
     mock_ws_func.return_value = mock_ws
-    result = await su.total_for_category("grocery")
-    assert isinstance(result, float)
+    mock_ws.get_all_values.return_value = [
+        ["hdr"] * 4,
+        ["hdr"] * 4,
+        ["05/01/2025", "10", "", "Hannah"],
+        ["05/02/2025", "5", "", "SomeoneElse"],
+        ["05/03/2025", "15", "", "Brian (BofA)"],
+    ]
+    result = await su.total_for_category("grocery", persons)
+    assert result == 25.0
 
 
 @pytest.mark.asyncio
@@ -211,33 +236,56 @@ async def test_top_n_expenses(mock_ws_func, mock_ws):
 
 @pytest.mark.asyncio
 @patch("sheets_utils.get_expense_worksheet")
-async def test_spent_this_week(mock_ws_func, mock_ws):
+async def test_spent_this_week(mock_ws_func, mock_ws, persons):
     mock_ws_func.return_value = mock_ws
-    result = await su.spent_this_week()
-    assert isinstance(result, float)
+    mock_ws.get_all_values.return_value = [
+        ["hdr"] * 26,
+        ["hdr"] * 26,
+        _food_row("05/12/2025", 20, "Hannah"),
+    ]
+    result = await su.spent_this_week(persons)
+    assert result == 20.0
 
 
 @pytest.mark.asyncio
 @patch("sheets_utils.get_expense_worksheet")
-async def test_projected_spending(mock_ws_func, mock_ws):
+async def test_projected_spending(mock_ws_func, mock_ws, persons):
     mock_ws_func.return_value = mock_ws
-    result = await su.projected_spending()
-    assert isinstance(result, float)
+    mock_ws.get_all_values.return_value = [
+        ["hdr"] * 26,
+        ["hdr"] * 26,
+        _food_row("05/01/2025", 30, "Hannah"),
+    ]
+    result = await su.projected_spending(persons)
+    # May 2025: 31 days; spending so far $30 on day 15 -> ~62 projected
+    assert result == pytest.approx((30 / 15) * 31, rel=1e-3)
 
 
 @pytest.mark.asyncio
 @patch("sheets_utils.get_expense_worksheet")
-async def test_weekend_vs_weekday(mock_ws_func, mock_ws):
+async def test_weekend_vs_weekday(mock_ws_func, mock_ws, persons):
     mock_ws_func.return_value = mock_ws
-    weekend, weekday = await su.weekend_vs_weekday()
-    assert isinstance(weekend, float)
-    assert isinstance(weekday, float)
+    mock_ws.get_all_values.return_value = [
+        ["hdr"] * 26,
+        ["hdr"] * 26,
+        _food_row("05/10/2025", 50, "Hannah"),  # Sat
+        _food_row("05/12/2025", 30, "Hannah"),  # Mon
+    ]
+    weekend, weekday = await su.weekend_vs_weekday(persons)
+    assert weekend == 50.0
+    assert weekday == 30.0
 
 
 @pytest.mark.asyncio
 @patch("sheets_utils.get_expense_worksheet")
-async def test_no_spend_days(mock_ws_func, mock_ws):
+async def test_no_spend_days(mock_ws_func, mock_ws, persons):
     mock_ws_func.return_value = mock_ws
-    count, days = await su.no_spend_days()
-    assert isinstance(count, int)
-    assert isinstance(days, list)
+    mock_ws.get_all_values.return_value = [
+        ["hdr"] * 26,
+        ["hdr"] * 26,
+        _food_row("05/01/2025", 10, "Hannah"),
+        _food_row("05/03/2025", 5, "Hannah"),
+    ]
+    count, days = await su.no_spend_days(persons)
+    assert count == 13  # days 2..15 excluding 1 and 3 up to frozen day 15
+    assert 2 in days and 4 in days

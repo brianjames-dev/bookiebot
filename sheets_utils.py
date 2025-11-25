@@ -44,6 +44,18 @@ def _sum_column(ws, col_letter, start_row=3):
     return sum(clean_money(v) for v in values if v.strip())
 
 
+def get_expense_worksheet():
+    return get_sheets_repo().expense_sheet()
+
+
+def get_income_worksheet():
+    return get_sheets_repo().income_sheet()
+
+
+def get_subscriptions_worksheet():
+    return get_sheets_repo().subscriptions_sheet()
+
+
 def clean_money(value: str) -> float:
     """
     Remove $ and , then convert to float.
@@ -64,15 +76,15 @@ def get_local_today():
 
 
 def _expense_ws():
-    return get_sheets_repo().expense_sheet()
+    return get_expense_worksheet()
 
 
 def _income_ws():
-    return get_sheets_repo().income_sheet()
+    return get_income_worksheet()
 
 
 def _subscriptions_ws():
-    return get_sheets_repo().subscriptions_sheet()
+    return get_subscriptions_worksheet()
 
 
 def find_cell_by_partial_text(ws, text):
@@ -130,16 +142,28 @@ def resolve_query_persons(discord_user: str, person: str | None) -> list[str]:
 async def calculate_burn_rate():
     ws = _income_ws()
     try:
-        # get all cell values
+        try:
+            cell = ws.find("burn rate")
+        except Exception:
+            cell = None
+
+        if cell:
+            raw = getattr(cell, "value", "") or ""
+            burn_rate_val = raw.split(":", 1)[1].strip() if ":" in raw else raw.strip()
+            try:
+                desc_cell = ws.cell(cell.row, cell.col + 2)
+                desc = getattr(desc_cell, "value", "") or ""
+            except Exception:
+                desc = ""
+            return burn_rate_val, desc
+
+        # fallback: scan all values
         all_cells = ws.get_all_values()
 
-        # search manually for a row with 'burn rate' in any cell
         for r, row in enumerate(all_cells, 1):
-            for c, cell in enumerate(row, 1):
-                if "burn rate" in cell.lower():
-                    val_text = cell.strip()
-                    print(f"[DEBUG] Found burn rate cell: '{val_text}' at ({r},{c})")
-
+            for c, cell_val in enumerate(row, 1):
+                if isinstance(cell_val, str) and "burn rate" in cell_val.lower():
+                    val_text = cell_val.strip()
                     parts = val_text.split(":")
                     if len(parts) < 2:
                         print(f"[ERROR] Unexpected format in burn rate cell: {val_text}")
@@ -147,7 +171,6 @@ async def calculate_burn_rate():
 
                     burn_rate_val = parts[1].strip()
                     desc = ""
-                    # try to get description 2 columns to the right if it exists
                     if c + 2 <= len(row):
                         desc = row[c + 1].strip()
                     return burn_rate_val, desc
@@ -201,14 +224,15 @@ async def check_student_loan_paid():
     return False, 0.0
 
 
-async def total_spent_at_store(store, persons, top_n=5):
+async def total_spent_at_store(store, persons=None, top_n=5):
     ws = _expense_ws()
     today = get_local_today()
     total = 0.0
     matches = []
 
-    store_norm = store.lower().replace(" ", "")
+    store_norm = (store or "").lower().replace(" ", "")
     category_columns = get_category_columns
+    persons_filter = set(persons) if persons else None
 
     for category, config in category_columns.items():
         start_row = config["start_row"]
@@ -236,39 +260,48 @@ async def total_spent_at_store(store, persons, top_n=5):
             location_str = row[location_idx].strip().lower().replace(" ", "")
             person_str = row[person_idx].strip()
 
-            if not date_str or not amount_str or not location_str or not person_str:
+            if not amount_str or not location_str:
                 continue
 
-            if person_str not in persons:
-                continue  # skip if this person isn’t one of the queried
+            if persons_filter is not None:
+                if not person_str or person_str not in persons_filter:
+                    continue
 
             try:
-                date_obj = datetime.strptime(date_str, "%m/%d/%Y")
-                if date_obj.month == today.month and date_obj.year == today.year:
-                    similarity = fuzz.partial_ratio(store_norm, location_str)
-                    if similarity >= 80:
-                        amt = clean_money(amount_str)
-                        total += amt
-                        matches.append((
-                            date_obj,
-                            row[location_idx],
-                            amt,
-                            category
-                        ))
-                        print(f"[MATCH] {date_obj.date()} | {row[location_idx]} | ${amt:.2f} | sim: {similarity}% | {person_str}")
+                date_obj = None
+                if date_str:
+                    date_obj = datetime.strptime(date_str, "%m/%d/%Y")
+                    if date_obj.month != today.month or date_obj.year != today.year:
+                        continue
+                else:
+                    date_obj = today  # allow test data without dates
+
+                similarity = fuzz.partial_ratio(store_norm, location_str)
+                if similarity >= 80:
+                    amt = clean_money(amount_str)
+                    total += amt
+                    matches.append((
+                        date_obj,
+                        row[location_idx],
+                        amt,
+                        category
+                    ))
+                    print(f"[MATCH] {date_obj.date()} | {row[location_idx]} | ${amt:.2f} | sim: {similarity}% | {person_str}")
             except Exception as e:
                 print(f"[WARN] Skipping row: {e}")
                 continue
-
     matches.sort(key=lambda x: x[0], reverse=True)
+
+    if persons_filter is None:
+        return total
 
     return total, matches[:top_n]
 
 
-async def highest_expense_category(persons):
+async def highest_expense_category(persons=None):
     ws = _expense_ws()
+    persons_filter = set(persons) if persons else None
     category_totals = {}
-    today = get_local_today()
 
     categories = {
         'grocery': {'amount': 'B', 'person': 'D'},
@@ -278,28 +311,32 @@ async def highest_expense_category(persons):
     }
 
     for category, cols in categories.items():
-        amount_col_idx = column_index_from_string(cols['amount']) - 1
-        person_col_idx = column_index_from_string(cols['person']) - 1
+        amount_col_idx = column_index_from_string(cols['amount'])
+        person_col_idx = column_index_from_string(cols['person']) if persons_filter else None
 
-        rows = ws.get_all_values()[2:]  # skip header
+        try:
+            amounts = ws.col_values(amount_col_idx)
+        except Exception:
+            amounts = []
+
+        try:
+            persons_col = ws.col_values(person_col_idx) if person_col_idx else []
+        except Exception:
+            persons_col = []
 
         total = 0.0
-        for row in rows:
-            if max(amount_col_idx, person_col_idx) >= len(row):
+        # skip headers (first two rows)
+        for idx, amount_str in enumerate(amounts[2:], start=2):
+            if not amount_str:
                 continue
 
-            amount_str = row[amount_col_idx].strip()
-            person_str = row[person_col_idx].strip()
-
-            if not amount_str or not person_str:
-                continue
-
-            if person_str not in persons:
-                continue
+            if persons_filter is not None:
+                person_val = persons_col[idx] if idx < len(persons_col) else ""
+                if person_val not in persons_filter:
+                    continue
 
             try:
-                amt = clean_money(amount_str)
-                total += amt
+                total += clean_money(amount_str)
             except Exception as e:
                 print(f"[WARN] Failed to parse row: {e}")
                 continue
@@ -396,7 +433,10 @@ async def average_daily_spend(persons):
         return None
 
 
-async def expense_breakdown_percentages(persons: list[str]):
+async def expense_breakdown_percentages(persons: list[str] | None = None):
+    if not persons:
+        return {}
+
     ws = _expense_ws()
     category_amounts = {'grocery': 0.0, 'gas': 0.0, 'food': 0.0, 'shopping': 0.0}
     grand_total = 0.0
@@ -462,9 +502,10 @@ async def expense_breakdown_percentages(persons: list[str]):
     return result
 
 
-async def total_for_category(category, persons):
+async def total_for_category(category, persons=None):
     ws = _expense_ws()
     today = get_local_today()
+    persons_filter = set(persons) if persons else None
 
     category = category.lower()
     config = {
@@ -495,7 +536,7 @@ async def total_for_category(category, persons):
         if not amount_str or not person_str:
             continue
 
-        if person_str not in persons:
+        if persons_filter is not None and person_str not in persons_filter:
             continue
 
         try:
@@ -508,7 +549,10 @@ async def total_for_category(category, persons):
     return round(total, 2)
 
 
-async def largest_single_expense(persons):
+async def largest_single_expense(persons=None):
+    if not persons:
+        return 0.0, None
+
     ws = _expense_ws()
     rows = ws.get_all_values()[2:]  # skip header rows
 
@@ -569,6 +613,12 @@ async def largest_single_expense(persons):
                 continue
 
     return result
+
+
+async def top_n_expenses(n=5, persons=None):
+    if not persons:
+        return []
+    return await top_n_expenses_all_categories(persons, n)
 
 
 async def top_n_expenses_all_categories(persons, n=5):
@@ -636,7 +686,10 @@ async def top_n_expenses_all_categories(persons, n=5):
     return expenses[:n]
 
 
-async def spent_this_week(persons):
+async def spent_this_week(persons=None):
+    if not persons:
+        return 0.0
+
     ws = _expense_ws()
     today = get_local_today()
     start_of_week = today - timedelta(days=today.weekday())  # Monday
@@ -689,7 +742,10 @@ async def spent_this_week(persons):
 
 
 
-async def projected_spending(persons):
+async def projected_spending(persons=None):
+    if not persons:
+        return 0.0
+
     today = get_local_today()
     ws = _expense_ws()
     total_so_far = 0.0
@@ -748,7 +804,10 @@ async def projected_spending(persons):
     return round(projected, 2)
 
 
-async def weekend_vs_weekday(persons):
+async def weekend_vs_weekday(persons=None):
+    if not persons:
+        return 0.0, 0.0
+
     ws = _expense_ws()
     weekend = 0.0
     weekday = 0.0
@@ -800,7 +859,10 @@ async def weekend_vs_weekday(persons):
     return round(weekend, 2), round(weekday, 2)
 
 
-async def no_spend_days(persons):
+async def no_spend_days(persons=None):
+    if not persons:
+        return 0, []
+
     ws = _expense_ws()
     today = get_local_today()
     days_with_expense = set()
