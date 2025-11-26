@@ -144,6 +144,11 @@ pytest --llm-live unit_tests/test_scenario_runner.py -k rent
 - The fixture factory switches to `CassetteLLMClient`.
 - HTTP traffic is stored in `unit_tests/cassettes/<fixture>.yaml`.
 - Subsequent test runs replay from the cassette without hitting the network.
+- Command breakdown:
+  - `pytest` — run the test runner
+  - `--llm-live` — call the live OpenAI API and record/replay via cassette
+  - `unit_tests/test_scenario_runner.py` — target this specific test file
+  - `-k rent` — keyword filter to run only tests whose names contain “rent” (skip others)
 
 ---
 

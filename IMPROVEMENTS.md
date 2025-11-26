@@ -150,6 +150,17 @@ TZ=America/Los_Angeles
 - Consider adding Sentry (or equivalent) for exception capture and breadcrumbs.
 
 
+## CI/CD + LLM Drift Automation
+
+- **Capture prod LLM telemetry** (with redaction): log prompts, model replies, intent/handler decisions, and failure modes (fallback, bad entities) with anonymized context.
+- **RAG-driven triage:** cluster/summarize recent failures to surface the top bad cases per intent.
+- **Auto-generate tests/fixtures:** for top failures, have a bot propose new LLM fixtures + scenario tests (and cassette slots) in a PR for human review.
+- **Gate CI with replay:** run deterministic suite (fixtures + cassettes) on every PR; require previously failing cases to pass when prompts/handlers change.
+- **Nightly/weekly cassette refresh:** replay curated prompts with `--llm-live`, update cassettes, and open a PR if outputs drift.
+- **Code-review assistant:** a bot flags prompt/handler diffs and suggests missing tests (e.g., ambiguous person resolution).
+- **Alerting loop:** pipe production LLM mismatches into an issue queue; group similar issues via RAG and auto-kick the test/PR generation flow above.
+
+
 ## Testing
 
 - Current tests (`unit_tests/test_sheets_utils.py`) don’t match function signatures and will fail. Align tests after refactor:
@@ -252,4 +263,3 @@ cfg = CATEGORY_COLUMNS[category]
 ---
 
 If you want, this plan can be executed incrementally starting with the Quick Wins and a small PR that only touches `bot.py`, `requirements.txt`, `sheets_config.py`, and a couple of `matplotlib` imports. Subsequent PRs can refactor `sheets_utils.py` into a repository + pure logic without changing behavior.
-
