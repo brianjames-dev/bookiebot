@@ -1,12 +1,12 @@
 # all intent handlers
 
-from sheets_writer import write_to_sheet
-import sheets_utils as su
+from bookiebot.sheets_writer import write_to_sheet
+import bookiebot.sheets_utils as su
 import openai
 import matplotlib.pyplot as plt
 import io
 from datetime import datetime
-from sheets_utils import resolve_query_persons, get_local_today
+from bookiebot.sheets_utils import resolve_query_persons, get_local_today
 
 try:
     import discord

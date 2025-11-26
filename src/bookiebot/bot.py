@@ -1,8 +1,8 @@
 import discord
 import os
 from dotenv import load_dotenv
-from intent_parser import parse_message_llm
-from intent_handlers import handle_intent
+from bookiebot.intent_parser import parse_message_llm
+from bookiebot.intent_handlers import handle_intent
 import intent_explorer
 
 print("🚀 Starting bot...")

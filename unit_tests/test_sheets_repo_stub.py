@@ -1,4 +1,4 @@
-from sheets_repo import get_sheets_repo
+from bookiebot.sheets_repo import get_sheets_repo
 from unit_tests.support.sheets_repo_stub import InMemoryWorksheet, SheetsRepoStub
 
 

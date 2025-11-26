@@ -14,15 +14,15 @@ This document explains how to run and extend the new local harness that exercise
 ## 2. Key Components
 | File | Purpose | Notes |
 |------|---------|-------|
-| `llm_client.py` | Defines the `LLMClient` protocol plus `OpenAIClient`, `FixtureLLMClient`, and `CassetteLLMClient`. | Production uses `OpenAIClient`; tests build fixture/cassette clients. |
-| `sheets_repo.py` | Repository abstraction returned by `get_sheets_repo()`. | Production repo talks to Google Sheets; tests override it with `SheetsRepoStub`. |
+| `src/bookiebot/llm_client.py` | Defines the `LLMClient` protocol plus `OpenAIClient`, `FixtureLLMClient`, and `CassetteLLMClient`. | Production uses `OpenAIClient`; tests build fixture/cassette clients. |
+| `src/bookiebot/sheets_repo.py` | Repository abstraction returned by `get_sheets_repo()`. | Production repo talks to Google Sheets; tests override it with `SheetsRepoStub`. |
 | `unit_tests/support/sheets_repo_stub.py` | In-memory worksheet + repo stub. | `repo.patched()` temporarily replaces the live repo so handlers use fixture data. |
-| `unit_tests/support/fixture_loader.py` | Loads sheet fixtures (`fixtures/sheets/*.json`) and expands placeholders like `__TODAY__`. | `build_repo_from_fixture("base_month")` returns a ready-to-use `SheetsRepoStub`. |
+| `unit_tests/support/fixture_loader.py` | Loads sheet fixtures (`unit_tests/fixtures/sheets/*.json`) and expands placeholders like `__TODAY__`. | `build_repo_from_fixture("base_month")` returns a ready-to-use `SheetsRepoStub`. |
 | `unit_tests/support/scenario_runner.py` | Fake Discord runner that feeds fixture LLM responses into the parser/handlers and captures replies. | Accepts either an LLM fixture path or a custom `LLMClient`. |
-| `unit_tests/conftest.py` | Pytest plumbing. Adds `--llm-live`, stubs optional deps (`gspread`, `openai`), and exposes `llm_client_factory`. |
+| `unit_tests/conftest.py` | Pytest plumbing. Adds `--llm-live`, stubs optional deps (`gspread`, `openai`), and exposes `llm_client_factory`; prepends `src/` to `sys.path`. |
 | `unit_tests/fixtures/llm/*.json` | LLM outputs for deterministic tests. | Each file mirrors the JSON the parser expects (`intent` + `entities`). |
 | `unit_tests/fixtures/sheets/*.json` | Workbook snapshots for the Sheets stub. | You can define rows either as arrays or `{ "A": value }` column maps. |
-| `unit_tests/test_*` | Current coverage: parser contracts, scenario flows, and sheet stub behavior. | Add new files here as you expand coverage. |
+| `unit_tests/test_*` | Coverage: parser contracts, scenario flows, sheet helpers, and handler-level intent tests. | Add new files here as you expand coverage. |
 
 ---
 
@@ -108,7 +108,7 @@ Guards the in-memory worksheet behavior and the repo override context manager.
 
 ### Testing Options
 - `pytest unit_tests/test_scenario_runner.py -k <pattern>` – targeted scenario(s)
-- `pytest unit_tests/test_*` – full sandbox + parser/stub suites
+- `pytest unit_tests/test_*` – full sandbox + parser/stub/handler suites
 - `pytest unit_tests/test_intent_parser.py` – parser-only
 - `pytest unit_tests/test_sheets_repo_stub.py` – sheet stub utilities
 - add `--llm-live` to any command when you need real OpenAI responses
@@ -116,7 +116,7 @@ Guards the in-memory worksheet behavior and the repo override context manager.
 
 ---
 
-## 5. Refreshing Real OpenAI Responses
+## 6. Refreshing Real OpenAI Responses
 Use this when you change prompts or want to verify model drift.
 
 **Prereqs**
@@ -133,7 +133,7 @@ pytest --llm-live unit_tests/test_scenario_runner.py -k rent
 
 ---
 
-## 6. Extending Coverage
+## 7. Extending Coverage
 1. **Add sheet data**: update `unit_tests/fixtures/sheets/*.json` or create a new file describing the relevant tabs.
 2. **Add an LLM fixture**: drop a JSON file in `unit_tests/fixtures/llm/` describing the parser output for your utterance.
 3. **Write a scenario test**:
@@ -151,7 +151,7 @@ pytest --llm-live unit_tests/test_scenario_runner.py -k rent
 
 ---
 
-## 7. CI & Workflow Recommendations
+## 8. CI & Workflow Recommendations
 - Tag sandbox tests with `@pytest.mark.sandbox` (pending) and run `pytest -m "sandbox and not llm_live"` on every PR.
 - Add a nightly/weekly job that runs `pytest --llm-live -m sandbox` to refresh cassettes and surface prompt drift.
 - Consider a helper script or Make target:
@@ -162,7 +162,7 @@ pytest --llm-live unit_tests/test_scenario_runner.py -k rent
 
 ---
 
-## 8. Next Steps to Strengthen the Harness
+## 9. Next Steps to Strengthen the Harness
 1. **More fixtures** for all remaining intents (need expenses, SMUD/student loan, transfers, analytics queries).
 2. **Caching/context testing hooks** once those features land – expose dependency injection points so the sandbox can validate them.
 3. **Documentation samples** – add troubleshooting tips (e.g., where replies are stored, how to inspect sheet state) and template files for adding new fixtures.

@@ -1,8 +1,8 @@
 import asyncio
 import json
 
-from intent_parser import parse_message_llm
-from llm_client import FixtureLLMClient, LLMClient
+from bookiebot.intent_parser import parse_message_llm
+from bookiebot.llm_client import FixtureLLMClient, LLMClient
 
 
 def test_parse_message_llm_uses_fixture_payload():

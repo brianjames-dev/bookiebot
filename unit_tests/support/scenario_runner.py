@@ -4,8 +4,8 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Awaitable, Callable, Dict, Optional, Union
 
-from llm_client import FixtureLLMClient, LLMClient
-from intent_parser import parse_message_llm
+from bookiebot.llm_client import FixtureLLMClient, LLMClient
+from bookiebot.intent_parser import parse_message_llm
 
 
 class FakeChannel:

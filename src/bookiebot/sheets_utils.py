@@ -1,7 +1,7 @@
 from openpyxl.utils import column_index_from_string
 from datetime import datetime, timedelta
 import re
-from sheets_config import get_category_columns
+from bookiebot.sheets_config import get_category_columns
 from dateutil import parser as dateparser
 from collections import defaultdict, Counter
 import matplotlib.pyplot as plt
@@ -19,7 +19,7 @@ except ImportError:  # pragma: no cover - fallback for tests
 
 import gspread
 from pytz import timezone
-from sheets_repo import get_sheets_repo
+from bookiebot.sheets_repo import get_sheets_repo
 
 try:
     from rapidfuzz import fuzz

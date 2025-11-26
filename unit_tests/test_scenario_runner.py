@@ -3,7 +3,7 @@ from pathlib import Path
 
 from openpyxl.utils import column_index_from_string
 
-from intent_handlers import handle_intent
+from bookiebot.intent_handlers import handle_intent
 from unit_tests.support.scenario_runner import FakeMessage, run_scenario
 from unit_tests.support.fixture_loader import build_repo_from_fixture
 

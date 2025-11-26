@@ -2,12 +2,12 @@
 
 from datetime import datetime
 from openpyxl.utils import column_index_from_string
-from card_ui import CardSelectView
+from bookiebot.card_ui import CardSelectView
 import asyncio
 import pytz
-from sheets_config import get_category_columns
-from sheets_utils import resolve_query_persons
-from sheets_repo import get_sheets_repo
+from bookiebot.sheets_config import get_category_columns
+from bookiebot.sheets_utils import resolve_query_persons
+from bookiebot.sheets_repo import get_sheets_repo
 
 
 # Temporary memory for user interactions (used for dropdown callbacks)

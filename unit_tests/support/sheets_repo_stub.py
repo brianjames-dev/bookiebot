@@ -83,7 +83,7 @@ class SheetsRepoStub:
 
     @contextlib.contextmanager
     def patched(self):
-        from sheets_repo import get_sheets_repo, override_sheets_repo
+        from bookiebot.sheets_repo import get_sheets_repo, override_sheets_repo
 
         previous = get_sheets_repo()
         override_sheets_repo(self)
