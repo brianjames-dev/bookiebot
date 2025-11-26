@@ -87,7 +87,7 @@ class OpenAIClient(LLMClient):
             )
 
         response = await asyncio.to_thread(_call)
-        return response.choices[0].message.content
+        return response.choices[0].message.content  # type: ignore[index]
 
 
 class FixtureLLMClient(LLMClient):

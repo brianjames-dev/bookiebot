@@ -4,7 +4,8 @@ from datetime import datetime
 from openpyxl.utils import column_index_from_string
 from bookiebot.card_ui import CardSelectView
 import asyncio
-import pytz
+import os
+from zoneinfo import ZoneInfo
 from bookiebot.sheets_config import get_category_columns
 from bookiebot.sheets_utils import resolve_query_persons
 from bookiebot.sheets_repo import get_sheets_repo
@@ -22,10 +23,15 @@ async def write_to_sheet(data, message):
 
 
 async def write_income_to_sheet(data, message):
+    ws = None
     try:
         ws = get_sheets_repo().income_sheet()
     except Exception as e:
         print(f"Could not access income sheet: {e}")
+        if message:
+            await message.channel.send("Error accessing income sheet.")
+        return
+    if ws is None:
         if message:
             await message.channel.send("Error accessing income sheet.")
         return
@@ -68,10 +74,15 @@ async def write_expense_to_sheet(data, message):
         await message.channel.send(f"❌ Unknown category: {category}")
         return
 
+    ws = None
     try:
         ws = get_sheets_repo().expense_sheet()
     except Exception as e:
         print(f"❌ Could not access expense sheet: {e}")
+        if message:
+            await message.channel.send("Error accessing expense sheet.")
+        return
+    if ws is None:
         if message:
             await message.channel.send("Error accessing expense sheet.")
         return
@@ -143,7 +154,7 @@ async def write_expense_to_sheet(data, message):
 
 
 def normalize_expense_data(data, person):
-    tz = pytz.timezone("America/Los_Angeles")  # or whatever timezone you’re in
+    tz = ZoneInfo(os.getenv("TZ", "America/Los_Angeles"))
     local_now = datetime.now(tz)
     return {
         "date": local_now.strftime("%-m/%-d/%Y"),

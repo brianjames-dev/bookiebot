@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Protocol
+from typing import Protocol, Any
 
 from bookiebot.sheets_auth import (
     get_expense_worksheet,
@@ -10,13 +10,13 @@ from bookiebot.sheets_auth import (
 
 
 class SheetsRepository(Protocol):
-    def expense_sheet(self):
+    def expense_sheet(self) -> Any:
         ...
 
-    def income_sheet(self):
+    def income_sheet(self) -> Any:
         ...
 
-    def subscriptions_sheet(self):
+    def subscriptions_sheet(self) -> Any:
         ...
 
 

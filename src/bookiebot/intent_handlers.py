@@ -6,6 +6,7 @@ import openai
 import matplotlib.pyplot as plt
 import io
 from datetime import datetime
+from typing import Any, cast
 from bookiebot.sheets_utils import resolve_query_persons, get_local_today
 
 try:
@@ -105,13 +106,16 @@ Now the user asks:
 Please respond helpfully and clearly.
 """
     try:
-        response = openai.ChatCompletion.create(
-            model="gpt-3.5-turbo",
-            messages=[
-                {"role": "system", "content": "You are a financial assistant chatbot."},
-                {"role": "user", "content": prompt}
-            ],
-            temperature=0.5
+        response = cast(
+            Any,
+            openai.ChatCompletion.create(
+                model="gpt-3.5-turbo",
+                messages=[
+                    {"role": "system", "content": "You are a financial assistant chatbot."},
+                    {"role": "user", "content": prompt}
+                ],
+                temperature=0.5
+            ),
         )
         reply = response.choices[0].message.content
         await message.channel.send(reply)
@@ -166,7 +170,13 @@ async def query_total_for_store_handler(entities, message):
         await message.channel.send("❌ Could not determine person(s) to query.")
         return
 
-    total, matches = await su.total_spent_at_store(store, persons_to_query)
+    total_result = await su.total_spent_at_store(store, persons_to_query)
+    total: float
+    matches: list[Any]
+    if isinstance(total_result, tuple):
+        total, matches = total_result
+    else:
+        total, matches = total_result, []
 
     response = f"💰 You’ve spent ${total:.2f} at {store} this month.\n"
     if matches:
@@ -264,12 +274,13 @@ async def query_expense_breakdown_handler(entities, message):
 
     # Pie Chart
     fig, ax = plt.subplots(figsize=(6, 6))
-    colors = plt.get_cmap('Pastel1').colors
+    cmap = plt.get_cmap('Pastel1')
+    colors = getattr(cmap, "colors", None)
 
     largest_idx = amounts.index(max(amounts))
     explode = [0.1 if i == largest_idx else 0 for i in range(len(amounts))]
 
-    wedges, texts, autotexts = ax.pie(
+    pie_result = ax.pie(
         amounts,
         labels=labels,
         autopct='%1.1f%%',
@@ -280,6 +291,10 @@ async def query_expense_breakdown_handler(entities, message):
         radius=0.9,
         textprops={'fontsize': 10}
     )
+
+    wedges = pie_result[0]
+    texts = pie_result[1] if len(pie_result) > 1 else []
+    autotexts = pie_result[2] if len(pie_result) > 2 else []
 
     for autotext in autotexts:
         autotext.set_fontsize(11)
@@ -330,7 +345,7 @@ async def query_largest_single_expense_handler(entities, message):
         return
 
     result = await su.largest_single_expense(persons)
-    if result:
+    if isinstance(result, dict):
         await message.channel.send(
             f"💸 Largest single expense: ${result['amount']:.2f} — "
             f"{result['item']} at {result['location']} on {result['date']} "

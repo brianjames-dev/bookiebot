@@ -125,7 +125,7 @@ async def test_simple_queries(monkeypatch, message, intent, su_attr, return_valu
     else:
         monkeypatch.setattr(ih.su, su_attr, AsyncMock(return_value=return_value))
 
-    entities = {"category": "food", "store": "Costco"}
+    entities: dict[str, object] = {"category": "food", "store": "Costco"}
     if intent == "query_total_for_item":
         entities["item"] = "Coffee"
     if intent == "query_daily_spending_calendar":

@@ -13,7 +13,7 @@ TOKEN = os.getenv("DISCORD_TOKEN")
 if not TOKEN:
     raise RuntimeError("❌ DISCORD_TOKEN is not set in the environment!")
 
-CHANNEL_NAME = "babys-books"
+CHANNEL_NAME = os.getenv("CHANNEL_NAME", "babys-books")
 
 # Discord intents
 intents = discord.Intents.default()

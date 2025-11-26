@@ -108,11 +108,25 @@ Guards the in-memory worksheet behavior and the repo override context manager.
 
 ### Testing Options
 - `pytest unit_tests/test_scenario_runner.py -k <pattern>` – targeted scenario(s)
+- `pytest unit_tests/test_intent_handlers.py -k <pattern>` – handler-only intent checks (mocks helpers, asserts replies)
 - `pytest unit_tests/test_*` – full sandbox + parser/stub/handler suites
 - `pytest unit_tests/test_intent_parser.py` – parser-only
 - `pytest unit_tests/test_sheets_repo_stub.py` – sheet stub utilities
 - add `--llm-live` to any command when you need real OpenAI responses
 - combine with `-vv` / `-s` for verbose logs
+
+#### Running with the live LLM (records/replays cassettes)
+- `pytest --llm-live unit_tests/test_scenario_runner.py -k query_rent_paid`
+  - Uses the real LLM once, saves to `unit_tests/cassettes/query_rent.yaml`, then replays on future runs.
+  - Test location: `unit_tests/test_scenario_runner.py::test_query_rent_paid`.
+- `pytest --llm-live unit_tests/test_scenario_runner.py -k log_expense`
+  - Runs the log-expense flow end to end with live LLM output; cassette saved under `unit_tests/cassettes/`.
+- `pytest --llm-live unit_tests/test_intent_parser.py -k parse_message_llm`
+  - Calls the parser directly with live LLM to refresh fixture expectations.
+
+Notes:
+- You need `OPENAI_API_KEY` set and `vcrpy` installed (`pip install -r requirements.txt`).
+- Cassettes are stored in `unit_tests/cassettes/*.yaml`; commit them for deterministic CI runs or gitignore if you prefer to re-record locally.
 
 ---
 

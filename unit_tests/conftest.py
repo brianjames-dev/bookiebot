@@ -35,7 +35,7 @@ def _ensure_gspread_stub():
     def authorize(_creds):
         return Client()
 
-    sys.modules["gspread"] = types.SimpleNamespace(authorize=authorize, utils=utils)
+    sys.modules["gspread"] = types.SimpleNamespace(authorize=authorize, utils=utils)  # type: ignore[assignment]
 
 
 _ensure_gspread_stub()
@@ -53,7 +53,7 @@ def _ensure_openai_stub():
         def create(*args, **kwargs):
             raise RuntimeError("openai stub cannot make real API calls.")
 
-    sys.modules["openai"] = types.SimpleNamespace(ChatCompletion=ChatCompletion)
+    sys.modules["openai"] = types.SimpleNamespace(ChatCompletion=ChatCompletion)  # type: ignore[assignment]
 
 
 _ensure_openai_stub()

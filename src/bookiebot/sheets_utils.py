@@ -1,6 +1,9 @@
 from openpyxl.utils import column_index_from_string
 from datetime import datetime, timedelta
+import os
 import re
+from typing import Any, Optional
+from zoneinfo import ZoneInfo
 from bookiebot.sheets_config import get_category_columns
 from dateutil import parser as dateparser
 from collections import defaultdict, Counter
@@ -18,7 +21,6 @@ except ImportError:  # pragma: no cover - fallback for tests
     discord = _Discord()
 
 import gspread
-from pytz import timezone
 from bookiebot.sheets_repo import get_sheets_repo
 
 try:
@@ -44,15 +46,15 @@ def _sum_column(ws, col_letter, start_row=3):
     return sum(clean_money(v) for v in values if v.strip())
 
 
-def get_expense_worksheet():
+def get_expense_worksheet() -> Any:
     return get_sheets_repo().expense_sheet()
 
 
-def get_income_worksheet():
+def get_income_worksheet() -> Any:
     return get_sheets_repo().income_sheet()
 
 
-def get_subscriptions_worksheet():
+def get_subscriptions_worksheet() -> Any:
     return get_sheets_repo().subscriptions_sheet()
 
 
@@ -72,7 +74,8 @@ def clean_money(value: str) -> float:
 
 
 def get_local_today():
-    return datetime.now(timezone("America/Los_Angeles"))
+    tz = ZoneInfo(os.getenv("TZ", "America/Los_Angeles"))
+    return datetime.now(tz)
 
 
 def _expense_ws():
@@ -141,6 +144,8 @@ def resolve_query_persons(discord_user: str, person: str | None) -> list[str]:
 # QUERY FUNCTIONS
 async def calculate_burn_rate():
     ws = _income_ws()
+    if ws is None:
+        return None, None
     try:
         try:
             cell = ws.find("burn rate")
@@ -185,6 +190,8 @@ async def calculate_burn_rate():
 
 async def check_rent_paid():
     ws = _income_ws()
+    if ws is None:
+        return False, 0.0
     try:
         cell = ws.find("Rent")
         amount_cell = ws.cell(cell.row, cell.col + 1).value
@@ -199,6 +206,8 @@ async def check_rent_paid():
 
 async def check_smud_paid():
     ws = _income_ws()
+    if ws is None:
+        return False, 0.0
     try:
         cell = ws.find("SMUD")
         amount_cell = ws.cell(cell.row, cell.col + 1).value
@@ -212,6 +221,8 @@ async def check_smud_paid():
 
 async def check_student_loan_paid():
     ws = _income_ws()
+    if ws is None:
+        return False, 0.0
     try:
         cell = ws.find("Student Loan Payment")
         amount_cell = ws.cell(cell.row, cell.col + 1).value
@@ -226,6 +237,8 @@ async def check_student_loan_paid():
 
 async def total_spent_at_store(store, persons=None, top_n=5):
     ws = _expense_ws()
+    if ws is None:
+        return 0.0 if persons is None else (0.0, [])
     today = get_local_today()
     total = 0.0
     matches = []
@@ -300,6 +313,8 @@ async def total_spent_at_store(store, persons=None, top_n=5):
 
 async def highest_expense_category(persons=None):
     ws = _expense_ws()
+    if ws is None:
+        return None, 0.0
     persons_filter = set(persons) if persons else None
     category_totals = {}
 
@@ -352,6 +367,8 @@ async def highest_expense_category(persons=None):
 
 async def total_income():
     ws = _income_ws()
+    if ws is None:
+        return 0.0
     try:
         cell = ws.find("Monthly Income:")
         income_val = ws.cell(cell.row, cell.col + 1).value
@@ -369,6 +386,8 @@ async def total_income():
 
 async def remaining_budget():
     ws = _income_ws()
+    if ws is None:
+        return 0.0
     try:
         cell = ws.find("Margins:")
         val = ws.cell(cell.row, cell.col + 2).value
@@ -379,7 +398,10 @@ async def remaining_budget():
         return 0.0
 
 
-async def average_daily_spend(persons):
+async def average_daily_spend(persons: Optional[list[str]] = None):
+    if not persons:
+        return 0.0
+
     ws = _expense_ws()
     try:
         today = get_local_today()
@@ -438,6 +460,8 @@ async def expense_breakdown_percentages(persons: list[str] | None = None):
         return {}
 
     ws = _expense_ws()
+    if ws is None:
+        return {}
     category_amounts = {'grocery': 0.0, 'gas': 0.0, 'food': 0.0, 'shopping': 0.0}
     grand_total = 0.0
 
@@ -504,6 +528,8 @@ async def expense_breakdown_percentages(persons: list[str] | None = None):
 
 async def total_for_category(category, persons=None):
     ws = _expense_ws()
+    if ws is None:
+        return 0.0
     today = get_local_today()
     persons_filter = set(persons) if persons else None
 
@@ -554,6 +580,8 @@ async def largest_single_expense(persons=None):
         return 0.0, None
 
     ws = _expense_ws()
+    if ws is None:
+        return 0.0, None
     rows = ws.get_all_values()[2:]  # skip header rows
 
     configs = {
@@ -1200,7 +1228,7 @@ async def days_budget_lasts():
     remaining = await remaining_budget()
     avg_daily = await average_daily_spend()
 
-    if avg_daily == 0:
+    if not avg_daily:
         return None  # avoid division by 0
 
     estimated_days = remaining / avg_daily

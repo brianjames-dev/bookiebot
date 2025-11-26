@@ -323,11 +323,17 @@ async def test_average_daily_spend(mock_ws_func, mock_ws, persons):
 
 @pytest.mark.asyncio
 @patch("bookiebot.sheets_utils.get_expense_worksheet")
-async def test_largest_single_expense(mock_ws_func, mock_ws):
+async def test_largest_single_expense(mock_ws_func, mock_ws, persons):
     mock_ws_func.return_value = mock_ws
-    amt, row = await su.largest_single_expense()
-    assert isinstance(amt, float)
-    assert isinstance(row, list) or row is None
+    mock_ws.get_all_values.return_value = [
+        ["hdr"] * 26,
+        ["hdr"] * 26,
+        _food_row("05/12/2025", 30, "Hannah"),
+        _shopping_row("05/14/2025", 50, "Brian (BofA)"),
+    ]
+    result = await su.largest_single_expense(persons)
+    assert isinstance(result, dict)
+    assert result["amount"] == 50.0
 
 
 @pytest.mark.asyncio
@@ -474,7 +480,7 @@ async def test_expenses_on_day(mock_ws_func, mock_ws, persons):
 
     entries, total = await su.expenses_on_day("05/10/2025", persons)
     assert total == 12.0
-    assert entries[0]["item"] == "Pizza"
+    assert entries is not None and entries[0]["item"] == "Pizza"
 
 
 @pytest.mark.asyncio
