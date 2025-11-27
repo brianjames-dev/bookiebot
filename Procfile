@@ -1,1 +1,1 @@
-worker: python3 bot.py
+worker: PYTHONPATH=src python3 -m bookiebot.bot
