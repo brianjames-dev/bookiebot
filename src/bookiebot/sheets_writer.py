@@ -2,7 +2,7 @@
 
 from datetime import datetime
 from openpyxl.utils import column_index_from_string
-from bookiebot.card_ui import CardSelectView
+from bookiebot.card_ui import CardButtonView
 import asyncio
 import os
 from zoneinfo import ZoneInfo
@@ -130,7 +130,7 @@ async def write_expense_to_sheet(data, message):
                 f"✅ Logged {category} expense: ${stored['data']['amount']} for {selected_card}"
             )
 
-        view = CardSelectView(handle_selection)
+        view = CardButtonView(handle_selection)
         await message.channel.send(
             f"{message.author.mention}, which card did you use?",
             view=view
