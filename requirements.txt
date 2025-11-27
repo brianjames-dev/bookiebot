@@ -6,4 +6,5 @@ python-dotenv==1.0.1
 openpyxl
 matplotlib
 rapidfuzz
-pytz
+pytest
+vcrpy

@@ -1,0 +1,4 @@
+{
+  "intent": "query_top_n_expenses",
+  "entities": {"n": 3}
+}

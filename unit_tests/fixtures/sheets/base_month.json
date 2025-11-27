@@ -1,0 +1,30 @@
+{
+  "expense": {
+    "columns": "Z",
+    "rows": [
+      {},
+      {},
+      {"N": "__TODAY__", "O": "Coffee", "P": "18.50", "Q": "Blue Bottle", "R": "Hannah"},
+      {"A": "__TODAY__-1", "B": "120.00", "C": "Trader Joe's", "D": "Hannah"},
+      {"H": "__TODAY__-2", "I": "45.00", "J": "Brian (BofA)"},
+      {"V": "__TODAY__-3", "W": "Desk", "X": "300.00", "Y": "IKEA", "Z": "Brian (AL)"}
+    ]
+  },
+  "income": {
+    "columns": "F",
+    "rows": [
+      {"B": "Monthly Income:"},
+      {"A": "Rent", "B": "$2,000.00"},
+      {"A": "SMUD", "B": "$140.00"},
+      {"A": "Student Loan Payment", "B": "$325.00"},
+      {"A": "Monthly Income", "B": "$7,500.00"}
+    ]
+  },
+  "subscriptions": {
+    "columns": "D",
+    "rows": [
+      {"A": "Service", "B": "Amount", "C": "Status"},
+      {"A": "Spotify", "B": "$9.99", "C": "Active"}
+    ]
+  }
+}

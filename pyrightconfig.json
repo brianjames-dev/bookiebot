@@ -1,0 +1,5 @@
+{
+  "include": ["src", "unit_tests"],
+  "extraPaths": ["src"],
+  "reportMissingImports": true
+}

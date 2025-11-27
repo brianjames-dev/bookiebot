@@ -1,0 +1,4 @@
+{
+  "intent": "query_most_frequent_purchases",
+  "entities": {"n": 3}
+}

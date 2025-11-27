@@ -1,0 +1,4 @@
+{
+  "intent": "query_total_for_item",
+  "entities": {"item": "cofee"}
+}

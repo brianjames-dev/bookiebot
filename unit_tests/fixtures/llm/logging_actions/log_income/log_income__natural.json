@@ -1,0 +1,4 @@
+{
+  "intent": "log_income",
+  "entities": {"type": "income", "amount": 1000, "source": "Acme", "label": "paycheck"}
+}

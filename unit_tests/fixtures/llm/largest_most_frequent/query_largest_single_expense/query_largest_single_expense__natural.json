@@ -1,0 +1,4 @@
+{
+  "intent": "query_largest_single_expense",
+  "entities": {"n": 1}
+}

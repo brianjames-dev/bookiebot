@@ -1,0 +1,4 @@
+{
+  "intent": "log_student_loan_paid",
+  "entities": {"amount": 300}
+}
