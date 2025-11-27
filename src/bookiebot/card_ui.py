@@ -1,8 +1,8 @@
-from typing import Any, TYPE_CHECKING
+from typing import Any
 
-if TYPE_CHECKING:
-    import discord
-else:  # pragma: no cover - runtime fallback for tests without discord.py
+try:
+    import discord  # type: ignore
+except ImportError:  # pragma: no cover - runtime fallback for tests without discord.py
     class _SelectOption:
         def __init__(self, label, value):
             self.label = label
