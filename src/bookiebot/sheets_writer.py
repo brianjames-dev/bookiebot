@@ -115,11 +115,18 @@ async def write_expense_to_sheet(data, message):
                 await interaction.response.send_message("❌ Session expired.")
                 return
 
+            # Acknowledge quickly to avoid "Unknown interaction" errors, then send follow-up.
+            try:
+                await interaction.response.defer(ephemeral=True)
+            except Exception:
+                # If already acknowledged, continue to follow-up.
+                pass
+
             stored["data"]["person"] = selected_card
             values = normalize_expense_data(stored["data"], selected_card)
             log_category_row(values, ws, category)
 
-            await interaction.response.send_message(
+            await interaction.followup.send(
                 f"✅ Logged {category} expense: ${stored['data']['amount']} for {selected_card}"
             )
 
