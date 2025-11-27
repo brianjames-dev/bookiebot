@@ -66,7 +66,7 @@ async def on_message(message):
     logger.info(
         "📩 New message",
         extra={
-            "msg": content,
+            "text": content,
             "user": str(message.author),
             "user_id": str(message.author.id),
             "channel": message.channel.name,

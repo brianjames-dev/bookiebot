@@ -46,7 +46,7 @@ class JsonFormatter(logging.Formatter):
             "msg": record.getMessage(),
         }
         # Optional context injected via `extra=`
-        for key in ("user", "user_id", "channel", "intent", "entities", "exception"):
+        for key in ("user", "user_id", "channel", "intent", "entities", "exception", "text"):
             if hasattr(record, key):
                 payload[key] = getattr(record, key)
         if record.exc_info:
