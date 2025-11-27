@@ -14,8 +14,13 @@ class FakeChannel:
     def __init__(self) -> None:
         self.sent_messages: list[str] = []
 
-    async def send(self, content: str) -> None:
-        self.sent_messages.append(content)
+    async def send(self, content: str = "", **kwargs) -> None:
+        # Capture text content; ignore other kwargs (files, views) to keep tests simple.
+        self.sent_messages.append(content or "")
+        file = kwargs.get("file")
+        if file is not None:
+            filename = getattr(file, "filename", "attachment")
+            self.sent_messages.append(f"[file:{filename}]")
 
 
 @dataclass

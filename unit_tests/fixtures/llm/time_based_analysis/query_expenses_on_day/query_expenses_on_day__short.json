@@ -1,0 +1,4 @@
+{
+  "intent": "query_expenses_on_day",
+  "entities": {"date": "05/10"}
+}

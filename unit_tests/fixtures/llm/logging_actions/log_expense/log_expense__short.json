@@ -1,0 +1,10 @@
+{
+  "intent": "log_expense",
+  "entities": {
+    "type": "expense",
+    "amount": 5.0,
+    "item": "coffee",
+    "location": "Starbucks",
+    "category": "food"
+  }
+}

@@ -1,0 +1,4 @@
+{
+  "intent": "log_smud_paid",
+  "entities": {"amount": 100}
+}

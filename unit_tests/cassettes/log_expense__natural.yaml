@@ -33,7 +33,7 @@ interactions:
       \"amount\": 75 } }\n\n    If the message is about logging an expense or income:\n    -
       intent: \"log_expense\" or \"log_income\"\n    - entities: JSON with:\n        -
       type: \"expense\" or \"income\"\n        - amount: float (do not include $)\n        -
-      date: always use today''s date: 2025-11-25\n\n    If it''s an EXPENSE, also
+      date: always use today''s date: 2025-11-26\n\n    If it''s an EXPENSE, also
       include:\n        - item: short label for what was bought (e.g., \"coffee\",
       \"gas\", \"groceries\", or \"Starbucks reload\")\n        - location: where
       it was bought (e.g., Trader Joe''s, Shell, Ulta)\n        - category: one of
@@ -67,9 +67,9 @@ interactions:
       intents from the list above\n    - entities: JSON with any useful parameters
       (e.g., \"store\" for a store query, \"category\", \"vendor\", \"n\" for top-n
       queries), or empty if none.\n\n    Always return ONLY a valid JSON object with
-      the correct keys and values. Do not explain anything.  \n\n    Now parse this:\n    \"\"\"Did
-      we already pay rent?\"\"\"\n    "}, {"role": "user", "content": "Did we already
-      pay rent?"}], "temperature": 0}'
+      the correct keys and values. Do not explain anything.  \n\n    Now parse this:\n    \"\"\"Paid
+      $18.50 for coffee\"\"\"\n    "}, {"role": "user", "content": "Paid $18.50 for
+      coffee"}], "temperature": 0}'
     headers:
       Accept:
       - '*/*'
@@ -78,7 +78,7 @@ interactions:
       Connection:
       - keep-alive
       Content-Length:
-      - '5707'
+      - '5703'
       Content-Type:
       - application/json
       User-Agent:
@@ -92,21 +92,24 @@ interactions:
     uri: https://api.openai.com/v1/chat/completions
   response:
     body:
-      string: "{\n  \"id\": \"chatcmpl-Cfy5M6BsuuoSFdgQ55dMuoB7EwHm9\",\n  \"object\":
-        \"chat.completion\",\n  \"created\": 1764118452,\n  \"model\": \"gpt-3.5-turbo-0125\",\n
+      string: "{\n  \"id\": \"chatcmpl-CgQPjPfoDqaItpl8mWaQSEHThTvUR\",\n  \"object\":
+        \"chat.completion\",\n  \"created\": 1764227347,\n  \"model\": \"gpt-3.5-turbo-0125\",\n
         \ \"choices\": [\n    {\n      \"index\": 0,\n      \"message\": {\n        \"role\":
-        \"assistant\",\n        \"content\": \"{\\n    \\\"intent\\\": \\\"query_rent_paid\\\",\\n
-        \   \\\"entities\\\": {}\\n}\",\n        \"refusal\": null,\n        \"annotations\":
+        \"assistant\",\n        \"content\": \"{\\n    \\\"intent\\\": \\\"log_expense\\\",\\n
+        \   \\\"entities\\\": {\\n        \\\"type\\\": \\\"expense\\\",\\n        \\\"amount\\\":
+        18.5,\\n        \\\"date\\\": \\\"2025-11-26\\\",\\n        \\\"item\\\":
+        \\\"coffee\\\",\\n        \\\"location\\\": \\\"\\\",\\n        \\\"category\\\":
+        \\\"food\\\"\\n    }\\n}\",\n        \"refusal\": null,\n        \"annotations\":
         []\n      },\n      \"logprobs\": null,\n      \"finish_reason\": \"stop\"\n
-        \   }\n  ],\n  \"usage\": {\n    \"prompt_tokens\": 1362,\n    \"completion_tokens\":
-        16,\n    \"total_tokens\": 1378,\n    \"prompt_tokens_details\": {\n      \"cached_tokens\":
+        \   }\n  ],\n  \"usage\": {\n    \"prompt_tokens\": 1364,\n    \"completion_tokens\":
+        65,\n    \"total_tokens\": 1429,\n    \"prompt_tokens_details\": {\n      \"cached_tokens\":
         0,\n      \"audio_tokens\": 0\n    },\n    \"completion_tokens_details\":
         {\n      \"reasoning_tokens\": 0,\n      \"audio_tokens\": 0,\n      \"accepted_prediction_tokens\":
         0,\n      \"rejected_prediction_tokens\": 0\n    }\n  },\n  \"service_tier\":
         \"default\",\n  \"system_fingerprint\": null\n}\n"
     headers:
       CF-RAY:
-      - 9a4569c43e5777a8-SJC
+      - 9a4fcc51bed7b625-SJC
       Connection:
       - keep-alive
       Content-Encoding:
@@ -114,14 +117,14 @@ interactions:
       Content-Type:
       - application/json
       Date:
-      - Wed, 26 Nov 2025 00:54:13 GMT
+      - Thu, 27 Nov 2025 07:09:08 GMT
       Server:
       - cloudflare
       Set-Cookie:
-      - __cf_bm=e5YzfOllk4Hn2XJCZ3hAR2GKrwGVs9a9fPDrza_xz1c-1764118453-1.0.1.1-ET_AFAaN6uFeWrRsMZQVHGhquWam0w_3SQSxjdI6xdZETmAt_y3SczCnNOpmnFCtCE..ek6tDWJ_.G4rQucoTzI1h0a.Efo5PMLZAp_59Gg;
-        path=/; expires=Wed, 26-Nov-25 01:24:13 GMT; domain=.api.openai.com; HttpOnly;
+      - __cf_bm=UX1iGazRNImD1TX0EJE8u4YFdpSHUvG8A8LKGvWEGSM-1764227348-1.0.1.1-wKhZfazraqI14tvXlakJa9SEMdpQmcDd2F1nH8BO_013LECd_SnvE5YCui2luNUMP0MzKeEnU6ZiFA0sTcY.fimUVhsQTB8e5.lvlusFeE0;
+        path=/; expires=Thu, 27-Nov-25 07:39:08 GMT; domain=.api.openai.com; HttpOnly;
         Secure; SameSite=None
-      - _cfuvid=C8L7w5GJRo0f11q4iMh753BiJVY2dSDqrXTsp3rJShk-1764118453239-0.0.1.1-604800000;
+      - _cfuvid=gf9AmoZTZFL5icu9C4kol0Vsmj7FKh2qNwn4FGsRaOs-1764227348133-0.0.1.1-604800000;
         path=/; domain=.api.openai.com; HttpOnly; Secure; SameSite=None
       Strict-Transport-Security:
       - max-age=31536000; includeSubDomains; preload
@@ -138,13 +141,13 @@ interactions:
       openai-organization:
       - user-pqa6kr1gum38uodqkfjnuwub
       openai-processing-ms:
-      - '388'
+      - '1102'
       openai-project:
       - proj_G8MJwPnD1zbcbyBUyqQMzcQ9
       openai-version:
       - '2020-10-01'
       x-envoy-upstream-service-time:
-      - '681'
+      - '1356'
       x-openai-proxy-wasm:
       - v0.1
       x-ratelimit-limit-requests:
@@ -154,13 +157,13 @@ interactions:
       x-ratelimit-remaining-requests:
       - '9999'
       x-ratelimit-remaining-tokens:
-      - '198674'
+      - '198675'
       x-ratelimit-reset-requests:
       - 8.64s
       x-ratelimit-reset-tokens:
       - 397ms
       x-request-id:
-      - req_3bf1285fbd784ef89c85dedb17def4d8
+      - req_4fa0b27c953d4b4abe4fb3250311cf7d
     status:
       code: 200
       message: OK

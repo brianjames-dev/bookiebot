@@ -100,7 +100,7 @@ Guards the in-memory worksheet behavior and the repo override context manager.
 ## 5. Example Workflow
 1. **Install deps** – in your terminal run `pip install -r requirements.txt`. Activate your venv if needed.
 2. **Pick fixtures** – choose or add entries under `unit_tests/fixtures/sheets/` and `unit_tests/fixtures/llm/` that match the conversation you want to test.
-3. **Run a deterministic scenario** – e.g., `pytest unit_tests/test_scenario_runner.py -k log_expense`. The runner loads your fixtures, injects them through `run_scenario()`, and asserts replies plus sheet mutations.
+3. **Run a deterministic scenario** – e.g., `pytest unit_tests/test_intent_outputs.py -k log_expense`. The runner loads your fixtures, injects them through `run_scenario()`, and asserts replies plus sheet mutations.
 4. **Check parser contracts** – `pytest unit_tests/test_intent_parser.py` ensures prompt changes still parse fixture payloads.
 5. **Inspect sheet state** – add temporary assertions or prints inside the scenario test (e.g., `repo.expense.get_all_values()`) to see the in-memory workbook after the handler runs.
 6. **Optional live refresh** – set `OPENAI_API_KEY` and run `pytest --llm-live unit_tests/test_scenario_runner.py -k query_rent` to regenerate OpenAI responses and store the cassette under `unit_tests/cassettes/`.
@@ -116,11 +116,11 @@ Guards the in-memory worksheet behavior and the repo override context manager.
 - combine with `-vv` / `-s` for verbose logs
 
 #### Running with the live LLM (records/replays cassettes)
-- `pytest --llm-live unit_tests/test_scenario_runner.py -k query_rent_paid`
-  - Uses the real LLM once, saves to `unit_tests/cassettes/query_rent.yaml`, then replays on future runs.
-  - Test location: `unit_tests/test_scenario_runner.py::test_query_rent_paid`.
-- `pytest --llm-live unit_tests/test_scenario_runner.py -k log_expense`
-  - Runs the log-expense flow end to end with live LLM output; cassette saved under `unit_tests/cassettes/`.
+- `pytest --llm-live unit_tests/test_intent_outputs.py -k query_rent_paid`
+  - Uses the real LLM once, saves to `unit_tests/cassettes/query_rent_paid__natural.yaml`, then replays on future runs.
+  - Test location: `unit_tests/test_intent_outputs.py::test_intent_scenarios` (scenario named `query_rent_paid__natural`).
+- `pytest --llm-live unit_tests/test_intent_outputs.py -k log_expense`
+  - Runs the log-expense flow end to end with live LLM output; cassette saved under `unit_tests/cassettes/log_expense__*.yaml`.
 - `pytest --llm-live unit_tests/test_intent_parser.py -k parse_message_llm`
   - Calls the parser directly with live LLM to refresh fixture expectations.
 
@@ -139,34 +139,24 @@ Use this when you change prompts or want to verify model drift.
 
 **Command**
 ```bash
-pytest --llm-live unit_tests/test_scenario_runner.py -k rent
+pytest --llm-live unit_tests/test_intent_outputs.py -k rent
 ```
 - The fixture factory switches to `CassetteLLMClient`.
-- HTTP traffic is stored in `unit_tests/cassettes/<fixture>.yaml`.
+- HTTP traffic is stored in `unit_tests/cassettes/<fixture-stem>.yaml` (one per LLM fixture).
 - Subsequent test runs replay from the cassette without hitting the network.
 - Command breakdown:
   - `pytest` — run the test runner
   - `--llm-live` — call the live OpenAI API and record/replay via cassette
-  - `unit_tests/test_scenario_runner.py` — target this specific test file
-  - `-k rent` — keyword filter to run only tests whose names contain “rent” (skip others)
+  - `unit_tests/test_intent_outputs.py` — target the intent scenario table
+  - `-k rent` — keyword filter to run only rent-related scenarios (skip others)
 
 ---
 
 ## 7. Extending Coverage
 1. **Add sheet data**: update `unit_tests/fixtures/sheets/*.json` or create a new file describing the relevant tabs.
 2. **Add an LLM fixture**: drop a JSON file in `unit_tests/fixtures/llm/` describing the parser output for your utterance.
-3. **Write a scenario test**:
-   ```python
-   def test_query_smud(llm_client_factory):
-       repo = build_repo_from_fixture("base_month")
-       llm_client = llm_client_factory("unit_tests/fixtures/llm/query_smud.json")
-       async def _run():
-           with repo.patched():
-               return await run_scenario("Did we pay SMUD?", llm_client=llm_client, handler=handle_intent)
-       result = asyncio.run(_run())
-       assert "SMUD" in result.replies[0]
-   ```
-4. **(Optional) Live refresh**: run the test with `--llm-live` to regenerate the fixture from the real model and commit the cassette.
+3. **Wire the scenario**: add an entry to `SCENARIOS` in `unit_tests/test_intent_outputs.py` that points at your new fixture paths and optional sheet fixture.
+4. **(Optional) Live refresh**: run the scenario with `--llm-live` to regenerate the cassette and commit it.
 
 ---
 

@@ -1,0 +1,4 @@
+{
+  "intent": "log_income",
+  "entities": {"type": "income", "amount": 500, "source": "Gift", "label": "bonus"}
+}

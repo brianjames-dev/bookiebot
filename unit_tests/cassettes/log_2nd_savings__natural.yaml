@@ -1,0 +1,167 @@
+interactions:
+- request:
+    body: '{"model": "gpt-3.5-turbo", "messages": [{"role": "system", "content": "\n    You
+      are a financial assistant named BookieBot located in the PST time zone. Given
+      a message, identify the user''s intent and extract entities if necessary.\n\n    Available
+      intents:\n    [''log_expense'', ''log_need_expense'', ''log_income'', ''log_rent_paid'',
+      ''log_smud_paid'', ''log_student_loan_paid'', ''log_1st_savings'', ''log_2nd_savings'',
+      ''query_rent_paid'', ''query_smud_paid'', ''query_student_loans_paid'', ''query_1st_savings'',
+      ''query_2nd_savings'', ''query_subscriptions'', ''query_burn_rate'', ''query_remaining_budget'',
+      ''query_projected_spending'', ''query_total_income'', ''query_average_daily_spend'',
+      ''query_expense_breakdown_percentages'', ''query_total_for_store'', ''query_total_for_category'',
+      ''query_total_for_item'', ''query_largest_single_expense'', ''query_top_n_expenses'',
+      ''query_most_frequent_purchases'', ''query_highest_expense_category'', ''query_spent_this_week'',
+      ''query_no_spend_days'', ''query_longest_no_spend_streak'', ''query_days_budget_lasts'',
+      ''query_expenses_on_day'', ''query_daily_spending_calendar'', ''query_weekend_vs_weekday'',
+      ''query_best_worst_day_of_week'']\n\n    If the message clearly matches one
+      of the available intents above, return:\n    {\n    \"intent\": \"<intent_name>\",\n    \"entities\":
+      { ... }\n    }\n\n    If the message does NOT clearly match any available intent,
+      return:\n    {\n    \"intent\": \"fallback\",\n    \"entities\": {}\n    }\n\n    If
+      the message is about logging a payment for **rent**, **SMUD**, or **student
+      loan**, use the specific intents:\n    - \"log_rent_paid\" \u2192 when paying
+      rent\n    - \"log_smud_paid\" \u2192 when paying SMUD (utilities)\n    - \"log_student_loan_paid\"
+      \u2192 when paying a student loan\n\n    For these intents, extract the amount
+      paid as:\n    - entities: { \"amount\": <float> }\n\n    Do NOT treat these
+      payments as generic expenses. Do NOT assign them a category. Do NOT include
+      item, location, or store \u2014 only use the amount and the correct intent.\n\n    If
+      the message is about logging a Need expense, only include the description of
+      the expense and the amount.\n    Do NOT include item, category, location, or
+      other fields. Use the following format:User: \"Need expense 45 for bus ticket\"\n    \u2192
+      { \"intent\": \"log_need_expense\", \"entities\": { \"description\": \"bus ticket\",
+      \"amount\": 45 } }\n    User: \"Add a Need expense of 75 for car repair\"\n    \u2192
+      { \"intent\": \"log_need_expense\", \"entities\": { \"description\": \"car repair\",
+      \"amount\": 75 } }\n\n    If the message is about logging an expense or income:\n    -
+      intent: \"log_expense\" or \"log_income\"\n    - entities: JSON with:\n        -
+      type: \"expense\" or \"income\"\n        - amount: float (do not include $)\n        -
+      date: always use today''s date: 2025-11-26\n\n    If it''s an EXPENSE, also
+      include:\n        - item: short label for what was bought (e.g., \"coffee\",
+      \"gas\", \"groceries\", or \"Starbucks reload\")\n        - location: where
+      it was bought (e.g., Trader Joe''s, Shell, Ulta)\n        - category: one of
+      [\"grocery\", \"gas\", \"food\", \"shopping\"]\n\n    \u2757 Do NOT leave \"item\"
+      blank \u2014 if unsure, infer based on the location or context (e.g., \"coffee\"
+      for Starbucks).\n\n    Valid options for the \"person\" field are:\n    - \"Hannah\"\n    -
+      \"Brian (BofA)\"\n    - \"Brian (AL)\"\n    - \"TOTAL\" (for combined totals)\n\n    If
+      the message clearly mentions one of these names or \"TOTAL\", include it as
+      `\"person\": \"<name>\"` in the entities.\n    If the message mentions \"Brian\",
+      assume it refers to **both of Brian\u2019s accounts combined** \u2014 leave
+      `\"person\": \"Brian\"` to signal this, and the downstream code will sum both
+      `\"Brian (BofA)\"` and `\"Brian (AL)\"`.\n    If the message specifically mentions
+      **\u201con my AL card\u201d** or **\u201con my Alaska card\u201d**, set `\"person\":
+      \"Brian (AL)\"`.\n    If the message specifically mentions **\u201con my BofA
+      card\u201d**, set `\"person\": \"Brian (BofA)\"`.\n    If no name is specified,
+      and no \"TOTAL\" is mentioned, leave out `\"person\"` and default to the Discord
+      user\u2019s name.If no name or \"TOTAL\" is explicitly mentioned in the message,
+      leave \"person\" out of entities.\n\n    Categorize EXPENSE as:\n    - \"grocery\"
+      = food or essentials from grocery stores (Trader Joe\u2019s, Costco, Safeway).
+      If the word \"groceries\" is mentioned, always choose \"grocery\".\n    - \"gas\"
+      = fuel purchases (Shell, Chevron, etc.)\n    - \"food\" = restaurants, cafes,
+      or fast food (Chipotle, Starbucks, etc.) \u2014 if not explicitly \"groceries\",
+      but clearly food-related\n    - \"shopping\" = all other non-food, non-grocery,
+      non-gas purchases (clothes, gifts, household items)\n\n    If the location or
+      description does NOT clearly match one of the 4 categories [\"grocery\", \"gas\",
+      \"food\", \"shopping\"], assume it refers to a specific store or vendor, and
+      extract it as the ''store'' entity.\n\n    If the message is about logging INCOME,
+      also include:\n        - source: who sent the money (e.g., Acme Corp, IRS, Mom)\n        -
+      label: reason or description (e.g., paycheck, birthday gift, tax refund)\n\n    If
+      the message is a QUERY (not logging), return:\n    - intent: one of the query
+      intents from the list above\n    - entities: JSON with any useful parameters
+      (e.g., \"store\" for a store query, \"category\", \"vendor\", \"n\" for top-n
+      queries), or empty if none.\n\n    Always return ONLY a valid JSON object with
+      the correct keys and values. Do not explain anything.  \n\n    Now parse this:\n    \"\"\"log
+      second savings 250\"\"\"\n    "}, {"role": "user", "content": "log second savings
+      250"}], "temperature": 0}'
+    headers:
+      Accept:
+      - '*/*'
+      Accept-Encoding:
+      - gzip, deflate, br, zstd
+      Connection:
+      - keep-alive
+      Content-Length:
+      - '5703'
+      Content-Type:
+      - application/json
+      User-Agent:
+      - OpenAI/v1 PythonBindings/0.28.0
+      X-OpenAI-Client-User-Agent:
+      - '{"bindings_version": "0.28.0", "httplib": "requests", "lang": "python", "lang_version":
+        "3.13.5", "platform": "macOS-26.1-arm64-arm-64bit-Mach-O", "publisher": "openai",
+        "uname": "Darwin 25.1.0 Darwin Kernel Version 25.1.0: Mon Oct 20 19:32:56
+        PDT 2025; root:xnu-12377.41.6~2/RELEASE_ARM64_T8132 arm64 arm"}'
+    method: POST
+    uri: https://api.openai.com/v1/chat/completions
+  response:
+    body:
+      string: "{\n  \"id\": \"chatcmpl-CgQPvdPiENDhALGWPTR9xrLSVCOlW\",\n  \"object\":
+        \"chat.completion\",\n  \"created\": 1764227359,\n  \"model\": \"gpt-3.5-turbo-0125\",\n
+        \ \"choices\": [\n    {\n      \"index\": 0,\n      \"message\": {\n        \"role\":
+        \"assistant\",\n        \"content\": \"{\\n    \\\"intent\\\": \\\"log_2nd_savings\\\",\\n
+        \   \\\"entities\\\": {\\n        \\\"amount\\\": 250\\n    }\\n}\",\n        \"refusal\":
+        null,\n        \"annotations\": []\n      },\n      \"logprobs\": null,\n
+        \     \"finish_reason\": \"stop\"\n    }\n  ],\n  \"usage\": {\n    \"prompt_tokens\":
+        1360,\n    \"completion_tokens\": 28,\n    \"total_tokens\": 1388,\n    \"prompt_tokens_details\":
+        {\n      \"cached_tokens\": 0,\n      \"audio_tokens\": 0\n    },\n    \"completion_tokens_details\":
+        {\n      \"reasoning_tokens\": 0,\n      \"audio_tokens\": 0,\n      \"accepted_prediction_tokens\":
+        0,\n      \"rejected_prediction_tokens\": 0\n    }\n  },\n  \"service_tier\":
+        \"default\",\n  \"system_fingerprint\": null\n}\n"
+    headers:
+      CF-RAY:
+      - 9a4fcca04b30306f-SJC
+      Connection:
+      - keep-alive
+      Content-Encoding:
+      - br
+      Content-Type:
+      - application/json
+      Date:
+      - Thu, 27 Nov 2025 07:09:19 GMT
+      Server:
+      - cloudflare
+      Set-Cookie:
+      - __cf_bm=s8kJ5McMkNtKS5d4ZrrCAnR9Fda2EBwTBSGMuvmoLVw-1764227359-1.0.1.1-kb7Cx0S26zFCdVUXnsJ89vaT1awVSo91yD3ZIo209YS.04HW9jzV6MwJ4K8EUnQ68YDF.4EBJw_qdzmdMOtx92TIlontp_dhD6C2eoHS9UY;
+        path=/; expires=Thu, 27-Nov-25 07:39:19 GMT; domain=.api.openai.com; HttpOnly;
+        Secure; SameSite=None
+      - _cfuvid=eOe_eR0Aw_ShyUsAM4q1Wg5L0FBTJHD71etUcqaz9Hg-1764227359766-0.0.1.1-604800000;
+        path=/; domain=.api.openai.com; HttpOnly; Secure; SameSite=None
+      Strict-Transport-Security:
+      - max-age=31536000; includeSubDomains; preload
+      Transfer-Encoding:
+      - chunked
+      X-Content-Type-Options:
+      - nosniff
+      access-control-expose-headers:
+      - X-Request-ID
+      alt-svc:
+      - h3=":443"; ma=86400
+      cf-cache-status:
+      - DYNAMIC
+      openai-organization:
+      - user-pqa6kr1gum38uodqkfjnuwub
+      openai-processing-ms:
+      - '446'
+      openai-project:
+      - proj_G8MJwPnD1zbcbyBUyqQMzcQ9
+      openai-version:
+      - '2020-10-01'
+      x-envoy-upstream-service-time:
+      - '609'
+      x-openai-proxy-wasm:
+      - v0.1
+      x-ratelimit-limit-requests:
+      - '10000'
+      x-ratelimit-limit-tokens:
+      - '200000'
+      x-ratelimit-remaining-requests:
+      - '9991'
+      x-ratelimit-remaining-tokens:
+      - '198675'
+      x-ratelimit-reset-requests:
+      - 1m14.102s
+      x-ratelimit-reset-tokens:
+      - 397ms
+      x-request-id:
+      - req_9f86b27c8e2e46e28038c94399937b1b
+    status:
+      code: 200
+      message: OK
+version: 1

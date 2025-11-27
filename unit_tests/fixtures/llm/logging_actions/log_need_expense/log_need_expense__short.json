@@ -1,0 +1,4 @@
+{
+  "intent": "log_need_expense",
+  "entities": {"description": "car repair", "amount": 75}
+}

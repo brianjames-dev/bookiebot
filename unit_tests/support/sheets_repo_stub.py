@@ -2,7 +2,10 @@ from __future__ import annotations
 
 import contextlib
 from dataclasses import dataclass
+import re
 from typing import Iterable, List, Sequence
+
+from openpyxl.utils import column_index_from_string, get_column_letter
 
 
 @dataclass
@@ -62,6 +65,23 @@ class InMemoryWorksheet:
     def update_cell(self, row: int, col: int, value: str) -> None:
         row_idx, col_idx = self._ensure_position(row, col)
         self._rows[row_idx][col_idx] = str(value)
+
+    def _parse_a1(self, a1: str) -> tuple[int, int]:
+        match = re.match(r"^([A-Za-z]+)(\d+)$", a1)
+        if not match:
+            raise ValueError(f"Invalid A1 reference: {a1}")
+        col_letters, row_str = match.groups()
+        col = column_index_from_string(col_letters)
+        row = int(row_str)
+        return row, col
+
+    def acell(self, a1: str) -> Cell:
+        row, col = self._parse_a1(a1)
+        return self.cell(row, col)
+
+    def update_acell(self, a1: str, value: str) -> None:
+        row, col = self._parse_a1(a1)
+        self.update_cell(row, col, value)
 
 
 class SheetsRepoStub:
