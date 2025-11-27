@@ -3,7 +3,7 @@ import os
 from dotenv import load_dotenv
 from bookiebot.intent_parser import parse_message_llm
 from bookiebot.intent_handlers import handle_intent
-import intent_explorer
+from bookiebot import intent_explorer
 
 print("🚀 Starting bot...")
 
