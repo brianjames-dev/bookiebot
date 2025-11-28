@@ -63,7 +63,8 @@ def init_logging() -> None:
         return
 
     root = logging.getLogger()
-    root.setLevel(logging.INFO)
+    level_name = os.getenv("LOG_LEVEL", "INFO").upper()
+    root.setLevel(level_name)
 
     formatter = JsonFormatter()
 

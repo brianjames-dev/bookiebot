@@ -1,6 +1,7 @@
 # expense & income logging
 
 from datetime import datetime
+import logging
 from openpyxl.utils import column_index_from_string
 from bookiebot.card_ui import CardButtonView
 import asyncio
@@ -9,6 +10,8 @@ from zoneinfo import ZoneInfo
 from bookiebot.sheets_config import get_category_columns
 from bookiebot.sheets_utils import resolve_query_persons
 from bookiebot.sheets_repo import get_sheets_repo
+
+logger = logging.getLogger(__name__)
 
 
 # Temporary memory for user interactions (used for dropdown callbacks)
@@ -27,7 +30,7 @@ async def write_income_to_sheet(data, message):
     try:
         ws = get_sheets_repo().income_sheet()
     except Exception as e:
-        print(f"Could not access income sheet: {e}")
+        logger.error("Could not access income sheet", extra={"exception": str(e)})
         if message:
             await message.channel.send("Error accessing income sheet.")
         return
@@ -39,8 +42,8 @@ async def write_income_to_sheet(data, message):
     try:
         summary_cell = ws.find("Monthly Income:")
         summary_row = summary_cell.row
-    except:
-        print("Could not find 'Monthly Income:' in the sheet.")
+    except Exception as e:
+        logger.error("Could not find 'Monthly Income:' in the sheet.", extra={"exception": str(e)})
         return
 
     col_b_values = ws.col_values(2)  # Column B
@@ -51,7 +54,7 @@ async def write_income_to_sheet(data, message):
             break
 
     if last_entry_row is None:
-        print("Could not find any existing income entries.")
+        logger.error("Could not find any existing income entries.")
         return
 
     insert_row_index = last_entry_row
@@ -61,7 +64,7 @@ async def write_income_to_sheet(data, message):
 
     ws.insert_row(["", description, amount], index=insert_row_index)
 
-    print(f"Income logged: {description} - ${amount} into row {insert_row_index}")
+    logger.info("Income logged", extra={"description": description, "amount": amount, "row": insert_row_index})
     if message:
         await message.channel.send(
             f"Income logged: ${amount} from {data.get('source')}"
@@ -78,7 +81,7 @@ async def write_expense_to_sheet(data, message):
     try:
         ws = get_sheets_repo().expense_sheet()
     except Exception as e:
-        print(f"❌ Could not access expense sheet: {e}")
+        logger.error("Could not access expense sheet", extra={"exception": str(e)})
         if message:
             await message.channel.send("Error accessing expense sheet.")
         return
@@ -88,19 +91,21 @@ async def write_expense_to_sheet(data, message):
         return
 
     discord_user = message.author.name.lower()
-    print(f"[DEBUG] Discord user: {discord_user}")
+    logger.debug("Discord user", extra={"user": discord_user})
 
     # Determine `person(s)` to log
     person = (data.get("person") or "").strip()
+    if person.lower() in {"total", "all", "both", "everyone", "all persons", "all people"}:
+        person = ""
     if not person:
         persons_to_log = resolve_query_persons(discord_user, None)
-        print(f"[DEBUG] Resolved persons: {persons_to_log}")
+        logger.debug("Resolved persons", extra={"persons": persons_to_log})
         if not persons_to_log:
             await message.channel.send("❌ Could not determine person for logging.")
             return
     else:
         persons_to_log = resolve_query_persons(discord_user, person)
-        print(f"[DEBUG] Resolved explicit person: {persons_to_log}")
+        logger.debug("Resolved explicit person", extra={"persons": persons_to_log})
         if not persons_to_log:
             await message.channel.send(f"❌ Could not resolve specified person: {person}")
             return
@@ -177,11 +182,11 @@ def normalize_expense_data(data, person):
 
 
 def log_category_row(values, worksheet, category):
-    print(f"[DEBUG] VALUES passed to log_category_row(): {values}")
+        logger.debug("Values passed to log_category_row", extra={"values": values})
 
-    config = get_category_columns[category]
-    row_start = config["start_row"]
-    columns = config["columns"]
+        config = get_category_columns[category]
+        row_start = config["start_row"]
+        columns = config["columns"]
 
     ref_col_letter = columns.get("amount") or list(columns.values())[0]
     ref_col_index = column_index_from_string(ref_col_letter)
@@ -190,10 +195,10 @@ def log_category_row(values, worksheet, category):
 
     for field, col_letter in columns.items():
         value = values.get(field)
-        print(f"[DEBUG] Field: {field}, Column: {col_letter}, Value: '{value}'")
-        if value is not None:
-            col_index = column_index_from_string(col_letter)
-            print(f"[DEBUG] Writing '{value}' to row {first_empty_row}, col {col_index} ({col_letter})")
-            worksheet.update_cell(first_empty_row, col_index, value)
+            logger.debug("Writing field", extra={"field": field, "column": col_letter, "value": value})
+            if value is not None:
+                col_index = column_index_from_string(col_letter)
+                logger.debug("Writing cell", extra={"value": value, "row": first_empty_row, "col": col_index, "column": col_letter})
+                worksheet.update_cell(first_empty_row, col_index, value)
 
-    print(f"Wrote to {category} row {first_empty_row}")
+    logger.info("Logged expense row", extra={"category": category, "row": first_empty_row})

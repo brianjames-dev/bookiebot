@@ -132,6 +132,9 @@ def resolve_query_persons(discord_user: str, person: str | None) -> list[str]:
         }
         return mapping.get(discord_user, [])
 
+    if person.lower() in {"total", "all", "both", "everyone", "all persons", "all people"}:
+        return ["Brian (BofA)", "Brian (AL)", "Hannah"]
+
     if person.lower() == "brian":
         return ["Brian (BofA)", "Brian (AL)"]
 
