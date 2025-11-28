@@ -38,6 +38,35 @@ def _is_debug_allowed(user: discord.abc.User) -> bool:
     return str(user.id) in DEBUG_ALLOWLIST
 
 
+def _current_build_env() -> tuple[str, str]:
+    git_sha = os.getenv("GIT_SHA") or os.getenv("RAILWAY_GIT_COMMIT_SHA") or "unknown"
+    env_name = os.getenv("BOT_ENV") or os.getenv("ENV") or "unknown"
+    return git_sha, env_name
+
+
+def _build_incident_payload(
+    summary: str,
+    requester: discord.abc.User,
+    channel: object | None,
+    logs: list[str],
+    intent: str | None = None,
+    entities: dict | None = None,
+) -> dict:
+    git_sha, env_name = _current_build_env()
+    return {
+        "summary": summary,
+        "user": str(requester),
+        "user_id": str(getattr(requester, "id", "")),
+        "channel": getattr(channel, "name", None) or getattr(channel, "id", "unknown"),
+        "intent": intent,
+        "entities": entities or {},
+        "build": git_sha,
+        "env": env_name,
+        "uptime_seconds": uptime_seconds(),
+        "logs": logs,
+    }
+
+
 @client.event
 async def on_ready():
     logger.info("✅ Logged in as bot", extra={"user": str(client.user)})
@@ -157,8 +186,7 @@ async def debug_status(interaction: discord.Interaction):
         return
 
     uptime = uptime_seconds()
-    git_sha = os.getenv("GIT_SHA", "unknown")
-    env_name = os.getenv("ENV", "unknown")
+    git_sha, env_name = _current_build_env()
     llm_ready = bool(os.getenv("OPENAI_API_KEY"))
     sheet_ready = bool(os.getenv("EXPENSE_SHEET_KEY") or os.getenv("INCOME_SHEET_KEY"))
 
@@ -171,6 +199,43 @@ async def debug_status(interaction: discord.Interaction):
     )
     await interaction.response.send_message(msg, ephemeral=True)
 
+
+@tree.command(name="debug_open_issue", description="(Admin) Capture an incident payload for LLM triage")
+@app_commands.describe(summary="Short description of the issue", lines="Number of log lines to include (default 200)")
+async def debug_open_issue(interaction: discord.Interaction, summary: str, lines: int = 200):
+    if not _is_debug_allowed(interaction.user):
+        await interaction.response.send_message("❌ Not authorized.", ephemeral=True)
+        return
+
+    lines = max(1, min(lines, 2000))
+    logs = get_recent_logs(limit=lines)
+    payload = _build_incident_payload(
+        summary=summary,
+        requester=interaction.user,
+        channel=interaction.channel,
+        logs=logs,
+    )
+
+    # Stub: in the future, POST this payload to the LLM ops agent and return a ticket link/token.
+    await interaction.response.send_message(
+        "📄 Incident payload captured (stub only). No action sent upstream.\n"
+        "Use `/debug confirm-fix <token>` once upstream integration is wired.",
+        ephemeral=True,
+    )
+
+
+@tree.command(name="debug_confirm_fix", description="(Admin) Confirm sending a captured issue to the ops agent")
+@app_commands.describe(token="Token or reference id from open-issue (stub)")
+async def debug_confirm_fix(interaction: discord.Interaction, token: str):
+    if not _is_debug_allowed(interaction.user):
+        await interaction.response.send_message("❌ Not authorized.", ephemeral=True)
+        return
+
+    # Stub: in the future, this would push the incident to the agent or approve a pending fix.
+    await interaction.response.send_message(
+        f"✅ Stub: acknowledged token `{token}`. No action sent upstream yet.",
+        ephemeral=True,
+    )
 
 try:
     client.run(TOKEN)
