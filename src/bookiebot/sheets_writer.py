@@ -182,11 +182,11 @@ def normalize_expense_data(data, person):
 
 
 def log_category_row(values, worksheet, category):
-        logger.debug("Values passed to log_category_row", extra={"values": values})
+    logger.debug("Values passed to log_category_row", extra={"values": values})
 
-        config = get_category_columns[category]
-        row_start = config["start_row"]
-        columns = config["columns"]
+    config = get_category_columns[category]
+    row_start = config["start_row"]
+    columns = config["columns"]
 
     ref_col_letter = columns.get("amount") or list(columns.values())[0]
     ref_col_index = column_index_from_string(ref_col_letter)
@@ -195,10 +195,10 @@ def log_category_row(values, worksheet, category):
 
     for field, col_letter in columns.items():
         value = values.get(field)
-            logger.debug("Writing field", extra={"field": field, "column": col_letter, "value": value})
-            if value is not None:
-                col_index = column_index_from_string(col_letter)
-                logger.debug("Writing cell", extra={"value": value, "row": first_empty_row, "col": col_index, "column": col_letter})
-                worksheet.update_cell(first_empty_row, col_index, value)
+        logger.debug("Writing field", extra={"field": field, "column": col_letter, "value": value})
+        if value is not None:
+            col_index = column_index_from_string(col_letter)
+            logger.debug("Writing cell", extra={"value": value, "row": first_empty_row, "col": col_index, "column": col_letter})
+            worksheet.update_cell(first_empty_row, col_index, value)
 
     logger.info("Logged expense row", extra={"category": category, "row": first_empty_row})
