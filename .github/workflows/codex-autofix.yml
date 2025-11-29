@@ -20,7 +20,10 @@ jobs:
       - name: Run Codex Autofix
         uses: openai/codex-action@v1
         with:
-          openai_api_key: ${{ secrets.OPENAI_API_KEY }}
-          github_token: ${{ secrets.GITHUB_TOKEN }}
-          # Optional: include additional context from dispatch payload
-          # incident: ${{ toJson(github.event.client_payload.incident) }}
+          prompt: |
+            Incident summary: ${{ github.event.client_payload.incident.summary }}
+            Incident payload (JSON):
+            ${{ toJson(github.event.client_payload.incident) }}
+            Please propose a fix and open a PR.
+          openai-api-key: ${{ secrets.OPENAI_API_KEY }}
+          github-token: ${{ secrets.GITHUB_TOKEN }}
