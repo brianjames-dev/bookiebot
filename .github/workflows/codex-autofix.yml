@@ -44,6 +44,19 @@ jobs:
           sandbox: danger-full-access
           allow-bots: true
           effort: low
+          output-file: codex-output.md
+
+      - name: Read Codex output
+        id: codex_output
+        if: always()
+        run: |
+          if [ -f codex-output.md ]; then
+            echo "codex_summary<<'EOF'" >> $GITHUB_OUTPUT
+            sed -n '1,200p' codex-output.md >> $GITHUB_OUTPUT
+            echo "EOF" >> $GITHUB_OUTPUT
+          else
+            echo "codex_summary=No Codex output captured." >> $GITHUB_OUTPUT
+          fi
 
       - name: Check for changes
         id: git_status
@@ -64,8 +77,16 @@ jobs:
           body: |
             Automated changes from Codex.
 
-            Summary: ${{ github.event.client_payload.summary || 'n/a' }}
+            Summary (from incident): ${{ github.event.client_payload.summary || 'n/a' }}
+
             Incident payload (JSON):
+            ```json
             ${{ toJson(github.event.client_payload.incident) }}
+            ```
+
+            AI-generated PR summary (from Codex):
+            ```
+            ${{ steps.codex_output.outputs.codex_summary }}
+            ```
           branch: "codex/autofix-${{ github.run_id }}"
           delete-branch: true
