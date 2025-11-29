@@ -26,4 +26,3 @@ jobs:
             ${{ toJson(github.event.client_payload.incident) }}
             Please propose a fix and open a PR.
           openai-api-key: ${{ secrets.OPENAI_API_KEY }}
-          github-token: ${{ secrets.GITHUB_TOKEN }}
