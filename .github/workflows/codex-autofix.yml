@@ -49,8 +49,27 @@ jobs:
           effort: low
           output-file: codex-output.md
 
-      - name: Build PR body
+      - name: Build PR title and body
+        id: pr_meta
         run: |
+          # Derive PR title from Codex output (first non-empty line), otherwise incident summary.
+          if [ -f codex-output.md ]; then
+            codex_title=$(sed -n '/./{s/^[[:space:]]*//;p;q;}' codex-output.md)
+          fi
+          if [ -z "$codex_title" ]; then
+            codex_title="${{ github.event.client_payload.incident.summary || 'Codex autofix updates' }}"
+          fi
+          # Truncate title to 120 chars
+          pr_title=$(printf '%s' "$codex_title" | cut -c1-120)
+          echo "pr_title=$pr_title" >> "$GITHUB_OUTPUT"
+
+          # Capture a readable Codex summary (max ~200 lines) without forcing horizontal scroll.
+          if [ -f codex-output.md ]; then
+            codex_summary=$(sed -n '1,200p' codex-output.md)
+          else
+            codex_summary="No Codex output captured."
+          fi
+
           {
             echo "Automated changes from Codex."
             echo
@@ -62,13 +81,7 @@ jobs:
             echo '```'
             echo
             echo "AI-generated PR summary (from Codex):"
-            echo '```'
-            if [ -f codex-output.md ]; then
-              sed -n '1,200p' codex-output.md
-            else
-              echo 'No Codex output captured.'
-            fi
-            echo '```'
+            echo "$codex_summary"
           } > pr-body.md
 
       - name: Check for changes
@@ -86,7 +99,7 @@ jobs:
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
           commit-message: "Codex: ${{ github.event.client_payload.incident.summary || 'autofix updates' }}"
-          title: "Codex: ${{ github.event.client_payload.incident.summary || 'autofix updates' }}"
+          title: "${{ steps.pr_meta.outputs.pr_title }}"
           body-path: pr-body.md
           branch: "codex/autofix-${{ github.run_id }}"
           delete-branch: true
