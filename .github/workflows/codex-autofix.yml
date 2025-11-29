@@ -52,12 +52,13 @@ jobs:
         run: |
           if [ -f codex-output.md ]; then
             {
-              echo "codex_summary<<EOF"
-              sed -n '1,200p' codex-output.md
-              echo "EOF"
+              echo 'codex_summary<<EOF_CodexSummary'
+              # Limit to first 200 lines; don't let sed failure kill the step
+              sed -n '1,200p' codex-output.md || true
+              echo 'EOF_CodexSummary'
             } >> "$GITHUB_OUTPUT"
           else
-            echo "codex_summary=No Codex output captured." >> $GITHUB_OUTPUT
+            echo 'codex_summary=No Codex output captured.' >> "$GITHUB_OUTPUT"
           fi
 
       - name: Check for changes
