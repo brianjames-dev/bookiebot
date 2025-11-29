@@ -91,3 +91,5 @@ It leverages agentic AI to understand natural language commands, update a Google
 ## 📄 License
 
 MIT License
+
+Smoke-test confirmation: Codex touched this README via automated PR.
