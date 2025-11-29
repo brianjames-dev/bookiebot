@@ -8,3 +8,4 @@ matplotlib
 rapidfuzz
 pytest
 vcrpy
+aiohttp

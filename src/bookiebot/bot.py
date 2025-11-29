@@ -1,6 +1,10 @@
 import discord
 import logging
 import os
+import json
+import urllib.request
+from urllib.error import URLError, HTTPError
+import aiohttp
 from discord import app_commands
 from dotenv import load_dotenv
 from bookiebot.intent_parser import parse_message_llm
@@ -30,6 +34,12 @@ intents.message_content = True
 client = discord.Client(intents=intents)
 tree = app_commands.CommandTree(client)
 DEBUG_ALLOWLIST = {u.strip() for u in os.getenv("DEBUG_ADMINS", "").split(",") if u.strip()}
+AGENT_ENDPOINT = os.getenv("DEBUG_AGENT_ENDPOINT", "").strip()
+AGENT_API_KEY = os.getenv("DEBUG_AGENT_API_KEY", "").strip()
+GITHUB_DISPATCH_TOKEN = os.getenv("GITHUB_DISPATCH_TOKEN", "").strip()
+GITHUB_REPO = os.getenv("GITHUB_REPO", "").strip()
+GITHUB_DISPATCH_EVENT = os.getenv("GITHUB_DISPATCH_EVENT", "codex_autofix").strip()
+GITHUB_API_BASE = "https://api.github.com"
 
 
 def _is_debug_allowed(user: discord.abc.User) -> bool:
@@ -65,6 +75,98 @@ def _build_incident_payload(
         "uptime_seconds": uptime_seconds(),
         "logs": logs,
     }
+
+
+async def _post_to_agent(payload: dict) -> tuple[bool, str, dict]:
+    """
+    Send a JSON payload to the configured agent endpoint.
+    Returns (ok, message, response_json).
+    """
+    if not AGENT_ENDPOINT:
+        return False, "No DEBUG_AGENT_ENDPOINT configured.", {}
+
+    headers = {"Content-Type": "application/json"}
+    if AGENT_API_KEY:
+        headers["Authorization"] = f"Bearer {AGENT_API_KEY}"
+
+    data = json.dumps(payload).encode("utf-8")
+
+    def _send():
+        req = urllib.request.Request(AGENT_ENDPOINT, data=data, headers=headers, method="POST")
+        with urllib.request.urlopen(req, timeout=15) as resp:
+            body = resp.read()
+            if not body:
+                return {}
+            return json.loads(body.decode("utf-8"))
+
+    try:
+        resp_json = await client.loop.run_in_executor(None, _send)
+        return True, "ok", resp_json
+    except HTTPError as e:
+        return False, f"HTTP {e.code}: {e.reason}", {}
+    except URLError as e:
+        return False, f"Network error: {e.reason}", {}
+    except Exception as e:
+        return False, str(e), {}
+
+
+async def _fetch_latest_pr() -> str | None:
+    if not GITHUB_DISPATCH_TOKEN or not GITHUB_REPO:
+        return None
+    url = f"{GITHUB_API_BASE}/repos/{GITHUB_REPO}/pulls?state=open&sort=created&direction=desc&per_page=1"
+    headers = {
+        "Authorization": f"token {GITHUB_DISPATCH_TOKEN}",
+        "Accept": "application/vnd.github+json",
+        "User-Agent": "codex-autofix-dispatch-bot",
+    }
+    try:
+        timeout = aiohttp.ClientTimeout(total=10)
+        async with aiohttp.ClientSession(timeout=timeout) as session:
+            async with session.get(url, headers=headers) as resp:
+                if resp.status != 200:
+                    return None
+                data = await resp.json()
+                if isinstance(data, list) and data:
+                    return data[0].get("html_url")
+    except Exception:
+        return None
+    return None
+
+
+async def trigger_codex_autofix(incident_payload: dict) -> tuple[bool, str, str | None]:
+    """
+    Send a repository_dispatch event to GitHub to trigger the codex-autofix workflow.
+    Returns (success, message, pr_url_best_effort).
+    """
+    if not GITHUB_DISPATCH_TOKEN or not GITHUB_REPO or not GITHUB_DISPATCH_EVENT:
+        return False, "GITHUB_DISPATCH_TOKEN, GITHUB_REPO, or GITHUB_DISPATCH_EVENT not configured.", None
+
+    url = f"{GITHUB_API_BASE}/repos/{GITHUB_REPO}/dispatches"
+    body = {
+        "event_type": GITHUB_DISPATCH_EVENT,
+        "client_payload": {
+            "incident": incident_payload,
+        },
+    }
+    headers = {
+        "Authorization": f"token {GITHUB_DISPATCH_TOKEN}",
+        "Accept": "application/vnd.github+json",
+        "User-Agent": "codex-autofix-dispatch-bot",
+    }
+
+    try:
+        timeout = aiohttp.ClientTimeout(total=15)
+        async with aiohttp.ClientSession(timeout=timeout) as session:
+            async with session.post(url, json=body, headers=headers) as resp:
+                if resp.status == 204:
+                    pr_url = await _fetch_latest_pr()
+                    return True, "Dispatch created.", pr_url
+                text = await resp.text()
+                logger.error("GitHub dispatch failed: %s %s", resp.status, text)
+                return False, f"GitHub dispatch failed ({resp.status}): {text}", None
+    except Exception as e:
+        logger.exception("Dispatch exception", extra={"exception": str(e)})
+        return False, f"Exception during dispatch: {e}", None
 
 
 @client.event
@@ -216,12 +318,20 @@ async def debug_open_issue(interaction: discord.Interaction, summary: str, lines
         logs=logs,
     )
 
-    # Stub: in the future, POST this payload to the LLM ops agent and return a ticket link/token.
-    await interaction.response.send_message(
-        "📄 Incident payload captured (stub only). No action sent upstream.\n"
-        "Use `/debug confirm-fix <token>` once upstream integration is wired.",
-        ephemeral=True,
-    )
+    await interaction.response.defer(ephemeral=True)
+    ok, msg, pr_url = await trigger_codex_autofix(payload)
+    if not ok:
+        await interaction.followup.send(f"❌ Could not dispatch Codex autofix: {msg}", ephemeral=True)
+        return
+
+    workflow_link = f"https://github.com/{GITHUB_REPO}/actions/workflows/codex-autofix.yml" if GITHUB_REPO else "Workflow link unavailable."
+    text = f"✅ Sent incident to Codex autofix.\n🔗 Workflow: {workflow_link}"
+    if pr_url:
+        text += f"\n🔗 Latest open PR (best effort): {pr_url}"
+    else:
+        text += "\n(Watch the workflow for the Codex-created PR.)"
+
+    await interaction.followup.send(text, ephemeral=True)
 
 
 @tree.command(name="debug_confirm_fix", description="(Admin) Confirm sending a captured issue to the ops agent")
@@ -231,9 +341,8 @@ async def debug_confirm_fix(interaction: discord.Interaction, token: str):
         await interaction.response.send_message("❌ Not authorized.", ephemeral=True)
         return
 
-    # Stub: in the future, this would push the incident to the agent or approve a pending fix.
     await interaction.response.send_message(
-        f"✅ Stub: acknowledged token `{token}`. No action sent upstream yet.",
+        f"👍 Noted. Token `{token}` acknowledged. Once the Codex PR is merged and deployed, re-run your checks.",
         ephemeral=True,
     )
 

@@ -1,0 +1,26 @@
+name: Codex Autofix
+
+on:
+  repository_dispatch:
+    types: [codex_autofix]
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  codex-fix:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Run Codex Autofix
+        uses: openai/codex-action@v1
+        with:
+          openai_api_key: ${{ secrets.OPENAI_API_KEY }}
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          # Optional: include additional context from dispatch payload
+          # incident: ${{ toJson(github.event.client_payload.incident) }}
