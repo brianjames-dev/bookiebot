@@ -51,9 +51,11 @@ jobs:
         if: always()
         run: |
           if [ -f codex-output.md ]; then
-            echo "codex_summary<<'EOF'" >> $GITHUB_OUTPUT
-            sed -n '1,200p' codex-output.md >> $GITHUB_OUTPUT
-            echo "EOF" >> $GITHUB_OUTPUT
+            {
+              echo "codex_summary<<EOF"
+              sed -n '1,200p' codex-output.md
+              echo "EOF"
+            } >> $GITHUB_OUTPUT
           else
             echo "codex_summary=No Codex output captured." >> $GITHUB_OUTPUT
           fi
