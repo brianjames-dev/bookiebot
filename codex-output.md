@@ -1,0 +1,1 @@
+Added a short confirmation line in `README.md:6` so the repo clearly signals that the Codex auto‑PR smoke test succeeded. No further changes required.
