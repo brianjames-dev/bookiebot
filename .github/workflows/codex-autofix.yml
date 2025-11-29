@@ -33,6 +33,9 @@ jobs:
         uses: openai/codex-action@v1
         with:
           prompt: |
+            You are Codex, preparing a minimal, safe patch for BookieBot. Use the incident summary to guide what to fix.
+            If no clear, minimal fix is obvious, do nothing.
+
             Incident summary: ${{ github.event.client_payload.incident.summary }}
             Incident payload (JSON):
             ${{ toJson(github.event.client_payload.incident) }}
@@ -56,8 +59,13 @@ jobs:
         uses: peter-evans/create-pull-request@v5
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
-          commit-message: "Codex autofix updates"
-          title: "Codex autofix updates"
-          body: "Automated changes from Codex."
+          commit-message: "Codex: ${{ github.event.client_payload.summary || 'autofix updates' }}"
+          title: "Codex: ${{ github.event.client_payload.summary || 'autofix updates' }}"
+          body: |
+            Automated changes from Codex.
+
+            Summary: ${{ github.event.client_payload.summary || 'n/a' }}
+            Incident payload (JSON):
+            ${{ toJson(github.event.client_payload.incident) }}
           branch: "codex/autofix-${{ github.run_id }}"
           delete-branch: true

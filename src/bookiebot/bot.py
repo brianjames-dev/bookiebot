@@ -146,6 +146,7 @@ async def trigger_codex_autofix(incident_payload: dict) -> tuple[bool, str, str 
         "event_type": GITHUB_DISPATCH_EVENT,
         "client_payload": {
             "incident": incident_payload,
+            "summary": incident_payload.get("summary"),
         },
     }
     headers = {
@@ -167,6 +168,43 @@ async def trigger_codex_autofix(incident_payload: dict) -> tuple[bool, str, str 
     except Exception as e:
         logger.exception("Dispatch exception", extra={"exception": str(e)})
         return False, f"Exception during dispatch: {e}", None
+
+
+async def _poll_for_pr(branch_prefix: str, *, attempts: int = 10, delay_seconds: float = 6.0) -> str | None:
+    """
+    Poll GitHub for the newest open PR whose head branch starts with branch_prefix.
+    Best-effort; returns the PR URL or None.
+    """
+    if not GITHUB_DISPATCH_TOKEN or not GITHUB_REPO:
+        return None
+
+    url = f"{GITHUB_API_BASE}/repos/{GITHUB_REPO}/pulls?state=open&sort=created&direction=desc&per_page=5"
+    headers = {
+        "Authorization": f"token {GITHUB_DISPATCH_TOKEN}",
+        "Accept": "application/vnd.github+json",
+        "User-Agent": "codex-autofix-dispatch-bot",
+    }
+
+    timeout = aiohttp.ClientTimeout(total=10)
+    for _ in range(attempts):
+        try:
+            async with aiohttp.ClientSession(timeout=timeout) as session:
+                async with session.get(url, headers=headers) as resp:
+                    if resp.status != 200:
+                        await asyncio.sleep(delay_seconds)
+                        continue
+                    data = await resp.json()
+                    if isinstance(data, list):
+                        for pr in data:
+                            head = pr.get("head", {})
+                            ref = head.get("ref", "")
+                            if ref.startswith(branch_prefix):
+                                return pr.get("html_url")
+        except Exception:
+            pass
+        await asyncio.sleep(delay_seconds)
+
+    return None
 
 
 @client.event
@@ -326,12 +364,15 @@ async def debug_open_issue(interaction: discord.Interaction, summary: str, lines
 
     workflow_link = f"https://github.com/{GITHUB_REPO}/actions/workflows/codex-autofix.yml" if GITHUB_REPO else "Workflow link unavailable."
     text = f"✅ Sent incident to Codex autofix.\n🔗 Workflow: {workflow_link}"
-    if pr_url:
-        text += f"\n🔗 Latest open PR (best effort): {pr_url}"
-    else:
-        text += "\n(Watch the workflow for the Codex-created PR.)"
-
     await interaction.followup.send(text, ephemeral=True)
+
+    # Best-effort poll for the PR using the branch prefix used in the workflow.
+    branch_prefix = f"codex/autofix-"
+    pr_url_polled = await _poll_for_pr(branch_prefix)
+    if pr_url_polled:
+        await interaction.followup.send(f"🔗 Codex PR: {pr_url_polled}", ephemeral=True)
+    elif pr_url:
+        await interaction.followup.send(f"🔗 Codex PR (best effort): {pr_url}", ephemeral=True)
 
 
 @tree.command(name="debug_confirm_fix", description="(Admin) Confirm sending a captured issue to the ops agent")
