@@ -91,3 +91,5 @@ It leverages agentic AI to understand natural language commands, update a Google
 ## 📄 License
 
 MIT License
+
+Pipeline smoke test: Codex automated PR flow verified.
