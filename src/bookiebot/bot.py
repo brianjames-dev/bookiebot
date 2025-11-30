@@ -481,18 +481,19 @@ async def debug_open_issue(interaction: discord.Interaction, summary: str, lines
     # Record when this run started so we can ignore older PRs
     started_at = datetime.now(timezone.utc)
 
-    # 4) Braille spinner: 10 frames per second, poll GitHub once per second, max 5 minutes
+    # 4) Braille spinner: show every frame (no skipping), ~4 updates/sec, poll GitHub once/sec
     branch_prefix = "codex/autofix-"
     spinner_frames = ["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"]
-    spinner_interval = 0.1   # 10 updates per second
-    poll_interval = 1.0      # one poll per second
-    max_duration_seconds = 300  # 5 minutes
+
+    spinner_interval = 0.25        # ~4 edits per second
+    poll_interval = 1.0            # poll GitHub once per second
+    max_duration_seconds = 300     # 5 minutes
 
     spinner_idx = 0
     last_poll_at = started_at
+    last_spinner_update = started_at
 
     while True:
-        tick_start = time.monotonic()
         now = datetime.now(timezone.utc)
         elapsed = (now - started_at).total_seconds()
 
@@ -517,26 +518,26 @@ async def debug_open_issue(interaction: discord.Interaction, summary: str, lines
                 )
                 return
 
-        # Spinner + elapsed time using real wall-clock
-        elapsed_seconds_int = int(elapsed)
-        minutes = elapsed_seconds_int // 60
-        seconds = elapsed_seconds_int % 60
-        elapsed_str = f"{minutes}:{seconds:02d}"
+        # Update spinner ~4x/sec using real elapsed time
+        if (now - last_spinner_update).total_seconds() >= spinner_interval:
+            last_spinner_update = now
 
-        spin = spinner_frames[spinner_idx]
-        spinner_idx = (spinner_idx + 1) % len(spinner_frames)
+            elapsed_seconds_int = int(elapsed)
+            minutes = elapsed_seconds_int // 60
+            seconds = elapsed_seconds_int % 60
+            elapsed_str = f"{minutes}:{seconds:02d}"
 
-        await _safe_edit_followup(
-            interaction.followup,
-            status_msg.id,
-            f"{base_text}\nStatus: {spin} {elapsed_str}",
-        )
+            spin = spinner_frames[spinner_idx]
+            spinner_idx = (spinner_idx + 1) % len(spinner_frames)
 
-        # Try to keep ~0.1s between spinner frames, accounting for loop overhead
-        tick_duration = time.monotonic() - tick_start
-        sleep_for = max(0.0, spinner_interval - tick_duration)
-        if sleep_for > 0:
-            await asyncio.sleep(sleep_for)
+            await _safe_edit_followup(
+                interaction.followup,
+                status_msg.id,
+                f"{base_text}\nStatus: {spin} {elapsed_str}",
+            )
+
+        # Small sleep so we don't busy-loop
+        await asyncio.sleep(0.1)
 
     # 5) Fallback if we never saw a PR during polling
     if pr_url:
