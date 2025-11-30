@@ -468,8 +468,7 @@ async def debug_open_issue(interaction: discord.Interaction, summary: str, lines
     base_text = (
         "✅ Sent incident to Codex autofix.\n"
         f"🔗 Workflow: {workflow_link_display}\n"
-        "Polling for PR…"
-    )
+        "🔍 Polling for Codex PR...")
 
     # 3) Send a single ephemeral status message that we'll edit in place.
     status_msg = await interaction.followup.send(
@@ -483,7 +482,7 @@ async def debug_open_issue(interaction: discord.Interaction, summary: str, lines
 
     # 4) Spinner loop: target 4 ticks per second, 5 minutes total
     branch_prefix = "codex/autofix-"
-    spinner = ["|", "/", "-", "\\"]
+    spinner = ["->   ", "-->  ", "---> ", "---->"]
     attempts = 1200          # 1200 * 0.25s = 300s = 5 minutes (target)
     delay_seconds = 0.25     # target 4 polls per second
 
@@ -515,7 +514,7 @@ async def debug_open_issue(interaction: discord.Interaction, summary: str, lines
         await _safe_edit_followup(
             interaction.followup,
             status_msg.id,
-            f"{base_text}\nThinking... {spin} {elapsed_str}",
+            f"{base_text}\nElapsed {spin} {elapsed_str}",
         )
 
         # Adjust sleep to account for loop overhead so we stay close to 0.25s per tick
