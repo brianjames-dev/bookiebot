@@ -83,7 +83,9 @@ jobs:
             echo "Summary (from incident): ${{ github.event.client_payload.incident.summary || 'n/a' }}"
             echo
             echo "AI-generated PR summary (from Codex):"
+            echo '```'
             echo "$codex_summary"
+            echo '```'
             echo
             echo "Incident payload (JSON):"
             echo '```json'
