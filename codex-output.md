@@ -1,0 +1,1 @@
+Added a simple verification line to `README.md:7` confirming the Codex auto PR pipeline is operational. No tests run (documentation-only change).
