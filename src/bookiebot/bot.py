@@ -507,13 +507,18 @@ async def debug_open_issue(interaction: discord.Interaction, summary: str, lines
             pr_url_polled = await _find_pr_for_branch(branch_prefix, created_after=started_at)
             if pr_url_polled:
                 pr_link_display = f"<{pr_url_polled}>"
+                total_elapsed = (datetime.now(timezone.utc) - started_at).total_seconds()
+                total_minutes = int(total_elapsed) // 60
+                total_seconds = int(total_elapsed) % 60
+                elapsed_line = f"⏱️ Elapsed: {total_minutes}:{total_seconds:02d}"
                 await _safe_edit_followup(
                     interaction.followup,
                     status_msg.id,
                     (
                         "✅ Codex autofix completed.\n"
                         f"🔗 Workflow: {workflow_link_display}\n"
-                        f"🔗 Codex PR: {pr_link_display}"
+                        f"🔗 Codex PR: {pr_link_display}\n"
+                        f"{elapsed_line}"
                     ),
                 )
                 return
@@ -545,13 +550,19 @@ async def debug_open_issue(interaction: discord.Interaction, summary: str, lines
     else:
         fallback_link = "(PR not yet detected; check workflow run.)"
 
+    total_elapsed = (datetime.now(timezone.utc) - started_at).total_seconds()
+    total_minutes = int(total_elapsed) // 60
+    total_seconds = int(total_elapsed) % 60
+    elapsed_line = f"⏱️ Elapsed: {total_minutes}:{total_seconds:02d}"
+
     await _safe_edit_followup(
         interaction.followup,
         status_msg.id,
         (
             "⚠️ Codex autofix finished polling.\n"
             f"🔗 Workflow: {workflow_link_display}\n"
-            f"🔗 Codex PR (best effort): {fallback_link}"
+            f"🔗 Codex PR (best effort): {fallback_link}\n"
+            f"{elapsed_line}"
         ),
     )
 
