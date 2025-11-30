@@ -557,7 +557,7 @@ async def debug_open_issue(interaction: discord.Interaction, summary: str, lines
     base_text = (
         "✅ Sent incident to Codex autofix.\n"
         f"🔗 Workflow: {workflow_link_display}\n"
-        "Polling for PR…"
+        "⏳ Polling for Codex PR..."
     )
 
     # 3) Send a single ephemeral status message that we'll edit in place.
@@ -651,7 +651,7 @@ async def debug_open_issue(interaction: discord.Interaction, summary: str, lines
                 status_msg.id,
                 (
                     f"{base_text}\n"
-                    f"Status: {spin} {elapsed_str}"
+                    f"{spin} {elapsed_str}"
                     f"{' • ' + state_text if state_text else ''}"
                 ),
             )
