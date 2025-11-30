@@ -5,10 +5,12 @@ import os
 import json
 import urllib.request
 from urllib.error import URLError, HTTPError
+from datetime import datetime, timezone
+from typing import cast
+
 import aiohttp
 from discord import app_commands
 from dotenv import load_dotenv
-from typing import cast
 
 from bookiebot.intent_parser import parse_message_llm
 from bookiebot.intent_handlers import handle_intent
@@ -36,6 +38,7 @@ intents.message_content = True
 
 client = discord.Client(intents=intents)
 tree = app_commands.CommandTree(client)
+
 DEBUG_ALLOWLIST = {u.strip() for u in os.getenv("DEBUG_ADMINS", "").split(",") if u.strip()}
 AGENT_ENDPOINT = os.getenv("DEBUG_AGENT_ENDPOINT", "").strip()
 AGENT_API_KEY = os.getenv("DEBUG_AGENT_API_KEY", "").strip()
@@ -114,6 +117,9 @@ async def _post_to_agent(payload: dict) -> tuple[bool, str, dict]:
 
 
 async def _fetch_latest_pr() -> str | None:
+    """
+    Best-effort: fetch the latest open PR URL (used only for fallback messaging).
+    """
     if not GITHUB_DISPATCH_TOKEN or not GITHUB_REPO:
         return None
     url = f"{GITHUB_API_BASE}/repos/{GITHUB_REPO}/pulls?state=open&sort=created&direction=desc&per_page=1"
@@ -177,6 +183,7 @@ async def _poll_for_pr(branch_prefix: str, *, attempts: int = 40, delay_seconds:
     """
     Poll GitHub for the newest open PR whose head branch starts with branch_prefix.
     Best-effort; returns the PR URL or None.
+    (Currently unused, but kept for potential future use.)
     """
     if not GITHUB_DISPATCH_TOKEN or not GITHUB_REPO:
         return None
@@ -210,9 +217,10 @@ async def _poll_for_pr(branch_prefix: str, *, attempts: int = 40, delay_seconds:
     return None
 
 
-async def _find_pr_for_branch(branch_prefix: str) -> str | None:
+async def _find_pr_for_branch(branch_prefix: str, created_after: datetime | None = None) -> str | None:
     """
     Single-attempt check for an open PR whose branch starts with the given prefix.
+    If created_after is provided, only consider PRs created at or after that timestamp.
     """
     if not GITHUB_DISPATCH_TOKEN or not GITHUB_REPO:
         return None
@@ -234,8 +242,24 @@ async def _find_pr_for_branch(branch_prefix: str) -> str | None:
                     for pr in data:
                         head = pr.get("head", {})
                         ref = head.get("ref", "")
-                        if ref.startswith(branch_prefix):
-                            return pr.get("html_url")
+                        if not ref.startswith(branch_prefix):
+                            continue
+
+                        created_at_str = pr.get("created_at")
+                        if created_after and created_at_str:
+                            # GitHub uses ISO 8601 with 'Z' (UTC), e.g. "2025-11-28T20:15:23Z"
+                            try:
+                                created_at = datetime.fromisoformat(
+                                    created_at_str.replace("Z", "+00:00")
+                                )
+                            except Exception:
+                                created_at = None
+
+                            # Only consider PRs created at or after this command started
+                            if created_at and created_at < created_after:
+                                continue
+
+                        return pr.get("html_url")
     except Exception:
         return None
     return None
@@ -435,7 +459,7 @@ async def debug_open_issue(interaction: discord.Interaction, summary: str, lines
     # Build workflow URL and a non-embedding display version
     if GITHUB_REPO:
         workflow_url = f"https://github.com/{GITHUB_REPO}/actions/workflows/codex-autofix.yml"
-        workflow_link_display = f"<{workflow_url}>"  # no embed preview
+        workflow_link_display = f"<{workflow_url}>"  # prevent embed
     else:
         workflow_url = None
         workflow_link_display = "Workflow link unavailable."
@@ -453,14 +477,17 @@ async def debug_open_issue(interaction: discord.Interaction, summary: str, lines
     )
     status_msg = cast(discord.Message, status_msg)
 
+    # Record when this run started so we can ignore older PRs
+    started_at = datetime.now(timezone.utc)
+
     # 4) Spinner loop updating that one message while waiting for the PR
     branch_prefix = "codex/autofix-"
     spinner = ["|", "/", "-", "\\"]
-    attempts = 300          # 300 attempts * 1s = ~5 minutes
+    attempts = 300          # 300 * 1s = ~5 minutes
     delay_seconds = 1.0     # poll once per second
 
     for idx in range(attempts):
-        pr_url_polled = await _find_pr_for_branch(branch_prefix)
+        pr_url_polled = await _find_pr_for_branch(branch_prefix, created_after=started_at)
         if pr_url_polled:
             pr_link_display = f"<{pr_url_polled}>"
             await _safe_edit_followup(
