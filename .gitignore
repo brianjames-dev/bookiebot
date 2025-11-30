@@ -39,3 +39,7 @@ dist/
 
 # Jupyter Notebook checkpoints (if any)
 .ipynb_checkpoints/
+
+# Codex transient artifacts
+codex-output.md
+pr-body.md

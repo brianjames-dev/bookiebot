@@ -365,15 +365,15 @@ async def debug_open_issue(interaction: discord.Interaction, summary: str, lines
 
     workflow_link = f"https://github.com/{GITHUB_REPO}/actions/workflows/codex-autofix.yml" if GITHUB_REPO else "Workflow link unavailable."
     text = f"✅ Sent incident to Codex autofix.\n🔗 Workflow: {workflow_link}"
-    await interaction.followup.send(text, ephemeral=True)
+    await interaction.followup.send(text, ephemeral=True, suppress_embeds=True)
 
     # Best-effort poll for the PR using the branch prefix used in the workflow.
     branch_prefix = f"codex/autofix-"
     pr_url_polled = await _poll_for_pr(branch_prefix)
     if pr_url_polled:
-        await interaction.followup.send(f"🔗 Codex PR: {pr_url_polled}", ephemeral=True)
+        await interaction.followup.send(f"🔗 Codex PR: {pr_url_polled}", ephemeral=True, suppress_embeds=True)
     elif pr_url:
-        await interaction.followup.send(f"🔗 Codex PR (best effort): {pr_url}", ephemeral=True)
+        await interaction.followup.send(f"🔗 Codex PR (best effort): {pr_url}", ephemeral=True, suppress_embeds=True)
 
 
 @tree.command(name="debug_confirm_fix", description="(Admin) Confirm sending a captured issue to the ops agent")

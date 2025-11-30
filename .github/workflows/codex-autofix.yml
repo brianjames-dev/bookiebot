@@ -37,6 +37,10 @@ jobs:
           prompt: |
             You are Codex, preparing a minimal, safe patch for BookieBot. Use the incident summary to guide what to fix.
             If no clear, minimal fix is obvious, do nothing.
+            Format your response as:
+            PR Title: <a concise PR title describing what you changed>
+            <blank line>
+            <a short, multi-line summary of what changed and why>
 
             Incident summary: ${{ github.event.client_payload.incident.summary }}
             Incident payload (JSON):
@@ -52,20 +56,23 @@ jobs:
       - name: Build PR title and body
         id: pr_meta
         run: |
-          # Derive PR title from Codex output (first non-empty line), otherwise incident summary.
+          # Derive PR title from Codex output (line starting with 'PR Title:' if present), otherwise first non-empty line, else incident summary.
           if [ -f codex-output.md ]; then
-            codex_title=$(sed -n '/./{s/^[[:space:]]*//;p;q;}' codex-output.md)
+            codex_title=$(grep -m1 '^PR Title:' codex-output.md | sed 's/^PR Title:[[:space:]]*//')
+            if [ -z "$codex_title" ]; then
+              codex_title=$(sed -n '/./{s/^[[:space:]]*//;p;q;}' codex-output.md)
+            fi
           fi
           if [ -z "$codex_title" ]; then
             codex_title="${{ github.event.client_payload.incident.summary || 'Codex autofix updates' }}"
           fi
-          # Truncate title to 120 chars
+          # Truncate title to 120 chars to satisfy GitHub UI limits
           pr_title=$(printf '%s' "$codex_title" | cut -c1-120)
           echo "pr_title=$pr_title" >> "$GITHUB_OUTPUT"
 
-          # Capture a readable Codex summary (max ~200 lines) without forcing horizontal scroll.
+          # Capture Codex summary (full file if present).
           if [ -f codex-output.md ]; then
-            codex_summary=$(sed -n '1,200p' codex-output.md)
+            codex_summary=$(cat codex-output.md)
           else
             codex_summary="No Codex output captured."
           fi
@@ -75,13 +82,13 @@ jobs:
             echo
             echo "Summary (from incident): ${{ github.event.client_payload.incident.summary || 'n/a' }}"
             echo
+            echo "AI-generated PR summary (from Codex):"
+            echo "$codex_summary"
+            echo
             echo "Incident payload (JSON):"
             echo '```json'
             echo '${{ toJson(github.event.client_payload.incident) }}'
             echo '```'
-            echo
-            echo "AI-generated PR summary (from Codex):"
-            echo "$codex_summary"
           } > pr-body.md
 
       - name: Check for changes
@@ -98,7 +105,7 @@ jobs:
         uses: peter-evans/create-pull-request@v5
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
-          commit-message: "Codex: ${{ github.event.client_payload.incident.summary || 'autofix updates' }}"
+          commit-message: "Codex: ${{ steps.pr_meta.outputs.pr_title }}"
           title: "${{ steps.pr_meta.outputs.pr_title }}"
           body-path: pr-body.md
           branch: "codex/autofix-${{ github.run_id }}"
