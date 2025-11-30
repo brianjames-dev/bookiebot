@@ -171,7 +171,7 @@ async def trigger_codex_autofix(incident_payload: dict) -> tuple[bool, str, str 
         return False, f"Exception during dispatch: {e}", None
 
 
-async def _poll_for_pr(branch_prefix: str, *, attempts: int = 10, delay_seconds: float = 6.0) -> str | None:
+async def _poll_for_pr(branch_prefix: str, *, attempts: int = 40, delay_seconds: float = 10.0) -> str | None:
     """
     Poll GitHub for the newest open PR whose head branch starts with branch_prefix.
     Best-effort; returns the PR URL or None.
