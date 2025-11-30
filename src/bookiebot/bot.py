@@ -639,7 +639,7 @@ async def debug_open_issue(interaction: discord.Interaction, summary: str, lines
             spin = spinner_frames[spinner_idx]
             spinner_idx = (spinner_idx + 1) % len(spinner_frames)
 
-            status_prefix = run_status_label or "in_progress"
+            status_prefix = run_status_label or ""
             state_text = run_step_label or ""
 
             await _safe_edit_followup(
@@ -647,8 +647,8 @@ async def debug_open_issue(interaction: discord.Interaction, summary: str, lines
                 status_msg.id,
                 (
                     f"{base_text}\n"
-                    f"{status_prefix} {spin} {elapsed_str}"
-                    f"{' • ' + state_text if state_text else ''}"
+                    f"{status_prefix + ' ' if status_prefix else ''}{spin} {elapsed_str}"
+                    f"{' • ' + state_text if state_text else ''}".rstrip()
                 ),
             )
 
