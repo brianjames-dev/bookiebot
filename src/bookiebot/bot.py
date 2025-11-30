@@ -7,6 +7,7 @@ import urllib.request
 from urllib.error import URLError, HTTPError
 from datetime import datetime, timezone
 from typing import cast
+import time
 
 import aiohttp
 from discord import app_commands
@@ -480,13 +481,15 @@ async def debug_open_issue(interaction: discord.Interaction, summary: str, lines
     # Record when this run started so we can ignore older PRs
     started_at = datetime.now(timezone.utc)
 
-    # 4) Spinner loop: 4 ticks per second, 5 minutes total
+    # 4) Spinner loop: target 4 ticks per second, 5 minutes total
     branch_prefix = "codex/autofix-"
     spinner = ["|", "/", "-", "\\"]
-    attempts = 1200          # 1200 * 0.25s = 300s = 5 minutes
-    delay_seconds = 0.25     # 4 polls per second
+    attempts = 1200          # 1200 * 0.25s = 300s = 5 minutes (target)
+    delay_seconds = 0.25     # target 4 polls per second
 
     for idx in range(attempts):
+        tick_start = time.monotonic()
+
         # Only consider PRs created after this command started
         pr_url_polled = await _find_pr_for_branch(branch_prefix, created_after=started_at)
         if pr_url_polled:
@@ -502,9 +505,9 @@ async def debug_open_issue(interaction: discord.Interaction, summary: str, lines
             )
             return
 
-        # Spinner + elapsed time logic
+        # Spinner + elapsed time using real wall-clock
         spin = spinner[idx % len(spinner)]
-        elapsed_seconds = idx // 4  # 4 ticks per second → second advances every 4 ticks
+        elapsed_seconds = int((datetime.now(timezone.utc) - started_at).total_seconds())
         minutes = elapsed_seconds // 60
         seconds = elapsed_seconds % 60
         elapsed_str = f"{minutes}:{seconds:02d}"
@@ -512,9 +515,14 @@ async def debug_open_issue(interaction: discord.Interaction, summary: str, lines
         await _safe_edit_followup(
             interaction.followup,
             status_msg.id,
-            f"{base_text}\nStatus: {spin} {elapsed_str}",
+            f"{base_text}\nThinking... {spin} {elapsed_str}",
         )
-        await asyncio.sleep(delay_seconds)
+
+        # Adjust sleep to account for loop overhead so we stay close to 0.25s per tick
+        tick_duration = time.monotonic() - tick_start
+        sleep_for = max(0.0, delay_seconds - tick_duration)
+        if sleep_for > 0:
+            await asyncio.sleep(sleep_for)
 
     # 5) Fallback if we never saw a PR during polling
     if pr_url:
