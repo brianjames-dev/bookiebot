@@ -39,6 +39,7 @@ jobs:
             If no clear, minimal fix is obvious, do nothing.
             Format your response as:
             PR Title: <a concise PR title describing what you changed>
+            <blank line>
             <a short, multi-line summary of what changed and why>
 
             Incident summary: ${{ github.event.client_payload.incident.summary }}
@@ -71,8 +72,8 @@ jobs:
 
           # Capture Codex summary (full file if present).
           if [ -f codex-output.md ]; then
-            # Strip a leading 'PR Title:' line from the summary so it doesn't show in the body.
-            codex_summary=$(sed '1{/^PR Title:/d;}' codex-output.md)
+            # Strip a leading 'PR Title:' line and any leading blank lines from the summary before embedding in the body.
+            codex_summary=$(sed '1{/^PR Title:/d;};/./,$!d' codex-output.md)
           else
             codex_summary="No Codex output captured."
           fi
