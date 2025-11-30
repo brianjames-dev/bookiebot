@@ -6,9 +6,10 @@ import json
 import urllib.request
 from urllib.error import URLError, HTTPError
 import aiohttp
-import asyncio
 from discord import app_commands
 from dotenv import load_dotenv
+from typing import cast
+
 from bookiebot.intent_parser import parse_message_llm
 from bookiebot.intent_handlers import handle_intent
 from bookiebot import intent_explorer
@@ -245,19 +246,18 @@ async def _safe_edit_followup(followup: discord.Webhook, message_id: int, conten
         await followup.edit_message(
             message_id=message_id,
             content=content,
-            suppress_embeds=True,
         )
     except Exception as e:
         logger.exception("Failed to edit followup message", extra={"exception": str(e)})
         try:
-            await followup.send(content, ephemeral=True, suppress_embeds=True)
+            await followup.send(content, ephemeral=True)
         except Exception:
             logger.exception("Failed to send fallback followup", extra={"exception": str(e)})
 
 
 async def _safe_edit_original(interaction: discord.Interaction, content: str) -> None:
     try:
-        await interaction.edit_original_response(content=content, suppress_embeds=True)
+        await interaction.edit_original_response(content=content)
     except Exception as e:
         logger.exception("Failed to edit original response", extra={"exception": str(e)})
 
@@ -348,8 +348,17 @@ async def on_message(message):
 
 
 @tree.command(name="debug_logs", description="(Admin) Show recent logs")
-@app_commands.describe(lines="Number of lines to return (default 200, max 2000)", level="Optional level filter (INFO/WARN/ERROR)", contains="Optional substring filter")
-async def debug_logs(interaction: discord.Interaction, lines: int = 200, level: str | None = None, contains: str | None = None):
+@app_commands.describe(
+    lines="Number of lines to return (default 200, max 2000)",
+    level="Optional level filter (INFO/WARN/ERROR)",
+    contains="Optional substring filter",
+)
+async def debug_logs(
+    interaction: discord.Interaction,
+    lines: int = 200,
+    level: str | None = None,
+    contains: str | None = None,
+):
     if not _is_debug_allowed(interaction.user):
         await interaction.response.send_message("❌ Not authorized.", ephemeral=True)
         return
@@ -411,49 +420,76 @@ async def debug_open_issue(interaction: discord.Interaction, summary: str, lines
         logs=logs,
     )
 
+    # 1) Defer so we don't time out
     await interaction.response.defer(ephemeral=True)
+
+    # 2) Trigger Codex autofix
     ok, msg, pr_url = await trigger_codex_autofix(payload)
     if not ok:
-        await interaction.edit_original_response(
+        await interaction.followup.send(
             content=f"❌ Could not dispatch Codex autofix: {msg}",
-            suppress_embeds=True,
+            ephemeral=True,
         )
         return
 
-    workflow_link = f"https://github.com/{GITHUB_REPO}/actions/workflows/codex-autofix.yml" if GITHUB_REPO else "Workflow link unavailable."
-    base_text = f"✅ Sent incident to Codex autofix.\n🔗 Workflow: {workflow_link}\nPolling for PR…"
-    # Initial message right after defer
-    await _safe_edit_original(interaction, base_text)
+    workflow_link = (
+        f"https://github.com/{GITHUB_REPO}/actions/workflows/codex-autofix.yml"
+        if GITHUB_REPO
+        else "Workflow link unavailable."
+    )
+    base_text = (
+        "✅ Sent incident to Codex autofix.\n"
+        f"🔗 Workflow: {workflow_link}\n"
+        "Polling for PR…"
+    )
 
-    # Spinner loop to update a single message while waiting for the PR.
+    # 3) Send a single ephemeral status message that we'll edit in place.
+    status_msg = await interaction.followup.send(
+        content=base_text,
+        ephemeral=True,
+    )
+    # Pylance thinks this may be None; cast to satisfy the type checker.
+    status_msg = cast(discord.Message, status_msg)
+
+    # 4) Spinner loop updating that one message while waiting for the PR
     branch_prefix = "codex/autofix-"
     spinner = ["|", "/", "-", "\\"]
     attempts = 40
     delay_seconds = 10.0
+
     for idx in range(attempts):
         pr_url_polled = await _find_pr_for_branch(branch_prefix)
         if pr_url_polled:
-            await _safe_edit_original(
-                interaction,
-                f"✅ Codex autofix completed.\n🔗 Workflow: {workflow_link}\n🔗 Codex PR: {pr_url_polled}",
+            await _safe_edit_followup(
+                interaction.followup,
+                status_msg.id,
+                f"✅ Codex autofix completed.\n"
+                f"🔗 Workflow: {workflow_link}\n"
+                f"🔗 Codex PR: {pr_url_polled}",
             )
             return
-        # update spinner
+
         spin = spinner[idx % len(spinner)]
-        await _safe_edit_original(
-            interaction,
+        await _safe_edit_followup(
+            interaction.followup,
+            status_msg.id,
             f"{base_text}\nStatus: {spin} ({idx+1}/{attempts})",
         )
         await asyncio.sleep(delay_seconds)
 
-    # Fallback if we never saw a PR
+    # 5) Fallback if we never saw a PR during polling
     fallback = pr_url or "(PR not yet detected; check workflow run.)"
-    await _safe_edit_original(
-        interaction,
-        f"⚠️ Codex autofix finished polling.\n🔗 Workflow: {workflow_link}\n🔗 Codex PR (best effort): {fallback}",
+    await _safe_edit_followup(
+        interaction.followup,
+        status_msg.id,
+        f"⚠️ Codex autofix finished polling.\n"
+        f"🔗 Workflow: {workflow_link}\n"
+        f"🔗 Codex PR (best effort): {fallback}",
     )
+
 
 try:
     client.run(TOKEN)
 except Exception as e:
     logger.exception("Bot failed to start", extra={"exception": str(e)})
+    
