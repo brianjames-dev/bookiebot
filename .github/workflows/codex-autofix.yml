@@ -11,18 +11,8 @@ permissions:
 jobs:
   codex-fix:
     runs-on: ubuntu-latest
-    env:
-      DISCORD_STATUS_WEBHOOK: ${{ secrets.DISCORD_STATUS_WEBHOOK }}
 
     steps:
-      - name: Notify start
-        run: |
-          if [ -n "$DISCORD_STATUS_WEBHOOK" ]; then
-            curl -X POST -H "Content-Type: application/json" \
-              -d "{\"content\":\"[codex] Run #${{ github.run_id }} started (codex-autofix).\"}" \
-              "$DISCORD_STATUS_WEBHOOK"
-          fi
-
       - name: Check out repository
         uses: actions/checkout@v4
         with:
@@ -62,14 +52,6 @@ jobs:
           allow-bots: true
           effort: low
           output-file: codex-output.md
-
-      - name: Notify Codex run finished
-        run: |
-          if [ -n "$DISCORD_STATUS_WEBHOOK" ]; then
-            curl -X POST -H "Content-Type: application/json" \
-              -d "{\"content\":\"[codex] Run #${{ github.run_id }} finished Codex step.\"}" \
-              "$DISCORD_STATUS_WEBHOOK"
-          fi
 
       - name: Build PR title and body
         id: pr_meta
@@ -132,18 +114,3 @@ jobs:
           body-path: pr-body.md
           branch: "codex/autofix-${{ github.run_id }}"
           delete-branch: true
-
-      - name: Notify completion
-        if: always()
-        run: |
-          if [ -n "$DISCORD_STATUS_WEBHOOK" ]; then
-            status="${{ job.status }}"
-            pr_url="${{ steps.create_pr.outputs.pull-request-url }}"
-            msg="[codex] Run #${{ github.run_id }} completed with status: ${status}."
-            if [ -n "$pr_url" ]; then
-              msg="$msg PR: $pr_url"
-            fi
-            curl -X POST -H "Content-Type: application/json" \
-              -d "{\"content\":\"${msg}\"}" \
-              "$DISCORD_STATUS_WEBHOOK"
-          fi
