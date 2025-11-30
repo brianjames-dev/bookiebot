@@ -240,6 +240,21 @@ async def _find_pr_for_branch(branch_prefix: str) -> str | None:
     return None
 
 
+async def _safe_edit_followup(followup: discord.Webhook, message_id: int, content: str) -> None:
+    try:
+        await followup.edit_message(
+            message_id=message_id,
+            content=content,
+            suppress_embeds=True,
+        )
+    except Exception as e:
+        logger.exception("Failed to edit followup message", extra={"exception": str(e)})
+        try:
+            await followup.send(content, ephemeral=True, suppress_embeds=True)
+        except Exception:
+            logger.exception("Failed to send fallback followup", extra={"exception": str(e)})
+
+
 @client.event
 async def on_ready():
     logger.info("✅ Logged in as bot", extra={"user": str(client.user)})
@@ -389,15 +404,16 @@ async def debug_open_issue(interaction: discord.Interaction, summary: str, lines
         logs=logs,
     )
 
+    followup = interaction.followup
     await interaction.response.defer(ephemeral=True)
     ok, msg, pr_url = await trigger_codex_autofix(payload)
     if not ok:
-        await interaction.followup.send(f"❌ Could not dispatch Codex autofix: {msg}", ephemeral=True, suppress_embeds=True)
+        await followup.send(f"❌ Could not dispatch Codex autofix: {msg}", ephemeral=True, suppress_embeds=True)
         return
 
     workflow_link = f"https://github.com/{GITHUB_REPO}/actions/workflows/codex-autofix.yml" if GITHUB_REPO else "Workflow link unavailable."
     base_text = f"✅ Sent incident to Codex autofix.\n🔗 Workflow: {workflow_link}\nPolling for PR…"
-    message = await interaction.followup.send(base_text, ephemeral=True, suppress_embeds=True)
+    message = await followup.send(base_text, ephemeral=True, suppress_embeds=True)
 
     # Spinner loop to update a single message while waiting for the PR.
     branch_prefix = "codex/autofix-"
@@ -407,27 +423,27 @@ async def debug_open_issue(interaction: discord.Interaction, summary: str, lines
     for idx in range(attempts):
         pr_url_polled = await _find_pr_for_branch(branch_prefix)
         if pr_url_polled:
-            await interaction.followup.edit_message(
-                message_id=message.id,
-                content=f"✅ Codex autofix completed.\n🔗 Workflow: {workflow_link}\n🔗 Codex PR: {pr_url_polled}",
-                suppress_embeds=True,
+            await _safe_edit_followup(
+                followup,
+                message.id,
+                f"✅ Codex autofix completed.\n🔗 Workflow: {workflow_link}\n🔗 Codex PR: {pr_url_polled}",
             )
             return
         # update spinner
         spin = spinner[idx % len(spinner)]
-        await interaction.followup.edit_message(
-            message_id=message.id,
-            content=f"{base_text}\nStatus: {spin} ({idx+1}/{attempts})",
-            suppress_embeds=True,
+        await _safe_edit_followup(
+            followup,
+            message.id,
+            f"{base_text}\nStatus: {spin} ({idx+1}/{attempts})",
         )
         await asyncio.sleep(delay_seconds)
 
     # Fallback if we never saw a PR
     fallback = pr_url or "(PR not yet detected; check workflow run.)"
-    await interaction.followup.edit_message(
-        message_id=message.id,
-        content=f"⚠️ Codex autofix finished polling.\n🔗 Workflow: {workflow_link}\n🔗 Codex PR (best effort): {fallback}",
-        suppress_embeds=True,
+    await _safe_edit_followup(
+        followup,
+        message.id,
+        f"⚠️ Codex autofix finished polling.\n🔗 Workflow: {workflow_link}\n🔗 Codex PR (best effort): {fallback}",
     )
 
 try:
