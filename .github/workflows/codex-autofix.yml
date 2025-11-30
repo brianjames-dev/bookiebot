@@ -50,7 +50,7 @@ jobs:
           openai-api-key: ${{ secrets.OPENAI_API_KEY }}
           sandbox: danger-full-access
           allow-bots: true
-          effort: low
+          effort: "medium"
           output-file: codex-output.md
 
       - name: Build PR title and body
