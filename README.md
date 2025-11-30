@@ -4,6 +4,8 @@
 BookieBot is an intelligent Discord bot designed to help you track personal expenses and income directly from Discord.\
 It leverages agentic AI to understand natural language commands, update a Google Sheet, and provide insightful budget analytics in real time.
 
+✅ Mobile smoke test confirms the auto PR pipeline works end-to-end on mobile clients.
+
 ## 🚀 Features
 
 - Log expenses, income, rent, utilities, savings, and more via natural language (e.g., *"I spent \$25 on groceries today"*).
