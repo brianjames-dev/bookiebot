@@ -90,4 +90,6 @@ It leverages agentic AI to understand natural language commands, update a Google
 
 ## 📄 License
 
+Smoke test: confirming the auto PR system works.
+
 MIT License
