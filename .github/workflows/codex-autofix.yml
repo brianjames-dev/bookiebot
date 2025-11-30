@@ -39,7 +39,6 @@ jobs:
             If no clear, minimal fix is obvious, do nothing.
             Format your response as:
             PR Title: <a concise PR title describing what you changed>
-            <blank line>
             <a short, multi-line summary of what changed and why>
 
             Incident summary: ${{ github.event.client_payload.incident.summary }}
