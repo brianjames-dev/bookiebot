@@ -411,15 +411,18 @@ async def debug_open_issue(interaction: discord.Interaction, summary: str, lines
         logs=logs,
     )
 
-    followup = interaction.followup
     await interaction.response.defer(ephemeral=True)
     ok, msg, pr_url = await trigger_codex_autofix(payload)
     if not ok:
-        await interaction.edit_original_response(content=f"❌ Could not dispatch Codex autofix: {msg}")
+        await interaction.edit_original_response(
+            content=f"❌ Could not dispatch Codex autofix: {msg}",
+            suppress_embeds=True,
+        )
         return
 
     workflow_link = f"https://github.com/{GITHUB_REPO}/actions/workflows/codex-autofix.yml" if GITHUB_REPO else "Workflow link unavailable."
     base_text = f"✅ Sent incident to Codex autofix.\n🔗 Workflow: {workflow_link}\nPolling for PR…"
+    # Initial message right after defer
     await _safe_edit_original(interaction, base_text)
 
     # Spinner loop to update a single message while waiting for the PR.
