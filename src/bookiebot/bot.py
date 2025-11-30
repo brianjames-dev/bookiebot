@@ -143,6 +143,95 @@ async def _fetch_latest_pr() -> str | None:
     return None
 
 
+async def _find_latest_workflow_run(started_after: datetime) -> tuple[int | None, str | None, str | None]:
+    """
+    Best-effort: find the latest codex-autofix workflow run created after started_after.
+    Returns (run_id, status, html_url).
+    """
+    if not GITHUB_DISPATCH_TOKEN or not GITHUB_REPO:
+        return None, None, None
+
+    url = f"{GITHUB_API_BASE}/repos/{GITHUB_REPO}/actions/workflows/codex-autofix.yml/runs?event=repository_dispatch&per_page=5"
+    headers = {
+        "Authorization": f"token {GITHUB_DISPATCH_TOKEN}",
+        "Accept": "application/vnd.github+json",
+        "User-Agent": "codex-autofix-dispatch-bot",
+    }
+    try:
+        timeout = aiohttp.ClientTimeout(total=10)
+        async with aiohttp.ClientSession(timeout=timeout) as session:
+            async with session.get(url, headers=headers) as resp:
+                if resp.status != 200:
+                    return None, None, None
+                data = await resp.json()
+                runs = data.get("workflow_runs", []) if isinstance(data, dict) else []
+                for run in runs:
+                    created_at = run.get("created_at")
+                    if not created_at:
+                        continue
+                    try:
+                        created_dt = datetime.fromisoformat(created_at.replace("Z", "+00:00"))
+                    except Exception:
+                        continue
+                    if created_dt >= started_after:
+                        return run.get("id"), run.get("status"), run.get("html_url")
+    except Exception:
+        return None, None, None
+    return None, None, None
+
+
+async def _fetch_run_step_status(run_id: int) -> tuple[str | None, str | None]:
+    """
+    Return (run_status, step_label) for the run's primary job, best-effort.
+    """
+    if not GITHUB_DISPATCH_TOKEN or not GITHUB_REPO:
+        return None, None
+
+    url = f"{GITHUB_API_BASE}/repos/{GITHUB_REPO}/actions/runs/{run_id}/jobs?per_page=20"
+    headers = {
+        "Authorization": f"token {GITHUB_DISPATCH_TOKEN}",
+        "Accept": "application/vnd.github+json",
+        "User-Agent": "codex-autofix-dispatch-bot",
+    }
+    try:
+        timeout = aiohttp.ClientTimeout(total=10)
+        async with aiohttp.ClientSession(timeout=timeout) as session:
+            async with session.get(url, headers=headers) as resp:
+                if resp.status != 200:
+                    return None, None
+                data = await resp.json()
+                jobs = data.get("jobs", []) if isinstance(data, dict) else []
+                if not jobs:
+                    return None, None
+                job = jobs[0]
+                run_status = job.get("status")
+                steps = job.get("steps", []) or []
+
+                # Find the first step that is in_progress or queued; otherwise last step name.
+                current_step_name = None
+                total_steps = len(steps)
+                current_idx = None
+                for idx, step in enumerate(steps, start=1):
+                    status = step.get("status")
+                    if status in {"in_progress", "queued", "waiting"}:
+                        current_step_name = step.get("name")
+                        current_idx = idx
+                        break
+                if current_step_name is None and steps:
+                    current_step_name = steps[-1].get("name")
+                    current_idx = total_steps
+
+                if current_step_name and total_steps and current_idx:
+                    step_label = f"{current_step_name} ({current_idx}/{total_steps})"
+                else:
+                    step_label = current_step_name
+
+                return run_status, step_label
+    except Exception:
+        return None, None
+    return None, None
+
+
 async def trigger_codex_autofix(incident_payload: dict) -> tuple[bool, str, str | None]:
     """
     Send a repository_dispatch event to GitHub to trigger the codex-autofix workflow.
@@ -492,6 +581,10 @@ async def debug_open_issue(interaction: discord.Interaction, summary: str, lines
     spinner_idx = 0
     last_poll_at = started_at
     last_spinner_update = started_at
+    last_run_poll = started_at
+    run_id: int | None = None
+    run_status_label: str | None = None
+    run_step_label: str | None = None
 
     while True:
         now = datetime.now(timezone.utc)
@@ -504,6 +597,17 @@ async def debug_open_issue(interaction: discord.Interaction, summary: str, lines
         # Poll GitHub at most once per second
         if (now - last_poll_at).total_seconds() >= poll_interval:
             last_poll_at = now
+
+            # Discover workflow run if we don't have it yet
+            if run_id is None and (now - last_run_poll).total_seconds() >= poll_interval:
+                last_run_poll = now
+                run_id, run_status_label, _run_url = await _find_latest_workflow_run(started_at)
+
+            # Update job/step status if we know the run id
+            if run_id is not None and (now - last_run_poll).total_seconds() >= poll_interval:
+                last_run_poll = now
+                run_status_label, run_step_label = await _fetch_run_step_status(run_id)
+
             pr_url_polled = await _find_pr_for_branch(branch_prefix, created_after=started_at)
             if pr_url_polled:
                 pr_link_display = f"<{pr_url_polled}>"
@@ -535,10 +639,21 @@ async def debug_open_issue(interaction: discord.Interaction, summary: str, lines
             spin = spinner_frames[spinner_idx]
             spinner_idx = (spinner_idx + 1) % len(spinner_frames)
 
+            state_parts = []
+            if run_status_label:
+                state_parts.append(run_status_label.replace("_", " "))
+            if run_step_label:
+                state_parts.append(run_step_label)
+            state_text = " • ".join(state_parts)
+
             await _safe_edit_followup(
                 interaction.followup,
                 status_msg.id,
-                f"{base_text}\nStatus: {spin} {elapsed_str}",
+                (
+                    f"{base_text}\n"
+                    f"Status: {spin} {elapsed_str}"
+                    f"{' • ' + state_text if state_text else ''}"
+                ),
             )
 
         # Small sleep so we don't busy-loop
