@@ -72,7 +72,8 @@ jobs:
 
           # Capture Codex summary (full file if present).
           if [ -f codex-output.md ]; then
-            codex_summary=$(cat codex-output.md)
+            # Strip a leading 'PR Title:' line from the summary so it doesn't show in the body.
+            codex_summary=$(sed '1{/^PR Title:/d;}' codex-output.md)
           else
             codex_summary="No Codex output captured."
           fi

@@ -375,19 +375,6 @@ async def debug_open_issue(interaction: discord.Interaction, summary: str, lines
     elif pr_url:
         await interaction.followup.send(f"🔗 Codex PR (best effort): {pr_url}", ephemeral=True, suppress_embeds=True)
 
-
-@tree.command(name="debug_confirm_fix", description="(Admin) Confirm sending a captured issue to the ops agent")
-@app_commands.describe(token="Token or reference id from open-issue (stub)")
-async def debug_confirm_fix(interaction: discord.Interaction, token: str):
-    if not _is_debug_allowed(interaction.user):
-        await interaction.response.send_message("❌ Not authorized.", ephemeral=True)
-        return
-
-    await interaction.response.send_message(
-        f"👍 Noted. Token `{token}` acknowledged. Once the Codex PR is merged and deployed, re-run your checks.",
-        ephemeral=True,
-    )
-
 try:
     client.run(TOKEN)
 except Exception as e:
