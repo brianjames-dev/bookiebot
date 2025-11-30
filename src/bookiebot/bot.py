@@ -468,7 +468,8 @@ async def debug_open_issue(interaction: discord.Interaction, summary: str, lines
     base_text = (
         "✅ Sent incident to Codex autofix.\n"
         f"🔗 Workflow: {workflow_link_display}\n"
-        "🔍 Polling for Codex PR...")
+        "Polling for PR…"
+    )
 
     # 3) Send a single ephemeral status message that we'll edit in place.
     status_msg = await interaction.followup.send(
@@ -480,46 +481,60 @@ async def debug_open_issue(interaction: discord.Interaction, summary: str, lines
     # Record when this run started so we can ignore older PRs
     started_at = datetime.now(timezone.utc)
 
-    # 4) Spinner loop: target 4 ticks per second, 5 minutes total
+    # 4) Braille spinner: 10 frames per second, poll GitHub once per second, max 5 minutes
     branch_prefix = "codex/autofix-"
-    spinner = ["->   ", "-->  ", "---> ", "---->"]
-    attempts = 1200          # 1200 * 0.25s = 300s = 5 minutes (target)
-    delay_seconds = 0.25     # target 4 polls per second
+    spinner_frames = ["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"]
+    spinner_interval = 0.1   # 10 updates per second
+    poll_interval = 1.0      # one poll per second
+    max_duration_seconds = 300  # 5 minutes
 
-    for idx in range(attempts):
+    spinner_idx = 0
+    last_poll_at = started_at
+
+    while True:
         tick_start = time.monotonic()
+        now = datetime.now(timezone.utc)
+        elapsed = (now - started_at).total_seconds()
 
-        # Only consider PRs created after this command started
-        pr_url_polled = await _find_pr_for_branch(branch_prefix, created_after=started_at)
-        if pr_url_polled:
-            pr_link_display = f"<{pr_url_polled}>"
-            await _safe_edit_followup(
-                interaction.followup,
-                status_msg.id,
-                (
-                    "✅ Codex autofix completed.\n"
-                    f"🔗 Workflow: {workflow_link_display}\n"
-                    f"🔗 Codex PR: {pr_link_display}"
-                ),
-            )
-            return
+        # Stop after max_duration_seconds
+        if elapsed >= max_duration_seconds:
+            break
+
+        # Poll GitHub at most once per second
+        if (now - last_poll_at).total_seconds() >= poll_interval:
+            last_poll_at = now
+            pr_url_polled = await _find_pr_for_branch(branch_prefix, created_after=started_at)
+            if pr_url_polled:
+                pr_link_display = f"<{pr_url_polled}>"
+                await _safe_edit_followup(
+                    interaction.followup,
+                    status_msg.id,
+                    (
+                        "✅ Codex autofix completed.\n"
+                        f"🔗 Workflow: {workflow_link_display}\n"
+                        f"🔗 Codex PR: {pr_link_display}"
+                    ),
+                )
+                return
 
         # Spinner + elapsed time using real wall-clock
-        spin = spinner[idx % len(spinner)]
-        elapsed_seconds = int((datetime.now(timezone.utc) - started_at).total_seconds())
-        minutes = elapsed_seconds // 60
-        seconds = elapsed_seconds % 60
+        elapsed_seconds_int = int(elapsed)
+        minutes = elapsed_seconds_int // 60
+        seconds = elapsed_seconds_int % 60
         elapsed_str = f"{minutes}:{seconds:02d}"
+
+        spin = spinner_frames[spinner_idx]
+        spinner_idx = (spinner_idx + 1) % len(spinner_frames)
 
         await _safe_edit_followup(
             interaction.followup,
             status_msg.id,
-            f"{base_text}\nElapsed {spin} {elapsed_str}",
+            f"{base_text}\nStatus: {spin} {elapsed_str}",
         )
 
-        # Adjust sleep to account for loop overhead so we stay close to 0.25s per tick
+        # Try to keep ~0.1s between spinner frames, accounting for loop overhead
         tick_duration = time.monotonic() - tick_start
-        sleep_for = max(0.0, delay_seconds - tick_duration)
+        sleep_for = max(0.0, spinner_interval - tick_duration)
         if sleep_for > 0:
             await asyncio.sleep(sleep_for)
 
