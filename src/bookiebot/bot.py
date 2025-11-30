@@ -639,20 +639,18 @@ async def debug_open_issue(interaction: discord.Interaction, summary: str, lines
             spin = spinner_frames[spinner_idx]
             spinner_idx = (spinner_idx + 1) % len(spinner_frames)
 
-            state_parts = []
+            status_line = f"{spin} {elapsed_str}"
             if run_status_label:
-                state_parts.append(run_status_label.replace("_", " "))
+                status_line += f" {run_status_label}"
             if run_step_label:
-                state_parts.append(run_step_label)
-            state_text = " • ".join(state_parts)
+                status_line += f" • {run_step_label}"
 
             await _safe_edit_followup(
                 interaction.followup,
                 status_msg.id,
                 (
                     f"{base_text}\n"
-                    f"{spin} {elapsed_str}"
-                    f"{' • ' + state_text if state_text else ''}"
+                    f"{status_line}"
                 ),
             )
 
