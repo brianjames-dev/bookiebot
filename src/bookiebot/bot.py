@@ -480,13 +480,14 @@ async def debug_open_issue(interaction: discord.Interaction, summary: str, lines
     # Record when this run started so we can ignore older PRs
     started_at = datetime.now(timezone.utc)
 
-    # 4) Spinner loop updating that one message while waiting for the PR
+    # 4) Spinner loop: 4 ticks per second, 5 minutes total
     branch_prefix = "codex/autofix-"
     spinner = ["|", "/", "-", "\\"]
-    attempts = 300          # 300 * 1s = ~5 minutes
-    delay_seconds = 1.0     # poll once per second
+    attempts = 1200          # 1200 * 0.25s = 300s = 5 minutes
+    delay_seconds = 0.25     # 4 polls per second
 
     for idx in range(attempts):
+        # Only consider PRs created after this command started
         pr_url_polled = await _find_pr_for_branch(branch_prefix, created_after=started_at)
         if pr_url_polled:
             pr_link_display = f"<{pr_url_polled}>"
@@ -501,11 +502,17 @@ async def debug_open_issue(interaction: discord.Interaction, summary: str, lines
             )
             return
 
+        # Spinner + elapsed time logic
         spin = spinner[idx % len(spinner)]
+        elapsed_seconds = idx // 4  # 4 ticks per second → second advances every 4 ticks
+        minutes = elapsed_seconds // 60
+        seconds = elapsed_seconds % 60
+        elapsed_str = f"{minutes}:{seconds:02d}"
+
         await _safe_edit_followup(
             interaction.followup,
             status_msg.id,
-            f"{base_text}\nStatus: {spin} ({idx+1}/{attempts})",
+            f"{base_text}\nStatus: {spin} {elapsed_str}",
         )
         await asyncio.sleep(delay_seconds)
 
