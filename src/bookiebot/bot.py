@@ -432,14 +432,17 @@ async def debug_open_issue(interaction: discord.Interaction, summary: str, lines
         )
         return
 
-    workflow_link = (
-        f"https://github.com/{GITHUB_REPO}/actions/workflows/codex-autofix.yml"
-        if GITHUB_REPO
-        else "Workflow link unavailable."
-    )
+    # Build workflow URL and a non-embedding display version
+    if GITHUB_REPO:
+        workflow_url = f"https://github.com/{GITHUB_REPO}/actions/workflows/codex-autofix.yml"
+        workflow_link_display = f"<{workflow_url}>"  # no embed preview
+    else:
+        workflow_url = None
+        workflow_link_display = "Workflow link unavailable."
+
     base_text = (
         "✅ Sent incident to Codex autofix.\n"
-        f"🔗 Workflow: {workflow_link}\n"
+        f"🔗 Workflow: {workflow_link_display}\n"
         "Polling for PR…"
     )
 
@@ -448,24 +451,26 @@ async def debug_open_issue(interaction: discord.Interaction, summary: str, lines
         content=base_text,
         ephemeral=True,
     )
-    # Pylance thinks this may be None; cast to satisfy the type checker.
     status_msg = cast(discord.Message, status_msg)
 
     # 4) Spinner loop updating that one message while waiting for the PR
     branch_prefix = "codex/autofix-"
     spinner = ["|", "/", "-", "\\"]
-    attempts = 40
-    delay_seconds = 10.0
+    attempts = 300          # 300 attempts * 1s = ~5 minutes
+    delay_seconds = 1.0     # poll once per second
 
     for idx in range(attempts):
         pr_url_polled = await _find_pr_for_branch(branch_prefix)
         if pr_url_polled:
+            pr_link_display = f"<{pr_url_polled}>"
             await _safe_edit_followup(
                 interaction.followup,
                 status_msg.id,
-                f"✅ Codex autofix completed.\n"
-                f"🔗 Workflow: {workflow_link}\n"
-                f"🔗 Codex PR: {pr_url_polled}",
+                (
+                    "✅ Codex autofix completed.\n"
+                    f"🔗 Workflow: {workflow_link_display}\n"
+                    f"🔗 Codex PR: {pr_link_display}"
+                ),
             )
             return
 
@@ -478,13 +483,19 @@ async def debug_open_issue(interaction: discord.Interaction, summary: str, lines
         await asyncio.sleep(delay_seconds)
 
     # 5) Fallback if we never saw a PR during polling
-    fallback = pr_url or "(PR not yet detected; check workflow run.)"
+    if pr_url:
+        fallback_link = f"<{pr_url}>"
+    else:
+        fallback_link = "(PR not yet detected; check workflow run.)"
+
     await _safe_edit_followup(
         interaction.followup,
         status_msg.id,
-        f"⚠️ Codex autofix finished polling.\n"
-        f"🔗 Workflow: {workflow_link}\n"
-        f"🔗 Codex PR (best effort): {fallback}",
+        (
+            "⚠️ Codex autofix finished polling.\n"
+            f"🔗 Workflow: {workflow_link_display}\n"
+            f"🔗 Codex PR (best effort): {fallback_link}"
+        ),
     )
 
 
@@ -492,4 +503,3 @@ try:
     client.run(TOKEN)
 except Exception as e:
     logger.exception("Bot failed to start", extra={"exception": str(e)})
-    
