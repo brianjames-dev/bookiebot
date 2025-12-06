@@ -118,14 +118,26 @@ def extract_amount_from_text(text):
     return 0.0
 
 
-def resolve_query_persons(discord_user: str, person: str | None) -> list[str]:
+def resolve_query_persons(discord_user: str, person: str | None, user_id: str | None = None) -> list[str]:
     """
     Given discord_user and optional person, return a list of person(s) to query.
+    Prefers the Discord user_id (stable) and falls back to the username for legacy behavior.
     """
     discord_user = (discord_user or "").strip().lower()
+    user_id = (str(user_id).strip() if user_id is not None else None)
     person = (person or "").strip()
 
     if not person:
+        id_mapping = {
+            # Brian
+            "676638528590970917": ["Brian (BofA)", "Brian (AL)"],
+            "1395120954589315303": ["Brian (BofA)", "Brian (AL)"],
+            # Hannah
+            "830984827904851969": ["Hannah"],
+        }
+        if user_id and user_id in id_mapping:
+            return id_mapping[user_id]
+
         mapping = {
             "hannerish": ["Hannah"],
             ".deebers": ["Brian (BofA)", "Brian (AL)"]

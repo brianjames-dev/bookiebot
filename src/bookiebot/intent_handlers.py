@@ -76,8 +76,9 @@ async def handle_intent(intent, entities, message, last_context=None):
     # For query intents, resolve to actual list of person(s)
     if intent.startswith("query_"):
         discord_user = message.author.name.lower()
+        discord_user_id = str(message.author.id)
         person = entities.get("person")
-        persons_to_query = resolve_query_persons(discord_user, person)
+        persons_to_query = resolve_query_persons(discord_user, person, discord_user_id)
 
         if not persons_to_query:
             await message.channel.send("❌ Could not resolve person(s) to query.")
@@ -193,7 +194,8 @@ async def query_total_for_store_handler(entities, message):
 
 async def query_highest_expense_category_handler(entities, message):
     discord_user = message.author.name.lower()
-    persons_to_query = resolve_query_persons(discord_user, entities.get("person"))
+    discord_user_id = str(message.author.id)
+    persons_to_query = resolve_query_persons(discord_user, entities.get("person"), discord_user_id)
 
     if not persons_to_query:
         await message.channel.send("❌ Could not resolve person(s) to query.")
