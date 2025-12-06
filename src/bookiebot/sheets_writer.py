@@ -92,6 +92,16 @@ async def write_expense_to_sheet(data, message):
 
     discord_user = message.author.name.lower()
     discord_user_id = str(message.author.id)
+
+    # If the message explicitly mentions a non-bot user, treat that mention as the actor.
+    # This lets people post via shortcuts/webhooks and still log under the correct account.
+    for mentioned in getattr(message, "mentions", []) or []:
+        if getattr(mentioned, "bot", False):
+            continue
+        discord_user = (getattr(mentioned, "name", None) or getattr(mentioned, "display_name", "")).lower()
+        discord_user_id = str(getattr(mentioned, "id", discord_user_id))
+        logger.debug("Using mentioned user for resolution", extra={"user": discord_user, "user_id": discord_user_id})
+        break
     logger.debug("Discord user", extra={"user": discord_user})
 
     # Determine `person(s)` to log
