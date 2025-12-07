@@ -121,13 +121,22 @@ def extract_amount_from_text(text):
 def resolve_query_persons(discord_user: str, person: str | None, user_id: str | None = None) -> list[str]:
     """
     Given discord_user and optional person, return a list of person(s) to query.
-    Prefers the Discord user_id (stable) and falls back to the username for legacy behavior.
+    Prefers the Discord username when present to avoid user_id collisions, then falls back to the user_id.
     """
     discord_user = (discord_user or "").strip().lower()
     user_id = (str(user_id).strip() if user_id is not None else None)
     person = (person or "").strip()
 
     if not person:
+        # First try username-based matching to avoid user_id collisions across clients/webhooks.
+        name_mapping = {
+            "hannerish": ["Hannah"],
+            "hannerish#0000": ["Hannah"],
+            ".deebers": ["Brian (BofA)", "Brian (AL)"]
+        }
+        if discord_user in name_mapping:
+            return name_mapping[discord_user]
+
         id_mapping = {
             # Brian
             "676638528590970917": ["Brian (BofA)", "Brian (AL)"],
@@ -138,11 +147,7 @@ def resolve_query_persons(discord_user: str, person: str | None, user_id: str | 
         if user_id and user_id in id_mapping:
             return id_mapping[user_id]
 
-        mapping = {
-            "hannerish": ["Hannah"],
-            ".deebers": ["Brian (BofA)", "Brian (AL)"]
-        }
-        return mapping.get(discord_user, [])
+        return []
 
     if person.lower() in {"total", "all", "both", "everyone", "all persons", "all people"}:
         return ["Brian (BofA)", "Brian (AL)", "Hannah"]
