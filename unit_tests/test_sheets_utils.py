@@ -34,6 +34,13 @@ def _shopping_row(date_str, amount, person):
     row[su.column_index_from_string("Z") - 1] = person
     return row
 
+
+def test_resolve_query_persons_prefers_username_over_colliding_id():
+    # user_id maps to Brian but username belongs to Hannah; should prefer Hannah
+    result = su.resolve_query_persons("hannerish#0000", None, "1395120954589315303")
+    assert result == ["Hannah"]
+
+
 @pytest.fixture
 def mock_ws():
     ws = MagicMock()
