@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import Protocol, Any
 
-from bookiebot.sheets_auth import (
+from bookiebot.sheets.auth import (
     get_expense_worksheet,
     get_income_worksheet,
     get_subscriptions_worksheet,

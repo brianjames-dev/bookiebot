@@ -11,7 +11,7 @@ import os
 from copy import deepcopy
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Protocol
+from typing import Any, Dict, List, Optional, Protocol, Literal, ContextManager, cast, TYPE_CHECKING
 
 try:  # Optional dependency for YAML fixtures.
     import yaml  # type: ignore
@@ -22,6 +22,11 @@ try:  # Optional dependency for cassette recording.
     import vcr  # type: ignore
 except ImportError:  # pragma: no cover - optional
     vcr = None
+
+if TYPE_CHECKING:
+    from vcr.cassette import RecordMode as VcrRecordMode  # type: ignore
+else:  # pragma: no cover - runtime fallback
+    VcrRecordMode = str  # type: ignore[misc,assignment]
 
 from dotenv import load_dotenv
 
@@ -135,16 +140,30 @@ class CassetteLLMClient(LLMClient):
         cassette_path: Path,
         *,
         inner: Optional[LLMClient] = None,
-        record_mode: str = "once",
+        record_mode: "VcrRecordMode | Literal['once', 'all', 'new_episodes', 'none']" = "once",
     ):
         if vcr is None:
             raise RuntimeError("vcrpy is required for CassetteLLMClient.")
         self._cassette_path = cassette_path
         self._inner = inner or OpenAIClient()
-        self._record_mode = record_mode
+
+        # Normalize to the VCR RecordMode enum for type checkers and runtime.
+        try:
+            from vcr.cassette import RecordMode as RuntimeRecordMode  # type: ignore
+
+            if isinstance(record_mode, RuntimeRecordMode):
+                record_mode_enum: RuntimeRecordMode = record_mode  # type: ignore[assignment]
+            else:
+                record_mode_enum = RuntimeRecordMode(record_mode)  # type: ignore[call-arg]
+            record_mode_value: str = record_mode_enum.value  # type: ignore[assignment]
+        except Exception:
+            record_mode_enum = cast("VcrRecordMode", record_mode)
+            record_mode_value = cast(str, getattr(record_mode, "value", record_mode))
+
+        self._record_mode: "VcrRecordMode | Literal['once', 'all', 'new_episodes', 'none']" = record_mode_enum
         self._vcr = vcr.VCR(
             filter_headers=["authorization", "api-key"],
-            record_mode=record_mode,
+            record_mode=cast("VcrRecordMode", record_mode_enum),
         )
 
     async def complete(
@@ -154,7 +173,8 @@ class CassetteLLMClient(LLMClient):
         temperature: float = 0.0,
         **kwargs: Any,
     ) -> Any:
-        with self._vcr.use_cassette(str(self._cassette_path)):
+        cassette_ctx = self._vcr.use_cassette(str(self._cassette_path))
+        with cast(ContextManager[Any], cassette_ctx):
             return await self._inner.complete(
                 messages=messages,
                 temperature=temperature,

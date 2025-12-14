@@ -4,8 +4,8 @@ from typing import Any, Dict, Optional
 
 from dotenv import load_dotenv
 
-from bookiebot.intent_explorer import INTENTS
-from bookiebot.llm_client import LLMClient, OpenAIClient
+from bookiebot.intents.explorer import INTENTS
+from bookiebot.llm.client import LLMClient, OpenAIClient
 
 load_dotenv()
 

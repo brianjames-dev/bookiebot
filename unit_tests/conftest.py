@@ -9,7 +9,7 @@ SRC = ROOT / "src"
 if str(SRC) not in sys.path:
     sys.path.insert(0, str(SRC))
 
-from bookiebot.llm_client import CassetteLLMClient, FixtureLLMClient, OpenAIClient
+from bookiebot.llm.client import CassetteLLMClient, FixtureLLMClient, OpenAIClient
 
 
 def _ensure_gspread_stub():

@@ -4,8 +4,8 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Awaitable, Callable, Dict, Optional, Union
 
-from bookiebot.llm_client import FixtureLLMClient, LLMClient
-from bookiebot.intent_parser import parse_message_llm
+from bookiebot.llm.client import FixtureLLMClient, LLMClient
+from bookiebot.intents.parser import parse_message_llm
 
 
 class FakeChannel:
@@ -69,7 +69,7 @@ async def run_scenario(
     fake_message = FakeMessage(content=message_text, author=FakeAuthor(name=author_name))
 
     intent_data = await parse_message_llm(message_text, llm_client=llm_client)
-    intent = intent_data.get("intent")
+    intent = intent_data.get("intent") or ""
     entities = intent_data.get("entities", {})
 
     if handler and intent:

@@ -3,13 +3,13 @@
 from datetime import datetime
 import logging
 from openpyxl.utils import column_index_from_string
-from bookiebot.card_ui import CardButtonView
+from bookiebot.ui.card import CardButtonView
 import asyncio
 import os
 from zoneinfo import ZoneInfo
-from bookiebot.sheets_config import get_category_columns
-from bookiebot.sheets_utils import resolve_query_persons
-from bookiebot.sheets_repo import get_sheets_repo
+from bookiebot.sheets.config import get_category_columns
+from bookiebot.sheets.utils import resolve_query_persons
+from bookiebot.sheets.repo import get_sheets_repo
 
 logger = logging.getLogger(__name__)
 

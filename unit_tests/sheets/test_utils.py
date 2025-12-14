@@ -2,7 +2,7 @@ import pytest
 from unittest.mock import MagicMock, patch, AsyncMock
 from datetime import datetime
 
-from bookiebot import sheets_utils as su
+from bookiebot.sheets import utils as su
 
 
 # ---------------------------------------------------------------------------
@@ -57,7 +57,7 @@ def mock_ws():
 
 
 @pytest.mark.asyncio
-@patch("bookiebot.sheets_utils.get_income_worksheet")
+@patch("bookiebot.sheets.utils.get_income_worksheet")
 async def test_calculate_burn_rate(mock_get_income_worksheet):
     mock_ws = MagicMock()
     mock_get_income_worksheet.return_value = mock_ws
@@ -79,7 +79,7 @@ async def test_calculate_burn_rate(mock_get_income_worksheet):
 
 
 @pytest.mark.asyncio
-@patch("bookiebot.sheets_utils.get_income_worksheet")
+@patch("bookiebot.sheets.utils.get_income_worksheet")
 async def test_check_rent_paid(mock_get_income_worksheet):
     mock_ws = MagicMock()
     mock_get_income_worksheet.return_value = mock_ws
@@ -92,7 +92,7 @@ async def test_check_rent_paid(mock_get_income_worksheet):
 
 
 @pytest.mark.asyncio
-@patch("bookiebot.sheets_utils.get_income_worksheet")
+@patch("bookiebot.sheets.utils.get_income_worksheet")
 async def test_check_smud_paid(mock_get_income_worksheet):
     mock_ws = MagicMock()
     mock_get_income_worksheet.return_value = mock_ws
@@ -107,7 +107,7 @@ async def test_check_smud_paid(mock_get_income_worksheet):
 
 
 @pytest.mark.asyncio
-@patch("bookiebot.sheets_utils.get_income_worksheet")
+@patch("bookiebot.sheets.utils.get_income_worksheet")
 async def test_check_student_loan_paid(mock_get_income_worksheet):
     mock_ws = MagicMock()
     mock_get_income_worksheet.return_value = mock_ws
@@ -129,7 +129,7 @@ async def test_check_student_loan_paid(mock_get_income_worksheet):
         ("Subway", 15),
     ],
 )
-@patch("bookiebot.sheets_utils.get_expense_worksheet")
+@patch("bookiebot.sheets.utils.get_expense_worksheet")
 async def test_total_spent_at_store(mock_get_expense_worksheet, store, expected_total):
     mock_ws = MagicMock()
     mock_get_expense_worksheet.return_value = mock_ws
@@ -151,7 +151,7 @@ async def test_total_spent_at_store(mock_get_expense_worksheet, store, expected_
 
 
 @pytest.mark.asyncio
-@patch("bookiebot.sheets_utils.get_expense_worksheet")
+@patch("bookiebot.sheets.utils.get_expense_worksheet")
 async def test_total_spent_on_item(mock_get_expense_worksheet, persons):
     mock_ws = MagicMock()
     mock_get_expense_worksheet.return_value = mock_ws
@@ -171,8 +171,8 @@ async def test_total_spent_on_item(mock_get_expense_worksheet, persons):
 
 
 @pytest.mark.asyncio
-@patch("bookiebot.sheets_utils.column_index_from_string")
-@patch("bookiebot.sheets_utils.get_expense_worksheet")
+@patch("bookiebot.sheets.utils.column_index_from_string")
+@patch("bookiebot.sheets.utils.get_expense_worksheet")
 async def test_highest_expense_category(mock_get_expense_worksheet, mock_col_idx):
     mock_ws = MagicMock()
     mock_get_expense_worksheet.return_value = mock_ws
@@ -200,7 +200,7 @@ async def test_highest_expense_category(mock_get_expense_worksheet, mock_col_idx
 
 
 @pytest.mark.asyncio
-@patch("bookiebot.sheets_utils.get_income_worksheet")
+@patch("bookiebot.sheets.utils.get_income_worksheet")
 async def test_remaining_budget(mock_get_income_worksheet):
     mock_ws = MagicMock()
     mock_get_income_worksheet.return_value = mock_ws
@@ -212,7 +212,7 @@ async def test_remaining_budget(mock_get_income_worksheet):
 
 
 @pytest.mark.asyncio
-@patch("bookiebot.sheets_utils.get_income_worksheet")
+@patch("bookiebot.sheets.utils.get_income_worksheet")
 async def test_total_income_valid(mock_get_income_worksheet):
     mock_ws = MagicMock()
     mock_get_income_worksheet.return_value = mock_ws
@@ -231,7 +231,7 @@ async def test_total_income_valid(mock_get_income_worksheet):
 
 
 @pytest.mark.asyncio
-@patch("bookiebot.sheets_utils.get_income_worksheet")
+@patch("bookiebot.sheets.utils.get_income_worksheet")
 async def test_total_income_invalid_value(mock_get_income_worksheet):
     mock_ws = MagicMock()
     mock_get_income_worksheet.return_value = mock_ws
@@ -248,7 +248,7 @@ async def test_total_income_invalid_value(mock_get_income_worksheet):
 
 
 @pytest.mark.asyncio
-@patch("bookiebot.sheets_utils.get_income_worksheet")
+@patch("bookiebot.sheets.utils.get_income_worksheet")
 async def test_total_income_missing_cell(mock_get_income_worksheet):
     mock_ws = MagicMock()
     mock_get_income_worksheet.return_value = mock_ws
@@ -261,7 +261,7 @@ async def test_total_income_missing_cell(mock_get_income_worksheet):
 
 
 @pytest.mark.asyncio
-@patch("bookiebot.sheets_utils.get_expense_worksheet")
+@patch("bookiebot.sheets.utils.get_expense_worksheet")
 async def test_expense_breakdown_percentages(mock_ws_func, mock_ws):
     mock_ws_func.return_value = mock_ws
     # prepare totals for Brian (BofA) and Hannah
@@ -299,7 +299,7 @@ async def test_expense_breakdown_percentages(mock_ws_func, mock_ws):
 
 
 @pytest.mark.asyncio
-@patch("bookiebot.sheets_utils.get_expense_worksheet")
+@patch("bookiebot.sheets.utils.get_expense_worksheet")
 async def test_total_for_category(mock_ws_func, mock_ws, persons):
     mock_ws_func.return_value = mock_ws
     mock_ws.get_all_values.return_value = [
@@ -314,7 +314,7 @@ async def test_total_for_category(mock_ws_func, mock_ws, persons):
 
 
 @pytest.mark.asyncio
-@patch("bookiebot.sheets_utils.get_expense_worksheet")
+@patch("bookiebot.sheets.utils.get_expense_worksheet")
 async def test_average_daily_spend(mock_ws_func, mock_ws, persons):
     mock_ws_func.return_value = mock_ws
     mock_ws.get_all_values.return_value = [
@@ -329,7 +329,7 @@ async def test_average_daily_spend(mock_ws_func, mock_ws, persons):
 
 
 @pytest.mark.asyncio
-@patch("bookiebot.sheets_utils.get_expense_worksheet")
+@patch("bookiebot.sheets.utils.get_expense_worksheet")
 async def test_largest_single_expense(mock_ws_func, mock_ws, persons):
     mock_ws_func.return_value = mock_ws
     mock_ws.get_all_values.return_value = [
@@ -344,7 +344,7 @@ async def test_largest_single_expense(mock_ws_func, mock_ws, persons):
 
 
 @pytest.mark.asyncio
-@patch("bookiebot.sheets_utils.get_expense_worksheet")
+@patch("bookiebot.sheets.utils.get_expense_worksheet")
 async def test_top_n_expenses_all_categories(mock_ws_func, mock_ws, persons):
     mock_ws_func.return_value = mock_ws
     mock_ws.get_all_values.return_value = [
@@ -362,7 +362,7 @@ async def test_top_n_expenses_all_categories(mock_ws_func, mock_ws, persons):
 
 
 @pytest.mark.asyncio
-@patch("bookiebot.sheets_utils.get_expense_worksheet")
+@patch("bookiebot.sheets.utils.get_expense_worksheet")
 async def test_top_n_expenses(mock_ws_func, mock_ws):
     mock_ws_func.return_value = mock_ws
     top_n = await su.top_n_expenses(3)
@@ -371,7 +371,7 @@ async def test_top_n_expenses(mock_ws_func, mock_ws):
 
 
 @pytest.mark.asyncio
-@patch("bookiebot.sheets_utils.get_expense_worksheet")
+@patch("bookiebot.sheets.utils.get_expense_worksheet")
 async def test_spent_this_week(mock_ws_func, mock_ws, persons):
     mock_ws_func.return_value = mock_ws
     mock_ws.get_all_values.return_value = [
@@ -384,7 +384,7 @@ async def test_spent_this_week(mock_ws_func, mock_ws, persons):
 
 
 @pytest.mark.asyncio
-@patch("bookiebot.sheets_utils.get_expense_worksheet")
+@patch("bookiebot.sheets.utils.get_expense_worksheet")
 async def test_projected_spending(mock_ws_func, mock_ws, persons):
     mock_ws_func.return_value = mock_ws
     mock_ws.get_all_values.return_value = [
@@ -398,7 +398,7 @@ async def test_projected_spending(mock_ws_func, mock_ws, persons):
 
 
 @pytest.mark.asyncio
-@patch("bookiebot.sheets_utils.get_expense_worksheet")
+@patch("bookiebot.sheets.utils.get_expense_worksheet")
 async def test_daily_spending_calendar(mock_ws_func, mock_ws, persons):
     mock_ws_func.return_value = mock_ws
     mock_ws.get_all_values.return_value = [
@@ -412,7 +412,7 @@ async def test_daily_spending_calendar(mock_ws_func, mock_ws, persons):
 
 
 @pytest.mark.asyncio
-@patch("bookiebot.sheets_utils.get_expense_worksheet")
+@patch("bookiebot.sheets.utils.get_expense_worksheet")
 async def test_best_worst_day_of_week(mock_ws_func, mock_ws, persons):
     mock_ws_func.return_value = mock_ws
     mock_ws.get_all_values.return_value = [
@@ -432,7 +432,7 @@ async def test_best_worst_day_of_week(mock_ws_func, mock_ws, persons):
 
 
 @pytest.mark.asyncio
-@patch("bookiebot.sheets_utils.get_expense_worksheet")
+@patch("bookiebot.sheets.utils.get_expense_worksheet")
 async def test_longest_no_spend_streak(mock_ws_func, mock_ws, persons):
     mock_ws_func.return_value = mock_ws
     mock_ws.get_all_values.return_value = [
@@ -454,7 +454,7 @@ async def test_days_budget_lasts(monkeypatch):
 
 
 @pytest.mark.asyncio
-@patch("bookiebot.sheets_utils.get_expense_worksheet")
+@patch("bookiebot.sheets.utils.get_expense_worksheet")
 async def test_most_frequent_purchases(mock_ws_func, mock_ws, persons):
     mock_ws_func.return_value = mock_ws
     mock_ws.get_all_values.return_value = [
@@ -473,7 +473,7 @@ async def test_most_frequent_purchases(mock_ws_func, mock_ws, persons):
 
 
 @pytest.mark.asyncio
-@patch("bookiebot.sheets_utils.get_expense_worksheet")
+@patch("bookiebot.sheets.utils.get_expense_worksheet")
 async def test_expenses_on_day(mock_ws_func, mock_ws, persons):
     mock_ws_func.return_value = mock_ws
     rows = [
@@ -491,7 +491,7 @@ async def test_expenses_on_day(mock_ws_func, mock_ws, persons):
 
 
 @pytest.mark.asyncio
-@patch("bookiebot.sheets_utils.get_subscriptions_worksheet")
+@patch("bookiebot.sheets.utils.get_subscriptions_worksheet")
 async def test_list_subscriptions(mock_subs_ws):
     rows = [[""] * 6 for _ in range(6)]
     # Needs row (index 6 -> seventh row)
@@ -505,7 +505,7 @@ async def test_list_subscriptions(mock_subs_ws):
 
 
 @pytest.mark.asyncio
-@patch("bookiebot.sheets_utils.get_expense_worksheet")
+@patch("bookiebot.sheets.utils.get_expense_worksheet")
 async def test_weekend_vs_weekday(mock_ws_func, mock_ws, persons):
     mock_ws_func.return_value = mock_ws
     mock_ws.get_all_values.return_value = [
@@ -520,7 +520,7 @@ async def test_weekend_vs_weekday(mock_ws_func, mock_ws, persons):
 
 
 @pytest.mark.asyncio
-@patch("bookiebot.sheets_utils.get_expense_worksheet")
+@patch("bookiebot.sheets.utils.get_expense_worksheet")
 async def test_no_spend_days(mock_ws_func, mock_ws, persons):
     mock_ws_func.return_value = mock_ws
     mock_ws.get_all_values.return_value = [

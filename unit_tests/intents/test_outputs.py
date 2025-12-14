@@ -5,7 +5,7 @@ from typing import Callable, Optional
 
 from openpyxl.utils import column_index_from_string
 
-from bookiebot.intent_handlers import handle_intent
+from bookiebot.intents.handlers import handle_intent
 from unit_tests.support.scenario_runner import FakeMessage, run_scenario
 from unit_tests.support.fixture_loader import build_repo_from_fixture
 

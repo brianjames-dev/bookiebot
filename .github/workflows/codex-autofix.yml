@@ -8,6 +8,9 @@ permissions:
   contents: write
   pull-requests: write
 
+env:
+  FAIL_LOG: ""
+
 jobs:
   codex-fix:
     runs-on: ubuntu-latest
@@ -39,6 +42,9 @@ jobs:
           fi
           python -m pip install pytest
 
+      - name: Init fail log env
+        run: echo "FAIL_LOG=" >> "$GITHUB_ENV"
+
       - name: Cache npm (Codex action global installs)
         uses: actions/cache@v4
         with:
@@ -68,6 +74,56 @@ jobs:
           allow-bots: true
           effort: "medium"
           output-file: codex-output.md
+
+      - name: Run unit tests (attempt 1)
+        id: tests1
+        run: |
+          set -uo pipefail
+          export PYTHONPATH=src
+          pytest 2>&1 | tee pytest.log
+          status=${PIPESTATUS[0]}
+          if [ "$status" -ne 0 ]; then
+            echo "status=fail" >> "$GITHUB_OUTPUT"
+            tail -n 200 pytest.log > pytest-fail.log
+            {
+              echo "FAIL_LOG<<'EOF'"
+              cat pytest-fail.log
+              echo "EOF"
+            } >> "$GITHUB_ENV"
+          else
+            echo "status=pass" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Run Codex Autofix (attempt 2 with test failures)
+        if: steps.tests1.outputs.status == 'fail'
+        uses: openai/codex-action@v1
+        with:
+          prompt: >
+            You are Codex, preparing a minimal, safe patch for BookieBot. Use the incident summary to guide what to fix.
+            If no clear, minimal fix is obvious, do nothing.
+            Format your response as:
+            PR Title: <a concise PR title describing what you changed>
+
+            Incident summary: ${{ github.event.client_payload.incident.summary }}
+            Incident payload (JSON):
+            ${{ toJson(github.event.client_payload.incident) }}
+
+            The previous test run failed with:
+            ${{ env.FAIL_LOG }}
+
+            Please propose a fix (prioritize the failing tests above) and open a PR.
+          openai-api-key: ${{ secrets.OPENAI_API_KEY }}
+          sandbox: danger-full-access
+          allow-bots: true
+          effort: "medium"
+          output-file: codex-output.md
+
+      - name: Run unit tests (attempt 2)
+        if: steps.tests1.outputs.status == 'fail'
+        run: |
+          set -euo pipefail
+          export PYTHONPATH=src
+          pytest
 
       - name: Build PR title and body
         id: pr_meta

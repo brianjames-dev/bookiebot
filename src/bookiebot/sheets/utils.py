@@ -4,7 +4,7 @@ import os
 import re
 from typing import Any, Optional
 from zoneinfo import ZoneInfo
-from bookiebot.sheets_config import get_category_columns
+from bookiebot.sheets.config import get_category_columns
 from dateutil import parser as dateparser
 from collections import defaultdict, Counter
 import matplotlib.pyplot as plt
@@ -25,7 +25,7 @@ except ImportError:  # pragma: no cover - fallback for tests
     discord = _Discord()
 
 import gspread
-from bookiebot.sheets_repo import get_sheets_repo
+from bookiebot.sheets.repo import get_sheets_repo
 
 try:
     from rapidfuzz import fuzz

@@ -2,7 +2,7 @@ import pytest
 from types import SimpleNamespace
 from unittest.mock import AsyncMock, MagicMock, patch
 
-import bookiebot.intent_handlers as ih
+import bookiebot.intents.handlers as ih
 
 
 class DummyChannel:
