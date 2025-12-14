@@ -15,7 +15,7 @@ class DummyChannel:
 
 @pytest.fixture(autouse=True)
 def _patch_resolver(monkeypatch):
-    monkeypatch.setattr(ih, "resolve_query_persons", lambda user, person=None: ["Hannah"])
+    monkeypatch.setattr(ih, "resolve_query_persons", lambda user, person=None, user_id=None: ["Hannah"])
     yield
 
 

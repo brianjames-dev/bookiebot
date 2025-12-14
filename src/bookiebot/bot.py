@@ -1,7 +1,11 @@
+import os
+
+# Disable discord voice/audio stack to avoid loading audioop (deprecated in Python 3.13)
+os.environ.setdefault("DISCORD_AUDIO_DISABLE", "1")
+
 import asyncio
 import discord
 import logging
-import os
 import json
 import urllib.request
 from urllib.error import URLError, HTTPError

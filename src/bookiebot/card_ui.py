@@ -1,4 +1,8 @@
 from typing import Any, TYPE_CHECKING
+import os
+
+# Disable discord voice/audio stack to avoid loading audioop (deprecated in Python 3.13)
+os.environ.setdefault("DISCORD_AUDIO_DISABLE", "1")
 
 try:
     import discord  # type: ignore

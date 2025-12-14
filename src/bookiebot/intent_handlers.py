@@ -1,4 +1,8 @@
 # all intent handlers
+import os
+
+# Disable discord voice/audio stack to avoid loading audioop (deprecated in Python 3.13)
+os.environ.setdefault("DISCORD_AUDIO_DISABLE", "1")
 
 from bookiebot.sheets_writer import write_to_sheet
 import bookiebot.sheets_utils as su
@@ -75,8 +79,8 @@ async def handle_intent(intent, entities, message, last_context=None):
 
     # For query intents, resolve to actual list of person(s)
     if intent.startswith("query_"):
-        discord_user = message.author.name.lower()
-        discord_user_id = str(message.author.id)
+        discord_user = getattr(message.author, "name", "").lower()
+        discord_user_id = getattr(message.author, "id", None)
         person = entities.get("person")
         persons_to_query = resolve_query_persons(discord_user, person, discord_user_id)
 
@@ -193,8 +197,8 @@ async def query_total_for_store_handler(entities, message):
 
 
 async def query_highest_expense_category_handler(entities, message):
-    discord_user = message.author.name.lower()
-    discord_user_id = str(message.author.id)
+    discord_user = getattr(message.author, "name", "").lower()
+    discord_user_id = getattr(message.author, "id", None)
     persons_to_query = resolve_query_persons(discord_user, entities.get("person"), discord_user_id)
 
     if not persons_to_query:

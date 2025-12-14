@@ -90,8 +90,9 @@ async def write_expense_to_sheet(data, message):
             await message.channel.send("Error accessing expense sheet.")
         return
 
-    discord_user = message.author.name.lower()
-    discord_user_id = str(message.author.id)
+    discord_user = getattr(message.author, "name", "").lower()
+    discord_user_id = getattr(message.author, "id", None)
+    discord_user_id = str(discord_user_id) if discord_user_id is not None else None
 
     # If the message explicitly mentions a non-bot user, treat that mention as the actor.
     # This lets people post via shortcuts/webhooks and still log under the correct account.
@@ -99,7 +100,8 @@ async def write_expense_to_sheet(data, message):
         if getattr(mentioned, "bot", False):
             continue
         discord_user = (getattr(mentioned, "name", None) or getattr(mentioned, "display_name", "")).lower()
-        discord_user_id = str(getattr(mentioned, "id", discord_user_id))
+        mentioned_id = getattr(mentioned, "id", discord_user_id)
+        discord_user_id = str(mentioned_id) if mentioned_id is not None else None
         logger.debug("Using mentioned user for resolution", extra={"user": discord_user, "user_id": discord_user_id})
         break
     logger.debug("Discord user", extra={"user": discord_user})
