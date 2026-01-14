@@ -79,7 +79,8 @@ async def write_expense_to_sheet(data, message):
         return
 
     if category not in get_category_columns:
-        await message.channel.send(f"❌ Unknown category: {category}")
+        available = ", ".join(sorted(get_category_columns.keys()))
+        await message.channel.send(f"❌ Unknown category: {category}. Available categories: {available}.")
         return
 
     ws = None
