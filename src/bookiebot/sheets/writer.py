@@ -72,7 +72,12 @@ async def write_income_to_sheet(data, message):
 
 
 async def write_expense_to_sheet(data, message):
-    category = data["category"].lower()
+    category = (data.get("category") or "").strip().lower()
+    if not category:
+        if message:
+            await message.channel.send("❌ Could not log entry — missing category.")
+        return
+
     if category not in get_category_columns:
         await message.channel.send(f"❌ Unknown category: {category}")
         return
