@@ -3,6 +3,7 @@ from types import SimpleNamespace
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import bookiebot.intents.handlers as ih
+from bookiebot.sheets.routing import SpreadsheetAccessError
 
 
 class DummyChannel:
@@ -49,6 +50,16 @@ async def test_log_income_calls_writer(monkeypatch, message):
     await ih.handle_intent("log_income", data, message)
 
     writer.assert_awaited_once_with(data, message)
+
+
+@pytest.mark.asyncio
+async def test_sheet_routing_errors_are_sent_to_user(monkeypatch, message):
+    writer = AsyncMock(side_effect=SpreadsheetAccessError("Could not open spreadsheet 'abc'."))
+    monkeypatch.setattr(ih, "write_to_sheet", writer)
+
+    await ih.handle_intent("log_income", {"type": "income", "amount": 1000.0}, message)
+
+    assert message.channel.sent == [("Could not open spreadsheet 'abc'.", {})]
 
 
 @pytest.mark.asyncio

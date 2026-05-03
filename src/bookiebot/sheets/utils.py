@@ -1,5 +1,6 @@
 from openpyxl.utils import column_index_from_string
 from datetime import datetime, timedelta
+import logging
 import os
 import re
 from typing import Any, Optional
@@ -27,6 +28,7 @@ except ImportError:  # pragma: no cover - fallback for tests
 
 import gspread
 from bookiebot.sheets.repo import get_sheets_repo
+from bookiebot.sheets.routing import get_current_discord_user_id
 
 try:
     from rapidfuzz import fuzz
@@ -43,6 +45,9 @@ except ImportError:  # pragma: no cover - fallback for tests
             return 0.0
 
     fuzz = _Fuzz()
+
+
+logger = logging.getLogger(__name__)
 
 # HELPER FUNCTIONS
 def _sum_column(ws, col_letter, start_row=3):
@@ -1423,6 +1428,7 @@ def log_payment(category_label, amount):
     """
     ws = _income_ws()
     rows = ws.get_all_values()
+    discord_user_id = get_current_discord_user_id()
 
     for row_idx, row in enumerate(rows):
         if len(row) < 2:
@@ -1433,10 +1439,42 @@ def log_payment(category_label, amount):
             # Write to column C (3)
             cell_to_update = gspread.utils.rowcol_to_a1(row_idx + 1, 3)
             ws.update_acell(cell_to_update, str(amount))
-            print(f"[INFO] Logged ${amount} for {category_label} at {cell_to_update}")
+
+            actual_value = ws.acell(cell_to_update).value
+            if abs(clean_money(actual_value) - clean_money(str(amount))) > 0.001:
+                logger.error(
+                    "Payment update did not verify",
+                    extra={
+                        "category": category_label,
+                        "amount": amount,
+                        "actual_value": actual_value,
+                        "cell": cell_to_update,
+                        "worksheet": getattr(ws, "title", ""),
+                        "user_id": discord_user_id,
+                    },
+                )
+                return False
+
+            logger.info(
+                "Payment logged",
+                extra={
+                    "category": category_label,
+                    "amount": amount,
+                    "cell": cell_to_update,
+                    "worksheet": getattr(ws, "title", ""),
+                    "user_id": discord_user_id,
+                },
+            )
             return True
 
-    print(f"[ERROR] Could not find category '{category_label}' in income sheet.")
+    logger.error(
+        "Could not find payment category in income sheet",
+        extra={
+            "category": category_label,
+            "worksheet": getattr(ws, "title", ""),
+            "user_id": discord_user_id,
+        },
+    )
     return False
 
 

@@ -11,8 +11,8 @@ from zoneinfo import ZoneInfo
 
 PACIFIC_TZ = ZoneInfo("America/Los_Angeles")
 
-DEFAULT_BRIAN_DISCORD_USER_IDS = ("676638528590970917", "1395120954589315303")
-DEFAULT_HANNAH_DISCORD_USER_IDS = ("830984827904851969",)
+DEFAULT_BRIAN_DISCORD_USER_IDS = ("676638528590970917",)
+DEFAULT_HANNAH_DISCORD_USER_IDS = ("830984827904851969", "1395120954589315303")
 
 DEFAULT_YEARLY_SHEET_CONFIG = {
     2026: {
@@ -38,6 +38,10 @@ class UnknownDiscordUserError(SheetRoutingError):
 
 class MissingYearConfigError(SheetRoutingError):
     """Raised when spreadsheet IDs are not configured for the requested year."""
+
+
+class SpreadsheetAccessError(SheetRoutingError):
+    """Raised when a configured spreadsheet cannot be opened."""
 
 
 class MissingMonthWorksheetError(SheetRoutingError):
@@ -78,8 +82,9 @@ def _csv_env_values(name: str) -> tuple[str, ...]:
 def _configured_user_ids(owner_key: str, defaults: tuple[str, ...]) -> tuple[str, ...]:
     plural = _csv_env_values(f"{owner_key.upper()}_DISCORD_USER_IDS")
     singular = os.getenv(f"{owner_key.upper()}_DISCORD_USER_ID", "").strip()
-    values = plural or ((singular,) if singular else defaults)
-    return tuple(str(value).strip() for value in values if str(value).strip())
+    env_values = plural + ((singular,) if singular else ())
+    values = defaults + env_values
+    return tuple(dict.fromkeys(str(value).strip() for value in values if str(value).strip()))
 
 
 def get_discord_user_config() -> dict[str, DiscordUserConfig]:
@@ -99,6 +104,13 @@ def get_discord_user_config() -> dict[str, DiscordUserConfig]:
             budget_owner_key="hannah",
             expense_persons=("Hannah",),
         )
+    # The Apple Shortcut relay currently posts as hannerish#0000 with this ID.
+    # Keep it pinned to Hannah even if older environment config also lists it for Brian.
+    config["1395120954589315303"] = DiscordUserConfig(
+        name="Hannah",
+        budget_owner_key="hannah",
+        expense_persons=("Hannah",),
+    )
     return config
 
 
@@ -212,6 +224,13 @@ def get_shared_expenses_spreadsheet_id(year: int | str) -> str:
 def get_month_worksheet(gc: Any, spreadsheet_id: str, month_name: str) -> Any:
     try:
         spreadsheet = gc.open_by_key(spreadsheet_id)
+    except Exception as exc:
+        raise SpreadsheetAccessError(
+            f"Could not open spreadsheet '{spreadsheet_id}'. "
+            "Check that the Google service account has access to this file."
+        ) from exc
+
+    try:
         return spreadsheet.worksheet(month_name)
     except Exception as exc:
         raise MissingMonthWorksheetError(

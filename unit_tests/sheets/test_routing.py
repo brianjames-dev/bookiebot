@@ -9,6 +9,7 @@ from bookiebot.sheets import routing
 
 BRIAN_ID = "676638528590970917"
 HANNAH_ID = "830984827904851969"
+HANNAH_SHORTCUT_ID = "1395120954589315303"
 
 
 class FakeSpreadsheet:
@@ -42,6 +43,29 @@ def test_brian_user_resolves_to_brian_budget_spreadsheet():
 def test_hannah_user_resolves_to_hannah_budget_spreadsheet():
     sheet_id = routing.get_budget_spreadsheet_id_for_user(HANNAH_ID, 2026)
     assert sheet_id == "1lEULEvZ5UzjuhnGPncpvh56xxA8JsfYyns0JS_Okmsg"
+
+
+def test_hannah_shortcut_user_resolves_to_hannah_budget_spreadsheet():
+    sheet_id = routing.get_budget_spreadsheet_id_for_user(HANNAH_SHORTCUT_ID, 2026)
+    assert sheet_id == "1lEULEvZ5UzjuhnGPncpvh56xxA8JsfYyns0JS_Okmsg"
+
+
+def test_hannah_shortcut_user_stays_hannah_when_old_env_lists_it_for_brian(monkeypatch):
+    monkeypatch.setenv("BRIAN_DISCORD_USER_IDS", f"{BRIAN_ID},{HANNAH_SHORTCUT_ID}")
+
+    config = routing.get_user_config(HANNAH_SHORTCUT_ID)
+
+    assert config.name == "Hannah"
+    assert config.budget_owner_key == "hannah"
+    assert config.expense_persons == ("Hannah",)
+
+
+def test_env_user_ids_are_additive_with_defaults(monkeypatch):
+    monkeypatch.setenv("HANNAH_DISCORD_USER_IDS", "extra-hannah-id")
+
+    assert routing.get_user_config(HANNAH_ID).name == "Hannah"
+    assert routing.get_user_config(HANNAH_SHORTCUT_ID).name == "Hannah"
+    assert routing.get_user_config("extra-hannah-id").name == "Hannah"
 
 
 def test_both_users_resolve_to_same_shared_expenses_spreadsheet():
@@ -114,3 +138,10 @@ def test_get_month_worksheet_errors_when_tab_missing():
 
     with pytest.raises(routing.MissingMonthWorksheetError, match="Worksheet 'May'"):
         routing.get_month_worksheet(gc, sheet_id, "May")
+
+
+def test_get_month_worksheet_errors_when_spreadsheet_cannot_be_opened():
+    gc = FakeGC({})
+
+    with pytest.raises(routing.SpreadsheetAccessError, match="Could not open spreadsheet 'sheet-id'"):
+        routing.get_month_worksheet(gc, "sheet-id", "May")

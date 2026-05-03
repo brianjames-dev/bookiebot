@@ -13,6 +13,7 @@ from datetime import datetime
 from typing import Any, cast
 from bookiebot.sheets.utils import resolve_query_persons, get_local_today
 from bookiebot.sheets.routing import (
+    SheetRoutingError,
     UnknownDiscordUserError,
     get_user_config,
     sheet_user_context,
@@ -82,6 +83,10 @@ def _message_actor_user_id(message) -> str | None:
     return str(author_id) if author_id is not None else None
 
 
+def _budget_profile_name(message) -> str:
+    return get_user_config(_message_actor_user_id(message)).name
+
+
 # INTENT HANDLER
 async def handle_intent(intent, entities, message, last_context=None):
     handler = INTENT_HANDLERS.get(intent)
@@ -115,7 +120,10 @@ async def handle_intent(intent, entities, message, last_context=None):
             entities["persons"] = persons_to_query
             print(f"🔎 Resolved persons for query: {persons_to_query}")
 
-        await handler(entities, message)
+        try:
+            await handler(entities, message)
+        except SheetRoutingError as e:
+            await message.channel.send(str(e))
 
 
 # FALLBACK HANDLER
@@ -645,9 +653,9 @@ async def log_rent_paid_handler(entities, message):
 
     success = su.log_rent_paid(amount)
     if success:
-        await message.channel.send(f"✅ Logged rent as paid: ${amount:.2f}")
+        await message.channel.send(f"✅ Logged rent as paid for {_budget_profile_name(message)}: ${amount:.2f}")
     else:
-        await message.channel.send("❌ Could not find the Rent row to log payment.")
+        await message.channel.send("❌ Could not confirm the Rent payment was written.")
 
 
 async def log_smud_paid_handler(entities, message):
@@ -658,9 +666,9 @@ async def log_smud_paid_handler(entities, message):
 
     success = su.log_smud_paid(amount)
     if success:
-        await message.channel.send(f"✅ Logged SMUD as paid: ${amount:.2f}")
+        await message.channel.send(f"✅ Logged SMUD as paid for {_budget_profile_name(message)}: ${amount:.2f}")
     else:
-        await message.channel.send("❌ Could not find the SMUD row to log payment.")
+        await message.channel.send("❌ Could not confirm the SMUD payment was written.")
 
 
 async def log_student_loan_paid_handler(entities, message):
@@ -671,9 +679,9 @@ async def log_student_loan_paid_handler(entities, message):
 
     success = su.log_student_loan_paid(amount)
     if success:
-        await message.channel.send(f"✅ Logged student loan as paid: ${amount:.2f}")
+        await message.channel.send(f"✅ Logged student loan as paid for {_budget_profile_name(message)}: ${amount:.2f}")
     else:
-        await message.channel.send("❌ Could not find the Student Loan row to log payment.")
+        await message.channel.send("❌ Could not confirm the Student Loan payment was written.")
 
 
 async def query_1st_savings_handler(entities, message):

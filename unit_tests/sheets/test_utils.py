@@ -3,6 +3,7 @@ from unittest.mock import MagicMock, patch, AsyncMock
 from datetime import datetime
 
 from bookiebot.sheets import utils as su
+from unit_tests.support.sheets_repo_stub import SheetsRepoStub
 
 
 # ---------------------------------------------------------------------------
@@ -37,7 +38,23 @@ def _shopping_row(date_str, amount, person):
 
 def test_resolve_query_persons_uses_discord_user_id():
     result = su.resolve_query_persons("any-display-name", None, "1395120954589315303")
-    assert result == ["Brian (BofA)", "Brian (AL)"]
+    assert result == ["Hannah"]
+
+
+def test_log_payment_updates_and_verifies_income_cell():
+    repo = SheetsRepoStub(income_rows=[["", "Rent", ""]])
+
+    with repo.patched():
+        assert su.log_payment("rent", 1625) is True
+
+    assert repo.income.acell("C1").value == "1625"
+
+
+def test_log_payment_returns_false_when_label_missing():
+    repo = SheetsRepoStub(income_rows=[["", "Groceries", ""]])
+
+    with repo.patched():
+        assert su.log_payment("rent", 1625) is False
 
 
 @pytest.fixture
