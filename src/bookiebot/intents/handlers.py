@@ -16,6 +16,7 @@ from bookiebot.sheets.routing import (
     SheetRoutingError,
     UnknownDiscordUserError,
     get_user_config,
+    resolve_actor_key,
     sheet_user_context,
 )
 
@@ -72,19 +73,22 @@ INTENT_HANDLERS = {
 }
 
 
-def _message_actor_user_id(message) -> str | None:
+def _message_actor_key(message) -> str | None:
     for mentioned in getattr(message, "mentions", []) or []:
         if getattr(mentioned, "bot", False):
             continue
         mentioned_id = getattr(mentioned, "id", None)
-        return str(mentioned_id) if mentioned_id is not None else None
+        mentioned_name = getattr(mentioned, "name", None) or getattr(mentioned, "display_name", None)
+        return resolve_actor_key(mentioned_id, mentioned_name)
 
-    author_id = getattr(getattr(message, "author", None), "id", None)
-    return str(author_id) if author_id is not None else None
+    author = getattr(message, "author", None)
+    author_id = getattr(author, "id", None)
+    author_name = getattr(author, "name", None) or getattr(author, "display_name", None)
+    return resolve_actor_key(author_id, author_name)
 
 
 def _budget_profile_name(message) -> str:
-    return get_user_config(_message_actor_user_id(message)).name
+    return get_user_config(_message_actor_key(message)).name
 
 
 # INTENT HANDLER
@@ -94,7 +98,7 @@ async def handle_intent(intent, entities, message, last_context=None):
         await fallback_handler(message.content, message, context=last_context)
         return
 
-    actor_user_id = _message_actor_user_id(message)
+    actor_user_id = _message_actor_key(message)
     try:
         get_user_config(actor_user_id)
     except UnknownDiscordUserError as e:

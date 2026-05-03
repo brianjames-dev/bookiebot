@@ -12,7 +12,10 @@ from zoneinfo import ZoneInfo
 PACIFIC_TZ = ZoneInfo("America/Los_Angeles")
 
 DEFAULT_BRIAN_DISCORD_USER_IDS = ("676638528590970917",)
-DEFAULT_HANNAH_DISCORD_USER_IDS = ("830984827904851969", "1395120954589315303")
+DEFAULT_HANNAH_DISCORD_USER_IDS = ("830984827904851969",)
+APPLE_SHORTCUT_RELAY_USER_ID = "1395120954589315303"
+BRIAN_SHORTCUT_ACTOR_KEY = "shortcut:brian"
+HANNAH_SHORTCUT_ACTOR_KEY = "shortcut:hannah"
 
 DEFAULT_YEARLY_SHEET_CONFIG = {
     2026: {
@@ -104,9 +107,12 @@ def get_discord_user_config() -> dict[str, DiscordUserConfig]:
             budget_owner_key="hannah",
             expense_persons=("Hannah",),
         )
-    # The Apple Shortcut relay currently posts as hannerish#0000 with this ID.
-    # Keep it pinned to Hannah even if older environment config also lists it for Brian.
-    config["1395120954589315303"] = DiscordUserConfig(
+    config[BRIAN_SHORTCUT_ACTOR_KEY] = DiscordUserConfig(
+        name="Brian",
+        budget_owner_key="brian",
+        expense_persons=("Brian (BofA)", "Brian (AL)"),
+    )
+    config[HANNAH_SHORTCUT_ACTOR_KEY] = DiscordUserConfig(
         name="Hannah",
         budget_owner_key="hannah",
         expense_persons=("Hannah",),
@@ -121,15 +127,35 @@ def normalize_discord_user_id(discord_user_id: Any) -> str | None:
     return user_id or None
 
 
-def get_user_config(discord_user_id: Any) -> DiscordUserConfig:
+def _normalize_shortcut_sender(discord_user: str | None) -> str:
+    user = (discord_user or "").strip().lower()
+    if user.endswith("#0000"):
+        user = user[:-5]
+    return user
+
+
+def resolve_actor_key(discord_user_id: Any, discord_user: str | None = None) -> str | None:
     user_id = normalize_discord_user_id(discord_user_id)
-    if not user_id:
+    if user_id != APPLE_SHORTCUT_RELAY_USER_ID:
+        return user_id
+
+    sender = _normalize_shortcut_sender(discord_user)
+    if sender in {".deebers", "deebers"}:
+        return BRIAN_SHORTCUT_ACTOR_KEY
+    if sender in {"hannerish"}:
+        return HANNAH_SHORTCUT_ACTOR_KEY
+    return user_id
+
+
+def get_user_config(discord_user_id: Any, discord_user: str | None = None) -> DiscordUserConfig:
+    actor_key = resolve_actor_key(discord_user_id, discord_user)
+    if not actor_key:
         raise UnknownDiscordUserError(
             "I don't have your Discord account mapped to a budget profile yet. "
             "Ask Brian to configure your user ID."
         )
 
-    config = get_discord_user_config().get(user_id)
+    config = get_discord_user_config().get(actor_key)
     if config is None:
         raise UnknownDiscordUserError(
             "I don't have your Discord account mapped to a budget profile yet. "

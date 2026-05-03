@@ -10,7 +10,7 @@ from dateutil import parser as dateparser
 from collections import defaultdict, Counter
 import matplotlib.pyplot as plt
 import io
-from bookiebot.sheets.routing import get_user_config, UnknownDiscordUserError
+from bookiebot.sheets.routing import get_user_config, resolve_actor_key, UnknownDiscordUserError
 
 # Disable discord voice/audio stack to avoid loading audioop (deprecated in Python 3.13)
 os.environ.setdefault("DISCORD_AUDIO_DISABLE", "1")
@@ -138,7 +138,8 @@ def resolve_query_persons(discord_user: str, person: str | None, user_id: str | 
 
     if not person:
         try:
-            return list(get_user_config(user_id).expense_persons)
+            actor_key = resolve_actor_key(user_id, discord_user)
+            return list(get_user_config(actor_key).expense_persons)
         except UnknownDiscordUserError:
             return []
 

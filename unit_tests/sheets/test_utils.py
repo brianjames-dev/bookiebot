@@ -37,8 +37,13 @@ def _shopping_row(date_str, amount, person):
 
 
 def test_resolve_query_persons_uses_discord_user_id():
-    result = su.resolve_query_persons("any-display-name", None, "1395120954589315303")
+    result = su.resolve_query_persons("hannerish#0000", None, "1395120954589315303")
     assert result == ["Hannah"]
+
+
+def test_resolve_query_persons_disambiguates_shared_shortcut_relay_id():
+    result = su.resolve_query_persons(".Deebers#0000", None, "1395120954589315303")
+    assert result == ["Brian (BofA)", "Brian (AL)"]
 
 
 def test_log_payment_updates_and_verifies_income_cell():

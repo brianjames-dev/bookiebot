@@ -9,7 +9,7 @@ from bookiebot.sheets import routing
 
 BRIAN_ID = "676638528590970917"
 HANNAH_ID = "830984827904851969"
-HANNAH_SHORTCUT_ID = "1395120954589315303"
+SHORTCUT_RELAY_ID = "1395120954589315303"
 
 
 class FakeSpreadsheet:
@@ -46,14 +46,21 @@ def test_hannah_user_resolves_to_hannah_budget_spreadsheet():
 
 
 def test_hannah_shortcut_user_resolves_to_hannah_budget_spreadsheet():
-    sheet_id = routing.get_budget_spreadsheet_id_for_user(HANNAH_SHORTCUT_ID, 2026)
+    actor_key = routing.resolve_actor_key(SHORTCUT_RELAY_ID, "hannerish#0000")
+    sheet_id = routing.get_budget_spreadsheet_id_for_user(actor_key, 2026)
     assert sheet_id == "1lEULEvZ5UzjuhnGPncpvh56xxA8JsfYyns0JS_Okmsg"
 
 
-def test_hannah_shortcut_user_stays_hannah_when_old_env_lists_it_for_brian(monkeypatch):
-    monkeypatch.setenv("BRIAN_DISCORD_USER_IDS", f"{BRIAN_ID},{HANNAH_SHORTCUT_ID}")
+def test_brian_shortcut_user_resolves_to_brian_budget_spreadsheet():
+    actor_key = routing.resolve_actor_key(SHORTCUT_RELAY_ID, ".Deebers#0000")
+    sheet_id = routing.get_budget_spreadsheet_id_for_user(actor_key, 2026)
+    assert sheet_id == "1ArI4qapaj-LGg7v5OC47WdfYijjLdu3QPRPgKLbgD3U"
 
-    config = routing.get_user_config(HANNAH_SHORTCUT_ID)
+
+def test_hannah_shortcut_user_stays_hannah_when_old_env_lists_relay_for_brian(monkeypatch):
+    monkeypatch.setenv("BRIAN_DISCORD_USER_IDS", f"{BRIAN_ID},{SHORTCUT_RELAY_ID}")
+
+    config = routing.get_user_config(routing.resolve_actor_key(SHORTCUT_RELAY_ID, "hannerish#0000"))
 
     assert config.name == "Hannah"
     assert config.budget_owner_key == "hannah"
@@ -64,7 +71,7 @@ def test_env_user_ids_are_additive_with_defaults(monkeypatch):
     monkeypatch.setenv("HANNAH_DISCORD_USER_IDS", "extra-hannah-id")
 
     assert routing.get_user_config(HANNAH_ID).name == "Hannah"
-    assert routing.get_user_config(HANNAH_SHORTCUT_ID).name == "Hannah"
+    assert routing.get_user_config(routing.resolve_actor_key(SHORTCUT_RELAY_ID, "hannerish#0000")).name == "Hannah"
     assert routing.get_user_config("extra-hannah-id").name == "Hannah"
 
 
