@@ -172,7 +172,7 @@ pytest --llm-live unit_tests/test_intent_outputs.py -k rent
 ---
 
 ## 9. Next Steps to Strengthen the Harness
-1. **More fixtures** for all remaining intents (need expenses, SMUD/student loan, transfers, analytics queries).
+1. **More fixtures** for all remaining intents (need expenses, PG&E/student loan, transfers, analytics queries).
 2. **Caching/context testing hooks** once those features land – expose dependency injection points so the sandbox can validate them.
 3. **Documentation samples** – add troubleshooting tips (e.g., where replies are stored, how to inspect sheet state) and template files for adding new fixtures.
 4. **CI integration** – implement the recommendations above so every PR runs the sandbox before merging.

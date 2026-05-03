@@ -4,8 +4,8 @@ interactions:
       are a financial assistant named BookieBot located in the PST time zone. Given
       a message, identify the user''s intent and extract entities if necessary.\n\n    Available
       intents:\n    [''log_expense'', ''log_need_expense'', ''log_income'', ''log_rent_paid'',
-      ''log_smud_paid'', ''log_student_loan_paid'', ''log_1st_savings'', ''log_2nd_savings'',
-      ''query_rent_paid'', ''query_smud_paid'', ''query_student_loans_paid'', ''query_1st_savings'',
+      ''log_pge_paid'', ''log_student_loan_paid'', ''log_1st_savings'', ''log_2nd_savings'',
+      ''query_rent_paid'', ''query_pge_paid'', ''query_student_loans_paid'', ''query_1st_savings'',
       ''query_2nd_savings'', ''query_subscriptions'', ''query_burn_rate'', ''query_remaining_budget'',
       ''query_projected_spending'', ''query_total_income'', ''query_average_daily_spend'',
       ''query_expense_breakdown_percentages'', ''query_total_for_store'', ''query_total_for_category'',
@@ -17,9 +17,9 @@ interactions:
       of the available intents above, return:\n    {\n    \"intent\": \"<intent_name>\",\n    \"entities\":
       { ... }\n    }\n\n    If the message does NOT clearly match any available intent,
       return:\n    {\n    \"intent\": \"fallback\",\n    \"entities\": {}\n    }\n\n    If
-      the message is about logging a payment for **rent**, **SMUD**, or **student
+      the message is about logging a payment for **rent**, **PG&E**, or **student
       loan**, use the specific intents:\n    - \"log_rent_paid\" \u2192 when paying
-      rent\n    - \"log_smud_paid\" \u2192 when paying SMUD (utilities)\n    - \"log_student_loan_paid\"
+      rent\n    - \"log_pge_paid\" \u2192 when paying PG&E (utilities)\n    - \"log_student_loan_paid\"
       \u2192 when paying a student loan\n\n    For these intents, extract the amount
       paid as:\n    - entities: { \"amount\": <float> }\n\n    Do NOT treat these
       payments as generic expenses. Do NOT assign them a category. Do NOT include
@@ -68,7 +68,7 @@ interactions:
       (e.g., \"store\" for a store query, \"category\", \"vendor\", \"n\" for top-n
       queries), or empty if none.\n\n    Always return ONLY a valid JSON object with
       the correct keys and values. Do not explain anything.  \n\n    Now parse this:\n    \"\"\"Did
-      we pay SMUD?\"\"\"\n    "}, {"role": "user", "content": "Did we pay SMUD?"}],
+      we pay PG&E?\"\"\"\n    "}, {"role": "user", "content": "Did we pay PG&E?"}],
       "temperature": 0}'
     headers:
       Accept:
@@ -95,7 +95,7 @@ interactions:
       string: "{\n  \"id\": \"chatcmpl-CgQWLZv0FSrsSe6eDEExJQDu568u0\",\n  \"object\":
         \"chat.completion\",\n  \"created\": 1764227757,\n  \"model\": \"gpt-3.5-turbo-0125\",\n
         \ \"choices\": [\n    {\n      \"index\": 0,\n      \"message\": {\n        \"role\":
-        \"assistant\",\n        \"content\": \"{\\n    \\\"intent\\\": \\\"query_smud_paid\\\",\\n
+        \"assistant\",\n        \"content\": \"{\\n    \\\"intent\\\": \\\"query_pge_paid\\\",\\n
         \   \\\"entities\\\": {}\\n}\",\n        \"refusal\": null,\n        \"annotations\":
         []\n      },\n      \"logprobs\": null,\n      \"finish_reason\": \"stop\"\n
         \   }\n  ],\n  \"usage\": {\n    \"prompt_tokens\": 1362,\n    \"completion_tokens\":

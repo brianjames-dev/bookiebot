@@ -36,7 +36,9 @@ INTENT_HANDLERS = {
     "log_expense":                          lambda e, m: write_to_sheet(e, m),
     "log_income":                           lambda e, m: write_to_sheet(e, m),
     "log_rent_paid":                        lambda e, m: log_rent_paid_handler(e, m),
-    "log_smud_paid":                        lambda e, m: log_smud_paid_handler(e, m),
+    "log_pge_paid":                         lambda e, m: log_pge_paid_handler(e, m),
+    "log_recology_paid":                    lambda e, m: log_recology_paid_handler(e, m),
+    "log_water_paid":                       lambda e, m: log_water_paid_handler(e, m),
     "log_student_loan_paid":                lambda e, m: log_student_loan_paid_handler(e, m),
     "log_1st_savings":                      lambda e, m: log_1st_savings_handler(e, m),
     "log_2nd_savings":                      lambda e, m: log_2nd_savings_handler(e, m),
@@ -45,7 +47,9 @@ INTENT_HANDLERS = {
     # Query handlers
     "query_burn_rate":                      lambda e, m: query_burn_rate_handler(m),
     "query_rent_paid":                      lambda e, m: query_rent_paid_handler(m),
-    "query_smud_paid":                      lambda e, m: query_smud_paid_handler(m),
+    "query_pge_paid":                       lambda e, m: query_pge_paid_handler(m),
+    "query_recology_paid":                  lambda e, m: query_recology_paid_handler(m),
+    "query_water_paid":                     lambda e, m: query_water_paid_handler(m),
     "query_student_loans_paid":             lambda e, m: query_student_loan_paid_handler(m),
     "query_total_for_store":                lambda e, m: query_total_for_store_handler(e, m),
     "query_highest_expense_category":       lambda e, m: query_highest_expense_category_handler(e, m),
@@ -183,12 +187,28 @@ async def query_rent_paid_handler(message):
         await message.channel.send("❌ You have NOT paid rent yet this month.")
 
 
-async def query_smud_paid_handler(message):
-    paid, amount = await su.check_smud_paid()
+async def query_pge_paid_handler(message):
+    paid, amount = await su.check_pge_paid()
     if paid:
-        await message.channel.send(f"✅ You paid ${amount:.2f} for SMUD this month.")
+        await message.channel.send(f"✅ You paid ${amount:.2f} for PG&E this month.")
     else:
-        await message.channel.send("❌ You have NOT paid SMUD yet this month.")
+        await message.channel.send("❌ You have NOT paid PG&E yet this month.")
+
+
+async def query_recology_paid_handler(message):
+    paid, amount = await su.check_recology_paid()
+    if paid:
+        await message.channel.send(f"✅ You paid ${amount:.2f} for Recology this month.")
+    else:
+        await message.channel.send("❌ You have NOT paid Recology yet this month.")
+
+
+async def query_water_paid_handler(message):
+    paid, amount = await su.check_water_paid()
+    if paid:
+        await message.channel.send(f"✅ You paid ${amount:.2f} for water this month.")
+    else:
+        await message.channel.send("❌ You have NOT paid water yet this month.")
 
 
 async def query_student_loan_paid_handler(message):
@@ -662,17 +682,43 @@ async def log_rent_paid_handler(entities, message):
         await message.channel.send("❌ Could not confirm the Rent payment was written.")
 
 
-async def log_smud_paid_handler(entities, message):
+async def log_pge_paid_handler(entities, message):
     amount = entities.get("amount")
     if amount is None:
-        await message.channel.send("❌ Please specify the amount you paid for SMUD.")
+        await message.channel.send("❌ Please specify the amount you paid for PG&E.")
         return
 
-    success = su.log_smud_paid(amount)
+    success = su.log_pge_paid(amount)
     if success:
-        await message.channel.send(f"✅ Logged SMUD as paid for {_budget_profile_name(message)}: ${amount:.2f}")
+        await message.channel.send(f"✅ Logged PG&E as paid for {_budget_profile_name(message)}: ${amount:.2f}")
     else:
-        await message.channel.send("❌ Could not confirm the SMUD payment was written.")
+        await message.channel.send("❌ Could not confirm the PG&E payment was written.")
+
+
+async def log_recology_paid_handler(entities, message):
+    amount = entities.get("amount")
+    if amount is None:
+        await message.channel.send("❌ Please specify the amount you paid for Recology.")
+        return
+
+    success = su.log_recology_paid(amount)
+    if success:
+        await message.channel.send(f"✅ Logged Recology as paid for {_budget_profile_name(message)}: ${amount:.2f}")
+    else:
+        await message.channel.send("❌ Could not confirm the Recology payment was written.")
+
+
+async def log_water_paid_handler(entities, message):
+    amount = entities.get("amount")
+    if amount is None:
+        await message.channel.send("❌ Please specify the amount you paid for water.")
+        return
+
+    success = su.log_water_paid(amount)
+    if success:
+        await message.channel.send(f"✅ Logged water as paid for {_budget_profile_name(message)}: ${amount:.2f}")
+    else:
+        await message.channel.send("❌ Could not confirm the water payment was written.")
 
 
 async def log_student_loan_paid_handler(entities, message):

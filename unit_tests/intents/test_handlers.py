@@ -67,7 +67,9 @@ async def test_sheet_routing_errors_are_sent_to_user(monkeypatch, message):
     ("intent", "func_name", "amount", "expected"),
     [
         ("log_rent_paid", "log_rent_paid", 1200.0, "rent"),
-        ("log_smud_paid", "log_smud_paid", 85.0, "SMUD"),
+        ("log_pge_paid", "log_pge_paid", 85.0, "PG&E"),
+        ("log_recology_paid", "log_recology_paid", 85.0, "Recology"),
+        ("log_water_paid", "log_water_paid", 85.0, "water"),
         ("log_student_loan_paid", "log_student_loan_paid", 250.0, "student loan"),
         ("log_1st_savings", "log_1st_savings", 100.0, "1st savings"),
         ("log_2nd_savings", "log_2nd_savings", 200.0, "2nd savings"),
@@ -113,7 +115,9 @@ async def test_query_rent_paid(monkeypatch, message):
 @pytest.mark.parametrize(
     ("intent", "su_attr", "return_value", "expected_sub"),
     [
-        ("query_smud_paid", "check_smud_paid", (True, 80.0), "SMUD"),
+        ("query_pge_paid", "check_pge_paid", (True, 80.0), "PG&E"),
+        ("query_recology_paid", "check_recology_paid", (True, 80.0), "Recology"),
+        ("query_water_paid", "check_water_paid", (True, 80.0), "water"),
         ("query_student_loans_paid", "check_student_loan_paid", (False, 0.0), "NOT"),
         ("query_total_income", "total_income", 1500.0, "1500.00"),
         ("query_remaining_budget", "remaining_budget", 200.0, "Remaining spending budget"),

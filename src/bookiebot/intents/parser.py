@@ -41,9 +41,11 @@ async def parse_message_llm(user_message: str, *, llm_client: Optional[LLMClient
     "entities": {{}}
     }}
 
-    If the message is about logging a payment for **rent**, **SMUD**, or **student loan**, use the specific intents:
+    If the message is about logging a payment for **rent**, **PG&E**, **Recology/trash**, **water**, or **student loan**, use the specific intents:
     - "log_rent_paid" → when paying rent
-    - "log_smud_paid" → when paying SMUD (utilities)
+    - "log_pge_paid" → when paying PG&E / PGE / gas and electric utilities
+    - "log_recology_paid" → when paying Recology, trash, garbage, or waste bills
+    - "log_water_paid" → when paying water, water bill, or Santa Rosa Water
     - "log_student_loan_paid" → when paying a student loan
 
     For these intents, extract the amount paid as:

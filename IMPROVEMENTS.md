@@ -48,7 +48,7 @@ resp = await asyncio.to_thread(openai.ChatCompletion.create, **kwargs)
 ## Intent Parsing (LLM + Rules)
 
 - Extract the prompt into a dedicated module and remove non‑ASCII control chars for reliability.
-- Add rule‑based fast paths for deterministic intents (e.g., "paid rent $1200", "paid SMUD", "student loan"). Use LLM only when ambiguous.
+- Add rule‑based fast paths for deterministic intents (e.g., "paid rent $1200", "paid PG&E", "student loan"). Use LLM only when ambiguous.
 - Validate LLM outputs with a schema to prevent runtime key errors. Example using pydantic:
 
 ```python
@@ -185,7 +185,7 @@ TZ=America/Los_Angeles
 
 3) LLM Parser Hardening
    - Move prompt and parsing into `intent_parser/` with schema validation.
-   - Add rule‑based fast paths for rent/SMUD/loan/need expense.
+   - Add rule‑based fast paths for rent/PG&E/loan/need expense.
 
 4) Async + Reliability
    - Introduce retry/backoff utilities.

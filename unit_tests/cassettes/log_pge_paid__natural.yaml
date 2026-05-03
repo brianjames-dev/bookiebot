@@ -4,8 +4,8 @@ interactions:
       are a financial assistant named BookieBot located in the PST time zone. Given
       a message, identify the user''s intent and extract entities if necessary.\n\n    Available
       intents:\n    [''log_expense'', ''log_need_expense'', ''log_income'', ''log_rent_paid'',
-      ''log_smud_paid'', ''log_student_loan_paid'', ''log_1st_savings'', ''log_2nd_savings'',
-      ''query_rent_paid'', ''query_smud_paid'', ''query_student_loans_paid'', ''query_1st_savings'',
+      ''log_pge_paid'', ''log_student_loan_paid'', ''log_1st_savings'', ''log_2nd_savings'',
+      ''query_rent_paid'', ''query_pge_paid'', ''query_student_loans_paid'', ''query_1st_savings'',
       ''query_2nd_savings'', ''query_subscriptions'', ''query_burn_rate'', ''query_remaining_budget'',
       ''query_projected_spending'', ''query_total_income'', ''query_average_daily_spend'',
       ''query_expense_breakdown_percentages'', ''query_total_for_store'', ''query_total_for_category'',
@@ -17,9 +17,9 @@ interactions:
       of the available intents above, return:\n    {\n    \"intent\": \"<intent_name>\",\n    \"entities\":
       { ... }\n    }\n\n    If the message does NOT clearly match any available intent,
       return:\n    {\n    \"intent\": \"fallback\",\n    \"entities\": {}\n    }\n\n    If
-      the message is about logging a payment for **rent**, **SMUD**, or **student
+      the message is about logging a payment for **rent**, **PG&E**, or **student
       loan**, use the specific intents:\n    - \"log_rent_paid\" \u2192 when paying
-      rent\n    - \"log_smud_paid\" \u2192 when paying SMUD (utilities)\n    - \"log_student_loan_paid\"
+      rent\n    - \"log_pge_paid\" \u2192 when paying PG&E (utilities)\n    - \"log_student_loan_paid\"
       \u2192 when paying a student loan\n\n    For these intents, extract the amount
       paid as:\n    - entities: { \"amount\": <float> }\n\n    Do NOT treat these
       payments as generic expenses. Do NOT assign them a category. Do NOT include
@@ -67,8 +67,8 @@ interactions:
       intents from the list above\n    - entities: JSON with any useful parameters
       (e.g., \"store\" for a store query, \"category\", \"vendor\", \"n\" for top-n
       queries), or empty if none.\n\n    Always return ONLY a valid JSON object with
-      the correct keys and values. Do not explain anything.  \n\n    Now parse this:\n    \"\"\"did
-      we pay smd?\"\"\"\n    "}, {"role": "user", "content": "did we pay smd?"}],
+      the correct keys and values. Do not explain anything.  \n\n    Now parse this:\n    \"\"\"PG&E
+      payment 140\"\"\"\n    "}, {"role": "user", "content": "PG&E payment 140"}],
       "temperature": 0}'
     headers:
       Accept:
@@ -78,7 +78,7 @@ interactions:
       Connection:
       - keep-alive
       Content-Length:
-      - '5689'
+      - '5691'
       Content-Type:
       - application/json
       User-Agent:
@@ -92,21 +92,21 @@ interactions:
     uri: https://api.openai.com/v1/chat/completions
   response:
     body:
-      string: "{\n  \"id\": \"chatcmpl-CgQWMG3w0mbhw4KaYu8W6Nnpmmm0o\",\n  \"object\":
-        \"chat.completion\",\n  \"created\": 1764227758,\n  \"model\": \"gpt-3.5-turbo-0125\",\n
+      string: "{\n  \"id\": \"chatcmpl-CgQPoOzJZ6qKDzQsJRpksCS682vWx\",\n  \"object\":
+        \"chat.completion\",\n  \"created\": 1764227352,\n  \"model\": \"gpt-3.5-turbo-0125\",\n
         \ \"choices\": [\n    {\n      \"index\": 0,\n      \"message\": {\n        \"role\":
-        \"assistant\",\n        \"content\": \"{\\n    \\\"intent\\\": \\\"log_smud_paid\\\",\\n
-        \   \\\"entities\\\": {}\\n}\",\n        \"refusal\": null,\n        \"annotations\":
-        []\n      },\n      \"logprobs\": null,\n      \"finish_reason\": \"stop\"\n
-        \   }\n  ],\n  \"usage\": {\n    \"prompt_tokens\": 1362,\n    \"completion_tokens\":
-        17,\n    \"total_tokens\": 1379,\n    \"prompt_tokens_details\": {\n      \"cached_tokens\":
-        0,\n      \"audio_tokens\": 0\n    },\n    \"completion_tokens_details\":
+        \"assistant\",\n        \"content\": \"{\\n    \\\"intent\\\": \\\"log_pge_paid\\\",\\n
+        \   \\\"entities\\\": {\\n        \\\"amount\\\": 140\\n    }\\n}\",\n        \"refusal\":
+        null,\n        \"annotations\": []\n      },\n      \"logprobs\": null,\n
+        \     \"finish_reason\": \"stop\"\n    }\n  ],\n  \"usage\": {\n    \"prompt_tokens\":
+        1360,\n    \"completion_tokens\": 26,\n    \"total_tokens\": 1386,\n    \"prompt_tokens_details\":
+        {\n      \"cached_tokens\": 0,\n      \"audio_tokens\": 0\n    },\n    \"completion_tokens_details\":
         {\n      \"reasoning_tokens\": 0,\n      \"audio_tokens\": 0,\n      \"accepted_prediction_tokens\":
         0,\n      \"rejected_prediction_tokens\": 0\n    }\n  },\n  \"service_tier\":
         \"default\",\n  \"system_fingerprint\": null\n}\n"
     headers:
       CF-RAY:
-      - 9a4fd6628c6b22d2-SJC
+      - 9a4fcc7aac16a709-SJC
       Connection:
       - keep-alive
       Content-Encoding:
@@ -114,14 +114,14 @@ interactions:
       Content-Type:
       - application/json
       Date:
-      - Thu, 27 Nov 2025 07:15:59 GMT
+      - Thu, 27 Nov 2025 07:09:13 GMT
       Server:
       - cloudflare
       Set-Cookie:
-      - __cf_bm=w2TBFykGveY37fWI7Qb.4YLSsPnrVJpbuKPJAs11qZ0-1764227759-1.0.1.1-zdezJUKj_VzERH5rpTlk.HFI3x537npNuJVoBtYERqJX_dEzyLWjQoGkZmh7vYL95tEpeDZygbegmzOJjIzmK4Npw_KE4LmW.voBEJ56eEw;
-        path=/; expires=Thu, 27-Nov-25 07:45:59 GMT; domain=.api.openai.com; HttpOnly;
+      - __cf_bm=4BUfSfc1OkMM9UTVHlghPJjx0gbjzL7CVmWYsiUcueo-1764227353-1.0.1.1-uyhqKfzx.eKJBs.aIttbMokczY6jhGm81hsbEE_GB3YdffKFTQrwIrTCsCBNFUS9hyEQll8BEY3g_X8TpsYsxMktRJVzER5egRHQ.GDUlQQ;
+        path=/; expires=Thu, 27-Nov-25 07:39:13 GMT; domain=.api.openai.com; HttpOnly;
         Secure; SameSite=None
-      - _cfuvid=VyKu02GgqVCPlCLaY64msy3AF_BUjEmbA9SP4x0tJI8-1764227759015-0.0.1.1-604800000;
+      - _cfuvid=UdzlIlE4viJrHzEWdM4_moekQNg6Lp7284nNsdcsS8k-1764227353290-0.0.1.1-604800000;
         path=/; domain=.api.openai.com; HttpOnly; Secure; SameSite=None
       Strict-Transport-Security:
       - max-age=31536000; includeSubDomains; preload
@@ -138,13 +138,13 @@ interactions:
       openai-organization:
       - user-pqa6kr1gum38uodqkfjnuwub
       openai-processing-ms:
-      - '424'
+      - '433'
       openai-project:
       - proj_G8MJwPnD1zbcbyBUyqQMzcQ9
       openai-version:
       - '2020-10-01'
       x-envoy-upstream-service-time:
-      - '444'
+      - '467'
       x-openai-proxy-wasm:
       - v0.1
       x-ratelimit-limit-requests:
@@ -152,15 +152,15 @@ interactions:
       x-ratelimit-limit-tokens:
       - '200000'
       x-ratelimit-remaining-requests:
-      - '9997'
+      - '9995'
       x-ratelimit-remaining-tokens:
-      - '198679'
+      - '198678'
       x-ratelimit-reset-requests:
-      - 24.276s
+      - 37.378s
       x-ratelimit-reset-tokens:
       - 396ms
       x-request-id:
-      - req_50a64ccd3b8f4cc6bc755c160c9397f8
+      - req_1556e8d71f8d4d7ba047bffc8c211d84
     status:
       code: 200
       message: OK

@@ -218,20 +218,33 @@ async def check_rent_paid():
     return False, 0.0
 
 
-async def check_smud_paid():
+async def check_payment_paid(category_label: str):
     ws = _income_ws()
     if ws is None:
         return False, 0.0
     try:
-        cell = ws.find("SMUD")
+        cell = ws.find(category_label)
         amount_cell = ws.cell(cell.row, cell.col + 1).value
         if amount_cell:
             cleaned = clean_money(amount_cell)
             if cleaned > 0:
                 return True, cleaned
     except Exception as e:
-        print(f"[ERROR] Failed to check SMUD paid: {e}")
+        print(f"[ERROR] Failed to check {category_label} paid: {e}")
     return False, 0.0
+
+
+async def check_pge_paid():
+    return await check_payment_paid("PG&E")
+
+
+async def check_recology_paid():
+    return await check_payment_paid("Recology")
+
+
+async def check_water_paid():
+    return await check_payment_paid("Water")
+
 
 async def check_student_loan_paid():
     ws = _income_ws()
@@ -1483,8 +1496,16 @@ def log_rent_paid(amount):
     return log_payment("rent", amount)
 
 
-def log_smud_paid(amount):
-    return log_payment("smud", amount)
+def log_pge_paid(amount):
+    return log_payment("pg&e", amount)
+
+
+def log_recology_paid(amount):
+    return log_payment("recology", amount)
+
+
+def log_water_paid(amount):
+    return log_payment("water", amount)
 
 
 def log_student_loan_paid(amount):

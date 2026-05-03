@@ -114,15 +114,38 @@ async def test_check_rent_paid(mock_get_income_worksheet):
 
 @pytest.mark.asyncio
 @patch("bookiebot.sheets.utils.get_income_worksheet")
-async def test_check_smud_paid(mock_get_income_worksheet):
+async def test_check_pge_paid(mock_get_income_worksheet):
     mock_ws = MagicMock()
     mock_get_income_worksheet.return_value = mock_ws
     mock_ws.find.return_value.row = 2
     mock_ws.find.return_value.col = 2
     mock_ws.cell.return_value.value = "$85"
 
-    paid, amount = await su.check_smud_paid()
+    paid, amount = await su.check_pge_paid()
 
+    assert paid is True
+    assert amount == 85.0
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    ("func_name", "label"),
+    [
+        ("check_recology_paid", "Recology"),
+        ("check_water_paid", "Water"),
+    ],
+)
+@patch("bookiebot.sheets.utils.get_income_worksheet")
+async def test_check_new_utility_paid(mock_get_income_worksheet, func_name, label):
+    mock_ws = MagicMock()
+    mock_get_income_worksheet.return_value = mock_ws
+    mock_ws.find.return_value.row = 2
+    mock_ws.find.return_value.col = 2
+    mock_ws.cell.return_value.value = "$85"
+
+    paid, amount = await getattr(su, func_name)()
+
+    mock_ws.find.assert_called_once_with(label)
     assert paid is True
     assert amount == 85.0
 

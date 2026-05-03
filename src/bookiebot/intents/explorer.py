@@ -6,14 +6,18 @@ FRIENDLY_NAMES = {
     "log_expense": "Log Expense",
     "log_income": "Log Income",
     "log_rent_paid": "Log Rent Paid",
-    "log_smud_paid": "Log SMUD Paid",
+    "log_pge_paid": "Log PG&E Paid",
+    "log_recology_paid": "Log Recology Paid",
+    "log_water_paid": "Log Water Paid",
     "log_student_loan_paid": "Log Student Loan Paid",
     "log_1st_savings": "Log 1st Savings Deposit",
     "log_2nd_savings": "Log 2nd Savings Deposit",
     "log_need_expense": "Log NEED Expense",
     "query_burn_rate": "Burn Rate",
     "query_rent_paid": "Check Rent Paid",
-    "query_smud_paid": "Check SMUD Paid",
+    "query_pge_paid": "Check PG&E Paid",
+    "query_recology_paid": "Check Recology Paid",
+    "query_water_paid": "Check Water Paid",
     "query_student_loans_paid": "Check Student Loans Paid",
     "query_total_for_store": "Total Spent at Specific Store",
     "query_highest_expense_category": "Highest Expense Category",
@@ -60,9 +64,17 @@ INTENT_DETAILS = {
         "Log that you paid your rent.",
         ["paid rent $1200", "logged rent $1300"]
     ),
-    "log_smud_paid": (
-        "Log your SMUD (electricity) bill payment.",
-        ["paid SMUD $90", "logged electricity bill $100"]
+    "log_pge_paid": (
+        "Log your PG&E utility bill payment.",
+        ["paid PG&E $90", "logged PGE bill $100"]
+    ),
+    "log_recology_paid": (
+        "Log your Recology trash bill payment.",
+        ["paid Recology $90", "trash bill 100"]
+    ),
+    "log_water_paid": (
+        "Log your water bill payment.",
+        ["paid water bill $90", "Santa Rosa Water 100"]
     ),
     "log_student_loan_paid": (
         "Log your student loan payment.",
@@ -90,9 +102,17 @@ INTENT_DETAILS = {
         "Check if/when your rent was paid.",
         ["when did I last pay rent?", "have I paid rent this month?"]
     ),
-    "query_smud_paid": (
-        "Check if/when your SMUD bill was paid.",
-        ["when did I last pay SMUD?", "show SMUD payments"]
+    "query_pge_paid": (
+        "Check if/when your PG&E bill was paid.",
+        ["when did I last pay PG&E?", "show PGE payments"]
+    ),
+    "query_recology_paid": (
+        "Check if/when your Recology trash bill was paid.",
+        ["when did I last pay Recology?", "trash bill paid?"]
+    ),
+    "query_water_paid": (
+        "Check if/when your water bill was paid.",
+        ["when did I last pay water?", "Santa Rosa Water paid?"]
     ),
     "query_student_loans_paid": (
         "Check if/when you paid your student loans.",
@@ -196,10 +216,11 @@ INTENT_DETAILS = {
 INTENT_GROUPS = [
     ("Logging Actions", [
         "log_expense", "log_need_expense", "log_income", "log_rent_paid",
-        "log_smud_paid", "log_student_loan_paid", "log_1st_savings", "log_2nd_savings"
+        "log_pge_paid", "log_recology_paid", "log_water_paid", "log_student_loan_paid",
+        "log_1st_savings", "log_2nd_savings"
     ]),
     ("Checking Payments", [
-        "query_rent_paid", "query_smud_paid", "query_student_loans_paid",
+        "query_rent_paid", "query_pge_paid", "query_recology_paid", "query_water_paid", "query_student_loans_paid",
         "query_1st_savings", "query_2nd_savings", "query_subscriptions"
     ]),
     ("Spending & Budget Overview", [
