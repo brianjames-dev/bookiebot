@@ -26,7 +26,7 @@ class FakeChannel:
 @dataclass
 class FakeAuthor:
     name: str = "Hannerish"
-    id: int = 123456789  # minimal stand-in for Discord user id
+    id: int = 830984827904851969  # Hannah's default mapped Discord user id
 
 
 @dataclass

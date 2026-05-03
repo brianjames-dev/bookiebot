@@ -11,6 +11,7 @@ from bookiebot.core import incidents
 from bookiebot.core import github_dispatch
 from bookiebot.core import ui
 from bookiebot.logging_config import get_recent_logs, uptime_seconds
+from bookiebot.sheets.routing import get_current_year, get_year_config, MissingYearConfigError
 
 
 def register_commands(tree: app_commands.CommandTree):
@@ -58,7 +59,11 @@ def register_commands(tree: app_commands.CommandTree):
         uptime = uptime_seconds()
         git_sha, env_name = incidents.current_build_env()
         llm_ready = bool(os.getenv("OPENAI_API_KEY"))
-        sheet_ready = bool(os.getenv("EXPENSE_SHEET_KEY") or os.getenv("INCOME_SHEET_KEY"))
+        try:
+            get_year_config(get_current_year())
+            sheet_ready = bool(os.getenv("GOOGLE_SERVICE_ACCOUNT_JSON"))
+        except MissingYearConfigError:
+            sheet_ready = False
 
         msg = (
             f"⏱️ Uptime: {uptime/3600:.2f}h\n"

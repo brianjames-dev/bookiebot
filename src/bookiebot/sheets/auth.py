@@ -1,7 +1,5 @@
 import json
 import os
-from datetime import datetime
-from zoneinfo import ZoneInfo
 
 try:
     import gspread
@@ -18,16 +16,19 @@ except ImportError:  # pragma: no cover - fallback for tests
 
 from dotenv import load_dotenv
 from google.oauth2.service_account import Credentials
+from bookiebot.sheets.routing import (
+    get_current_discord_user_id,
+    get_current_month_name,
+    get_current_year,
+    get_month_worksheet,
+    get_shared_expenses_spreadsheet_id,
+    get_budget_spreadsheet_id_for_user,
+)
 
 load_dotenv()
 
-PACIFIC_TZ = ZoneInfo("America/Los_Angeles")
 SCOPES = ["https://www.googleapis.com/auth/spreadsheets"]
 _GC = None
-
-
-def _now_pacific():
-    return datetime.now(PACIFIC_TZ)
 
 
 def _get_gc():
@@ -42,28 +43,25 @@ def _get_gc():
     return _GC
 
 
-def _open_month_sheet(sheet_key_env: str):
-    sheet_key = os.getenv(sheet_key_env)
-    if not sheet_key:
-        raise RuntimeError(f"{sheet_key_env} not set in environment.")
-    gc = _get_gc()
-    sheet = gc.open_by_key(sheet_key)
-    month_name = _now_pacific().strftime("%B")
-    return sheet.worksheet(month_name)
+def _open_month_sheet(spreadsheet_id: str):
+    return get_month_worksheet(_get_gc(), spreadsheet_id, get_current_month_name())
 
 
 def get_expense_worksheet():
-    return _open_month_sheet("EXPENSE_SHEET_KEY")
+    year = get_current_year()
+    spreadsheet_id = get_shared_expenses_spreadsheet_id(year)
+    return _open_month_sheet(spreadsheet_id)
 
 
 def get_income_worksheet():
-    return _open_month_sheet("INCOME_SHEET_KEY")
+    year = get_current_year()
+    spreadsheet_id = get_budget_spreadsheet_id_for_user(get_current_discord_user_id(), year)
+    return _open_month_sheet(spreadsheet_id)
 
 
 def get_subscriptions_worksheet():
-    sheet_key = os.getenv("INCOME_SHEET_KEY")
-    if not sheet_key:
-        raise RuntimeError("INCOME_SHEET_KEY not set in environment.")
+    year = get_current_year()
+    sheet_key = get_budget_spreadsheet_id_for_user(get_current_discord_user_id(), year)
     gc = _get_gc()
     sheet = gc.open_by_key(sheet_key)
     return sheet.worksheet("Subscriptions")

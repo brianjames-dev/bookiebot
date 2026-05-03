@@ -9,6 +9,7 @@ from dateutil import parser as dateparser
 from collections import defaultdict, Counter
 import matplotlib.pyplot as plt
 import io
+from bookiebot.sheets.routing import get_user_config, UnknownDiscordUserError
 
 # Disable discord voice/audio stack to avoid loading audioop (deprecated in Python 3.13)
 os.environ.setdefault("DISCORD_AUDIO_DISABLE", "1")
@@ -125,33 +126,16 @@ def extract_amount_from_text(text):
 def resolve_query_persons(discord_user: str, person: str | None, user_id: str | None = None) -> list[str]:
     """
     Given discord_user and optional person, return a list of person(s) to query.
-    Prefers the Discord username when present to avoid user_id collisions, then falls back to the user_id.
+    Uses stable Discord user IDs when no person is explicitly supplied.
     """
-    discord_user = (discord_user or "").strip().lower()
     user_id = (str(user_id).strip() if user_id is not None else None)
     person = (person or "").strip()
 
     if not person:
-        # First try username-based matching to avoid user_id collisions across clients/webhooks.
-        name_mapping = {
-            "hannerish": ["Hannah"],
-            "hannerish#0000": ["Hannah"],
-            ".deebers": ["Brian (BofA)", "Brian (AL)"]
-        }
-        if discord_user in name_mapping:
-            return name_mapping[discord_user]
-
-        id_mapping = {
-            # Brian
-            "676638528590970917": ["Brian (BofA)", "Brian (AL)"],
-            "1395120954589315303": ["Brian (BofA)", "Brian (AL)"],
-            # Hannah
-            "830984827904851969": ["Hannah"],
-        }
-        if user_id and user_id in id_mapping:
-            return id_mapping[user_id]
-
-        return []
+        try:
+            return list(get_user_config(user_id).expense_persons)
+        except UnknownDiscordUserError:
+            return []
 
     if person.lower() in {"total", "all", "both", "everyone", "all persons", "all people"}:
         return ["Brian (BofA)", "Brian (AL)", "Hannah"]

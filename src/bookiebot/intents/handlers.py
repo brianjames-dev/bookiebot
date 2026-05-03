@@ -12,6 +12,11 @@ import io
 from datetime import datetime
 from typing import Any, cast
 from bookiebot.sheets.utils import resolve_query_persons, get_local_today
+from bookiebot.sheets.routing import (
+    UnknownDiscordUserError,
+    get_user_config,
+    sheet_user_context,
+)
 
 try:
     import discord
@@ -66,6 +71,17 @@ INTENT_HANDLERS = {
 }
 
 
+def _message_actor_user_id(message) -> str | None:
+    for mentioned in getattr(message, "mentions", []) or []:
+        if getattr(mentioned, "bot", False):
+            continue
+        mentioned_id = getattr(mentioned, "id", None)
+        return str(mentioned_id) if mentioned_id is not None else None
+
+    author_id = getattr(getattr(message, "author", None), "id", None)
+    return str(author_id) if author_id is not None else None
+
+
 # INTENT HANDLER
 async def handle_intent(intent, entities, message, last_context=None):
     handler = INTENT_HANDLERS.get(intent)
@@ -73,26 +89,33 @@ async def handle_intent(intent, entities, message, last_context=None):
         await fallback_handler(message.content, message, context=last_context)
         return
 
-    if "person" not in entities or not entities["person"]:
-        print(f"👤 No person specified, letting resolver handle Discord user: {message.author.name}")
-        entities["person"] = None
+    actor_user_id = _message_actor_user_id(message)
+    try:
+        get_user_config(actor_user_id)
+    except UnknownDiscordUserError as e:
+        await message.channel.send(str(e))
+        return
 
-    # For query intents, resolve to actual list of person(s)
-    if intent.startswith("query_"):
-        discord_user = getattr(message.author, "name", "").lower()
-        discord_user_id = getattr(message.author, "id", None)
-        person = entities.get("person")
-        persons_to_query = resolve_query_persons(discord_user, person, discord_user_id)
+    with sheet_user_context(actor_user_id):
+        if "person" not in entities or not entities["person"]:
+            print(f"👤 No person specified, letting resolver handle Discord user: {message.author.name}")
+            entities["person"] = None
 
-        if not persons_to_query:
-            await message.channel.send("❌ Could not resolve person(s) to query.")
-            return
+        # For query intents, resolve to actual list of person(s)
+        if intent.startswith("query_"):
+            discord_user = getattr(message.author, "name", "").lower()
+            person = entities.get("person")
+            persons_to_query = resolve_query_persons(discord_user, person, actor_user_id)
 
-        # overwrite person in entities with resolved list
-        entities["persons"] = persons_to_query
-        print(f"🔎 Resolved persons for query: {persons_to_query}")
+            if not persons_to_query:
+                await message.channel.send("❌ Could not resolve person(s) to query.")
+                return
 
-    await handler(entities, message)
+            # overwrite person in entities with resolved list
+            entities["persons"] = persons_to_query
+            print(f"🔎 Resolved persons for query: {persons_to_query}")
+
+        await handler(entities, message)
 
 
 # FALLBACK HANDLER

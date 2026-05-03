@@ -23,7 +23,7 @@ def _patch_resolver(monkeypatch):
 def message():
     return SimpleNamespace(
         content="hi",
-        author=SimpleNamespace(name="hannerish"),
+        author=SimpleNamespace(name="hannerish", id=830984827904851969),
         channel=DummyChannel(),
     )
 

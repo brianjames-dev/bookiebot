@@ -35,10 +35,9 @@ def _shopping_row(date_str, amount, person):
     return row
 
 
-def test_resolve_query_persons_prefers_username_over_colliding_id():
-    # user_id maps to Brian but username belongs to Hannah; should prefer Hannah
-    result = su.resolve_query_persons("hannerish#0000", None, "1395120954589315303")
-    assert result == ["Hannah"]
+def test_resolve_query_persons_uses_discord_user_id():
+    result = su.resolve_query_persons("any-display-name", None, "1395120954589315303")
+    assert result == ["Brian (BofA)", "Brian (AL)"]
 
 
 @pytest.fixture
