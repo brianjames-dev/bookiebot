@@ -10,6 +10,8 @@ from zoneinfo import ZoneInfo
 from bookiebot.sheets.config import get_category_columns
 from bookiebot.sheets.utils import resolve_query_persons
 from bookiebot.sheets.repo import get_sheets_repo
+from bookiebot.sheets.routing import get_current_discord_user_id
+from bookiebot.sheets.undo import UndoAction, record_undo_action
 
 logger = logging.getLogger(__name__)
 
@@ -63,6 +65,17 @@ async def write_income_to_sheet(data, message):
     amount = data.get("amount", "")
 
     ws.insert_row(["", description, amount], index=insert_row_index)
+    record_undo_action(
+        get_current_discord_user_id(),
+        UndoAction(
+            worksheet="income",
+            kind="delete_row",
+            row=insert_row_index,
+            columns=[],
+            previous_values=[],
+            description=f"income ${amount} from {data.get('source')}",
+        ),
+    )
 
     logger.info("Income logged", extra={"description": description, "amount": amount, "row": insert_row_index})
     if message:
@@ -148,7 +161,8 @@ async def write_expense_to_sheet(data, message):
 
             stored["data"]["person"] = selected_card
             values = normalize_expense_data(stored["data"], selected_card)
-            log_category_row(values, ws, category)
+            row = log_category_row(values, ws, category)
+            record_expense_undo(category, row, stored["data"].get("amount"), selected_card)
 
             await interaction.followup.send(
                 f"✅ Logged {category} expense: ${stored['data']['amount']} for {selected_card}"
@@ -176,7 +190,8 @@ async def write_expense_to_sheet(data, message):
             await message.channel.send(msg)
         return
 
-    log_category_row(values_to_write, ws, category)
+    row = log_category_row(values_to_write, ws, category)
+    record_expense_undo(category, row, data.get("amount"), selected_person)
 
     if message:
         await message.channel.send(
@@ -221,3 +236,20 @@ def log_category_row(values, worksheet, category):
             worksheet.update_cell(first_empty_row, col_index, value)
 
     logger.info("Logged expense row", extra={"category": category, "row": first_empty_row})
+    return first_empty_row
+
+
+def record_expense_undo(category, row, amount, person):
+    columns = get_category_columns[category]["columns"]
+    col_indexes = [column_index_from_string(col_letter) for col_letter in columns.values()]
+    record_undo_action(
+        get_current_discord_user_id(),
+        UndoAction(
+            worksheet="expense",
+            kind="clear_cells",
+            row=row,
+            columns=col_indexes,
+            previous_values=["" for _ in col_indexes],
+            description=f"{category} expense ${amount} for {person}",
+        ),
+    )

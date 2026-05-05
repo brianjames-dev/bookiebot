@@ -4,6 +4,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import bookiebot.intents.handlers as ih
 from bookiebot.sheets.routing import SpreadsheetAccessError
+from unit_tests.support.sheets_repo_stub import SheetsRepoStub
 
 
 class DummyChannel:
@@ -90,6 +91,28 @@ async def test_log_need_expense(monkeypatch, message):
     await ih.handle_intent("log_need_expense", {"description": "Groceries", "amount": 42.0}, message)
 
     assert any("Need expense" in (msg or "") for msg, _ in message.channel.sent)
+
+
+@pytest.mark.asyncio
+async def test_undo_last_transaction_clears_logged_expense(monkeypatch, message):
+    import bookiebot.sheets.writer as writer
+
+    monkeypatch.setattr(writer, "resolve_query_persons", lambda user, person=None, user_id=None: ["Hannah"])
+    repo = SheetsRepoStub(expense_rows=[[], []])
+
+    with repo.patched():
+        await ih.handle_intent(
+            "log_expense",
+            {"type": "expense", "category": "food", "amount": 5.0, "item": "Coffee", "location": "Cafe"},
+            message,
+        )
+
+        assert repo.expense.cell(3, 16).value == "5.0"
+
+        await ih.handle_intent("undo_last_transaction", {}, message)
+
+        assert repo.expense.cell(3, 16).value == ""
+        assert any("Undid:" in (msg or "") for msg, _ in message.channel.sent)
 
 
 # Query intents (happy paths via mocked helpers)

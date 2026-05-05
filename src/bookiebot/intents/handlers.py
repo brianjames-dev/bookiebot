@@ -19,6 +19,7 @@ from bookiebot.sheets.routing import (
     resolve_actor_key,
     sheet_user_context,
 )
+from bookiebot.sheets.undo import undo_last_action
 
 try:
     import discord
@@ -43,6 +44,7 @@ INTENT_HANDLERS = {
     "log_1st_savings":                      lambda e, m: log_1st_savings_handler(e, m),
     "log_2nd_savings":                      lambda e, m: log_2nd_savings_handler(e, m),
     "log_need_expense":                     lambda e, m: log_need_expense_handler(e, m),
+    "undo_last_transaction":                lambda e, m: undo_last_transaction_handler(m),
 
     # Query handlers
     "query_burn_rate":                      lambda e, m: query_burn_rate_handler(m),
@@ -132,6 +134,12 @@ async def handle_intent(intent, entities, message, last_context=None):
             await handler(entities, message)
         except SheetRoutingError as e:
             await message.channel.send(str(e))
+
+
+async def undo_last_transaction_handler(message):
+    success, detail = undo_last_action(_message_actor_key(message))
+    prefix = "✅" if success else "❌"
+    await message.channel.send(f"{prefix} {detail}")
 
 
 # FALLBACK HANDLER

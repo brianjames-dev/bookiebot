@@ -53,6 +53,10 @@ def register_events(client: discord.Client, tree: discord.app_commands.CommandTr
             await message.channel.send(output)
             return
 
+        if content.lower() in {"undo", "undo last", "undo last transaction", "remove last entry"}:
+            await handle_intent("undo_last_transaction", {}, message)
+            return
+
         try:
             intent_data = await parse_message_llm(content)
             intent = intent_data.get("intent")

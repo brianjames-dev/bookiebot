@@ -29,6 +29,7 @@ except ImportError:  # pragma: no cover - fallback for tests
 import gspread
 from bookiebot.sheets.repo import get_sheets_repo
 from bookiebot.sheets.routing import get_current_discord_user_id
+from bookiebot.sheets.undo import UndoAction, record_undo_action
 
 try:
     from rapidfuzz import fuzz
@@ -1452,6 +1453,7 @@ def log_payment(category_label, amount):
         if label_cell.startswith(category_label.lower()):
             # Write to column C (3)
             cell_to_update = gspread.utils.rowcol_to_a1(row_idx + 1, 3)
+            previous_value = ws.acell(cell_to_update).value
             ws.update_acell(cell_to_update, str(amount))
 
             actual_value = ws.acell(cell_to_update).value
@@ -1478,6 +1480,17 @@ def log_payment(category_label, amount):
                     "worksheet": getattr(ws, "title", ""),
                     "user_id": discord_user_id,
                 },
+            )
+            record_undo_action(
+                discord_user_id,
+                UndoAction(
+                    worksheet="income",
+                    kind="restore_cells",
+                    row=row_idx + 1,
+                    columns=[3],
+                    previous_values=[previous_value],
+                    description=f"{category_label} payment ${amount}",
+                ),
             )
             return True
 
@@ -1606,8 +1619,20 @@ def log_1st_savings(amount):
 
         row, col = cell.row, cell.col
         target_cell = gspread.utils.rowcol_to_a1(row, col + 3)
+        previous_value = ws.acell(target_cell).value
 
         ws.update_acell(target_cell, str(amount))
+        record_undo_action(
+            get_current_discord_user_id(),
+            UndoAction(
+                worksheet="income",
+                kind="restore_cells",
+                row=row,
+                columns=[col + 3],
+                previous_values=[previous_value],
+                description=f"1st savings deposit ${amount}",
+            ),
+        )
         print(f"[INFO] Logged 1st savings deposit: ${amount} at {target_cell}")
         return True
 
@@ -1629,8 +1654,20 @@ def log_2nd_savings(amount):
 
         row, col = cell.row, cell.col
         target_cell = gspread.utils.rowcol_to_a1(row, col + 3)
+        previous_value = ws.acell(target_cell).value
 
         ws.update_acell(target_cell, str(amount))
+        record_undo_action(
+            get_current_discord_user_id(),
+            UndoAction(
+                worksheet="income",
+                kind="restore_cells",
+                row=row,
+                columns=[col + 3],
+                previous_values=[previous_value],
+                description=f"2nd savings deposit ${amount}",
+            ),
+        )
         print(f"[INFO] Logged 2nd savings deposit: ${amount} at {target_cell}")
         return True
 
@@ -1657,6 +1694,17 @@ def log_need_expense(description, amount):
         # write description and amount
         ws.update_acell(f"B{insert_row_idx}", description)
         ws.update_acell(f"C{insert_row_idx}", str(amount))
+        record_undo_action(
+            get_current_discord_user_id(),
+            UndoAction(
+                worksheet="income",
+                kind="delete_row",
+                row=insert_row_idx,
+                columns=[],
+                previous_values=[],
+                description=f"Need expense '{description}' ${amount}",
+            ),
+        )
 
         print(f"[INFO] Logged Need expense: '{description}' - ${amount} at row {insert_row_idx}")
         return True

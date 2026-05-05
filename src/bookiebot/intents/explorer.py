@@ -13,6 +13,7 @@ FRIENDLY_NAMES = {
     "log_1st_savings": "Log 1st Savings Deposit",
     "log_2nd_savings": "Log 2nd Savings Deposit",
     "log_need_expense": "Log NEED Expense",
+    "undo_last_transaction": "Undo Last Transaction",
     "query_burn_rate": "Burn Rate",
     "query_rent_paid": "Check Rent Paid",
     "query_pge_paid": "Check PG&E Paid",
@@ -91,6 +92,10 @@ INTENT_DETAILS = {
     "log_need_expense": (
         "Log a necessary or non-discretionary expense.",
         ["logged $80 for medication (need)", "spent 60 on gas (need)"]
+    ),
+    "undo_last_transaction": (
+        "Undo the most recent transaction logged through BookieBot.",
+        ["undo last transaction", "remove my last entry"]
     ),
 
     # Query Intents
@@ -217,7 +222,7 @@ INTENT_GROUPS = [
     ("Logging Actions", [
         "log_expense", "log_need_expense", "log_income", "log_rent_paid",
         "log_pge_paid", "log_recology_paid", "log_water_paid", "log_student_loan_paid",
-        "log_1st_savings", "log_2nd_savings"
+        "log_1st_savings", "log_2nd_savings", "undo_last_transaction"
     ]),
     ("Checking Payments", [
         "query_rent_paid", "query_pge_paid", "query_recology_paid", "query_water_paid", "query_student_loans_paid",

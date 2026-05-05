@@ -41,6 +41,10 @@ async def parse_message_llm(user_message: str, *, llm_client: Optional[LLMClient
     "entities": {{}}
     }}
 
+    If the message asks to undo, remove, reverse, or delete the most recently logged BookieBot transaction, use:
+    - intent: "undo_last_transaction"
+    - entities: {{}}
+
     If the message is about logging a payment for **rent**, **PG&E**, **Recology/trash**, **water**, or **student loan**, use the specific intents:
     - "log_rent_paid" → when paying rent
     - "log_pge_paid" → when paying PG&E / PGE / gas and electric utilities

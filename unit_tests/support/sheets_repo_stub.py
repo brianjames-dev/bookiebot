@@ -62,6 +62,11 @@ class InMemoryWorksheet:
         row = [str(v) for v in values]
         self._rows.insert(idx, row)
 
+    def delete_rows(self, start_index: int, end_index: int | None = None) -> None:
+        start = max(start_index - 1, 0)
+        end = start if end_index is None else max(end_index - 1, start)
+        del self._rows[start : end + 1]
+
     def update_cell(self, row: int, col: int, value: str) -> None:
         row_idx, col_idx = self._ensure_position(row, col)
         self._rows[row_idx][col_idx] = str(value)
