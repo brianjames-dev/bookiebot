@@ -157,7 +157,7 @@ def resolve_query_persons(discord_user: str, person: str | None, user_id: str | 
 
 
 # QUERY FUNCTIONS
-async def calculate_burn_rate():
+async def calculate_burn_rate() -> tuple[str | None, str | None]:
     ws = _income_ws()
     if ws is None:
         return None, None
@@ -1033,7 +1033,7 @@ async def total_spent_on_item(item, persons, top_n=5):
     return total, matches[:top_n]
 
 
-async def daily_spending_calendar(persons):
+async def daily_spending_calendar(persons: list[str]) -> tuple[str, Any]:
     ws = _expense_ws()
     today = get_local_today()
     daily_totals = defaultdict(float)

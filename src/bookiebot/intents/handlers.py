@@ -10,6 +10,7 @@ import openai
 import matplotlib.pyplot as plt
 import io
 from datetime import datetime
+from collections.abc import Awaitable, Callable
 from typing import Any, cast
 from bookiebot.sheets.utils import resolve_query_persons, get_local_today
 from bookiebot.sheets.routing import (
@@ -32,7 +33,11 @@ except ImportError:  # pragma: no cover - fallback for tests without discord.py
 
     discord = _Discord()
 
-INTENT_HANDLERS = {
+IntentEntities = dict[str, Any]
+IntentHandler = Callable[[IntentEntities, Any], Awaitable[None]]
+
+
+INTENT_HANDLERS: dict[str, IntentHandler] = {
     # Logging handlers
     "log_expense":                          lambda e, m: write_to_sheet(e, m),
     "log_income":                           lambda e, m: write_to_sheet(e, m),
@@ -98,7 +103,7 @@ def _budget_profile_name(message) -> str:
 
 
 # INTENT HANDLER
-async def handle_intent(intent, entities, message, last_context=None):
+async def handle_intent(intent: str, entities: IntentEntities, message: Any, last_context: Any = None) -> None:
     handler = INTENT_HANDLERS.get(intent)
     if not handler or intent == "fallback":
         await fallback_handler(message.content, message, context=last_context)
@@ -136,14 +141,14 @@ async def handle_intent(intent, entities, message, last_context=None):
             await message.channel.send(str(e))
 
 
-async def undo_last_transaction_handler(message):
+async def undo_last_transaction_handler(message: Any) -> None:
     success, detail = undo_last_action(_message_actor_key(message))
     prefix = "✅" if success else "❌"
     await message.channel.send(f"{prefix} {detail}")
 
 
 # FALLBACK HANDLER
-async def fallback_handler(user_message, message, context=None):
+async def fallback_handler(user_message: str, message: Any, context: Any = None) -> None:
     """
     If no intent matched, use GPT to generate a general helpful response.
     Optionally include context from last output.
@@ -177,7 +182,7 @@ Please respond helpfully and clearly.
 
 
 # QUERY HANDLERS
-async def query_burn_rate_handler(message):
+async def query_burn_rate_handler(message: Any) -> None:
     burn_rate, desc = await su.calculate_burn_rate()
     if burn_rate and desc:
         await message.channel.send(f"🔥 Burn rate: You are allowed to spend {burn_rate}\n\n {desc}")
@@ -520,7 +525,7 @@ async def query_total_for_item_handler(entities, message):
     await message.channel.send(response)
 
 
-async def query_daily_spending_calendar_handler(entities, message):
+async def query_daily_spending_calendar_handler(entities: IntentEntities, message: Any) -> None:
     persons = entities.get("persons")
     if not persons:
         await message.channel.send("❌ Could not determine person(s) to query.")
