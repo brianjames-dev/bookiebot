@@ -115,6 +115,29 @@ async def test_undo_last_transaction_clears_logged_expense(monkeypatch, message)
         assert any("Undid:" in (msg or "") for msg, _ in message.channel.sent)
 
 
+def test_expense_undo_can_be_recorded_after_context_exits():
+    from bookiebot.sheets.undo import undo_last_action
+    import bookiebot.sheets.writer as writer
+
+    repo = SheetsRepoStub(expense_rows=[[], []])
+
+    with repo.patched():
+        row = writer.log_category_row(
+            {"date": "5/5/2026", "amount": 50.0, "person": "Brian (AL)"},
+            repo.expense,
+            "gas",
+        )
+        writer.record_expense_undo("gas", row, 50.0, "Brian (AL)", "676638528590970917")
+
+        success, detail = undo_last_action("676638528590970917")
+
+        assert success is True
+        assert "gas expense" in detail
+        assert repo.expense.cell(row, 8).value == ""
+        assert repo.expense.cell(row, 9).value == ""
+        assert repo.expense.cell(row, 10).value == ""
+
+
 # Query intents (happy paths via mocked helpers)
 @pytest.mark.asyncio
 async def test_query_burn_rate(monkeypatch, message):

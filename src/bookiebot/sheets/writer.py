@@ -144,7 +144,12 @@ async def write_expense_to_sheet(data, message):
 
     # If multiple (ambiguous Brian), ask which card
     if len(persons_to_log) > 1:
-        pending_data_by_user[discord_user] = {"data": data, "worksheet": ws, "category": category}
+        pending_data_by_user[discord_user] = {
+            "data": data,
+            "worksheet": ws,
+            "category": category,
+            "undo_user_key": get_current_discord_user_id() or discord_user_id,
+        }
 
         async def handle_selection(interaction, selected_card):
             stored = pending_data_by_user.pop(discord_user, None)
@@ -162,7 +167,13 @@ async def write_expense_to_sheet(data, message):
             stored["data"]["person"] = selected_card
             values = normalize_expense_data(stored["data"], selected_card)
             row = log_category_row(values, ws, category)
-            record_expense_undo(category, row, stored["data"].get("amount"), selected_card)
+            record_expense_undo(
+                category,
+                row,
+                stored["data"].get("amount"),
+                selected_card,
+                stored.get("undo_user_key"),
+            )
 
             await interaction.followup.send(
                 f"✅ Logged {category} expense: ${stored['data']['amount']} for {selected_card}"
@@ -239,11 +250,11 @@ def log_category_row(values, worksheet, category):
     return first_empty_row
 
 
-def record_expense_undo(category, row, amount, person):
+def record_expense_undo(category, row, amount, person, user_key=None):
     columns = get_category_columns[category]["columns"]
     col_indexes = [column_index_from_string(col_letter) for col_letter in columns.values()]
     record_undo_action(
-        get_current_discord_user_id(),
+        user_key or get_current_discord_user_id(),
         UndoAction(
             worksheet="expense",
             kind="clear_cells",
