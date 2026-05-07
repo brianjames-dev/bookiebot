@@ -160,8 +160,8 @@ async def test_update_recent_action_changes_logged_expense_amount(monkeypatch, m
 
         assert repo.expense.cell(3, 16).value == "12.5"
 
-    assert any("Before: food expense" in (msg or "") for msg, _ in message.channel.sent)
-    assert any("amount $12.5" in (msg or "") and "amount $14.75" in (msg or "") for msg, _ in message.channel.sent)
+    assert any("Before:\n```" in (msg or "") for msg, _ in message.channel.sent)
+    assert any("Amount: $12.5" in (msg or "") and "Amount: $14.75" in (msg or "") for msg, _ in message.channel.sent)
 
 
 @pytest.mark.asyncio

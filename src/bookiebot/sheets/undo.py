@@ -181,8 +181,10 @@ def _format_actions(actions: list[LoggedAction], *, empty_message: str, final_pr
 
     lines = ["Recent logged actions I can work with:"]
     for index, logged in enumerate(actions, start=1):
+        title, data_lines = _format_action_list_item(index, logged.action)
+        lines.append(title)
         lines.append("```")
-        lines.extend(_format_action_list_item(index, logged.action))
+        lines.extend(data_lines)
         lines.append("```")
     lines.append(final_prompt)
     return "\n".join(lines)
@@ -198,6 +200,28 @@ def action_option_label(action: UndoAction) -> str:
     label_parts = [part for part in (item, location, f"${amount}" if amount else "", person) if part]
     label = " - ".join(label_parts) or action.description or category
     return label[:100]
+
+
+def action_title(action: UndoAction) -> str:
+    action_type = action.metadata.get("type")
+    category = action.metadata.get("category")
+    if action_type == "expense":
+        return f"{category or 'expense'} expense".title()
+    if action_type == "update":
+        return f"Updated: {(category or 'transaction').capitalize()} Expense"
+    if action_type == "move":
+        source = action.metadata.get("source_category", "unknown")
+        destination = action.metadata.get("destination_category") or category or "unknown"
+        return f"Moved: {source.capitalize()} -> {destination.capitalize()}"
+    if action_type == "need_expense":
+        return "Need Expense"
+    if action_type == "payment":
+        return f"{category or 'payment'} payment".title()
+    if action_type == "savings":
+        return f"{category or 'savings'} deposit".title()
+    if action.metadata.get("source"):
+        return "Income"
+    return "Transaction"
 
 
 def format_recent_actions(user_key: str | None, limit: int = 5, offset: int = 0) -> str:
@@ -410,56 +434,36 @@ def _field_values_for_action(action: UndoAction, values: list[str] | None = None
 
 
 def _format_action_snapshot(action: UndoAction, values: list[str] | None = None) -> str:
+    return "\n".join(_format_action_data_lines(action, values))
+
+
+def _format_action_data_lines(action: UndoAction, values: list[str] | None = None) -> list[str]:
     field_values = _field_values_for_action(action, values)
     if action.metadata.get("type") in {"expense", "update", "move"}:
-        category = action.metadata.get("category", "expense")
-        item = field_values.get("item") or category
-        amount = field_values.get("amount", "")
-        location = field_values.get("location", "")
-        person = field_values.get("person") or action.metadata.get("person", "")
-        parts = [f"{category} expense"]
-        if item:
-            parts.append(f"item '{item}'")
-        if amount:
-            prefix = "" if str(amount).startswith("$") else "$"
-            parts.append(f"amount {prefix}{amount}")
-        if location:
-            parts.append(f"location '{location}'")
-        if person:
-            parts.append(f"person/card '{person}'")
-        return ", ".join(parts)
+        return _field_data_lines(field_values, action)
 
     if action.metadata.get("type") in {"payment", "savings"}:
         amount = field_values.get("amount", "")
-        return f"{action.description} amount ${amount}" if amount else action.description
+        if amount:
+            prefix = "" if str(amount).startswith("$") else "$"
+            return [f"Amount: {prefix}{amount}"]
+        return [action.description]
 
-    return action.description
+    return [action.description]
 
 
-def _format_action_list_item(index: int, action: UndoAction) -> list[str]:
+def _format_action_list_item(index: int, action: UndoAction) -> tuple[str, list[str]]:
     field_values = _field_values_for_action(action)
-    action_type = action.metadata.get("type")
-    category = action.metadata.get("category")
-    title = "transaction"
-    if action_type == "expense":
-        title = f"{category or 'expense'} expense".title()
-    elif action_type == "update":
-        title = f"Updated: {(category or 'transaction').capitalize()} Expense"
-    elif action_type == "move":
-        source = action.metadata.get("source_category", "unknown")
-        destination = action.metadata.get("destination_category") or category or "unknown"
-        title = f"Moved: {source.capitalize()} -> {destination.capitalize()}"
-    elif action_type == "need_expense":
-        title = "Need Expense"
-    elif action_type == "payment":
-        title = f"{category or 'payment'} payment".title()
-    elif action_type == "savings":
-        title = f"{category or 'savings'} deposit".title()
-    elif action.metadata.get("source"):
-        title = "Income"
+    title = action_title(action)
 
-    lines = [f"{index}. {title}"]
+    lines = _field_data_lines(field_values, action)
+    if not lines:
+        lines = [action.description]
+    return f"{index}. {title}", lines
 
+
+def _field_data_lines(field_values: dict[str, str], action: UndoAction) -> list[str]:
+    lines: list[str] = []
     display_fields = [
         ("date", "Date"),
         ("item", "Item"),
@@ -474,9 +478,6 @@ def _format_action_list_item(index: int, action: UndoAction) -> list[str]:
         if value:
             prefix = "$" if field == "amount" and not str(value).startswith("$") else ""
             lines.append(f"   {label}: {prefix}{value}")
-
-    if len(lines) == 1:
-        lines.append(f"   {action.description}")
     return lines
 
 
@@ -642,12 +643,32 @@ def move_recent_action(
             description=f"moved {source_category} expense to {destination_category}",
         ),
     )
+    destination_display_action = UndoAction(
+        worksheet="expense",
+        kind="clear_cells",
+        row=destination_row,
+        columns=destination_columns,
+        previous_values=[],
+        new_values=destination_new_values,
+        metadata={
+            "type": "expense",
+            "category": destination_category,
+            "person": destination_values.get("person", ""),
+            "display_fields": json.dumps(destination_fields),
+        },
+        description=f"{destination_category} expense",
+    )
     return (
         True,
         "Moved logged expense:\n"
-        f"Before: {_format_action_snapshot(action, source_current_values)}\n"
-        f"After: {destination_category} expense, "
-        + ", ".join(f"{field} '{value}'" for field, value in destination_values.items() if value),
+        "Before:\n"
+        "```\n"
+        f"{_format_action_snapshot(action, source_current_values)}\n"
+        "```\n"
+        "After:\n"
+        "```\n"
+        f"{_format_action_snapshot(destination_display_action, destination_new_values)}\n"
+        "```",
     )
 
 
@@ -745,8 +766,14 @@ def update_recent_action(
     return (
         True,
         "Updated logged action:\n"
-        f"Before: {_format_action_snapshot(logged.action, before_values)}\n"
-        f"After: {_format_action_snapshot(logged.action, after_values)}",
+        "Before:\n"
+        "```\n"
+        f"{_format_action_snapshot(logged.action, before_values)}\n"
+        "```\n"
+        "After:\n"
+        "```\n"
+        f"{_format_action_snapshot(logged.action, after_values)}\n"
+        "```",
     )
 
 

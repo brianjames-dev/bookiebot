@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import Callable
 
-from bookiebot.sheets.undo import LoggedAction
+from bookiebot.sheets.undo import LoggedAction, action_title
 from bookiebot.ui.card import ButtonBase, ButtonStyle, Interaction, ViewBase
 
 
@@ -18,9 +18,10 @@ class RecentActionButton(ButtonBase):  # type: ignore[misc]
 
 
 class RecentActionSelectButton(ButtonBase):  # type: ignore[misc]
-    def __init__(self, index: int, action_id: str, callback_func: Callable):
+    def __init__(self, index: int, action: LoggedAction, callback_func: Callable):
         style_value = getattr(ButtonStyle, "primary", ButtonStyle.primary)
-        super().__init__(label=f"Select {index}", style=style_value, custom_id=action_id)
+        label = f"{index}. {action_title(action.action)}"
+        super().__init__(label=label[:80], style=style_value, custom_id=action.id)
         self.callback_func = callback_func
 
     async def callback(self, interaction: Interaction):
@@ -31,7 +32,7 @@ class RecentActionSelectView(ViewBase):  # type: ignore[misc]
     def __init__(self, actions: list[LoggedAction], callback_func: Callable):
         super().__init__(timeout=120)
         for index, logged in enumerate(actions[:25], start=1):
-            self.add_item(RecentActionSelectButton(index, logged.id, callback_func))
+            self.add_item(RecentActionSelectButton(index, logged, callback_func))
 
 
 class RecentActionDecisionView(ViewBase):  # type: ignore[misc]
