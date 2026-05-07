@@ -35,7 +35,7 @@ from bookiebot.sheets.undo import (
     undo_last_action,
     update_recent_action,
 )
-from bookiebot.ui.recent_actions import RecentActionDecisionView, RecentActionSelectView
+from bookiebot.ui.recent_actions import MoveCategoryView, RecentActionDecisionView, RecentActionSelectView
 
 try:
     import discord
@@ -239,7 +239,8 @@ def _recent_action_select_view(actor_key: str | None, actions: list[Any], *, des
             if decision == "move":
                 set_pending_move_selection(actor_key, action_id)
                 await decision_interaction.response.send_message(
-                    "Reply with `move it to food`, `move it to grocery`, `move it to gas`, or `move it to shopping`."
+                    "Which category would you like to move this transaction to?",
+                    view=_move_category_view(actor_key, action_id),
                 )
                 return
             clear_pending_action_selection(actor_key)
@@ -251,6 +252,24 @@ def _recent_action_select_view(actor_key: str | None, actions: list[Any], *, des
         )
 
     return RecentActionSelectView(actions, handle_select)
+
+
+def _move_category_view(actor_key: str | None, action_id: str, updates: dict[str, Any] | None = None):
+    async def handle_category(interaction: Any, category: str) -> None:
+        try:
+            await interaction.response.defer()
+        except Exception:
+            pass
+        success, detail = move_recent_action(
+            actor_key,
+            destination_category=category,
+            updates=updates or {},
+            action_id=action_id,
+        )
+        prefix = "✅" if success else "❌"
+        await interaction.followup.send(f"{prefix} {detail}")
+
+    return MoveCategoryView(handle_category)
 
 
 async def update_recent_action_handler(entities: IntentEntities, message: Any) -> None:

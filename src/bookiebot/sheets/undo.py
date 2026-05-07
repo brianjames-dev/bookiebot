@@ -212,7 +212,7 @@ def action_title(action: UndoAction) -> str:
     if action_type == "move":
         source = action.metadata.get("source_category", "unknown")
         destination = action.metadata.get("destination_category") or category or "unknown"
-        return f"Moved: {source.capitalize()} -> {destination.capitalize()}"
+        return f"Moved Expense: {source.capitalize()} -> {destination.capitalize()}"
     if action_type == "need_expense":
         return "Need Expense"
     if action_type == "payment":
