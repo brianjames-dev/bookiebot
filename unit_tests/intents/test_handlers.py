@@ -157,7 +157,8 @@ async def test_update_recent_action_changes_logged_expense_amount(monkeypatch, m
 
         assert repo.expense.cell(3, 16).value == "12.5"
 
-    assert any("Updated food expense $12.5 for Hannah" in (msg or "") for msg, _ in message.channel.sent)
+    assert any("Before: food expense" in (msg or "") for msg, _ in message.channel.sent)
+    assert any("amount $12.5" in (msg or "") and "amount $14.75" in (msg or "") for msg, _ in message.channel.sent)
 
 
 @pytest.mark.asyncio
@@ -177,6 +178,47 @@ async def test_update_recent_action_can_match_logged_expense_text(monkeypatch, m
         await ih.handle_intent("update_recent_action", {"match_text": "Chipotle", "updates": {"location": "Chipotle downtown"}}, message)
 
         assert repo.expense.cell(3, 17).value == "Chipotle downtown"
+
+
+@pytest.mark.asyncio
+async def test_update_recent_action_lists_candidates_when_value_missing(monkeypatch, message):
+    import bookiebot.sheets.writer as writer
+
+    monkeypatch.setattr(writer, "resolve_query_persons", lambda user, person=None, user_id=None: ["Hannah"])
+    repo = SheetsRepoStub(expense_rows=[[], []])
+
+    with repo.patched():
+        await ih.handle_intent(
+            "log_expense",
+            {"type": "expense", "category": "food", "amount": 12.5, "item": "Burrito", "location": "Chipotle"},
+            message,
+        )
+
+        await ih.handle_intent("update_recent_action", {"match_text": "Chipotle", "updates": {}}, message)
+
+        assert repo.expense.cell(3, 16).value == "12.5"
+
+    assert any("Which one should I update" in (msg or "") for msg, _ in message.channel.sent)
+
+
+@pytest.mark.asyncio
+async def test_update_recent_action_asks_for_value_after_candidate_selected(monkeypatch, message):
+    import bookiebot.sheets.writer as writer
+
+    monkeypatch.setattr(writer, "resolve_query_persons", lambda user, person=None, user_id=None: ["Hannah"])
+    repo = SheetsRepoStub(expense_rows=[[], []])
+
+    with repo.patched():
+        await ih.handle_intent(
+            "log_expense",
+            {"type": "expense", "category": "food", "amount": 12.5, "item": "Burrito", "location": "Chipotle"},
+            message,
+        )
+
+        await ih.handle_intent("update_recent_action", {"match_text": "Chipotle", "updates": {}}, message)
+        await ih.handle_intent("update_recent_action", {"index": 1, "updates": {}}, message)
+
+    assert any("Please specify the new value" in (msg or "") for msg, _ in message.channel.sent)
 
 
 @pytest.mark.asyncio

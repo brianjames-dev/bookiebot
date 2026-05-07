@@ -30,6 +30,7 @@ class UndoAction:
 _LAST_ACTION_BY_USER: dict[str, UndoAction] = {}
 _GLOBAL_LAST_ACTION: UndoAction | None = None
 _PENDING_DELETE_IDS_BY_USER: dict[str, list[str]] = {}
+_PENDING_UPDATE_IDS_BY_USER: dict[str, list[str]] = {}
 _LOG_HEADERS = ["id", "created_at", "user_key", "status", "undone_at", "action_json"]
 
 
@@ -252,6 +253,38 @@ def format_delete_candidates(user_key: str | None, match_text: str, limit: int =
     )
 
 
+def format_update_candidates(user_key: str | None, match_text: str, limit: int = 10) -> str:
+    key = str(user_key) if user_key else ""
+    actions = matching_recent_actions(user_key, match_text, limit)
+    if key:
+        _PENDING_UPDATE_IDS_BY_USER[key] = [logged.id for logged in actions]
+    return _format_actions(
+        actions,
+        empty_message=f"I could not find a recent logged action matching '{match_text}'.",
+        final_prompt="Which one should I update? Reply with the number and the new value.",
+    )
+
+
+def has_pending_action_selection(user_key: str | None) -> bool:
+    key = str(user_key) if user_key else ""
+    return bool(
+        key
+        and (
+            _PENDING_UPDATE_IDS_BY_USER.get(key)
+            or _PENDING_DELETE_IDS_BY_USER.get(key)
+        )
+    )
+
+
+def pending_action_selection_kind(user_key: str | None) -> Literal["update", "delete"] | None:
+    key = str(user_key) if user_key else ""
+    if key and _PENDING_UPDATE_IDS_BY_USER.get(key):
+        return "update"
+    if key and _PENDING_DELETE_IDS_BY_USER.get(key):
+        return "delete"
+    return None
+
+
 def _field_columns_for_action(action: UndoAction) -> dict[str, int]:
     if action.worksheet == "expense":
         from bookiebot.sheets.config import get_category_columns
@@ -268,6 +301,44 @@ def _field_columns_for_action(action: UndoAction) -> dict[str, int]:
         return {"amount": action.columns[0]} if action.columns else {}
 
     return {}
+
+
+def _field_values_for_action(action: UndoAction, values: list[str] | None = None) -> dict[str, str]:
+    field_columns = _field_columns_for_action(action)
+    fields = list(field_columns.keys())
+    source_values = list(values if values is not None else action.new_values)
+    while len(source_values) < len(fields):
+        source_values.append("")
+    return {
+        field: str(source_values[index])
+        for index, field in enumerate(fields)
+    }
+
+
+def _format_action_snapshot(action: UndoAction, values: list[str] | None = None) -> str:
+    field_values = _field_values_for_action(action, values)
+    if action.metadata.get("type") == "expense":
+        category = action.metadata.get("category", "expense")
+        item = field_values.get("item") or category
+        amount = field_values.get("amount", "")
+        location = field_values.get("location", "")
+        person = field_values.get("person") or action.metadata.get("person", "")
+        parts = [f"{category} expense"]
+        if item:
+            parts.append(f"item '{item}'")
+        if amount:
+            parts.append(f"amount ${amount}")
+        if location:
+            parts.append(f"location '{location}'")
+        if person:
+            parts.append(f"person/card '{person}'")
+        return ", ".join(parts)
+
+    if action.metadata.get("type") in {"payment", "savings"}:
+        amount = field_values.get("amount", "")
+        return f"{action.description} amount ${amount}" if amount else action.description
+
+    return action.description
 
 
 def _update_logged_new_values(logged_id: str, updates_by_col: dict[int, Any]) -> None:
@@ -294,6 +365,21 @@ def update_recent_action(
     action_id: str | None = None,
     match_text: str | None = None,
 ) -> tuple[bool, str]:
+    normalized_updates = {
+        str(field).strip().lower(): value
+        for field, value in updates.items()
+        if value not in (None, "")
+    }
+    if match_text and not normalized_updates and not index and not action_id:
+        return False, format_update_candidates(user_key, match_text, 10)
+
+    key = str(user_key) if user_key else ""
+    if index is not None and key and key in _PENDING_UPDATE_IDS_BY_USER:
+        candidate_ids = _PENDING_UPDATE_IDS_BY_USER.get(key, [])
+        if 1 <= index <= len(candidate_ids):
+            action_id = candidate_ids[index - 1]
+            index = None
+
     logged = select_recent_action(
         user_key,
         index=index,
@@ -307,20 +393,19 @@ def update_recent_action(
     if not field_columns:
         return False, "I found that action, but I do not know how to edit its fields yet."
 
-    normalized_updates = {
-        str(field).strip().lower(): value
-        for field, value in updates.items()
-        if value not in (None, "")
-    }
     unknown = sorted(set(normalized_updates) - set(field_columns))
     if unknown:
         available = ", ".join(sorted(field_columns))
         return False, f"I can update {available} for that action, but not: {', '.join(unknown)}."
 
     if not normalized_updates:
-        return False, "Tell me which field to change, like amount, location, item, person, or date."
+        return False, f"I found {_format_action_snapshot(logged.action)}. Please specify the new value."
 
     ws = _worksheet(logged.action.worksheet)
+    before_values = list(logged.action.new_values)
+    after_values = list(before_values)
+    while len(after_values) < len(field_columns):
+        after_values.append("")
     previous_values: list[str] = []
     columns: list[int] = []
     values: list[str] = []
@@ -331,6 +416,8 @@ def update_recent_action(
         columns.append(col)
         values.append(str(value))
         updates_by_col[col] = value
+        field_index = list(field_columns).index(field)
+        after_values[field_index] = str(value)
 
     try:
         for col, value in zip(columns, values):
@@ -340,6 +427,8 @@ def update_recent_action(
         return False, "Something went wrong while updating that logged action."
 
     _update_logged_new_values(logged.id, updates_by_col)
+    if key:
+        _PENDING_UPDATE_IDS_BY_USER.pop(key, None)
     record_undo_action(
         user_key,
         UndoAction(
@@ -357,8 +446,12 @@ def update_recent_action(
             description=f"updated {logged.action.description}",
         ),
     )
-    changes = ", ".join(f"{field} to {normalized_updates[field]}" for field in normalized_updates)
-    return True, f"Updated {logged.action.description}: {changes}."
+    return (
+        True,
+        "Updated logged action:\n"
+        f"Before: {_format_action_snapshot(logged.action, before_values)}\n"
+        f"After: {_format_action_snapshot(logged.action, after_values)}",
+    )
 
 
 def _mark_undone(logged_id: str) -> None:

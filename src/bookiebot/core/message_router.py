@@ -5,6 +5,8 @@ from bookiebot.core import config
 from bookiebot.intents.parser import parse_message_llm
 from bookiebot.intents.handlers import handle_intent
 from bookiebot.intents import explorer as intent_explorer
+from bookiebot.sheets.routing import resolve_actor_key
+from bookiebot.sheets.undo import pending_action_selection_kind
 
 logger = logging.getLogger(__name__)
 
@@ -49,6 +51,17 @@ def register_events(client: discord.Client, tree: discord.app_commands.CommandTr
 
         if content.isdigit():
             idx = int(content)
+            actor_key = resolve_actor_key(
+                getattr(message.author, "id", None),
+                getattr(message.author, "name", None) or getattr(message.author, "display_name", None),
+            )
+            pending_kind = pending_action_selection_kind(actor_key)
+            if pending_kind == "update":
+                await handle_intent("update_recent_action", {"index": idx}, message)
+                return
+            if pending_kind == "delete":
+                await handle_intent("delete_recent_action", {"index": idx}, message)
+                return
             output = intent_explorer.describe_intent(idx)
             await message.channel.send(output)
             return
