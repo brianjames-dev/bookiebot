@@ -131,8 +131,10 @@ async def test_query_recent_actions_lists_logged_expense(monkeypatch, message):
 
         await ih.handle_intent("query_recent_actions", {"n": 5}, message)
 
-    assert any("food expense $12.5 for Hannah" in (msg or "") for msg, _ in message.channel.sent)
-    assert any("Which one should I change or undo" in (msg or "") for msg, _ in message.channel.sent)
+    assert any("Amount: $12.5" in (msg or "") for msg, _ in message.channel.sent)
+    assert any("Location: Chipotle" in (msg or "") for msg, _ in message.channel.sent)
+    assert any("Type the number of the transaction you want to change or undo" in (msg or "") for msg, _ in message.channel.sent)
+    assert any(kwargs.get("view") is not None for _msg, kwargs in message.channel.sent)
 
 
 @pytest.mark.asyncio
@@ -198,7 +200,7 @@ async def test_update_recent_action_lists_candidates_when_value_missing(monkeypa
 
         assert repo.expense.cell(3, 16).value == "12.5"
 
-    assert any("Which one should I update" in (msg or "") for msg, _ in message.channel.sent)
+    assert any("Type the number of the transaction you want to update" in (msg or "") for msg, _ in message.channel.sent)
 
 
 @pytest.mark.asyncio
@@ -239,7 +241,7 @@ async def test_delete_recent_action_lists_matching_candidates_before_delete(monk
 
         assert repo.expense.cell(3, 16).value == "12.5"
 
-    assert any("Which one should I delete" in (msg or "") for msg, _ in message.channel.sent)
+    assert any("Type the number of the transaction you want to delete" in (msg or "") for msg, _ in message.channel.sent)
 
 
 @pytest.mark.asyncio
@@ -263,6 +265,60 @@ async def test_delete_recent_action_deletes_pending_candidate_by_index(monkeypat
         assert repo.expense.cell(3, 17).value == ""
 
     assert any("Deleted: food expense $12.5 for Hannah" in (msg or "") for msg, _ in message.channel.sent)
+
+
+@pytest.mark.asyncio
+async def test_move_recent_action_moves_grocery_to_food_and_can_undo(monkeypatch, message):
+    import bookiebot.sheets.writer as writer
+
+    monkeypatch.setattr(writer, "resolve_query_persons", lambda user, person=None, user_id=None: ["Hannah"])
+    repo = SheetsRepoStub(expense_rows=[[], []])
+
+    with repo.patched():
+        await ih.handle_intent(
+            "log_expense",
+            {"type": "expense", "category": "grocery", "amount": 12.5, "item": "Burrito", "location": "Chipotle"},
+            message,
+        )
+
+        assert repo.expense.cell(3, 2).value == "12.5"
+
+        await ih.handle_intent("move_recent_action", {"index": 1, "category": "food", "updates": {"item": "Burrito"}}, message)
+
+        assert repo.expense.cell(3, 2).value == ""
+        assert repo.expense.cell(3, 15).value == "Burrito"
+        assert repo.expense.cell(3, 16).value == "12.5"
+        assert repo.expense.cell(3, 17).value == "Chipotle"
+        assert repo.expense.cell(3, 18).value == "Hannah"
+
+        await ih.handle_intent("undo_last_transaction", {}, message)
+
+        assert repo.expense.cell(3, 2).value == "12.5"
+        assert repo.expense.cell(3, 15).value == ""
+        assert repo.expense.cell(3, 16).value == ""
+        assert repo.expense.cell(3, 17).value == ""
+        assert repo.expense.cell(3, 18).value == ""
+
+    assert any("Moved logged expense" in (msg or "") for msg, _ in message.channel.sent)
+
+
+@pytest.mark.asyncio
+async def test_move_recent_action_lists_candidates_before_category(monkeypatch, message):
+    import bookiebot.sheets.writer as writer
+
+    monkeypatch.setattr(writer, "resolve_query_persons", lambda user, person=None, user_id=None: ["Hannah"])
+    repo = SheetsRepoStub(expense_rows=[[], []])
+
+    with repo.patched():
+        await ih.handle_intent(
+            "log_expense",
+            {"type": "expense", "category": "grocery", "amount": 12.5, "item": "Burrito", "location": "Chipotle"},
+            message,
+        )
+
+        await ih.handle_intent("move_recent_action", {"match_text": "Chipotle", "category": "food"}, message)
+
+    assert any("Type the number of the transaction you want to move" in (msg or "") for msg, _ in message.channel.sent)
 
 
 def test_expense_undo_can_be_recorded_after_context_exits():

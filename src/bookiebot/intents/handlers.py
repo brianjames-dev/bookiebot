@@ -20,7 +20,19 @@ from bookiebot.sheets.routing import (
     resolve_actor_key,
     sheet_user_context,
 )
-from bookiebot.sheets.undo import delete_recent_action, format_recent_actions, undo_last_action, update_recent_action
+from bookiebot.sheets.undo import (
+    clear_pending_action_selection,
+    delete_recent_action,
+    format_recent_actions,
+    move_recent_action,
+    recent_actions,
+    set_pending_delete_selection,
+    set_pending_move_selection,
+    set_pending_update_selection,
+    undo_last_action,
+    update_recent_action,
+)
+from bookiebot.ui.recent_actions import RecentActionDecisionView, RecentActionSelectView
 
 try:
     import discord
@@ -53,6 +65,7 @@ INTENT_HANDLERS: dict[str, IntentHandler] = {
     "delete_recent_action":                 lambda e, m: delete_recent_action_handler(e, m),
     "query_recent_actions":                 lambda e, m: query_recent_actions_handler(e, m),
     "update_recent_action":                 lambda e, m: update_recent_action_handler(e, m),
+    "move_recent_action":                   lambda e, m: move_recent_action_handler(e, m),
 
     # Query handlers
     "query_burn_rate":                      lambda e, m: query_burn_rate_handler(m),
@@ -173,7 +186,41 @@ async def query_recent_actions_handler(entities: IntentEntities, message: Any) -
     except (TypeError, ValueError):
         limit = 10
     limit = min(max(limit, 1), 20)
-    await message.channel.send(format_recent_actions(_message_actor_key(message), limit))
+    actor_key = _message_actor_key(message)
+    actions = recent_actions(actor_key, limit)
+
+    async def handle_select(interaction: Any, action_id: str) -> None:
+        set_pending_update_selection(actor_key, action_id)
+
+        async def handle_decision(decision_interaction: Any, decision: str) -> None:
+            if decision == "update":
+                set_pending_update_selection(actor_key, action_id)
+                await decision_interaction.response.send_message(
+                    "Reply with `1 amount to 20`, `1 location to Chipotle`, or another field change."
+                )
+                return
+            if decision == "delete":
+                set_pending_delete_selection(actor_key, action_id)
+                success, detail = delete_recent_action(actor_key, index=1)
+                prefix = "✅" if success else "❌"
+                await decision_interaction.response.send_message(f"{prefix} {detail}")
+                return
+            if decision == "move":
+                set_pending_move_selection(actor_key, action_id)
+                await decision_interaction.response.send_message(
+                    "Reply with `move it to food`, `move it to grocery`, `move it to gas`, or `move it to shopping`."
+                )
+                return
+            clear_pending_action_selection(actor_key)
+            await decision_interaction.response.send_message("Canceled.")
+
+        await interaction.response.send_message(
+            "What would you like to do with this transaction?",
+            view=RecentActionDecisionView(handle_decision),
+        )
+
+    view = RecentActionSelectView(actions, handle_select) if actions else None
+    await message.channel.send(format_recent_actions(actor_key, limit), view=view)
 
 
 async def update_recent_action_handler(entities: IntentEntities, message: Any) -> None:
@@ -193,6 +240,32 @@ async def update_recent_action_handler(entities: IntentEntities, message: Any) -
 
     success, detail = update_recent_action(
         _message_actor_key(message),
+        updates=updates,
+        index=index,
+        action_id=entities.get("action_id"),
+        match_text=entities.get("match_text") or entities.get("description") or entities.get("location") or entities.get("item"),
+    )
+    prefix = "✅" if success else "❌"
+    await message.channel.send(f"{prefix} {detail}")
+
+
+async def move_recent_action_handler(entities: IntentEntities, message: Any) -> None:
+    updates = entities.get("updates") or {}
+    if not isinstance(updates, dict):
+        updates = {}
+    for field in ("amount", "location", "item", "person", "date"):
+        if field in entities and field not in updates:
+            updates[field] = entities[field]
+
+    index = entities.get("index")
+    try:
+        index = int(index) if index is not None else None
+    except (TypeError, ValueError):
+        index = None
+
+    success, detail = move_recent_action(
+        _message_actor_key(message),
+        destination_category=entities.get("category") or entities.get("destination_category"),
         updates=updates,
         index=index,
         action_id=entities.get("action_id"),

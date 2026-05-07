@@ -53,6 +53,10 @@ async def parse_message_llm(user_message: str, *, llm_client: Optional[LLMClient
         "match_text": "<store/item/description/category text such as Chipotle if provided>"
       }}
 
+    If the message asks to delete, remove, clear, change, edit, update, fix, or correct an expense/transaction/action but does NOT specify which one, use:
+    - intent: "query_recent_actions"
+    - entities: {{ "n": 10 }}
+
     If the message asks to change, edit, update, fix, redo, or correct a recently logged BookieBot action, but does not provide an exact action id or enough detail to safely edit a cell, use:
     - intent: "query_recent_actions"
     - entities: {{ "n": 10 }}
@@ -69,6 +73,22 @@ async def parse_message_llm(user_message: str, *, llm_client: Optional[LLMClient
             "item": "<new item/name if changing item>",
             "person": "<new person/card if changing card/person>",
             "date": "<new date if changing date>"
+        }}
+      }}
+
+    If the message asks to move, recategorize, reclassify, or change the category of a recent expense, use:
+    - intent: "move_recent_action"
+    - entities: {{
+        "index": <number if the user identifies a numbered action>,
+        "action_id": "<id if provided>",
+        "match_text": "<store/item/description text such as Chipotle if provided>",
+        "category": "<destination category: grocery, gas, food, or shopping>",
+        "updates": {{
+            "item": "<item if needed for the destination category>",
+            "amount": <float if correcting amount too>,
+            "location": "<location if correcting location too>",
+            "person": "<person/card if correcting person too>",
+            "date": "<date if correcting date too>"
         }}
       }}
 

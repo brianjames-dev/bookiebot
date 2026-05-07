@@ -17,6 +17,7 @@ FRIENDLY_NAMES = {
     "delete_recent_action": "Delete Recent Action",
     "query_recent_actions": "Recent Logged Actions",
     "update_recent_action": "Update Recent Action",
+    "move_recent_action": "Move Recent Action",
     "query_burn_rate": "Burn Rate",
     "query_rent_paid": "Check Rent Paid",
     "query_pge_paid": "Check PG&E Paid",
@@ -111,6 +112,10 @@ INTENT_DETAILS = {
     "update_recent_action": (
         "Update a field on a recent logged action.",
         ["change the last one to $18.25", "update the Chipotle expense amount to 14.50"]
+    ),
+    "move_recent_action": (
+        "Move a recent expense to a different category.",
+        ["move the Chipotle expense to food", "that grocery expense should be shopping"]
     ),
 
     # Query Intents
@@ -237,7 +242,7 @@ INTENT_GROUPS = [
     ("Logging Actions", [
         "log_expense", "log_need_expense", "log_income", "log_rent_paid",
         "log_pge_paid", "log_recology_paid", "log_water_paid", "log_student_loan_paid",
-        "log_1st_savings", "log_2nd_savings", "undo_last_transaction", "delete_recent_action", "query_recent_actions", "update_recent_action"
+        "log_1st_savings", "log_2nd_savings", "undo_last_transaction", "delete_recent_action", "query_recent_actions", "update_recent_action", "move_recent_action"
     ]),
     ("Checking Payments", [
         "query_rent_paid", "query_pge_paid", "query_recology_paid", "query_water_paid", "query_student_loans_paid",

@@ -12,7 +12,7 @@ from bookiebot.sheets.repo import get_sheets_repo
 logger = logging.getLogger(__name__)
 
 WorksheetName = Literal["expense", "income"]
-ActionKind = Literal["clear_cells", "delete_row", "restore_cells"]
+ActionKind = Literal["clear_cells", "delete_row", "restore_cells", "move_expense"]
 
 
 @dataclass
@@ -31,6 +31,7 @@ _LAST_ACTION_BY_USER: dict[str, UndoAction] = {}
 _GLOBAL_LAST_ACTION: UndoAction | None = None
 _PENDING_DELETE_IDS_BY_USER: dict[str, list[str]] = {}
 _PENDING_UPDATE_IDS_BY_USER: dict[str, list[str]] = {}
+_PENDING_MOVE_IDS_BY_USER: dict[str, list[str]] = {}
 _LOG_HEADERS = ["id", "created_at", "user_key", "status", "undone_at", "action_json"]
 
 
@@ -173,21 +174,28 @@ def _format_actions(actions: list[LoggedAction], *, empty_message: str, final_pr
 
     lines = ["Recent logged actions I can work with:"]
     for index, logged in enumerate(actions, start=1):
-        action = logged.action
-        where = f"{action.worksheet} row {action.row}"
-        category = action.metadata.get("category")
-        if category:
-            where = f"{category} / {where}"
-        lines.append(f"{index}. {action.description} ({where}, id `{logged.id}`)")
+        lines.extend(_format_action_list_item(index, logged.action))
     lines.append(final_prompt)
     return "\n".join(lines)
+
+
+def action_option_label(action: UndoAction) -> str:
+    field_values = _field_values_for_action(action)
+    category = action.metadata.get("category") or action.metadata.get("type") or "transaction"
+    item = field_values.get("item")
+    location = field_values.get("location")
+    amount = field_values.get("amount")
+    person = field_values.get("person") or action.metadata.get("person")
+    label_parts = [part for part in (item, location, f"${amount}" if amount else "", person) if part]
+    label = " - ".join(label_parts) or action.description or category
+    return label[:100]
 
 
 def format_recent_actions(user_key: str | None, limit: int = 10) -> str:
     return _format_actions(
         recent_actions(user_key, limit),
         empty_message="I do not have any recent logged actions for you this month.",
-        final_prompt="Which one should I change or undo, and what should happen to it?",
+        final_prompt="Type the number of the transaction you want to change or undo, followed by what should happen to it.",
     )
 
 
@@ -249,7 +257,7 @@ def format_delete_candidates(user_key: str | None, match_text: str, limit: int =
     return _format_actions(
         actions,
         empty_message=f"I could not find a recent logged action matching '{match_text}'.",
-        final_prompt="Which one should I delete? Reply with the number from this list or the action id.",
+        final_prompt="Type the number of the transaction you want to delete.",
     )
 
 
@@ -261,8 +269,46 @@ def format_update_candidates(user_key: str | None, match_text: str, limit: int =
     return _format_actions(
         actions,
         empty_message=f"I could not find a recent logged action matching '{match_text}'.",
-        final_prompt="Which one should I update? Reply with the number and the new value.",
+        final_prompt="Type the number of the transaction you want to update, followed by the new value.",
     )
+
+
+def format_move_candidates(user_key: str | None, match_text: str, limit: int = 10) -> str:
+    key = str(user_key) if user_key else ""
+    actions = matching_recent_actions(user_key, match_text, limit)
+    if key:
+        _PENDING_MOVE_IDS_BY_USER[key] = [logged.id for logged in actions]
+    return _format_actions(
+        actions,
+        empty_message=f"I could not find a recent logged action matching '{match_text}'.",
+        final_prompt="Type the number of the transaction you want to move, followed by the new category.",
+    )
+
+
+def set_pending_update_selection(user_key: str | None, action_id: str) -> None:
+    key = str(user_key) if user_key else ""
+    if key:
+        _PENDING_UPDATE_IDS_BY_USER[key] = [action_id]
+
+
+def set_pending_delete_selection(user_key: str | None, action_id: str) -> None:
+    key = str(user_key) if user_key else ""
+    if key:
+        _PENDING_DELETE_IDS_BY_USER[key] = [action_id]
+
+
+def set_pending_move_selection(user_key: str | None, action_id: str) -> None:
+    key = str(user_key) if user_key else ""
+    if key:
+        _PENDING_MOVE_IDS_BY_USER[key] = [action_id]
+
+
+def clear_pending_action_selection(user_key: str | None) -> None:
+    key = str(user_key) if user_key else ""
+    if key:
+        _PENDING_UPDATE_IDS_BY_USER.pop(key, None)
+        _PENDING_DELETE_IDS_BY_USER.pop(key, None)
+        _PENDING_MOVE_IDS_BY_USER.pop(key, None)
 
 
 def has_pending_action_selection(user_key: str | None) -> bool:
@@ -272,16 +318,19 @@ def has_pending_action_selection(user_key: str | None) -> bool:
         and (
             _PENDING_UPDATE_IDS_BY_USER.get(key)
             or _PENDING_DELETE_IDS_BY_USER.get(key)
+            or _PENDING_MOVE_IDS_BY_USER.get(key)
         )
     )
 
 
-def pending_action_selection_kind(user_key: str | None) -> Literal["update", "delete"] | None:
+def pending_action_selection_kind(user_key: str | None) -> Literal["update", "delete", "move"] | None:
     key = str(user_key) if user_key else ""
     if key and _PENDING_UPDATE_IDS_BY_USER.get(key):
         return "update"
     if key and _PENDING_DELETE_IDS_BY_USER.get(key):
         return "delete"
+    if key and _PENDING_MOVE_IDS_BY_USER.get(key):
+        return "move"
     return None
 
 
@@ -341,6 +390,46 @@ def _format_action_snapshot(action: UndoAction, values: list[str] | None = None)
     return action.description
 
 
+def _format_action_list_item(index: int, action: UndoAction) -> list[str]:
+    field_values = _field_values_for_action(action)
+    action_type = action.metadata.get("type")
+    category = action.metadata.get("category")
+    title = "transaction"
+    if action_type == "expense":
+        title = f"{category or 'expense'} expense"
+    elif action_type == "update":
+        title = f"updated {category or 'transaction'}"
+    elif action_type == "need_expense":
+        title = "Need expense"
+    elif action_type == "payment":
+        title = f"{category or 'payment'} payment"
+    elif action_type == "savings":
+        title = f"{category or 'savings'} deposit"
+    elif action.metadata.get("source"):
+        title = "income"
+
+    lines = [f"{index}. {title}"]
+
+    display_fields = [
+        ("date", "Date"),
+        ("item", "Item"),
+        ("location", "Location"),
+        ("amount", "Amount"),
+        ("person", "Person"),
+    ]
+    for field, label in display_fields:
+        value = field_values.get(field)
+        if not value and field == "person":
+            value = action.metadata.get("person")
+        if value:
+            prefix = "$" if field == "amount" and not str(value).startswith("$") else ""
+            lines.append(f"   {label}: {prefix}{value}")
+
+    if len(lines) == 1:
+        lines.append(f"   {action.description}")
+    return lines
+
+
 def _update_logged_new_values(logged_id: str, updates_by_col: dict[int, Any]) -> None:
     found = _find_log_row(logged_id)
     if found is None:
@@ -355,6 +444,157 @@ def _update_logged_new_values(logged_id: str, updates_by_col: dict[int, Any]) ->
             values[columns.index(col)] = str(value)
     logged.action.new_values = values
     ws.update_cell(row_index, 6, json.dumps(asdict(logged.action), separators=(",", ":")))
+
+
+def _category_columns(category: str) -> dict[str, int]:
+    from openpyxl.utils import column_index_from_string
+
+    from bookiebot.sheets.config import get_category_columns
+
+    return {
+        field: column_index_from_string(col_letter)
+        for field, col_letter in get_category_columns[category]["columns"].items()
+    }
+
+
+def _first_empty_category_row(ws: Any, category: str) -> int:
+    from bookiebot.sheets.config import get_category_columns
+
+    config = get_category_columns[category]
+    row_start = config["start_row"]
+    columns = config["columns"]
+    ref_col_letter = columns.get("amount") or list(columns.values())[0]
+    ref_col_index = _category_columns(category)[next(field for field, col in columns.items() if col == ref_col_letter)]
+    col_values = ws.col_values(ref_col_index)[row_start - 1:]
+    for offset, value in enumerate(col_values):
+        if not str(value).strip():
+            return row_start + offset
+    return len(col_values) + row_start
+
+
+def _values_for_category(source_values: dict[str, str], destination_category: str, overrides: dict[str, Any]) -> dict[str, str]:
+    from bookiebot.sheets.config import get_category_columns
+
+    destination_fields = get_category_columns[destination_category]["columns"].keys()
+    clean_overrides = {
+        field: value
+        for field, value in overrides.items()
+        if value not in (None, "")
+    }
+    values = {
+        field: str(clean_overrides.get(field, source_values.get(field, "")))
+        for field in destination_fields
+    }
+    if "item" in values and not values["item"]:
+        values["item"] = str(clean_overrides.get("item") or source_values.get("location") or source_values.get("item") or "")
+    return values
+
+
+def _missing_required_move_fields(values: dict[str, str], destination_category: str) -> list[str]:
+    required = ["date", "amount", "person"]
+    if destination_category in {"food", "shopping"}:
+        required.append("item")
+    return [field for field in required if field in values and not str(values[field]).strip()]
+
+
+def move_recent_action(
+    user_key: str | None,
+    *,
+    destination_category: str | None,
+    updates: dict[str, Any] | None = None,
+    index: int | None = None,
+    action_id: str | None = None,
+    match_text: str | None = None,
+) -> tuple[bool, str]:
+    from bookiebot.sheets.config import get_category_columns
+
+    updates = updates or {}
+    destination_category = (destination_category or "").strip().lower()
+    if match_text and not index and not action_id:
+        return False, format_move_candidates(user_key, match_text, 10)
+
+    key = str(user_key) if user_key else ""
+    if index is not None and key and key in _PENDING_MOVE_IDS_BY_USER:
+        candidate_ids = _PENDING_MOVE_IDS_BY_USER.get(key, [])
+        if 1 <= index <= len(candidate_ids):
+            action_id = candidate_ids[index - 1]
+            index = None
+
+    if destination_category not in get_category_columns:
+        available = ", ".join(sorted(get_category_columns))
+        return False, f"Tell me which category to move it to. Available categories: {available}."
+
+    logged = select_recent_action(user_key, index=index, action_id=action_id, match_text=match_text)
+    if logged is None:
+        return False, format_recent_actions(user_key, 10)
+
+    action = logged.action
+    if action.metadata.get("type") != "expense" or action.worksheet != "expense":
+        return False, "I can only move normal expense rows between categories right now."
+
+    source_category = action.metadata.get("category", "")
+    if source_category == destination_category:
+        return False, f"That expense is already in {destination_category}."
+
+    source_values = _field_values_for_action(action)
+    destination_values = _values_for_category(source_values, destination_category, updates)
+    missing = _missing_required_move_fields(destination_values, destination_category)
+    if missing:
+        return False, f"I can move it to {destination_category}, but I still need: {', '.join(missing)}."
+
+    ws = _worksheet("expense")
+    source_columns = action.columns
+    source_current_values = [ws.cell(action.row, col).value for col in source_columns]
+    destination_row = _first_empty_category_row(ws, destination_category)
+    destination_columns_by_field = _category_columns(destination_category)
+    destination_fields = list(destination_values.keys())
+    destination_columns = [destination_columns_by_field[field] for field in destination_fields]
+    destination_new_values = [destination_values[field] for field in destination_fields]
+    destination_previous_values = [ws.cell(destination_row, col).value for col in destination_columns]
+
+    try:
+        for col in source_columns:
+            ws.update_cell(action.row, col, "")
+        for col, value in zip(destination_columns, destination_new_values):
+            ws.update_cell(destination_row, col, value)
+    except Exception as e:
+        logger.exception("Failed to move recent action", extra={"exception": str(e)})
+        return False, "Something went wrong while moving that expense."
+
+    _mark_undone(logged.id)
+    if key:
+        _PENDING_MOVE_IDS_BY_USER.pop(key, None)
+
+    record_undo_action(
+        user_key,
+        UndoAction(
+            worksheet="expense",
+            kind="move_expense",
+            row=destination_row,
+            columns=destination_columns,
+            previous_values=destination_previous_values,
+            new_values=destination_new_values,
+            metadata={
+                "type": "expense",
+                "category": destination_category,
+                "person": destination_values.get("person", ""),
+                "source_action_id": logged.id,
+                "source_category": source_category,
+                "source_row": str(action.row),
+                "source_columns": json.dumps(source_columns),
+                "source_values": json.dumps(source_current_values),
+                "destination_category": destination_category,
+            },
+            description=f"moved {source_category} expense to {destination_category}",
+        ),
+    )
+    return (
+        True,
+        "Moved logged expense:\n"
+        f"Before: {_format_action_snapshot(action, source_current_values)}\n"
+        f"After: {destination_category} expense, "
+        + ", ".join(f"{field} '{value}'" for field, value in destination_values.items() if value),
+    )
 
 
 def update_recent_action(
@@ -470,7 +710,15 @@ def _latest_logged_action(user_key: str | None) -> LoggedAction | None:
 
 def _apply_undo_action(action: UndoAction) -> tuple[bool, str]:
     ws = _worksheet(action.worksheet)
-    if action.kind == "delete_row":
+    if action.kind == "move_expense":
+        source_row = int(action.metadata["source_row"])
+        source_columns = [int(col) for col in json.loads(action.metadata["source_columns"])]
+        source_values = [str(value) for value in json.loads(action.metadata["source_values"])]
+        for col, value in zip(source_columns, source_values):
+            ws.update_cell(source_row, col, value)
+        for col, value in zip(action.columns, action.previous_values):
+            ws.update_cell(action.row, col, value)
+    elif action.kind == "delete_row":
         if hasattr(ws, "delete_rows"):
             ws.delete_rows(action.row)
         elif hasattr(ws, "delete_row"):
