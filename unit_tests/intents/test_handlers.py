@@ -179,6 +179,50 @@ async def test_update_recent_action_can_match_logged_expense_text(monkeypatch, m
         assert repo.expense.cell(3, 17).value == "Chipotle downtown"
 
 
+@pytest.mark.asyncio
+async def test_delete_recent_action_lists_matching_candidates_before_delete(monkeypatch, message):
+    import bookiebot.sheets.writer as writer
+
+    monkeypatch.setattr(writer, "resolve_query_persons", lambda user, person=None, user_id=None: ["Hannah"])
+    repo = SheetsRepoStub(expense_rows=[[], []])
+
+    with repo.patched():
+        await ih.handle_intent(
+            "log_expense",
+            {"type": "expense", "category": "food", "amount": 12.5, "item": "Burrito", "location": "Chipotle"},
+            message,
+        )
+
+        await ih.handle_intent("delete_recent_action", {"match_text": "Chipotle"}, message)
+
+        assert repo.expense.cell(3, 16).value == "12.5"
+
+    assert any("Which one should I delete" in (msg or "") for msg, _ in message.channel.sent)
+
+
+@pytest.mark.asyncio
+async def test_delete_recent_action_deletes_pending_candidate_by_index(monkeypatch, message):
+    import bookiebot.sheets.writer as writer
+
+    monkeypatch.setattr(writer, "resolve_query_persons", lambda user, person=None, user_id=None: ["Hannah"])
+    repo = SheetsRepoStub(expense_rows=[[], []])
+
+    with repo.patched():
+        await ih.handle_intent(
+            "log_expense",
+            {"type": "expense", "category": "food", "amount": 12.5, "item": "Burrito", "location": "Chipotle"},
+            message,
+        )
+        await ih.handle_intent("delete_recent_action", {"match_text": "Chipotle"}, message)
+        await ih.handle_intent("delete_recent_action", {"index": 1}, message)
+
+        assert repo.expense.cell(3, 14).value == ""
+        assert repo.expense.cell(3, 16).value == ""
+        assert repo.expense.cell(3, 17).value == ""
+
+    assert any("Deleted: food expense $12.5 for Hannah" in (msg or "") for msg, _ in message.channel.sent)
+
+
 def test_expense_undo_can_be_recorded_after_context_exits():
     from bookiebot.sheets.undo import undo_last_action
     import bookiebot.sheets.writer as writer

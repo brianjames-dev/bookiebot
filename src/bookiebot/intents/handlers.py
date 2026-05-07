@@ -20,7 +20,7 @@ from bookiebot.sheets.routing import (
     resolve_actor_key,
     sheet_user_context,
 )
-from bookiebot.sheets.undo import format_recent_actions, undo_last_action, update_recent_action
+from bookiebot.sheets.undo import delete_recent_action, format_recent_actions, undo_last_action, update_recent_action
 
 try:
     import discord
@@ -50,6 +50,7 @@ INTENT_HANDLERS: dict[str, IntentHandler] = {
     "log_2nd_savings":                      lambda e, m: log_2nd_savings_handler(e, m),
     "log_need_expense":                     lambda e, m: log_need_expense_handler(e, m),
     "undo_last_transaction":                lambda e, m: undo_last_transaction_handler(m),
+    "delete_recent_action":                 lambda e, m: delete_recent_action_handler(e, m),
     "query_recent_actions":                 lambda e, m: query_recent_actions_handler(e, m),
     "update_recent_action":                 lambda e, m: update_recent_action_handler(e, m),
 
@@ -145,6 +146,23 @@ async def handle_intent(intent: str, entities: IntentEntities, message: Any, las
 
 async def undo_last_transaction_handler(message: Any) -> None:
     success, detail = undo_last_action(_message_actor_key(message))
+    prefix = "✅" if success else "❌"
+    await message.channel.send(f"{prefix} {detail}")
+
+
+async def delete_recent_action_handler(entities: IntentEntities, message: Any) -> None:
+    index = entities.get("index")
+    try:
+        index = int(index) if index is not None else None
+    except (TypeError, ValueError):
+        index = None
+
+    success, detail = delete_recent_action(
+        _message_actor_key(message),
+        index=index,
+        action_id=entities.get("action_id"),
+        match_text=entities.get("match_text") or entities.get("description") or entities.get("location") or entities.get("item"),
+    )
     prefix = "✅" if success else "❌"
     await message.channel.send(f"{prefix} {detail}")
 

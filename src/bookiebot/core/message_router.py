@@ -57,6 +57,12 @@ def register_events(client: discord.Client, tree: discord.app_commands.CommandTr
             await handle_intent("undo_last_transaction", {}, message)
             return
 
+        if content.lower().startswith(("delete #", "remove #", "clear #")):
+            idx_text = content.split("#", 1)[1].strip()
+            if idx_text.isdigit():
+                await handle_intent("delete_recent_action", {"index": int(idx_text)}, message)
+                return
+
         if content.lower() in {
             "recent actions",
             "recent logged actions",

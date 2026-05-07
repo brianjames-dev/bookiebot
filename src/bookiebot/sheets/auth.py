@@ -23,6 +23,7 @@ from bookiebot.sheets.routing import (
     get_month_worksheet,
     get_shared_expenses_spreadsheet_id,
     get_budget_spreadsheet_id_for_user,
+    now_pacific,
 )
 
 load_dotenv()
@@ -65,3 +66,40 @@ def get_subscriptions_worksheet():
     gc = _get_gc()
     sheet = gc.open_by_key(sheet_key)
     return sheet.worksheet("Subscriptions")
+
+
+def get_action_log_worksheet():
+    year = get_current_year()
+    spreadsheet_id = get_shared_expenses_spreadsheet_id(year)
+    spreadsheet = _get_gc().open_by_key(spreadsheet_id)
+    title = f"_BookieBot Action Log - {now_pacific():%Y-%m}"
+
+    try:
+        return spreadsheet.worksheet(title)
+    except Exception:
+        worksheet = spreadsheet.add_worksheet(title=title, rows=1000, cols=6)
+        worksheet.update_cell(1, 1, "id")
+        worksheet.update_cell(1, 2, "created_at")
+        worksheet.update_cell(1, 3, "user_key")
+        worksheet.update_cell(1, 4, "status")
+        worksheet.update_cell(1, 5, "undone_at")
+        worksheet.update_cell(1, 6, "action_json")
+        try:
+            spreadsheet.batch_update(
+                {
+                    "requests": [
+                        {
+                            "updateSheetProperties": {
+                                "properties": {
+                                    "sheetId": worksheet.id,
+                                    "hidden": True,
+                                },
+                                "fields": "hidden",
+                            }
+                        }
+                    ]
+                }
+            )
+        except Exception:
+            pass
+        return worksheet

@@ -41,9 +41,17 @@ async def parse_message_llm(user_message: str, *, llm_client: Optional[LLMClient
     "entities": {{}}
     }}
 
-    If the message asks to undo, remove, reverse, or delete the most recently logged BookieBot transaction, use:
+    If the message asks to undo, remove, reverse, or delete the most recently logged BookieBot transaction without specifying a store, item, category, or other target, use:
     - intent: "undo_last_transaction"
     - entities: {{}}
+
+    If the message asks to remove, delete, clear, undo, or reverse a specific recent logged action, such as a Chipotle expense or a numbered/id action from a recent action list, use:
+    - intent: "delete_recent_action"
+    - entities: {{
+        "index": <number if the user identifies a numbered action>,
+        "action_id": "<id if provided>",
+        "match_text": "<store/item/description/category text such as Chipotle if provided>"
+      }}
 
     If the message asks to change, edit, update, fix, redo, or correct a recently logged BookieBot action, but does not provide an exact action id or enough detail to safely edit a cell, use:
     - intent: "query_recent_actions"

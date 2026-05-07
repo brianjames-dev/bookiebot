@@ -101,10 +101,12 @@ class SheetsRepoStub:
         expense_rows: Sequence[Sequence[str]] | None = None,
         income_rows: Sequence[Sequence[str]] | None = None,
         subscriptions_rows: Sequence[Sequence[str]] | None = None,
+        action_log_rows: Sequence[Sequence[str]] | None = None,
     ):
         self.expense = InMemoryWorksheet(expense_rows, title="Expense")
         self.income = InMemoryWorksheet(income_rows, title="Income")
         self.subscriptions = InMemoryWorksheet(subscriptions_rows, title="Subscriptions")
+        self.action_log = InMemoryWorksheet(action_log_rows, title="_BookieBot Action Log")
 
     @contextlib.contextmanager
     def patched(self):
@@ -126,3 +128,6 @@ class SheetsRepoStub:
 
     def subscriptions_sheet(self):
         return self.subscriptions
+
+    def action_log_sheet(self):
+        return self.action_log
