@@ -57,6 +57,16 @@ def register_events(client: discord.Client, tree: discord.app_commands.CommandTr
             await handle_intent("undo_last_transaction", {}, message)
             return
 
+        if content.lower() in {
+            "recent actions",
+            "recent logged actions",
+            "show recent actions",
+            "show last actions",
+            "undo history",
+        }:
+            await handle_intent("query_recent_actions", {"n": 10}, message)
+            return
+
         try:
             intent_data = await parse_message_llm(content)
             intent = intent_data.get("intent")

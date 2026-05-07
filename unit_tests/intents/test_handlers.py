@@ -115,6 +115,70 @@ async def test_undo_last_transaction_clears_logged_expense(monkeypatch, message)
         assert any("Undid:" in (msg or "") for msg, _ in message.channel.sent)
 
 
+@pytest.mark.asyncio
+async def test_query_recent_actions_lists_logged_expense(monkeypatch, message):
+    import bookiebot.sheets.writer as writer
+
+    monkeypatch.setattr(writer, "resolve_query_persons", lambda user, person=None, user_id=None: ["Hannah"])
+    repo = SheetsRepoStub(expense_rows=[[], []])
+
+    with repo.patched():
+        await ih.handle_intent(
+            "log_expense",
+            {"type": "expense", "category": "food", "amount": 12.5, "item": "Burrito", "location": "Chipotle"},
+            message,
+        )
+
+        await ih.handle_intent("query_recent_actions", {"n": 5}, message)
+
+    assert any("food expense $12.5 for Hannah" in (msg or "") for msg, _ in message.channel.sent)
+    assert any("Which one should I change or undo" in (msg or "") for msg, _ in message.channel.sent)
+
+
+@pytest.mark.asyncio
+async def test_update_recent_action_changes_logged_expense_amount(monkeypatch, message):
+    import bookiebot.sheets.writer as writer
+
+    monkeypatch.setattr(writer, "resolve_query_persons", lambda user, person=None, user_id=None: ["Hannah"])
+    repo = SheetsRepoStub(expense_rows=[[], []])
+
+    with repo.patched():
+        await ih.handle_intent(
+            "log_expense",
+            {"type": "expense", "category": "food", "amount": 12.5, "item": "Burrito", "location": "Chipotle"},
+            message,
+        )
+
+        await ih.handle_intent("update_recent_action", {"index": 1, "updates": {"amount": 14.75}}, message)
+
+        assert repo.expense.cell(3, 16).value == "14.75"
+
+        await ih.handle_intent("undo_last_transaction", {}, message)
+
+        assert repo.expense.cell(3, 16).value == "12.5"
+
+    assert any("Updated food expense $12.5 for Hannah" in (msg or "") for msg, _ in message.channel.sent)
+
+
+@pytest.mark.asyncio
+async def test_update_recent_action_can_match_logged_expense_text(monkeypatch, message):
+    import bookiebot.sheets.writer as writer
+
+    monkeypatch.setattr(writer, "resolve_query_persons", lambda user, person=None, user_id=None: ["Hannah"])
+    repo = SheetsRepoStub(expense_rows=[[], []])
+
+    with repo.patched():
+        await ih.handle_intent(
+            "log_expense",
+            {"type": "expense", "category": "food", "amount": 12.5, "item": "Burrito", "location": "Chipotle"},
+            message,
+        )
+
+        await ih.handle_intent("update_recent_action", {"match_text": "Chipotle", "updates": {"location": "Chipotle downtown"}}, message)
+
+        assert repo.expense.cell(3, 17).value == "Chipotle downtown"
+
+
 def test_expense_undo_can_be_recorded_after_context_exits():
     from bookiebot.sheets.undo import undo_last_action
     import bookiebot.sheets.writer as writer

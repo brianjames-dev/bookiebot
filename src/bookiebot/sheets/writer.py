@@ -73,6 +73,8 @@ async def write_income_to_sheet(data, message):
             row=insert_row_index,
             columns=[],
             previous_values=[],
+            new_values=["", str(description), str(amount)],
+            metadata={"type": "income", "source": str(data.get("source") or "")},
             description=f"income ${amount} from {data.get('source')}",
         ),
     )
@@ -170,7 +172,7 @@ async def write_expense_to_sheet(data, message):
             record_expense_undo(
                 category,
                 row,
-                stored["data"].get("amount"),
+                values,
                 selected_card,
                 stored.get("undo_user_key"),
             )
@@ -202,7 +204,7 @@ async def write_expense_to_sheet(data, message):
         return
 
     row = log_category_row(values_to_write, ws, category)
-    record_expense_undo(category, row, data.get("amount"), selected_person)
+    record_expense_undo(category, row, values_to_write, selected_person)
 
     if message:
         await message.channel.send(
@@ -250,9 +252,16 @@ def log_category_row(values, worksheet, category):
     return first_empty_row
 
 
-def record_expense_undo(category, row, amount, person, user_key=None):
+def record_expense_undo(category, row, values_or_amount, person, user_key=None):
     columns = get_category_columns[category]["columns"]
     col_indexes = [column_index_from_string(col_letter) for col_letter in columns.values()]
+    if isinstance(values_or_amount, dict):
+        values = values_or_amount
+        amount = values.get("amount")
+        new_values = [str(values.get(field, "")) for field in columns.keys()]
+    else:
+        amount = values_or_amount
+        new_values = []
     record_undo_action(
         user_key or get_current_discord_user_id(),
         UndoAction(
@@ -261,6 +270,8 @@ def record_expense_undo(category, row, amount, person, user_key=None):
             row=row,
             columns=col_indexes,
             previous_values=["" for _ in col_indexes],
+            new_values=new_values,
+            metadata={"type": "expense", "category": category, "person": str(person)},
             description=f"{category} expense ${amount} for {person}",
         ),
     )

@@ -59,6 +59,12 @@ def _ensure_openai_stub():
 _ensure_openai_stub()
 
 
+@pytest.fixture(autouse=True)
+def _isolate_action_log(tmp_path, monkeypatch):
+    monkeypatch.setenv("BOOKIEBOT_ACTION_LOG_DIR", str(tmp_path / "action_logs"))
+    yield
+
+
 def pytest_addoption(parser):
     parser.addoption(
         "--llm-live",

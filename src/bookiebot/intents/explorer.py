@@ -14,6 +14,8 @@ FRIENDLY_NAMES = {
     "log_2nd_savings": "Log 2nd Savings Deposit",
     "log_need_expense": "Log NEED Expense",
     "undo_last_transaction": "Undo Last Transaction",
+    "query_recent_actions": "Recent Logged Actions",
+    "update_recent_action": "Update Recent Action",
     "query_burn_rate": "Burn Rate",
     "query_rent_paid": "Check Rent Paid",
     "query_pge_paid": "Check PG&E Paid",
@@ -96,6 +98,14 @@ INTENT_DETAILS = {
     "undo_last_transaction": (
         "Undo the most recent transaction logged through BookieBot.",
         ["undo last transaction", "remove my last entry"]
+    ),
+    "query_recent_actions": (
+        "Show recent logged actions that can be changed or undone.",
+        ["show my last 10 actions", "I messed up that last one", "can I change that Chipotle expense?"]
+    ),
+    "update_recent_action": (
+        "Update a field on a recent logged action.",
+        ["change the last one to $18.25", "update the Chipotle expense amount to 14.50"]
     ),
 
     # Query Intents
@@ -222,7 +232,7 @@ INTENT_GROUPS = [
     ("Logging Actions", [
         "log_expense", "log_need_expense", "log_income", "log_rent_paid",
         "log_pge_paid", "log_recology_paid", "log_water_paid", "log_student_loan_paid",
-        "log_1st_savings", "log_2nd_savings", "undo_last_transaction"
+        "log_1st_savings", "log_2nd_savings", "undo_last_transaction", "query_recent_actions", "update_recent_action"
     ]),
     ("Checking Payments", [
         "query_rent_paid", "query_pge_paid", "query_recology_paid", "query_water_paid", "query_student_loans_paid",

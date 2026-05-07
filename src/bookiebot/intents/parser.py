@@ -45,6 +45,29 @@ async def parse_message_llm(user_message: str, *, llm_client: Optional[LLMClient
     - intent: "undo_last_transaction"
     - entities: {{}}
 
+    If the message asks to change, edit, update, fix, redo, or correct a recently logged BookieBot action, but does not provide an exact action id or enough detail to safely edit a cell, use:
+    - intent: "query_recent_actions"
+    - entities: {{ "n": 10 }}
+
+    If the message asks to change, edit, update, fix, redo, or correct a recently logged BookieBot action and includes the target plus the requested field change, use:
+    - intent: "update_recent_action"
+    - entities: {{
+        "index": <1 for "last one", or explicit number if provided>,
+        "action_id": "<id if provided>",
+        "match_text": "<store/item/description text such as Chipotle if provided>",
+        "updates": {{
+            "amount": <float if changing amount>,
+            "location": "<new location if changing location>",
+            "item": "<new item/name if changing item>",
+            "person": "<new person/card if changing card/person>",
+            "date": "<new date if changing date>"
+        }}
+      }}
+
+    If the message asks to show or list recent logged actions, undo history, edit candidates, or the last N actions, use:
+    - intent: "query_recent_actions"
+    - entities: {{ "n": <integer if provided, otherwise 10> }}
+
     If the message is about logging a payment for **rent**, **PG&E**, **Recology/trash**, **water**, or **student loan**, use the specific intents:
     - "log_rent_paid" → when paying rent
     - "log_pge_paid" → when paying PG&E / PGE / gas and electric utilities

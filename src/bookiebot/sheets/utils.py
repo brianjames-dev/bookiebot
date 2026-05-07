@@ -1489,6 +1489,8 @@ def log_payment(category_label, amount):
                     row=row_idx + 1,
                     columns=[3],
                     previous_values=[previous_value],
+                    new_values=[str(amount)],
+                    metadata={"type": "payment", "category": category_label},
                     description=f"{category_label} payment ${amount}",
                 ),
             )
@@ -1630,6 +1632,8 @@ def log_1st_savings(amount):
                 row=row,
                 columns=[col + 3],
                 previous_values=[previous_value],
+                new_values=[str(amount)],
+                metadata={"type": "savings", "category": "1st savings"},
                 description=f"1st savings deposit ${amount}",
             ),
         )
@@ -1665,6 +1669,8 @@ def log_2nd_savings(amount):
                 row=row,
                 columns=[col + 3],
                 previous_values=[previous_value],
+                new_values=[str(amount)],
+                metadata={"type": "savings", "category": "2nd savings"},
                 description=f"2nd savings deposit ${amount}",
             ),
         )
@@ -1702,6 +1708,8 @@ def log_need_expense(description, amount):
                 row=insert_row_idx,
                 columns=[],
                 previous_values=[],
+                new_values=[str(description), str(amount)],
+                metadata={"type": "need_expense"},
                 description=f"Need expense '{description}' ${amount}",
             ),
         )

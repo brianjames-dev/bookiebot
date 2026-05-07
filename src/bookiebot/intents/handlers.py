@@ -20,7 +20,7 @@ from bookiebot.sheets.routing import (
     resolve_actor_key,
     sheet_user_context,
 )
-from bookiebot.sheets.undo import undo_last_action
+from bookiebot.sheets.undo import format_recent_actions, undo_last_action, update_recent_action
 
 try:
     import discord
@@ -50,6 +50,8 @@ INTENT_HANDLERS: dict[str, IntentHandler] = {
     "log_2nd_savings":                      lambda e, m: log_2nd_savings_handler(e, m),
     "log_need_expense":                     lambda e, m: log_need_expense_handler(e, m),
     "undo_last_transaction":                lambda e, m: undo_last_transaction_handler(m),
+    "query_recent_actions":                 lambda e, m: query_recent_actions_handler(e, m),
+    "update_recent_action":                 lambda e, m: update_recent_action_handler(e, m),
 
     # Query handlers
     "query_burn_rate":                      lambda e, m: query_burn_rate_handler(m),
@@ -143,6 +145,41 @@ async def handle_intent(intent: str, entities: IntentEntities, message: Any, las
 
 async def undo_last_transaction_handler(message: Any) -> None:
     success, detail = undo_last_action(_message_actor_key(message))
+    prefix = "✅" if success else "❌"
+    await message.channel.send(f"{prefix} {detail}")
+
+
+async def query_recent_actions_handler(entities: IntentEntities, message: Any) -> None:
+    try:
+        limit = int(entities.get("n") or 10)
+    except (TypeError, ValueError):
+        limit = 10
+    limit = min(max(limit, 1), 20)
+    await message.channel.send(format_recent_actions(_message_actor_key(message), limit))
+
+
+async def update_recent_action_handler(entities: IntentEntities, message: Any) -> None:
+    updates = entities.get("updates") or {}
+    if not isinstance(updates, dict):
+        updates = {}
+
+    for field in ("amount", "location", "item", "person", "date"):
+        if field in entities and field not in updates:
+            updates[field] = entities[field]
+
+    index = entities.get("index")
+    try:
+        index = int(index) if index is not None else None
+    except (TypeError, ValueError):
+        index = None
+
+    success, detail = update_recent_action(
+        _message_actor_key(message),
+        updates=updates,
+        index=index,
+        action_id=entities.get("action_id"),
+        match_text=entities.get("match_text") or entities.get("description") or entities.get("location") or entities.get("item"),
+    )
     prefix = "✅" if success else "❌"
     await message.channel.send(f"{prefix} {detail}")
 
