@@ -32,6 +32,7 @@ _GLOBAL_LAST_ACTION: UndoAction | None = None
 _PENDING_DELETE_IDS_BY_USER: dict[str, list[str]] = {}
 _PENDING_UPDATE_IDS_BY_USER: dict[str, list[str]] = {}
 _PENDING_MOVE_IDS_BY_USER: dict[str, list[str]] = {}
+_PENDING_UPDATE_FIELD_BY_USER: dict[str, tuple[str, str]] = {}
 _RECENT_ACTION_OFFSET_BY_USER: dict[str, int] = {}
 _LOG_HEADERS = ["id", "created_at", "user_key", "status", "undone_at", "action_json"]
 
@@ -364,6 +365,18 @@ def clear_pending_action_selection(user_key: str | None) -> None:
         _PENDING_UPDATE_IDS_BY_USER.pop(key, None)
         _PENDING_DELETE_IDS_BY_USER.pop(key, None)
         _PENDING_MOVE_IDS_BY_USER.pop(key, None)
+        _PENDING_UPDATE_FIELD_BY_USER.pop(key, None)
+
+
+def set_pending_update_field(user_key: str | None, action_id: str, field: str) -> None:
+    key = str(user_key) if user_key else ""
+    if key:
+        _PENDING_UPDATE_FIELD_BY_USER[key] = (action_id, field)
+
+
+def pending_update_field(user_key: str | None) -> tuple[str, str] | None:
+    key = str(user_key) if user_key else ""
+    return _PENDING_UPDATE_FIELD_BY_USER.get(key)
 
 
 def has_pending_action_selection(user_key: str | None) -> bool:
@@ -392,19 +405,24 @@ def pending_action_selection_kind(user_key: str | None) -> Literal["update", "de
 def _field_columns_for_action(action: UndoAction) -> dict[str, int]:
     if action.worksheet == "expense":
         from bookiebot.sheets.config import get_category_columns
+        from openpyxl.utils import column_index_from_string
 
         category = action.metadata.get("category")
         if category and category in get_category_columns:
-            fields = get_category_columns[category]["columns"].keys()
             return {
-                field: col
-                for field, col in zip(fields, action.columns)
+                field: column_index_from_string(col_letter)
+                for field, col_letter in get_category_columns[category]["columns"].items()
             }
 
     if action.metadata.get("type") in {"payment", "savings"}:
         return {"amount": action.columns[0]} if action.columns else {}
 
     return {}
+
+
+def editable_fields_for_action(action: UndoAction) -> list[str]:
+    fields = list(_field_columns_for_action(action).keys())
+    return [field for field in fields if field != "date"]
 
 
 def _field_values_for_action(action: UndoAction, values: list[str] | None = None) -> dict[str, str]:
@@ -745,6 +763,7 @@ def update_recent_action(
     _update_logged_new_values(logged.id, updates_by_col)
     if key:
         _PENDING_UPDATE_IDS_BY_USER.pop(key, None)
+        _PENDING_UPDATE_FIELD_BY_USER.pop(key, None)
     record_undo_action(
         user_key,
         UndoAction(

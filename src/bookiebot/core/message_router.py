@@ -23,7 +23,7 @@ from bookiebot.intents.parser import parse_message_llm
 from bookiebot.intents.handlers import handle_intent
 from bookiebot.intents import explorer as intent_explorer
 from bookiebot.sheets.routing import resolve_actor_key
-from bookiebot.sheets.undo import pending_action_selection_kind
+from bookiebot.sheets.undo import pending_action_selection_kind, pending_update_field
 
 logger = logging.getLogger(__name__)
 
@@ -209,12 +209,23 @@ def register_events(client: discord.Client, tree: discord.app_commands.CommandTr
             await message.channel.send(output)
             return
 
+        actor_key = resolve_actor_key(
+            getattr(message.author, "id", None),
+            getattr(message.author, "name", None) or getattr(message.author, "display_name", None),
+        )
+        pending_field = pending_update_field(actor_key)
+        if pending_field:
+            action_id, field = pending_field
+            value = content.strip()
+            if field == "amount":
+                amount_match = re.search(r"\$?\s*(\d+(?:\.\d{1,2})?)", value)
+                if amount_match:
+                    value = amount_match.group(1)
+            await handle_intent("update_recent_action", {"action_id": action_id, "updates": {field: value}}, message)
+            return
+
         if content.isdigit():
             idx = int(content)
-            actor_key = resolve_actor_key(
-                getattr(message.author, "id", None),
-                getattr(message.author, "name", None) or getattr(message.author, "display_name", None),
-            )
             pending_kind = pending_action_selection_kind(actor_key)
             if pending_kind == "update":
                 await handle_intent("update_recent_action", {"index": idx}, message)

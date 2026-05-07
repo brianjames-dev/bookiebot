@@ -23,19 +23,28 @@ from bookiebot.sheets.routing import (
 from bookiebot.sheets.undo import (
     clear_pending_action_selection,
     delete_recent_action,
+    editable_fields_for_action,
     format_recent_actions,
     matching_recent_actions,
     move_recent_action,
     next_recent_actions_page,
     recent_actions,
     reset_recent_actions_page,
+    select_recent_action,
     set_pending_delete_selection,
     set_pending_move_selection,
+    set_pending_update_field,
     set_pending_update_selection,
     undo_last_action,
     update_recent_action,
 )
-from bookiebot.ui.recent_actions import MoveCategoryView, RecentActionDecisionView, RecentActionSelectView
+from bookiebot.ui.recent_actions import (
+    MoveCategoryView,
+    PersonSelectView,
+    RecentActionDecisionView,
+    RecentActionSelectView,
+    UpdateFieldView,
+)
 
 try:
     import discord
@@ -222,8 +231,14 @@ def _recent_action_select_view(actor_key: str | None, actions: list[Any], *, des
         async def handle_decision(decision_interaction: Any, decision: str) -> None:
             if decision == "update":
                 set_pending_update_selection(actor_key, action_id)
+                logged = select_recent_action(actor_key, action_id=action_id)
+                fields = editable_fields_for_action(logged.action) if logged else []
+                if not fields:
+                    await decision_interaction.response.send_message("I do not know how to update fields for that transaction yet.")
+                    return
                 await decision_interaction.response.send_message(
-                    "Reply with `1 amount to 20`, `1 location to Chipotle`, or another field change."
+                    "Which field would you like to update?",
+                    view=_update_field_view(actor_key, action_id, fields),
                 )
                 return
             if decision == "delete":
@@ -270,6 +285,35 @@ def _move_category_view(actor_key: str | None, action_id: str, updates: dict[str
         await interaction.followup.send(f"{prefix} {detail}")
 
     return MoveCategoryView(handle_category)
+
+
+def _update_field_view(actor_key: str | None, action_id: str, fields: list[str]):
+    async def handle_field(interaction: Any, field: str) -> None:
+        if field == "person":
+            async def handle_person(person_interaction: Any, person: str) -> None:
+                try:
+                    await person_interaction.response.defer()
+                except Exception:
+                    pass
+                success, detail = update_recent_action(
+                    actor_key,
+                    updates={"person": person},
+                    action_id=action_id,
+                )
+                prefix = "✅" if success else "❌"
+                await person_interaction.followup.send(f"{prefix} {detail}")
+
+            await interaction.response.send_message(
+                "Which person/card should this transaction use?",
+                view=PersonSelectView(handle_person),
+            )
+            return
+
+        set_pending_update_field(actor_key, action_id, field)
+        label = field.replace("_", " ")
+        await interaction.response.send_message(f"Reply with the new {label}.")
+
+    return UpdateFieldView(fields, handle_field)
 
 
 async def update_recent_action_handler(entities: IntentEntities, message: Any) -> None:

@@ -54,3 +54,37 @@ class MoveCategoryView(ViewBase):  # type: ignore[misc]
         super().__init__(timeout=120)
         for category in ["Grocery", "Gas", "Food", "Shopping"]:
             self.add_item(RecentActionButton(category, category.lower(), callback_func))
+
+
+class UpdateFieldView(ViewBase):  # type: ignore[misc]
+    def __init__(self, fields: list[str], callback_func: Callable):
+        super().__init__(timeout=120)
+        labels = {
+            "amount": "Amount",
+            "item": "Item",
+            "location": "Location",
+            "person": "Person",
+        }
+        for field in fields:
+            if field in labels:
+                self.add_item(RecentActionButton(labels[field], field, callback_func))
+
+
+class PersonSelect(SelectBase):  # type: ignore[misc]
+    def __init__(self, callback_func: Callable):
+        options = [
+            SelectOption(label="Hannah", value="Hannah"),
+            SelectOption(label="Brian (BofA)", value="Brian (BofA)"),
+            SelectOption(label="Brian (AL)", value="Brian (AL)"),
+        ]
+        super().__init__(placeholder="Select person/card", options=options)
+        self.callback_func = callback_func
+
+    async def callback(self, interaction: Interaction):
+        await self.callback_func(interaction, self.values[0])
+
+
+class PersonSelectView(ViewBase):  # type: ignore[misc]
+    def __init__(self, callback_func: Callable):
+        super().__init__(timeout=120)
+        self.add_item(PersonSelect(callback_func))
