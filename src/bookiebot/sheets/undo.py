@@ -72,11 +72,12 @@ def _logged_action_from_row(row: list[str]) -> LoggedAction:
     padded = list(row) + [""] * (len(_LOG_HEADERS) - len(row))
     action_json = padded[5] or "{}"
     payload = json.loads(action_json)
+    status: Literal["active", "undone"] = "undone" if padded[3] == "undone" else "active"
     return LoggedAction(
         id=padded[0],
         created_at=padded[1],
         user_key=padded[2] or None,
-        status=padded[3] or "active",
+        status=status,
         undone_at=padded[4] or None,
         action=_action_from_dict(payload),
     )
