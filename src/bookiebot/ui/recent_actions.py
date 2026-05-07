@@ -2,24 +2,8 @@ from __future__ import annotations
 
 from typing import Callable
 
-from bookiebot.sheets.undo import LoggedAction, action_option_label
-from bookiebot.ui.card import ButtonBase, ButtonStyle, Interaction, SelectBase, SelectOption, ViewBase
-
-
-class RecentActionSelect(SelectBase):  # type: ignore[misc]
-    def __init__(self, actions: list[LoggedAction], callback_func: Callable):
-        options = [
-            SelectOption(
-                label=f"{index}. {action_option_label(logged.action)}",
-                value=logged.id,
-            )
-            for index, logged in enumerate(actions[:25], start=1)
-        ]
-        super().__init__(placeholder="Select transaction", options=options)
-        self.callback_func = callback_func
-
-    async def callback(self, interaction: Interaction):
-        await self.callback_func(interaction, self.values[0])
+from bookiebot.sheets.undo import LoggedAction
+from bookiebot.ui.card import ButtonBase, ButtonStyle, Interaction, ViewBase
 
 
 class RecentActionButton(ButtonBase):  # type: ignore[misc]
@@ -33,10 +17,21 @@ class RecentActionButton(ButtonBase):  # type: ignore[misc]
         await self.callback_func(interaction, self.custom_id)
 
 
+class RecentActionSelectButton(ButtonBase):  # type: ignore[misc]
+    def __init__(self, index: int, action_id: str, callback_func: Callable):
+        style_value = getattr(ButtonStyle, "primary", ButtonStyle.primary)
+        super().__init__(label=f"Select {index}", style=style_value, custom_id=action_id)
+        self.callback_func = callback_func
+
+    async def callback(self, interaction: Interaction):
+        await self.callback_func(interaction, self.custom_id)
+
+
 class RecentActionSelectView(ViewBase):  # type: ignore[misc]
     def __init__(self, actions: list[LoggedAction], callback_func: Callable):
         super().__init__(timeout=120)
-        self.add_item(RecentActionSelect(actions, callback_func))
+        for index, logged in enumerate(actions[:25], start=1):
+            self.add_item(RecentActionSelectButton(index, logged.id, callback_func))
 
 
 class RecentActionDecisionView(ViewBase):  # type: ignore[misc]

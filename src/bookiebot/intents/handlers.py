@@ -24,6 +24,7 @@ from bookiebot.sheets.undo import (
     clear_pending_action_selection,
     delete_recent_action,
     format_recent_actions,
+    matching_recent_actions,
     move_recent_action,
     next_recent_actions_page,
     recent_actions,
@@ -195,7 +196,27 @@ async def query_recent_actions_handler(entities: IntentEntities, message: Any) -
         reset_recent_actions_page(actor_key)
         output = format_recent_actions(actor_key, limit)
 
+    view = _recent_action_select_view(actor_key, actions) if actions else None
+    await message.channel.send(_with_component_spacer(output, view), view=view)
+
+
+def _recent_action_select_view(actor_key: str | None, actions: list[Any], *, destination_category: str | None = None, updates: dict[str, Any] | None = None):
     async def handle_select(interaction: Any, action_id: str) -> None:
+        if destination_category:
+            try:
+                await interaction.response.defer()
+            except Exception:
+                pass
+            success, detail = move_recent_action(
+                actor_key,
+                destination_category=destination_category,
+                updates=updates or {},
+                action_id=action_id,
+            )
+            prefix = "✅" if success else "❌"
+            await interaction.followup.send(f"{prefix} {detail}")
+            return
+
         set_pending_update_selection(actor_key, action_id)
 
         async def handle_decision(decision_interaction: Any, decision: str) -> None:
@@ -207,9 +228,13 @@ async def query_recent_actions_handler(entities: IntentEntities, message: Any) -
                 return
             if decision == "delete":
                 set_pending_delete_selection(actor_key, action_id)
+                try:
+                    await decision_interaction.response.defer()
+                except Exception:
+                    pass
                 success, detail = delete_recent_action(actor_key, index=1)
                 prefix = "✅" if success else "❌"
-                await decision_interaction.response.send_message(f"{prefix} {detail}")
+                await decision_interaction.followup.send(f"{prefix} {detail}")
                 return
             if decision == "move":
                 set_pending_move_selection(actor_key, action_id)
@@ -225,8 +250,7 @@ async def query_recent_actions_handler(entities: IntentEntities, message: Any) -
             view=RecentActionDecisionView(handle_decision),
         )
 
-    view = RecentActionSelectView(actions, handle_select) if actions else None
-    await message.channel.send(output, view=view)
+    return RecentActionSelectView(actions, handle_select)
 
 
 async def update_recent_action_handler(entities: IntentEntities, message: Any) -> None:
@@ -268,14 +292,31 @@ async def move_recent_action_handler(entities: IntentEntities, message: Any) -> 
     except (TypeError, ValueError):
         index = None
 
+    actor_key = _message_actor_key(message)
+    destination_category = entities.get("category") or entities.get("destination_category")
+    match_text = entities.get("match_text") or entities.get("description") or entities.get("location") or entities.get("item")
+
     success, detail = move_recent_action(
-        _message_actor_key(message),
-        destination_category=entities.get("category") or entities.get("destination_category"),
+        actor_key,
+        destination_category=destination_category,
         updates=updates,
         index=index,
         action_id=entities.get("action_id"),
-        match_text=entities.get("match_text") or entities.get("description") or entities.get("location") or entities.get("item"),
+        match_text=match_text,
     )
+    if detail.startswith("Recent logged actions"):
+        if match_text:
+            actions = matching_recent_actions(actor_key, match_text, 10)
+        else:
+            actions = recent_actions(actor_key, 5)
+        view = _recent_action_select_view(
+            actor_key,
+            actions,
+            destination_category=str(destination_category) if destination_category else None,
+            updates=updates,
+        ) if actions else None
+        await message.channel.send(_with_component_spacer(detail, view), view=view)
+        return
     await _send_action_result(message, success, detail)
 
 
@@ -285,6 +326,10 @@ async def _send_action_result(message: Any, success: bool, detail: str) -> None:
         return
     prefix = "✅" if success else "❌"
     await message.channel.send(f"{prefix} {detail}")
+
+
+def _with_component_spacer(content: str, view: Any | None) -> str:
+    return f"{content}\n\u200b" if view is not None else content
 
 
 # FALLBACK HANDLER

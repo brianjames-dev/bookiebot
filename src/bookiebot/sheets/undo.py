@@ -36,6 +36,10 @@ _RECENT_ACTION_OFFSET_BY_USER: dict[str, int] = {}
 _LOG_HEADERS = ["id", "created_at", "user_key", "status", "undone_at", "action_json"]
 
 
+def _sheet_value(value: Any) -> str:
+    return "" if value is None else str(value)
+
+
 @dataclass
 class LoggedAction:
     id: str
@@ -52,9 +56,9 @@ def _action_from_dict(payload: dict) -> UndoAction:
         kind=payload["kind"],
         row=int(payload["row"]),
         columns=[int(col) for col in payload.get("columns", [])],
-        previous_values=[str(value) for value in payload.get("previous_values", [])],
+        previous_values=[_sheet_value(value) for value in payload.get("previous_values", [])],
         description=str(payload.get("description", "")),
-        new_values=[str(value) for value in payload.get("new_values", [])],
+        new_values=[_sheet_value(value) for value in payload.get("new_values", [])],
         metadata={str(k): str(v) for k, v in payload.get("metadata", {}).items()},
     )
 
@@ -177,7 +181,9 @@ def _format_actions(actions: list[LoggedAction], *, empty_message: str, final_pr
 
     lines = ["Recent logged actions I can work with:"]
     for index, logged in enumerate(actions, start=1):
+        lines.append("```")
         lines.extend(_format_action_list_item(index, logged.action))
+        lines.append("```")
     lines.append(final_prompt)
     return "\n".join(lines)
 
@@ -198,7 +204,7 @@ def format_recent_actions(user_key: str | None, limit: int = 5, offset: int = 0)
     return _format_actions(
         recent_actions(user_key, limit, offset),
         empty_message="I do not have any recent logged actions for you this month.",
-        final_prompt="Type the number of the transaction you want to change or undo, followed by what should happen to it. Type `show more` to see older transactions.",
+        final_prompt="Type the number of the transaction, followed by what should happen to it (change, move, or undo).\n\nType `show more` to see older transactions.",
     )
 
 
@@ -212,7 +218,7 @@ def next_recent_actions_page(user_key: str | None, page_size: int = 5) -> tuple[
         _format_actions(
             actions,
             empty_message="I do not have more recent logged actions for you this month.",
-            final_prompt="Type the number of the transaction you want to change or undo, followed by what should happen to it. Type `show more` to continue.",
+            final_prompt="Type the number of the transaction, followed by what should happen to it (change, move, or undo).\n\nType `show more` to continue.",
         ),
         actions,
     )
@@ -388,7 +394,7 @@ def _field_values_for_action(action: UndoAction, values: list[str] | None = None
         while len(source_values) < len(fields):
             source_values.append("")
         return {
-            field: str(source_values[index])
+            field: _sheet_value(source_values[index])
             for index, field in enumerate(fields)
         }
 
@@ -398,7 +404,7 @@ def _field_values_for_action(action: UndoAction, values: list[str] | None = None
     while len(source_values) < len(fields):
         source_values.append("")
     return {
-        field: str(source_values[index])
+        field: _sheet_value(source_values[index])
         for index, field in enumerate(fields)
     }
 
@@ -436,7 +442,7 @@ def _format_action_list_item(index: int, action: UndoAction) -> list[str]:
     category = action.metadata.get("category")
     title = "transaction"
     if action_type == "expense":
-        title = f"{category or 'expense'} expense"
+        title = f"{category or 'expense'} expense".title()
     elif action_type == "update":
         title = f"Updated: {(category or 'transaction').capitalize()} Expense"
     elif action_type == "move":
@@ -444,13 +450,13 @@ def _format_action_list_item(index: int, action: UndoAction) -> list[str]:
         destination = action.metadata.get("destination_category") or category or "unknown"
         title = f"Moved: {source.capitalize()} -> {destination.capitalize()}"
     elif action_type == "need_expense":
-        title = "Need expense"
+        title = "Need Expense"
     elif action_type == "payment":
-        title = f"{category or 'payment'} payment"
+        title = f"{category or 'payment'} payment".title()
     elif action_type == "savings":
-        title = f"{category or 'savings'} deposit"
+        title = f"{category or 'savings'} deposit".title()
     elif action.metadata.get("source"):
-        title = "income"
+        title = "Income"
 
     lines = [f"{index}. {title}"]
 
@@ -526,7 +532,7 @@ def _values_for_category(source_values: dict[str, str], destination_category: st
         if value not in (None, "")
     }
     values = {
-        field: str(clean_overrides.get(field, source_values.get(field, "")))
+        field: _sheet_value(clean_overrides.get(field, source_values.get(field, "")))
         for field in destination_fields
     }
     if "item" in values and not values["item"]:
@@ -591,13 +597,13 @@ def move_recent_action(
 
     ws = _worksheet("expense")
     source_columns = action.columns
-    source_current_values = [ws.cell(action.row, col).value for col in source_columns]
+    source_current_values = [_sheet_value(ws.cell(action.row, col).value) for col in source_columns]
     destination_row = _first_empty_category_row(ws, destination_category)
     destination_columns_by_field = _category_columns(destination_category)
     destination_fields = list(destination_values.keys())
     destination_columns = [destination_columns_by_field[field] for field in destination_fields]
     destination_new_values = [destination_values[field] for field in destination_fields]
-    destination_previous_values = [ws.cell(destination_row, col).value for col in destination_columns]
+    destination_previous_values = [_sheet_value(ws.cell(destination_row, col).value) for col in destination_columns]
 
     try:
         for col in source_columns:
@@ -701,7 +707,7 @@ def update_recent_action(
     updates_by_col: dict[int, Any] = {}
     for field, value in normalized_updates.items():
         col = field_columns[field]
-        previous_values.append(ws.cell(logged.action.row, col).value)
+        previous_values.append(_sheet_value(ws.cell(logged.action.row, col).value))
         columns.append(col)
         values.append(str(value))
         updates_by_col[col] = value
@@ -763,7 +769,7 @@ def _apply_undo_action(action: UndoAction) -> tuple[bool, str]:
     if action.kind == "move_expense":
         source_row = int(action.metadata["source_row"])
         source_columns = [int(col) for col in json.loads(action.metadata["source_columns"])]
-        source_values = [str(value) for value in json.loads(action.metadata["source_values"])]
+        source_values = [_sheet_value(value) for value in json.loads(action.metadata["source_values"])]
         for col, value in zip(source_columns, source_values):
             ws.update_cell(source_row, col, value)
         for col, value in zip(action.columns, action.previous_values):

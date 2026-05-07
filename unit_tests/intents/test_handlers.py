@@ -133,7 +133,8 @@ async def test_query_recent_actions_lists_logged_expense(monkeypatch, message):
 
     assert any("Amount: $12.5" in (msg or "") for msg, _ in message.channel.sent)
     assert any("Location: Chipotle" in (msg or "") for msg, _ in message.channel.sent)
-    assert any("Type the number of the transaction you want to change or undo" in (msg or "") for msg, _ in message.channel.sent)
+    assert any("Food Expense" in (msg or "") for msg, _ in message.channel.sent)
+    assert any("Type the number of the transaction, followed by what should happen to it (change, move, or undo)" in (msg or "") for msg, _ in message.channel.sent)
     assert any(kwargs.get("view") is not None for _msg, kwargs in message.channel.sent)
 
 
@@ -322,6 +323,10 @@ async def test_move_recent_action_moves_grocery_to_food_and_can_undo(monkeypatch
         assert repo.expense.cell(3, 16).value == ""
         assert repo.expense.cell(3, 17).value == ""
         assert repo.expense.cell(3, 18).value == ""
+        assert repo.expense.cell(3, 15).value != "None"
+        assert repo.expense.cell(3, 16).value != "None"
+        assert repo.expense.cell(3, 17).value != "None"
+        assert repo.expense.cell(3, 18).value != "None"
 
     assert any("Moved logged expense" in (msg or "") for msg, _ in message.channel.sent)
 
@@ -343,6 +348,7 @@ async def test_move_recent_action_lists_candidates_before_category(monkeypatch, 
         await ih.handle_intent("move_recent_action", {"match_text": "Chipotle", "category": "food"}, message)
 
     assert any("Type the number of the transaction you want to move" in (msg or "") for msg, _ in message.channel.sent)
+    assert any(kwargs.get("view") is not None for _msg, kwargs in message.channel.sent)
 
 
 def test_expense_undo_can_be_recorded_after_context_exits():
