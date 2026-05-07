@@ -25,7 +25,9 @@ from bookiebot.sheets.undo import (
     delete_recent_action,
     format_recent_actions,
     move_recent_action,
+    next_recent_actions_page,
     recent_actions,
+    reset_recent_actions_page,
     set_pending_delete_selection,
     set_pending_move_selection,
     set_pending_update_selection,
@@ -176,18 +178,22 @@ async def delete_recent_action_handler(entities: IntentEntities, message: Any) -
         action_id=entities.get("action_id"),
         match_text=entities.get("match_text") or entities.get("description") or entities.get("location") or entities.get("item"),
     )
-    prefix = "✅" if success else "❌"
-    await message.channel.send(f"{prefix} {detail}")
+    await _send_action_result(message, success, detail)
 
 
 async def query_recent_actions_handler(entities: IntentEntities, message: Any) -> None:
     try:
-        limit = int(entities.get("n") or 10)
+        limit = int(entities.get("n") or 5)
     except (TypeError, ValueError):
-        limit = 10
-    limit = min(max(limit, 1), 20)
+        limit = 5
+    limit = min(max(limit, 1), 25)
     actor_key = _message_actor_key(message)
-    actions = recent_actions(actor_key, limit)
+    if entities.get("more"):
+        output, actions = next_recent_actions_page(actor_key, 5)
+    else:
+        actions = recent_actions(actor_key, limit)
+        reset_recent_actions_page(actor_key)
+        output = format_recent_actions(actor_key, limit)
 
     async def handle_select(interaction: Any, action_id: str) -> None:
         set_pending_update_selection(actor_key, action_id)
@@ -220,7 +226,7 @@ async def query_recent_actions_handler(entities: IntentEntities, message: Any) -
         )
 
     view = RecentActionSelectView(actions, handle_select) if actions else None
-    await message.channel.send(format_recent_actions(actor_key, limit), view=view)
+    await message.channel.send(output, view=view)
 
 
 async def update_recent_action_handler(entities: IntentEntities, message: Any) -> None:
@@ -245,8 +251,7 @@ async def update_recent_action_handler(entities: IntentEntities, message: Any) -
         action_id=entities.get("action_id"),
         match_text=entities.get("match_text") or entities.get("description") or entities.get("location") or entities.get("item"),
     )
-    prefix = "✅" if success else "❌"
-    await message.channel.send(f"{prefix} {detail}")
+    await _send_action_result(message, success, detail)
 
 
 async def move_recent_action_handler(entities: IntentEntities, message: Any) -> None:
@@ -271,6 +276,13 @@ async def move_recent_action_handler(entities: IntentEntities, message: Any) -> 
         action_id=entities.get("action_id"),
         match_text=entities.get("match_text") or entities.get("description") or entities.get("location") or entities.get("item"),
     )
+    await _send_action_result(message, success, detail)
+
+
+async def _send_action_result(message: Any, success: bool, detail: str) -> None:
+    if detail.startswith("Recent logged actions") or detail.startswith("I do not have more recent logged actions"):
+        await message.channel.send(detail)
+        return
     prefix = "✅" if success else "❌"
     await message.channel.send(f"{prefix} {detail}")
 

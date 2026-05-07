@@ -4,7 +4,7 @@ from bookiebot.core.message_router import _action_management_intent
 def test_delete_unspecified_expense_routes_to_recent_actions():
     assert _action_management_intent("I need to delete an expense") == (
         "query_recent_actions",
-        {"n": 10},
+        {"n": 5},
     )
 
 
@@ -18,7 +18,7 @@ def test_delete_specific_expense_routes_to_targeted_delete():
 def test_change_unspecified_expense_routes_to_recent_actions():
     assert _action_management_intent("I need to change a transaction") == (
         "query_recent_actions",
-        {"n": 10},
+        {"n": 5},
     )
 
 
@@ -47,4 +47,45 @@ def test_selected_transaction_move_followup_routes_to_move_action():
     assert _action_management_intent("move it to food") == (
         "move_recent_action",
         {"category": "food"},
+    )
+
+
+def test_change_item_name_routes_to_recent_actions():
+    assert _action_management_intent("change item name") == (
+        "query_recent_actions",
+        {"n": 5},
+    )
+
+
+def test_change_last_transaction_item_name_routes_to_recent_actions():
+    assert _action_management_intent("change item name of last transaction") == (
+        "query_recent_actions",
+        {"n": 5},
+    )
+
+
+def test_indexed_move_routes_to_move_action():
+    from bookiebot.core.message_router import _indexed_action_intent
+
+    assert _indexed_action_intent("2 move to food") == (
+        "move_recent_action",
+        {"index": 2, "category": "food"},
+    )
+
+
+def test_recent_query_show_more():
+    from bookiebot.core.message_router import _recent_query_intent
+
+    assert _recent_query_intent("show more") == (
+        "query_recent_actions",
+        {"more": True},
+    )
+
+
+def test_recent_query_explicit_n_caps_at_25():
+    from bookiebot.core.message_router import _recent_query_intent
+
+    assert _recent_query_intent("show last 30 transactions") == (
+        "query_recent_actions",
+        {"n": 25},
     )

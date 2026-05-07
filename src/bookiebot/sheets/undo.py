@@ -32,6 +32,7 @@ _GLOBAL_LAST_ACTION: UndoAction | None = None
 _PENDING_DELETE_IDS_BY_USER: dict[str, list[str]] = {}
 _PENDING_UPDATE_IDS_BY_USER: dict[str, list[str]] = {}
 _PENDING_MOVE_IDS_BY_USER: dict[str, list[str]] = {}
+_RECENT_ACTION_OFFSET_BY_USER: dict[str, int] = {}
 _LOG_HEADERS = ["id", "created_at", "user_key", "status", "undone_at", "action_json"]
 
 
@@ -158,14 +159,16 @@ def record_undo_action(user_key: str | None, action: UndoAction) -> None:
         logger.exception("Failed to persist undo action")
 
 
-def recent_actions(user_key: str | None, limit: int = 10) -> list[LoggedAction]:
+def recent_actions(user_key: str | None, limit: int = 5, offset: int = 0) -> list[LoggedAction]:
     key = str(user_key) if user_key else None
     matches = [
         action
         for action in _read_log()
         if action.status == "active" and (key is None or action.user_key == key)
     ]
-    return list(reversed(matches))[: max(limit, 1)]
+    start = max(offset, 0)
+    end = start + max(limit, 1)
+    return list(reversed(matches))[start:end]
 
 
 def _format_actions(actions: list[LoggedAction], *, empty_message: str, final_prompt: str) -> str:
@@ -191,12 +194,34 @@ def action_option_label(action: UndoAction) -> str:
     return label[:100]
 
 
-def format_recent_actions(user_key: str | None, limit: int = 10) -> str:
+def format_recent_actions(user_key: str | None, limit: int = 5, offset: int = 0) -> str:
     return _format_actions(
-        recent_actions(user_key, limit),
+        recent_actions(user_key, limit, offset),
         empty_message="I do not have any recent logged actions for you this month.",
-        final_prompt="Type the number of the transaction you want to change or undo, followed by what should happen to it.",
+        final_prompt="Type the number of the transaction you want to change or undo, followed by what should happen to it. Type `show more` to see older transactions.",
     )
+
+
+def next_recent_actions_page(user_key: str | None, page_size: int = 5) -> tuple[str, list[LoggedAction]]:
+    key = str(user_key) if user_key else ""
+    offset = _RECENT_ACTION_OFFSET_BY_USER.get(key, 0)
+    actions = recent_actions(user_key, page_size, offset)
+    if actions and key:
+        _RECENT_ACTION_OFFSET_BY_USER[key] = offset + page_size
+    return (
+        _format_actions(
+            actions,
+            empty_message="I do not have more recent logged actions for you this month.",
+            final_prompt="Type the number of the transaction you want to change or undo, followed by what should happen to it. Type `show more` to continue.",
+        ),
+        actions,
+    )
+
+
+def reset_recent_actions_page(user_key: str | None) -> None:
+    key = str(user_key) if user_key else ""
+    if key:
+        _RECENT_ACTION_OFFSET_BY_USER[key] = 5
 
 
 def _action_search_text(logged: LoggedAction) -> str:
@@ -353,6 +378,20 @@ def _field_columns_for_action(action: UndoAction) -> dict[str, int]:
 
 
 def _field_values_for_action(action: UndoAction, values: list[str] | None = None) -> dict[str, str]:
+    display_fields = action.metadata.get("display_fields")
+    if display_fields:
+        try:
+            fields = [str(field) for field in json.loads(display_fields)]
+        except Exception:
+            fields = []
+        source_values = list(values if values is not None else action.new_values)
+        while len(source_values) < len(fields):
+            source_values.append("")
+        return {
+            field: str(source_values[index])
+            for index, field in enumerate(fields)
+        }
+
     field_columns = _field_columns_for_action(action)
     fields = list(field_columns.keys())
     source_values = list(values if values is not None else action.new_values)
@@ -366,7 +405,7 @@ def _field_values_for_action(action: UndoAction, values: list[str] | None = None
 
 def _format_action_snapshot(action: UndoAction, values: list[str] | None = None) -> str:
     field_values = _field_values_for_action(action, values)
-    if action.metadata.get("type") == "expense":
+    if action.metadata.get("type") in {"expense", "update", "move"}:
         category = action.metadata.get("category", "expense")
         item = field_values.get("item") or category
         amount = field_values.get("amount", "")
@@ -376,7 +415,8 @@ def _format_action_snapshot(action: UndoAction, values: list[str] | None = None)
         if item:
             parts.append(f"item '{item}'")
         if amount:
-            parts.append(f"amount ${amount}")
+            prefix = "" if str(amount).startswith("$") else "$"
+            parts.append(f"amount {prefix}{amount}")
         if location:
             parts.append(f"location '{location}'")
         if person:
@@ -398,7 +438,11 @@ def _format_action_list_item(index: int, action: UndoAction) -> list[str]:
     if action_type == "expense":
         title = f"{category or 'expense'} expense"
     elif action_type == "update":
-        title = f"updated {category or 'transaction'}"
+        title = f"Updated: {(category or 'transaction').capitalize()} Expense"
+    elif action_type == "move":
+        source = action.metadata.get("source_category", "unknown")
+        destination = action.metadata.get("destination_category") or category or "unknown"
+        title = f"Moved: {source.capitalize()} -> {destination.capitalize()}"
     elif action_type == "need_expense":
         title = "Need expense"
     elif action_type == "payment":
@@ -520,13 +564,16 @@ def move_recent_action(
             action_id = candidate_ids[index - 1]
             index = None
 
+    if not index and not action_id and not match_text:
+        return False, format_recent_actions(user_key, 5)
+
     if destination_category not in get_category_columns:
         available = ", ".join(sorted(get_category_columns))
         return False, f"Tell me which category to move it to. Available categories: {available}."
 
     logged = select_recent_action(user_key, index=index, action_id=action_id, match_text=match_text)
     if logged is None:
-        return False, format_recent_actions(user_key, 10)
+        return False, format_recent_actions(user_key, 5)
 
     action = logged.action
     if action.metadata.get("type") != "expense" or action.worksheet != "expense":
@@ -575,7 +622,7 @@ def move_recent_action(
             previous_values=destination_previous_values,
             new_values=destination_new_values,
             metadata={
-                "type": "expense",
+                "type": "move",
                 "category": destination_category,
                 "person": destination_values.get("person", ""),
                 "source_action_id": logged.id,
@@ -584,6 +631,7 @@ def move_recent_action(
                 "source_columns": json.dumps(source_columns),
                 "source_values": json.dumps(source_current_values),
                 "destination_category": destination_category,
+                "display_fields": json.dumps(destination_fields),
             },
             description=f"moved {source_category} expense to {destination_category}",
         ),
@@ -627,7 +675,7 @@ def update_recent_action(
         match_text=match_text,
     )
     if logged is None:
-        return False, format_recent_actions(user_key, 10)
+        return False, format_recent_actions(user_key, 5)
 
     field_columns = _field_columns_for_action(logged.action)
     if not field_columns:
@@ -642,6 +690,7 @@ def update_recent_action(
         return False, f"I found {_format_action_snapshot(logged.action)}. Please specify the new value."
 
     ws = _worksheet(logged.action.worksheet)
+    display_fields = list(field_columns.keys())
     before_values = list(logged.action.new_values)
     after_values = list(before_values)
     while len(after_values) < len(field_columns):
@@ -677,11 +726,12 @@ def update_recent_action(
             row=logged.action.row,
             columns=columns,
             previous_values=previous_values,
-            new_values=values,
+            new_values=after_values,
             metadata={
                 **logged.action.metadata,
                 "type": "update",
                 "updated_action_id": logged.id,
+                "display_fields": json.dumps(display_fields),
             },
             description=f"updated {logged.action.description}",
         ),
@@ -758,7 +808,7 @@ def delete_recent_action(
         logged = select_recent_action(user_key, index=index)
 
     if logged is None:
-        return False, format_recent_actions(user_key, 10)
+        return False, format_recent_actions(user_key, 5)
 
     try:
         success, detail = _apply_undo_action(logged.action)

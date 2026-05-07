@@ -75,9 +75,11 @@ def _extract_action_match_text(content: str) -> str | None:
         "category",
         "in",
         "into",
+        "name",
+        "of",
         "should",
     } | _ACTION_NOUNS | _DELETE_VERBS | _UPDATE_VERBS | _MOVE_VERBS
-    field_words = {"amount", "card", "date", "item", "location", "person"}
+    field_words = {"amount", "card", "date", "item", "location", "name", "person"}
     candidates = [word for word in words if word not in stop_words and word not in field_words]
     candidates = [word for word in candidates if word not in _CATEGORIES]
     return " ".join(candidates) or None
@@ -97,6 +99,7 @@ def _action_management_intent(content: str) -> tuple[str, dict] | None:
     text = content.lower()
     words = set(re.findall(r"[a-z&']+", text))
     has_action_noun = bool(words & _ACTION_NOUNS)
+    has_update_field = bool(words & {"amount", "card", "date", "item", "location", "name", "person"})
 
     destination_category = _extract_destination_category(text)
     if destination_category and (has_action_noun or "it" in words or "that" in words) and "to" in words and not (words & _DELETE_VERBS):
@@ -107,6 +110,8 @@ def _action_management_intent(content: str) -> tuple[str, dict] | None:
         return "move_recent_action", entities
 
     if not has_action_noun:
+        if words & _UPDATE_VERBS and has_update_field:
+            return "query_recent_actions", {"n": 5}
         return None
 
     if words & _MOVE_VERBS or ("category" in words and words & _UPDATE_VERBS):
@@ -120,14 +125,49 @@ def _action_management_intent(content: str) -> tuple[str, dict] | None:
         match_text = _extract_action_match_text(text)
         if match_text:
             return "delete_recent_action", {"match_text": match_text}
-        return "query_recent_actions", {"n": 10}
+        return "query_recent_actions", {"n": 5}
 
     if words & _UPDATE_VERBS:
         match_text = _extract_action_match_text(text)
         if match_text:
             return "update_recent_action", {"match_text": match_text, "updates": {}}
-        return "query_recent_actions", {"n": 10}
+        return "query_recent_actions", {"n": 5}
 
+    return None
+
+
+def _indexed_action_intent(content: str) -> tuple[str, dict] | None:
+    match = re.match(r"^\s*(\d{1,2})\b(.+)$", content.strip(), flags=re.IGNORECASE)
+    if not match:
+        return None
+    index = int(match.group(1))
+    rest = match.group(2).lower()
+    words = set(re.findall(r"[a-z&']+", rest))
+    destination_category = _extract_destination_category(rest)
+    if destination_category and (words & _MOVE_VERBS or "to" in words):
+        return "move_recent_action", {"index": index, "category": destination_category}
+    if words & _DELETE_VERBS:
+        return "delete_recent_action", {"index": index}
+    if words & _UPDATE_VERBS:
+        return "update_recent_action", {"index": index, "updates": {}}
+    return None
+
+
+def _recent_query_intent(content: str) -> tuple[str, dict] | None:
+    text = content.lower().strip()
+    if text == "show more":
+        return "query_recent_actions", {"more": True}
+    if text in {
+        "recent actions",
+        "recent logged actions",
+        "show recent actions",
+        "show last actions",
+        "undo history",
+    }:
+        return "query_recent_actions", {"n": 5}
+    match = re.search(r"\b(?:show|list)\b.*\b(?:last|recent)\s+(\d{1,2})\b.*\b(?:actions|expenses|transactions)\b", text)
+    if match:
+        return "query_recent_actions", {"n": min(int(match.group(1)), 25)}
     return None
 
 
@@ -199,14 +239,16 @@ def register_events(client: discord.Client, tree: discord.app_commands.CommandTr
                 await handle_intent("delete_recent_action", {"index": int(idx_text)}, message)
                 return
 
-        if content.lower() in {
-            "recent actions",
-            "recent logged actions",
-            "show recent actions",
-            "show last actions",
-            "undo history",
-        }:
-            await handle_intent("query_recent_actions", {"n": 10}, message)
+        recent_query = _recent_query_intent(content)
+        if recent_query:
+            intent, entities = recent_query
+            await handle_intent(intent, entities, message)
+            return
+
+        indexed_action = _indexed_action_intent(content)
+        if indexed_action:
+            intent, entities = indexed_action
+            await handle_intent(intent, entities, message)
             return
 
         action_management = _action_management_intent(content)

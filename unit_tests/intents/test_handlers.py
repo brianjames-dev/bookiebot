@@ -183,6 +183,30 @@ async def test_update_recent_action_can_match_logged_expense_text(monkeypatch, m
 
 
 @pytest.mark.asyncio
+async def test_recent_actions_display_updated_action_with_full_fields(monkeypatch, message):
+    import bookiebot.sheets.writer as writer
+
+    monkeypatch.setattr(writer, "resolve_query_persons", lambda user, person=None, user_id=None: ["Hannah"])
+    repo = SheetsRepoStub(expense_rows=[[], []])
+
+    with repo.patched():
+        await ih.handle_intent(
+            "log_expense",
+            {"type": "expense", "category": "food", "amount": 12.5, "item": "Burrito", "location": "Chipotle"},
+            message,
+        )
+        await ih.handle_intent("update_recent_action", {"index": 1, "updates": {"amount": 14.75}}, message)
+        await ih.handle_intent("query_recent_actions", {"n": 5}, message)
+
+    recent_reply = message.channel.sent[-1][0] or ""
+    assert "Updated: Food Expense" in recent_reply
+    assert "Item: Burrito" in recent_reply
+    assert "Location: Chipotle" in recent_reply
+    assert "Amount: $14.75" in recent_reply
+    assert "Person: Hannah" in recent_reply
+
+
+@pytest.mark.asyncio
 async def test_update_recent_action_lists_candidates_when_value_missing(monkeypatch, message):
     import bookiebot.sheets.writer as writer
 
