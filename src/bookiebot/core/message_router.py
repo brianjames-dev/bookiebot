@@ -23,7 +23,7 @@ from bookiebot.intents.parser import parse_message_llm
 from bookiebot.intents.handlers import handle_intent
 from bookiebot.intents import explorer as intent_explorer
 from bookiebot.sheets.routing import resolve_actor_key
-from bookiebot.sheets.undo import pending_action_selection_kind, pending_update_field
+from bookiebot.sheets.undo import pending_action_selection_kind, pending_move_item, pending_update_field
 
 logger = logging.getLogger(__name__)
 
@@ -213,6 +213,16 @@ def register_events(client: discord.Client, tree: discord.app_commands.CommandTr
             getattr(message.author, "id", None),
             getattr(message.author, "name", None) or getattr(message.author, "display_name", None),
         )
+        pending_item_move = pending_move_item(actor_key)
+        if pending_item_move:
+            action_id, category = pending_item_move
+            await handle_intent(
+                "move_recent_action",
+                {"action_id": action_id, "category": category, "updates": {"item": content.strip()}},
+                message,
+            )
+            return
+
         pending_field = pending_update_field(actor_key)
         if pending_field:
             action_id, field = pending_field

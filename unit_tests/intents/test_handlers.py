@@ -134,7 +134,8 @@ async def test_query_recent_actions_lists_logged_expense(monkeypatch, message):
     assert any("Amount: $12.5" in (msg or "") for msg, _ in message.channel.sent)
     assert any("Location: Chipotle" in (msg or "") for msg, _ in message.channel.sent)
     assert any("Food Expense" in (msg or "") for msg, _ in message.channel.sent)
-    assert any("Type the number of the transaction, followed by what should happen to it (change, move, or undo)" in (msg or "") for msg, _ in message.channel.sent)
+    assert any("Type `show more` to see older transactions." in (msg or "") for msg, _ in message.channel.sent)
+    assert not any("Type the number of the transaction, followed by what should happen to it" in (msg or "") for msg, _ in message.channel.sent)
     assert any(kwargs.get("view") is not None for _msg, kwargs in message.channel.sent)
 
 
@@ -205,6 +206,52 @@ async def test_recent_actions_display_updated_action_with_full_fields(monkeypatc
     assert "Location: Chipotle" in recent_reply
     assert "Amount: $14.75" in recent_reply
     assert "Person: Hannah" in recent_reply
+
+
+@pytest.mark.asyncio
+async def test_recent_actions_hide_original_after_update(monkeypatch, message):
+    import bookiebot.sheets.writer as writer
+
+    monkeypatch.setattr(writer, "resolve_query_persons", lambda user, person=None, user_id=None: ["Hannah"])
+    repo = SheetsRepoStub(expense_rows=[[], []])
+
+    with repo.patched():
+        await ih.handle_intent(
+            "log_expense",
+            {"type": "expense", "category": "food", "amount": 10.0, "item": "Burger", "location": "Wendy's"},
+            message,
+        )
+        await ih.handle_intent("update_recent_action", {"index": 1, "updates": {"item": "Cookie"}}, message)
+        await ih.handle_intent("query_recent_actions", {"n": 5}, message)
+
+    recent_reply = message.channel.sent[-1][0] or ""
+    assert "1. Updated: Food Expense" in recent_reply
+    assert "2. Food Expense" not in recent_reply
+    assert recent_reply.count("Location: Wendy's") == 1
+
+
+@pytest.mark.asyncio
+async def test_recent_actions_hide_moved_action_after_update(monkeypatch, message):
+    import bookiebot.sheets.writer as writer
+
+    monkeypatch.setattr(writer, "resolve_query_persons", lambda user, person=None, user_id=None: ["Hannah"])
+    repo = SheetsRepoStub(expense_rows=[[], []])
+
+    with repo.patched():
+        await ih.handle_intent(
+            "log_expense",
+            {"type": "expense", "category": "grocery", "amount": 5.0, "item": "Groceries", "location": "Costco"},
+            message,
+        )
+        await ih.handle_intent("move_recent_action", {"index": 1, "category": "food", "updates": {"item": "Cookie"}}, message)
+        await ih.handle_intent("update_recent_action", {"index": 1, "updates": {"amount": 6.0}}, message)
+        await ih.handle_intent("query_recent_actions", {"n": 5}, message)
+
+    recent_reply = message.channel.sent[-1][0] or ""
+    assert "1. Updated: Food Expense" in recent_reply
+    assert "2. Moved Expense" not in recent_reply
+    assert recent_reply.count("Location: Costco") == 1
+    assert "Amount: $6.0" in recent_reply
 
 
 @pytest.mark.asyncio
@@ -328,6 +375,37 @@ async def test_move_recent_action_moves_grocery_to_food_and_can_undo(monkeypatch
         assert repo.expense.cell(3, 17).value != "None"
         assert repo.expense.cell(3, 18).value != "None"
 
+    assert any("Moved logged expense" in (msg or "") for msg, _ in message.channel.sent)
+
+
+@pytest.mark.asyncio
+async def test_move_recent_action_asks_for_item_when_destination_requires_it(monkeypatch, message):
+    import bookiebot.sheets.writer as writer
+
+    monkeypatch.setattr(writer, "resolve_query_persons", lambda user, person=None, user_id=None: ["Hannah"])
+    repo = SheetsRepoStub(expense_rows=[[], []])
+
+    with repo.patched():
+        await ih.handle_intent(
+            "log_expense",
+            {"type": "expense", "category": "grocery", "amount": 12.5, "item": "Groceries", "location": "Chipotle"},
+            message,
+        )
+
+        await ih.handle_intent("move_recent_action", {"index": 1, "category": "food"}, message)
+
+        assert repo.expense.cell(3, 2).value == "12.5"
+        assert repo.expense.cell(3, 15).value == ""
+        assert repo.expense.cell(3, 16).value == ""
+
+        await ih.handle_intent("move_recent_action", {"index": 1, "category": "food", "updates": {"item": "Burrito"}}, message)
+
+        assert repo.expense.cell(3, 2).value == ""
+        assert repo.expense.cell(3, 15).value == "Burrito"
+        assert repo.expense.cell(3, 16).value == "12.5"
+        assert repo.expense.cell(3, 17).value == "Chipotle"
+
+    assert any((msg or "") == "What is the name of the item?" for msg, _ in message.channel.sent)
     assert any("Moved logged expense" in (msg or "") for msg, _ in message.channel.sent)
 
 

@@ -24,6 +24,7 @@ from bookiebot.sheets.undo import (
     clear_pending_action_selection,
     delete_recent_action,
     editable_fields_for_action,
+    format_action_detail_block,
     format_recent_actions,
     matching_recent_actions,
     move_recent_action,
@@ -222,8 +223,7 @@ def _recent_action_select_view(actor_key: str | None, actions: list[Any], *, des
                 updates=updates or {},
                 action_id=action_id,
             )
-            prefix = "✅" if success else "❌"
-            await interaction.followup.send(f"{prefix} {detail}")
+            await _send_interaction_action_result(interaction, success, detail)
             return
 
         set_pending_update_selection(actor_key, action_id)
@@ -248,8 +248,7 @@ def _recent_action_select_view(actor_key: str | None, actions: list[Any], *, des
                 except Exception:
                     pass
                 success, detail = delete_recent_action(actor_key, index=1)
-                prefix = "✅" if success else "❌"
-                await decision_interaction.followup.send(f"{prefix} {detail}")
+                await _send_interaction_action_result(decision_interaction, success, detail)
                 return
             if decision == "move":
                 set_pending_move_selection(actor_key, action_id)
@@ -261,8 +260,10 @@ def _recent_action_select_view(actor_key: str | None, actions: list[Any], *, des
             clear_pending_action_selection(actor_key)
             await decision_interaction.response.send_message("Canceled.")
 
+        logged = select_recent_action(actor_key, action_id=action_id)
+        detail_block = f"\n\n{format_action_detail_block(logged.action)}" if logged else ""
         await interaction.response.send_message(
-            "What would you like to do with this transaction?",
+            f"What would you like to do with this transaction?{detail_block}",
             view=RecentActionDecisionView(handle_decision),
         )
 
@@ -281,8 +282,7 @@ def _move_category_view(actor_key: str | None, action_id: str, updates: dict[str
             updates=updates or {},
             action_id=action_id,
         )
-        prefix = "✅" if success else "❌"
-        await interaction.followup.send(f"{prefix} {detail}")
+        await _send_interaction_action_result(interaction, success, detail)
 
     return MoveCategoryView(handle_category)
 
@@ -300,8 +300,7 @@ def _update_field_view(actor_key: str | None, action_id: str, fields: list[str])
                     updates={"person": person},
                     action_id=action_id,
                 )
-                prefix = "✅" if success else "❌"
-                await person_interaction.followup.send(f"{prefix} {detail}")
+                await _send_interaction_action_result(person_interaction, success, detail)
 
             await interaction.response.send_message(
                 "Which person/card should this transaction use?",
@@ -387,8 +386,19 @@ async def _send_action_result(message: Any, success: bool, detail: str) -> None:
     if detail.startswith("Recent logged actions") or detail.startswith("I do not have more recent logged actions"):
         await message.channel.send(detail)
         return
+    if detail == "What is the name of the item?":
+        await message.channel.send(detail)
+        return
     prefix = "✅" if success else "❌"
     await message.channel.send(f"{prefix} {detail}")
+
+
+async def _send_interaction_action_result(interaction: Any, success: bool, detail: str) -> None:
+    if detail == "What is the name of the item?":
+        await interaction.followup.send(detail)
+        return
+    prefix = "✅" if success else "❌"
+    await interaction.followup.send(f"{prefix} {detail}")
 
 
 def _with_component_spacer(content: str, view: Any | None) -> str:

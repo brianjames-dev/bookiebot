@@ -33,6 +33,7 @@ _PENDING_DELETE_IDS_BY_USER: dict[str, list[str]] = {}
 _PENDING_UPDATE_IDS_BY_USER: dict[str, list[str]] = {}
 _PENDING_MOVE_IDS_BY_USER: dict[str, list[str]] = {}
 _PENDING_UPDATE_FIELD_BY_USER: dict[str, tuple[str, str]] = {}
+_PENDING_MOVE_ITEM_BY_USER: dict[str, tuple[str, str]] = {}
 _RECENT_ACTION_OFFSET_BY_USER: dict[str, int] = {}
 _LOG_HEADERS = ["id", "created_at", "user_key", "status", "undone_at", "action_json"]
 
@@ -164,16 +165,49 @@ def record_undo_action(user_key: str | None, action: UndoAction) -> None:
         logger.exception("Failed to persist undo action")
 
 
+def _lineage_parent_id(action: UndoAction) -> str | None:
+    return action.metadata.get("updated_action_id") or action.metadata.get("source_action_id") or None
+
+
+def _lineage_id(logged: LoggedAction, actions_by_id: dict[str, LoggedAction]) -> str:
+    current = logged
+    seen = {logged.id}
+    while parent_id := _lineage_parent_id(current.action):
+        if parent_id in seen:
+            break
+        parent = actions_by_id.get(parent_id)
+        if parent is None:
+            break
+        seen.add(parent_id)
+        current = parent
+    return current.id
+
+
+def _dedupe_actions_by_lineage(actions: list[LoggedAction], all_actions: list[LoggedAction]) -> list[LoggedAction]:
+    actions_by_id = {action.id: action for action in all_actions}
+    seen_lineages: set[str] = set()
+    deduped: list[LoggedAction] = []
+    for action in reversed(actions):
+        lineage_id = _lineage_id(action, actions_by_id)
+        if lineage_id in seen_lineages:
+            continue
+        seen_lineages.add(lineage_id)
+        deduped.append(action)
+    return deduped
+
+
 def recent_actions(user_key: str | None, limit: int = 5, offset: int = 0) -> list[LoggedAction]:
     key = str(user_key) if user_key else None
+    all_actions = _read_log()
     matches = [
         action
-        for action in _read_log()
+        for action in all_actions
         if action.status == "active" and (key is None or action.user_key == key)
     ]
+    matches = _dedupe_actions_by_lineage(matches, all_actions)
     start = max(offset, 0)
     end = start + max(limit, 1)
-    return list(reversed(matches))[start:end]
+    return matches[start:end]
 
 
 def _format_actions(actions: list[LoggedAction], *, empty_message: str, final_prompt: str) -> str:
@@ -229,7 +263,7 @@ def format_recent_actions(user_key: str | None, limit: int = 5, offset: int = 0)
     return _format_actions(
         recent_actions(user_key, limit, offset),
         empty_message="I do not have any recent logged actions for you this month.",
-        final_prompt="Type the number of the transaction, followed by what should happen to it (change, move, or undo).\n\nType `show more` to see older transactions.",
+        final_prompt="Type `show more` to see older transactions.",
     )
 
 
@@ -243,7 +277,7 @@ def next_recent_actions_page(user_key: str | None, page_size: int = 5) -> tuple[
         _format_actions(
             actions,
             empty_message="I do not have more recent logged actions for you this month.",
-            final_prompt="Type the number of the transaction, followed by what should happen to it (change, move, or undo).\n\nType `show more` to continue.",
+            final_prompt="Type `show more` to continue.",
         ),
         actions,
     )
@@ -366,6 +400,7 @@ def clear_pending_action_selection(user_key: str | None) -> None:
         _PENDING_DELETE_IDS_BY_USER.pop(key, None)
         _PENDING_MOVE_IDS_BY_USER.pop(key, None)
         _PENDING_UPDATE_FIELD_BY_USER.pop(key, None)
+        _PENDING_MOVE_ITEM_BY_USER.pop(key, None)
 
 
 def set_pending_update_field(user_key: str | None, action_id: str, field: str) -> None:
@@ -377,6 +412,17 @@ def set_pending_update_field(user_key: str | None, action_id: str, field: str) -
 def pending_update_field(user_key: str | None) -> tuple[str, str] | None:
     key = str(user_key) if user_key else ""
     return _PENDING_UPDATE_FIELD_BY_USER.get(key)
+
+
+def set_pending_move_item(user_key: str | None, action_id: str, destination_category: str) -> None:
+    key = str(user_key) if user_key else ""
+    if key:
+        _PENDING_MOVE_ITEM_BY_USER[key] = (action_id, destination_category)
+
+
+def pending_move_item(user_key: str | None) -> tuple[str, str] | None:
+    key = str(user_key) if user_key else ""
+    return _PENDING_MOVE_ITEM_BY_USER.get(key)
 
 
 def has_pending_action_selection(user_key: str | None) -> bool:
@@ -453,6 +499,10 @@ def _field_values_for_action(action: UndoAction, values: list[str] | None = None
 
 def _format_action_snapshot(action: UndoAction, values: list[str] | None = None) -> str:
     return "\n".join(_format_action_data_lines(action, values))
+
+
+def format_action_detail_block(action: UndoAction) -> str:
+    return "```\n" + _format_action_snapshot(action) + "\n```"
 
 
 def _format_action_data_lines(action: UndoAction, values: list[str] | None = None) -> list[str]:
@@ -554,8 +604,6 @@ def _values_for_category(source_values: dict[str, str], destination_category: st
         field: _sheet_value(clean_overrides.get(field, source_values.get(field, "")))
         for field in destination_fields
     }
-    if "item" in values and not values["item"]:
-        values["item"] = str(clean_overrides.get("item") or source_values.get("location") or source_values.get("item") or "")
     return values
 
 
@@ -612,6 +660,9 @@ def move_recent_action(
     destination_values = _values_for_category(source_values, destination_category, updates)
     missing = _missing_required_move_fields(destination_values, destination_category)
     if missing:
+        if missing == ["item"]:
+            set_pending_move_item(user_key, logged.id, destination_category)
+            return False, "What is the name of the item?"
         return False, f"I can move it to {destination_category}, but I still need: {', '.join(missing)}."
 
     ws = _worksheet("expense")
@@ -636,6 +687,7 @@ def move_recent_action(
     _mark_undone(logged.id)
     if key:
         _PENDING_MOVE_IDS_BY_USER.pop(key, None)
+        _PENDING_MOVE_ITEM_BY_USER.pop(key, None)
 
     record_undo_action(
         user_key,
