@@ -30,6 +30,7 @@ load_dotenv()
 
 SCOPES = ["https://www.googleapis.com/auth/spreadsheets"]
 _GC = None
+_ACTION_LOG_WORKSHEET_BY_TITLE = {}
 
 
 def _get_gc():
@@ -71,11 +72,17 @@ def get_subscriptions_worksheet():
 def get_action_log_worksheet():
     year = get_current_year()
     spreadsheet_id = get_shared_expenses_spreadsheet_id(year)
-    spreadsheet = _get_gc().open_by_key(spreadsheet_id)
     title = f"_BookieBot Action Log - {now_pacific():%Y-%m}"
+    cache_key = (spreadsheet_id, title)
+    if cache_key in _ACTION_LOG_WORKSHEET_BY_TITLE:
+        return _ACTION_LOG_WORKSHEET_BY_TITLE[cache_key]
+
+    spreadsheet = _get_gc().open_by_key(spreadsheet_id)
 
     try:
-        return spreadsheet.worksheet(title)
+        worksheet = spreadsheet.worksheet(title)
+        _ACTION_LOG_WORKSHEET_BY_TITLE[cache_key] = worksheet
+        return worksheet
     except Exception:
         worksheet = spreadsheet.add_worksheet(title=title, rows=1000, cols=6)
         worksheet.update_cell(1, 1, "id")
@@ -102,4 +109,5 @@ def get_action_log_worksheet():
             )
         except Exception:
             pass
+        _ACTION_LOG_WORKSHEET_BY_TITLE[cache_key] = worksheet
         return worksheet

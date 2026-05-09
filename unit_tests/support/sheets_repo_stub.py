@@ -62,6 +62,9 @@ class InMemoryWorksheet:
         row = [str(v) for v in values]
         self._rows.insert(idx, row)
 
+    def append_row(self, values: Iterable[str]) -> None:
+        self._rows.append([str(v) for v in values])
+
     def delete_rows(self, start_index: int, end_index: int | None = None) -> None:
         start = max(start_index - 1, 0)
         end = start if end_index is None else max(end_index - 1, start)

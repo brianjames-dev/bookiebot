@@ -5,6 +5,7 @@ from datetime import datetime
 import json
 import logging
 from typing import Any, Literal
+import weakref
 from uuid import uuid4
 
 from bookiebot.sheets.repo import get_sheets_repo
@@ -36,6 +37,7 @@ _PENDING_UPDATE_FIELD_BY_USER: dict[str, tuple[str, str]] = {}
 _PENDING_MOVE_ITEM_BY_USER: dict[str, tuple[str, str]] = {}
 _RECENT_ACTION_OFFSET_BY_USER: dict[str, int] = {}
 _LOG_HEADERS = ["id", "created_at", "user_key", "status", "undone_at", "action_json"]
+_LOG_HEADER_READY: weakref.WeakSet[Any] = weakref.WeakSet()
 
 
 def _sheet_value(value: Any) -> str:
@@ -50,6 +52,18 @@ class LoggedAction:
     action: UndoAction
     status: Literal["active", "undone"] = "active"
     undone_at: str | None = None
+
+
+@dataclass
+class _LogRecord:
+    row_index: int
+    logged: LoggedAction
+
+
+@dataclass
+class _ActionLogData:
+    ws: Any
+    records: list[_LogRecord]
 
 
 def _action_from_dict(payload: dict) -> UndoAction:
@@ -69,12 +83,33 @@ def _log_sheet():
     return get_sheets_repo().action_log_sheet()
 
 
+def _log_header_is_ready(ws: Any) -> bool:
+    try:
+        return ws in _LOG_HEADER_READY
+    except TypeError:
+        return bool(getattr(ws, "_bookiebot_log_header_ready", False))
+
+
+def _mark_log_header_ready(ws: Any) -> None:
+    try:
+        _LOG_HEADER_READY.add(ws)
+    except TypeError:
+        try:
+            setattr(ws, "_bookiebot_log_header_ready", True)
+        except Exception:
+            pass
+
+
 def _ensure_log_header(ws: Any) -> None:
+    if _log_header_is_ready(ws):
+        return
     rows = ws.get_all_values()
     if rows and rows[0][: len(_LOG_HEADERS)] == _LOG_HEADERS:
+        _mark_log_header_ready(ws)
         return
     for col, header in enumerate(_LOG_HEADERS, start=1):
         ws.update_cell(1, col, header)
+    _mark_log_header_ready(ws)
 
 
 def _logged_action_from_row(row: list[str]) -> LoggedAction:
@@ -92,56 +127,64 @@ def _logged_action_from_row(row: list[str]) -> LoggedAction:
     )
 
 
-def _read_log() -> list[LoggedAction]:
+def _read_log_data() -> _ActionLogData | None:
     try:
         ws = _log_sheet()
         _ensure_log_header(ws)
-        rows = ws.get_all_values()[1:]
+        rows = ws.get_all_values()
     except Exception:
         logger.exception("Failed to read action log worksheet")
-        return []
-    actions = []
-    for row in rows:
+        return None
+
+    records: list[_LogRecord] = []
+    for row_index, row in enumerate(rows[1:], start=2):
         if not row or not row[0]:
             continue
         try:
-            actions.append(_logged_action_from_row(row))
+            records.append(_LogRecord(row_index=row_index, logged=_logged_action_from_row(row)))
         except Exception:
             logger.warning("Skipping malformed action log row", extra={"row": row})
-    return actions
+    return _ActionLogData(ws=ws, records=records)
+
+
+def _read_log() -> list[LoggedAction]:
+    data = _read_log_data()
+    if data is None:
+        return []
+    return [record.logged for record in data.records]
 
 
 def _append_logged_action(user_key: str | None, action: UndoAction) -> None:
     ws = _log_sheet()
     _ensure_log_header(ws)
-    rows = ws.get_all_values()
-    row_index = len(rows) + 1
     logged = LoggedAction(
         id=uuid4().hex[:8],
         created_at=datetime.now().isoformat(timespec="seconds"),
         user_key=str(user_key) if user_key else None,
         action=action,
     )
-    ws.insert_row(
-        [
-            logged.id,
-            logged.created_at,
-            logged.user_key or "",
-            logged.status,
-            logged.undone_at or "",
-            json.dumps(asdict(logged.action), separators=(",", ":")),
-        ],
-        index=row_index,
-    )
-
-
-def _find_log_row(logged_id: str) -> tuple[Any, int, LoggedAction] | None:
-    ws = _log_sheet()
-    _ensure_log_header(ws)
+    row = [
+        logged.id,
+        logged.created_at,
+        logged.user_key or "",
+        logged.status,
+        logged.undone_at or "",
+        json.dumps(asdict(logged.action), separators=(",", ":")),
+    ]
+    if hasattr(ws, "append_row"):
+        ws.append_row(row)
+        return
     rows = ws.get_all_values()
-    for row_index, row in enumerate(rows[1:], start=2):
-        if row and row[0] == logged_id:
-            return ws, row_index, _logged_action_from_row(row)
+    ws.insert_row(row, index=len(rows) + 1)
+
+
+def _find_log_row(logged_id: str, log_data: _ActionLogData | None = None) -> tuple[Any, int, LoggedAction] | None:
+    data = log_data or _read_log_data()
+    if data is None:
+        return None
+    for record in data.records:
+        if record.logged.id == logged_id:
+            return data.ws, record.row_index, record.logged
     return None
 
 
@@ -202,7 +245,10 @@ def _dedupe_actions_by_lineage(actions: list[LoggedAction], all_actions: list[Lo
 
 def recent_actions(user_key: str | None, limit: int = 5, offset: int = 0) -> list[LoggedAction]:
     key = str(user_key) if user_key else None
-    all_actions = _read_log()
+    data = _read_log_data()
+    if data is None:
+        return []
+    all_actions = [record.logged for record in data.records]
     matches = [
         action
         for action in all_actions
@@ -216,12 +262,18 @@ def recent_actions(user_key: str | None, limit: int = 5, offset: int = 0) -> lis
     return matches[start:end]
 
 
-def _latest_raw_logged_action(user_key: str | None) -> LoggedAction | None:
+def _latest_raw_logged_action(
+    user_key: str | None,
+    log_data: _ActionLogData | None = None,
+) -> LoggedAction | None:
     key = str(user_key) if user_key else None
+    data = log_data or _read_log_data()
+    if data is None:
+        return None
     matches = [
-        action
-        for action in _read_log()
-        if action.status == "active" and (key is None or action.user_key == key)
+        record.logged
+        for record in data.records
+        if record.logged.status == "active" and (key is None or record.logged.user_key == key)
     ]
     return matches[-1] if matches else None
 
@@ -239,6 +291,14 @@ def _format_actions(actions: list[LoggedAction], *, empty_message: str, final_pr
         lines.append("```")
     lines.append(final_prompt)
     return "\n".join(lines)
+
+
+def format_recent_action_list(actions: list[LoggedAction], *, continued: bool = False) -> str:
+    return _format_actions(
+        actions,
+        empty_message="I do not have any recent logged actions for you this month.",
+        final_prompt="Type `show more` to continue." if continued else "Type `show more` to see older transactions.",
+    )
 
 
 def action_option_label(action: UndoAction) -> str:
@@ -565,8 +625,12 @@ def _field_data_lines(field_values: dict[str, str], action: UndoAction) -> list[
     return lines
 
 
-def _update_logged_new_values(logged_id: str, updates_by_col: dict[int, Any]) -> None:
-    found = _find_log_row(logged_id)
+def _update_logged_new_values(
+    logged_id: str,
+    updates_by_col: dict[int, Any],
+    log_data: _ActionLogData | None = None,
+) -> None:
+    found = _find_log_row(logged_id, log_data)
     if found is None:
         return
     ws, row_index, logged = found
@@ -662,20 +726,18 @@ def _shift_logged_action_rows(
     upper_row: int,
     delta: int,
     exclude_ids: set[str] | None = None,
+    log_data: _ActionLogData | None = None,
 ) -> None:
     if upper_row < lower_row:
         return
     exclude_ids = exclude_ids or set()
-    ws = _log_sheet()
-    _ensure_log_header(ws)
-    rows = ws.get_all_values()
-    for row_index, row in enumerate(rows[1:], start=2):
-        if not row or not row[0] or row[0] in exclude_ids:
+    data = log_data or _read_log_data()
+    if data is None:
+        raise RuntimeError("Could not read action log for row-reference updates.")
+    for record in data.records:
+        if record.logged.id in exclude_ids:
             continue
-        try:
-            logged = _logged_action_from_row(row)
-        except Exception:
-            continue
+        logged = record.logged
         if logged.status != "active":
             continue
 
@@ -696,7 +758,7 @@ def _shift_logged_action_rows(
                 changed = True
 
         if changed:
-            _write_logged_action(ws, row_index, logged)
+            _write_logged_action(data.ws, record.row_index, logged)
 
 
 def _values_for_category(source_values: dict[str, str], destination_category: str, overrides: dict[str, Any]) -> dict[str, str]:
@@ -962,8 +1024,8 @@ def update_recent_action(
     )
 
 
-def _mark_undone(logged_id: str) -> None:
-    found = _find_log_row(logged_id)
+def _mark_undone(logged_id: str, log_data: _ActionLogData | None = None) -> None:
+    found = _find_log_row(logged_id, log_data)
     if found is None:
         return
     ws, row_index, _logged = found
@@ -971,8 +1033,8 @@ def _mark_undone(logged_id: str) -> None:
     ws.update_cell(row_index, 5, datetime.now().isoformat(timespec="seconds"))
 
 
-def _mark_active(logged_id: str) -> None:
-    found = _find_log_row(logged_id)
+def _mark_active(logged_id: str, log_data: _ActionLogData | None = None) -> None:
+    found = _find_log_row(logged_id, log_data)
     if found is None:
         return
     ws, row_index, _logged = found
@@ -980,11 +1042,14 @@ def _mark_active(logged_id: str) -> None:
     ws.update_cell(row_index, 5, "")
 
 
-def _latest_logged_action(user_key: str | None) -> LoggedAction | None:
-    return _latest_raw_logged_action(user_key)
+def _latest_logged_action(
+    user_key: str | None,
+    log_data: _ActionLogData | None = None,
+) -> LoggedAction | None:
+    return _latest_raw_logged_action(user_key, log_data)
 
 
-def _apply_undo_action(action: UndoAction) -> tuple[bool, str]:
+def _apply_undo_action(action: UndoAction, log_data: _ActionLogData | None = None) -> tuple[bool, str]:
     ws = _worksheet(action.worksheet)
     if action.kind == "move_expense":
         source_row = int(action.metadata["source_row"])
@@ -999,14 +1064,15 @@ def _apply_undo_action(action: UndoAction) -> tuple[bool, str]:
         snapshot = json.loads(action.metadata["category_snapshot"])
         start_row = int(action.metadata["compact_start_row"])
         end_row = int(action.metadata["compact_end_row"])
-        _restore_category_snapshot(ws, start_row, action.columns, snapshot)
         _shift_logged_action_rows(
             category=category,
             lower_row=start_row,
             upper_row=end_row - 1,
             delta=1,
             exclude_ids={action.metadata.get("deleted_action_id", "")},
+            log_data=log_data,
         )
+        _restore_category_snapshot(ws, start_row, action.columns, snapshot)
     elif action.kind == "delete_row":
         if hasattr(ws, "delete_rows"):
             ws.delete_rows(action.row)
@@ -1039,14 +1105,18 @@ def _delete_expense_action_with_compaction(user_key: str | None, logged: LoggedA
     snapshot = _category_snapshot(ws, rows, columns)
 
     try:
+        log_data = _read_log_data()
+        if log_data is None:
+            return False, "Something went wrong while reading the action log."
         _shift_category_cells_up(ws, start_row=action.row, end_row=end_row, columns=columns)
-        _mark_undone(logged.id)
+        _mark_undone(logged.id, log_data)
         _shift_logged_action_rows(
             category=category,
             lower_row=action.row + 1,
             upper_row=end_row,
             delta=-1,
             exclude_ids={logged.id},
+            log_data=log_data,
         )
     except Exception as e:
         logger.exception("Failed to compact deleted expense", extra={"exception": str(e)})
@@ -1127,7 +1197,8 @@ def delete_recent_action(
 def undo_last_action(user_key: str | None) -> tuple[bool, str]:
     global _GLOBAL_LAST_ACTION
     key = str(user_key) if user_key else None
-    logged = _latest_logged_action(key)
+    log_data = _read_log_data()
+    logged = _latest_logged_action(key, log_data) if log_data is not None else None
     if logged:
         action = logged.action
     elif key:
@@ -1140,7 +1211,7 @@ def undo_last_action(user_key: str | None) -> tuple[bool, str]:
             return False, "I do not have a recent transaction to undo."
 
     try:
-        success, detail = _apply_undo_action(action)
+        success, detail = _apply_undo_action(action, log_data)
     except Exception as e:
         logger.exception("Failed to undo last action", extra={"exception": str(e)})
         if key:
@@ -1155,11 +1226,12 @@ def undo_last_action(user_key: str | None) -> tuple[bool, str]:
             _update_logged_new_values(
                 updated_action_id,
                 {col: value for col, value in zip(action.columns, action.previous_values)},
+                log_data,
             )
         deleted_action_id = action.metadata.get("deleted_action_id")
         if deleted_action_id and action.kind == "compact_category_cells":
-            _mark_active(deleted_action_id)
-        _mark_undone(logged.id)
+            _mark_active(deleted_action_id, log_data)
+        _mark_undone(logged.id, log_data)
     if _GLOBAL_LAST_ACTION is action:
         _GLOBAL_LAST_ACTION = None
     return True, detail

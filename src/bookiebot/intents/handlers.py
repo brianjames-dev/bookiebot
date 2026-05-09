@@ -25,7 +25,7 @@ from bookiebot.sheets.undo import (
     delete_recent_action,
     editable_fields_for_action,
     format_action_detail_block,
-    format_recent_actions,
+    format_recent_action_list,
     matching_recent_actions,
     move_recent_action,
     next_recent_actions_page,
@@ -209,7 +209,7 @@ async def query_recent_actions_handler(entities: IntentEntities, message: Any) -
     else:
         actions = recent_actions(actor_key, limit)
         reset_recent_actions_page(actor_key)
-        output = format_recent_actions(actor_key, limit)
+        output = format_recent_action_list(actions)
 
     view = _recent_action_select_view(actor_key, actions) if actions else None
     await message.channel.send(_with_component_spacer(output, view), view=view)

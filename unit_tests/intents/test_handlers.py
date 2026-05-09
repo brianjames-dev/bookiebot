@@ -430,6 +430,43 @@ async def test_undo_delete_restores_compacted_category_and_log_rows(monkeypatch,
 
 
 @pytest.mark.asyncio
+async def test_undo_delete_does_not_restore_cells_if_log_reference_repair_fails(monkeypatch, message):
+    import bookiebot.sheets.undo as undo
+    import bookiebot.sheets.writer as writer
+
+    monkeypatch.setattr(writer, "resolve_query_persons", lambda user, person=None, user_id=None: ["Hannah"])
+    repo = SheetsRepoStub(expense_rows=[[], []])
+
+    with repo.patched():
+        await ih.handle_intent(
+            "log_expense",
+            {"type": "expense", "category": "shopping", "amount": 200.0, "item": "Watch", "location": "Zales"},
+            message,
+        )
+        await ih.handle_intent(
+            "log_expense",
+            {"type": "expense", "category": "shopping", "amount": 1200.0, "item": "Guitar", "location": "Guitar Center"},
+            message,
+        )
+        await ih.handle_intent("delete_recent_action", {"index": 2}, message)
+
+        assert repo.expense.cell(3, 23).value == "Guitar"
+        assert repo.expense.cell(4, 23).value == ""
+
+        def fail_reference_repair(**_kwargs):
+            raise RuntimeError("quota")
+
+        monkeypatch.setattr(undo, "_shift_logged_action_rows", fail_reference_repair)
+
+        await ih.handle_intent("undo_last_transaction", {}, message)
+
+        assert repo.expense.cell(3, 23).value == "Guitar"
+        assert repo.expense.cell(4, 23).value == ""
+
+    assert any("Something went wrong while undoing the last transaction" in (msg or "") for msg, _ in message.channel.sent)
+
+
+@pytest.mark.asyncio
 async def test_move_recent_action_moves_grocery_to_food_and_can_undo(monkeypatch, message):
     import bookiebot.sheets.writer as writer
 
