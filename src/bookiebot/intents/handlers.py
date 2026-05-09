@@ -234,6 +234,7 @@ async def delete_recent_action_handler(entities: IntentEntities, message: Any) -
     if detail.startswith("Recent logged actions"):
         actions = matching_recent_actions(actor_key, str(match_text), 10) if match_text else recent_actions(actor_key, 5)
         view = _delete_candidates_view(actor_key, actions) if actions else None
+        detail = _without_single_candidate_instruction(detail, actions)
         await message.channel.send(_with_component_spacer(detail, view), view=view)
         return
     await _send_action_result(message, success, detail)
@@ -552,6 +553,7 @@ async def update_recent_action_handler(entities: IntentEntities, message: Any) -
     if detail.startswith("Recent logged actions"):
         actions = matching_recent_actions(actor_key, str(match_text), 10) if match_text else recent_actions(actor_key, 5)
         view = _update_candidates_view(actor_key, actions) if actions else None
+        detail = _without_single_candidate_instruction(detail, actions)
         await message.channel.send(_with_component_spacer(detail, view), view=view)
         return
     if not success and not has_update_values and detail.startswith("I found "):
@@ -611,6 +613,7 @@ async def move_recent_action_handler(entities: IntentEntities, message: Any) -> 
             destination_category=str(destination_category) if destination_category else None,
             updates=updates,
         ) if actions else None
+        detail = _without_single_candidate_instruction(detail, actions)
         await message.channel.send(_with_component_spacer(detail, view), view=view)
         return
     await _send_action_result(message, success, detail)
@@ -637,6 +640,15 @@ async def _send_interaction_action_result(interaction: Any, success: bool, detai
 
 def _with_component_spacer(content: str, view: Any | None) -> str:
     return f"{content}\n\u200b" if view is not None else content
+
+
+def _without_single_candidate_instruction(content: str, actions: list[Any]) -> str:
+    if len(actions) != 1:
+        return content
+    lines = content.splitlines()
+    if lines and lines[-1].startswith("Use the controls below, or type the number of the transaction you want to "):
+        return "\n".join(lines[:-1])
+    return content
 
 
 # FALLBACK HANDLER

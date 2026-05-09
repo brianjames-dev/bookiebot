@@ -291,7 +291,7 @@ async def test_update_recent_action_lists_candidates_when_value_missing(monkeypa
 
         assert repo.expense.cell(3, 16).value == "$12.50"
 
-    assert any("Use the controls below, or type the number of the transaction you want to update" in (msg or "") for msg, _ in message.channel.sent)
+    assert not any("Use the controls below, or type the number of the transaction you want to update" in (msg or "") for msg, _ in message.channel.sent)
     view = next(kwargs.get("view") for _msg, kwargs in message.channel.sent if kwargs.get("view") is not None)
     labels = [getattr(child, "label", "") for child in getattr(view, "children", [])]
     assert "Confirm Update" in labels
@@ -339,7 +339,7 @@ async def test_delete_recent_action_lists_matching_candidates_before_delete(monk
 
         assert repo.expense.cell(3, 16).value == "$12.50"
 
-    assert any("Use the controls below, or type the number of the transaction you want to delete" in (msg or "") for msg, _ in message.channel.sent)
+    assert not any("Use the controls below, or type the number of the transaction you want to delete" in (msg or "") for msg, _ in message.channel.sent)
     assert any(kwargs.get("view") is not None for _msg, kwargs in message.channel.sent)
 
 
@@ -640,7 +640,7 @@ async def test_move_recent_action_lists_candidates_before_category(monkeypatch, 
 
         await ih.handle_intent("move_recent_action", {"match_text": "Chipotle", "category": "food"}, message)
 
-    assert any("Use the controls below, or type the number of the transaction you want to move" in (msg or "") for msg, _ in message.channel.sent)
+    assert not any("Use the controls below, or type the number of the transaction you want to move" in (msg or "") for msg, _ in message.channel.sent)
     assert any(kwargs.get("view") is not None for _msg, kwargs in message.channel.sent)
     view = next(kwargs.get("view") for _msg, kwargs in message.channel.sent if kwargs.get("view") is not None)
     labels = [getattr(child, "label", "") for child in getattr(view, "children", [])]
