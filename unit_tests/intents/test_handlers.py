@@ -357,6 +357,79 @@ async def test_delete_recent_action_deletes_pending_candidate_by_index(monkeypat
 
 
 @pytest.mark.asyncio
+async def test_delete_recent_action_compacts_category_and_updates_shifted_log_rows(monkeypatch, message):
+    import bookiebot.sheets.writer as writer
+
+    monkeypatch.setattr(writer, "resolve_query_persons", lambda user, person=None, user_id=None: ["Hannah"])
+    repo = SheetsRepoStub(expense_rows=[[], []])
+
+    with repo.patched():
+        await ih.handle_intent(
+            "log_expense",
+            {"type": "expense", "category": "food", "amount": 10.0, "item": "Burger", "location": "Wendy's"},
+            message,
+        )
+        await ih.handle_intent(
+            "log_expense",
+            {"type": "expense", "category": "food", "amount": 5.0, "item": "Coffee", "location": "Starbucks"},
+            message,
+        )
+
+        await ih.handle_intent("delete_recent_action", {"index": 2}, message)
+
+        assert repo.expense.cell(3, 15).value == "Coffee"
+        assert repo.expense.cell(3, 16).value == "5.0"
+        assert repo.expense.cell(3, 17).value == "Starbucks"
+        assert repo.expense.cell(4, 15).value == ""
+        assert repo.expense.cell(4, 16).value == ""
+        assert repo.expense.cell(4, 17).value == ""
+
+        await ih.handle_intent("update_recent_action", {"index": 1, "updates": {"amount": 6.0}}, message)
+
+        assert repo.expense.cell(3, 16).value == "6.0"
+        assert repo.expense.cell(4, 16).value == ""
+
+    assert any("Deleted: food expense $10.0 for Hannah" in (msg or "") for msg, _ in message.channel.sent)
+
+
+@pytest.mark.asyncio
+async def test_undo_delete_restores_compacted_category_and_log_rows(monkeypatch, message):
+    import bookiebot.sheets.writer as writer
+
+    monkeypatch.setattr(writer, "resolve_query_persons", lambda user, person=None, user_id=None: ["Hannah"])
+    repo = SheetsRepoStub(expense_rows=[[], []])
+
+    with repo.patched():
+        await ih.handle_intent(
+            "log_expense",
+            {"type": "expense", "category": "food", "amount": 10.0, "item": "Burger", "location": "Wendy's"},
+            message,
+        )
+        await ih.handle_intent(
+            "log_expense",
+            {"type": "expense", "category": "food", "amount": 5.0, "item": "Coffee", "location": "Starbucks"},
+            message,
+        )
+
+        await ih.handle_intent("delete_recent_action", {"index": 2}, message)
+        await ih.handle_intent("undo_last_transaction", {}, message)
+
+        assert repo.expense.cell(3, 15).value == "Burger"
+        assert repo.expense.cell(3, 16).value == "10.0"
+        assert repo.expense.cell(3, 17).value == "Wendy's"
+        assert repo.expense.cell(4, 15).value == "Coffee"
+        assert repo.expense.cell(4, 16).value == "5.0"
+        assert repo.expense.cell(4, 17).value == "Starbucks"
+
+        await ih.handle_intent("update_recent_action", {"match_text": "Starbucks", "updates": {"amount": 6.0}}, message)
+
+        assert repo.expense.cell(3, 16).value == "10.0"
+        assert repo.expense.cell(4, 16).value == "6.0"
+
+    assert any("Undid: deleted food expense $10.0 for Hannah" in (msg or "") for msg, _ in message.channel.sent)
+
+
+@pytest.mark.asyncio
 async def test_move_recent_action_moves_grocery_to_food_and_can_undo(monkeypatch, message):
     import bookiebot.sheets.writer as writer
 

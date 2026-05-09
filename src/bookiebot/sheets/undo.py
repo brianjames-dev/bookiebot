@@ -12,7 +12,7 @@ from bookiebot.sheets.repo import get_sheets_repo
 logger = logging.getLogger(__name__)
 
 WorksheetName = Literal["expense", "income"]
-ActionKind = Literal["clear_cells", "delete_row", "restore_cells", "move_expense"]
+ActionKind = Literal["clear_cells", "delete_row", "restore_cells", "move_expense", "compact_category_cells"]
 
 
 @dataclass
@@ -145,6 +145,10 @@ def _find_log_row(logged_id: str) -> tuple[Any, int, LoggedAction] | None:
     return None
 
 
+def _write_logged_action(ws: Any, row_index: int, logged: LoggedAction) -> None:
+    ws.update_cell(row_index, 6, json.dumps(asdict(logged.action), separators=(",", ":")))
+
+
 def _worksheet(name: WorksheetName):
     repo = get_sheets_repo()
     if name == "expense":
@@ -202,12 +206,24 @@ def recent_actions(user_key: str | None, limit: int = 5, offset: int = 0) -> lis
     matches = [
         action
         for action in all_actions
-        if action.status == "active" and (key is None or action.user_key == key)
+        if action.status == "active"
+        and action.action.metadata.get("type") != "delete"
+        and (key is None or action.user_key == key)
     ]
     matches = _dedupe_actions_by_lineage(matches, all_actions)
     start = max(offset, 0)
     end = start + max(limit, 1)
     return matches[start:end]
+
+
+def _latest_raw_logged_action(user_key: str | None) -> LoggedAction | None:
+    key = str(user_key) if user_key else None
+    matches = [
+        action
+        for action in _read_log()
+        if action.status == "active" and (key is None or action.user_key == key)
+    ]
+    return matches[-1] if matches else None
 
 
 def _format_actions(actions: list[LoggedAction], *, empty_message: str, final_prompt: str) -> str:
@@ -562,7 +578,7 @@ def _update_logged_new_values(logged_id: str, updates_by_col: dict[int, Any]) ->
         if col in columns:
             values[columns.index(col)] = str(value)
     logged.action.new_values = values
-    ws.update_cell(row_index, 6, json.dumps(asdict(logged.action), separators=(",", ":")))
+    _write_logged_action(ws, row_index, logged)
 
 
 def _category_columns(category: str) -> dict[str, int]:
@@ -589,6 +605,98 @@ def _first_empty_category_row(ws: Any, category: str) -> int:
         if not str(value).strip():
             return row_start + offset
     return len(col_values) + row_start
+
+
+def _last_occupied_category_row(ws: Any, category: str) -> int:
+    from bookiebot.sheets.config import get_category_columns
+
+    config = get_category_columns[category]
+    row_start = int(config["start_row"])
+    columns = config["columns"]
+    ref_col_letter = columns.get("amount") or list(columns.values())[0]
+    ref_col_index = _category_columns(category)[next(field for field, col in columns.items() if col == ref_col_letter)]
+    col_values = ws.col_values(ref_col_index)
+    for row_index in range(len(col_values), row_start - 1, -1):
+        if str(col_values[row_index - 1]).strip():
+            return row_index
+    return row_start - 1
+
+
+def _category_snapshot(ws: Any, rows: range, columns: list[int]) -> list[list[str]]:
+    return [
+        [_sheet_value(ws.cell(row, col).value) for col in columns]
+        for row in rows
+    ]
+
+
+def _restore_category_snapshot(ws: Any, start_row: int, columns: list[int], snapshot: list[list[str]]) -> None:
+    for row_offset, row_values in enumerate(snapshot):
+        row = start_row + row_offset
+        for col, value in zip(columns, row_values):
+            ws.update_cell(row, col, _sheet_value(value))
+
+
+def _shift_category_cells_up(ws: Any, *, start_row: int, end_row: int, columns: list[int]) -> None:
+    if end_row < start_row:
+        for col in columns:
+            ws.update_cell(start_row, col, "")
+        return
+
+    for row in range(start_row, end_row):
+        for col in columns:
+            ws.update_cell(row, col, _sheet_value(ws.cell(row + 1, col).value))
+    for col in columns:
+        ws.update_cell(end_row, col, "")
+
+
+def _action_category(action: UndoAction) -> str | None:
+    if action.worksheet != "expense":
+        return None
+    return action.metadata.get("category")
+
+
+def _shift_logged_action_rows(
+    *,
+    category: str,
+    lower_row: int,
+    upper_row: int,
+    delta: int,
+    exclude_ids: set[str] | None = None,
+) -> None:
+    if upper_row < lower_row:
+        return
+    exclude_ids = exclude_ids or set()
+    ws = _log_sheet()
+    _ensure_log_header(ws)
+    rows = ws.get_all_values()
+    for row_index, row in enumerate(rows[1:], start=2):
+        if not row or not row[0] or row[0] in exclude_ids:
+            continue
+        try:
+            logged = _logged_action_from_row(row)
+        except Exception:
+            continue
+        if logged.status != "active":
+            continue
+
+        changed = False
+        if _action_category(logged.action) == category and lower_row <= logged.action.row <= upper_row:
+            logged.action.row += delta
+            changed = True
+
+        source_category = logged.action.metadata.get("source_category")
+        source_row = logged.action.metadata.get("source_row")
+        if source_category == category and source_row:
+            try:
+                parsed_source_row = int(source_row)
+            except ValueError:
+                parsed_source_row = 0
+            if lower_row <= parsed_source_row <= upper_row:
+                logged.action.metadata["source_row"] = str(parsed_source_row + delta)
+                changed = True
+
+        if changed:
+            _write_logged_action(ws, row_index, logged)
 
 
 def _values_for_category(source_values: dict[str, str], destination_category: str, overrides: dict[str, Any]) -> dict[str, str]:
@@ -631,6 +739,7 @@ def move_recent_action(
         return False, format_move_candidates(user_key, match_text, 10)
 
     key = str(user_key) if user_key else ""
+    requested_index = index
     if index is not None and key and key in _PENDING_MOVE_IDS_BY_USER:
         candidate_ids = _PENDING_MOVE_IDS_BY_USER.get(key, [])
         if 1 <= index <= len(candidate_ids):
@@ -645,6 +754,8 @@ def move_recent_action(
         return False, f"Tell me which category to move it to. Available categories: {available}."
 
     logged = select_recent_action(user_key, index=index, action_id=action_id, match_text=match_text)
+    if logged is None and requested_index is not None and action_id:
+        logged = select_recent_action(user_key, index=requested_index)
     if logged is None:
         return False, format_recent_actions(user_key, 5)
 
@@ -759,6 +870,7 @@ def update_recent_action(
         return False, format_update_candidates(user_key, match_text, 10)
 
     key = str(user_key) if user_key else ""
+    requested_index = index
     if index is not None and key and key in _PENDING_UPDATE_IDS_BY_USER:
         candidate_ids = _PENDING_UPDATE_IDS_BY_USER.get(key, [])
         if 1 <= index <= len(candidate_ids):
@@ -771,6 +883,8 @@ def update_recent_action(
         action_id=action_id,
         match_text=match_text,
     )
+    if logged is None and requested_index is not None and action_id:
+        logged = select_recent_action(user_key, index=requested_index)
     if logged is None:
         return False, format_recent_actions(user_key, 5)
 
@@ -857,9 +971,17 @@ def _mark_undone(logged_id: str) -> None:
     ws.update_cell(row_index, 5, datetime.now().isoformat(timespec="seconds"))
 
 
+def _mark_active(logged_id: str) -> None:
+    found = _find_log_row(logged_id)
+    if found is None:
+        return
+    ws, row_index, _logged = found
+    ws.update_cell(row_index, 4, "active")
+    ws.update_cell(row_index, 5, "")
+
+
 def _latest_logged_action(user_key: str | None) -> LoggedAction | None:
-    actions = recent_actions(user_key, 1)
-    return actions[0] if actions else None
+    return _latest_raw_logged_action(user_key)
 
 
 def _apply_undo_action(action: UndoAction) -> tuple[bool, str]:
@@ -872,6 +994,19 @@ def _apply_undo_action(action: UndoAction) -> tuple[bool, str]:
             ws.update_cell(source_row, col, value)
         for col, value in zip(action.columns, action.previous_values):
             ws.update_cell(action.row, col, value)
+    elif action.kind == "compact_category_cells":
+        category = action.metadata["category"]
+        snapshot = json.loads(action.metadata["category_snapshot"])
+        start_row = int(action.metadata["compact_start_row"])
+        end_row = int(action.metadata["compact_end_row"])
+        _restore_category_snapshot(ws, start_row, action.columns, snapshot)
+        _shift_logged_action_rows(
+            category=category,
+            lower_row=start_row,
+            upper_row=end_row - 1,
+            delta=1,
+            exclude_ids={action.metadata.get("deleted_action_id", "")},
+        )
     elif action.kind == "delete_row":
         if hasattr(ws, "delete_rows"):
             ws.delete_rows(action.row)
@@ -890,6 +1025,56 @@ def _apply_undo_action(action: UndoAction) -> tuple[bool, str]:
     return True, f"Undid: {action.description}"
 
 
+def _delete_expense_action_with_compaction(user_key: str | None, logged: LoggedAction) -> tuple[bool, str]:
+    action = logged.action
+    category = _action_category(action)
+    if action.metadata.get("type") not in {"expense", "update", "move"} or not category:
+        return False, ""
+
+    ws = _worksheet("expense")
+    category_columns_by_field = _category_columns(category)
+    columns = list(category_columns_by_field.values())
+    end_row = max(action.row, _last_occupied_category_row(ws, category))
+    rows = range(action.row, end_row + 1)
+    snapshot = _category_snapshot(ws, rows, columns)
+
+    try:
+        _shift_category_cells_up(ws, start_row=action.row, end_row=end_row, columns=columns)
+        _mark_undone(logged.id)
+        _shift_logged_action_rows(
+            category=category,
+            lower_row=action.row + 1,
+            upper_row=end_row,
+            delta=-1,
+            exclude_ids={logged.id},
+        )
+    except Exception as e:
+        logger.exception("Failed to compact deleted expense", extra={"exception": str(e)})
+        return False, "Something went wrong while deleting that logged action."
+
+    record_undo_action(
+        user_key,
+        UndoAction(
+            worksheet="expense",
+            kind="compact_category_cells",
+            row=action.row,
+            columns=columns,
+            previous_values=[],
+            new_values=[],
+            metadata={
+                "type": "delete",
+                "category": category,
+                "deleted_action_id": logged.id,
+                "compact_start_row": str(action.row),
+                "compact_end_row": str(end_row),
+                "category_snapshot": json.dumps(snapshot),
+            },
+            description=f"deleted {action.description}",
+        ),
+    )
+    return True, f"Deleted: {action.description}"
+
+
 def delete_recent_action(
     user_key: str | None,
     *,
@@ -902,6 +1087,7 @@ def delete_recent_action(
         return False, format_delete_candidates(user_key, match_text, 10)
 
     logged: LoggedAction | None = None
+    requested_index = index
     if action_id:
         logged = select_recent_action(user_key, action_id=action_id)
     elif index is not None and key and key in _PENDING_DELETE_IDS_BY_USER:
@@ -910,9 +1096,18 @@ def delete_recent_action(
             logged = select_recent_action(user_key, action_id=candidate_ids[index - 1])
     elif index is not None:
         logged = select_recent_action(user_key, index=index)
+    if logged is None and requested_index is not None:
+        logged = select_recent_action(user_key, index=requested_index)
 
     if logged is None:
         return False, format_recent_actions(user_key, 5)
+
+    if logged.action.worksheet == "expense":
+        success, detail = _delete_expense_action_with_compaction(user_key, logged)
+        if detail:
+            if success and key:
+                _PENDING_DELETE_IDS_BY_USER.pop(key, None)
+            return success, detail
 
     try:
         success, detail = _apply_undo_action(logged.action)
@@ -961,6 +1156,9 @@ def undo_last_action(user_key: str | None) -> tuple[bool, str]:
                 updated_action_id,
                 {col: value for col, value in zip(action.columns, action.previous_values)},
             )
+        deleted_action_id = action.metadata.get("deleted_action_id")
+        if deleted_action_id and action.kind == "compact_category_cells":
+            _mark_active(deleted_action_id)
         _mark_undone(logged.id)
     if _GLOBAL_LAST_ACTION is action:
         _GLOBAL_LAST_ACTION = None
