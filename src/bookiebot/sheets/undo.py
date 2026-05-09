@@ -9,6 +9,7 @@ import weakref
 from uuid import uuid4
 
 from bookiebot.sheets.repo import get_sheets_repo
+from bookiebot.sheets.routing import actor_key_aliases
 
 logger = logging.getLogger(__name__)
 
@@ -244,7 +245,7 @@ def _dedupe_actions_by_lineage(actions: list[LoggedAction], all_actions: list[Lo
 
 
 def recent_actions(user_key: str | None, limit: int = 5, offset: int = 0) -> list[LoggedAction]:
-    key = str(user_key) if user_key else None
+    keys = actor_key_aliases(str(user_key)) if user_key else set()
     data = _read_log_data()
     if data is None:
         return []
@@ -254,7 +255,7 @@ def recent_actions(user_key: str | None, limit: int = 5, offset: int = 0) -> lis
         for action in all_actions
         if action.status == "active"
         and action.action.metadata.get("type") != "delete"
-        and (key is None or action.user_key == key)
+        and (not keys or action.user_key in keys)
     ]
     matches = _dedupe_actions_by_lineage(matches, all_actions)
     start = max(offset, 0)
@@ -266,14 +267,14 @@ def _latest_raw_logged_action(
     user_key: str | None,
     log_data: _ActionLogData | None = None,
 ) -> LoggedAction | None:
-    key = str(user_key) if user_key else None
+    keys = actor_key_aliases(str(user_key)) if user_key else set()
     data = log_data or _read_log_data()
     if data is None:
         return None
     matches = [
         record.logged
         for record in data.records
-        if record.logged.status == "active" and (key is None or record.logged.user_key == key)
+        if record.logged.status == "active" and (not keys or record.logged.user_key in keys)
     ]
     return matches[-1] if matches else None
 

@@ -606,6 +606,30 @@ def test_undo_does_not_use_memory_fallback_when_action_log_read_fails(monkeypatc
         assert repo.expense.cell(row, 4).value == "Brian (AL)"
 
 
+def test_shortcut_logged_action_can_be_undone_by_canonical_discord_user():
+    from bookiebot.sheets.undo import undo_last_action
+    import bookiebot.sheets.writer as writer
+
+    repo = SheetsRepoStub(expense_rows=[[], []])
+
+    with repo.patched():
+        row = writer.log_category_row(
+            {"date": "5/9/2026", "amount": 55.0, "location": "Safeway", "person": "Brian (AL)"},
+            repo.expense,
+            "grocery",
+        )
+        writer.record_expense_undo("grocery", row, 55.0, "Brian (AL)", "shortcut:brian")
+
+        success, detail = undo_last_action("676638528590970917")
+
+        assert success is True
+        assert "grocery expense" in detail
+        assert repo.expense.cell(row, 1).value == ""
+        assert repo.expense.cell(row, 2).value == ""
+        assert repo.expense.cell(row, 3).value == ""
+        assert repo.expense.cell(row, 4).value == ""
+
+
 # Query intents (happy paths via mocked helpers)
 @pytest.mark.asyncio
 async def test_query_burn_rate(monkeypatch, message):

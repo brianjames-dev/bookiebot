@@ -141,10 +141,26 @@ def resolve_actor_key(discord_user_id: Any, discord_user: str | None = None) -> 
 
     sender = _normalize_shortcut_sender(discord_user)
     if sender in {".deebers", "deebers"}:
-        return BRIAN_SHORTCUT_ACTOR_KEY
+        return DEFAULT_BRIAN_DISCORD_USER_IDS[0]
     if sender in {"hannerish"}:
-        return HANNAH_SHORTCUT_ACTOR_KEY
+        return DEFAULT_HANNAH_DISCORD_USER_IDS[0]
     return user_id
+
+
+def actor_key_aliases(actor_key: str | None) -> set[str]:
+    if not actor_key:
+        return set()
+
+    config_by_key = get_discord_user_config()
+    config = config_by_key.get(str(actor_key))
+    if config is None:
+        return {str(actor_key)}
+
+    return {
+        key
+        for key, candidate in config_by_key.items()
+        if candidate.budget_owner_key == config.budget_owner_key
+    }
 
 
 def get_user_config(discord_user_id: Any, discord_user: str | None = None) -> DiscordUserConfig:

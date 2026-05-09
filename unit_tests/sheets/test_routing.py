@@ -47,12 +47,14 @@ def test_hannah_user_resolves_to_hannah_budget_spreadsheet():
 
 def test_hannah_shortcut_user_resolves_to_hannah_budget_spreadsheet():
     actor_key = routing.resolve_actor_key(SHORTCUT_RELAY_ID, "hannerish#0000")
+    assert actor_key == HANNAH_ID
     sheet_id = routing.get_budget_spreadsheet_id_for_user(actor_key, 2026)
     assert sheet_id == "1lEULEvZ5UzjuhnGPncpvh56xxA8JsfYyns0JS_Okmsg"
 
 
 def test_brian_shortcut_user_resolves_to_brian_budget_spreadsheet():
     actor_key = routing.resolve_actor_key(SHORTCUT_RELAY_ID, ".Deebers#0000")
+    assert actor_key == BRIAN_ID
     sheet_id = routing.get_budget_spreadsheet_id_for_user(actor_key, 2026)
     assert sheet_id == "1ArI4qapaj-LGg7v5OC47WdfYijjLdu3QPRPgKLbgD3U"
 
@@ -73,6 +75,11 @@ def test_env_user_ids_are_additive_with_defaults(monkeypatch):
     assert routing.get_user_config(HANNAH_ID).name == "Hannah"
     assert routing.get_user_config(routing.resolve_actor_key(SHORTCUT_RELAY_ID, "hannerish#0000")).name == "Hannah"
     assert routing.get_user_config("extra-hannah-id").name == "Hannah"
+
+
+def test_actor_key_aliases_include_legacy_shortcut_keys():
+    assert routing.actor_key_aliases(BRIAN_ID) >= {BRIAN_ID, routing.BRIAN_SHORTCUT_ACTOR_KEY}
+    assert routing.actor_key_aliases(HANNAH_ID) >= {HANNAH_ID, routing.HANNAH_SHORTCUT_ACTOR_KEY}
 
 
 def test_both_users_resolve_to_same_shared_expenses_spreadsheet():
