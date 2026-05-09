@@ -45,7 +45,7 @@ def make_assert_log_expense(expected_amount: float):
         )
         amount_cell = repo.expense.cell(target_row, amount_col)
         person_cell = repo.expense.cell(target_row, person_col)
-        assert float(amount_cell.value) == expected_amount
+        assert float(str(amount_cell.value).replace("$", "").replace(",", "")) == expected_amount
         assert person_cell.value == "Hannah"
         return True
 

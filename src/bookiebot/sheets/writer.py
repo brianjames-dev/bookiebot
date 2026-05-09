@@ -11,7 +11,7 @@ from bookiebot.sheets.config import get_category_columns
 from bookiebot.sheets.utils import resolve_query_persons
 from bookiebot.sheets.repo import get_sheets_repo
 from bookiebot.sheets.routing import get_current_discord_user_id
-from bookiebot.sheets.undo import UndoAction, _update_contiguous_row, record_undo_action
+from bookiebot.sheets.undo import UndoAction, _sheet_user_entered_value, _update_contiguous_row, record_undo_action
 
 logger = logging.getLogger(__name__)
 
@@ -249,7 +249,7 @@ def log_category_row(values, worksheet, category):
             col_index = column_index_from_string(col_letter)
             logger.debug("Writing cell", extra={"value": value, "row": first_empty_row, "col": col_index, "column": col_letter})
             write_columns.append(col_index)
-            write_values.append(value)
+            write_values.append(_sheet_user_entered_value(field, value))
 
     _update_contiguous_row(worksheet, first_empty_row, write_columns, write_values)
 

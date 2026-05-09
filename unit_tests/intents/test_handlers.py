@@ -124,7 +124,7 @@ async def test_undo_last_transaction_clears_logged_expense(monkeypatch, message)
             message,
         )
 
-        assert repo.expense.cell(3, 16).value == "5.0"
+        assert repo.expense.cell(3, 16).value == "$5.00"
         assert repo.expense.update_cell_calls == 0
         assert repo.expense.update_calls == 1
 
@@ -174,11 +174,11 @@ async def test_update_recent_action_changes_logged_expense_amount(monkeypatch, m
 
         await ih.handle_intent("update_recent_action", {"index": 1, "updates": {"amount": 14.75}}, message)
 
-        assert repo.expense.cell(3, 16).value == "14.75"
+        assert repo.expense.cell(3, 16).value == "$14.75"
 
         await ih.handle_intent("undo_last_transaction", {}, message)
 
-        assert repo.expense.cell(3, 16).value == "12.5"
+        assert repo.expense.cell(3, 16).value == "$12.50"
 
     assert any("Before:\n```" in (msg or "") for msg, _ in message.channel.sent)
     assert any("Amount: $12.5" in (msg or "") and "Amount: $14.75" in (msg or "") for msg, _ in message.channel.sent)
@@ -289,7 +289,7 @@ async def test_update_recent_action_lists_candidates_when_value_missing(monkeypa
 
         await ih.handle_intent("update_recent_action", {"match_text": "Chipotle", "updates": {}}, message)
 
-        assert repo.expense.cell(3, 16).value == "12.5"
+        assert repo.expense.cell(3, 16).value == "$12.50"
 
     assert any("Use the controls below, or type the number of the transaction you want to update" in (msg or "") for msg, _ in message.channel.sent)
     view = next(kwargs.get("view") for _msg, kwargs in message.channel.sent if kwargs.get("view") is not None)
@@ -337,7 +337,7 @@ async def test_delete_recent_action_lists_matching_candidates_before_delete(monk
 
         await ih.handle_intent("delete_recent_action", {"match_text": "Chipotle"}, message)
 
-        assert repo.expense.cell(3, 16).value == "12.5"
+        assert repo.expense.cell(3, 16).value == "$12.50"
 
     assert any("Use the controls below, or type the number of the transaction you want to delete" in (msg or "") for msg, _ in message.channel.sent)
     assert any(kwargs.get("view") is not None for _msg, kwargs in message.channel.sent)
@@ -390,7 +390,7 @@ async def test_delete_recent_action_compacts_category_and_updates_shifted_log_ro
         await ih.handle_intent("delete_recent_action", {"index": 2}, message)
 
         assert repo.expense.cell(3, 15).value == "Coffee"
-        assert repo.expense.cell(3, 16).value == "5.0"
+        assert repo.expense.cell(3, 16).value == "$5.00"
         assert repo.expense.cell(3, 17).value == "Starbucks"
         assert repo.expense.cell(4, 15).value == ""
         assert repo.expense.cell(4, 16).value == ""
@@ -400,7 +400,7 @@ async def test_delete_recent_action_compacts_category_and_updates_shifted_log_ro
 
         await ih.handle_intent("update_recent_action", {"index": 1, "updates": {"amount": 6.0}}, message)
 
-        assert repo.expense.cell(3, 16).value == "6.0"
+        assert repo.expense.cell(3, 16).value == "$6.00"
         assert repo.expense.cell(4, 16).value == ""
 
     assert any("Deleted: food expense $10.0 for Hannah" in (msg or "") for msg, _ in message.channel.sent)
@@ -429,16 +429,16 @@ async def test_undo_delete_restores_compacted_category_and_log_rows(monkeypatch,
         await ih.handle_intent("undo_last_transaction", {}, message)
 
         assert repo.expense.cell(3, 15).value == "Burger"
-        assert repo.expense.cell(3, 16).value == "10.0"
+        assert repo.expense.cell(3, 16).value == "$10.00"
         assert repo.expense.cell(3, 17).value == "Wendy's"
         assert repo.expense.cell(4, 15).value == "Coffee"
-        assert repo.expense.cell(4, 16).value == "5.0"
+        assert repo.expense.cell(4, 16).value == "$5.00"
         assert repo.expense.cell(4, 17).value == "Starbucks"
 
         await ih.handle_intent("update_recent_action", {"match_text": "Starbucks", "updates": {"amount": 6.0}}, message)
 
-        assert repo.expense.cell(3, 16).value == "10.0"
-        assert repo.expense.cell(4, 16).value == "6.0"
+        assert repo.expense.cell(3, 16).value == "$10.00"
+        assert repo.expense.cell(4, 16).value == "$6.00"
 
     assert any("Undid: deleted food expense $10.0 for Hannah" in (msg or "") for msg, _ in message.channel.sent)
 
@@ -494,19 +494,19 @@ async def test_move_recent_action_moves_grocery_to_food_and_can_undo(monkeypatch
             message,
         )
 
-        assert repo.expense.cell(3, 2).value == "12.5"
+        assert repo.expense.cell(3, 2).value == "$12.50"
 
         await ih.handle_intent("move_recent_action", {"index": 1, "category": "food", "updates": {"item": "Burrito"}}, message)
 
         assert repo.expense.cell(3, 2).value == ""
         assert repo.expense.cell(3, 15).value == "Burrito"
-        assert repo.expense.cell(3, 16).value == "12.5"
+        assert repo.expense.cell(3, 16).value == "$12.50"
         assert repo.expense.cell(3, 17).value == "Chipotle"
         assert repo.expense.cell(3, 18).value == "Hannah"
 
         await ih.handle_intent("undo_last_transaction", {}, message)
 
-        assert repo.expense.cell(3, 2).value == "12.5"
+        assert repo.expense.cell(3, 2).value == "$12.50"
         assert repo.expense.cell(3, 15).value == ""
         assert repo.expense.cell(3, 16).value == ""
         assert repo.expense.cell(3, 17).value == ""
@@ -542,18 +542,18 @@ async def test_move_recent_action_compacts_source_category_and_updates_shifted_l
         repo.expense.update_cell_calls = 0
         await ih.handle_intent("move_recent_action", {"index": 2, "category": "food", "updates": {"item": "Snacks"}}, message)
 
-        assert repo.expense.cell(3, 2).value == "20.0"
+        assert repo.expense.cell(3, 2).value == "$20.00"
         assert repo.expense.cell(3, 3).value == "Costco"
         assert repo.expense.cell(4, 2).value == ""
         assert repo.expense.cell(3, 15).value == "Snacks"
-        assert repo.expense.cell(3, 16).value == "10.0"
+        assert repo.expense.cell(3, 16).value == "$10.00"
         assert repo.expense.cell(3, 17).value == "Safeway"
         assert repo.expense.update_cell_calls == 0
         assert repo.expense.update_calls == 2
 
         await ih.handle_intent("update_recent_action", {"match_text": "Costco", "updates": {"amount": 25.0}}, message)
 
-        assert repo.expense.cell(3, 2).value == "25.0"
+        assert repo.expense.cell(3, 2).value == "$25.00"
         assert repo.expense.cell(4, 2).value == ""
 
 
@@ -579,9 +579,9 @@ async def test_undo_move_restores_compacted_source_category_and_log_rows(monkeyp
         await ih.handle_intent("move_recent_action", {"index": 2, "category": "food", "updates": {"item": "Snacks"}}, message)
         await ih.handle_intent("undo_last_transaction", {}, message)
 
-        assert repo.expense.cell(3, 2).value == "10.0"
+        assert repo.expense.cell(3, 2).value == "$10.00"
         assert repo.expense.cell(3, 3).value == "Safeway"
-        assert repo.expense.cell(4, 2).value == "20.0"
+        assert repo.expense.cell(4, 2).value == "$20.00"
         assert repo.expense.cell(4, 3).value == "Costco"
         assert repo.expense.cell(3, 15).value == ""
         assert repo.expense.cell(3, 16).value == ""
@@ -589,8 +589,8 @@ async def test_undo_move_restores_compacted_source_category_and_log_rows(monkeyp
 
         await ih.handle_intent("update_recent_action", {"match_text": "Costco", "updates": {"amount": 25.0}}, message)
 
-        assert repo.expense.cell(3, 2).value == "10.0"
-        assert repo.expense.cell(4, 2).value == "25.0"
+        assert repo.expense.cell(3, 2).value == "$10.00"
+        assert repo.expense.cell(4, 2).value == "$25.00"
 
 
 @pytest.mark.asyncio
@@ -609,7 +609,7 @@ async def test_move_recent_action_asks_for_item_when_destination_requires_it(mon
 
         await ih.handle_intent("move_recent_action", {"index": 1, "category": "food"}, message)
 
-        assert repo.expense.cell(3, 2).value == "12.5"
+        assert repo.expense.cell(3, 2).value == "$12.50"
         assert repo.expense.cell(3, 15).value == ""
         assert repo.expense.cell(3, 16).value == ""
 
@@ -617,7 +617,7 @@ async def test_move_recent_action_asks_for_item_when_destination_requires_it(mon
 
         assert repo.expense.cell(3, 2).value == ""
         assert repo.expense.cell(3, 15).value == "Burrito"
-        assert repo.expense.cell(3, 16).value == "12.5"
+        assert repo.expense.cell(3, 16).value == "$12.50"
         assert repo.expense.cell(3, 17).value == "Chipotle"
 
     assert any((msg or "") == "What is the name of the item?" for msg, _ in message.channel.sent)
@@ -692,7 +692,7 @@ def test_undo_does_not_use_memory_fallback_when_action_log_read_fails(monkeypatc
         assert success is False
         assert "could not read the action log" in detail
         assert repo.expense.cell(row, 1).value == "5/5/2026"
-        assert repo.expense.cell(row, 2).value == "200.0"
+        assert repo.expense.cell(row, 2).value == "$200.00"
         assert repo.expense.cell(row, 3).value == "Costco"
         assert repo.expense.cell(row, 4).value == "Brian (AL)"
 

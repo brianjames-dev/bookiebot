@@ -47,6 +47,23 @@ def _sheet_value(value: Any) -> str:
     return "" if value is None else str(value)
 
 
+def _currency_user_entered_value(value: Any) -> str:
+    text = _sheet_value(value).strip()
+    if not text or text.startswith("$"):
+        return text
+    try:
+        amount = float(text.replace(",", ""))
+    except ValueError:
+        return text
+    return f"${amount:.2f}"
+
+
+def _sheet_user_entered_value(field: str, value: Any) -> str:
+    if field == "amount":
+        return _currency_user_entered_value(value)
+    return _sheet_value(value)
+
+
 def _range_name(start_row: int, start_col: int, end_row: int, end_col: int) -> str:
     start = f"{get_column_letter(start_col)}{start_row}"
     end = f"{get_column_letter(end_col)}{end_row}"
@@ -356,7 +373,8 @@ def action_option_label(action: UndoAction) -> str:
     location = field_values.get("location")
     amount = field_values.get("amount")
     person = field_values.get("person") or action.metadata.get("person")
-    label_parts = [part for part in (item, location, f"${amount}" if amount else "", person) if part]
+    amount_label = amount if str(amount).startswith("$") else f"${amount}" if amount else ""
+    label_parts = [part for part in (item, location, amount_label, person) if part]
     label = " - ".join(label_parts) or action.description or category
     return label[:100]
 
@@ -936,6 +954,10 @@ def move_recent_action(
     destination_fields = list(destination_values.keys())
     destination_columns = [destination_columns_by_field[field] for field in destination_fields]
     destination_new_values = [destination_values[field] for field in destination_fields]
+    destination_sheet_values = [
+        _sheet_user_entered_value(field, destination_values[field])
+        for field in destination_fields
+    ]
     destination_previous_values = [_sheet_value(ws.cell(destination_row, col).value) for col in destination_columns]
 
     try:
@@ -948,7 +970,7 @@ def move_recent_action(
             end_row=source_end_row,
             columns=source_category_columns,
         )
-        _update_contiguous_row(ws, destination_row, destination_columns, destination_new_values)
+        _update_contiguous_row(ws, destination_row, destination_columns, destination_sheet_values)
         _mark_undone(logged.id, log_data)
         _shift_logged_action_rows(
             category=source_category,
@@ -1084,7 +1106,7 @@ def update_recent_action(
         col = field_columns[field]
         previous_values.append(_sheet_value(ws.cell(logged.action.row, col).value))
         columns.append(col)
-        values.append(str(value))
+        values.append(_sheet_user_entered_value(field, value))
         updates_by_col[col] = value
         field_index = list(field_columns).index(field)
         after_values[field_index] = str(value)
