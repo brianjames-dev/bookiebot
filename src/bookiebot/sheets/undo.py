@@ -64,10 +64,10 @@ def _update_range(ws: Any, start_row: int, start_col: int, values: list[list[Any
     range_name = _range_name(start_row, start_col, start_row + len(padded) - 1, start_col + max_width - 1)
     if hasattr(ws, "update"):
         try:
-            ws.update(padded, range_name=range_name)
+            ws.update(padded, range_name=range_name, raw=False)
             return
         except TypeError:
-            ws.update(range_name, padded)
+            ws.update(range_name, padded, raw=False)
             return
     for row_offset, row_values in enumerate(padded):
         for col_offset, value in enumerate(row_values):
