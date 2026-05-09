@@ -48,13 +48,25 @@ def test_hannah_user_resolves_to_hannah_budget_spreadsheet():
 def test_hannah_shortcut_user_resolves_to_hannah_budget_spreadsheet():
     actor_key = routing.resolve_actor_key(SHORTCUT_RELAY_ID, "hannerish#0000")
     sheet_id = routing.get_budget_spreadsheet_id_for_user(actor_key, 2026)
+    assert actor_key == HANNAH_ID
     assert sheet_id == "1lEULEvZ5UzjuhnGPncpvh56xxA8JsfYyns0JS_Okmsg"
 
 
 def test_brian_shortcut_user_resolves_to_brian_budget_spreadsheet():
     actor_key = routing.resolve_actor_key(SHORTCUT_RELAY_ID, ".Deebers#0000")
     sheet_id = routing.get_budget_spreadsheet_id_for_user(actor_key, 2026)
+    assert actor_key == BRIAN_ID
     assert sheet_id == "1ArI4qapaj-LGg7v5OC47WdfYijjLdu3QPRPgKLbgD3U"
+
+
+def test_shortcut_actor_key_is_stable_user_id_for_undo_logs():
+    assert routing.resolve_actor_key(SHORTCUT_RELAY_ID, ".Deebers#0000") == BRIAN_ID
+    assert routing.resolve_actor_key(SHORTCUT_RELAY_ID, "hannerish#0000") == HANNAH_ID
+
+
+def test_legacy_shortcut_actor_keys_still_resolve_to_budget_profiles():
+    assert routing.get_user_config(routing.BRIAN_SHORTCUT_ACTOR_KEY).name == "Brian"
+    assert routing.get_user_config(routing.HANNAH_SHORTCUT_ACTOR_KEY).name == "Hannah"
 
 
 def test_hannah_shortcut_user_stays_hannah_when_old_env_lists_relay_for_brian(monkeypatch):

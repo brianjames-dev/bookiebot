@@ -134,6 +134,10 @@ def _normalize_shortcut_sender(discord_user: str | None) -> str:
     return user
 
 
+def _primary_user_id(owner_key: str, defaults: tuple[str, ...]) -> str:
+    return _configured_user_ids(owner_key, defaults)[0]
+
+
 def resolve_actor_key(discord_user_id: Any, discord_user: str | None = None) -> str | None:
     user_id = normalize_discord_user_id(discord_user_id)
     if user_id != APPLE_SHORTCUT_RELAY_USER_ID:
@@ -141,9 +145,9 @@ def resolve_actor_key(discord_user_id: Any, discord_user: str | None = None) -> 
 
     sender = _normalize_shortcut_sender(discord_user)
     if sender in {".deebers", "deebers"}:
-        return BRIAN_SHORTCUT_ACTOR_KEY
+        return _primary_user_id("brian", DEFAULT_BRIAN_DISCORD_USER_IDS)
     if sender in {"hannerish"}:
-        return HANNAH_SHORTCUT_ACTOR_KEY
+        return _primary_user_id("hannah", DEFAULT_HANNAH_DISCORD_USER_IDS)
     return user_id
 
 
