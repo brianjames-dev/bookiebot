@@ -1,4 +1,5 @@
 from bookiebot.core.message_router import _action_management_intent
+from bookiebot.core.message_router import _format_processing_error
 
 
 def test_delete_unspecified_expense_routes_to_recent_actions():
@@ -89,3 +90,16 @@ def test_recent_query_explicit_n_caps_at_25():
         "query_recent_actions",
         {"n": 25},
     )
+
+
+def test_processing_error_reply_includes_context_for_income():
+    reply = _format_processing_error(
+        "log_income",
+        {"amount": 21.88, "source": "Amazon", "label": "Return"},
+        RuntimeError("post-write bookkeeping failed"),
+    )
+
+    assert "I hit an error while logging income" in reply
+    assert "Request: log_income $21.88 from Amazon (Return)" in reply
+    assert "Error: RuntimeError: post-write bookkeeping failed" in reply
+    assert "sheet may already have been updated" in reply

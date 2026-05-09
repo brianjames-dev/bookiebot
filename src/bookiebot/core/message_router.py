@@ -43,6 +43,74 @@ _MOVE_VERBS = {"categorize", "move", "reclassify", "recategorize"}
 _CATEGORIES = {"grocery", "groceries", "gas", "food", "shopping"}
 
 
+def _short_value(value: object, *, limit: int = 80) -> str:
+    text = str(value).strip()
+    if len(text) <= limit:
+        return text
+    return f"{text[: limit - 3]}..."
+
+
+def _intent_action_label(intent: str | None) -> str:
+    labels = {
+        "log_income": "logging income",
+        "log_expense": "logging an expense",
+        "log_need_expense": "logging a Need expense",
+        "log_rent_paid": "logging rent paid",
+        "log_pge_paid": "logging PG&E paid",
+        "log_recology_paid": "logging Recology paid",
+        "log_water_paid": "logging water paid",
+        "log_student_loan_paid": "logging a student loan payment",
+        "query_recent_actions": "showing recent actions",
+        "update_recent_action": "updating a logged action",
+        "delete_recent_action": "deleting a logged action",
+        "move_recent_action": "moving a logged action",
+    }
+    return labels.get(intent or "", f"handling `{intent}`" if intent else "handling your request")
+
+
+def _format_intent_summary(intent: str | None, entities: dict) -> str:
+    parts = [intent or "unknown"]
+    amount = entities.get("amount")
+    if amount not in (None, ""):
+        parts.append(f"${amount}")
+
+    if intent == "log_income":
+        source = entities.get("source")
+        label = entities.get("label")
+        if source:
+            parts.append(f"from {_short_value(source)}")
+        if label:
+            parts.append(f"({_short_value(label)})")
+    elif intent == "log_expense":
+        category = entities.get("category")
+        item = entities.get("item")
+        location = entities.get("location")
+        if category:
+            parts.append(f"in {_short_value(category)}")
+        if item:
+            parts.append(f"for {_short_value(item)}")
+        if location:
+            parts.append(f"at {_short_value(location)}")
+
+    return " ".join(parts)
+
+
+def _format_processing_error(intent: str | None, entities: dict, error: Exception) -> str:
+    error_name = type(error).__name__
+    error_detail = _short_value(error or error_name, limit=120)
+    action = _intent_action_label(intent)
+    summary = _format_intent_summary(intent, entities)
+
+    lines = [
+        f"❌ I hit an error while {action}.",
+        f"Request: {summary}",
+        f"Error: {error_name}: {error_detail}",
+    ]
+    if (intent or "").startswith("log_"):
+        lines.append("If you also see a success message, the sheet may already have been updated. Check `recent actions` before retrying.")
+    return "\n".join(lines)
+
+
 def _extract_action_match_text(content: str) -> str | None:
     text = content.lower()
     text = re.sub(r"\$?\d+(?:\.\d{1,2})?", " ", text)
@@ -316,5 +384,14 @@ def register_events(client: discord.Client, tree: discord.app_commands.CommandTr
         try:
             await handle_intent(intent, entities, message)
         except Exception as e:
-            logger.exception("Failed to handle intent", extra={"exception": str(e)})
-            await message.channel.send("❌ Something went wrong while processing your request.")
+            logger.exception(
+                "Failed to handle intent",
+                extra={
+                    "exception": str(e),
+                    "intent": intent,
+                    "entities": entities,
+                    "user": str(message.author),
+                    "user_id": str(message.author.id),
+                },
+            )
+            await message.channel.send(_format_processing_error(intent, entities, e))
