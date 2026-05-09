@@ -8,7 +8,12 @@ from bookiebot.ui.card import ButtonBase, ButtonStyle, Interaction, SelectBase, 
 
 class RecentActionButton(ButtonBase):  # type: ignore[misc]
     def __init__(self, label: str, custom_id: str, callback_func: Callable):
-        style_name = "danger" if custom_id == "delete" else "secondary"
+        if custom_id in {"delete", "confirm_delete"}:
+            style_name = "danger"
+        elif custom_id == "cancel":
+            style_name = "secondary"
+        else:
+            style_name = "primary"
         style_value = getattr(ButtonStyle, style_name, getattr(ButtonStyle, "primary", ButtonStyle.primary))
         super().__init__(label=label, style=style_value, custom_id=custom_id)
         self.callback_func = callback_func

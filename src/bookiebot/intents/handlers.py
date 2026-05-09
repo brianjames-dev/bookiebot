@@ -451,7 +451,7 @@ async def _send_interaction_action_result(interaction: Any, success: bool, detai
 
 
 def _with_component_spacer(content: str, view: Any | None) -> str:
-    return f"{content}\n\n\u200b" if view is not None else content
+    return f"{content}\n\u200b" if view is not None else content
 
 
 # FALLBACK HANDLER
