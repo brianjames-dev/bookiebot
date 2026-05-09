@@ -29,6 +29,7 @@ from bookiebot.sheets.undo import (
     matching_recent_actions,
     move_recent_action,
     next_recent_actions_page,
+    pending_action_selection_id,
     recent_actions,
     reset_recent_actions_page,
     select_recent_action,
@@ -46,6 +47,7 @@ from bookiebot.ui.recent_actions import (
     PersonSelectView,
     RecentActionDecisionView,
     RecentActionSelectView,
+    UpdateConfirmView,
     UpdateFieldView,
 )
 
@@ -417,6 +419,50 @@ def _move_category_view(actor_key: str | None, action_id: str, updates: dict[str
     return MoveCategoryView(handle_category)
 
 
+async def _send_update_field_prompt(target: Any, actor_key: str | None, action_id: str) -> None:
+    logged = select_recent_action(actor_key, action_id=action_id)
+    fields = editable_fields_for_action(logged.action) if logged else []
+    if not fields:
+        await target.response.send_message("I do not know how to update fields for that transaction yet.")
+        return
+    detail_block = f"\n\n{format_action_detail_block(logged.action)}" if logged else ""
+    await target.response.send_message(
+        _with_component_spacer(f"Which field would you like to update?{detail_block}", True),
+        view=_update_field_view(actor_key, action_id, fields),
+    )
+
+
+def _update_candidates_view(actor_key: str | None, actions: list[Any]):
+    if len(actions) == 1:
+        return _update_confirm_view(actor_key, actions[0].id)
+    return _update_action_select_view(actor_key, actions)
+
+
+def _update_action_select_view(actor_key: str | None, actions: list[Any]):
+    async def handle_select(interaction: Any, action_id: str) -> None:
+        logged = select_recent_action(actor_key, action_id=action_id)
+        detail_block = f"\n\n{format_action_detail_block(logged.action)}" if logged else ""
+        set_pending_update_selection(actor_key, action_id)
+        await interaction.response.send_message(
+            _with_component_spacer(f"Update this transaction?{detail_block}", True),
+            view=_update_confirm_view(actor_key, action_id),
+        )
+
+    return RecentActionSelectView(actions, handle_select)
+
+
+def _update_confirm_view(actor_key: str | None, action_id: str):
+    async def handle_confirm(interaction: Any, decision: str) -> None:
+        if decision == "confirm_update":
+            set_pending_update_selection(actor_key, action_id)
+            await _send_update_field_prompt(interaction, actor_key, action_id)
+            return
+        clear_pending_action_selection(actor_key)
+        await interaction.response.send_message("Canceled.")
+
+    return UpdateConfirmView(handle_confirm)
+
+
 def _update_field_view(actor_key: str | None, action_id: str, fields: list[str]):
     async def handle_field(interaction: Any, field: str) -> None:
         if field == "person":
@@ -453,6 +499,7 @@ async def update_recent_action_handler(entities: IntentEntities, message: Any) -
     for field in ("amount", "location", "item", "person", "date"):
         if field in entities and field not in updates:
             updates[field] = entities[field]
+    has_update_values = any(value not in (None, "") for value in updates.values())
 
     index = entities.get("index")
     try:
@@ -460,13 +507,39 @@ async def update_recent_action_handler(entities: IntentEntities, message: Any) -
     except (TypeError, ValueError):
         index = None
 
+    actor_key = _message_actor_key(message)
+    action_id = entities.get("action_id")
+    match_text = entities.get("match_text") or entities.get("description") or entities.get("location") or entities.get("item")
+
     success, detail = update_recent_action(
-        _message_actor_key(message),
+        actor_key,
         updates=updates,
         index=index,
-        action_id=entities.get("action_id"),
-        match_text=entities.get("match_text") or entities.get("description") or entities.get("location") or entities.get("item"),
+        action_id=action_id,
+        match_text=match_text,
     )
+    if detail.startswith("Recent logged actions"):
+        actions = matching_recent_actions(actor_key, str(match_text), 10) if match_text else recent_actions(actor_key, 5)
+        view = _update_candidates_view(actor_key, actions) if actions else None
+        await message.channel.send(_with_component_spacer(detail, view), view=view)
+        return
+    if not success and not has_update_values and detail.startswith("I found "):
+        selected_action_id = str(action_id) if action_id else None
+        if selected_action_id is None and index is not None:
+            selected_action_id = pending_action_selection_id(actor_key, "update", index)
+            if selected_action_id is None:
+                logged = select_recent_action(actor_key, index=index)
+                selected_action_id = logged.id if logged else None
+        if selected_action_id:
+            class _ChannelResponse:
+                async def send_message(self, content: str, **kwargs: Any) -> None:
+                    await message.channel.send(content, **kwargs)
+
+            class _MessageTarget:
+                response = _ChannelResponse()
+
+            await _send_update_field_prompt(_MessageTarget(), actor_key, selected_action_id)
+            return
     await _send_action_result(message, success, detail)
 
 

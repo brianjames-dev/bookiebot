@@ -68,6 +68,13 @@ class MoveConfirmView(ViewBase):  # type: ignore[misc]
         self.add_item(RecentActionButton("Cancel", "cancel", callback_func))
 
 
+class UpdateConfirmView(ViewBase):  # type: ignore[misc]
+    def __init__(self, callback_func: Callable):
+        super().__init__(timeout=120)
+        self.add_item(RecentActionButton("Confirm Update", "confirm_update", callback_func))
+        self.add_item(RecentActionButton("Cancel", "cancel", callback_func))
+
+
 class MoveCategoryView(ViewBase):  # type: ignore[misc]
     def __init__(self, callback_func: Callable):
         super().__init__(timeout=120)

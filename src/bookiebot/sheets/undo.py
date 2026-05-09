@@ -443,7 +443,7 @@ def format_update_candidates(user_key: str | None, match_text: str, limit: int =
     return _format_actions(
         actions,
         empty_message=f"I could not find a recent logged action matching '{match_text}'.",
-        final_prompt="Type the number of the transaction you want to update, followed by the new value.",
+        final_prompt="Use the controls below, or type the number of the transaction you want to update.",
     )
 
 
@@ -543,6 +543,25 @@ def pending_action_selection_count(user_key: str | None, kind: Literal["update",
     if kind == "move":
         return len(_PENDING_MOVE_IDS_BY_USER.get(key, []))
     return 0
+
+
+def pending_action_selection_id(
+    user_key: str | None,
+    kind: Literal["update", "delete", "move"],
+    index: int,
+) -> str | None:
+    key = str(user_key) if user_key else ""
+    if not key or index < 1:
+        return None
+    if kind == "update":
+        action_ids = _PENDING_UPDATE_IDS_BY_USER.get(key, [])
+    elif kind == "delete":
+        action_ids = _PENDING_DELETE_IDS_BY_USER.get(key, [])
+    else:
+        action_ids = _PENDING_MOVE_IDS_BY_USER.get(key, [])
+    if index <= len(action_ids):
+        return action_ids[index - 1]
+    return None
 
 
 def _field_columns_for_action(action: UndoAction) -> dict[str, int]:

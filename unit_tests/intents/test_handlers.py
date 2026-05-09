@@ -289,11 +289,15 @@ async def test_update_recent_action_lists_candidates_when_value_missing(monkeypa
 
         assert repo.expense.cell(3, 16).value == "12.5"
 
-    assert any("Type the number of the transaction you want to update" in (msg or "") for msg, _ in message.channel.sent)
+    assert any("Use the controls below, or type the number of the transaction you want to update" in (msg or "") for msg, _ in message.channel.sent)
+    view = next(kwargs.get("view") for _msg, kwargs in message.channel.sent if kwargs.get("view") is not None)
+    labels = [getattr(child, "label", "") for child in getattr(view, "children", [])]
+    assert "Confirm Update" in labels
+    assert "Cancel" in labels
 
 
 @pytest.mark.asyncio
-async def test_update_recent_action_asks_for_value_after_candidate_selected(monkeypatch, message):
+async def test_update_recent_action_asks_for_field_after_candidate_selected(monkeypatch, message):
     import bookiebot.sheets.writer as writer
 
     monkeypatch.setattr(writer, "resolve_query_persons", lambda user, person=None, user_id=None: ["Hannah"])
@@ -309,7 +313,10 @@ async def test_update_recent_action_asks_for_value_after_candidate_selected(monk
         await ih.handle_intent("update_recent_action", {"match_text": "Chipotle", "updates": {}}, message)
         await ih.handle_intent("update_recent_action", {"index": 1, "updates": {}}, message)
 
-    assert any("Please specify the new value" in (msg or "") for msg, _ in message.channel.sent)
+    assert any("Which field would you like to update?" in (msg or "") for msg, _ in message.channel.sent)
+    view = message.channel.sent[-1][1].get("view")
+    labels = [getattr(child, "label", "") for child in getattr(view, "children", [])]
+    assert labels == ["Item", "Amount", "Location", "Person"]
 
 
 @pytest.mark.asyncio
