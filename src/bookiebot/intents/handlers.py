@@ -1,4 +1,5 @@
 # all intent handlers
+from contextlib import asynccontextmanager
 import os
 
 # Disable discord voice/audio stack to avoid loading audioop (deprecated in Python 3.13)
@@ -64,6 +65,35 @@ except ImportError:  # pragma: no cover - fallback for tests without discord.py
 
 IntentEntities = dict[str, Any]
 IntentHandler = Callable[[IntentEntities, Any], Awaitable[None]]
+
+
+_LOADING_INTENTS = {
+    "log_expense",
+    "log_income",
+    "log_rent_paid",
+    "log_pge_paid",
+    "log_recology_paid",
+    "log_water_paid",
+    "log_student_loan_paid",
+    "log_1st_savings",
+    "log_2nd_savings",
+    "log_need_expense",
+    "undo_last_transaction",
+    "delete_recent_action",
+    "update_recent_action",
+    "move_recent_action",
+}
+
+
+@asynccontextmanager
+async def _maybe_typing(message: Any, intent: str):
+    channel = getattr(message, "channel", None)
+    typing = getattr(channel, "typing", None)
+    if intent not in _LOADING_INTENTS or not callable(typing):
+        yield
+        return
+    async with typing():
+        yield
 
 
 INTENT_HANDLERS: dict[str, IntentHandler] = {
@@ -174,7 +204,8 @@ async def handle_intent(intent: str, entities: IntentEntities, message: Any, las
             print(f"🔎 Resolved persons for query: {persons_to_query}")
 
         try:
-            await handler(entities, message)
+            async with _maybe_typing(message, intent):
+                await handler(entities, message)
         except SheetRoutingError as e:
             await message.channel.send(str(e))
 
