@@ -250,7 +250,7 @@ def _recent_action_select_view(actor_key: str | None, actions: list[Any], *, des
                     await decision_interaction.response.send_message("I do not know how to update fields for that transaction yet.")
                     return
                 await decision_interaction.response.send_message(
-                    "Which field would you like to update?",
+                    _with_component_spacer("Which field would you like to update?", True),
                     view=_update_field_view(actor_key, action_id, fields),
                 )
                 return
@@ -266,7 +266,7 @@ def _recent_action_select_view(actor_key: str | None, actions: list[Any], *, des
             if decision == "move":
                 set_pending_move_selection(actor_key, action_id)
                 await decision_interaction.response.send_message(
-                    "Which category would you like to move this transaction to?",
+                    _with_component_spacer("Which category would you like to move this transaction to?", True),
                     view=_move_category_view(actor_key, action_id),
                 )
                 return
@@ -276,7 +276,7 @@ def _recent_action_select_view(actor_key: str | None, actions: list[Any], *, des
         logged = select_recent_action(actor_key, action_id=action_id)
         detail_block = f"\n\n{format_action_detail_block(logged.action)}" if logged else ""
         await interaction.response.send_message(
-            f"What would you like to do with this transaction?{detail_block}",
+            _with_component_spacer(f"What would you like to do with this transaction?{detail_block}", True),
             view=RecentActionDecisionView(handle_decision),
         )
 
@@ -295,7 +295,7 @@ def _delete_action_select_view(actor_key: str | None, actions: list[Any]):
         detail_block = f"\n\n{format_action_detail_block(logged.action)}" if logged else ""
         set_pending_delete_selection(actor_key, action_id)
         await interaction.response.send_message(
-            f"Delete this transaction?{detail_block}",
+            _with_component_spacer(f"Delete this transaction?{detail_block}", True),
             view=_delete_confirm_view(actor_key, action_id),
         )
 
@@ -352,7 +352,7 @@ def _update_field_view(actor_key: str | None, action_id: str, fields: list[str])
                 await _send_interaction_action_result(person_interaction, success, detail)
 
             await interaction.response.send_message(
-                "Which person/card should this transaction use?",
+                _with_component_spacer("Which person/card should this transaction use?", True),
                 view=PersonSelectView(handle_person),
             )
             return
@@ -451,7 +451,7 @@ async def _send_interaction_action_result(interaction: Any, success: bool, detai
 
 
 def _with_component_spacer(content: str, view: Any | None) -> str:
-    return f"{content}\n\u200b" if view is not None else content
+    return f"{content}\n\n\u200b" if view is not None else content
 
 
 # FALLBACK HANDLER
