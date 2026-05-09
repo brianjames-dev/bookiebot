@@ -368,13 +368,20 @@ def reset_recent_actions_page(user_key: str | None) -> None:
 
 def _action_search_text(logged: LoggedAction) -> str:
     action = logged.action
+    searchable_metadata_keys = (
+        "type",
+        "category",
+        "person",
+        "source_category",
+        "destination_category",
+    )
     parts = [
         logged.id,
         action.description,
         action.worksheet,
         str(action.row),
         *action.new_values,
-        *action.metadata.values(),
+        *(action.metadata.get(key) for key in searchable_metadata_keys),
     ]
     return " ".join(str(part).lower() for part in parts if part is not None)
 
@@ -448,7 +455,7 @@ def format_move_candidates(user_key: str | None, match_text: str, limit: int = 1
     return _format_actions(
         actions,
         empty_message=f"I could not find a recent logged action matching '{match_text}'.",
-        final_prompt="Type the number of the transaction you want to move, followed by the new category.",
+        final_prompt="Use the controls below, or type the number of the transaction you want to move followed by the new category.",
     )
 
 
@@ -855,6 +862,10 @@ def move_recent_action(
     ws = _worksheet("expense")
     source_columns = action.columns
     source_current_values = [_sheet_value(ws.cell(action.row, col).value) for col in source_columns]
+    source_columns_by_field = _category_columns(source_category)
+    source_category_columns = list(source_columns_by_field.values())
+    source_end_row = max(action.row, _last_occupied_category_row(ws, source_category))
+    source_snapshot = _category_snapshot(ws, range(action.row, source_end_row + 1), source_category_columns)
     destination_row = _first_empty_category_row(ws, destination_category)
     destination_columns_by_field = _category_columns(destination_category)
     destination_fields = list(destination_values.keys())
@@ -863,15 +874,30 @@ def move_recent_action(
     destination_previous_values = [_sheet_value(ws.cell(destination_row, col).value) for col in destination_columns]
 
     try:
-        for col in source_columns:
-            ws.update_cell(action.row, col, "")
+        log_data = _read_log_data()
+        if log_data is None:
+            return False, "Something went wrong while reading the action log."
+        _shift_category_cells_up(
+            ws,
+            start_row=action.row,
+            end_row=source_end_row,
+            columns=source_category_columns,
+        )
         for col, value in zip(destination_columns, destination_new_values):
             ws.update_cell(destination_row, col, value)
+        _mark_undone(logged.id, log_data)
+        _shift_logged_action_rows(
+            category=source_category,
+            lower_row=action.row + 1,
+            upper_row=source_end_row,
+            delta=-1,
+            exclude_ids={logged.id},
+            log_data=log_data,
+        )
     except Exception as e:
         logger.exception("Failed to move recent action", extra={"exception": str(e)})
         return False, "Something went wrong while moving that expense."
 
-    _mark_undone(logged.id)
     if key:
         _PENDING_MOVE_IDS_BY_USER.pop(key, None)
         _PENDING_MOVE_ITEM_BY_USER.pop(key, None)
@@ -894,6 +920,10 @@ def move_recent_action(
                 "source_row": str(action.row),
                 "source_columns": json.dumps(source_columns),
                 "source_values": json.dumps(source_current_values),
+                "source_category_columns": json.dumps(source_category_columns),
+                "source_compact_start_row": str(action.row),
+                "source_compact_end_row": str(source_end_row),
+                "source_category_snapshot": json.dumps(source_snapshot),
                 "destination_category": destination_category,
                 "display_fields": json.dumps(destination_fields),
             },
@@ -1066,11 +1096,27 @@ def _latest_logged_action(
 def _apply_undo_action(action: UndoAction, log_data: _ActionLogData | None = None) -> tuple[bool, str]:
     ws = _worksheet(action.worksheet)
     if action.kind == "move_expense":
-        source_row = int(action.metadata["source_row"])
-        source_columns = [int(col) for col in json.loads(action.metadata["source_columns"])]
-        source_values = [_sheet_value(value) for value in json.loads(action.metadata["source_values"])]
-        for col, value in zip(source_columns, source_values):
-            ws.update_cell(source_row, col, value)
+        if "source_category_snapshot" in action.metadata:
+            source_category = action.metadata["source_category"]
+            source_start_row = int(action.metadata["source_compact_start_row"])
+            source_end_row = int(action.metadata["source_compact_end_row"])
+            source_columns = [int(col) for col in json.loads(action.metadata["source_category_columns"])]
+            source_snapshot = json.loads(action.metadata["source_category_snapshot"])
+            _shift_logged_action_rows(
+                category=source_category,
+                lower_row=source_start_row,
+                upper_row=source_end_row - 1,
+                delta=1,
+                exclude_ids={action.metadata.get("source_action_id", "")},
+                log_data=log_data,
+            )
+            _restore_category_snapshot(ws, source_start_row, source_columns, source_snapshot)
+        else:
+            source_row = int(action.metadata["source_row"])
+            source_columns = [int(col) for col in json.loads(action.metadata["source_columns"])]
+            source_values = [_sheet_value(value) for value in json.loads(action.metadata["source_values"])]
+            for col, value in zip(source_columns, source_values):
+                ws.update_cell(source_row, col, value)
         for col, value in zip(action.columns, action.previous_values):
             ws.update_cell(action.row, col, value)
     elif action.kind == "compact_category_cells":
@@ -1247,6 +1293,9 @@ def undo_last_action(user_key: str | None) -> tuple[bool, str]:
         deleted_action_id = action.metadata.get("deleted_action_id")
         if deleted_action_id and action.kind == "compact_category_cells":
             _mark_active(deleted_action_id, log_data)
+        source_action_id = action.metadata.get("source_action_id")
+        if source_action_id and action.kind == "move_expense":
+            _mark_active(source_action_id, log_data)
         _mark_undone(logged.id, log_data)
     if _GLOBAL_LAST_ACTION is action:
         _GLOBAL_LAST_ACTION = None

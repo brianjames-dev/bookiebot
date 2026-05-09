@@ -507,6 +507,76 @@ async def test_move_recent_action_moves_grocery_to_food_and_can_undo(monkeypatch
 
 
 @pytest.mark.asyncio
+async def test_move_recent_action_compacts_source_category_and_updates_shifted_log_rows(monkeypatch, message):
+    import bookiebot.sheets.writer as writer
+
+    monkeypatch.setattr(writer, "resolve_query_persons", lambda user, person=None, user_id=None: ["Hannah"])
+    repo = SheetsRepoStub(expense_rows=[[], []])
+
+    with repo.patched():
+        await ih.handle_intent(
+            "log_expense",
+            {"type": "expense", "category": "grocery", "amount": 10.0, "item": "Groceries", "location": "Safeway"},
+            message,
+        )
+        await ih.handle_intent(
+            "log_expense",
+            {"type": "expense", "category": "grocery", "amount": 20.0, "item": "Groceries", "location": "Costco"},
+            message,
+        )
+
+        await ih.handle_intent("move_recent_action", {"index": 2, "category": "food", "updates": {"item": "Snacks"}}, message)
+
+        assert repo.expense.cell(3, 2).value == "20.0"
+        assert repo.expense.cell(3, 3).value == "Costco"
+        assert repo.expense.cell(4, 2).value == ""
+        assert repo.expense.cell(3, 15).value == "Snacks"
+        assert repo.expense.cell(3, 16).value == "10.0"
+        assert repo.expense.cell(3, 17).value == "Safeway"
+
+        await ih.handle_intent("update_recent_action", {"match_text": "Costco", "updates": {"amount": 25.0}}, message)
+
+        assert repo.expense.cell(3, 2).value == "25.0"
+        assert repo.expense.cell(4, 2).value == ""
+
+
+@pytest.mark.asyncio
+async def test_undo_move_restores_compacted_source_category_and_log_rows(monkeypatch, message):
+    import bookiebot.sheets.writer as writer
+
+    monkeypatch.setattr(writer, "resolve_query_persons", lambda user, person=None, user_id=None: ["Hannah"])
+    repo = SheetsRepoStub(expense_rows=[[], []])
+
+    with repo.patched():
+        await ih.handle_intent(
+            "log_expense",
+            {"type": "expense", "category": "grocery", "amount": 10.0, "item": "Groceries", "location": "Safeway"},
+            message,
+        )
+        await ih.handle_intent(
+            "log_expense",
+            {"type": "expense", "category": "grocery", "amount": 20.0, "item": "Groceries", "location": "Costco"},
+            message,
+        )
+
+        await ih.handle_intent("move_recent_action", {"index": 2, "category": "food", "updates": {"item": "Snacks"}}, message)
+        await ih.handle_intent("undo_last_transaction", {}, message)
+
+        assert repo.expense.cell(3, 2).value == "10.0"
+        assert repo.expense.cell(3, 3).value == "Safeway"
+        assert repo.expense.cell(4, 2).value == "20.0"
+        assert repo.expense.cell(4, 3).value == "Costco"
+        assert repo.expense.cell(3, 15).value == ""
+        assert repo.expense.cell(3, 16).value == ""
+        assert repo.expense.cell(3, 17).value == ""
+
+        await ih.handle_intent("update_recent_action", {"match_text": "Costco", "updates": {"amount": 25.0}}, message)
+
+        assert repo.expense.cell(3, 2).value == "10.0"
+        assert repo.expense.cell(4, 2).value == "25.0"
+
+
+@pytest.mark.asyncio
 async def test_move_recent_action_asks_for_item_when_destination_requires_it(monkeypatch, message):
     import bookiebot.sheets.writer as writer
 
@@ -553,8 +623,12 @@ async def test_move_recent_action_lists_candidates_before_category(monkeypatch, 
 
         await ih.handle_intent("move_recent_action", {"match_text": "Chipotle", "category": "food"}, message)
 
-    assert any("Type the number of the transaction you want to move" in (msg or "") for msg, _ in message.channel.sent)
+    assert any("Use the controls below, or type the number of the transaction you want to move" in (msg or "") for msg, _ in message.channel.sent)
     assert any(kwargs.get("view") is not None for _msg, kwargs in message.channel.sent)
+    view = next(kwargs.get("view") for _msg, kwargs in message.channel.sent if kwargs.get("view") is not None)
+    labels = [getattr(child, "label", "") for child in getattr(view, "children", [])]
+    assert "Confirm Move" in labels
+    assert "Cancel" in labels
 
 
 def test_expense_undo_can_be_recorded_after_context_exits():

@@ -42,6 +42,7 @@ from bookiebot.sheets.undo import (
 from bookiebot.ui.recent_actions import (
     DeleteConfirmView,
     MoveCategoryView,
+    MoveConfirmView,
     PersonSelectView,
     RecentActionDecisionView,
     RecentActionSelectView,
@@ -319,6 +320,86 @@ def _delete_confirm_view(actor_key: str | None, action_id: str):
     return DeleteConfirmView(handle_confirm)
 
 
+def _move_candidates_view(
+    actor_key: str | None,
+    actions: list[Any],
+    *,
+    destination_category: str | None = None,
+    updates: dict[str, Any] | None = None,
+):
+    if len(actions) == 1:
+        return _move_confirm_view(
+            actor_key,
+            actions[0].id,
+            destination_category=destination_category,
+            updates=updates,
+        )
+    return _move_action_select_view(
+        actor_key,
+        actions,
+        destination_category=destination_category,
+        updates=updates,
+    )
+
+
+def _move_action_select_view(
+    actor_key: str | None,
+    actions: list[Any],
+    *,
+    destination_category: str | None = None,
+    updates: dict[str, Any] | None = None,
+):
+    async def handle_select(interaction: Any, action_id: str) -> None:
+        logged = select_recent_action(actor_key, action_id=action_id)
+        detail_block = f"\n\n{format_action_detail_block(logged.action)}" if logged else ""
+        set_pending_move_selection(actor_key, action_id)
+        await interaction.response.send_message(
+            _with_component_spacer(f"Move this transaction?{detail_block}", True),
+            view=_move_confirm_view(
+                actor_key,
+                action_id,
+                destination_category=destination_category,
+                updates=updates,
+            ),
+        )
+
+    return RecentActionSelectView(actions, handle_select)
+
+
+def _move_confirm_view(
+    actor_key: str | None,
+    action_id: str,
+    *,
+    destination_category: str | None = None,
+    updates: dict[str, Any] | None = None,
+):
+    async def handle_confirm(interaction: Any, decision: str) -> None:
+        if decision == "confirm_move":
+            set_pending_move_selection(actor_key, action_id)
+            if destination_category:
+                try:
+                    await interaction.response.defer()
+                except Exception:
+                    pass
+                success, detail = move_recent_action(
+                    actor_key,
+                    destination_category=destination_category,
+                    updates=updates or {},
+                    action_id=action_id,
+                )
+                await _send_interaction_action_result(interaction, success, detail)
+                return
+            await interaction.response.send_message(
+                _with_component_spacer("Which category would you like to move this transaction to?", True),
+                view=_move_category_view(actor_key, action_id, updates),
+            )
+            return
+        clear_pending_action_selection(actor_key)
+        await interaction.response.send_message("Canceled.")
+
+    return MoveConfirmView(handle_confirm)
+
+
 def _move_category_view(actor_key: str | None, action_id: str, updates: dict[str, Any] | None = None):
     async def handle_category(interaction: Any, category: str) -> None:
         try:
@@ -420,7 +501,7 @@ async def move_recent_action_handler(entities: IntentEntities, message: Any) -> 
             actions = matching_recent_actions(actor_key, match_text, 10)
         else:
             actions = recent_actions(actor_key, 5)
-        view = _recent_action_select_view(
+        view = _move_candidates_view(
             actor_key,
             actions,
             destination_category=str(destination_category) if destination_category else None,
