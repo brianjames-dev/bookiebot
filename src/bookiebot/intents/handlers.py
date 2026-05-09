@@ -64,8 +64,8 @@ IntentHandler = Callable[[IntentEntities, Any], Awaitable[None]]
 
 INTENT_HANDLERS: dict[str, IntentHandler] = {
     # Logging handlers
-    "log_expense":                          lambda e, m: write_to_sheet(e, m),
-    "log_income":                           lambda e, m: write_to_sheet(e, m),
+    "log_expense":                          lambda e, m: write_transaction_to_sheet("expense", e, m),
+    "log_income":                           lambda e, m: write_transaction_to_sheet("income", e, m),
     "log_rent_paid":                        lambda e, m: log_rent_paid_handler(e, m),
     "log_pge_paid":                         lambda e, m: log_pge_paid_handler(e, m),
     "log_recology_paid":                    lambda e, m: log_recology_paid_handler(e, m),
@@ -111,6 +111,11 @@ INTENT_HANDLERS: dict[str, IntentHandler] = {
     "query_1st_savings":                    lambda e, m: query_1st_savings_handler(e, m),
     "query_2nd_savings":                    lambda e, m: query_2nd_savings_handler(e, m),
 }
+
+
+async def write_transaction_to_sheet(transaction_type: str, entities: IntentEntities, message: Any) -> None:
+    entities["type"] = transaction_type
+    await write_to_sheet(entities, message)
 
 
 def _message_actor_key(message) -> str | None:

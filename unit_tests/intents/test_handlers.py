@@ -54,6 +54,23 @@ async def test_log_income_calls_writer(monkeypatch, message):
 
 
 @pytest.mark.asyncio
+async def test_log_income_adds_missing_transaction_type(monkeypatch, message):
+    writer = AsyncMock()
+    monkeypatch.setattr(ih, "write_to_sheet", writer)
+    data = {"amount": 21.88, "date": "2026-05-09", "source": "Amazon", "label": "Return"}
+
+    await ih.handle_intent("log_income", data, message)
+
+    writer.assert_awaited_once()
+    written_data, written_message = writer.await_args.args
+    assert written_message is message
+    assert written_data["type"] == "income"
+    assert written_data["amount"] == 21.88
+    assert written_data["source"] == "Amazon"
+    assert written_data["label"] == "Return"
+
+
+@pytest.mark.asyncio
 async def test_sheet_routing_errors_are_sent_to_user(monkeypatch, message):
     writer = AsyncMock(side_effect=SpreadsheetAccessError("Could not open spreadsheet 'abc'."))
     monkeypatch.setattr(ih, "write_to_sheet", writer)
