@@ -8,6 +8,8 @@ from typing import Any, Literal
 import weakref
 from uuid import uuid4
 
+from openpyxl.utils import get_column_letter
+
 from bookiebot.sheets.repo import get_sheets_repo
 from bookiebot.sheets.routing import actor_key_aliases
 
@@ -43,6 +45,52 @@ _LOG_HEADER_READY: weakref.WeakSet[Any] = weakref.WeakSet()
 
 def _sheet_value(value: Any) -> str:
     return "" if value is None else str(value)
+
+
+def _range_name(start_row: int, start_col: int, end_row: int, end_col: int) -> str:
+    start = f"{get_column_letter(start_col)}{start_row}"
+    end = f"{get_column_letter(end_col)}{end_row}"
+    return start if start == end else f"{start}:{end}"
+
+
+def _update_range(ws: Any, start_row: int, start_col: int, values: list[list[Any]]) -> None:
+    if not values:
+        return
+    normalized = [[_sheet_value(value) for value in row] for row in values]
+    max_width = max((len(row) for row in normalized), default=0)
+    if max_width == 0:
+        return
+    padded = [row + [""] * (max_width - len(row)) for row in normalized]
+    range_name = _range_name(start_row, start_col, start_row + len(padded) - 1, start_col + max_width - 1)
+    if hasattr(ws, "update"):
+        try:
+            ws.update(padded, range_name=range_name)
+            return
+        except TypeError:
+            ws.update(range_name, padded)
+            return
+    for row_offset, row_values in enumerate(padded):
+        for col_offset, value in enumerate(row_values):
+            ws.update_cell(start_row + row_offset, start_col + col_offset, value)
+
+
+def _update_contiguous_row(ws: Any, row: int, columns: list[int], values: list[Any]) -> None:
+    if not columns:
+        return
+    pairs = sorted(zip(columns, values, strict=False), key=lambda item: item[0])
+    group_columns: list[int] = []
+    group_values: list[Any] = []
+    previous_col: int | None = None
+    for col, value in pairs:
+        if previous_col is not None and col != previous_col + 1:
+            _update_range(ws, row, group_columns[0], [group_values])
+            group_columns = []
+            group_values = []
+        group_columns.append(col)
+        group_values.append(value)
+        previous_col = col
+    if group_columns:
+        _update_range(ws, row, group_columns[0], [group_values])
 
 
 @dataclass
@@ -108,8 +156,7 @@ def _ensure_log_header(ws: Any) -> None:
     if rows and rows[0][: len(_LOG_HEADERS)] == _LOG_HEADERS:
         _mark_log_header_ready(ws)
         return
-    for col, header in enumerate(_LOG_HEADERS, start=1):
-        ws.update_cell(1, col, header)
+    _update_range(ws, 1, 1, [_LOG_HEADERS])
     _mark_log_header_ready(ws)
 
 
@@ -190,7 +237,7 @@ def _find_log_row(logged_id: str, log_data: _ActionLogData | None = None) -> tup
 
 
 def _write_logged_action(ws: Any, row_index: int, logged: LoggedAction) -> None:
-    ws.update_cell(row_index, 6, json.dumps(asdict(logged.action), separators=(",", ":")))
+    _update_range(ws, row_index, 6, [[json.dumps(asdict(logged.action), separators=(",", ":"))]])
 
 
 def _worksheet(name: WorksheetName):
@@ -734,23 +781,22 @@ def _category_snapshot(ws: Any, rows: range, columns: list[int]) -> list[list[st
 
 
 def _restore_category_snapshot(ws: Any, start_row: int, columns: list[int], snapshot: list[list[str]]) -> None:
-    for row_offset, row_values in enumerate(snapshot):
-        row = start_row + row_offset
-        for col, value in zip(columns, row_values):
-            ws.update_cell(row, col, _sheet_value(value))
+    if not snapshot or not columns:
+        return
+    _update_range(ws, start_row, min(columns), snapshot)
 
 
 def _shift_category_cells_up(ws: Any, *, start_row: int, end_row: int, columns: list[int]) -> None:
+    if not columns:
+        return
+    start_col = min(columns)
     if end_row < start_row:
-        for col in columns:
-            ws.update_cell(start_row, col, "")
+        _update_range(ws, start_row, start_col, [[""] * len(columns)])
         return
 
-    for row in range(start_row, end_row):
-        for col in columns:
-            ws.update_cell(row, col, _sheet_value(ws.cell(row + 1, col).value))
-    for col in columns:
-        ws.update_cell(end_row, col, "")
+    shifted_values = _category_snapshot(ws, range(start_row + 1, end_row + 1), columns)
+    shifted_values.append([""] * len(columns))
+    _update_range(ws, start_row, start_col, shifted_values)
 
 
 def _action_category(action: UndoAction) -> str | None:
@@ -902,8 +948,7 @@ def move_recent_action(
             end_row=source_end_row,
             columns=source_category_columns,
         )
-        for col, value in zip(destination_columns, destination_new_values):
-            ws.update_cell(destination_row, col, value)
+        _update_contiguous_row(ws, destination_row, destination_columns, destination_new_values)
         _mark_undone(logged.id, log_data)
         _shift_logged_action_rows(
             category=source_category,
@@ -1045,8 +1090,7 @@ def update_recent_action(
         after_values[field_index] = str(value)
 
     try:
-        for col, value in zip(columns, values):
-            ws.update_cell(logged.action.row, col, value)
+        _update_contiguous_row(ws, logged.action.row, columns, values)
     except Exception as e:
         logger.exception("Failed to update recent action", extra={"exception": str(e)})
         return False, "Something went wrong while updating that logged action."
@@ -1092,8 +1136,7 @@ def _mark_undone(logged_id: str, log_data: _ActionLogData | None = None) -> None
     if found is None:
         return
     ws, row_index, _logged = found
-    ws.update_cell(row_index, 4, "undone")
-    ws.update_cell(row_index, 5, datetime.now().isoformat(timespec="seconds"))
+    _update_range(ws, row_index, 4, [["undone", datetime.now().isoformat(timespec="seconds")]])
 
 
 def _mark_active(logged_id: str, log_data: _ActionLogData | None = None) -> None:
@@ -1101,8 +1144,7 @@ def _mark_active(logged_id: str, log_data: _ActionLogData | None = None) -> None
     if found is None:
         return
     ws, row_index, _logged = found
-    ws.update_cell(row_index, 4, "active")
-    ws.update_cell(row_index, 5, "")
+    _update_range(ws, row_index, 4, [["active", ""]])
 
 
 def _latest_logged_action(
@@ -1134,10 +1176,8 @@ def _apply_undo_action(action: UndoAction, log_data: _ActionLogData | None = Non
             source_row = int(action.metadata["source_row"])
             source_columns = [int(col) for col in json.loads(action.metadata["source_columns"])]
             source_values = [_sheet_value(value) for value in json.loads(action.metadata["source_values"])]
-            for col, value in zip(source_columns, source_values):
-                ws.update_cell(source_row, col, value)
-        for col, value in zip(action.columns, action.previous_values):
-            ws.update_cell(action.row, col, value)
+            _update_contiguous_row(ws, source_row, source_columns, source_values)
+        _update_contiguous_row(ws, action.row, action.columns, action.previous_values)
     elif action.kind == "compact_category_cells":
         category = action.metadata["category"]
         snapshot = json.loads(action.metadata["category_snapshot"])
@@ -1160,11 +1200,9 @@ def _apply_undo_action(action: UndoAction, log_data: _ActionLogData | None = Non
         else:
             return False, "This sheet client cannot delete rows."
     elif action.kind == "clear_cells":
-        for col in action.columns:
-            ws.update_cell(action.row, col, "")
+        _update_contiguous_row(ws, action.row, action.columns, [""] * len(action.columns))
     elif action.kind == "restore_cells":
-        for col, value in zip(action.columns, action.previous_values):
-            ws.update_cell(action.row, col, value)
+        _update_contiguous_row(ws, action.row, action.columns, action.previous_values)
     else:
         return False, "Unknown undo action."
     return True, f"Undid: {action.description}"

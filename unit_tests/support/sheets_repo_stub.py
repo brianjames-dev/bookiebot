@@ -24,6 +24,8 @@ class InMemoryWorksheet:
     def __init__(self, rows: Sequence[Sequence[str]] | None = None, title: str = "Sheet"):
         self.title = title
         self._rows: List[List[str]] = [list(map(str, row)) for row in rows or []]
+        self.update_calls = 0
+        self.update_cell_calls = 0
 
     def _ensure_position(self, row: int, col: int) -> tuple[int, int]:
         while len(self._rows) < row:
@@ -71,8 +73,22 @@ class InMemoryWorksheet:
         del self._rows[start : end + 1]
 
     def update_cell(self, row: int, col: int, value: str) -> None:
+        self.update_cell_calls += 1
         row_idx, col_idx = self._ensure_position(row, col)
         self._rows[row_idx][col_idx] = str(value)
+
+    def update(self, values, range_name: str | None = None, **_kwargs) -> None:
+        self.update_calls += 1
+        if range_name is None:
+            start_row = 1
+            start_col = 1
+        else:
+            start_a1 = range_name.split(":", 1)[0]
+            start_row, start_col = self._parse_a1(start_a1)
+        for row_offset, row_values in enumerate(values):
+            for col_offset, value in enumerate(row_values):
+                row_idx, col_idx = self._ensure_position(start_row + row_offset, start_col + col_offset)
+                self._rows[row_idx][col_idx] = str(value)
 
     def _parse_a1(self, a1: str) -> tuple[int, int]:
         match = re.match(r"^([A-Za-z]+)(\d+)$", a1)

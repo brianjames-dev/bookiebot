@@ -125,6 +125,8 @@ async def test_undo_last_transaction_clears_logged_expense(monkeypatch, message)
         )
 
         assert repo.expense.cell(3, 16).value == "5.0"
+        assert repo.expense.update_cell_calls == 0
+        assert repo.expense.update_calls == 1
 
         await ih.handle_intent("undo_last_transaction", {}, message)
 
@@ -383,6 +385,8 @@ async def test_delete_recent_action_compacts_category_and_updates_shifted_log_ro
             message,
         )
 
+        repo.expense.update_calls = 0
+        repo.expense.update_cell_calls = 0
         await ih.handle_intent("delete_recent_action", {"index": 2}, message)
 
         assert repo.expense.cell(3, 15).value == "Coffee"
@@ -391,6 +395,8 @@ async def test_delete_recent_action_compacts_category_and_updates_shifted_log_ro
         assert repo.expense.cell(4, 15).value == ""
         assert repo.expense.cell(4, 16).value == ""
         assert repo.expense.cell(4, 17).value == ""
+        assert repo.expense.update_cell_calls == 0
+        assert repo.expense.update_calls == 1
 
         await ih.handle_intent("update_recent_action", {"index": 1, "updates": {"amount": 6.0}}, message)
 
@@ -532,6 +538,8 @@ async def test_move_recent_action_compacts_source_category_and_updates_shifted_l
             message,
         )
 
+        repo.expense.update_calls = 0
+        repo.expense.update_cell_calls = 0
         await ih.handle_intent("move_recent_action", {"index": 2, "category": "food", "updates": {"item": "Snacks"}}, message)
 
         assert repo.expense.cell(3, 2).value == "20.0"
@@ -540,6 +548,8 @@ async def test_move_recent_action_compacts_source_category_and_updates_shifted_l
         assert repo.expense.cell(3, 15).value == "Snacks"
         assert repo.expense.cell(3, 16).value == "10.0"
         assert repo.expense.cell(3, 17).value == "Safeway"
+        assert repo.expense.update_cell_calls == 0
+        assert repo.expense.update_calls == 2
 
         await ih.handle_intent("update_recent_action", {"match_text": "Costco", "updates": {"amount": 25.0}}, message)
 
