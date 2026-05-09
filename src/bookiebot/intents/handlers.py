@@ -40,6 +40,7 @@ from bookiebot.sheets.undo import (
     update_recent_action,
 )
 from bookiebot.ui.recent_actions import (
+    DeleteConfirmView,
     MoveCategoryView,
     PersonSelectView,
     RecentActionDecisionView,
@@ -188,12 +189,19 @@ async def delete_recent_action_handler(entities: IntentEntities, message: Any) -
     except (TypeError, ValueError):
         index = None
 
+    actor_key = _message_actor_key(message)
+    match_text = entities.get("match_text") or entities.get("description") or entities.get("location") or entities.get("item")
     success, detail = delete_recent_action(
-        _message_actor_key(message),
+        actor_key,
         index=index,
         action_id=entities.get("action_id"),
-        match_text=entities.get("match_text") or entities.get("description") or entities.get("location") or entities.get("item"),
+        match_text=match_text,
     )
+    if detail.startswith("Recent logged actions"):
+        actions = matching_recent_actions(actor_key, str(match_text), 10) if match_text else recent_actions(actor_key, 5)
+        view = _delete_candidates_view(actor_key, actions) if actions else None
+        await message.channel.send(_with_component_spacer(detail, view), view=view)
+        return
     await _send_action_result(message, success, detail)
 
 
@@ -273,6 +281,42 @@ def _recent_action_select_view(actor_key: str | None, actions: list[Any], *, des
         )
 
     return RecentActionSelectView(actions, handle_select)
+
+
+def _delete_candidates_view(actor_key: str | None, actions: list[Any]):
+    if len(actions) == 1:
+        return _delete_confirm_view(actor_key, actions[0].id)
+    return _delete_action_select_view(actor_key, actions)
+
+
+def _delete_action_select_view(actor_key: str | None, actions: list[Any]):
+    async def handle_select(interaction: Any, action_id: str) -> None:
+        logged = select_recent_action(actor_key, action_id=action_id)
+        detail_block = f"\n\n{format_action_detail_block(logged.action)}" if logged else ""
+        set_pending_delete_selection(actor_key, action_id)
+        await interaction.response.send_message(
+            f"Delete this transaction?{detail_block}",
+            view=_delete_confirm_view(actor_key, action_id),
+        )
+
+    return RecentActionSelectView(actions, handle_select)
+
+
+def _delete_confirm_view(actor_key: str | None, action_id: str):
+    async def handle_confirm(interaction: Any, decision: str) -> None:
+        if decision == "confirm_delete":
+            set_pending_delete_selection(actor_key, action_id)
+            try:
+                await interaction.response.defer()
+            except Exception:
+                pass
+            success, detail = delete_recent_action(actor_key, action_id=action_id)
+            await _send_interaction_action_result(interaction, success, detail)
+            return
+        clear_pending_action_selection(actor_key)
+        await interaction.response.send_message("Canceled.")
+
+    return DeleteConfirmView(handle_confirm)
 
 
 def _move_category_view(actor_key: str | None, action_id: str, updates: dict[str, Any] | None = None):

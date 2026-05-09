@@ -23,7 +23,12 @@ from bookiebot.intents.parser import parse_message_llm
 from bookiebot.intents.handlers import handle_intent
 from bookiebot.intents import explorer as intent_explorer
 from bookiebot.sheets.routing import resolve_actor_key
-from bookiebot.sheets.undo import pending_action_selection_kind, pending_move_item, pending_update_field
+from bookiebot.sheets.undo import (
+    pending_action_selection_count,
+    pending_action_selection_kind,
+    pending_move_item,
+    pending_update_field,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -327,6 +332,14 @@ def register_events(client: discord.Client, tree: discord.app_commands.CommandTr
             if idx_text.isdigit():
                 await handle_intent("delete_recent_action", {"index": int(idx_text)}, message)
                 return
+
+        if (
+            pending_action_selection_kind(actor_key) == "delete"
+            and pending_action_selection_count(actor_key, "delete") == 1
+            and set(re.findall(r"[a-z']+", content.lower())) & _DELETE_VERBS
+        ):
+            await handle_intent("delete_recent_action", {"index": 1}, message)
+            return
 
         recent_query = _recent_query_intent(content)
         if recent_query:

@@ -423,7 +423,7 @@ def format_delete_candidates(user_key: str | None, match_text: str, limit: int =
     return _format_actions(
         actions,
         empty_message=f"I could not find a recent logged action matching '{match_text}'.",
-        final_prompt="Type the number of the transaction you want to delete.",
+        final_prompt="Use the controls below, or type the number of the transaction you want to delete.",
     )
 
 
@@ -522,6 +522,19 @@ def pending_action_selection_kind(user_key: str | None) -> Literal["update", "de
     if key and _PENDING_MOVE_IDS_BY_USER.get(key):
         return "move"
     return None
+
+
+def pending_action_selection_count(user_key: str | None, kind: Literal["update", "delete", "move"]) -> int:
+    key = str(user_key) if user_key else ""
+    if not key:
+        return 0
+    if kind == "update":
+        return len(_PENDING_UPDATE_IDS_BY_USER.get(key, []))
+    if kind == "delete":
+        return len(_PENDING_DELETE_IDS_BY_USER.get(key, []))
+    if kind == "move":
+        return len(_PENDING_MOVE_IDS_BY_USER.get(key, []))
+    return 0
 
 
 def _field_columns_for_action(action: UndoAction) -> dict[str, int]:
@@ -1198,7 +1211,9 @@ def undo_last_action(user_key: str | None) -> tuple[bool, str]:
     global _GLOBAL_LAST_ACTION
     key = str(user_key) if user_key else None
     log_data = _read_log_data()
-    logged = _latest_logged_action(key, log_data) if log_data is not None else None
+    if log_data is None:
+        return False, "I could not read the action log right now. Please wait a minute and try undo again."
+    logged = _latest_logged_action(key, log_data)
     if logged:
         action = logged.action
     elif key:

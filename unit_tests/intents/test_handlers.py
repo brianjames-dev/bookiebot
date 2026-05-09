@@ -330,7 +330,8 @@ async def test_delete_recent_action_lists_matching_candidates_before_delete(monk
 
         assert repo.expense.cell(3, 16).value == "12.5"
 
-    assert any("Type the number of the transaction you want to delete" in (msg or "") for msg, _ in message.channel.sent)
+    assert any("Use the controls below, or type the number of the transaction you want to delete" in (msg or "") for msg, _ in message.channel.sent)
+    assert any(kwargs.get("view") is not None for _msg, kwargs in message.channel.sent)
 
 
 @pytest.mark.asyncio
@@ -577,6 +578,32 @@ def test_expense_undo_can_be_recorded_after_context_exits():
         assert repo.expense.cell(row, 8).value == ""
         assert repo.expense.cell(row, 9).value == ""
         assert repo.expense.cell(row, 10).value == ""
+
+
+def test_undo_does_not_use_memory_fallback_when_action_log_read_fails(monkeypatch):
+    import bookiebot.sheets.undo as undo
+    import bookiebot.sheets.writer as writer
+
+    repo = SheetsRepoStub(expense_rows=[[], []])
+
+    with repo.patched():
+        row = writer.log_category_row(
+            {"date": "5/5/2026", "amount": 200.0, "location": "Costco", "person": "Brian (AL)"},
+            repo.expense,
+            "grocery",
+        )
+        writer.record_expense_undo("grocery", row, 200.0, "Brian (AL)", "676638528590970917")
+
+        monkeypatch.setattr(undo, "_read_log_data", lambda: None)
+
+        success, detail = undo.undo_last_action("676638528590970917")
+
+        assert success is False
+        assert "could not read the action log" in detail
+        assert repo.expense.cell(row, 1).value == "5/5/2026"
+        assert repo.expense.cell(row, 2).value == "200.0"
+        assert repo.expense.cell(row, 3).value == "Costco"
+        assert repo.expense.cell(row, 4).value == "Brian (AL)"
 
 
 # Query intents (happy paths via mocked helpers)
