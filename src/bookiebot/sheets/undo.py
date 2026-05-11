@@ -318,7 +318,7 @@ def recent_actions(user_key: str | None, limit: int = 5, offset: int = 0) -> lis
         action
         for action in all_actions
         if action.status == "active"
-        and action.action.metadata.get("type") != "delete"
+        and action.action.metadata.get("type") not in {"delete", "system_state"}
         and (not keys or action.user_key in keys)
     ]
     matches = _dedupe_actions_by_lineage(matches, all_actions)
@@ -338,7 +338,9 @@ def _latest_raw_logged_action(
     matches = [
         record.logged
         for record in data.records
-        if record.logged.status == "active" and (not keys or record.logged.user_key in keys)
+        if record.logged.status == "active"
+        and record.logged.action.metadata.get("type") != "system_state"
+        and (not keys or record.logged.user_key in keys)
     ]
     return matches[-1] if matches else None
 

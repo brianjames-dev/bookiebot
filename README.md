@@ -32,6 +32,16 @@ It leverages agentic AI to understand natural language commands, update a Google
 > 💬 *"Show me my top 3 expenses this month"*\
 > 📝 Bot fetches and lists your largest expenses.
 
+## 🎭 Daily Avatar Rotation
+
+BookieBot can rotate its Discord profile picture once per day. Add square avatar images to:
+
+```text
+assets/avatars/
+```
+
+Supported formats are `.png`, `.jpg`, `.jpeg`, and `.webp`. Rotation is enabled by default when images are present. Set `BOOKIEBOT_AVATAR_ROTATION_ENABLED=false` to disable it, or set `BOOKIEBOT_AVATAR_DIR` to use a different folder.
+
 ## 📷 Screenshots
 
 ### Intent Recognition – Page 1

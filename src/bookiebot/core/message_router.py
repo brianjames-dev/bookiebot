@@ -1,6 +1,7 @@
 import logging
 import re
 import os
+import asyncio
 
 # Disable discord voice/audio stack to avoid loading audioop (deprecated in Python 3.13)
 os.environ.setdefault("DISCORD_AUDIO_DISABLE", "1")
@@ -19,6 +20,7 @@ except ModuleNotFoundError:
     discord = _Discord()
 
 from bookiebot.core import config
+from bookiebot.core.avatar_rotation import run_avatar_rotation_loop
 from bookiebot.intents.parser import parse_message_llm
 from bookiebot.intents.handlers import handle_intent
 from bookiebot.intents import explorer as intent_explorer
@@ -31,6 +33,7 @@ from bookiebot.sheets.undo import (
 )
 
 logger = logging.getLogger(__name__)
+_AVATAR_ROTATION_TASK: asyncio.Task | None = None
 
 _ACTION_NOUNS = {
     "action",
@@ -247,7 +250,10 @@ def _recent_query_intent(content: str) -> tuple[str, dict] | None:
 def register_events(client: discord.Client, tree: discord.app_commands.CommandTree):
     @client.event
     async def on_ready():
+        global _AVATAR_ROTATION_TASK
         logger.info("✅ Logged in as bot", extra={"user": str(client.user)})
+        if _AVATAR_ROTATION_TASK is None or _AVATAR_ROTATION_TASK.done():
+            _AVATAR_ROTATION_TASK = asyncio.create_task(run_avatar_rotation_loop(client))
         try:
             await tree.sync()
             logger.info("✅ Synced application commands")
