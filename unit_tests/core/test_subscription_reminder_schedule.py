@@ -1,7 +1,7 @@
 from datetime import date, datetime
 
 from bookiebot.core import subscription_reminders
-from bookiebot.sheets.subscriptions import Subscription, SubscriptionReminder
+from bookiebot.sheets.subscriptions import Subscription, SubscriptionParseWarning, SubscriptionReminder
 
 
 def test_reminder_is_not_eligible_before_configured_hour(monkeypatch):
@@ -72,3 +72,39 @@ def test_format_subscription_reminder_digest_supports_today_group():
         "Today\n"
         "- Railway: $5.00 on May 15"
     )
+
+
+def test_format_subscription_parse_warning_digest():
+    warnings = [
+        SubscriptionParseWarning(
+            source_range="Subscriptions!A8:C8",
+            reason="missing amount",
+            values=("22nd", "Missing Amount"),
+        ),
+        SubscriptionParseWarning(
+            source_range="Subscriptions!A9:C9",
+            reason='invalid monthly day "bad day"',
+            values=("Bad Date", "$5.00"),
+        ),
+    ]
+
+    assert subscription_reminders.format_subscription_parse_warning_digest("<@123>", warnings) == (
+        "<@123> I found 2 subscription sheet issues that need attention.\n"
+        "These rows were not added to the reminder schedule:\n"
+        "- Subscriptions!A8:C8: missing amount (22nd, Missing Amount)\n"
+        '- Subscriptions!A9:C9: invalid monthly day "bad day" (Bad Date, $5.00)'
+    )
+
+
+def test_parse_warning_metadata_is_scoped_to_day():
+    warning = SubscriptionParseWarning(
+        source_range="Subscriptions!A8:C8",
+        reason="missing amount",
+        values=("22nd", "Missing Amount"),
+    )
+
+    assert subscription_reminders._parse_warning_metadata(warning, date(2026, 5, 14)) == {
+        "warning_key": "Subscriptions!A8:C8|missing amount|22nd|Missing Amount",
+        "source_range": "Subscriptions!A8:C8",
+        "warning_date": "2026-05-14",
+    }

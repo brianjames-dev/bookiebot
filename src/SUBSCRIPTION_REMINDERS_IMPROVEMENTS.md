@@ -16,8 +16,8 @@ This document tracks improvements that would make the feature more reliable, mor
 - Implemented: digest headline includes the total amount expected in the next 7 days.
 - Implemented: `Today` digest grouping is supported when a subscription uses a `0` day reminder window.
 - Implemented: admin `/debug_subscriptions` command syncs the hidden sheet and reports parse warnings.
-- Partially implemented: parse warnings are collected for malformed rows in the pretty grouped layout and surfaced through `/debug_subscriptions`.
-- Not implemented yet: proactive user-facing parse-error notifications.
+- Implemented: parse warnings are collected for malformed rows in the pretty grouped layout and surfaced through `/debug_subscriptions`.
+- Implemented: proactive parse-warning notifications are sent after 10 AM when rows cannot be normalized, with once-per-day duplicate prevention.
 - Not implemented yet: bill confirmation/reconciliation.
 
 ## Product Decisions
@@ -46,6 +46,8 @@ Why this matters:
 - Manual debugging should be rare.
 
 ## 2. Parse Warnings and User-Facing Errors
+
+Status: implemented for the current pretty grouped layout. BookieBot sends a concise warning digest after 10 AM when rows cannot be normalized, and avoids repeating the same warning every hour.
 
 When BookieBot reads the visible `Subscriptions` sheet, it should detect rows that look like subscriptions but cannot be normalized.
 
@@ -135,6 +137,8 @@ Why this matters:
 - This can be opt-in globally or per subscription.
 
 ## 6. Cash-Flow Rollups
+
+Status: implemented for subscription reminder digests. The first notification line includes the total amount expected to pull in the next 7 days.
 
 Add totals to reminder digests.
 

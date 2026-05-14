@@ -13,7 +13,13 @@ from bookiebot.sheets.routing import (
     now_pacific,
     sheet_user_context,
 )
-from bookiebot.sheets.subscriptions import SubscriptionReminder, due_subscription_reminders
+from bookiebot.sheets.subscriptions import (
+    SubscriptionParseWarning,
+    SubscriptionReminder,
+    debug_subscription_sync,
+    due_subscription_reminders,
+    due_subscription_reminders_for_subscriptions,
+)
 from bookiebot.sheets.undo import has_system_event, record_system_event
 
 logger = logging.getLogger(__name__)
@@ -92,6 +98,15 @@ def _reminder_metadata(reminder: SubscriptionReminder) -> dict[str, str]:
     }
 
 
+def _parse_warning_metadata(warning: SubscriptionParseWarning, current: date) -> dict[str, str]:
+    warning_key = "|".join((warning.source_range, warning.reason, *warning.values))
+    return {
+        "warning_key": warning_key,
+        "source_range": warning.source_range,
+        "warning_date": current.isoformat(),
+    }
+
+
 def _format_pull_date(reminder: SubscriptionReminder) -> str:
     return f"{reminder.pull_date:%b} {reminder.pull_date.day}"
 
@@ -135,6 +150,20 @@ def format_subscription_reminder_digest(mention: str, reminders: list[Subscripti
     return "\n".join(lines)
 
 
+def format_subscription_parse_warning_digest(mention: str, warnings: list[SubscriptionParseWarning]) -> str:
+    noun = "issue" if len(warnings) == 1 else "issues"
+    verb = "needs" if len(warnings) == 1 else "need"
+    lines = [
+        f"{mention} I found {len(warnings)} subscription sheet {noun} that {verb} attention.",
+        "These rows were not added to the reminder schedule:",
+    ]
+    for warning in warnings[:10]:
+        lines.append(f"- {warning.format()}")
+    if len(warnings) > 10:
+        lines.append(f"- ...and {len(warnings) - 10} more")
+    return "\n".join(lines)
+
+
 async def send_due_subscription_reminders(client: Any, today: date | None = None) -> int:
     if not _reminders_enabled():
         return 0
@@ -152,9 +181,36 @@ async def send_due_subscription_reminders(client: Any, today: date | None = None
     for actor_key, mention in _notification_users():
         try:
             with sheet_user_context(actor_key):
-                reminders = due_subscription_reminders(current)
+                subscriptions, warnings = debug_subscription_sync()
+                reminders = due_subscription_reminders_for_subscriptions(subscriptions, current)
         except Exception:
             logger.exception("Failed to evaluate subscription reminders", extra={"actor_key": actor_key})
+            try:
+                with sheet_user_context(actor_key):
+                    reminders = due_subscription_reminders(current)
+                    warnings = []
+            except Exception:
+                logger.exception("Failed fallback subscription reminder evaluation", extra={"actor_key": actor_key})
+                continue
+
+        unsent_warnings: list[SubscriptionParseWarning] = []
+        for warning in warnings:
+            metadata = _parse_warning_metadata(warning, current)
+            if not has_system_event(actor_key, "subscription_parse_warning_sent", metadata):
+                unsent_warnings.append(warning)
+
+        if unsent_warnings:
+            await channel.send(format_subscription_parse_warning_digest(mention, unsent_warnings))
+            for warning in unsent_warnings:
+                record_system_event(
+                    actor_key,
+                    "subscription_parse_warning_sent",
+                    _parse_warning_metadata(warning, current),
+                    f"Subscription parse warning sent for {warning.source_range}",
+                )
+                sent += 1
+
+        if not reminders:
             continue
 
         unsent_reminders: list[SubscriptionReminder] = []

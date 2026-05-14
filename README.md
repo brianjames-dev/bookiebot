@@ -45,15 +45,28 @@ Supported formats are `.png`, `.jpg`, `.jpeg`, and `.webp`. Rotation is enabled 
 
 ## Subscription Reminders
 
-BookieBot keeps the visible `Subscriptions` worksheet as the editable source of truth, then syncs it into a hidden per-user worksheet named `_BookieBot Subscription Schedule`. Reminders read from that normalized hidden sheet and fire once after 10 AM Pacific when a charge is 7, 3, or 1 day away. The current block layout is supported, but the hidden sheet uses one row per subscription:
+BookieBot keeps the visible `Subscriptions` worksheet as the editable source of truth, then syncs it into a hidden per-user worksheet named `_BookieBot Subscription Schedule`. Reminders fire once after 10 AM Pacific when a charge is 7, 3, or 1 day away, and the digest headline includes the total expected pull amount for the next 7 days.
 
 ```text
-Active | Name | Amount | Kind | Cadence | Pull Day | Pull Date | Account | Reminder Offsets
-yes    | ChatGPT | $20.00 | needs | monthly | 21 | | BofA | 7,3,1
-yes    | Amazon Prime | $152.90 | needs | yearly | | 10/29 | Amex | 7,3,1
+<@user> $177.90 will be pulled in the next 7 days.
+Upcoming subscription pulls:
+
+Tomorrow
+- Railway: $5.00 on May 15
+
+In 3 days
+- ChatGPT: $20.00 on May 17
 ```
 
-Use `Pull Day` for monthly subscriptions and `Pull Date` for yearly subscriptions. Set `BOOKIEBOT_SUBSCRIPTION_REMINDERS_ENABLED=false` to disable the background checker, or set `BOOKIEBOT_SUBSCRIPTION_REMINDER_SEND_HOUR=9` to change the first eligible send hour.
+The current block layout is supported. The hidden sheet uses one normalized row per subscription with columns for owner, kind, cadence, amount, pull day/month, reminder offsets, source range, and sync timestamp. If BookieBot finds malformed visible subscription rows it cannot safely normalize, it sends a concise parse-warning digest and skips those rows until fixed.
+
+Admin/debug support:
+
+```text
+/debug_subscriptions
+```
+
+This command forces a sync, lists parsed subscriptions, and reports skipped rows. Set `BOOKIEBOT_SUBSCRIPTION_REMINDERS_ENABLED=false` to disable the background checker, or set `BOOKIEBOT_SUBSCRIPTION_REMINDER_SEND_HOUR=9` to change the first eligible send hour.
 
 ## 📷 Screenshots
 

@@ -432,8 +432,7 @@ def _update_range(ws: object, start_row: int, start_col: int, values: list[list[
         ws.update(range_name, values, raw=False)
 
 
-def sync_subscription_schedule_sheet() -> list[Subscription]:
-    subscriptions = parse_visible_subscription_schedules()
+def _write_subscription_schedule_rows(subscriptions: list[Subscription]) -> None:
     rows = [NORMALIZED_SCHEDULE_HEADERS] + [_subscription_to_row(subscription) for subscription in subscriptions]
     ws = get_sheets_repo().subscription_schedule_sheet()
     existing_rows = ws.get_all_values()
@@ -445,22 +444,17 @@ def sync_subscription_schedule_sheet() -> list[Subscription]:
     ]
     padded_rows = [row + [""] * (width - len(row)) for row in padded_rows]
     _update_range(ws, 1, 1, padded_rows)
+
+
+def sync_subscription_schedule_sheet() -> list[Subscription]:
+    subscriptions = parse_visible_subscription_schedules()
+    _write_subscription_schedule_rows(subscriptions)
     return subscriptions
 
 
 def debug_subscription_sync() -> tuple[list[Subscription], list[SubscriptionParseWarning]]:
     subscriptions, warnings = parse_visible_subscription_schedules_with_warnings()
-    rows = [NORMALIZED_SCHEDULE_HEADERS] + [_subscription_to_row(subscription) for subscription in subscriptions]
-    ws = get_sheets_repo().subscription_schedule_sheet()
-    existing_rows = ws.get_all_values()
-    rows_to_write = max(len(rows), len(existing_rows), 1)
-    width = len(NORMALIZED_SCHEDULE_HEADERS)
-    padded_rows = [
-        (rows[index] if index < len(rows) else [""] * width)
-        for index in range(rows_to_write)
-    ]
-    padded_rows = [row + [""] * (width - len(row)) for row in padded_rows]
-    _update_range(ws, 1, 1, padded_rows)
+    _write_subscription_schedule_rows(subscriptions)
     return subscriptions, warnings
 
 
@@ -500,9 +494,25 @@ def next_pull_date(subscription: Subscription, today: date) -> date | None:
     return candidate
 
 
+def due_subscription_reminders_for_subscriptions(
+    subscriptions: list[Subscription],
+    today: date,
+) -> list[SubscriptionReminder]:
+    reminders: list[SubscriptionReminder] = []
+    for subscription in subscriptions:
+        if not subscription.active:
+            continue
+        pull_date = next_pull_date(subscription, today)
+        if pull_date is None:
+            continue
+        days_until = (pull_date - today).days
+        if days_until in subscription.reminder_offsets:
+            reminders.append(SubscriptionReminder(subscription, pull_date, days_until))
+    return sorted(reminders, key=lambda reminder: (reminder.pull_date, reminder.subscription.name.lower()))
+
+
 def due_subscription_reminders(today: date | None = None) -> list[SubscriptionReminder]:
     current = today or date.today()
-    reminders: list[SubscriptionReminder] = []
     try:
         subscriptions = sync_subscription_schedule_sheet()
     except Exception:
@@ -514,16 +524,7 @@ def due_subscription_reminders(today: date | None = None) -> list[SubscriptionRe
         except Exception:
             subscriptions = list_subscription_schedules()
 
-    for subscription in subscriptions:
-        if not subscription.active:
-            continue
-        pull_date = next_pull_date(subscription, current)
-        if pull_date is None:
-            continue
-        days_until = (pull_date - current).days
-        if days_until in subscription.reminder_offsets:
-            reminders.append(SubscriptionReminder(subscription, pull_date, days_until))
-    return sorted(reminders, key=lambda reminder: (reminder.pull_date, reminder.subscription.name.lower()))
+    return due_subscription_reminders_for_subscriptions(subscriptions, current)
 
 
 def format_subscription_reminder(reminder: SubscriptionReminder, mention: str | None = None) -> str:
