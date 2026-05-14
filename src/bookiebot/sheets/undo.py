@@ -277,6 +277,44 @@ def record_undo_action(user_key: str | None, action: UndoAction) -> None:
         logger.exception("Failed to persist undo action")
 
 
+def record_system_event(user_key: str | None, event_type: str, metadata: dict[str, str], description: str) -> None:
+    """Persist non-user-visible bot state in the action log."""
+    payload = {"type": "system_state", "event_type": event_type, **metadata}
+    try:
+        _append_logged_action(
+            user_key,
+            UndoAction(
+                worksheet="income",
+                kind="restore_cells",
+                row=0,
+                columns=[],
+                previous_values=[],
+                new_values=[],
+                metadata=payload,
+                description=description,
+            ),
+        )
+    except Exception:
+        logger.exception("Failed to persist system event", extra={"event_type": event_type})
+
+
+def has_system_event(user_key: str | None, event_type: str, metadata: dict[str, str]) -> bool:
+    keys = actor_key_aliases(str(user_key)) if user_key else set()
+    for logged in _read_log():
+        action_metadata = logged.action.metadata
+        if logged.status != "active":
+            continue
+        if action_metadata.get("type") != "system_state":
+            continue
+        if action_metadata.get("event_type") != event_type:
+            continue
+        if keys and logged.user_key not in keys:
+            continue
+        if all(action_metadata.get(key) == value for key, value in metadata.items()):
+            return True
+    return False
+
+
 def _lineage_parent_id(action: UndoAction) -> str | None:
     return action.metadata.get("updated_action_id") or action.metadata.get("source_action_id") or None
 

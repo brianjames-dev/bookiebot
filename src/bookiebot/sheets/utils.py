@@ -1408,6 +1408,22 @@ async def list_subscriptions():
     wants_total = 0.0
 
     rows = ws.get_all_values()
+    try:
+        from bookiebot.sheets.subscriptions import list_subscription_schedules
+
+        schedules = list_subscription_schedules(rows)
+        if schedules:
+            for subscription in schedules:
+                is_need = subscription.kind.lower() in {"need", "needs"}
+                target = needs if is_need else wants
+                target.append((subscription.name, subscription.amount))
+                if is_need:
+                    needs_total += subscription.amount
+                else:
+                    wants_total += subscription.amount
+            return needs, round(needs_total, 2), wants, round(wants_total, 2)
+    except Exception:
+        logger.exception("Failed to parse subscription schedules; falling back to legacy layout")
 
     # Needs and Wants start at row 7 (0-based index = 6)
     for row in rows[6:]:

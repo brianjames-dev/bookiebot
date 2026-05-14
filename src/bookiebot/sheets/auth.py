@@ -31,6 +31,8 @@ load_dotenv()
 SCOPES = ["https://www.googleapis.com/auth/spreadsheets"]
 _GC = None
 _ACTION_LOG_WORKSHEET_BY_TITLE = {}
+_SUBSCRIPTION_SCHEDULE_WORKSHEET_BY_KEY = {}
+SUBSCRIPTION_SCHEDULE_WORKSHEET_TITLE = "_BookieBot Subscription Schedule"
 
 
 def _get_gc():
@@ -67,6 +69,42 @@ def get_subscriptions_worksheet():
     gc = _get_gc()
     sheet = gc.open_by_key(sheet_key)
     return sheet.worksheet("Subscriptions")
+
+
+def get_subscription_schedule_worksheet():
+    year = get_current_year()
+    sheet_key = get_budget_spreadsheet_id_for_user(get_current_discord_user_id(), year)
+    cache_key = (sheet_key, SUBSCRIPTION_SCHEDULE_WORKSHEET_TITLE)
+    if cache_key in _SUBSCRIPTION_SCHEDULE_WORKSHEET_BY_KEY:
+        return _SUBSCRIPTION_SCHEDULE_WORKSHEET_BY_KEY[cache_key]
+
+    spreadsheet = _get_gc().open_by_key(sheet_key)
+    try:
+        worksheet = spreadsheet.worksheet(SUBSCRIPTION_SCHEDULE_WORKSHEET_TITLE)
+        _SUBSCRIPTION_SCHEDULE_WORKSHEET_BY_KEY[cache_key] = worksheet
+        return worksheet
+    except Exception:
+        worksheet = spreadsheet.add_worksheet(title=SUBSCRIPTION_SCHEDULE_WORKSHEET_TITLE, rows=200, cols=14)
+        try:
+            spreadsheet.batch_update(
+                {
+                    "requests": [
+                        {
+                            "updateSheetProperties": {
+                                "properties": {
+                                    "sheetId": worksheet.id,
+                                    "hidden": True,
+                                },
+                                "fields": "hidden",
+                            }
+                        }
+                    ]
+                }
+            )
+        except Exception:
+            pass
+        _SUBSCRIPTION_SCHEDULE_WORKSHEET_BY_KEY[cache_key] = worksheet
+        return worksheet
 
 
 def get_action_log_worksheet():

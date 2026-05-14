@@ -9,6 +9,7 @@ It leverages agentic AI to understand natural language commands, update a Google
 - Log expenses, income, rent, utilities, savings, and more via natural language (e.g., *"I spent \$25 on groceries today"*).
 - Query financial data easily (e.g., *"What did I spend last week?"*, *"Show me my largest single expense"*).
 - Supports dozens of intents including burn rate calculation, category breakdowns, and daily/weekly insights.
+- Sends proactive subscription pull-date reminders 7, 3, and 1 day before expected charges.
 - Fully integrated with Google Sheets for persistent, transparent data storage.
 - Asynchronous and scalable, with clear error handling and feedback messages.
 
@@ -41,6 +42,18 @@ assets/avatars/
 ```
 
 Supported formats are `.png`, `.jpg`, `.jpeg`, and `.webp`. Rotation is enabled by default when images are present. Set `BOOKIEBOT_AVATAR_ROTATION_ENABLED=false` to disable it, or set `BOOKIEBOT_AVATAR_DIR` to use a different folder.
+
+## Subscription Reminders
+
+BookieBot keeps the visible `Subscriptions` worksheet as the editable source of truth, then syncs it into a hidden per-user worksheet named `_BookieBot Subscription Schedule`. Reminders read from that normalized hidden sheet and fire when a charge is 7, 3, or 1 day away. The current block layout is supported, but the hidden sheet uses one row per subscription:
+
+```text
+Active | Name | Amount | Kind | Cadence | Pull Day | Pull Date | Account | Reminder Offsets
+yes    | ChatGPT | $20.00 | needs | monthly | 21 | | BofA | 7,3,1
+yes    | Amazon Prime | $152.90 | needs | yearly | | 10/29 | Amex | 7,3,1
+```
+
+Use `Pull Day` for monthly subscriptions and `Pull Date` for yearly subscriptions. Set `BOOKIEBOT_SUBSCRIPTION_REMINDERS_ENABLED=false` to disable the background checker.
 
 ## 📷 Screenshots
 

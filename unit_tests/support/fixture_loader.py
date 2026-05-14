@@ -68,4 +68,5 @@ def build_repo_from_fixture(name: str) -> SheetsRepoStub:
         expense_rows=data.get("expense"),
         income_rows=data.get("income"),
         subscriptions_rows=data.get("subscriptions"),
+        subscription_schedule_rows=data.get("subscription_schedule"),
     )

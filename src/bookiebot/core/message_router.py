@@ -21,6 +21,7 @@ except ModuleNotFoundError:
 
 from bookiebot.core import config
 from bookiebot.core.avatar_rotation import run_avatar_rotation_loop
+from bookiebot.core.subscription_reminders import ensure_subscription_reminder_loop
 from bookiebot.intents.parser import parse_message_llm
 from bookiebot.intents.handlers import handle_intent
 from bookiebot.intents import explorer as intent_explorer
@@ -254,6 +255,7 @@ def register_events(client: discord.Client, tree: discord.app_commands.CommandTr
         logger.info("✅ Logged in as bot", extra={"user": str(client.user)})
         if _AVATAR_ROTATION_TASK is None or _AVATAR_ROTATION_TASK.done():
             _AVATAR_ROTATION_TASK = asyncio.create_task(run_avatar_rotation_loop(client))
+        ensure_subscription_reminder_loop(client)
         try:
             await tree.sync()
             logger.info("✅ Synced application commands")

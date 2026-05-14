@@ -1,0 +1,104 @@
+from datetime import date
+
+from bookiebot.sheets.subscriptions import (
+    NORMALIZED_SCHEDULE_HEADERS,
+    Subscription,
+    SubscriptionReminder,
+    format_subscription_reminder,
+    list_subscription_schedules,
+    next_pull_date,
+    sync_subscription_schedule_sheet,
+)
+from bookiebot.sheets.routing import sheet_user_context
+from unit_tests.support.sheets_repo_stub import SheetsRepoStub
+
+
+def test_parses_current_block_layout():
+    rows = [
+        [],
+        ["", "SUBSCRIPTIONS"],
+        [],
+        ["Needs", "", "(Monthly)", "", "Needs", "", "(Yearly)", "", "", "Wants", "", "(Monthly)"],
+        ["", "", "", "", "", "", "", "", "", "", "", ""],
+        ["Recurring:", "Name:", "Amount:", "", "Recurring:", "Name:", "Amount:", "", "", "Date:", "Name:", "Amount:"],
+        ["3rd", "Xfinity", "$61.50", "", "10/29", "Amazon Prime", "$152.90", "", "", "5th", "YouTube Premium", "$13.99"],
+        ["21st", "ChatGPT", "$20.00", "", "2/4", "MacroFactor", "$71.99", "", "", "16th", "Apple iCloud Storage", "$2.99"],
+    ]
+
+    subscriptions = list_subscription_schedules(rows)
+
+    assert [(sub.name, sub.cadence, sub.pull_month, sub.pull_day) for sub in subscriptions] == [
+        ("Xfinity", "monthly", None, 3),
+        ("ChatGPT", "monthly", None, 21),
+        ("Amazon Prime", "yearly", 10, 29),
+        ("MacroFactor", "yearly", 2, 4),
+        ("YouTube Premium", "monthly", None, 5),
+        ("Apple iCloud Storage", "monthly", None, 16),
+    ]
+
+
+def test_parses_recommended_normalized_layout():
+    rows = [
+        ["Active", "Name", "Amount", "Kind", "Cadence", "Pull Day", "Pull Date", "Account", "Reminder Offsets"],
+        ["yes", "Spotify", "$9.99", "wants", "monthly", "14", "", "BofA", "7,3,1"],
+        ["no", "Old Service", "$1.00", "wants", "monthly", "15", "", "", ""],
+        ["yes", "Amazon Prime", "$152.90", "needs", "yearly", "", "10/29", "Amex", "7,1"],
+    ]
+
+    subscriptions = list_subscription_schedules(rows)
+
+    assert [sub.name for sub in subscriptions] == ["Spotify", "Amazon Prime"]
+    assert subscriptions[0].account == "BofA"
+    assert subscriptions[1].reminder_offsets == (1, 7)
+
+
+def test_next_pull_date_clamps_month_end_and_rolls_forward():
+    subscription = Subscription(name="Month End", amount=10, cadence="monthly", pull_day=31)
+
+    assert next_pull_date(subscription, date(2026, 2, 20)) == date(2026, 2, 28)
+    assert next_pull_date(subscription, date(2026, 3, 31)) == date(2026, 3, 31)
+    assert next_pull_date(subscription, date(2026, 4, 1)) == date(2026, 4, 30)
+
+
+def test_format_subscription_reminder():
+    subscription = Subscription(name="ChatGPT", amount=20, cadence="monthly", pull_day=21, account="BofA")
+
+    text = format_subscription_reminder(
+        reminder=SubscriptionReminder(subscription=subscription, days_until=1, pull_date=date(2026, 5, 21)),
+        mention="<@123>",
+    )
+
+    assert text == "<@123> Reminder: ChatGPT is expected to pull $20.00 from BofA tomorrow (May 21)."
+
+
+def test_sync_subscription_schedule_sheet_writes_hidden_normalized_rows():
+    repo = SheetsRepoStub(
+        subscriptions_rows=[
+            [],
+            ["", "SUBSCRIPTIONS"],
+            [],
+            ["Needs", "", "(Monthly)"],
+            [],
+            ["Recurring:", "Name:", "Amount:"],
+            ["21st", "ChatGPT", "$20.00"],
+        ],
+    )
+
+    with repo.patched(), sheet_user_context("830984827904851969"):
+        subscriptions = sync_subscription_schedule_sheet()
+
+    rows = repo.subscription_schedule.get_all_values()
+    assert [sub.name for sub in subscriptions] == ["ChatGPT"]
+    assert rows[0] == NORMALIZED_SCHEDULE_HEADERS
+    assert rows[1][1:10] == [
+        "yes",
+        "hannah",
+        "Hannah",
+        "needs",
+        "monthly",
+        "ChatGPT",
+        "20.00",
+        "21",
+        "",
+    ]
+    assert rows[1][12] == "Subscriptions!A7:C7"
