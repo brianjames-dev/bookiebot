@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import asyncio
-from datetime import date
+from datetime import date, datetime
 import logging
 import os
 from typing import Any
@@ -35,6 +35,19 @@ def _check_interval_seconds() -> int:
         return max(int(raw), 60)
     except ValueError:
         return 3600
+
+
+def _send_hour() -> int:
+    raw = os.getenv("BOOKIEBOT_SUBSCRIPTION_REMINDER_SEND_HOUR", "10").strip()
+    try:
+        return min(max(int(raw), 0), 23)
+    except ValueError:
+        return 10
+
+
+def _reminder_is_eligible(now: datetime | None = None) -> bool:
+    current = now or now_pacific()
+    return current.hour >= _send_hour()
 
 
 def _notification_users() -> list[tuple[str, str]]:
@@ -73,6 +86,9 @@ def _target_channel(client: Any) -> Any | None:
 async def send_due_subscription_reminders(client: Any, today: date | None = None) -> int:
     if not _reminders_enabled():
         return 0
+    current_time = now_pacific()
+    if today is None and not _reminder_is_eligible(current_time):
+        return 0
 
     channel = _target_channel(client)
     if channel is None:
@@ -80,7 +96,7 @@ async def send_due_subscription_reminders(client: Any, today: date | None = None
         return 0
 
     sent = 0
-    current = today or now_pacific().date()
+    current = today or current_time.date()
     for actor_key, mention in _notification_users():
         try:
             with sheet_user_context(actor_key):
