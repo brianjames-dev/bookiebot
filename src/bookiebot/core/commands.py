@@ -11,10 +11,55 @@ from bookiebot.core import incidents
 from bookiebot.core import github_dispatch
 from bookiebot.core import ui
 from bookiebot.logging_config import get_recent_logs, uptime_seconds
-from bookiebot.sheets.routing import get_current_year, get_year_config, MissingYearConfigError
+from bookiebot.sheets.routing import get_current_year, get_year_config, MissingYearConfigError, sheet_user_context
+from bookiebot.sheets.subscriptions import debug_subscription_sync
 
 
 def register_commands(tree: app_commands.CommandTree):
+    @tree.command(name="debug_subscriptions", description="(Admin) Sync and inspect subscription reminder data")
+    async def debug_subscriptions(interaction: discord.Interaction):
+        if not auth.is_debug_allowed(interaction.user):
+            await interaction.response.send_message("❌ Not authorized.", ephemeral=True)
+            return
+
+        await interaction.response.defer(ephemeral=True)
+        actor_key = str(interaction.user.id)
+        try:
+            with sheet_user_context(actor_key):
+                subscriptions, warnings = debug_subscription_sync()
+        except Exception as exc:
+            await interaction.followup.send(
+                content=f"❌ Could not sync subscriptions: {type(exc).__name__}: {exc}",
+                ephemeral=True,
+            )
+            return
+
+        lines = [
+            f"Synced {len(subscriptions)} subscriptions.",
+            "Hidden sheet: `_BookieBot Subscription Schedule`",
+        ]
+        if subscriptions:
+            lines.append("")
+            lines.append("Parsed subscriptions:")
+            for subscription in subscriptions[:20]:
+                if subscription.cadence == "yearly":
+                    schedule = f"{subscription.pull_month}/{subscription.pull_day}"
+                else:
+                    schedule = f"{subscription.pull_day}"
+                lines.append(f"- {subscription.name}: ${subscription.amount:.2f} {subscription.cadence} on {schedule}")
+            if len(subscriptions) > 20:
+                lines.append(f"- ...and {len(subscriptions) - 20} more")
+        if warnings:
+            lines.append("")
+            lines.append(f"Skipped {len(warnings)} row(s):")
+            for warning in warnings[:10]:
+                lines.append(f"- {warning.format()}")
+            if len(warnings) > 10:
+                lines.append(f"- ...and {len(warnings) - 10} more")
+
+        content = "\n".join(lines)
+        await interaction.followup.send(content=content[:1900], ephemeral=True)
+
     @tree.command(name="debug_logs", description="(Admin) Show recent logs")
     @app_commands.describe(
         lines="Number of lines to return (default 200, max 2000)",

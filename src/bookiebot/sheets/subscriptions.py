@@ -64,6 +64,17 @@ class SubscriptionReminder:
         return f"{sub.name.lower()}|{sub.cadence}|{self.pull_date.isoformat()}|{self.days_until}"
 
 
+@dataclass(frozen=True)
+class SubscriptionParseWarning:
+    source_range: str
+    reason: str
+    values: tuple[str, ...] = ()
+
+    def format(self) -> str:
+        detail = f" ({', '.join(value for value in self.values if value)})" if any(self.values) else ""
+        return f"{self.source_range}: {self.reason}{detail}"
+
+
 def _cell(row: list[str], index: int) -> str:
     if index >= len(row):
         return ""
@@ -205,6 +216,29 @@ def _subscription_from_fields(
     )
 
 
+def _parse_warning_for_fields(
+    fields: dict[str, str],
+    cadence: SubscriptionCadence,
+    source_range: str,
+) -> SubscriptionParseWarning | None:
+    schedule = fields.get("recurring", "") or fields.get("pull_day", "") or fields.get("pull_date", "") or fields.get("date", "")
+    name = fields.get("name", "") or fields.get("service", "") or fields.get("merchant", "")
+    amount = fields.get("amount", "") or fields.get("estimate", "") or fields.get("expected_amount", "")
+    if not name.strip():
+        return SubscriptionParseWarning(source_range, "missing subscription name", (schedule, amount))
+    if not amount.strip():
+        return SubscriptionParseWarning(source_range, "missing amount", (schedule, name))
+    if not schedule.strip():
+        return SubscriptionParseWarning(source_range, "missing pull date", (name, amount))
+    if cadence == "yearly":
+        month, day = _parse_month_day(schedule)
+        if month is None or day is None:
+            return SubscriptionParseWarning(source_range, f'invalid yearly date "{schedule}"', (name, amount))
+    elif _parse_day(schedule) is None:
+        return SubscriptionParseWarning(source_range, f'invalid monthly day "{schedule}"', (name, amount))
+    return None
+
+
 def _parse_normalized_table(rows: list[list[str]]) -> list[Subscription]:
     if not rows:
         return []
@@ -256,6 +290,7 @@ def _parse_block_layout(
     owner_key: str = "",
     owner_name: str = "",
     updated_at: str = "",
+    warnings: list[SubscriptionParseWarning] | None = None,
 ) -> list[Subscription]:
     subscriptions: list[Subscription] = []
     for row_index, row in enumerate(rows):
@@ -298,6 +333,10 @@ def _parse_block_layout(
                 )
                 if subscription:
                     subscriptions.append(subscription)
+                elif warnings is not None:
+                    warning = _parse_warning_for_fields(fields, cadence, source_range)
+                    if warning:
+                        warnings.append(warning)
     return subscriptions
 
 
@@ -311,6 +350,13 @@ def list_subscription_schedules(rows: list[list[str]] | None = None) -> list[Sub
 
 
 def parse_visible_subscription_schedules(rows: list[list[str]] | None = None) -> list[Subscription]:
+    subscriptions, _warnings = parse_visible_subscription_schedules_with_warnings(rows)
+    return subscriptions
+
+
+def parse_visible_subscription_schedules_with_warnings(
+    rows: list[list[str]] | None = None,
+) -> tuple[list[Subscription], list[SubscriptionParseWarning]]:
     if rows is None:
         rows = get_sheets_repo().subscriptions_sheet().get_all_values()
 
@@ -320,9 +366,16 @@ def parse_visible_subscription_schedules(rows: list[list[str]] | None = None) ->
     except Exception:
         owner_key, owner_name = "", ""
 
+    warnings: list[SubscriptionParseWarning] = []
     subscriptions = _parse_normalized_table(rows)
     if not subscriptions:
-        subscriptions = _parse_block_layout(rows, owner_key=owner_key, owner_name=owner_name, updated_at=updated_at)
+        subscriptions = _parse_block_layout(
+            rows,
+            owner_key=owner_key,
+            owner_name=owner_name,
+            updated_at=updated_at,
+            warnings=warnings,
+        )
 
     normalized: list[Subscription] = []
     for subscription in subscriptions:
@@ -345,7 +398,7 @@ def parse_visible_subscription_schedules(rows: list[list[str]] | None = None) ->
                 category=subscription.category,
             )
         )
-    return normalized
+    return normalized, warnings
 
 
 def _subscription_to_row(subscription: Subscription) -> list[str]:
@@ -393,6 +446,22 @@ def sync_subscription_schedule_sheet() -> list[Subscription]:
     padded_rows = [row + [""] * (width - len(row)) for row in padded_rows]
     _update_range(ws, 1, 1, padded_rows)
     return subscriptions
+
+
+def debug_subscription_sync() -> tuple[list[Subscription], list[SubscriptionParseWarning]]:
+    subscriptions, warnings = parse_visible_subscription_schedules_with_warnings()
+    rows = [NORMALIZED_SCHEDULE_HEADERS] + [_subscription_to_row(subscription) for subscription in subscriptions]
+    ws = get_sheets_repo().subscription_schedule_sheet()
+    existing_rows = ws.get_all_values()
+    rows_to_write = max(len(rows), len(existing_rows), 1)
+    width = len(NORMALIZED_SCHEDULE_HEADERS)
+    padded_rows = [
+        (rows[index] if index < len(rows) else [""] * width)
+        for index in range(rows_to_write)
+    ]
+    padded_rows = [row + [""] * (width - len(row)) for row in padded_rows]
+    _update_range(ws, 1, 1, padded_rows)
+    return subscriptions, warnings
 
 
 def list_normalized_subscription_schedules() -> list[Subscription]:

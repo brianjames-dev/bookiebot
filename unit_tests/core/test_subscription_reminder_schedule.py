@@ -42,7 +42,8 @@ def test_format_subscription_reminder_digest_groups_by_window():
     ]
 
     assert subscription_reminders.format_subscription_reminder_digest("<@123>", reminders) == (
-        "<@123> Upcoming subscription pulls:\n"
+        "<@123> $177.90 will be pulled in the next 7 days.\n"
+        "Upcoming subscription pulls:\n"
         "\n"
         "Tomorrow\n"
         "- Railway: $5.00 from BofA on May 15\n"
@@ -52,4 +53,22 @@ def test_format_subscription_reminder_digest_groups_by_window():
         "\n"
         "In 7 days\n"
         "- Amazon Prime: $152.90 on May 21"
+    )
+
+
+def test_format_subscription_reminder_digest_supports_today_group():
+    reminders = [
+        SubscriptionReminder(
+            subscription=Subscription(name="Railway", amount=5, cadence="monthly", pull_day=15),
+            pull_date=date(2026, 5, 15),
+            days_until=0,
+        ),
+    ]
+
+    assert subscription_reminders.format_subscription_reminder_digest("<@123>", reminders) == (
+        "<@123> $5.00 will be pulled in the next 7 days.\n"
+        "Upcoming subscription pulls:\n"
+        "\n"
+        "Today\n"
+        "- Railway: $5.00 on May 15"
     )

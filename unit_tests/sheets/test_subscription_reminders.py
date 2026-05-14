@@ -8,6 +8,7 @@ from bookiebot.sheets.subscriptions import (
     list_subscription_schedules,
     next_pull_date,
     sync_subscription_schedule_sheet,
+    parse_visible_subscription_schedules_with_warnings,
 )
 from bookiebot.sheets.routing import sheet_user_context
 from unit_tests.support.sheets_repo_stub import SheetsRepoStub
@@ -102,3 +103,25 @@ def test_sync_subscription_schedule_sheet_writes_hidden_normalized_rows():
         "",
     ]
     assert rows[1][12] == "Subscriptions!A7:C7"
+
+
+def test_parse_visible_subscription_schedules_reports_skipped_rows():
+    rows = [
+        [],
+        ["", "SUBSCRIPTIONS"],
+        [],
+        ["Needs", "", "(Monthly)"],
+        [],
+        ["Recurring:", "Name:", "Amount:"],
+        ["21st", "ChatGPT", "$20.00"],
+        ["22nd", "Missing Amount", ""],
+        ["bad day", "Bad Date", "$5.00"],
+    ]
+
+    subscriptions, warnings = parse_visible_subscription_schedules_with_warnings(rows)
+
+    assert [sub.name for sub in subscriptions] == ["ChatGPT"]
+    assert [warning.format() for warning in warnings] == [
+        "Subscriptions!A8:C8: missing amount (22nd, Missing Amount)",
+        'Subscriptions!A9:C9: invalid monthly day "bad day" (Bad Date, $5.00)',
+    ]

@@ -102,9 +102,15 @@ def _format_reminder_amount(reminder: SubscriptionReminder) -> str:
 
 
 def _format_digest_heading(days_until: int) -> str:
+    if days_until == 0:
+        return "Today"
     if days_until == 1:
         return "Tomorrow"
     return f"In {days_until} days"
+
+
+def _reminder_total(reminders: list[SubscriptionReminder]) -> float:
+    return round(sum(reminder.subscription.amount for reminder in reminders), 2)
 
 
 def format_subscription_reminder_digest(mention: str, reminders: list[SubscriptionReminder]) -> str:
@@ -112,7 +118,11 @@ def format_subscription_reminder_digest(mention: str, reminders: list[Subscripti
     for reminder in sorted(reminders, key=lambda item: (item.days_until, item.pull_date, item.subscription.name.lower())):
         grouped[reminder.days_until].append(reminder)
 
-    lines = [f"{mention} Upcoming subscription pulls:"]
+    total = _reminder_total(reminders)
+    lines = [
+        f"{mention} ${total:.2f} will be pulled in the next 7 days.",
+        "Upcoming subscription pulls:",
+    ]
     for days_until in sorted(grouped):
         lines.append("")
         lines.append(_format_digest_heading(days_until))
