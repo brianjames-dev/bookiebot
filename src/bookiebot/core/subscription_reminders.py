@@ -202,19 +202,22 @@ def format_subscription_reminder_digest(
 
     total = _reminder_total(reminders)
     lines = [
-        f"{mention} ${total:.2f} will be pulled in the next 7 days.",
-        "Upcoming subscription pulls:",
+        f"{mention} `${total:.2f}` will be pulled by subscriptions in the next 7 days.",
+        "",
+        "Upcoming:",
+        "```",
     ]
     for days_until in sorted(grouped):
-        lines.append("")
+        if lines[-1] != "```":
+            lines.append("")
         lines.append(_format_digest_heading(days_until))
         for reminder in grouped[days_until]:
-            account = f" from {reminder.subscription.account}" if reminder.subscription.account else ""
             note = f" ({reconciliation_notes[reminder.key]})" if reminder.key in reconciliation_notes else ""
             lines.append(
-                f"- {reminder.subscription.name}: {_format_reminder_amount(reminder)}{account} "
-                f"on {_format_pull_date(reminder)}{note}"
+                f"{reminder.subscription.name} - {_format_reminder_amount(reminder)} - "
+                f"{_format_pull_date(reminder)}{note}"
             )
+    lines.append("```")
     return "\n".join(lines)
 
 
