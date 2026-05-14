@@ -72,17 +72,14 @@ def test_format_subscription_reminder_digest_groups_by_window():
     assert subscription_reminders.format_subscription_reminder_digest("<@123>", reminders) == (
         "<@123> `$177.90` will be pulled by subscriptions in the next 7 days.\n"
         "\n"
-        "Upcoming:\n"
-        "```\n"
         "Tomorrow\n"
-        "Railway - $5.00 - May 15\n"
+        "`Railway - $5.00 - May 15`\n"
         "\n"
         "In 3 days\n"
-        "ChatGPT - $20.00 - May 17\n"
+        "`ChatGPT - $20.00 - May 17`\n"
         "\n"
         "In 7 days\n"
-        "Amazon Prime - $152.90 - May 21\n"
-        "```"
+        "`Amazon Prime - $152.90 - May 21`"
     )
 
 
@@ -98,11 +95,8 @@ def test_format_subscription_reminder_digest_supports_today_group():
     assert subscription_reminders.format_subscription_reminder_digest("<@123>", reminders) == (
         "<@123> `$5.00` will be pulled by subscriptions in the next 7 days.\n"
         "\n"
-        "Upcoming:\n"
-        "```\n"
         "Today\n"
-        "Railway - $5.00 - May 15\n"
-        "```"
+        "`Railway - $5.00 - May 15`"
     )
 
 
@@ -120,11 +114,8 @@ def test_format_subscription_reminder_digest_includes_reconciliation_note():
     ) == (
         "<@123> `$140.00` will be pulled by subscriptions in the next 7 days.\n"
         "\n"
-        "Upcoming:\n"
-        "```\n"
         "Tomorrow\n"
-        "PG&E - $140.00 - May 15 (no logged payment yet for this expected tomorrow pull)\n"
-        "```"
+        "`PG&E - $140.00 - May 15 (no logged payment yet for this expected tomorrow pull)`"
     )
 
 
