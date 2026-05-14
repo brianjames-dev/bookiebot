@@ -232,6 +232,26 @@ def format_subscription_parse_warning_digest(mention: str, warnings: list[Subscr
     return "\n".join(lines)
 
 
+def sync_subscription_schedules_for_users() -> dict[str, tuple[int, int]]:
+    results: dict[str, tuple[int, int]] = {}
+    for actor_key, _mention in _notification_users():
+        try:
+            with sheet_user_context(actor_key):
+                subscriptions, warnings = debug_subscription_sync()
+            results[actor_key] = (len(subscriptions), len(warnings))
+            logger.info(
+                "Subscription schedule synced",
+                extra={
+                    "actor_key": actor_key,
+                    "subscriptions": len(subscriptions),
+                    "warnings": len(warnings),
+                },
+            )
+        except Exception:
+            logger.exception("Failed to sync subscription schedule", extra={"actor_key": actor_key})
+    return results
+
+
 async def send_due_subscription_reminders(client: Any, today: date | None = None) -> int:
     if not _reminders_enabled():
         return 0
@@ -308,6 +328,7 @@ async def send_due_subscription_reminders(client: Any, today: date | None = None
 async def run_subscription_reminder_loop(client: Any) -> None:
     while True:
         try:
+            sync_subscription_schedules_for_users()
             await send_due_subscription_reminders(client)
         except asyncio.CancelledError:
             raise

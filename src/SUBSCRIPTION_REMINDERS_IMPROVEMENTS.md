@@ -12,6 +12,7 @@ This document tracks improvements that would make the feature more reliable, mor
 ## Current Implementation Status
 
 - Implemented: hidden normalized subscription schedule per user.
+- Implemented: background sync refreshes hidden normalized schedules even before the daily notification window.
 - Implemented: reminder digest grouped by timing window.
 - Implemented: digest headline includes the total amount expected in the next 7 days.
 - Implemented: `Today` digest grouping is supported and same-day reminders are included in the default reminder windows.
@@ -30,6 +31,8 @@ This document tracks improvements that would make the feature more reliable, mor
 - Price-change detection becomes much more useful after bank/API integrations exist. Without external transaction data, BookieBot can only notice changes that the user already typed into the sheet.
 
 ## 1. Automatic Sync Health and Self-Healing
+
+Status: mostly implemented. BookieBot syncs before reminder checks and also refreshes hidden normalized schedules in the background before the notification window. Missing hidden sheets are recreated by the repository layer. Malformed visible rows are surfaced through parse warnings.
 
 BookieBot should automatically keep the hidden normalized schedule in sync with the visible `Subscriptions` sheet.
 

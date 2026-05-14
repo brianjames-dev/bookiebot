@@ -1,7 +1,9 @@
 from datetime import date, datetime
 
 from bookiebot.core import subscription_reminders
+from bookiebot.sheets.routing import sheet_user_context
 from bookiebot.sheets.subscriptions import Subscription, SubscriptionParseWarning, SubscriptionReminder
+from unit_tests.support.sheets_repo_stub import SheetsRepoStub
 
 
 def test_reminder_is_not_eligible_before_configured_hour(monkeypatch):
@@ -164,3 +166,30 @@ def test_parse_warning_metadata_is_scoped_to_day():
         "source_range": "Subscriptions!A8:C8",
         "warning_date": "2026-05-14",
     }
+
+
+def test_sync_subscription_schedules_for_users_refreshes_hidden_sheets(monkeypatch):
+    repo = SheetsRepoStub(
+        subscriptions_rows=[
+            [],
+            ["", "SUBSCRIPTIONS"],
+            [],
+            ["Needs", "", "(Monthly)"],
+            [],
+            ["Recurring:", "Name:", "Amount:"],
+            ["21st", "ChatGPT", "$20.00"],
+        ],
+    )
+    monkeypatch.setattr(
+        subscription_reminders,
+        "_notification_users",
+        lambda: [("830984827904851969", "<@830984827904851969>")],
+    )
+
+    with repo.patched(), sheet_user_context("830984827904851969"):
+        results = subscription_reminders.sync_subscription_schedules_for_users()
+
+    rows = repo.subscription_schedule.get_all_values()
+    assert results == {"830984827904851969": (1, 0)}
+    assert rows[0][0] == "id"
+    assert rows[1][6] == "ChatGPT"
