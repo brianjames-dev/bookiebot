@@ -22,6 +22,32 @@ def test_reminder_is_eligible_after_configured_hour(monkeypatch):
     assert subscription_reminders._reminder_is_eligible(datetime(2026, 5, 14, 15, 30)) is True
 
 
+def test_reminder_eligibility_uses_per_owner_hour(monkeypatch):
+    monkeypatch.setenv("BOOKIEBOT_SUBSCRIPTION_REMINDER_SEND_HOUR", "10")
+    monkeypatch.setenv("BRIAN_SUBSCRIPTION_REMINDER_SEND_HOUR", "8")
+
+    assert (
+        subscription_reminders._reminder_is_eligible(
+            datetime(2026, 5, 14, 8, 0),
+            "676638528590970917",
+        )
+        is True
+    )
+
+
+def test_reminder_eligibility_falls_back_to_global_hour(monkeypatch):
+    monkeypatch.setenv("BOOKIEBOT_SUBSCRIPTION_REMINDER_SEND_HOUR", "10")
+    monkeypatch.delenv("HANNAH_SUBSCRIPTION_REMINDER_SEND_HOUR", raising=False)
+
+    assert (
+        subscription_reminders._reminder_is_eligible(
+            datetime(2026, 5, 14, 9, 59),
+            "830984827904851969",
+        )
+        is False
+    )
+
+
 def test_format_subscription_reminder_digest_groups_by_window():
     reminders = [
         SubscriptionReminder(
@@ -72,6 +98,36 @@ def test_format_subscription_reminder_digest_supports_today_group():
         "Today\n"
         "- Railway: $5.00 on May 15"
     )
+
+
+def test_format_subscription_reminder_digest_includes_reconciliation_note():
+    reminder = SubscriptionReminder(
+        subscription=Subscription(name="PG&E", amount=140, cadence="monthly", pull_day=15),
+        pull_date=date(2026, 5, 15),
+        days_until=1,
+    )
+
+    assert subscription_reminders.format_subscription_reminder_digest(
+        "<@123>",
+        [reminder],
+        {reminder.key: "no logged payment yet for this expected tomorrow pull"},
+    ) == (
+        "<@123> $140.00 will be pulled in the next 7 days.\n"
+        "Upcoming subscription pulls:\n"
+        "\n"
+        "Tomorrow\n"
+        "- PG&E: $140.00 on May 15 (no logged payment yet for this expected tomorrow pull)"
+    )
+
+
+def test_bill_key_for_known_bill_names():
+    assert subscription_reminders._bill_key_for_name("PG&E") == "pge"
+    assert subscription_reminders._bill_key_for_name("PGE Utilities") == "pge"
+    assert subscription_reminders._bill_key_for_name("Recology") == "recology"
+    assert subscription_reminders._bill_key_for_name("Santa Rosa Water") == "water"
+    assert subscription_reminders._bill_key_for_name("Student Loan Payment") == "student_loan"
+    assert subscription_reminders._bill_key_for_name("Rent") == "rent"
+    assert subscription_reminders._bill_key_for_name("Railway") is None
 
 
 def test_format_subscription_parse_warning_digest():

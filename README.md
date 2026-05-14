@@ -45,7 +45,7 @@ Supported formats are `.png`, `.jpg`, `.jpeg`, and `.webp`. Rotation is enabled 
 
 ## Subscription Reminders
 
-BookieBot keeps the visible `Subscriptions` worksheet as the editable source of truth, then syncs it into a hidden per-user worksheet named `_BookieBot Subscription Schedule`. Reminders fire once after 10 AM Pacific when a charge is 7, 3, or 1 day away, and the digest headline includes the total expected pull amount for the next 7 days.
+BookieBot keeps the visible `Subscriptions` worksheet as the editable source of truth, then syncs it into a hidden per-user worksheet named `_BookieBot Subscription Schedule`. Reminders fire once after the configured Pacific send hour when a charge is 7, 3, 1, or 0 days away, and the digest headline includes the total expected pull amount for the next 7 days.
 
 ```text
 <@user> $177.90 will be pulled in the next 7 days.
@@ -60,6 +60,13 @@ In 3 days
 
 The current block layout is supported. The hidden sheet uses one normalized row per subscription with columns for owner, kind, cadence, amount, pull day/month, reminder offsets, source range, and sync timestamp. If BookieBot finds malformed visible subscription rows it cannot safely normalize, it sends a concise parse-warning digest and skips those rows until fixed.
 
+For scheduled rows that look like manually tracked bills, such as Rent, PG&E, Recology, Water, or Student Loan, BookieBot checks the existing payment fields and annotates the reminder if no payment has been logged yet:
+
+```text
+Tomorrow
+- PG&E: $140.00 on May 15 (no logged payment yet for this expected tomorrow pull)
+```
+
 Admin/debug support:
 
 ```text
@@ -67,6 +74,13 @@ Admin/debug support:
 ```
 
 This command forces a sync, lists parsed subscriptions, and reports skipped rows. Set `BOOKIEBOT_SUBSCRIPTION_REMINDERS_ENABLED=false` to disable the background checker, or set `BOOKIEBOT_SUBSCRIPTION_REMINDER_SEND_HOUR=9` to change the first eligible send hour.
+
+Per-user send-hour overrides are also supported:
+
+```env
+BRIAN_SUBSCRIPTION_REMINDER_SEND_HOUR=10
+HANNAH_SUBSCRIPTION_REMINDER_SEND_HOUR=8
+```
 
 ## 📷 Screenshots
 

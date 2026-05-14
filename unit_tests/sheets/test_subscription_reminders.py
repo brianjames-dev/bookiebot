@@ -53,6 +53,17 @@ def test_parses_recommended_normalized_layout():
     assert subscriptions[1].reminder_offsets == (1, 7)
 
 
+def test_default_reminder_offsets_include_same_day():
+    rows = [
+        ["Active", "Name", "Amount", "Kind", "Cadence", "Pull Day", "Pull Date", "Account", "Reminder Offsets"],
+        ["yes", "Spotify", "$9.99", "wants", "monthly", "14", "", "BofA", ""],
+    ]
+
+    subscriptions = list_subscription_schedules(rows)
+
+    assert subscriptions[0].reminder_offsets == (7, 3, 1, 0)
+
+
 def test_next_pull_date_clamps_month_end_and_rolls_forward():
     subscription = Subscription(name="Month End", amount=10, cadence="monthly", pull_day=31)
 

@@ -5,11 +5,13 @@ from collections import defaultdict
 from datetime import date, datetime
 import logging
 import os
+import re
 from typing import Any
 
 from bookiebot.sheets.routing import (
     APPLE_SHORTCUT_RELAY_USER_ID,
     get_discord_user_config,
+    get_user_config,
     now_pacific,
     sheet_user_context,
 )
@@ -20,6 +22,7 @@ from bookiebot.sheets.subscriptions import (
     due_subscription_reminders,
     due_subscription_reminders_for_subscriptions,
 )
+import bookiebot.sheets.utils as sheet_utils
 from bookiebot.sheets.undo import has_system_event, record_system_event
 
 logger = logging.getLogger(__name__)
@@ -44,17 +47,28 @@ def _check_interval_seconds() -> int:
         return 3600
 
 
-def _send_hour() -> int:
-    raw = os.getenv("BOOKIEBOT_SUBSCRIPTION_REMINDER_SEND_HOUR", "10").strip()
+def _coerce_hour(raw: str, fallback: int = 10) -> int:
     try:
         return min(max(int(raw), 0), 23)
     except ValueError:
-        return 10
+        return fallback
 
 
-def _reminder_is_eligible(now: datetime | None = None) -> bool:
+def _send_hour(actor_key: str | None = None) -> int:
+    raw = ""
+    if actor_key:
+        try:
+            owner_key = get_user_config(actor_key).budget_owner_key.upper()
+            raw = os.getenv(f"{owner_key}_SUBSCRIPTION_REMINDER_SEND_HOUR", "").strip()
+        except Exception:
+            raw = ""
+    raw = raw or os.getenv("BOOKIEBOT_SUBSCRIPTION_REMINDER_SEND_HOUR", "10").strip()
+    return _coerce_hour(raw, 10)
+
+
+def _reminder_is_eligible(now: datetime | None = None, actor_key: str | None = None) -> bool:
     current = now or now_pacific()
-    return current.hour >= _send_hour()
+    return current.hour >= _send_hour(actor_key)
 
 
 def _notification_users() -> list[tuple[str, str]]:
@@ -128,7 +142,60 @@ def _reminder_total(reminders: list[SubscriptionReminder]) -> float:
     return round(sum(reminder.subscription.amount for reminder in reminders), 2)
 
 
-def format_subscription_reminder_digest(mention: str, reminders: list[SubscriptionReminder]) -> str:
+def _bill_key_for_name(name: str) -> str | None:
+    normalized = re.sub(r"[^a-z0-9]+", " ", name.lower()).strip()
+    if not normalized:
+        return None
+    if "student loan" in normalized:
+        return "student_loan"
+    if "pg e" in normalized or "pge" in normalized or "gas electric" in normalized:
+        return "pge"
+    if "recology" in normalized or "trash" in normalized or "garbage" in normalized:
+        return "recology"
+    if "santa rosa water" in normalized or normalized == "water" or " water " in f" {normalized} ":
+        return "water"
+    if normalized == "rent" or normalized.endswith(" rent") or normalized.startswith("rent "):
+        return "rent"
+    return None
+
+
+async def _bill_reconciliation_note(reminder: SubscriptionReminder) -> str | None:
+    if reminder.days_until not in {0, 1}:
+        return None
+    bill_key = _bill_key_for_name(reminder.subscription.name)
+    if bill_key is None:
+        return None
+
+    checkers = {
+        "rent": sheet_utils.check_rent_paid,
+        "pge": sheet_utils.check_pge_paid,
+        "recology": sheet_utils.check_recology_paid,
+        "water": sheet_utils.check_water_paid,
+        "student_loan": sheet_utils.check_student_loan_paid,
+    }
+    paid, amount = await checkers[bill_key]()
+    if paid:
+        return None
+
+    when = "today" if reminder.days_until == 0 else "tomorrow"
+    return f"no logged payment yet for this expected {when} pull"
+
+
+async def _bill_reconciliation_notes(reminders: list[SubscriptionReminder]) -> dict[str, str]:
+    notes: dict[str, str] = {}
+    for reminder in reminders:
+        note = await _bill_reconciliation_note(reminder)
+        if note:
+            notes[reminder.key] = note
+    return notes
+
+
+def format_subscription_reminder_digest(
+    mention: str,
+    reminders: list[SubscriptionReminder],
+    reconciliation_notes: dict[str, str] | None = None,
+) -> str:
+    reconciliation_notes = reconciliation_notes or {}
     grouped: dict[int, list[SubscriptionReminder]] = defaultdict(list)
     for reminder in sorted(reminders, key=lambda item: (item.days_until, item.pull_date, item.subscription.name.lower())):
         grouped[reminder.days_until].append(reminder)
@@ -143,9 +210,10 @@ def format_subscription_reminder_digest(mention: str, reminders: list[Subscripti
         lines.append(_format_digest_heading(days_until))
         for reminder in grouped[days_until]:
             account = f" from {reminder.subscription.account}" if reminder.subscription.account else ""
+            note = f" ({reconciliation_notes[reminder.key]})" if reminder.key in reconciliation_notes else ""
             lines.append(
                 f"- {reminder.subscription.name}: {_format_reminder_amount(reminder)}{account} "
-                f"on {_format_pull_date(reminder)}"
+                f"on {_format_pull_date(reminder)}{note}"
             )
     return "\n".join(lines)
 
@@ -168,8 +236,6 @@ async def send_due_subscription_reminders(client: Any, today: date | None = None
     if not _reminders_enabled():
         return 0
     current_time = now_pacific()
-    if today is None and not _reminder_is_eligible(current_time):
-        return 0
 
     channel = _target_channel(client)
     if channel is None:
@@ -179,6 +245,9 @@ async def send_due_subscription_reminders(client: Any, today: date | None = None
     sent = 0
     current = today or current_time.date()
     for actor_key, mention in _notification_users():
+        if today is None and not _reminder_is_eligible(current_time, actor_key):
+            continue
+
         try:
             with sheet_user_context(actor_key):
                 subscriptions, warnings = debug_subscription_sync()
@@ -221,7 +290,9 @@ async def send_due_subscription_reminders(client: Any, today: date | None = None
         if not unsent_reminders:
             continue
 
-        await channel.send(format_subscription_reminder_digest(mention, unsent_reminders))
+        with sheet_user_context(actor_key):
+            reconciliation_notes = await _bill_reconciliation_notes(unsent_reminders)
+        await channel.send(format_subscription_reminder_digest(mention, unsent_reminders, reconciliation_notes))
         for reminder in unsent_reminders:
             metadata = _reminder_metadata(reminder)
             record_system_event(

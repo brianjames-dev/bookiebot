@@ -4,7 +4,7 @@ BookieBot now has a first working subscription reminder flow:
 
 - The visible `Subscriptions` sheet remains the user-facing source of truth.
 - BookieBot syncs that sheet into a hidden normalized tab named `_BookieBot Subscription Schedule`.
-- Reminders are sent after 10 AM Pacific when a subscription is 7, 3, or 1 day away.
+- Reminders are sent after the configured Pacific send hour when a subscription is 7, 3, 1, or 0 days away.
 - Multiple due reminders are grouped into one Discord digest per user.
 
 This document tracks improvements that would make the feature more reliable, more automatic, and easier to debug when something goes wrong.
@@ -14,11 +14,12 @@ This document tracks improvements that would make the feature more reliable, mor
 - Implemented: hidden normalized subscription schedule per user.
 - Implemented: reminder digest grouped by timing window.
 - Implemented: digest headline includes the total amount expected in the next 7 days.
-- Implemented: `Today` digest grouping is supported when a subscription uses a `0` day reminder window.
+- Implemented: `Today` digest grouping is supported and same-day reminders are included in the default reminder windows.
 - Implemented: admin `/debug_subscriptions` command syncs the hidden sheet and reports parse warnings.
 - Implemented: parse warnings are collected for malformed rows in the pretty grouped layout and surfaced through `/debug_subscriptions`.
 - Implemented: proactive parse-warning notifications are sent after 10 AM when rows cannot be normalized, with once-per-day duplicate prevention.
-- Not implemented yet: bill confirmation/reconciliation.
+- Implemented: per-user notification send-hour overrides through `BRIAN_SUBSCRIPTION_REMINDER_SEND_HOUR` and `HANNAH_SUBSCRIPTION_REMINDER_SEND_HOUR`.
+- Implemented: near-term bill confirmation/reconciliation for scheduled rows that match Rent, PG&E, Recology, Water, or Student Loan.
 
 ## Product Decisions
 
@@ -122,6 +123,8 @@ Why this matters:
 
 ## 5. Same-Day Reminders
 
+Status: implemented by default. Reminder windows now include `7,3,1,0`.
+
 Optionally add a `0` day reminder window.
 
 Example digest:
@@ -160,6 +163,8 @@ Why this matters:
 - Larger upcoming pulls become easier to spot.
 
 ## 7. Bill Confirmation and Reconciliation
+
+Status: near-term version implemented. If a scheduled row looks like Rent, PG&E, Recology, Water, or Student Loan and is due today/tomorrow, BookieBot checks the existing manually logged payment fields and annotates the reminder if no payment has been logged.
 
 Compare expected pulls against payments already logged in BookieBot.
 
@@ -244,6 +249,8 @@ Recommendation:
 
 ## 10. Per-User Notification Settings
 
+Status: implemented for send hour through owner-specific environment variables.
+
 Allow each budget owner to configure reminder timing.
 
 Examples:
@@ -269,4 +276,4 @@ Why this matters:
 7. Bill confirmation/reconciliation
 8. Dedicated reminder log if action-log debugging becomes painful
 9. Price change detection after bank/API integrations
-10. Per-user notification settings
+10. Per-user notification settings beyond send hour

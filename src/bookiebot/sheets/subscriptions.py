@@ -14,7 +14,7 @@ from bookiebot.sheets.utils import clean_money
 
 SubscriptionCadence = Literal["monthly", "yearly"]
 
-DEFAULT_REMINDER_OFFSETS = (7, 3, 1)
+DEFAULT_REMINDER_OFFSETS = (7, 3, 1, 0)
 NORMALIZED_SCHEDULE_HEADERS = [
     "id",
     "active",
