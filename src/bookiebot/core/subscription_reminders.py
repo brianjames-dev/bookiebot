@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+from collections import defaultdict
 from datetime import date, datetime
 import logging
 import os
@@ -12,7 +13,7 @@ from bookiebot.sheets.routing import (
     now_pacific,
     sheet_user_context,
 )
-from bookiebot.sheets.subscriptions import due_subscription_reminders, format_subscription_reminder
+from bookiebot.sheets.subscriptions import SubscriptionReminder, due_subscription_reminders
 from bookiebot.sheets.undo import has_system_event, record_system_event
 
 logger = logging.getLogger(__name__)
@@ -83,6 +84,47 @@ def _target_channel(client: Any) -> Any | None:
     return None
 
 
+def _reminder_metadata(reminder: SubscriptionReminder) -> dict[str, str]:
+    return {
+        "reminder_key": reminder.key,
+        "pull_date": reminder.pull_date.isoformat(),
+        "days_until": str(reminder.days_until),
+    }
+
+
+def _format_pull_date(reminder: SubscriptionReminder) -> str:
+    return f"{reminder.pull_date:%b} {reminder.pull_date.day}"
+
+
+def _format_reminder_amount(reminder: SubscriptionReminder) -> str:
+    amount = reminder.subscription.amount
+    return f"${amount:.2f}" if amount else "amount unknown"
+
+
+def _format_digest_heading(days_until: int) -> str:
+    if days_until == 1:
+        return "Tomorrow"
+    return f"In {days_until} days"
+
+
+def format_subscription_reminder_digest(mention: str, reminders: list[SubscriptionReminder]) -> str:
+    grouped: dict[int, list[SubscriptionReminder]] = defaultdict(list)
+    for reminder in sorted(reminders, key=lambda item: (item.days_until, item.pull_date, item.subscription.name.lower())):
+        grouped[reminder.days_until].append(reminder)
+
+    lines = [f"{mention} Upcoming subscription pulls:"]
+    for days_until in sorted(grouped):
+        lines.append("")
+        lines.append(_format_digest_heading(days_until))
+        for reminder in grouped[days_until]:
+            account = f" from {reminder.subscription.account}" if reminder.subscription.account else ""
+            lines.append(
+                f"- {reminder.subscription.name}: {_format_reminder_amount(reminder)}{account} "
+                f"on {_format_pull_date(reminder)}"
+            )
+    return "\n".join(lines)
+
+
 async def send_due_subscription_reminders(client: Any, today: date | None = None) -> int:
     if not _reminders_enabled():
         return 0
@@ -105,15 +147,17 @@ async def send_due_subscription_reminders(client: Any, today: date | None = None
             logger.exception("Failed to evaluate subscription reminders", extra={"actor_key": actor_key})
             continue
 
+        unsent_reminders: list[SubscriptionReminder] = []
         for reminder in reminders:
-            metadata = {
-                "reminder_key": reminder.key,
-                "pull_date": reminder.pull_date.isoformat(),
-                "days_until": str(reminder.days_until),
-            }
-            if has_system_event(actor_key, "subscription_reminder_sent", metadata):
-                continue
-            await channel.send(format_subscription_reminder(reminder, mention=mention))
+            if not has_system_event(actor_key, "subscription_reminder_sent", _reminder_metadata(reminder)):
+                unsent_reminders.append(reminder)
+
+        if not unsent_reminders:
+            continue
+
+        await channel.send(format_subscription_reminder_digest(mention, unsent_reminders))
+        for reminder in unsent_reminders:
+            metadata = _reminder_metadata(reminder)
             record_system_event(
                 actor_key,
                 "subscription_reminder_sent",
