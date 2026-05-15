@@ -259,3 +259,37 @@ async def test_digest_includes_items_with_existing_per_item_audit_rows(monkeypat
     assert "`Railway - $5.00 - May 15`" in channel.messages[0]
     assert "`Raycast - $10.00 - May 19`" in channel.messages[0]
     assert "`ChatGPT - $20.00 - May 21`" in channel.messages[0]
+
+
+@pytest.mark.asyncio
+async def test_digest_uses_process_cache_when_persistent_marker_fails(monkeypatch):
+    repo = SheetsRepoStub(
+        subscriptions_rows=[
+            [],
+            ["", "SUBSCRIPTIONS"],
+            [],
+            ["Needs", "", "(Monthly)"],
+            [],
+            ["Recurring:", "Name:", "Amount:"],
+            ["15th", "Railway", "$5.00"],
+        ],
+    )
+    channel = FakeChannel()
+    client = FakeClient(channel)
+    monkeypatch.setenv("CHANNEL_ID", "123")
+    monkeypatch.setattr(
+        subscription_reminders,
+        "_notification_users",
+        lambda: [("676638528590970917", "<@676638528590970917>")],
+    )
+    monkeypatch.setattr(subscription_reminders, "record_system_event", lambda *args, **kwargs: False)
+    subscription_reminders._DIGEST_SENT_CACHE.clear()
+
+    with repo.patched(), sheet_user_context("676638528590970917"):
+        first_sent = await subscription_reminders.send_due_subscription_reminders(client, today=date(2026, 5, 15))
+        second_sent = await subscription_reminders.send_due_subscription_reminders(client, today=date(2026, 5, 15))
+
+    assert first_sent > 0
+    assert second_sent == 0
+    assert len(channel.messages) == 1
+    subscription_reminders._DIGEST_SENT_CACHE.clear()

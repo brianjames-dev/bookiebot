@@ -277,7 +277,7 @@ def record_undo_action(user_key: str | None, action: UndoAction) -> None:
         logger.exception("Failed to persist undo action")
 
 
-def record_system_event(user_key: str | None, event_type: str, metadata: dict[str, str], description: str) -> None:
+def record_system_event(user_key: str | None, event_type: str, metadata: dict[str, str], description: str) -> bool:
     """Persist non-user-visible bot state in the action log."""
     payload = {"type": "system_state", "event_type": event_type, **metadata}
     try:
@@ -294,8 +294,10 @@ def record_system_event(user_key: str | None, event_type: str, metadata: dict[st
                 description=description,
             ),
         )
+        return True
     except Exception:
         logger.exception("Failed to persist system event", extra={"event_type": event_type})
+        return False
 
 
 def has_system_event(user_key: str | None, event_type: str, metadata: dict[str, str]) -> bool:
