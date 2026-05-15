@@ -28,7 +28,6 @@ from bookiebot.sheets.undo import has_system_event, record_system_event
 logger = logging.getLogger(__name__)
 
 _REMINDER_TASK: asyncio.Task | None = None
-_DIGEST_SENT_CACHE: set[tuple[str, str]] = set()
 
 
 def _reminders_enabled() -> bool:
@@ -124,10 +123,6 @@ def _parse_warning_metadata(warning: SubscriptionParseWarning, current: date) ->
 
 def _digest_metadata(current: date) -> dict[str, str]:
     return {"digest_date": current.isoformat()}
-
-
-def _digest_cache_key(actor_key: str, current: date) -> tuple[str, str]:
-    return (str(actor_key), current.isoformat())
 
 
 def _format_pull_date(reminder: SubscriptionReminder) -> str:
@@ -312,24 +307,17 @@ async def send_due_subscription_reminders(client: Any, today: date | None = None
             continue
 
         digest_metadata = _digest_metadata(current)
-        digest_cache_key = _digest_cache_key(actor_key, current)
-        if digest_cache_key in _DIGEST_SENT_CACHE or has_system_event(actor_key, "subscription_digest_sent", digest_metadata):
+        if has_system_event(actor_key, "subscription_digest_sent", digest_metadata):
             continue
 
         with sheet_user_context(actor_key):
             reconciliation_notes = await _bill_reconciliation_notes(reminders)
-        persistent_digest_recorded = record_system_event(
+        record_system_event(
             actor_key,
             "subscription_digest_sent",
             digest_metadata,
             f"Subscription digest sent for {current.isoformat()}",
         )
-        if not persistent_digest_recorded:
-            logger.error(
-                "Subscription digest marker failed to persist; using in-memory suppression for this process",
-                extra={"actor_key": actor_key, "digest_date": current.isoformat()},
-            )
-        _DIGEST_SENT_CACHE.add(digest_cache_key)
         await channel.send(format_subscription_reminder_digest(mention, reminders, reconciliation_notes))
         for reminder in reminders:
             metadata = _reminder_metadata(reminder)
