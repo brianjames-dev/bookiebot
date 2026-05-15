@@ -135,8 +135,8 @@ Optionally add a `0` day reminder window.
 Example digest:
 
 ```text
-Today
-- Railway: $5.00 on May 15
+Today:
+`Railway - $5.00 - May 15`
 ```
 
 Why this matters:
@@ -153,13 +153,17 @@ Add totals to reminder digests.
 Example:
 
 ```text
-Upcoming subscription pulls:
+<@user> `$44.99` will be pulled by subscriptions in the next 7 days.
 
-Tomorrow - total $44.99
-- Railway: $5.00 on May 15
-- LinkedIn Premium: $39.99 on May 15
+Today:
+`None`
 
-Next 7 days total: $218.88
+Tomorrow:
+`Railway - $5.00 - May 15`
+`LinkedIn Premium - $39.99 - May 15`
+
+Upcoming:
+`None`
 ```
 
 Why this matters:

@@ -136,10 +136,10 @@ def _format_reminder_amount(reminder: SubscriptionReminder) -> str:
 
 def _format_digest_heading(days_until: int) -> str:
     if days_until == 0:
-        return "Today"
+        return "Today:"
     if days_until == 1:
-        return "Tomorrow"
-    return f"In {days_until} days"
+        return "Tomorrow:"
+    return "Upcoming:"
 
 
 def _reminder_total(reminders: list[SubscriptionReminder]) -> float:
@@ -200,20 +200,33 @@ def format_subscription_reminder_digest(
     reconciliation_notes: dict[str, str] | None = None,
 ) -> str:
     reconciliation_notes = reconciliation_notes or {}
-    grouped: dict[int, list[SubscriptionReminder]] = defaultdict(list)
+    grouped: dict[str, list[SubscriptionReminder]] = defaultdict(list)
     for reminder in sorted(reminders, key=lambda item: (item.days_until, item.pull_date, item.subscription.name.lower())):
-        grouped[reminder.days_until].append(reminder)
+        if reminder.days_until == 0:
+            grouped["today"].append(reminder)
+        elif reminder.days_until == 1:
+            grouped["tomorrow"].append(reminder)
+        else:
+            grouped["upcoming"].append(reminder)
 
     total = _reminder_total(reminders)
     lines = [
         f"{mention} `${total:.2f}` will be pulled by subscriptions in the next 7 days.",
         "",
     ]
-    for days_until in sorted(grouped):
+    for section_key, heading in (
+        ("today", "Today:"),
+        ("tomorrow", "Tomorrow:"),
+        ("upcoming", "Upcoming:"),
+    ):
         if lines[-1] != "":
             lines.append("")
-        lines.append(_format_digest_heading(days_until))
-        for reminder in grouped[days_until]:
+        lines.append(heading)
+        section_reminders = grouped.get(section_key, [])
+        if not section_reminders:
+            lines.append("`None`")
+            continue
+        for reminder in section_reminders:
             note = f" ({reconciliation_notes[reminder.key]})" if reminder.key in reconciliation_notes else ""
             lines.append(
                 f"`{reminder.subscription.name} - {_format_reminder_amount(reminder)} - "

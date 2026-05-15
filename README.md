@@ -48,14 +48,17 @@ Supported formats are `.png`, `.jpg`, `.jpeg`, and `.webp`. Rotation is enabled 
 BookieBot keeps the visible `Subscriptions` worksheet as the editable source of truth, then syncs it into a hidden per-user worksheet named `_BookieBot Subscription Schedule`. Reminders fire once per user per day after the configured Pacific send hour and include every subscription expected to pull in the next 7 days.
 
 ```text
-<@user> $177.90 will be pulled in the next 7 days.
-Upcoming subscription pulls:
+<@user> `$177.90` will be pulled by subscriptions in the next 7 days.
 
-Tomorrow
-- Railway: $5.00 on May 15
+Today:
+`None`
 
-In 3 days
-- ChatGPT: $20.00 on May 17
+Tomorrow:
+`Railway - $5.00 - May 15`
+
+Upcoming:
+`ChatGPT - $20.00 - May 17`
+`Amazon Prime - $152.90 - May 21`
 ```
 
 The current block layout is supported. The hidden sheet uses one normalized row per subscription with columns for owner, kind, cadence, amount, pull day/month, reminder offsets, source range, and sync timestamp. BookieBot refreshes this hidden sheet in the background even before the daily notification window, so sheet changes can be normalized automatically before reminders are due. If BookieBot finds malformed visible subscription rows it cannot safely normalize, it sends a concise parse-warning digest and skips those rows until fixed.
@@ -63,8 +66,8 @@ The current block layout is supported. The hidden sheet uses one normalized row 
 For scheduled rows that look like manually tracked bills, such as Rent, PG&E, Recology, Water, or Student Loan, BookieBot checks the existing payment fields and annotates the reminder if no payment has been logged yet:
 
 ```text
-Tomorrow
-- PG&E: $140.00 on May 15 (no logged payment yet for this expected tomorrow pull)
+Tomorrow:
+`PG&E - $140.00 - May 15 (no logged payment yet for this expected tomorrow pull)`
 ```
 
 Admin/debug support:

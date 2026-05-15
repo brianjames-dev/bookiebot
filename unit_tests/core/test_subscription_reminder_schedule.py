@@ -90,13 +90,14 @@ def test_format_subscription_reminder_digest_groups_by_window():
     assert subscription_reminders.format_subscription_reminder_digest("<@123>", reminders) == (
         "<@123> `$177.90` will be pulled by subscriptions in the next 7 days.\n"
         "\n"
-        "Tomorrow\n"
+        "Today:\n"
+        "`None`\n"
+        "\n"
+        "Tomorrow:\n"
         "`Railway - $5.00 - May 15`\n"
         "\n"
-        "In 3 days\n"
+        "Upcoming:\n"
         "`ChatGPT - $20.00 - May 17`\n"
-        "\n"
-        "In 7 days\n"
         "`Amazon Prime - $152.90 - May 21`"
     )
 
@@ -113,8 +114,14 @@ def test_format_subscription_reminder_digest_supports_today_group():
     assert subscription_reminders.format_subscription_reminder_digest("<@123>", reminders) == (
         "<@123> `$5.00` will be pulled by subscriptions in the next 7 days.\n"
         "\n"
-        "Today\n"
-        "`Railway - $5.00 - May 15`"
+        "Today:\n"
+        "`Railway - $5.00 - May 15`\n"
+        "\n"
+        "Tomorrow:\n"
+        "`None`\n"
+        "\n"
+        "Upcoming:\n"
+        "`None`"
     )
 
 
@@ -132,8 +139,14 @@ def test_format_subscription_reminder_digest_includes_reconciliation_note():
     ) == (
         "<@123> `$140.00` will be pulled by subscriptions in the next 7 days.\n"
         "\n"
-        "Tomorrow\n"
-        "`PG&E - $140.00 - May 15 (no logged payment yet for this expected tomorrow pull)`"
+        "Today:\n"
+        "`None`\n"
+        "\n"
+        "Tomorrow:\n"
+        "`PG&E - $140.00 - May 15 (no logged payment yet for this expected tomorrow pull)`\n"
+        "\n"
+        "Upcoming:\n"
+        "`None`"
     )
 
 
@@ -259,4 +272,3 @@ async def test_digest_includes_items_with_existing_per_item_audit_rows(monkeypat
     assert "`Railway - $5.00 - May 15`" in channel.messages[0]
     assert "`Raycast - $10.00 - May 19`" in channel.messages[0]
     assert "`ChatGPT - $20.00 - May 21`" in channel.messages[0]
-
