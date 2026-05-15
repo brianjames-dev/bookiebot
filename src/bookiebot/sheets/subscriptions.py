@@ -506,7 +506,7 @@ def due_subscription_reminders_for_subscriptions(
         if pull_date is None:
             continue
         days_until = (pull_date - today).days
-        if days_until in subscription.reminder_offsets:
+        if 0 <= days_until <= 7:
             reminders.append(SubscriptionReminder(subscription, pull_date, days_until))
     return sorted(reminders, key=lambda reminder: (reminder.pull_date, reminder.subscription.name.lower()))
 

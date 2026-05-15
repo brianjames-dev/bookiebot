@@ -121,6 +121,10 @@ def _parse_warning_metadata(warning: SubscriptionParseWarning, current: date) ->
     }
 
 
+def _digest_metadata(current: date) -> dict[str, str]:
+    return {"digest_date": current.isoformat()}
+
+
 def _format_pull_date(reminder: SubscriptionReminder) -> str:
     return f"{reminder.pull_date:%b} {reminder.pull_date.day}"
 
@@ -302,16 +306,26 @@ async def send_due_subscription_reminders(client: Any, today: date | None = None
         if not reminders:
             continue
 
+        digest_metadata = _digest_metadata(current)
+        if has_system_event(actor_key, "subscription_digest_sent", digest_metadata):
+            continue
+
         unsent_reminders: list[SubscriptionReminder] = []
         for reminder in reminders:
             if not has_system_event(actor_key, "subscription_reminder_sent", _reminder_metadata(reminder)):
                 unsent_reminders.append(reminder)
 
         if not unsent_reminders:
-            continue
+            unsent_reminders = reminders
 
         with sheet_user_context(actor_key):
             reconciliation_notes = await _bill_reconciliation_notes(unsent_reminders)
+        record_system_event(
+            actor_key,
+            "subscription_digest_sent",
+            digest_metadata,
+            f"Subscription digest sent for {current.isoformat()}",
+        )
         await channel.send(format_subscription_reminder_digest(mention, unsent_reminders, reconciliation_notes))
         for reminder in unsent_reminders:
             metadata = _reminder_metadata(reminder)

@@ -4,7 +4,7 @@ BookieBot now has a first working subscription reminder flow:
 
 - The visible `Subscriptions` sheet remains the user-facing source of truth.
 - BookieBot syncs that sheet into a hidden normalized tab named `_BookieBot Subscription Schedule`.
-- Reminders are sent after the configured Pacific send hour when a subscription is 7, 3, 1, or 0 days away.
+- Reminders are sent once per user per day after the configured Pacific send hour and include every subscription expected to pull in the next 7 days.
 - Multiple due reminders are grouped into one Discord digest per user.
 
 This document tracks improvements that would make the feature more reliable, more automatic, and easier to debug when something goes wrong.
@@ -15,7 +15,9 @@ This document tracks improvements that would make the feature more reliable, mor
 - Implemented: background sync refreshes hidden normalized schedules even before the daily notification window.
 - Implemented: reminder digest grouped by timing window.
 - Implemented: digest headline includes the total amount expected in the next 7 days.
-- Implemented: `Today` digest grouping is supported and same-day reminders are included in the default reminder windows.
+- Implemented: `Today` digest grouping is supported.
+- Implemented: every subscription due in the next 7 days is included; reminder selection is no longer limited to only 0, 1, 3, and 7 days.
+- Implemented: once-per-user daily digest tracking prevents repeated subscription digests later the same day.
 - Implemented: admin `/debug_subscriptions` command syncs the hidden sheet and reports parse warnings.
 - Implemented: parse warnings are collected for malformed rows in the pretty grouped layout and surfaced through `/debug_subscriptions`.
 - Implemented: proactive parse-warning notifications are sent after 10 AM when rows cannot be normalized, with once-per-day duplicate prevention.

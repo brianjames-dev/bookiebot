@@ -45,7 +45,7 @@ Supported formats are `.png`, `.jpg`, `.jpeg`, and `.webp`. Rotation is enabled 
 
 ## Subscription Reminders
 
-BookieBot keeps the visible `Subscriptions` worksheet as the editable source of truth, then syncs it into a hidden per-user worksheet named `_BookieBot Subscription Schedule`. Reminders fire once after the configured Pacific send hour when a charge is 7, 3, 1, or 0 days away, and the digest headline includes the total expected pull amount for the next 7 days.
+BookieBot keeps the visible `Subscriptions` worksheet as the editable source of truth, then syncs it into a hidden per-user worksheet named `_BookieBot Subscription Schedule`. Reminders fire once per user per day after the configured Pacific send hour and include every subscription expected to pull in the next 7 days.
 
 ```text
 <@user> $177.90 will be pulled in the next 7 days.

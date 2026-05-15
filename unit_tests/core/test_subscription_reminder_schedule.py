@@ -165,6 +165,12 @@ def test_parse_warning_metadata_is_scoped_to_day():
     }
 
 
+def test_digest_metadata_is_scoped_to_day():
+    assert subscription_reminders._digest_metadata(date(2026, 5, 14)) == {
+        "digest_date": "2026-05-14",
+    }
+
+
 def test_sync_subscription_schedules_for_users_refreshes_hidden_sheets(monkeypatch):
     repo = SheetsRepoStub(
         subscriptions_rows=[

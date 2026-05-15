@@ -7,6 +7,7 @@ from bookiebot.sheets.subscriptions import (
     format_subscription_reminder,
     list_subscription_schedules,
     next_pull_date,
+    due_subscription_reminders_for_subscriptions,
     sync_subscription_schedule_sheet,
     parse_visible_subscription_schedules_with_warnings,
 )
@@ -62,6 +63,27 @@ def test_default_reminder_offsets_include_same_day():
     subscriptions = list_subscription_schedules(rows)
 
     assert subscriptions[0].reminder_offsets == (7, 3, 1, 0)
+
+
+def test_due_subscription_reminders_include_every_day_in_next_7_days():
+    subscriptions = [
+        Subscription(name="Today", amount=1, cadence="monthly", pull_day=14),
+        Subscription(name="Tomorrow", amount=2, cadence="monthly", pull_day=15),
+        Subscription(name="Two Days", amount=3, cadence="monthly", pull_day=16),
+        Subscription(name="Four Days", amount=4, cadence="monthly", pull_day=18),
+        Subscription(name="Seven Days", amount=5, cadence="monthly", pull_day=21),
+        Subscription(name="Eight Days", amount=6, cadence="monthly", pull_day=22),
+    ]
+
+    reminders = due_subscription_reminders_for_subscriptions(subscriptions, date(2026, 5, 14))
+
+    assert [(reminder.subscription.name, reminder.days_until) for reminder in reminders] == [
+        ("Today", 0),
+        ("Tomorrow", 1),
+        ("Two Days", 2),
+        ("Four Days", 4),
+        ("Seven Days", 7),
+    ]
 
 
 def test_next_pull_date_clamps_month_end_and_rolls_forward():
