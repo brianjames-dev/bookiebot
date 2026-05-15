@@ -310,32 +310,26 @@ async def send_due_subscription_reminders(client: Any, today: date | None = None
         if has_system_event(actor_key, "subscription_digest_sent", digest_metadata):
             continue
 
-        unsent_reminders: list[SubscriptionReminder] = []
-        for reminder in reminders:
-            if not has_system_event(actor_key, "subscription_reminder_sent", _reminder_metadata(reminder)):
-                unsent_reminders.append(reminder)
-
-        if not unsent_reminders:
-            unsent_reminders = reminders
-
         with sheet_user_context(actor_key):
-            reconciliation_notes = await _bill_reconciliation_notes(unsent_reminders)
+            reconciliation_notes = await _bill_reconciliation_notes(reminders)
         record_system_event(
             actor_key,
             "subscription_digest_sent",
             digest_metadata,
             f"Subscription digest sent for {current.isoformat()}",
         )
-        await channel.send(format_subscription_reminder_digest(mention, unsent_reminders, reconciliation_notes))
-        for reminder in unsent_reminders:
+        await channel.send(format_subscription_reminder_digest(mention, reminders, reconciliation_notes))
+        for reminder in reminders:
             metadata = _reminder_metadata(reminder)
-            record_system_event(
-                actor_key,
-                "subscription_reminder_sent",
-                metadata,
-                f"Subscription reminder sent for {reminder.subscription.name}",
-            )
-            sent += 1
+            if not has_system_event(actor_key, "subscription_reminder_sent", metadata):
+                record_system_event(
+                    actor_key,
+                    "subscription_reminder_sent",
+                    metadata,
+                    f"Subscription reminder sent for {reminder.subscription.name}",
+                )
+                sent += 1
+        sent += 1
     return sent
 
 

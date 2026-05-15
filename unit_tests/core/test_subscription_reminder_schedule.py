@@ -1,9 +1,27 @@
 from datetime import date, datetime
 
+import pytest
+
 from bookiebot.core import subscription_reminders
 from bookiebot.sheets.routing import sheet_user_context
 from bookiebot.sheets.subscriptions import Subscription, SubscriptionParseWarning, SubscriptionReminder
 from unit_tests.support.sheets_repo_stub import SheetsRepoStub
+
+
+class FakeChannel:
+    def __init__(self):
+        self.messages = []
+
+    async def send(self, content):
+        self.messages.append(content)
+
+
+class FakeClient:
+    def __init__(self, channel):
+        self.channel = channel
+
+    def get_channel(self, _channel_id):
+        return self.channel
 
 
 def test_reminder_is_not_eligible_before_configured_hour(monkeypatch):
@@ -196,3 +214,48 @@ def test_sync_subscription_schedules_for_users_refreshes_hidden_sheets(monkeypat
     assert results == {"830984827904851969": (1, 0)}
     assert rows[0][0] == "id"
     assert rows[1][6] == "ChatGPT"
+
+
+@pytest.mark.asyncio
+async def test_digest_includes_items_with_existing_per_item_audit_rows(monkeypatch):
+    repo = SheetsRepoStub(
+        subscriptions_rows=[
+            [],
+            ["", "SUBSCRIPTIONS"],
+            [],
+            ["Needs", "", "(Monthly)"],
+            [],
+            ["Recurring:", "Name:", "Amount:"],
+            ["15th", "Railway", "$5.00"],
+            ["19th", "Raycast", "$10.00"],
+            ["21st", "ChatGPT", "$20.00"],
+        ],
+        action_log_rows=[
+            ["id", "created_at", "user_key", "status", "undone_at", "action_json"],
+            [
+                "oldrail",
+                "2026-05-15T09:00:00",
+                "676638528590970917",
+                "active",
+                "",
+                '{"worksheet":"income","kind":"restore_cells","row":0,"columns":[],"previous_values":[],"description":"Subscription reminder sent for Railway","new_values":[],"metadata":{"type":"system_state","event_type":"subscription_reminder_sent","reminder_key":"railway|monthly|2026-05-15|0","pull_date":"2026-05-15","days_until":"0"}}',
+            ],
+        ],
+    )
+    channel = FakeChannel()
+    client = FakeClient(channel)
+    monkeypatch.setenv("CHANNEL_ID", "123")
+    monkeypatch.setattr(
+        subscription_reminders,
+        "_notification_users",
+        lambda: [("676638528590970917", "<@676638528590970917>")],
+    )
+
+    with repo.patched(), sheet_user_context("676638528590970917"):
+        sent = await subscription_reminders.send_due_subscription_reminders(client, today=date(2026, 5, 15))
+
+    assert sent == 3
+    assert len(channel.messages) == 1
+    assert "`Railway - $5.00 - May 15`" in channel.messages[0]
+    assert "`Raycast - $10.00 - May 19`" in channel.messages[0]
+    assert "`ChatGPT - $20.00 - May 21`" in channel.messages[0]
