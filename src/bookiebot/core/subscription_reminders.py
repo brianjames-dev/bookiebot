@@ -2,10 +2,10 @@ from __future__ import annotations
 
 import asyncio
 from collections import defaultdict
+from dataclasses import dataclass
 from datetime import date, datetime
 import logging
 import os
-import re
 from typing import Any
 
 from bookiebot.sheets.routing import (
@@ -22,12 +22,28 @@ from bookiebot.sheets.subscriptions import (
     due_subscription_reminders,
     due_subscription_reminders_for_subscriptions,
 )
-import bookiebot.sheets.utils as sheet_utils
+from bookiebot.sheets.bills import (
+    BillReminder,
+    BillScheduleWarning,
+    due_bill_reminders,
+)
 from bookiebot.sheets.undo import has_system_event, record_system_event
 
 logger = logging.getLogger(__name__)
 
 _REMINDER_TASK: asyncio.Task | None = None
+
+
+@dataclass(frozen=True)
+class CashPullReminder:
+    name: str
+    pull_date: date
+    days_until: int
+    key: str
+    source: str
+    amount: float | None = None
+    amount_missing: bool = False
+    overdue: bool = False
 
 
 def _reminders_enabled() -> bool:
@@ -112,7 +128,27 @@ def _reminder_metadata(reminder: SubscriptionReminder) -> dict[str, str]:
     }
 
 
+def _bill_reminder_metadata(reminder: BillReminder) -> dict[str, str]:
+    return {
+        "reminder_key": reminder.key,
+        "bill_key": reminder.bill.bill_key,
+        "pull_date": reminder.pull_date.isoformat(),
+        "days_until": str(reminder.days_until),
+        "amount_entered": "yes" if reminder.amount_entered else "no",
+        "overdue": "yes" if reminder.overdue else "no",
+    }
+
+
 def _parse_warning_metadata(warning: SubscriptionParseWarning, current: date) -> dict[str, str]:
+    warning_key = "|".join((warning.source_range, warning.reason, *warning.values))
+    return {
+        "warning_key": warning_key,
+        "source_range": warning.source_range,
+        "warning_date": current.isoformat(),
+    }
+
+
+def _bill_warning_metadata(warning: BillScheduleWarning, current: date) -> dict[str, str]:
     warning_key = "|".join((warning.source_range, warning.reason, *warning.values))
     return {
         "warning_key": warning_key,
@@ -125,12 +161,14 @@ def _digest_metadata(current: date) -> dict[str, str]:
     return {"digest_date": current.isoformat()}
 
 
-def _format_pull_date(reminder: SubscriptionReminder) -> str:
+def _format_pull_date(reminder: CashPullReminder) -> str:
     return f"{reminder.pull_date:%b} {reminder.pull_date.day}"
 
 
-def _format_reminder_amount(reminder: SubscriptionReminder) -> str:
-    amount = reminder.subscription.amount
+def _format_reminder_amount(reminder: CashPullReminder) -> str:
+    if reminder.amount_missing:
+        return "amount missing"
+    amount = reminder.amount
     return f"${amount:.2f}" if amount else "amount unknown"
 
 
@@ -142,66 +180,53 @@ def _format_digest_heading(days_until: int) -> str:
     return "Upcoming:"
 
 
-def _reminder_total(reminders: list[SubscriptionReminder]) -> float:
-    return round(sum(reminder.subscription.amount for reminder in reminders), 2)
+def _cash_pull_total(reminders: list[CashPullReminder]) -> float:
+    return round(sum(reminder.amount or 0 for reminder in reminders if not reminder.amount_missing), 2)
 
 
-def _bill_key_for_name(name: str) -> str | None:
-    normalized = re.sub(r"[^a-z0-9]+", " ", name.lower()).strip()
-    if not normalized:
-        return None
-    if "student loan" in normalized:
-        return "student_loan"
-    if "pg e" in normalized or "pge" in normalized or "gas electric" in normalized:
-        return "pge"
-    if "recology" in normalized or "trash" in normalized or "garbage" in normalized:
-        return "recology"
-    if "santa rosa water" in normalized or normalized == "water" or " water " in f" {normalized} ":
-        return "water"
-    if normalized == "rent" or normalized.endswith(" rent") or normalized.startswith("rent "):
-        return "rent"
-    return None
+def _missing_amount_count(reminders: list[CashPullReminder]) -> int:
+    return sum(1 for reminder in reminders if reminder.amount_missing)
 
 
-async def _bill_reconciliation_note(reminder: SubscriptionReminder) -> str | None:
-    if reminder.days_until not in {0, 1}:
-        return None
-    bill_key = _bill_key_for_name(reminder.subscription.name)
-    if bill_key is None:
-        return None
-
-    checkers = {
-        "rent": sheet_utils.check_rent_paid,
-        "pge": sheet_utils.check_pge_paid,
-        "recology": sheet_utils.check_recology_paid,
-        "water": sheet_utils.check_water_paid,
-        "student_loan": sheet_utils.check_student_loan_paid,
-    }
-    paid, amount = await checkers[bill_key]()
-    if paid:
-        return None
-
-    when = "today" if reminder.days_until == 0 else "tomorrow"
-    return f"no logged payment yet for this expected {when} pull"
+def _subscription_cash_pull(reminder: SubscriptionReminder) -> CashPullReminder:
+    return CashPullReminder(
+        name=reminder.subscription.name,
+        pull_date=reminder.pull_date,
+        days_until=reminder.days_until,
+        key=reminder.key,
+        source="subscription",
+        amount=reminder.subscription.amount,
+    )
 
 
-async def _bill_reconciliation_notes(reminders: list[SubscriptionReminder]) -> dict[str, str]:
-    notes: dict[str, str] = {}
-    for reminder in reminders:
-        note = await _bill_reconciliation_note(reminder)
-        if note:
-            notes[reminder.key] = note
-    return notes
+def _bill_cash_pull(reminder: BillReminder) -> CashPullReminder:
+    return CashPullReminder(
+        name=reminder.bill.display_name,
+        pull_date=reminder.pull_date,
+        days_until=reminder.days_until,
+        key=reminder.key,
+        source="bill",
+        amount=reminder.amount,
+        amount_missing=not reminder.amount_entered,
+        overdue=reminder.overdue,
+    )
 
 
-def format_subscription_reminder_digest(
+def _cash_pull_sort_key(reminder: CashPullReminder) -> tuple[int, date, str]:
+    source_order = 0 if reminder.source == "bill" else 1
+    return source_order, reminder.pull_date, reminder.name.lower()
+
+
+def format_cash_pull_digest(
     mention: str,
-    reminders: list[SubscriptionReminder],
-    reconciliation_notes: dict[str, str] | None = None,
+    reminders: list[CashPullReminder],
 ) -> str:
-    reconciliation_notes = reconciliation_notes or {}
-    grouped: dict[str, list[SubscriptionReminder]] = defaultdict(list)
-    for reminder in sorted(reminders, key=lambda item: (item.days_until, item.pull_date, item.subscription.name.lower())):
+    grouped: dict[str, list[CashPullReminder]] = defaultdict(list)
+    overdue: list[CashPullReminder] = []
+    for reminder in sorted(reminders, key=_cash_pull_sort_key):
+        if reminder.overdue:
+            overdue.append(reminder)
+            continue
         if reminder.days_until == 0:
             grouped["today"].append(reminder)
         elif reminder.days_until == 1:
@@ -209,11 +234,17 @@ def format_subscription_reminder_digest(
         else:
             grouped["upcoming"].append(reminder)
 
-    total = _reminder_total(reminders)
-    lines = [
-        f"{mention} `${total:.2f}` will be pulled by subscriptions in the next 7 days.",
-        "",
-    ]
+    total = _cash_pull_total(reminders)
+    missing_count = _missing_amount_count(reminders)
+    if missing_count:
+        missing_label = "missing amount" if missing_count == 1 else "missing amounts"
+        headline = (
+            f"{mention} `${total:.2f}` known + `{missing_count} {missing_label}` "
+            "will be pulled by bills and subscriptions in the next 7 days."
+        )
+    else:
+        headline = f"{mention} `${total:.2f}` will be pulled by bills and subscriptions in the next 7 days."
+    lines = [headline, ""]
     for section_key, heading in (
         ("today", "Today:"),
         ("tomorrow", "Tomorrow:"),
@@ -227,12 +258,23 @@ def format_subscription_reminder_digest(
             lines.append("`None`")
             continue
         for reminder in section_reminders:
-            note = f" ({reconciliation_notes[reminder.key]})" if reminder.key in reconciliation_notes else ""
             lines.append(
-                f"`{reminder.subscription.name} - {_format_reminder_amount(reminder)} - "
-                f"{_format_pull_date(reminder)}{note}`"
+                f"`{reminder.name} - {_format_reminder_amount(reminder)} - {_format_pull_date(reminder)}`"
             )
+    if overdue:
+        lines.append("")
+        lines.append("Missing overdue:")
+        for reminder in overdue:
+            lines.append(f"`{reminder.name} - amount missing - {_format_pull_date(reminder)}`")
     return "\n".join(lines)
+
+
+def format_subscription_reminder_digest(
+    mention: str,
+    reminders: list[SubscriptionReminder],
+    reconciliation_notes: dict[str, str] | None = None,
+) -> str:
+    return format_cash_pull_digest(mention, [_subscription_cash_pull(reminder) for reminder in reminders])
 
 
 def format_subscription_parse_warning_digest(mention: str, warnings: list[SubscriptionParseWarning]) -> str:
@@ -241,6 +283,20 @@ def format_subscription_parse_warning_digest(mention: str, warnings: list[Subscr
     lines = [
         f"{mention} I found {len(warnings)} subscription sheet {noun} that {verb} attention.",
         "These rows were not added to the reminder schedule:",
+    ]
+    for warning in warnings[:10]:
+        lines.append(f"- {warning.format()}")
+    if len(warnings) > 10:
+        lines.append(f"- ...and {len(warnings) - 10} more")
+    return "\n".join(lines)
+
+
+def format_bill_schedule_warning_digest(mention: str, warnings: list[BillScheduleWarning]) -> str:
+    noun = "issue" if len(warnings) == 1 else "issues"
+    verb = "needs" if len(warnings) == 1 else "need"
+    lines = [
+        f"{mention} I found {len(warnings)} bill schedule {noun} that {verb} attention.",
+        "These rows were not added to cash pull reminders:",
     ]
     for warning in warnings[:10]:
         lines.append(f"- {warning.format()}")
@@ -289,12 +345,14 @@ async def send_due_subscription_reminders(client: Any, today: date | None = None
             with sheet_user_context(actor_key):
                 subscriptions, warnings = debug_subscription_sync()
                 reminders = due_subscription_reminders_for_subscriptions(subscriptions, current)
+                bill_reminders, bill_warnings = due_bill_reminders(current)
         except Exception:
             logger.exception("Failed to evaluate subscription reminders", extra={"actor_key": actor_key})
             try:
                 with sheet_user_context(actor_key):
                     reminders = due_subscription_reminders(current)
                     warnings = []
+                    bill_reminders, bill_warnings = due_bill_reminders(current)
             except Exception:
                 logger.exception("Failed fallback subscription reminder evaluation", extra={"actor_key": actor_key})
                 continue
@@ -306,6 +364,13 @@ async def send_due_subscription_reminders(client: Any, today: date | None = None
                 unsent_warnings.append(warning)
 
         if unsent_warnings:
+            if not record_system_event(
+                actor_key,
+                "subscription_parse_warning_digest_sent",
+                {**_digest_metadata(current), "warning_count": str(len(unsent_warnings))},
+                f"Subscription parse warning digest sent for {current.isoformat()}",
+            ):
+                continue
             await channel.send(format_subscription_parse_warning_digest(mention, unsent_warnings))
             for warning in unsent_warnings:
                 record_system_event(
@@ -316,22 +381,47 @@ async def send_due_subscription_reminders(client: Any, today: date | None = None
                 )
                 sent += 1
 
-        if not reminders:
+        unsent_bill_warnings: list[BillScheduleWarning] = []
+        for warning in bill_warnings:
+            metadata = _bill_warning_metadata(warning, current)
+            if not has_system_event(actor_key, "bill_schedule_warning_sent", metadata):
+                unsent_bill_warnings.append(warning)
+
+        if unsent_bill_warnings:
+            if not record_system_event(
+                actor_key,
+                "bill_schedule_warning_digest_sent",
+                {**_digest_metadata(current), "warning_count": str(len(unsent_bill_warnings))},
+                f"Bill schedule warning digest sent for {current.isoformat()}",
+            ):
+                continue
+            await channel.send(format_bill_schedule_warning_digest(mention, unsent_bill_warnings))
+            for warning in unsent_bill_warnings:
+                record_system_event(
+                    actor_key,
+                    "bill_schedule_warning_sent",
+                    _bill_warning_metadata(warning, current),
+                    f"Bill schedule warning sent for {warning.source_range}",
+                )
+                sent += 1
+
+        cash_pulls = [_subscription_cash_pull(reminder) for reminder in reminders]
+        cash_pulls.extend(_bill_cash_pull(reminder) for reminder in bill_reminders)
+        if not cash_pulls:
             continue
 
         digest_metadata = _digest_metadata(current)
-        if has_system_event(actor_key, "subscription_digest_sent", digest_metadata):
+        if has_system_event(actor_key, "cash_pull_digest_sent", digest_metadata):
             continue
 
-        with sheet_user_context(actor_key):
-            reconciliation_notes = await _bill_reconciliation_notes(reminders)
-        record_system_event(
+        if not record_system_event(
             actor_key,
-            "subscription_digest_sent",
+            "cash_pull_digest_sent",
             digest_metadata,
-            f"Subscription digest sent for {current.isoformat()}",
-        )
-        await channel.send(format_subscription_reminder_digest(mention, reminders, reconciliation_notes))
+            f"Cash pull digest sent for {current.isoformat()}",
+        ):
+            continue
+        await channel.send(format_cash_pull_digest(mention, cash_pulls))
         for reminder in reminders:
             metadata = _reminder_metadata(reminder)
             if not has_system_event(actor_key, "subscription_reminder_sent", metadata):
@@ -340,6 +430,16 @@ async def send_due_subscription_reminders(client: Any, today: date | None = None
                     "subscription_reminder_sent",
                     metadata,
                     f"Subscription reminder sent for {reminder.subscription.name}",
+                )
+                sent += 1
+        for reminder in bill_reminders:
+            metadata = _bill_reminder_metadata(reminder)
+            if not has_system_event(actor_key, "bill_reminder_sent", metadata):
+                record_system_event(
+                    actor_key,
+                    "bill_reminder_sent",
+                    metadata,
+                    f"Bill reminder sent for {reminder.bill.display_name}",
                 )
                 sent += 1
         sent += 1

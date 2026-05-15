@@ -121,6 +121,7 @@ class SheetsRepoStub:
         income_rows: Sequence[Sequence[str]] | None = None,
         subscriptions_rows: Sequence[Sequence[str]] | None = None,
         subscription_schedule_rows: Sequence[Sequence[str]] | None = None,
+        bill_schedule_rows: Sequence[Sequence[str]] | None = None,
         action_log_rows: Sequence[Sequence[str]] | None = None,
     ):
         self.expense = InMemoryWorksheet(expense_rows, title="Expense")
@@ -129,6 +130,10 @@ class SheetsRepoStub:
         self.subscription_schedule = InMemoryWorksheet(
             subscription_schedule_rows,
             title="_BookieBot Subscription Schedule",
+        )
+        self.bill_schedule = InMemoryWorksheet(
+            bill_schedule_rows,
+            title="_BookieBot Bill Schedule",
         )
         self.action_log = InMemoryWorksheet(action_log_rows, title="_BookieBot Action Log")
 
@@ -155,6 +160,9 @@ class SheetsRepoStub:
 
     def subscription_schedule_sheet(self):
         return self.subscription_schedule
+
+    def bill_schedule_sheet(self):
+        return self.bill_schedule
 
     def action_log_sheet(self):
         return self.action_log

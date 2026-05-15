@@ -3,6 +3,7 @@ from datetime import date, datetime
 import pytest
 
 from bookiebot.core import subscription_reminders
+from bookiebot.sheets.bills import BillReminder, BillSchedule
 from bookiebot.sheets.routing import sheet_user_context
 from bookiebot.sheets.subscriptions import Subscription, SubscriptionParseWarning, SubscriptionReminder
 from unit_tests.support.sheets_repo_stub import SheetsRepoStub
@@ -88,7 +89,7 @@ def test_format_subscription_reminder_digest_groups_by_window():
     ]
 
     assert subscription_reminders.format_subscription_reminder_digest("<@123>", reminders) == (
-        "<@123> `$177.90` will be pulled by subscriptions in the next 7 days.\n"
+        "<@123> `$177.90` will be pulled by bills and subscriptions in the next 7 days.\n"
         "\n"
         "Today:\n"
         "`None`\n"
@@ -112,7 +113,7 @@ def test_format_subscription_reminder_digest_supports_today_group():
     ]
 
     assert subscription_reminders.format_subscription_reminder_digest("<@123>", reminders) == (
-        "<@123> `$5.00` will be pulled by subscriptions in the next 7 days.\n"
+        "<@123> `$5.00` will be pulled by bills and subscriptions in the next 7 days.\n"
         "\n"
         "Today:\n"
         "`Railway - $5.00 - May 15`\n"
@@ -137,27 +138,93 @@ def test_format_subscription_reminder_digest_includes_reconciliation_note():
         [reminder],
         {reminder.key: "no logged payment yet for this expected tomorrow pull"},
     ) == (
-        "<@123> `$140.00` will be pulled by subscriptions in the next 7 days.\n"
+        "<@123> `$140.00` will be pulled by bills and subscriptions in the next 7 days.\n"
         "\n"
         "Today:\n"
         "`None`\n"
         "\n"
         "Tomorrow:\n"
-        "`PG&E - $140.00 - May 15 (no logged payment yet for this expected tomorrow pull)`\n"
+        "`PG&E - $140.00 - May 15`\n"
         "\n"
         "Upcoming:\n"
         "`None`"
     )
 
 
-def test_bill_key_for_known_bill_names():
-    assert subscription_reminders._bill_key_for_name("PG&E") == "pge"
-    assert subscription_reminders._bill_key_for_name("PGE Utilities") == "pge"
-    assert subscription_reminders._bill_key_for_name("Recology") == "recology"
-    assert subscription_reminders._bill_key_for_name("Santa Rosa Water") == "water"
-    assert subscription_reminders._bill_key_for_name("Student Loan Payment") == "student_loan"
-    assert subscription_reminders._bill_key_for_name("Rent") == "rent"
-    assert subscription_reminders._bill_key_for_name("Railway") is None
+def test_format_cash_pull_digest_includes_bills_and_missing_amounts():
+    subscription = SubscriptionReminder(
+        subscription=Subscription(name="ChatGPT", amount=20, cadence="monthly", pull_day=21),
+        pull_date=date(2026, 5, 21),
+        days_until=6,
+    )
+    pge = BillReminder(
+        bill=BillSchedule("pge", "PG&E", "monthly", 16, source_label="PG&E"),
+        pull_date=date(2026, 5, 16),
+        days_until=1,
+        amount=None,
+        amount_entered=False,
+    )
+    rent = BillReminder(
+        bill=BillSchedule("rent", "Rent", "monthly", 15, source_label="Rent"),
+        pull_date=date(2026, 5, 15),
+        days_until=0,
+        amount=2000,
+        amount_entered=True,
+    )
+
+    text = subscription_reminders.format_cash_pull_digest(
+        "<@123>",
+        [
+            subscription_reminders._subscription_cash_pull(subscription),
+            subscription_reminders._bill_cash_pull(pge),
+            subscription_reminders._bill_cash_pull(rent),
+        ],
+    )
+
+    assert text == (
+        "<@123> `$2020.00` known + `1 missing amount` will be pulled by bills and subscriptions in the next 7 days.\n"
+        "\n"
+        "Today:\n"
+        "`Rent - $2000.00 - May 15`\n"
+        "\n"
+        "Tomorrow:\n"
+        "`PG&E - amount missing - May 16`\n"
+        "\n"
+        "Upcoming:\n"
+        "`ChatGPT - $20.00 - May 21`"
+    )
+
+
+def test_format_cash_pull_digest_includes_overdue_missing_section():
+    pge = BillReminder(
+        bill=BillSchedule("pge", "PG&E", "monthly", 14, source_label="PG&E"),
+        pull_date=date(2026, 5, 14),
+        days_until=-1,
+        amount=None,
+        amount_entered=False,
+        overdue=True,
+    )
+
+    text = subscription_reminders.format_cash_pull_digest(
+        "<@123>",
+        [subscription_reminders._bill_cash_pull(pge)],
+    )
+
+    assert text == (
+        "<@123> `$0.00` known + `1 missing amount` will be pulled by bills and subscriptions in the next 7 days.\n"
+        "\n"
+        "Today:\n"
+        "`None`\n"
+        "\n"
+        "Tomorrow:\n"
+        "`None`\n"
+        "\n"
+        "Upcoming:\n"
+        "`None`\n"
+        "\n"
+        "Missing overdue:\n"
+        "`PG&E - amount missing - May 14`"
+    )
 
 
 def test_format_subscription_parse_warning_digest():

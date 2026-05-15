@@ -4,8 +4,9 @@ BookieBot now has a first working subscription reminder flow:
 
 - The visible `Subscriptions` sheet remains the user-facing source of truth.
 - BookieBot syncs that sheet into a hidden normalized tab named `_BookieBot Subscription Schedule`.
-- Reminders are sent once per user per day after the configured Pacific send hour and include every subscription expected to pull in the next 7 days.
-- Multiple due reminders are grouped into one Discord digest per user.
+- BookieBot creates a hidden `_BookieBot Bill Schedule` tab for dynamic fixed-date bills.
+- Reminders are sent once per user per day after the configured Pacific send hour and include every subscription and scheduled bill expected to pull in the next 7 days.
+- Multiple due reminders are grouped into one Discord cash-pull digest per user.
 
 This document tracks improvements that would make the feature more reliable, more automatic, and easier to debug when something goes wrong.
 
@@ -17,12 +18,17 @@ This document tracks improvements that would make the feature more reliable, mor
 - Implemented: digest headline includes the total amount expected in the next 7 days.
 - Implemented: `Today` digest grouping is supported.
 - Implemented: every subscription due in the next 7 days is included; reminder selection is no longer limited to only 0, 1, 3, and 7 days.
+- Implemented: hidden bill schedule support for fixed-date dynamic bills such as Rent, PG&E, Recology, Water, and Student Loan Payment.
+- Implemented: combined cash-pull digest includes subscriptions and scheduled bills together.
+- Implemented: bill reminders distinguish known amounts from missing monthly bill amounts.
+- Implemented: overdue bill rows with missing amounts are included daily until the amount is entered or the month changes.
+- Implemented: quarterly bill schedules use explicit pull months such as `2,5,8,11`.
 - Implemented: once-per-user daily digest tracking prevents repeated subscription digests later the same day.
 - Implemented: admin `/debug_subscriptions` command syncs the hidden sheet and reports parse warnings.
 - Implemented: parse warnings are collected for malformed rows in the pretty grouped layout and surfaced through `/debug_subscriptions`.
 - Implemented: proactive parse-warning notifications are sent after 10 AM when rows cannot be normalized, with once-per-day duplicate prevention.
 - Implemented: per-user notification send-hour overrides through `BRIAN_SUBSCRIPTION_REMINDER_SEND_HOUR` and `HANNAH_SUBSCRIPTION_REMINDER_SEND_HOUR`.
-- Implemented: near-term bill confirmation/reconciliation for scheduled rows that match Rent, PG&E, Recology, Water, or Student Loan.
+- Implemented: bill schedule warnings are surfaced when a non-template hidden bill row cannot be normalized.
 
 ## Product Decisions
 
@@ -173,20 +179,26 @@ Why this matters:
 
 ## 7. Bill Confirmation and Reconciliation
 
-Status: near-term version implemented. If a scheduled row looks like Rent, PG&E, Recology, Water, or Student Loan and is due today/tomorrow, BookieBot checks the existing manually logged payment fields and annotates the reminder if no payment has been logged.
+Status: implemented as first-class scheduled bills. BookieBot reads `_BookieBot Bill Schedule`, checks the existing manually logged monthly payment fields, and includes bills in the same cash-pull digest as subscriptions.
 
 Compare expected pulls against payments already logged in BookieBot.
 
 Example:
 
 ```text
-PG&E is expected tomorrow, but no payment has been logged yet.
+<@user> `$245.00` known + `1 missing amount` will be pulled by bills and subscriptions in the next 7 days.
+
+Tomorrow:
+`PG&E - amount missing - May 19`
 ```
 
 Near-term version:
 
-- Use BookieBot's manually logged payment fields.
-- Alert when a dynamic bill is expected soon and has not been marked paid.
+- Use BookieBot's manually logged payment fields as the monthly amount source.
+- Use `_BookieBot Bill Schedule` for fixed autopay dates.
+- Include known bill amounts in the digest total.
+- Count missing amounts separately so the notification preview does not understate known cash needs.
+- Repeat overdue missing bill notices daily until the amount is entered or the month changes.
 
 Future version:
 

@@ -32,7 +32,9 @@ SCOPES = ["https://www.googleapis.com/auth/spreadsheets"]
 _GC = None
 _ACTION_LOG_WORKSHEET_BY_TITLE = {}
 _SUBSCRIPTION_SCHEDULE_WORKSHEET_BY_KEY = {}
+_BILL_SCHEDULE_WORKSHEET_BY_KEY = {}
 SUBSCRIPTION_SCHEDULE_WORKSHEET_TITLE = "_BookieBot Subscription Schedule"
+BILL_SCHEDULE_WORKSHEET_TITLE = "_BookieBot Bill Schedule"
 
 
 def _get_gc():
@@ -104,6 +106,42 @@ def get_subscription_schedule_worksheet():
         except Exception:
             pass
         _SUBSCRIPTION_SCHEDULE_WORKSHEET_BY_KEY[cache_key] = worksheet
+        return worksheet
+
+
+def get_bill_schedule_worksheet():
+    year = get_current_year()
+    sheet_key = get_budget_spreadsheet_id_for_user(get_current_discord_user_id(), year)
+    cache_key = (sheet_key, BILL_SCHEDULE_WORKSHEET_TITLE)
+    if cache_key in _BILL_SCHEDULE_WORKSHEET_BY_KEY:
+        return _BILL_SCHEDULE_WORKSHEET_BY_KEY[cache_key]
+
+    spreadsheet = _get_gc().open_by_key(sheet_key)
+    try:
+        worksheet = spreadsheet.worksheet(BILL_SCHEDULE_WORKSHEET_TITLE)
+        _BILL_SCHEDULE_WORKSHEET_BY_KEY[cache_key] = worksheet
+        return worksheet
+    except Exception:
+        worksheet = spreadsheet.add_worksheet(title=BILL_SCHEDULE_WORKSHEET_TITLE, rows=100, cols=9)
+        try:
+            spreadsheet.batch_update(
+                {
+                    "requests": [
+                        {
+                            "updateSheetProperties": {
+                                "properties": {
+                                    "sheetId": worksheet.id,
+                                    "hidden": True,
+                                },
+                                "fields": "hidden",
+                            }
+                        }
+                    ]
+                }
+            )
+        except Exception:
+            pass
+        _BILL_SCHEDULE_WORKSHEET_BY_KEY[cache_key] = worksheet
         return worksheet
 
 

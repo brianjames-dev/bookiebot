@@ -12,6 +12,7 @@ from bookiebot.core import github_dispatch
 from bookiebot.core import ui
 from bookiebot.logging_config import get_recent_logs, uptime_seconds
 from bookiebot.sheets.routing import get_current_year, get_year_config, MissingYearConfigError, sheet_user_context
+from bookiebot.sheets.bills import parse_bill_schedules_with_warnings
 from bookiebot.sheets.subscriptions import debug_subscription_sync
 
 
@@ -27,6 +28,7 @@ def register_commands(tree: app_commands.CommandTree):
         try:
             with sheet_user_context(actor_key):
                 subscriptions, warnings = debug_subscription_sync()
+                bills, bill_warnings = parse_bill_schedules_with_warnings()
         except Exception as exc:
             await interaction.followup.send(
                 content=f"❌ Could not sync subscriptions: {type(exc).__name__}: {exc}",
@@ -37,6 +39,8 @@ def register_commands(tree: app_commands.CommandTree):
         lines = [
             f"Synced {len(subscriptions)} subscriptions.",
             "Hidden sheet: `_BookieBot Subscription Schedule`",
+            f"Loaded {len(bills)} bill schedules.",
+            "Hidden bill sheet: `_BookieBot Bill Schedule`",
         ]
         if subscriptions:
             lines.append("")
@@ -56,6 +60,23 @@ def register_commands(tree: app_commands.CommandTree):
                 lines.append(f"- {warning.format()}")
             if len(warnings) > 10:
                 lines.append(f"- ...and {len(warnings) - 10} more")
+        if bills:
+            lines.append("")
+            lines.append("Parsed bill schedules:")
+            for bill in bills[:20]:
+                schedule = f"{bill.pull_day}"
+                if bill.recurrence == "quarterly":
+                    schedule = f"{bill.pull_day} in months {','.join(str(month) for month in bill.pull_months)}"
+                lines.append(f"- {bill.display_name}: {bill.recurrence} on {schedule}")
+            if len(bills) > 20:
+                lines.append(f"- ...and {len(bills) - 20} more")
+        if bill_warnings:
+            lines.append("")
+            lines.append(f"Skipped {len(bill_warnings)} bill row(s):")
+            for warning in bill_warnings[:10]:
+                lines.append(f"- {warning.format()}")
+            if len(bill_warnings) > 10:
+                lines.append(f"- ...and {len(bill_warnings) - 10} more")
 
         content = "\n".join(lines)
         await interaction.followup.send(content=content[:1900], ephemeral=True)

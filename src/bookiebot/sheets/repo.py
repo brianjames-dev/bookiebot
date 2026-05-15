@@ -4,6 +4,7 @@ from typing import Protocol, Any
 
 from bookiebot.sheets.auth import (
     get_action_log_worksheet,
+    get_bill_schedule_worksheet,
     get_expense_worksheet,
     get_income_worksheet,
     get_subscription_schedule_worksheet,
@@ -24,6 +25,9 @@ class SheetsRepository(Protocol):
     def subscription_schedule_sheet(self) -> Any:
         ...
 
+    def bill_schedule_sheet(self) -> Any:
+        ...
+
     def action_log_sheet(self) -> Any:
         ...
 
@@ -42,6 +46,9 @@ class GSpreadSheetsRepository:
 
     def subscription_schedule_sheet(self):
         return get_subscription_schedule_worksheet()
+
+    def bill_schedule_sheet(self):
+        return get_bill_schedule_worksheet()
 
     def action_log_sheet(self):
         return get_action_log_worksheet()
