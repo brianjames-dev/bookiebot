@@ -14,20 +14,12 @@ from bookiebot.sheets.utils import clean_money
 
 SubscriptionCadence = Literal["monthly", "yearly"]
 
-DEFAULT_REMINDER_OFFSETS = (7, 3, 1, 0)
 NORMALIZED_SCHEDULE_HEADERS = [
-    "id",
-    "active",
-    "budget_owner_key",
-    "owner_name",
-    "kind",
     "cadence",
     "name",
     "amount",
     "pull_day",
     "pull_month",
-    "account",
-    "reminder_offsets",
     "source_range",
     "updated_at",
 ]
@@ -47,7 +39,6 @@ class Subscription:
     kind: str = ""
     account: str = ""
     active: bool = True
-    reminder_offsets: tuple[int, ...] = DEFAULT_REMINDER_OFFSETS
     source_range: str = ""
     updated_at: str = ""
 
@@ -116,17 +107,6 @@ def _parse_month_day(value: str) -> tuple[int | None, int | None]:
         return parsed.month, parsed.day
     except ValueError:
         return None, None
-
-
-def _parse_offsets(value: str) -> tuple[int, ...]:
-    if not value.strip():
-        return DEFAULT_REMINDER_OFFSETS
-    offsets = sorted({int(match) for match in re.findall(r"\d+", value)})
-    return tuple(offset for offset in offsets if offset >= 0) or DEFAULT_REMINDER_OFFSETS
-
-
-def _format_offsets(offsets: tuple[int, ...]) -> str:
-    return ",".join(str(offset) for offset in offsets)
 
 
 def _parse_active(value: str) -> bool:
@@ -210,7 +190,6 @@ def _subscription_from_fields(
         kind=(fields.get("kind") or fields.get("type") or "").strip(),
         account=(fields.get("account") or fields.get("card") or "").strip(),
         active=_parse_active(active_value),
-        reminder_offsets=_parse_offsets(fields.get("reminder_offsets", "") or fields.get("reminders", "")),
         source_range=resolved_source_range,
         updated_at=resolved_updated_at,
     )
@@ -244,13 +223,8 @@ def _parse_normalized_table(rows: list[list[str]]) -> list[Subscription]:
         return []
     for header_index, row in enumerate(rows[:10]):
         normalized = [_normalize_header(value) for value in row]
-        if "name" not in normalized and "service" not in normalized:
-            continue
-        if "amount" not in normalized:
-            continue
-        if normalized.count("name") + normalized.count("service") > 1 or normalized.count("amount") > 1:
-            continue
-        if not ({"pull_day", "day"} & set(normalized) or {"pull_date", "date"} & set(normalized)):
+        header_values = [header for header in normalized if header]
+        if header_values != NORMALIZED_SCHEDULE_HEADERS:
             continue
 
         subscriptions: list[Subscription] = []
@@ -392,7 +366,6 @@ def parse_visible_subscription_schedules_with_warnings(
                 pull_day=subscription.pull_day,
                 pull_month=subscription.pull_month,
                 account=subscription.account,
-                reminder_offsets=subscription.reminder_offsets,
                 source_range=subscription.source_range,
                 updated_at=subscription.updated_at or updated_at,
                 category=subscription.category,
@@ -403,18 +376,11 @@ def parse_visible_subscription_schedules_with_warnings(
 
 def _subscription_to_row(subscription: Subscription) -> list[str]:
     return [
-        subscription.id,
-        "yes" if subscription.active else "no",
-        subscription.budget_owner_key,
-        subscription.owner_name,
-        subscription.kind,
         subscription.cadence,
         subscription.name,
         f"{subscription.amount:.2f}",
         str(subscription.pull_day or ""),
         str(subscription.pull_month or ""),
-        subscription.account,
-        _format_offsets(subscription.reminder_offsets),
         subscription.source_range,
         subscription.updated_at,
     ]
@@ -437,7 +403,7 @@ def _write_subscription_schedule_rows(subscriptions: list[Subscription]) -> None
     ws = get_sheets_repo().subscription_schedule_sheet()
     existing_rows = ws.get_all_values()
     rows_to_write = max(len(rows), len(existing_rows), 1)
-    width = len(NORMALIZED_SCHEDULE_HEADERS)
+    width = max(len(NORMALIZED_SCHEDULE_HEADERS), max((len(row) for row in existing_rows), default=0))
     padded_rows = [
         (rows[index] if index < len(rows) else [""] * width)
         for index in range(rows_to_write)

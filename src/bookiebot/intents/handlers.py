@@ -67,29 +67,11 @@ IntentEntities = dict[str, Any]
 IntentHandler = Callable[[IntentEntities, Any], Awaitable[None]]
 
 
-_LOADING_INTENTS = {
-    "log_expense",
-    "log_income",
-    "log_rent_paid",
-    "log_pge_paid",
-    "log_recology_paid",
-    "log_water_paid",
-    "log_student_loan_paid",
-    "log_1st_savings",
-    "log_2nd_savings",
-    "log_need_expense",
-    "undo_last_transaction",
-    "delete_recent_action",
-    "update_recent_action",
-    "move_recent_action",
-}
-
-
 @asynccontextmanager
 async def _maybe_typing(message: Any, intent: str):
     channel = getattr(message, "channel", None)
     typing = getattr(channel, "typing", None)
-    if intent not in _LOADING_INTENTS or not callable(typing):
+    if not callable(typing):
         yield
         return
     async with typing():
@@ -174,40 +156,41 @@ def _budget_profile_name(message) -> str:
 async def handle_intent(intent: str, entities: IntentEntities, message: Any, last_context: Any = None) -> None:
     handler = INTENT_HANDLERS.get(intent)
     if not handler or intent == "fallback":
-        await fallback_handler(message.content, message, context=last_context)
+        async with _maybe_typing(message, intent):
+            await fallback_handler(message.content, message, context=last_context)
         return
 
-    actor_user_id = _message_actor_key(message)
-    try:
-        get_user_config(actor_user_id)
-    except UnknownDiscordUserError as e:
-        await message.channel.send(str(e))
-        return
-
-    with sheet_user_context(actor_user_id):
-        if "person" not in entities or not entities["person"]:
-            print(f"👤 No person specified, letting resolver handle Discord user: {message.author.name}")
-            entities["person"] = None
-
-        # For query intents, resolve to actual list of person(s)
-        if intent.startswith("query_"):
-            discord_user = getattr(message.author, "name", "").lower()
-            person = entities.get("person")
-            persons_to_query = resolve_query_persons(discord_user, person, actor_user_id)
-
-            if not persons_to_query:
-                await message.channel.send("❌ Could not resolve person(s) to query.")
-                return
-
-            # overwrite person in entities with resolved list
-            entities["persons"] = persons_to_query
-            print(f"🔎 Resolved persons for query: {persons_to_query}")
-
+    async with _maybe_typing(message, intent):
+        actor_user_id = _message_actor_key(message)
         try:
-            async with _maybe_typing(message, intent):
-                await handler(entities, message)
-        except SheetRoutingError as e:
+            get_user_config(actor_user_id)
+        except UnknownDiscordUserError as e:
             await message.channel.send(str(e))
+            return
+
+        with sheet_user_context(actor_user_id):
+            if "person" not in entities or not entities["person"]:
+                print(f"👤 No person specified, letting resolver handle Discord user: {message.author.name}")
+                entities["person"] = None
+
+            # For query intents, resolve to actual list of person(s)
+            if intent.startswith("query_"):
+                discord_user = getattr(message.author, "name", "").lower()
+                person = entities.get("person")
+                persons_to_query = resolve_query_persons(discord_user, person, actor_user_id)
+
+                if not persons_to_query:
+                    await message.channel.send("❌ Could not resolve person(s) to query.")
+                    return
+
+                # overwrite person in entities with resolved list
+                entities["persons"] = persons_to_query
+                print(f"🔎 Resolved persons for query: {persons_to_query}")
+
+            try:
+                await handler(entities, message)
+            except SheetRoutingError as e:
+                await message.channel.send(str(e))
 
 
 async def undo_last_transaction_handler(message: Any) -> None:
@@ -241,17 +224,20 @@ async def delete_recent_action_handler(entities: IntentEntities, message: Any) -
 
 
 async def query_recent_actions_handler(entities: IntentEntities, message: Any) -> None:
+    page_size = 5
+    max_explicit_limit = 25
     try:
         limit = int(entities.get("n") or 5)
     except (TypeError, ValueError):
-        limit = 5
-    limit = min(max(limit, 1), 25)
+        limit = page_size
+    max_limit = max_explicit_limit if entities.get("explicit_n") else page_size
+    limit = min(max(limit, 1), max_limit)
     actor_key = _message_actor_key(message)
     if entities.get("more"):
-        output, actions = next_recent_actions_page(actor_key, 5)
+        output, actions = next_recent_actions_page(actor_key, page_size)
     else:
         actions = recent_actions(actor_key, limit)
-        reset_recent_actions_page(actor_key)
+        reset_recent_actions_page(actor_key, limit)
         output = format_recent_action_list(actions)
 
     view = _recent_action_select_view(actor_key, actions) if actions else None

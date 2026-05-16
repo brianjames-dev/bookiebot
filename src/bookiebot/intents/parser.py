@@ -55,11 +55,11 @@ async def parse_message_llm(user_message: str, *, llm_client: Optional[LLMClient
 
     If the message asks to delete, remove, clear, change, edit, update, fix, or correct an expense/transaction/action but does NOT specify which one, use:
     - intent: "query_recent_actions"
-    - entities: {{ "n": 10 }}
+    - entities: {{ "n": 5 }}
 
     If the message asks to change, edit, update, fix, redo, or correct a recently logged BookieBot action, but does not provide an exact action id or enough detail to safely edit a cell, use:
     - intent: "query_recent_actions"
-    - entities: {{ "n": 10 }}
+    - entities: {{ "n": 5 }}
 
     If the message asks to change, edit, update, fix, redo, or correct a recently logged BookieBot action and includes the target plus the requested field change, use:
     - intent: "update_recent_action"
@@ -94,7 +94,7 @@ async def parse_message_llm(user_message: str, *, llm_client: Optional[LLMClient
 
     If the message asks to show or list recent logged actions, undo history, edit candidates, or the last N actions, use:
     - intent: "query_recent_actions"
-    - entities: {{ "n": <integer if provided, otherwise 10> }}
+    - entities: {{ "n": <integer if provided, otherwise 5>, "explicit_n": <true only if the user asked for a specific number> }}
 
     If the message is about logging a payment for **rent**, **PG&E**, **Recology/trash**, **water**, or **student loan**, use the specific intents:
     - "log_rent_paid" → when paying rent

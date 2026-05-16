@@ -58,6 +58,17 @@ def _currency_user_entered_value(value: Any) -> str:
     return f"${amount:.2f}"
 
 
+def _money_display_value(value: Any) -> str:
+    text = _sheet_value(value).strip()
+    if not text:
+        return ""
+    try:
+        amount = float(text.replace("$", "").replace(",", ""))
+    except ValueError:
+        return text if text.startswith("$") else f"${text}"
+    return f"${amount:.2f}"
+
+
 def _sheet_user_entered_value(field: str, value: Any) -> str:
     if field == "amount":
         return _currency_user_entered_value(value)
@@ -467,10 +478,10 @@ def next_recent_actions_page(user_key: str | None, page_size: int = 5) -> tuple[
     )
 
 
-def reset_recent_actions_page(user_key: str | None) -> None:
+def reset_recent_actions_page(user_key: str | None, next_offset: int = 5) -> None:
     key = str(user_key) if user_key else ""
     if key:
-        _RECENT_ACTION_OFFSET_BY_USER[key] = 5
+        _RECENT_ACTION_OFFSET_BY_USER[key] = max(next_offset, 0)
 
 
 def _action_search_text(logged: LoggedAction) -> str:
@@ -733,11 +744,13 @@ def _format_action_data_lines(action: UndoAction, values: list[str] | None = Non
     if action.metadata.get("type") in {"expense", "update", "move"}:
         return _field_data_lines(field_values, action)
 
+    if action.metadata.get("type") == "income":
+        return _income_data_lines(action, values)
+
     if action.metadata.get("type") in {"payment", "savings"}:
         amount = field_values.get("amount", "")
         if amount:
-            prefix = "" if str(amount).startswith("$") else "$"
-            return [f"Amount: {prefix}{amount}"]
+            return [f"   Amount: {_money_display_value(amount)}"]
         return [action.description]
 
     return [action.description]
@@ -747,10 +760,31 @@ def _format_action_list_item(index: int, action: UndoAction) -> tuple[str, list[
     field_values = _field_values_for_action(action)
     title = action_title(action)
 
-    lines = _field_data_lines(field_values, action)
+    if action.metadata.get("type") == "income":
+        lines = _income_data_lines(action)
+    elif action.metadata.get("type") in {"payment", "savings"}:
+        lines = _format_action_data_lines(action)
+    else:
+        lines = _field_data_lines(field_values, action)
     if not lines:
         lines = [action.description]
     return f"{index}. {title}", lines
+
+
+def _income_data_lines(action: UndoAction, values: list[str] | None = None) -> list[str]:
+    source_values = list(values if values is not None else action.new_values)
+    while len(source_values) < 3:
+        source_values.append("")
+    description = _sheet_value(source_values[1]).strip()
+    amount = _money_display_value(source_values[2])
+    source = action.metadata.get("source") or description
+    if amount and source:
+        return [f"   Income: {amount} from {source}"]
+    if amount:
+        return [f"   Income: {amount}"]
+    if description:
+        return [f"   Income: {description}"]
+    return [f"   {action.description}"]
 
 
 def _field_data_lines(field_values: dict[str, str], action: UndoAction) -> list[str]:
@@ -767,8 +801,8 @@ def _field_data_lines(field_values: dict[str, str], action: UndoAction) -> list[
         if not value and field == "person":
             value = action.metadata.get("person")
         if value:
-            prefix = "$" if field == "amount" and not str(value).startswith("$") else ""
-            lines.append(f"   {label}: {prefix}{value}")
+            display_value = _money_display_value(value) if field == "amount" else value
+            lines.append(f"   {label}: {display_value}")
     return lines
 
 

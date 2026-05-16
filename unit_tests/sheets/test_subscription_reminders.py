@@ -39,30 +39,28 @@ def test_parses_current_block_layout():
     ]
 
 
-def test_parses_recommended_normalized_layout():
+def test_parses_current_hidden_normalized_layout():
     rows = [
-        ["Active", "Name", "Amount", "Kind", "Cadence", "Pull Day", "Pull Date", "Account", "Reminder Offsets"],
-        ["yes", "Spotify", "$9.99", "wants", "monthly", "14", "", "BofA", "7,3,1"],
-        ["no", "Old Service", "$1.00", "wants", "monthly", "15", "", "", ""],
-        ["yes", "Amazon Prime", "$152.90", "needs", "yearly", "", "10/29", "Amex", "7,1"],
+        NORMALIZED_SCHEDULE_HEADERS,
+        ["monthly", "Spotify", "$9.99", "14", "", "Subscriptions!A2:C2", "2026-05-16T13:11:02-07:00"],
+        ["yearly", "Amazon Prime", "$152.90", "29", "10", "Subscriptions!A3:C3", "2026-05-16T13:11:02-07:00"],
     ]
 
     subscriptions = list_subscription_schedules(rows)
 
-    assert [sub.name for sub in subscriptions] == ["Spotify", "Amazon Prime"]
-    assert subscriptions[0].account == "BofA"
-    assert subscriptions[1].reminder_offsets == (1, 7)
-
-
-def test_default_reminder_offsets_include_same_day():
-    rows = [
-        ["Active", "Name", "Amount", "Kind", "Cadence", "Pull Day", "Pull Date", "Account", "Reminder Offsets"],
-        ["yes", "Spotify", "$9.99", "wants", "monthly", "14", "", "BofA", ""],
+    assert [(sub.name, sub.cadence, sub.pull_day, sub.pull_month) for sub in subscriptions] == [
+        ("Spotify", "monthly", 14, None),
+        ("Amazon Prime", "yearly", 29, 10),
     ]
 
-    subscriptions = list_subscription_schedules(rows)
 
-    assert subscriptions[0].reminder_offsets == (7, 3, 1, 0)
+def test_old_hidden_normalized_layout_is_not_supported():
+    rows = [
+        ["id", "active", "budget_owner_key", "owner_name", "kind", "cadence", "name", "amount", "pull_day", "pull_month"],
+        ["old", "yes", "brian", "Brian", "needs", "monthly", "Spotify", "$9.99", "14", ""],
+    ]
+
+    assert list_subscription_schedules(rows) == []
 
 
 def test_due_subscription_reminders_include_every_day_in_next_7_days():
@@ -116,6 +114,40 @@ def test_sync_subscription_schedule_sheet_writes_hidden_normalized_rows():
             ["Recurring:", "Name:", "Amount:"],
             ["21st", "ChatGPT", "$20.00"],
         ],
+        subscription_schedule_rows=[
+            [
+                "id",
+                "active",
+                "budget_owner_key",
+                "owner_name",
+                "kind",
+                "cadence",
+                "name",
+                "amount",
+                "pull_day",
+                "pull_month",
+                "account",
+                "reminder_offsets",
+                "source_range",
+                "updated_at",
+            ],
+            [
+                "old",
+                "yes",
+                "hannah",
+                "Hannah",
+                "needs",
+                "monthly",
+                "Old",
+                "1.00",
+                "1",
+                "",
+                "",
+                "7,3,1,0",
+                "Old!A1:C1",
+                "old-time",
+            ],
+        ],
     )
 
     with repo.patched(), sheet_user_context("830984827904851969"):
@@ -123,19 +155,19 @@ def test_sync_subscription_schedule_sheet_writes_hidden_normalized_rows():
 
     rows = repo.subscription_schedule.get_all_values()
     assert [sub.name for sub in subscriptions] == ["ChatGPT"]
-    assert rows[0] == NORMALIZED_SCHEDULE_HEADERS
-    assert rows[1][1:10] == [
-        "yes",
-        "hannah",
-        "Hannah",
-        "needs",
+    assert rows[0][:7] == NORMALIZED_SCHEDULE_HEADERS
+    assert rows[1][:6] == [
         "monthly",
         "ChatGPT",
         "20.00",
         "21",
         "",
+        "Subscriptions!A7:C7",
     ]
-    assert rows[1][12] == "Subscriptions!A7:C7"
+    assert rows[1][6]
+    assert len(rows[0]) == 14
+    assert all(value == "" for value in rows[0][7:])
+    assert all(value == "" for value in rows[1][7:])
 
 
 def test_parse_visible_subscription_schedules_reports_skipped_rows():

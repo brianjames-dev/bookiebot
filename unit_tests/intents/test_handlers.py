@@ -15,6 +15,27 @@ class DummyChannel:
         self.sent.append((content, kwargs))
 
 
+class DummyTyping:
+    def __init__(self, channel):
+        self.channel = channel
+
+    async def __aenter__(self):
+        self.channel.typing_enters += 1
+
+    async def __aexit__(self, exc_type, exc, tb):
+        self.channel.typing_exits += 1
+
+
+class TypingChannel(DummyChannel):
+    def __init__(self):
+        super().__init__()
+        self.typing_enters = 0
+        self.typing_exits = 0
+
+    def typing(self):
+        return DummyTyping(self)
+
+
 @pytest.fixture(autouse=True)
 def _patch_resolver(monkeypatch):
     monkeypatch.setattr(ih, "resolve_query_persons", lambda user, person=None, user_id=None: ["Hannah"])
@@ -28,6 +49,17 @@ def message():
         author=SimpleNamespace(name="hannerish", id=830984827904851969),
         channel=DummyChannel(),
     )
+
+
+@pytest.mark.asyncio
+async def test_maybe_typing_wraps_query_intents_too(message):
+    message.channel = TypingChannel()
+
+    async with ih._maybe_typing(message, "query_total_income"):
+        pass
+
+    assert message.channel.typing_enters == 1
+    assert message.channel.typing_exits == 1
 
 
 # Logging intents
@@ -150,12 +182,107 @@ async def test_query_recent_actions_lists_logged_expense(monkeypatch, message):
 
         await ih.handle_intent("query_recent_actions", {"n": 5}, message)
 
-    assert any("Amount: $12.5" in (msg or "") for msg, _ in message.channel.sent)
+    assert any("Amount: $12.50" in (msg or "") for msg, _ in message.channel.sent)
     assert any("Location: Chipotle" in (msg or "") for msg, _ in message.channel.sent)
     assert any("Food Expense" in (msg or "") for msg, _ in message.channel.sent)
     assert any("Type `show more` to see older transactions." in (msg or "") for msg, _ in message.channel.sent)
     assert not any("Type the number of the transaction, followed by what should happen to it" in (msg or "") for msg, _ in message.channel.sent)
     assert any(kwargs.get("view") is not None for _msg, kwargs in message.channel.sent)
+
+
+@pytest.mark.asyncio
+async def test_query_recent_actions_formats_income_cleanly(message):
+    repo = SheetsRepoStub(income_rows=[["", "Existing Income", "100"], ["", "Monthly Income:", ""]])
+
+    with repo.patched():
+        await ih.handle_intent(
+            "log_income",
+            {"type": "income", "amount": 1639.9, "source": "Sonic"},
+            message,
+        )
+
+        await ih.handle_intent("query_recent_actions", {"n": 5}, message)
+
+    recent_reply = message.channel.sent[-1][0] or ""
+    assert "1. Income" in recent_reply
+    assert "   Income: $1639.90 from Sonic" in recent_reply
+    assert "income $1639.9 from Sonic" not in recent_reply
+
+
+@pytest.mark.asyncio
+async def test_query_recent_actions_caps_initial_list_and_pages_by_five(monkeypatch, message):
+    import bookiebot.sheets.writer as writer
+
+    monkeypatch.setattr(writer, "resolve_query_persons", lambda user, person=None, user_id=None: ["Hannah"])
+    repo = SheetsRepoStub(expense_rows=[[], []])
+
+    with repo.patched():
+        for index in range(7):
+            await ih.handle_intent(
+                "log_expense",
+                {
+                    "type": "expense",
+                    "category": "food",
+                    "amount": float(index + 1),
+                    "item": f"Item {index + 1}",
+                    "location": "Test Store",
+                },
+                message,
+            )
+
+        await ih.handle_intent("query_recent_actions", {"n": 10}, message)
+        first_page = message.channel.sent[-1][0] or ""
+
+        await ih.handle_intent("query_recent_actions", {"more": True}, message)
+        second_page = message.channel.sent[-1][0] or ""
+
+        await ih.handle_intent("query_recent_actions", {"more": True}, message)
+        empty_page = message.channel.sent[-1][0] or ""
+
+    assert first_page.count("Food Expense") == 5
+    assert "Item: Item 7" in first_page
+    assert "Item: Item 3" in first_page
+    assert "Item: Item 2" not in first_page
+    assert second_page.count("Food Expense") == 2
+    assert "Item: Item 2" in second_page
+    assert "Item: Item 1" in second_page
+    assert empty_page == "I do not have more recent logged actions for you this month."
+
+
+@pytest.mark.asyncio
+async def test_query_recent_actions_obeys_explicit_count_and_pages_after_it(monkeypatch, message):
+    import bookiebot.sheets.writer as writer
+
+    monkeypatch.setattr(writer, "resolve_query_persons", lambda user, person=None, user_id=None: ["Hannah"])
+    repo = SheetsRepoStub(expense_rows=[[], []])
+
+    with repo.patched():
+        for index in range(12):
+            await ih.handle_intent(
+                "log_expense",
+                {
+                    "type": "expense",
+                    "category": "food",
+                    "amount": float(index + 1),
+                    "item": f"Item {index + 1}",
+                    "location": "Test Store",
+                },
+                message,
+            )
+
+        await ih.handle_intent("query_recent_actions", {"n": 10, "explicit_n": True}, message)
+        first_page = message.channel.sent[-1][0] or ""
+
+        await ih.handle_intent("query_recent_actions", {"more": True}, message)
+        second_page = message.channel.sent[-1][0] or ""
+
+    assert first_page.count("Food Expense") == 10
+    assert "Item: Item 12" in first_page
+    assert "Item: Item 3" in first_page
+    assert "Item: Item 2" not in first_page
+    assert second_page.count("Food Expense") == 2
+    assert "Item: Item 2" in second_page
+    assert "Item: Item 1" in second_page
 
 
 @pytest.mark.asyncio
@@ -181,7 +308,7 @@ async def test_update_recent_action_changes_logged_expense_amount(monkeypatch, m
         assert repo.expense.cell(3, 16).value == "$12.50"
 
     assert any("Before:\n```" in (msg or "") for msg, _ in message.channel.sent)
-    assert any("Amount: $12.5" in (msg or "") and "Amount: $14.75" in (msg or "") for msg, _ in message.channel.sent)
+    assert any("Amount: $12.50" in (msg or "") and "Amount: $14.75" in (msg or "") for msg, _ in message.channel.sent)
 
 
 @pytest.mark.asyncio
@@ -270,7 +397,7 @@ async def test_recent_actions_hide_moved_action_after_update(monkeypatch, messag
     assert "1. Updated: Food Expense" in recent_reply
     assert "2. Moved Expense" not in recent_reply
     assert recent_reply.count("Location: Costco") == 1
-    assert "Amount: $6.0" in recent_reply
+    assert "Amount: $6.00" in recent_reply
 
 
 @pytest.mark.asyncio

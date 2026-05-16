@@ -250,19 +250,19 @@ def format_cash_pull_digest(
         ("tomorrow", "Tomorrow:"),
         ("upcoming", "Upcoming:"),
     ):
+        section_reminders = grouped.get(section_key, [])
+        if not section_reminders:
+            continue
         if lines[-1] != "":
             lines.append("")
         lines.append(heading)
-        section_reminders = grouped.get(section_key, [])
-        if not section_reminders:
-            lines.append("`None`")
-            continue
         for reminder in section_reminders:
             lines.append(
                 f"`{reminder.name} - {_format_reminder_amount(reminder)} - {_format_pull_date(reminder)}`"
             )
     if overdue:
-        lines.append("")
+        if lines[-1] != "":
+            lines.append("")
         lines.append("Missing overdue:")
         for reminder in overdue:
             lines.append(f"`{reminder.name} - amount missing - {_format_pull_date(reminder)}`")

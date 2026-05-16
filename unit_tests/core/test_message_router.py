@@ -1,5 +1,44 @@
+import pytest
+
 from bookiebot.core.message_router import _action_management_intent
 from bookiebot.core.message_router import _format_processing_error
+from bookiebot.core.message_router import _maybe_typing
+
+
+class DummyTyping:
+    def __init__(self, channel):
+        self.channel = channel
+
+    async def __aenter__(self):
+        self.channel.typing_enters += 1
+
+    async def __aexit__(self, exc_type, exc, tb):
+        self.channel.typing_exits += 1
+
+
+class TypingChannel:
+    def __init__(self):
+        self.typing_enters = 0
+        self.typing_exits = 0
+
+    def typing(self):
+        return DummyTyping(self)
+
+
+class TypingMessage:
+    def __init__(self):
+        self.channel = TypingChannel()
+
+
+@pytest.mark.asyncio
+async def test_message_router_maybe_typing_wraps_pre_intent_work():
+    message = TypingMessage()
+
+    async with _maybe_typing(message):
+        pass
+
+    assert message.channel.typing_enters == 1
+    assert message.channel.typing_exits == 1
 
 
 def test_delete_unspecified_expense_routes_to_recent_actions():
@@ -83,12 +122,21 @@ def test_recent_query_show_more():
     )
 
 
+def test_recent_query_explicit_n_is_preserved():
+    from bookiebot.core.message_router import _recent_query_intent
+
+    assert _recent_query_intent("show last 10 transactions") == (
+        "query_recent_actions",
+        {"n": 10, "explicit_n": True},
+    )
+
+
 def test_recent_query_explicit_n_caps_at_25():
     from bookiebot.core.message_router import _recent_query_intent
 
     assert _recent_query_intent("show last 30 transactions") == (
         "query_recent_actions",
-        {"n": 25},
+        {"n": 25, "explicit_n": True},
     )
 
 

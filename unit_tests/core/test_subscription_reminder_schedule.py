@@ -91,9 +91,6 @@ def test_format_subscription_reminder_digest_groups_by_window():
     assert subscription_reminders.format_subscription_reminder_digest("<@123>", reminders) == (
         "<@123> `$177.90` will be pulled by bills and subscriptions in the next 7 days.\n"
         "\n"
-        "Today:\n"
-        "`None`\n"
-        "\n"
         "Tomorrow:\n"
         "`Railway - $5.00 - May 15`\n"
         "\n"
@@ -116,13 +113,7 @@ def test_format_subscription_reminder_digest_supports_today_group():
         "<@123> `$5.00` will be pulled by bills and subscriptions in the next 7 days.\n"
         "\n"
         "Today:\n"
-        "`Railway - $5.00 - May 15`\n"
-        "\n"
-        "Tomorrow:\n"
-        "`None`\n"
-        "\n"
-        "Upcoming:\n"
-        "`None`"
+        "`Railway - $5.00 - May 15`"
     )
 
 
@@ -140,14 +131,8 @@ def test_format_subscription_reminder_digest_includes_reconciliation_note():
     ) == (
         "<@123> `$140.00` will be pulled by bills and subscriptions in the next 7 days.\n"
         "\n"
-        "Today:\n"
-        "`None`\n"
-        "\n"
         "Tomorrow:\n"
-        "`PG&E - $140.00 - May 15`\n"
-        "\n"
-        "Upcoming:\n"
-        "`None`"
+        "`PG&E - $140.00 - May 15`"
     )
 
 
@@ -212,15 +197,6 @@ def test_format_cash_pull_digest_includes_overdue_missing_section():
 
     assert text == (
         "<@123> `$0.00` known + `1 missing amount` will be pulled by bills and subscriptions in the next 7 days.\n"
-        "\n"
-        "Today:\n"
-        "`None`\n"
-        "\n"
-        "Tomorrow:\n"
-        "`None`\n"
-        "\n"
-        "Upcoming:\n"
-        "`None`\n"
         "\n"
         "Missing overdue:\n"
         "`PG&E - amount missing - May 14`"
@@ -292,8 +268,8 @@ def test_sync_subscription_schedules_for_users_refreshes_hidden_sheets(monkeypat
 
     rows = repo.subscription_schedule.get_all_values()
     assert results == {"830984827904851969": (1, 0)}
-    assert rows[0][0] == "id"
-    assert rows[1][6] == "ChatGPT"
+    assert rows[0][:7] == ["cadence", "name", "amount", "pull_day", "pull_month", "source_range", "updated_at"]
+    assert rows[1][1] == "ChatGPT"
 
 
 @pytest.mark.asyncio

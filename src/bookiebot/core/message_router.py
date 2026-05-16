@@ -2,6 +2,7 @@ import logging
 import re
 import os
 import asyncio
+from contextlib import asynccontextmanager
 
 # Disable discord voice/audio stack to avoid loading audioop (deprecated in Python 3.13)
 os.environ.setdefault("DISCORD_AUDIO_DISABLE", "1")
@@ -50,6 +51,17 @@ _DELETE_VERBS = {"clear", "delete", "remove", "erase"}
 _UPDATE_VERBS = {"change", "correct", "edit", "fix", "redo", "update"}
 _MOVE_VERBS = {"categorize", "move", "reclassify", "recategorize"}
 _CATEGORIES = {"grocery", "groceries", "gas", "food", "shopping"}
+
+
+@asynccontextmanager
+async def _maybe_typing(message):
+    channel = getattr(message, "channel", None)
+    typing = getattr(channel, "typing", None)
+    if not callable(typing):
+        yield
+        return
+    async with typing():
+        yield
 
 
 def _short_value(value: object, *, limit: int = 80) -> str:
@@ -244,7 +256,7 @@ def _recent_query_intent(content: str) -> tuple[str, dict] | None:
         return "query_recent_actions", {"n": 5}
     match = re.search(r"\b(?:show|list)\b.*\b(?:last|recent)\s+(\d{1,2})\b.*\b(?:actions|expenses|transactions)\b", text)
     if match:
-        return "query_recent_actions", {"n": min(int(match.group(1)), 25)}
+        return "query_recent_actions", {"n": min(int(match.group(1)), 25), "explicit_n": True}
     return None
 
 
@@ -374,7 +386,8 @@ def register_events(client: discord.Client, tree: discord.app_commands.CommandTr
             return
 
         try:
-            intent_data = await parse_message_llm(content)
+            async with _maybe_typing(message):
+                intent_data = await parse_message_llm(content)
             intent = intent_data.get("intent")
             entities = intent_data.get("entities", {})
             logger.info(
