@@ -125,7 +125,7 @@ def _format_reconciliation_section(
 
 
 def _format_reconciliation_table(items: list[ReconciliationItem]) -> str:
-    header = f"{'Date':<10}  {'Amount':>10}  {'Name':<26}  {'Status':<12}  Note"
+    header = f"{'Date':<5}  {'Amt':>8}  {'Name':<22}  Note"
     divider = "-" * len(header)
     rows = [_format_reconciliation_row(item) for item in items]
     return "```text\n" + "\n".join([header, divider, *rows]) + "\n```"
@@ -137,12 +137,47 @@ def _format_reconciliation_row(item: ReconciliationItem) -> str:
     amount = abs(transaction.amount)
     name = transaction.merchant_name or transaction.name
     return (
-        f"{_clip(date, 10):<10}  "
-        f"{f'${amount:.2f}':>10}  "
-        f"{_clip(name, 26):<26}  "
-        f"{_clip(item.status, 12):<12}  "
-        f"{_clip(item.notes or '', 24)}"
+        f"{_short_date(date):<5}  "
+        f"{_short_money(amount):>8}  "
+        f"{_clip(name, 22):<22}  "
+        f"{_compact_note(item.notes or item.status)}"
     )
+
+
+def _short_date(value: str) -> str:
+    if len(value) >= 10 and value[4] == "-" and value[7] == "-":
+        return value[5:10]
+    return _clip(value, 5)
+
+
+def _short_money(amount: float) -> str:
+    text = f"${amount:.2f}"
+    if len(text) <= 8:
+        return text
+    if amount >= 1000:
+        compact = f"${amount / 1000:.1f}k"
+        if len(compact) <= 8:
+            return compact
+    return _clip(text, 8)
+
+
+def _compact_note(value: str) -> str:
+    normalized = value.replace("_", " ").strip().lower()
+    if "outflow transaction" in normalized:
+        return "expense"
+    if "inflow without payroll" in normalized:
+        return "credit"
+    if "transfer/payment" in normalized:
+        return "transfer"
+    if "interest income" in normalized:
+        return "interest"
+    if "possible income" in normalized:
+        return "income?"
+    if "subscription" in normalized or "bill" in normalized:
+        return "bill/sub"
+    if "pending" in normalized:
+        return "pending"
+    return _clip(normalized, 10)
 
 
 def _clip(value: str, width: int) -> str:

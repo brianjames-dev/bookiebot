@@ -125,5 +125,9 @@ def test_format_reconciliation_preview_does_not_cut_code_blocks():
     output = format_reconciliation_preview(ReconciliationPreview(owner_key="brian", items=items), max_chars=700)
 
     assert output.count("```") % 2 == 0
+    assert "Date        Amt  Name" in output
+    assert "Status" not in output
+    assert "05-17" in output
+    assert "expense" in output
     assert "...and " in output
     assert len(output) <= 760
