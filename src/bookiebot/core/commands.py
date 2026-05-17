@@ -24,6 +24,13 @@ from bookiebot.sheets.bills import parse_bill_schedules_with_warnings
 from bookiebot.sheets.subscriptions import debug_subscription_sync
 
 
+async def _send_bank_command_error(interaction: discord.Interaction, content: str) -> None:
+    if interaction.response.is_done():
+        await interaction.edit_original_response(content=content)
+    else:
+        await interaction.response.send_message(content, ephemeral=True)
+
+
 def register_commands(tree: app_commands.CommandTree):
     @tree.command(name="debug_bank_status", description="(Admin) Show read-only bank integration status")
     async def debug_bank_status(interaction: discord.Interaction):
@@ -31,14 +38,14 @@ def register_commands(tree: app_commands.CommandTree):
             await interaction.response.send_message("❌ Not authorized.", ephemeral=True)
             return
 
-        await interaction.response.defer(ephemeral=True)
+        await interaction.response.send_message("Checking bank integration status...", ephemeral=True)
         try:
             service = build_banking_service()
             status = service.status()
         except Exception as exc:
-            await interaction.followup.send(
-                content=f"❌ Could not load banking status: {type(exc).__name__}: {exc}",
-                ephemeral=True,
+            await _send_bank_command_error(
+                interaction,
+                f"❌ Could not load banking status: {type(exc).__name__}: {exc}",
             )
             return
 
@@ -53,7 +60,7 @@ def register_commands(tree: app_commands.CommandTree):
             f"- Last successful sync: {status.last_success_at or 'never'}",
             f"- Last sync error: {status.last_error or 'none'}",
         ]
-        await interaction.followup.send(content="\n".join(lines), ephemeral=True)
+        await interaction.edit_original_response(content="\n".join(lines))
 
     @tree.command(name="debug_bank_sandbox_link", description="(Admin) Link a Plaid Sandbox Item for your budget owner")
     @app_commands.describe(institution_id="Plaid Sandbox institution id, defaults to ins_109508")
@@ -62,35 +69,43 @@ def register_commands(tree: app_commands.CommandTree):
             await interaction.response.send_message("❌ Not authorized.", ephemeral=True)
             return
 
-        await interaction.response.defer(ephemeral=True)
+        await interaction.response.send_message("Linking Plaid Sandbox Item...", ephemeral=True)
         try:
             owner = get_user_config(interaction.user.id)
             service = build_banking_service()
             if service.config.plaid_env != "sandbox":
-                await interaction.followup.send(
-                    content="❌ Sandbox link command only runs when `PLAID_ENV=sandbox`.",
-                    ephemeral=True,
+                await _send_bank_command_error(
+                    interaction,
+                    "❌ Sandbox link command only runs when `PLAID_ENV=sandbox`.",
                 )
                 return
-            item = await service.link_sandbox_item(owner.budget_owner_key, institution_id=institution_id)
+            item = await asyncio.wait_for(
+                service.link_sandbox_item(owner.budget_owner_key, institution_id=institution_id),
+                timeout=45,
+            )
+        except asyncio.TimeoutError:
+            await _send_bank_command_error(
+                interaction,
+                "❌ Plaid Sandbox link timed out after 45 seconds. Check Railway logs and Plaid credentials.",
+            )
+            return
         except PlaidApiError as exc:
-            await interaction.followup.send(content=f"❌ Plaid error: {exc}", ephemeral=True)
+            await _send_bank_command_error(interaction, f"❌ Plaid error: {exc}")
             return
         except Exception as exc:
-            await interaction.followup.send(
-                content=f"❌ Could not link Sandbox Item: {type(exc).__name__}: {exc}",
-                ephemeral=True,
+            await _send_bank_command_error(
+                interaction,
+                f"❌ Could not link Sandbox Item: {type(exc).__name__}: {exc}",
             )
             return
 
-        await interaction.followup.send(
+        await interaction.edit_original_response(
             content=(
                 f"Linked Sandbox Item for {owner.name}.\n"
                 f"- Institution: {item.institution_name or 'unknown'}\n"
                 f"- Owner key: `{item.owner_key}`\n"
                 "- Access token stored encrypted locally."
             ),
-            ephemeral=True,
         )
 
     @tree.command(name="debug_bank_sync", description="(Admin) Sync Plaid transactions for your budget owner")
@@ -99,26 +114,29 @@ def register_commands(tree: app_commands.CommandTree):
             await interaction.response.send_message("❌ Not authorized.", ephemeral=True)
             return
 
-        await interaction.response.defer(ephemeral=True)
+        await interaction.response.send_message("Syncing bank transactions...", ephemeral=True)
         try:
             owner = get_user_config(interaction.user.id)
             service = build_banking_service()
-            results = await service.sync_owner(owner.budget_owner_key)
+            results = await asyncio.wait_for(service.sync_owner(owner.budget_owner_key), timeout=45)
+        except asyncio.TimeoutError:
+            await _send_bank_command_error(
+                interaction,
+                "❌ Bank transaction sync timed out after 45 seconds. Check Railway logs and try again.",
+            )
+            return
         except PlaidApiError as exc:
-            await interaction.followup.send(content=f"❌ Plaid error: {exc}", ephemeral=True)
+            await _send_bank_command_error(interaction, f"❌ Plaid error: {exc}")
             return
         except Exception as exc:
-            await interaction.followup.send(
-                content=f"❌ Could not sync bank transactions: {type(exc).__name__}: {exc}",
-                ephemeral=True,
+            await _send_bank_command_error(
+                interaction,
+                f"❌ Could not sync bank transactions: {type(exc).__name__}: {exc}",
             )
             return
 
         if not results:
-            await interaction.followup.send(
-                content="No active bank Items are linked for your budget owner yet.",
-                ephemeral=True,
-            )
+            await interaction.edit_original_response(content="No active bank Items are linked for your budget owner yet.")
             return
 
         lines = [f"Synced {len(results)} bank Item(s) for {owner.name}:"]
@@ -129,7 +147,7 @@ def register_commands(tree: app_commands.CommandTree):
                 f"{result.accounts} account(s), "
                 f"{result.added} added, {result.modified} modified, {result.removed} removed"
             )
-        await interaction.followup.send(content="\n".join(lines), ephemeral=True)
+        await interaction.edit_original_response(content="\n".join(lines))
 
     @tree.command(name="debug_subscriptions", description="(Admin) Sync and inspect subscription reminder data")
     async def debug_subscriptions(interaction: discord.Interaction):
