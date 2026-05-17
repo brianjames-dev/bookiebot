@@ -41,7 +41,7 @@ def register_commands(tree: app_commands.CommandTree):
             await interaction.response.send_message("❌ Not authorized.", ephemeral=True)
             return
 
-        await interaction.response.send_message("Checking bank integration status...", ephemeral=True)
+        await interaction.response.defer(ephemeral=True)
         try:
             service = build_banking_service()
             status = service.status()
@@ -72,7 +72,7 @@ def register_commands(tree: app_commands.CommandTree):
             await interaction.response.send_message("❌ Not authorized.", ephemeral=True)
             return
 
-        await interaction.response.send_message("Linking Plaid Sandbox Item...", ephemeral=True)
+        await interaction.response.defer(ephemeral=True)
         try:
             owner = get_user_config(interaction.user.id)
             service = build_banking_service()
@@ -117,7 +117,7 @@ def register_commands(tree: app_commands.CommandTree):
             await interaction.response.send_message("❌ Not authorized.", ephemeral=True)
             return
 
-        await interaction.response.send_message("Syncing bank transactions...", ephemeral=True)
+        await interaction.response.defer(ephemeral=True)
         try:
             owner = get_user_config(interaction.user.id)
             service = build_banking_service()
@@ -210,7 +210,7 @@ def register_commands(tree: app_commands.CommandTree):
             await interaction.response.send_message("❌ Not authorized.", ephemeral=True)
             return
 
-        await interaction.response.send_message("Loading recent bank transactions...", ephemeral=True)
+        await interaction.response.defer(ephemeral=True)
         try:
             owner = get_user_config(interaction.user.id)
             service = build_banking_service()
