@@ -104,6 +104,7 @@ class BankingService:
 
     def reconciliation_preview(self, owner_key: str, limit: int = 25, *, force: bool = False) -> ReconciliationPreview:
         self.store.initialize()
+        cached_transaction_count = self.store.transaction_count(owner_key)
         transactions = self.store.bank_transactions_for_reconciliation(owner_key=owner_key, limit=limit, force=force)
         items = []
         for transaction in transactions:
@@ -118,7 +119,13 @@ class BankingService:
                     notes=notes,
                 )
             )
-        return ReconciliationPreview(owner_key=owner_key, items=items)
+        return ReconciliationPreview(
+            owner_key=owner_key,
+            items=items,
+            force=force,
+            cached_transaction_count=cached_transaction_count,
+            candidate_transaction_count=len(transactions),
+        )
 
     async def _fetch_accounts_for_item(
         self,

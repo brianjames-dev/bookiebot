@@ -353,6 +353,20 @@ class BankStore:
             ).fetchall()
         return [_bank_transaction_from_row(row) for row in rows]
 
+    def transaction_count(self, owner_key: str) -> int:
+        self.initialize()
+        with self.connect() as conn:
+            row = conn.execute(
+                """
+                SELECT COUNT(*)
+                FROM bank_transactions
+                WHERE owner_key = ?
+                  AND removed_at IS NULL
+                """,
+                (owner_key,),
+            ).fetchone()
+        return int(row[0]) if row else 0
+
     def bank_transactions_for_reconciliation(
         self,
         owner_key: str,

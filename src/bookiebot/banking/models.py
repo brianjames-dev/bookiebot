@@ -114,3 +114,6 @@ class ReconciliationItem:
 class ReconciliationPreview:
     owner_key: str
     items: list[ReconciliationItem]
+    force: bool = False
+    cached_transaction_count: int = 0
+    candidate_transaction_count: int = 0

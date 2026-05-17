@@ -28,14 +28,22 @@ def format_bank_transaction_table(transactions: list[BankTransaction]) -> str:
 
 
 def format_reconciliation_preview(preview: ReconciliationPreview, *, max_chars: int = 1800) -> str:
+    summary = (
+        "Bank reconciliation preview:\n"
+        f"- Force: {'yes' if preview.force else 'no'}\n"
+        f"- Cached transactions: {preview.cached_transaction_count}\n"
+        f"- Candidate transactions: {preview.candidate_transaction_count}"
+    )
     if not preview.items:
-        return "No unreconciled cached bank transactions found."
+        if preview.force:
+            return summary + "\n\nNo cached bank transactions were available to preview."
+        return summary + "\n\nNo unreconciled cached bank transactions found."
 
     groups: dict[str, list[ReconciliationItem]] = defaultdict(list)
     for item in preview.items:
         groups[item.classification].append(item)
 
-    lines = ["Bank reconciliation preview:"]
+    lines = [summary]
     omitted_total = 0
     for classification in (
         "expense",
