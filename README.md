@@ -99,12 +99,17 @@ BANK_TOKEN_ENCRYPTION_KEY=
 BANK_SQLITE_PATH=data/banking.sqlite3
 ```
 
+On Railway, `data/banking.sqlite3` is not durable across redeploys unless a persistent volume is mounted. For persistent SQLite, mount a Railway volume and set `BANK_SQLITE_PATH` to the mounted path, for example `/data/banking.sqlite3`. Without a volume, use the Sandbox seed command after each redeploy.
+
 Admin/debug commands:
 
 ```text
 /debug_bank_status
+/debug_bank_seed_sandbox
 /debug_bank_sandbox_link
 /debug_bank_sync
+/debug_bank_transactions
+/debug_bank_reconcile
 ```
 
 The first production-facing goal is reconciliation: matching bank transactions against manually logged expenses, income, subscriptions, and bills before anything is imported into the sheet.

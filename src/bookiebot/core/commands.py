@@ -150,6 +150,57 @@ def register_commands(tree: app_commands.CommandTree):
             )
         await interaction.edit_original_response(content="\n".join(lines))
 
+    @tree.command(name="debug_bank_seed_sandbox", description="(Admin) Link and sync a Plaid Sandbox Item")
+    @app_commands.describe(institution_id="Plaid Sandbox institution id, defaults to ins_109508")
+    async def debug_bank_seed_sandbox(interaction: discord.Interaction, institution_id: str = "ins_109508"):
+        if not auth.is_debug_allowed(interaction.user):
+            await interaction.response.send_message("❌ Not authorized.", ephemeral=True)
+            return
+
+        await interaction.response.defer(ephemeral=True)
+        try:
+            owner = get_user_config(interaction.user.id)
+            service = build_banking_service()
+            if service.config.plaid_env != "sandbox":
+                await interaction.followup.send(
+                    content="❌ Sandbox seed command only runs when `PLAID_ENV=sandbox`.",
+                    ephemeral=True,
+                )
+                return
+            item, results = await asyncio.wait_for(
+                service.seed_sandbox_owner(owner.budget_owner_key, institution_id=institution_id),
+                timeout=60,
+            )
+        except asyncio.TimeoutError:
+            await interaction.followup.send(
+                content="❌ Sandbox seed timed out after 60 seconds. Check Railway logs and try again.",
+                ephemeral=True,
+            )
+            return
+        except PlaidApiError as exc:
+            await interaction.followup.send(content=f"❌ Plaid error: {exc}", ephemeral=True)
+            return
+        except Exception as exc:
+            await interaction.followup.send(
+                content=f"❌ Could not seed Sandbox bank data: {type(exc).__name__}: {exc}",
+                ephemeral=True,
+            )
+            return
+
+        lines = [
+            f"Seeded Sandbox bank data for {owner.name}.",
+            f"- Institution: {item.institution_name or 'unknown'}",
+            f"- Owner key: `{item.owner_key}`",
+        ]
+        for result in results:
+            lines.append(
+                "- "
+                f"{result.institution_name or f'Item {result.item_id}'}: "
+                f"{result.accounts} account(s), "
+                f"{result.added} added, {result.modified} modified, {result.removed} removed"
+            )
+        await interaction.followup.send(content="\n".join(lines), ephemeral=True)
+
     @tree.command(name="debug_bank_transactions", description="(Admin) Show recent synced bank transactions")
     @app_commands.describe(limit="Number of transactions to show (default 10, max 25)")
     async def debug_bank_transactions(interaction: discord.Interaction, limit: int = 10):
@@ -185,19 +236,19 @@ def register_commands(tree: app_commands.CommandTree):
             await interaction.response.send_message("❌ Not authorized.", ephemeral=True)
             return
 
-        await interaction.response.send_message("Building bank reconciliation preview...", ephemeral=True)
+        await interaction.response.defer(ephemeral=True)
         try:
             owner = get_user_config(interaction.user.id)
             service = build_banking_service()
             preview = service.reconciliation_preview(owner.budget_owner_key, limit=max(1, min(limit, 50)))
         except Exception as exc:
-            await _send_bank_command_error(
-                interaction,
-                f"❌ Could not build reconciliation preview: {type(exc).__name__}: {exc}",
+            await interaction.followup.send(
+                content=f"❌ Could not build reconciliation preview: {type(exc).__name__}: {exc}",
+                ephemeral=True,
             )
             return
 
-        await interaction.edit_original_response(content=format_reconciliation_preview(preview, max_chars=1900))
+        await interaction.followup.send(content=format_reconciliation_preview(preview, max_chars=1900), ephemeral=True)
 
     @tree.command(name="debug_subscriptions", description="(Admin) Sync and inspect subscription reminder data")
     async def debug_subscriptions(interaction: discord.Interaction):

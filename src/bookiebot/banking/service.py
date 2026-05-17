@@ -35,6 +35,16 @@ class BankingService:
         self.store.upsert_accounts(accounts)
         return item
 
+    async def seed_sandbox_owner(self, owner_key: str, institution_id: str = "ins_109508") -> tuple[LinkedBankItem, list[SyncResult]]:
+        self.store.initialize()
+        existing_items = self.store.list_active_items(owner_key=owner_key)
+        if existing_items:
+            item = existing_items[0]
+        else:
+            item = await self.link_sandbox_item(owner_key, institution_id=institution_id)
+        results = await self.sync_owner(owner_key)
+        return item, results
+
     async def sync_owner(self, owner_key: str) -> list[SyncResult]:
         self.store.initialize()
         results: list[SyncResult] = []

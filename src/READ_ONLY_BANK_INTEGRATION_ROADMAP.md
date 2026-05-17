@@ -30,9 +30,11 @@ Implemented first slice:
 - Recent cached bank transaction inspection.
 - Admin-only debug commands:
   - `/debug_bank_status`
+  - `/debug_bank_seed_sandbox`
   - `/debug_bank_sandbox_link`
   - `/debug_bank_sync`
   - `/debug_bank_transactions`
+  - `/debug_bank_reconcile`
 
 Not implemented yet:
 
