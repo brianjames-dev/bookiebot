@@ -1,6 +1,8 @@
-import discord
 import asyncio
 import os
+os.environ.setdefault("DISCORD_AUDIO_DISABLE", "1")
+
+import discord
 from datetime import datetime, timezone
 from typing import cast
 

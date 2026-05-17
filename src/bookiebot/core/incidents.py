@@ -2,6 +2,7 @@ import json
 import urllib.request
 from urllib.error import URLError, HTTPError
 import os
+os.environ.setdefault("DISCORD_AUDIO_DISABLE", "1")
 
 from bookiebot.logging_config import uptime_seconds
 from bookiebot.core import config

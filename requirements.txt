@@ -10,3 +10,4 @@ pytest
 pytest-asyncio==0.23.8
 vcrpy
 aiohttp
+audioop-lts

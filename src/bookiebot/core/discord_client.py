@@ -1,3 +1,6 @@
+import os
+os.environ.setdefault("DISCORD_AUDIO_DISABLE", "1")
+
 import discord
 from discord import app_commands
 
