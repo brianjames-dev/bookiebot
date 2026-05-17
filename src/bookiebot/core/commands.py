@@ -10,13 +10,127 @@ from bookiebot.core import auth, config
 from bookiebot.core import incidents
 from bookiebot.core import github_dispatch
 from bookiebot.core import ui
+from bookiebot.banking.plaid_client import PlaidApiError
+from bookiebot.banking.service import build_banking_service
 from bookiebot.logging_config import get_recent_logs, uptime_seconds
-from bookiebot.sheets.routing import get_current_year, get_year_config, MissingYearConfigError, sheet_user_context
+from bookiebot.sheets.routing import (
+    get_current_year,
+    get_user_config,
+    get_year_config,
+    MissingYearConfigError,
+    sheet_user_context,
+)
 from bookiebot.sheets.bills import parse_bill_schedules_with_warnings
 from bookiebot.sheets.subscriptions import debug_subscription_sync
 
 
 def register_commands(tree: app_commands.CommandTree):
+    @tree.command(name="debug_bank_status", description="(Admin) Show read-only bank integration status")
+    async def debug_bank_status(interaction: discord.Interaction):
+        if not auth.is_debug_allowed(interaction.user):
+            await interaction.response.send_message("❌ Not authorized.", ephemeral=True)
+            return
+
+        await interaction.response.defer(ephemeral=True)
+        try:
+            service = build_banking_service()
+            status = service.status()
+        except Exception as exc:
+            await interaction.followup.send(
+                content=f"❌ Could not load banking status: {type(exc).__name__}: {exc}",
+                ephemeral=True,
+            )
+            return
+
+        lines = [
+            "Bank integration status:",
+            f"- Configured: {'yes' if status.configured else 'no'}",
+            f"- Plaid env: {status.plaid_env}",
+            f"- Store: `{status.sqlite_path}`",
+            f"- Linked Items: {status.item_count}",
+            f"- Accounts: {status.account_count}",
+            f"- Stored transactions: {status.transaction_count}",
+            f"- Last successful sync: {status.last_success_at or 'never'}",
+            f"- Last sync error: {status.last_error or 'none'}",
+        ]
+        await interaction.followup.send(content="\n".join(lines), ephemeral=True)
+
+    @tree.command(name="debug_bank_sandbox_link", description="(Admin) Link a Plaid Sandbox Item for your budget owner")
+    @app_commands.describe(institution_id="Plaid Sandbox institution id, defaults to ins_109508")
+    async def debug_bank_sandbox_link(interaction: discord.Interaction, institution_id: str = "ins_109508"):
+        if not auth.is_debug_allowed(interaction.user):
+            await interaction.response.send_message("❌ Not authorized.", ephemeral=True)
+            return
+
+        await interaction.response.defer(ephemeral=True)
+        try:
+            owner = get_user_config(interaction.user.id)
+            service = build_banking_service()
+            if service.config.plaid_env != "sandbox":
+                await interaction.followup.send(
+                    content="❌ Sandbox link command only runs when `PLAID_ENV=sandbox`.",
+                    ephemeral=True,
+                )
+                return
+            item = await service.link_sandbox_item(owner.budget_owner_key, institution_id=institution_id)
+        except PlaidApiError as exc:
+            await interaction.followup.send(content=f"❌ Plaid error: {exc}", ephemeral=True)
+            return
+        except Exception as exc:
+            await interaction.followup.send(
+                content=f"❌ Could not link Sandbox Item: {type(exc).__name__}: {exc}",
+                ephemeral=True,
+            )
+            return
+
+        await interaction.followup.send(
+            content=(
+                f"Linked Sandbox Item for {owner.name}.\n"
+                f"- Institution: {item.institution_name or 'unknown'}\n"
+                f"- Owner key: `{item.owner_key}`\n"
+                "- Access token stored encrypted locally."
+            ),
+            ephemeral=True,
+        )
+
+    @tree.command(name="debug_bank_sync", description="(Admin) Sync Plaid transactions for your budget owner")
+    async def debug_bank_sync(interaction: discord.Interaction):
+        if not auth.is_debug_allowed(interaction.user):
+            await interaction.response.send_message("❌ Not authorized.", ephemeral=True)
+            return
+
+        await interaction.response.defer(ephemeral=True)
+        try:
+            owner = get_user_config(interaction.user.id)
+            service = build_banking_service()
+            results = await service.sync_owner(owner.budget_owner_key)
+        except PlaidApiError as exc:
+            await interaction.followup.send(content=f"❌ Plaid error: {exc}", ephemeral=True)
+            return
+        except Exception as exc:
+            await interaction.followup.send(
+                content=f"❌ Could not sync bank transactions: {type(exc).__name__}: {exc}",
+                ephemeral=True,
+            )
+            return
+
+        if not results:
+            await interaction.followup.send(
+                content="No active bank Items are linked for your budget owner yet.",
+                ephemeral=True,
+            )
+            return
+
+        lines = [f"Synced {len(results)} bank Item(s) for {owner.name}:"]
+        for result in results:
+            lines.append(
+                "- "
+                f"{result.institution_name or f'Item {result.item_id}'}: "
+                f"{result.accounts} account(s), "
+                f"{result.added} added, {result.modified} modified, {result.removed} removed"
+            )
+        await interaction.followup.send(content="\n".join(lines), ephemeral=True)
+
     @tree.command(name="debug_subscriptions", description="(Admin) Sync and inspect subscription reminder data")
     async def debug_subscriptions(interaction: discord.Interaction):
         if not auth.is_debug_allowed(interaction.user):

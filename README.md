@@ -85,6 +85,30 @@ BRIAN_SUBSCRIPTION_REMINDER_SEND_HOUR=10
 HANNAH_SUBSCRIPTION_REMINDER_SEND_HOUR=8
 ```
 
+## Read-Only Bank Integration
+
+The Plaid-backed bank integration is in its first Sandbox-only implementation phase. It does not write bank transactions into budget sheets yet. The current slice can link a Plaid Sandbox Item, store the access token encrypted outside Google Sheets, fetch accounts, and sync transactions with Plaid's `/transactions/sync` cursor flow.
+
+Required environment variables:
+
+```env
+PLAID_CLIENT_ID=
+PLAID_SECRET=
+PLAID_ENV=sandbox
+BANK_TOKEN_ENCRYPTION_KEY=
+BANK_SQLITE_PATH=data/banking.sqlite3
+```
+
+Admin/debug commands:
+
+```text
+/debug_bank_status
+/debug_bank_sandbox_link
+/debug_bank_sync
+```
+
+The first production-facing goal is reconciliation: matching bank transactions against manually logged expenses, income, subscriptions, and bills before anything is imported into the sheet.
+
 ## 📷 Screenshots
 
 ### Intent Recognition – Page 1
