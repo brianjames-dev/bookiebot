@@ -180,3 +180,45 @@ def test_format_reconciliation_preview_uses_narrow_rows():
     assert "Note" not in output
     assert "Very Long Merchant Name T~" in output
     assert all(len(line) <= 46 for line in code_lines if line and not line.startswith("-"))
+
+
+def test_format_reconciliation_preview_separates_matched_items():
+    transaction = BankTransaction(
+        id=1,
+        provider_transaction_id="txn-1",
+        owner_key="brian",
+        account_name="Checking",
+        account_mask="0000",
+        account_type="depository",
+        account_subtype="checking",
+        date="2026-05-17",
+        authorized_date=None,
+        name="Starbucks",
+        merchant_name=None,
+        amount=4.33,
+        pending=False,
+        payment_channel="in store",
+        updated_at="2026-05-17T00:00:00+00:00",
+    )
+    item = ReconciliationItem(
+        id=1,
+        owner_key="brian",
+        bank_transaction_id=1,
+        provider_transaction_id="txn-1",
+        classification="expense",
+        status="matched",
+        confidence=0.96,
+        matched_action_log_id="abc123",
+        matched_sheet_ref="expense!row 12",
+        first_seen_at="2026-05-17T00:00:00+00:00",
+        last_seen_at="2026-05-17T00:00:00+00:00",
+        resolved_at=None,
+        ignored_at=None,
+        notes="matched expense action",
+        transaction=transaction,
+    )
+
+    output = format_reconciliation_preview(ReconciliationPreview(owner_key="brian", items=[item]))
+
+    assert "Matched Expense:" in output
+    assert "05-17     $4.33  Starbucks" in output

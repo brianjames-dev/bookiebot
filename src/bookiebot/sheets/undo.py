@@ -230,6 +230,17 @@ def _read_log() -> list[LoggedAction]:
     return [record.logged for record in data.records]
 
 
+def read_active_logged_actions(user_key: str | None = None) -> list[LoggedAction]:
+    keys = actor_key_aliases(str(user_key)) if user_key else set()
+    return [
+        logged
+        for logged in _read_log()
+        if logged.status == "active"
+        and logged.action.metadata.get("type") != "system_state"
+        and (not keys or logged.user_key in keys)
+    ]
+
+
 def _append_logged_action(user_key: str | None, action: UndoAction) -> None:
     ws = _log_sheet()
     _ensure_log_header(ws)

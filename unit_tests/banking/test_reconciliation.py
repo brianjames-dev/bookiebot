@@ -4,9 +4,10 @@ from bookiebot.banking.config import BankingConfig
 from bookiebot.banking.crypto import TokenCipher
 from bookiebot.banking.models import BankAccount, BankTransaction
 from bookiebot.banking.plaid_client import PlaidClient
-from bookiebot.banking.reconciliation import classify_transaction
+from bookiebot.banking.reconciliation import classify_transaction, reconcile_transaction
 from bookiebot.banking.service import BankingService
 from bookiebot.banking.store import BankStore
+from bookiebot.sheets.undo import LoggedAction, UndoAction
 
 
 def _transaction(name: str, amount: float, pending: bool = False) -> BankTransaction:
@@ -87,6 +88,79 @@ def test_classify_pending_as_needs_review():
     assert classification == "needs_review"
     assert status == "needs_review"
     assert notes == "pending transaction"
+
+
+def test_reconcile_matches_logged_expense_by_amount_and_date():
+    action = LoggedAction(
+        id="abc123",
+        created_at="2026-05-17T12:00:00",
+        user_key="676638528590970917",
+        action=UndoAction(
+            worksheet="expense",
+            kind="clear_cells",
+            row=12,
+            columns=[14, 15, 16, 17, 18],
+            previous_values=["", "", "", "", ""],
+            new_values=["5/17/2026", "coffee", "4.33", "Starbucks", "Brian (BofA)"],
+            metadata={"type": "expense", "category": "food", "person": "Brian (BofA)"},
+            description="food expense $4.33 for Brian (BofA)",
+        ),
+    )
+
+    decision = reconcile_transaction(_transaction("Starbucks", 4.33), [action])
+
+    assert decision.status == "matched"
+    assert decision.classification == "expense"
+    assert decision.matched_action_log_id == "abc123"
+    assert decision.matched_sheet_ref == "expense!row 12"
+    assert decision.notes == "matched expense action"
+
+
+def test_reconcile_matches_utility_payment_as_bill():
+    action = LoggedAction(
+        id="pge123",
+        created_at="2026-05-17T12:00:00",
+        user_key="676638528590970917",
+        action=UndoAction(
+            worksheet="income",
+            kind="restore_cells",
+            row=8,
+            columns=[3],
+            previous_values=[""],
+            new_values=["132.36"],
+            metadata={"type": "payment", "category": "pg&e"},
+            description="pg&e payment $132.36",
+        ),
+    )
+
+    decision = reconcile_transaction(_transaction("PG&E WEB ONLINE", 132.36), [action])
+
+    assert decision.status == "matched"
+    assert decision.classification == "subscription_or_bill"
+    assert decision.matched_action_log_id == "pge123"
+
+
+def test_reconcile_does_not_match_wrong_amount():
+    action = LoggedAction(
+        id="abc123",
+        created_at="2026-05-17T12:00:00",
+        user_key="676638528590970917",
+        action=UndoAction(
+            worksheet="expense",
+            kind="clear_cells",
+            row=12,
+            columns=[1, 2, 3, 4],
+            previous_values=["", "", "", ""],
+            new_values=["5/17/2026", "5.33", "Starbucks", "Brian (BofA)"],
+            metadata={"type": "expense", "category": "grocery", "person": "Brian (BofA)"},
+            description="grocery expense $5.33 for Brian (BofA)",
+        ),
+    )
+
+    decision = reconcile_transaction(_transaction("Starbucks", 4.33), [action])
+
+    assert decision.status == "needs_review"
+    assert decision.matched_action_log_id is None
 
 
 def test_reconciliation_preview_persists_items(tmp_path):

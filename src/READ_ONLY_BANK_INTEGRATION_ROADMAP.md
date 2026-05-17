@@ -385,6 +385,14 @@ Status: in progress.
 
 BookieBot should treat reconciliation as a durable workflow, not as a one-off transaction list.
 
+Current implementation:
+
+- `/debug_bank_reconcile` reads cached Plaid transactions and active BookieBot action-log rows.
+- It attempts read-only matches against real logged `expense`, `income`, and utility/bill `payment` actions.
+- Matching is conservative: amount must match within one cent and dates must be within a small window.
+- Successful action-log matches are stored on `bank_reconciliation_items` with the matched action-log id and sheet row reference.
+- The Discord preview separates matched items from items that still need review.
+
 Core operating model:
 
 - Run reconciliation once per user per day.
@@ -686,7 +694,7 @@ Build:
 - Add once-daily reconciliation scan.
 - Add `/debug_bank_reconcile` preview command before proactive notifications.
 - Import inbox for unmatched posted outflows and inflows.
-- Matching against action log/manual sheet rows.
+- Matching against action log/manual sheet rows. Initial action-log matching is implemented for `expense`, `income`, and `payment` actions.
 - Discord review command.
 - Confirm/ignore/import actions.
 
@@ -801,6 +809,7 @@ Manual tests:
 - Inspect cached transactions with `/debug_bank_transactions`.
 - Preview reconciliation with `/debug_bank_reconcile`.
 - Confirm successful matches appear in the reconciliation summary.
+- Confirm real action-log matches appear under matched sections such as `Matched Expense`.
 - Confirm transfer/payment rows are not suggested as expenses.
 - Confirm unmatched spending can become a proposed Expense.
 - Confirm unmatched deposits can become proposed Income or Refund/Credit.

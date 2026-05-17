@@ -39,9 +39,9 @@ def format_reconciliation_preview(preview: ReconciliationPreview, *, max_chars: 
             return summary + "\n\nNo cached bank transactions were available to preview."
         return summary + "\n\nNo unreconciled cached bank transactions found."
 
-    groups: dict[str, list[ReconciliationItem]] = defaultdict(list)
+    groups: dict[tuple[str, str], list[ReconciliationItem]] = defaultdict(list)
     for item in preview.items:
-        groups[item.classification].append(item)
+        groups[(item.classification, _status_group(item))].append(item)
 
     lines = [summary]
     omitted_total = 0
@@ -54,18 +54,19 @@ def format_reconciliation_preview(preview: ReconciliationPreview, *, max_chars: 
         "needs_review",
         "ignore",
     ):
-        items = groups.get(classification)
-        if not items:
-            continue
-        section_lines, omitted = _format_reconciliation_section(
-            CLASSIFICATION_LABELS[classification],
-            items,
-            max_chars=max_chars,
-            current_chars=len("\n".join(lines)),
-        )
-        omitted_total += omitted
-        if section_lines:
-            lines.extend(section_lines)
+        for status_group in ("matched", "needs_review"):
+            items = groups.get((classification, status_group))
+            if not items:
+                continue
+            section_lines, omitted = _format_reconciliation_section(
+                _section_label(classification, status_group),
+                items,
+                max_chars=max_chars,
+                current_chars=len("\n".join(lines)),
+            )
+            omitted_total += omitted
+            if section_lines:
+                lines.extend(section_lines)
 
     if omitted_total:
         lines.append("")
@@ -141,6 +142,17 @@ def _format_reconciliation_row(item: ReconciliationItem) -> str:
         f"{_short_money(amount):>8}  "
         f"{_clip(name, 26)}"
     )
+
+
+def _status_group(item: ReconciliationItem) -> str:
+    return "matched" if item.status == "matched" and item.matched_action_log_id else "needs_review"
+
+
+def _section_label(classification: str, status_group: str) -> str:
+    label = CLASSIFICATION_LABELS[classification]
+    if status_group == "matched":
+        return f"Matched {label}"
+    return label
 
 
 def _short_date(value: str) -> str:

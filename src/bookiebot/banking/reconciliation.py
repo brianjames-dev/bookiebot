@@ -1,12 +1,16 @@
 from __future__ import annotations
 
+from dataclasses import dataclass
+from datetime import date, datetime
 import re
+from typing import Iterable
 
 from bookiebot.banking.models import (
     BankTransaction,
     ReconciliationClassification,
     ReconciliationStatus,
 )
+from bookiebot.sheets.undo import LoggedAction
 
 
 TRANSFER_PATTERNS = (
@@ -51,6 +55,24 @@ SUBSCRIPTION_PATTERNS = (
 )
 
 
+@dataclass(frozen=True)
+class ActionLogMatch:
+    action_id: str
+    sheet_ref: str
+    confidence: float
+    notes: str
+
+
+@dataclass(frozen=True)
+class ReconciliationDecision:
+    classification: ReconciliationClassification
+    status: ReconciliationStatus
+    confidence: float
+    notes: str
+    matched_action_log_id: str | None = None
+    matched_sheet_ref: str | None = None
+
+
 def classify_transaction(transaction: BankTransaction) -> tuple[ReconciliationClassification, ReconciliationStatus, float, str]:
     transaction_text = _normalized_transaction_text(transaction)
 
@@ -76,6 +98,65 @@ def classify_transaction(transaction: BankTransaction) -> tuple[ReconciliationCl
     return "needs_review", "needs_review", 0.20, "unclassified transaction"
 
 
+def reconcile_transaction(
+    transaction: BankTransaction,
+    action_log: Iterable[LoggedAction] = (),
+) -> ReconciliationDecision:
+    classification, status, confidence, notes = classify_transaction(transaction)
+    match = match_action_log(transaction, action_log, classification)
+    if match:
+        return ReconciliationDecision(
+            classification=_matched_classification(classification, match.notes),
+            status="matched",
+            confidence=max(confidence, match.confidence),
+            notes=match.notes,
+            matched_action_log_id=match.action_id,
+            matched_sheet_ref=match.sheet_ref,
+        )
+    return ReconciliationDecision(classification=classification, status=status, confidence=confidence, notes=notes)
+
+
+def match_action_log(
+    transaction: BankTransaction,
+    action_log: Iterable[LoggedAction],
+    classification: ReconciliationClassification | None = None,
+) -> ActionLogMatch | None:
+    transaction_date = _transaction_date(transaction)
+    if transaction_date is None:
+        return None
+
+    compatible = _compatible_action_types(transaction, classification)
+    candidates = []
+    for logged in action_log:
+        candidate = _action_candidate(logged)
+        if candidate is None or candidate["type"] not in compatible:
+            continue
+        if abs(candidate["amount"] - abs(transaction.amount)) > 0.01:
+            continue
+        day_delta = abs((candidate["date"] - transaction_date).days)
+        if day_delta > 3:
+            continue
+        score = 0.86 - (day_delta * 0.05)
+        name_score = _name_score(transaction, candidate["text"])
+        score += name_score * 0.10
+        candidates.append((score, day_delta, candidate, logged))
+
+    if not candidates:
+        return None
+
+    score, day_delta, candidate, logged = sorted(candidates, key=lambda item: (-item[0], item[1]))[0]
+    action_type = candidate["type"]
+    notes = f"matched {action_type} action"
+    if day_delta:
+        notes = f"{notes} within {day_delta}d"
+    return ActionLogMatch(
+        action_id=logged.id,
+        sheet_ref=f"{logged.action.worksheet}!row {logged.action.row}",
+        confidence=min(score, 0.98),
+        notes=notes,
+    )
+
+
 def _normalized_transaction_text(transaction: BankTransaction) -> str:
     parts = [
         transaction.name,
@@ -87,3 +168,127 @@ def _normalized_transaction_text(transaction: BankTransaction) -> str:
 
 def _contains_any(text: str, patterns: tuple[str, ...]) -> bool:
     return any(pattern in text for pattern in patterns)
+
+
+def _transaction_date(transaction: BankTransaction) -> date | None:
+    raw = transaction.date or transaction.authorized_date
+    if not raw:
+        return None
+    try:
+        return datetime.strptime(raw[:10], "%Y-%m-%d").date()
+    except ValueError:
+        return None
+
+
+def _compatible_action_types(
+    transaction: BankTransaction,
+    classification: ReconciliationClassification | None,
+) -> set[str]:
+    if transaction.amount < 0:
+        return {"income"}
+    if classification == "subscription_or_bill":
+        return {"payment", "expense"}
+    if classification == "transfer_or_payment":
+        return {"payment"}
+    return {"expense", "payment"}
+
+
+def _matched_classification(
+    classification: ReconciliationClassification,
+    notes: str,
+) -> ReconciliationClassification:
+    if "income action" in notes:
+        return "income"
+    if "payment action" in notes:
+        return "subscription_or_bill"
+    return classification
+
+
+def _action_candidate(logged: LoggedAction) -> dict | None:
+    action = logged.action
+    action_type = action.metadata.get("type", "")
+    if action_type not in {"expense", "income", "payment"}:
+        return None
+
+    amount = _action_amount(action_type, action.new_values, action.description)
+    action_date = _action_date(action.new_values, logged.created_at)
+    if amount is None or action_date is None or amount <= 0:
+        return None
+
+    text_parts = [
+        action.description,
+        action.metadata.get("category", ""),
+        action.metadata.get("source", ""),
+        *action.new_values,
+    ]
+    return {
+        "type": action_type,
+        "amount": amount,
+        "date": action_date,
+        "text": " ".join(str(part) for part in text_parts if part),
+    }
+
+
+def _action_amount(action_type: str, values: list[str], description: str) -> float | None:
+    if action_type == "income" and len(values) >= 3:
+        return _money_value(values[2])
+    if action_type == "payment" and values:
+        return _money_value(values[-1])
+    for value in values:
+        amount = _money_value(value)
+        if amount is not None and amount > 0:
+            return amount
+    return _money_from_text(description)
+
+
+def _action_date(values: list[str], created_at: str) -> date | None:
+    for value in values:
+        parsed = _parse_date(value)
+        if parsed:
+            return parsed
+    return _parse_date(created_at)
+
+
+def _money_value(value: str) -> float | None:
+    text = str(value).strip()
+    if not text:
+        return None
+    try:
+        return abs(float(text.replace("$", "").replace(",", "")))
+    except ValueError:
+        return None
+
+
+def _money_from_text(text: str) -> float | None:
+    match = re.search(r"\$?\s*([0-9][0-9,]*(?:\.[0-9]{1,2})?)", text)
+    if not match:
+        return None
+    return _money_value(match.group(1))
+
+
+def _parse_date(value: str) -> date | None:
+    text = str(value).strip()
+    if not text:
+        return None
+    for fmt, width in (("%Y-%m-%d", 10), ("%Y-%m-%dT%H:%M:%S", 19), ("%m/%d/%Y", 10)):
+        try:
+            return datetime.strptime(text[:width], fmt).date()
+        except ValueError:
+            continue
+    match = re.match(r"^(\d{1,2})/(\d{1,2})/(\d{4})", text)
+    if match:
+        month, day, year = (int(part) for part in match.groups())
+        return date(year, month, day)
+    return None
+
+
+def _name_score(transaction: BankTransaction, action_text: str) -> float:
+    bank_text = _normalized_transaction_text(transaction)
+    action_normalized = re.sub(r"[^a-z0-9]+", " ", action_text.lower()).strip()
+    if not bank_text or not action_normalized:
+        return 0.0
+    bank_tokens = {token for token in re.split(r"\s+", bank_text) if len(token) >= 3}
+    action_tokens = {token for token in re.split(r"\s+", action_normalized) if len(token) >= 3}
+    if not bank_tokens or not action_tokens:
+        return 0.0
+    return len(bank_tokens & action_tokens) / len(bank_tokens)

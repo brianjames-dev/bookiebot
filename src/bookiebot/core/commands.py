@@ -245,7 +245,13 @@ def register_commands(tree: app_commands.CommandTree):
         try:
             owner = get_user_config(interaction.user.id)
             service = build_banking_service()
-            preview = service.reconciliation_preview(owner.budget_owner_key, limit=max(1, min(limit, 50)), force=force)
+            preview = await asyncio.to_thread(
+                service.reconciliation_preview,
+                owner.budget_owner_key,
+                limit=max(1, min(limit, 50)),
+                force=force,
+                actor_key=str(interaction.user.id),
+            )
         except Exception as exc:
             await interaction.followup.send(
                 content=f"❌ Could not build reconciliation preview: {type(exc).__name__}: {exc}",

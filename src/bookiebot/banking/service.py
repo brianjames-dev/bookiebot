@@ -7,8 +7,9 @@ from bookiebot.banking.config import BankingConfig, load_banking_config
 from bookiebot.banking.crypto import TokenCipher
 from bookiebot.banking.models import BankAccount, BankStatus, BankTransaction, LinkedBankItem, ReconciliationPreview, SyncResult
 from bookiebot.banking.plaid_client import PlaidClient
-from bookiebot.banking.reconciliation import classify_transaction
+from bookiebot.banking.reconciliation import reconcile_transaction
 from bookiebot.banking.store import BankStore
+from bookiebot.sheets.undo import read_active_logged_actions
 
 
 logger = logging.getLogger(__name__)
@@ -102,21 +103,31 @@ class BankingService:
     def recent_transactions(self, owner_key: str, limit: int = 10) -> list[BankTransaction]:
         return self.store.recent_transactions(owner_key=owner_key, limit=limit)
 
-    def reconciliation_preview(self, owner_key: str, limit: int = 25, *, force: bool = False) -> ReconciliationPreview:
+    def reconciliation_preview(
+        self,
+        owner_key: str,
+        limit: int = 25,
+        *,
+        force: bool = False,
+        actor_key: str | None = None,
+    ) -> ReconciliationPreview:
         self.store.initialize()
         cached_transaction_count = self.store.transaction_count(owner_key)
         transactions = self.store.bank_transactions_for_reconciliation(owner_key=owner_key, limit=limit, force=force)
+        action_log = read_active_logged_actions(actor_key) if actor_key else []
         items = []
         for transaction in transactions:
-            classification, status, confidence, notes = classify_transaction(transaction)
+            decision = reconcile_transaction(transaction, action_log)
             items.append(
                 self.store.upsert_reconciliation_item(
                     owner_key=owner_key,
                     transaction=transaction,
-                    classification=classification,
-                    status=status,
-                    confidence=confidence,
-                    notes=notes,
+                    classification=decision.classification,
+                    status=decision.status,
+                    confidence=decision.confidence,
+                    notes=decision.notes,
+                    matched_action_log_id=decision.matched_action_log_id,
+                    matched_sheet_ref=decision.matched_sheet_ref,
                 )
             )
         return ReconciliationPreview(
