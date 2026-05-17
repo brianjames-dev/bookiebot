@@ -10,7 +10,7 @@ from bookiebot.core import auth, config
 from bookiebot.core import incidents
 from bookiebot.core import github_dispatch
 from bookiebot.core import ui
-from bookiebot.banking.formatting import format_bank_transaction
+from bookiebot.banking.formatting import format_bank_transaction_table
 from bookiebot.banking.plaid_client import PlaidApiError
 from bookiebot.banking.service import build_banking_service
 from bookiebot.logging_config import get_recent_logs, uptime_seconds
@@ -175,7 +175,7 @@ def register_commands(tree: app_commands.CommandTree):
 
         capped_limit = max(1, min(limit, 25))
         lines = [f"Recent bank transactions for {owner.name} ({len(transactions)} of max {capped_limit}):"]
-        lines.extend(format_bank_transaction(transaction) for transaction in transactions)
+        lines.append(format_bank_transaction_table(transactions))
         await interaction.edit_original_response(content="\n".join(lines)[:1900])
 
     @tree.command(name="debug_subscriptions", description="(Admin) Sync and inspect subscription reminder data")
