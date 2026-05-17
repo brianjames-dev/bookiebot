@@ -197,7 +197,7 @@ def register_commands(tree: app_commands.CommandTree):
             )
             return
 
-        await interaction.edit_original_response(content=format_reconciliation_preview(preview)[:1900])
+        await interaction.edit_original_response(content=format_reconciliation_preview(preview, max_chars=1900))
 
     @tree.command(name="debug_subscriptions", description="(Admin) Sync and inspect subscription reminder data")
     async def debug_subscriptions(interaction: discord.Interaction):

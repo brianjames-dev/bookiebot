@@ -383,6 +383,7 @@ class BankStore:
                   AND (
                     r.id IS NULL
                     OR r.status IN ('needs_review', 'pending_user', 'conflict')
+                    OR r.classification = 'transfer_or_payment'
                   )
                 ORDER BY COALESCE(t.date, t.authorized_date, '') DESC, t.updated_at DESC, t.id DESC
                 LIMIT ?

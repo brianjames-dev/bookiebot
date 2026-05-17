@@ -27,7 +27,7 @@ def format_bank_transaction_table(transactions: list[BankTransaction]) -> str:
     return "```text\n" + "\n".join([header, divider, *rows]) + "\n```"
 
 
-def format_reconciliation_preview(preview: ReconciliationPreview) -> str:
+def format_reconciliation_preview(preview: ReconciliationPreview, *, max_chars: int = 1800) -> str:
     if not preview.items:
         return "No unreconciled cached bank transactions found."
 
@@ -36,6 +36,7 @@ def format_reconciliation_preview(preview: ReconciliationPreview) -> str:
         groups[item.classification].append(item)
 
     lines = ["Bank reconciliation preview:"]
+    omitted_total = 0
     for classification in (
         "expense",
         "income",
@@ -48,9 +49,19 @@ def format_reconciliation_preview(preview: ReconciliationPreview) -> str:
         items = groups.get(classification)
         if not items:
             continue
+        section_lines, omitted = _format_reconciliation_section(
+            CLASSIFICATION_LABELS[classification],
+            items,
+            max_chars=max_chars,
+            current_chars=len("\n".join(lines)),
+        )
+        omitted_total += omitted
+        if section_lines:
+            lines.extend(section_lines)
+
+    if omitted_total:
         lines.append("")
-        lines.append(f"{CLASSIFICATION_LABELS[classification]}:")
-        lines.append(_format_reconciliation_table(items))
+        lines.append(f"...and {omitted_total} more item(s). Use a lower limit or inspect transactions directly.")
 
     return "\n".join(lines)
 
@@ -82,6 +93,27 @@ def format_bank_transaction_row(transaction: BankTransaction, *, code_wrap: bool
     if code_wrap:
         return f"`{line}`"
     return line
+
+
+def _format_reconciliation_section(
+    label: str,
+    items: list[ReconciliationItem],
+    *,
+    max_chars: int,
+    current_chars: int,
+) -> tuple[list[str], int]:
+    kept: list[ReconciliationItem] = []
+    omitted = 0
+    for item in items:
+        candidate = ["", f"{label}:", _format_reconciliation_table([*kept, item])]
+        candidate_text = "\n".join(candidate)
+        if current_chars + len(candidate_text) + 80 > max_chars:
+            omitted += 1
+            continue
+        kept.append(item)
+    if not kept:
+        return [], omitted
+    return ["", f"{label}:", _format_reconciliation_table(kept)], omitted
 
 
 def _format_reconciliation_table(items: list[ReconciliationItem]) -> str:

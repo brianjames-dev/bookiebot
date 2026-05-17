@@ -1,5 +1,9 @@
-from bookiebot.banking.models import BankTransaction
-from bookiebot.banking.formatting import format_bank_transaction, format_bank_transaction_table
+from bookiebot.banking.models import BankTransaction, ReconciliationItem, ReconciliationPreview
+from bookiebot.banking.formatting import (
+    format_bank_transaction,
+    format_bank_transaction_table,
+    format_reconciliation_preview,
+)
 
 
 def test_format_bank_transaction_outflow():
@@ -77,3 +81,49 @@ def test_format_bank_transaction_table_aligns_and_clips():
     assert "Very Long Merchant Name T~" in table
     assert "Plaid Checking *0000" in table
     assert table.endswith("\n```")
+
+
+def test_format_reconciliation_preview_does_not_cut_code_blocks():
+    transaction = BankTransaction(
+        id=1,
+        provider_transaction_id="txn-1",
+        owner_key="brian",
+        account_name="Checking",
+        account_mask="0000",
+        account_type="depository",
+        account_subtype="checking",
+        date="2026-05-17",
+        authorized_date=None,
+        name="Very Long Merchant Name That Should Clip",
+        merchant_name=None,
+        amount=18.5,
+        pending=False,
+        payment_channel="in store",
+        updated_at="2026-05-17T00:00:00+00:00",
+    )
+    items = [
+        ReconciliationItem(
+            id=index,
+            owner_key="brian",
+            bank_transaction_id=index,
+            provider_transaction_id=f"txn-{index}",
+            classification="expense",
+            status="needs_review",
+            confidence=0.6,
+            matched_action_log_id=None,
+            matched_sheet_ref=None,
+            first_seen_at="2026-05-17T00:00:00+00:00",
+            last_seen_at="2026-05-17T00:00:00+00:00",
+            resolved_at=None,
+            ignored_at=None,
+            notes="outflow transaction",
+            transaction=transaction,
+        )
+        for index in range(10)
+    ]
+
+    output = format_reconciliation_preview(ReconciliationPreview(owner_key="brian", items=items), max_chars=700)
+
+    assert output.count("```") % 2 == 0
+    assert "...and " in output
+    assert len(output) <= 760

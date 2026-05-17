@@ -52,21 +52,21 @@ SUBSCRIPTION_PATTERNS = (
 
 
 def classify_transaction(transaction: BankTransaction) -> tuple[ReconciliationClassification, ReconciliationStatus, float, str]:
-    text = _normalized_text(transaction)
+    transaction_text = _normalized_transaction_text(transaction)
 
     if transaction.pending:
         return "needs_review", "needs_review", 0.40, "pending transaction"
 
-    if _contains_any(text, TRANSFER_PATTERNS):
+    if _contains_any(transaction_text, TRANSFER_PATTERNS):
         return "transfer_or_payment", "matched", 0.95, "transfer/payment pattern"
 
-    if transaction.amount > 0 and _contains_any(text, SUBSCRIPTION_PATTERNS):
+    if transaction.amount > 0 and _contains_any(transaction_text, SUBSCRIPTION_PATTERNS):
         return "subscription_or_bill", "needs_review", 0.75, "possible subscription or bill"
 
     if transaction.amount < 0:
-        if _contains_any(text, PAYROLL_PATTERNS):
+        if _contains_any(transaction_text, PAYROLL_PATTERNS):
             return "income", "needs_review", 0.80, "possible income deposit"
-        if _contains_any(text, INTEREST_PATTERNS):
+        if _contains_any(transaction_text, INTEREST_PATTERNS):
             return "income", "needs_review", 0.65, "interest income"
         return "refund_or_credit", "needs_review", 0.65, "inflow without payroll pattern"
 
@@ -76,13 +76,10 @@ def classify_transaction(transaction: BankTransaction) -> tuple[ReconciliationCl
     return "needs_review", "needs_review", 0.20, "unclassified transaction"
 
 
-def _normalized_text(transaction: BankTransaction) -> str:
+def _normalized_transaction_text(transaction: BankTransaction) -> str:
     parts = [
         transaction.name,
         transaction.merchant_name or "",
-        transaction.account_name or "",
-        transaction.account_type or "",
-        transaction.account_subtype or "",
     ]
     text = " ".join(parts).lower()
     return re.sub(r"\s+", " ", text).strip()
@@ -90,4 +87,3 @@ def _normalized_text(transaction: BankTransaction) -> str:
 
 def _contains_any(text: str, patterns: tuple[str, ...]) -> bool:
     return any(pattern in text for pattern in patterns)
-

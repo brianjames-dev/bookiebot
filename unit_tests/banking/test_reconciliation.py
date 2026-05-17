@@ -29,6 +29,23 @@ def _transaction(name: str, amount: float, pending: bool = False) -> BankTransac
     )
 
 
+def test_classify_credit_card_account_purchase_as_expense():
+    txn = _transaction("Touchstone Climbing", 78.50)
+    txn = BankTransaction(
+        **{
+            **txn.__dict__,
+            "account_name": "Plaid Credit Card",
+            "account_subtype": "credit card",
+        }
+    )
+
+    classification, status, _confidence, notes = classify_transaction(txn)
+
+    assert classification == "expense"
+    assert status == "needs_review"
+    assert notes == "outflow transaction"
+
+
 def test_classify_transfer_payment_as_matched():
     classification, status, confidence, notes = classify_transaction(
         _transaction("CREDIT CARD 3333 PAYMENT", 25.0)
