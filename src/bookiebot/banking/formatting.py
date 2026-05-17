@@ -125,7 +125,7 @@ def _format_reconciliation_section(
 
 
 def _format_reconciliation_table(items: list[ReconciliationItem]) -> str:
-    header = f"{'Date':<5}  {'Amt':>8}  {'Name':<22}  Note"
+    header = f"{'Date':<5}  {'Amt':>8}  Name"
     divider = "-" * len(header)
     rows = [_format_reconciliation_row(item) for item in items]
     return "```text\n" + "\n".join([header, divider, *rows]) + "\n```"
@@ -139,8 +139,7 @@ def _format_reconciliation_row(item: ReconciliationItem) -> str:
     return (
         f"{_short_date(date):<5}  "
         f"{_short_money(amount):>8}  "
-        f"{_clip(name, 22):<22}  "
-        f"{_compact_note(item.notes or item.status)}"
+        f"{_clip(name, 26)}"
     )
 
 

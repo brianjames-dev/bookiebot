@@ -122,12 +122,61 @@ def test_format_reconciliation_preview_does_not_cut_code_blocks():
         for index in range(10)
     ]
 
-    output = format_reconciliation_preview(ReconciliationPreview(owner_key="brian", items=items), max_chars=700)
+    output = format_reconciliation_preview(ReconciliationPreview(owner_key="brian", items=items), max_chars=500)
 
     assert output.count("```") % 2 == 0
     assert "Date        Amt  Name" in output
     assert "Status" not in output
+    assert "Note" not in output
     assert "05-17" in output
-    assert "expense" in output
+    assert "Expense:" in output
     assert "...and " in output
     assert len(output) <= 760
+
+
+def test_format_reconciliation_preview_uses_narrow_rows():
+    transaction = BankTransaction(
+        id=1,
+        provider_transaction_id="txn-1",
+        owner_key="brian",
+        account_name="Checking",
+        account_mask="0000",
+        account_type="depository",
+        account_subtype="checking",
+        date="2026-05-17",
+        authorized_date=None,
+        name="Very Long Merchant Name That Should Clip",
+        merchant_name=None,
+        amount=1234.56,
+        pending=False,
+        payment_channel="in store",
+        updated_at="2026-05-17T00:00:00+00:00",
+    )
+    item = ReconciliationItem(
+        id=1,
+        owner_key="brian",
+        bank_transaction_id=1,
+        provider_transaction_id="txn-1",
+        classification="expense",
+        status="needs_review",
+        confidence=0.6,
+        matched_action_log_id=None,
+        matched_sheet_ref=None,
+        first_seen_at="2026-05-17T00:00:00+00:00",
+        last_seen_at="2026-05-17T00:00:00+00:00",
+        resolved_at=None,
+        ignored_at=None,
+        notes="outflow transaction",
+        transaction=transaction,
+    )
+
+    output = format_reconciliation_preview(ReconciliationPreview(owner_key="brian", items=[item]))
+    code_lines = [
+        line
+        for line in output.splitlines()
+        if not line.startswith("```") and line not in {"Bank reconciliation preview:", "Expense:"}
+    ]
+
+    assert "Note" not in output
+    assert "Very Long Merchant Name T~" in output
+    assert all(len(line) <= 46 for line in code_lines if line and not line.startswith("-"))
