@@ -17,7 +17,7 @@ Keep the implementation adapter-shaped so another provider can be added later, b
 
 ## Current Implementation Status
 
-Status: Phase 1 started.
+Status: Phase 1 implemented; once-daily reconciliation workflow is now in progress.
 
 Implemented first slice:
 
@@ -27,16 +27,19 @@ Implemented first slice:
 - Owner-scoped linked Items and accounts.
 - `/transactions/sync` cursor storage.
 - Transaction upsert handling for `added`, `modified`, and `removed`.
+- Recent cached bank transaction inspection.
 - Admin-only debug commands:
   - `/debug_bank_status`
   - `/debug_bank_sandbox_link`
   - `/debug_bank_sync`
+  - `/debug_bank_transactions`
 
 Not implemented yet:
 
 - Real Plaid Link browser flow.
 - Production/Trial account linking.
-- Bank transaction review inbox.
+- Once-daily cached reconciliation workflow.
+- Bank transaction review inbox and resolution state.
 - Expense/income import confirmation.
 - Bill, subscription, and income reconciliation.
 - Low-cost balance snapshots and estimated balance tracking.
@@ -342,7 +345,129 @@ User-facing reconciliation should trigger when:
 - An expected bill/subscription remains missing after the grace window.
 - Pending activity creates a clear cash-flow risk against upcoming pulls.
 
+If everything reconciles cleanly, BookieBot may send a concise success summary when useful, but it should not spam the user every day just to say nothing changed.
+
 ## Reconciliation Design
+
+### In Progress: Once-Daily Cached Reconciliation
+
+Status: in progress.
+
+BookieBot should treat reconciliation as a durable workflow, not as a one-off transaction list.
+
+Core operating model:
+
+- Run reconciliation once per user per day.
+- Sync Plaid transactions once during that job.
+- Reconcile from locally cached transactions and BookieBot sheet/action-log data.
+- Cache reconciliation results locally.
+- Do not make more Plaid calls while the user is answering review questions.
+- Keep asking about unresolved items on future runs until they are resolved, ignored, imported, or otherwise classified.
+
+Recommended timing:
+
+```text
+7:00 AM Pacific: bank sync + reconciliation scan
+10:00 AM Pacific: existing cash-pull reminder digest
+```
+
+The daily reconciliation job should:
+
+1. Sync new/changed Plaid transactions for linked Items.
+2. Look at new/changed posted transactions since the last reconciliation run.
+3. Compare them against BookieBot action-log entries and current sheet rows.
+4. Classify each transaction using simple BookieBot-shaped buckets.
+5. Store a reconciliation item for each relevant bank transaction.
+6. Send one Discord digest only when there is something useful to report.
+
+Simple classification buckets:
+
+```text
+expense
+income
+subscription_or_bill
+transfer_or_payment
+refund_or_credit
+ignore
+needs_review
+```
+
+User-facing labels:
+
+```text
+Expense
+Income
+Subscription/Bill
+Transfer/Payment
+Refund/Credit
+Ignored
+Needs review
+```
+
+Initial conservative rules:
+
+- Positive amount with merchant-like text -> `expense`.
+- Negative amount with payroll-like text -> `income`.
+- Negative amount from a merchant-like source -> `refund_or_credit`.
+- Card payments, ACH transfers, CDs, savings transfers, and account movement -> `transfer_or_payment`.
+- Matches known subscription/bill schedule by merchant/date/amount -> `subscription_or_bill`.
+- Anything ambiguous -> `needs_review`.
+
+Durable reconciliation state should be stored locally.
+
+Suggested table:
+
+```text
+bank_reconciliation_items
+id | owner_key | bank_transaction_id | classification | status | matched_action_log_id | matched_sheet_ref | confidence | first_seen_at | last_seen_at | resolved_at | ignored_at | notes
+```
+
+Statuses:
+
+```text
+matched
+needs_review
+pending_user
+confirmed
+import_requested
+ignored
+conflict
+```
+
+Daily digest examples:
+
+```text
+@Deebers bank reconciliation is clear.
+
+Matched:
+`Starbucks - $4.33 - May 11 - Expense`
+`McDonald's - $12.00 - May 11 - Expense`
+`Sonic - $1,639.90 - May 15 - Income`
+```
+
+```text
+@Deebers bank reconciliation found 2 items that need review.
+
+Matched:
+`Starbucks - $4.33 - May 11 - Expense`
+
+Needs review:
+`United Airlines - $500.00 inflow - May 12`
+Is this a refund/credit, income, or should I ignore it?
+
+Unlogged:
+`Uber - $5.40 - May 14`
+Should I create a new Expense?
+```
+
+Product rules:
+
+- Do not auto-create sheet rows from bank data in the first version.
+- Ask before creating a missing expense or income entry.
+- Treat subscription/bill matches as confirmation unless amount/date differs enough to need review.
+- Treat transfers/payments as non-budget events unless a future workflow needs them.
+- Treat refunds/credits separately from paycheck income.
+- Prefer quiet success when nothing needs attention.
 
 ### Low-Cost Balance Estimation
 
@@ -515,10 +640,16 @@ Exit criteria:
 
 ### Phase 3: Transaction and Income Review Inbox
 
+Status: in progress.
+
 Goal: let BookieBot identify unlogged expenses and income without auto-writing them.
 
 Build:
 
+- Add durable reconciliation item storage.
+- Add simple rule-based transaction classification.
+- Add once-daily reconciliation scan.
+- Add `/debug_bank_reconcile` preview command before proactive notifications.
 - Import inbox for unmatched posted outflows and inflows.
 - Matching against action log/manual sheet rows.
 - Discord review command.
@@ -526,6 +657,9 @@ Build:
 
 Exit criteria:
 
+- Reconciliation results are cached and do not require repeated Plaid calls.
+- Resolved/ignored items are not repeatedly surfaced.
+- Unresolved items continue to be shown until handled.
 - BookieBot can show likely unlogged transactions.
 - User can import selected expenses into existing expense categories.
 - User can import selected income into the existing income sheet flow.
@@ -600,6 +734,10 @@ Unit tests:
 - Transaction sync cursor application.
 - Added/modified/removed transaction changes.
 - Pending vs posted handling.
+- Rule-based transaction classification.
+- Reconciliation item status transitions.
+- Once-daily reconciliation duplicate suppression.
+- Cached reconciliation result reuse without Plaid calls.
 - Balance snapshot estimation math.
 - Checking vs credit-card balance presentation.
 - Monthly Balance snapshot scheduling.
@@ -615,10 +753,17 @@ Integration tests:
 - Webhook handling for `SYNC_UPDATES_AVAILABLE`.
 - `/accounts/balance/get` response parsing.
 - Balance snapshot persistence.
+- Reconciliation scan against cached bank transactions and action-log fixtures.
 
 Manual tests:
 
 - Link Sandbox institution.
+- Inspect cached transactions with `/debug_bank_transactions`.
+- Preview reconciliation with `/debug_bank_reconcile`.
+- Confirm successful matches appear in the reconciliation summary.
+- Confirm transfer/payment rows are not suggested as expenses.
+- Confirm unmatched spending can become a proposed Expense.
+- Confirm unmatched deposits can become proposed Income or Refund/Credit.
 - Mark checking and credit-card accounts as watched.
 - Take an initial Balance snapshot.
 - Verify estimated balances change after synced posted transactions.
@@ -631,6 +776,9 @@ Manual tests:
 ## Open Product Questions
 
 - Should pending transactions appear in user-facing review lists, or only in balance/risk context?
+- Should a fully successful reconciliation send a digest every day, or only when new matched items exist?
+- How long should unresolved reconciliation items be repeated before escalation or quieter reminders?
+- What exact user replies should resolve a pending item: `create expense`, `ignore`, `transfer`, `refund`, `income`, or slash-command buttons later?
 - What grace window should bill/subscription reconciliation use after an expected pull date?
 - Should BookieBot import transactions directly into the monthly sheet or keep a separate staging tab first?
 - Should estimated balances be included in daily cash-pull digests or only shown when risk exists?
