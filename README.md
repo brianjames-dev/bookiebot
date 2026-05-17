@@ -96,10 +96,11 @@ PLAID_CLIENT_ID=
 PLAID_SECRET=
 PLAID_ENV=sandbox
 BANK_TOKEN_ENCRYPTION_KEY=
+BANK_DATABASE_URL=
 BANK_SQLITE_PATH=data/banking.sqlite3
 ```
 
-On Railway, `data/banking.sqlite3` is not durable across redeploys unless a persistent volume is mounted. For persistent SQLite, mount a Railway volume and set `BANK_SQLITE_PATH` to the mounted path, for example `/data/banking.sqlite3`. Without a volume, use the Sandbox seed command after each redeploy.
+On Railway, `data/banking.sqlite3` is not durable across redeploys unless a persistent volume is mounted. For Sandbox testing, use `/debug_bank_seed_sandbox` after each redeploy. Before linking real bank accounts, use Railway Postgres and set `BANK_DATABASE_URL`; SQLite should remain local/Sandbox-only unless it is backed by a mounted volume.
 
 Admin/debug commands:
 

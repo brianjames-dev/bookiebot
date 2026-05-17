@@ -22,7 +22,7 @@ Status: Phase 1 implemented; once-daily reconciliation workflow is now in progre
 Implemented first slice:
 
 - Plaid Sandbox HTTP client using the existing `aiohttp` dependency.
-- Local SQLite bank store.
+- Local SQLite bank store for Sandbox/local development.
 - Env-backed access-token encryption before tokens are written to disk.
 - Owner-scoped linked Items and accounts.
 - `/transactions/sync` cursor storage.
@@ -38,6 +38,7 @@ Implemented first slice:
 
 Not implemented yet:
 
+- Railway Postgres bank store for persistent production/Trial data.
 - Real Plaid Link browser flow.
 - Production/Trial account linking.
 - Once-daily cached reconciliation workflow.
@@ -172,9 +173,32 @@ Do not store bank tokens in Google Sheets.
 
 Recommended v1 storage:
 
-- Local encrypted SQLite if running in a persistent environment.
-- Railway Postgres if available and persistent.
+- Local encrypted SQLite for local development and Sandbox testing.
+- Railway Postgres for real Plaid Trial/Production data.
 - Environment-backed encryption key.
+
+Storage rule:
+
+```text
+Sandbox testing: SQLite is acceptable.
+Real bank data: Postgres first.
+```
+
+Reasoning:
+
+- Railway's app filesystem is ephemeral unless a volume is mounted.
+- Ephemeral SQLite loses linked Items, encrypted access tokens, transactions, cursors, and reconciliation state on redeploy.
+- A mounted SQLite volume can work, but Postgres is better for migrations, backups, operational visibility, and future multi-instance safety.
+- Railway Postgres may add storage/database cost, but BookieBot's expected data volume is very small.
+
+Configuration model:
+
+```text
+BANK_DATABASE_URL=postgres://...
+BANK_SQLITE_PATH=data/banking.sqlite3
+```
+
+If `BANK_DATABASE_URL` is set, use Postgres. Otherwise, fall back to SQLite for local/Sandbox development.
 
 Minimum tables:
 
@@ -186,6 +210,8 @@ bank_balance_snapshots
 bank_sync_state
 bank_reconciliation_matches
 ```
+
+The current implementation has started with `bank_reconciliation_items`; the final schema should keep either `bank_reconciliation_items` or `bank_reconciliation_matches` as the canonical name, not both.
 
 `bank_items`:
 
@@ -235,6 +261,8 @@ PLAID_SECRET
 PLAID_ENV=sandbox|production
 PLAID_WEBHOOK_SECRET
 BANK_TOKEN_ENCRYPTION_KEY
+BANK_DATABASE_URL
+BANK_SQLITE_PATH
 PUBLIC_BASE_URL
 ```
 
@@ -628,7 +656,10 @@ Goal: make the integration safe enough for real data.
 
 Build:
 
-- Add encrypted token storage.
+- Add Postgres-backed bank storage via `BANK_DATABASE_URL`.
+- Keep SQLite fallback for local/Sandbox development.
+- Add schema initialization/migration path for Postgres.
+- Add encrypted token storage in Postgres.
 - Add owner-scoped bank Item/account tables.
 - Add disconnect/delete-data flow.
 - Redact secrets in logs.
@@ -636,9 +667,11 @@ Build:
 
 Exit criteria:
 
-- Access tokens are encrypted at rest.
+- Real Plaid Trial/Production access tokens are stored in Postgres, not ephemeral SQLite.
+- Access tokens are encrypted at rest before database write.
 - Tokens are never written to sheets or Discord.
 - Each owner only sees their own accounts.
+- Railway redeploys do not lose linked Items, sync cursors, cached transactions, or reconciliation state.
 
 ### Phase 3: Transaction and Income Review Inbox
 
@@ -715,6 +748,7 @@ Goal: safely test with real data.
 
 Build:
 
+- Confirm Postgres storage is enabled and persistent.
 - Move from Sandbox to Plaid Trial/Production config.
 - Link one real institution first.
 - Validate transaction date, merchant, amount, pending, and posting behavior.
@@ -722,6 +756,7 @@ Build:
 
 Exit criteria:
 
+- `BANK_DATABASE_URL` is configured in Railway.
 - One real Item syncs reliably.
 - No secrets leak into logs, sheets, or Discord.
 - Disconnect/delete-data has been tested.
@@ -733,6 +768,7 @@ Unit tests:
 
 - Token encryption/decryption.
 - Owner scoping.
+- Storage backend selection: Postgres when `BANK_DATABASE_URL` is set, SQLite otherwise.
 - Transaction sync cursor application.
 - Added/modified/removed transaction changes.
 - Pending vs posted handling.
@@ -750,6 +786,7 @@ Unit tests:
 
 Integration tests:
 
+- Postgres schema initialization.
 - Plaid Sandbox link/token exchange.
 - `/transactions/sync` cursor flow.
 - Webhook handling for `SYNC_UPDATES_AVAILABLE`.
@@ -759,6 +796,7 @@ Integration tests:
 
 Manual tests:
 
+- Confirm Railway Postgres persists bank status after redeploy.
 - Link Sandbox institution.
 - Inspect cached transactions with `/debug_bank_transactions`.
 - Preview reconciliation with `/debug_bank_reconcile`.
@@ -777,6 +815,9 @@ Manual tests:
 
 ## Open Product Questions
 
+- What exact Railway Postgres cost/usage should we expect on the current plan?
+- Should we keep SQLite fallback indefinitely for local development, or move local development to Docker/Postgres later?
+- Which migration tool should we use for Postgres schema changes, if any?
 - Should pending transactions appear in user-facing review lists, or only in balance/risk context?
 - Should a fully successful reconciliation send a digest every day, or only when new matched items exist?
 - How long should unresolved reconciliation items be repeated before escalation or quieter reminders?
