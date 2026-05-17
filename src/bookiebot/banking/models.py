@@ -1,6 +1,28 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from typing import Literal
+
+
+ReconciliationClassification = Literal[
+    "expense",
+    "income",
+    "subscription_or_bill",
+    "transfer_or_payment",
+    "refund_or_credit",
+    "ignore",
+    "needs_review",
+]
+
+ReconciliationStatus = Literal[
+    "matched",
+    "needs_review",
+    "pending_user",
+    "confirmed",
+    "import_requested",
+    "ignored",
+    "conflict",
+]
 
 
 @dataclass(frozen=True)
@@ -67,3 +89,28 @@ class BankStatus:
     transaction_count: int
     last_success_at: str | None
     last_error: str | None
+
+
+@dataclass(frozen=True)
+class ReconciliationItem:
+    id: int
+    owner_key: str
+    bank_transaction_id: int
+    provider_transaction_id: str
+    classification: ReconciliationClassification
+    status: ReconciliationStatus
+    confidence: float
+    matched_action_log_id: str | None
+    matched_sheet_ref: str | None
+    first_seen_at: str
+    last_seen_at: str
+    resolved_at: str | None
+    ignored_at: str | None
+    notes: str | None
+    transaction: BankTransaction
+
+
+@dataclass(frozen=True)
+class ReconciliationPreview:
+    owner_key: str
+    items: list[ReconciliationItem]

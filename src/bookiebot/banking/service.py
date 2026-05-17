@@ -5,8 +5,9 @@ from typing import Any
 
 from bookiebot.banking.config import BankingConfig, load_banking_config
 from bookiebot.banking.crypto import TokenCipher
-from bookiebot.banking.models import BankAccount, BankStatus, BankTransaction, LinkedBankItem, SyncResult
+from bookiebot.banking.models import BankAccount, BankStatus, BankTransaction, LinkedBankItem, ReconciliationPreview, SyncResult
 from bookiebot.banking.plaid_client import PlaidClient
+from bookiebot.banking.reconciliation import classify_transaction
 from bookiebot.banking.store import BankStore
 
 
@@ -90,6 +91,24 @@ class BankingService:
 
     def recent_transactions(self, owner_key: str, limit: int = 10) -> list[BankTransaction]:
         return self.store.recent_transactions(owner_key=owner_key, limit=limit)
+
+    def reconciliation_preview(self, owner_key: str, limit: int = 25) -> ReconciliationPreview:
+        self.store.initialize()
+        transactions = self.store.unreconciled_transactions(owner_key=owner_key, limit=limit)
+        items = []
+        for transaction in transactions:
+            classification, status, confidence, notes = classify_transaction(transaction)
+            items.append(
+                self.store.upsert_reconciliation_item(
+                    owner_key=owner_key,
+                    transaction=transaction,
+                    classification=classification,
+                    status=status,
+                    confidence=confidence,
+                    notes=notes,
+                )
+            )
+        return ReconciliationPreview(owner_key=owner_key, items=items)
 
     async def _fetch_accounts_for_item(
         self,

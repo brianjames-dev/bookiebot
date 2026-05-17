@@ -8,7 +8,15 @@ import sqlite3
 from typing import Any, Iterator
 
 from bookiebot.banking.crypto import TokenCipher
-from bookiebot.banking.models import BankAccount, BankStatus, BankTransaction, LinkedBankItem
+from bookiebot.banking.models import (
+    BankAccount,
+    BankStatus,
+    BankTransaction,
+    LinkedBankItem,
+    ReconciliationClassification,
+    ReconciliationItem,
+    ReconciliationStatus,
+)
 
 
 def utc_now_iso() -> str:
@@ -90,6 +98,22 @@ class BankStore:
                     last_success_at TEXT,
                     last_error TEXT,
                     webhook_pending INTEGER NOT NULL DEFAULT 0
+                );
+
+                CREATE TABLE IF NOT EXISTS bank_reconciliation_items (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    owner_key TEXT NOT NULL,
+                    bank_transaction_id INTEGER NOT NULL UNIQUE REFERENCES bank_transactions(id) ON DELETE CASCADE,
+                    classification TEXT NOT NULL,
+                    status TEXT NOT NULL,
+                    matched_action_log_id TEXT,
+                    matched_sheet_ref TEXT,
+                    confidence REAL NOT NULL,
+                    first_seen_at TEXT NOT NULL,
+                    last_seen_at TEXT NOT NULL,
+                    resolved_at TEXT,
+                    ignored_at TEXT,
+                    notes TEXT
                 );
                 """
             )
@@ -329,6 +353,120 @@ class BankStore:
             ).fetchall()
         return [_bank_transaction_from_row(row) for row in rows]
 
+    def unreconciled_transactions(self, owner_key: str, limit: int = 50) -> list[BankTransaction]:
+        safe_limit = max(1, min(int(limit), 100))
+        self.initialize()
+        with self.connect() as conn:
+            rows = conn.execute(
+                """
+                SELECT
+                    t.id,
+                    t.provider_transaction_id,
+                    t.owner_key,
+                    t.date,
+                    t.authorized_date,
+                    t.name,
+                    t.merchant_name,
+                    t.amount,
+                    t.pending,
+                    t.payment_channel,
+                    t.updated_at,
+                    a.name AS account_name,
+                    a.mask AS account_mask,
+                    a.type AS account_type,
+                    a.subtype AS account_subtype
+                FROM bank_transactions t
+                LEFT JOIN bank_accounts a ON a.id = t.account_id
+                LEFT JOIN bank_reconciliation_items r ON r.bank_transaction_id = t.id
+                WHERE t.owner_key = ?
+                  AND t.removed_at IS NULL
+                  AND (
+                    r.id IS NULL
+                    OR r.status IN ('needs_review', 'pending_user', 'conflict')
+                  )
+                ORDER BY COALESCE(t.date, t.authorized_date, '') DESC, t.updated_at DESC, t.id DESC
+                LIMIT ?
+                """,
+                (owner_key, safe_limit),
+            ).fetchall()
+        return [_bank_transaction_from_row(row) for row in rows]
+
+    def upsert_reconciliation_item(
+        self,
+        *,
+        owner_key: str,
+        transaction: BankTransaction,
+        classification: ReconciliationClassification,
+        status: ReconciliationStatus,
+        confidence: float,
+        notes: str | None = None,
+        matched_action_log_id: str | None = None,
+        matched_sheet_ref: str | None = None,
+    ) -> ReconciliationItem:
+        now = utc_now_iso()
+        with self.connect() as conn:
+            conn.execute(
+                """
+                INSERT INTO bank_reconciliation_items (
+                    owner_key, bank_transaction_id, classification, status,
+                    matched_action_log_id, matched_sheet_ref, confidence,
+                    first_seen_at, last_seen_at, notes
+                )
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                ON CONFLICT(bank_transaction_id) DO UPDATE SET
+                    classification = excluded.classification,
+                    status = CASE
+                        WHEN bank_reconciliation_items.status IN ('confirmed', 'ignored', 'import_requested')
+                        THEN bank_reconciliation_items.status
+                        ELSE excluded.status
+                    END,
+                    matched_action_log_id = excluded.matched_action_log_id,
+                    matched_sheet_ref = excluded.matched_sheet_ref,
+                    confidence = excluded.confidence,
+                    last_seen_at = excluded.last_seen_at,
+                    notes = excluded.notes
+                """,
+                (
+                    owner_key,
+                    transaction.id,
+                    classification,
+                    status,
+                    matched_action_log_id,
+                    matched_sheet_ref,
+                    confidence,
+                    now,
+                    now,
+                    notes,
+                ),
+            )
+            row = conn.execute(
+                """
+                SELECT
+                    r.*,
+                    t.provider_transaction_id,
+                    t.date,
+                    t.authorized_date,
+                    t.name,
+                    t.merchant_name,
+                    t.amount,
+                    t.pending,
+                    t.payment_channel,
+                    t.updated_at,
+                    a.name AS account_name,
+                    a.mask AS account_mask,
+                    a.type AS account_type,
+                    a.subtype AS account_subtype
+                FROM bank_reconciliation_items r
+                JOIN bank_transactions t ON t.id = r.bank_transaction_id
+                LEFT JOIN bank_accounts a ON a.id = t.account_id
+                WHERE r.bank_transaction_id = ?
+                """,
+                (transaction.id,),
+            ).fetchone()
+        if row is None:
+            raise RuntimeError("Failed to load stored reconciliation item")
+        return _reconciliation_item_from_row(row)
+
     def status(self, configured: bool, plaid_env: str) -> BankStatus:
         self.initialize()
         with self.connect() as conn:
@@ -385,4 +523,41 @@ def _bank_transaction_from_row(row: sqlite3.Row) -> BankTransaction:
         pending=bool(row["pending"]),
         payment_channel=row["payment_channel"],
         updated_at=str(row["updated_at"]),
+    )
+
+
+def _reconciliation_item_from_row(row: sqlite3.Row) -> ReconciliationItem:
+    transaction = BankTransaction(
+        id=int(row["bank_transaction_id"]),
+        provider_transaction_id=str(row["provider_transaction_id"]),
+        owner_key=str(row["owner_key"]),
+        account_name=row["account_name"],
+        account_mask=row["account_mask"],
+        account_type=row["account_type"],
+        account_subtype=row["account_subtype"],
+        date=row["date"],
+        authorized_date=row["authorized_date"],
+        name=str(row["name"]),
+        merchant_name=row["merchant_name"],
+        amount=float(row["amount"]),
+        pending=bool(row["pending"]),
+        payment_channel=row["payment_channel"],
+        updated_at=str(row["updated_at"]),
+    )
+    return ReconciliationItem(
+        id=int(row["id"]),
+        owner_key=str(row["owner_key"]),
+        bank_transaction_id=int(row["bank_transaction_id"]),
+        provider_transaction_id=str(row["provider_transaction_id"]),
+        classification=row["classification"],
+        status=row["status"],
+        confidence=float(row["confidence"]),
+        matched_action_log_id=row["matched_action_log_id"],
+        matched_sheet_ref=row["matched_sheet_ref"],
+        first_seen_at=str(row["first_seen_at"]),
+        last_seen_at=str(row["last_seen_at"]),
+        resolved_at=row["resolved_at"],
+        ignored_at=row["ignored_at"],
+        notes=row["notes"],
+        transaction=transaction,
     )

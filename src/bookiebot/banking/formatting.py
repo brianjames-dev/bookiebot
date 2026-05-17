@@ -1,6 +1,19 @@
 from __future__ import annotations
 
-from bookiebot.banking.models import BankTransaction
+from collections import defaultdict
+
+from bookiebot.banking.models import BankTransaction, ReconciliationItem, ReconciliationPreview
+
+
+CLASSIFICATION_LABELS = {
+    "expense": "Expense",
+    "income": "Income",
+    "subscription_or_bill": "Subscription/Bill",
+    "transfer_or_payment": "Transfer/Payment",
+    "refund_or_credit": "Refund/Credit",
+    "ignore": "Ignored",
+    "needs_review": "Needs review",
+}
 
 
 def format_bank_transaction(transaction: BankTransaction) -> str:
@@ -12,6 +25,34 @@ def format_bank_transaction_table(transactions: list[BankTransaction]) -> str:
     divider = "-" * len(header)
     rows = [format_bank_transaction_row(transaction, code_wrap=False) for transaction in transactions]
     return "```text\n" + "\n".join([header, divider, *rows]) + "\n```"
+
+
+def format_reconciliation_preview(preview: ReconciliationPreview) -> str:
+    if not preview.items:
+        return "No unreconciled cached bank transactions found."
+
+    groups: dict[str, list[ReconciliationItem]] = defaultdict(list)
+    for item in preview.items:
+        groups[item.classification].append(item)
+
+    lines = ["Bank reconciliation preview:"]
+    for classification in (
+        "expense",
+        "income",
+        "subscription_or_bill",
+        "refund_or_credit",
+        "transfer_or_payment",
+        "needs_review",
+        "ignore",
+    ):
+        items = groups.get(classification)
+        if not items:
+            continue
+        lines.append("")
+        lines.append(f"{CLASSIFICATION_LABELS[classification]}:")
+        lines.append(_format_reconciliation_table(items))
+
+    return "\n".join(lines)
 
 
 def format_bank_transaction_row(transaction: BankTransaction, *, code_wrap: bool = True) -> str:
@@ -41,6 +82,27 @@ def format_bank_transaction_row(transaction: BankTransaction, *, code_wrap: bool
     if code_wrap:
         return f"`{line}`"
     return line
+
+
+def _format_reconciliation_table(items: list[ReconciliationItem]) -> str:
+    header = f"{'Date':<10}  {'Amount':>10}  {'Name':<26}  {'Status':<12}  Note"
+    divider = "-" * len(header)
+    rows = [_format_reconciliation_row(item) for item in items]
+    return "```text\n" + "\n".join([header, divider, *rows]) + "\n```"
+
+
+def _format_reconciliation_row(item: ReconciliationItem) -> str:
+    transaction = item.transaction
+    date = transaction.date or transaction.authorized_date or "unknown"
+    amount = abs(transaction.amount)
+    name = transaction.merchant_name or transaction.name
+    return (
+        f"{_clip(date, 10):<10}  "
+        f"{f'${amount:.2f}':>10}  "
+        f"{_clip(name, 26):<26}  "
+        f"{_clip(item.status, 12):<12}  "
+        f"{_clip(item.notes or '', 24)}"
+    )
 
 
 def _clip(value: str, width: int) -> str:
