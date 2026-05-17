@@ -5,7 +5,7 @@ from typing import Any
 
 from bookiebot.banking.config import BankingConfig, load_banking_config
 from bookiebot.banking.crypto import TokenCipher
-from bookiebot.banking.models import BankAccount, BankStatus, LinkedBankItem, SyncResult
+from bookiebot.banking.models import BankAccount, BankStatus, BankTransaction, LinkedBankItem, SyncResult
 from bookiebot.banking.plaid_client import PlaidClient
 from bookiebot.banking.store import BankStore
 
@@ -88,6 +88,9 @@ class BankingService:
     def status(self) -> BankStatus:
         return self.store.status(configured=self.config.configured, plaid_env=self.config.plaid_env)
 
+    def recent_transactions(self, owner_key: str, limit: int = 10) -> list[BankTransaction]:
+        return self.store.recent_transactions(owner_key=owner_key, limit=limit)
+
     async def _fetch_accounts_for_item(
         self,
         item: LinkedBankItem,
@@ -130,4 +133,3 @@ def _float_or_none(value: Any) -> float | None:
         return float(value)
     except (TypeError, ValueError):
         return None
-

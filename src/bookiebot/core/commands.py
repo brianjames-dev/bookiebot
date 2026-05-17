@@ -10,6 +10,7 @@ from bookiebot.core import auth, config
 from bookiebot.core import incidents
 from bookiebot.core import github_dispatch
 from bookiebot.core import ui
+from bookiebot.banking.formatting import format_bank_transaction
 from bookiebot.banking.plaid_client import PlaidApiError
 from bookiebot.banking.service import build_banking_service
 from bookiebot.logging_config import get_recent_logs, uptime_seconds
@@ -148,6 +149,34 @@ def register_commands(tree: app_commands.CommandTree):
                 f"{result.added} added, {result.modified} modified, {result.removed} removed"
             )
         await interaction.edit_original_response(content="\n".join(lines))
+
+    @tree.command(name="debug_bank_transactions", description="(Admin) Show recent synced bank transactions")
+    @app_commands.describe(limit="Number of transactions to show (default 10, max 25)")
+    async def debug_bank_transactions(interaction: discord.Interaction, limit: int = 10):
+        if not auth.is_debug_allowed(interaction.user):
+            await interaction.response.send_message("❌ Not authorized.", ephemeral=True)
+            return
+
+        await interaction.response.send_message("Loading recent bank transactions...", ephemeral=True)
+        try:
+            owner = get_user_config(interaction.user.id)
+            service = build_banking_service()
+            transactions = service.recent_transactions(owner.budget_owner_key, limit=limit)
+        except Exception as exc:
+            await _send_bank_command_error(
+                interaction,
+                f"❌ Could not load bank transactions: {type(exc).__name__}: {exc}",
+            )
+            return
+
+        if not transactions:
+            await interaction.edit_original_response(content="No synced bank transactions found for your budget owner.")
+            return
+
+        capped_limit = max(1, min(limit, 25))
+        lines = [f"Recent bank transactions for {owner.name} ({len(transactions)} of max {capped_limit}):"]
+        lines.extend(format_bank_transaction(transaction) for transaction in transactions)
+        await interaction.edit_original_response(content="\n".join(lines)[:1900])
 
     @tree.command(name="debug_subscriptions", description="(Admin) Sync and inspect subscription reminder data")
     async def debug_subscriptions(interaction: discord.Interaction):

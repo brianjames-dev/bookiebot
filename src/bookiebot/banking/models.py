@@ -28,6 +28,25 @@ class BankAccount:
 
 
 @dataclass(frozen=True)
+class BankTransaction:
+    id: int
+    provider_transaction_id: str
+    owner_key: str
+    account_name: str | None
+    account_mask: str | None
+    account_type: str | None
+    account_subtype: str | None
+    date: str | None
+    authorized_date: str | None
+    name: str
+    merchant_name: str | None
+    amount: float
+    pending: bool
+    payment_channel: str | None
+    updated_at: str
+
+
+@dataclass(frozen=True)
 class SyncResult:
     item_id: int
     institution_name: str | None
@@ -48,4 +67,3 @@ class BankStatus:
     transaction_count: int
     last_success_at: str | None
     last_error: str | None
-

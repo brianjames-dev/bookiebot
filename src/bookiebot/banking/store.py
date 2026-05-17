@@ -8,7 +8,7 @@ import sqlite3
 from typing import Any, Iterator
 
 from bookiebot.banking.crypto import TokenCipher
-from bookiebot.banking.models import BankAccount, BankStatus, LinkedBankItem
+from bookiebot.banking.models import BankAccount, BankStatus, BankTransaction, LinkedBankItem
 
 
 def utc_now_iso() -> str:
@@ -296,6 +296,39 @@ class BankStore:
             )
         return len(ids)
 
+    def recent_transactions(self, owner_key: str, limit: int = 10) -> list[BankTransaction]:
+        safe_limit = max(1, min(int(limit), 25))
+        self.initialize()
+        with self.connect() as conn:
+            rows = conn.execute(
+                """
+                SELECT
+                    t.id,
+                    t.provider_transaction_id,
+                    t.owner_key,
+                    t.date,
+                    t.authorized_date,
+                    t.name,
+                    t.merchant_name,
+                    t.amount,
+                    t.pending,
+                    t.payment_channel,
+                    t.updated_at,
+                    a.name AS account_name,
+                    a.mask AS account_mask,
+                    a.type AS account_type,
+                    a.subtype AS account_subtype
+                FROM bank_transactions t
+                LEFT JOIN bank_accounts a ON a.id = t.account_id
+                WHERE t.owner_key = ?
+                  AND t.removed_at IS NULL
+                ORDER BY COALESCE(t.date, t.authorized_date, '') DESC, t.updated_at DESC, t.id DESC
+                LIMIT ?
+                """,
+                (owner_key, safe_limit),
+            ).fetchall()
+        return [_bank_transaction_from_row(row) for row in rows]
+
     def status(self, configured: bool, plaid_env: str) -> BankStatus:
         self.initialize()
         with self.connect() as conn:
@@ -334,3 +367,22 @@ def _linked_item_from_row(row: sqlite3.Row) -> LinkedBankItem:
         status=str(row["status"]),
     )
 
+
+def _bank_transaction_from_row(row: sqlite3.Row) -> BankTransaction:
+    return BankTransaction(
+        id=int(row["id"]),
+        provider_transaction_id=str(row["provider_transaction_id"]),
+        owner_key=str(row["owner_key"]),
+        account_name=row["account_name"],
+        account_mask=row["account_mask"],
+        account_type=row["account_type"],
+        account_subtype=row["account_subtype"],
+        date=row["date"],
+        authorized_date=row["authorized_date"],
+        name=str(row["name"]),
+        merchant_name=row["merchant_name"],
+        amount=float(row["amount"]),
+        pending=bool(row["pending"]),
+        payment_channel=row["payment_channel"],
+        updated_at=str(row["updated_at"]),
+    )
