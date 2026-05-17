@@ -353,6 +353,17 @@ class BankStore:
             ).fetchall()
         return [_bank_transaction_from_row(row) for row in rows]
 
+    def bank_transactions_for_reconciliation(
+        self,
+        owner_key: str,
+        *,
+        limit: int = 50,
+        force: bool = False,
+    ) -> list[BankTransaction]:
+        if force:
+            return self.recent_transactions(owner_key=owner_key, limit=min(max(1, int(limit)), 25))
+        return self.unreconciled_transactions(owner_key=owner_key, limit=limit)
+
     def unreconciled_transactions(self, owner_key: str, limit: int = 50) -> list[BankTransaction]:
         safe_limit = max(1, min(int(limit), 100))
         self.initialize()
@@ -383,7 +394,6 @@ class BankStore:
                   AND (
                     r.id IS NULL
                     OR r.status IN ('needs_review', 'pending_user', 'conflict')
-                    OR r.classification = 'transfer_or_payment'
                   )
                 ORDER BY COALESCE(t.date, t.authorized_date, '') DESC, t.updated_at DESC, t.id DESC
                 LIMIT ?

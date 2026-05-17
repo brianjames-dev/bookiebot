@@ -164,3 +164,73 @@ def test_reconciliation_preview_persists_items(tmp_path):
     assert by_name["Starbucks"].status == "needs_review"
     assert by_name["CREDIT CARD 3333 PAYMENT"].classification == "transfer_or_payment"
     assert by_name["CREDIT CARD 3333 PAYMENT"].status == "matched"
+
+
+def test_reconciliation_preview_force_rechecks_already_matched_items(tmp_path):
+    store = BankStore(tmp_path / "banking.sqlite3", TokenCipher("test-secret-key"))
+    store.initialize()
+    item = store.upsert_item(
+        owner_key="brian",
+        provider="plaid",
+        item_id="item-1",
+        access_token="access-sandbox-123",
+        institution_name="Plaid Sandbox",
+    )
+    store.upsert_accounts(
+        [
+            BankAccount(
+                item_id=item.id,
+                provider_account_id="account-1",
+                owner_key="brian",
+                name="Checking",
+                mask="0000",
+                type="depository",
+                subtype="checking",
+                official_name=None,
+                current_balance=500.0,
+                available_balance=450.0,
+            )
+        ]
+    )
+    store.upsert_transactions(
+        [
+            {
+                "transaction_id": "txn-payment",
+                "account_id": "account-1",
+                "date": "2026-05-17",
+                "name": "CREDIT CARD 3333 PAYMENT",
+                "amount": 25.0,
+                "pending": False,
+            }
+        ],
+        owner_key="brian",
+    )
+    service = BankingService(
+        config=BankingConfig(
+            plaid_client_id="client",
+            plaid_secret="secret",
+            plaid_env="sandbox",
+            token_encryption_key="test-secret-key",
+            sqlite_path=Path("unused.sqlite3"),
+        ),
+        store=store,
+        plaid=PlaidClient(
+            BankingConfig(
+                plaid_client_id="client",
+                plaid_secret="secret",
+                plaid_env="sandbox",
+                token_encryption_key="test-secret-key",
+                sqlite_path=Path("unused.sqlite3"),
+            )
+        ),
+    )
+
+    first_preview = service.reconciliation_preview("brian")
+    second_preview = service.reconciliation_preview("brian")
+    forced_preview = service.reconciliation_preview("brian", force=True)
+
+    assert len(first_preview.items) == 1
+    assert first_preview.items[0].status == "matched"
+    assert second_preview.items == []
+    assert len(forced_preview.items) == 1
+    assert forced_preview.items[0].classification == "transfer_or_payment"

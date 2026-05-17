@@ -230,8 +230,11 @@ def register_commands(tree: app_commands.CommandTree):
         await interaction.edit_original_response(content="\n".join(lines)[:1900])
 
     @tree.command(name="debug_bank_reconcile", description="(Admin) Preview cached bank reconciliation classifications")
-    @app_commands.describe(limit="Number of unreconciled transactions to classify (default 25, max 50)")
-    async def debug_bank_reconcile(interaction: discord.Interaction, limit: int = 25):
+    @app_commands.describe(
+        limit="Number of transactions to classify (default 25, max 50)",
+        force="Re-preview already reconciled cached transactions",
+    )
+    async def debug_bank_reconcile(interaction: discord.Interaction, limit: int = 25, force: bool = False):
         if not auth.is_debug_allowed(interaction.user):
             await interaction.response.send_message("❌ Not authorized.", ephemeral=True)
             return
@@ -240,7 +243,7 @@ def register_commands(tree: app_commands.CommandTree):
         try:
             owner = get_user_config(interaction.user.id)
             service = build_banking_service()
-            preview = service.reconciliation_preview(owner.budget_owner_key, limit=max(1, min(limit, 50)))
+            preview = service.reconciliation_preview(owner.budget_owner_key, limit=max(1, min(limit, 50)), force=force)
         except Exception as exc:
             await interaction.followup.send(
                 content=f"❌ Could not build reconciliation preview: {type(exc).__name__}: {exc}",

@@ -102,9 +102,9 @@ class BankingService:
     def recent_transactions(self, owner_key: str, limit: int = 10) -> list[BankTransaction]:
         return self.store.recent_transactions(owner_key=owner_key, limit=limit)
 
-    def reconciliation_preview(self, owner_key: str, limit: int = 25) -> ReconciliationPreview:
+    def reconciliation_preview(self, owner_key: str, limit: int = 25, *, force: bool = False) -> ReconciliationPreview:
         self.store.initialize()
-        transactions = self.store.unreconciled_transactions(owner_key=owner_key, limit=limit)
+        transactions = self.store.bank_transactions_for_reconciliation(owner_key=owner_key, limit=limit, force=force)
         items = []
         for transaction in transactions:
             classification, status, confidence, notes = classify_transaction(transaction)
