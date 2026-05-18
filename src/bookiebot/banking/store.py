@@ -199,6 +199,81 @@ class BankStore:
             updated = conn.execute("SELECT * FROM bank_items WHERE id = ?", (int(item_db_id),)).fetchone()
         return _linked_item_from_row(updated) if updated else None
 
+    def purge_disconnected_item(self, owner_key: str, item_db_id: int) -> dict[str, int] | None:
+        self.initialize()
+        with self.connect() as conn:
+            row = conn.execute(
+                "SELECT * FROM bank_items WHERE id = ? AND owner_key = ?",
+                (int(item_db_id), owner_key),
+            ).fetchone()
+            if row is None:
+                return None
+            if str(row["status"]) != "disconnected":
+                return {
+                    "item_id": int(item_db_id),
+                    "status": 0,
+                    "accounts": 0,
+                    "transactions": 0,
+                    "reconciliation_items": 0,
+                }
+
+            transaction_rows = conn.execute(
+                """
+                SELECT t.id
+                FROM bank_transactions t
+                JOIN bank_accounts a ON a.id = t.account_id
+                WHERE a.item_id = ?
+                  AND t.owner_key = ?
+                """,
+                (int(item_db_id), owner_key),
+            ).fetchall()
+            transaction_ids = [int(transaction["id"]) for transaction in transaction_rows]
+            reconciliation_count = 0
+            transaction_count = len(transaction_ids)
+            if transaction_ids:
+                placeholders = ",".join("?" for _ in transaction_ids)
+                reconciliation_count = int(
+                    conn.execute(
+                        f"""
+                        SELECT COUNT(*) AS count
+                        FROM bank_reconciliation_items
+                        WHERE bank_transaction_id IN ({placeholders})
+                        """,
+                        tuple(transaction_ids),
+                    ).fetchone()["count"]
+                )
+                conn.execute(
+                    f"DELETE FROM bank_reconciliation_items WHERE bank_transaction_id IN ({placeholders})",
+                    tuple(transaction_ids),
+                )
+                conn.execute(
+                    f"DELETE FROM bank_transactions WHERE id IN ({placeholders})",
+                    tuple(transaction_ids),
+                )
+
+            account_count = int(
+                conn.execute(
+                    "SELECT COUNT(*) AS count FROM bank_accounts WHERE item_id = ? AND owner_key = ?",
+                    (int(item_db_id), owner_key),
+                ).fetchone()["count"]
+            )
+            conn.execute(
+                "DELETE FROM bank_accounts WHERE item_id = ? AND owner_key = ?",
+                (int(item_db_id), owner_key),
+            )
+            conn.execute("DELETE FROM bank_sync_state WHERE item_id = ?", (int(item_db_id),))
+            conn.execute(
+                "DELETE FROM bank_items WHERE id = ? AND owner_key = ?",
+                (int(item_db_id), owner_key),
+            )
+        return {
+            "item_id": int(item_db_id),
+            "status": 1,
+            "accounts": account_count,
+            "transactions": transaction_count,
+            "reconciliation_items": reconciliation_count,
+        }
+
     def get_access_token(self, item_db_id: int) -> str:
         with self.connect() as conn:
             row = conn.execute(

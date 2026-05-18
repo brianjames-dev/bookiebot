@@ -161,6 +161,85 @@ def test_store_disconnect_item_is_owner_scoped(tmp_path):
     assert len(store.list_active_items("brian")) == 1
 
 
+def test_store_purges_disconnected_item_cached_data(tmp_path):
+    store = _store(tmp_path)
+    item = store.upsert_item(
+        owner_key="brian",
+        provider="plaid",
+        item_id="item-brian",
+        access_token="access-sandbox-brian",
+        institution_name="Plaid Sandbox",
+    )
+    store.upsert_accounts(
+        [
+            BankAccount(
+                item_id=item.id,
+                provider_account_id="account-brian",
+                owner_key="brian",
+                name="Brian Checking",
+                mask="1111",
+                type="depository",
+                subtype="checking",
+                official_name=None,
+                current_balance=500.0,
+                available_balance=450.0,
+            )
+        ]
+    )
+    store.upsert_transactions(
+        [
+            {
+                "transaction_id": "txn-brian",
+                "account_id": "account-brian",
+                "date": "2026-05-17",
+                "name": "Coffee",
+                "amount": 7.0,
+                "pending": False,
+            }
+        ],
+        owner_key="brian",
+    )
+    transaction = store.recent_transactions("brian", limit=1)[0]
+    store.upsert_reconciliation_item(
+        owner_key="brian",
+        transaction=transaction,
+        classification="expense",
+        status="needs_review",
+        confidence=0.6,
+        notes="outflow transaction",
+    )
+
+    assert store.purge_disconnected_item("brian", item.id)["status"] == 0
+    store.disconnect_item("brian", item.id)
+    result = store.purge_disconnected_item("brian", item.id)
+
+    assert result == {
+        "item_id": item.id,
+        "status": 1,
+        "accounts": 1,
+        "transactions": 1,
+        "reconciliation_items": 1,
+    }
+    assert store.list_items("brian") == []
+    assert store.transaction_count("brian") == 0
+    assert store.unresolved_reconciliation_items("brian") == []
+
+
+def test_store_purge_disconnected_item_is_owner_scoped(tmp_path):
+    store = _store(tmp_path)
+    item = store.upsert_item(
+        owner_key="brian",
+        provider="plaid",
+        item_id="item-brian",
+        access_token="access-sandbox-brian",
+        institution_name="Plaid Sandbox",
+    )
+    store.disconnect_item("brian", item.id)
+
+    assert store.purge_disconnected_item("hannah", item.id) is None
+    assert len(store.list_items("brian")) == 1
+
+
 def test_recent_transactions_are_owner_scoped_ordered_and_limited(tmp_path):
     store = _store(tmp_path)
     brian_item = store.upsert_item(

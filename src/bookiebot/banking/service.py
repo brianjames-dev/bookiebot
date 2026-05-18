@@ -142,6 +142,9 @@ class BankingService:
     def disconnect_item(self, owner_key: str, item_db_id: int) -> LinkedBankItem | None:
         return self.store.disconnect_item(owner_key, item_db_id)
 
+    def purge_disconnected_item(self, owner_key: str, item_db_id: int) -> dict[str, int] | None:
+        return self.store.purge_disconnected_item(owner_key, item_db_id)
+
     def recent_transactions(self, owner_key: str, limit: int = 10) -> list[BankTransaction]:
         return self.store.recent_transactions(owner_key=owner_key, limit=limit)
 
