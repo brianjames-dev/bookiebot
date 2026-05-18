@@ -10,6 +10,7 @@ from typing import Any
 
 from aiohttp import web
 
+from bookiebot.banking.plaid_client import PlaidApiError
 from bookiebot.banking.service import build_banking_service
 
 
@@ -98,49 +99,74 @@ async def _bank_link_page(request: web.Request) -> web.Response:
 
 
 async def _bank_link_token(request: web.Request) -> web.Response:
-    token_data = await _verified_request_token(request)
-    service = build_banking_service()
-    link_token = await service.create_link_token(token_data["owner_key"])
-    return web.json_response({"link_token": link_token})
+    try:
+        token_data = await _verified_request_token(request)
+        service = build_banking_service()
+        link_token = await service.create_link_token(token_data["owner_key"])
+        return web.json_response({"link_token": link_token})
+    except web.HTTPException as exc:
+        return _json_error(exc.text or exc.reason, status=exc.status)
+    except PlaidApiError as exc:
+        return _json_error(str(exc), status=502)
+    except Exception as exc:
+        return _json_error(f"{type(exc).__name__}: {exc}", status=500)
 
 
 async def _bank_exchange_public_token(request: web.Request) -> web.Response:
-    token_data = await _verified_request_token(request)
-    body = await request.json()
-    public_token = str(body.get("public_token") or "").strip()
-    metadata = body.get("metadata") if isinstance(body.get("metadata"), dict) else {}
-    institution = metadata.get("institution") if isinstance(metadata, dict) else {}
-    institution_name = None
-    if isinstance(institution, dict):
-        institution_name = str(institution.get("name") or "").strip() or None
-    if not public_token:
-        return web.json_response({"error": "Missing public_token"}, status=400)
+    try:
+        token_data = await _verified_request_token(request)
+        body = await _request_json(request)
+        public_token = str(body.get("public_token") or "").strip()
+        metadata = body.get("metadata") if isinstance(body.get("metadata"), dict) else {}
+        institution = metadata.get("institution") if isinstance(metadata, dict) else {}
+        institution_name = None
+        if isinstance(institution, dict):
+            institution_name = str(institution.get("name") or "").strip() or None
+        if not public_token:
+            return _json_error("Missing public_token", status=400)
 
-    service = build_banking_service()
-    item = await service.link_public_token(
-        token_data["owner_key"],
-        public_token,
-        institution_name=institution_name,
-    )
-    return web.json_response(
-        {
-            "ok": True,
-            "institution_name": item.institution_name,
-            "owner_key": item.owner_key,
-        }
-    )
+        service = build_banking_service()
+        item = await service.link_public_token(
+            token_data["owner_key"],
+            public_token,
+            institution_name=institution_name,
+        )
+        return web.json_response(
+            {
+                "ok": True,
+                "institution_name": item.institution_name,
+                "owner_key": item.owner_key,
+            }
+        )
+    except web.HTTPException as exc:
+        return _json_error(exc.text or exc.reason, status=exc.status)
+    except PlaidApiError as exc:
+        return _json_error(str(exc), status=502)
+    except Exception as exc:
+        return _json_error(f"{type(exc).__name__}: {exc}", status=500)
 
 
 async def _verified_request_token(request: web.Request) -> dict[str, str]:
-    try:
-        body = await request.json()
-    except Exception as exc:
-        raise web.HTTPBadRequest(text="Invalid JSON") from exc
+    body = await _request_json(request)
     token = str(body.get("setup_token") or "").strip()
     try:
         return verify_bank_link_setup_token(token)
     except BankLinkTokenError as exc:
         raise web.HTTPUnauthorized(text=str(exc)) from exc
+
+
+async def _request_json(request: web.Request) -> dict[str, Any]:
+    try:
+        body = await request.json()
+    except Exception as exc:
+        raise web.HTTPBadRequest(text="Invalid JSON") from exc
+    if not isinstance(body, dict):
+        raise web.HTTPBadRequest(text="JSON body must be an object")
+    return body
+
+
+def _json_error(message: str, *, status: int) -> web.Response:
+    return web.json_response({"error": message}, status=status)
 
 
 def _link_page_html(setup_token: str) -> str:
@@ -179,7 +205,14 @@ def _link_page_html(setup_token: str) -> str:
         body: JSON.stringify(body)
       }});
       const text = await response.text();
-      const data = text ? JSON.parse(text) : {{}};
+      let data = {{}};
+      if (text) {{
+        try {{
+          data = JSON.parse(text);
+        }} catch (_error) {{
+          data = {{ error: text }};
+        }}
+      }}
       if (!response.ok) throw new Error(data.error || text || 'Request failed');
       return data;
     }}

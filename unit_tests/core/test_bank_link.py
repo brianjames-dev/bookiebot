@@ -4,6 +4,7 @@ import pytest
 
 from bookiebot.core.bank_link import (
     BankLinkTokenError,
+    _link_page_html,
     create_bank_link_setup_token,
     verify_bank_link_setup_token,
 )
@@ -38,3 +39,11 @@ def test_bank_link_setup_token_expires(monkeypatch):
 
     with pytest.raises(BankLinkTokenError):
         verify_bank_link_setup_token(token)
+
+
+def test_bank_link_page_handles_non_json_api_errors():
+    html = _link_page_html("setup-token")
+
+    assert "try {" in html
+    assert "JSON.parse(text)" in html
+    assert "data = { error: text }" in html
