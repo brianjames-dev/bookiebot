@@ -243,7 +243,12 @@ class BankingService:
 def build_banking_service() -> BankingService:
     config = load_banking_config()
     cipher = TokenCipher(config.token_encryption_key or "missing-dev-key")
-    store = BankStore(config.sqlite_path, cipher)
+    if config.database_url:
+        from bookiebot.banking.postgres_store import PostgresBankStore
+
+        store = PostgresBankStore(config.database_url, cipher)
+    else:
+        store = BankStore(config.sqlite_path, cipher)
     plaid = PlaidClient(config)
     return BankingService(config=config, store=store, plaid=plaid)
 

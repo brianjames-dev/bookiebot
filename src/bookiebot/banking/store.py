@@ -149,7 +149,7 @@ class BankStore:
             )
             row = conn.execute("SELECT * FROM bank_items WHERE item_id = ?", (item_id,)).fetchone()
             conn.execute(
-                "INSERT OR IGNORE INTO bank_sync_state (item_id) VALUES (?)",
+                "INSERT INTO bank_sync_state (item_id) VALUES (?) ON CONFLICT(item_id) DO NOTHING",
                 (int(row["id"]),),
             )
             return _linked_item_from_row(row)
@@ -388,14 +388,14 @@ class BankStore:
         with self.connect() as conn:
             row = conn.execute(
                 """
-                SELECT COUNT(*)
+                SELECT COUNT(*) AS count
                 FROM bank_transactions
                 WHERE owner_key = ?
                   AND removed_at IS NULL
                 """,
                 (owner_key,),
             ).fetchone()
-        return int(row[0]) if row else 0
+        return int(row["count"]) if row else 0
 
     def bank_transactions_for_reconciliation(
         self,
@@ -691,10 +691,14 @@ class BankStore:
     def status(self, configured: bool, plaid_env: str) -> BankStatus:
         self.initialize()
         with self.connect() as conn:
-            item_count = int(conn.execute("SELECT COUNT(*) FROM bank_items WHERE status = 'active'").fetchone()[0])
-            account_count = int(conn.execute("SELECT COUNT(*) FROM bank_accounts").fetchone()[0])
+            item_count = int(
+                conn.execute("SELECT COUNT(*) AS count FROM bank_items WHERE status = 'active'").fetchone()["count"]
+            )
+            account_count = int(conn.execute("SELECT COUNT(*) AS count FROM bank_accounts").fetchone()["count"])
             transaction_count = int(
-                conn.execute("SELECT COUNT(*) FROM bank_transactions WHERE removed_at IS NULL").fetchone()[0]
+                conn.execute(
+                    "SELECT COUNT(*) AS count FROM bank_transactions WHERE removed_at IS NULL"
+                ).fetchone()["count"]
             )
             sync_row = conn.execute(
                 """

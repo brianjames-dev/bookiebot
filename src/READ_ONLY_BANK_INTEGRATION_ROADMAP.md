@@ -35,6 +35,7 @@ Implemented first slice:
 - Daily digest duplicate suppression through the BookieBot action log.
 - Review inbox and manual resolution commands for unresolved bank transactions.
 - Expense and income import commands that create normal sheet rows and action-log entries.
+- Optional Postgres bank store selected by `BANK_DATABASE_URL`, with SQLite retained as local fallback.
 - Admin-only debug commands:
   - `/debug_bank_status`
   - `/debug_bank_seed_sandbox`
@@ -51,7 +52,6 @@ Implemented first slice:
 
 Not implemented yet:
 
-- Railway Postgres bank store for persistent production/Trial data.
 - Real Plaid Link browser flow.
 - Production/Trial account linking.
 - Non-debug/user-friendly reconciliation commands.
@@ -680,14 +680,14 @@ Goal: make the integration safe enough for real data.
 
 Build:
 
-- Add Postgres-backed bank storage via `BANK_DATABASE_URL`.
-- Keep SQLite fallback for local/Sandbox development.
-- Add schema initialization/migration path for Postgres.
-- Add encrypted token storage in Postgres.
-- Add owner-scoped bank Item/account tables.
+- Add Postgres-backed bank storage via `BANK_DATABASE_URL`. Implemented.
+- Keep SQLite fallback for local/Sandbox development. Implemented.
+- Add schema initialization/migration path for Postgres. Initial schema creation is implemented.
+- Add encrypted token storage in Postgres. Implemented.
+- Add owner-scoped bank Item/account tables. Implemented.
 - Add disconnect/delete-data flow.
 - Redact secrets in logs.
-- Add tests for owner isolation.
+- Add tests for owner isolation. Implemented for SQLite; Postgres integration coverage is still needed.
 
 Exit criteria:
 

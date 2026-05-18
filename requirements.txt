@@ -11,3 +11,4 @@ pytest-asyncio==0.23.8
 vcrpy
 aiohttp
 audioop-lts; python_version >= "3.13"
+psycopg[binary]==3.2.3

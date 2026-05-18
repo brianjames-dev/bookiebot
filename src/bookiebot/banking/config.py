@@ -18,6 +18,7 @@ class BankingConfig:
     plaid_env: str
     token_encryption_key: str
     sqlite_path: Path
+    database_url: str | None = None
     public_base_url: str | None = None
 
     @property
@@ -41,6 +42,6 @@ def load_banking_config() -> BankingConfig:
         plaid_env=plaid_env,
         token_encryption_key=os.getenv("BANK_TOKEN_ENCRYPTION_KEY", "").strip(),
         sqlite_path=sqlite_path,
+        database_url=os.getenv("BANK_DATABASE_URL", "").strip() or None,
         public_base_url=os.getenv("PUBLIC_BASE_URL", "").strip() or None,
     )
-
