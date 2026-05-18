@@ -33,13 +33,30 @@ class BankingService:
     async def link_sandbox_item(self, owner_key: str, institution_id: str = "ins_109508") -> LinkedBankItem:
         self.store.initialize()
         public_token = await self.plaid.create_sandbox_public_token(institution_id=institution_id)
+        return await self.link_public_token(
+            owner_key,
+            public_token,
+            institution_name=f"Plaid Sandbox {institution_id}",
+        )
+
+    async def create_link_token(self, owner_key: str) -> str:
+        return await self.plaid.create_link_token(owner_key=owner_key)
+
+    async def link_public_token(
+        self,
+        owner_key: str,
+        public_token: str,
+        *,
+        institution_name: str | None = None,
+    ) -> LinkedBankItem:
+        self.store.initialize()
         access_token, item_id = await self.plaid.exchange_public_token(public_token)
         item = self.store.upsert_item(
             owner_key=owner_key,
             provider="plaid",
             item_id=item_id,
             access_token=access_token,
-            institution_name=f"Plaid Sandbox {institution_id}",
+            institution_name=institution_name,
         )
         accounts = await self._fetch_accounts_for_item(item)
         self.store.upsert_accounts(accounts)

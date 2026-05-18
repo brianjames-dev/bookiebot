@@ -36,8 +36,12 @@ Implemented first slice:
 - Review inbox and manual resolution commands for unresolved bank transactions.
 - Expense and income import commands that create normal sheet rows and action-log entries.
 - Optional Postgres bank store selected by `BANK_DATABASE_URL`, with SQLite retained as local fallback.
+- Hosted Plaid Link page with signed setup tokens.
+- `/debug_bank_link` command that creates a private browser Link URL.
+- Link-token creation and public-token exchange into encrypted bank storage.
 - Admin-only debug commands:
   - `/debug_bank_status`
+  - `/debug_bank_link`
   - `/debug_bank_seed_sandbox`
   - `/debug_bank_sandbox_link`
   - `/debug_bank_sync`
@@ -52,7 +56,6 @@ Implemented first slice:
 
 Not implemented yet:
 
-- Real Plaid Link browser flow.
 - Production/Trial account linking.
 - Non-debug/user-friendly reconciliation commands.
 - Bill, subscription, and income reconciliation.
@@ -304,13 +307,15 @@ Possible command:
 
 Flow:
 
-1. BookieBot creates a Plaid Link token for the requesting owner.
-2. User opens Link and connects one institution.
-3. Client receives `public_token`.
-4. Backend exchanges `public_token` for an access token.
-5. Access token is encrypted and stored.
-6. BookieBot fetches accounts and starts an initial transaction sync.
-7. BookieBot confirms the linked institution and account names.
+1. BookieBot creates a signed setup URL for the requesting owner. Implemented as `/debug_bank_link`.
+2. User opens BookieBot's hosted Link page. Implemented.
+3. Browser asks BookieBot for a Plaid Link token. Implemented.
+4. User connects one institution through Plaid Link. Implemented.
+5. Client receives `public_token`. Implemented.
+6. Backend exchanges `public_token` for an access token. Implemented.
+7. Access token is encrypted and stored. Implemented.
+8. BookieBot fetches accounts and starts an initial transaction sync. Account fetch is implemented; explicit `/debug_bank_sync` runs transaction sync after linking.
+9. BookieBot confirms the linked institution and account names. Implemented in the web response and debug status.
 
 ### Sync Accounts
 
@@ -661,11 +666,11 @@ Build:
 
 - Add Plaid SDK/client dependency.
 - Add Plaid environment config.
-- Implement Sandbox public-token creation or Link token flow.
-- Exchange public token for access token.
-- Fetch accounts.
-- Run `/transactions/sync`.
-- Store fake accounts and transactions.
+- Implement Sandbox public-token creation or Link token flow. Implemented.
+- Exchange public token for access token. Implemented.
+- Fetch accounts. Implemented.
+- Run `/transactions/sync`. Implemented.
+- Store fake accounts and transactions. Implemented.
 - Add a developer-only debug command to show sync counts.
 
 Exit criteria:

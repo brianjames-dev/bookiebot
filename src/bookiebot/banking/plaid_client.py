@@ -28,6 +28,26 @@ class PlaidClient:
         data = await self._post("/sandbox/public_token/create", payload)
         return str(data["public_token"])
 
+    async def create_link_token(
+        self,
+        *,
+        owner_key: str,
+        client_name: str = "BookieBot",
+        products: list[str] | None = None,
+    ) -> str:
+        payload: dict[str, Any] = {
+            "client_name": client_name,
+            "country_codes": ["US"],
+            "language": "en",
+            "products": products or ["transactions"],
+            "user": {"client_user_id": owner_key},
+            "transactions": {"days_requested": 90},
+        }
+        if self.config.plaid_redirect_uri:
+            payload["redirect_uri"] = self.config.plaid_redirect_uri
+        data = await self._post("/link/token/create", payload)
+        return str(data["link_token"])
+
     async def exchange_public_token(self, public_token: str) -> tuple[str, str]:
         data = await self._post("/item/public_token/exchange", {"public_token": public_token})
         return str(data["access_token"]), str(data["item_id"])
@@ -75,4 +95,3 @@ class PlaidClient:
                 if not isinstance(data, dict):
                     raise PlaidApiError(f"Unexpected Plaid response for {path}")
                 return data
-

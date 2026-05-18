@@ -20,6 +20,7 @@ class BankingConfig:
     sqlite_path: Path
     database_url: str | None = None
     public_base_url: str | None = None
+    plaid_redirect_uri: str | None = None
 
     @property
     def plaid_base_url(self) -> str:
@@ -44,4 +45,5 @@ def load_banking_config() -> BankingConfig:
         sqlite_path=sqlite_path,
         database_url=os.getenv("BANK_DATABASE_URL", "").strip() or None,
         public_base_url=os.getenv("PUBLIC_BASE_URL", "").strip() or None,
+        plaid_redirect_uri=os.getenv("PLAID_REDIRECT_URI", "").strip() or None,
     )

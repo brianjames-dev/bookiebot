@@ -24,6 +24,7 @@ from bookiebot.core import config
 from bookiebot.core.avatar_rotation import run_avatar_rotation_loop
 from bookiebot.core.bank_reconciliation import ensure_bank_reconciliation_loop
 from bookiebot.core.subscription_reminders import ensure_subscription_reminder_loop
+from bookiebot.core.web_server import ensure_web_server
 from bookiebot.intents.parser import parse_message_llm
 from bookiebot.intents.handlers import handle_intent
 from bookiebot.intents import explorer as intent_explorer
@@ -266,6 +267,7 @@ def register_events(client: discord.Client, tree: discord.app_commands.CommandTr
     async def on_ready():
         global _AVATAR_ROTATION_TASK
         logger.info("✅ Logged in as bot", extra={"user": str(client.user)})
+        ensure_web_server(client)
         if _AVATAR_ROTATION_TASK is None or _AVATAR_ROTATION_TASK.done():
             _AVATAR_ROTATION_TASK = asyncio.create_task(run_avatar_rotation_loop(client))
         ensure_bank_reconciliation_loop(client)

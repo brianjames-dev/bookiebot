@@ -19,6 +19,7 @@ from bookiebot.banking.formatting import (
 )
 from bookiebot.banking.plaid_client import PlaidApiError
 from bookiebot.banking.service import build_banking_service
+from bookiebot.core.bank_link import BankLinkTokenError, create_bank_link_setup_token
 from bookiebot.logging_config import get_recent_logs, uptime_seconds
 from bookiebot.sheets.routing import (
     get_current_year,
@@ -212,6 +213,45 @@ def register_commands(tree: app_commands.CommandTree):
                 f"- Owner key: `{item.owner_key}`\n"
                 "- Access token stored encrypted locally."
             ),
+        )
+
+    @tree.command(name="debug_bank_link", description="(Admin) Create a Plaid Link URL for your budget owner")
+    async def debug_bank_link(interaction: discord.Interaction):
+        if not auth.is_debug_allowed(interaction.user):
+            await interaction.response.send_message("❌ Not authorized.", ephemeral=True)
+            return
+
+        await interaction.response.defer(ephemeral=True)
+        try:
+            owner = get_user_config(interaction.user.id)
+            service = build_banking_service()
+            public_base_url = (service.config.public_base_url or "").rstrip("/")
+            if not public_base_url:
+                await _send_bank_command_error(
+                    interaction,
+                    "❌ `PUBLIC_BASE_URL` is required before creating a Plaid Link URL.",
+                )
+                return
+            token = create_bank_link_setup_token(
+                actor_key=str(interaction.user.id),
+                owner_key=owner.budget_owner_key,
+            )
+        except BankLinkTokenError as exc:
+            await _send_bank_command_error(interaction, f"❌ Could not create bank link token: {exc}")
+            return
+        except Exception as exc:
+            await _send_bank_command_error(
+                interaction,
+                f"❌ Could not create bank link URL: {type(exc).__name__}: {exc}",
+            )
+            return
+
+        await interaction.edit_original_response(
+            content=(
+                f"Open this private Plaid Link URL for {owner.name} within 15 minutes:\n"
+                f"{public_base_url}/bank/link?token={token}\n\n"
+                "After linking, run `/debug_bank_status` and `/debug_bank_sync`."
+            )
         )
 
     @tree.command(name="debug_bank_sync", description="(Admin) Sync Plaid transactions for your budget owner")
