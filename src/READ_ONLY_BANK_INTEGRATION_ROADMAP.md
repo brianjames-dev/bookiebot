@@ -865,6 +865,8 @@ Manual tests:
 
 ## External References
 
+Rebuild marker: 2026-05-18.
+
 - Plaid free/Sandbox/Trial overview: https://support.plaid.com/hc/en-us/articles/16194695660311-Can-I-use-Plaid-for-free
 - Plaid pricing models: https://support.plaid.com/hc/en-us/articles/16194632655895-How-much-does-Plaid-cost-and-what-are-the-pricing-models
 - Plaid Sandbox docs: https://plaid.com/docs/sandbox/
