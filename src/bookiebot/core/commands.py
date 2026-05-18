@@ -15,6 +15,7 @@ from bookiebot.core import ui
 from bookiebot.banking.formatting import (
     format_bank_transaction_table_chunks,
     format_bank_transaction_table,
+    format_group_match_amount_mismatch,
     format_reconciliation_detail,
     format_reconciliation_preview,
     format_reconciliation_review,
@@ -32,6 +33,7 @@ from bookiebot.sheets.routing import (
 )
 from bookiebot.sheets.config import get_category_columns
 from bookiebot.sheets.repo import get_sheets_repo
+from bookiebot.sheets.undo import update_recent_action
 from bookiebot.sheets.writer import log_category_row, log_income_row, record_expense_undo
 from bookiebot.sheets.bills import parse_bill_schedules_with_warnings
 from bookiebot.sheets.subscriptions import debug_subscription_sync
@@ -959,11 +961,7 @@ def register_commands(tree: app_commands.CommandTree):
         bank_amount = abs(item.transaction.amount)
         if status == "amount_mismatch":
             await interaction.followup.send(
-                content=(
-                    "Group total does not exactly match the bank transaction.\n"
-                    f"Bank: `${bank_amount:.2f}`\n"
-                    f"Selected rows: `${total:.2f}`"
-                ),
+                content=format_group_match_amount_mismatch(item, candidates)[:1900],
                 ephemeral=True,
             )
             return
@@ -975,6 +973,45 @@ def register_commands(tree: app_commands.CommandTree):
                 f"Rows total: `${total:.2f}`\n"
                 f"Rows: `{', '.join(candidate.action_id for candidate in candidates)}`"
             ),
+            ephemeral=True,
+        )
+
+    @tree.command(name="debug_bank_update_action_amount", description="(Admin) Update a sheet/action-log amount")
+    @app_commands.describe(
+        action_id="Action ID shown by /debug_bank_review_detail or a group mismatch",
+        amount="Correct amount to write into the existing sheet row",
+    )
+    async def debug_bank_update_action_amount(interaction: discord.Interaction, action_id: str, amount: float):
+        if not auth.is_debug_allowed(interaction.user):
+            await interaction.response.send_message("❌ Not authorized.", ephemeral=True)
+            return
+
+        await interaction.response.defer(ephemeral=True)
+        clean_action_id = _clean_command_text(action_id)
+        if amount < 0:
+            await interaction.followup.send("❌ Amount must be zero or greater.", ephemeral=True)
+            return
+        try:
+            success, detail = await asyncio.to_thread(
+                update_recent_action,
+                str(interaction.user.id),
+                updates={"amount": f"{amount:.2f}"},
+                action_id=clean_action_id,
+            )
+        except Exception as exc:
+            await interaction.followup.send(
+                content=f"❌ Could not update action amount: {type(exc).__name__}: {exc}",
+                ephemeral=True,
+            )
+            return
+
+        prefix = "✅" if success else "❌"
+        await interaction.followup.send(
+            content=(
+                f"{prefix} {detail}\n\n"
+                "If this was for a grouped bank match, rerun "
+                "`/debug_bank_match_group` with the same reconciliation ID and action IDs."
+            )[:1900],
             ephemeral=True,
         )
 

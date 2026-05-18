@@ -1,11 +1,15 @@
+from datetime import date
+
 from bookiebot.banking.models import BankTransaction, ReconciliationItem, ReconciliationPreview
 from bookiebot.banking.formatting import (
     format_bank_transaction,
     format_bank_transaction_table,
     format_bank_transaction_table_chunks,
+    format_group_match_amount_mismatch,
     format_reconciliation_preview,
     format_reconciliation_review,
 )
+from bookiebot.banking.reconciliation import ActionLogCandidate
 from bookiebot.core.commands import _clean_command_text
 
 
@@ -127,6 +131,55 @@ def test_format_bank_transaction_table_chunks_keep_code_fences_closed():
     assert all(chunk.endswith("\n```") for chunk in chunks)
     assert all(chunk.count("```") == 2 for chunk in chunks)
     assert sum(chunk.count("2026-05-17") for chunk in chunks) == 25
+
+
+def test_format_group_match_amount_mismatch_shows_update_choices():
+    transaction = BankTransaction(
+        id=1,
+        provider_transaction_id="txn-1",
+        owner_key="brian",
+        account_name="Checking",
+        account_mask="2178",
+        account_type="depository",
+        account_subtype="checking",
+        date="2026-05-18",
+        authorized_date=None,
+        name="Venmo",
+        merchant_name=None,
+        amount=173.59,
+        pending=False,
+        payment_channel=None,
+        updated_at="2026-05-18T00:00:00+00:00",
+    )
+    item = ReconciliationItem(
+        id=126,
+        owner_key="brian",
+        bank_transaction_id=1,
+        provider_transaction_id="txn-1",
+        classification="needs_review",
+        status="needs_review",
+        confidence=0.5,
+        matched_action_log_id=None,
+        matched_sheet_ref=None,
+        first_seen_at="2026-05-18T00:00:00+00:00",
+        last_seen_at="2026-05-18T00:00:00+00:00",
+        resolved_at=None,
+        ignored_at=None,
+        notes="manual review",
+        transaction=transaction,
+    )
+    candidates = [
+        ActionLogCandidate("minted123", "expense!row 12", "expense", date(2026, 5, 15), 135.93, "Minted", 0.9, ""),
+        ActionLogCandidate("zazzle123", "expense!row 13", "expense", date(2026, 5, 15), 38.00, "Zazzle", 0.9, ""),
+    ]
+
+    output = format_group_match_amount_mismatch(item, candidates)
+
+    assert "Bank: `$173.59`" in output
+    assert "Selected rows: `$173.93`" in output
+    assert "Difference: `$-0.34`" in output
+    assert "Selected sheet rows:" in output
+    assert "`/debug_bank_update_action_amount action_id:zazzle123 amount:37.66`" in output
 
 
 def test_format_reconciliation_preview_does_not_cut_code_blocks():

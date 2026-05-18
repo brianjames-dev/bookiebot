@@ -150,6 +150,34 @@ def format_reconciliation_detail(
     return "\n".join(lines)
 
 
+def format_group_match_amount_mismatch(
+    item: ReconciliationItem,
+    candidates: list[ActionLogCandidate],
+) -> str:
+    bank_amount = abs(item.transaction.amount)
+    selected_total = sum(candidate.amount for candidate in candidates)
+    difference = bank_amount - selected_total
+    lines = [
+        "Group total does not exactly match the bank transaction.",
+        f"Bank: `${bank_amount:.2f}`",
+        f"Selected rows: `${selected_total:.2f}`",
+        f"Difference: `${difference:+.2f}`",
+        "",
+        "Selected sheet rows:",
+        _format_group_mismatch_table(candidates),
+        "",
+        "Update one row, then run the group match again:",
+    ]
+    for candidate in candidates:
+        suggested_amount = candidate.amount + difference
+        if suggested_amount < 0:
+            continue
+        lines.append(
+            f"`/debug_bank_update_action_amount action_id:{candidate.action_id} amount:{suggested_amount:.2f}`"
+        )
+    return "\n".join(lines)
+
+
 def format_bank_transaction_row(transaction: BankTransaction, *, code_wrap: bool = True) -> str:
     date = transaction.date or transaction.authorized_date or "unknown date"
     name = transaction.merchant_name or transaction.name
@@ -207,6 +235,21 @@ def _format_action_candidate_group_table(groups: list[ActionLogCandidateGroup]) 
             f"{_short_money(group.total_amount):>8}  "
             f"{group.confidence:.2f}  "
             f"{_clip(labels, 30)}"
+        )
+    return _code_table([header, divider, *rows])
+
+
+def _format_group_mismatch_table(candidates: list[ActionLogCandidate]) -> str:
+    header = f"{'Action ID':<9}  {'Date':<5}  {'Amt':>8}  {'Row':<14}  Label"
+    divider = "-" * len(header)
+    rows = []
+    for candidate in candidates:
+        rows.append(
+            f"{candidate.action_id:<9}  "
+            f"{_short_date(candidate.date.isoformat()):<5}  "
+            f"{_short_money(candidate.amount):>8}  "
+            f"{_clip(candidate.sheet_ref, 14):<14}  "
+            f"{_clip(candidate.label, 24)}"
         )
     return _code_table([header, divider, *rows])
 
