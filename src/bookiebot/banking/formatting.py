@@ -27,6 +27,28 @@ def format_bank_transaction_table(transactions: list[BankTransaction]) -> str:
     return "```text\n" + "\n".join([header, divider, *rows]) + "\n```"
 
 
+def format_bank_transaction_table_chunks(
+    transactions: list[BankTransaction],
+    *,
+    max_chars: int = 1700,
+) -> list[str]:
+    header = f"{'Date':<10}  {'Type':<7}  {'Amount':>10}  {'Name':<26}  Account"
+    divider = "-" * len(header)
+    chunks: list[str] = []
+    rows: list[str] = []
+    for transaction in transactions:
+        row = format_bank_transaction_row(transaction, code_wrap=False)
+        candidate = _code_table([header, divider, *rows, row])
+        if rows and len(candidate) > max_chars:
+            chunks.append(_code_table([header, divider, *rows]))
+            rows = [row]
+        else:
+            rows.append(row)
+    if rows or not chunks:
+        chunks.append(_code_table([header, divider, *rows]))
+    return chunks
+
+
 def format_reconciliation_preview(preview: ReconciliationPreview, *, max_chars: int = 1800) -> str:
     summary = (
         "Bank reconciliation preview:\n"
@@ -112,6 +134,10 @@ def format_bank_transaction_row(transaction: BankTransaction, *, code_wrap: bool
     if code_wrap:
         return f"`{line}`"
     return line
+
+
+def _code_table(lines: list[str]) -> str:
+    return "```text\n" + "\n".join(lines) + "\n```"
 
 
 def _format_reconciliation_section(

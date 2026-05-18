@@ -13,6 +13,7 @@ from bookiebot.core import incidents
 from bookiebot.core import github_dispatch
 from bookiebot.core import ui
 from bookiebot.banking.formatting import (
+    format_bank_transaction_table_chunks,
     format_bank_transaction_table,
     format_reconciliation_preview,
     format_reconciliation_review,
@@ -601,9 +602,15 @@ def register_commands(tree: app_commands.CommandTree):
             return
 
         capped_limit = max(1, min(limit, 25))
-        lines = [f"Recent bank transactions for {owner.name} ({len(transactions)} of max {capped_limit}):"]
-        lines.append(format_bank_transaction_table(transactions))
-        await interaction.edit_original_response(content="\n".join(lines)[:1900])
+        chunks = format_bank_transaction_table_chunks(transactions)
+        await interaction.edit_original_response(
+            content=(
+                f"Recent bank transactions for {owner.name} ({len(transactions)} of max {capped_limit}):\n"
+                f"{chunks[0]}"
+            )
+        )
+        for chunk in chunks[1:]:
+            await interaction.followup.send(content=chunk, ephemeral=True)
 
     @tree.command(name="debug_bank_seed_action_log", description="(Admin) Seed debug bank transactions from action log")
     @app_commands.describe(limit="Number of action-log rows to seed as debug transactions (default 25, max 100)")

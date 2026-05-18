@@ -2,6 +2,7 @@ from bookiebot.banking.models import BankTransaction, ReconciliationItem, Reconc
 from bookiebot.banking.formatting import (
     format_bank_transaction,
     format_bank_transaction_table,
+    format_bank_transaction_table_chunks,
     format_reconciliation_preview,
     format_reconciliation_review,
 )
@@ -95,6 +96,37 @@ def test_format_bank_transaction_table_aligns_and_clips():
     assert "Very Long Merchant Name T~" in table
     assert "Plaid Checking *0000" in table
     assert table.endswith("\n```")
+
+
+def test_format_bank_transaction_table_chunks_keep_code_fences_closed():
+    transactions = [
+        BankTransaction(
+            id=index,
+            provider_transaction_id=f"txn-{index}",
+            owner_key="brian",
+            account_name="Very Long Account Name That Clips",
+            account_mask="1234",
+            account_type="depository",
+            account_subtype="checking",
+            date="2026-05-17",
+            authorized_date=None,
+            name="Very Long Merchant Name That Should Clip",
+            merchant_name=None,
+            amount=18.5 + index,
+            pending=False,
+            payment_channel="in store",
+            updated_at="2026-05-17T00:00:00+00:00",
+        )
+        for index in range(25)
+    ]
+
+    chunks = format_bank_transaction_table_chunks(transactions, max_chars=500)
+
+    assert len(chunks) > 1
+    assert all(chunk.startswith("```text\nDate") for chunk in chunks)
+    assert all(chunk.endswith("\n```") for chunk in chunks)
+    assert all(chunk.count("```") == 2 for chunk in chunks)
+    assert sum(chunk.count("2026-05-17") for chunk in chunks) == 25
 
 
 def test_format_reconciliation_preview_does_not_cut_code_blocks():
