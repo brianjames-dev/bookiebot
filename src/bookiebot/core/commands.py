@@ -369,6 +369,45 @@ def register_commands(tree: app_commands.CommandTree):
 
         await interaction.followup.send(content=format_reconciliation_review(items)[:1900], ephemeral=True)
 
+    @tree.command(name="debug_bank_ignore", description="(Admin) Ignore an unresolved bank reconciliation item")
+    @app_commands.describe(reconciliation_id="ID shown by /debug_bank_review")
+    async def debug_bank_ignore(interaction: discord.Interaction, reconciliation_id: int):
+        if not auth.is_debug_allowed(interaction.user):
+            await interaction.response.send_message("❌ Not authorized.", ephemeral=True)
+            return
+
+        await interaction.response.defer(ephemeral=True)
+        try:
+            owner = get_user_config(interaction.user.id)
+            service = build_banking_service()
+            item = await asyncio.to_thread(
+                service.ignore_reconciliation_item,
+                owner.budget_owner_key,
+                reconciliation_id,
+            )
+        except Exception as exc:
+            await interaction.followup.send(
+                content=f"❌ Could not ignore bank review item: {type(exc).__name__}: {exc}",
+                ephemeral=True,
+            )
+            return
+
+        if item is None:
+            await interaction.followup.send(
+                content=f"No bank reconciliation item `{reconciliation_id}` was found for {owner.name}.",
+                ephemeral=True,
+            )
+            return
+
+        transaction = item.transaction
+        await interaction.followup.send(
+            content=(
+                f"Ignored bank reconciliation item `{item.id}` for {owner.name}: "
+                f"`{transaction.name} - ${abs(transaction.amount):.2f}`"
+            ),
+            ephemeral=True,
+        )
+
     @tree.command(name="debug_subscriptions", description="(Admin) Sync and inspect subscription reminder data")
     async def debug_subscriptions(interaction: discord.Interaction):
         if not auth.is_debug_allowed(interaction.user):

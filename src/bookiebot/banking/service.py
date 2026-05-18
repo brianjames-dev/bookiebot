@@ -168,6 +168,9 @@ class BankingService:
     def unresolved_reconciliation_items(self, owner_key: str, limit: int = 25) -> list:
         return self.store.unresolved_reconciliation_items(owner_key, limit=limit)
 
+    def ignore_reconciliation_item(self, owner_key: str, reconciliation_id: int):
+        return self.store.ignore_reconciliation_item(owner_key, reconciliation_id)
+
     def reconciliation_preview(
         self,
         owner_key: str,

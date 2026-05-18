@@ -278,3 +278,65 @@ def test_unresolved_reconciliation_items_only_returns_open_items(tmp_path):
 
     assert [item.id for item in unresolved] == [open_item.id]
     assert unresolved[0].transaction.name == "Unlogged Coffee"
+
+
+def test_ignore_reconciliation_item_hides_it_from_review(tmp_path):
+    store = _store(tmp_path)
+    item = store.upsert_item(
+        owner_key="brian",
+        provider="plaid",
+        item_id="item-brian",
+        access_token="access-sandbox-brian",
+        institution_name="Plaid Sandbox",
+    )
+    store.upsert_accounts(
+        [
+            BankAccount(
+                item_id=item.id,
+                provider_account_id="account-brian",
+                owner_key="brian",
+                name="Brian Checking",
+                mask="1111",
+                type="depository",
+                subtype="checking",
+                official_name=None,
+                current_balance=500.0,
+                available_balance=450.0,
+            )
+        ]
+    )
+    store.upsert_transactions(
+        [
+            {
+                "transaction_id": "txn-open",
+                "account_id": "account-brian",
+                "date": "2026-05-17",
+                "name": "Unlogged Coffee",
+                "amount": 12.34,
+                "pending": False,
+            }
+        ],
+        owner_key="brian",
+    )
+    transaction = store.recent_transactions("brian", limit=1)[0]
+    open_item = store.upsert_reconciliation_item(
+        owner_key="brian",
+        transaction=transaction,
+        classification="expense",
+        status="needs_review",
+        confidence=0.6,
+    )
+
+    ignored = store.ignore_reconciliation_item("brian", open_item.id)
+
+    assert ignored is not None
+    assert ignored.id == open_item.id
+    assert ignored.status == "ignored"
+    assert ignored.ignored_at
+    assert store.unresolved_reconciliation_items("brian") == []
+
+
+def test_ignore_reconciliation_item_is_owner_scoped(tmp_path):
+    store = _store(tmp_path)
+
+    assert store.ignore_reconciliation_item("brian", 999) is None

@@ -556,6 +556,79 @@ class BankStore:
             ).fetchall()
         return [_reconciliation_item_from_row(row) for row in rows]
 
+    def ignore_reconciliation_item(self, owner_key: str, reconciliation_id: int) -> ReconciliationItem | None:
+        now = utc_now_iso()
+        self.initialize()
+        with self.connect() as conn:
+            row = conn.execute(
+                """
+                SELECT
+                    r.*,
+                    t.provider_transaction_id,
+                    t.date,
+                    t.authorized_date,
+                    t.name,
+                    t.merchant_name,
+                    t.amount,
+                    t.pending,
+                    t.payment_channel,
+                    t.updated_at,
+                    a.name AS account_name,
+                    a.mask AS account_mask,
+                    a.type AS account_type,
+                    a.subtype AS account_subtype
+                FROM bank_reconciliation_items r
+                JOIN bank_transactions t ON t.id = r.bank_transaction_id
+                LEFT JOIN bank_accounts a ON a.id = t.account_id
+                WHERE r.id = ?
+                  AND r.owner_key = ?
+                  AND t.removed_at IS NULL
+                """,
+                (int(reconciliation_id), owner_key),
+            ).fetchone()
+            if row is None:
+                return None
+            conn.execute(
+                """
+                UPDATE bank_reconciliation_items
+                SET status = 'ignored',
+                    ignored_at = ?,
+                    last_seen_at = ?,
+                    notes = CASE
+                        WHEN notes IS NULL OR notes = '' THEN 'ignored by user'
+                        ELSE notes || '; ignored by user'
+                    END
+                WHERE id = ?
+                  AND owner_key = ?
+                """,
+                (now, now, int(reconciliation_id), owner_key),
+            )
+            updated = conn.execute(
+                """
+                SELECT
+                    r.*,
+                    t.provider_transaction_id,
+                    t.date,
+                    t.authorized_date,
+                    t.name,
+                    t.merchant_name,
+                    t.amount,
+                    t.pending,
+                    t.payment_channel,
+                    t.updated_at,
+                    a.name AS account_name,
+                    a.mask AS account_mask,
+                    a.type AS account_type,
+                    a.subtype AS account_subtype
+                FROM bank_reconciliation_items r
+                JOIN bank_transactions t ON t.id = r.bank_transaction_id
+                LEFT JOIN bank_accounts a ON a.id = t.account_id
+                WHERE r.id = ?
+                """,
+                (int(reconciliation_id),),
+            ).fetchone()
+        return _reconciliation_item_from_row(updated) if updated else None
+
     def status(self, configured: bool, plaid_env: str) -> BankStatus:
         self.initialize()
         with self.connect() as conn:
