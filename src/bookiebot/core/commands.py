@@ -254,6 +254,69 @@ def register_commands(tree: app_commands.CommandTree):
             )
         )
 
+    @tree.command(name="debug_bank_items", description="(Admin) List linked bank Items for your budget owner")
+    async def debug_bank_items(interaction: discord.Interaction):
+        if not auth.is_debug_allowed(interaction.user):
+            await interaction.response.send_message("❌ Not authorized.", ephemeral=True)
+            return
+
+        await interaction.response.defer(ephemeral=True)
+        try:
+            owner = get_user_config(interaction.user.id)
+            service = build_banking_service()
+            items = await asyncio.to_thread(service.linked_items, owner.budget_owner_key)
+        except Exception as exc:
+            await _send_bank_command_error(
+                interaction,
+                f"❌ Could not list bank Items: {type(exc).__name__}: {exc}",
+            )
+            return
+
+        if not items:
+            await interaction.edit_original_response(content=f"No bank Items found for {owner.name}.")
+            return
+
+        header = f"{'ID':>4}  {'Status':<12}  Institution"
+        divider = "-" * len(header)
+        rows = [
+            f"{item.id:>4}  {item.status:<12}  {item.institution_name or item.item_id}"
+            for item in items
+        ]
+        await interaction.edit_original_response(
+            content=f"Bank Items for {owner.name}:\n```text\n" + "\n".join([header, divider, *rows]) + "\n```"
+        )
+
+    @tree.command(name="debug_bank_disconnect_item", description="(Admin) Disconnect a linked bank Item")
+    @app_commands.describe(item_id="ID shown by /debug_bank_items")
+    async def debug_bank_disconnect_item(interaction: discord.Interaction, item_id: int):
+        if not auth.is_debug_allowed(interaction.user):
+            await interaction.response.send_message("❌ Not authorized.", ephemeral=True)
+            return
+
+        await interaction.response.defer(ephemeral=True)
+        try:
+            owner = get_user_config(interaction.user.id)
+            service = build_banking_service()
+            item = await asyncio.to_thread(service.disconnect_item, owner.budget_owner_key, item_id)
+        except Exception as exc:
+            await _send_bank_command_error(
+                interaction,
+                f"❌ Could not disconnect bank Item: {type(exc).__name__}: {exc}",
+            )
+            return
+
+        if item is None:
+            await interaction.edit_original_response(content=f"No bank Item `{item_id}` was found for {owner.name}.")
+            return
+
+        await interaction.edit_original_response(
+            content=(
+                f"Disconnected bank Item `{item.id}` for {owner.name}: "
+                f"{item.institution_name or item.item_id}.\n"
+                "It will no longer sync. Existing cached transactions remain for audit/debug history."
+            )
+        )
+
     @tree.command(name="debug_bank_sync", description="(Admin) Sync Plaid transactions for your budget owner")
     async def debug_bank_sync(interaction: discord.Interaction):
         if not auth.is_debug_allowed(interaction.user):

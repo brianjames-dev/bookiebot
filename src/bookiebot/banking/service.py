@@ -136,6 +136,12 @@ class BankingService:
     def status(self) -> BankStatus:
         return self.store.status(configured=self.config.configured, plaid_env=self.config.plaid_env)
 
+    def linked_items(self, owner_key: str) -> list[LinkedBankItem]:
+        return self.store.list_items(owner_key=owner_key)
+
+    def disconnect_item(self, owner_key: str, item_db_id: int) -> LinkedBankItem | None:
+        return self.store.disconnect_item(owner_key, item_db_id)
+
     def recent_transactions(self, owner_key: str, limit: int = 10) -> list[BankTransaction]:
         return self.store.recent_transactions(owner_key=owner_key, limit=limit)
 

@@ -125,6 +125,42 @@ def test_store_resets_owner_sync_cursors(tmp_path):
     assert store.get_cursor(hannah_item.id) == "cursor-hannah"
 
 
+def test_store_disconnects_item_without_deleting_history(tmp_path):
+    store = _store(tmp_path)
+    item = store.upsert_item(
+        owner_key="brian",
+        provider="plaid",
+        item_id="item-brian",
+        access_token="access-sandbox-brian",
+        institution_name="Plaid Sandbox",
+    )
+
+    disconnected = store.disconnect_item("brian", item.id)
+
+    assert disconnected is not None
+    assert disconnected.id == item.id
+    assert disconnected.status == "disconnected"
+    assert store.list_active_items("brian") == []
+    all_items = store.list_items("brian")
+    assert len(all_items) == 1
+    assert all_items[0].status == "disconnected"
+    assert store.get_access_token(item.id) == "access-sandbox-brian"
+
+
+def test_store_disconnect_item_is_owner_scoped(tmp_path):
+    store = _store(tmp_path)
+    item = store.upsert_item(
+        owner_key="brian",
+        provider="plaid",
+        item_id="item-brian",
+        access_token="access-sandbox-brian",
+        institution_name="Plaid Sandbox",
+    )
+
+    assert store.disconnect_item("hannah", item.id) is None
+    assert len(store.list_active_items("brian")) == 1
+
+
 def test_recent_transactions_are_owner_scoped_ordered_and_limited(tmp_path):
     store = _store(tmp_path)
     brian_item = store.upsert_item(

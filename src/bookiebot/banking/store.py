@@ -164,6 +164,41 @@ class BankStore:
         with self.connect() as conn:
             return [_linked_item_from_row(row) for row in conn.execute(query, params).fetchall()]
 
+    def list_items(self, owner_key: str | None = None) -> list[LinkedBankItem]:
+        query = "SELECT * FROM bank_items"
+        params: tuple[Any, ...] = ()
+        if owner_key:
+            query += " WHERE owner_key = ?"
+            params = (owner_key,)
+        query += " ORDER BY created_at"
+        self.initialize()
+        with self.connect() as conn:
+            return [_linked_item_from_row(row) for row in conn.execute(query, params).fetchall()]
+
+    def disconnect_item(self, owner_key: str, item_db_id: int) -> LinkedBankItem | None:
+        now = utc_now_iso()
+        self.initialize()
+        with self.connect() as conn:
+            row = conn.execute(
+                "SELECT * FROM bank_items WHERE id = ? AND owner_key = ?",
+                (int(item_db_id), owner_key),
+            ).fetchone()
+            if row is None:
+                return None
+            conn.execute(
+                """
+                UPDATE bank_items
+                SET status = 'disconnected',
+                    disconnected_at = ?,
+                    updated_at = ?
+                WHERE id = ?
+                  AND owner_key = ?
+                """,
+                (now, now, int(item_db_id), owner_key),
+            )
+            updated = conn.execute("SELECT * FROM bank_items WHERE id = ?", (int(item_db_id),)).fetchone()
+        return _linked_item_from_row(updated) if updated else None
+
     def get_access_token(self, item_db_id: int) -> str:
         with self.connect() as conn:
             row = conn.execute(

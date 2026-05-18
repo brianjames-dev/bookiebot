@@ -42,6 +42,8 @@ Implemented first slice:
 - Admin-only debug commands:
   - `/debug_bank_status`
   - `/debug_bank_link`
+  - `/debug_bank_items`
+  - `/debug_bank_disconnect_item`
   - `/debug_bank_seed_sandbox`
   - `/debug_bank_sandbox_link`
   - `/debug_bank_sync`
