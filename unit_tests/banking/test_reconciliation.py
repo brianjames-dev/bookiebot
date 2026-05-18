@@ -119,6 +119,54 @@ def test_reconcile_matches_logged_expense_by_amount_and_date():
     assert decision.notes == "matched expense action"
 
 
+def test_reconcile_income_requires_name_overlap():
+    action = LoggedAction(
+        id="income123",
+        created_at="2026-05-17T12:00:00",
+        user_key="676638528590970917",
+        action=UndoAction(
+            worksheet="income",
+            kind="delete_row",
+            row=12,
+            columns=[],
+            previous_values=[],
+            new_values=["", "Hannah Venmo", "100.0"],
+            metadata={"type": "income", "source": "Hannah Venmo"},
+            description="income $100.0 from Hannah Venmo",
+        ),
+    )
+
+    decision = reconcile_transaction(_transaction("Sonic", -100.0), [action])
+
+    assert decision.status == "needs_review"
+    assert decision.classification == "income"
+    assert decision.matched_action_log_id is None
+
+
+def test_reconcile_income_matches_when_source_overlaps():
+    action = LoggedAction(
+        id="income123",
+        created_at="2026-05-17T12:00:00",
+        user_key="676638528590970917",
+        action=UndoAction(
+            worksheet="income",
+            kind="delete_row",
+            row=12,
+            columns=[],
+            previous_values=[],
+            new_values=["", "Sonic paycheck", "100.0"],
+            metadata={"type": "income", "source": "Sonic"},
+            description="income $100.0 from Sonic",
+        ),
+    )
+
+    decision = reconcile_transaction(_transaction("Sonic", -100.0), [action])
+
+    assert decision.status == "matched"
+    assert decision.classification == "income"
+    assert decision.matched_action_log_id == "income123"
+
+
 def test_action_log_bank_transaction_builds_debug_expense_row():
     action = LoggedAction(
         id="abc123",

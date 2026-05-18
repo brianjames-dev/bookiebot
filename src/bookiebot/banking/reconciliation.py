@@ -138,6 +138,8 @@ def match_action_log(
             continue
         score = 0.86 - (day_delta * 0.05)
         name_score = _name_score(transaction, candidate["text"])
+        if candidate["type"] == "income" and name_score <= 0:
+            continue
         score += name_score * 0.10
         candidates.append((score, day_delta, candidate, logged))
 
