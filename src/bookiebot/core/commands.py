@@ -263,6 +263,53 @@ def register_commands(tree: app_commands.CommandTree):
             ephemeral=True,
         )
 
+    @tree.command(name="debug_bank_seed_unmatched", description="(Admin) Seed one unmatched debug bank transaction")
+    @app_commands.describe(
+        name="Merchant/source name for the debug transaction",
+        amount="Amount for the debug transaction",
+        kind="expense or income",
+    )
+    async def debug_bank_seed_unmatched(
+        interaction: discord.Interaction,
+        name: str = "Unlogged Test Purchase",
+        amount: float = 12.34,
+        kind: str = "expense",
+    ):
+        if not auth.is_debug_allowed(interaction.user):
+            await interaction.response.send_message("❌ Not authorized.", ephemeral=True)
+            return
+
+        await interaction.response.defer(ephemeral=True)
+        try:
+            owner = get_user_config(interaction.user.id)
+            normalized_kind = kind.strip().lower()
+            if normalized_kind not in {"expense", "income"}:
+                await interaction.followup.send("❌ `kind` must be `expense` or `income`.", ephemeral=True)
+                return
+            service = build_banking_service()
+            transaction = await asyncio.to_thread(
+                service.seed_unmatched_debug_transaction,
+                owner.budget_owner_key,
+                name=name,
+                amount=amount,
+                kind=normalized_kind,
+            )
+        except Exception as exc:
+            await interaction.followup.send(
+                content=f"❌ Could not seed unmatched bank transaction: {type(exc).__name__}: {exc}",
+                ephemeral=True,
+            )
+            return
+
+        direction = "income" if transaction.amount < 0 else "expense"
+        await interaction.followup.send(
+            content=(
+                f"Seeded unmatched debug {direction} for {owner.name}: "
+                f"`{transaction.name} - ${abs(transaction.amount):.2f} - {transaction.date or transaction.authorized_date}`"
+            ),
+            ephemeral=True,
+        )
+
     @tree.command(name="debug_bank_reconcile", description="(Admin) Preview cached bank reconciliation classifications")
     @app_commands.describe(
         limit="Number of transactions to classify (default 25, max 50)",

@@ -463,3 +463,41 @@ def test_seed_cached_transactions_from_action_log_then_matches(monkeypatch, tmp_
     assert len(preview.items) == 1
     assert preview.items[0].status == "matched"
     assert preview.items[0].matched_action_log_id == "abc123"
+
+
+def test_seed_unmatched_debug_transaction_then_needs_review(tmp_path):
+    store = BankStore(tmp_path / "banking.sqlite3", TokenCipher("test-secret-key"))
+    service = BankingService(
+        config=BankingConfig(
+            plaid_client_id="client",
+            plaid_secret="secret",
+            plaid_env="sandbox",
+            token_encryption_key="test-secret-key",
+            sqlite_path=Path("unused.sqlite3"),
+        ),
+        store=store,
+        plaid=PlaidClient(
+            BankingConfig(
+                plaid_client_id="client",
+                plaid_secret="secret",
+                plaid_env="sandbox",
+                token_encryption_key="test-secret-key",
+                sqlite_path=Path("unused.sqlite3"),
+            )
+        ),
+    )
+
+    transaction = service.seed_unmatched_debug_transaction(
+        "brian",
+        name="Unlogged Coffee",
+        amount=12.34,
+        date="2026-05-17",
+    )
+    preview = service.reconciliation_preview("brian", force=True, actor_key="676638528590970917")
+
+    assert transaction.name == "Unlogged Coffee"
+    assert store.transaction_count("brian") == 1
+    assert len(preview.items) == 1
+    assert preview.items[0].classification == "expense"
+    assert preview.items[0].status == "needs_review"
+    assert preview.items[0].matched_action_log_id is None

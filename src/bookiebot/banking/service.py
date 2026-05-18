@@ -1,7 +1,9 @@
 from __future__ import annotations
 
 import logging
+from datetime import date as local_date
 from typing import Any
+from uuid import uuid4
 
 from bookiebot.banking.config import BankingConfig, load_banking_config
 from bookiebot.banking.crypto import TokenCipher
@@ -133,6 +135,35 @@ class BankingService:
         if rows:
             self.store.upsert_transactions(rows, owner_key)
         return len(rows), len(actions)
+
+    def seed_unmatched_debug_transaction(
+        self,
+        owner_key: str,
+        *,
+        name: str = "Unlogged Test Purchase",
+        amount: float = 12.34,
+        date: str | None = None,
+        kind: str = "expense",
+    ) -> BankTransaction:
+        self.store.initialize()
+        amount_value = abs(float(amount))
+        if kind == "income":
+            amount_value = -amount_value
+        row = {
+            "transaction_id": f"bookiebot-debug-unmatched-{uuid4().hex[:10]}",
+            "account_id": "bookiebot-debug-unmatched",
+            "date": date or local_date.today().isoformat(),
+            "name": name,
+            "merchant_name": None,
+            "amount": amount_value,
+            "pending": False,
+            "payment_channel": "bookiebot_debug",
+        }
+        self.store.upsert_transactions([row], owner_key)
+        transactions = self.store.recent_transactions(owner_key, limit=1)
+        if not transactions:
+            raise RuntimeError("Failed to seed unmatched debug transaction")
+        return transactions[0]
 
     def reconciliation_preview(
         self,
