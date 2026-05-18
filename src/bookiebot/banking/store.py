@@ -175,6 +175,15 @@ class BankStore:
         with self.connect() as conn:
             return [_linked_item_from_row(row) for row in conn.execute(query, params).fetchall()]
 
+    def get_item(self, owner_key: str, item_db_id: int) -> LinkedBankItem | None:
+        self.initialize()
+        with self.connect() as conn:
+            row = conn.execute(
+                "SELECT * FROM bank_items WHERE id = ? AND owner_key = ?",
+                (int(item_db_id), owner_key),
+            ).fetchone()
+        return _linked_item_from_row(row) if row else None
+
     def disconnect_item(self, owner_key: str, item_db_id: int) -> LinkedBankItem | None:
         now = utc_now_iso()
         self.initialize()

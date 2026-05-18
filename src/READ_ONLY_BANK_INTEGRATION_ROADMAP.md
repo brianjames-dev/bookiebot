@@ -44,6 +44,7 @@ Implemented first slice:
   - `/debug_bank_link`
   - `/debug_bank_items`
   - `/debug_bank_disconnect_item`
+  - `/debug_bank_remove_item`
   - `/debug_bank_purge_item`
   - `/debug_bank_seed_sandbox`
   - `/debug_bank_sandbox_link`

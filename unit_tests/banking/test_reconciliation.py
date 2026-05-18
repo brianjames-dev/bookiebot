@@ -395,6 +395,7 @@ def test_reconciliation_preview_force_rechecks_already_matched_items(tmp_path):
 class _SandboxPlaidStub:
     def __init__(self):
         self.sync_cursors = []
+        self.removed_tokens = []
 
     async def get_accounts(self, _access_token):
         return [
@@ -428,6 +429,74 @@ class _SandboxPlaidStub:
             "next_cursor": "cursor-refreshed",
             "has_more": False,
         }
+
+    async def remove_item(self, access_token):
+        self.removed_tokens.append(access_token)
+        return {"removed": True}
+
+
+@pytest.mark.asyncio
+async def test_remove_item_from_plaid_calls_provider_and_disconnects(tmp_path):
+    store = BankStore(tmp_path / "banking.sqlite3", TokenCipher("test-secret-key"))
+    store.initialize()
+    item = store.upsert_item(
+        owner_key="brian",
+        provider="plaid",
+        item_id="item-1",
+        access_token="access-sandbox-123",
+        institution_name="Plaid Sandbox",
+    )
+    plaid = _SandboxPlaidStub()
+    service = BankingService(
+        config=BankingConfig(
+            plaid_client_id="client",
+            plaid_secret="secret",
+            plaid_env="sandbox",
+            token_encryption_key="test-secret-key",
+            sqlite_path=Path("unused.sqlite3"),
+        ),
+        store=store,
+        plaid=plaid,
+    )
+
+    disconnected = await service.remove_item_from_plaid("brian", item.id)
+
+    assert plaid.removed_tokens == ["access-sandbox-123"]
+    assert disconnected is not None
+    assert disconnected.status == "disconnected"
+    assert store.list_active_items("brian") == []
+
+
+@pytest.mark.asyncio
+async def test_remove_item_from_plaid_skips_provider_for_disconnected_item(tmp_path):
+    store = BankStore(tmp_path / "banking.sqlite3", TokenCipher("test-secret-key"))
+    store.initialize()
+    item = store.upsert_item(
+        owner_key="brian",
+        provider="plaid",
+        item_id="item-1",
+        access_token="access-sandbox-123",
+        institution_name="Plaid Sandbox",
+    )
+    store.disconnect_item("brian", item.id)
+    plaid = _SandboxPlaidStub()
+    service = BankingService(
+        config=BankingConfig(
+            plaid_client_id="client",
+            plaid_secret="secret",
+            plaid_env="sandbox",
+            token_encryption_key="test-secret-key",
+            sqlite_path=Path("unused.sqlite3"),
+        ),
+        store=store,
+        plaid=plaid,
+    )
+
+    disconnected = await service.remove_item_from_plaid("brian", item.id)
+
+    assert plaid.removed_tokens == []
+    assert disconnected is not None
+    assert disconnected.status == "disconnected"
 
 
 @pytest.mark.asyncio

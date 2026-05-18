@@ -142,6 +142,15 @@ class BankingService:
     def disconnect_item(self, owner_key: str, item_db_id: int) -> LinkedBankItem | None:
         return self.store.disconnect_item(owner_key, item_db_id)
 
+    async def remove_item_from_plaid(self, owner_key: str, item_db_id: int) -> LinkedBankItem | None:
+        item = self.store.get_item(owner_key, item_db_id)
+        if item is None:
+            return None
+        if item.status == "active":
+            access_token = self.store.get_access_token(item.id)
+            await self.plaid.remove_item(access_token)
+        return self.store.disconnect_item(owner_key, item_db_id)
+
     def purge_disconnected_item(self, owner_key: str, item_db_id: int) -> dict[str, int] | None:
         return self.store.purge_disconnected_item(owner_key, item_db_id)
 

@@ -54,3 +54,31 @@ async def test_create_link_token_includes_redirect_uri_when_configured(tmp_path)
     await client.create_link_token(owner_key="brian")
 
     assert captured["payload"]["redirect_uri"] == "https://example.test/bank/link"
+
+
+@pytest.mark.asyncio
+async def test_remove_item_calls_plaid_item_remove(tmp_path):
+    config = BankingConfig(
+        plaid_client_id="client",
+        plaid_secret="secret",
+        plaid_env="sandbox",
+        token_encryption_key="key",
+        sqlite_path=tmp_path / "banking.sqlite3",
+    )
+    client = PlaidClient(config)
+    captured = {}
+
+    async def fake_post(path, payload):
+        captured["path"] = path
+        captured["payload"] = payload
+        return {"removed": True}
+
+    client._post = fake_post
+
+    response = await client.remove_item("access-sandbox-123")
+
+    assert response == {"removed": True}
+    assert captured == {
+        "path": "/item/remove",
+        "payload": {"access_token": "access-sandbox-123"},
+    }

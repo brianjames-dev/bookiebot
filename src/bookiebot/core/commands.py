@@ -317,6 +317,49 @@ def register_commands(tree: app_commands.CommandTree):
             )
         )
 
+    @tree.command(name="debug_bank_remove_item", description="(Admin) Remove a bank Item from Plaid and disconnect it")
+    @app_commands.describe(item_id="ID shown by /debug_bank_items")
+    async def debug_bank_remove_item(interaction: discord.Interaction, item_id: int):
+        if not auth.is_debug_allowed(interaction.user):
+            await interaction.response.send_message("❌ Not authorized.", ephemeral=True)
+            return
+
+        await interaction.response.defer(ephemeral=True)
+        try:
+            owner = get_user_config(interaction.user.id)
+            service = build_banking_service()
+            item = await asyncio.wait_for(
+                service.remove_item_from_plaid(owner.budget_owner_key, item_id),
+                timeout=30,
+            )
+        except asyncio.TimeoutError:
+            await _send_bank_command_error(
+                interaction,
+                "❌ Plaid Item removal timed out after 30 seconds. Check Railway logs and try again.",
+            )
+            return
+        except PlaidApiError as exc:
+            await _send_bank_command_error(interaction, f"❌ Plaid error while removing Item: {exc}")
+            return
+        except Exception as exc:
+            await _send_bank_command_error(
+                interaction,
+                f"❌ Could not remove bank Item: {type(exc).__name__}: {exc}",
+            )
+            return
+
+        if item is None:
+            await interaction.edit_original_response(content=f"No bank Item `{item_id}` was found for {owner.name}.")
+            return
+
+        await interaction.edit_original_response(
+            content=(
+                f"Removed bank Item `{item.id}` from Plaid and disconnected it for {owner.name}: "
+                f"{item.institution_name or item.item_id}.\n"
+                "Existing cached transactions remain until you run `/debug_bank_purge_item`."
+            )
+        )
+
     @tree.command(name="debug_bank_purge_item", description="(Admin) Delete cached data for a disconnected bank Item")
     @app_commands.describe(item_id="Disconnected ID shown by /debug_bank_items")
     async def debug_bank_purge_item(interaction: discord.Interaction, item_id: int):
