@@ -37,6 +37,7 @@ from bookiebot.sheets.undo import update_recent_action
 from bookiebot.sheets.writer import log_category_row, log_income_row, record_expense_undo
 from bookiebot.sheets.bills import parse_bill_schedules_with_warnings
 from bookiebot.sheets.subscriptions import debug_subscription_sync
+from bookiebot.ui.bank_reconciliation import BankReconciliationDetailView
 
 
 async def _send_bank_command_error(interaction: discord.Interaction, content: str) -> None:
@@ -63,6 +64,155 @@ def _clean_command_text(value: str | None) -> str:
     if len(text) >= 2 and text[0] == text[-1] and text[0] in {"'", '"'}:
         return text[1:-1].strip()
     return text
+
+
+async def _send_bank_reconciliation_detail(
+    interaction: discord.Interaction,
+    *,
+    owner_key: str,
+    owner_name: str,
+    reconciliation_id: int,
+    actor_key: str,
+    fallback: bool = False,
+) -> None:
+    service = build_banking_service()
+    item, candidates, groups = await asyncio.to_thread(
+        service.reconciliation_match_candidates,
+        owner_key,
+        reconciliation_id,
+        actor_key=actor_key,
+        fallback=fallback,
+        limit=15 if fallback else 5,
+    )
+    if item is None:
+        await interaction.followup.send(
+            content=f"No bank reconciliation item `{reconciliation_id}` was found for {owner_name}.",
+            ephemeral=True,
+        )
+        return
+
+    async def handle_action(action_interaction: discord.Interaction, action: str) -> None:
+        await action_interaction.response.defer(ephemeral=True)
+        try:
+            if action.startswith("group:"):
+                group_index = int(action.split(":", 1)[1])
+                if group_index < 0 or group_index >= len(groups):
+                    await action_interaction.followup.send("That grouped match is no longer available.", ephemeral=True)
+                    return
+                group = groups[group_index]
+                action_ids = [candidate.action_id for candidate in group.candidates]
+                matched_item, matched_candidates, status = await asyncio.to_thread(
+                    service.confirm_reconciliation_action_group_match,
+                    owner_key,
+                    reconciliation_id,
+                    actor_key=actor_key,
+                    action_ids=action_ids,
+                )
+                if matched_item is None:
+                    await action_interaction.followup.send(
+                        f"No bank reconciliation item `{reconciliation_id}` was found for {owner_name}.",
+                        ephemeral=True,
+                    )
+                    return
+                if status == "amount_mismatch":
+                    await action_interaction.followup.send(
+                        content=format_group_match_amount_mismatch(matched_item, matched_candidates)[:1900],
+                        ephemeral=True,
+                    )
+                    return
+                if status != "matched":
+                    await action_interaction.followup.send(
+                        content=f"Could not match that grouped suggestion yet: `{status}`.",
+                        ephemeral=True,
+                    )
+                    return
+                total = sum(candidate.amount for candidate in matched_candidates)
+                await action_interaction.followup.send(
+                    content=(
+                        f"Matched `{matched_item.transaction.name}` for `${abs(matched_item.transaction.amount):.2f}` "
+                        f"to {len(matched_candidates)} existing sheet rows.\n"
+                        f"Rows total: `${total:.2f}`"
+                    ),
+                    ephemeral=True,
+                )
+                return
+
+            if action.startswith("candidate:"):
+                candidate_index = int(action.split(":", 1)[1])
+                if candidate_index < 0 or candidate_index >= len(candidates):
+                    await action_interaction.followup.send("That row match is no longer available.", ephemeral=True)
+                    return
+                candidate = candidates[candidate_index]
+                matched_item, matched_candidate, status = await asyncio.to_thread(
+                    service.confirm_reconciliation_action_match,
+                    owner_key,
+                    reconciliation_id,
+                    actor_key=actor_key,
+                    action_id=candidate.action_id,
+                )
+                if matched_item is None:
+                    await action_interaction.followup.send(
+                        f"No bank reconciliation item `{reconciliation_id}` was found for {owner_name}.",
+                        ephemeral=True,
+                    )
+                    return
+                if status != "matched" or matched_candidate is None:
+                    await action_interaction.followup.send(
+                        content=f"Could not match that row yet: `{status}`.",
+                        ephemeral=True,
+                    )
+                    return
+                await action_interaction.followup.send(
+                    content=(
+                        f"Matched `{matched_item.transaction.name}` for `${abs(matched_item.transaction.amount):.2f}` "
+                        f"to existing `{matched_candidate.action_type}` row.\n"
+                        f"Sheet: `{matched_candidate.label} - ${matched_candidate.amount:.2f} - {matched_candidate.sheet_ref}`"
+                    ),
+                    ephemeral=True,
+                )
+                return
+
+            if action == "fallback":
+                await _send_bank_reconciliation_detail(
+                    action_interaction,
+                    owner_key=owner_key,
+                    owner_name=owner_name,
+                    reconciliation_id=reconciliation_id,
+                    actor_key=actor_key,
+                    fallback=True,
+                )
+                return
+
+            if action == "ignore":
+                ignored = await asyncio.to_thread(service.ignore_reconciliation_item, owner_key, reconciliation_id)
+                if ignored is None:
+                    await action_interaction.followup.send(
+                        f"No bank reconciliation item `{reconciliation_id}` was found for {owner_name}.",
+                        ephemeral=True,
+                    )
+                    return
+                await action_interaction.followup.send(
+                    f"Ignored `{ignored.transaction.name}` for `${abs(ignored.transaction.amount):.2f}`.",
+                    ephemeral=True,
+                )
+        except Exception as exc:
+            await action_interaction.followup.send(
+                content=f"Could not complete that reconciliation action: {type(exc).__name__}: {exc}",
+                ephemeral=True,
+            )
+
+    view = BankReconciliationDetailView(candidates, groups, handle_action, fallback_available=not fallback)
+    await interaction.followup.send(
+        content=format_reconciliation_detail(
+            item,
+            candidates,
+            groups,
+            fallback=fallback,
+            include_commands=False,
+        )[:1900],
+        view=view,
+        ephemeral=True,
+    )
 
 
 def _log_bank_reconciliation_expense(
@@ -805,14 +955,13 @@ def register_commands(tree: app_commands.CommandTree):
         await interaction.response.defer(ephemeral=True)
         try:
             owner = get_user_config(interaction.user.id)
-            service = build_banking_service()
-            item, candidates, groups = await asyncio.to_thread(
-                service.reconciliation_match_candidates,
-                owner.budget_owner_key,
-                reconciliation_id,
+            await _send_bank_reconciliation_detail(
+                interaction,
+                owner_key=owner.budget_owner_key,
+                owner_name=owner.name,
+                reconciliation_id=reconciliation_id,
                 actor_key=str(interaction.user.id),
                 fallback=fallback,
-                limit=15 if fallback else 5,
             )
         except Exception as exc:
             await interaction.followup.send(
@@ -820,18 +969,6 @@ def register_commands(tree: app_commands.CommandTree):
                 ephemeral=True,
             )
             return
-
-        if item is None:
-            await interaction.followup.send(
-                content=f"No bank reconciliation item `{reconciliation_id}` was found for {owner.name}.",
-                ephemeral=True,
-            )
-            return
-
-        await interaction.followup.send(
-            content=format_reconciliation_detail(item, candidates, groups, fallback=fallback)[:1900],
-            ephemeral=True,
-        )
 
     @tree.command(name="debug_bank_match", description="(Admin) Match a bank review item to an existing sheet row")
     @app_commands.describe(

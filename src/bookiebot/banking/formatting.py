@@ -114,6 +114,7 @@ def format_reconciliation_detail(
     groups: list[ActionLogCandidateGroup] | None = None,
     *,
     fallback: bool = False,
+    include_commands: bool = True,
 ) -> str:
     transaction = item.transaction
     title = "Recent 30-day fallback matches" if fallback else "Possible matches"
@@ -135,18 +136,23 @@ def format_reconciliation_detail(
         lines.append(_format_action_candidate_table(candidates))
     if groups:
         lines.extend(["", "Possible grouped matches:"])
-        lines.append(_format_action_candidate_group_table(groups))
-    lines.extend(
-        [
-            "",
-            "Resolve with:",
-            f"`/debug_bank_match reconciliation_id:{item.id} action_id:<id>`",
-            f"`/debug_bank_match_group reconciliation_id:{item.id} action_ids:<id1,id2>`",
-            f"`/debug_bank_review_detail reconciliation_id:{item.id} fallback:true`",
-            f"`/debug_bank_log_expense reconciliation_id:{item.id} ...`",
-            f"`/debug_bank_ignore reconciliation_id:{item.id}`",
-        ]
-    )
+        if not include_commands:
+            lines.append("BookieBot found existing sheet rows that add up to this bank transaction.")
+        lines.append(_format_action_candidate_group_table(groups, show_action_ids=include_commands))
+    if include_commands:
+        lines.extend(
+            [
+                "",
+                "Resolve with:",
+                f"`/debug_bank_match reconciliation_id:{item.id} action_id:<id>`",
+                f"`/debug_bank_match_group reconciliation_id:{item.id} action_ids:<id1,id2>`",
+                f"`/debug_bank_review_detail reconciliation_id:{item.id} fallback:true`",
+                f"`/debug_bank_log_expense reconciliation_id:{item.id} ...`",
+                f"`/debug_bank_ignore reconciliation_id:{item.id}`",
+            ]
+        )
+    else:
+        lines.extend(["", "Use the buttons below to resolve this item."])
     return "\n".join(lines)
 
 
@@ -223,19 +229,34 @@ def _format_action_candidate_table(candidates: list[ActionLogCandidate]) -> str:
     return _code_table([header, divider, *rows])
 
 
-def _format_action_candidate_group_table(groups: list[ActionLogCandidateGroup]) -> str:
-    header = f"{'Action IDs':<21}  {'Total':>8}  {'Conf':>4}  Rows"
+def _format_action_candidate_group_table(
+    groups: list[ActionLogCandidateGroup],
+    *,
+    show_action_ids: bool = True,
+) -> str:
+    if show_action_ids:
+        header = f"{'Action IDs':<21}  {'Total':>8}  {'Conf':>4}  Rows"
+    else:
+        header = f"{'Choice':<6}  {'Total':>8}  {'Conf':>4}  Rows"
     divider = "-" * len(header)
     rows = []
-    for group in groups:
+    for index, group in enumerate(groups, start=1):
         ids = ",".join(candidate.action_id for candidate in group.candidates)
         labels = " + ".join(_clip(candidate.label, 14) for candidate in group.candidates)
-        rows.append(
-            f"{_clip(ids, 21):<21}  "
-            f"{_short_money(group.total_amount):>8}  "
-            f"{group.confidence:.2f}  "
-            f"{_clip(labels, 30)}"
-        )
+        if show_action_ids:
+            rows.append(
+                f"{_clip(ids, 21):<21}  "
+                f"{_short_money(group.total_amount):>8}  "
+                f"{group.confidence:.2f}  "
+                f"{_clip(labels, 30)}"
+            )
+        else:
+            rows.append(
+                f"{index:<6}  "
+                f"{_short_money(group.total_amount):>8}  "
+                f"{group.confidence:.2f}  "
+                f"{_clip(labels, 30)}"
+            )
     return _code_table([header, divider, *rows])
 
 

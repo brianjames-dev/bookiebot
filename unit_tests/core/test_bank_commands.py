@@ -6,10 +6,12 @@ from bookiebot.banking.formatting import (
     format_bank_transaction_table,
     format_bank_transaction_table_chunks,
     format_group_match_amount_mismatch,
+    format_reconciliation_detail,
     format_reconciliation_preview,
     format_reconciliation_review,
 )
 from bookiebot.banking.reconciliation import ActionLogCandidate
+from bookiebot.banking.reconciliation import ActionLogCandidateGroup
 from bookiebot.core.commands import _clean_command_text
 
 
@@ -180,6 +182,57 @@ def test_format_group_match_amount_mismatch_shows_update_choices():
     assert "Difference: `$-0.34`" in output
     assert "Selected sheet rows:" in output
     assert "`/debug_bank_update_action_amount action_id:zazzle123 amount:37.66`" in output
+
+
+def test_format_reconciliation_detail_can_hide_debug_commands_for_button_flow():
+    transaction = BankTransaction(
+        id=1,
+        provider_transaction_id="txn-1",
+        owner_key="brian",
+        account_name="Checking",
+        account_mask="2178",
+        account_type="depository",
+        account_subtype="checking",
+        date="2026-05-18",
+        authorized_date=None,
+        name="Venmo",
+        merchant_name=None,
+        amount=173.59,
+        pending=False,
+        payment_channel=None,
+        updated_at="2026-05-18T00:00:00+00:00",
+    )
+    item = ReconciliationItem(
+        id=126,
+        owner_key="brian",
+        bank_transaction_id=1,
+        provider_transaction_id="txn-1",
+        classification="needs_review",
+        status="needs_review",
+        confidence=0.5,
+        matched_action_log_id=None,
+        matched_sheet_ref=None,
+        first_seen_at="2026-05-18T00:00:00+00:00",
+        last_seen_at="2026-05-18T00:00:00+00:00",
+        resolved_at=None,
+        ignored_at=None,
+        notes="manual review",
+        transaction=transaction,
+    )
+    first = ActionLogCandidate(
+        "minted123", "expense!row 12", "expense", date(2026, 5, 15), 135.93, "graduation invites", 0.73, ""
+    )
+    second = ActionLogCandidate(
+        "zazzle123", "expense!row 13", "expense", date(2026, 5, 15), 37.66, "graduation announcements", 0.37, ""
+    )
+    group = ActionLogCandidateGroup("minted123+zazzle123", (first, second), 173.59, 0.71, "")
+
+    output = format_reconciliation_detail(item, [], [group], include_commands=False)
+
+    assert "/debug_bank_match_group" not in output
+    assert "Use the buttons below to resolve this item." in output
+    assert "Choice" in output
+    assert "BookieBot found existing sheet rows" in output
 
 
 def test_format_reconciliation_preview_does_not_cut_code_blocks():
