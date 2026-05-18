@@ -17,7 +17,7 @@ Keep the implementation adapter-shaped so another provider can be added later, b
 
 ## Current Implementation Status
 
-Status: Phase 1 implemented; once-daily reconciliation workflow is now in progress.
+Status: Phase 1 implemented; Phase 3 transaction/income review inbox is in progress.
 
 Implemented first slice:
 
@@ -28,22 +28,33 @@ Implemented first slice:
 - `/transactions/sync` cursor storage.
 - Transaction upsert handling for `added`, `modified`, and `removed`.
 - Recent cached bank transaction inspection.
+- Durable SQLite reconciliation item storage.
+- Rule-based cached transaction classification.
+- Conservative action-log matching for `expense`, `income`, and utility/bill `payment` actions.
+- Once-daily reconciliation digest loop, defaulting to 7:00 AM Pacific.
+- Daily digest duplicate suppression through the BookieBot action log.
+- Review inbox and manual resolution commands for unresolved bank transactions.
+- Expense and income import commands that create normal sheet rows and action-log entries.
 - Admin-only debug commands:
   - `/debug_bank_status`
   - `/debug_bank_seed_sandbox`
   - `/debug_bank_sandbox_link`
   - `/debug_bank_sync`
   - `/debug_bank_transactions`
+  - `/debug_bank_seed_action_log`
+  - `/debug_bank_seed_unmatched`
   - `/debug_bank_reconcile`
+  - `/debug_bank_review`
+  - `/debug_bank_ignore`
+  - `/debug_bank_log_expense`
+  - `/debug_bank_log_income`
 
 Not implemented yet:
 
 - Railway Postgres bank store for persistent production/Trial data.
 - Real Plaid Link browser flow.
 - Production/Trial account linking.
-- Once-daily cached reconciliation workflow.
-- Bank transaction review inbox and resolution state.
-- Expense/income import confirmation.
+- Non-debug/user-friendly reconciliation commands.
 - Bill, subscription, and income reconciliation.
 - Low-cost balance snapshots and estimated balance tracking.
 - Balance-based cash-flow warnings.
@@ -392,6 +403,11 @@ Current implementation:
 - Matching is conservative: amount must match within one cent and dates must be within a small window.
 - Successful action-log matches are stored on `bank_reconciliation_items` with the matched action-log id and sheet row reference.
 - The Discord preview separates matched items from items that still need review.
+- `/debug_bank_review` lists unresolved reconciliation items with stable ids.
+- `/debug_bank_ignore` resolves an item without writing to the sheet.
+- `/debug_bank_log_expense` imports an unresolved posted outflow into the existing expense sheet flow.
+- `/debug_bank_log_income` imports an unresolved posted inflow into the existing income sheet flow.
+- A scheduled bank reconciliation loop runs after the configured send hour and sends one digest per user/date only when unresolved items need review.
 
 Core operating model:
 
@@ -411,12 +427,12 @@ Recommended timing:
 
 The daily reconciliation job should:
 
-1. Sync new/changed Plaid transactions for linked Items.
-2. Look at new/changed posted transactions since the last reconciliation run.
-3. Compare them against BookieBot action-log entries and current sheet rows.
-4. Classify each transaction using simple BookieBot-shaped buckets.
-5. Store a reconciliation item for each relevant bank transaction.
-6. Send one Discord digest only when there is something useful to report.
+1. Sync new/changed Plaid transactions for linked Items. Implemented for configured Plaid Items.
+2. Look at new/changed posted transactions since the last reconciliation run. Implemented through unreconciled cached transaction selection.
+3. Compare them against BookieBot action-log entries and current sheet rows. Action-log comparison is implemented; direct sheet-row fallback remains future work.
+4. Classify each transaction using simple BookieBot-shaped buckets. Implemented with conservative rules.
+5. Store a reconciliation item for each relevant bank transaction. Implemented.
+6. Send one Discord digest only when there is something useful to report. Implemented for unresolved review items.
 
 Simple classification buckets:
 
@@ -689,14 +705,16 @@ Goal: let BookieBot identify unlogged expenses and income without auto-writing t
 
 Build:
 
-- Add durable reconciliation item storage.
-- Add simple rule-based transaction classification.
-- Add once-daily reconciliation scan.
-- Add `/debug_bank_reconcile` preview command before proactive notifications.
-- Import inbox for unmatched posted outflows and inflows.
-- Matching against action log/manual sheet rows. Initial action-log matching is implemented for `expense`, `income`, and `payment` actions.
-- Discord review command.
-- Confirm/ignore/import actions.
+- Add durable reconciliation item storage. Implemented for SQLite.
+- Add simple rule-based transaction classification. Implemented.
+- Add once-daily reconciliation scan. Implemented for cached transactions and configured Plaid Items.
+- Add `/debug_bank_reconcile` preview command before proactive notifications. Implemented.
+- Import inbox for unmatched posted outflows and inflows. Implemented through `/debug_bank_review`.
+- Matching against action log/manual sheet rows. Initial action-log matching is implemented for `expense`, `income`, and `payment` actions; direct sheet matching remains future work.
+- Discord review command. Implemented.
+- Confirm/ignore/import actions. Implemented for ignore, expense import, and income import.
+- Add non-debug aliases once the workflow is stable.
+- Add clearer resolution prompts/buttons after Discord UI shape is settled.
 
 Exit criteria:
 
@@ -704,9 +722,9 @@ Exit criteria:
 - Resolved/ignored items are not repeatedly surfaced.
 - Unresolved items continue to be shown until handled.
 - BookieBot can show likely unlogged transactions.
-- User can import selected expenses into existing expense categories.
-- User can import selected income into the existing income sheet flow.
-- Imported transactions create normal action-log entries.
+- User can import selected expenses into existing expense categories. Implemented.
+- User can import selected income into the existing income sheet flow. Implemented.
+- Imported transactions create normal action-log entries. Implemented.
 
 ### Phase 4: Bill, Subscription, and Income Reconciliation
 

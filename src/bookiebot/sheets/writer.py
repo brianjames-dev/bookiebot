@@ -28,7 +28,6 @@ async def write_to_sheet(data, message):
 
 
 async def write_income_to_sheet(data, message):
-    ws = None
     try:
         ws = get_sheets_repo().income_sheet()
     except Exception as e:
@@ -42,13 +41,27 @@ async def write_income_to_sheet(data, message):
         return
 
     try:
-        summary_cell = ws.find("Monthly Income:")
+        row, description, amount = log_income_row(data, ws)
+    except Exception as e:
+        logger.error("Could not log income", extra={"exception": str(e)})
+        return
+
+    logger.info("Income logged", extra={"description": description, "amount": amount, "row": row})
+    if message:
+        await message.channel.send(
+            f"Income logged: ${amount} from {data.get('source')}"
+        )
+
+
+def log_income_row(data, worksheet):
+    try:
+        summary_cell = worksheet.find("Monthly Income:")
         summary_row = summary_cell.row
     except Exception as e:
         logger.error("Could not find 'Monthly Income:' in the sheet.", extra={"exception": str(e)})
-        return
+        raise
 
-    col_b_values = ws.col_values(2)  # Column B
+    col_b_values = worksheet.col_values(2)  # Column B
     last_entry_row = None
     for i in range(summary_row - 1, 0, -1):
         if i <= len(col_b_values) and col_b_values[i - 1].strip():
@@ -57,14 +70,14 @@ async def write_income_to_sheet(data, message):
 
     if last_entry_row is None:
         logger.error("Could not find any existing income entries.")
-        return
+        raise RuntimeError("Could not find any existing income entries.")
 
     insert_row_index = last_entry_row
 
     description = f"{data.get('source', '')} {data.get('label', '')}".strip()
     amount = data.get("amount", "")
 
-    ws.insert_row(["", description, amount], index=insert_row_index)
+    worksheet.insert_row(["", description, amount], index=insert_row_index)
     record_undo_action(
         get_current_discord_user_id(),
         UndoAction(
@@ -78,12 +91,7 @@ async def write_income_to_sheet(data, message):
             description=f"income ${amount} from {data.get('source')}",
         ),
     )
-
-    logger.info("Income logged", extra={"description": description, "amount": amount, "row": insert_row_index})
-    if message:
-        await message.channel.send(
-            f"Income logged: ${amount} from {data.get('source')}"
-        )
+    return insert_row_index, description, amount
 
 
 async def write_expense_to_sheet(data, message):

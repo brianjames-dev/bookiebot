@@ -29,7 +29,7 @@ from bookiebot.sheets.routing import (
 )
 from bookiebot.sheets.config import get_category_columns
 from bookiebot.sheets.repo import get_sheets_repo
-from bookiebot.sheets.writer import log_category_row, record_expense_undo
+from bookiebot.sheets.writer import log_category_row, log_income_row, record_expense_undo
 from bookiebot.sheets.bills import parse_bill_schedules_with_warnings
 from bookiebot.sheets.subscriptions import debug_subscription_sync
 
@@ -97,6 +97,42 @@ def _log_bank_reconciliation_expense(
         owner_key,
         reconciliation_id,
         matched_sheet_ref=f"expense!row {row}",
+    )
+    return confirmed, "logged"
+
+
+def _log_bank_reconciliation_income(
+    *,
+    actor_key: str,
+    owner_key: str,
+    reconciliation_id: int,
+    source: str,
+    label: str,
+):
+    service = build_banking_service()
+    item = service.get_reconciliation_item(owner_key, reconciliation_id)
+    if item is None:
+        return None, "not_found"
+    if item.status not in {"needs_review", "pending_user", "conflict"}:
+        return item, "not_unresolved"
+    if item.transaction.amount >= 0:
+        return item, "not_income"
+
+    transaction = item.transaction
+    source_name = _clean_command_text(source) or _clean_command_text(transaction.merchant_name or transaction.name)
+    values = {
+        "type": "income",
+        "amount": abs(transaction.amount),
+        "source": source_name,
+        "label": _clean_command_text(label),
+    }
+    with sheet_user_context(actor_key):
+        worksheet = get_sheets_repo().income_sheet()
+        row, _description, _amount = log_income_row(values, worksheet)
+    confirmed = service.confirm_reconciliation_item(
+        owner_key,
+        reconciliation_id,
+        matched_sheet_ref=f"income!row {row}",
     )
     return confirmed, "logged"
 
@@ -546,7 +582,69 @@ def register_commands(tree: app_commands.CommandTree):
         transaction = confirmed.transaction
         await interaction.followup.send(
             content=(
-                f"Logged bank reconciliation item `{confirmed.id}` as `{normalized_category}` for {person.strip()}: "
+                f"Logged bank reconciliation item `{confirmed.id}` as `{normalized_category}` for {clean_person}: "
+                f"`{transaction.name} - ${abs(transaction.amount):.2f}`"
+            ),
+            ephemeral=True,
+        )
+
+    @tree.command(name="debug_bank_log_income", description="(Admin) Log an unresolved bank item as income")
+    @app_commands.describe(
+        reconciliation_id="ID shown by /debug_bank_review",
+        source="Optional income source override",
+        label="Optional income label, such as paycheck or refund",
+    )
+    async def debug_bank_log_income(
+        interaction: discord.Interaction,
+        reconciliation_id: int,
+        source: str = "",
+        label: str = "",
+    ):
+        if not auth.is_debug_allowed(interaction.user):
+            await interaction.response.send_message("❌ Not authorized.", ephemeral=True)
+            return
+
+        await interaction.response.defer(ephemeral=True)
+        try:
+            owner = get_user_config(interaction.user.id)
+            confirmed, status = await asyncio.to_thread(
+                _log_bank_reconciliation_income,
+                actor_key=str(interaction.user.id),
+                owner_key=owner.budget_owner_key,
+                reconciliation_id=reconciliation_id,
+                source=_clean_command_text(source),
+                label=_clean_command_text(label),
+            )
+        except Exception as exc:
+            await interaction.followup.send(
+                content=f"❌ Could not log bank income: {type(exc).__name__}: {exc}",
+                ephemeral=True,
+            )
+            return
+
+        if status == "not_found" or confirmed is None:
+            await interaction.followup.send(
+                content=f"No bank reconciliation item `{reconciliation_id}` was found for {owner.name}.",
+                ephemeral=True,
+            )
+            return
+        if status == "not_unresolved":
+            await interaction.followup.send(
+                content=f"Bank reconciliation item `{reconciliation_id}` is already `{confirmed.status}`.",
+                ephemeral=True,
+            )
+            return
+        if status == "not_income":
+            await interaction.followup.send(
+                content=f"Bank reconciliation item `{reconciliation_id}` is not an income inflow.",
+                ephemeral=True,
+            )
+            return
+
+        transaction = confirmed.transaction
+        await interaction.followup.send(
+            content=(
+                f"Logged bank reconciliation item `{confirmed.id}` as income: "
                 f"`{transaction.name} - ${abs(transaction.amount):.2f}`"
             ),
             ephemeral=True,
