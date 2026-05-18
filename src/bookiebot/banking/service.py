@@ -11,9 +11,11 @@ from bookiebot.banking.models import BankAccount, BankStatus, BankTransaction, L
 from bookiebot.banking.plaid_client import PlaidClient
 from bookiebot.banking.reconciliation import (
     ActionLogCandidate,
+    ActionLogCandidateGroup,
     action_log_bank_transaction,
     action_log_candidate_by_id,
     find_action_log_candidates,
+    find_action_log_candidate_groups,
     recent_action_log_candidates,
     reconcile_transaction,
 )
@@ -254,10 +256,10 @@ class BankingService:
         actor_key: str,
         fallback: bool = False,
         limit: int = 10,
-    ) -> tuple[ReconciliationItem | None, list[ActionLogCandidate]]:
+    ) -> tuple[ReconciliationItem | None, list[ActionLogCandidate], list[ActionLogCandidateGroup]]:
         item = self.get_reconciliation_item(owner_key, reconciliation_id)
         if item is None:
-            return None, []
+            return None, [], []
         action_log = read_active_logged_actions(actor_key)
         excluded = self.store.matched_action_log_ids(owner_key)
         if fallback:
@@ -268,6 +270,7 @@ class BankingService:
                 days_back=30,
                 limit=limit,
             )
+            groups: list[ActionLogCandidateGroup] = []
         else:
             candidates = find_action_log_candidates(
                 item.transaction,
@@ -277,7 +280,16 @@ class BankingService:
                 window_days=7,
                 limit=limit,
             )
-        return item, candidates
+            groups = find_action_log_candidate_groups(
+                item.transaction,
+                action_log,
+                classification=item.classification,
+                excluded_action_ids=excluded,
+                window_days=7,
+                max_group_size=4,
+                limit=5,
+            )
+        return item, candidates, groups
 
     def confirm_reconciliation_action_match(
         self,
@@ -313,6 +325,58 @@ class BankingService:
             notes="matched existing sheet/action-log row",
         )
         return confirmed, candidate, "matched"
+
+    def confirm_reconciliation_action_group_match(
+        self,
+        owner_key: str,
+        reconciliation_id: int,
+        *,
+        actor_key: str,
+        action_ids: list[str],
+    ) -> tuple[ReconciliationItem | None, list[ActionLogCandidate], str]:
+        item = self.get_reconciliation_item(owner_key, reconciliation_id)
+        if item is None:
+            return None, [], "not_found"
+        if item.status not in {"needs_review", "pending_user", "conflict", "matched"}:
+            return item, [], "not_unresolved"
+
+        cleaned_ids = [action_id.strip() for action_id in action_ids if action_id.strip()]
+        if len(cleaned_ids) < 2:
+            return item, [], "too_few"
+        if len(set(cleaned_ids)) != len(cleaned_ids):
+            return item, [], "duplicate"
+
+        excluded = self.store.matched_action_log_ids(owner_key)
+        already_matched = [action_id for action_id in cleaned_ids if action_id in excluded]
+        if already_matched:
+            return item, [], "already_matched"
+
+        action_by_id = {logged.id: logged for logged in read_active_logged_actions(actor_key)}
+        candidates: list[ActionLogCandidate] = []
+        for action_id in cleaned_ids:
+            logged = action_by_id.get(action_id)
+            if logged is None:
+                return item, candidates, "action_not_found"
+            candidate = action_log_candidate_by_id(logged)
+            if candidate is None:
+                return item, candidates, "action_not_reconcilable"
+            candidates.append(candidate)
+
+        total_cents = sum(round(candidate.amount * 100) for candidate in candidates)
+        bank_cents = round(abs(item.transaction.amount) * 100)
+        if abs(total_cents - bank_cents) > 1:
+            return item, candidates, "amount_mismatch"
+
+        match_id = "+".join(candidate.action_id for candidate in candidates)
+        sheet_ref = " + ".join(candidate.sheet_ref for candidate in candidates)
+        confirmed = self.confirm_reconciliation_item(
+            owner_key,
+            reconciliation_id,
+            matched_action_log_id=match_id,
+            matched_sheet_ref=sheet_ref,
+            notes=f"matched existing grouped rows totaling ${total_cents / 100:.2f}",
+        )
+        return confirmed, candidates, "matched"
 
     def reconciliation_preview(
         self,

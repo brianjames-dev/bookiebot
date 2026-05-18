@@ -59,6 +59,7 @@ Implemented first slice:
   - `/debug_bank_review`
   - `/debug_bank_review_detail`
   - `/debug_bank_match`
+  - `/debug_bank_match_group`
   - `/debug_bank_ignore`
   - `/debug_bank_log_expense`
   - `/debug_bank_log_income`

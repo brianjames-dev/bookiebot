@@ -76,6 +76,15 @@ class ActionLogCandidate:
 
 
 @dataclass(frozen=True)
+class ActionLogCandidateGroup:
+    group_id: str
+    candidates: tuple[ActionLogCandidate, ...]
+    total_amount: float
+    confidence: float
+    notes: str
+
+
+@dataclass(frozen=True)
 class ReconciliationDecision:
     classification: ReconciliationClassification
     status: ReconciliationStatus
@@ -262,6 +271,74 @@ def recent_action_log_candidates(
         )
 
     return sorted(candidates, key=lambda item: (-item.confidence, item.date), reverse=False)[: max(1, limit)]
+
+
+def find_action_log_candidate_groups(
+    transaction: BankTransaction,
+    action_log: Iterable[LoggedAction],
+    *,
+    classification: ReconciliationClassification | None = None,
+    excluded_action_ids: set[str] | None = None,
+    window_days: int = 7,
+    max_group_size: int = 4,
+    limit: int = 5,
+) -> list[ActionLogCandidateGroup]:
+    transaction_date = _transaction_date(transaction)
+    if transaction_date is None:
+        return []
+
+    excluded = excluded_action_ids or set()
+    compatible = _compatible_action_types(transaction, classification)
+    candidates: list[ActionLogCandidate] = []
+    for logged in action_log:
+        if logged.id in excluded:
+            continue
+        candidate = _action_candidate(logged)
+        if candidate is None or candidate["type"] not in compatible:
+            continue
+        day_delta = abs((candidate["date"] - transaction_date).days)
+        if day_delta > window_days:
+            continue
+        amount = float(candidate["amount"])
+        if amount <= 0 or amount >= abs(transaction.amount):
+            continue
+        name_score = _name_score(transaction, candidate["text"])
+        candidates.append(
+            _action_log_candidate(
+                logged,
+                candidate,
+                confidence=max(0.2, min(0.95, 0.70 - (day_delta * 0.03) + (name_score * 0.10))),
+                notes=f"group candidate, date Δ {day_delta}d",
+            )
+        )
+
+    candidates = sorted(candidates, key=lambda item: (-item.confidence, item.date))[:24]
+    target_cents = round(abs(transaction.amount) * 100)
+    groups: list[ActionLogCandidateGroup] = []
+
+    def search(start: int, picked: list[ActionLogCandidate], total_cents: int) -> None:
+        if len(groups) >= limit:
+            return
+        if picked and abs(total_cents - target_cents) <= 1:
+            avg_confidence = sum(candidate.confidence for candidate in picked) / len(picked)
+            groups.append(
+                ActionLogCandidateGroup(
+                    group_id="+".join(candidate.action_id for candidate in picked),
+                    candidates=tuple(picked),
+                    total_amount=total_cents / 100,
+                    confidence=min(avg_confidence + 0.10, 0.99),
+                    notes=f"exact aggregate match across {len(picked)} rows",
+                )
+            )
+            return
+        if total_cents > target_cents + 1 or len(picked) >= max_group_size:
+            return
+        for index in range(start, len(candidates)):
+            candidate = candidates[index]
+            search(index + 1, [*picked, candidate], total_cents + round(candidate.amount * 100))
+
+    search(0, [], 0)
+    return sorted(groups, key=lambda group: (-group.confidence, len(group.candidates)))[:limit]
 
 
 def action_log_candidate_by_id(logged: LoggedAction) -> ActionLogCandidate | None:

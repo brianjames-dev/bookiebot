@@ -3,7 +3,7 @@ from __future__ import annotations
 from collections import defaultdict
 
 from bookiebot.banking.models import BankTransaction, ReconciliationItem, ReconciliationPreview
-from bookiebot.banking.reconciliation import ActionLogCandidate
+from bookiebot.banking.reconciliation import ActionLogCandidate, ActionLogCandidateGroup
 
 
 CLASSIFICATION_LABELS = {
@@ -111,6 +111,7 @@ def format_reconciliation_review(items: list[ReconciliationItem]) -> str:
 def format_reconciliation_detail(
     item: ReconciliationItem,
     candidates: list[ActionLogCandidate],
+    groups: list[ActionLogCandidateGroup] | None = None,
     *,
     fallback: bool = False,
 ) -> str:
@@ -132,11 +133,15 @@ def format_reconciliation_detail(
         lines.append("No candidate sheet/action-log rows found.")
     else:
         lines.append(_format_action_candidate_table(candidates))
+    if groups:
+        lines.extend(["", "Possible grouped matches:"])
+        lines.append(_format_action_candidate_group_table(groups))
     lines.extend(
         [
             "",
             "Resolve with:",
             f"`/debug_bank_match reconciliation_id:{item.id} action_id:<id>`",
+            f"`/debug_bank_match_group reconciliation_id:{item.id} action_ids:<id1,id2>`",
             f"`/debug_bank_review_detail reconciliation_id:{item.id} fallback:true`",
             f"`/debug_bank_log_expense reconciliation_id:{item.id} ...`",
             f"`/debug_bank_ignore reconciliation_id:{item.id}`",
@@ -186,6 +191,22 @@ def _format_action_candidate_table(candidates: list[ActionLogCandidate]) -> str:
             f"{_clip(candidate.action_type, 7):<7}  "
             f"{candidate.confidence:.2f}  "
             f"{_clip(candidate.label, 28)}"
+        )
+    return _code_table([header, divider, *rows])
+
+
+def _format_action_candidate_group_table(groups: list[ActionLogCandidateGroup]) -> str:
+    header = f"{'Action IDs':<21}  {'Total':>8}  {'Conf':>4}  Rows"
+    divider = "-" * len(header)
+    rows = []
+    for group in groups:
+        ids = ",".join(candidate.action_id for candidate in group.candidates)
+        labels = " + ".join(_clip(candidate.label, 14) for candidate in group.candidates)
+        rows.append(
+            f"{_clip(ids, 21):<21}  "
+            f"{_short_money(group.total_amount):>8}  "
+            f"{group.confidence:.2f}  "
+            f"{_clip(labels, 30)}"
         )
     return _code_table([header, divider, *rows])
 

@@ -804,7 +804,7 @@ def register_commands(tree: app_commands.CommandTree):
         try:
             owner = get_user_config(interaction.user.id)
             service = build_banking_service()
-            item, candidates = await asyncio.to_thread(
+            item, candidates, groups = await asyncio.to_thread(
                 service.reconciliation_match_candidates,
                 owner.budget_owner_key,
                 reconciliation_id,
@@ -827,7 +827,7 @@ def register_commands(tree: app_commands.CommandTree):
             return
 
         await interaction.followup.send(
-            content=format_reconciliation_detail(item, candidates, fallback=fallback)[:1900],
+            content=format_reconciliation_detail(item, candidates, groups, fallback=fallback)[:1900],
             ephemeral=True,
         )
 
@@ -892,6 +892,88 @@ def register_commands(tree: app_commands.CommandTree):
                 f"`{candidate.action_id}` for {owner.name}.\n"
                 f"Bank: `{transaction.name} - ${abs(transaction.amount):.2f}`\n"
                 f"Sheet: `{candidate.label} - ${candidate.amount:.2f} - {candidate.sheet_ref}`"
+            ),
+            ephemeral=True,
+        )
+
+    @tree.command(name="debug_bank_match_group", description="(Admin) Match one bank item to multiple existing rows")
+    @app_commands.describe(
+        reconciliation_id="ID shown by /debug_bank_review",
+        action_ids="Comma-separated Action IDs shown by /debug_bank_review_detail",
+    )
+    async def debug_bank_match_group(interaction: discord.Interaction, reconciliation_id: int, action_ids: str):
+        if not auth.is_debug_allowed(interaction.user):
+            await interaction.response.send_message("❌ Not authorized.", ephemeral=True)
+            return
+
+        await interaction.response.defer(ephemeral=True)
+        cleaned_ids = [_clean_command_text(part) for part in action_ids.split(",")]
+        try:
+            owner = get_user_config(interaction.user.id)
+            service = build_banking_service()
+            item, candidates, status = await asyncio.to_thread(
+                service.confirm_reconciliation_action_group_match,
+                owner.budget_owner_key,
+                reconciliation_id,
+                actor_key=str(interaction.user.id),
+                action_ids=cleaned_ids,
+            )
+        except Exception as exc:
+            await interaction.followup.send(
+                content=f"❌ Could not group-match bank review item: {type(exc).__name__}: {exc}",
+                ephemeral=True,
+            )
+            return
+
+        if status == "not_found" or item is None:
+            await interaction.followup.send(
+                content=f"No bank reconciliation item `{reconciliation_id}` was found for {owner.name}.",
+                ephemeral=True,
+            )
+            return
+        if status == "not_unresolved":
+            await interaction.followup.send(
+                content=f"Bank reconciliation item `{reconciliation_id}` is already `{item.status}`.",
+                ephemeral=True,
+            )
+            return
+        if status == "too_few":
+            await interaction.followup.send("Choose at least two action-log rows for a group match.", ephemeral=True)
+            return
+        if status == "duplicate":
+            await interaction.followup.send("Each action-log row can only be selected once.", ephemeral=True)
+            return
+        if status == "already_matched":
+            await interaction.followup.send(
+                content="One of those action-log rows is already matched to another bank item.",
+                ephemeral=True,
+            )
+            return
+        if status in {"action_not_found", "action_not_reconcilable"}:
+            await interaction.followup.send(
+                content="One of those action-log rows was not found or cannot be reconciled.",
+                ephemeral=True,
+            )
+            return
+        total = sum(candidate.amount for candidate in candidates)
+        bank_amount = abs(item.transaction.amount)
+        if status == "amount_mismatch":
+            await interaction.followup.send(
+                content=(
+                    "Group total does not exactly match the bank transaction.\n"
+                    f"Bank: `${bank_amount:.2f}`\n"
+                    f"Selected rows: `${total:.2f}`"
+                ),
+                ephemeral=True,
+            )
+            return
+
+        await interaction.followup.send(
+            content=(
+                f"Matched bank reconciliation item `{item.id}` to `{len(candidates)}` existing rows for {owner.name}.\n"
+                f"Bank: `{item.transaction.name} - ${bank_amount:.2f}`\n"
+                f"Rows total: `${total:.2f}`\n"
+                f"Rows: `{', '.join(candidate.action_id for candidate in candidates)}`"
             ),
             ephemeral=True,
         )
