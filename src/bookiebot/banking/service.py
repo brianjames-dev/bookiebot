@@ -44,6 +44,16 @@ class BankingService:
         else:
             item = await self.link_sandbox_item(owner_key, institution_id=institution_id)
         results = await self.sync_owner(owner_key)
+        if self.store.transaction_count(owner_key) == 0 and not any(
+            result.added or result.modified for result in results
+        ):
+            reset_count = self.store.reset_sync_cursors(owner_key)
+            if reset_count:
+                logger.info(
+                    "Reset empty Sandbox transaction cursor cache",
+                    extra={"owner_key": owner_key, "items": reset_count},
+                )
+                results = await self.sync_owner(owner_key)
         return item, results
 
     async def sync_owner(self, owner_key: str) -> list[SyncResult]:

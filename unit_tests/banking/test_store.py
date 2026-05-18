@@ -99,6 +99,32 @@ def test_store_persists_sync_cursor_and_error(tmp_path):
     assert status.last_error == "boom"
 
 
+def test_store_resets_owner_sync_cursors(tmp_path):
+    store = _store(tmp_path)
+    brian_item = store.upsert_item(
+        owner_key="brian",
+        provider="plaid",
+        item_id="item-brian",
+        access_token="access-sandbox-brian",
+        institution_name="Plaid Sandbox",
+    )
+    hannah_item = store.upsert_item(
+        owner_key="hannah",
+        provider="plaid",
+        item_id="item-hannah",
+        access_token="access-sandbox-hannah",
+        institution_name="Plaid Sandbox",
+    )
+    store.mark_sync_success(brian_item.id, "cursor-brian")
+    store.mark_sync_success(hannah_item.id, "cursor-hannah")
+
+    reset_count = store.reset_sync_cursors("brian")
+
+    assert reset_count == 1
+    assert store.get_cursor(brian_item.id) is None
+    assert store.get_cursor(hannah_item.id) == "cursor-hannah"
+
+
 def test_recent_transactions_are_owner_scoped_ordered_and_limited(tmp_path):
     store = _store(tmp_path)
     brian_item = store.upsert_item(

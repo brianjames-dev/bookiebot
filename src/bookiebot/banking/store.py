@@ -214,6 +214,36 @@ class BankStore:
                 (item_db_id, now, error[:1000]),
             )
 
+    def reset_sync_cursors(self, owner_key: str) -> int:
+        """Clear Plaid transaction cursors for an owner so the next sync backfills cached rows."""
+        now = utc_now_iso()
+        self.initialize()
+        with self.connect() as conn:
+            rows = conn.execute(
+                """
+                SELECT s.item_id
+                FROM bank_sync_state s
+                JOIN bank_items i ON i.id = s.item_id
+                WHERE i.owner_key = ?
+                  AND i.status = 'active'
+                  AND s.transactions_cursor IS NOT NULL
+                """,
+                (owner_key,),
+            ).fetchall()
+            conn.execute(
+                """
+                UPDATE bank_sync_state
+                SET transactions_cursor = NULL,
+                    last_sync_at = ?,
+                    last_error = NULL
+                WHERE item_id IN (
+                    SELECT id FROM bank_items WHERE owner_key = ? AND status = 'active'
+                )
+                """,
+                (now, owner_key),
+            )
+        return len(rows)
+
     def upsert_accounts(self, accounts: list[BankAccount]) -> int:
         now = utc_now_iso()
         with self.connect() as conn:

@@ -1,5 +1,7 @@
 from pathlib import Path
 
+import pytest
+
 from bookiebot.banking.config import BankingConfig
 from bookiebot.banking.crypto import TokenCipher
 from bookiebot.banking.models import BankAccount, BankTransaction
@@ -308,3 +310,73 @@ def test_reconciliation_preview_force_rechecks_already_matched_items(tmp_path):
     assert second_preview.items == []
     assert len(forced_preview.items) == 1
     assert forced_preview.items[0].classification == "transfer_or_payment"
+
+
+class _SandboxPlaidStub:
+    def __init__(self):
+        self.sync_cursors = []
+
+    async def get_accounts(self, _access_token):
+        return [
+            {
+                "account_id": "account-1",
+                "name": "Plaid Checking",
+                "mask": "0000",
+                "type": "depository",
+                "subtype": "checking",
+                "balances": {"current": 500.0, "available": 450.0},
+            }
+        ]
+
+    async def sync_transactions(self, _access_token, cursor=None):
+        self.sync_cursors.append(cursor)
+        if cursor:
+            return {"added": [], "modified": [], "removed": [], "next_cursor": cursor, "has_more": False}
+        return {
+            "added": [
+                {
+                    "transaction_id": "txn-1",
+                    "account_id": "account-1",
+                    "date": "2026-05-17",
+                    "name": "Starbucks",
+                    "amount": 4.33,
+                    "pending": False,
+                }
+            ],
+            "modified": [],
+            "removed": [],
+            "next_cursor": "cursor-refreshed",
+            "has_more": False,
+        }
+
+
+@pytest.mark.asyncio
+async def test_seed_sandbox_resets_cursor_when_cache_is_empty(tmp_path):
+    store = BankStore(tmp_path / "banking.sqlite3", TokenCipher("test-secret-key"))
+    store.initialize()
+    item = store.upsert_item(
+        owner_key="brian",
+        provider="plaid",
+        item_id="item-1",
+        access_token="access-sandbox-123",
+        institution_name="Plaid Sandbox",
+    )
+    store.mark_sync_success(item.id, "stale-cursor")
+    plaid = _SandboxPlaidStub()
+    service = BankingService(
+        config=BankingConfig(
+            plaid_client_id="client",
+            plaid_secret="secret",
+            plaid_env="sandbox",
+            token_encryption_key="test-secret-key",
+            sqlite_path=Path("unused.sqlite3"),
+        ),
+        store=store,
+        plaid=plaid,
+    )
+
+    _item, results = await service.seed_sandbox_owner("brian")
+
+    assert plaid.sync_cursors == ["stale-cursor", None]
+    assert sum(result.added for result in results) == 1
+    assert store.transaction_count("brian") == 1
