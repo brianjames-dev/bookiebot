@@ -828,12 +828,30 @@ class BankStore:
             ).fetchone()
         return _reconciliation_item_from_row(row) if row else None
 
+    def matched_action_log_ids(self, owner_key: str) -> set[str]:
+        self.initialize()
+        with self.connect() as conn:
+            rows = conn.execute(
+                """
+                SELECT matched_action_log_id
+                FROM bank_reconciliation_items
+                WHERE owner_key = ?
+                  AND matched_action_log_id IS NOT NULL
+                  AND matched_action_log_id != ''
+                  AND status IN ('matched', 'confirmed', 'import_requested')
+                """,
+                (owner_key,),
+            ).fetchall()
+        return {str(row["matched_action_log_id"]) for row in rows}
+
     def confirm_reconciliation_item(
         self,
         owner_key: str,
         reconciliation_id: int,
         *,
+        matched_action_log_id: str | None = None,
         matched_sheet_ref: str | None = None,
+        notes: str = "logged from bank review",
     ) -> ReconciliationItem | None:
         now = utc_now_iso()
         self.initialize()
@@ -844,15 +862,16 @@ class BankStore:
                 SET status = 'confirmed',
                     resolved_at = ?,
                     last_seen_at = ?,
+                    matched_action_log_id = COALESCE(?, matched_action_log_id),
                     matched_sheet_ref = COALESCE(?, matched_sheet_ref),
                     notes = CASE
-                        WHEN notes IS NULL OR notes = '' THEN 'logged from bank review'
-                        ELSE notes || '; logged from bank review'
+                        WHEN notes IS NULL OR notes = '' THEN ?
+                        ELSE notes || '; ' || ?
                     END
                 WHERE id = ?
                   AND owner_key = ?
                 """,
-                (now, now, matched_sheet_ref, int(reconciliation_id), owner_key),
+                (now, now, matched_action_log_id, matched_sheet_ref, notes, notes, int(reconciliation_id), owner_key),
             )
         return self.get_reconciliation_item(owner_key, reconciliation_id)
 

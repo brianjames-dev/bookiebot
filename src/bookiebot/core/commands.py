@@ -15,6 +15,7 @@ from bookiebot.core import ui
 from bookiebot.banking.formatting import (
     format_bank_transaction_table_chunks,
     format_bank_transaction_table,
+    format_reconciliation_detail,
     format_reconciliation_preview,
     format_reconciliation_review,
 )
@@ -781,6 +782,116 @@ def register_commands(tree: app_commands.CommandTree):
             content=(
                 f"Ignored bank reconciliation item `{item.id}` for {owner.name}: "
                 f"`{transaction.name} - ${abs(transaction.amount):.2f}`"
+            ),
+            ephemeral=True,
+        )
+
+    @tree.command(name="debug_bank_review_detail", description="(Admin) Show one bank review item with possible matches")
+    @app_commands.describe(
+        reconciliation_id="ID shown by /debug_bank_review",
+        fallback="Show recent 30-day action-log fallback instead of fuzzy matches",
+    )
+    async def debug_bank_review_detail(
+        interaction: discord.Interaction,
+        reconciliation_id: int,
+        fallback: bool = False,
+    ):
+        if not auth.is_debug_allowed(interaction.user):
+            await interaction.response.send_message("❌ Not authorized.", ephemeral=True)
+            return
+
+        await interaction.response.defer(ephemeral=True)
+        try:
+            owner = get_user_config(interaction.user.id)
+            service = build_banking_service()
+            item, candidates = await asyncio.to_thread(
+                service.reconciliation_match_candidates,
+                owner.budget_owner_key,
+                reconciliation_id,
+                actor_key=str(interaction.user.id),
+                fallback=fallback,
+                limit=15 if fallback else 5,
+            )
+        except Exception as exc:
+            await interaction.followup.send(
+                content=f"❌ Could not load bank review detail: {type(exc).__name__}: {exc}",
+                ephemeral=True,
+            )
+            return
+
+        if item is None:
+            await interaction.followup.send(
+                content=f"No bank reconciliation item `{reconciliation_id}` was found for {owner.name}.",
+                ephemeral=True,
+            )
+            return
+
+        await interaction.followup.send(
+            content=format_reconciliation_detail(item, candidates, fallback=fallback)[:1900],
+            ephemeral=True,
+        )
+
+    @tree.command(name="debug_bank_match", description="(Admin) Match a bank review item to an existing sheet row")
+    @app_commands.describe(
+        reconciliation_id="ID shown by /debug_bank_review",
+        action_id="Action ID shown by /debug_bank_review_detail",
+    )
+    async def debug_bank_match(interaction: discord.Interaction, reconciliation_id: int, action_id: str):
+        if not auth.is_debug_allowed(interaction.user):
+            await interaction.response.send_message("❌ Not authorized.", ephemeral=True)
+            return
+
+        await interaction.response.defer(ephemeral=True)
+        clean_action_id = _clean_command_text(action_id)
+        try:
+            owner = get_user_config(interaction.user.id)
+            service = build_banking_service()
+            item, candidate, status = await asyncio.to_thread(
+                service.confirm_reconciliation_action_match,
+                owner.budget_owner_key,
+                reconciliation_id,
+                actor_key=str(interaction.user.id),
+                action_id=clean_action_id,
+            )
+        except Exception as exc:
+            await interaction.followup.send(
+                content=f"❌ Could not match bank review item: {type(exc).__name__}: {exc}",
+                ephemeral=True,
+            )
+            return
+
+        if status == "not_found" or item is None:
+            await interaction.followup.send(
+                content=f"No bank reconciliation item `{reconciliation_id}` was found for {owner.name}.",
+                ephemeral=True,
+            )
+            return
+        if status == "not_unresolved":
+            await interaction.followup.send(
+                content=f"Bank reconciliation item `{reconciliation_id}` is already `{item.status}`.",
+                ephemeral=True,
+            )
+            return
+        if status == "already_matched":
+            await interaction.followup.send(
+                content=f"Action-log row `{clean_action_id}` is already matched to another bank item.",
+                ephemeral=True,
+            )
+            return
+        if candidate is None:
+            await interaction.followup.send(
+                content=f"Action-log row `{clean_action_id}` was not found or cannot be reconciled.",
+                ephemeral=True,
+            )
+            return
+
+        transaction = item.transaction
+        await interaction.followup.send(
+            content=(
+                f"Matched bank reconciliation item `{item.id}` to existing `{candidate.action_type}` row "
+                f"`{candidate.action_id}` for {owner.name}.\n"
+                f"Bank: `{transaction.name} - ${abs(transaction.amount):.2f}`\n"
+                f"Sheet: `{candidate.label} - ${candidate.amount:.2f} - {candidate.sheet_ref}`"
             ),
             ephemeral=True,
         )

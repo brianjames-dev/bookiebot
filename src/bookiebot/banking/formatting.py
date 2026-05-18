@@ -3,6 +3,7 @@ from __future__ import annotations
 from collections import defaultdict
 
 from bookiebot.banking.models import BankTransaction, ReconciliationItem, ReconciliationPreview
+from bookiebot.banking.reconciliation import ActionLogCandidate
 
 
 CLASSIFICATION_LABELS = {
@@ -107,6 +108,43 @@ def format_reconciliation_review(items: list[ReconciliationItem]) -> str:
     return "Unresolved bank reconciliation items:\n```text\n" + "\n".join([header, divider, *rows]) + "\n```"
 
 
+def format_reconciliation_detail(
+    item: ReconciliationItem,
+    candidates: list[ActionLogCandidate],
+    *,
+    fallback: bool = False,
+) -> str:
+    transaction = item.transaction
+    title = "Recent 30-day fallback matches" if fallback else "Possible matches"
+    lines = [
+        "Bank reconciliation item:",
+        "```text",
+        f"ID:      {item.id}",
+        f"Date:    {transaction.date or transaction.authorized_date or 'unknown'}",
+        f"Amount:  ${abs(transaction.amount):.2f}",
+        f"Type:    {item.classification}",
+        f"Name:    {transaction.merchant_name or transaction.name}",
+        f"Account: {_format_account(transaction)}",
+        "```",
+        f"{title}:",
+    ]
+    if not candidates:
+        lines.append("No candidate sheet/action-log rows found.")
+    else:
+        lines.append(_format_action_candidate_table(candidates))
+    lines.extend(
+        [
+            "",
+            "Resolve with:",
+            f"`/debug_bank_match reconciliation_id:{item.id} action_id:<id>`",
+            f"`/debug_bank_review_detail reconciliation_id:{item.id} fallback:true`",
+            f"`/debug_bank_log_expense reconciliation_id:{item.id} ...`",
+            f"`/debug_bank_ignore reconciliation_id:{item.id}`",
+        ]
+    )
+    return "\n".join(lines)
+
+
 def format_bank_transaction_row(transaction: BankTransaction, *, code_wrap: bool = True) -> str:
     date = transaction.date or transaction.authorized_date or "unknown date"
     name = transaction.merchant_name or transaction.name
@@ -134,6 +172,29 @@ def format_bank_transaction_row(transaction: BankTransaction, *, code_wrap: bool
     if code_wrap:
         return f"`{line}`"
     return line
+
+
+def _format_action_candidate_table(candidates: list[ActionLogCandidate]) -> str:
+    header = f"{'Action ID':<9}  {'Date':<5}  {'Amt':>8}  {'Type':<7}  {'Conf':>4}  Label"
+    divider = "-" * len(header)
+    rows = []
+    for candidate in candidates:
+        rows.append(
+            f"{candidate.action_id:<9}  "
+            f"{_short_date(candidate.date.isoformat()):<5}  "
+            f"{_short_money(candidate.amount):>8}  "
+            f"{_clip(candidate.action_type, 7):<7}  "
+            f"{candidate.confidence:.2f}  "
+            f"{_clip(candidate.label, 28)}"
+        )
+    return _code_table([header, divider, *rows])
+
+
+def _format_account(transaction: BankTransaction) -> str:
+    account = transaction.account_name or "Unknown account"
+    if transaction.account_mask:
+        account = f"{account} *{transaction.account_mask}"
+    return account
 
 
 def _code_table(lines: list[str]) -> str:

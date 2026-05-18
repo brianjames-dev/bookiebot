@@ -623,11 +623,15 @@ def test_confirm_reconciliation_item_hides_it_from_review(tmp_path):
     confirmed = store.confirm_reconciliation_item(
         "brian",
         open_item.id,
+        matched_action_log_id="abc123",
         matched_sheet_ref="expense!row 5",
+        notes="matched existing row",
     )
 
     assert confirmed is not None
     assert confirmed.status == "confirmed"
     assert confirmed.resolved_at
+    assert confirmed.matched_action_log_id == "abc123"
     assert confirmed.matched_sheet_ref == "expense!row 5"
+    assert store.matched_action_log_ids("brian") == {"abc123"}
     assert store.unresolved_reconciliation_items("brian") == []

@@ -7,9 +7,16 @@ from uuid import uuid4
 
 from bookiebot.banking.config import BankingConfig, load_banking_config
 from bookiebot.banking.crypto import TokenCipher
-from bookiebot.banking.models import BankAccount, BankStatus, BankTransaction, LinkedBankItem, ReconciliationPreview, SyncResult
+from bookiebot.banking.models import BankAccount, BankStatus, BankTransaction, LinkedBankItem, ReconciliationItem, ReconciliationPreview, SyncResult
 from bookiebot.banking.plaid_client import PlaidClient
-from bookiebot.banking.reconciliation import action_log_bank_transaction, reconcile_transaction
+from bookiebot.banking.reconciliation import (
+    ActionLogCandidate,
+    action_log_bank_transaction,
+    action_log_candidate_by_id,
+    find_action_log_candidates,
+    recent_action_log_candidates,
+    reconcile_transaction,
+)
 from bookiebot.banking.store import BankStore
 from bookiebot.sheets.undo import read_active_logged_actions
 
@@ -227,13 +234,85 @@ class BankingService:
         owner_key: str,
         reconciliation_id: int,
         *,
+        matched_action_log_id: str | None = None,
         matched_sheet_ref: str | None = None,
+        notes: str = "logged from bank review",
     ):
         return self.store.confirm_reconciliation_item(
             owner_key,
             reconciliation_id,
+            matched_action_log_id=matched_action_log_id,
             matched_sheet_ref=matched_sheet_ref,
+            notes=notes,
         )
+
+    def reconciliation_match_candidates(
+        self,
+        owner_key: str,
+        reconciliation_id: int,
+        *,
+        actor_key: str,
+        fallback: bool = False,
+        limit: int = 10,
+    ) -> tuple[ReconciliationItem | None, list[ActionLogCandidate]]:
+        item = self.get_reconciliation_item(owner_key, reconciliation_id)
+        if item is None:
+            return None, []
+        action_log = read_active_logged_actions(actor_key)
+        excluded = self.store.matched_action_log_ids(owner_key)
+        if fallback:
+            candidates = recent_action_log_candidates(
+                item.transaction,
+                action_log,
+                excluded_action_ids=excluded,
+                days_back=30,
+                limit=limit,
+            )
+        else:
+            candidates = find_action_log_candidates(
+                item.transaction,
+                action_log,
+                classification=item.classification,
+                excluded_action_ids=excluded,
+                window_days=7,
+                limit=limit,
+            )
+        return item, candidates
+
+    def confirm_reconciliation_action_match(
+        self,
+        owner_key: str,
+        reconciliation_id: int,
+        *,
+        actor_key: str,
+        action_id: str,
+    ) -> tuple[ReconciliationItem | None, ActionLogCandidate | None, str]:
+        item = self.get_reconciliation_item(owner_key, reconciliation_id)
+        if item is None:
+            return None, None, "not_found"
+        if item.status not in {"needs_review", "pending_user", "conflict", "matched"}:
+            return item, None, "not_unresolved"
+
+        excluded = self.store.matched_action_log_ids(owner_key)
+        if action_id in excluded and item.matched_action_log_id != action_id:
+            return item, None, "already_matched"
+
+        action_by_id = {logged.id: logged for logged in read_active_logged_actions(actor_key)}
+        logged = action_by_id.get(action_id)
+        if logged is None:
+            return item, None, "action_not_found"
+        candidate = action_log_candidate_by_id(logged)
+        if candidate is None:
+            return item, None, "action_not_reconcilable"
+
+        confirmed = self.confirm_reconciliation_item(
+            owner_key,
+            reconciliation_id,
+            matched_action_log_id=candidate.action_id,
+            matched_sheet_ref=candidate.sheet_ref,
+            notes="matched existing sheet/action-log row",
+        )
+        return confirmed, candidate, "matched"
 
     def reconciliation_preview(
         self,

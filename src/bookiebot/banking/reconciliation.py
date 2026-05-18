@@ -64,6 +64,18 @@ class ActionLogMatch:
 
 
 @dataclass(frozen=True)
+class ActionLogCandidate:
+    action_id: str
+    sheet_ref: str
+    action_type: str
+    date: date
+    amount: float
+    label: str
+    confidence: float
+    notes: str
+
+
+@dataclass(frozen=True)
 class ReconciliationDecision:
     classification: ReconciliationClassification
     status: ReconciliationStatus
@@ -134,7 +146,7 @@ def match_action_log(
         if abs(candidate["amount"] - abs(transaction.amount)) > 0.01:
             continue
         day_delta = abs((candidate["date"] - transaction_date).days)
-        if day_delta > 3:
+        if day_delta > 7:
             continue
         score = 0.86 - (day_delta * 0.05)
         name_score = _name_score(transaction, candidate["text"])
@@ -159,6 +171,106 @@ def match_action_log(
     )
 
 
+def find_action_log_candidates(
+    transaction: BankTransaction,
+    action_log: Iterable[LoggedAction],
+    *,
+    classification: ReconciliationClassification | None = None,
+    excluded_action_ids: set[str] | None = None,
+    window_days: int = 7,
+    limit: int = 5,
+) -> list[ActionLogCandidate]:
+    transaction_date = _transaction_date(transaction)
+    if transaction_date is None:
+        return []
+
+    excluded = excluded_action_ids or set()
+    compatible = _compatible_action_types(transaction, classification)
+    candidates: list[ActionLogCandidate] = []
+    for logged in action_log:
+        if logged.id in excluded:
+            continue
+        candidate = _action_candidate(logged)
+        if candidate is None or candidate["type"] not in compatible:
+            continue
+        day_delta = abs((candidate["date"] - transaction_date).days)
+        if day_delta > window_days:
+            continue
+
+        amount_delta = abs(candidate["amount"] - abs(transaction.amount))
+        amount_tolerance = max(2.0, abs(transaction.amount) * 0.05)
+        if amount_delta > amount_tolerance:
+            continue
+
+        name_score = _name_score(transaction, candidate["text"])
+        amount_score = max(0.0, 1 - (amount_delta / amount_tolerance))
+        date_score = max(0.0, 1 - (day_delta / max(window_days, 1)))
+        score = (amount_score * 0.55) + (date_score * 0.30) + (name_score * 0.15)
+        if candidate["type"] == "income" and name_score <= 0 and amount_delta > 0.01:
+            continue
+        candidates.append(
+            _action_log_candidate(
+                logged,
+                candidate,
+                confidence=min(score, 0.98),
+                notes=f"amount Δ ${amount_delta:.2f}, date Δ {day_delta}d",
+            )
+        )
+
+    return sorted(candidates, key=lambda item: (-item.confidence, item.date), reverse=False)[: max(1, limit)]
+
+
+def recent_action_log_candidates(
+    transaction: BankTransaction,
+    action_log: Iterable[LoggedAction],
+    *,
+    excluded_action_ids: set[str] | None = None,
+    days_back: int = 30,
+    limit: int = 25,
+) -> list[ActionLogCandidate]:
+    transaction_date = _transaction_date(transaction)
+    if transaction_date is None:
+        return []
+
+    excluded = excluded_action_ids or set()
+    compatible = _compatible_action_types(transaction, None)
+    earliest = transaction_date.toordinal() - max(1, days_back)
+    latest = transaction_date.toordinal() + 1
+    candidates: list[ActionLogCandidate] = []
+    for logged in action_log:
+        if logged.id in excluded:
+            continue
+        candidate = _action_candidate(logged)
+        if candidate is None or candidate["type"] not in compatible:
+            continue
+        ordinal = candidate["date"].toordinal()
+        if ordinal < earliest or ordinal > latest:
+            continue
+        amount_delta = abs(candidate["amount"] - abs(transaction.amount))
+        day_delta = abs((candidate["date"] - transaction_date).days)
+        name_score = _name_score(transaction, candidate["text"])
+        rough_score = max(0.0, 1 - min(amount_delta / max(abs(transaction.amount), 1), 1)) * 0.65
+        rough_score += max(0.0, 1 - min(day_delta / max(days_back, 1), 1)) * 0.25
+        rough_score += name_score * 0.10
+        candidates.append(
+            _action_log_candidate(
+                logged,
+                candidate,
+                confidence=min(rough_score, 0.95),
+                notes=f"recent fallback, amount Δ ${amount_delta:.2f}, date Δ {day_delta}d",
+            )
+        )
+
+    return sorted(candidates, key=lambda item: (-item.confidence, item.date), reverse=False)[: max(1, limit)]
+
+
+def action_log_candidate_by_id(logged: LoggedAction) -> ActionLogCandidate | None:
+    candidate = _action_candidate(logged)
+    if candidate is None:
+        return None
+    return _action_log_candidate(logged, candidate, confidence=1.0, notes="manually selected")
+
+
 def action_log_bank_transaction(logged: LoggedAction) -> dict | None:
     """Build a deterministic debug bank transaction from a real BookieBot action-log row."""
     candidate = _action_candidate(logged)
@@ -176,6 +288,25 @@ def action_log_bank_transaction(logged: LoggedAction) -> dict | None:
         "pending": False,
         "payment_channel": "bookiebot_debug",
     }
+
+
+def _action_log_candidate(
+    logged: LoggedAction,
+    candidate: dict,
+    *,
+    confidence: float,
+    notes: str,
+) -> ActionLogCandidate:
+    return ActionLogCandidate(
+        action_id=logged.id,
+        sheet_ref=f"{logged.action.worksheet}!row {logged.action.row}",
+        action_type=str(candidate["type"]),
+        date=candidate["date"],
+        amount=float(candidate["amount"]),
+        label=_action_transaction_name(logged),
+        confidence=confidence,
+        notes=notes,
+    )
 
 
 def _normalized_transaction_text(transaction: BankTransaction) -> str:

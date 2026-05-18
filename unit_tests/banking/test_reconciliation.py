@@ -7,7 +7,12 @@ from bookiebot.banking.crypto import TokenCipher
 from bookiebot.banking.models import BankAccount, BankTransaction
 from bookiebot.banking.plaid_client import PlaidClient
 import bookiebot.banking.service as banking_service
-from bookiebot.banking.reconciliation import action_log_bank_transaction, classify_transaction, reconcile_transaction
+from bookiebot.banking.reconciliation import (
+    action_log_bank_transaction,
+    classify_transaction,
+    find_action_log_candidates,
+    reconcile_transaction,
+)
 from bookiebot.banking.service import BankingService
 from bookiebot.banking.store import BankStore
 from bookiebot.sheets.undo import LoggedAction, UndoAction
@@ -117,6 +122,37 @@ def test_reconcile_matches_logged_expense_by_amount_and_date():
     assert decision.matched_action_log_id == "abc123"
     assert decision.matched_sheet_ref == "expense!row 12"
     assert decision.notes == "matched expense action"
+
+
+def test_find_action_log_candidates_allows_fuzzy_amount_and_seven_day_window():
+    action = LoggedAction(
+        id="abc123",
+        created_at="2026-05-12T12:00:00",
+        user_key="676638528590970917",
+        action=UndoAction(
+            worksheet="expense",
+            kind="clear_cells",
+            row=12,
+            columns=[14, 15, 16, 17, 18],
+            previous_values=["", "", "", "", ""],
+            new_values=["5/12/2026", "hardware", "88.99", "Ace Hardware", "Brian (BofA)"],
+            metadata={"type": "expense", "category": "home", "person": "Brian (BofA)"},
+            description="home expense $88.99 for Brian (BofA)",
+        ),
+    )
+    transaction = BankTransaction(
+        **{
+            **_transaction("Bennett Valley Ace Hardware", 89.99).__dict__,
+            "date": "2026-05-18",
+        }
+    )
+
+    candidates = find_action_log_candidates(transaction, [action], classification="expense")
+
+    assert len(candidates) == 1
+    assert candidates[0].action_id == "abc123"
+    assert candidates[0].sheet_ref == "expense!row 12"
+    assert "date Δ 6d" in candidates[0].notes
 
 
 def test_reconcile_income_requires_name_overlap():
@@ -709,3 +745,141 @@ def test_seed_unmatched_debug_transaction_then_needs_review(tmp_path):
     assert preview.items[0].classification == "expense"
     assert preview.items[0].status == "needs_review"
     assert preview.items[0].matched_action_log_id is None
+
+
+def test_reconciliation_match_candidates_excludes_already_matched_actions(monkeypatch, tmp_path):
+    matched_action = LoggedAction(
+        id="matched123",
+        created_at="2026-05-17T12:00:00",
+        user_key="676638528590970917",
+        action=UndoAction(
+            worksheet="expense",
+            kind="clear_cells",
+            row=12,
+            columns=[14, 15, 16, 17, 18],
+            previous_values=["", "", "", "", ""],
+            new_values=["5/17/2026", "coffee", "12.34", "Coffee", "Brian (BofA)"],
+            metadata={"type": "expense", "category": "food", "person": "Brian (BofA)"},
+            description="food expense $12.34 for Brian (BofA)",
+        ),
+    )
+    available_action = LoggedAction(
+        id="available123",
+        created_at="2026-05-17T12:00:00",
+        user_key="676638528590970917",
+        action=UndoAction(
+            worksheet="expense",
+            kind="clear_cells",
+            row=13,
+            columns=[14, 15, 16, 17, 18],
+            previous_values=["", "", "", "", ""],
+            new_values=["5/17/2026", "coffee", "12.34", "Coffee Shop", "Brian (BofA)"],
+            metadata={"type": "expense", "category": "food", "person": "Brian (BofA)"},
+            description="food expense $12.34 for Brian (BofA)",
+        ),
+    )
+    monkeypatch.setattr(
+        banking_service,
+        "read_active_logged_actions",
+        lambda _actor_key: [matched_action, available_action],
+    )
+    store = BankStore(tmp_path / "banking.sqlite3", TokenCipher("test-secret-key"))
+    service = BankingService(
+        config=BankingConfig(
+            plaid_client_id="client",
+            plaid_secret="secret",
+            plaid_env="sandbox",
+            token_encryption_key="test-secret-key",
+            sqlite_path=Path("unused.sqlite3"),
+        ),
+        store=store,
+        plaid=PlaidClient(
+            BankingConfig(
+                plaid_client_id="client",
+                plaid_secret="secret",
+                plaid_env="sandbox",
+                token_encryption_key="test-secret-key",
+                sqlite_path=Path("unused.sqlite3"),
+            )
+        ),
+    )
+    transaction = service.seed_unmatched_debug_transaction(
+        "brian",
+        name="Coffee",
+        amount=12.34,
+        date="2026-05-17",
+    )
+    preview_item = service.reconciliation_preview("brian", force=True).items[0]
+    store.upsert_reconciliation_item(
+        owner_key="brian",
+        transaction=transaction,
+        classification="expense",
+        status="matched",
+        confidence=0.96,
+        matched_action_log_id="matched123",
+        matched_sheet_ref="expense!row 12",
+    )
+
+    item, candidates = service.reconciliation_match_candidates(
+        "brian",
+        preview_item.id,
+        actor_key="676638528590970917",
+    )
+
+    assert item is not None
+    assert [candidate.action_id for candidate in candidates] == ["available123"]
+
+
+def test_confirm_reconciliation_action_match_marks_existing_row(monkeypatch, tmp_path):
+    action = LoggedAction(
+        id="abc123",
+        created_at="2026-05-17T12:00:00",
+        user_key="676638528590970917",
+        action=UndoAction(
+            worksheet="expense",
+            kind="clear_cells",
+            row=12,
+            columns=[14, 15, 16, 17, 18],
+            previous_values=["", "", "", "", ""],
+            new_values=["5/17/2026", "coffee", "12.34", "Coffee", "Brian (BofA)"],
+            metadata={"type": "expense", "category": "food", "person": "Brian (BofA)"},
+            description="food expense $12.34 for Brian (BofA)",
+        ),
+    )
+    monkeypatch.setattr(banking_service, "read_active_logged_actions", lambda _actor_key: [action])
+    store = BankStore(tmp_path / "banking.sqlite3", TokenCipher("test-secret-key"))
+    service = BankingService(
+        config=BankingConfig(
+            plaid_client_id="client",
+            plaid_secret="secret",
+            plaid_env="sandbox",
+            token_encryption_key="test-secret-key",
+            sqlite_path=Path("unused.sqlite3"),
+        ),
+        store=store,
+        plaid=PlaidClient(
+            BankingConfig(
+                plaid_client_id="client",
+                plaid_secret="secret",
+                plaid_env="sandbox",
+                token_encryption_key="test-secret-key",
+                sqlite_path=Path("unused.sqlite3"),
+            )
+        ),
+    )
+    service.seed_unmatched_debug_transaction("brian", name="Coffee", amount=12.34, date="2026-05-17")
+    item = service.reconciliation_preview("brian", force=True).items[0]
+
+    confirmed, candidate, status = service.confirm_reconciliation_action_match(
+        "brian",
+        item.id,
+        actor_key="676638528590970917",
+        action_id="abc123",
+    )
+
+    assert status == "matched"
+    assert candidate is not None
+    assert confirmed is not None
+    assert confirmed.status == "confirmed"
+    assert confirmed.matched_action_log_id == "abc123"
+    assert confirmed.matched_sheet_ref == "expense!row 12"
