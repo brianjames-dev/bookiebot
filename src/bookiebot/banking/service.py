@@ -171,6 +171,22 @@ class BankingService:
     def ignore_reconciliation_item(self, owner_key: str, reconciliation_id: int):
         return self.store.ignore_reconciliation_item(owner_key, reconciliation_id)
 
+    def get_reconciliation_item(self, owner_key: str, reconciliation_id: int):
+        return self.store.get_reconciliation_item(owner_key, reconciliation_id)
+
+    def confirm_reconciliation_item(
+        self,
+        owner_key: str,
+        reconciliation_id: int,
+        *,
+        matched_sheet_ref: str | None = None,
+    ):
+        return self.store.confirm_reconciliation_item(
+            owner_key,
+            reconciliation_id,
+            matched_sheet_ref=matched_sheet_ref,
+        )
+
     def reconciliation_preview(
         self,
         owner_key: str,

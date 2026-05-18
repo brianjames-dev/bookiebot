@@ -629,6 +629,65 @@ class BankStore:
             ).fetchone()
         return _reconciliation_item_from_row(updated) if updated else None
 
+    def get_reconciliation_item(self, owner_key: str, reconciliation_id: int) -> ReconciliationItem | None:
+        self.initialize()
+        with self.connect() as conn:
+            row = conn.execute(
+                """
+                SELECT
+                    r.*,
+                    t.provider_transaction_id,
+                    t.date,
+                    t.authorized_date,
+                    t.name,
+                    t.merchant_name,
+                    t.amount,
+                    t.pending,
+                    t.payment_channel,
+                    t.updated_at,
+                    a.name AS account_name,
+                    a.mask AS account_mask,
+                    a.type AS account_type,
+                    a.subtype AS account_subtype
+                FROM bank_reconciliation_items r
+                JOIN bank_transactions t ON t.id = r.bank_transaction_id
+                LEFT JOIN bank_accounts a ON a.id = t.account_id
+                WHERE r.id = ?
+                  AND r.owner_key = ?
+                  AND t.removed_at IS NULL
+                """,
+                (int(reconciliation_id), owner_key),
+            ).fetchone()
+        return _reconciliation_item_from_row(row) if row else None
+
+    def confirm_reconciliation_item(
+        self,
+        owner_key: str,
+        reconciliation_id: int,
+        *,
+        matched_sheet_ref: str | None = None,
+    ) -> ReconciliationItem | None:
+        now = utc_now_iso()
+        self.initialize()
+        with self.connect() as conn:
+            conn.execute(
+                """
+                UPDATE bank_reconciliation_items
+                SET status = 'confirmed',
+                    resolved_at = ?,
+                    last_seen_at = ?,
+                    matched_sheet_ref = COALESCE(?, matched_sheet_ref),
+                    notes = CASE
+                        WHEN notes IS NULL OR notes = '' THEN 'logged from bank review'
+                        ELSE notes || '; logged from bank review'
+                    END
+                WHERE id = ?
+                  AND owner_key = ?
+                """,
+                (now, now, matched_sheet_ref, int(reconciliation_id), owner_key),
+            )
+        return self.get_reconciliation_item(owner_key, reconciliation_id)
+
     def status(self, configured: bool, plaid_env: str) -> BankStatus:
         self.initialize()
         with self.connect() as conn:
