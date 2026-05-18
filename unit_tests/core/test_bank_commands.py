@@ -129,7 +129,7 @@ def test_format_reconciliation_preview_does_not_cut_code_blocks():
     assert "Status" not in output
     assert "Note" not in output
     assert "05-17" in output
-    assert "Expense:" in output
+    assert "Unmatched Expense:" in output
     assert "...and " in output
     assert len(output) <= 760
 
@@ -174,7 +174,7 @@ def test_format_reconciliation_preview_uses_narrow_rows():
     code_lines = [
         line
         for line in output.splitlines()
-        if not line.startswith("```") and line not in {"Bank reconciliation preview:", "Expense:"}
+        if not line.startswith("```") and line not in {"Bank reconciliation preview:", "Unmatched Expense:"}
     ]
 
     assert "Note" not in output
@@ -222,3 +222,74 @@ def test_format_reconciliation_preview_separates_matched_items():
 
     assert "Matched Expense:" in output
     assert "05-17     $4.33  Starbucks" in output
+
+
+def test_format_reconciliation_preview_tightens_section_spacing():
+    transaction = BankTransaction(
+        id=1,
+        provider_transaction_id="txn-1",
+        owner_key="brian",
+        account_name="Checking",
+        account_mask="0000",
+        account_type="depository",
+        account_subtype="checking",
+        date="2026-05-17",
+        authorized_date=None,
+        name="Coffee",
+        merchant_name=None,
+        amount=4.33,
+        pending=False,
+        payment_channel="in store",
+        updated_at="2026-05-17T00:00:00+00:00",
+    )
+    items = [
+        ReconciliationItem(
+            id=1,
+            owner_key="brian",
+            bank_transaction_id=1,
+            provider_transaction_id="txn-1",
+            classification="expense",
+            status="needs_review",
+            confidence=0.6,
+            matched_action_log_id=None,
+            matched_sheet_ref=None,
+            first_seen_at="2026-05-17T00:00:00+00:00",
+            last_seen_at="2026-05-17T00:00:00+00:00",
+            resolved_at=None,
+            ignored_at=None,
+            notes="outflow transaction",
+            transaction=transaction,
+        ),
+        ReconciliationItem(
+            id=2,
+            owner_key="brian",
+            bank_transaction_id=2,
+            provider_transaction_id="txn-2",
+            classification="income",
+            status="matched",
+            confidence=0.96,
+            matched_action_log_id="income1",
+            matched_sheet_ref="income!row 5",
+            first_seen_at="2026-05-17T00:00:00+00:00",
+            last_seen_at="2026-05-17T00:00:00+00:00",
+            resolved_at=None,
+            ignored_at=None,
+            notes="matched income action",
+            transaction=BankTransaction(
+                **{
+                    **transaction.__dict__,
+                    "id": 2,
+                    "provider_transaction_id": "txn-2",
+                    "name": "Paycheck",
+                    "amount": -100.0,
+                }
+            ),
+        ),
+    ]
+
+    output = format_reconciliation_preview(ReconciliationPreview(owner_key="brian", items=items))
+
+    assert "Unmatched Expense:" in output
+    assert "Matched Income:" in output
+    assert "\n```\n\n\n" not in output
+    assert "\n```\nMatched Income:" in output

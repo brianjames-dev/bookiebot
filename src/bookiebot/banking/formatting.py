@@ -43,7 +43,7 @@ def format_reconciliation_preview(preview: ReconciliationPreview, *, max_chars: 
     for item in preview.items:
         groups[(item.classification, _status_group(item))].append(item)
 
-    lines = [summary]
+    lines = [summary, ""]
     omitted_total = 0
     for classification in (
         "expense",
@@ -69,7 +69,8 @@ def format_reconciliation_preview(preview: ReconciliationPreview, *, max_chars: 
                 lines.extend(section_lines)
 
     if omitted_total:
-        lines.append("")
+        if lines[-1] != "":
+            lines.append("")
         lines.append(f"...and {omitted_total} more item(s). Use a lower limit or inspect transactions directly.")
 
     return "\n".join(lines)
@@ -114,7 +115,7 @@ def _format_reconciliation_section(
     kept: list[ReconciliationItem] = []
     omitted = 0
     for item in items:
-        candidate = ["", f"{label}:", _format_reconciliation_table([*kept, item])]
+        candidate = [f"{label}:", _format_reconciliation_table([*kept, item])]
         candidate_text = "\n".join(candidate)
         if current_chars + len(candidate_text) + 80 > max_chars:
             omitted += 1
@@ -122,7 +123,7 @@ def _format_reconciliation_section(
         kept.append(item)
     if not kept:
         return [], omitted
-    return ["", f"{label}:", _format_reconciliation_table(kept)], omitted
+    return [f"{label}:", _format_reconciliation_table(kept)], omitted
 
 
 def _format_reconciliation_table(items: list[ReconciliationItem]) -> str:
@@ -152,7 +153,7 @@ def _section_label(classification: str, status_group: str) -> str:
     label = CLASSIFICATION_LABELS[classification]
     if status_group == "matched":
         return f"Matched {label}"
-    return label
+    return f"Unmatched {label}"
 
 
 def _short_date(value: str) -> str:
