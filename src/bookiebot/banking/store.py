@@ -842,7 +842,11 @@ class BankStore:
                 """,
                 (owner_key,),
             ).fetchall()
-        return {str(row["matched_action_log_id"]) for row in rows}
+        matched_ids: set[str] = set()
+        for row in rows:
+            raw_id = str(row["matched_action_log_id"])
+            matched_ids.update(part.strip() for part in raw_id.split("+") if part.strip())
+        return matched_ids
 
     def confirm_reconciliation_item(
         self,
@@ -872,6 +876,43 @@ class BankStore:
                   AND owner_key = ?
                 """,
                 (now, now, matched_action_log_id, matched_sheet_ref, notes, notes, int(reconciliation_id), owner_key),
+            )
+        return self.get_reconciliation_item(owner_key, reconciliation_id)
+
+    def reopen_reconciliation_item(self, owner_key: str, reconciliation_id: int) -> ReconciliationItem | None:
+        now = utc_now_iso()
+        self.initialize()
+        with self.connect() as conn:
+            row = conn.execute(
+                """
+                SELECT r.id
+                FROM bank_reconciliation_items r
+                JOIN bank_transactions t ON t.id = r.bank_transaction_id
+                WHERE r.id = ?
+                  AND r.owner_key = ?
+                  AND t.removed_at IS NULL
+                """,
+                (int(reconciliation_id), owner_key),
+            ).fetchone()
+            if row is None:
+                return None
+            conn.execute(
+                """
+                UPDATE bank_reconciliation_items
+                SET status = 'needs_review',
+                    matched_action_log_id = NULL,
+                    matched_sheet_ref = NULL,
+                    resolved_at = NULL,
+                    ignored_at = NULL,
+                    last_seen_at = ?,
+                    notes = CASE
+                        WHEN notes IS NULL OR notes = '' THEN 'reopened for review'
+                        ELSE notes || '; reopened for review'
+                    END
+                WHERE id = ?
+                  AND owner_key = ?
+                """,
+                (now, int(reconciliation_id), owner_key),
             )
         return self.get_reconciliation_item(owner_key, reconciliation_id)
 

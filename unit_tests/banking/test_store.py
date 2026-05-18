@@ -635,3 +635,126 @@ def test_confirm_reconciliation_item_hides_it_from_review(tmp_path):
     assert confirmed.matched_sheet_ref == "expense!row 5"
     assert store.matched_action_log_ids("brian") == {"abc123"}
     assert store.unresolved_reconciliation_items("brian") == []
+
+
+def test_reopen_reconciliation_item_returns_confirmed_item_to_review(tmp_path):
+    store = _store(tmp_path)
+    item = store.upsert_item(
+        owner_key="brian",
+        provider="plaid",
+        item_id="item-brian",
+        access_token="access-sandbox-brian",
+        institution_name="Plaid Sandbox",
+    )
+    store.upsert_accounts(
+        [
+            BankAccount(
+                item_id=item.id,
+                provider_account_id="account-brian",
+                owner_key="brian",
+                name="Brian Checking",
+                mask="1111",
+                type="depository",
+                subtype="checking",
+                official_name=None,
+                current_balance=500.0,
+                available_balance=450.0,
+            )
+        ]
+    )
+    store.upsert_transactions(
+        [
+            {
+                "transaction_id": "txn-open",
+                "account_id": "account-brian",
+                "date": "2026-05-17",
+                "name": "Unlogged Coffee",
+                "amount": 12.34,
+                "pending": False,
+            }
+        ],
+        owner_key="brian",
+    )
+    transaction = store.recent_transactions("brian", limit=1)[0]
+    open_item = store.upsert_reconciliation_item(
+        owner_key="brian",
+        transaction=transaction,
+        classification="expense",
+        status="needs_review",
+        confidence=0.6,
+    )
+    store.confirm_reconciliation_item(
+        "brian",
+        open_item.id,
+        matched_action_log_id="abc123+def456",
+        matched_sheet_ref="expense!row 5 + expense!row 6",
+        notes="matched existing rows",
+    )
+
+    reopened = store.reopen_reconciliation_item("brian", open_item.id)
+
+    assert reopened is not None
+    assert reopened.status == "needs_review"
+    assert reopened.resolved_at is None
+    assert reopened.matched_action_log_id is None
+    assert reopened.matched_sheet_ref is None
+    assert store.matched_action_log_ids("brian") == set()
+    assert [item.id for item in store.unresolved_reconciliation_items("brian")] == [open_item.id]
+
+
+def test_matched_action_log_ids_splits_group_matches(tmp_path):
+    store = _store(tmp_path)
+    item = store.upsert_item(
+        owner_key="brian",
+        provider="plaid",
+        item_id="item-brian",
+        access_token="access-sandbox-brian",
+        institution_name="Plaid Sandbox",
+    )
+    store.upsert_accounts(
+        [
+            BankAccount(
+                item_id=item.id,
+                provider_account_id="account-brian",
+                owner_key="brian",
+                name="Brian Checking",
+                mask="1111",
+                type="depository",
+                subtype="checking",
+                official_name=None,
+                current_balance=500.0,
+                available_balance=450.0,
+            )
+        ]
+    )
+    store.upsert_transactions(
+        [
+            {
+                "transaction_id": "txn-open",
+                "account_id": "account-brian",
+                "date": "2026-05-17",
+                "name": "Venmo",
+                "amount": 173.59,
+                "pending": False,
+            }
+        ],
+        owner_key="brian",
+    )
+    transaction = store.recent_transactions("brian", limit=1)[0]
+    open_item = store.upsert_reconciliation_item(
+        owner_key="brian",
+        transaction=transaction,
+        classification="expense",
+        status="needs_review",
+        confidence=0.6,
+    )
+
+    store.confirm_reconciliation_item(
+        "brian",
+        open_item.id,
+        matched_action_log_id="minted123+zazzle123",
+        matched_sheet_ref="expense!row 12 + expense!row 13",
+        notes="matched existing rows",
+    )
+
+    assert store.matched_action_log_ids("brian") == {"minted123", "zazzle123"}

@@ -938,6 +938,46 @@ def register_commands(tree: app_commands.CommandTree):
             ephemeral=True,
         )
 
+    @tree.command(name="debug_bank_reopen", description="(Admin) Reopen a resolved bank reconciliation item")
+    @app_commands.describe(reconciliation_id="ID shown by /debug_bank_review or /debug_bank_review_detail")
+    async def debug_bank_reopen(interaction: discord.Interaction, reconciliation_id: int):
+        if not auth.is_debug_allowed(interaction.user):
+            await interaction.response.send_message("❌ Not authorized.", ephemeral=True)
+            return
+
+        await interaction.response.defer(ephemeral=True)
+        try:
+            owner = get_user_config(interaction.user.id)
+            service = build_banking_service()
+            item = await asyncio.to_thread(
+                service.reopen_reconciliation_item,
+                owner.budget_owner_key,
+                reconciliation_id,
+            )
+        except Exception as exc:
+            await interaction.followup.send(
+                content=f"❌ Could not reopen bank review item: {type(exc).__name__}: {exc}",
+                ephemeral=True,
+            )
+            return
+
+        if item is None:
+            await interaction.followup.send(
+                content=f"No bank reconciliation item `{reconciliation_id}` was found for {owner.name}.",
+                ephemeral=True,
+            )
+            return
+
+        transaction = item.transaction
+        await interaction.followup.send(
+            content=(
+                f"Reopened bank reconciliation item `{item.id}` for {owner.name}: "
+                f"`{transaction.name} - ${abs(transaction.amount):.2f}`.\n"
+                "Run `/debug_bank_review_detail` to test the guided flow again."
+            ),
+            ephemeral=True,
+        )
+
     @tree.command(name="debug_bank_review_detail", description="(Admin) Show one bank review item with possible matches")
     @app_commands.describe(
         reconciliation_id="ID shown by /debug_bank_review",
