@@ -208,3 +208,73 @@ def test_recent_transactions_are_owner_scoped_ordered_and_limited(tmp_path):
     assert [transaction.name for transaction in transactions] == ["New Coffee"]
     assert transactions[0].account_name == "Brian Checking"
     assert transactions[0].account_mask == "1111"
+
+
+def test_unresolved_reconciliation_items_only_returns_open_items(tmp_path):
+    store = _store(tmp_path)
+    item = store.upsert_item(
+        owner_key="brian",
+        provider="plaid",
+        item_id="item-brian",
+        access_token="access-sandbox-brian",
+        institution_name="Plaid Sandbox",
+    )
+    store.upsert_accounts(
+        [
+            BankAccount(
+                item_id=item.id,
+                provider_account_id="account-brian",
+                owner_key="brian",
+                name="Brian Checking",
+                mask="1111",
+                type="depository",
+                subtype="checking",
+                official_name=None,
+                current_balance=500.0,
+                available_balance=450.0,
+            )
+        ]
+    )
+    store.upsert_transactions(
+        [
+            {
+                "transaction_id": "txn-open",
+                "account_id": "account-brian",
+                "date": "2026-05-17",
+                "name": "Unlogged Coffee",
+                "amount": 12.34,
+                "pending": False,
+            },
+            {
+                "transaction_id": "txn-matched",
+                "account_id": "account-brian",
+                "date": "2026-05-17",
+                "name": "Logged Coffee",
+                "amount": 4.33,
+                "pending": False,
+            },
+        ],
+        owner_key="brian",
+    )
+    transactions = store.recent_transactions("brian", limit=2)
+    by_name = {transaction.name: transaction for transaction in transactions}
+    open_item = store.upsert_reconciliation_item(
+        owner_key="brian",
+        transaction=by_name["Unlogged Coffee"],
+        classification="expense",
+        status="needs_review",
+        confidence=0.6,
+    )
+    store.upsert_reconciliation_item(
+        owner_key="brian",
+        transaction=by_name["Logged Coffee"],
+        classification="expense",
+        status="matched",
+        confidence=0.96,
+        matched_action_log_id="abc123",
+    )
+
+    unresolved = store.unresolved_reconciliation_items("brian")
+
+    assert [item.id for item in unresolved] == [open_item.id]
+    assert unresolved[0].transaction.name == "Unlogged Coffee"

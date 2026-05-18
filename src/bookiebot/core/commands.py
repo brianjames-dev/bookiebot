@@ -12,7 +12,11 @@ from bookiebot.core import auth, config
 from bookiebot.core import incidents
 from bookiebot.core import github_dispatch
 from bookiebot.core import ui
-from bookiebot.banking.formatting import format_bank_transaction_table, format_reconciliation_preview
+from bookiebot.banking.formatting import (
+    format_bank_transaction_table,
+    format_reconciliation_preview,
+    format_reconciliation_review,
+)
 from bookiebot.banking.plaid_client import PlaidApiError
 from bookiebot.banking.service import build_banking_service
 from bookiebot.logging_config import get_recent_logs, uptime_seconds
@@ -339,6 +343,31 @@ def register_commands(tree: app_commands.CommandTree):
             return
 
         await interaction.followup.send(content=format_reconciliation_preview(preview, max_chars=1900), ephemeral=True)
+
+    @tree.command(name="debug_bank_review", description="(Admin) Show unresolved bank reconciliation items")
+    @app_commands.describe(limit="Number of unresolved items to show (default 25, max 100)")
+    async def debug_bank_review(interaction: discord.Interaction, limit: int = 25):
+        if not auth.is_debug_allowed(interaction.user):
+            await interaction.response.send_message("❌ Not authorized.", ephemeral=True)
+            return
+
+        await interaction.response.defer(ephemeral=True)
+        try:
+            owner = get_user_config(interaction.user.id)
+            service = build_banking_service()
+            items = await asyncio.to_thread(
+                service.unresolved_reconciliation_items,
+                owner.budget_owner_key,
+                limit=max(1, min(limit, 100)),
+            )
+        except Exception as exc:
+            await interaction.followup.send(
+                content=f"❌ Could not load bank review items: {type(exc).__name__}: {exc}",
+                ephemeral=True,
+            )
+            return
+
+        await interaction.followup.send(content=format_reconciliation_review(items)[:1900], ephemeral=True)
 
     @tree.command(name="debug_subscriptions", description="(Admin) Sync and inspect subscription reminder data")
     async def debug_subscriptions(interaction: discord.Interaction):

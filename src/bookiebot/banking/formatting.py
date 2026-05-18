@@ -76,6 +76,15 @@ def format_reconciliation_preview(preview: ReconciliationPreview, *, max_chars: 
     return "\n".join(lines)
 
 
+def format_reconciliation_review(items: list[ReconciliationItem]) -> str:
+    if not items:
+        return "No unresolved bank reconciliation items."
+    header = f"{'ID':>4}  {'Date':<5}  {'Amt':>8}  {'Type':<8}  Name"
+    divider = "-" * len(header)
+    rows = [_format_reconciliation_review_row(item) for item in items]
+    return "Unresolved bank reconciliation items:\n```text\n" + "\n".join([header, divider, *rows]) + "\n```"
+
+
 def format_bank_transaction_row(transaction: BankTransaction, *, code_wrap: bool = True) -> str:
     date = transaction.date or transaction.authorized_date or "unknown date"
     name = transaction.merchant_name or transaction.name
@@ -142,6 +151,20 @@ def _format_reconciliation_row(item: ReconciliationItem) -> str:
         f"{_short_date(date):<5}  "
         f"{_short_money(amount):>8}  "
         f"{_clip(name, 26)}"
+    )
+
+
+def _format_reconciliation_review_row(item: ReconciliationItem) -> str:
+    transaction = item.transaction
+    date = transaction.date or transaction.authorized_date or "unknown"
+    amount = abs(transaction.amount)
+    name = transaction.merchant_name or transaction.name
+    return (
+        f"{item.id:>4}  "
+        f"{_short_date(date):<5}  "
+        f"{_short_money(amount):>8}  "
+        f"{_clip(item.classification, 8):<8}  "
+        f"{_clip(name, 24)}"
     )
 
 

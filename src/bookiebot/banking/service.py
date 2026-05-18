@@ -165,6 +165,9 @@ class BankingService:
             raise RuntimeError("Failed to seed unmatched debug transaction")
         return transactions[0]
 
+    def unresolved_reconciliation_items(self, owner_key: str, limit: int = 25) -> list:
+        return self.store.unresolved_reconciliation_items(owner_key, limit=limit)
+
     def reconciliation_preview(
         self,
         owner_key: str,

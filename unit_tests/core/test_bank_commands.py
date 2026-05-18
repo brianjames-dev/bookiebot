@@ -3,6 +3,7 @@ from bookiebot.banking.formatting import (
     format_bank_transaction,
     format_bank_transaction_table,
     format_reconciliation_preview,
+    format_reconciliation_review,
 )
 
 
@@ -293,3 +294,49 @@ def test_format_reconciliation_preview_tightens_section_spacing():
     assert "Matched Income:" in output
     assert "\n```\n\n\n" not in output
     assert "\n```\nMatched Income:" in output
+
+
+def test_format_reconciliation_review_lists_unresolved_ids():
+    transaction = BankTransaction(
+        id=10,
+        provider_transaction_id="txn-10",
+        owner_key="brian",
+        account_name="Checking",
+        account_mask="0000",
+        account_type="depository",
+        account_subtype="checking",
+        date="2026-05-18",
+        authorized_date=None,
+        name="Unlogged Coffee",
+        merchant_name=None,
+        amount=12.34,
+        pending=False,
+        payment_channel="bookiebot_debug",
+        updated_at="2026-05-18T00:00:00+00:00",
+    )
+    item = ReconciliationItem(
+        id=42,
+        owner_key="brian",
+        bank_transaction_id=10,
+        provider_transaction_id="txn-10",
+        classification="expense",
+        status="needs_review",
+        confidence=0.6,
+        matched_action_log_id=None,
+        matched_sheet_ref=None,
+        first_seen_at="2026-05-18T00:00:00+00:00",
+        last_seen_at="2026-05-18T00:00:00+00:00",
+        resolved_at=None,
+        ignored_at=None,
+        notes="outflow transaction",
+        transaction=transaction,
+    )
+
+    output = format_reconciliation_review([item])
+
+    assert output.startswith("Unresolved bank reconciliation items:")
+    assert "  42  05-18    $12.34  expense   Unlogged Coffee" in output
+
+
+def test_format_reconciliation_review_empty():
+    assert format_reconciliation_review([]) == "No unresolved bank reconciliation items."
