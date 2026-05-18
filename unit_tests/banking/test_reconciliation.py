@@ -489,7 +489,7 @@ def test_seed_unmatched_debug_transaction_then_needs_review(tmp_path):
 
     transaction = service.seed_unmatched_debug_transaction(
         "brian",
-        name="Unlogged Coffee",
+        name='"Unlogged Coffee"',
         amount=12.34,
         date="2026-05-17",
     )

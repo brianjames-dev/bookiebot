@@ -17,6 +17,13 @@ from bookiebot.sheets.undo import read_active_logged_actions
 logger = logging.getLogger(__name__)
 
 
+def _clean_debug_text(value: str | None) -> str:
+    text = (value or "").strip()
+    if len(text) >= 2 and text[0] == text[-1] and text[0] in {"'", '"'}:
+        return text[1:-1].strip()
+    return text
+
+
 class BankingService:
     def __init__(self, config: BankingConfig, store: BankStore, plaid: PlaidClient):
         self.config = config
@@ -153,7 +160,7 @@ class BankingService:
             "transaction_id": f"bookiebot-debug-unmatched-{uuid4().hex[:10]}",
             "account_id": "bookiebot-debug-unmatched",
             "date": date or local_date.today().isoformat(),
-            "name": name,
+            "name": _clean_debug_text(name) or "Unlogged Test Purchase",
             "merchant_name": None,
             "amount": amount_value,
             "pending": False,

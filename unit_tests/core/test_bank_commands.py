@@ -5,6 +5,19 @@ from bookiebot.banking.formatting import (
     format_reconciliation_preview,
     format_reconciliation_review,
 )
+from bookiebot.core.commands import _clean_command_text
+
+
+def test_clean_command_text_strips_matching_outer_quotes():
+    assert _clean_command_text('"Unlogged Coffee"') == "Unlogged Coffee"
+    assert _clean_command_text("'Brian (BofA)'") == "Brian (BofA)"
+    assert _clean_command_text("  \"Safeway\"  ") == "Safeway"
+
+
+def test_clean_command_text_keeps_unwrapped_text_and_inner_apostrophes():
+    assert _clean_command_text("Brian (BofA)") == "Brian (BofA)"
+    assert _clean_command_text("McDonald's") == "McDonald's"
+    assert _clean_command_text(None) == ""
 
 
 def test_format_bank_transaction_outflow():

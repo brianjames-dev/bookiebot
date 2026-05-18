@@ -53,6 +53,13 @@ def _bank_date_to_sheet_date(value: str | None) -> str:
     return f"{parsed.month}/{parsed.day}/{parsed.year}"
 
 
+def _clean_command_text(value: str | None) -> str:
+    text = (value or "").strip()
+    if len(text) >= 2 and text[0] == text[-1] and text[0] in {"'", '"'}:
+        return text[1:-1].strip()
+    return text
+
+
 def _log_bank_reconciliation_expense(
     *,
     actor_key: str,
@@ -73,18 +80,19 @@ def _log_bank_reconciliation_expense(
         return item, "not_expense"
 
     transaction = item.transaction
-    source_name = transaction.merchant_name or transaction.name
+    source_name = _clean_command_text(transaction.merchant_name or transaction.name)
+    clean_person = _clean_command_text(person)
     values = {
         "date": _bank_date_to_sheet_date(transaction.date or transaction.authorized_date),
         "amount": abs(transaction.amount),
-        "item": item_name.strip() or source_name,
-        "location": location.strip() or source_name,
-        "person": person.strip(),
+        "item": _clean_command_text(item_name) or source_name,
+        "location": _clean_command_text(location) or source_name,
+        "person": clean_person,
     }
     with sheet_user_context(actor_key):
         worksheet = get_sheets_repo().expense_sheet()
         row = log_category_row(values, worksheet, category)
-        record_expense_undo(category, row, values, person.strip(), actor_key)
+        record_expense_undo(category, row, values, clean_person, actor_key)
     confirmed = service.confirm_reconciliation_item(
         owner_key,
         reconciliation_id,
@@ -341,7 +349,7 @@ def register_commands(tree: app_commands.CommandTree):
         await interaction.response.defer(ephemeral=True)
         try:
             owner = get_user_config(interaction.user.id)
-            normalized_kind = kind.strip().lower()
+            normalized_kind = _clean_command_text(kind).lower()
             if normalized_kind not in {"expense", "income"}:
                 await interaction.followup.send("❌ `kind` must be `expense` or `income`.", ephemeral=True)
                 return
@@ -349,7 +357,7 @@ def register_commands(tree: app_commands.CommandTree):
             transaction = await asyncio.to_thread(
                 service.seed_unmatched_debug_transaction,
                 owner.budget_owner_key,
-                name=name,
+                name=_clean_command_text(name),
                 amount=amount,
                 kind=normalized_kind,
             )
@@ -484,7 +492,7 @@ def register_commands(tree: app_commands.CommandTree):
             return
 
         await interaction.response.defer(ephemeral=True)
-        normalized_category = category.strip().lower()
+        normalized_category = _clean_command_text(category).lower()
         if normalized_category not in get_category_columns:
             available = ", ".join(sorted(get_category_columns))
             await interaction.followup.send(
@@ -492,7 +500,8 @@ def register_commands(tree: app_commands.CommandTree):
                 ephemeral=True,
             )
             return
-        if not person.strip():
+        clean_person = _clean_command_text(person)
+        if not clean_person:
             await interaction.followup.send("❌ `person` is required.", ephemeral=True)
             return
 
@@ -504,9 +513,9 @@ def register_commands(tree: app_commands.CommandTree):
                 owner_key=owner.budget_owner_key,
                 reconciliation_id=reconciliation_id,
                 category=normalized_category,
-                person=person,
-                item_name=item,
-                location=location,
+                person=clean_person,
+                item_name=_clean_command_text(item),
+                location=_clean_command_text(location),
             )
         except Exception as exc:
             await interaction.followup.send(
