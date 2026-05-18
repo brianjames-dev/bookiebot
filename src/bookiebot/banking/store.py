@@ -69,6 +69,7 @@ class BankStore:
                     official_name TEXT,
                     current_balance REAL,
                     available_balance REAL,
+                    watched INTEGER NOT NULL DEFAULT 1,
                     updated_at TEXT NOT NULL
                 );
 
@@ -117,6 +118,14 @@ class BankStore:
                 );
                 """
             )
+            self._ensure_account_watch_column(conn)
+
+    def _ensure_account_watch_column(self, conn: sqlite3.Connection) -> None:
+        try:
+            conn.execute("ALTER TABLE bank_accounts ADD COLUMN watched INTEGER NOT NULL DEFAULT 1")
+        except sqlite3.OperationalError as exc:
+            if "duplicate column name" not in str(exc).lower():
+                raise
 
     def upsert_item(
         self,
@@ -371,9 +380,9 @@ class BankStore:
                     """
                     INSERT INTO bank_accounts (
                         item_id, provider_account_id, owner_key, name, mask, type, subtype,
-                        official_name, current_balance, available_balance, updated_at
+                        official_name, current_balance, available_balance, watched, updated_at
                     )
-                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                     ON CONFLICT(provider_account_id) DO UPDATE SET
                         owner_key = excluded.owner_key,
                         name = excluded.name,
@@ -396,10 +405,47 @@ class BankStore:
                         account.official_name,
                         account.current_balance,
                         account.available_balance,
+                        1 if account.watched else 0,
                         now,
                     ),
                 )
         return len(accounts)
+
+    def list_accounts(self, owner_key: str) -> list[BankAccount]:
+        self.initialize()
+        with self.connect() as conn:
+            rows = conn.execute(
+                """
+                SELECT *
+                FROM bank_accounts
+                WHERE owner_key = ?
+                ORDER BY item_id, name, mask
+                """,
+                (owner_key,),
+            ).fetchall()
+        return [_bank_account_from_row(row) for row in rows]
+
+    def set_account_watched(self, owner_key: str, account_db_id: int, watched: bool) -> BankAccount | None:
+        self.initialize()
+        with self.connect() as conn:
+            row = conn.execute(
+                "SELECT * FROM bank_accounts WHERE id = ? AND owner_key = ?",
+                (int(account_db_id), owner_key),
+            ).fetchone()
+            if row is None:
+                return None
+            conn.execute(
+                """
+                UPDATE bank_accounts
+                SET watched = ?,
+                    updated_at = ?
+                WHERE id = ?
+                  AND owner_key = ?
+                """,
+                (1 if watched else 0, utc_now_iso(), int(account_db_id), owner_key),
+            )
+            updated = conn.execute("SELECT * FROM bank_accounts WHERE id = ?", (int(account_db_id),)).fetchone()
+        return _bank_account_from_row(updated) if updated else None
 
     def upsert_transactions(self, transactions: list[dict[str, Any]], owner_key: str) -> int:
         now = utc_now_iso()
@@ -495,6 +541,7 @@ class BankStore:
                 LEFT JOIN bank_accounts a ON a.id = t.account_id
                 WHERE t.owner_key = ?
                   AND t.removed_at IS NULL
+                  AND (t.account_id IS NULL OR COALESCE(a.watched, 1) = 1)
                 ORDER BY COALESCE(t.date, t.authorized_date, '') DESC, t.updated_at DESC, t.id DESC
                 LIMIT ?
                 """,
@@ -554,6 +601,7 @@ class BankStore:
                 LEFT JOIN bank_reconciliation_items r ON r.bank_transaction_id = t.id
                 WHERE t.owner_key = ?
                   AND t.removed_at IS NULL
+                  AND (t.account_id IS NULL OR COALESCE(a.watched, 1) = 1)
                   AND (
                     r.id IS NULL
                     OR r.status IN ('needs_review', 'pending_user', 'conflict')
@@ -667,6 +715,7 @@ class BankStore:
                 LEFT JOIN bank_accounts a ON a.id = t.account_id
                 WHERE r.owner_key = ?
                   AND t.removed_at IS NULL
+                  AND (t.account_id IS NULL OR COALESCE(a.watched, 1) = 1)
                   AND r.status IN ('needs_review', 'pending_user', 'conflict')
                 ORDER BY COALESCE(t.date, t.authorized_date, '') DESC, r.id DESC
                 LIMIT ?
@@ -847,6 +896,23 @@ def _linked_item_from_row(row: sqlite3.Row) -> LinkedBankItem:
         item_id=str(row["item_id"]),
         institution_name=row["institution_name"],
         status=str(row["status"]),
+    )
+
+
+def _bank_account_from_row(row: sqlite3.Row) -> BankAccount:
+    return BankAccount(
+        id=int(row["id"]),
+        item_id=int(row["item_id"]),
+        provider_account_id=str(row["provider_account_id"]),
+        owner_key=str(row["owner_key"]),
+        name=str(row["name"]),
+        mask=row["mask"],
+        type=row["type"],
+        subtype=row["subtype"],
+        official_name=row["official_name"],
+        current_balance=float(row["current_balance"]) if row["current_balance"] is not None else None,
+        available_balance=float(row["available_balance"]) if row["available_balance"] is not None else None,
+        watched=bool(row["watched"]),
     )
 
 

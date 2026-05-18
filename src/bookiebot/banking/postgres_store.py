@@ -84,10 +84,12 @@ class PostgresBankStore(BankStore):
                     official_name TEXT,
                     current_balance DOUBLE PRECISION,
                     available_balance DOUBLE PRECISION,
+                    watched INTEGER NOT NULL DEFAULT 1,
                     updated_at TEXT NOT NULL
                 )
                 """
             )
+            conn.execute("ALTER TABLE bank_accounts ADD COLUMN IF NOT EXISTS watched INTEGER NOT NULL DEFAULT 1")
             conn.execute(
                 """
                 CREATE TABLE IF NOT EXISTS bank_transactions (

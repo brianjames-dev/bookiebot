@@ -39,10 +39,13 @@ Implemented first slice:
 - Hosted Plaid Link page with signed setup tokens.
 - `/debug_bank_link` command that creates a private browser Link URL.
 - Link-token creation and public-token exchange into encrypted bank storage.
+- Account watch controls so only selected accounts appear in recent transaction and reconciliation views.
 - Admin-only debug commands:
   - `/debug_bank_status`
   - `/debug_bank_link`
   - `/debug_bank_items`
+  - `/debug_bank_accounts`
+  - `/debug_bank_watch_account`
   - `/debug_bank_disconnect_item`
   - `/debug_bank_remove_item`
   - `/debug_bank_purge_item`

@@ -392,6 +392,97 @@ def test_reconciliation_preview_force_rechecks_already_matched_items(tmp_path):
     assert forced_preview.items[0].classification == "transfer_or_payment"
 
 
+def test_reconciliation_preview_excludes_ignored_accounts(tmp_path):
+    store = BankStore(tmp_path / "banking.sqlite3", TokenCipher("test-secret-key"))
+    store.initialize()
+    item = store.upsert_item(
+        owner_key="brian",
+        provider="plaid",
+        item_id="item-1",
+        access_token="access-sandbox-123",
+        institution_name="Plaid Sandbox",
+    )
+    store.upsert_accounts(
+        [
+            BankAccount(
+                item_id=item.id,
+                provider_account_id="account-watched",
+                owner_key="brian",
+                name="Checking",
+                mask="0000",
+                type="depository",
+                subtype="checking",
+                official_name=None,
+                current_balance=500.0,
+                available_balance=450.0,
+            ),
+            BankAccount(
+                item_id=item.id,
+                provider_account_id="account-ignored",
+                owner_key="brian",
+                name="Savings",
+                mask="1111",
+                type="depository",
+                subtype="savings",
+                official_name=None,
+                current_balance=300.0,
+                available_balance=300.0,
+            ),
+        ]
+    )
+    ignored_account = [
+        account for account in store.list_accounts("brian")
+        if account.provider_account_id == "account-ignored"
+    ][0]
+    store.set_account_watched("brian", ignored_account.id, False)
+    store.upsert_transactions(
+        [
+            {
+                "transaction_id": "txn-watched",
+                "account_id": "account-watched",
+                "date": "2026-05-17",
+                "name": "Starbucks",
+                "amount": 4.33,
+                "pending": False,
+            },
+            {
+                "transaction_id": "txn-ignored",
+                "account_id": "account-ignored",
+                "date": "2026-05-18",
+                "name": "Savings Interest",
+                "amount": -4.22,
+                "pending": False,
+            },
+        ],
+        owner_key="brian",
+    )
+    service = BankingService(
+        config=BankingConfig(
+            plaid_client_id="client",
+            plaid_secret="secret",
+            plaid_env="sandbox",
+            token_encryption_key="test-secret-key",
+            sqlite_path=Path("unused.sqlite3"),
+        ),
+        store=store,
+        plaid=PlaidClient(
+            BankingConfig(
+                plaid_client_id="client",
+                plaid_secret="secret",
+                plaid_env="sandbox",
+                token_encryption_key="test-secret-key",
+                sqlite_path=Path("unused.sqlite3"),
+            )
+        ),
+    )
+
+    preview = service.reconciliation_preview("brian", force=True)
+
+    assert [item.transaction.name for item in preview.items] == ["Starbucks"]
+    assert preview.cached_transaction_count == 2
+    assert preview.candidate_transaction_count == 1
+
+
 class _SandboxPlaidStub:
     def __init__(self):
         self.sync_cursors = []

@@ -325,6 +325,122 @@ def test_recent_transactions_are_owner_scoped_ordered_and_limited(tmp_path):
     assert transactions[0].account_mask == "1111"
 
 
+def test_account_watch_status_filters_recent_transactions(tmp_path):
+    store = _store(tmp_path)
+    item = store.upsert_item(
+        owner_key="brian",
+        provider="plaid",
+        item_id="item-brian",
+        access_token="access-sandbox-brian",
+        institution_name="Plaid Sandbox",
+    )
+    store.upsert_accounts(
+        [
+            BankAccount(
+                item_id=item.id,
+                provider_account_id="account-watched",
+                owner_key="brian",
+                name="Primary Checking",
+                mask="1111",
+                type="depository",
+                subtype="checking",
+                official_name=None,
+                current_balance=500.0,
+                available_balance=450.0,
+            ),
+            BankAccount(
+                item_id=item.id,
+                provider_account_id="account-ignored",
+                owner_key="brian",
+                name="Savings",
+                mask="2222",
+                type="depository",
+                subtype="savings",
+                official_name=None,
+                current_balance=300.0,
+                available_balance=300.0,
+            ),
+        ]
+    )
+    accounts = {account.provider_account_id: account for account in store.list_accounts("brian")}
+    ignored = store.set_account_watched("brian", accounts["account-ignored"].id, False)
+    store.upsert_transactions(
+        [
+            {
+                "transaction_id": "txn-watched",
+                "account_id": "account-watched",
+                "date": "2026-05-17",
+                "name": "Coffee",
+                "amount": 7.0,
+                "pending": False,
+            },
+            {
+                "transaction_id": "txn-ignored",
+                "account_id": "account-ignored",
+                "date": "2026-05-18",
+                "name": "Savings Interest",
+                "amount": -4.22,
+                "pending": False,
+            },
+        ],
+        owner_key="brian",
+    )
+
+    transactions = store.recent_transactions("brian", limit=10)
+
+    assert ignored is not None
+    assert ignored.watched is False
+    assert [transaction.name for transaction in transactions] == ["Coffee"]
+    assert store.transaction_count("brian") == 2
+
+
+def test_upsert_accounts_preserves_existing_watch_status(tmp_path):
+    store = _store(tmp_path)
+    item = store.upsert_item(
+        owner_key="brian",
+        provider="plaid",
+        item_id="item-brian",
+        access_token="access-sandbox-brian",
+        institution_name="Plaid Sandbox",
+    )
+    account = BankAccount(
+        item_id=item.id,
+        provider_account_id="account-brian",
+        owner_key="brian",
+        name="Brian Checking",
+        mask="1111",
+        type="depository",
+        subtype="checking",
+        official_name=None,
+        current_balance=500.0,
+        available_balance=450.0,
+    )
+    store.upsert_accounts([account])
+    account_id = store.list_accounts("brian")[0].id
+    store.set_account_watched("brian", account_id, False)
+
+    store.upsert_accounts(
+        [
+            BankAccount(
+                item_id=item.id,
+                provider_account_id="account-brian",
+                owner_key="brian",
+                name="Renamed Checking",
+                mask="1111",
+                type="depository",
+                subtype="checking",
+                official_name=None,
+                current_balance=600.0,
+                available_balance=550.0,
+            )
+        ]
+    )
+
+    refreshed = store.list_accounts("brian")[0]
+    assert refreshed.name == "Renamed Checking"
+    assert refreshed.watched is False
+
+
 def test_unresolved_reconciliation_items_only_returns_open_items(tmp_path):
     store = _store(tmp_path)
     item = store.upsert_item(

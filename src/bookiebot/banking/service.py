@@ -139,6 +139,12 @@ class BankingService:
     def linked_items(self, owner_key: str) -> list[LinkedBankItem]:
         return self.store.list_items(owner_key=owner_key)
 
+    def accounts(self, owner_key: str) -> list[BankAccount]:
+        return self.store.list_accounts(owner_key)
+
+    def set_account_watched(self, owner_key: str, account_db_id: int, watched: bool) -> BankAccount | None:
+        return self.store.set_account_watched(owner_key, account_db_id, watched)
+
     def disconnect_item(self, owner_key: str, item_db_id: int) -> LinkedBankItem | None:
         return self.store.disconnect_item(owner_key, item_db_id)
 

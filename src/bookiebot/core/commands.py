@@ -286,6 +286,94 @@ def register_commands(tree: app_commands.CommandTree):
             content=f"Bank Items for {owner.name}:\n```text\n" + "\n".join([header, divider, *rows]) + "\n```"
         )
 
+    @tree.command(name="debug_bank_accounts", description="(Admin) List bank accounts and watch status")
+    async def debug_bank_accounts(interaction: discord.Interaction):
+        if not auth.is_debug_allowed(interaction.user):
+            await interaction.response.send_message("❌ Not authorized.", ephemeral=True)
+            return
+
+        await interaction.response.defer(ephemeral=True)
+        try:
+            owner = get_user_config(interaction.user.id)
+            service = build_banking_service()
+            accounts = await asyncio.to_thread(service.accounts, owner.budget_owner_key)
+        except Exception as exc:
+            await _send_bank_command_error(
+                interaction,
+                f"❌ Could not list bank accounts: {type(exc).__name__}: {exc}",
+            )
+            return
+
+        if not accounts:
+            await interaction.edit_original_response(content=f"No bank accounts found for {owner.name}.")
+            return
+
+        header = f"{'ID':>4}  {'Watch':<5}  {'Item':>4}  {'Type':<13}  {'Mask':<4}  Account"
+        divider = "-" * len(header)
+        rows = []
+        for account in accounts[:40]:
+            subtype = account.subtype or account.type or ""
+            mask = account.mask or ""
+            rows.append(
+                f"{account.id or 0:>4}  "
+                f"{'yes' if account.watched else 'no':<5}  "
+                f"{account.item_id:>4}  "
+                f"{subtype[:13]:<13}  "
+                f"{mask[:4]:<4}  "
+                f"{account.name[:45]}"
+            )
+        suffix = "\n...truncated" if len(accounts) > len(rows) else ""
+        await interaction.edit_original_response(
+            content=(
+                f"Bank accounts for {owner.name}:\n"
+                "```text\n"
+                + "\n".join([header, divider, *rows])
+                + suffix
+                + "\n```"
+            )[:1900]
+        )
+
+    @tree.command(name="debug_bank_watch_account", description="(Admin) Include or exclude a bank account")
+    @app_commands.describe(
+        account_id="ID shown by /debug_bank_accounts",
+        watched="True to include in recent/reconcile views, false to exclude",
+    )
+    async def debug_bank_watch_account(interaction: discord.Interaction, account_id: int, watched: bool):
+        if not auth.is_debug_allowed(interaction.user):
+            await interaction.response.send_message("❌ Not authorized.", ephemeral=True)
+            return
+
+        await interaction.response.defer(ephemeral=True)
+        try:
+            owner = get_user_config(interaction.user.id)
+            service = build_banking_service()
+            account = await asyncio.to_thread(
+                service.set_account_watched,
+                owner.budget_owner_key,
+                account_id,
+                watched,
+            )
+        except Exception as exc:
+            await _send_bank_command_error(
+                interaction,
+                f"❌ Could not update bank account watch status: {type(exc).__name__}: {exc}",
+            )
+            return
+
+        if account is None:
+            await interaction.edit_original_response(
+                content=f"No bank account `{account_id}` was found for {owner.name}."
+            )
+            return
+
+        await interaction.edit_original_response(
+            content=(
+                f"Bank account `{account.id}` is now "
+                f"{'watched' if account.watched else 'ignored'} for {owner.name}: "
+                f"{account.name}{f' *{account.mask}' if account.mask else ''}."
+            )
+        )
+
     @tree.command(name="debug_bank_disconnect_item", description="(Admin) Disconnect a linked bank Item")
     @app_commands.describe(item_id="ID shown by /debug_bank_items")
     async def debug_bank_disconnect_item(interaction: discord.Interaction, item_id: int):

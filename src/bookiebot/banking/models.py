@@ -47,6 +47,8 @@ class BankAccount:
     official_name: str | None
     current_balance: float | None
     available_balance: float | None
+    id: int | None = None
+    watched: bool = True
 
 
 @dataclass(frozen=True)
