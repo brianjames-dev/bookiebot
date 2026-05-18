@@ -231,6 +231,38 @@ def register_commands(tree: app_commands.CommandTree):
         lines.append(format_bank_transaction_table(transactions))
         await interaction.edit_original_response(content="\n".join(lines)[:1900])
 
+    @tree.command(name="debug_bank_seed_action_log", description="(Admin) Seed debug bank transactions from action log")
+    @app_commands.describe(limit="Number of action-log rows to seed as debug transactions (default 25, max 100)")
+    async def debug_bank_seed_action_log(interaction: discord.Interaction, limit: int = 25):
+        if not auth.is_debug_allowed(interaction.user):
+            await interaction.response.send_message("❌ Not authorized.", ephemeral=True)
+            return
+
+        await interaction.response.defer(ephemeral=True)
+        try:
+            owner = get_user_config(interaction.user.id)
+            service = build_banking_service()
+            seeded, considered = await asyncio.to_thread(
+                service.seed_cached_transactions_from_action_log,
+                owner.budget_owner_key,
+                str(interaction.user.id),
+                limit=max(1, min(limit, 100)),
+            )
+        except Exception as exc:
+            await interaction.followup.send(
+                content=f"❌ Could not seed action-log bank transactions: {type(exc).__name__}: {exc}",
+                ephemeral=True,
+            )
+            return
+
+        await interaction.followup.send(
+            content=(
+                f"Seeded {seeded} debug bank transaction(s) from {considered} active action-log row(s) "
+                f"for {owner.name}."
+            ),
+            ephemeral=True,
+        )
+
     @tree.command(name="debug_bank_reconcile", description="(Admin) Preview cached bank reconciliation classifications")
     @app_commands.describe(
         limit="Number of transactions to classify (default 25, max 50)",

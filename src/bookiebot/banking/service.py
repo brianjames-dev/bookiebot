@@ -7,7 +7,7 @@ from bookiebot.banking.config import BankingConfig, load_banking_config
 from bookiebot.banking.crypto import TokenCipher
 from bookiebot.banking.models import BankAccount, BankStatus, BankTransaction, LinkedBankItem, ReconciliationPreview, SyncResult
 from bookiebot.banking.plaid_client import PlaidClient
-from bookiebot.banking.reconciliation import reconcile_transaction
+from bookiebot.banking.reconciliation import action_log_bank_transaction, reconcile_transaction
 from bookiebot.banking.store import BankStore
 from bookiebot.sheets.undo import read_active_logged_actions
 
@@ -112,6 +112,27 @@ class BankingService:
 
     def recent_transactions(self, owner_key: str, limit: int = 10) -> list[BankTransaction]:
         return self.store.recent_transactions(owner_key=owner_key, limit=limit)
+
+    def seed_cached_transactions_from_action_log(
+        self,
+        owner_key: str,
+        actor_key: str,
+        *,
+        limit: int = 25,
+    ) -> tuple[int, int]:
+        """Debug helper: seed bank cache from real BookieBot action-log rows."""
+        self.store.initialize()
+        actions = read_active_logged_actions(actor_key)
+        rows = []
+        for logged in reversed(actions):
+            row = action_log_bank_transaction(logged)
+            if row is not None:
+                rows.append(row)
+            if len(rows) >= max(1, min(limit, 100)):
+                break
+        if rows:
+            self.store.upsert_transactions(rows, owner_key)
+        return len(rows), len(actions)
 
     def reconciliation_preview(
         self,

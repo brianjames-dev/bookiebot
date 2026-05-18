@@ -157,6 +157,25 @@ def match_action_log(
     )
 
 
+def action_log_bank_transaction(logged: LoggedAction) -> dict | None:
+    """Build a deterministic debug bank transaction from a real BookieBot action-log row."""
+    candidate = _action_candidate(logged)
+    if candidate is None:
+        return None
+    action_type = candidate["type"]
+    amount = -candidate["amount"] if action_type == "income" else candidate["amount"]
+    return {
+        "transaction_id": f"bookiebot-action-log-{logged.id}",
+        "account_id": "bookiebot-action-log",
+        "date": candidate["date"].isoformat(),
+        "name": _action_transaction_name(logged),
+        "merchant_name": None,
+        "amount": amount,
+        "pending": False,
+        "payment_channel": "bookiebot_debug",
+    }
+
+
 def _normalized_transaction_text(transaction: BankTransaction) -> str:
     parts = [
         transaction.name,
@@ -227,6 +246,22 @@ def _action_candidate(logged: LoggedAction) -> dict | None:
         "date": action_date,
         "text": " ".join(str(part) for part in text_parts if part),
     }
+
+
+def _action_transaction_name(logged: LoggedAction) -> str:
+    action = logged.action
+    action_type = action.metadata.get("type", "")
+    if action_type == "income":
+        return action.metadata.get("source") or action.description or "BookieBot Income"
+    if action_type == "payment":
+        return action.metadata.get("category") or action.description or "BookieBot Payment"
+    if action_type == "expense":
+        values = [value for value in action.new_values if value]
+        for value in values[1:]:
+            if _money_value(value) is None and not _parse_date(value):
+                return value
+        return action.metadata.get("category") or action.description or "BookieBot Expense"
+    return action.description or "BookieBot Action"
 
 
 def _action_amount(action_type: str, values: list[str], description: str) -> float | None:

@@ -6,7 +6,8 @@ from bookiebot.banking.config import BankingConfig
 from bookiebot.banking.crypto import TokenCipher
 from bookiebot.banking.models import BankAccount, BankTransaction
 from bookiebot.banking.plaid_client import PlaidClient
-from bookiebot.banking.reconciliation import classify_transaction, reconcile_transaction
+import bookiebot.banking.service as banking_service
+from bookiebot.banking.reconciliation import action_log_bank_transaction, classify_transaction, reconcile_transaction
 from bookiebot.banking.service import BankingService
 from bookiebot.banking.store import BankStore
 from bookiebot.sheets.undo import LoggedAction, UndoAction
@@ -116,6 +117,37 @@ def test_reconcile_matches_logged_expense_by_amount_and_date():
     assert decision.matched_action_log_id == "abc123"
     assert decision.matched_sheet_ref == "expense!row 12"
     assert decision.notes == "matched expense action"
+
+
+def test_action_log_bank_transaction_builds_debug_expense_row():
+    action = LoggedAction(
+        id="abc123",
+        created_at="2026-05-17T12:00:00",
+        user_key="676638528590970917",
+        action=UndoAction(
+            worksheet="expense",
+            kind="clear_cells",
+            row=12,
+            columns=[14, 15, 16, 17, 18],
+            previous_values=["", "", "", "", ""],
+            new_values=["5/17/2026", "coffee", "4.33", "Starbucks", "Brian (BofA)"],
+            metadata={"type": "expense", "category": "food", "person": "Brian (BofA)"},
+            description="food expense $4.33 for Brian (BofA)",
+        ),
+    )
+
+    row = action_log_bank_transaction(action)
+
+    assert row == {
+        "transaction_id": "bookiebot-action-log-abc123",
+        "account_id": "bookiebot-action-log",
+        "date": "2026-05-17",
+        "name": "coffee",
+        "merchant_name": None,
+        "amount": 4.33,
+        "pending": False,
+        "payment_channel": "bookiebot_debug",
+    }
 
 
 def test_reconcile_matches_utility_payment_as_bill():
@@ -380,3 +412,54 @@ async def test_seed_sandbox_resets_cursor_when_cache_is_empty(tmp_path):
     assert plaid.sync_cursors == ["stale-cursor", None]
     assert sum(result.added for result in results) == 1
     assert store.transaction_count("brian") == 1
+
+
+def test_seed_cached_transactions_from_action_log_then_matches(monkeypatch, tmp_path):
+    action = LoggedAction(
+        id="abc123",
+        created_at="2026-05-17T12:00:00",
+        user_key="676638528590970917",
+        action=UndoAction(
+            worksheet="expense",
+            kind="clear_cells",
+            row=12,
+            columns=[14, 15, 16, 17, 18],
+            previous_values=["", "", "", "", ""],
+            new_values=["5/17/2026", "coffee", "4.33", "Starbucks", "Brian (BofA)"],
+            metadata={"type": "expense", "category": "food", "person": "Brian (BofA)"},
+            description="food expense $4.33 for Brian (BofA)",
+        ),
+    )
+    monkeypatch.setattr(banking_service, "read_active_logged_actions", lambda _actor_key: [action])
+    store = BankStore(tmp_path / "banking.sqlite3", TokenCipher("test-secret-key"))
+    service = BankingService(
+        config=BankingConfig(
+            plaid_client_id="client",
+            plaid_secret="secret",
+            plaid_env="sandbox",
+            token_encryption_key="test-secret-key",
+            sqlite_path=Path("unused.sqlite3"),
+        ),
+        store=store,
+        plaid=PlaidClient(
+            BankingConfig(
+                plaid_client_id="client",
+                plaid_secret="secret",
+                plaid_env="sandbox",
+                token_encryption_key="test-secret-key",
+                sqlite_path=Path("unused.sqlite3"),
+            )
+        ),
+    )
+
+    seeded, considered = service.seed_cached_transactions_from_action_log(
+        "brian",
+        "676638528590970917",
+    )
+    preview = service.reconciliation_preview("brian", force=True, actor_key="676638528590970917")
+
+    assert (seeded, considered) == (1, 1)
+    assert store.transaction_count("brian") == 1
+    assert len(preview.items) == 1
+    assert preview.items[0].status == "matched"
+    assert preview.items[0].matched_action_log_id == "abc123"
