@@ -331,6 +331,39 @@ async def test_update_recent_action_can_match_logged_expense_text(monkeypatch, m
 
 
 @pytest.mark.asyncio
+async def test_update_recent_action_by_id_can_update_older_action_outside_recent_page(monkeypatch, message):
+    import bookiebot.sheets.writer as writer
+    from bookiebot.sheets.undo import read_active_logged_actions, update_recent_action
+
+    monkeypatch.setattr(writer, "resolve_query_persons", lambda user, person=None, user_id=None: ["Hannah"])
+    repo = SheetsRepoStub(expense_rows=[[], []])
+
+    with repo.patched():
+        for index in range(12):
+            await ih.handle_intent(
+                "log_expense",
+                {
+                    "type": "expense",
+                    "category": "food",
+                    "amount": 10 + index,
+                    "item": f"Item {index}",
+                    "location": f"Store {index}",
+                },
+                message,
+            )
+        older_action = read_active_logged_actions(str(message.author.id))[0]
+
+        success, detail = update_recent_action(
+            str(message.author.id),
+            action_id=older_action.id,
+            updates={"amount": "42.42"},
+        )
+
+        assert success, detail
+        assert repo.expense.cell(3, 16).value == "$42.42"
+
+
+@pytest.mark.asyncio
 async def test_recent_actions_display_updated_action_with_full_fields(monkeypatch, message):
     import bookiebot.sheets.writer as writer
 

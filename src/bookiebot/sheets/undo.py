@@ -391,6 +391,28 @@ def recent_actions(user_key: str | None, limit: int = 5, offset: int = 0) -> lis
     return matches[start:end]
 
 
+def active_logged_action_by_id(user_key: str | None, action_id: str) -> LoggedAction | None:
+    action_id = str(action_id or "").strip().lower()
+    if not action_id:
+        return None
+    keys = actor_key_aliases(str(user_key)) if user_key else set()
+    data = _read_log_data()
+    if data is None:
+        return None
+    for record in reversed(data.records):
+        logged = record.logged
+        if logged.id.lower() != action_id:
+            continue
+        if logged.status != "active":
+            return None
+        if logged.action.metadata.get("type") in {"delete", "system_state"}:
+            return None
+        if keys and logged.user_key not in keys:
+            return None
+        return logged
+    return None
+
+
 def _latest_raw_logged_action(
     user_key: str | None,
     log_data: _ActionLogData | None = None,
@@ -525,12 +547,9 @@ def select_recent_action(
     match_text: str | None = None,
     limit: int = 10,
 ) -> LoggedAction | None:
-    actions = recent_actions(user_key, limit)
     if action_id:
-        action_id = action_id.strip().lower()
-        for logged in actions:
-            if logged.id.lower() == action_id:
-                return logged
+        return active_logged_action_by_id(user_key, action_id)
+    actions = recent_actions(user_key, limit)
     if index is not None and 1 <= index <= len(actions):
         return actions[index - 1]
     if match_text:
