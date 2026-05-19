@@ -241,7 +241,7 @@ def read_active_logged_actions(user_key: str | None = None) -> list[LoggedAction
     ]
 
 
-def _append_logged_action(user_key: str | None, action: UndoAction) -> None:
+def _append_logged_action(user_key: str | None, action: UndoAction) -> str:
     ws = _log_sheet()
     _ensure_log_header(ws)
     logged = LoggedAction(
@@ -260,9 +260,10 @@ def _append_logged_action(user_key: str | None, action: UndoAction) -> None:
     ]
     if hasattr(ws, "append_row"):
         ws.append_row(row)
-        return
+        return logged.id
     rows = ws.get_all_values()
     ws.insert_row(row, index=len(rows) + 1)
+    return logged.id
 
 
 def _find_log_row(logged_id: str, log_data: _ActionLogData | None = None) -> tuple[Any, int, LoggedAction] | None:
@@ -288,15 +289,16 @@ def _worksheet(name: WorksheetName):
     raise ValueError(f"Unsupported worksheet: {name}")
 
 
-def record_undo_action(user_key: str | None, action: UndoAction) -> None:
+def record_undo_action(user_key: str | None, action: UndoAction) -> str | None:
     global _GLOBAL_LAST_ACTION
     _GLOBAL_LAST_ACTION = action
     if user_key:
         _LAST_ACTION_BY_USER[str(user_key)] = action
     try:
-        _append_logged_action(user_key, action)
+        return _append_logged_action(user_key, action)
     except Exception:
         logger.exception("Failed to persist undo action")
+        return None
 
 
 def record_system_event(user_key: str | None, event_type: str, metadata: dict[str, str], description: str) -> bool:
@@ -1139,6 +1141,7 @@ def update_recent_action(
     index: int | None = None,
     action_id: str | None = None,
     match_text: str | None = None,
+    metadata_extra: dict[str, str] | None = None,
 ) -> tuple[bool, str]:
     normalized_updates = {
         str(field).strip().lower(): value
@@ -1222,6 +1225,7 @@ def update_recent_action(
                 "type": "update",
                 "updated_action_id": logged.id,
                 "display_fields": json.dumps(display_fields),
+                **(metadata_extra or {}),
             },
             description=f"updated {logged.action.description}",
         ),
@@ -1418,6 +1422,39 @@ def delete_recent_action(
     if key:
         _PENDING_DELETE_IDS_BY_USER.pop(key, None)
     return True, f"Deleted: {logged.action.description}"
+
+
+def undo_logged_action(user_key: str | None, action_id: str) -> tuple[bool, str]:
+    key = str(user_key) if user_key else None
+    log_data = _read_log_data()
+    if log_data is None:
+        return False, "I could not read the action log right now."
+    logged = select_recent_action(key, action_id=action_id)
+    if logged is None:
+        return False, f"I could not find active action `{action_id}`."
+    try:
+        success, detail = _apply_undo_action(logged.action, log_data)
+    except Exception as e:
+        logger.exception("Failed to undo logged action", extra={"exception": str(e), "action_id": action_id})
+        return False, "Something went wrong while undoing that logged action."
+    if not success:
+        return False, detail
+
+    updated_action_id = logged.action.metadata.get("updated_action_id")
+    if updated_action_id and logged.action.kind == "restore_cells":
+        _update_logged_new_values(
+            updated_action_id,
+            {col: value for col, value in zip(logged.action.columns, logged.action.previous_values)},
+            log_data,
+        )
+    deleted_action_id = logged.action.metadata.get("deleted_action_id")
+    if deleted_action_id and logged.action.kind == "compact_category_cells":
+        _mark_active(deleted_action_id, log_data)
+    source_action_id = logged.action.metadata.get("source_action_id")
+    if source_action_id and logged.action.kind == "move_expense":
+        _mark_active(source_action_id, log_data)
+    _mark_undone(logged.id, log_data)
+    return True, detail
 
 
 def undo_last_action(user_key: str | None) -> tuple[bool, str]:

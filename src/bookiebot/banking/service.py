@@ -20,7 +20,7 @@ from bookiebot.banking.reconciliation import (
     reconcile_transaction,
 )
 from bookiebot.banking.store import BankStore
-from bookiebot.sheets.undo import read_active_logged_actions, update_recent_action
+from bookiebot.sheets.undo import delete_recent_action, read_active_logged_actions, undo_logged_action, update_recent_action
 
 
 logger = logging.getLogger(__name__)
@@ -31,6 +31,20 @@ def _clean_debug_text(value: str | None) -> str:
     if len(text) >= 2 and text[0] == text[-1] and text[0] in {"'", '"'}:
         return text[1:-1].strip()
     return text
+
+
+def _find_action_for_sheet_ref(action_log: list, sheet_ref: str | None):
+    if not sheet_ref or "!row " not in sheet_ref:
+        return None
+    worksheet, row_text = sheet_ref.split("!row ", 1)
+    try:
+        row = int(row_text.strip())
+    except ValueError:
+        return None
+    for logged in reversed(action_log):
+        if logged.action.worksheet == worksheet and logged.action.row == row:
+            return logged
+    return None
 
 
 class BankingService:
@@ -225,6 +239,9 @@ class BankingService:
     def unresolved_reconciliation_items(self, owner_key: str, limit: int = 25) -> list:
         return self.store.unresolved_reconciliation_items(owner_key, limit=limit)
 
+    def resolved_reconciliation_items(self, owner_key: str, limit: int = 25) -> list:
+        return self.store.resolved_reconciliation_items(owner_key, limit=limit)
+
     def ignore_reconciliation_item(self, owner_key: str, reconciliation_id: int):
         return self.store.ignore_reconciliation_item(owner_key, reconciliation_id)
 
@@ -344,6 +361,10 @@ class BankingService:
                 actor_key,
                 updates={"amount": f"{bank_amount:.2f}"},
                 action_id=candidate.action_id,
+                metadata_extra={
+                    "origin": "bank_reconciliation",
+                    "bank_reconciliation_id": str(reconciliation_id),
+                },
             )
             if not success:
                 return item, candidate, f"amount_update_failed: {detail}"
@@ -363,6 +384,72 @@ class BankingService:
             notes="matched existing sheet/action-log row",
         )
         return confirmed, candidate, update_status
+
+    def revert_reconciliation_item(
+        self,
+        owner_key: str,
+        reconciliation_id: int,
+        *,
+        actor_key: str,
+        undo_sheet_action: bool = False,
+    ) -> tuple[ReconciliationItem | None, list[str], str]:
+        item = self.get_reconciliation_item(owner_key, reconciliation_id)
+        if item is None:
+            return None, [], "not_found"
+
+        details: list[str] = []
+        if undo_sheet_action:
+            details.extend(self._undo_reconciliation_sheet_actions(item, actor_key=actor_key))
+
+        reopened = self.reopen_reconciliation_item(owner_key, reconciliation_id)
+        return reopened, details, "reopened"
+
+    def _undo_reconciliation_sheet_actions(self, item: ReconciliationItem, *, actor_key: str) -> list[str]:
+        action_log = read_active_logged_actions(actor_key)
+        action_by_id = {logged.id: logged for logged in action_log}
+        details: list[str] = []
+
+        matched_ids = [
+            part.strip()
+            for part in (item.matched_action_log_id or "").split("+")
+            if part.strip()
+        ]
+        update_ids = [
+            logged.id
+            for logged in reversed(action_log)
+            if logged.action.metadata.get("origin") == "bank_reconciliation"
+            and logged.action.metadata.get("bank_reconciliation_id") == str(item.id)
+            and logged.action.metadata.get("type") == "update"
+        ]
+        if not update_ids and matched_ids:
+            update_ids = [
+                logged.id
+                for logged in reversed(action_log)
+                if logged.action.metadata.get("type") == "update"
+                and logged.action.metadata.get("updated_action_id") in matched_ids
+            ][:1]
+        for action_id in update_ids:
+            success, detail = undo_logged_action(actor_key, action_id)
+            details.append(("Undid amount update: " if success else "Could not undo amount update: ") + detail)
+
+        logged_match_ids = [
+            action_id
+            for action_id in matched_ids
+            if action_id in action_by_id
+            and action_by_id[action_id].action.metadata.get("origin") == "bank_reconciliation"
+        ]
+        if not logged_match_ids and "logged as " in (item.notes or "").lower():
+            sheet_action = _find_action_for_sheet_ref(action_log, item.matched_sheet_ref)
+            if sheet_action is not None:
+                logged_match_ids = [sheet_action.id]
+
+        for action_id in logged_match_ids:
+            success, detail = delete_recent_action(actor_key, action_id=action_id)
+            details.append(("Deleted logged sheet row: " if success else "Could not delete logged sheet row: ") + detail)
+
+        if not details:
+            details.append("No BookieBot-created sheet action was found to undo.")
+        return details
 
     def confirm_reconciliation_action_group_match(
         self,

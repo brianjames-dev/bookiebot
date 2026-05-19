@@ -403,12 +403,24 @@ class _BankExpenseLogModal(discord.ui.Modal, title="Log bank item as expense"):
             with sheet_user_context(self.actor_key):
                 worksheet = get_sheets_repo().expense_sheet()
                 row = await asyncio.to_thread(log_category_row, values, worksheet, category)
-                await asyncio.to_thread(record_expense_undo, category, row, values, person, self.actor_key)
+                action_id = await asyncio.to_thread(
+                    record_expense_undo,
+                    category,
+                    row,
+                    values,
+                    person,
+                    self.actor_key,
+                    {
+                        "origin": "bank_reconciliation",
+                        "bank_reconciliation_id": str(self.item.id),
+                    },
+                )
             service = build_banking_service()
             confirmed = await asyncio.to_thread(
                 service.confirm_reconciliation_item,
                 self.owner_key,
                 self.item.id,
+                matched_action_log_id=action_id,
                 matched_sheet_ref=f"expense!row {row}",
                 notes="logged as expense from bank reconciliation",
             )
@@ -453,12 +465,22 @@ class _BankIncomeLogModal(discord.ui.Modal, title="Log bank item as income/refun
         try:
             with sheet_user_context(self.actor_key):
                 worksheet = get_sheets_repo().income_sheet()
-                row, _description, _amount = await asyncio.to_thread(log_income_row, values, worksheet)
+                row, _description, _amount, action_id = await asyncio.to_thread(
+                    log_income_row,
+                    values,
+                    worksheet,
+                    return_action_id=True,
+                    metadata_extra={
+                        "origin": "bank_reconciliation",
+                        "bank_reconciliation_id": str(self.item.id),
+                    },
+                )
             service = build_banking_service()
             confirmed = await asyncio.to_thread(
                 service.confirm_reconciliation_item,
                 self.owner_key,
                 self.item.id,
+                matched_action_log_id=action_id,
                 matched_sheet_ref=f"income!row {row}",
                 notes="logged as income/refund from bank reconciliation",
             )

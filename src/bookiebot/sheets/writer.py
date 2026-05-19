@@ -53,7 +53,7 @@ async def write_income_to_sheet(data, message):
         )
 
 
-def log_income_row(data, worksheet):
+def log_income_row(data, worksheet, *, return_action_id: bool = False, metadata_extra: dict | None = None):
     try:
         summary_cell = worksheet.find("Monthly Income:")
         summary_row = summary_cell.row
@@ -78,7 +78,7 @@ def log_income_row(data, worksheet):
     amount = data.get("amount", "")
 
     worksheet.insert_row(["", description, amount], index=insert_row_index)
-    record_undo_action(
+    action_id = record_undo_action(
         get_current_discord_user_id(),
         UndoAction(
             worksheet="income",
@@ -87,10 +87,12 @@ def log_income_row(data, worksheet):
             columns=[],
             previous_values=[],
             new_values=["", str(description), str(amount)],
-            metadata={"type": "income", "source": str(data.get("source") or "")},
+            metadata={"type": "income", "source": str(data.get("source") or ""), **(metadata_extra or {})},
             description=f"income ${amount} from {data.get('source')}",
         ),
     )
+    if return_action_id:
+        return insert_row_index, description, amount, action_id
     return insert_row_index, description, amount
 
 
@@ -265,7 +267,7 @@ def log_category_row(values, worksheet, category):
     return first_empty_row
 
 
-def record_expense_undo(category, row, values_or_amount, person, user_key=None):
+def record_expense_undo(category, row, values_or_amount, person, user_key=None, metadata_extra: dict | None = None):
     columns = get_category_columns[category]["columns"]
     col_indexes = [column_index_from_string(col_letter) for col_letter in columns.values()]
     if isinstance(values_or_amount, dict):
@@ -275,7 +277,7 @@ def record_expense_undo(category, row, values_or_amount, person, user_key=None):
     else:
         amount = values_or_amount
         new_values = []
-    record_undo_action(
+    return record_undo_action(
         user_key or get_current_discord_user_id(),
         UndoAction(
             worksheet="expense",
@@ -284,7 +286,7 @@ def record_expense_undo(category, row, values_or_amount, person, user_key=None):
             columns=col_indexes,
             previous_values=["" for _ in col_indexes],
             new_values=new_values,
-            metadata={"type": "expense", "category": category, "person": str(person)},
+            metadata={"type": "expense", "category": category, "person": str(person), **(metadata_extra or {})},
             description=f"{category} expense ${amount} for {person}",
         ),
     )

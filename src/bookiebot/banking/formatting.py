@@ -108,6 +108,15 @@ def format_reconciliation_review(items: list[ReconciliationItem]) -> str:
     return "Unresolved bank reconciliation items:\n```text\n" + "\n".join([header, divider, *rows]) + "\n```"
 
 
+def format_resolved_reconciliation_review(items: list[ReconciliationItem]) -> str:
+    if not items:
+        return "No resolved bank reconciliation items."
+    header = f"{'ID':>4}  {'Date':<5}  {'Amt':>8}  {'Status':<9}  {'Action':<10}  Name"
+    divider = "-" * len(header)
+    rows = [_format_resolved_reconciliation_review_row(item) for item in items]
+    return "Resolved bank reconciliation items:\n```text\n" + "\n".join([header, divider, *rows]) + "\n```"
+
+
 def format_reconciliation_detail(
     item: ReconciliationItem,
     candidates: list[ActionLogCandidate],
@@ -360,6 +369,22 @@ def _format_reconciliation_review_row(item: ReconciliationItem) -> str:
         f"{_short_date(date):<5}  "
         f"{_short_money(amount):>8}  "
         f"{_clip(item.classification, 8):<8}  "
+        f"{_clip(name, 24)}"
+    )
+
+
+def _format_resolved_reconciliation_review_row(item: ReconciliationItem) -> str:
+    transaction = item.transaction
+    date = transaction.date or transaction.authorized_date or "unknown"
+    amount = abs(transaction.amount)
+    name = transaction.merchant_name or transaction.name
+    action = item.matched_action_log_id or item.matched_sheet_ref or ""
+    return (
+        f"{item.id:>4}  "
+        f"{_short_date(date):<5}  "
+        f"{_short_money(amount):>8}  "
+        f"{_clip(item.status, 9):<9}  "
+        f"{_clip(action, 10):<10}  "
         f"{_clip(name, 24)}"
     )
 

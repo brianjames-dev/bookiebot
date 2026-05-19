@@ -17,6 +17,7 @@ from bookiebot.banking.formatting import (
     format_bank_transaction_table,
     format_reconciliation_preview,
     format_reconciliation_review,
+    format_resolved_reconciliation_review,
 )
 from bookiebot.banking.plaid_client import PlaidApiError
 from bookiebot.banking.service import build_banking_service
@@ -100,10 +101,21 @@ def _log_bank_reconciliation_expense(
     with sheet_user_context(actor_key):
         worksheet = get_sheets_repo().expense_sheet()
         row = log_category_row(values, worksheet, category)
-        record_expense_undo(category, row, values, clean_person, actor_key)
+        action_id = record_expense_undo(
+            category,
+            row,
+            values,
+            clean_person,
+            actor_key,
+            {
+                "origin": "bank_reconciliation",
+                "bank_reconciliation_id": str(reconciliation_id),
+            },
+        )
     confirmed = service.confirm_reconciliation_item(
         owner_key,
         reconciliation_id,
+        matched_action_log_id=action_id,
         matched_sheet_ref=f"expense!row {row}",
     )
     return confirmed, "logged"
@@ -136,10 +148,19 @@ def _log_bank_reconciliation_income(
     }
     with sheet_user_context(actor_key):
         worksheet = get_sheets_repo().income_sheet()
-        row, _description, _amount = log_income_row(values, worksheet)
+        row, _description, _amount, action_id = log_income_row(
+            values,
+            worksheet,
+            return_action_id=True,
+            metadata_extra={
+                "origin": "bank_reconciliation",
+                "bank_reconciliation_id": str(reconciliation_id),
+            },
+        )
     confirmed = service.confirm_reconciliation_item(
         owner_key,
         reconciliation_id,
+        matched_action_log_id=action_id,
         matched_sheet_ref=f"income!row {row}",
     )
     return confirmed, "logged"
@@ -752,6 +773,31 @@ def register_commands(tree: app_commands.CommandTree):
 
         await interaction.followup.send(content=format_reconciliation_review(items)[:1900], ephemeral=True)
 
+    @tree.command(name="debug_bank_resolved", description="(Admin) Show resolved bank reconciliation items")
+    @app_commands.describe(limit="Number of resolved items to show (default 25, max 100)")
+    async def debug_bank_resolved(interaction: discord.Interaction, limit: int = 25):
+        if not auth.is_debug_allowed(interaction.user):
+            await interaction.response.send_message("❌ Not authorized.", ephemeral=True)
+            return
+
+        await interaction.response.defer(ephemeral=True)
+        try:
+            owner = get_user_config(interaction.user.id)
+            service = build_banking_service()
+            items = await asyncio.to_thread(
+                service.resolved_reconciliation_items,
+                owner.budget_owner_key,
+                limit=max(1, min(limit, 100)),
+            )
+        except Exception as exc:
+            await interaction.followup.send(
+                content=f"❌ Could not load resolved bank items: {type(exc).__name__}: {exc}",
+                ephemeral=True,
+            )
+            return
+
+        await interaction.followup.send(content=format_resolved_reconciliation_review(items)[:1900], ephemeral=True)
+
     @tree.command(name="debug_bank_digest", description="(Admin) Send the bank reconciliation digest now")
     @app_commands.describe(force="Send even if today's digest was already marked as sent")
     async def debug_bank_digest(interaction: discord.Interaction, force: bool = True):
@@ -866,6 +912,59 @@ def register_commands(tree: app_commands.CommandTree):
                 f"`{transaction.name} - ${abs(transaction.amount):.2f}`.\n"
                 "Run `/debug_bank_review_detail` to test the guided flow again."
             ),
+            ephemeral=True,
+        )
+
+    @tree.command(name="debug_bank_revert", description="(Admin) Reopen a bank item and optionally undo its sheet change")
+    @app_commands.describe(
+        reconciliation_id="ID shown by /debug_bank_resolved",
+        undo_sheet_action="Also undo the sheet action BookieBot created for this reconciliation",
+    )
+    async def debug_bank_revert(
+        interaction: discord.Interaction,
+        reconciliation_id: int,
+        undo_sheet_action: bool = False,
+    ):
+        if not auth.is_debug_allowed(interaction.user):
+            await interaction.response.send_message("❌ Not authorized.", ephemeral=True)
+            return
+
+        await interaction.response.defer(ephemeral=True)
+        try:
+            owner = get_user_config(interaction.user.id)
+            service = build_banking_service()
+            item, details, status = await asyncio.to_thread(
+                service.revert_reconciliation_item,
+                owner.budget_owner_key,
+                reconciliation_id,
+                actor_key=str(interaction.user.id),
+                undo_sheet_action=undo_sheet_action,
+            )
+        except Exception as exc:
+            await interaction.followup.send(
+                content=f"❌ Could not revert bank item: {type(exc).__name__}: {exc}",
+                ephemeral=True,
+            )
+            return
+
+        if status == "not_found" or item is None:
+            await interaction.followup.send(
+                content=f"No bank reconciliation item `{reconciliation_id}` was found for {owner.name}.",
+                ephemeral=True,
+            )
+            return
+
+        transaction = item.transaction
+        detail_text = "\n".join(f"- {detail}" for detail in details)
+        if not detail_text:
+            detail_text = "- Sheet actions were left unchanged."
+        await interaction.followup.send(
+            content=(
+                f"Reverted bank reconciliation item `{item.id}` for {owner.name}: "
+                f"`{transaction.name} - ${abs(transaction.amount):.2f}`.\n"
+                f"{detail_text}\n"
+                "Run `/debug_bank_review_detail` to test it again."
+            )[:1900],
             ephemeral=True,
         )
 

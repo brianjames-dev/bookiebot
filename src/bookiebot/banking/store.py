@@ -731,6 +731,40 @@ class BankStore:
             ).fetchall()
         return [_reconciliation_item_from_row(row) for row in rows]
 
+    def resolved_reconciliation_items(self, owner_key: str, limit: int = 25) -> list[ReconciliationItem]:
+        safe_limit = max(1, min(int(limit), 100))
+        self.initialize()
+        with self.connect() as conn:
+            rows = conn.execute(
+                """
+                SELECT
+                    r.*,
+                    t.provider_transaction_id,
+                    t.date,
+                    t.authorized_date,
+                    t.name,
+                    t.merchant_name,
+                    t.amount,
+                    t.pending,
+                    t.payment_channel,
+                    t.updated_at,
+                    a.name AS account_name,
+                    a.mask AS account_mask,
+                    a.type AS account_type,
+                    a.subtype AS account_subtype
+                FROM bank_reconciliation_items r
+                JOIN bank_transactions t ON t.id = r.bank_transaction_id
+                LEFT JOIN bank_accounts a ON a.id = t.account_id
+                WHERE r.owner_key = ?
+                  AND t.removed_at IS NULL
+                  AND r.status IN ('confirmed', 'ignored', 'import_requested')
+                ORDER BY COALESCE(r.resolved_at, r.ignored_at, r.last_seen_at) DESC, r.id DESC
+                LIMIT ?
+                """,
+                (owner_key, safe_limit),
+            ).fetchall()
+        return [_reconciliation_item_from_row(row) for row in rows]
+
     def ignore_reconciliation_item(self, owner_key: str, reconciliation_id: int) -> ReconciliationItem | None:
         now = utc_now_iso()
         self.initialize()

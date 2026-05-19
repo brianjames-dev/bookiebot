@@ -1015,6 +1015,201 @@ def test_confirm_reconciliation_action_match_updates_sheet_amount_when_needed(mo
     ]
 
 
+def test_resolved_reconciliation_items_lists_confirmed_items(tmp_path):
+    store = BankStore(tmp_path / "banking.sqlite3", TokenCipher("test-secret-key"))
+    service = BankingService(
+        config=BankingConfig(
+            plaid_client_id="client",
+            plaid_secret="secret",
+            plaid_env="sandbox",
+            token_encryption_key="test-secret-key",
+            sqlite_path=Path("unused.sqlite3"),
+        ),
+        store=store,
+        plaid=PlaidClient(
+            BankingConfig(
+                plaid_client_id="client",
+                plaid_secret="secret",
+                plaid_env="sandbox",
+                token_encryption_key="test-secret-key",
+                sqlite_path=Path("unused.sqlite3"),
+            )
+        ),
+    )
+    service.seed_unmatched_debug_transaction("brian", name="Coffee", amount=12.34, date="2026-05-17")
+    item = service.reconciliation_preview("brian", force=True).items[0]
+    service.confirm_reconciliation_item(
+        "brian",
+        item.id,
+        matched_action_log_id="abc123",
+        matched_sheet_ref="expense!row 12",
+    )
+
+    resolved = service.resolved_reconciliation_items("brian", limit=10)
+
+    assert [item.id for item in resolved] == [item.id]
+    assert resolved[0].status == "confirmed"
+
+
+def test_revert_reconciliation_item_can_undo_bank_amount_update(monkeypatch, tmp_path):
+    original_action = LoggedAction(
+        id="abc123",
+        created_at="2026-05-17T12:00:00",
+        user_key="676638528590970917",
+        action=UndoAction(
+            worksheet="expense",
+            kind="clear_cells",
+            row=12,
+            columns=[14, 15, 16, 17, 18],
+            previous_values=["", "", "", "", ""],
+            new_values=["5/17/2026", "food", "20.89", "Glizzy", "Brian (BofA)"],
+            metadata={"type": "expense", "category": "food", "person": "Brian (BofA)"},
+            description="food expense $20.89 for Brian (BofA)",
+        ),
+    )
+    undone = []
+    store = BankStore(tmp_path / "banking.sqlite3", TokenCipher("test-secret-key"))
+    service = BankingService(
+        config=BankingConfig(
+            plaid_client_id="client",
+            plaid_secret="secret",
+            plaid_env="sandbox",
+            token_encryption_key="test-secret-key",
+            sqlite_path=Path("unused.sqlite3"),
+        ),
+        store=store,
+        plaid=PlaidClient(
+            BankingConfig(
+                plaid_client_id="client",
+                plaid_secret="secret",
+                plaid_env="sandbox",
+                token_encryption_key="test-secret-key",
+                sqlite_path=Path("unused.sqlite3"),
+            )
+        ),
+    )
+    service.seed_unmatched_debug_transaction("brian", name="Glizzy", amount=20.89, date="2026-05-17")
+    item = service.reconciliation_preview("brian", force=True).items[0]
+    update_action = LoggedAction(
+        id="upd123",
+        created_at="2026-05-17T12:01:00",
+        user_key="676638528590970917",
+        action=UndoAction(
+            worksheet="expense",
+            kind="restore_cells",
+            row=12,
+            columns=[16],
+            previous_values=["20.09"],
+            new_values=["20.89"],
+            metadata={
+                "type": "update",
+                "updated_action_id": "abc123",
+                "origin": "bank_reconciliation",
+                "bank_reconciliation_id": str(item.id),
+            },
+            description="updated food expense $20.89 for Brian (BofA)",
+        ),
+    )
+    monkeypatch.setattr(banking_service, "read_active_logged_actions", lambda _actor_key: [original_action, update_action])
+    monkeypatch.setattr(
+        banking_service,
+        "undo_logged_action",
+        lambda user_key, action_id: (undone.append((user_key, action_id)) or (True, "Undid amount update")),
+    )
+    service.confirm_reconciliation_item(
+        "brian",
+        item.id,
+        matched_action_log_id="abc123",
+        matched_sheet_ref="expense!row 12",
+    )
+
+    reopened, details, status = service.revert_reconciliation_item(
+        "brian",
+        item.id,
+        actor_key="676638528590970917",
+        undo_sheet_action=True,
+    )
+
+    assert status == "reopened"
+    assert reopened is not None
+    assert reopened.status == "needs_review"
+    assert undone == [("676638528590970917", "upd123")]
+    assert any("Undid amount update" in detail for detail in details)
+
+
+def test_revert_reconciliation_item_can_delete_bank_logged_row(monkeypatch, tmp_path):
+    logged_action = LoggedAction(
+        id="new123",
+        created_at="2026-05-17T12:00:00",
+        user_key="676638528590970917",
+        action=UndoAction(
+            worksheet="expense",
+            kind="clear_cells",
+            row=12,
+            columns=[14, 15, 16, 17, 18],
+            previous_values=["", "", "", "", ""],
+            new_values=["5/17/2026", "food", "12.34", "Coffee", "Brian (BofA)"],
+            metadata={
+                "type": "expense",
+                "category": "food",
+                "person": "Brian (BofA)",
+                "origin": "bank_reconciliation",
+                "bank_reconciliation_id": "999",
+            },
+            description="food expense $12.34 for Brian (BofA)",
+        ),
+    )
+    deleted = []
+    monkeypatch.setattr(banking_service, "read_active_logged_actions", lambda _actor_key: [logged_action])
+    monkeypatch.setattr(
+        banking_service,
+        "delete_recent_action",
+        lambda user_key, action_id=None, **_kwargs: (deleted.append((user_key, action_id)) or (True, "Deleted row")),
+    )
+    store = BankStore(tmp_path / "banking.sqlite3", TokenCipher("test-secret-key"))
+    service = BankingService(
+        config=BankingConfig(
+            plaid_client_id="client",
+            plaid_secret="secret",
+            plaid_env="sandbox",
+            token_encryption_key="test-secret-key",
+            sqlite_path=Path("unused.sqlite3"),
+        ),
+        store=store,
+        plaid=PlaidClient(
+            BankingConfig(
+                plaid_client_id="client",
+                plaid_secret="secret",
+                plaid_env="sandbox",
+                token_encryption_key="test-secret-key",
+                sqlite_path=Path("unused.sqlite3"),
+            )
+        ),
+    )
+    service.seed_unmatched_debug_transaction("brian", name="Coffee", amount=12.34, date="2026-05-17")
+    item = service.reconciliation_preview("brian", force=True).items[0]
+    service.confirm_reconciliation_item(
+        "brian",
+        item.id,
+        matched_action_log_id="new123",
+        matched_sheet_ref="expense!row 12",
+        notes="logged as expense from bank reconciliation",
+    )
+
+    reopened, details, status = service.revert_reconciliation_item(
+        "brian",
+        item.id,
+        actor_key="676638528590970917",
+        undo_sheet_action=True,
+    )
+
+    assert status == "reopened"
+    assert reopened is not None
+    assert reopened.status == "needs_review"
+    assert deleted == [("676638528590970917", "new123")]
+    assert any("Deleted logged sheet row" in detail for detail in details)
+
+
 def test_confirm_reconciliation_action_group_match_requires_exact_total(monkeypatch, tmp_path):
     actions = [
         LoggedAction(
