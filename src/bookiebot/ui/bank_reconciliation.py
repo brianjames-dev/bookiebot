@@ -26,8 +26,9 @@ class BankReconciliationDetailView(ViewBase):  # type: ignore[misc]
         callback_func: Callable,
         *,
         fallback_available: bool = True,
+        session_controls: bool = False,
     ):
-        super().__init__(timeout=180)
+        super().__init__(timeout=600)
         for index, group in enumerate(groups[:2], start=1):
             total = f"${group.total_amount:.2f}"
             label = f"Match group {index} ({total})" if len(groups) > 1 else f"Match grouped rows ({total})"
@@ -42,4 +43,13 @@ class BankReconciliationDetailView(ViewBase):  # type: ignore[misc]
             )
         if fallback_available:
             self.add_item(BankReconciliationButton("Show more possible matches", "fallback", callback_func))
+        if session_controls:
+            self.add_item(BankReconciliationButton("Skip for now", "skip", callback_func))
         self.add_item(BankReconciliationButton("Ignore this bank item", "ignore", callback_func))
+
+
+class BankReconciliationDigestView(ViewBase):  # type: ignore[misc]
+    def __init__(self, callback_func: Callable):
+        super().__init__(timeout=600)
+        self.add_item(BankReconciliationButton("Reconcile Now", "start", callback_func))
+        self.add_item(BankReconciliationButton("Remind Me Later", "later", callback_func))

@@ -9,6 +9,7 @@ from typing import Any
 from bookiebot.banking.formatting import format_reconciliation_review
 from bookiebot.banking.models import ReconciliationPreview
 from bookiebot.banking.service import build_banking_service
+from bookiebot.core.bank_reconciliation_flow import send_next_bank_reconciliation_item
 from bookiebot.sheets.routing import (
     APPLE_SHORTCUT_RELAY_USER_ID,
     get_discord_user_config,
@@ -16,6 +17,7 @@ from bookiebot.sheets.routing import (
     now_pacific,
 )
 from bookiebot.sheets.undo import has_system_event, record_system_event
+from bookiebot.ui.bank_reconciliation import BankReconciliationDigestView
 
 logger = logging.getLogger(__name__)
 
@@ -107,9 +109,36 @@ async def send_due_bank_reconciliation_digest(client: Any, today: date | None = 
         message = await asyncio.to_thread(_prepare_bank_reconciliation_digest, actor_key, mention, current)
         if not message:
             continue
-        await channel.send(message)
+        await channel.send(message, view=_bank_reconciliation_digest_view(actor_key))
         sent += 1
     return sent
+
+
+def _bank_reconciliation_digest_view(actor_key: str) -> BankReconciliationDigestView:
+    async def handle_action(interaction: Any, action: str) -> None:
+        if str(getattr(interaction.user, "id", "")) != str(actor_key):
+            await interaction.response.send_message(
+                "This reconciliation inbox belongs to another user.",
+                ephemeral=True,
+            )
+            return
+        await interaction.response.defer(ephemeral=True)
+        if action == "later":
+            await interaction.followup.send(
+                "Okay. I will leave these bank reconciliation items unresolved for later.",
+                ephemeral=True,
+            )
+            return
+        if action == "start":
+            owner = get_user_config(actor_key)
+            await send_next_bank_reconciliation_item(
+                interaction,
+                owner_key=owner.budget_owner_key,
+                owner_name=owner.name,
+                actor_key=actor_key,
+            )
+
+    return BankReconciliationDigestView(handle_action)
 
 
 def _prepare_bank_reconciliation_digest(actor_key: str, mention: str, current: date) -> str | None:
