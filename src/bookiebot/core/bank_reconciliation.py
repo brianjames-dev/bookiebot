@@ -28,8 +28,6 @@ from bookiebot.ui.bank_reconciliation import (
 logger = logging.getLogger(__name__)
 
 _BANK_RECONCILIATION_TASK: asyncio.Task | None = None
-_BANK_RECONCILIATION_SNOOZES: dict[str, datetime] = {}
-_BANK_RECONCILIATION_DEFAULT_SNOOZES: dict[str, str] = {}
 
 
 def _bank_reconciliation_enabled() -> bool:
@@ -130,10 +128,13 @@ async def send_due_bank_reconciliation_digest(client: Any, today: date | None = 
 
 
 async def _send_due_snoozed_bank_reconciliation_digests(channel: Any, current_time: datetime) -> int:
+    service = build_banking_service()
     due_actor_keys = [
         actor_key
-        for actor_key, remind_at in list(_BANK_RECONCILIATION_SNOOZES.items())
-        if current_time >= remind_at
+        for actor_key, _remind_at in await asyncio.to_thread(
+            service.due_reconciliation_snoozes,
+            current_time.isoformat(),
+        )
     ]
     sent = 0
     for actor_key in due_actor_keys:
@@ -145,7 +146,7 @@ async def _send_due_snoozed_bank_reconciliation_digests(channel: Any, current_ti
             mark_sent=False,
             force=True,
         )
-        _BANK_RECONCILIATION_SNOOZES.pop(actor_key, None)
+        await asyncio.to_thread(service.clear_reconciliation_snooze_until, actor_key)
         if not message:
             continue
         await channel.send(f"{message}\n\u200b", view=bank_reconciliation_digest_view(actor_key))
@@ -178,10 +179,11 @@ def bank_reconciliation_digest_view(actor_key: str) -> BankReconciliationDigestV
 
 
 async def _handle_bank_reconciliation_snooze(interaction: Any, actor_key: str) -> None:
-    default = _BANK_RECONCILIATION_DEFAULT_SNOOZES.get(actor_key)
+    service = build_banking_service()
+    default = await asyncio.to_thread(service.get_reconciliation_default_snooze, actor_key)
     if default:
         label, remind_at = _resolve_snooze(default, now_pacific())
-        _BANK_RECONCILIATION_SNOOZES[actor_key] = remind_at
+        await asyncio.to_thread(service.set_reconciliation_snooze_until, actor_key, remind_at.isoformat())
         await interaction.followup.send(
             content=(
                 f"I will remind you {label}.\n"
@@ -208,9 +210,10 @@ def _snooze_options_view(actor_key: str) -> BankReconciliationSnoozeView:
             return
         await interaction.response.defer(ephemeral=True)
         option = action.split(":", 1)[1]
-        _BANK_RECONCILIATION_DEFAULT_SNOOZES[actor_key] = option
         label, remind_at = _resolve_snooze(option, now_pacific())
-        _BANK_RECONCILIATION_SNOOZES[actor_key] = remind_at
+        service = build_banking_service()
+        await asyncio.to_thread(service.set_reconciliation_default_snooze, actor_key, option)
+        await asyncio.to_thread(service.set_reconciliation_snooze_until, actor_key, remind_at.isoformat())
         await interaction.followup.send(
             f"I will remind you {label}. I saved that as your default reminder time.",
             ephemeral=True,
@@ -251,8 +254,9 @@ async def _send_specific_time_modal(interaction: Any, actor_key: str) -> None:
                     ephemeral=True,
                 )
                 return
-            _BANK_RECONCILIATION_DEFAULT_SNOOZES[actor_key] = f"specific:{raw_value}"
-            _BANK_RECONCILIATION_SNOOZES[actor_key] = parsed
+            service = build_banking_service()
+            await asyncio.to_thread(service.set_reconciliation_default_snooze, actor_key, f"specific:{raw_value}")
+            await asyncio.to_thread(service.set_reconciliation_snooze_until, actor_key, parsed.isoformat())
             await modal_interaction.response.send_message(
                 f"I will remind you at {_format_reminder_time(parsed)}. I saved that as your default reminder time.",
                 ephemeral=True,
