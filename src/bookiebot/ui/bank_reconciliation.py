@@ -58,3 +58,18 @@ class BankReconciliationDigestView(ViewBase):  # type: ignore[misc]
         super().__init__(timeout=600)
         self.add_item(BankReconciliationButton("Reconcile Now", "start", callback_func))
         self.add_item(BankReconciliationButton("Remind Me Later", "later", callback_func))
+
+
+class BankReconciliationSnoozeView(ViewBase):  # type: ignore[misc]
+    def __init__(self, callback_func: Callable):
+        super().__init__(timeout=600)
+        self.add_item(BankReconciliationButton("1 hour", "snooze:1h", callback_func))
+        self.add_item(BankReconciliationButton("2 hours", "snooze:2h", callback_func))
+        self.add_item(BankReconciliationButton("Specific Time", "snooze:specific", callback_func))
+        self.add_item(BankReconciliationButton("Tomorrow (same time)", "snooze:tomorrow", callback_func))
+
+
+class BankReconciliationChangeDefaultView(ViewBase):  # type: ignore[misc]
+    def __init__(self, callback_func: Callable):
+        super().__init__(timeout=600)
+        self.add_item(BankReconciliationButton("Tap Here", "change_default", callback_func))

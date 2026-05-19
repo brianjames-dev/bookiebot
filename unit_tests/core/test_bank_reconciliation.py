@@ -1,5 +1,11 @@
+from datetime import datetime
+
 from bookiebot.banking.models import BankTransaction, ReconciliationItem, ReconciliationPreview
-from bookiebot.core.bank_reconciliation import format_bank_reconciliation_digest
+from bookiebot.core.bank_reconciliation import (
+    _parse_specific_snooze_time,
+    _resolve_snooze,
+    format_bank_reconciliation_digest,
+)
 
 
 def test_format_bank_reconciliation_digest_lists_unresolved_items():
@@ -51,3 +57,28 @@ def test_format_bank_reconciliation_digest_lists_unresolved_items():
     assert "Checked this run: `1`" in output
     assert "Unresolved bank reconciliation items:" in output
     assert "  42  05-18    $12.34  expense   Unlogged Coffee" in output
+
+
+def test_resolve_snooze_options_use_readable_labels():
+    current = datetime(2026, 5, 18, 14, 30)
+
+    label, remind_at = _resolve_snooze("1h", current)
+    assert label == "in 1 hour"
+    assert remind_at == datetime(2026, 5, 18, 15, 30)
+
+    label, remind_at = _resolve_snooze("2h", current)
+    assert label == "in 2 hours"
+    assert remind_at == datetime(2026, 5, 18, 16, 30)
+
+    label, remind_at = _resolve_snooze("tomorrow", current)
+    assert label == "tomorrow at the same time"
+    assert remind_at == datetime(2026, 5, 19, 14, 30)
+
+
+def test_parse_specific_snooze_time_rolls_past_times_to_tomorrow():
+    current = datetime(2026, 5, 18, 14, 30)
+
+    assert _parse_specific_snooze_time("3:30 PM", current) == datetime(2026, 5, 18, 15, 30)
+    assert _parse_specific_snooze_time("9 AM", current) == datetime(2026, 5, 19, 9, 0)
+    assert _parse_specific_snooze_time("tomorrow 9 AM", current) == datetime(2026, 5, 19, 9, 0)
+    assert _parse_specific_snooze_time("not a time", current) is None

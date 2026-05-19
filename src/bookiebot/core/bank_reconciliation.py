@@ -1,10 +1,12 @@
 from __future__ import annotations
 
 import asyncio
-from datetime import date, datetime
+from datetime import date, datetime, timedelta
 import logging
 import os
 from typing import Any
+
+import discord
 
 from bookiebot.banking.formatting import format_reconciliation_review
 from bookiebot.banking.models import ReconciliationPreview
@@ -17,11 +19,17 @@ from bookiebot.sheets.routing import (
     now_pacific,
 )
 from bookiebot.sheets.undo import has_system_event, record_system_event
-from bookiebot.ui.bank_reconciliation import BankReconciliationDigestView
+from bookiebot.ui.bank_reconciliation import (
+    BankReconciliationChangeDefaultView,
+    BankReconciliationDigestView,
+    BankReconciliationSnoozeView,
+)
 
 logger = logging.getLogger(__name__)
 
 _BANK_RECONCILIATION_TASK: asyncio.Task | None = None
+_BANK_RECONCILIATION_SNOOZES: dict[str, datetime] = {}
+_BANK_RECONCILIATION_DEFAULT_SNOOZES: dict[str, str] = {}
 
 
 def _bank_reconciliation_enabled() -> bool:
@@ -95,15 +103,16 @@ async def send_due_bank_reconciliation_digest(client: Any, today: date | None = 
     if not _bank_reconciliation_enabled():
         return 0
     current_time = now_pacific()
-    if today is None and not _is_eligible(current_time):
-        return 0
 
     channel = _target_channel(client)
     if channel is None:
         logger.warning("Bank reconciliation digest skipped because no target Discord channel was found")
         return 0
 
-    sent = 0
+    sent = await _send_due_snoozed_bank_reconciliation_digests(channel, current_time)
+    if today is None and not _is_eligible(current_time):
+        return sent
+
     current = today or current_time.date()
     for actor_key, mention in _notification_users():
         message = await asyncio.to_thread(
@@ -113,6 +122,30 @@ async def send_due_bank_reconciliation_digest(client: Any, today: date | None = 
             current,
             mark_sent=True,
         )
+        if not message:
+            continue
+        await channel.send(f"{message}\n\u200b", view=bank_reconciliation_digest_view(actor_key))
+        sent += 1
+    return sent
+
+
+async def _send_due_snoozed_bank_reconciliation_digests(channel: Any, current_time: datetime) -> int:
+    due_actor_keys = [
+        actor_key
+        for actor_key, remind_at in list(_BANK_RECONCILIATION_SNOOZES.items())
+        if current_time >= remind_at
+    ]
+    sent = 0
+    for actor_key in due_actor_keys:
+        message = await asyncio.to_thread(
+            prepare_bank_reconciliation_digest,
+            actor_key,
+            f"<@{actor_key}>",
+            current_time.date(),
+            mark_sent=False,
+            force=True,
+        )
+        _BANK_RECONCILIATION_SNOOZES.pop(actor_key, None)
         if not message:
             continue
         await channel.send(f"{message}\n\u200b", view=bank_reconciliation_digest_view(actor_key))
@@ -130,10 +163,7 @@ def bank_reconciliation_digest_view(actor_key: str) -> BankReconciliationDigestV
             return
         await interaction.response.defer(ephemeral=True)
         if action == "later":
-            await interaction.followup.send(
-                "Okay. I will leave these bank reconciliation items unresolved for later.",
-                ephemeral=True,
-            )
+            await _handle_bank_reconciliation_snooze(interaction, actor_key)
             return
         if action == "start":
             owner = get_user_config(actor_key)
@@ -145,6 +175,134 @@ def bank_reconciliation_digest_view(actor_key: str) -> BankReconciliationDigestV
             )
 
     return BankReconciliationDigestView(handle_action)
+
+
+async def _handle_bank_reconciliation_snooze(interaction: Any, actor_key: str) -> None:
+    default = _BANK_RECONCILIATION_DEFAULT_SNOOZES.get(actor_key)
+    if default:
+        label, remind_at = _resolve_snooze(default, now_pacific())
+        _BANK_RECONCILIATION_SNOOZES[actor_key] = remind_at
+        await interaction.followup.send(
+            content=(
+                f"I will remind you {label}.\n"
+                "If you want to change the default reminder time, tap below."
+            ),
+            view=_change_default_view(actor_key),
+            ephemeral=True,
+        )
+        return
+    await interaction.followup.send(
+        content="When should I remind you again?",
+        view=_snooze_options_view(actor_key),
+        ephemeral=True,
+    )
+
+
+def _snooze_options_view(actor_key: str) -> BankReconciliationSnoozeView:
+    async def handle_snooze(interaction: Any, action: str) -> None:
+        if str(getattr(interaction.user, "id", "")) != str(actor_key):
+            await interaction.response.send_message("This reminder belongs to another user.", ephemeral=True)
+            return
+        if action == "snooze:specific":
+            await _send_specific_time_modal(interaction, actor_key)
+            return
+        await interaction.response.defer(ephemeral=True)
+        option = action.split(":", 1)[1]
+        _BANK_RECONCILIATION_DEFAULT_SNOOZES[actor_key] = option
+        label, remind_at = _resolve_snooze(option, now_pacific())
+        _BANK_RECONCILIATION_SNOOZES[actor_key] = remind_at
+        await interaction.followup.send(
+            f"I will remind you {label}. I saved that as your default reminder time.",
+            ephemeral=True,
+        )
+
+    return BankReconciliationSnoozeView(handle_snooze)
+
+
+def _change_default_view(actor_key: str) -> BankReconciliationChangeDefaultView:
+    async def handle_change(interaction: Any, action: str) -> None:
+        if str(getattr(interaction.user, "id", "")) != str(actor_key):
+            await interaction.response.send_message("This reminder belongs to another user.", ephemeral=True)
+            return
+        await interaction.response.defer(ephemeral=True)
+        await interaction.followup.send(
+            content="Choose a new default reminder time.",
+            view=_snooze_options_view(actor_key),
+            ephemeral=True,
+        )
+
+    return BankReconciliationChangeDefaultView(handle_change)
+
+
+async def _send_specific_time_modal(interaction: Any, actor_key: str) -> None:
+    class SpecificTimeModal(discord.ui.Modal, title="Bank reminder time"):
+        reminder_time = discord.ui.TextInput(
+            label="Time today or tomorrow",
+            placeholder="Examples: 3:30 PM, 15:30, tomorrow 9 AM",
+            max_length=40,
+        )
+
+        async def on_submit(self, modal_interaction: discord.Interaction) -> None:
+            raw_value = str(self.reminder_time.value)
+            parsed = _parse_specific_snooze_time(raw_value, now_pacific())
+            if parsed is None:
+                await modal_interaction.response.send_message(
+                    "I could not understand that time. Try `3:30 PM`, `15:30`, or `tomorrow 9 AM`.",
+                    ephemeral=True,
+                )
+                return
+            _BANK_RECONCILIATION_DEFAULT_SNOOZES[actor_key] = f"specific:{raw_value}"
+            _BANK_RECONCILIATION_SNOOZES[actor_key] = parsed
+            await modal_interaction.response.send_message(
+                f"I will remind you at {_format_reminder_time(parsed)}. I saved that as your default reminder time.",
+                ephemeral=True,
+            )
+
+    await interaction.response.send_modal(SpecificTimeModal())
+
+
+def _resolve_snooze(option: str, current: datetime) -> tuple[str, datetime]:
+    if option == "1h":
+        return "in 1 hour", current + timedelta(hours=1)
+    if option == "2h":
+        return "in 2 hours", current + timedelta(hours=2)
+    if option == "tomorrow":
+        return "tomorrow at the same time", current + timedelta(days=1)
+    if option.startswith("specific:"):
+        parsed = _parse_specific_snooze_time(option.split(":", 1)[1], current)
+        if parsed is not None:
+            return f"at {_format_reminder_time(parsed)}", parsed
+    return "in 1 hour", current + timedelta(hours=1)
+
+
+def _parse_specific_snooze_time(raw_value: str, current: datetime) -> datetime | None:
+    text = raw_value.strip().lower()
+    if not text:
+        return None
+    day_offset = 0
+    if text.startswith("tomorrow"):
+        day_offset = 1
+        text = text.replace("tomorrow", "", 1).strip()
+    formats = ("%I:%M %p", "%I %p", "%H:%M", "%H")
+    for fmt in formats:
+        try:
+            parsed = datetime.strptime(text.upper(), fmt)
+        except ValueError:
+            continue
+        candidate = current.replace(
+            hour=parsed.hour,
+            minute=parsed.minute,
+            second=0,
+            microsecond=0,
+        ) + timedelta(days=day_offset)
+        if candidate <= current:
+            candidate += timedelta(days=1)
+        return candidate
+    return None
+
+
+def _format_reminder_time(value: datetime) -> str:
+    return value.strftime("%-I:%M %p on %-m/%-d")
 
 
 def prepare_bank_reconciliation_digest(
