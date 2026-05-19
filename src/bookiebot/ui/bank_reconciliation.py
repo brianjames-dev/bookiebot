@@ -8,7 +8,12 @@ from bookiebot.ui.card import ButtonBase, ButtonStyle, Interaction, ViewBase
 
 class BankReconciliationButton(ButtonBase):  # type: ignore[misc]
     def __init__(self, label: str, action: str, callback_func: Callable):
-        style_name = "secondary" if action in {"fallback", "ignore"} else "primary"
+        if action == "ignore":
+            style_name = "danger"
+        elif action in {"fallback", "later", "skip"}:
+            style_name = "secondary"
+        else:
+            style_name = "primary"
         style_value = getattr(ButtonStyle, style_name, getattr(ButtonStyle, "primary", ButtonStyle.primary))
         super().__init__(label=label, style=style_value, custom_id=f"bank_reconcile:{action}")
         self.action = action
@@ -41,11 +46,11 @@ class BankReconciliationDetailView(ViewBase):  # type: ignore[misc]
                     callback_func,
                 )
             )
-        if fallback_available:
-            self.add_item(BankReconciliationButton("Show more possible matches", "fallback", callback_func))
         if session_controls:
             self.add_item(BankReconciliationButton("Skip for now", "skip", callback_func))
         self.add_item(BankReconciliationButton("Ignore this bank item", "ignore", callback_func))
+        if fallback_available:
+            self.add_item(BankReconciliationButton("Show more possible matches", "fallback", callback_func))
 
 
 class BankReconciliationDigestView(ViewBase):  # type: ignore[misc]
