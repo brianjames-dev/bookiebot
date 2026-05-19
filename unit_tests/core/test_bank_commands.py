@@ -230,11 +230,54 @@ def test_format_reconciliation_detail_can_hide_debug_commands_for_button_flow():
     output = format_reconciliation_detail(item, [], [group], include_commands=False)
 
     assert "/debug_bank_match_group" not in output
+    assert "Flow:    Money out / charge" in output
     assert "Use the buttons below to resolve this item." in output
     assert "Choice 1: $173.59 total, 0.71 confidence" in output
     assert "$135.93  graduation invites" in output
     assert "$37.66  graduation announcements" in output
     assert "BookieBot found existing sheet rows" in output
+
+
+def test_format_reconciliation_detail_labels_money_in_flow():
+    transaction = BankTransaction(
+        id=1,
+        provider_transaction_id="txn-1",
+        owner_key="brian",
+        account_name="Credit Card",
+        account_mask="5746",
+        account_type="credit",
+        account_subtype="credit card",
+        date="2026-05-18",
+        authorized_date=None,
+        name="Apple",
+        merchant_name=None,
+        amount=-51.87,
+        pending=False,
+        payment_channel=None,
+        updated_at="2026-05-18T00:00:00+00:00",
+    )
+    item = ReconciliationItem(
+        id=125,
+        owner_key="brian",
+        bank_transaction_id=1,
+        provider_transaction_id="txn-1",
+        classification="needs_review",
+        status="needs_review",
+        confidence=0.5,
+        matched_action_log_id=None,
+        matched_sheet_ref=None,
+        first_seen_at="2026-05-18T00:00:00+00:00",
+        last_seen_at="2026-05-18T00:00:00+00:00",
+        resolved_at=None,
+        ignored_at=None,
+        notes="manual review",
+        transaction=transaction,
+    )
+
+    output = format_reconciliation_detail(item, [], [], include_commands=False)
+
+    assert "Amount:  $51.87" in output
+    assert "Flow:    Money in / refund" in output
 
 
 def test_format_reconciliation_preview_does_not_cut_code_blocks():

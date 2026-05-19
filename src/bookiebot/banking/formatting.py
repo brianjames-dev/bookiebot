@@ -124,6 +124,7 @@ def format_reconciliation_detail(
         f"ID:      {item.id}",
         f"Date:    {transaction.date or transaction.authorized_date or 'unknown'}",
         f"Amount:  ${abs(transaction.amount):.2f}",
+        f"Flow:    {_transaction_flow_label(transaction)}",
         f"Type:    {item.classification}",
         f"Name:    {transaction.merchant_name or transaction.name}",
         f"Account: {_format_account(transaction)}",
@@ -297,6 +298,12 @@ def _format_account(transaction: BankTransaction) -> str:
     if transaction.account_mask:
         account = f"{account} *{transaction.account_mask}"
     return account
+
+
+def _transaction_flow_label(transaction: BankTransaction) -> str:
+    if transaction.amount < 0:
+        return "Money in / refund"
+    return "Money out / charge"
 
 
 def _code_table(lines: list[str]) -> str:

@@ -46,6 +46,7 @@ class BankReconciliationDetailView(ViewBase):  # type: ignore[misc]
                     callback_func,
                 )
             )
+        self.add_item(BankReconciliationButton("Log item", "log", callback_func))
         if session_controls:
             self.add_item(BankReconciliationButton("Skip for now", "skip", callback_func))
         self.add_item(BankReconciliationButton("Ignore this bank item", "ignore", callback_func))
@@ -73,3 +74,10 @@ class BankReconciliationChangeDefaultView(ViewBase):  # type: ignore[misc]
     def __init__(self, callback_func: Callable):
         super().__init__(timeout=600)
         self.add_item(BankReconciliationButton("Tap Here", "change_default", callback_func))
+
+
+class BankReconciliationLogChoiceView(ViewBase):  # type: ignore[misc]
+    def __init__(self, callback_func: Callable):
+        super().__init__(timeout=600)
+        self.add_item(BankReconciliationButton("Log as expense", "log:expense", callback_func))
+        self.add_item(BankReconciliationButton("Log as income/refund", "log:income", callback_func))

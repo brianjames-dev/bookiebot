@@ -1,14 +1,33 @@
 from __future__ import annotations
 
 import asyncio
+from datetime import datetime
 from typing import Any
+
+import discord
 
 from bookiebot.banking.formatting import (
     format_group_match_amount_mismatch,
     format_reconciliation_detail,
 )
 from bookiebot.banking.service import build_banking_service
-from bookiebot.ui.bank_reconciliation import BankReconciliationDetailView
+from bookiebot.sheets.config import get_category_columns
+from bookiebot.sheets.repo import get_sheets_repo
+from bookiebot.sheets.routing import sheet_user_context
+from bookiebot.sheets.writer import log_category_row, log_income_row, record_expense_undo
+from bookiebot.ui.bank_reconciliation import BankReconciliationDetailView, BankReconciliationLogChoiceView
+
+
+def _bank_date_to_sheet_date(value: str | None) -> str:
+    if not value:
+        current = datetime.now()
+        return f"{current.month}/{current.day}/{current.year}"
+    try:
+        parsed = datetime.strptime(value[:10], "%Y-%m-%d")
+    except ValueError:
+        current = datetime.now()
+        return f"{current.month}/{current.day}/{current.year}"
+    return f"{parsed.month}/{parsed.day}/{parsed.year}"
 
 
 async def send_next_bank_reconciliation_item(
@@ -185,6 +204,19 @@ async def send_bank_reconciliation_detail(
                 )
                 return
 
+            if action == "log":
+                await action_interaction.followup.send(
+                    content="How should this bank item be logged?",
+                    view=_log_choice_view(
+                        item=item,
+                        owner_key=owner_key,
+                        actor_key=actor_key,
+                        continue_session=continue_session,
+                    ),
+                    ephemeral=True,
+                )
+                return
+
             if action == "skip":
                 skipped.add(reconciliation_id)
                 await action_interaction.followup.send(
@@ -237,3 +269,144 @@ async def send_bank_reconciliation_detail(
         view=view,
         ephemeral=True,
     )
+
+
+def _log_choice_view(*, item: Any, owner_key: str, actor_key: str, continue_session: Any) -> BankReconciliationLogChoiceView:
+    async def handle_log_choice(interaction: Any, action: str) -> None:
+        if action == "log:expense":
+            await interaction.response.send_modal(
+                _BankExpenseLogModal(
+                    item=item,
+                    owner_key=owner_key,
+                    actor_key=actor_key,
+                    continue_session=continue_session,
+                )
+            )
+            return
+        if action == "log:income":
+            await interaction.response.send_modal(
+                _BankIncomeLogModal(
+                    item=item,
+                    owner_key=owner_key,
+                    actor_key=actor_key,
+                    continue_session=continue_session,
+                )
+            )
+
+    return BankReconciliationLogChoiceView(handle_log_choice)
+
+
+class _BankExpenseLogModal(discord.ui.Modal, title="Log bank item as expense"):
+    category = discord.ui.TextInput(label="Category", placeholder="food, grocery, gas, shopping", max_length=40)
+    item_name = discord.ui.TextInput(label="Item", max_length=80)
+    location = discord.ui.TextInput(label="Location", max_length=80)
+    person = discord.ui.TextInput(label="Person/card", placeholder="Brian (BofA)", max_length=80)
+
+    def __init__(self, *, item: Any, owner_key: str, actor_key: str, continue_session: Any):
+        super().__init__()
+        self.item = item
+        self.owner_key = owner_key
+        self.actor_key = actor_key
+        self.continue_session = continue_session
+        transaction = item.transaction
+        source_name = transaction.merchant_name or transaction.name
+        self.category.default = "food"
+        self.item_name.default = source_name
+        self.location.default = source_name
+        self.person.default = "Brian (BofA)"
+
+    async def on_submit(self, interaction: discord.Interaction) -> None:
+        category = str(self.category.value).strip().lower()
+        if category not in get_category_columns:
+            available = ", ".join(sorted(get_category_columns))
+            await interaction.response.send_message(
+                f"Unknown category `{category}`. Available categories: {available}.",
+                ephemeral=True,
+            )
+            return
+        person = str(self.person.value).strip()
+        transaction = self.item.transaction
+        values = {
+            "date": _bank_date_to_sheet_date(transaction.date or transaction.authorized_date),
+            "amount": abs(transaction.amount),
+            "item": str(self.item_name.value).strip(),
+            "location": str(self.location.value).strip(),
+            "person": person,
+        }
+        try:
+            with sheet_user_context(self.actor_key):
+                worksheet = get_sheets_repo().expense_sheet()
+                row = await asyncio.to_thread(log_category_row, values, worksheet, category)
+                await asyncio.to_thread(record_expense_undo, category, row, values, person, self.actor_key)
+            service = build_banking_service()
+            confirmed = await asyncio.to_thread(
+                service.confirm_reconciliation_item,
+                self.owner_key,
+                self.item.id,
+                matched_sheet_ref=f"expense!row {row}",
+                notes="logged as expense from bank reconciliation",
+            )
+        except Exception as exc:
+            await interaction.response.send_message(
+                f"Could not log expense: {type(exc).__name__}: {exc}",
+                ephemeral=True,
+            )
+            return
+        if confirmed is None:
+            await interaction.response.send_message("That bank reconciliation item was no longer available.", ephemeral=True)
+            return
+        await interaction.response.send_message(
+            f"Logged `{transaction.name}` as `{category}` expense: `${abs(transaction.amount):.2f}`.",
+            ephemeral=True,
+        )
+        await self.continue_session(interaction)
+
+
+class _BankIncomeLogModal(discord.ui.Modal, title="Log bank item as income/refund"):
+    source = discord.ui.TextInput(label="Source", max_length=80)
+    label = discord.ui.TextInput(label="Label", placeholder="refund, reimbursement, paycheck", max_length=80)
+
+    def __init__(self, *, item: Any, owner_key: str, actor_key: str, continue_session: Any):
+        super().__init__()
+        self.item = item
+        self.owner_key = owner_key
+        self.actor_key = actor_key
+        self.continue_session = continue_session
+        transaction = item.transaction
+        source_name = transaction.merchant_name or transaction.name
+        self.source.default = source_name
+        self.label.default = "refund"
+
+    async def on_submit(self, interaction: discord.Interaction) -> None:
+        transaction = self.item.transaction
+        values = {
+            "source": str(self.source.value).strip(),
+            "label": str(self.label.value).strip(),
+            "amount": abs(transaction.amount),
+        }
+        try:
+            with sheet_user_context(self.actor_key):
+                worksheet = get_sheets_repo().income_sheet()
+                row, _description, _amount = await asyncio.to_thread(log_income_row, values, worksheet)
+            service = build_banking_service()
+            confirmed = await asyncio.to_thread(
+                service.confirm_reconciliation_item,
+                self.owner_key,
+                self.item.id,
+                matched_sheet_ref=f"income!row {row}",
+                notes="logged as income/refund from bank reconciliation",
+            )
+        except Exception as exc:
+            await interaction.response.send_message(
+                f"Could not log income/refund: {type(exc).__name__}: {exc}",
+                ephemeral=True,
+            )
+            return
+        if confirmed is None:
+            await interaction.response.send_message("That bank reconciliation item was no longer available.", ephemeral=True)
+            return
+        await interaction.response.send_message(
+            f"Logged `{transaction.name}` as income/refund: `${abs(transaction.amount):.2f}`.",
+            ephemeral=True,
+        )
+        await self.continue_session(interaction)
