@@ -934,6 +934,87 @@ def test_confirm_reconciliation_action_match_marks_existing_row(monkeypatch, tmp
     assert confirmed.matched_sheet_ref == "expense!row 12"
 
 
+def test_confirm_reconciliation_action_match_updates_sheet_amount_when_needed(monkeypatch, tmp_path):
+    action = LoggedAction(
+        id="abc123",
+        created_at="2026-05-17T12:00:00",
+        user_key="676638528590970917",
+        action=UndoAction(
+            worksheet="expense",
+            kind="clear_cells",
+            row=12,
+            columns=[14, 15, 16, 17, 18],
+            previous_values=["", "", "", "", ""],
+            new_values=["5/17/2026", "food", "20.09", "Glizzy", "Brian (BofA)"],
+            metadata={"type": "expense", "category": "food", "person": "Brian (BofA)"},
+            description="food expense $20.09 for Brian (BofA)",
+        ),
+    )
+    updated_action = LoggedAction(
+        id="abc123",
+        created_at="2026-05-17T12:00:00",
+        user_key="676638528590970917",
+        action=UndoAction(
+            worksheet="expense",
+            kind="clear_cells",
+            row=12,
+            columns=[14, 15, 16, 17, 18],
+            previous_values=["", "", "", "", ""],
+            new_values=["5/17/2026", "food", "20.89", "Glizzy", "Brian (BofA)"],
+            metadata={"type": "expense", "category": "food", "person": "Brian (BofA)"},
+            description="food expense $20.89 for Brian (BofA)",
+        ),
+    )
+    actions = [action]
+    update_calls = []
+
+    def fake_update_recent_action(user_key, *, updates, action_id=None, **_kwargs):
+        update_calls.append((user_key, updates, action_id))
+        actions[0] = updated_action
+        return True, "Updated logged action"
+
+    monkeypatch.setattr(banking_service, "read_active_logged_actions", lambda _actor_key: actions)
+    monkeypatch.setattr(banking_service, "update_recent_action", fake_update_recent_action)
+    store = BankStore(tmp_path / "banking.sqlite3", TokenCipher("test-secret-key"))
+    service = BankingService(
+        config=BankingConfig(
+            plaid_client_id="client",
+            plaid_secret="secret",
+            plaid_env="sandbox",
+            token_encryption_key="test-secret-key",
+            sqlite_path=Path("unused.sqlite3"),
+        ),
+        store=store,
+        plaid=PlaidClient(
+            BankingConfig(
+                plaid_client_id="client",
+                plaid_secret="secret",
+                plaid_env="sandbox",
+                token_encryption_key="test-secret-key",
+                sqlite_path=Path("unused.sqlite3"),
+            )
+        ),
+    )
+    service.seed_unmatched_debug_transaction("brian", name="ArmK Oracle Park F&b", amount=20.89, date="2026-05-17")
+    item = service.reconciliation_preview("brian", force=True).items[0]
+
+    confirmed, candidate, status = service.confirm_reconciliation_action_match(
+        "brian",
+        item.id,
+        actor_key="676638528590970917",
+        action_id="abc123",
+    )
+
+    assert status == "matched_updated"
+    assert candidate is not None
+    assert candidate.amount == 20.89
+    assert confirmed is not None
+    assert confirmed.status == "confirmed"
+    assert update_calls == [
+        ("676638528590970917", {"amount": "20.89"}, "abc123"),
+    ]
+
+
 def test_confirm_reconciliation_action_group_match_requires_exact_total(monkeypatch, tmp_path):
     actions = [
         LoggedAction(

@@ -20,7 +20,7 @@ from bookiebot.banking.reconciliation import (
     reconcile_transaction,
 )
 from bookiebot.banking.store import BankStore
-from bookiebot.sheets.undo import read_active_logged_actions
+from bookiebot.sheets.undo import read_active_logged_actions, update_recent_action
 
 
 logger = logging.getLogger(__name__)
@@ -338,6 +338,23 @@ class BankingService:
         if candidate is None:
             return item, None, "action_not_reconcilable"
 
+        bank_amount = abs(item.transaction.amount)
+        if round(candidate.amount * 100) != round(bank_amount * 100):
+            success, detail = update_recent_action(
+                actor_key,
+                updates={"amount": f"{bank_amount:.2f}"},
+                action_id=candidate.action_id,
+            )
+            if not success:
+                return item, candidate, f"amount_update_failed: {detail}"
+            updated_logged = {entry.id: entry for entry in read_active_logged_actions(actor_key)}.get(action_id)
+            updated_candidate = action_log_candidate_by_id(updated_logged) if updated_logged else None
+            if updated_candidate is not None:
+                candidate = updated_candidate
+            update_status = "matched_updated"
+        else:
+            update_status = "matched"
+
         confirmed = self.confirm_reconciliation_item(
             owner_key,
             reconciliation_id,
@@ -345,7 +362,7 @@ class BankingService:
             matched_sheet_ref=candidate.sheet_ref,
             notes="matched existing sheet/action-log row",
         )
-        return confirmed, candidate, "matched"
+        return confirmed, candidate, update_status
 
     def confirm_reconciliation_action_group_match(
         self,

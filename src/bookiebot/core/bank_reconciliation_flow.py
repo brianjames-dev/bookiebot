@@ -183,17 +183,21 @@ async def send_bank_reconciliation_detail(
                         ephemeral=True,
                     )
                     return
-                if status != "matched" or matched_candidate is None:
+                if status not in {"matched", "matched_updated"} or matched_candidate is None:
                     await action_interaction.followup.send(
                         content=f"Could not match that row yet: `{status}`.",
                         ephemeral=True,
                     )
                     return
+                update_note = ""
+                if status == "matched_updated":
+                    update_note = f"\nUpdated sheet amount to `${abs(matched_item.transaction.amount):.2f}`."
                 await action_interaction.followup.send(
                     content=(
                         f"Matched `{matched_item.transaction.name}` for `${abs(matched_item.transaction.amount):.2f}` "
                         f"to existing `{matched_candidate.action_type}` row.\n"
                         f"Sheet: `{matched_candidate.label} - ${matched_candidate.amount:.2f} - {matched_candidate.sheet_ref}`"
+                        f"{update_note}"
                     ),
                     ephemeral=True,
                 )
