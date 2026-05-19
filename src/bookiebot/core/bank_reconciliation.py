@@ -109,7 +109,7 @@ async def send_due_bank_reconciliation_digest(client: Any, today: date | None = 
         message = await asyncio.to_thread(_prepare_bank_reconciliation_digest, actor_key, mention, current)
         if not message:
             continue
-        await channel.send(message, view=_bank_reconciliation_digest_view(actor_key))
+        await channel.send(f"{message}\n\u200b", view=_bank_reconciliation_digest_view(actor_key))
         sent += 1
     return sent
 
