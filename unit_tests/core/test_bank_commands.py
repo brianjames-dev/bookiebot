@@ -1,5 +1,7 @@
 from datetime import date
 
+import pytest
+
 from bookiebot.banking.models import BankTransaction, ReconciliationItem, ReconciliationPreview
 from bookiebot.banking.formatting import (
     format_bank_transaction,
@@ -13,6 +15,7 @@ from bookiebot.banking.formatting import (
 from bookiebot.banking.reconciliation import ActionLogCandidate
 from bookiebot.banking.reconciliation import ActionLogCandidateGroup
 from bookiebot.core.commands import _clean_command_text
+from bookiebot.ui.bank_reconciliation import BankExpenseFixedFieldsView
 
 
 def test_clean_command_text_strips_matching_outer_quotes():
@@ -278,6 +281,35 @@ def test_format_reconciliation_detail_labels_money_in_flow():
 
     assert "Amount:  $51.87" in output
     assert "Flow:    Money in / refund" in output
+
+
+@pytest.mark.asyncio
+async def test_bank_expense_fixed_fields_view_uses_dropdowns_for_fixed_fields():
+    async def noop_field(*args):
+        return None
+
+    async def noop_continue(*args):
+        return None
+
+    view = BankExpenseFixedFieldsView(
+        noop_field,
+        noop_continue,
+        default_category="shopping",
+        default_person="Brian (AL)",
+    )
+
+    children = getattr(view, "children", [])
+    category_select = children[0]
+    person_select = children[1]
+    button_labels = [getattr(child, "label", None) for child in children]
+
+    assert getattr(category_select, "placeholder", "") == "Select category"
+    assert getattr(person_select, "placeholder", "") == "Select person/card"
+    assert [option.value for option in category_select.options] == ["food", "grocery", "gas", "shopping"]
+    assert [option.value for option in person_select.options] == ["Hannah", "Brian (BofA)", "Brian (AL)"]
+    assert any(option.value == "shopping" and option.default for option in category_select.options)
+    assert any(option.value == "Brian (AL)" and option.default for option in person_select.options)
+    assert "Continue" in button_labels
 
 
 def test_format_reconciliation_preview_does_not_cut_code_blocks():

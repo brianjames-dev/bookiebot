@@ -15,7 +15,11 @@ from bookiebot.sheets.config import get_category_columns
 from bookiebot.sheets.repo import get_sheets_repo
 from bookiebot.sheets.routing import sheet_user_context
 from bookiebot.sheets.writer import log_category_row, log_income_row, record_expense_undo
-from bookiebot.ui.bank_reconciliation import BankReconciliationDetailView, BankReconciliationLogChoiceView
+from bookiebot.ui.bank_reconciliation import (
+    BankExpenseFixedFieldsView,
+    BankReconciliationDetailView,
+    BankReconciliationLogChoiceView,
+)
 
 
 def _bank_date_to_sheet_date(value: str | None) -> str:
@@ -28,6 +32,12 @@ def _bank_date_to_sheet_date(value: str | None) -> str:
         current = datetime.now()
         return f"{current.month}/{current.day}/{current.year}"
     return f"{parsed.month}/{parsed.day}/{parsed.year}"
+
+
+def _default_expense_person(owner_key: str) -> str:
+    if owner_key == "hannah":
+        return "Hannah"
+    return "Brian (BofA)"
 
 
 async def send_next_bank_reconciliation_item(
@@ -274,13 +284,15 @@ async def send_bank_reconciliation_detail(
 def _log_choice_view(*, item: Any, owner_key: str, actor_key: str, continue_session: Any) -> BankReconciliationLogChoiceView:
     async def handle_log_choice(interaction: Any, action: str) -> None:
         if action == "log:expense":
-            await interaction.response.send_modal(
-                _BankExpenseLogModal(
+            await interaction.response.send_message(
+                content="Choose the fixed fields for this expense.",
+                view=_expense_fixed_fields_view(
                     item=item,
                     owner_key=owner_key,
                     actor_key=actor_key,
                     continue_session=continue_session,
-                )
+                ),
+                ephemeral=True,
             )
             return
         if action == "log:income":
@@ -296,27 +308,77 @@ def _log_choice_view(*, item: Any, owner_key: str, actor_key: str, continue_sess
     return BankReconciliationLogChoiceView(handle_log_choice)
 
 
+def _expense_fixed_fields_view(
+    *,
+    item: Any,
+    owner_key: str,
+    actor_key: str,
+    continue_session: Any,
+) -> BankExpenseFixedFieldsView:
+    default_category = "food"
+    default_person = _default_expense_person(owner_key)
+    fixed_view: BankExpenseFixedFieldsView | None = None
+
+    async def handle_field(interaction: Any, field: str, value: str, view: Any) -> None:
+        target_view = view or fixed_view
+        if field == "category":
+            target_view.selected_category = value
+        if field == "person":
+            target_view.selected_person = value
+        await interaction.response.defer(ephemeral=True)
+
+    async def handle_continue(interaction: Any, action: str) -> None:
+        target_view = fixed_view
+        category = getattr(target_view, "selected_category", default_category)
+        person = getattr(target_view, "selected_person", default_person)
+        await interaction.response.send_modal(
+            _BankExpenseLogModal(
+                item=item,
+                owner_key=owner_key,
+                actor_key=actor_key,
+                continue_session=continue_session,
+                category=category,
+                person=person,
+            )
+        )
+
+    fixed_view = BankExpenseFixedFieldsView(
+        handle_field,
+        handle_continue,
+        default_category=default_category,
+        default_person=default_person,
+    )
+    return fixed_view
+
+
 class _BankExpenseLogModal(discord.ui.Modal, title="Log bank item as expense"):
-    category = discord.ui.TextInput(label="Category", placeholder="food, grocery, gas, shopping", max_length=40)
     item_name = discord.ui.TextInput(label="Item", max_length=80)
     location = discord.ui.TextInput(label="Location", max_length=80)
-    person = discord.ui.TextInput(label="Person/card", placeholder="Brian (BofA)", max_length=80)
 
-    def __init__(self, *, item: Any, owner_key: str, actor_key: str, continue_session: Any):
+    def __init__(
+        self,
+        *,
+        item: Any,
+        owner_key: str,
+        actor_key: str,
+        continue_session: Any,
+        category: str,
+        person: str,
+    ):
         super().__init__()
         self.item = item
         self.owner_key = owner_key
         self.actor_key = actor_key
         self.continue_session = continue_session
+        self.category = category
+        self.person = person
         transaction = item.transaction
         source_name = transaction.merchant_name or transaction.name
-        self.category.default = "food"
         self.item_name.default = source_name
         self.location.default = source_name
-        self.person.default = "Brian (BofA)"
 
     async def on_submit(self, interaction: discord.Interaction) -> None:
-        category = str(self.category.value).strip().lower()
+        category = self.category
         if category not in get_category_columns:
             available = ", ".join(sorted(get_category_columns))
             await interaction.response.send_message(
@@ -324,7 +386,7 @@ class _BankExpenseLogModal(discord.ui.Modal, title="Log bank item as expense"):
                 ephemeral=True,
             )
             return
-        person = str(self.person.value).strip()
+        person = self.person
         transaction = self.item.transaction
         values = {
             "date": _bank_date_to_sheet_date(transaction.date or transaction.authorized_date),

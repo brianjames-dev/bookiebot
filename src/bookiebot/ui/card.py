@@ -35,10 +35,11 @@ else:  # pragma: no cover - test fallback
             self.followup = _Followup()
 
     class SelectOption:
-        def __init__(self, label, value, description=None):
+        def __init__(self, label, value, description=None, default=False):
             self.label = label
             self.value = value
             self.description = description
+            self.default = default
 
     class ButtonStyle:
         primary: int = 1

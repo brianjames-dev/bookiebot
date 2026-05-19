@@ -3,7 +3,7 @@ from __future__ import annotations
 from collections.abc import Callable
 
 from bookiebot.banking.reconciliation import ActionLogCandidate, ActionLogCandidateGroup
-from bookiebot.ui.card import ButtonBase, ButtonStyle, Interaction, ViewBase
+from bookiebot.ui.card import ButtonBase, ButtonStyle, Interaction, SelectBase, SelectOption, ViewBase
 
 
 class BankReconciliationButton(ButtonBase):  # type: ignore[misc]
@@ -81,3 +81,46 @@ class BankReconciliationLogChoiceView(ViewBase):  # type: ignore[misc]
         super().__init__(timeout=600)
         self.add_item(BankReconciliationButton("Log as expense", "log:expense", callback_func))
         self.add_item(BankReconciliationButton("Log as income/refund", "log:income", callback_func))
+
+
+class BankExpenseCategorySelect(SelectBase):  # type: ignore[misc]
+    def __init__(self, callback_func: Callable, *, default_category: str):
+        options = [
+            SelectOption(label=category.title(), value=category, default=category == default_category)
+            for category in ["food", "grocery", "gas", "shopping"]
+        ]
+        super().__init__(placeholder="Select category", options=options)
+        self.callback_func = callback_func
+
+    async def callback(self, interaction: Interaction):
+        await self.callback_func(interaction, "category", self.values[0], self.view)
+
+
+class BankExpensePersonSelect(SelectBase):  # type: ignore[misc]
+    def __init__(self, callback_func: Callable, *, default_person: str):
+        options = [
+            SelectOption(label=person, value=person, default=person == default_person)
+            for person in ["Hannah", "Brian (BofA)", "Brian (AL)"]
+        ]
+        super().__init__(placeholder="Select person/card", options=options)
+        self.callback_func = callback_func
+
+    async def callback(self, interaction: Interaction):
+        await self.callback_func(interaction, "person", self.values[0], self.view)
+
+
+class BankExpenseFixedFieldsView(ViewBase):  # type: ignore[misc]
+    def __init__(
+        self,
+        field_callback: Callable,
+        continue_callback: Callable,
+        *,
+        default_category: str = "food",
+        default_person: str = "Brian (BofA)",
+    ):
+        super().__init__(timeout=600)
+        self.selected_category = default_category
+        self.selected_person = default_person
+        self.add_item(BankExpenseCategorySelect(field_callback, default_category=default_category))
+        self.add_item(BankExpensePersonSelect(field_callback, default_person=default_person))
+        self.add_item(BankReconciliationButton("Continue", "continue_log_expense", continue_callback))
