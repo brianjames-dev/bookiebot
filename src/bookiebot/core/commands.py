@@ -21,6 +21,10 @@ from bookiebot.banking.formatting import (
 from bookiebot.banking.plaid_client import PlaidApiError
 from bookiebot.banking.service import build_banking_service
 from bookiebot.core.bank_link import BankLinkTokenError, create_bank_link_setup_token
+from bookiebot.core.bank_reconciliation import (
+    bank_reconciliation_digest_view,
+    prepare_bank_reconciliation_digest,
+)
 from bookiebot.core.bank_reconciliation_flow import send_bank_reconciliation_detail
 from bookiebot.logging_config import get_recent_logs, uptime_seconds
 from bookiebot.sheets.routing import (
@@ -747,6 +751,44 @@ def register_commands(tree: app_commands.CommandTree):
             return
 
         await interaction.followup.send(content=format_reconciliation_review(items)[:1900], ephemeral=True)
+
+    @tree.command(name="debug_bank_digest", description="(Admin) Send the bank reconciliation digest now")
+    @app_commands.describe(force="Send even if today's digest was already marked as sent")
+    async def debug_bank_digest(interaction: discord.Interaction, force: bool = True):
+        if not auth.is_debug_allowed(interaction.user):
+            await interaction.response.send_message("❌ Not authorized.", ephemeral=True)
+            return
+
+        await interaction.response.defer(ephemeral=True)
+        try:
+            actor_key = str(interaction.user.id)
+            message = await asyncio.to_thread(
+                prepare_bank_reconciliation_digest,
+                actor_key,
+                f"<@{actor_key}>",
+                datetime.now().date(),
+                mark_sent=False,
+                force=force,
+            )
+        except Exception as exc:
+            await interaction.followup.send(
+                content=f"❌ Could not prepare bank reconciliation digest: {type(exc).__name__}: {exc}",
+                ephemeral=True,
+            )
+            return
+
+        if not message:
+            await interaction.followup.send(
+                content="No bank reconciliation digest is due right now. There may be no unresolved items.",
+                ephemeral=True,
+            )
+            return
+
+        await interaction.followup.send(
+            content=f"{message}\n\u200b",
+            view=bank_reconciliation_digest_view(str(interaction.user.id)),
+            ephemeral=True,
+        )
 
     @tree.command(name="debug_bank_ignore", description="(Admin) Ignore an unresolved bank reconciliation item")
     @app_commands.describe(reconciliation_id="ID shown by /debug_bank_review")

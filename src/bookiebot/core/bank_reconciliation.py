@@ -106,15 +106,21 @@ async def send_due_bank_reconciliation_digest(client: Any, today: date | None = 
     sent = 0
     current = today or current_time.date()
     for actor_key, mention in _notification_users():
-        message = await asyncio.to_thread(_prepare_bank_reconciliation_digest, actor_key, mention, current)
+        message = await asyncio.to_thread(
+            prepare_bank_reconciliation_digest,
+            actor_key,
+            mention,
+            current,
+            mark_sent=True,
+        )
         if not message:
             continue
-        await channel.send(f"{message}\n\u200b", view=_bank_reconciliation_digest_view(actor_key))
+        await channel.send(f"{message}\n\u200b", view=bank_reconciliation_digest_view(actor_key))
         sent += 1
     return sent
 
 
-def _bank_reconciliation_digest_view(actor_key: str) -> BankReconciliationDigestView:
+def bank_reconciliation_digest_view(actor_key: str) -> BankReconciliationDigestView:
     async def handle_action(interaction: Any, action: str) -> None:
         if str(getattr(interaction.user, "id", "")) != str(actor_key):
             await interaction.response.send_message(
@@ -141,9 +147,16 @@ def _bank_reconciliation_digest_view(actor_key: str) -> BankReconciliationDigest
     return BankReconciliationDigestView(handle_action)
 
 
-def _prepare_bank_reconciliation_digest(actor_key: str, mention: str, current: date) -> str | None:
+def prepare_bank_reconciliation_digest(
+    actor_key: str,
+    mention: str,
+    current: date,
+    *,
+    mark_sent: bool,
+    force: bool = False,
+) -> str | None:
     metadata = _digest_metadata(current)
-    if has_system_event(actor_key, "bank_reconciliation_digest_sent", metadata):
+    if not force and has_system_event(actor_key, "bank_reconciliation_digest_sent", metadata):
         return None
 
     try:
@@ -164,13 +177,14 @@ def _prepare_bank_reconciliation_digest(actor_key: str, mention: str, current: d
     if not unresolved:
         return None
 
-    if not record_system_event(
-        actor_key,
-        "bank_reconciliation_digest_sent",
-        {**metadata, "unresolved_count": str(len(unresolved))},
-        f"Bank reconciliation digest sent for {current.isoformat()}",
-    ):
-        return None
+    if mark_sent:
+        if not record_system_event(
+            actor_key,
+            "bank_reconciliation_digest_sent",
+            {**metadata, "unresolved_count": str(len(unresolved))},
+            f"Bank reconciliation digest sent for {current.isoformat()}",
+        ):
+            return None
 
     return format_bank_reconciliation_digest(mention, preview, unresolved)
 
