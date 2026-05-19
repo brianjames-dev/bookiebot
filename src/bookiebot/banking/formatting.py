@@ -138,7 +138,9 @@ def format_reconciliation_detail(
         lines.extend(["", "Possible grouped matches:"])
         if not include_commands:
             lines.append("BookieBot found existing sheet rows that add up to this bank transaction.")
-        lines.append(_format_action_candidate_group_table(groups, show_action_ids=include_commands))
+            lines.append(_format_guided_action_candidate_groups(groups))
+        else:
+            lines.append(_format_action_candidate_group_table(groups, show_action_ids=True))
     if include_commands:
         lines.extend(
             [
@@ -258,6 +260,21 @@ def _format_action_candidate_group_table(
                 f"{_clip(labels, 30)}"
             )
     return _code_table([header, divider, *rows])
+
+
+def _format_guided_action_candidate_groups(groups: list[ActionLogCandidateGroup]) -> str:
+    lines: list[str] = []
+    for index, group in enumerate(groups[:5], start=1):
+        lines.append(f"Choice {index}: {_short_money(group.total_amount)} total, {group.confidence:.2f} confidence")
+        for candidate in group.candidates:
+            lines.append(
+                f"  - {_short_date(candidate.date.isoformat())}  "
+                f"{_short_money(candidate.amount):>8}  "
+                f"{_clip(candidate.label, 46)}"
+            )
+        if index != min(len(groups), 5):
+            lines.append("")
+    return _code_table(lines)
 
 
 def _format_group_mismatch_table(candidates: list[ActionLogCandidate]) -> str:

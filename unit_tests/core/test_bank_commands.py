@@ -231,7 +231,9 @@ def test_format_reconciliation_detail_can_hide_debug_commands_for_button_flow():
 
     assert "/debug_bank_match_group" not in output
     assert "Use the buttons below to resolve this item." in output
-    assert "Choice" in output
+    assert "Choice 1: $173.59 total, 0.71 confidence" in output
+    assert "$135.93  graduation invites" in output
+    assert "$37.66  graduation announcements" in output
     assert "BookieBot found existing sheet rows" in output
 
 
