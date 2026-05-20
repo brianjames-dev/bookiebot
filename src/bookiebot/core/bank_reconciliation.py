@@ -118,11 +118,22 @@ async def send_due_bank_reconciliation_digest(client: Any, today: date | None = 
             actor_key,
             mention,
             current,
-            mark_sent=True,
+            mark_sent=False,
         )
         if not message:
             continue
         await channel.send(f"{message}\n\u200b", view=bank_reconciliation_digest_view(actor_key))
+        if not await asyncio.to_thread(
+            record_system_event,
+            actor_key,
+            "bank_reconciliation_digest_sent",
+            {**_digest_metadata(current), "sent_after": "discord_send"},
+            f"Bank reconciliation digest sent for {current.isoformat()}",
+        ):
+            logger.warning(
+                "Bank reconciliation digest sent but system event was not recorded",
+                extra={"actor_key": actor_key, "digest_date": current.isoformat()},
+            )
         sent += 1
     return sent
 

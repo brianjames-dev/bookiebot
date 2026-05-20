@@ -1,11 +1,34 @@
 from datetime import datetime
+import pytest
 
 from bookiebot.banking.models import BankTransaction, ReconciliationItem, ReconciliationPreview
+import bookiebot.core.bank_reconciliation as bank_reconciliation
 from bookiebot.core.bank_reconciliation import (
     _parse_specific_snooze_time,
     _resolve_snooze,
     format_bank_reconciliation_digest,
 )
+
+
+class FakeChannel:
+    def __init__(self):
+        self.messages = []
+
+    async def send(self, content, **kwargs):
+        self.messages.append((content, kwargs))
+
+
+class FailingChannel:
+    async def send(self, content, **kwargs):
+        raise RuntimeError("discord send failed")
+
+
+class FakeClient:
+    def __init__(self, channel):
+        self.channel = channel
+
+    def get_channel(self, _channel_id):
+        return self.channel
 
 
 def test_format_bank_reconciliation_digest_lists_unresolved_items():
@@ -82,3 +105,61 @@ def test_parse_specific_snooze_time_rolls_past_times_to_tomorrow():
     assert _parse_specific_snooze_time("9 AM", current) == datetime(2026, 5, 19, 9, 0)
     assert _parse_specific_snooze_time("tomorrow 9 AM", current) == datetime(2026, 5, 19, 9, 0)
     assert _parse_specific_snooze_time("not a time", current) is None
+
+
+@pytest.mark.asyncio
+async def test_bank_digest_records_sent_event_only_after_discord_send(monkeypatch):
+    recorded = []
+    channel = FakeChannel()
+    client = FakeClient(channel)
+    async def no_snoozed(*_args):
+        return 0
+
+    monkeypatch.setenv("CHANNEL_ID", "123")
+    monkeypatch.setattr(bank_reconciliation, "_send_due_snoozed_bank_reconciliation_digests", no_snoozed)
+    monkeypatch.setattr(bank_reconciliation, "_notification_users", lambda: [("676638528590970917", "<@676638528590970917>")])
+    monkeypatch.setattr(bank_reconciliation, "prepare_bank_reconciliation_digest", lambda *_args, **_kwargs: "digest")
+    monkeypatch.setattr(
+        bank_reconciliation,
+        "record_system_event",
+        lambda user_key, event_type, metadata, description: recorded.append(
+            (user_key, event_type, metadata, description)
+        )
+        or True,
+    )
+
+    sent = await bank_reconciliation.send_due_bank_reconciliation_digest(client, today=datetime(2026, 5, 20).date())
+
+    assert sent == 1
+    assert channel.messages[0][0] == "digest\n\u200b"
+    assert recorded == [
+        (
+            "676638528590970917",
+            "bank_reconciliation_digest_sent",
+            {"digest_date": "2026-05-20", "sent_after": "discord_send"},
+            "Bank reconciliation digest sent for 2026-05-20",
+        )
+    ]
+
+
+@pytest.mark.asyncio
+async def test_bank_digest_does_not_record_sent_event_when_discord_send_fails(monkeypatch):
+    recorded = []
+    client = FakeClient(FailingChannel())
+    async def no_snoozed(*_args):
+        return 0
+
+    monkeypatch.setenv("CHANNEL_ID", "123")
+    monkeypatch.setattr(bank_reconciliation, "_send_due_snoozed_bank_reconciliation_digests", no_snoozed)
+    monkeypatch.setattr(bank_reconciliation, "_notification_users", lambda: [("676638528590970917", "<@676638528590970917>")])
+    monkeypatch.setattr(bank_reconciliation, "prepare_bank_reconciliation_digest", lambda *_args, **_kwargs: "digest")
+    monkeypatch.setattr(
+        bank_reconciliation,
+        "record_system_event",
+        lambda *args: recorded.append(args) or True,
+    )
+
+    with pytest.raises(RuntimeError, match="discord send failed"):
+        await bank_reconciliation.send_due_bank_reconciliation_digest(client, today=datetime(2026, 5, 20).date())
+
+    assert recorded == []

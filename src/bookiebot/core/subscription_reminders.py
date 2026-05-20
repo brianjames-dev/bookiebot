@@ -47,9 +47,31 @@ class CashPullReminder:
 
 
 @dataclass(frozen=True)
+class PendingSystemEvent:
+    actor_key: str
+    event_type: str
+    metadata: dict[str, str]
+    description: str
+
+
+@dataclass(frozen=True)
 class PreparedReminderMessages:
     messages: list[str]
     sent_count: int
+    post_send_events: list[PendingSystemEvent] | None = None
+
+
+def _prepared(
+    *,
+    messages: list[str],
+    sent_count: int,
+    events: list[PendingSystemEvent] | None = None,
+) -> PreparedReminderMessages:
+    return PreparedReminderMessages(messages=messages, sent_count=sent_count, post_send_events=events or [])
+
+
+def _pending_event(actor_key: str, event_type: str, metadata: dict[str, str], description: str) -> PendingSystemEvent:
+    return PendingSystemEvent(actor_key=actor_key, event_type=event_type, metadata=metadata, description=description)
 
 
 def _reminders_enabled() -> bool:
@@ -349,12 +371,25 @@ async def send_due_subscription_reminders(client: Any, today: date | None = None
         prepared = await asyncio.to_thread(_prepare_due_reminder_messages, actor_key, mention, current)
         for message in prepared.messages:
             await channel.send(message)
+        for event in prepared.post_send_events or []:
+            if not await asyncio.to_thread(
+                record_system_event,
+                event.actor_key,
+                event.event_type,
+                event.metadata,
+                event.description,
+            ):
+                logger.warning(
+                    "Reminder digest was sent but system event was not recorded",
+                    extra={"actor_key": event.actor_key, "event_type": event.event_type},
+                )
         sent += prepared.sent_count
     return sent
 
 
 def _prepare_due_reminder_messages(actor_key: str, mention: str, current: date) -> PreparedReminderMessages:
     messages: list[str] = []
+    post_send_events: list[PendingSystemEvent] = []
     sent = 0
     try:
         with sheet_user_context(actor_key):
@@ -370,7 +405,7 @@ def _prepare_due_reminder_messages(actor_key: str, mention: str, current: date) 
                 bill_reminders, bill_warnings = due_bill_reminders(current)
         except Exception:
             logger.exception("Failed fallback subscription reminder evaluation", extra={"actor_key": actor_key})
-            return PreparedReminderMessages(messages=[], sent_count=0)
+            return _prepared(messages=[], sent_count=0)
 
     unsent_warnings: list[SubscriptionParseWarning] = []
     for warning in warnings:
@@ -379,21 +414,22 @@ def _prepare_due_reminder_messages(actor_key: str, mention: str, current: date) 
             unsent_warnings.append(warning)
 
     if unsent_warnings:
-        if not record_system_event(
-            actor_key,
-            "subscription_parse_warning_digest_sent",
-            {**_digest_metadata(current), "warning_count": str(len(unsent_warnings))},
-            f"Subscription parse warning digest sent for {current.isoformat()}",
-        ):
-            return PreparedReminderMessages(messages=messages, sent_count=sent)
         messages.append(format_subscription_parse_warning_digest(mention, unsent_warnings))
+        post_send_events.append(
+            _pending_event(
+                actor_key,
+                "subscription_parse_warning_digest_sent",
+                {**_digest_metadata(current), "warning_count": str(len(unsent_warnings))},
+                f"Subscription parse warning digest sent for {current.isoformat()}",
+            )
+        )
         for warning in unsent_warnings:
-            record_system_event(
+            post_send_events.append(_pending_event(
                 actor_key,
                 "subscription_parse_warning_sent",
                 _parse_warning_metadata(warning, current),
                 f"Subscription parse warning sent for {warning.source_range}",
-            )
+            ))
             sent += 1
 
     unsent_bill_warnings: list[BillScheduleWarning] = []
@@ -403,62 +439,64 @@ def _prepare_due_reminder_messages(actor_key: str, mention: str, current: date) 
             unsent_bill_warnings.append(warning)
 
     if unsent_bill_warnings:
-        if not record_system_event(
-            actor_key,
-            "bill_schedule_warning_digest_sent",
-            {**_digest_metadata(current), "warning_count": str(len(unsent_bill_warnings))},
-            f"Bill schedule warning digest sent for {current.isoformat()}",
-        ):
-            return PreparedReminderMessages(messages=messages, sent_count=sent)
         messages.append(format_bill_schedule_warning_digest(mention, unsent_bill_warnings))
+        post_send_events.append(
+            _pending_event(
+                actor_key,
+                "bill_schedule_warning_digest_sent",
+                {**_digest_metadata(current), "warning_count": str(len(unsent_bill_warnings))},
+                f"Bill schedule warning digest sent for {current.isoformat()}",
+            )
+        )
         for warning in unsent_bill_warnings:
-            record_system_event(
+            post_send_events.append(_pending_event(
                 actor_key,
                 "bill_schedule_warning_sent",
                 _bill_warning_metadata(warning, current),
                 f"Bill schedule warning sent for {warning.source_range}",
-            )
+            ))
             sent += 1
 
     cash_pulls = [_subscription_cash_pull(reminder) for reminder in reminders]
     cash_pulls.extend(_bill_cash_pull(reminder) for reminder in bill_reminders)
     if not cash_pulls:
-        return PreparedReminderMessages(messages=messages, sent_count=sent)
+        return _prepared(messages=messages, sent_count=sent, events=post_send_events)
 
     digest_metadata = _digest_metadata(current)
     if has_system_event(actor_key, "cash_pull_digest_sent", digest_metadata):
-        return PreparedReminderMessages(messages=messages, sent_count=sent)
+        return _prepared(messages=messages, sent_count=sent, events=post_send_events)
 
-    if not record_system_event(
-        actor_key,
-        "cash_pull_digest_sent",
-        digest_metadata,
-        f"Cash pull digest sent for {current.isoformat()}",
-    ):
-        return PreparedReminderMessages(messages=messages, sent_count=sent)
     messages.append(format_cash_pull_digest(mention, cash_pulls))
+    post_send_events.append(
+        _pending_event(
+            actor_key,
+            "cash_pull_digest_sent",
+            digest_metadata,
+            f"Cash pull digest sent for {current.isoformat()}",
+        )
+    )
     for reminder in reminders:
         metadata = _reminder_metadata(reminder)
         if not has_system_event(actor_key, "subscription_reminder_sent", metadata):
-            record_system_event(
+            post_send_events.append(_pending_event(
                 actor_key,
                 "subscription_reminder_sent",
                 metadata,
                 f"Subscription reminder sent for {reminder.subscription.name}",
-            )
+            ))
             sent += 1
     for reminder in bill_reminders:
         metadata = _bill_reminder_metadata(reminder)
         if not has_system_event(actor_key, "bill_reminder_sent", metadata):
-            record_system_event(
+            post_send_events.append(_pending_event(
                 actor_key,
                 "bill_reminder_sent",
                 metadata,
                 f"Bill reminder sent for {reminder.bill.display_name}",
-            )
+            ))
             sent += 1
     sent += 1
-    return PreparedReminderMessages(messages=messages, sent_count=sent)
+    return _prepared(messages=messages, sent_count=sent, events=post_send_events)
 
 
 async def run_subscription_reminder_loop(client: Any) -> None:
