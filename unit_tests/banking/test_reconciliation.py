@@ -437,6 +437,44 @@ def test_find_scheduled_pull_candidates_includes_near_matches():
     assert candidates[0].label == "Apple iCloud Storage (subscription)"
 
 
+def test_find_scheduled_pull_candidates_includes_exact_amount_with_vague_bank_name():
+    candidates = find_scheduled_pull_candidates(
+        _transaction("Santa Rosa", 117.36),
+        [
+            ScheduledPullCandidate(
+                source_type="bill",
+                name="Water",
+                amount=117.36,
+                pull_date=date(2026, 5, 20),
+                source_ref="_BookieBot Bill Schedule!A4:I4",
+            )
+        ],
+    )
+
+    assert len(candidates) == 1
+    assert candidates[0].label == "Water (bill)"
+    assert candidates[0].amount == 117.36
+
+
+def test_find_scheduled_pull_candidates_includes_bill_without_entered_amount_by_date():
+    candidates = find_scheduled_pull_candidates(
+        _transaction("Recology Sonoma", 145.36),
+        [
+            ScheduledPullCandidate(
+                source_type="bill",
+                name="Recology",
+                amount=0.0,
+                pull_date=date(2026, 5, 20),
+                source_ref="_BookieBot Bill Schedule!A3:I3",
+            )
+        ],
+    )
+
+    assert len(candidates) == 1
+    assert candidates[0].label == "Recology (bill)"
+    assert candidates[0].amount == 145.36
+
+
 def test_reconcile_does_not_match_wrong_amount():
     action = LoggedAction(
         id="abc123",

@@ -261,22 +261,26 @@ def find_scheduled_pull_candidates(
         if day_delta > window_days:
             continue
         name_score = _scheduled_name_score(transaction, pull.name)
-        amount_delta = abs(pull.amount - abs(transaction.amount))
+        candidate_amount = pull.amount if pull.amount > 0 else abs(transaction.amount)
+        amount_delta = abs(candidate_amount - abs(transaction.amount))
         amount_tolerance = _candidate_amount_tolerance(abs(transaction.amount), name_score)
         if amount_delta > amount_tolerance:
             continue
-        if name_score <= 0 and day_delta > 3:
+        exact_or_wildcard_amount = pull.amount <= 0 or amount_delta <= 0.01
+        if name_score <= 0 and not exact_or_wildcard_amount and day_delta > 3:
             continue
         amount_score = max(0.0, 1 - (amount_delta / amount_tolerance))
         date_score = max(0.0, 1 - (day_delta / max(window_days, 1)))
-        score = (amount_score * 0.55) + (date_score * 0.30) + (name_score * 0.15)
+        score = (amount_score * 0.50) + (date_score * 0.30) + (name_score * 0.20)
+        if exact_or_wildcard_amount:
+            score += 0.10
         candidates.append(
             ActionLogCandidate(
                 action_id=f"schedule:{pull.source_type}:{pull.source_ref}",
                 sheet_ref=pull.source_ref,
                 action_type="schedule",
                 date=pull.pull_date,
-                amount=pull.amount,
+                amount=candidate_amount,
                 label=f"{pull.name} ({pull.source_type})",
                 confidence=min(score, 0.98),
                 notes=f"{pull.source_type} schedule, amount Δ ${amount_delta:.2f}, date Δ {day_delta}d",

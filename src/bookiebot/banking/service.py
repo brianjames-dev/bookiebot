@@ -90,15 +90,13 @@ def _scheduled_pulls_for_transactions(
 
             for bill in list_bill_schedules():
                 amount_entered, amount = bill_amount_for_source_label(bill.source_label)
-                if not amount_entered or amount <= 0:
-                    continue
                 expected = next_bill_pull_date(bill, start_date)
                 while expected is not None and expected <= end_date:
                     candidates.append(
                         ScheduledPullCandidate(
                             source_type="bill",
                             name=bill.display_name,
-                            amount=amount,
+                            amount=amount if amount_entered and amount > 0 else 0.0,
                             pull_date=expected,
                             source_ref=bill.source_range or f"bill:{bill.bill_key}",
                             account=bill.account,
