@@ -159,6 +159,64 @@ def test_find_action_log_candidates_allows_fuzzy_amount_and_seven_day_window():
     assert "date Δ 6d" in candidates[0].notes
 
 
+def test_find_action_log_candidates_scores_subset_merchant_names_highly():
+    action = LoggedAction(
+        id="ace123",
+        created_at="2026-05-18T12:00:00",
+        user_key="676638528590970917",
+        action=UndoAction(
+            worksheet="expense",
+            kind="clear_cells",
+            row=12,
+            columns=[14, 15, 16, 17, 18],
+            previous_values=["", "", "", "", ""],
+            new_values=["5/18/2026", "hardware", "3.17", "Ace Hardware", "Brian (BofA)"],
+            metadata={"type": "expense", "category": "home", "person": "Brian (BofA)"},
+            description="home expense $3.17 for Brian (BofA)",
+        ),
+    )
+
+    transaction = BankTransaction(
+        **{
+            **_transaction("Bennett Valley Ace Hardware", 3.17).__dict__,
+            "date": "2026-05-18",
+        }
+    )
+    candidates = find_action_log_candidates(transaction, [action], classification="expense")
+
+    assert len(candidates) == 1
+    assert candidates[0].action_id == "ace123"
+    assert candidates[0].confidence > 0.90
+
+
+def test_find_action_log_candidates_allows_tip_sized_difference_for_strong_name_match():
+    action = LoggedAction(
+        id="restaurant123",
+        created_at="2026-05-18T12:00:00",
+        user_key="676638528590970917",
+        action=UndoAction(
+            worksheet="expense",
+            kind="clear_cells",
+            row=12,
+            columns=[14, 15, 16, 17, 18],
+            previous_values=["", "", "", "", ""],
+            new_values=["5/18/2026", "dinner", "23.25", "La Texanita Restaurant", "Brian (BofA)"],
+            metadata={"type": "expense", "category": "food", "person": "Brian (BofA)"},
+            description="food expense $23.25 for Brian (BofA)",
+        ),
+    )
+
+    candidates = find_action_log_candidates(
+        _transaction("La Texanita Restaurant", 28.25),
+        [action],
+        classification="expense",
+    )
+
+    assert len(candidates) == 1
+    assert candidates[0].action_id == "restaurant123"
+    assert "amount Δ $5.00" in candidates[0].notes
+
+
 def test_find_action_log_candidate_groups_matches_exact_aggregate_total():
     actions = [
         LoggedAction(

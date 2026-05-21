@@ -260,11 +260,11 @@ def find_scheduled_pull_candidates(
         day_delta = abs((pull.pull_date - transaction_date).days)
         if day_delta > window_days:
             continue
+        name_score = _scheduled_name_score(transaction, pull.name)
         amount_delta = abs(pull.amount - abs(transaction.amount))
-        amount_tolerance = max(2.0, abs(transaction.amount) * 0.05)
+        amount_tolerance = _candidate_amount_tolerance(abs(transaction.amount), name_score)
         if amount_delta > amount_tolerance:
             continue
-        name_score = _scheduled_name_score(transaction, pull.name)
         if name_score <= 0 and day_delta > 3:
             continue
         amount_score = max(0.0, 1 - (amount_delta / amount_tolerance))
@@ -312,12 +312,12 @@ def find_action_log_candidates(
         if day_delta > window_days:
             continue
 
+        name_score = _name_score(transaction, candidate["text"])
         amount_delta = abs(candidate["amount"] - abs(transaction.amount))
-        amount_tolerance = max(2.0, abs(transaction.amount) * 0.05)
+        amount_tolerance = _candidate_amount_tolerance(abs(transaction.amount), name_score)
         if amount_delta > amount_tolerance:
             continue
 
-        name_score = _name_score(transaction, candidate["text"])
         amount_score = max(0.0, 1 - (amount_delta / amount_tolerance))
         date_score = max(0.0, 1 - (day_delta / max(window_days, 1)))
         score = (amount_score * 0.55) + (date_score * 0.30) + (name_score * 0.15)
@@ -640,9 +640,7 @@ def _name_score(transaction: BankTransaction, action_text: str) -> float:
         return 0.0
     bank_tokens = {token for token in re.split(r"\s+", bank_text) if len(token) >= 3}
     action_tokens = {token for token in re.split(r"\s+", action_normalized) if len(token) >= 3}
-    if not bank_tokens or not action_tokens:
-        return 0.0
-    return len(bank_tokens & action_tokens) / len(bank_tokens)
+    return _token_overlap_score(bank_tokens, action_tokens)
 
 
 def _scheduled_name_score(transaction: BankTransaction, schedule_name: str) -> float:
@@ -652,10 +650,9 @@ def _scheduled_name_score(transaction: BankTransaction, schedule_name: str) -> f
         return 0.0
     bank_tokens = {token for token in re.split(r"\s+", bank_text) if len(token) >= 3}
     schedule_tokens = {token for token in re.split(r"\s+", schedule_text) if len(token) >= 3}
-    if not bank_tokens or not schedule_tokens:
-        return 0.0
-    if bank_tokens & schedule_tokens:
-        return len(bank_tokens & schedule_tokens) / len(bank_tokens)
+    token_score = _token_overlap_score(bank_tokens, schedule_tokens)
+    if token_score > 0:
+        return token_score
     if any(token in schedule_text or schedule_text in token for token in bank_tokens):
         return 0.35
     return 0.0
@@ -671,3 +668,23 @@ def _normalize_schedule_text(value: str) -> str:
     for old, new in replacements.items():
         text = text.replace(old, new)
     return re.sub(r"[^a-z0-9]+", " ", text).strip()
+
+
+def _token_overlap_score(left_tokens: set[str], right_tokens: set[str]) -> float:
+    if not left_tokens or not right_tokens:
+        return 0.0
+    overlap = left_tokens & right_tokens
+    if not overlap:
+        return 0.0
+    bank_coverage = len(overlap) / len(left_tokens)
+    candidate_coverage = len(overlap) / len(right_tokens)
+    return max(bank_coverage, candidate_coverage)
+
+
+def _candidate_amount_tolerance(transaction_amount: float, name_score: float) -> float:
+    base = max(2.0, transaction_amount * 0.05)
+    if name_score >= 0.80:
+        return max(base, 15.0, transaction_amount * 0.35)
+    if name_score >= 0.50:
+        return max(base, 10.0, transaction_amount * 0.25)
+    return base
