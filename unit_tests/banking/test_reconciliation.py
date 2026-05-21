@@ -1,3 +1,4 @@
+from datetime import date
 from pathlib import Path
 
 import pytest
@@ -8,6 +9,7 @@ from bookiebot.banking.models import BankAccount, BankTransaction
 from bookiebot.banking.plaid_client import PlaidClient
 import bookiebot.banking.service as banking_service
 from bookiebot.banking.reconciliation import (
+    ScheduledPullCandidate,
     action_log_bank_transaction,
     classify_transaction,
     find_action_log_candidate_groups,
@@ -304,6 +306,56 @@ def test_reconcile_matches_utility_payment_as_bill():
     assert decision.status == "matched"
     assert decision.classification == "subscription_or_bill"
     assert decision.matched_action_log_id == "pge123"
+
+
+def test_reconcile_matches_subscription_schedule_without_action_log():
+    scheduled = ScheduledPullCandidate(
+        source_type="subscription",
+        name="Railway",
+        amount=5.00,
+        pull_date=date(2026, 5, 17),
+        source_ref="Subscriptions!B10:D10",
+    )
+
+    decision = reconcile_transaction(_transaction("RAILWAY", 5.00), scheduled_pulls=[scheduled])
+
+    assert decision.status == "matched"
+    assert decision.classification == "subscription_or_bill"
+    assert decision.matched_sheet_ref == "Subscriptions!B10:D10"
+    assert decision.notes == "matched subscription schedule"
+
+
+def test_reconcile_matches_bill_schedule_within_date_window():
+    scheduled = ScheduledPullCandidate(
+        source_type="bill",
+        name="PG&E",
+        amount=132.36,
+        pull_date=date(2026, 5, 16),
+        source_ref="_BookieBot Bill Schedule!A3:I3",
+    )
+
+    decision = reconcile_transaction(_transaction("PG&E WEB ONLINE", 132.36), scheduled_pulls=[scheduled])
+
+    assert decision.status == "matched"
+    assert decision.classification == "subscription_or_bill"
+    assert decision.matched_sheet_ref == "_BookieBot Bill Schedule!A3:I3"
+    assert decision.notes == "matched bill schedule within 1d"
+
+
+def test_reconcile_does_not_match_schedule_with_wrong_amount():
+    scheduled = ScheduledPullCandidate(
+        source_type="subscription",
+        name="Railway",
+        amount=5.00,
+        pull_date=date(2026, 5, 17),
+        source_ref="Subscriptions!B10:D10",
+    )
+
+    decision = reconcile_transaction(_transaction("RAILWAY", 6.00), scheduled_pulls=[scheduled])
+
+    assert decision.status == "needs_review"
+    assert decision.classification == "expense"
+    assert decision.matched_sheet_ref is None
 
 
 def test_reconcile_does_not_match_wrong_amount():

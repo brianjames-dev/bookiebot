@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import logging
-from datetime import date as local_date
+from datetime import date as local_date, timedelta
 from typing import Any
 from uuid import uuid4
 
@@ -12,6 +12,7 @@ from bookiebot.banking.plaid_client import PlaidClient
 from bookiebot.banking.reconciliation import (
     ActionLogCandidate,
     ActionLogCandidateGroup,
+    ScheduledPullCandidate,
     action_log_bank_transaction,
     action_log_candidate_by_id,
     find_action_log_candidates,
@@ -19,6 +20,9 @@ from bookiebot.banking.reconciliation import (
     recent_action_log_candidates,
     reconcile_transaction,
 )
+from bookiebot.sheets.bills import bill_amount_for_source_label, list_bill_schedules, next_bill_pull_date
+from bookiebot.sheets.routing import sheet_user_context
+from bookiebot.sheets.subscriptions import list_normalized_subscription_schedules, next_pull_date
 from bookiebot.banking.store import BankStore
 from bookiebot.sheets.undo import delete_recent_action, read_active_logged_actions, undo_logged_action, update_recent_action
 
@@ -45,6 +49,74 @@ def _find_action_for_sheet_ref(action_log: list, sheet_ref: str | None):
         if logged.action.worksheet == worksheet and logged.action.row == row:
             return logged
     return None
+
+
+def _scheduled_pulls_for_transactions(
+    transactions: list[BankTransaction],
+    *,
+    actor_key: str | None,
+    window_days: int = 7,
+) -> list[ScheduledPullCandidate]:
+    if not actor_key or not transactions:
+        return []
+
+    transaction_dates = [_transaction_local_date(transaction) for transaction in transactions]
+    transaction_dates = [value for value in transaction_dates if value is not None]
+    if not transaction_dates:
+        return []
+
+    start_date = min(transaction_dates) - timedelta(days=window_days)
+    end_date = max(transaction_dates) + timedelta(days=window_days)
+    candidates: list[ScheduledPullCandidate] = []
+    try:
+        with sheet_user_context(actor_key):
+            for subscription in list_normalized_subscription_schedules():
+                if subscription.amount <= 0:
+                    continue
+                expected = next_pull_date(subscription, start_date)
+                while expected is not None and expected <= end_date:
+                    candidates.append(
+                        ScheduledPullCandidate(
+                            source_type="subscription",
+                            name=subscription.name,
+                            amount=subscription.amount,
+                            pull_date=expected,
+                            source_ref=subscription.source_range or f"subscription:{subscription.id or subscription.name}",
+                            account=subscription.account,
+                        )
+                    )
+                    expected = next_pull_date(subscription, expected + timedelta(days=1))
+
+            for bill in list_bill_schedules():
+                amount_entered, amount = bill_amount_for_source_label(bill.source_label)
+                if not amount_entered or amount <= 0:
+                    continue
+                expected = next_bill_pull_date(bill, start_date)
+                while expected is not None and expected <= end_date:
+                    candidates.append(
+                        ScheduledPullCandidate(
+                            source_type="bill",
+                            name=bill.display_name,
+                            amount=amount,
+                            pull_date=expected,
+                            source_ref=bill.source_range or f"bill:{bill.bill_key}",
+                            account=bill.account,
+                        )
+                    )
+                    expected = next_bill_pull_date(bill, expected + timedelta(days=1))
+    except Exception:
+        logger.exception("Failed to load scheduled pulls for bank reconciliation", extra={"actor_key": actor_key})
+    return candidates
+
+
+def _transaction_local_date(transaction: BankTransaction) -> local_date | None:
+    raw = transaction.date or transaction.authorized_date
+    if not raw:
+        return None
+    try:
+        return local_date.fromisoformat(raw[:10])
+    except ValueError:
+        return None
 
 
 class BankingService:
@@ -515,9 +587,10 @@ class BankingService:
         cached_transaction_count = self.store.transaction_count(owner_key)
         transactions = self.store.bank_transactions_for_reconciliation(owner_key=owner_key, limit=limit, force=force)
         action_log = read_active_logged_actions(actor_key) if actor_key else []
+        scheduled_pulls = _scheduled_pulls_for_transactions(transactions, actor_key=actor_key)
         items = []
         for transaction in transactions:
-            decision = reconcile_transaction(transaction, action_log)
+            decision = reconcile_transaction(transaction, action_log, scheduled_pulls)
             items.append(
                 self.store.upsert_reconciliation_item(
                     owner_key=owner_key,

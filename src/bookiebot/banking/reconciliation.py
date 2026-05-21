@@ -85,6 +85,16 @@ class ActionLogCandidateGroup:
 
 
 @dataclass(frozen=True)
+class ScheduledPullCandidate:
+    source_type: str
+    name: str
+    amount: float
+    pull_date: date
+    source_ref: str
+    account: str = ""
+
+
+@dataclass(frozen=True)
 class ReconciliationDecision:
     classification: ReconciliationClassification
     status: ReconciliationStatus
@@ -122,6 +132,7 @@ def classify_transaction(transaction: BankTransaction) -> tuple[ReconciliationCl
 def reconcile_transaction(
     transaction: BankTransaction,
     action_log: Iterable[LoggedAction] = (),
+    scheduled_pulls: Iterable[ScheduledPullCandidate] = (),
 ) -> ReconciliationDecision:
     classification, status, confidence, notes = classify_transaction(transaction)
     match = match_action_log(transaction, action_log, classification)
@@ -133,6 +144,15 @@ def reconcile_transaction(
             notes=match.notes,
             matched_action_log_id=match.action_id,
             matched_sheet_ref=match.sheet_ref,
+        )
+    scheduled_match = match_scheduled_pull(transaction, scheduled_pulls)
+    if scheduled_match:
+        return ReconciliationDecision(
+            classification="subscription_or_bill",
+            status="matched",
+            confidence=max(confidence, scheduled_match.confidence),
+            notes=scheduled_match.notes,
+            matched_sheet_ref=scheduled_match.sheet_ref,
         )
     return ReconciliationDecision(classification=classification, status=status, confidence=confidence, notes=notes)
 
@@ -176,6 +196,48 @@ def match_action_log(
         action_id=logged.id,
         sheet_ref=f"{logged.action.worksheet}!row {logged.action.row}",
         confidence=min(score, 0.98),
+        notes=notes,
+    )
+
+
+def match_scheduled_pull(
+    transaction: BankTransaction,
+    scheduled_pulls: Iterable[ScheduledPullCandidate],
+    *,
+    window_days: int = 3,
+) -> ActionLogMatch | None:
+    if transaction.pending or transaction.amount <= 0:
+        return None
+    transaction_date = _transaction_date(transaction)
+    if transaction_date is None:
+        return None
+
+    matches: list[tuple[float, int, ScheduledPullCandidate]] = []
+    for pull in scheduled_pulls:
+        if abs(pull.amount - abs(transaction.amount)) > 0.01:
+            continue
+        day_delta = abs((pull.pull_date - transaction_date).days)
+        if day_delta > window_days:
+            continue
+        name_score = _scheduled_name_score(transaction, pull.name)
+        if name_score <= 0 and day_delta > 1:
+            continue
+        score = 0.78 - (day_delta * 0.06) + (name_score * 0.18)
+        if name_score <= 0:
+            score -= 0.08
+        matches.append((min(score, 0.98), day_delta, pull))
+
+    if not matches:
+        return None
+
+    score, day_delta, pull = sorted(matches, key=lambda item: (-item[0], item[1], item[2].name.lower()))[0]
+    notes = f"matched {pull.source_type} schedule"
+    if day_delta:
+        notes = f"{notes} within {day_delta}d"
+    return ActionLogMatch(
+        action_id="",
+        sheet_ref=pull.source_ref,
+        confidence=score,
         notes=notes,
     )
 
@@ -537,3 +599,31 @@ def _name_score(transaction: BankTransaction, action_text: str) -> float:
     if not bank_tokens or not action_tokens:
         return 0.0
     return len(bank_tokens & action_tokens) / len(bank_tokens)
+
+
+def _scheduled_name_score(transaction: BankTransaction, schedule_name: str) -> float:
+    bank_text = _normalize_schedule_text(_normalized_transaction_text(transaction))
+    schedule_text = _normalize_schedule_text(schedule_name)
+    if not bank_text or not schedule_text:
+        return 0.0
+    bank_tokens = {token for token in re.split(r"\s+", bank_text) if len(token) >= 3}
+    schedule_tokens = {token for token in re.split(r"\s+", schedule_text) if len(token) >= 3}
+    if not bank_tokens or not schedule_tokens:
+        return 0.0
+    if bank_tokens & schedule_tokens:
+        return len(bank_tokens & schedule_tokens) / len(bank_tokens)
+    if any(token in schedule_text or schedule_text in token for token in bank_tokens):
+        return 0.35
+    return 0.0
+
+
+def _normalize_schedule_text(value: str) -> str:
+    text = value.lower()
+    replacements = {
+        "pg&e": "pge",
+        "p g e": "pge",
+        "apple.com/bill": "apple",
+    }
+    for old, new in replacements.items():
+        text = text.replace(old, new)
+    return re.sub(r"[^a-z0-9]+", " ", text).strip()
