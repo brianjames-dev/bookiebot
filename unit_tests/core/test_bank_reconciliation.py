@@ -1,4 +1,5 @@
-from datetime import datetime
+from datetime import date, datetime
+from types import SimpleNamespace
 import pytest
 
 from bookiebot.banking.models import BankTransaction, ReconciliationItem, ReconciliationPreview
@@ -80,6 +81,81 @@ def test_format_bank_reconciliation_digest_lists_unresolved_items():
     assert "Checked this run: `1`" in output
     assert "Unresolved bank reconciliation items:" in output
     assert "  42  05-18    $12.34  expense   Unlogged Coffee" in output
+
+
+def test_prepare_bank_reconciliation_digest_uses_cached_items_when_sync_fails(monkeypatch):
+    transaction = BankTransaction(
+        id=1,
+        provider_transaction_id="txn-1",
+        owner_key="brian",
+        account_name="Checking",
+        account_mask="0000",
+        account_type="depository",
+        account_subtype="checking",
+        date="2026-05-18",
+        authorized_date=None,
+        name="Unlogged Coffee",
+        merchant_name=None,
+        amount=12.34,
+        pending=False,
+        payment_channel="bookiebot_debug",
+        updated_at="2026-05-18T00:00:00+00:00",
+    )
+    item = ReconciliationItem(
+        id=42,
+        owner_key="brian",
+        bank_transaction_id=1,
+        provider_transaction_id="txn-1",
+        classification="expense",
+        status="needs_review",
+        confidence=0.6,
+        matched_action_log_id=None,
+        matched_sheet_ref=None,
+        first_seen_at="2026-05-18T00:00:00+00:00",
+        last_seen_at="2026-05-18T00:00:00+00:00",
+        resolved_at=None,
+        ignored_at=None,
+        notes="outflow transaction",
+        transaction=transaction,
+    )
+
+    class FakeService:
+        config = SimpleNamespace(configured=True)
+
+        async def sync_owner(self, _owner_key):
+            raise RuntimeError("Plaid unavailable")
+
+        def reconciliation_preview(self, owner_key, *, limit, actor_key):
+            return ReconciliationPreview(
+                owner_key=owner_key,
+                items=[item],
+                cached_transaction_count=1,
+                candidate_transaction_count=1,
+            )
+
+        def unresolved_reconciliation_items(self, _owner_key, *, limit):
+            return [item]
+
+    monkeypatch.setattr(
+        bank_reconciliation,
+        "get_user_config",
+        lambda _actor_key: SimpleNamespace(budget_owner_key="brian"),
+    )
+    monkeypatch.setattr(bank_reconciliation, "build_banking_service", lambda: FakeService())
+    monkeypatch.setattr(bank_reconciliation, "has_system_event", lambda *_args: False)
+
+    output = bank_reconciliation.prepare_bank_reconciliation_digest(
+        "123",
+        "<@123>",
+        date(2026, 5, 20),
+        mark_sent=False,
+        force=False,
+    )
+
+    assert output is not None
+    assert "bank reconciliation found `1` item" in output
+    assert "Bank sync warning: using cached bank data for this digest." in output
+    assert "Unlogged Coffee" in output
 
 
 def test_resolve_snooze_options_use_readable_labels():

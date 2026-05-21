@@ -11,6 +11,7 @@ from bookiebot.banking.formatting import (
     format_reconciliation_detail,
     format_reconciliation_preview,
     format_reconciliation_review,
+    format_reconciliation_review_chunks,
 )
 from bookiebot.banking.reconciliation import ActionLogCandidate
 from bookiebot.banking.reconciliation import ActionLogCandidateGroup
@@ -568,3 +569,50 @@ def test_format_reconciliation_review_lists_unresolved_ids():
 
 def test_format_reconciliation_review_empty():
     assert format_reconciliation_review([]) == "No unresolved bank reconciliation items."
+
+
+def test_format_reconciliation_review_chunks_preserve_code_fences():
+    items = [
+        ReconciliationItem(
+            id=index,
+            owner_key="brian",
+            bank_transaction_id=index,
+            provider_transaction_id=f"txn-{index}",
+            classification="expense",
+            status="needs_review",
+            confidence=0.6,
+            matched_action_log_id=None,
+            matched_sheet_ref=None,
+            first_seen_at="2026-05-18T00:00:00+00:00",
+            last_seen_at="2026-05-18T00:00:00+00:00",
+            resolved_at=None,
+            ignored_at=None,
+            notes="outflow transaction",
+            transaction=BankTransaction(
+                id=index,
+                provider_transaction_id=f"txn-{index}",
+                owner_key="brian",
+                account_name="Checking",
+                account_mask="0000",
+                account_type="depository",
+                account_subtype="checking",
+                date="2026-05-18",
+                authorized_date=None,
+                name=f"Long Merchant Name {index}",
+                merchant_name=None,
+                amount=12.34,
+                pending=False,
+                payment_channel="bookiebot_debug",
+                updated_at="2026-05-18T00:00:00+00:00",
+            ),
+        )
+        for index in range(1, 31)
+    ]
+
+    chunks = format_reconciliation_review_chunks(items, max_chars=500)
+
+    assert len(chunks) > 1
+    assert all(chunk.startswith("Unresolved bank reconciliation items:\n```text\n") for chunk in chunks)
+    assert all(chunk.endswith("\n```") for chunk in chunks)
+    assert all(len(chunk) <= 500 for chunk in chunks)
+    assert sum(chunk.count("Long Merchant Name") for chunk in chunks) == 30

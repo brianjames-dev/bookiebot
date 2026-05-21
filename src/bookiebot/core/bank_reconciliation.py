@@ -332,11 +332,20 @@ def prepare_bank_reconciliation_digest(
     if not force and has_system_event(actor_key, "bank_reconciliation_digest_sent", metadata):
         return None
 
-    try:
-        owner = get_user_config(actor_key)
-        service = build_banking_service()
-        if service.config.configured:
+    owner = get_user_config(actor_key)
+    service = build_banking_service()
+    sync_error: str | None = None
+    if service.config.configured:
+        try:
             asyncio.run(service.sync_owner(owner.budget_owner_key))
+        except Exception as exc:
+            sync_error = f"{type(exc).__name__}: {exc}"
+            logger.warning(
+                "Bank sync failed before reconciliation digest; using cached data",
+                extra={"actor_key": actor_key, "error": sync_error},
+            )
+
+    try:
         preview = service.reconciliation_preview(
             owner.budget_owner_key,
             limit=50,
@@ -359,20 +368,32 @@ def prepare_bank_reconciliation_digest(
         ):
             return None
 
-    return format_bank_reconciliation_digest(mention, preview, unresolved)
+    return format_bank_reconciliation_digest(mention, preview, unresolved, sync_error=sync_error)
 
 
-def format_bank_reconciliation_digest(mention: str, preview: ReconciliationPreview, unresolved: list) -> str:
+def format_bank_reconciliation_digest(
+    mention: str,
+    preview: ReconciliationPreview,
+    unresolved: list,
+    *,
+    sync_error: str | None = None,
+) -> str:
     noun = "item" if len(unresolved) == 1 else "items"
     verb = "needs" if len(unresolved) == 1 else "need"
     lines = [
         f"{mention} bank reconciliation found `{len(unresolved)}` {noun} that {verb} review.",
-        "",
-        f"Cached transactions: `{preview.cached_transaction_count}`",
-        f"Checked this run: `{preview.candidate_transaction_count}`",
-        "",
-        format_reconciliation_review(unresolved),
     ]
+    if sync_error:
+        lines.extend(["", "Bank sync warning: using cached bank data for this digest."])
+    lines.extend(
+        [
+            "",
+            f"Cached transactions: `{preview.cached_transaction_count}`",
+            f"Checked this run: `{preview.candidate_transaction_count}`",
+            "",
+            format_reconciliation_review(unresolved),
+        ]
+    )
     return "\n".join(lines)[:1900]
 
 

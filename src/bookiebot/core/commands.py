@@ -16,8 +16,8 @@ from bookiebot.banking.formatting import (
     format_bank_transaction_table_chunks,
     format_bank_transaction_table,
     format_reconciliation_preview,
-    format_reconciliation_review,
-    format_resolved_reconciliation_review,
+    format_reconciliation_review_chunks,
+    format_resolved_reconciliation_review_chunks,
 )
 from bookiebot.banking.plaid_client import PlaidApiError
 from bookiebot.banking.service import build_banking_service
@@ -771,7 +771,8 @@ def register_commands(tree: app_commands.CommandTree):
             )
             return
 
-        await interaction.followup.send(content=format_reconciliation_review(items)[:1900], ephemeral=True)
+        for chunk in format_reconciliation_review_chunks(items, max_chars=1800):
+            await interaction.followup.send(content=chunk, ephemeral=True)
 
     @tree.command(name="debug_bank_resolved", description="(Admin) Show resolved bank reconciliation items")
     @app_commands.describe(limit="Number of resolved items to show (default 25, max 100)")
@@ -796,7 +797,8 @@ def register_commands(tree: app_commands.CommandTree):
             )
             return
 
-        await interaction.followup.send(content=format_resolved_reconciliation_review(items)[:1900], ephemeral=True)
+        for chunk in format_resolved_reconciliation_review_chunks(items, max_chars=1800):
+            await interaction.followup.send(content=chunk, ephemeral=True)
 
     @tree.command(name="debug_bank_digest", description="(Admin) Send the bank reconciliation digest now")
     @app_commands.describe(force="Send even if today's digest was already marked as sent")

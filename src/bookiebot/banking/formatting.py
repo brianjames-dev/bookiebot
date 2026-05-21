@@ -108,6 +108,19 @@ def format_reconciliation_review(items: list[ReconciliationItem]) -> str:
     return "Unresolved bank reconciliation items:\n```text\n" + "\n".join([header, divider, *rows]) + "\n```"
 
 
+def format_reconciliation_review_chunks(
+    items: list[ReconciliationItem],
+    *,
+    max_chars: int = 1800,
+) -> list[str]:
+    if not items:
+        return ["No unresolved bank reconciliation items."]
+    header = f"{'ID':>4}  {'Date':<5}  {'Amt':>8}  {'Type':<8}  Name"
+    divider = "-" * len(header)
+    rows = [_format_reconciliation_review_row(item) for item in items]
+    return _chunk_code_table("Unresolved bank reconciliation items:", header, divider, rows, max_chars=max_chars)
+
+
 def format_resolved_reconciliation_review(items: list[ReconciliationItem]) -> str:
     if not items:
         return "No resolved bank reconciliation items."
@@ -115,6 +128,19 @@ def format_resolved_reconciliation_review(items: list[ReconciliationItem]) -> st
     divider = "-" * len(header)
     rows = [_format_resolved_reconciliation_review_row(item) for item in items]
     return "Resolved bank reconciliation items:\n```text\n" + "\n".join([header, divider, *rows]) + "\n```"
+
+
+def format_resolved_reconciliation_review_chunks(
+    items: list[ReconciliationItem],
+    *,
+    max_chars: int = 1800,
+) -> list[str]:
+    if not items:
+        return ["No resolved bank reconciliation items."]
+    header = f"{'ID':>4}  {'Date':<5}  {'Amt':>8}  {'Status':<9}  {'Action':<10}  Name"
+    divider = "-" * len(header)
+    rows = [_format_resolved_reconciliation_review_row(item) for item in items]
+    return _chunk_code_table("Resolved bank reconciliation items:", header, divider, rows, max_chars=max_chars)
 
 
 def format_reconciliation_detail(
@@ -317,6 +343,32 @@ def _transaction_flow_label(transaction: BankTransaction) -> str:
 
 def _code_table(lines: list[str]) -> str:
     return "```text\n" + "\n".join(lines) + "\n```"
+
+
+def _chunk_code_table(
+    title: str,
+    header: str,
+    divider: str,
+    rows: list[str],
+    *,
+    max_chars: int,
+) -> list[str]:
+    chunks: list[str] = []
+    current: list[str] = []
+    for row in rows:
+        candidate = _titled_code_table(title, [header, divider, *current, row])
+        if current and len(candidate) > max_chars:
+            chunks.append(_titled_code_table(title, [header, divider, *current]))
+            current = [row]
+        else:
+            current.append(row)
+    if current or not chunks:
+        chunks.append(_titled_code_table(title, [header, divider, *current]))
+    return chunks
+
+
+def _titled_code_table(title: str, lines: list[str]) -> str:
+    return title + "\n" + _code_table(lines)
 
 
 def _format_reconciliation_section(
