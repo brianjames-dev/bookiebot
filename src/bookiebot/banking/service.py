@@ -17,6 +17,7 @@ from bookiebot.banking.reconciliation import (
     action_log_candidate_by_id,
     find_action_log_candidates,
     find_action_log_candidate_groups,
+    find_scheduled_pull_candidates,
     recent_action_log_candidates,
     reconcile_transaction,
 )
@@ -372,17 +373,24 @@ class BankingService:
             return None, [], []
         action_log = read_active_logged_actions(actor_key)
         excluded = self.store.matched_action_log_ids(owner_key)
+        schedule_candidates = find_scheduled_pull_candidates(
+            item.transaction,
+            _scheduled_pulls_for_transactions([item.transaction], actor_key=actor_key),
+            window_days=14 if fallback else 7,
+            limit=limit,
+        )
         if fallback:
-            candidates = recent_action_log_candidates(
+            action_candidates = recent_action_log_candidates(
                 item.transaction,
                 action_log,
                 excluded_action_ids=excluded,
                 days_back=30,
                 limit=limit,
             )
+            candidates = [*schedule_candidates, *action_candidates][: max(1, limit)]
             groups: list[ActionLogCandidateGroup] = []
         else:
-            candidates = find_action_log_candidates(
+            action_candidates = find_action_log_candidates(
                 item.transaction,
                 action_log,
                 classification=item.classification,
@@ -390,6 +398,7 @@ class BankingService:
                 window_days=7,
                 limit=limit,
             )
+            candidates = [*schedule_candidates, *action_candidates][: max(1, limit)]
             groups = find_action_log_candidate_groups(
                 item.transaction,
                 action_log,
@@ -400,6 +409,40 @@ class BankingService:
                 limit=5,
             )
         return item, candidates, groups
+
+    def confirm_reconciliation_schedule_match(
+        self,
+        owner_key: str,
+        reconciliation_id: int,
+        *,
+        actor_key: str,
+        schedule_ref: str,
+    ) -> tuple[ReconciliationItem | None, ActionLogCandidate | None, str]:
+        item = self.get_reconciliation_item(owner_key, reconciliation_id)
+        if item is None:
+            return None, None, "not_found"
+        if item.status not in {"needs_review", "pending_user", "conflict", "matched"}:
+            return item, None, "not_unresolved"
+
+        candidates = find_scheduled_pull_candidates(
+            item.transaction,
+            _scheduled_pulls_for_transactions([item.transaction], actor_key=actor_key),
+            window_days=14,
+            limit=25,
+        )
+        candidate = next((candidate for candidate in candidates if candidate.sheet_ref == schedule_ref), None)
+        if candidate is None:
+            return item, None, "schedule_not_found"
+        if round(candidate.amount * 100) != round(abs(item.transaction.amount) * 100):
+            return item, candidate, "amount_mismatch"
+
+        confirmed = self.confirm_reconciliation_item(
+            owner_key,
+            reconciliation_id,
+            matched_sheet_ref=candidate.sheet_ref,
+            notes=f"matched {candidate.label}",
+        )
+        return confirmed, candidate, "matched"
 
     def confirm_reconciliation_action_match(
         self,

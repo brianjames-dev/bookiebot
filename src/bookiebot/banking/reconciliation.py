@@ -242,6 +242,50 @@ def match_scheduled_pull(
     )
 
 
+def find_scheduled_pull_candidates(
+    transaction: BankTransaction,
+    scheduled_pulls: Iterable[ScheduledPullCandidate],
+    *,
+    window_days: int = 7,
+    limit: int = 5,
+) -> list[ActionLogCandidate]:
+    if transaction.pending or transaction.amount <= 0:
+        return []
+    transaction_date = _transaction_date(transaction)
+    if transaction_date is None:
+        return []
+
+    candidates: list[ActionLogCandidate] = []
+    for pull in scheduled_pulls:
+        day_delta = abs((pull.pull_date - transaction_date).days)
+        if day_delta > window_days:
+            continue
+        amount_delta = abs(pull.amount - abs(transaction.amount))
+        amount_tolerance = max(2.0, abs(transaction.amount) * 0.05)
+        if amount_delta > amount_tolerance:
+            continue
+        name_score = _scheduled_name_score(transaction, pull.name)
+        if name_score <= 0 and day_delta > 3:
+            continue
+        amount_score = max(0.0, 1 - (amount_delta / amount_tolerance))
+        date_score = max(0.0, 1 - (day_delta / max(window_days, 1)))
+        score = (amount_score * 0.55) + (date_score * 0.30) + (name_score * 0.15)
+        candidates.append(
+            ActionLogCandidate(
+                action_id=f"schedule:{pull.source_type}:{pull.source_ref}",
+                sheet_ref=pull.source_ref,
+                action_type="schedule",
+                date=pull.pull_date,
+                amount=pull.amount,
+                label=f"{pull.name} ({pull.source_type})",
+                confidence=min(score, 0.98),
+                notes=f"{pull.source_type} schedule, amount Δ ${amount_delta:.2f}, date Δ {day_delta}d",
+            )
+        )
+
+    return sorted(candidates, key=lambda item: (-item.confidence, item.date))[: max(1, limit)]
+
+
 def find_action_log_candidates(
     transaction: BankTransaction,
     action_log: Iterable[LoggedAction],

@@ -39,9 +39,10 @@ class BankReconciliationDetailView(ViewBase):  # type: ignore[misc]
             label = f"Match group {index} ({total})" if len(groups) > 1 else f"Match grouped rows ({total})"
             self.add_item(BankReconciliationButton(label, f"group:{index - 1}", callback_func))
         for index, candidate in enumerate(candidates[:2], start=1):
+            label_prefix = "Match schedule" if candidate.action_type == "schedule" else "Match row"
             self.add_item(
                 BankReconciliationButton(
-                    f"Match row {index} (${candidate.amount:.2f})",
+                    f"{label_prefix} {index} (${candidate.amount:.2f})",
                     f"candidate:{index - 1}",
                     callback_func,
                 )

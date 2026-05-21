@@ -12,6 +12,7 @@ from bookiebot.banking.reconciliation import (
     ScheduledPullCandidate,
     action_log_bank_transaction,
     classify_transaction,
+    find_scheduled_pull_candidates,
     find_action_log_candidate_groups,
     find_action_log_candidates,
     reconcile_transaction,
@@ -356,6 +357,26 @@ def test_reconcile_does_not_match_schedule_with_wrong_amount():
     assert decision.status == "needs_review"
     assert decision.classification == "expense"
     assert decision.matched_sheet_ref is None
+
+
+def test_find_scheduled_pull_candidates_includes_near_matches():
+    candidates = find_scheduled_pull_candidates(
+        _transaction("APPLE.COM/BILL", 2.99),
+        [
+            ScheduledPullCandidate(
+                source_type="subscription",
+                name="Apple iCloud Storage",
+                amount=2.99,
+                pull_date=date(2026, 5, 18),
+                source_ref="Subscriptions!J8:L8",
+            )
+        ],
+    )
+
+    assert len(candidates) == 1
+    assert candidates[0].action_id == "schedule:subscription:Subscriptions!J8:L8"
+    assert candidates[0].action_type == "schedule"
+    assert candidates[0].label == "Apple iCloud Storage (subscription)"
 
 
 def test_reconcile_does_not_match_wrong_amount():
@@ -929,6 +950,106 @@ def test_reconciliation_match_candidates_excludes_already_matched_actions(monkey
     assert item is not None
     assert [candidate.action_id for candidate in candidates] == ["available123"]
     assert groups == []
+
+
+def test_reconciliation_match_candidates_includes_schedule_matches(monkeypatch, tmp_path):
+    monkeypatch.setattr(banking_service, "read_active_logged_actions", lambda _actor_key: [])
+    monkeypatch.setattr(
+        banking_service,
+        "_scheduled_pulls_for_transactions",
+        lambda _transactions, actor_key: [
+            ScheduledPullCandidate(
+                source_type="subscription",
+                name="Railway",
+                amount=5.00,
+                pull_date=date(2026, 5, 17),
+                source_ref="Subscriptions!B10:D10",
+            )
+        ],
+    )
+    store = BankStore(tmp_path / "banking.sqlite3", TokenCipher("test-secret-key"))
+    service = BankingService(
+        config=BankingConfig(
+            plaid_client_id="client",
+            plaid_secret="secret",
+            plaid_env="sandbox",
+            token_encryption_key="test-secret-key",
+            sqlite_path=Path("unused.sqlite3"),
+        ),
+        store=store,
+        plaid=PlaidClient(
+            BankingConfig(
+                plaid_client_id="client",
+                plaid_secret="secret",
+                plaid_env="sandbox",
+                token_encryption_key="test-secret-key",
+                sqlite_path=Path("unused.sqlite3"),
+            )
+        ),
+    )
+    service.seed_unmatched_debug_transaction("brian", name="Railway", amount=5.00, date="2026-05-17")
+    item = service.reconciliation_preview("brian", force=True).items[0]
+
+    _item, candidates, _groups = service.reconciliation_match_candidates(
+        "brian",
+        item.id,
+        actor_key="676638528590970917",
+    )
+
+    assert [candidate.action_type for candidate in candidates] == ["schedule"]
+    assert candidates[0].sheet_ref == "Subscriptions!B10:D10"
+
+
+def test_confirm_reconciliation_schedule_match_marks_schedule_row(monkeypatch, tmp_path):
+    monkeypatch.setattr(
+        banking_service,
+        "_scheduled_pulls_for_transactions",
+        lambda _transactions, actor_key: [
+            ScheduledPullCandidate(
+                source_type="bill",
+                name="PG&E",
+                amount=132.36,
+                pull_date=date(2026, 5, 17),
+                source_ref="_BookieBot Bill Schedule!A3:I3",
+            )
+        ],
+    )
+    store = BankStore(tmp_path / "banking.sqlite3", TokenCipher("test-secret-key"))
+    service = BankingService(
+        config=BankingConfig(
+            plaid_client_id="client",
+            plaid_secret="secret",
+            plaid_env="sandbox",
+            token_encryption_key="test-secret-key",
+            sqlite_path=Path("unused.sqlite3"),
+        ),
+        store=store,
+        plaid=PlaidClient(
+            BankingConfig(
+                plaid_client_id="client",
+                plaid_secret="secret",
+                plaid_env="sandbox",
+                token_encryption_key="test-secret-key",
+                sqlite_path=Path("unused.sqlite3"),
+            )
+        ),
+    )
+    service.seed_unmatched_debug_transaction("brian", name="PG&E WEB ONLINE", amount=132.36, date="2026-05-17")
+    item = service.reconciliation_preview("brian", force=True).items[0]
+
+    confirmed, candidate, status = service.confirm_reconciliation_schedule_match(
+        "brian",
+        item.id,
+        actor_key="676638528590970917",
+        schedule_ref="_BookieBot Bill Schedule!A3:I3",
+    )
+
+    assert status == "matched"
+    assert candidate is not None
+    assert confirmed is not None
+    assert confirmed.status == "confirmed"
+    assert confirmed.matched_action_log_id is None
+    assert confirmed.matched_sheet_ref == "_BookieBot Bill Schedule!A3:I3"
 
 
 def test_confirm_reconciliation_action_match_marks_existing_row(monkeypatch, tmp_path):

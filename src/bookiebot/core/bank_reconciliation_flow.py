@@ -170,6 +170,36 @@ async def send_bank_reconciliation_detail(
                     await action_interaction.followup.send("That row match is no longer available.", ephemeral=True)
                     return
                 candidate = candidates[candidate_index]
+                if candidate.action_type == "schedule" or candidate.action_id.startswith("schedule:"):
+                    matched_item, matched_candidate, status = await asyncio.to_thread(
+                        service.confirm_reconciliation_schedule_match,
+                        owner_key,
+                        reconciliation_id,
+                        actor_key=actor_key,
+                        schedule_ref=candidate.sheet_ref,
+                    )
+                    if matched_item is None:
+                        await action_interaction.followup.send(
+                            f"No bank reconciliation item `{reconciliation_id}` was found for {owner_name}.",
+                            ephemeral=True,
+                        )
+                        return
+                    if status != "matched" or matched_candidate is None:
+                        await action_interaction.followup.send(
+                            content=f"Could not match that schedule yet: `{status}`.",
+                            ephemeral=True,
+                        )
+                        return
+                    await action_interaction.followup.send(
+                        content=(
+                            f"Matched `{matched_item.transaction.name}` for `${abs(matched_item.transaction.amount):.2f}` "
+                            f"to `{matched_candidate.label}`.\n"
+                            f"Schedule: `{matched_candidate.sheet_ref}`"
+                        ),
+                        ephemeral=True,
+                    )
+                    await continue_session(action_interaction)
+                    return
                 matched_item, matched_candidate, status = await asyncio.to_thread(
                     service.confirm_reconciliation_action_match,
                     owner_key,
