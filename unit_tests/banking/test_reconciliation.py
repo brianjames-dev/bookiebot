@@ -1,3 +1,4 @@
+from contextlib import nullcontext
 from datetime import date
 from pathlib import Path
 
@@ -19,6 +20,8 @@ from bookiebot.banking.reconciliation import (
 )
 from bookiebot.banking.service import BankingService
 from bookiebot.banking.store import BankStore
+from bookiebot.sheets.bills import BillSchedule
+from bookiebot.sheets.subscriptions import Subscription
 from bookiebot.sheets.undo import LoggedAction, UndoAction
 
 
@@ -1146,6 +1149,81 @@ def test_confirm_reconciliation_schedule_match_marks_schedule_row(monkeypatch, t
     assert confirmed.status == "confirmed"
     assert confirmed.matched_action_log_id is None
     assert confirmed.matched_sheet_ref == "_BookieBot Bill Schedule!A3:I3"
+
+
+def test_scheduled_pulls_falls_back_to_visible_subscriptions(monkeypatch):
+    monkeypatch.setattr(banking_service, "sheet_user_context", lambda _actor_key: nullcontext())
+    monkeypatch.setattr(banking_service, "list_normalized_subscription_schedules", lambda: [])
+    monkeypatch.setattr(
+        banking_service,
+        "parse_visible_subscription_schedules",
+        lambda: [
+            Subscription(
+                name="iCloud Storage",
+                amount=2.99,
+                cadence="monthly",
+                pull_day=16,
+                source_range="Subscriptions!J8:L8",
+            )
+        ],
+    )
+    monkeypatch.setattr(banking_service, "list_bill_schedules", lambda: [])
+    transaction = BankTransaction(
+        **{
+            **_transaction("Apple", 2.99).__dict__,
+            "date": "2026-05-18",
+        }
+    )
+
+    candidates = banking_service._scheduled_pulls_for_transactions([transaction], actor_key="brian")
+
+    assert [(candidate.source_type, candidate.name, candidate.amount, candidate.pull_date) for candidate in candidates] == [
+        ("subscription", "iCloud Storage", 2.99, date(2026, 5, 16))
+    ]
+    assert candidates[0].source_ref == "Subscriptions!J8:L8"
+
+
+def test_scheduled_pulls_still_loads_bills_when_subscriptions_fail(monkeypatch):
+    monkeypatch.setattr(banking_service, "sheet_user_context", lambda _actor_key: nullcontext())
+    monkeypatch.setattr(
+        banking_service,
+        "list_normalized_subscription_schedules",
+        lambda: (_ for _ in ()).throw(RuntimeError("subscription sheet unavailable")),
+    )
+    monkeypatch.setattr(
+        banking_service,
+        "parse_visible_subscription_schedules",
+        lambda: (_ for _ in ()).throw(RuntimeError("visible sheet unavailable")),
+    )
+    monkeypatch.setattr(
+        banking_service,
+        "list_bill_schedules",
+        lambda: [
+            BillSchedule(
+                bill_key="recology",
+                display_name="Recology",
+                recurrence="quarterly",
+                pull_day=20,
+                pull_months=(2, 5, 8, 11),
+                source_label="Recology",
+                source_range="_BookieBot Bill Schedule!A3:I3",
+            )
+        ],
+    )
+    monkeypatch.setattr(banking_service, "bill_amount_for_source_label", lambda _source_label: (True, 145.36))
+    transaction = BankTransaction(
+        **{
+            **_transaction("Recology Sonoma", 145.36).__dict__,
+            "date": "2026-05-20",
+        }
+    )
+
+    candidates = banking_service._scheduled_pulls_for_transactions([transaction], actor_key="brian")
+
+    assert [(candidate.source_type, candidate.name, candidate.amount, candidate.pull_date) for candidate in candidates] == [
+        ("bill", "Recology", 145.36, date(2026, 5, 20))
+    ]
+    assert candidates[0].source_ref == "_BookieBot Bill Schedule!A3:I3"
 
 
 def test_confirm_reconciliation_action_match_marks_existing_row(monkeypatch, tmp_path):

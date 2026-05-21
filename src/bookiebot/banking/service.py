@@ -23,7 +23,11 @@ from bookiebot.banking.reconciliation import (
 )
 from bookiebot.sheets.bills import bill_amount_for_source_label, list_bill_schedules, next_bill_pull_date
 from bookiebot.sheets.routing import sheet_user_context
-from bookiebot.sheets.subscriptions import list_normalized_subscription_schedules, next_pull_date
+from bookiebot.sheets.subscriptions import (
+    list_normalized_subscription_schedules,
+    next_pull_date,
+    parse_visible_subscription_schedules,
+)
 from bookiebot.banking.store import BankStore
 from bookiebot.sheets.undo import delete_recent_action, read_active_logged_actions, undo_logged_action, update_recent_action
 
@@ -69,42 +73,74 @@ def _scheduled_pulls_for_transactions(
     start_date = min(transaction_dates) - timedelta(days=window_days)
     end_date = max(transaction_dates) + timedelta(days=window_days)
     candidates: list[ScheduledPullCandidate] = []
-    try:
-        with sheet_user_context(actor_key):
-            for subscription in list_normalized_subscription_schedules():
-                if subscription.amount <= 0:
-                    continue
-                expected = next_pull_date(subscription, start_date)
-                while expected is not None and expected <= end_date:
-                    candidates.append(
-                        ScheduledPullCandidate(
-                            source_type="subscription",
-                            name=subscription.name,
-                            amount=subscription.amount,
-                            pull_date=expected,
-                            source_ref=subscription.source_range or f"subscription:{subscription.id or subscription.name}",
-                            account=subscription.account,
-                        )
-                    )
-                    expected = next_pull_date(subscription, expected + timedelta(days=1))
+    with sheet_user_context(actor_key):
+        try:
+            subscriptions = list_normalized_subscription_schedules()
+        except Exception:
+            logger.exception(
+                "Failed to load normalized subscription schedules for bank reconciliation",
+                extra={"actor_key": actor_key},
+            )
+            subscriptions = []
+        if not subscriptions:
+            try:
+                subscriptions = parse_visible_subscription_schedules()
+            except Exception:
+                logger.exception(
+                    "Failed to load visible subscription schedules for bank reconciliation",
+                    extra={"actor_key": actor_key},
+                )
+                subscriptions = []
 
-            for bill in list_bill_schedules():
-                amount_entered, amount = bill_amount_for_source_label(bill.source_label)
-                expected = next_bill_pull_date(bill, start_date)
-                while expected is not None and expected <= end_date:
-                    candidates.append(
-                        ScheduledPullCandidate(
-                            source_type="bill",
-                            name=bill.display_name,
-                            amount=amount if amount_entered and amount > 0 else 0.0,
-                            pull_date=expected,
-                            source_ref=bill.source_range or f"bill:{bill.bill_key}",
-                            account=bill.account,
-                        )
+        for subscription in subscriptions:
+            if subscription.amount <= 0:
+                continue
+            expected = next_pull_date(subscription, start_date)
+            while expected is not None and expected <= end_date:
+                candidates.append(
+                    ScheduledPullCandidate(
+                        source_type="subscription",
+                        name=subscription.name,
+                        amount=subscription.amount,
+                        pull_date=expected,
+                        source_ref=subscription.source_range or f"subscription:{subscription.id or subscription.name}",
+                        account=subscription.account,
                     )
-                    expected = next_bill_pull_date(bill, expected + timedelta(days=1))
-    except Exception:
-        logger.exception("Failed to load scheduled pulls for bank reconciliation", extra={"actor_key": actor_key})
+                )
+                expected = next_pull_date(subscription, expected + timedelta(days=1))
+
+        try:
+            bills = list_bill_schedules()
+        except Exception:
+            logger.exception(
+                "Failed to load bill schedules for bank reconciliation",
+                extra={"actor_key": actor_key},
+            )
+            bills = []
+
+        for bill in bills:
+            try:
+                amount_entered, amount = bill_amount_for_source_label(bill.source_label)
+            except Exception:
+                logger.exception(
+                    "Failed to load bill amount for bank reconciliation",
+                    extra={"actor_key": actor_key, "bill_key": bill.bill_key},
+                )
+                amount_entered = False
+                amount = 0.0
+            expected = next_bill_pull_date(bill, start_date)
+            while expected is not None and expected <= end_date:
+                candidates.append(
+                    ScheduledPullCandidate(
+                        source_type="bill",
+                        name=bill.display_name,
+                        amount=amount if amount_entered and amount > 0 else 0.0,
+                        pull_date=expected,
+                        source_ref=bill.source_range or f"bill:{bill.bill_key}",
+                        account=bill.account,
+                    )
+                )
+                expected = next_bill_pull_date(bill, expected + timedelta(days=1))
     return candidates
 
 
