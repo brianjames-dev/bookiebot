@@ -7,7 +7,7 @@ from bookiebot.ui.card import ButtonBase, ButtonStyle, Interaction, SelectBase, 
 
 
 class BankReconciliationButton(ButtonBase):  # type: ignore[misc]
-    def __init__(self, label: str, action: str, callback_func: Callable):
+    def __init__(self, label: str, action: str, callback_func: Callable, *, custom_id: str | None = None):
         if action == "ignore":
             style_name = "danger"
         elif action in {"fallback", "later", "skip"}:
@@ -15,7 +15,7 @@ class BankReconciliationButton(ButtonBase):  # type: ignore[misc]
         else:
             style_name = "primary"
         style_value = getattr(ButtonStyle, style_name, getattr(ButtonStyle, "primary", ButtonStyle.primary))
-        super().__init__(label=label, style=style_value, custom_id=f"bank_reconcile:{action}")
+        super().__init__(label=label, style=style_value, custom_id=custom_id or f"bank_reconcile:{action}")
         self.action = action
         self.callback_func = callback_func
 
@@ -55,10 +55,24 @@ class BankReconciliationDetailView(ViewBase):  # type: ignore[misc]
 
 
 class BankReconciliationDigestView(ViewBase):  # type: ignore[misc]
-    def __init__(self, callback_func: Callable):
-        super().__init__(timeout=600)
-        self.add_item(BankReconciliationButton("Reconcile Now", "start", callback_func))
-        self.add_item(BankReconciliationButton("Remind Me Later", "later", callback_func))
+    def __init__(self, callback_func: Callable, *, actor_key: str):
+        super().__init__(timeout=None)
+        self.add_item(
+            BankReconciliationButton(
+                "Reconcile Now",
+                "start",
+                callback_func,
+                custom_id=f"bank_reconcile:start:{actor_key}",
+            )
+        )
+        self.add_item(
+            BankReconciliationButton(
+                "Remind Me Later",
+                "later",
+                callback_func,
+                custom_id=f"bank_reconcile:later:{actor_key}",
+            )
+        )
 
 
 class BankReconciliationSnoozeView(ViewBase):  # type: ignore[misc]

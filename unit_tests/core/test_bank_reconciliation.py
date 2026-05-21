@@ -27,9 +27,19 @@ class FailingChannel:
 class FakeClient:
     def __init__(self, channel):
         self.channel = channel
+        self.views = []
 
     def get_channel(self, _channel_id):
         return self.channel
+
+    def add_view(self, view):
+        self.views.append(view)
+
+
+class FakeInteraction:
+    def __init__(self, *, user_id="123", message_id="456"):
+        self.user = SimpleNamespace(id=user_id)
+        self.message = SimpleNamespace(id=message_id)
 
 
 def test_format_bank_reconciliation_digest_lists_unresolved_items():
@@ -81,6 +91,50 @@ def test_format_bank_reconciliation_digest_lists_unresolved_items():
     assert "Checked this run: `1`" in output
     assert "Unresolved bank reconciliation items:" in output
     assert "  42  05-18    $12.34  expense   Unlogged Coffee" in output
+
+
+@pytest.mark.asyncio
+async def test_bank_reconciliation_digest_view_is_persistent():
+    view = bank_reconciliation.bank_reconciliation_digest_view("123")
+
+    assert view.timeout is None
+    assert [child.custom_id for child in view.children] == [
+        "bank_reconcile:start:123",
+        "bank_reconcile:later:123",
+    ]
+
+
+@pytest.mark.asyncio
+async def test_register_persistent_bank_reconciliation_view_once(monkeypatch):
+    client = FakeClient(FakeChannel())
+    bank_reconciliation._PERSISTENT_DIGEST_VIEW_REGISTERED = False
+    monkeypatch.setattr(bank_reconciliation, "_notification_users", lambda: [("123", "<@123>")])
+
+    bank_reconciliation.register_persistent_bank_reconciliation_views(client)
+    bank_reconciliation.register_persistent_bank_reconciliation_views(client)
+
+    assert len(client.views) == 1
+    assert client.views[0].timeout is None
+
+
+@pytest.mark.asyncio
+async def test_claim_bank_reconciliation_prompt_allows_one_start(monkeypatch):
+    seen = set()
+
+    def fake_has_event(user_key, event_type, metadata):
+        return (user_key, event_type, tuple(sorted(metadata.items()))) in seen
+
+    def fake_record_event(user_key, event_type, metadata, description):
+        seen.add((user_key, event_type, tuple(sorted(metadata.items()))))
+        return True
+
+    monkeypatch.setattr(bank_reconciliation, "has_system_event", fake_has_event)
+    monkeypatch.setattr(bank_reconciliation, "record_system_event", fake_record_event)
+
+    interaction = FakeInteraction(user_id="123", message_id="456")
+
+    assert await bank_reconciliation._claim_bank_reconciliation_prompt(interaction, "123") is True
+    assert await bank_reconciliation._claim_bank_reconciliation_prompt(interaction, "123") is False
 
 
 def test_prepare_bank_reconciliation_digest_uses_cached_items_when_sync_fails(monkeypatch):

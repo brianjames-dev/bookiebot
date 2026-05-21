@@ -28,6 +28,7 @@ from bookiebot.ui.bank_reconciliation import (
 logger = logging.getLogger(__name__)
 
 _BANK_RECONCILIATION_TASK: asyncio.Task | None = None
+_PERSISTENT_DIGEST_VIEW_REGISTERED = False
 
 
 def _bank_reconciliation_enabled() -> bool:
@@ -167,7 +168,8 @@ async def _send_due_snoozed_bank_reconciliation_digests(channel: Any, current_ti
 
 def bank_reconciliation_digest_view(actor_key: str) -> BankReconciliationDigestView:
     async def handle_action(interaction: Any, action: str) -> None:
-        if str(getattr(interaction.user, "id", "")) != str(actor_key):
+        interaction_actor_key = _interaction_actor_key(interaction)
+        if interaction_actor_key != str(actor_key):
             await interaction.response.send_message(
                 "This reconciliation inbox belongs to another user.",
                 ephemeral=True,
@@ -178,6 +180,13 @@ def bank_reconciliation_digest_view(actor_key: str) -> BankReconciliationDigestV
             await _handle_bank_reconciliation_snooze(interaction, actor_key)
             return
         if action == "start":
+            if not await _claim_bank_reconciliation_prompt(interaction, actor_key):
+                await interaction.followup.send(
+                    content="This reconciliation prompt has already been used. Run `/debug_bank_review` to inspect the current inbox.",
+                    ephemeral=True,
+                )
+                return
+            await _clear_digest_prompt_buttons(interaction)
             owner = get_user_config(actor_key)
             await send_next_bank_reconciliation_item(
                 interaction,
@@ -186,7 +195,84 @@ def bank_reconciliation_digest_view(actor_key: str) -> BankReconciliationDigestV
                 actor_key=actor_key,
             )
 
-    return BankReconciliationDigestView(handle_action)
+    return BankReconciliationDigestView(handle_action, actor_key=str(actor_key))
+
+
+def persistent_bank_reconciliation_digest_view(actor_key: str) -> BankReconciliationDigestView:
+    async def handle_action(interaction: Any, action: str) -> None:
+        interaction_actor_key = _interaction_actor_key(interaction)
+        if interaction_actor_key != str(actor_key):
+            await interaction.response.send_message(
+                "This reconciliation inbox belongs to another user.",
+                ephemeral=True,
+            )
+            return
+        await interaction.response.defer(ephemeral=True)
+        if action == "later":
+            await _handle_bank_reconciliation_snooze(interaction, actor_key)
+            return
+        if action == "start":
+            if not await _claim_bank_reconciliation_prompt(interaction, actor_key):
+                await interaction.followup.send(
+                    content="This reconciliation prompt has already been used. Run `/debug_bank_review` to inspect the current inbox.",
+                    ephemeral=True,
+                )
+                return
+            await _clear_digest_prompt_buttons(interaction)
+            owner = get_user_config(actor_key)
+            await send_next_bank_reconciliation_item(
+                interaction,
+                owner_key=owner.budget_owner_key,
+                owner_name=owner.name,
+                actor_key=actor_key,
+            )
+
+    return BankReconciliationDigestView(handle_action, actor_key=str(actor_key))
+
+
+def register_persistent_bank_reconciliation_views(client: Any) -> None:
+    global _PERSISTENT_DIGEST_VIEW_REGISTERED
+    if _PERSISTENT_DIGEST_VIEW_REGISTERED:
+        return
+    add_view = getattr(client, "add_view", None)
+    if not callable(add_view):
+        return
+    for actor_key, _mention in _notification_users():
+        add_view(persistent_bank_reconciliation_digest_view(actor_key))
+    _PERSISTENT_DIGEST_VIEW_REGISTERED = True
+
+
+def _interaction_actor_key(interaction: Any) -> str:
+    return str(getattr(getattr(interaction, "user", None), "id", "") or "")
+
+
+def _digest_prompt_metadata(interaction: Any) -> dict[str, str]:
+    message_id = str(getattr(getattr(interaction, "message", None), "id", "") or "unknown")
+    return {"prompt_message_id": message_id}
+
+
+async def _claim_bank_reconciliation_prompt(interaction: Any, actor_key: str) -> bool:
+    metadata = _digest_prompt_metadata(interaction)
+    if await asyncio.to_thread(has_system_event, actor_key, "bank_reconciliation_prompt_started", metadata):
+        return False
+    return await asyncio.to_thread(
+        record_system_event,
+        actor_key,
+        "bank_reconciliation_prompt_started",
+        metadata,
+        f"Bank reconciliation prompt started for message {metadata['prompt_message_id']}",
+    )
+
+
+async def _clear_digest_prompt_buttons(interaction: Any) -> None:
+    message = getattr(interaction, "message", None)
+    edit = getattr(message, "edit", None)
+    if not callable(edit):
+        return
+    try:
+        await edit(view=None)
+    except Exception:
+        logger.exception("Failed to clear bank reconciliation digest buttons")
 
 
 async def _handle_bank_reconciliation_snooze(interaction: Any, actor_key: str) -> None:
