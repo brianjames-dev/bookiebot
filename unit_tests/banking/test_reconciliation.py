@@ -1267,6 +1267,45 @@ def test_scheduled_pulls_include_entered_bill_amount_on_transaction_date(monkeyp
     )
 
 
+def test_scheduled_pulls_include_name_matched_bill_without_amount(monkeypatch):
+    banking_service._SCHEDULE_SOURCE_CACHE.clear()
+    monkeypatch.setattr(banking_service, "sheet_user_context", lambda _actor_key: nullcontext())
+    monkeypatch.setattr(banking_service, "list_normalized_subscription_schedules", lambda: [])
+    monkeypatch.setattr(banking_service, "parse_visible_subscription_schedules", lambda: [])
+    monkeypatch.setattr(
+        banking_service,
+        "list_bill_schedules",
+        lambda: [
+            BillSchedule(
+                bill_key="recology",
+                display_name="Recology",
+                recurrence="quarterly",
+                pull_day=20,
+                pull_months=(2, 8, 11),
+                source_label="Recology",
+                source_range="_BookieBot Bill Schedule!A3:I3",
+            )
+        ],
+    )
+    monkeypatch.setattr(banking_service, "bill_amount_for_source_label", lambda _source_label: (False, 0.0))
+    transaction = BankTransaction(
+        **{
+            **_transaction("Recology Sonoma", 145.36).__dict__,
+            "date": "2026-05-20",
+        }
+    )
+
+    pulls = banking_service._scheduled_pulls_for_transactions([transaction], actor_key="brian")
+    candidates = find_scheduled_pull_candidates(transaction, pulls)
+
+    assert any(
+        candidate.label == "Recology (bill)"
+        and candidate.amount == 145.36
+        and candidate.date == date(2026, 5, 20)
+        for candidate in candidates
+    )
+
+
 def test_confirm_reconciliation_action_match_marks_existing_row(monkeypatch, tmp_path):
     action = LoggedAction(
         id="abc123",

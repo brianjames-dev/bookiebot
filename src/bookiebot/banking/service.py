@@ -124,6 +124,24 @@ def _find_action_for_sheet_ref(action_log: list, sheet_ref: str | None):
     return None
 
 
+def _bill_name_matches_transaction(bill_name: str, transaction: BankTransaction) -> bool:
+    bill_text = " ".join(token for token in _simple_match_tokens(bill_name) if len(token) >= 3)
+    transaction_text = " ".join(
+        token
+        for token in _simple_match_tokens(" ".join(filter(None, [transaction.name, transaction.merchant_name])))
+        if len(token) >= 3
+    )
+    if not bill_text or not transaction_text:
+        return False
+    return bill_text in transaction_text or any(token in bill_text for token in transaction_text.split())
+
+
+def _simple_match_tokens(value: str | None) -> list[str]:
+    import re
+
+    return re.sub(r"[^a-z0-9]+", " ", (value or "").lower()).split()
+
+
 def _scheduled_pulls_for_transactions(
     transactions: list[BankTransaction],
     *,
@@ -138,7 +156,12 @@ def _scheduled_pulls_for_transactions(
     if not transaction_dates:
         return []
 
-    unique_transaction_dates = tuple(sorted(set(transaction_dates)))
+    transactions_by_date: dict[local_date, list[BankTransaction]] = {}
+    for transaction in transactions:
+        transaction_date = _transaction_local_date(transaction)
+        if transaction_date is not None:
+            transactions_by_date.setdefault(transaction_date, []).append(transaction)
+    unique_transaction_dates = tuple(sorted(transactions_by_date))
     start_date = min(transaction_dates) - timedelta(days=window_days)
     end_date = max(transaction_dates) + timedelta(days=window_days)
     subscriptions, bills_with_amounts = _schedule_sources_for_actor(actor_key)
@@ -176,20 +199,23 @@ def _scheduled_pulls_for_transactions(
                 )
             )
             expected = next_bill_pull_date(bill, expected + timedelta(days=1))
-        if amount_entered and amount > 0:
-            for transaction_date in unique_transaction_dates:
-                if transaction_date in seen_pull_dates:
-                    continue
-                candidates.append(
-                    ScheduledPullCandidate(
-                        source_type="bill",
-                        name=bill.display_name,
-                        amount=amount,
-                        pull_date=transaction_date,
-                        source_ref=bill.source_range or f"bill:{bill.bill_key}",
-                        account=bill.account,
-                    )
+        for transaction_date in unique_transaction_dates:
+            if transaction_date in seen_pull_dates:
+                continue
+            date_transactions = transactions_by_date.get(transaction_date, [])
+            name_matches = any(_bill_name_matches_transaction(bill.display_name, transaction) for transaction in date_transactions)
+            if not ((amount_entered and amount > 0) or name_matches):
+                continue
+            candidates.append(
+                ScheduledPullCandidate(
+                    source_type="bill",
+                    name=bill.display_name,
+                    amount=amount if amount_entered and amount > 0 else 0.0,
+                    pull_date=transaction_date,
+                    source_ref=bill.source_range or f"bill:{bill.bill_key}",
+                    account=bill.account,
                 )
+            )
     return candidates
 
 

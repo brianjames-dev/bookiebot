@@ -271,6 +271,8 @@ async def _clear_digest_prompt_buttons(interaction: Any) -> None:
         return
     try:
         await edit(view=None)
+    except discord.NotFound:
+        logger.info("Bank reconciliation digest message was already deleted before buttons could be cleared")
     except Exception:
         logger.exception("Failed to clear bank reconciliation digest buttons")
 
