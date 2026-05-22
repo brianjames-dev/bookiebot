@@ -1,19 +1,20 @@
 from __future__ import annotations
 
 from contextlib import contextmanager
+import importlib
 from pathlib import Path
 import re
 from typing import Any, Iterator
 
 from bookiebot.banking.crypto import TokenCipher
 from bookiebot.banking.models import BankStatus
-from bookiebot.banking.store import BankStore
+from bookiebot.banking.store import BankStore, BankStoreConnection
 
 
 def _import_psycopg():
     try:
-        import psycopg
-        from psycopg.rows import dict_row
+        psycopg = importlib.import_module("psycopg")
+        dict_row = importlib.import_module("psycopg.rows").dict_row
     except ModuleNotFoundError as exc:
         raise RuntimeError(
             "BANK_DATABASE_URL is set, but psycopg is not installed. "
@@ -37,6 +38,11 @@ class _PostgresConnection:
         with self.conn.cursor() as cursor:
             return cursor.executemany(_postgres_sql(sql), params_seq)
 
+    def executescript(self, sql_script: str):
+        statements = [statement.strip() for statement in sql_script.split(";") if statement.strip()]
+        for statement in statements:
+            self.execute(statement)
+
 
 class PostgresBankStore(BankStore):
     def __init__(self, database_url: str, cipher: TokenCipher):
@@ -44,7 +50,7 @@ class PostgresBankStore(BankStore):
         self.database_url = database_url
 
     @contextmanager
-    def connect(self) -> Iterator[_PostgresConnection]:
+    def connect(self) -> Iterator[BankStoreConnection]:
         psycopg, dict_row = _import_psycopg()
         conn = psycopg.connect(self.database_url, row_factory=dict_row)
         try:

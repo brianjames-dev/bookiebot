@@ -5,7 +5,7 @@ from datetime import datetime, timezone
 import json
 from pathlib import Path
 import sqlite3
-from typing import Any, Iterator
+from typing import Any, Iterator, Protocol
 
 from bookiebot.banking.crypto import TokenCipher
 from bookiebot.banking.models import (
@@ -24,13 +24,24 @@ def utc_now_iso() -> str:
     return datetime.now(timezone.utc).isoformat()
 
 
+class BankStoreConnection(Protocol):
+    def execute(self, sql: str, params: tuple[Any, ...] = (), /) -> Any:
+        ...
+
+    def executemany(self, sql: str, params_seq: Any, /) -> Any:
+        ...
+
+    def executescript(self, sql_script: str, /) -> Any:
+        ...
+
+
 class BankStore:
     def __init__(self, path: Path, cipher: TokenCipher):
         self.path = path
         self.cipher = cipher
 
     @contextmanager
-    def connect(self) -> Iterator[sqlite3.Connection]:
+    def connect(self) -> Iterator[BankStoreConnection]:
         self.path.parent.mkdir(parents=True, exist_ok=True)
         conn = sqlite3.connect(self.path)
         conn.row_factory = sqlite3.Row
@@ -128,7 +139,7 @@ class BankStore:
             )
             self._ensure_account_watch_column(conn)
 
-    def _ensure_account_watch_column(self, conn: sqlite3.Connection) -> None:
+    def _ensure_account_watch_column(self, conn: BankStoreConnection) -> None:
         try:
             conn.execute("ALTER TABLE bank_accounts ADD COLUMN watched INTEGER NOT NULL DEFAULT 1")
         except sqlite3.OperationalError as exc:
@@ -300,7 +311,7 @@ class BankStore:
             "reconciliation_items": reconciliation_count,
         }
 
-    def purge_transactions_before(self, owner_key: str, cutoff_date: str) -> dict[str, int]:
+    def purge_transactions_before(self, owner_key: str, cutoff_date: str) -> dict[str, int | str]:
         self.initialize()
         with self.connect() as conn:
             transaction_rows = conn.execute(
