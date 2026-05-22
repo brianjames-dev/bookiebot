@@ -645,6 +645,8 @@ class BankingService:
             return None, None, "not_found"
         if item.status not in {"needs_review", "pending_user", "conflict", "matched"}:
             return item, None, "not_unresolved"
+        if item.transaction.pending:
+            return item, None, "pending_transaction"
 
         candidates = find_scheduled_pull_candidates(
             item.transaction,
@@ -679,6 +681,8 @@ class BankingService:
             return None, None, "not_found"
         if item.status not in {"needs_review", "pending_user", "conflict", "matched"}:
             return item, None, "not_unresolved"
+        if item.transaction.pending:
+            return item, None, "pending_transaction"
 
         excluded = self.store.matched_action_log_ids(owner_key)
         if action_id in excluded and item.matched_action_log_id != action_id:
@@ -801,6 +805,8 @@ class BankingService:
             return None, [], "not_found"
         if item.status not in {"needs_review", "pending_user", "conflict", "matched"}:
             return item, [], "not_unresolved"
+        if item.transaction.pending:
+            return item, [], "pending_transaction"
 
         cleaned_ids = [action_id.strip() for action_id in action_ids if action_id.strip()]
         if len(cleaned_ids) < 2:

@@ -190,6 +190,13 @@ def format_reconciliation_detail(
             ]
         )
     else:
+        if transaction.pending:
+            lines.extend(
+                [
+                    "",
+                    "This transaction is pending. BookieBot can show likely matches, but it will wait for the bank to post it before reconciliation.",
+                ]
+            )
         lines.extend(["", "Use the buttons below to resolve this item."])
     return "\n".join(lines)
 

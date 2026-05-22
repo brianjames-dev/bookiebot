@@ -16,7 +16,7 @@ from bookiebot.banking.formatting import (
 from bookiebot.banking.reconciliation import ActionLogCandidate
 from bookiebot.banking.reconciliation import ActionLogCandidateGroup
 from bookiebot.core.commands import _clean_command_text
-from bookiebot.ui.bank_reconciliation import BankExpenseFixedFieldsView
+from bookiebot.ui.bank_reconciliation import BankExpenseFixedFieldsView, BankReconciliationDetailView
 
 
 def test_clean_command_text_strips_matching_outer_quotes():
@@ -681,3 +681,91 @@ def test_format_reconciliation_review_chunks_preserve_code_fences():
     assert all(chunk.endswith("\n```") for chunk in chunks)
     assert all(len(chunk) <= 500 for chunk in chunks)
     assert sum(chunk.count("Long Merchant Name") for chunk in chunks) == 30
+
+
+@pytest.mark.asyncio
+async def test_bank_reconciliation_detail_view_uses_select_for_multiple_matches():
+    async def noop(*args):
+        return None
+
+    candidates = [
+        ActionLogCandidate(
+            action_id="action-1",
+            sheet_ref="expense!row 1",
+            action_type="expense",
+            date=date(2026, 5, 20),
+            amount=22.00,
+            label="The Gillette Company",
+            confidence=0.80,
+            notes="candidate",
+        ),
+        ActionLogCandidate(
+            action_id="schedule:subscription:Subscriptions!B8:D8",
+            sheet_ref="Subscriptions!B8:D8",
+            action_type="schedule",
+            date=date(2026, 5, 21),
+            amount=20.00,
+            label="ChatGPT Plus (subscription)",
+            confidence=0.26,
+            notes="candidate",
+        ),
+    ]
+
+    view = BankReconciliationDetailView(candidates, [], noop, session_controls=True)
+    children = getattr(view, "children", [])
+
+    assert getattr(children[0], "placeholder", "") == "Select a match"
+    assert [option.value for option in children[0].options] == ["candidate:0", "candidate:1"]
+    assert [getattr(child, "label", None) for child in children[1:]] == ["Log", "Skip", "Ignore", "Show More"]
+
+
+@pytest.mark.asyncio
+async def test_bank_reconciliation_detail_view_keeps_single_match_button():
+    async def noop(*args):
+        return None
+
+    candidates = [
+        ActionLogCandidate(
+            action_id="schedule:subscription:Subscriptions!B8:D8",
+            sheet_ref="Subscriptions!B8:D8",
+            action_type="schedule",
+            date=date(2026, 5, 21),
+            amount=20.00,
+            label="ChatGPT Plus (subscription)",
+            confidence=0.26,
+            notes="candidate",
+        )
+    ]
+
+    view = BankReconciliationDetailView(candidates, [], noop, session_controls=True)
+
+    assert [getattr(child, "label", None) for child in view.children] == [
+        "Match schedule ($20.00)",
+        "Log",
+        "Skip",
+        "Ignore",
+        "Show More",
+    ]
+
+
+@pytest.mark.asyncio
+async def test_bank_reconciliation_detail_view_hides_match_and_log_for_pending_items():
+    async def noop(*args):
+        return None
+
+    candidates = [
+        ActionLogCandidate(
+            action_id="schedule:bill:_BookieBot Bill Schedule!A4:I4",
+            sheet_ref="_BookieBot Bill Schedule!A4:I4",
+            action_type="schedule",
+            date=date(2026, 5, 20),
+            amount=145.36,
+            label="Recology (bill)",
+            confidence=0.98,
+            notes="candidate",
+        )
+    ]
+
+    view = BankReconciliationDetailView(candidates, [], noop, session_controls=True, pending=True)
+
+    assert [getattr(child, "label", None) for child in view.children] == ["Skip", "Ignore", "Show More"]

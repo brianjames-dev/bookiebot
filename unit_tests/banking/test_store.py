@@ -505,10 +505,18 @@ def test_unresolved_reconciliation_items_only_returns_open_items(tmp_path):
                 "amount": 4.33,
                 "pending": False,
             },
+            {
+                "transaction_id": "txn-pending",
+                "account_id": "account-brian",
+                "date": "2026-05-18",
+                "name": "Pending Coffee",
+                "amount": 5.55,
+                "pending": True,
+            },
         ],
         owner_key="brian",
     )
-    transactions = store.recent_transactions("brian", limit=2)
+    transactions = store.recent_transactions("brian", limit=3)
     by_name = {transaction.name: transaction for transaction in transactions}
     open_item = store.upsert_reconciliation_item(
         owner_key="brian",
@@ -525,11 +533,70 @@ def test_unresolved_reconciliation_items_only_returns_open_items(tmp_path):
         confidence=0.96,
         matched_action_log_id="abc123",
     )
+    store.upsert_reconciliation_item(
+        owner_key="brian",
+        transaction=by_name["Pending Coffee"],
+        classification="needs_review",
+        status="needs_review",
+        confidence=0.4,
+    )
 
     unresolved = store.unresolved_reconciliation_items("brian")
 
     assert [item.id for item in unresolved] == [open_item.id]
     assert unresolved[0].transaction.name == "Unlogged Coffee"
+
+
+def test_unreconciled_transactions_skip_pending_items(tmp_path):
+    store = _store(tmp_path)
+    item = store.upsert_item(
+        owner_key="brian",
+        provider="plaid",
+        item_id="item-brian",
+        access_token="access-sandbox-brian",
+        institution_name="Plaid Sandbox",
+    )
+    store.upsert_accounts(
+        [
+            BankAccount(
+                item_id=item.id,
+                provider_account_id="account-brian",
+                owner_key="brian",
+                name="Brian Checking",
+                mask="1111",
+                type="depository",
+                subtype="checking",
+                official_name=None,
+                current_balance=500.0,
+                available_balance=450.0,
+            )
+        ]
+    )
+    store.upsert_transactions(
+        [
+            {
+                "transaction_id": "txn-posted",
+                "account_id": "account-brian",
+                "date": "2026-05-18",
+                "name": "Posted Coffee",
+                "amount": 4.33,
+                "pending": False,
+            },
+            {
+                "transaction_id": "txn-pending",
+                "account_id": "account-brian",
+                "date": "2026-05-18",
+                "name": "Pending Coffee",
+                "amount": 5.55,
+                "pending": True,
+            },
+        ],
+        owner_key="brian",
+    )
+
+    transactions = store.unreconciled_transactions("brian")
+
+    assert [transaction.name for transaction in transactions] == ["Posted Coffee"]
 
 
 def test_ignore_reconciliation_item_hides_it_from_review(tmp_path):

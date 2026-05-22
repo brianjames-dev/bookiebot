@@ -608,6 +608,7 @@ class BankStore:
                 LEFT JOIN bank_reconciliation_items r ON r.bank_transaction_id = t.id
                 WHERE t.owner_key = ?
                   AND t.removed_at IS NULL
+                  AND t.pending = 0
                   AND (t.account_id IS NULL OR COALESCE(a.watched, 1) = 1)
                   AND (
                     r.id IS NULL
@@ -722,6 +723,7 @@ class BankStore:
                 LEFT JOIN bank_accounts a ON a.id = t.account_id
                 WHERE r.owner_key = ?
                   AND t.removed_at IS NULL
+                  AND t.pending = 0
                   AND (t.account_id IS NULL OR COALESCE(a.watched, 1) = 1)
                   AND r.status IN ('needs_review', 'pending_user', 'conflict')
                 ORDER BY COALESCE(t.date, t.authorized_date, '') DESC, r.id DESC

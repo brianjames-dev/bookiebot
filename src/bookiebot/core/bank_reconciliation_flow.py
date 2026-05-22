@@ -295,6 +295,7 @@ async def send_bank_reconciliation_detail(
         handle_action,
         fallback_available=not fallback,
         session_controls=session,
+        pending=item.transaction.pending,
     )
     header = ""
     if session and remaining_count is not None:

@@ -23,6 +23,50 @@ class BankReconciliationButton(ButtonBase):  # type: ignore[misc]
         await self.callback_func(interaction, self.action)
 
 
+class BankReconciliationMatchSelect(SelectBase):  # type: ignore[misc]
+    def __init__(
+        self,
+        options_with_actions: list[tuple[SelectOption, str]],
+        callback_func: Callable,
+    ):
+        super().__init__(
+            placeholder="Select a match",
+            options=[option for option, _action in options_with_actions],
+        )
+        self.actions_by_value = {
+            option.value: action
+            for option, action in options_with_actions
+        }
+        self.callback_func = callback_func
+
+    async def callback(self, interaction: Interaction):
+        await self.callback_func(interaction, self.actions_by_value[self.values[0]])
+
+
+def _candidate_option(index: int, candidate: ActionLogCandidate) -> tuple[SelectOption, str]:
+    source = "schedule" if candidate.action_type == "schedule" else "row"
+    label = f"{index}. ${candidate.amount:.2f} {candidate.label}"[:100]
+    description = f"{candidate.date:%m-%d} | {source} | conf {candidate.confidence:.2f}"[:100]
+    value = f"candidate:{index - 1}"
+    return SelectOption(label=label, value=value, description=description), value
+
+
+def _group_option(index: int, group: ActionLogCandidateGroup) -> tuple[SelectOption, str]:
+    label = f"{index}. ${group.total_amount:.2f} grouped rows"[:100]
+    description = f"{len(group.candidates)} rows | conf {group.confidence:.2f}"[:100]
+    value = f"group:{index - 1}"
+    return SelectOption(label=label, value=value, description=description), value
+
+
+def _single_match_label(action: str, option: SelectOption) -> str:
+    amount = option.label.split(" ", 2)[1] if " " in option.label else ""
+    if action.startswith("group:"):
+        return f"Match grouped rows ({amount})"
+    if "schedule" in (option.description or ""):
+        return f"Match schedule ({amount})"
+    return f"Match row ({amount})"
+
+
 class BankReconciliationDetailView(ViewBase):  # type: ignore[misc]
     def __init__(
         self,
@@ -32,27 +76,29 @@ class BankReconciliationDetailView(ViewBase):  # type: ignore[misc]
         *,
         fallback_available: bool = True,
         session_controls: bool = False,
+        pending: bool = False,
     ):
         super().__init__(timeout=600)
-        for index, group in enumerate(groups[:2], start=1):
-            total = f"${group.total_amount:.2f}"
-            label = f"Match group {index} ({total})" if len(groups) > 1 else f"Match grouped rows ({total})"
-            self.add_item(BankReconciliationButton(label, f"group:{index - 1}", callback_func))
-        for index, candidate in enumerate(candidates[:2], start=1):
-            label_prefix = "Match schedule" if candidate.action_type == "schedule" else "Match row"
-            self.add_item(
-                BankReconciliationButton(
-                    f"{label_prefix} {index} (${candidate.amount:.2f})",
-                    f"candidate:{index - 1}",
-                    callback_func,
-                )
-            )
-        self.add_item(BankReconciliationButton("Log item", "log", callback_func))
+        match_options = [
+            _group_option(index, group)
+            for index, group in enumerate(groups[:5], start=1)
+        ]
+        match_options.extend(
+            _candidate_option(index, candidate)
+            for index, candidate in enumerate(candidates[:20], start=1)
+        )
+        if not pending:
+            if len(match_options) == 1:
+                option, action = match_options[0]
+                self.add_item(BankReconciliationButton(_single_match_label(action, option), action, callback_func))
+            elif len(match_options) > 1:
+                self.add_item(BankReconciliationMatchSelect(match_options[:25], callback_func))
+            self.add_item(BankReconciliationButton("Log", "log", callback_func))
         if session_controls:
-            self.add_item(BankReconciliationButton("Skip for now", "skip", callback_func))
-        self.add_item(BankReconciliationButton("Ignore this bank item", "ignore", callback_func))
+            self.add_item(BankReconciliationButton("Skip", "skip", callback_func))
+        self.add_item(BankReconciliationButton("Ignore", "ignore", callback_func))
         if fallback_available:
-            self.add_item(BankReconciliationButton("Show more possible matches", "fallback", callback_func))
+            self.add_item(BankReconciliationButton("Show More", "fallback", callback_func))
 
 
 class BankReconciliationDigestView(ViewBase):  # type: ignore[misc]
