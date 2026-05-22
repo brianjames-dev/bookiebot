@@ -15,6 +15,8 @@ from bookiebot.banking.reconciliation import (
     ActionLogCandidate,
     ActionLogCandidateGroup,
     ScheduledPullCandidate,
+    _candidate_amount_tolerance,
+    _scheduled_name_score,
     action_log_bank_transaction,
     action_log_candidate_by_id,
     find_action_log_candidates,
@@ -147,6 +149,39 @@ def _simple_match_tokens(value: str | None) -> list[str]:
     import re
 
     return re.sub(r"[^a-z0-9]+", " ", (value or "").lower()).split()
+
+
+def _scheduled_pull_debug_rows(transaction: BankTransaction, pulls: list[ScheduledPullCandidate], window_days: int) -> list[str]:
+    transaction_date = _transaction_local_date(transaction)
+    if transaction.pending:
+        return ["Transaction is pending, so schedule candidates are skipped."]
+    if transaction.amount <= 0:
+        return ["Transaction is money-in, so schedule candidates are skipped."]
+    if transaction_date is None:
+        return ["Transaction date is missing or invalid."]
+
+    rows = [f"{'Name':<18} {'Pull':<5} {'Amt':>8} {'d':>2} {'Name':>4} {'Delta':>7} {'Result'}"]
+    rows.append("-" * len(rows[0]))
+    for pull in pulls[:25]:
+        day_delta = abs((pull.pull_date - transaction_date).days)
+        name_score = _scheduled_name_score(transaction, pull.name)
+        candidate_amount = pull.amount if pull.amount > 0 else abs(transaction.amount)
+        amount_delta = abs(candidate_amount - abs(transaction.amount))
+        amount_tolerance = _candidate_amount_tolerance(abs(transaction.amount), name_score)
+        exact_or_wildcard_amount = pull.amount <= 0 or amount_delta <= 0.01
+        result = "ok"
+        if day_delta > window_days:
+            result = "date"
+        elif amount_delta > amount_tolerance:
+            result = "amount"
+        elif name_score <= 0 and not exact_or_wildcard_amount and day_delta > 3:
+            result = "name/date"
+        rows.append(
+            f"{pull.name[:18]:<18} {pull.pull_date:%m-%d} "
+            f"{('$' + format(candidate_amount, '.2f')):>8} {day_delta:>2} "
+            f"{name_score:>4.2f} {('$' + format(amount_delta, '.2f')):>7} {result}"
+        )
+    return rows
 
 
 def _scheduled_pulls_for_transactions(
@@ -556,14 +591,16 @@ class BankingService:
         ]
         if bills_with_amounts:
             lines.extend(["", "Bills loaded:", "```text"])
+            lines.append(f"{'Bill':<18} {'Amt':>9} {'Day':>3} {'Months':<9} {'Name':<4} {'Next'}")
+            lines.append("-" * 58)
             for bill, amount_entered, amount in bills_with_amounts[:20]:
                 amount_text = f"${amount:.2f}" if amount_entered else "missing"
                 name_match = "yes" if _bill_name_matches_transaction(bill.display_name, transaction) else "no"
                 next_from_tx = next_bill_pull_date(bill, transaction_date) if transaction_date is not None else None
                 months = ",".join(str(month) for month in bill.pull_months) if bill.pull_months else "-"
                 lines.append(
-                    f"{bill.display_name[:18]:<18} amt={amount_text:<9} day={bill.pull_day:<2} "
-                    f"months={months:<10} name={name_match:<3} next={next_from_tx or 'none'}"
+                    f"{bill.display_name[:18]:<18} {amount_text:>9} {bill.pull_day:>3} "
+                    f"{months:<9} {name_match:<4} {next_from_tx or 'none'}"
                 )
             lines.append("```")
         if pulls:
@@ -576,6 +613,10 @@ class BankingService:
             lines.append("```")
         else:
             lines.extend(["", "Scheduled pulls generated for this bank item: `0`"])
+        if pulls:
+            lines.extend(["", "Schedule scoring:", "```text"])
+            lines.extend(_scheduled_pull_debug_rows(transaction, pulls, 14))
+            lines.append("```")
         if candidates:
             lines.extend(["", "Final schedule candidates:", "```text"])
             for candidate in candidates[:25]:

@@ -1358,7 +1358,9 @@ def test_reconciliation_schedule_debug_shows_loaded_bills(monkeypatch, tmp_path)
 
     assert "Loaded schedules: `0` subscription(s), `1` bill(s)." in output
     assert "Recology" in output
-    assert "name=yes" in output
+    assert "missing  20 2,8,11    yes" in output
+    assert "Schedule scoring:" in output
+    assert "Recology           05-20  $145.36  0 1.00   $0.00 ok" in output
     assert "Final schedule candidates:" in output
     assert "Recology (bill)" in output
 
