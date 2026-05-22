@@ -221,10 +221,11 @@ def _parse_warning_for_fields(
 def _parse_normalized_table(rows: list[list[str]]) -> list[Subscription]:
     if not rows:
         return []
+    required_headers = {"cadence", "name", "amount", "pull_day"}
     for header_index, row in enumerate(rows[:10]):
         normalized = [_normalize_header(value) for value in row]
-        header_values = [header for header in normalized if header]
-        if header_values != NORMALIZED_SCHEDULE_HEADERS:
+        header_values = {header for header in normalized if header}
+        if not required_headers <= header_values:
             continue
 
         subscriptions: list[Subscription] = []

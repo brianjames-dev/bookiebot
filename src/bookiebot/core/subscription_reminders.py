@@ -32,6 +32,7 @@ from bookiebot.sheets.undo import has_system_event, record_system_event
 logger = logging.getLogger(__name__)
 
 _REMINDER_TASK: asyncio.Task | None = None
+_LAST_REMINDER_EVALUATION_DATE: dict[str, date] = {}
 
 
 @dataclass(frozen=True)
@@ -368,7 +369,11 @@ async def send_due_subscription_reminders(client: Any, today: date | None = None
     for actor_key, mention in _notification_users():
         if today is None and not _reminder_is_eligible(current_time, actor_key):
             continue
+        if today is None and _LAST_REMINDER_EVALUATION_DATE.get(actor_key) == current:
+            continue
         prepared = await asyncio.to_thread(_prepare_due_reminder_messages, actor_key, mention, current)
+        if today is None:
+            _LAST_REMINDER_EVALUATION_DATE[actor_key] = current
         for message in prepared.messages:
             await channel.send(message)
         for event in prepared.post_send_events or []:
@@ -502,7 +507,6 @@ def _prepare_due_reminder_messages(actor_key: str, mention: str, current: date) 
 async def run_subscription_reminder_loop(client: Any) -> None:
     while True:
         try:
-            await asyncio.to_thread(sync_subscription_schedules_for_users)
             await send_due_subscription_reminders(client)
         except asyncio.CancelledError:
             raise

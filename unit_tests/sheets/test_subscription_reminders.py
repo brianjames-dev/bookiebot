@@ -5,6 +5,7 @@ from bookiebot.sheets.subscriptions import (
     Subscription,
     SubscriptionReminder,
     format_subscription_reminder,
+    list_normalized_subscription_schedules,
     list_subscription_schedules,
     next_pull_date,
     due_subscription_reminders_for_subscriptions,
@@ -54,13 +55,18 @@ def test_parses_current_hidden_normalized_layout():
     ]
 
 
-def test_old_hidden_normalized_layout_is_not_supported():
+def test_hidden_normalized_layout_can_be_read_by_header_names():
     rows = [
         ["id", "active", "budget_owner_key", "owner_name", "kind", "cadence", "name", "amount", "pull_day", "pull_month"],
         ["old", "yes", "brian", "Brian", "needs", "monthly", "Spotify", "$9.99", "14", ""],
     ]
 
-    assert list_subscription_schedules(rows) == []
+    subscriptions = list_subscription_schedules(rows)
+
+    assert len(subscriptions) == 1
+    assert subscriptions[0].name == "Spotify"
+    assert subscriptions[0].amount == 9.99
+    assert subscriptions[0].pull_day == 14
 
 
 def test_due_subscription_reminders_include_every_day_in_next_7_days():
@@ -168,6 +174,42 @@ def test_sync_subscription_schedule_sheet_writes_hidden_normalized_rows():
     assert len(rows[0]) == 14
     assert all(value == "" for value in rows[0][7:])
     assert all(value == "" for value in rows[1][7:])
+
+
+def test_list_normalized_subscription_schedules_accepts_extra_hidden_columns():
+    repo = SheetsRepoStub(
+        subscription_schedule_rows=[
+            [
+                "cadence",
+                "name",
+                "amount",
+                "pull_day",
+                "pull_month",
+                "account",
+                "source_range",
+                "updated_at",
+            ],
+            [
+                "monthly",
+                "iCloud Storage",
+                "2.99",
+                "16",
+                "",
+                "BofA",
+                "Subscriptions!J8:L8",
+                "2026-05-21T08:00:00-07:00",
+            ],
+        ],
+    )
+
+    with repo.patched(), sheet_user_context("676638528590970917"):
+        subscriptions = list_normalized_subscription_schedules()
+
+    assert len(subscriptions) == 1
+    assert subscriptions[0].name == "iCloud Storage"
+    assert subscriptions[0].amount == 2.99
+    assert subscriptions[0].account == "BofA"
+    assert subscriptions[0].source_range == "Subscriptions!J8:L8"
 
 
 def test_parse_visible_subscription_schedules_reports_skipped_rows():

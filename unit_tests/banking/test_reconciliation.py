@@ -1152,6 +1152,7 @@ def test_confirm_reconciliation_schedule_match_marks_schedule_row(monkeypatch, t
 
 
 def test_scheduled_pulls_falls_back_to_visible_subscriptions(monkeypatch):
+    banking_service._SCHEDULE_SOURCE_CACHE.clear()
     monkeypatch.setattr(banking_service, "sheet_user_context", lambda _actor_key: nullcontext())
     monkeypatch.setattr(banking_service, "list_normalized_subscription_schedules", lambda: [])
     monkeypatch.setattr(
@@ -1184,6 +1185,7 @@ def test_scheduled_pulls_falls_back_to_visible_subscriptions(monkeypatch):
 
 
 def test_scheduled_pulls_still_loads_bills_when_subscriptions_fail(monkeypatch):
+    banking_service._SCHEDULE_SOURCE_CACHE.clear()
     monkeypatch.setattr(banking_service, "sheet_user_context", lambda _actor_key: nullcontext())
     monkeypatch.setattr(
         banking_service,
