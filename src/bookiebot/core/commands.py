@@ -33,13 +33,14 @@ from bookiebot.sheets.routing import (
     get_user_config,
     get_year_config,
     MissingYearConfigError,
+    now_pacific,
     sheet_user_context,
 )
 from bookiebot.sheets.config import get_category_columns
 from bookiebot.sheets.repo import get_sheets_repo
 from bookiebot.sheets.undo import update_recent_action
 from bookiebot.sheets.writer import log_category_row, log_income_row, record_expense_undo
-from bookiebot.sheets.bills import parse_bill_schedules_with_warnings
+from bookiebot.sheets.bills import bill_amount_for_source_label, next_bill_pull_date, parse_bill_schedules_with_warnings
 from bookiebot.sheets.subscriptions import debug_subscription_sync
 
 
@@ -1377,7 +1378,14 @@ def register_commands(tree: app_commands.CommandTree):
                 schedule = f"{bill.pull_day}"
                 if bill.recurrence == "quarterly":
                     schedule = f"{bill.pull_day} in months {','.join(str(month) for month in bill.pull_months)}"
-                lines.append(f"- {bill.display_name}: {bill.recurrence} on {schedule}")
+                amount_entered, amount = bill_amount_for_source_label(bill.source_label)
+                amount_text = f"${amount:.2f}" if amount_entered else "amount missing"
+                next_pull = next_bill_pull_date(bill, now_pacific().date())
+                next_pull_text = next_pull.isoformat() if next_pull else "none"
+                lines.append(
+                    f"- {bill.display_name}: {bill.recurrence} on {schedule}; "
+                    f"source `{bill.source_label}` = {amount_text}; next {next_pull_text}"
+                )
             if len(bills) > 20:
                 lines.append(f"- ...and {len(bills) - 20} more")
         if bill_warnings:

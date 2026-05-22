@@ -138,6 +138,7 @@ def _scheduled_pulls_for_transactions(
     if not transaction_dates:
         return []
 
+    unique_transaction_dates = tuple(sorted(set(transaction_dates)))
     start_date = min(transaction_dates) - timedelta(days=window_days)
     end_date = max(transaction_dates) + timedelta(days=window_days)
     subscriptions, bills_with_amounts = _schedule_sources_for_actor(actor_key)
@@ -160,8 +161,10 @@ def _scheduled_pulls_for_transactions(
             expected = next_pull_date(subscription, expected + timedelta(days=1))
 
     for bill, amount_entered, amount in bills_with_amounts:
+        seen_pull_dates: set[local_date] = set()
         expected = next_bill_pull_date(bill, start_date)
         while expected is not None and expected <= end_date:
+            seen_pull_dates.add(expected)
             candidates.append(
                 ScheduledPullCandidate(
                     source_type="bill",
@@ -173,6 +176,20 @@ def _scheduled_pulls_for_transactions(
                 )
             )
             expected = next_bill_pull_date(bill, expected + timedelta(days=1))
+        if amount_entered and amount > 0:
+            for transaction_date in unique_transaction_dates:
+                if transaction_date in seen_pull_dates:
+                    continue
+                candidates.append(
+                    ScheduledPullCandidate(
+                        source_type="bill",
+                        name=bill.display_name,
+                        amount=amount,
+                        pull_date=transaction_date,
+                        source_ref=bill.source_range or f"bill:{bill.bill_key}",
+                        account=bill.account,
+                    )
+                )
     return candidates
 
 
