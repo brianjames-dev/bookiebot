@@ -478,6 +478,25 @@ def test_find_scheduled_pull_candidates_includes_bill_without_entered_amount_by_
     assert candidates[0].amount == 145.36
 
 
+def test_find_scheduled_pull_candidates_includes_pending_for_manual_review():
+    candidates = find_scheduled_pull_candidates(
+        _transaction("Recology Sonoma", 145.36, pending=True),
+        [
+            ScheduledPullCandidate(
+                source_type="bill",
+                name="Recology",
+                amount=145.36,
+                pull_date=date(2026, 5, 20),
+                source_ref="_BookieBot Bill Schedule!A3:I3",
+            )
+        ],
+    )
+
+    assert len(candidates) == 1
+    assert candidates[0].label == "Recology (bill)"
+    assert candidates[0].amount == 145.36
+
+
 def test_reconcile_does_not_match_wrong_amount():
     action = LoggedAction(
         id="abc123",

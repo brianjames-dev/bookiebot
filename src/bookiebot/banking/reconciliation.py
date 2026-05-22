@@ -249,7 +249,7 @@ def find_scheduled_pull_candidates(
     window_days: int = 7,
     limit: int = 5,
 ) -> list[ActionLogCandidate]:
-    if transaction.pending or transaction.amount <= 0:
+    if transaction.amount <= 0:
         return []
     transaction_date = _transaction_date(transaction)
     if transaction_date is None:

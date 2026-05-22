@@ -153,15 +153,18 @@ def _simple_match_tokens(value: str | None) -> list[str]:
 
 def _scheduled_pull_debug_rows(transaction: BankTransaction, pulls: list[ScheduledPullCandidate], window_days: int) -> list[str]:
     transaction_date = _transaction_local_date(transaction)
-    if transaction.pending:
-        return ["Transaction is pending, so schedule candidates are skipped."]
     if transaction.amount <= 0:
         return ["Transaction is money-in, so schedule candidates are skipped."]
     if transaction_date is None:
         return ["Transaction date is missing or invalid."]
 
-    rows = [f"{'Name':<18} {'Pull':<5} {'Amt':>8} {'d':>2} {'Name':>4} {'Delta':>7} {'Result'}"]
-    rows.append("-" * len(rows[0]))
+    rows = []
+    if transaction.pending:
+        rows.append("Transaction is pending; candidates are shown for review only.")
+        rows.append("")
+    header = f"{'Name':<18} {'Pull':<5} {'Amt':>8} {'d':>2} {'Name':>4} {'Delta':>7} {'Result'}"
+    rows.append(header)
+    rows.append("-" * len(header))
     for pull in pulls[:25]:
         day_delta = abs((pull.pull_date - transaction_date).days)
         name_score = _scheduled_name_score(transaction, pull.name)
