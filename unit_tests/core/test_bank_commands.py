@@ -242,6 +242,71 @@ def test_format_reconciliation_detail_can_hide_debug_commands_for_button_flow():
     assert "BookieBot found existing sheet rows" in output
 
 
+def test_format_reconciliation_detail_shows_readable_schedule_candidates():
+    transaction = BankTransaction(
+        id=1,
+        provider_transaction_id="txn-1",
+        owner_key="brian",
+        account_name="Checking",
+        account_mask="2178",
+        account_type="depository",
+        account_subtype="checking",
+        date="2026-05-20",
+        authorized_date=None,
+        name="Santa",
+        merchant_name=None,
+        amount=117.36,
+        pending=False,
+        payment_channel=None,
+        updated_at="2026-05-20T00:00:00+00:00",
+    )
+    item = ReconciliationItem(
+        id=929,
+        owner_key="brian",
+        bank_transaction_id=1,
+        provider_transaction_id="txn-1",
+        classification="expense",
+        status="needs_review",
+        confidence=0.5,
+        matched_action_log_id=None,
+        matched_sheet_ref=None,
+        first_seen_at="2026-05-20T00:00:00+00:00",
+        last_seen_at="2026-05-20T00:00:00+00:00",
+        resolved_at=None,
+        ignored_at=None,
+        notes="manual review",
+        transaction=transaction,
+    )
+    candidates = [
+        ActionLogCandidate(
+            "schedule:bill:_BookieBot Bill Schedule!A5:I5",
+            "_BookieBot Bill Schedule!A5:I5",
+            "schedule",
+            date(2026, 5, 18),
+            117.36,
+            "Water (bill)",
+            0.81,
+            "",
+        ),
+        ActionLogCandidate(
+            "4b4c6826",
+            "expense!row 9",
+            "expense",
+            date(2026, 5, 14),
+            116.00,
+            "Costco Wholesale",
+            0.47,
+            "",
+        ),
+    ]
+
+    output = format_reconciliation_detail(item, candidates, [], include_commands=False)
+
+    assert "schedule:bill" not in output
+    assert " 1  05-18   $117.36  bill      0.81  Water (bill)" in output
+    assert " 2  05-14   $116.00  expense   0.47  Costco Wholesale" in output
+
+
 def test_format_reconciliation_detail_labels_money_in_flow():
     transaction = BankTransaction(
         id=1,

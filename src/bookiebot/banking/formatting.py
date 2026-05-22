@@ -252,19 +252,29 @@ def format_bank_transaction_row(transaction: BankTransaction, *, code_wrap: bool
 
 
 def _format_action_candidate_table(candidates: list[ActionLogCandidate]) -> str:
-    header = f"{'Action ID':<9}  {'Date':<5}  {'Amt':>8}  {'Type':<7}  {'Conf':>4}  Label"
+    header = f"{'#':>2}  {'Date':<5}  {'Amt':>8}  {'Type':<8}  {'Conf':>4}  Match"
     divider = "-" * len(header)
     rows = []
-    for candidate in candidates:
+    for index, candidate in enumerate(candidates, start=1):
         rows.append(
-            f"{candidate.action_id:<9}  "
+            f"{index:>2}  "
             f"{_short_date(candidate.date.isoformat()):<5}  "
             f"{_short_money(candidate.amount):>8}  "
-            f"{_clip(candidate.action_type, 7):<7}  "
+            f"{_candidate_type_label(candidate):<8}  "
             f"{candidate.confidence:.2f}  "
-            f"{_clip(candidate.label, 28)}"
+            f"{_clip(candidate.label, 34)}"
         )
     return _code_table([header, divider, *rows])
+
+
+def _candidate_type_label(candidate: ActionLogCandidate) -> str:
+    if candidate.action_type == "schedule":
+        if "(bill)" in candidate.label:
+            return "bill"
+        if "(subscription)" in candidate.label:
+            return "sub"
+        return "schedule"
+    return _clip(candidate.action_type, 8)
 
 
 def _format_action_candidate_group_table(
