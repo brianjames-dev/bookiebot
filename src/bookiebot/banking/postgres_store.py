@@ -34,7 +34,8 @@ class _PostgresConnection:
         return self.conn.execute(_postgres_sql(sql), params)
 
     def executemany(self, sql: str, params_seq):
-        return self.conn.executemany(_postgres_sql(sql), params_seq)
+        with self.conn.cursor() as cursor:
+            return cursor.executemany(_postgres_sql(sql), params_seq)
 
 
 class PostgresBankStore(BankStore):
