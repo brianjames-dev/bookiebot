@@ -1003,6 +1003,32 @@ def register_commands(tree: app_commands.CommandTree):
             )
             return
 
+    @tree.command(name="debug_bank_schedule_candidates", description="(Admin) Debug schedule matching for a bank item")
+    @app_commands.describe(reconciliation_id="ID shown by /debug_bank_review or /debug_bank_review_detail")
+    async def debug_bank_schedule_candidates(interaction: discord.Interaction, reconciliation_id: int):
+        if not auth.is_debug_allowed(interaction.user):
+            await interaction.response.send_message("❌ Not authorized.", ephemeral=True)
+            return
+
+        await interaction.response.defer(ephemeral=True)
+        try:
+            owner = get_user_config(interaction.user.id)
+            service = build_banking_service()
+            output = await asyncio.to_thread(
+                service.reconciliation_schedule_debug,
+                owner.budget_owner_key,
+                reconciliation_id,
+                actor_key=str(interaction.user.id),
+            )
+        except Exception as exc:
+            await interaction.followup.send(
+                content=f"❌ Could not debug bank schedule candidates: {type(exc).__name__}: {exc}",
+                ephemeral=True,
+            )
+            return
+
+        await interaction.followup.send(content=output, ephemeral=True)
+
     @tree.command(name="debug_bank_match", description="(Admin) Match a bank review item to an existing sheet row")
     @app_commands.describe(
         reconciliation_id="ID shown by /debug_bank_review",

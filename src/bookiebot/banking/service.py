@@ -103,6 +103,13 @@ def _schedule_sources_for_actor(actor_key: str) -> tuple[list[Any], list[tuple[A
     return subscriptions, bills_with_amounts
 
 
+def clear_schedule_source_cache(actor_key: str | None = None) -> None:
+    if actor_key is None:
+        _SCHEDULE_SOURCE_CACHE.clear()
+    else:
+        _SCHEDULE_SOURCE_CACHE.pop(actor_key, None)
+
+
 def _clean_debug_text(value: str | None) -> str:
     text = (value or "").strip()
     if len(text) >= 2 and text[0] == text[-1] and text[0] in {"'", '"'}:
@@ -518,6 +525,68 @@ class BankingService:
                 limit=5,
             )
         return item, candidates, groups
+
+    def reconciliation_schedule_debug(
+        self,
+        owner_key: str,
+        reconciliation_id: int,
+        *,
+        actor_key: str,
+    ) -> str:
+        clear_schedule_source_cache(actor_key)
+        item = self.get_reconciliation_item(owner_key, reconciliation_id)
+        if item is None:
+            return f"No bank reconciliation item `{reconciliation_id}` was found."
+
+        transaction = item.transaction
+        transaction_date = _transaction_local_date(transaction)
+        subscriptions, bills_with_amounts = _schedule_sources_for_actor(actor_key)
+        pulls = _scheduled_pulls_for_transactions([transaction], actor_key=actor_key)
+        candidates = find_scheduled_pull_candidates(transaction, pulls, window_days=14, limit=25)
+
+        lines = [
+            "Bank schedule candidate debug:",
+            "```text",
+            f"ID:     {item.id}",
+            f"Date:   {transaction.date or transaction.authorized_date or 'unknown'}",
+            f"Amount: ${abs(transaction.amount):.2f}",
+            f"Name:   {transaction.merchant_name or transaction.name}",
+            "```",
+            f"Loaded schedules: `{len(subscriptions)}` subscription(s), `{len(bills_with_amounts)}` bill(s).",
+        ]
+        if bills_with_amounts:
+            lines.extend(["", "Bills loaded:", "```text"])
+            for bill, amount_entered, amount in bills_with_amounts[:20]:
+                amount_text = f"${amount:.2f}" if amount_entered else "missing"
+                name_match = "yes" if _bill_name_matches_transaction(bill.display_name, transaction) else "no"
+                next_from_tx = next_bill_pull_date(bill, transaction_date) if transaction_date is not None else None
+                months = ",".join(str(month) for month in bill.pull_months) if bill.pull_months else "-"
+                lines.append(
+                    f"{bill.display_name[:18]:<18} amt={amount_text:<9} day={bill.pull_day:<2} "
+                    f"months={months:<10} name={name_match:<3} next={next_from_tx or 'none'}"
+                )
+            lines.append("```")
+        if pulls:
+            lines.extend(["", "Scheduled pulls generated for this bank item:", "```text"])
+            for pull in pulls[:25]:
+                lines.append(
+                    f"{pull.source_type[:4]:<4} {pull.pull_date.isoformat()} "
+                    f"${pull.amount:.2f} {pull.name[:28]}"
+                )
+            lines.append("```")
+        else:
+            lines.extend(["", "Scheduled pulls generated for this bank item: `0`"])
+        if candidates:
+            lines.extend(["", "Final schedule candidates:", "```text"])
+            for candidate in candidates[:25]:
+                lines.append(
+                    f"{candidate.date.isoformat()} ${candidate.amount:.2f} "
+                    f"{candidate.confidence:.2f} {candidate.label[:30]}"
+                )
+            lines.append("```")
+        else:
+            lines.extend(["", "Final schedule candidates: `0`"])
+        return "\n".join(lines)[:1900]
 
     def confirm_reconciliation_schedule_match(
         self,

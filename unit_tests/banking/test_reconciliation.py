@@ -1306,6 +1306,63 @@ def test_scheduled_pulls_include_name_matched_bill_without_amount(monkeypatch):
     )
 
 
+def test_reconciliation_schedule_debug_shows_loaded_bills(monkeypatch, tmp_path):
+    banking_service._SCHEDULE_SOURCE_CACHE.clear()
+    monkeypatch.setattr(banking_service, "sheet_user_context", lambda _actor_key: nullcontext())
+    monkeypatch.setattr(banking_service, "list_normalized_subscription_schedules", lambda: [])
+    monkeypatch.setattr(banking_service, "parse_visible_subscription_schedules", lambda: [])
+    monkeypatch.setattr(
+        banking_service,
+        "list_bill_schedules",
+        lambda: [
+            BillSchedule(
+                bill_key="recology",
+                display_name="Recology",
+                recurrence="quarterly",
+                pull_day=20,
+                pull_months=(2, 8, 11),
+                source_label="Recology",
+                source_range="_BookieBot Bill Schedule!A3:I3",
+            )
+        ],
+    )
+    monkeypatch.setattr(banking_service, "bill_amount_for_source_label", lambda _source_label: (False, 0.0))
+    store = BankStore(tmp_path / "banking.sqlite3", TokenCipher("test-secret-key"))
+    service = BankingService(
+        config=BankingConfig(
+            plaid_client_id="client",
+            plaid_secret="secret",
+            plaid_env="sandbox",
+            token_encryption_key="test-secret-key",
+            sqlite_path=Path("unused.sqlite3"),
+        ),
+        store=store,
+        plaid=PlaidClient(
+            BankingConfig(
+                plaid_client_id="client",
+                plaid_secret="secret",
+                plaid_env="sandbox",
+                token_encryption_key="test-secret-key",
+                sqlite_path=Path("unused.sqlite3"),
+            )
+        ),
+    )
+    service.seed_unmatched_debug_transaction("brian", name="Recology Sonoma", amount=145.36, date="2026-05-20")
+    item = service.reconciliation_preview("brian", force=True).items[0]
+
+    output = service.reconciliation_schedule_debug(
+        "brian",
+        item.id,
+        actor_key="676638528590970917",
+    )
+
+    assert "Loaded schedules: `0` subscription(s), `1` bill(s)." in output
+    assert "Recology" in output
+    assert "name=yes" in output
+    assert "Final schedule candidates:" in output
+    assert "Recology (bill)" in output
+
+
 def test_confirm_reconciliation_action_match_marks_existing_row(monkeypatch, tmp_path):
     action = LoggedAction(
         id="abc123",
