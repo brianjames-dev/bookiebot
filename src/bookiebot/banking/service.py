@@ -410,6 +410,9 @@ class BankingService:
     def purge_disconnected_item(self, owner_key: str, item_db_id: int) -> dict[str, int] | None:
         return self.store.purge_disconnected_item(owner_key, item_db_id)
 
+    def purge_transactions_before(self, owner_key: str, cutoff_date: str) -> dict[str, int]:
+        return self.store.purge_transactions_before(owner_key, cutoff_date)
+
     def recent_transactions(self, owner_key: str, limit: int = 10) -> list[BankTransaction]:
         return self.store.recent_transactions(owner_key=owner_key, limit=limit)
 

@@ -514,6 +514,39 @@ def register_commands(tree: app_commands.CommandTree):
             )
         )
 
+    @tree.command(name="debug_bank_purge_before_month", description="(Admin) Delete cached bank transactions before this month")
+    async def debug_bank_purge_before_month(interaction: discord.Interaction):
+        if not auth.is_debug_allowed(interaction.user):
+            await interaction.response.send_message("❌ Not authorized.", ephemeral=True)
+            return
+
+        await interaction.response.defer(ephemeral=True)
+        try:
+            owner = get_user_config(interaction.user.id)
+            cutoff = now_pacific().date().replace(day=1).isoformat()
+            service = build_banking_service()
+            result = await asyncio.to_thread(
+                service.purge_transactions_before,
+                owner.budget_owner_key,
+                cutoff,
+            )
+        except Exception as exc:
+            await _send_bank_command_error(
+                interaction,
+                f"❌ Could not purge old bank cache: {type(exc).__name__}: {exc}",
+            )
+            return
+
+        await interaction.edit_original_response(
+            content=(
+                f"Purged cached bank data before `{result['cutoff_date']}` for {owner.name}.\n"
+                f"- Transactions deleted: {result['transactions']}\n"
+                f"- Reconciliation rows deleted: {result['reconciliation_items']}\n"
+                "- Bank Items/accounts preserved.\n"
+                "- Sheets and action logs untouched."
+            )
+        )
+
     @tree.command(name="debug_bank_sync", description="(Admin) Sync Plaid transactions for your budget owner")
     async def debug_bank_sync(interaction: discord.Interaction):
         if not auth.is_debug_allowed(interaction.user):

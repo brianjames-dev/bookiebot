@@ -299,6 +299,49 @@ class BankStore:
             "reconciliation_items": reconciliation_count,
         }
 
+    def purge_transactions_before(self, owner_key: str, cutoff_date: str) -> dict[str, int]:
+        self.initialize()
+        with self.connect() as conn:
+            transaction_rows = conn.execute(
+                """
+                SELECT id
+                FROM bank_transactions
+                WHERE owner_key = ?
+                  AND COALESCE(date, authorized_date, '') != ''
+                  AND COALESCE(date, authorized_date, '') < ?
+                """,
+                (owner_key, cutoff_date),
+            ).fetchall()
+            transaction_ids = [int(transaction["id"]) for transaction in transaction_rows]
+            reconciliation_count = 0
+            transaction_count = len(transaction_ids)
+            if transaction_ids:
+                placeholders = ",".join("?" for _ in transaction_ids)
+                reconciliation_count = int(
+                    conn.execute(
+                        f"""
+                        SELECT COUNT(*) AS count
+                        FROM bank_reconciliation_items
+                        WHERE bank_transaction_id IN ({placeholders})
+                        """,
+                        tuple(transaction_ids),
+                    ).fetchone()["count"]
+                )
+                conn.execute(
+                    f"DELETE FROM bank_reconciliation_items WHERE bank_transaction_id IN ({placeholders})",
+                    tuple(transaction_ids),
+                )
+                conn.execute(
+                    f"DELETE FROM bank_transactions WHERE id IN ({placeholders})",
+                    tuple(transaction_ids),
+                )
+
+        return {
+            "cutoff_date": cutoff_date,
+            "transactions": transaction_count,
+            "reconciliation_items": reconciliation_count,
+        }
+
     def get_access_token(self, item_db_id: int) -> str:
         with self.connect() as conn:
             row = conn.execute(

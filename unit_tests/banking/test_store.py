@@ -261,6 +261,158 @@ def test_store_purge_disconnected_item_is_owner_scoped(tmp_path):
     assert len(store.list_items("brian")) == 1
 
 
+def test_store_purges_transactions_before_cutoff_without_touching_accounts(tmp_path):
+    store = _store(tmp_path)
+    item = store.upsert_item(
+        owner_key="brian",
+        provider="plaid",
+        item_id="item-brian",
+        access_token="access-sandbox-brian",
+        institution_name="Plaid Sandbox",
+    )
+    store.upsert_accounts(
+        [
+            BankAccount(
+                item_id=item.id,
+                provider_account_id="account-brian",
+                owner_key="brian",
+                name="Brian Checking",
+                mask="1111",
+                type="depository",
+                subtype="checking",
+                official_name=None,
+                current_balance=500.0,
+                available_balance=450.0,
+            )
+        ]
+    )
+    store.upsert_transactions(
+        [
+            {
+                "transaction_id": "txn-april",
+                "account_id": "account-brian",
+                "date": "2026-04-30",
+                "name": "Old Coffee",
+                "amount": 4.33,
+                "pending": False,
+            },
+            {
+                "transaction_id": "txn-may",
+                "account_id": "account-brian",
+                "date": "2026-05-01",
+                "name": "Current Coffee",
+                "amount": 5.55,
+                "pending": False,
+            },
+        ],
+        owner_key="brian",
+    )
+    by_name = {transaction.name: transaction for transaction in store.recent_transactions("brian", limit=2)}
+    store.upsert_reconciliation_item(
+        owner_key="brian",
+        transaction=by_name["Old Coffee"],
+        classification="expense",
+        status="needs_review",
+        confidence=0.6,
+    )
+    current_item = store.upsert_reconciliation_item(
+        owner_key="brian",
+        transaction=by_name["Current Coffee"],
+        classification="expense",
+        status="needs_review",
+        confidence=0.6,
+    )
+
+    result = store.purge_transactions_before("brian", "2026-05-01")
+
+    assert result == {
+        "cutoff_date": "2026-05-01",
+        "transactions": 1,
+        "reconciliation_items": 1,
+    }
+    assert [transaction.name for transaction in store.recent_transactions("brian", limit=10)] == ["Current Coffee"]
+    assert [item.id for item in store.unresolved_reconciliation_items("brian")] == [current_item.id]
+    assert len(store.list_accounts("brian")) == 1
+
+
+def test_store_purge_transactions_before_is_owner_scoped(tmp_path):
+    store = _store(tmp_path)
+    brian_item = store.upsert_item(
+        owner_key="brian",
+        provider="plaid",
+        item_id="item-brian",
+        access_token="access-sandbox-brian",
+        institution_name="Plaid Sandbox",
+    )
+    hannah_item = store.upsert_item(
+        owner_key="hannah",
+        provider="plaid",
+        item_id="item-hannah",
+        access_token="access-sandbox-hannah",
+        institution_name="Plaid Sandbox",
+    )
+    store.upsert_accounts(
+        [
+            BankAccount(
+                item_id=brian_item.id,
+                provider_account_id="account-brian",
+                owner_key="brian",
+                name="Brian Checking",
+                mask="1111",
+                type="depository",
+                subtype="checking",
+                official_name=None,
+                current_balance=500.0,
+                available_balance=450.0,
+            ),
+            BankAccount(
+                item_id=hannah_item.id,
+                provider_account_id="account-hannah",
+                owner_key="hannah",
+                name="Hannah Checking",
+                mask="2222",
+                type="depository",
+                subtype="checking",
+                official_name=None,
+                current_balance=500.0,
+                available_balance=450.0,
+            ),
+        ]
+    )
+    store.upsert_transactions(
+        [
+            {
+                "transaction_id": "txn-brian-april",
+                "account_id": "account-brian",
+                "date": "2026-04-30",
+                "name": "Brian Old Coffee",
+                "amount": 4.33,
+                "pending": False,
+            },
+        ],
+        owner_key="brian",
+    )
+    store.upsert_transactions(
+        [
+            {
+                "transaction_id": "txn-hannah-april",
+                "account_id": "account-hannah",
+                "date": "2026-04-30",
+                "name": "Hannah Old Coffee",
+                "amount": 5.55,
+                "pending": False,
+            },
+        ],
+        owner_key="hannah",
+    )
+
+    result = store.purge_transactions_before("brian", "2026-05-01")
+
+    assert result["transactions"] == 1
+    assert store.recent_transactions("brian", limit=10) == []
+    assert [transaction.name for transaction in store.recent_transactions("hannah", limit=10)] == ["Hannah Old Coffee"]
+
+
 def test_recent_transactions_are_owner_scoped_ordered_and_limited(tmp_path):
     store = _store(tmp_path)
     brian_item = store.upsert_item(
