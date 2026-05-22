@@ -74,6 +74,33 @@ def test_reminder_eligibility_falls_back_to_global_hour(monkeypatch):
     )
 
 
+def test_prepare_due_reminder_messages_stops_on_sheets_quota_error(monkeypatch, caplog):
+    def fail_quota():
+        raise RuntimeError("APIError: [429]: Quota exceeded for quota metric 'Read requests'")
+
+    monkeypatch.setattr(subscription_reminders, "debug_subscription_sync", fail_quota)
+    monkeypatch.setattr(
+        subscription_reminders,
+        "due_subscription_reminders",
+        lambda *_args, **_kwargs: pytest.fail("quota fallback should not read Sheets again"),
+    )
+    monkeypatch.setattr(
+        subscription_reminders,
+        "due_bill_reminders",
+        lambda *_args, **_kwargs: pytest.fail("quota fallback should not read bill schedules"),
+    )
+
+    prepared = subscription_reminders._prepare_due_reminder_messages(
+        "676638528590970917",
+        "<@676638528590970917>",
+        date(2026, 5, 15),
+    )
+
+    assert prepared.sent_count == 0
+    assert prepared.messages == []
+    assert "Google Sheets read quota was exceeded" in caplog.text
+
+
 def test_format_subscription_reminder_digest_groups_by_window():
     reminders = [
         SubscriptionReminder(

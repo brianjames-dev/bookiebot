@@ -116,6 +116,11 @@ def _reminder_is_eligible(now: datetime | None = None, actor_key: str | None = N
     return current.hour >= _send_hour(actor_key)
 
 
+def _is_sheets_quota_error(exc: Exception) -> bool:
+    text = f"{type(exc).__name__}: {exc}".lower()
+    return "429" in text and "quota" in text
+
+
 def _notification_users() -> list[tuple[str, str]]:
     seen_owner_keys: set[str] = set()
     users: list[tuple[str, str]] = []
@@ -401,15 +406,27 @@ def _prepare_due_reminder_messages(actor_key: str, mention: str, current: date) 
             subscriptions, warnings = debug_subscription_sync()
             reminders = due_subscription_reminders_for_subscriptions(subscriptions, current)
             bill_reminders, bill_warnings = due_bill_reminders(current)
-    except Exception:
+    except Exception as exc:
+        if _is_sheets_quota_error(exc):
+            logger.warning(
+                "Subscription reminders skipped because Google Sheets read quota was exceeded",
+                extra={"actor_key": actor_key},
+            )
+            return _prepared(messages=[], sent_count=0)
         logger.exception("Failed to evaluate subscription reminders", extra={"actor_key": actor_key})
         try:
             with sheet_user_context(actor_key):
                 reminders = due_subscription_reminders(current)
                 warnings = []
                 bill_reminders, bill_warnings = due_bill_reminders(current)
-        except Exception:
-            logger.exception("Failed fallback subscription reminder evaluation", extra={"actor_key": actor_key})
+        except Exception as fallback_exc:
+            if _is_sheets_quota_error(fallback_exc):
+                logger.warning(
+                    "Fallback subscription reminders skipped because Google Sheets read quota was exceeded",
+                    extra={"actor_key": actor_key},
+                )
+            else:
+                logger.exception("Failed fallback subscription reminder evaluation", extra={"actor_key": actor_key})
             return _prepared(messages=[], sent_count=0)
 
     unsent_warnings: list[SubscriptionParseWarning] = []
