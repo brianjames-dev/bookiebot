@@ -858,7 +858,8 @@ class BankingService:
         actor_key: str | None = None,
     ) -> ReconciliationPreview:
         self.store.initialize()
-        cached_transaction_count = self.store.transaction_count(owner_key)
+        cache_buckets = self.store.reconciliation_cache_buckets(owner_key)
+        cached_transaction_count = cache_buckets.stored
         transactions = self.store.bank_transactions_for_reconciliation(owner_key=owner_key, limit=limit, force=force)
         action_log = read_active_logged_actions(actor_key) if actor_key else []
         scheduled_pulls = _scheduled_pulls_for_transactions(transactions, actor_key=actor_key)
@@ -883,6 +884,7 @@ class BankingService:
             force=force,
             cached_transaction_count=cached_transaction_count,
             candidate_transaction_count=len(transactions),
+            cache_buckets=cache_buckets,
         )
 
     async def _fetch_accounts_for_item(

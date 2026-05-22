@@ -51,10 +51,19 @@ def format_bank_transaction_table_chunks(
 
 
 def format_reconciliation_preview(preview: ReconciliationPreview, *, max_chars: int = 1800) -> str:
+    buckets = preview.cache_buckets
     summary = (
         "Bank reconciliation preview:\n"
         f"- Force: {'yes' if preview.force else 'no'}\n"
-        f"- Cached transactions: {preview.cached_transaction_count}\n"
+        f"- Stored bank transactions: {buckets.stored}\n"
+        f"- Needs review: {buckets.needs_review}\n"
+        f"- Matched automatically: {buckets.matched}\n"
+        f"- Confirmed/logged: {buckets.confirmed}\n"
+        f"- Ignored: {buckets.ignored}\n"
+        f"- Pending: {buckets.pending}\n"
+        f"- Not reviewed yet: {buckets.not_reviewed}\n"
+        f"- Unwatched accounts: {buckets.unwatched}\n"
+        f"- Other: {buckets.other}\n"
         f"- Candidate transactions: {preview.candidate_transaction_count}"
     )
     if not preview.items:

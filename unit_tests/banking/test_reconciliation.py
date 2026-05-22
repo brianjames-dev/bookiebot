@@ -1,6 +1,7 @@
 from contextlib import nullcontext
 from datetime import date
 from pathlib import Path
+from typing import cast
 
 import pytest
 
@@ -709,6 +710,7 @@ def test_reconciliation_preview_excludes_ignored_accounts(tmp_path):
         account for account in store.list_accounts("brian")
         if account.provider_account_id == "account-ignored"
     ][0]
+    assert ignored_account.id is not None
     store.set_account_watched("brian", ignored_account.id, False)
     store.upsert_transactions(
         [
@@ -822,7 +824,7 @@ async def test_remove_item_from_plaid_calls_provider_and_disconnects(tmp_path):
             sqlite_path=Path("unused.sqlite3"),
         ),
         store=store,
-        plaid=plaid,
+        plaid=cast(PlaidClient, plaid),
     )
 
     disconnected = await service.remove_item_from_plaid("brian", item.id)
@@ -855,7 +857,7 @@ async def test_remove_item_from_plaid_skips_provider_for_disconnected_item(tmp_p
             sqlite_path=Path("unused.sqlite3"),
         ),
         store=store,
-        plaid=plaid,
+        plaid=cast(PlaidClient, plaid),
     )
 
     disconnected = await service.remove_item_from_plaid("brian", item.id)
@@ -887,7 +889,7 @@ async def test_seed_sandbox_resets_cursor_when_cache_is_empty(tmp_path):
             sqlite_path=Path("unused.sqlite3"),
         ),
         store=store,
-        plaid=plaid,
+        plaid=cast(PlaidClient, plaid),
     )
 
     _item, results = await service.seed_sandbox_owner("brian")

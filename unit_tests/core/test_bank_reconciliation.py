@@ -2,7 +2,7 @@ from datetime import date, datetime
 from types import SimpleNamespace
 import pytest
 
-from bookiebot.banking.models import BankTransaction, ReconciliationItem, ReconciliationPreview
+from bookiebot.banking.models import BankTransaction, ReconciliationCacheBuckets, ReconciliationItem, ReconciliationPreview
 import bookiebot.core.bank_reconciliation as bank_reconciliation
 from bookiebot.core.bank_reconciliation import (
     _parse_specific_snooze_time,
@@ -82,13 +82,31 @@ def test_format_bank_reconciliation_digest_lists_unresolved_items():
         items=[item],
         cached_transaction_count=26,
         candidate_transaction_count=1,
+        cache_buckets=ReconciliationCacheBuckets(
+            stored=26,
+            needs_review=1,
+            matched=10,
+            confirmed=8,
+            ignored=2,
+            pending=3,
+            not_reviewed=1,
+            unwatched=1,
+        ),
     )
 
     output = format_bank_reconciliation_digest("<@123>", preview, [item])
 
     assert "<@123> bank reconciliation found `1` item that needs review." in output
-    assert "Cached transactions: `26`" in output
-    assert "Checked this run: `1`" in output
+    assert "Bank cache:" in output
+    assert "- Stored bank transactions: `26`" in output
+    assert "- Needs review: `1`" in output
+    assert "- Matched automatically: `10`" in output
+    assert "- Confirmed/logged: `8`" in output
+    assert "- Ignored: `2`" in output
+    assert "- Pending: `3`" in output
+    assert "- Not reviewed yet: `1`" in output
+    assert "- Unwatched accounts: `1`" in output
+    assert "- Checked this run: `1`" in output
     assert "Unresolved bank reconciliation items:" in output
     assert "  42  05-18    $12.34  expense   Unlogged Coffee" in output
 

@@ -473,11 +473,21 @@ def format_bank_reconciliation_digest(
     ]
     if sync_error:
         lines.extend(["", "Bank sync warning: using cached bank data for this digest."])
+    buckets = preview.cache_buckets
     lines.extend(
         [
             "",
-            f"Cached transactions: `{preview.cached_transaction_count}`",
-            f"Checked this run: `{preview.candidate_transaction_count}`",
+            "Bank cache:",
+            f"- Stored bank transactions: `{buckets.stored}`",
+            f"- Needs review: `{buckets.needs_review}`",
+            f"- Matched automatically: `{buckets.matched}`",
+            f"- Confirmed/logged: `{buckets.confirmed}`",
+            f"- Ignored: `{buckets.ignored}`",
+            f"- Pending: `{buckets.pending}`",
+            f"- Not reviewed yet: `{buckets.not_reviewed}`",
+            f"- Unwatched accounts: `{buckets.unwatched}`",
+            f"- Other: `{buckets.other}`",
+            f"- Checked this run: `{preview.candidate_transaction_count}`",
             "",
             format_reconciliation_review(unresolved),
         ]

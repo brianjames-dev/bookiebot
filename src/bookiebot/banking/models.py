@@ -113,9 +113,23 @@ class ReconciliationItem:
 
 
 @dataclass(frozen=True)
+class ReconciliationCacheBuckets:
+    stored: int = 0
+    needs_review: int = 0
+    matched: int = 0
+    confirmed: int = 0
+    ignored: int = 0
+    pending: int = 0
+    not_reviewed: int = 0
+    unwatched: int = 0
+    other: int = 0
+
+
+@dataclass(frozen=True)
 class ReconciliationPreview:
     owner_key: str
     items: list[ReconciliationItem]
     force: bool = False
     cached_transaction_count: int = 0
     candidate_transaction_count: int = 0
+    cache_buckets: ReconciliationCacheBuckets = ReconciliationCacheBuckets()

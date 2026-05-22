@@ -230,7 +230,9 @@ def test_store_purges_disconnected_item_cached_data(tmp_path):
         notes="outflow transaction",
     )
 
-    assert store.purge_disconnected_item("brian", item.id)["status"] == 0
+    not_ready_result = store.purge_disconnected_item("brian", item.id)
+    assert not_ready_result is not None
+    assert not_ready_result["status"] == 0
     store.disconnect_item("brian", item.id)
     result = store.purge_disconnected_item("brian", item.id)
 
@@ -536,6 +538,7 @@ def test_account_watch_status_filters_recent_transactions(tmp_path):
         ]
     )
     accounts = {account.provider_account_id: account for account in store.list_accounts("brian")}
+    assert accounts["account-ignored"].id is not None
     ignored = store.set_account_watched("brian", accounts["account-ignored"].id, False)
     store.upsert_transactions(
         [
@@ -590,6 +593,7 @@ def test_upsert_accounts_preserves_existing_watch_status(tmp_path):
     )
     store.upsert_accounts([account])
     account_id = store.list_accounts("brian")[0].id
+    assert account_id is not None
     store.set_account_watched("brian", account_id, False)
 
     store.upsert_accounts(
@@ -749,6 +753,152 @@ def test_unreconciled_transactions_skip_pending_items(tmp_path):
     transactions = store.unreconciled_transactions("brian")
 
     assert [transaction.name for transaction in transactions] == ["Posted Coffee"]
+
+
+def test_reconciliation_cache_buckets_counts_transaction_states(tmp_path):
+    store = _store(tmp_path)
+    item = store.upsert_item(
+        owner_key="brian",
+        provider="plaid",
+        item_id="item-brian",
+        access_token="access-sandbox-brian",
+        institution_name="Plaid Sandbox",
+    )
+    store.upsert_accounts(
+        [
+            BankAccount(
+                item_id=item.id,
+                provider_account_id="account-watched",
+                owner_key="brian",
+                name="Brian Checking",
+                mask="1111",
+                type="depository",
+                subtype="checking",
+                official_name=None,
+                current_balance=500.0,
+                available_balance=450.0,
+            ),
+            BankAccount(
+                item_id=item.id,
+                provider_account_id="account-unwatched",
+                owner_key="brian",
+                name="Savings",
+                mask="2222",
+                type="depository",
+                subtype="savings",
+                official_name=None,
+                current_balance=300.0,
+                available_balance=300.0,
+            ),
+        ]
+    )
+    accounts = {account.provider_account_id: account for account in store.list_accounts("brian")}
+    assert accounts["account-unwatched"].id is not None
+    store.set_account_watched("brian", accounts["account-unwatched"].id, False)
+    store.upsert_transactions(
+        [
+            {
+                "transaction_id": "txn-review",
+                "account_id": "account-watched",
+                "date": "2026-05-18",
+                "name": "Review",
+                "amount": 5.0,
+                "pending": False,
+            },
+            {
+                "transaction_id": "txn-matched",
+                "account_id": "account-watched",
+                "date": "2026-05-18",
+                "name": "Matched",
+                "amount": 6.0,
+                "pending": False,
+            },
+            {
+                "transaction_id": "txn-confirmed",
+                "account_id": "account-watched",
+                "date": "2026-05-18",
+                "name": "Confirmed",
+                "amount": 7.0,
+                "pending": False,
+            },
+            {
+                "transaction_id": "txn-ignored",
+                "account_id": "account-watched",
+                "date": "2026-05-18",
+                "name": "Ignored",
+                "amount": 8.0,
+                "pending": False,
+            },
+            {
+                "transaction_id": "txn-pending",
+                "account_id": "account-watched",
+                "date": "2026-05-18",
+                "name": "Pending",
+                "amount": 9.0,
+                "pending": True,
+            },
+            {
+                "transaction_id": "txn-new",
+                "account_id": "account-watched",
+                "date": "2026-05-18",
+                "name": "New",
+                "amount": 10.0,
+                "pending": False,
+            },
+            {
+                "transaction_id": "txn-unwatched",
+                "account_id": "account-unwatched",
+                "date": "2026-05-18",
+                "name": "Unwatched",
+                "amount": 11.0,
+                "pending": False,
+            },
+        ],
+        owner_key="brian",
+    )
+    transactions = {transaction.name: transaction for transaction in store.recent_transactions("brian", limit=10)}
+    store.upsert_reconciliation_item(
+        owner_key="brian",
+        transaction=transactions["Review"],
+        classification="expense",
+        status="needs_review",
+        confidence=0.6,
+    )
+    store.upsert_reconciliation_item(
+        owner_key="brian",
+        transaction=transactions["Matched"],
+        classification="expense",
+        status="matched",
+        confidence=0.9,
+    )
+    confirmed = store.upsert_reconciliation_item(
+        owner_key="brian",
+        transaction=transactions["Confirmed"],
+        classification="expense",
+        status="needs_review",
+        confidence=0.6,
+    )
+    store.confirm_reconciliation_item("brian", confirmed.id, matched_action_log_id="abc123")
+    ignored = store.upsert_reconciliation_item(
+        owner_key="brian",
+        transaction=transactions["Ignored"],
+        classification="expense",
+        status="needs_review",
+        confidence=0.6,
+    )
+    store.ignore_reconciliation_item("brian", ignored.id)
+
+    buckets = store.reconciliation_cache_buckets("brian")
+
+    assert buckets.stored == 7
+    assert buckets.needs_review == 1
+    assert buckets.matched == 1
+    assert buckets.confirmed == 1
+    assert buckets.ignored == 1
+    assert buckets.pending == 1
+    assert buckets.not_reviewed == 1
+    assert buckets.unwatched == 1
+    assert buckets.other == 0
 
 
 def test_ignore_reconciliation_item_hides_it_from_review(tmp_path):

@@ -13,6 +13,7 @@ from bookiebot.banking.models import (
     BankStatus,
     BankTransaction,
     LinkedBankItem,
+    ReconciliationCacheBuckets,
     ReconciliationClassification,
     ReconciliationItem,
     ReconciliationStatus,
@@ -612,6 +613,50 @@ class BankStore:
                 (owner_key,),
             ).fetchone()
         return int(row["count"]) if row else 0
+
+    def reconciliation_cache_buckets(self, owner_key: str) -> ReconciliationCacheBuckets:
+        self.initialize()
+        buckets = {
+            "stored": 0,
+            "needs_review": 0,
+            "matched": 0,
+            "confirmed": 0,
+            "ignored": 0,
+            "pending": 0,
+            "not_reviewed": 0,
+            "unwatched": 0,
+            "other": 0,
+        }
+        with self.connect() as conn:
+            rows = conn.execute(
+                """
+                SELECT
+                    CASE
+                        WHEN COALESCE(a.watched, 1) = 0 THEN 'unwatched'
+                        WHEN t.pending = 1 THEN 'pending'
+                        WHEN r.id IS NULL THEN 'not_reviewed'
+                        WHEN r.status IN ('needs_review', 'pending_user', 'conflict') THEN 'needs_review'
+                        WHEN r.status = 'matched' THEN 'matched'
+                        WHEN r.status IN ('confirmed', 'import_requested') THEN 'confirmed'
+                        WHEN r.status = 'ignored' THEN 'ignored'
+                        ELSE 'other'
+                    END AS bucket,
+                    COUNT(*) AS count
+                FROM bank_transactions t
+                LEFT JOIN bank_accounts a ON a.id = t.account_id
+                LEFT JOIN bank_reconciliation_items r ON r.bank_transaction_id = t.id
+                WHERE t.owner_key = ?
+                  AND t.removed_at IS NULL
+                GROUP BY bucket
+                """,
+                (owner_key,),
+            ).fetchall()
+        for row in rows:
+            bucket = str(row["bucket"])
+            if bucket in buckets:
+                buckets[bucket] = int(row["count"])
+        buckets["stored"] = sum(value for key, value in buckets.items() if key != "stored")
+        return ReconciliationCacheBuckets(**buckets)
 
     def bank_transactions_for_reconciliation(
         self,
