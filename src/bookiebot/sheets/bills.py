@@ -4,7 +4,7 @@ from calendar import monthrange
 from dataclasses import dataclass
 from datetime import date
 import re
-from typing import Literal
+from typing import Any, Literal, Protocol
 
 from openpyxl.utils import get_column_letter
 
@@ -13,6 +13,11 @@ from bookiebot.sheets.routing import now_pacific
 from bookiebot.sheets.utils import clean_money
 
 BillRecurrence = Literal["monthly", "quarterly"]
+
+
+class _WorksheetWithUpdate(Protocol):
+    def update(self, *args: Any, **kwargs: Any) -> Any:
+        ...
 
 BILL_SCHEDULE_HEADERS = [
     "bill_key",
@@ -166,7 +171,7 @@ def _bill_from_fields(fields: dict[str, str], source_range: str) -> tuple[BillSc
     )
 
 
-def _update_range(ws: object, start_row: int, start_col: int, values: list[list[str]]) -> None:
+def _update_range(ws: _WorksheetWithUpdate, start_row: int, start_col: int, values: list[list[str]]) -> None:
     if not values:
         return
     end_row = start_row + len(values) - 1

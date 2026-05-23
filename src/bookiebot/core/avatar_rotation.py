@@ -8,7 +8,7 @@ import json
 import logging
 import os
 from pathlib import Path
-from typing import Any
+from typing import Any, Awaitable, cast
 
 from bookiebot.sheets.repo import get_sheets_repo
 from bookiebot.sheets.routing import now_pacific
@@ -134,7 +134,7 @@ async def rotate_avatar_once(client: Any) -> bool:
         return False
 
     try:
-        await edit(avatar=selected.read_bytes())
+        await cast(Awaitable[Any], edit(avatar=selected.read_bytes()))
         _write_avatar_state(
             ws,
             row_index,

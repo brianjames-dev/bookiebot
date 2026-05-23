@@ -1,6 +1,7 @@
 # all intent handlers
 from contextlib import asynccontextmanager
 import os
+from collections.abc import AsyncIterator
 
 # Disable discord voice/audio stack to avoid loading audioop (deprecated in Python 3.13)
 os.environ.setdefault("DISCORD_AUDIO_DISABLE", "1")
@@ -12,7 +13,7 @@ import matplotlib.pyplot as plt
 import io
 from datetime import datetime
 from collections.abc import Awaitable, Callable
-from typing import Any, cast
+from typing import Any, AsyncContextManager, cast
 from bookiebot.sheets.utils import resolve_query_persons, get_local_today
 from bookiebot.sheets.routing import (
     SheetRoutingError,
@@ -68,13 +69,14 @@ IntentHandler = Callable[[IntentEntities, Any], Awaitable[None]]
 
 
 @asynccontextmanager
-async def _maybe_typing(message: Any, intent: str):
+async def _maybe_typing(message: Any, intent: str) -> AsyncIterator[None]:
     channel = getattr(message, "channel", None)
     typing = getattr(channel, "typing", None)
     if not callable(typing):
         yield
         return
-    async with typing():
+    typing_context = cast(AsyncContextManager[Any], typing())
+    async with typing_context:
         yield
 
 

@@ -3,6 +3,8 @@ import re
 import os
 import asyncio
 from contextlib import asynccontextmanager
+from collections.abc import AsyncIterator
+from typing import Any, AsyncContextManager, cast
 
 # Disable discord voice/audio stack to avoid loading audioop (deprecated in Python 3.13)
 os.environ.setdefault("DISCORD_AUDIO_DISABLE", "1")
@@ -56,13 +58,14 @@ _CATEGORIES = {"grocery", "groceries", "gas", "food", "shopping"}
 
 
 @asynccontextmanager
-async def _maybe_typing(message):
+async def _maybe_typing(message: Any) -> AsyncIterator[None]:
     channel = getattr(message, "channel", None)
     typing = getattr(channel, "typing", None)
     if not callable(typing):
         yield
         return
-    async with typing():
+    typing_context = cast(AsyncContextManager[Any], typing())
+    async with typing_context:
         yield
 
 
@@ -262,7 +265,7 @@ def _recent_query_intent(content: str) -> tuple[str, dict] | None:
     return None
 
 
-def register_events(client: discord.Client, tree: discord.app_commands.CommandTree):
+def register_events(client, tree):
     @client.event
     async def on_ready():
         global _AVATAR_ROTATION_TASK

@@ -4,7 +4,7 @@ os.environ.setdefault("DISCORD_AUDIO_DISABLE", "1")
 
 import discord
 from datetime import datetime, timezone
-from typing import cast
+from typing import Any, cast
 
 from discord import app_commands
 
@@ -12,6 +12,7 @@ from bookiebot.core import auth, config
 from bookiebot.core import incidents
 from bookiebot.core import github_dispatch
 from bookiebot.core import ui
+from bookiebot.banking import formatting as bank_formatting
 from bookiebot.banking.formatting import (
     format_bank_transaction_table_chunks,
     format_bank_transaction_table,
@@ -149,14 +150,17 @@ def _log_bank_reconciliation_income(
     }
     with sheet_user_context(actor_key):
         worksheet = get_sheets_repo().income_sheet()
-        row, _description, _amount, action_id = log_income_row(
-            values,
-            worksheet,
-            return_action_id=True,
-            metadata_extra={
-                "origin": "bank_reconciliation",
-                "bank_reconciliation_id": str(reconciliation_id),
-            },
+        row, _description, _amount, action_id = cast(
+            tuple[int, str, Any, str | None],
+            log_income_row(
+                values,
+                worksheet,
+                return_action_id=True,
+                metadata_extra={
+                    "origin": "bank_reconciliation",
+                    "bank_reconciliation_id": str(reconciliation_id),
+                },
+            ),
         )
     confirmed = service.confirm_reconciliation_item(
         owner_key,
@@ -1190,7 +1194,7 @@ def register_commands(tree: app_commands.CommandTree):
         bank_amount = abs(item.transaction.amount)
         if status == "amount_mismatch":
             await interaction.followup.send(
-                content=format_group_match_amount_mismatch(item, candidates)[:1900],
+                content=bank_formatting.format_group_match_amount_mismatch(item, candidates)[:1900],
                 ephemeral=True,
             )
             return

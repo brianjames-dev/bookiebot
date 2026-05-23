@@ -356,6 +356,9 @@ def _expense_fixed_fields_view(
 
     async def handle_field(interaction: Any, field: str, value: str, view: Any) -> None:
         target_view = view or fixed_view
+        if target_view is None:
+            await interaction.response.defer(ephemeral=True)
+            return
         if field == "category":
             target_view.selected_category = value
         if field == "person":

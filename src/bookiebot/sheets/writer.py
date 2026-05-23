@@ -2,6 +2,7 @@
 
 from datetime import datetime
 import logging
+from typing import Any, Literal, cast, overload
 from openpyxl.utils import column_index_from_string
 from bookiebot.ui.card import CardButtonView
 import asyncio
@@ -41,7 +42,10 @@ async def write_income_to_sheet(data, message):
         return
 
     try:
-        row, description, amount = log_income_row(data, ws)
+        row, description, amount = cast(
+            tuple[int, str, Any],
+            log_income_row(data, ws, return_action_id=False),
+        )
     except Exception as e:
         logger.error("Could not log income", extra={"exception": str(e)})
         return
@@ -53,7 +57,29 @@ async def write_income_to_sheet(data, message):
         )
 
 
-def log_income_row(data, worksheet, *, return_action_id: bool = False, metadata_extra: dict | None = None):
+@overload
+def log_income_row(
+    data: dict[str, Any],
+    worksheet: Any,
+    *,
+    return_action_id: Literal[True],
+    metadata_extra: dict | None = None,
+) -> tuple[int, str, Any, str | None]:
+    ...
+
+
+@overload
+def log_income_row(
+    data: dict[str, Any],
+    worksheet: Any,
+    *,
+    return_action_id: Literal[False] = False,
+    metadata_extra: dict | None = None,
+) -> tuple[int, str, Any]:
+    ...
+
+
+def log_income_row(data: dict[str, Any], worksheet: Any, *, return_action_id: bool = False, metadata_extra: dict | None = None):
     try:
         summary_cell = worksheet.find("Monthly Income:")
         summary_row = summary_cell.row

@@ -4,7 +4,7 @@ from calendar import monthrange
 from dataclasses import dataclass
 from datetime import date, datetime
 import re
-from typing import Literal
+from typing import Any, Literal, Protocol, cast
 
 from openpyxl.utils import get_column_letter
 
@@ -13,6 +13,11 @@ from bookiebot.sheets.routing import get_current_discord_user_id, get_user_confi
 from bookiebot.sheets.utils import clean_money
 
 SubscriptionCadence = Literal["monthly", "yearly"]
+
+
+class _WorksheetWithUpdate(Protocol):
+    def update(self, *args: Any, **kwargs: Any) -> Any:
+        ...
 
 NORMALIZED_SCHEDULE_HEADERS = [
     "cadence",
@@ -316,12 +321,11 @@ def _parse_block_layout(
 
 
 def list_subscription_schedules(rows: list[list[str]] | None = None) -> list[Subscription]:
-    if rows is None:
-        rows = get_sheets_repo().subscriptions_sheet().get_all_values()
-    subscriptions = _parse_normalized_table(rows)
+    rows_data = rows if rows is not None else cast(list[list[str]], get_sheets_repo().subscriptions_sheet().get_all_values())
+    subscriptions = _parse_normalized_table(rows_data)
     if subscriptions:
         return [subscription for subscription in subscriptions if subscription.active]
-    return [subscription for subscription in _parse_block_layout(rows) if subscription.active]
+    return [subscription for subscription in _parse_block_layout(rows_data) if subscription.active]
 
 
 def parse_visible_subscription_schedules(rows: list[list[str]] | None = None) -> list[Subscription]:
@@ -332,8 +336,7 @@ def parse_visible_subscription_schedules(rows: list[list[str]] | None = None) ->
 def parse_visible_subscription_schedules_with_warnings(
     rows: list[list[str]] | None = None,
 ) -> tuple[list[Subscription], list[SubscriptionParseWarning]]:
-    if rows is None:
-        rows = get_sheets_repo().subscriptions_sheet().get_all_values()
+    rows_data = rows if rows is not None else cast(list[list[str]], get_sheets_repo().subscriptions_sheet().get_all_values())
 
     updated_at = now_pacific().isoformat(timespec="seconds")
     try:
@@ -342,10 +345,10 @@ def parse_visible_subscription_schedules_with_warnings(
         owner_key, owner_name = "", ""
 
     warnings: list[SubscriptionParseWarning] = []
-    subscriptions = _parse_normalized_table(rows)
+    subscriptions = _parse_normalized_table(rows_data)
     if not subscriptions:
         subscriptions = _parse_block_layout(
-            rows,
+            rows_data,
             owner_key=owner_key,
             owner_name=owner_name,
             updated_at=updated_at,
@@ -387,16 +390,17 @@ def _subscription_to_row(subscription: Subscription) -> list[str]:
     ]
 
 
-def _update_range(ws: object, start_row: int, start_col: int, values: list[list[str]]) -> None:
+def _update_range(ws: _WorksheetWithUpdate, start_row: int, start_col: int, values: list[list[str]]) -> None:
     if not values:
         return
     end_row = start_row + len(values) - 1
     end_col = start_col + max(len(row) for row in values) - 1
     range_name = f"{get_column_letter(start_col)}{start_row}:{get_column_letter(end_col)}{end_row}"
+    worksheet = cast(_WorksheetWithUpdate, ws)
     try:
-        ws.update(values, range_name=range_name, raw=False)
+        worksheet.update(values, range_name=range_name, raw=False)
     except TypeError:
-        ws.update(range_name, values, raw=False)
+        worksheet.update(range_name, values, raw=False)
 
 
 def _write_subscription_schedule_rows(subscriptions: list[Subscription]) -> None:

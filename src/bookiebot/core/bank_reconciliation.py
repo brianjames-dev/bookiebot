@@ -4,7 +4,8 @@ import asyncio
 from datetime import date, datetime, timedelta
 import logging
 import os
-from typing import Any
+from collections.abc import Callable
+from typing import Any, Awaitable, cast
 
 import discord
 
@@ -269,8 +270,9 @@ async def _clear_digest_prompt_buttons(interaction: Any) -> None:
     edit = getattr(message, "edit", None)
     if not callable(edit):
         return
+    async_edit = cast(Callable[..., Awaitable[Any]], edit)
     try:
-        await edit(view=None)
+        await async_edit(view=None)
     except discord.NotFound:
         logger.info("Bank reconciliation digest message was already deleted before buttons could be cleared")
     except Exception:
