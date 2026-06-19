@@ -99,27 +99,6 @@ def test_store_persists_sync_cursor_and_error(tmp_path):
     assert status.last_error == "boom"
 
 
-def test_store_persists_reconciliation_snooze_settings_per_actor(tmp_path):
-    store = _store(tmp_path)
-
-    store.set_reconciliation_default_snooze("111", "1h")
-    store.set_reconciliation_snooze_until("111", "2026-05-18T15:30:00-07:00")
-    store.set_reconciliation_default_snooze("222", "tomorrow")
-    store.set_reconciliation_snooze_until("222", "2026-05-19T15:30:00-07:00")
-
-    assert store.get_reconciliation_default_snooze("111") == "1h"
-    assert store.get_reconciliation_snooze_until("111") == "2026-05-18T15:30:00-07:00"
-    assert store.get_reconciliation_default_snooze("222") == "tomorrow"
-    assert store.due_reconciliation_snoozes("2026-05-18T16:00:00-07:00") == [
-        ("111", "2026-05-18T15:30:00-07:00")
-    ]
-
-    store.clear_reconciliation_snooze_until("111")
-
-    assert store.get_reconciliation_snooze_until("111") is None
-    assert store.get_reconciliation_default_snooze("111") == "1h"
-
-
 def test_store_resets_owner_sync_cursors(tmp_path):
     store = _store(tmp_path)
     brian_item = store.upsert_item(

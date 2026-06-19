@@ -47,10 +47,15 @@ async def send_next_bank_reconciliation_item(
     owner_name: str,
     actor_key: str,
     skipped_ids: set[int] | None = None,
+    session_item_ids: set[int] | None = None,
 ) -> None:
     skipped = set(skipped_ids or set())
     service = build_banking_service()
     unresolved = await asyncio.to_thread(service.unresolved_reconciliation_items, owner_key, 100)
+    if session_item_ids is None:
+        session_item_ids = {item.id for item in unresolved}
+    else:
+        unresolved = [item for item in unresolved if item.id in session_item_ids]
     remaining = [item for item in unresolved if item.id not in skipped]
     if not remaining:
         if skipped:
@@ -74,6 +79,7 @@ async def send_next_bank_reconciliation_item(
         actor_key=actor_key,
         session=True,
         skipped_ids=skipped,
+        session_item_ids=session_item_ids,
         remaining_count=len(remaining),
     )
 
@@ -88,9 +94,11 @@ async def send_bank_reconciliation_detail(
     fallback: bool = False,
     session: bool = False,
     skipped_ids: set[int] | None = None,
+    session_item_ids: set[int] | None = None,
     remaining_count: int | None = None,
 ) -> None:
     skipped = set(skipped_ids or set())
+    session_scope = set(session_item_ids or {reconciliation_id})
     service = build_banking_service()
     item, candidates, groups = await asyncio.to_thread(
         service.reconciliation_match_candidates,
@@ -115,6 +123,7 @@ async def send_bank_reconciliation_detail(
                 owner_name=owner_name,
                 actor_key=actor_key,
                 skipped_ids=skipped,
+                session_item_ids=session_scope,
             )
 
     async def handle_action(action_interaction: Any, action: str) -> None:
@@ -244,6 +253,7 @@ async def send_bank_reconciliation_detail(
                     fallback=True,
                     session=session,
                     skipped_ids=skipped,
+                    session_item_ids=session_scope,
                     remaining_count=remaining_count,
                 )
                 return
@@ -268,6 +278,18 @@ async def send_bank_reconciliation_detail(
                     ephemeral=True,
                 )
                 await continue_session(action_interaction)
+                return
+
+            if action == "ignore_all":
+                ignored_count = 0
+                for item_id in sorted(session_scope - skipped):
+                    ignored = await asyncio.to_thread(service.ignore_reconciliation_item, owner_key, item_id)
+                    if ignored is not None:
+                        ignored_count += 1
+                await action_interaction.followup.send(
+                    f"Ignored `{ignored_count}` bank reconciliation item(s) from this review.",
+                    ephemeral=True,
+                )
                 return
 
             if action == "ignore":

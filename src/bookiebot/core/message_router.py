@@ -35,6 +35,7 @@ from bookiebot.sheets.undo import (
     pending_action_selection_count,
     pending_action_selection_kind,
     pending_move_item,
+    pop_pending_action_expiration_notice,
     pending_update_field,
 )
 
@@ -323,6 +324,10 @@ def register_events(client, tree):
                 message,
             )
             return
+        expired_notice = pop_pending_action_expiration_notice(actor_key)
+        if expired_notice:
+            await message.channel.send(f"❌ {expired_notice}")
+            return
 
         pending_field = pending_update_field(actor_key)
         if pending_field:
@@ -334,10 +339,18 @@ def register_events(client, tree):
                     value = amount_match.group(1)
             await handle_intent("update_recent_action", {"action_id": action_id, "updates": {field: value}}, message)
             return
+        expired_notice = pop_pending_action_expiration_notice(actor_key)
+        if expired_notice:
+            await message.channel.send(f"❌ {expired_notice}")
+            return
 
         if content.isdigit():
             idx = int(content)
             pending_kind = pending_action_selection_kind(actor_key)
+            expired_notice = pop_pending_action_expiration_notice(actor_key)
+            if expired_notice:
+                await message.channel.send(f"❌ {expired_notice}")
+                return
             if pending_kind == "update":
                 await handle_intent("update_recent_action", {"index": idx}, message)
                 return
@@ -368,6 +381,10 @@ def register_events(client, tree):
         ):
             await handle_intent("delete_recent_action", {"index": 1}, message)
             return
+        expired_notice = pop_pending_action_expiration_notice(actor_key)
+        if expired_notice:
+            await message.channel.send(f"❌ {expired_notice}")
+            return
 
         recent_query = _recent_query_intent(content)
         if recent_query:
@@ -388,7 +405,12 @@ def register_events(client, tree):
                 getattr(message.author, "id", None),
                 getattr(message.author, "name", None) or getattr(message.author, "display_name", None),
             )
-            if pending_action_selection_kind(actor_key) == "move" and intent == "move_recent_action":
+            pending_kind = pending_action_selection_kind(actor_key)
+            expired_notice = pop_pending_action_expiration_notice(actor_key)
+            if expired_notice:
+                await message.channel.send(f"❌ {expired_notice}")
+                return
+            if pending_kind == "move" and intent == "move_recent_action":
                 entities.setdefault("index", 1)
             await handle_intent(intent, entities, message)
             return

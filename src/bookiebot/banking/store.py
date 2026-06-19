@@ -129,12 +129,6 @@ class BankStore:
                     notes TEXT
                 );
 
-                CREATE TABLE IF NOT EXISTS bank_user_settings (
-                    actor_key TEXT PRIMARY KEY,
-                    default_reconciliation_snooze TEXT,
-                    reconciliation_snooze_until TEXT,
-                    updated_at TEXT NOT NULL
-                );
                 """
             )
             self._ensure_account_watch_column(conn)
@@ -1057,105 +1051,6 @@ class BankStore:
                 (now, int(reconciliation_id), owner_key),
             )
         return self.get_reconciliation_item(owner_key, reconciliation_id)
-
-    def get_reconciliation_default_snooze(self, actor_key: str) -> str | None:
-        self.initialize()
-        with self.connect() as conn:
-            row = conn.execute(
-                "SELECT default_reconciliation_snooze FROM bank_user_settings WHERE actor_key = ?",
-                (str(actor_key),),
-            ).fetchone()
-        if row is None:
-            return None
-        value = row["default_reconciliation_snooze"]
-        return str(value) if value else None
-
-    def set_reconciliation_default_snooze(self, actor_key: str, snooze_option: str) -> None:
-        now = utc_now_iso()
-        self.initialize()
-        with self.connect() as conn:
-            conn.execute(
-                """
-                INSERT INTO bank_user_settings (
-                    actor_key, default_reconciliation_snooze, updated_at
-                )
-                VALUES (?, ?, ?)
-                ON CONFLICT(actor_key) DO UPDATE SET
-                    default_reconciliation_snooze = excluded.default_reconciliation_snooze,
-                    updated_at = excluded.updated_at
-                """,
-                (str(actor_key), str(snooze_option), now),
-            )
-
-    def get_reconciliation_snooze_until(self, actor_key: str) -> str | None:
-        self.initialize()
-        with self.connect() as conn:
-            row = conn.execute(
-                "SELECT reconciliation_snooze_until FROM bank_user_settings WHERE actor_key = ?",
-                (str(actor_key),),
-            ).fetchone()
-        if row is None:
-            return None
-        value = row["reconciliation_snooze_until"]
-        return str(value) if value else None
-
-    def set_reconciliation_snooze_until(self, actor_key: str, remind_at_iso: str) -> None:
-        now = utc_now_iso()
-        self.initialize()
-        with self.connect() as conn:
-            conn.execute(
-                """
-                INSERT INTO bank_user_settings (
-                    actor_key, reconciliation_snooze_until, updated_at
-                )
-                VALUES (?, ?, ?)
-                ON CONFLICT(actor_key) DO UPDATE SET
-                    reconciliation_snooze_until = excluded.reconciliation_snooze_until,
-                    updated_at = excluded.updated_at
-                """,
-                (str(actor_key), str(remind_at_iso), now),
-            )
-
-    def clear_reconciliation_snooze_until(self, actor_key: str) -> None:
-        now = utc_now_iso()
-        self.initialize()
-        with self.connect() as conn:
-            conn.execute(
-                """
-                UPDATE bank_user_settings
-                SET reconciliation_snooze_until = NULL,
-                    updated_at = ?
-                WHERE actor_key = ?
-                """,
-                (now, str(actor_key)),
-            )
-
-    def due_reconciliation_snoozes(self, current_iso: str) -> list[tuple[str, str]]:
-        try:
-            current = datetime.fromisoformat(str(current_iso))
-        except ValueError:
-            current = datetime.now(timezone.utc)
-        self.initialize()
-        with self.connect() as conn:
-            rows = conn.execute(
-                """
-                SELECT actor_key, reconciliation_snooze_until
-                FROM bank_user_settings
-                WHERE reconciliation_snooze_until IS NOT NULL
-                ORDER BY reconciliation_snooze_until ASC
-                """,
-                (),
-            ).fetchall()
-        due: list[tuple[str, str]] = []
-        for row in rows:
-            remind_at = str(row["reconciliation_snooze_until"])
-            try:
-                parsed = datetime.fromisoformat(remind_at)
-            except ValueError:
-                continue
-            if parsed <= current:
-                due.append((str(row["actor_key"]), remind_at))
-        return due
 
     def status(self, configured: bool, plaid_env: str) -> BankStatus:
         self.initialize()

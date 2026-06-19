@@ -150,16 +150,6 @@ class PostgresBankStore(BankStore):
                 )
                 """
             )
-            conn.execute(
-                """
-                CREATE TABLE IF NOT EXISTS bank_user_settings (
-                    actor_key TEXT PRIMARY KEY,
-                    default_reconciliation_snooze TEXT,
-                    reconciliation_snooze_until TEXT,
-                    updated_at TEXT NOT NULL
-                )
-                """
-            )
 
     def status(self, configured: bool, plaid_env: str) -> BankStatus:
         status = super().status(configured, plaid_env)

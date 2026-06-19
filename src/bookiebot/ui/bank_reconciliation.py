@@ -8,9 +8,9 @@ from bookiebot.ui.card import ButtonBase, ButtonStyle, Interaction, SelectBase, 
 
 class BankReconciliationButton(ButtonBase):  # type: ignore[misc]
     def __init__(self, label: str, action: str, callback_func: Callable, *, custom_id: str | None = None):
-        if action == "ignore":
+        if action in {"ignore", "ignore_all"}:
             style_name = "danger"
-        elif action in {"fallback", "later", "skip"}:
+        elif action in {"fallback", "skip"}:
             style_name = "secondary"
         else:
             style_name = "primary"
@@ -96,6 +96,7 @@ class BankReconciliationDetailView(ViewBase):  # type: ignore[misc]
             self.add_item(BankReconciliationButton("Log", "log", callback_func))
         if session_controls:
             self.add_item(BankReconciliationButton("Skip", "skip", callback_func))
+            self.add_item(BankReconciliationButton("Ignore All", "ignore_all", callback_func))
         self.add_item(BankReconciliationButton("Ignore", "ignore", callback_func))
         if fallback_available:
             self.add_item(BankReconciliationButton("Show More", "fallback", callback_func))
@@ -112,29 +113,6 @@ class BankReconciliationDigestView(ViewBase):  # type: ignore[misc]
                 custom_id=f"bank_reconcile:start:{actor_key}",
             )
         )
-        self.add_item(
-            BankReconciliationButton(
-                "Remind Me Later",
-                "later",
-                callback_func,
-                custom_id=f"bank_reconcile:later:{actor_key}",
-            )
-        )
-
-
-class BankReconciliationSnoozeView(ViewBase):  # type: ignore[misc]
-    def __init__(self, callback_func: Callable):
-        super().__init__(timeout=600)
-        self.add_item(BankReconciliationButton("1 hour", "snooze:1h", callback_func))
-        self.add_item(BankReconciliationButton("2 hours", "snooze:2h", callback_func))
-        self.add_item(BankReconciliationButton("Specific Time", "snooze:specific", callback_func))
-        self.add_item(BankReconciliationButton("Tomorrow (same time)", "snooze:tomorrow", callback_func))
-
-
-class BankReconciliationChangeDefaultView(ViewBase):  # type: ignore[misc]
-    def __init__(self, callback_func: Callable):
-        super().__init__(timeout=600)
-        self.add_item(BankReconciliationButton("Tap Here", "change_default", callback_func))
 
 
 class BankReconciliationLogChoiceView(ViewBase):  # type: ignore[misc]

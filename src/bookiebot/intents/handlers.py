@@ -18,6 +18,7 @@ from bookiebot.sheets.utils import resolve_query_persons, get_local_today
 from bookiebot.sheets.routing import (
     SheetRoutingError,
     UnknownDiscordUserError,
+    actor_key_aliases,
     get_user_config,
     resolve_actor_key,
     sheet_user_context,
@@ -28,6 +29,7 @@ from bookiebot.sheets.undo import (
     editable_fields_for_action,
     format_action_detail_block,
     format_recent_action_list,
+    action_capabilities,
     matching_recent_actions,
     move_recent_action,
     next_recent_actions_page,
@@ -220,7 +222,7 @@ async def delete_recent_action_handler(entities: IntentEntities, message: Any) -
         actions = matching_recent_actions(actor_key, str(match_text), 10) if match_text else recent_actions(actor_key, 5)
         view = _delete_candidates_view(actor_key, actions) if actions else None
         detail = _without_single_candidate_instruction(detail, actions)
-        await message.channel.send(_with_component_spacer(detail, view), view=view)
+        await _send_recent_private_message(message, _with_component_spacer(detail, view), view=view)
         return
     await _send_action_result(message, success, detail)
 
@@ -243,14 +245,55 @@ async def query_recent_actions_handler(entities: IntentEntities, message: Any) -
         output = format_recent_action_list(actions)
 
     view = _recent_action_select_view(actor_key, actions) if actions else None
-    await message.channel.send(_with_component_spacer(output, view), view=view)
+    await _send_recent_private_message(message, _with_component_spacer(output, view), view=view)
+
+
+async def _send_recent_private_message(message: Any, content: str, **kwargs: Any) -> None:
+    author_send = getattr(getattr(message, "author", None), "send", None)
+    if callable(author_send):
+        try:
+            await author_send(content, **kwargs)
+        except Exception:
+            await message.channel.send("❌ I could not send that recent transaction workflow privately. Please check your DM settings.")
+            return
+        await message.channel.send("I sent your recent transaction workflow privately.")
+        return
+    await message.channel.send(content, **kwargs)
+
+
+def _interaction_actor_key(interaction: Any) -> str | None:
+    user = getattr(interaction, "user", None) or getattr(interaction, "author", None)
+    if user is None:
+        return None
+    return resolve_actor_key(
+        getattr(user, "id", None),
+        getattr(user, "name", None) or getattr(user, "display_name", None),
+    )
+
+
+def _interaction_belongs_to_actor(interaction: Any, actor_key: str | None) -> bool:
+    if not actor_key:
+        return True
+    interaction_actor = _interaction_actor_key(interaction)
+    if not interaction_actor:
+        return True
+    return interaction_actor in actor_key_aliases(str(actor_key))
+
+
+async def _reject_unowned_recent_interaction(interaction: Any, actor_key: str | None) -> bool:
+    if _interaction_belongs_to_actor(interaction, actor_key):
+        return False
+    await interaction.response.send_message("This recent transaction workflow belongs to another user.", ephemeral=True)
+    return True
 
 
 def _recent_action_select_view(actor_key: str | None, actions: list[Any], *, destination_category: str | None = None, updates: dict[str, Any] | None = None):
     async def handle_select(interaction: Any, action_id: str) -> None:
+        if await _reject_unowned_recent_interaction(interaction, actor_key):
+            return
         if destination_category:
             try:
-                await interaction.response.defer()
+                await interaction.response.defer(ephemeral=True)
             except Exception:
                 pass
             success, detail = move_recent_action(
@@ -262,45 +305,60 @@ def _recent_action_select_view(actor_key: str | None, actions: list[Any], *, des
             await _send_interaction_action_result(interaction, success, detail)
             return
 
-        set_pending_update_selection(actor_key, action_id)
-
         async def handle_decision(decision_interaction: Any, decision: str) -> None:
+            if await _reject_unowned_recent_interaction(decision_interaction, actor_key):
+                return
+            selected = select_recent_action(actor_key, action_id=action_id)
+            capabilities = action_capabilities(selected.action) if selected else None
             if decision == "update":
+                if capabilities and not capabilities.can_update:
+                    await decision_interaction.response.send_message(capabilities.update_reason, ephemeral=True)
+                    return
                 set_pending_update_selection(actor_key, action_id)
-                logged = select_recent_action(actor_key, action_id=action_id)
+                logged = selected
                 fields = editable_fields_for_action(logged.action) if logged else []
                 if not fields:
-                    await decision_interaction.response.send_message("I do not know how to update fields for that transaction yet.")
+                    await decision_interaction.response.send_message("I do not know how to update fields for that transaction yet.", ephemeral=True)
                     return
                 await decision_interaction.response.send_message(
                     _with_component_spacer("Which field would you like to update?", True),
                     view=_update_field_view(actor_key, action_id, fields),
+                    ephemeral=True,
                 )
                 return
             if decision == "delete":
+                if capabilities and not capabilities.can_delete:
+                    await decision_interaction.response.send_message(capabilities.delete_reason, ephemeral=True)
+                    return
                 set_pending_delete_selection(actor_key, action_id)
                 try:
-                    await decision_interaction.response.defer()
+                    await decision_interaction.response.defer(ephemeral=True)
                 except Exception:
                     pass
                 success, detail = delete_recent_action(actor_key, index=1)
                 await _send_interaction_action_result(decision_interaction, success, detail)
                 return
             if decision == "move":
+                if capabilities and not capabilities.can_move:
+                    await decision_interaction.response.send_message(capabilities.move_reason, ephemeral=True)
+                    return
                 set_pending_move_selection(actor_key, action_id)
                 await decision_interaction.response.send_message(
                     _with_component_spacer("Which category would you like to move this transaction to?", True),
                     view=_move_category_view(actor_key, action_id),
+                    ephemeral=True,
                 )
                 return
             clear_pending_action_selection(actor_key)
-            await decision_interaction.response.send_message("Canceled.")
+            await decision_interaction.response.send_message("Canceled.", ephemeral=True)
 
         logged = select_recent_action(actor_key, action_id=action_id)
+        capabilities = action_capabilities(logged.action) if logged else None
         detail_block = f"\n\n{format_action_detail_block(logged.action)}" if logged else ""
         await interaction.response.send_message(
             _with_component_spacer(f"What would you like to do with this transaction?{detail_block}", True),
-            view=RecentActionDecisionView(handle_decision),
+            view=RecentActionDecisionView(handle_decision, capabilities),
+            ephemeral=True,
         )
 
     return RecentActionSelectView(actions, handle_select)
@@ -314,12 +372,15 @@ def _delete_candidates_view(actor_key: str | None, actions: list[Any]):
 
 def _delete_action_select_view(actor_key: str | None, actions: list[Any]):
     async def handle_select(interaction: Any, action_id: str) -> None:
+        if await _reject_unowned_recent_interaction(interaction, actor_key):
+            return
         logged = select_recent_action(actor_key, action_id=action_id)
         detail_block = f"\n\n{format_action_detail_block(logged.action)}" if logged else ""
         set_pending_delete_selection(actor_key, action_id)
         await interaction.response.send_message(
             _with_component_spacer(f"Delete this transaction?{detail_block}", True),
             view=_delete_confirm_view(actor_key, action_id),
+            ephemeral=True,
         )
 
     return RecentActionSelectView(actions, handle_select)
@@ -327,17 +388,19 @@ def _delete_action_select_view(actor_key: str | None, actions: list[Any]):
 
 def _delete_confirm_view(actor_key: str | None, action_id: str):
     async def handle_confirm(interaction: Any, decision: str) -> None:
+        if await _reject_unowned_recent_interaction(interaction, actor_key):
+            return
         if decision == "confirm_delete":
             set_pending_delete_selection(actor_key, action_id)
             try:
-                await interaction.response.defer()
+                await interaction.response.defer(ephemeral=True)
             except Exception:
                 pass
             success, detail = delete_recent_action(actor_key, action_id=action_id)
             await _send_interaction_action_result(interaction, success, detail)
             return
         clear_pending_action_selection(actor_key)
-        await interaction.response.send_message("Canceled.")
+        await interaction.response.send_message("Canceled.", ephemeral=True)
 
     return DeleteConfirmView(handle_confirm)
 
@@ -372,6 +435,8 @@ def _move_action_select_view(
     updates: dict[str, Any] | None = None,
 ):
     async def handle_select(interaction: Any, action_id: str) -> None:
+        if await _reject_unowned_recent_interaction(interaction, actor_key):
+            return
         logged = select_recent_action(actor_key, action_id=action_id)
         detail_block = f"\n\n{format_action_detail_block(logged.action)}" if logged else ""
         set_pending_move_selection(actor_key, action_id)
@@ -383,6 +448,7 @@ def _move_action_select_view(
                 destination_category=destination_category,
                 updates=updates,
             ),
+            ephemeral=True,
         )
 
     return RecentActionSelectView(actions, handle_select)
@@ -396,11 +462,13 @@ def _move_confirm_view(
     updates: dict[str, Any] | None = None,
 ):
     async def handle_confirm(interaction: Any, decision: str) -> None:
+        if await _reject_unowned_recent_interaction(interaction, actor_key):
+            return
         if decision == "confirm_move":
             set_pending_move_selection(actor_key, action_id)
             if destination_category:
                 try:
-                    await interaction.response.defer()
+                    await interaction.response.defer(ephemeral=True)
                 except Exception:
                     pass
                 success, detail = move_recent_action(
@@ -414,18 +482,21 @@ def _move_confirm_view(
             await interaction.response.send_message(
                 _with_component_spacer("Which category would you like to move this transaction to?", True),
                 view=_move_category_view(actor_key, action_id, updates),
+                ephemeral=True,
             )
             return
         clear_pending_action_selection(actor_key)
-        await interaction.response.send_message("Canceled.")
+        await interaction.response.send_message("Canceled.", ephemeral=True)
 
     return MoveConfirmView(handle_confirm)
 
 
 def _move_category_view(actor_key: str | None, action_id: str, updates: dict[str, Any] | None = None):
     async def handle_category(interaction: Any, category: str) -> None:
+        if await _reject_unowned_recent_interaction(interaction, actor_key):
+            return
         try:
-            await interaction.response.defer()
+            await interaction.response.defer(ephemeral=True)
         except Exception:
             pass
         success, detail = move_recent_action(
@@ -443,12 +514,13 @@ async def _send_update_field_prompt(target: Any, actor_key: str | None, action_i
     logged = select_recent_action(actor_key, action_id=action_id)
     fields = editable_fields_for_action(logged.action) if logged else []
     if not fields:
-        await target.response.send_message("I do not know how to update fields for that transaction yet.")
+        await target.response.send_message("I do not know how to update fields for that transaction yet.", ephemeral=True)
         return
     detail_block = f"\n\n{format_action_detail_block(logged.action)}" if logged else ""
     await target.response.send_message(
         _with_component_spacer(f"Which field would you like to update?{detail_block}", True),
         view=_update_field_view(actor_key, action_id, fields),
+        ephemeral=True,
     )
 
 
@@ -460,12 +532,15 @@ def _update_candidates_view(actor_key: str | None, actions: list[Any]):
 
 def _update_action_select_view(actor_key: str | None, actions: list[Any]):
     async def handle_select(interaction: Any, action_id: str) -> None:
+        if await _reject_unowned_recent_interaction(interaction, actor_key):
+            return
         logged = select_recent_action(actor_key, action_id=action_id)
         detail_block = f"\n\n{format_action_detail_block(logged.action)}" if logged else ""
         set_pending_update_selection(actor_key, action_id)
         await interaction.response.send_message(
             _with_component_spacer(f"Update this transaction?{detail_block}", True),
             view=_update_confirm_view(actor_key, action_id),
+            ephemeral=True,
         )
 
     return RecentActionSelectView(actions, handle_select)
@@ -473,22 +548,28 @@ def _update_action_select_view(actor_key: str | None, actions: list[Any]):
 
 def _update_confirm_view(actor_key: str | None, action_id: str):
     async def handle_confirm(interaction: Any, decision: str) -> None:
+        if await _reject_unowned_recent_interaction(interaction, actor_key):
+            return
         if decision == "confirm_update":
             set_pending_update_selection(actor_key, action_id)
             await _send_update_field_prompt(interaction, actor_key, action_id)
             return
         clear_pending_action_selection(actor_key)
-        await interaction.response.send_message("Canceled.")
+        await interaction.response.send_message("Canceled.", ephemeral=True)
 
     return UpdateConfirmView(handle_confirm)
 
 
 def _update_field_view(actor_key: str | None, action_id: str, fields: list[str]):
     async def handle_field(interaction: Any, field: str) -> None:
+        if await _reject_unowned_recent_interaction(interaction, actor_key):
+            return
         if field == "person":
             async def handle_person(person_interaction: Any, person: str) -> None:
+                if await _reject_unowned_recent_interaction(person_interaction, actor_key):
+                    return
                 try:
-                    await person_interaction.response.defer()
+                    await person_interaction.response.defer(ephemeral=True)
                 except Exception:
                     pass
                 success, detail = update_recent_action(
@@ -501,12 +582,13 @@ def _update_field_view(actor_key: str | None, action_id: str, fields: list[str])
             await interaction.response.send_message(
                 _with_component_spacer("Which person/card should this transaction use?", True),
                 view=PersonSelectView(handle_person),
+                ephemeral=True,
             )
             return
 
         set_pending_update_field(actor_key, action_id, field)
         label = field.replace("_", " ")
-        await interaction.response.send_message(f"Reply with the new {label}.")
+        await interaction.response.send_message(f"Reply with the new {label}.", ephemeral=True)
 
     return UpdateFieldView(fields, handle_field)
 
@@ -542,7 +624,7 @@ async def update_recent_action_handler(entities: IntentEntities, message: Any) -
         actions = matching_recent_actions(actor_key, str(match_text), 10) if match_text else recent_actions(actor_key, 5)
         view = _update_candidates_view(actor_key, actions) if actions else None
         detail = _without_single_candidate_instruction(detail, actions)
-        await message.channel.send(_with_component_spacer(detail, view), view=view)
+        await _send_recent_private_message(message, _with_component_spacer(detail, view), view=view)
         return
     if not success and not has_update_values and detail.startswith("I found "):
         selected_action_id = str(action_id) if action_id else None
@@ -554,7 +636,8 @@ async def update_recent_action_handler(entities: IntentEntities, message: Any) -
         if selected_action_id:
             class _ChannelResponse:
                 async def send_message(self, content: str, **kwargs: Any) -> None:
-                    await message.channel.send(content, **kwargs)
+                    kwargs.pop("ephemeral", None)
+                    await _send_recent_private_message(message, content, **kwargs)
 
             class _MessageTarget:
                 response = _ChannelResponse()
@@ -602,28 +685,28 @@ async def move_recent_action_handler(entities: IntentEntities, message: Any) -> 
             updates=updates,
         ) if actions else None
         detail = _without_single_candidate_instruction(detail, actions)
-        await message.channel.send(_with_component_spacer(detail, view), view=view)
+        await _send_recent_private_message(message, _with_component_spacer(detail, view), view=view)
         return
     await _send_action_result(message, success, detail)
 
 
 async def _send_action_result(message: Any, success: bool, detail: str) -> None:
     if detail.startswith("Recent logged actions") or detail.startswith("I do not have more recent logged actions"):
-        await message.channel.send(detail)
+        await _send_recent_private_message(message, detail)
         return
     if detail == "What is the name of the item?":
-        await message.channel.send(detail)
+        await _send_recent_private_message(message, detail)
         return
     prefix = "✅" if success else "❌"
-    await message.channel.send(f"{prefix} {detail}")
+    await _send_recent_private_message(message, f"{prefix} {detail}")
 
 
 async def _send_interaction_action_result(interaction: Any, success: bool, detail: str) -> None:
     if detail == "What is the name of the item?":
-        await interaction.followup.send(detail)
+        await interaction.followup.send(detail, ephemeral=True)
         return
     prefix = "✅" if success else "❌"
-    await interaction.followup.send(f"{prefix} {detail}")
+    await interaction.followup.send(f"{prefix} {detail}", ephemeral=True)
 
 
 def _with_component_spacer(content: str, view: Any | None) -> str:

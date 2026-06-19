@@ -1,4 +1,6 @@
 import pytest
+from types import SimpleNamespace
+from unittest.mock import AsyncMock
 
 from bookiebot.core.message_router import _action_management_intent
 from bookiebot.core.message_router import _format_processing_error
@@ -151,3 +153,54 @@ def test_processing_error_reply_includes_context_for_income():
     assert "Request: log_income $21.88 from Amazon (Return)" in reply
     assert "Error: RuntimeError: post-write bookkeeping failed" in reply
     assert "sheet may already have been updated" in reply
+
+
+@pytest.mark.asyncio
+async def test_on_message_numeric_reply_reports_expired_pending_selection(monkeypatch):
+    import bookiebot.core.message_router as router
+    import bookiebot.sheets.undo as undo
+    from bookiebot.sheets.routing import resolve_actor_key
+
+    class DummyClient:
+        def __init__(self):
+            self.user = SimpleNamespace(id=1)
+            self.events = {}
+
+        def event(self, func):
+            self.events[func.__name__] = func
+            return func
+
+    class DummyChannel:
+        id = 123
+        name = "bookiebot"
+
+        def __init__(self):
+            self.sent = []
+
+        async def send(self, content=None, **kwargs):
+            self.sent.append((content, kwargs))
+
+    now = 0.0
+    monkeypatch.setattr(undo, "_pending_now", lambda: now)
+    monkeypatch.setattr(router.config, "CHANNEL_ID", None)
+    monkeypatch.setattr(router.config, "CHANNEL_NAME", "bookiebot")
+    handle_intent = AsyncMock()
+    monkeypatch.setattr(router, "handle_intent", handle_intent)
+
+    client = DummyClient()
+    router.register_events(client, SimpleNamespace())
+
+    actor_key = resolve_actor_key(830984827904851969, "hannerish")
+    undo.set_pending_delete_selection(actor_key, "expired-action")
+    now = 301.0
+
+    message = SimpleNamespace(
+        content="1",
+        author=SimpleNamespace(id=830984827904851969, name="hannerish"),
+        channel=DummyChannel(),
+    )
+
+    await client.events["on_message"](message)
+
+    assert message.channel.sent == [("❌ That recent transaction selection expired. Please choose the transaction again.", {})]
+    handle_intent.assert_not_awaited()

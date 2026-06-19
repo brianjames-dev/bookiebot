@@ -4,10 +4,11 @@ import pytest
 
 from bookiebot.banking.models import BankTransaction, ReconciliationCacheBuckets, ReconciliationItem, ReconciliationPreview
 import bookiebot.core.bank_reconciliation as bank_reconciliation
+import bookiebot.core.bank_reconciliation_flow as bank_reconciliation_flow
 from bookiebot.core.bank_reconciliation import (
-    _parse_specific_snooze_time,
-    _resolve_snooze,
+    _is_eligible,
     format_bank_reconciliation_digest,
+    format_bank_reconciliation_public_prompt,
 )
 
 
@@ -40,6 +41,65 @@ class FakeInteraction:
     def __init__(self, *, user_id="123", message_id="456"):
         self.user = SimpleNamespace(id=user_id)
         self.message = SimpleNamespace(id=message_id)
+
+
+class FakeResponse:
+    def __init__(self):
+        self.deferred = False
+
+    async def defer(self, **_kwargs):
+        self.deferred = True
+
+
+class FakeFollowup:
+    def __init__(self):
+        self.messages = []
+
+    async def send(self, content=None, **kwargs):
+        self.messages.append((content, kwargs))
+
+
+class FakeReviewInteraction:
+    def __init__(self):
+        self.response = FakeResponse()
+        self.followup = FakeFollowup()
+
+
+def _reconciliation_item(item_id: int, *, name: str) -> ReconciliationItem:
+    transaction = BankTransaction(
+        id=item_id,
+        provider_transaction_id=f"txn-{item_id}",
+        owner_key="brian",
+        account_name="Checking",
+        account_mask="0000",
+        account_type="depository",
+        account_subtype="checking",
+        date="2026-05-18",
+        authorized_date=None,
+        name=name,
+        merchant_name=None,
+        amount=12.34,
+        pending=False,
+        payment_channel="bookiebot_debug",
+        updated_at="2026-05-18T00:00:00+00:00",
+    )
+    return ReconciliationItem(
+        id=item_id,
+        owner_key="brian",
+        bank_transaction_id=item_id,
+        provider_transaction_id=f"txn-{item_id}",
+        classification="expense",
+        status="needs_review",
+        confidence=0.6,
+        matched_action_log_id=None,
+        matched_sheet_ref=None,
+        first_seen_at="2026-05-18T00:00:00+00:00",
+        last_seen_at="2026-05-18T00:00:00+00:00",
+        resolved_at=None,
+        ignored_at=None,
+        notes="outflow transaction",
+        transaction=transaction,
+    )
 
 
 def test_format_bank_reconciliation_digest_lists_unresolved_items():
@@ -111,6 +171,26 @@ def test_format_bank_reconciliation_digest_lists_unresolved_items():
     assert "  42  05-18    $12.34  expense   Unlogged Coffee" in output
 
 
+def test_format_bank_reconciliation_public_prompt_hides_transaction_details():
+    output = format_bank_reconciliation_public_prompt("<@123>", 2)
+
+    assert "<@123> bank reconciliation has `2` items that need review." in output
+    assert "review privately" in output
+    assert "No transaction details" in output
+    assert "Unresolved bank reconciliation items" not in output
+
+
+def test_bank_reconciliation_digest_eligibility_uses_morning_window(monkeypatch):
+    monkeypatch.setenv("BOOKIEBOT_BANK_RECONCILIATION_SEND_HOUR", "7")
+    monkeypatch.setenv("BOOKIEBOT_BANK_RECONCILIATION_SEND_WINDOW_MINUTES", "60")
+
+    assert _is_eligible(datetime(2026, 5, 20, 6, 59)) is False
+    assert _is_eligible(datetime(2026, 5, 20, 7, 0)) is True
+    assert _is_eligible(datetime(2026, 5, 20, 7, 59)) is True
+    assert _is_eligible(datetime(2026, 5, 20, 8, 0)) is False
+    assert _is_eligible(datetime(2026, 5, 20, 14, 30)) is False
+
+
 @pytest.mark.asyncio
 async def test_bank_reconciliation_digest_view_is_persistent():
     view = bank_reconciliation.bank_reconciliation_digest_view("123")
@@ -118,7 +198,6 @@ async def test_bank_reconciliation_digest_view_is_persistent():
     assert view.timeout is None
     assert [child.custom_id for child in view.children] == [
         "bank_reconcile:start:123",
-        "bank_reconcile:later:123",
     ]
 
 
@@ -230,29 +309,46 @@ def test_prepare_bank_reconciliation_digest_uses_cached_items_when_sync_fails(mo
     assert "Unlogged Coffee" in output
 
 
-def test_resolve_snooze_options_use_readable_labels():
-    current = datetime(2026, 5, 18, 14, 30)
+@pytest.mark.asyncio
+async def test_private_reconciliation_session_ignore_all_ignores_initial_batch(monkeypatch):
+    items = [
+        _reconciliation_item(42, name="Unlogged Coffee"),
+        _reconciliation_item(43, name="Unlogged Lunch"),
+    ]
+    ignored_ids = []
 
-    label, remind_at = _resolve_snooze("1h", current)
-    assert label == "in 1 hour"
-    assert remind_at == datetime(2026, 5, 18, 15, 30)
+    class FakeService:
+        def unresolved_reconciliation_items(self, owner_key, limit):
+            return [item for item in items if item.id not in ignored_ids]
 
-    label, remind_at = _resolve_snooze("2h", current)
-    assert label == "in 2 hours"
-    assert remind_at == datetime(2026, 5, 18, 16, 30)
+        def reconciliation_match_candidates(self, owner_key, reconciliation_id, *, actor_key, fallback, limit):
+            item = next((item for item in items if item.id == reconciliation_id), None)
+            return item, [], []
 
-    label, remind_at = _resolve_snooze("tomorrow", current)
-    assert label == "tomorrow at the same time"
-    assert remind_at == datetime(2026, 5, 19, 14, 30)
+        def ignore_reconciliation_item(self, owner_key, reconciliation_id):
+            item = next((item for item in items if item.id == reconciliation_id), None)
+            if item is None or reconciliation_id in ignored_ids:
+                return None
+            ignored_ids.append(reconciliation_id)
+            return item
 
+    monkeypatch.setattr(bank_reconciliation_flow, "build_banking_service", lambda: FakeService())
+    interaction = FakeReviewInteraction()
 
-def test_parse_specific_snooze_time_rolls_past_times_to_tomorrow():
-    current = datetime(2026, 5, 18, 14, 30)
+    await bank_reconciliation_flow.send_next_bank_reconciliation_item(
+        interaction,
+        owner_key="brian",
+        owner_name="Brian",
+        actor_key="123",
+    )
 
-    assert _parse_specific_snooze_time("3:30 PM", current) == datetime(2026, 5, 18, 15, 30)
-    assert _parse_specific_snooze_time("9 AM", current) == datetime(2026, 5, 19, 9, 0)
-    assert _parse_specific_snooze_time("tomorrow 9 AM", current) == datetime(2026, 5, 19, 9, 0)
-    assert _parse_specific_snooze_time("not a time", current) is None
+    view = interaction.followup.messages[0][1]["view"]
+    ignore_all = next(child for child in view.children if getattr(child, "label", None) == "Ignore All")
+    action_interaction = FakeReviewInteraction()
+    await ignore_all.callback(action_interaction)
+
+    assert ignored_ids == [42, 43]
+    assert action_interaction.followup.messages[-1][0] == "Ignored `2` bank reconciliation item(s) from this review."
 
 
 @pytest.mark.asyncio
@@ -260,13 +356,17 @@ async def test_bank_digest_records_sent_event_only_after_discord_send(monkeypatc
     recorded = []
     channel = FakeChannel()
     client = FakeClient(channel)
-    async def no_snoozed(*_args):
-        return 0
 
     monkeypatch.setenv("CHANNEL_ID", "123")
-    monkeypatch.setattr(bank_reconciliation, "_send_due_snoozed_bank_reconciliation_digests", no_snoozed)
     monkeypatch.setattr(bank_reconciliation, "_notification_users", lambda: [("676638528590970917", "<@676638528590970917>")])
-    monkeypatch.setattr(bank_reconciliation, "prepare_bank_reconciliation_digest", lambda *_args, **_kwargs: "digest")
+    monkeypatch.setattr(
+        bank_reconciliation,
+        "prepare_bank_reconciliation_digest_messages",
+        lambda *_args, **_kwargs: bank_reconciliation.PreparedBankReconciliationDigest(
+            public_message="public digest",
+            detail_message="private digest",
+        ),
+    )
     monkeypatch.setattr(
         bank_reconciliation,
         "record_system_event",
@@ -279,7 +379,7 @@ async def test_bank_digest_records_sent_event_only_after_discord_send(monkeypatc
     sent = await bank_reconciliation.send_due_bank_reconciliation_digest(client, today=datetime(2026, 5, 20).date())
 
     assert sent == 1
-    assert channel.messages[0][0] == "digest\n\u200b"
+    assert channel.messages[0][0] == "public digest\n\u200b"
     assert recorded == [
         (
             "676638528590970917",
@@ -291,16 +391,45 @@ async def test_bank_digest_records_sent_event_only_after_discord_send(monkeypatc
 
 
 @pytest.mark.asyncio
+async def test_bank_digest_does_not_send_after_morning_window_when_new_items_exist(monkeypatch):
+    channel = FakeChannel()
+    client = FakeClient(channel)
+
+    monkeypatch.setenv("CHANNEL_ID", "123")
+    monkeypatch.setenv("BOOKIEBOT_BANK_RECONCILIATION_SEND_HOUR", "7")
+    monkeypatch.setenv("BOOKIEBOT_BANK_RECONCILIATION_SEND_WINDOW_MINUTES", "60")
+    monkeypatch.setattr(bank_reconciliation, "now_pacific", lambda: datetime(2026, 5, 20, 14, 30))
+    monkeypatch.setattr(bank_reconciliation, "_notification_users", lambda: [("676638528590970917", "<@676638528590970917>")])
+    monkeypatch.setattr(
+        bank_reconciliation,
+        "prepare_bank_reconciliation_digest_messages",
+        lambda *_args, **_kwargs: bank_reconciliation.PreparedBankReconciliationDigest(
+            public_message="public digest",
+            detail_message="private digest",
+        ),
+    )
+
+    sent = await bank_reconciliation.send_due_bank_reconciliation_digest(client)
+
+    assert sent == 0
+    assert channel.messages == []
+
+
+@pytest.mark.asyncio
 async def test_bank_digest_does_not_record_sent_event_when_discord_send_fails(monkeypatch):
     recorded = []
     client = FakeClient(FailingChannel())
-    async def no_snoozed(*_args):
-        return 0
 
     monkeypatch.setenv("CHANNEL_ID", "123")
-    monkeypatch.setattr(bank_reconciliation, "_send_due_snoozed_bank_reconciliation_digests", no_snoozed)
     monkeypatch.setattr(bank_reconciliation, "_notification_users", lambda: [("676638528590970917", "<@676638528590970917>")])
-    monkeypatch.setattr(bank_reconciliation, "prepare_bank_reconciliation_digest", lambda *_args, **_kwargs: "digest")
+    monkeypatch.setattr(
+        bank_reconciliation,
+        "prepare_bank_reconciliation_digest_messages",
+        lambda *_args, **_kwargs: bank_reconciliation.PreparedBankReconciliationDigest(
+            public_message="public digest",
+            detail_message="private digest",
+        ),
+    )
     monkeypatch.setattr(
         bank_reconciliation,
         "record_system_event",

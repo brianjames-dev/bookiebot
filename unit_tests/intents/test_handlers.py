@@ -15,6 +15,16 @@ class DummyChannel:
         self.sent.append((content, kwargs))
 
 
+class PrivateAuthor:
+    def __init__(self, *, name="hannerish", user_id=830984827904851969):
+        self.name = name
+        self.id = user_id
+        self.dm_sent = []
+
+    async def send(self, content=None, **kwargs):
+        self.dm_sent.append((content, kwargs))
+
+
 class DummyTyping:
     def __init__(self, channel):
         self.channel = channel
@@ -191,6 +201,68 @@ async def test_query_recent_actions_lists_logged_expense(monkeypatch, message):
 
 
 @pytest.mark.asyncio
+async def test_query_recent_actions_sends_transaction_list_privately(monkeypatch):
+    import bookiebot.sheets.writer as writer
+
+    monkeypatch.setattr(writer, "resolve_query_persons", lambda user, person=None, user_id=None: ["Hannah"])
+    author = PrivateAuthor()
+    message = SimpleNamespace(content="hi", author=author, channel=DummyChannel())
+    repo = SheetsRepoStub(expense_rows=[[], []])
+
+    with repo.patched():
+        await ih.handle_intent(
+            "log_expense",
+            {"type": "expense", "category": "food", "amount": 12.5, "item": "Burrito", "location": "Chipotle"},
+            message,
+        )
+        await ih.handle_intent("query_recent_actions", {"n": 5}, message)
+
+    assert any("I sent your recent transaction workflow privately." == (msg or "") for msg, _ in message.channel.sent)
+    assert not any("Burrito" in (msg or "") for msg, _ in message.channel.sent)
+    recent_dm, kwargs = author.dm_sent[-1]
+    assert "Burrito" in (recent_dm or "")
+    assert "Chipotle" in (recent_dm or "")
+    assert kwargs.get("view") is not None
+
+
+@pytest.mark.asyncio
+async def test_recent_interaction_rejects_non_owner():
+    class Response:
+        def __init__(self):
+            self.sent = []
+
+        async def send_message(self, content=None, **kwargs):
+            self.sent.append((content, kwargs))
+
+    response = Response()
+    interaction = SimpleNamespace(
+        user=SimpleNamespace(id=676638528590970917, name=".deebers"),
+        response=response,
+    )
+
+    rejected = await ih._reject_unowned_recent_interaction(interaction, "830984827904851969")
+
+    assert rejected is True
+    assert response.sent == [
+        ("This recent transaction workflow belongs to another user.", {"ephemeral": True}),
+    ]
+
+
+@pytest.mark.asyncio
+async def test_recent_interaction_allows_owner_alias():
+    class Response:
+        async def send_message(self, content=None, **kwargs):
+            raise AssertionError("owner should not be rejected")
+
+    interaction = SimpleNamespace(
+        user=SimpleNamespace(id=830984827904851969, name="hannerish"),
+        response=Response(),
+    )
+
+    assert await ih._reject_unowned_recent_interaction(interaction, "830984827904851969") is False
+
+
+@pytest.mark.asyncio
 async def test_query_recent_actions_formats_income_cleanly(message):
     repo = SheetsRepoStub(income_rows=[["", "Existing Income", "100"], ["", "Monthly Income:", ""]])
 
@@ -207,6 +279,119 @@ async def test_query_recent_actions_formats_income_cleanly(message):
     assert "1. Income" in recent_reply
     assert "   Income: $1639.90 from Sonic" in recent_reply
     assert "income $1639.9 from Sonic" not in recent_reply
+
+
+@pytest.mark.asyncio
+async def test_recent_action_capabilities_control_available_decision_buttons(monkeypatch, message):
+    import bookiebot.sheets.writer as writer
+    from bookiebot.sheets.undo import action_capabilities, recent_actions
+    from bookiebot.ui.recent_actions import RecentActionDecisionView
+
+    monkeypatch.setattr(writer, "resolve_query_persons", lambda user, person=None, user_id=None: ["Hannah"])
+    repo = SheetsRepoStub(expense_rows=[[], []])
+
+    with repo.patched():
+        await ih.handle_intent(
+            "log_expense",
+            {"type": "expense", "category": "food", "amount": 12.5, "item": "Burrito", "location": "Chipotle"},
+            message,
+        )
+        action = recent_actions(str(message.author.id), 1)[0].action
+
+    capabilities = action_capabilities(action)
+    assert capabilities.can_update is True
+    assert capabilities.can_move is True
+    assert capabilities.can_delete is True
+    assert capabilities.editable_fields == ["item", "amount", "location", "person"]
+
+    view = RecentActionDecisionView(lambda *_args: None, capabilities)
+    labels = [getattr(child, "label", "") for child in getattr(view, "children", [])]
+    assert labels == ["Update", "Move", "Delete", "Cancel"]
+
+
+@pytest.mark.asyncio
+async def test_recent_action_capabilities_make_unsupported_operations_explicit():
+    from bookiebot.sheets.undo import UndoAction, action_capabilities
+    from bookiebot.ui.recent_actions import RecentActionDecisionView
+
+    income = UndoAction(
+        worksheet="income",
+        kind="delete_row",
+        row=3,
+        columns=[],
+        previous_values=[],
+        new_values=["", "Sonic", "100"],
+        metadata={"type": "income", "source": "Sonic"},
+        description="income $100 from Sonic",
+    )
+    need = UndoAction(
+        worksheet="income",
+        kind="delete_row",
+        row=8,
+        columns=[],
+        previous_values=[],
+        new_values=["Bus ticket", "45"],
+        metadata={"type": "need_expense"},
+        description="Need expense 'Bus ticket' $45",
+    )
+    payment = UndoAction(
+        worksheet="income",
+        kind="restore_cells",
+        row=12,
+        columns=[3],
+        previous_values=[""],
+        new_values=["85"],
+        metadata={"type": "payment", "category": "pg&e"},
+        description="pg&e payment $85",
+    )
+    savings = UndoAction(
+        worksheet="income",
+        kind="restore_cells",
+        row=22,
+        columns=[7],
+        previous_values=[""],
+        new_values=["200"],
+        metadata={"type": "savings", "category": "1st savings"},
+        description="1st savings deposit $200",
+    )
+
+    for action in (income, need):
+        capabilities = action_capabilities(action)
+        assert capabilities.can_update is False
+        assert capabilities.can_move is False
+        assert capabilities.can_delete is False
+        labels = [getattr(child, "label", "") for child in getattr(RecentActionDecisionView(lambda *_args: None, capabilities), "children", [])]
+        assert labels == ["Cancel"]
+        assert capabilities.delete_reason
+
+    for action in (payment, savings):
+        capabilities = action_capabilities(action)
+        assert capabilities.can_update is True
+        assert capabilities.editable_fields == ["amount"]
+        assert capabilities.can_move is False
+        assert capabilities.can_delete is False
+        labels = [getattr(child, "label", "") for child in getattr(RecentActionDecisionView(lambda *_args: None, capabilities), "children", [])]
+        assert labels == ["Update", "Cancel"]
+        assert "Use undo" in capabilities.delete_reason
+
+
+@pytest.mark.asyncio
+async def test_delete_recent_income_returns_clear_unsupported_reason(message):
+    repo = SheetsRepoStub(income_rows=[["", "Existing Income", "100"], ["", "Monthly Income:", ""]])
+
+    with repo.patched():
+        await ih.handle_intent(
+            "log_income",
+            {"type": "income", "amount": 1639.9, "source": "Sonic"},
+            message,
+        )
+        await ih.handle_intent("delete_recent_action", {"index": 1}, message)
+
+    reply = message.channel.sent[-1][0] or ""
+    assert "I cannot delete income rows from recent transactions yet" in reply
+    assert "Use undo if this was the last logged action" in reply
+    assert repo.income.cell(1, 2).value == "Sonic"
+    assert repo.income.cell(1, 3).value == "1639.9"
 
 
 @pytest.mark.asyncio
@@ -434,6 +619,140 @@ async def test_recent_actions_hide_moved_action_after_update(monkeypatch, messag
 
 
 @pytest.mark.asyncio
+async def test_move_recent_action_can_move_updated_expense(monkeypatch, message):
+    import bookiebot.sheets.writer as writer
+
+    monkeypatch.setattr(writer, "resolve_query_persons", lambda user, person=None, user_id=None: ["Hannah"])
+    repo = SheetsRepoStub(expense_rows=[[], []])
+
+    with repo.patched():
+        await ih.handle_intent(
+            "log_expense",
+            {"type": "expense", "category": "food", "amount": 12.5, "item": "Burrito", "location": "Chipotle"},
+            message,
+        )
+        await ih.handle_intent("update_recent_action", {"index": 1, "updates": {"amount": 14.75}}, message)
+        await ih.handle_intent("move_recent_action", {"index": 1, "category": "shopping"}, message)
+
+        assert repo.expense.cell(3, 15).value == ""
+        assert repo.expense.cell(3, 16).value == ""
+        assert repo.expense.cell(3, 17).value == ""
+        assert repo.expense.cell(3, 23).value == "Burrito"
+        assert repo.expense.cell(3, 24).value == "$14.75"
+        assert repo.expense.cell(3, 25).value == "Chipotle"
+        assert repo.expense.cell(3, 26).value == "Hannah"
+
+    assert any("Moved logged expense" in (msg or "") for msg, _ in message.channel.sent)
+
+
+@pytest.mark.asyncio
+async def test_move_recent_action_can_move_already_moved_expense(monkeypatch, message):
+    import bookiebot.sheets.writer as writer
+
+    monkeypatch.setattr(writer, "resolve_query_persons", lambda user, person=None, user_id=None: ["Hannah"])
+    repo = SheetsRepoStub(expense_rows=[[], []])
+
+    with repo.patched():
+        await ih.handle_intent(
+            "log_expense",
+            {"type": "expense", "category": "grocery", "amount": 12.5, "item": "Groceries", "location": "Chipotle"},
+            message,
+        )
+        await ih.handle_intent("move_recent_action", {"index": 1, "category": "food", "updates": {"item": "Burrito"}}, message)
+        await ih.handle_intent("move_recent_action", {"index": 1, "category": "shopping"}, message)
+
+        assert repo.expense.cell(3, 2).value == ""
+        assert repo.expense.cell(3, 15).value == ""
+        assert repo.expense.cell(3, 16).value == ""
+        assert repo.expense.cell(3, 23).value == "Burrito"
+        assert repo.expense.cell(3, 24).value == "$12.50"
+        assert repo.expense.cell(3, 25).value == "Chipotle"
+        assert repo.expense.cell(3, 26).value == "Hannah"
+
+    assert sum("Moved logged expense" in (msg or "") for msg, _ in message.channel.sent) == 2
+
+
+@pytest.mark.asyncio
+async def test_delete_recent_action_deletes_updated_expense_lineage(monkeypatch, message):
+    import bookiebot.sheets.writer as writer
+
+    monkeypatch.setattr(writer, "resolve_query_persons", lambda user, person=None, user_id=None: ["Hannah"])
+    repo = SheetsRepoStub(expense_rows=[[], []])
+
+    with repo.patched():
+        await ih.handle_intent(
+            "log_expense",
+            {"type": "expense", "category": "food", "amount": 10.0, "item": "Burger", "location": "Wendy's"},
+            message,
+        )
+        await ih.handle_intent(
+            "log_expense",
+            {"type": "expense", "category": "food", "amount": 5.0, "item": "Coffee", "location": "Starbucks"},
+            message,
+        )
+        await ih.handle_intent("update_recent_action", {"match_text": "Wendy", "updates": {"item": "Cookie"}}, message)
+        await ih.handle_intent("delete_recent_action", {"index": 1}, message)
+
+        assert repo.expense.cell(3, 15).value == "Coffee"
+        assert repo.expense.cell(3, 16).value == "$5.00"
+        assert repo.expense.cell(4, 15).value == ""
+        await ih.handle_intent("query_recent_actions", {"n": 5}, message)
+
+        recent_reply = message.channel.sent[-1][0] or ""
+        assert "Cookie" not in recent_reply
+        assert "Wendy" not in recent_reply
+        assert "Coffee" in recent_reply
+
+        await ih.handle_intent("undo_last_transaction", {}, message)
+
+        assert repo.expense.cell(3, 15).value == "Cookie"
+        assert repo.expense.cell(3, 16).value == "$10.00"
+        assert repo.expense.cell(3, 17).value == "Wendy's"
+        assert repo.expense.cell(4, 15).value == "Coffee"
+
+
+@pytest.mark.asyncio
+async def test_delete_recent_action_deletes_moved_expense_lineage(monkeypatch, message):
+    import bookiebot.sheets.writer as writer
+
+    monkeypatch.setattr(writer, "resolve_query_persons", lambda user, person=None, user_id=None: ["Hannah"])
+    repo = SheetsRepoStub(expense_rows=[[], []])
+
+    with repo.patched():
+        await ih.handle_intent(
+            "log_expense",
+            {"type": "expense", "category": "grocery", "amount": 10.0, "item": "Groceries", "location": "Safeway"},
+            message,
+        )
+        await ih.handle_intent(
+            "log_expense",
+            {"type": "expense", "category": "grocery", "amount": 20.0, "item": "Groceries", "location": "Costco"},
+            message,
+        )
+        await ih.handle_intent("move_recent_action", {"index": 2, "category": "food", "updates": {"item": "Snacks"}}, message)
+        await ih.handle_intent("delete_recent_action", {"index": 1}, message)
+
+        assert repo.expense.cell(3, 2).value == "$20.00"
+        assert repo.expense.cell(3, 3).value == "Costco"
+        assert repo.expense.cell(3, 15).value == ""
+        assert repo.expense.cell(3, 16).value == ""
+        await ih.handle_intent("query_recent_actions", {"n": 5}, message)
+
+        recent_reply = message.channel.sent[-1][0] or ""
+        assert "Safeway" not in recent_reply
+        assert "Snacks" not in recent_reply
+        assert "Costco" in recent_reply
+
+        await ih.handle_intent("undo_last_transaction", {}, message)
+
+        assert repo.expense.cell(3, 2).value == "$20.00"
+        assert repo.expense.cell(3, 3).value == "Costco"
+        assert repo.expense.cell(3, 15).value == "Snacks"
+        assert repo.expense.cell(3, 16).value == "$10.00"
+        assert repo.expense.cell(3, 17).value == "Safeway"
+
+
+@pytest.mark.asyncio
 async def test_update_recent_action_lists_candidates_when_value_missing(monkeypatch, message):
     import bookiebot.sheets.writer as writer
 
@@ -524,6 +843,61 @@ async def test_delete_recent_action_deletes_pending_candidate_by_index(monkeypat
         assert repo.expense.cell(3, 17).value == ""
 
     assert any("Deleted: food expense $12.5 for Hannah" in (msg or "") for msg, _ in message.channel.sent)
+
+
+@pytest.mark.asyncio
+async def test_delete_recent_action_expires_pending_candidate_selection(monkeypatch, message):
+    import bookiebot.sheets.undo as undo
+    import bookiebot.sheets.writer as writer
+
+    now = 0.0
+    monkeypatch.setattr(undo, "_pending_now", lambda: now)
+    monkeypatch.setattr(writer, "resolve_query_persons", lambda user, person=None, user_id=None: ["Hannah"])
+    repo = SheetsRepoStub(expense_rows=[[], []])
+
+    with repo.patched():
+        await ih.handle_intent(
+            "log_expense",
+            {"type": "expense", "category": "food", "amount": 12.5, "item": "Burrito", "location": "Chipotle"},
+            message,
+        )
+        await ih.handle_intent("delete_recent_action", {"match_text": "Chipotle"}, message)
+
+        now = 301.0
+        await ih.handle_intent("delete_recent_action", {"index": 1}, message)
+
+    reply = message.channel.sent[-1][0] or ""
+    assert "That recent transaction selection expired" in reply
+    assert repo.expense.cell(3, 15).value == "Burrito"
+    assert repo.expense.cell(3, 16).value == "$12.50"
+
+
+def test_pending_update_field_expires_and_clears_notice(monkeypatch):
+    import bookiebot.sheets.undo as undo
+
+    now = 0.0
+    monkeypatch.setattr(undo, "_pending_now", lambda: now)
+    undo.set_pending_update_field("user-1", "abc123", "amount")
+
+    now = 301.0
+
+    assert undo.pending_update_field("user-1") is None
+    assert undo.pop_pending_action_expiration_notice("user-1") == "That recent transaction selection expired. Please choose the transaction again."
+    assert undo.pop_pending_action_expiration_notice("user-1") is None
+
+
+def test_pending_move_item_expires_and_clears_notice(monkeypatch):
+    import bookiebot.sheets.undo as undo
+
+    now = 0.0
+    monkeypatch.setattr(undo, "_pending_now", lambda: now)
+    undo.set_pending_move_item("user-2", "abc123", "food")
+
+    now = 301.0
+
+    assert undo.pending_move_item("user-2") is None
+    assert undo.pop_pending_action_expiration_notice("user-2") == "That recent transaction selection expired. Please choose the transaction again."
+    assert undo.pending_move_item("user-2") is None
 
 
 @pytest.mark.asyncio

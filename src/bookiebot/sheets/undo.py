@@ -4,6 +4,7 @@ from dataclasses import asdict, dataclass, field
 from datetime import datetime
 import json
 import logging
+import time
 from typing import Any, Literal
 import weakref
 from uuid import uuid4
@@ -33,14 +34,39 @@ class UndoAction:
 
 _LAST_ACTION_BY_USER: dict[str, UndoAction] = {}
 _GLOBAL_LAST_ACTION: UndoAction | None = None
-_PENDING_DELETE_IDS_BY_USER: dict[str, list[str]] = {}
-_PENDING_UPDATE_IDS_BY_USER: dict[str, list[str]] = {}
-_PENDING_MOVE_IDS_BY_USER: dict[str, list[str]] = {}
-_PENDING_UPDATE_FIELD_BY_USER: dict[str, tuple[str, str]] = {}
-_PENDING_MOVE_ITEM_BY_USER: dict[str, tuple[str, str]] = {}
+_PENDING_ACTION_TTL_SECONDS = 300
+_PENDING_SELECTION_EXPIRED_MESSAGE = "That recent transaction selection expired. Please choose the transaction again."
 _RECENT_ACTION_OFFSET_BY_USER: dict[str, int] = {}
 _LOG_HEADERS = ["id", "created_at", "user_key", "status", "undone_at", "action_json"]
 _LOG_HEADER_READY: weakref.WeakSet[Any] = weakref.WeakSet()
+
+
+@dataclass
+class _PendingActionSelection:
+    action_ids: list[str]
+    created_at: float
+
+
+@dataclass
+class _PendingUpdateField:
+    action_id: str
+    field: str
+    created_at: float
+
+
+@dataclass
+class _PendingMoveItem:
+    action_id: str
+    destination_category: str
+    created_at: float
+
+
+_PENDING_DELETE_IDS_BY_USER: dict[str, _PendingActionSelection] = {}
+_PENDING_UPDATE_IDS_BY_USER: dict[str, _PendingActionSelection] = {}
+_PENDING_MOVE_IDS_BY_USER: dict[str, _PendingActionSelection] = {}
+_PENDING_UPDATE_FIELD_BY_USER: dict[str, _PendingUpdateField] = {}
+_PENDING_MOVE_ITEM_BY_USER: dict[str, _PendingMoveItem] = {}
+_PENDING_EXPIRATION_NOTICE_BY_USER: dict[str, str] = {}
 
 
 def _sheet_value(value: Any) -> str:
@@ -129,6 +155,18 @@ class LoggedAction:
     action: UndoAction
     status: Literal["active", "undone"] = "active"
     undone_at: str | None = None
+
+
+@dataclass(frozen=True)
+class ActionCapabilities:
+    can_update: bool
+    can_move: bool
+    can_delete: bool
+    can_undo: bool
+    editable_fields: list[str]
+    update_reason: str = ""
+    move_reason: str = ""
+    delete_reason: str = ""
 
 
 @dataclass
@@ -573,11 +611,79 @@ def matching_recent_actions(user_key: str | None, match_text: str, limit: int = 
     return matches
 
 
+def _pending_now() -> float:
+    return time.monotonic()
+
+
+def _pending_is_expired(created_at: float) -> bool:
+    return _pending_now() - created_at > _PENDING_ACTION_TTL_SECONDS
+
+
+def _pending_key(user_key: str | None) -> str:
+    return str(user_key) if user_key else ""
+
+
+def _new_pending_selection(action_ids: list[str]) -> _PendingActionSelection:
+    return _PendingActionSelection(action_ids=action_ids, created_at=_pending_now())
+
+
+def _set_pending_expired(key: str) -> None:
+    if key:
+        _PENDING_EXPIRATION_NOTICE_BY_USER[key] = _PENDING_SELECTION_EXPIRED_MESSAGE
+
+
+def _clear_pending_action_selection_key(key: str) -> None:
+    if key:
+        _PENDING_UPDATE_IDS_BY_USER.pop(key, None)
+        _PENDING_DELETE_IDS_BY_USER.pop(key, None)
+        _PENDING_MOVE_IDS_BY_USER.pop(key, None)
+        _PENDING_UPDATE_FIELD_BY_USER.pop(key, None)
+        _PENDING_MOVE_ITEM_BY_USER.pop(key, None)
+        _PENDING_EXPIRATION_NOTICE_BY_USER.pop(key, None)
+
+
+def pop_pending_action_expiration_notice(user_key: str | None) -> str | None:
+    key = _pending_key(user_key)
+    return _PENDING_EXPIRATION_NOTICE_BY_USER.pop(key, None) if key else None
+
+
+def _pending_selection_for_kind(
+    user_key: str | None,
+    kind: Literal["update", "delete", "move"],
+) -> tuple[_PendingActionSelection | None, bool]:
+    key = _pending_key(user_key)
+    if not key:
+        return None, False
+    if kind == "update":
+        pending = _PENDING_UPDATE_IDS_BY_USER.get(key)
+    elif kind == "delete":
+        pending = _PENDING_DELETE_IDS_BY_USER.get(key)
+    else:
+        pending = _PENDING_MOVE_IDS_BY_USER.get(key)
+    if pending is None:
+        return None, False
+    if _pending_is_expired(pending.created_at):
+        _clear_pending_action_selection_key(key)
+        _set_pending_expired(key)
+        return None, True
+    return pending, False
+
+
+def _active_pending_selection_kind(user_key: str | None) -> tuple[Literal["update", "delete", "move"] | None, bool]:
+    for kind in ("update", "delete", "move"):
+        pending, expired = _pending_selection_for_kind(user_key, kind)
+        if expired:
+            return None, True
+        if pending and pending.action_ids:
+            return kind, False
+    return None, False
+
+
 def format_delete_candidates(user_key: str | None, match_text: str, limit: int = 10) -> str:
-    key = str(user_key) if user_key else ""
+    key = _pending_key(user_key)
     actions = matching_recent_actions(user_key, match_text, limit)
     if key:
-        _PENDING_DELETE_IDS_BY_USER[key] = [logged.id for logged in actions]
+        _PENDING_DELETE_IDS_BY_USER[key] = _new_pending_selection([logged.id for logged in actions])
     return _format_actions(
         actions,
         empty_message=f"I could not find a recent logged action matching '{match_text}'.",
@@ -586,10 +692,10 @@ def format_delete_candidates(user_key: str | None, match_text: str, limit: int =
 
 
 def format_update_candidates(user_key: str | None, match_text: str, limit: int = 10) -> str:
-    key = str(user_key) if user_key else ""
+    key = _pending_key(user_key)
     actions = matching_recent_actions(user_key, match_text, limit)
     if key:
-        _PENDING_UPDATE_IDS_BY_USER[key] = [logged.id for logged in actions]
+        _PENDING_UPDATE_IDS_BY_USER[key] = _new_pending_selection([logged.id for logged in actions])
     return _format_actions(
         actions,
         empty_message=f"I could not find a recent logged action matching '{match_text}'.",
@@ -598,10 +704,10 @@ def format_update_candidates(user_key: str | None, match_text: str, limit: int =
 
 
 def format_move_candidates(user_key: str | None, match_text: str, limit: int = 10) -> str:
-    key = str(user_key) if user_key else ""
+    key = _pending_key(user_key)
     actions = matching_recent_actions(user_key, match_text, limit)
     if key:
-        _PENDING_MOVE_IDS_BY_USER[key] = [logged.id for logged in actions]
+        _PENDING_MOVE_IDS_BY_USER[key] = _new_pending_selection([logged.id for logged in actions])
     return _format_actions(
         actions,
         empty_message=f"I could not find a recent logged action matching '{match_text}'.",
@@ -610,89 +716,80 @@ def format_move_candidates(user_key: str | None, match_text: str, limit: int = 1
 
 
 def set_pending_update_selection(user_key: str | None, action_id: str) -> None:
-    key = str(user_key) if user_key else ""
+    key = _pending_key(user_key)
     if key:
-        _PENDING_UPDATE_IDS_BY_USER[key] = [action_id]
+        _PENDING_UPDATE_IDS_BY_USER[key] = _new_pending_selection([action_id])
 
 
 def set_pending_delete_selection(user_key: str | None, action_id: str) -> None:
-    key = str(user_key) if user_key else ""
+    key = _pending_key(user_key)
     if key:
-        _PENDING_DELETE_IDS_BY_USER[key] = [action_id]
+        _PENDING_DELETE_IDS_BY_USER[key] = _new_pending_selection([action_id])
 
 
 def set_pending_move_selection(user_key: str | None, action_id: str) -> None:
-    key = str(user_key) if user_key else ""
+    key = _pending_key(user_key)
     if key:
-        _PENDING_MOVE_IDS_BY_USER[key] = [action_id]
+        _PENDING_MOVE_IDS_BY_USER[key] = _new_pending_selection([action_id])
 
 
 def clear_pending_action_selection(user_key: str | None) -> None:
-    key = str(user_key) if user_key else ""
-    if key:
-        _PENDING_UPDATE_IDS_BY_USER.pop(key, None)
-        _PENDING_DELETE_IDS_BY_USER.pop(key, None)
-        _PENDING_MOVE_IDS_BY_USER.pop(key, None)
-        _PENDING_UPDATE_FIELD_BY_USER.pop(key, None)
-        _PENDING_MOVE_ITEM_BY_USER.pop(key, None)
+    _clear_pending_action_selection_key(_pending_key(user_key))
 
 
 def set_pending_update_field(user_key: str | None, action_id: str, field: str) -> None:
-    key = str(user_key) if user_key else ""
+    key = _pending_key(user_key)
     if key:
-        _PENDING_UPDATE_FIELD_BY_USER[key] = (action_id, field)
+        _PENDING_UPDATE_FIELD_BY_USER[key] = _PendingUpdateField(action_id=action_id, field=field, created_at=_pending_now())
 
 
 def pending_update_field(user_key: str | None) -> tuple[str, str] | None:
-    key = str(user_key) if user_key else ""
-    return _PENDING_UPDATE_FIELD_BY_USER.get(key)
+    key = _pending_key(user_key)
+    pending = _PENDING_UPDATE_FIELD_BY_USER.get(key)
+    if pending is None:
+        return None
+    if _pending_is_expired(pending.created_at):
+        _clear_pending_action_selection_key(key)
+        _set_pending_expired(key)
+        return None
+    return pending.action_id, pending.field
 
 
 def set_pending_move_item(user_key: str | None, action_id: str, destination_category: str) -> None:
-    key = str(user_key) if user_key else ""
+    key = _pending_key(user_key)
     if key:
-        _PENDING_MOVE_ITEM_BY_USER[key] = (action_id, destination_category)
+        _PENDING_MOVE_ITEM_BY_USER[key] = _PendingMoveItem(
+            action_id=action_id,
+            destination_category=destination_category,
+            created_at=_pending_now(),
+        )
 
 
 def pending_move_item(user_key: str | None) -> tuple[str, str] | None:
-    key = str(user_key) if user_key else ""
-    return _PENDING_MOVE_ITEM_BY_USER.get(key)
+    key = _pending_key(user_key)
+    pending = _PENDING_MOVE_ITEM_BY_USER.get(key)
+    if pending is None:
+        return None
+    if _pending_is_expired(pending.created_at):
+        _clear_pending_action_selection_key(key)
+        _set_pending_expired(key)
+        return None
+    return pending.action_id, pending.destination_category
 
 
 def has_pending_action_selection(user_key: str | None) -> bool:
-    key = str(user_key) if user_key else ""
-    return bool(
-        key
-        and (
-            _PENDING_UPDATE_IDS_BY_USER.get(key)
-            or _PENDING_DELETE_IDS_BY_USER.get(key)
-            or _PENDING_MOVE_IDS_BY_USER.get(key)
-        )
-    )
+    kind, _expired = _active_pending_selection_kind(user_key)
+    return kind is not None
 
 
 def pending_action_selection_kind(user_key: str | None) -> Literal["update", "delete", "move"] | None:
-    key = str(user_key) if user_key else ""
-    if key and _PENDING_UPDATE_IDS_BY_USER.get(key):
-        return "update"
-    if key and _PENDING_DELETE_IDS_BY_USER.get(key):
-        return "delete"
-    if key and _PENDING_MOVE_IDS_BY_USER.get(key):
-        return "move"
-    return None
+    kind, _expired = _active_pending_selection_kind(user_key)
+    return kind
 
 
 def pending_action_selection_count(user_key: str | None, kind: Literal["update", "delete", "move"]) -> int:
-    key = str(user_key) if user_key else ""
-    if not key:
-        return 0
-    if kind == "update":
-        return len(_PENDING_UPDATE_IDS_BY_USER.get(key, []))
-    if kind == "delete":
-        return len(_PENDING_DELETE_IDS_BY_USER.get(key, []))
-    if kind == "move":
-        return len(_PENDING_MOVE_IDS_BY_USER.get(key, []))
-    return 0
+    pending, _expired = _pending_selection_for_kind(user_key, kind)
+    return len(pending.action_ids) if pending else 0
 
 
 def pending_action_selection_id(
@@ -700,17 +797,11 @@ def pending_action_selection_id(
     kind: Literal["update", "delete", "move"],
     index: int,
 ) -> str | None:
-    key = str(user_key) if user_key else ""
-    if not key or index < 1:
+    if index < 1:
         return None
-    if kind == "update":
-        action_ids = _PENDING_UPDATE_IDS_BY_USER.get(key, [])
-    elif kind == "delete":
-        action_ids = _PENDING_DELETE_IDS_BY_USER.get(key, [])
-    else:
-        action_ids = _PENDING_MOVE_IDS_BY_USER.get(key, [])
-    if index <= len(action_ids):
-        return action_ids[index - 1]
+    pending, _expired = _pending_selection_for_kind(user_key, kind)
+    if pending and index <= len(pending.action_ids):
+        return pending.action_ids[index - 1]
     return None
 
 
@@ -735,6 +826,41 @@ def _field_columns_for_action(action: UndoAction) -> dict[str, int]:
 def editable_fields_for_action(action: UndoAction) -> list[str]:
     fields = list(_field_columns_for_action(action).keys())
     return [field for field in fields if field != "date"]
+
+
+def action_capabilities(action: UndoAction) -> ActionCapabilities:
+    action_type = action.metadata.get("type")
+    editable_fields = editable_fields_for_action(action)
+
+    can_update = bool(editable_fields)
+    update_reason = "" if can_update else "I do not know how to update fields for that transaction yet."
+
+    can_move = action.worksheet == "expense" and action_type in {"expense", "update", "move"} and bool(action.metadata.get("category"))
+    move_reason = "" if can_move else "I can only move normal expense rows between categories right now."
+
+    can_delete = action.worksheet == "expense" and action_type in {"expense", "update", "move"} and bool(action.metadata.get("category"))
+    if not can_delete:
+        if action_type == "income":
+            delete_reason = "I cannot delete income rows from recent transactions yet. Use undo if this was the last logged action."
+        elif action_type == "need_expense":
+            delete_reason = "I cannot delete Need expenses from recent transactions yet. Use undo if this was the last logged action."
+        elif action_type in {"payment", "savings"}:
+            delete_reason = "I cannot delete payments or savings deposits from recent transactions yet. Use undo if this was the last logged action."
+        else:
+            delete_reason = "I cannot delete that transaction type from recent transactions yet. Use undo if this was the last logged action."
+    else:
+        delete_reason = ""
+
+    return ActionCapabilities(
+        can_update=can_update,
+        can_move=can_move,
+        can_delete=can_delete,
+        can_undo=True,
+        editable_fields=editable_fields,
+        update_reason=update_reason,
+        move_reason=move_reason,
+        delete_reason=delete_reason,
+    )
 
 
 def _field_values_for_action(action: UndoAction, values: list[str] | None = None) -> dict[str, str]:
@@ -931,6 +1057,41 @@ def _action_category(action: UndoAction) -> str | None:
     return action.metadata.get("category")
 
 
+def _active_lineage_ids(logged: LoggedAction, log_data: _ActionLogData | None = None) -> set[str]:
+    data = log_data or _read_log_data()
+    if data is None:
+        return {logged.id}
+    actions_by_id = {record.logged.id: record.logged for record in data.records}
+    lineage_id = _lineage_id(logged, actions_by_id)
+    return {
+        record.logged.id
+        for record in data.records
+        if record.logged.status == "active"
+        and _lineage_id(record.logged, actions_by_id) == lineage_id
+    }
+
+
+def _mark_logged_ids_undone(logged_ids: set[str], log_data: _ActionLogData) -> None:
+    for logged_id in logged_ids:
+        _mark_undone(logged_id, log_data)
+
+
+def _mark_logged_ids_active(logged_ids: set[str], log_data: _ActionLogData) -> None:
+    for logged_id in logged_ids:
+        _mark_active(logged_id, log_data)
+
+
+def _deleted_action_ids(action: UndoAction) -> set[str]:
+    raw_ids = action.metadata.get("deleted_action_ids")
+    if raw_ids:
+        try:
+            return {str(action_id) for action_id in json.loads(raw_ids) if str(action_id)}
+        except Exception:
+            pass
+    deleted_id = action.metadata.get("deleted_action_id")
+    return {deleted_id} if deleted_id else set()
+
+
 def _shift_logged_action_rows(
     *,
     category: str,
@@ -1014,8 +1175,12 @@ def move_recent_action(
 
     key = str(user_key) if user_key else ""
     requested_index = index
-    if index is not None and key and key in _PENDING_MOVE_IDS_BY_USER:
-        candidate_ids = _PENDING_MOVE_IDS_BY_USER.get(key, [])
+    if index is not None and key:
+        pending, expired = _pending_selection_for_kind(user_key, "move")
+        if expired:
+            pop_pending_action_expiration_notice(user_key)
+            return False, _PENDING_SELECTION_EXPIRED_MESSAGE
+        candidate_ids = pending.action_ids if pending else []
         if 1 <= index <= len(candidate_ids):
             action_id = candidate_ids[index - 1]
             index = None
@@ -1034,14 +1199,26 @@ def move_recent_action(
         return False, format_recent_actions(user_key, 5)
 
     action = logged.action
-    if action.metadata.get("type") != "expense" or action.worksheet != "expense":
-        return False, "I can only move normal expense rows between categories right now."
+    capabilities = action_capabilities(action)
+    if not capabilities.can_move:
+        return False, capabilities.move_reason
 
     source_category = action.metadata.get("category", "")
     if source_category == destination_category:
         return False, f"That expense is already in {destination_category}."
 
-    source_values = _field_values_for_action(action)
+    ws = _worksheet("expense")
+    source_columns_by_field = _category_columns(source_category)
+    source_fields = list(source_columns_by_field)
+    source_category_columns = list(source_columns_by_field.values())
+    source_current_values = [
+        _sheet_value(ws.cell(action.row, col).value)
+        for col in source_category_columns
+    ]
+    source_values = {
+        field: source_current_values[index]
+        for index, field in enumerate(source_fields)
+    }
     destination_values = _values_for_category(source_values, destination_category, updates)
     missing = _missing_required_move_fields(destination_values, destination_category)
     if missing:
@@ -1050,11 +1227,6 @@ def move_recent_action(
             return False, "What is the name of the item?"
         return False, f"I can move it to {destination_category}, but I still need: {', '.join(missing)}."
 
-    ws = _worksheet("expense")
-    source_columns = action.columns
-    source_current_values = [_sheet_value(ws.cell(action.row, col).value) for col in source_columns]
-    source_columns_by_field = _category_columns(source_category)
-    source_category_columns = list(source_columns_by_field.values())
     source_end_row = max(action.row, _last_occupied_category_row(ws, source_category))
     source_snapshot = _category_snapshot(ws, range(action.row, source_end_row + 1), source_category_columns)
     destination_row = _first_empty_category_row(ws, destination_category)
@@ -1112,7 +1284,7 @@ def move_recent_action(
                 "source_action_id": logged.id,
                 "source_category": source_category,
                 "source_row": str(action.row),
-                "source_columns": json.dumps(source_columns),
+                "source_columns": json.dumps(source_category_columns),
                 "source_values": json.dumps(source_current_values),
                 "source_category_columns": json.dumps(source_category_columns),
                 "source_compact_start_row": str(action.row),
@@ -1172,8 +1344,12 @@ def update_recent_action(
 
     key = str(user_key) if user_key else ""
     requested_index = index
-    if index is not None and key and key in _PENDING_UPDATE_IDS_BY_USER:
-        candidate_ids = _PENDING_UPDATE_IDS_BY_USER.get(key, [])
+    if index is not None and key:
+        pending, expired = _pending_selection_for_kind(user_key, "update")
+        if expired:
+            pop_pending_action_expiration_notice(user_key)
+            return False, _PENDING_SELECTION_EXPIRED_MESSAGE
+        candidate_ids = pending.action_ids if pending else []
         if 1 <= index <= len(candidate_ids):
             action_id = candidate_ids[index - 1]
             index = None
@@ -1189,9 +1365,10 @@ def update_recent_action(
     if logged is None:
         return False, format_recent_actions(user_key, 5)
 
+    capabilities = action_capabilities(logged.action)
     field_columns = _field_columns_for_action(logged.action)
-    if not field_columns:
-        return False, "I found that action, but I do not know how to edit its fields yet."
+    if not capabilities.can_update or not field_columns:
+        return False, capabilities.update_reason
 
     unknown = sorted(set(normalized_updates) - set(field_columns))
     if unknown:
@@ -1315,12 +1492,13 @@ def _apply_undo_action(action: UndoAction, log_data: _ActionLogData | None = Non
         snapshot = json.loads(action.metadata["category_snapshot"])
         start_row = int(action.metadata["compact_start_row"])
         end_row = int(action.metadata["compact_end_row"])
+        deleted_ids = _deleted_action_ids(action)
         _shift_logged_action_rows(
             category=category,
             lower_row=start_row,
             upper_row=end_row - 1,
             delta=1,
-            exclude_ids={action.metadata.get("deleted_action_id", "")},
+            exclude_ids=deleted_ids,
             log_data=log_data,
         )
         _restore_category_snapshot(ws, start_row, action.columns, snapshot)
@@ -1357,14 +1535,15 @@ def _delete_expense_action_with_compaction(user_key: str | None, logged: LoggedA
         log_data = _read_log_data()
         if log_data is None:
             return False, "Something went wrong while reading the action log."
+        lineage_ids = _active_lineage_ids(logged, log_data)
         _shift_category_cells_up(ws, start_row=action.row, end_row=end_row, columns=columns)
-        _mark_undone(logged.id, log_data)
+        _mark_logged_ids_undone(lineage_ids, log_data)
         _shift_logged_action_rows(
             category=category,
             lower_row=action.row + 1,
             upper_row=end_row,
             delta=-1,
-            exclude_ids={logged.id},
+            exclude_ids=lineage_ids,
             log_data=log_data,
         )
     except Exception as e:
@@ -1384,6 +1563,7 @@ def _delete_expense_action_with_compaction(user_key: str | None, logged: LoggedA
                 "type": "delete",
                 "category": category,
                 "deleted_action_id": logged.id,
+                "deleted_action_ids": json.dumps(sorted(lineage_ids)),
                 "compact_start_row": str(action.row),
                 "compact_end_row": str(end_row),
                 "category_snapshot": json.dumps(snapshot),
@@ -1409,17 +1589,25 @@ def delete_recent_action(
     requested_index = index
     if action_id:
         logged = select_recent_action(user_key, action_id=action_id)
-    elif index is not None and key and key in _PENDING_DELETE_IDS_BY_USER:
-        candidate_ids = _PENDING_DELETE_IDS_BY_USER.get(key, [])
+    elif index is not None and key:
+        pending, expired = _pending_selection_for_kind(user_key, "delete")
+        if expired:
+            pop_pending_action_expiration_notice(user_key)
+            return False, _PENDING_SELECTION_EXPIRED_MESSAGE
+        candidate_ids = pending.action_ids if pending else []
         if 1 <= index <= len(candidate_ids):
             logged = select_recent_action(user_key, action_id=candidate_ids[index - 1])
-    elif index is not None:
-        logged = select_recent_action(user_key, index=index)
+        else:
+            logged = select_recent_action(user_key, index=index)
     if logged is None and requested_index is not None:
         logged = select_recent_action(user_key, index=requested_index)
 
     if logged is None:
         return False, format_recent_actions(user_key, 5)
+
+    capabilities = action_capabilities(logged.action)
+    if not capabilities.can_delete:
+        return False, capabilities.delete_reason
 
     if logged.action.worksheet == "expense":
         success, detail = _delete_expense_action_with_compaction(user_key, logged)
@@ -1466,9 +1654,9 @@ def undo_logged_action(user_key: str | None, action_id: str) -> tuple[bool, str]
             {col: value for col, value in zip(logged.action.columns, logged.action.previous_values)},
             log_data,
         )
-    deleted_action_id = logged.action.metadata.get("deleted_action_id")
-    if deleted_action_id and logged.action.kind == "compact_category_cells":
-        _mark_active(deleted_action_id, log_data)
+    deleted_action_ids = _deleted_action_ids(logged.action)
+    if deleted_action_ids and logged.action.kind == "compact_category_cells":
+        _mark_logged_ids_active(deleted_action_ids, log_data)
     source_action_id = logged.action.metadata.get("source_action_id")
     if source_action_id and logged.action.kind == "move_expense":
         _mark_active(source_action_id, log_data)
@@ -1512,9 +1700,9 @@ def undo_last_action(user_key: str | None) -> tuple[bool, str]:
                 {col: value for col, value in zip(action.columns, action.previous_values)},
                 log_data,
             )
-        deleted_action_id = action.metadata.get("deleted_action_id")
-        if deleted_action_id and action.kind == "compact_category_cells":
-            _mark_active(deleted_action_id, log_data)
+        deleted_action_ids = _deleted_action_ids(action)
+        if deleted_action_ids and action.kind == "compact_category_cells":
+            _mark_logged_ids_active(deleted_action_ids, log_data)
         source_action_id = action.metadata.get("source_action_id")
         if source_action_id and action.kind == "move_expense":
             _mark_active(source_action_id, log_data)

@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import Callable
 
-from bookiebot.sheets.undo import LoggedAction, action_option_label, action_title
+from bookiebot.sheets.undo import ActionCapabilities, LoggedAction, action_option_label, action_title
 from bookiebot.ui.card import ButtonBase, ButtonStyle, Interaction, SelectBase, SelectOption, ViewBase
 
 
@@ -46,11 +46,14 @@ class RecentActionSelectView(ViewBase):  # type: ignore[misc]
 
 
 class RecentActionDecisionView(ViewBase):  # type: ignore[misc]
-    def __init__(self, callback_func: Callable):
+    def __init__(self, callback_func: Callable, capabilities: ActionCapabilities | None = None):
         super().__init__(timeout=120)
-        self.add_item(RecentActionButton("Update", "update", callback_func))
-        self.add_item(RecentActionButton("Move", "move", callback_func))
-        self.add_item(RecentActionButton("Delete", "delete", callback_func))
+        if capabilities is None or capabilities.can_update:
+            self.add_item(RecentActionButton("Update", "update", callback_func))
+        if capabilities is None or capabilities.can_move:
+            self.add_item(RecentActionButton("Move", "move", callback_func))
+        if capabilities is None or capabilities.can_delete:
+            self.add_item(RecentActionButton("Delete", "delete", callback_func))
         self.add_item(RecentActionButton("Cancel", "cancel", callback_func))
 
 

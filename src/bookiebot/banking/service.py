@@ -478,24 +478,6 @@ class BankingService:
     def reopen_reconciliation_item(self, owner_key: str, reconciliation_id: int):
         return self.store.reopen_reconciliation_item(owner_key, reconciliation_id)
 
-    def get_reconciliation_default_snooze(self, actor_key: str) -> str | None:
-        return self.store.get_reconciliation_default_snooze(actor_key)
-
-    def set_reconciliation_default_snooze(self, actor_key: str, snooze_option: str) -> None:
-        self.store.set_reconciliation_default_snooze(actor_key, snooze_option)
-
-    def get_reconciliation_snooze_until(self, actor_key: str) -> str | None:
-        return self.store.get_reconciliation_snooze_until(actor_key)
-
-    def set_reconciliation_snooze_until(self, actor_key: str, remind_at_iso: str) -> None:
-        self.store.set_reconciliation_snooze_until(actor_key, remind_at_iso)
-
-    def clear_reconciliation_snooze_until(self, actor_key: str) -> None:
-        self.store.clear_reconciliation_snooze_until(actor_key)
-
-    def due_reconciliation_snoozes(self, current_iso: str) -> list[tuple[str, str]]:
-        return self.store.due_reconciliation_snoozes(current_iso)
-
     def get_reconciliation_item(self, owner_key: str, reconciliation_id: int):
         return self.store.get_reconciliation_item(owner_key, reconciliation_id)
 
