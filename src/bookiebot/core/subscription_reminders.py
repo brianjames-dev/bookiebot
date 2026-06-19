@@ -154,6 +154,35 @@ def _target_channel(client: Any) -> Any | None:
     return None
 
 
+async def _target_user(client: Any, actor_key: str) -> Any | None:
+    try:
+        user_id = int(actor_key)
+    except (TypeError, ValueError):
+        return None
+    get_user = getattr(client, "get_user", None)
+    if callable(get_user):
+        user = get_user(user_id)
+        if user is not None:
+            return user
+    fetch_user = getattr(client, "fetch_user", None)
+    if callable(fetch_user):
+        return await fetch_user(user_id)
+    return None
+
+
+async def _send_user_dm(client: Any, actor_key: str, content: str, **kwargs: Any) -> bool:
+    user = await _target_user(client, actor_key)
+    send = getattr(user, "send", None)
+    if not callable(send):
+        return False
+    try:
+        await send(content, **kwargs)
+        return True
+    except Exception:
+        logger.exception("Failed to send subscription reminder DM", extra={"actor_key": actor_key})
+        return False
+
+
 def _reminder_metadata(reminder: SubscriptionReminder) -> dict[str, str]:
     return {
         "reminder_key": reminder.key,
@@ -364,10 +393,7 @@ async def send_due_subscription_reminders(client: Any, today: date | None = None
         return 0
     current_time = now_pacific()
 
-    channel = _target_channel(client)
-    if channel is None:
-        logger.warning("Subscription reminders skipped because no target Discord channel was found")
-        return 0
+    fallback_channel = _target_channel(client)
 
     sent = 0
     current = today or current_time.date()
@@ -377,10 +403,19 @@ async def send_due_subscription_reminders(client: Any, today: date | None = None
         if today is None and _LAST_REMINDER_EVALUATION_DATE.get(actor_key) == current:
             continue
         prepared = await asyncio.to_thread(_prepare_due_reminder_messages, actor_key, mention, current)
+        delivered = True
+        for message in prepared.messages:
+            if not await _send_user_dm(client, actor_key, message):
+                delivered = False
+                break
+        if not delivered:
+            if fallback_channel is not None:
+                await fallback_channel.send(
+                    f"{mention} I could not send your private bills and subscriptions digest. Please check your DM settings."
+                )
+            continue
         if today is None:
             _LAST_REMINDER_EVALUATION_DATE[actor_key] = current
-        for message in prepared.messages:
-            await channel.send(message)
         for event in prepared.post_send_events or []:
             if not await asyncio.to_thread(
                 record_system_event,

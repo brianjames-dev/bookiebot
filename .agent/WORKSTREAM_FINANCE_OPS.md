@@ -100,6 +100,9 @@ Status: Complete for active recent-action lineages as of 2026-06-18.
 - Reconciliation digest channel messages now show a generic unresolved-item count instead of transaction details; detailed review remains ephemeral after `Reconcile Now`.
 - Daily reconciliation digest eligibility is now bounded to the configured morning send window, preventing newly synced Plaid items from causing a normal daily digest later in the day.
 - Added regression tests for the public digest prompt, morning send window, and after-window Plaid/new-item no-send behavior.
+- Reconciliation digests now send by DM with `Reconcile Now` and `View Inbox` controls.
+- `Ignore All` moved from individual reconciliation transaction cards to the inbox list view only.
+- Bills and subscriptions digests now send by DM instead of posting cash-pull details in the shared channel.
 
 Manual verification steps are tracked in `.agent/STATUS.md`.
 

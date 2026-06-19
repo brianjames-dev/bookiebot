@@ -4,7 +4,6 @@ import pytest
 
 from bookiebot.banking.models import BankTransaction, ReconciliationCacheBuckets, ReconciliationItem, ReconciliationPreview
 import bookiebot.core.bank_reconciliation as bank_reconciliation
-import bookiebot.core.bank_reconciliation_flow as bank_reconciliation_flow
 from bookiebot.core.bank_reconciliation import (
     _is_eligible,
     format_bank_reconciliation_digest,
@@ -25,13 +24,30 @@ class FailingChannel:
         raise RuntimeError("discord send failed")
 
 
+class FakeUser:
+    def __init__(self):
+        self.messages = []
+
+    async def send(self, content, **kwargs):
+        self.messages.append((content, kwargs))
+
+
+class FailingUser:
+    async def send(self, content, **kwargs):
+        raise RuntimeError("discord dm failed")
+
+
 class FakeClient:
-    def __init__(self, channel):
+    def __init__(self, channel, *, user=None):
         self.channel = channel
+        self.user = user
         self.views = []
 
     def get_channel(self, _channel_id):
         return self.channel
+
+    def get_user(self, _user_id):
+        return self.user
 
     def add_view(self, view):
         self.views.append(view)
@@ -175,8 +191,8 @@ def test_format_bank_reconciliation_public_prompt_hides_transaction_details():
     output = format_bank_reconciliation_public_prompt("<@123>", 2)
 
     assert "<@123> bank reconciliation has `2` items that need review." in output
-    assert "review privately" in output
-    assert "No transaction details" in output
+    assert "`Reconcile Now`" in output
+    assert "`View Inbox`" in output
     assert "Unresolved bank reconciliation items" not in output
 
 
@@ -198,6 +214,7 @@ async def test_bank_reconciliation_digest_view_is_persistent():
     assert view.timeout is None
     assert [child.custom_id for child in view.children] == [
         "bank_reconcile:start:123",
+        "bank_reconcile:inbox:123",
     ]
 
 
@@ -310,7 +327,8 @@ def test_prepare_bank_reconciliation_digest_uses_cached_items_when_sync_fails(mo
 
 
 @pytest.mark.asyncio
-async def test_private_reconciliation_session_ignore_all_ignores_initial_batch(monkeypatch):
+@pytest.mark.asyncio
+async def test_bank_reconciliation_inbox_ignore_all_ignores_displayed_batch(monkeypatch):
     items = [
         _reconciliation_item(42, name="Unlogged Coffee"),
         _reconciliation_item(43, name="Unlogged Lunch"),
@@ -318,12 +336,21 @@ async def test_private_reconciliation_session_ignore_all_ignores_initial_batch(m
     ignored_ids = []
 
     class FakeService:
-        def unresolved_reconciliation_items(self, owner_key, limit):
-            return [item for item in items if item.id not in ignored_ids]
+        config = SimpleNamespace(configured=True)
 
-        def reconciliation_match_candidates(self, owner_key, reconciliation_id, *, actor_key, fallback, limit):
-            item = next((item for item in items if item.id == reconciliation_id), None)
-            return item, [], []
+        async def sync_owner(self, _owner_key):
+            return None
+
+        def reconciliation_preview(self, owner_key, *, limit, actor_key):
+            return ReconciliationPreview(
+                owner_key=owner_key,
+                items=items,
+                cached_transaction_count=2,
+                candidate_transaction_count=2,
+            )
+
+        def unresolved_reconciliation_items(self, owner_key, *, limit):
+            return [item for item in items if item.id not in ignored_ids]
 
         def ignore_reconciliation_item(self, owner_key, reconciliation_id):
             item = next((item for item in items if item.id == reconciliation_id), None)
@@ -332,30 +359,33 @@ async def test_private_reconciliation_session_ignore_all_ignores_initial_batch(m
             ignored_ids.append(reconciliation_id)
             return item
 
-    monkeypatch.setattr(bank_reconciliation_flow, "build_banking_service", lambda: FakeService())
+    monkeypatch.setattr(
+        bank_reconciliation,
+        "get_user_config",
+        lambda _actor_key: SimpleNamespace(budget_owner_key="brian", name="Brian"),
+    )
+    monkeypatch.setattr(bank_reconciliation, "build_banking_service", lambda: FakeService())
+    monkeypatch.setattr(bank_reconciliation, "has_system_event", lambda *_args: False)
     interaction = FakeReviewInteraction()
 
-    await bank_reconciliation_flow.send_next_bank_reconciliation_item(
-        interaction,
-        owner_key="brian",
-        owner_name="Brian",
-        actor_key="123",
-    )
+    await bank_reconciliation._send_bank_reconciliation_inbox(interaction, "123")
 
     view = interaction.followup.messages[0][1]["view"]
     ignore_all = next(child for child in view.children if getattr(child, "label", None) == "Ignore All")
     action_interaction = FakeReviewInteraction()
+    action_interaction.user = SimpleNamespace(id="123")
     await ignore_all.callback(action_interaction)
 
     assert ignored_ids == [42, 43]
-    assert action_interaction.followup.messages[-1][0] == "Ignored `2` bank reconciliation item(s) from this review."
+    assert action_interaction.followup.messages[-1][0] == "Ignored `2` bank reconciliation item(s) from this inbox."
 
 
 @pytest.mark.asyncio
 async def test_bank_digest_records_sent_event_only_after_discord_send(monkeypatch):
     recorded = []
     channel = FakeChannel()
-    client = FakeClient(channel)
+    user = FakeUser()
+    client = FakeClient(channel, user=user)
 
     monkeypatch.setenv("CHANNEL_ID", "123")
     monkeypatch.setattr(bank_reconciliation, "_notification_users", lambda: [("676638528590970917", "<@676638528590970917>")])
@@ -379,12 +409,13 @@ async def test_bank_digest_records_sent_event_only_after_discord_send(monkeypatc
     sent = await bank_reconciliation.send_due_bank_reconciliation_digest(client, today=datetime(2026, 5, 20).date())
 
     assert sent == 1
-    assert channel.messages[0][0] == "public digest\n\u200b"
+    assert channel.messages == []
+    assert user.messages[0][0] == "public digest\n\u200b"
     assert recorded == [
         (
             "676638528590970917",
             "bank_reconciliation_digest_sent",
-            {"digest_date": "2026-05-20", "sent_after": "discord_send"},
+            {"digest_date": "2026-05-20", "sent_after": "discord_dm_send"},
             "Bank reconciliation digest sent for 2026-05-20",
         )
     ]
@@ -418,7 +449,8 @@ async def test_bank_digest_does_not_send_after_morning_window_when_new_items_exi
 @pytest.mark.asyncio
 async def test_bank_digest_does_not_record_sent_event_when_discord_send_fails(monkeypatch):
     recorded = []
-    client = FakeClient(FailingChannel())
+    channel = FakeChannel()
+    client = FakeClient(channel, user=FailingUser())
 
     monkeypatch.setenv("CHANNEL_ID", "123")
     monkeypatch.setattr(bank_reconciliation, "_notification_users", lambda: [("676638528590970917", "<@676638528590970917>")])
@@ -436,7 +468,13 @@ async def test_bank_digest_does_not_record_sent_event_when_discord_send_fails(mo
         lambda *args: recorded.append(args) or True,
     )
 
-    with pytest.raises(RuntimeError, match="discord send failed"):
-        await bank_reconciliation.send_due_bank_reconciliation_digest(client, today=datetime(2026, 5, 20).date())
+    sent = await bank_reconciliation.send_due_bank_reconciliation_digest(client, today=datetime(2026, 5, 20).date())
 
+    assert sent == 0
     assert recorded == []
+    assert channel.messages == [
+        (
+            "<@676638528590970917> I could not send your private bank reconciliation digest. Please check your DM settings.",
+            {},
+        )
+    ]

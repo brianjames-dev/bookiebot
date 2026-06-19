@@ -62,6 +62,12 @@ Decision: Reconciliation digest snooze/reminder functionality should be removed 
 
 Rationale: Snooze created a second digest delivery path that could make reconciliation prompts appear later in the day. Removing it simplifies the lifecycle to daily scheduled sends plus explicit review actions.
 
+## 2026-06-19 - Send Finance Digests By DM
+
+Decision: Reconciliation and bills/subscriptions digests should send detailed finance content to the target user's DM. Reconciliation digest controls should offer `Reconcile Now` and `View Inbox`; list-level `Ignore All` belongs only on the inbox view.
+
+Rationale: DM delivery avoids exposing finance details in shared channels. Keeping `Ignore All` on the inbox list makes the destructive bulk action apply only to the displayed batch, while one-at-a-time reconciliation stays focused on the current transaction.
+
 ## Pending Decisions
 
 - Where should durable system events live: banking database only, Google Sheets only, or dual-write during transition?

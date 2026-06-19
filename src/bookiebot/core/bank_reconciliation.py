@@ -23,6 +23,7 @@ from bookiebot.sheets.routing import (
 from bookiebot.sheets.undo import has_system_event, record_system_event
 from bookiebot.ui.bank_reconciliation import (
     BankReconciliationDigestView,
+    BankReconciliationInboxView,
 )
 
 logger = logging.getLogger(__name__)
@@ -35,6 +36,9 @@ _PERSISTENT_DIGEST_VIEW_REGISTERED = False
 class PreparedBankReconciliationDigest:
     public_message: str
     detail_message: str
+    item_ids: tuple[int, ...] = ()
+    owner_key: str = ""
+    owner_name: str = ""
 
 
 def _bank_reconciliation_enabled() -> bool:
@@ -110,6 +114,35 @@ def _target_channel(client: Any) -> Any | None:
     return None
 
 
+async def _target_user(client: Any, actor_key: str) -> Any | None:
+    try:
+        user_id = int(actor_key)
+    except (TypeError, ValueError):
+        return None
+    get_user = getattr(client, "get_user", None)
+    if callable(get_user):
+        user = get_user(user_id)
+        if user is not None:
+            return user
+    fetch_user = getattr(client, "fetch_user", None)
+    if callable(fetch_user):
+        return await fetch_user(user_id)
+    return None
+
+
+async def _send_user_dm(client: Any, actor_key: str, content: str, **kwargs: Any) -> bool:
+    user = await _target_user(client, actor_key)
+    send = getattr(user, "send", None)
+    if not callable(send):
+        return False
+    try:
+        await send(content, **kwargs)
+        return True
+    except Exception:
+        logger.exception("Failed to send bank reconciliation DM", extra={"actor_key": actor_key})
+        return False
+
+
 def _digest_metadata(current: date) -> dict[str, str]:
     return {"digest_date": current.isoformat()}
 
@@ -119,10 +152,7 @@ async def send_due_bank_reconciliation_digest(client: Any, today: date | None = 
         return 0
     current_time = now_pacific()
 
-    channel = _target_channel(client)
-    if channel is None:
-        logger.warning("Bank reconciliation digest skipped because no target Discord channel was found")
-        return 0
+    fallback_channel = _target_channel(client)
 
     if today is None and not _is_eligible(current_time):
         return 0
@@ -139,12 +169,23 @@ async def send_due_bank_reconciliation_digest(client: Any, today: date | None = 
         )
         if not digest:
             continue
-        await channel.send(f"{digest.public_message}\n\u200b", view=bank_reconciliation_digest_view(actor_key))
+        delivered = await _send_user_dm(
+            client,
+            actor_key,
+            f"{digest.public_message}\n\u200b",
+            view=bank_reconciliation_digest_view(actor_key),
+        )
+        if not delivered:
+            if fallback_channel is not None:
+                await fallback_channel.send(
+                    f"{mention} I could not send your private bank reconciliation digest. Please check your DM settings."
+                )
+            continue
         if not await asyncio.to_thread(
             record_system_event,
             actor_key,
             "bank_reconciliation_digest_sent",
-            {**_digest_metadata(current), "sent_after": "discord_send"},
+            {**_digest_metadata(current), "sent_after": "discord_dm_send"},
             f"Bank reconciliation digest sent for {current.isoformat()}",
         ):
             logger.warning(
@@ -153,6 +194,71 @@ async def send_due_bank_reconciliation_digest(client: Any, today: date | None = 
             )
         sent += 1
     return sent
+
+
+async def _start_bank_reconciliation_from_prompt(interaction: Any, actor_key: str, *, clear_prompt: bool) -> None:
+    if not await _claim_bank_reconciliation_prompt(interaction, actor_key):
+        await interaction.followup.send(
+            content="This reconciliation prompt has already been used. Run `/debug_bank_review` to inspect the current inbox.",
+            ephemeral=True,
+        )
+        return
+    if clear_prompt:
+        await _clear_digest_prompt_buttons(interaction)
+    owner = get_user_config(actor_key)
+    await send_next_bank_reconciliation_item(
+        interaction,
+        owner_key=owner.budget_owner_key,
+        owner_name=owner.name,
+        actor_key=actor_key,
+    )
+
+
+async def _send_bank_reconciliation_inbox(interaction: Any, actor_key: str) -> None:
+    digest = await asyncio.to_thread(
+        prepare_bank_reconciliation_digest_messages,
+        actor_key,
+        f"<@{actor_key}>",
+        now_pacific().date(),
+        mark_sent=False,
+        force=True,
+    )
+    if not digest:
+        await interaction.followup.send(
+            content="Bank reconciliation is all caught up. No unresolved items remain.",
+            ephemeral=True,
+        )
+        return
+
+    async def handle_inbox_action(action_interaction: Any, action: str) -> None:
+        interaction_actor_key = _interaction_actor_key(action_interaction)
+        if interaction_actor_key != str(actor_key):
+            await action_interaction.response.send_message(
+                "This reconciliation inbox belongs to another user.",
+                ephemeral=True,
+            )
+            return
+        await action_interaction.response.defer(ephemeral=True)
+        if action == "start":
+            await _start_bank_reconciliation_from_prompt(action_interaction, actor_key, clear_prompt=False)
+            return
+        if action == "ignore_all":
+            service = build_banking_service()
+            ignored_count = 0
+            for item_id in digest.item_ids:
+                ignored = await asyncio.to_thread(service.ignore_reconciliation_item, digest.owner_key, item_id)
+                if ignored is not None:
+                    ignored_count += 1
+            await action_interaction.followup.send(
+                f"Ignored `{ignored_count}` bank reconciliation item(s) from this inbox.",
+                ephemeral=True,
+            )
+
+    await interaction.followup.send(
+        content=digest.detail_message[:1900],
+        view=BankReconciliationInboxView(handle_inbox_action),
+        ephemeral=True,
+    )
 
 
 def bank_reconciliation_digest_view(actor_key: str) -> BankReconciliationDigestView:
@@ -166,20 +272,10 @@ def bank_reconciliation_digest_view(actor_key: str) -> BankReconciliationDigestV
             return
         await interaction.response.defer(ephemeral=True)
         if action == "start":
-            if not await _claim_bank_reconciliation_prompt(interaction, actor_key):
-                await interaction.followup.send(
-                    content="This reconciliation prompt has already been used. Run `/debug_bank_review` to inspect the current inbox.",
-                    ephemeral=True,
-                )
-                return
-            await _clear_digest_prompt_buttons(interaction)
-            owner = get_user_config(actor_key)
-            await send_next_bank_reconciliation_item(
-                interaction,
-                owner_key=owner.budget_owner_key,
-                owner_name=owner.name,
-                actor_key=actor_key,
-            )
+            await _start_bank_reconciliation_from_prompt(interaction, actor_key, clear_prompt=True)
+            return
+        if action == "inbox":
+            await _send_bank_reconciliation_inbox(interaction, actor_key)
 
     return BankReconciliationDigestView(handle_action, actor_key=str(actor_key))
 
@@ -195,20 +291,10 @@ def persistent_bank_reconciliation_digest_view(actor_key: str) -> BankReconcilia
             return
         await interaction.response.defer(ephemeral=True)
         if action == "start":
-            if not await _claim_bank_reconciliation_prompt(interaction, actor_key):
-                await interaction.followup.send(
-                    content="This reconciliation prompt has already been used. Run `/debug_bank_review` to inspect the current inbox.",
-                    ephemeral=True,
-                )
-                return
-            await _clear_digest_prompt_buttons(interaction)
-            owner = get_user_config(actor_key)
-            await send_next_bank_reconciliation_item(
-                interaction,
-                owner_key=owner.budget_owner_key,
-                owner_name=owner.name,
-                actor_key=actor_key,
-            )
+            await _start_bank_reconciliation_from_prompt(interaction, actor_key, clear_prompt=True)
+            return
+        if action == "inbox":
+            await _send_bank_reconciliation_inbox(interaction, actor_key)
 
     return BankReconciliationDigestView(handle_action, actor_key=str(actor_key))
 
@@ -335,6 +421,9 @@ def prepare_bank_reconciliation_digest_messages(
             sync_error=sync_error,
         ),
         detail_message=format_bank_reconciliation_digest(mention, preview, unresolved, sync_error=sync_error),
+        item_ids=tuple(int(item.id) for item in unresolved),
+        owner_key=owner.budget_owner_key,
+        owner_name=getattr(owner, "name", str(actor_key)),
     )
 
 
@@ -348,8 +437,7 @@ def format_bank_reconciliation_public_prompt(
     verb = "needs" if unresolved_count == 1 else "need"
     lines = [
         f"{mention} bank reconciliation has `{unresolved_count}` {noun} that {verb} review.",
-        "Use the button below to review privately.",
-        "No transaction details are shown in this channel.",
+        "Use `Reconcile Now` to review one transaction at a time, or `View Inbox` to see the full inbox first.",
     ]
     if sync_error:
         lines.append("Bank sync warning: using cached bank data.")

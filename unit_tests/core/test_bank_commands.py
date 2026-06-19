@@ -719,7 +719,6 @@ async def test_bank_reconciliation_detail_view_uses_select_for_multiple_matches(
     assert [getattr(child, "label", None) for child in children[1:]] == [
         "Log",
         "Skip",
-        "Ignore All",
         "Ignore",
         "Show More",
     ]
@@ -749,7 +748,6 @@ async def test_bank_reconciliation_detail_view_keeps_single_match_button():
         "Match schedule ($20.00)",
         "Log",
         "Skip",
-        "Ignore All",
         "Ignore",
         "Show More",
     ]
@@ -775,4 +773,4 @@ async def test_bank_reconciliation_detail_view_hides_match_and_log_for_pending_i
 
     view = BankReconciliationDetailView(candidates, [], noop, session_controls=True, pending=True)
 
-    assert [getattr(child, "label", None) for child in view.children] == ["Skip", "Ignore All", "Ignore", "Show More"]
+    assert [getattr(child, "label", None) for child in view.children] == ["Skip", "Ignore", "Show More"]

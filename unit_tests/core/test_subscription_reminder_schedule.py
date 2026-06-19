@@ -22,12 +22,29 @@ class FailingChannel:
         raise RuntimeError("discord send failed")
 
 
+class FakeUser:
+    def __init__(self):
+        self.messages = []
+
+    async def send(self, content, **_kwargs):
+        self.messages.append(content)
+
+
+class FailingUser:
+    async def send(self, content, **_kwargs):
+        raise RuntimeError("discord dm failed")
+
+
 class FakeClient:
-    def __init__(self, channel):
+    def __init__(self, channel, *, user=None):
         self.channel = channel
+        self.user = user
 
     def get_channel(self, _channel_id):
         return self.channel
+
+    def get_user(self, _user_id):
+        return self.user
 
 
 def test_reminder_is_not_eligible_before_configured_hour(monkeypatch):
@@ -331,7 +348,8 @@ async def test_digest_includes_items_with_existing_per_item_audit_rows(monkeypat
         ],
     )
     channel = FakeChannel()
-    client = FakeClient(channel)
+    user = FakeUser()
+    client = FakeClient(channel, user=user)
     monkeypatch.setenv("CHANNEL_ID", "123")
     monkeypatch.setattr(
         subscription_reminders,
@@ -343,17 +361,19 @@ async def test_digest_includes_items_with_existing_per_item_audit_rows(monkeypat
         sent = await subscription_reminders.send_due_subscription_reminders(client, today=date(2026, 5, 15))
 
     assert sent == 3
-    assert len(channel.messages) == 1
-    assert "`Railway - $5.00 - May 15`" in channel.messages[0]
-    assert "`Raycast - $10.00 - May 19`" in channel.messages[0]
-    assert "`ChatGPT - $20.00 - May 21`" in channel.messages[0]
+    assert channel.messages == []
+    assert len(user.messages) == 1
+    assert "`Railway - $5.00 - May 15`" in user.messages[0]
+    assert "`Raycast - $10.00 - May 19`" in user.messages[0]
+    assert "`ChatGPT - $20.00 - May 21`" in user.messages[0]
 
 
 @pytest.mark.asyncio
 async def test_subscription_digest_records_sent_events_only_after_discord_send(monkeypatch):
     recorded = []
     channel = FakeChannel()
-    client = FakeClient(channel)
+    user = FakeUser()
+    client = FakeClient(channel, user=user)
     event = subscription_reminders.PendingSystemEvent(
         actor_key="676638528590970917",
         event_type="cash_pull_digest_sent",
@@ -383,7 +403,8 @@ async def test_subscription_digest_records_sent_events_only_after_discord_send(m
     sent = await subscription_reminders.send_due_subscription_reminders(client, today=date(2026, 5, 15))
 
     assert sent == 1
-    assert channel.messages == ["digest"]
+    assert channel.messages == []
+    assert user.messages == ["digest"]
     assert recorded == [
         (
             "676638528590970917",
@@ -397,7 +418,8 @@ async def test_subscription_digest_records_sent_events_only_after_discord_send(m
 @pytest.mark.asyncio
 async def test_subscription_digest_does_not_record_sent_event_when_discord_send_fails(monkeypatch):
     recorded = []
-    client = FakeClient(FailingChannel())
+    channel = FakeChannel()
+    client = FakeClient(channel, user=FailingUser())
     event = subscription_reminders.PendingSystemEvent(
         actor_key="676638528590970917",
         event_type="cash_pull_digest_sent",
@@ -421,7 +443,10 @@ async def test_subscription_digest_does_not_record_sent_event_when_discord_send_
         lambda *args: recorded.append(args) or True,
     )
 
-    with pytest.raises(RuntimeError, match="discord send failed"):
-        await subscription_reminders.send_due_subscription_reminders(client, today=date(2026, 5, 15))
+    sent = await subscription_reminders.send_due_subscription_reminders(client, today=date(2026, 5, 15))
 
+    assert sent == 0
     assert recorded == []
+    assert channel.messages == [
+        "<@676638528590970917> I could not send your private bills and subscriptions digest. Please check your DM settings."
+    ]

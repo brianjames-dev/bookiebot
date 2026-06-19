@@ -280,18 +280,6 @@ async def send_bank_reconciliation_detail(
                 await continue_session(action_interaction)
                 return
 
-            if action == "ignore_all":
-                ignored_count = 0
-                for item_id in sorted(session_scope - skipped):
-                    ignored = await asyncio.to_thread(service.ignore_reconciliation_item, owner_key, item_id)
-                    if ignored is not None:
-                        ignored_count += 1
-                await action_interaction.followup.send(
-                    f"Ignored `{ignored_count}` bank reconciliation item(s) from this review.",
-                    ephemeral=True,
-                )
-                return
-
             if action == "ignore":
                 ignored = await asyncio.to_thread(service.ignore_reconciliation_item, owner_key, reconciliation_id)
                 if ignored is None:

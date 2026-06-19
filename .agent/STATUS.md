@@ -36,6 +36,9 @@ Harden the recent transactions flow where a user chooses a logged action and upd
 - Reconciliation digest channel messages now show only a generic count/summary and instruct the target user to review privately.
 - Daily reconciliation digest eligibility is now limited to the configured morning send window instead of any time after the send hour.
 - Added regression tests proving after-window Plaid/new-item availability does not post a daily digest later in the day.
+- Reconciliation digests now send by DM with `Reconcile Now` and `View Inbox` controls.
+- Reconciliation `Ignore All` now lives only on the inbox list view, not on each individual transaction review.
+- Bills and subscriptions digests now send by DM instead of posting cash-pull details to the shared channel.
 
 ## Current Notes
 
@@ -86,10 +89,14 @@ Use a test row or low-risk real row in Discord:
 16. Have another user try to operate on a recent-action component from your workflow if a stale/public component exists.
    - Expected: the bot says the workflow belongs to another user and does not mutate anything.
 17. Let the scheduled reconciliation digest post in the morning window.
-   - Expected: the channel message shows only the unresolved item count and says to review privately, with no transaction names or row details.
-18. Click `Reconcile Now` on the digest.
-   - Expected: the detailed bank transaction review appears ephemerally to the target user.
-19. Trigger or wait for a Plaid sync after the morning window.
+   - Expected: the digest appears in the target user's DM with `Reconcile Now` and `View Inbox`.
+18. Click `View Inbox` on the reconciliation digest.
+   - Expected: the DM/private inbox list shows unresolved transactions with `Reconcile Now` and `Ignore All`.
+19. Click `Reconcile Now` from either the digest or inbox view.
+   - Expected: the one-at-a-time transaction review appears, and individual transaction cards do not include `Ignore All`.
+20. Let the scheduled bills/subscriptions digest run.
+   - Expected: cash-pull details appear in the target user's DM, not the shared channel.
+21. Trigger or wait for a Plaid sync after the morning window.
    - Expected: new unresolved items do not cause a daily digest to appear in the channel later that day.
 
 ## Verification Baseline
