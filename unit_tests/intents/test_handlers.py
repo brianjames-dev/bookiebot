@@ -886,6 +886,20 @@ def test_pending_update_field_expires_and_clears_notice(monkeypatch):
     assert undo.pop_pending_action_expiration_notice("user-1") is None
 
 
+@pytest.mark.asyncio
+async def test_recent_action_component_views_use_five_minute_timeout():
+    async def noop(*_args):
+        return None
+
+    assert ih.RecentActionDecisionView(noop).timeout == 300
+    assert ih.UpdateConfirmView(noop).timeout == 300
+    assert ih.UpdateFieldView(["amount", "item", "location"], noop).timeout == 300
+    assert ih.DeleteConfirmView(noop).timeout == 300
+    assert ih.MoveConfirmView(noop).timeout == 300
+    assert ih.MoveCategoryView(noop).timeout == 300
+    assert ih.PersonSelectView(noop).timeout == 300
+
+
 def test_pending_move_item_expires_and_clears_notice(monkeypatch):
     import bookiebot.sheets.undo as undo
 

@@ -20,7 +20,7 @@ Task execution and documentation update rules live in `.Agents`.
 4. Deleting a moved action can leave source/destination lineage difficult to reason about unless the canonical sheet row is resolved first.
 5. The UI does not expose date updates, even though parser and update entities include `date`.
 6. Pending selections live only in process memory, so deploys, restarts, or long pauses lose context.
-7. Component views time out after 120 seconds while pending text state may still exist.
+7. Component views time out after 120 seconds while pending text state may still exist. Fixed 2026-06-18.
 8. Income, Need expenses, payments, and savings appear in recent actions but have inconsistent edit/move/delete capabilities.
 9. Match-text search only checks the latest 10 recent actions, so targeted commands can miss older actions.
 10. Reconciled actions can be updated, moved, deleted, or undone without updating/reopening reconciliation state.
@@ -94,6 +94,9 @@ Status: Complete for active recent-action lineages as of 2026-06-18.
 - Recent-action lists, candidate prompts, mutation prompts, and mutation results now send privately to the requesting user when Discord DMs are available.
 - Recent-action component responses are ephemeral, and controls reject users other than the original actor.
 - Added regression tests for private recent-action delivery and non-owner interaction rejection.
+- DM replies to recent-action update prompts now route through pending update-field handling even when the bot is restricted to the configured public channel.
+- Recent-action component view timeouts now match the 300-second pending-state TTL.
+- Added regression tests for DM update-field replies and five-minute component view timeouts.
 - Reconciliation digest channel messages now show a generic unresolved-item count instead of transaction details; detailed review remains ephemeral after `Reconcile Now`.
 - Daily reconciliation digest eligibility is now bounded to the configured morning send window, preventing newly synced Plaid items from causing a normal daily digest later in the day.
 - Added regression tests for the public digest prompt, morning send window, and after-window Plaid/new-item no-send behavior.

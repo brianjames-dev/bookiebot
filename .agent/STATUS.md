@@ -30,6 +30,9 @@ Harden the recent transactions flow where a user chooses a logged action and upd
 - Recent-action lists, candidate prompts, mutation prompts, and mutation results now send privately to the requesting user when Discord DMs are available.
 - Recent-action component responses are now ephemeral, and controls reject interactions from users other than the original actor.
 - Added regression tests for private recent-action delivery and non-owner interaction rejection.
+- DM replies to recent-action update prompts are now accepted even when BookieBot is restricted to a configured public channel.
+- Recent-action component view timeouts now match the 300-second pending-state TTL.
+- Added regression tests for DM update-field replies and five-minute component view timeouts.
 - Reconciliation digest channel messages now show only a generic count/summary and instruct the target user to review privately.
 - Daily reconciliation digest eligibility is now limited to the configured morning send window instead of any time after the send hour.
 - Added regression tests proving after-window Plaid/new-item availability does not post a daily digest later in the day.
@@ -78,13 +81,15 @@ Use a test row or low-risk real row in Discord:
    - Expected: the transaction list appears in your DM, while the channel only receives a generic acknowledgement.
 14. Click a recent-action control from the DM workflow.
    - Expected: follow-up prompts/results are only visible to you.
-15. Have another user try to operate on a recent-action component from your workflow if a stale/public component exists.
+15. Select `Update`, choose `Item`, `Amount`, or `Location`, then reply in the DM with the new value.
+   - Expected: the selected transaction updates and the reply is not ignored or routed to unrelated intent parsing.
+16. Have another user try to operate on a recent-action component from your workflow if a stale/public component exists.
    - Expected: the bot says the workflow belongs to another user and does not mutate anything.
-16. Let the scheduled reconciliation digest post in the morning window.
+17. Let the scheduled reconciliation digest post in the morning window.
    - Expected: the channel message shows only the unresolved item count and says to review privately, with no transaction names or row details.
-17. Click `Reconcile Now` on the digest.
+18. Click `Reconcile Now` on the digest.
    - Expected: the detailed bank transaction review appears ephemerally to the target user.
-18. Trigger or wait for a Plaid sync after the morning window.
+19. Trigger or wait for a Plaid sync after the morning window.
    - Expected: new unresolved items do not cause a daily digest to appear in the channel later that day.
 
 ## Verification Baseline
@@ -106,7 +111,7 @@ python -m pytest unit_tests/banking/test_reconciliation.py unit_tests/banking/te
 # 80 passed
 
 python -m pytest unit_tests/intents/test_handlers.py unit_tests/core/test_message_router.py -q
-# 98 passed
+# 100 passed
 
 python -m pyright
 # Did not run: pyright is not installed in the current Python environment.

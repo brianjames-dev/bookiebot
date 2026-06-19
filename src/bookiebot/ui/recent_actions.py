@@ -41,13 +41,13 @@ class RecentActionSelect(SelectBase):  # type: ignore[misc]
 
 class RecentActionSelectView(ViewBase):  # type: ignore[misc]
     def __init__(self, actions: list[LoggedAction], callback_func: Callable):
-        super().__init__(timeout=120)
+        super().__init__(timeout=300)
         self.add_item(RecentActionSelect(actions, callback_func))
 
 
 class RecentActionDecisionView(ViewBase):  # type: ignore[misc]
     def __init__(self, callback_func: Callable, capabilities: ActionCapabilities | None = None):
-        super().__init__(timeout=120)
+        super().__init__(timeout=300)
         if capabilities is None or capabilities.can_update:
             self.add_item(RecentActionButton("Update", "update", callback_func))
         if capabilities is None or capabilities.can_move:
@@ -59,35 +59,35 @@ class RecentActionDecisionView(ViewBase):  # type: ignore[misc]
 
 class DeleteConfirmView(ViewBase):  # type: ignore[misc]
     def __init__(self, callback_func: Callable):
-        super().__init__(timeout=120)
+        super().__init__(timeout=300)
         self.add_item(RecentActionButton("Confirm Delete", "confirm_delete", callback_func))
         self.add_item(RecentActionButton("Cancel", "cancel", callback_func))
 
 
 class MoveConfirmView(ViewBase):  # type: ignore[misc]
     def __init__(self, callback_func: Callable):
-        super().__init__(timeout=120)
+        super().__init__(timeout=300)
         self.add_item(RecentActionButton("Confirm Move", "confirm_move", callback_func))
         self.add_item(RecentActionButton("Cancel", "cancel", callback_func))
 
 
 class UpdateConfirmView(ViewBase):  # type: ignore[misc]
     def __init__(self, callback_func: Callable):
-        super().__init__(timeout=120)
+        super().__init__(timeout=300)
         self.add_item(RecentActionButton("Confirm Update", "confirm_update", callback_func))
         self.add_item(RecentActionButton("Cancel", "cancel", callback_func))
 
 
 class MoveCategoryView(ViewBase):  # type: ignore[misc]
     def __init__(self, callback_func: Callable):
-        super().__init__(timeout=120)
+        super().__init__(timeout=300)
         for category in ["Grocery", "Gas", "Food", "Shopping"]:
             self.add_item(RecentActionButton(category, category.lower(), callback_func))
 
 
 class UpdateFieldView(ViewBase):  # type: ignore[misc]
     def __init__(self, fields: list[str], callback_func: Callable):
-        super().__init__(timeout=120)
+        super().__init__(timeout=300)
         labels = {
             "amount": "Amount",
             "item": "Item",
@@ -115,5 +115,5 @@ class PersonSelect(SelectBase):  # type: ignore[misc]
 
 class PersonSelectView(ViewBase):  # type: ignore[misc]
     def __init__(self, callback_func: Callable):
-        super().__init__(timeout=120)
+        super().__init__(timeout=300)
         self.add_item(PersonSelect(callback_func))

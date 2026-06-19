@@ -288,11 +288,13 @@ def register_events(client, tree):
         if message.author == client.user:
             return
 
+        channel = getattr(message, "channel", None)
+        is_dm = getattr(channel, "guild", None) is None
         if config.CHANNEL_ID:
-            if message.channel.id != config.CHANNEL_ID:
+            if not is_dm and message.channel.id != config.CHANNEL_ID:
                 return
         else:
-            if message.channel.name != config.CHANNEL_NAME:
+            if not is_dm and getattr(message.channel, "name", None) != config.CHANNEL_NAME:
                 return
 
         content = message.content.strip()
@@ -302,7 +304,7 @@ def register_events(client, tree):
                 "text": content,
                 "user": str(message.author),
                 "user_id": str(message.author.id),
-                "channel": message.channel.name,
+                "channel": getattr(message.channel, "name", "dm"),
             },
         )
 
