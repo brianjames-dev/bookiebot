@@ -268,7 +268,6 @@ async def _send_recent_private_message(message: Any, content: str, **kwargs: Any
         except Exception:
             await message.channel.send("❌ I could not send that recent transaction workflow privately. Please check your DM settings.")
             return
-        await message.channel.send("I sent your recent transaction workflow privately.")
         return
     await message.channel.send(content, **kwargs)
 

@@ -217,7 +217,7 @@ async def test_query_recent_actions_sends_transaction_list_privately(monkeypatch
         )
         await ih.handle_intent("query_recent_actions", {"n": 5}, message)
 
-    assert any("I sent your recent transaction workflow privately." == (msg or "") for msg, _ in message.channel.sent)
+    assert not any("recent transaction workflow privately" in (msg or "") for msg, _ in message.channel.sent)
     assert not any("Burrito" in (msg or "") for msg, _ in message.channel.sent)
     recent_dm, kwargs = author.dm_sent[-1]
     assert "Burrito" in (recent_dm or "")
