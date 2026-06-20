@@ -4,13 +4,15 @@ Last updated: 2026-06-20
 
 ## Active Focus
 
-Grouped reconciliation amount mismatch handling is now in verification/manual-test mode.
+Recent transactions and reconciliation are in manual verification mode after the latest reliability fixes.
 
 ## On Deck
 
-1. Keep structured reconciliation event logging deferred unless Railway/app logs prove insufficient for debugging.
-2. Revisit reconciliation state-machine cleanup only if current statuses become confusing again.
-3. Consider a richer Discord button flow for grouped amount adjustments if the debug command path feels too manual.
+1. Manually verify recent transactions and reconciliation after the latest reliability fixes.
+2. Consider a richer Discord button flow for grouped amount adjustments if the current UX feels too manual.
+3. Harden recent-action pending state across restarts/deploys, since selections currently live only in process memory.
+4. Improve targeted recent-action search so commands can find older matches, not only the latest 10 recent actions.
+5. Explore clarifying questions before logging when BookieBot is uncertain instead of guessing or silently failing.
 
 ## Completed 2026-06-20
 
