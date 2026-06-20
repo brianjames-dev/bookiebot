@@ -1,6 +1,7 @@
 # all intent handlers
 from contextlib import asynccontextmanager
 import os
+import re
 from collections.abc import AsyncIterator
 
 # Disable discord voice/audio stack to avoid loading audioop (deprecated in Python 3.13)
@@ -257,10 +258,15 @@ async def query_recent_actions_handler(entities: IntentEntities, message: Any) -
         output = format_recent_action_list(actions)
 
     view = _recent_action_select_view(actor_key, actions) if actions else None
-    await _send_recent_private_message(message, _with_component_spacer(output, view), view=view)
+    await _send_recent_private_message(
+        message,
+        _with_component_spacer(output, view),
+        view=view,
+        public_ack="I sent your recent transactions list to your DMs.",
+    )
 
 
-async def _send_recent_private_message(message: Any, content: str, **kwargs: Any) -> None:
+async def _send_recent_private_message(message: Any, content: str, public_ack: str | None = None, **kwargs: Any) -> None:
     chunks = _discord_message_chunks(content)
     author_send = getattr(getattr(message, "author", None), "send", None)
     if callable(author_send):
@@ -271,6 +277,8 @@ async def _send_recent_private_message(message: Any, content: str, **kwargs: Any
         except Exception:
             await message.channel.send("❌ I could not send that recent transaction workflow privately. Please check your DM settings.")
             return
+        if public_ack:
+            await message.channel.send(public_ack)
         return
     for index, chunk in enumerate(chunks):
         chunk_kwargs = kwargs if index == len(chunks) - 1 else {}
@@ -280,25 +288,91 @@ async def _send_recent_private_message(message: Any, content: str, **kwargs: Any
 def _discord_message_chunks(content: str, *, max_chars: int = 1900) -> list[str]:
     if len(content) <= max_chars:
         return [content]
+    blocks = _recent_transaction_message_blocks(content)
+    if len(blocks) > 1:
+        return _discord_block_chunks(blocks, max_chars=max_chars)
+    return _discord_line_chunks(content, max_chars=max_chars)
+
+
+def _recent_transaction_message_blocks(content: str) -> list[str]:
+    blocks: list[str] = []
+    current: list[str] = []
+    in_code_block = False
+    saw_transaction = False
+
+    for line in content.splitlines():
+        starts_transaction = bool(re.match(r"^\d+\.\s", line)) and not in_code_block
+        starts_footer = line.startswith("Type `show more`") and not in_code_block
+        if (starts_transaction or starts_footer) and current:
+            blocks.append("\n".join(current))
+            current = []
+        if starts_transaction:
+            saw_transaction = True
+        current.append(line)
+        if line.strip() == "```":
+            in_code_block = not in_code_block
+
+    if current:
+        blocks.append("\n".join(current))
+    return blocks if saw_transaction else [content]
+
+
+def _discord_block_chunks(blocks: list[str], *, max_chars: int) -> list[str]:
+    chunks: list[str] = []
+    current = ""
+
+    for block in blocks:
+        if len(block) > max_chars:
+            if current:
+                chunks.append(current)
+                current = ""
+            chunks.extend(_discord_line_chunks(block, max_chars=max_chars))
+            continue
+        candidate = block if not current else f"{current}\n{block}"
+        if len(candidate) > max_chars:
+            if current:
+                chunks.append(current)
+            current = block
+        else:
+            current = candidate
+
+    if current:
+        chunks.append(current)
+    return chunks or [""]
+
+
+def _discord_line_chunks(content: str, *, max_chars: int) -> list[str]:
     chunks: list[str] = []
     current: list[str] = []
     current_len = 0
+    in_code_block = False
+
+    def flush_current() -> None:
+        nonlocal current, current_len
+        if not current:
+            return
+        chunk_lines = list(current)
+        if in_code_block:
+            chunk_lines.append("```")
+        chunks.append("\n".join(chunk_lines))
+        current = ["```"] if in_code_block else []
+        current_len = 4 if in_code_block else 0
+
     for line in content.splitlines():
         line_len = len(line) + 1
-        if current and current_len + line_len > max_chars:
-            chunks.append("\n".join(current))
-            current = []
-            current_len = 0
+        fence_margin = 4 if in_code_block else 0
+        if current and current_len + line_len + fence_margin > max_chars:
+            flush_current()
         if line_len > max_chars:
             if current:
-                chunks.append("\n".join(current))
-                current = []
-                current_len = 0
+                flush_current()
             for start in range(0, len(line), max_chars):
                 chunks.append(line[start : start + max_chars])
             continue
         current.append(line)
         current_len += line_len
+        if line.strip() == "```":
+            in_code_block = not in_code_block
     if current:
         chunks.append("\n".join(current))
     return chunks or [""]

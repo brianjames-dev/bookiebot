@@ -211,6 +211,7 @@ Status: Complete first pass as of 2026-06-20. Existing-row match confirmation up
 
 - One-word `recent` now routes directly to recent actions before LLM parsing, preventing misclassification into unrelated logging flows.
 - Expense sheet access during logging now retries once before returning a user-facing sheet access failure.
+- Large recent-action DM lists now split on complete transaction blocks, keep Markdown code fences balanced, attach controls to the final DM, and acknowledge successful private delivery in the public channel.
 
 ### Slice 6 - Simplify Module Boundaries
 

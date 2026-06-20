@@ -31,7 +31,7 @@ Grouped reconciliation amount mismatch handling is now in verification/manual-te
 - One-word `recent` now routes directly to recent transactions instead of falling through to LLM parsing.
 - Expense sheet access now retries once before failing, which protects normal expense logging from a transient Google Sheets access miss.
 - Updated income recent-action rows now display as income and keep the amount/source in the correct fields after source-only updates.
-- Large recent-action DM lists are now split into Discord-safe chunks, with controls attached to the final chunk.
+- Large recent-action DM lists are now split into Discord-safe chunks by complete transaction blocks, with controls attached to the final chunk and a generic channel acknowledgement after successful DM delivery.
 
 ## Completed 2026-06-18
 
@@ -152,8 +152,8 @@ Use a test row or low-risk real row in Discord:
    - Expected: BookieBot retries once before reporting a sheet access failure.
 36. Update only the source/name on a recent income row, then run `recent`.
    - Expected: the row displays as `Updated: Income` and still shows the original amount with the updated source.
-37. Run `show 20 recent transactions` or `show 25 recent transactions`.
-   - Expected: BookieBot sends the list privately across multiple DM messages instead of failing with a DM-settings error due to message length.
+37. Run `show 15 recent transactions`, `show 20 recent transactions`, or `show 25 recent transactions`.
+   - Expected: BookieBot sends the list privately across multiple DM messages, each transaction stays within a single DM message, code blocks render cleanly, controls appear on the final DM, and the public channel gets a generic sent-to-DMs acknowledgement.
 
 ## Verification Baseline
 
@@ -168,7 +168,7 @@ Latest verification:
 
 ```bash
 python -m pytest unit_tests -q
-# 325 passed
+# 326 passed
 
 python -m pytest unit_tests/banking/test_reconciliation.py unit_tests/banking/test_store.py unit_tests/core/test_bank_reconciliation.py -q
 # 81 passed

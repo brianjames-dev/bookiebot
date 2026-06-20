@@ -254,8 +254,37 @@ async def test_query_recent_actions_chunks_large_private_list(monkeypatch):
     assert len(author.dm_sent) > 1
     assert all(len(content or "") <= 1900 for content, _kwargs in author.dm_sent)
     assert not any("recent transaction workflow privately" in (msg or "") for msg, _ in message.channel.sent)
+    assert ("I sent your recent transactions list to your DMs.", {}) in message.channel.sent
     assert author.dm_sent[-1][1].get("view") is not None
     assert all(not kwargs.get("view") for _content, kwargs in author.dm_sent[:-1])
+    assert all((content or "").count("```") % 2 == 0 for content, _kwargs in author.dm_sent)
+
+
+def test_discord_message_chunks_keep_code_fences_balanced():
+    lines = ["Recent logged actions I can work with:"]
+    for index in range(1, 18):
+        lines.extend(
+            [
+                f"{index}. Food Expense",
+                "```",
+                "   Date: 6/16/2026",
+                f"   Item: Long item name {index}",
+                "   Location: Salt and Straw",
+                "   Amount: $6.95",
+                "   Person: Brian (BofA)",
+                "```",
+            ]
+        )
+    lines.append("Type `show more` to see older transactions.")
+
+    chunks = ih._discord_message_chunks("\n".join(lines), max_chars=900)
+
+    assert len(chunks) > 1
+    assert all(chunk.count("```") % 2 == 0 for chunk in chunks)
+    for index in range(1, 18):
+        title_chunk = next(chunk for chunk in chunks if f"{index}. Food Expense" in chunk)
+        detail_chunk = next(chunk for chunk in chunks if f"Long item name {index}" in chunk)
+        assert title_chunk == detail_chunk
 
 
 @pytest.mark.asyncio
