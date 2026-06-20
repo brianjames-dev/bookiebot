@@ -817,6 +817,9 @@ def _field_columns_for_action(action: UndoAction) -> dict[str, int]:
                 for field, col_letter in get_category_columns[category]["columns"].items()
             }
 
+    if action.metadata.get("type") == "income":
+        return {"source": 2, "amount": 3}
+
     if action.metadata.get("type") in {"payment", "savings"}:
         return {"amount": action.columns[0]} if action.columns else {}
 
@@ -838,10 +841,14 @@ def action_capabilities(action: UndoAction) -> ActionCapabilities:
     can_move = action.worksheet == "expense" and action_type in {"expense", "update", "move"} and bool(action.metadata.get("category"))
     move_reason = "" if can_move else "I can only move normal expense rows between categories right now."
 
-    can_delete = action.worksheet == "expense" and action_type in {"expense", "update", "move"} and bool(action.metadata.get("category"))
+    can_delete = (
+        action.worksheet == "expense"
+        and action_type in {"expense", "update", "move"}
+        and bool(action.metadata.get("category"))
+    ) or (action.worksheet == "income" and action_type == "income" and action.kind == "delete_row")
     if not can_delete:
         if action_type == "income":
-            delete_reason = "I cannot delete income rows from recent transactions yet. Use undo if this was the last logged action."
+            delete_reason = "I cannot delete that income row from recent transactions yet. Use undo if this was the last logged action."
         elif action_type == "need_expense":
             delete_reason = "I cannot delete Need expenses from recent transactions yet. Use undo if this was the last logged action."
         elif action_type in {"payment", "savings"}:

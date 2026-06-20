@@ -93,6 +93,7 @@ class UpdateFieldView(ViewBase):  # type: ignore[misc]
             "item": "Item",
             "location": "Location",
             "person": "Person",
+            "source": "Source",
         }
         for field in fields:
             if field in labels:

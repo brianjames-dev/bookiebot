@@ -70,6 +70,18 @@ IntentEntities = dict[str, Any]
 IntentHandler = Callable[[IntentEntities, Any], Awaitable[None]]
 
 
+def _pie_result_parts(pie_result: Any) -> tuple[list[Any], list[Any], list[Any]]:
+    if isinstance(pie_result, tuple):
+        wedges = list(pie_result[0]) if len(pie_result) > 0 else []
+        texts = list(pie_result[1]) if len(pie_result) > 1 else []
+        autotexts = list(pie_result[2]) if len(pie_result) > 2 else []
+        return wedges, texts, autotexts
+    wedges = list(getattr(pie_result, "patches", []) or [])
+    texts = list(getattr(pie_result, "texts", []) or [])
+    autotexts = list(getattr(pie_result, "autotexts", []) or [])
+    return wedges, texts, autotexts
+
+
 @asynccontextmanager
 async def _maybe_typing(message: Any, intent: str) -> AsyncIterator[None]:
     channel = getattr(message, "channel", None)
@@ -598,7 +610,7 @@ async def update_recent_action_handler(entities: IntentEntities, message: Any) -
     if not isinstance(updates, dict):
         updates = {}
 
-    for field in ("amount", "location", "item", "person", "date"):
+    for field in ("amount", "location", "item", "person", "date", "source"):
         if field in entities and field not in updates:
             updates[field] = entities[field]
     has_update_values = any(value not in (None, "") for value in updates.values())
@@ -651,7 +663,7 @@ async def move_recent_action_handler(entities: IntentEntities, message: Any) -> 
     updates = entities.get("updates") or {}
     if not isinstance(updates, dict):
         updates = {}
-    for field in ("amount", "location", "item", "person", "date"):
+    for field in ("amount", "location", "item", "person", "date", "source"):
         if field in entities and field not in updates:
             updates[field] = entities[field]
 
@@ -914,6 +926,10 @@ async def query_expense_breakdown_handler(entities, message):
         amounts.append(amt)
         lines.append(f"{category.capitalize()}: ${amt:.2f} ({pct:.2f}%)")
 
+    if not amounts:
+        await message.channel.send("❌ Could not calculate expense breakdown.")
+        return
+
     people_str = ", ".join(persons)
     grand_total = breakdown["grand_total"]
 
@@ -941,9 +957,7 @@ async def query_expense_breakdown_handler(entities, message):
         textprops={'fontsize': 10}
     )
 
-    wedges = pie_result[0]
-    texts = pie_result[1] if len(pie_result) > 1 else []
-    autotexts = pie_result[2] if len(pie_result) > 2 else []
+    _wedges, _texts, autotexts = _pie_result_parts(pie_result)
 
     for autotext in autotexts:
         autotext.set_fontsize(11)

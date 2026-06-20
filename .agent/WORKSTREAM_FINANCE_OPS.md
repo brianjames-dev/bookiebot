@@ -86,8 +86,9 @@ Status: Complete for active recent-action lineages as of 2026-06-18.
 - Delete undo now reactivates all action IDs recorded for that deleted lineage.
 - Added regression tests for moving updated expenses, moving already moved expenses, deleting updated expenses, and deleting moved expenses.
 - Added explicit recent-action capabilities and wired the selected-transaction controls to hide unsupported operations.
-- Added clearer unsupported-operation reasons for income, Need expenses, payments, and savings.
-- Added regression tests for expense capabilities, unsupported action capabilities, button visibility, and unsupported income deletion.
+- Added clearer unsupported-operation reasons for Need expenses, payments, savings, and other unsupported cases.
+- Income rows can now be updated for source/amount and deleted from recent transactions.
+- Added regression tests for expense capabilities, unsupported action capabilities, button visibility, income update, and income deletion.
 - Added TTL-backed pending state for recent-action selections, update-field prompts, and move-item prompts.
 - Expired pending replies now clear state and return a clear expired-selection message instead of falling through to intent routing or current recent-action indexes.
 - Added regression tests for expired delete selections, update-field prompts, move-item prompts, and router numeric replies.

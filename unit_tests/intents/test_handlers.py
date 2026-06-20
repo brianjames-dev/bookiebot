@@ -355,14 +355,24 @@ async def test_recent_action_capabilities_make_unsupported_operations_explicit()
         description="1st savings deposit $200",
     )
 
-    for action in (income, need):
-        capabilities = action_capabilities(action)
-        assert capabilities.can_update is False
-        assert capabilities.can_move is False
-        assert capabilities.can_delete is False
-        labels = [getattr(child, "label", "") for child in getattr(RecentActionDecisionView(lambda *_args: None, capabilities), "children", [])]
-        assert labels == ["Cancel"]
-        assert capabilities.delete_reason
+    income_capabilities = action_capabilities(income)
+    assert income_capabilities.can_update is True
+    assert income_capabilities.editable_fields == ["source", "amount"]
+    assert income_capabilities.can_move is False
+    assert income_capabilities.can_delete is True
+    income_labels = [
+        getattr(child, "label", "")
+        for child in getattr(RecentActionDecisionView(lambda *_args: None, income_capabilities), "children", [])
+    ]
+    assert income_labels == ["Update", "Delete", "Cancel"]
+
+    capabilities = action_capabilities(need)
+    assert capabilities.can_update is False
+    assert capabilities.can_move is False
+    assert capabilities.can_delete is False
+    labels = [getattr(child, "label", "") for child in getattr(RecentActionDecisionView(lambda *_args: None, capabilities), "children", [])]
+    assert labels == ["Cancel"]
+    assert capabilities.delete_reason
 
     for action in (payment, savings):
         capabilities = action_capabilities(action)
@@ -376,7 +386,32 @@ async def test_recent_action_capabilities_make_unsupported_operations_explicit()
 
 
 @pytest.mark.asyncio
-async def test_delete_recent_income_returns_clear_unsupported_reason(message):
+async def test_update_recent_income_changes_source_and_amount(message):
+    repo = SheetsRepoStub(income_rows=[["", "Existing Income", "100"], ["", "Monthly Income:", ""]])
+
+    with repo.patched():
+        await ih.handle_intent(
+            "log_income",
+            {"type": "income", "amount": 1639.9, "source": "Sonic"},
+            message,
+        )
+        await ih.handle_intent(
+            "update_recent_action",
+            {"index": 1, "updates": {"source": "xAI", "amount": 2977.16}},
+            message,
+        )
+
+        assert repo.income.cell(1, 2).value == "xAI"
+        assert repo.income.cell(1, 3).value == "$2977.16"
+
+        await ih.handle_intent("undo_last_transaction", {}, message)
+
+        assert repo.income.cell(1, 2).value == "Sonic"
+        assert repo.income.cell(1, 3).value == "1639.9"
+
+
+@pytest.mark.asyncio
+async def test_delete_recent_income_removes_logged_income_row(message):
     repo = SheetsRepoStub(income_rows=[["", "Existing Income", "100"], ["", "Monthly Income:", ""]])
 
     with repo.patched():
@@ -387,11 +422,9 @@ async def test_delete_recent_income_returns_clear_unsupported_reason(message):
         )
         await ih.handle_intent("delete_recent_action", {"index": 1}, message)
 
-    reply = message.channel.sent[-1][0] or ""
-    assert "I cannot delete income rows from recent transactions yet" in reply
-    assert "Use undo if this was the last logged action" in reply
-    assert repo.income.cell(1, 2).value == "Sonic"
-    assert repo.income.cell(1, 3).value == "1639.9"
+    assert repo.income.cell(1, 2).value == "Existing Income"
+    assert repo.income.cell(1, 3).value == "100"
+    assert any("Deleted: income $1639.9 from Sonic" in (msg or "") for msg, _ in message.channel.sent)
 
 
 @pytest.mark.asyncio
@@ -1350,6 +1383,36 @@ async def test_query_expense_breakdown(monkeypatch, message):
     monkeypatch.setattr(ih.su, "expense_breakdown_percentages", AsyncMock(return_value={}))
 
     await ih.handle_intent("query_expense_breakdown_percentages", {}, message)
+
+    assert any("could not calculate expense breakdown".lower() in (msg or "").lower() for msg, _ in message.channel.sent)
+
+
+def test_pie_result_parts_handles_container_without_len():
+    class FakePieContainer:
+        patches = ["wedge"]
+        texts = ["label"]
+        autotexts = ["percent"]
+
+    assert ih._pie_result_parts(FakePieContainer()) == (["wedge"], ["label"], ["percent"])
+
+
+@pytest.mark.asyncio
+async def test_query_expense_breakdown_handles_zero_categories(monkeypatch, message):
+    monkeypatch.setattr(
+        ih.su,
+        "expense_breakdown_percentages",
+        AsyncMock(
+            return_value={
+                "grand_total": 0.0,
+                "categories": {
+                    "food": {"amount": 0.0, "percentage": 0.0},
+                    "gas": {"amount": 0.0, "percentage": 0.0},
+                },
+            }
+        ),
+    )
+
+    await ih.handle_intent("query_expense_breakdown_percentages", {"persons": ["Hannah"]}, message)
 
     assert any("could not calculate expense breakdown".lower() in (msg or "").lower() for msg, _ in message.channel.sent)
 

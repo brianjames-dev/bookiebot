@@ -22,8 +22,9 @@ Harden the recent transactions flow where a user chooses a logged action and upd
 - Added regression tests for updated-action move, moved-action move, updated-action delete, and moved-action delete.
 - Added explicit recent-action capabilities for update, move, delete, undo, and editable fields.
 - Recent-action decision buttons now only show supported operations for the selected transaction.
-- Unsupported delete/move/update paths now return clearer reasons, including income, Need expense, payment, and savings cases.
-- Added regression tests for capability computation, button visibility, and unsupported income deletion.
+- Unsupported delete/move/update paths now return clearer reasons for Need expense, payment, savings, and other unsupported cases.
+- Income rows can now be updated for source/amount and deleted from recent transactions.
+- Added regression tests for capability computation, button visibility, income update, and income deletion.
 - Added 300-second TTLs for pending recent-action selections, pending update-field replies, and pending move-item replies.
 - Expired pending replies now return a clear "selection expired" message instead of falling through to unrelated commands or current recent-action indexes.
 - Added regression tests for expired pending delete selection, expired update-field replies, expired move-item replies, and router numeric replies.
@@ -69,34 +70,36 @@ Use a test row or low-risk real row in Discord:
 6. Run `undo last transaction`.
    - Expected: the moved food row is restored.
 7. Log income, then select it from recent actions.
-   - Expected: only `Cancel` is offered in the action decision controls.
-8. Try to delete a recent income row by index.
-   - Expected: the bot says income cannot be deleted from recent transactions yet and suggests undo if it was the last logged action.
-9. Select a recent payment or savings deposit.
+   - Expected: `Update`, `Delete`, and `Cancel` are offered; `Move` is not shown.
+8. Update a recent income row's source and amount, then undo it.
+   - Expected: the income sheet source and amount change, then undo restores the original values.
+9. Delete a recent income row by index, then undo it if needed.
+   - Expected: the logged income row is removed from the income sheet.
+10. Select a recent payment or savings deposit.
    - Expected: `Update` and `Cancel` are offered, while move/delete controls are not shown.
-10. Ask to delete a matching transaction, wait more than 5 minutes, then type `1`.
+11. Ask to delete a matching transaction, wait more than 5 minutes, then type `1`.
    - Expected: the bot says the recent transaction selection expired and does not delete anything.
-11. Start an update from the controls, wait more than 5 minutes at the "Reply with the new ..." prompt, then reply.
+12. Start an update from the controls, wait more than 5 minutes at the "Reply with the new ..." prompt, then reply.
    - Expected: the bot says the recent transaction selection expired and does not update the row.
-12. Move a grocery/gas transaction to food without an item, wait more than 5 minutes, then reply with an item name.
+13. Move a grocery/gas transaction to food without an item, wait more than 5 minutes, then reply with an item name.
    - Expected: the bot says the recent transaction selection expired and does not move the row.
-13. Run `recent actions` from Discord.
+14. Run `recent actions` from Discord.
    - Expected: the transaction list appears in your DM, while the channel only receives a generic acknowledgement.
-14. Click a recent-action control from the DM workflow.
+15. Click a recent-action control from the DM workflow.
    - Expected: follow-up prompts/results are only visible to you.
-15. Select `Update`, choose `Item`, `Amount`, or `Location`, then reply in the DM with the new value.
+16. Select `Update`, choose `Item`, `Amount`, or `Location`, then reply in the DM with the new value.
    - Expected: the selected transaction updates and the reply is not ignored or routed to unrelated intent parsing.
-16. Have another user try to operate on a recent-action component from your workflow if a stale/public component exists.
+17. Have another user try to operate on a recent-action component from your workflow if a stale/public component exists.
    - Expected: the bot says the workflow belongs to another user and does not mutate anything.
-17. Let the scheduled reconciliation digest post in the morning window.
+18. Let the scheduled reconciliation digest post in the morning window.
    - Expected: the digest appears in the target user's DM with `Reconcile Now` and `View Inbox`.
-18. Click `View Inbox` on the reconciliation digest.
+19. Click `View Inbox` on the reconciliation digest.
    - Expected: the DM/private inbox list shows unresolved transactions with `Reconcile Now` and `Ignore All`.
-19. Click `Reconcile Now` from either the digest or inbox view.
+20. Click `Reconcile Now` from either the digest or inbox view.
    - Expected: the one-at-a-time transaction review appears, and individual transaction cards do not include `Ignore All`.
-20. Let the scheduled bills/subscriptions digest run.
+21. Let the scheduled bills/subscriptions digest run.
    - Expected: cash-pull details appear in the target user's DM, not the shared channel.
-21. Trigger or wait for a Plaid sync after the morning window.
+22. Trigger or wait for a Plaid sync after the morning window.
    - Expected: new unresolved items do not cause a daily digest to appear in the channel later that day.
 
 ## Verification Baseline
