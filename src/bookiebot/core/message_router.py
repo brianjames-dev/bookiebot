@@ -32,6 +32,7 @@ from bookiebot.intents.handlers import handle_intent
 from bookiebot.intents import explorer as intent_explorer
 from bookiebot.sheets.routing import resolve_actor_key
 from bookiebot.sheets.undo import (
+    clear_pending_action_selection,
     pending_action_selection_count,
     pending_action_selection_kind,
     pending_move_item,
@@ -56,6 +57,7 @@ _DELETE_VERBS = {"clear", "delete", "remove", "erase"}
 _UPDATE_VERBS = {"change", "correct", "edit", "fix", "redo", "update"}
 _MOVE_VERBS = {"categorize", "move", "reclassify", "recategorize"}
 _CATEGORIES = {"grocery", "groceries", "gas", "food", "shopping"}
+_CANCEL_WORDS = {"cancel", "nevermind", "never mind", "stop"}
 
 
 @asynccontextmanager
@@ -319,6 +321,10 @@ def register_events(client, tree):
         )
         pending_item_move = pending_move_item(actor_key)
         if pending_item_move:
+            if content.lower() in _CANCEL_WORDS:
+                clear_pending_action_selection(actor_key)
+                await message.channel.send("Canceled.")
+                return
             action_id, category = pending_item_move
             await handle_intent(
                 "move_recent_action",

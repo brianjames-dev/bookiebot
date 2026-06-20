@@ -213,6 +213,10 @@ def format_reconciliation_detail(
 def format_group_match_amount_mismatch(
     item: ReconciliationItem,
     candidates: list[ActionLogCandidate],
+    *,
+    reconciliation_id: int | None = None,
+    action_ids: list[str] | None = None,
+    include_commands: bool = False,
 ) -> str:
     bank_amount = abs(item.transaction.amount)
     selected_total = sum(candidate.amount for candidate in candidates)
@@ -226,15 +230,22 @@ def format_group_match_amount_mismatch(
         "Selected sheet rows:",
         _format_group_mismatch_table(candidates),
         "",
-        "Update one row, then run the group match again:",
+        "Choose one row to adjust to the bank total.",
     ]
+    group_ids = action_ids or [candidate.action_id for candidate in candidates]
+    group_ids_text = ",".join(group_ids)
     for candidate in candidates:
         suggested_amount = candidate.amount + difference
         if suggested_amount < 0:
             continue
-        lines.append(
-            f"`/debug_bank_update_action_amount action_id:{candidate.action_id} amount:{suggested_amount:.2f}`"
-        )
+        if include_commands and reconciliation_id is not None:
+            lines.append(
+                f"`/debug_bank_match_group reconciliation_id:{reconciliation_id} "
+                f"action_ids:{group_ids_text} adjust_action_id:{candidate.action_id}` "
+                f"-> sets `{candidate.action_id}` to `${suggested_amount:.2f}`"
+            )
+        else:
+            lines.append(f"- {candidate.label}: `${candidate.amount:.2f}` -> `${suggested_amount:.2f}`")
     return "\n".join(lines)
 
 

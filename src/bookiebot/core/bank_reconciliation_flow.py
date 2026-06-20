@@ -18,6 +18,7 @@ from bookiebot.sheets.writer import log_category_row, log_income_row, record_exp
 from bookiebot.ui.bank_reconciliation import (
     BankExpenseFixedFieldsView,
     BankReconciliationDetailView,
+    BankReconciliationGroupAdjustView,
     BankReconciliationLogChoiceView,
 )
 
@@ -129,6 +130,52 @@ async def send_bank_reconciliation_detail(
     async def handle_action(action_interaction: Any, action: str) -> None:
         await action_interaction.response.defer(ephemeral=True)
         try:
+            if action.startswith("group_adjust:"):
+                _prefix, group_index_text, adjust_action_id = action.split(":", 2)
+                group_index = int(group_index_text)
+                if group_index < 0 or group_index >= len(groups):
+                    await action_interaction.followup.send("That grouped match is no longer available.", ephemeral=True)
+                    return
+                group = groups[group_index]
+                action_ids = [candidate.action_id for candidate in group.candidates]
+                matched_item, matched_candidates, status = await asyncio.to_thread(
+                    service.confirm_reconciliation_action_group_match,
+                    owner_key,
+                    reconciliation_id,
+                    actor_key=actor_key,
+                    action_ids=action_ids,
+                    adjust_action_id=adjust_action_id,
+                )
+                if matched_item is None:
+                    await action_interaction.followup.send(
+                        f"No bank reconciliation item `{reconciliation_id}` was found for {owner_name}.",
+                        ephemeral=True,
+                    )
+                    return
+                if status != "matched_adjusted":
+                    await action_interaction.followup.send(
+                        content=f"Could not adjust and match that grouped suggestion yet: `{status}`.",
+                        ephemeral=True,
+                    )
+                    return
+                total = sum(candidate.amount for candidate in matched_candidates)
+                adjusted = next(
+                    (candidate for candidate in matched_candidates if candidate.action_id == adjust_action_id),
+                    None,
+                )
+                adjustment_note = f"\nAdjusted `{adjusted.label}` to `${adjusted.amount:.2f}`." if adjusted else ""
+                await action_interaction.followup.send(
+                    content=(
+                        f"Matched `{matched_item.transaction.name}` for `${abs(matched_item.transaction.amount):.2f}` "
+                        f"to {len(matched_candidates)} existing sheet rows.\n"
+                        f"Rows total: `${total:.2f}`"
+                        f"{adjustment_note}"
+                    ),
+                    ephemeral=True,
+                )
+                await continue_session(action_interaction)
+                return
+
             if action.startswith("group:"):
                 group_index = int(action.split(":", 1)[1])
                 if group_index < 0 or group_index >= len(groups):
@@ -151,11 +198,22 @@ async def send_bank_reconciliation_detail(
                     return
                 if status == "amount_mismatch":
                     await action_interaction.followup.send(
-                        content=format_group_match_amount_mismatch(matched_item, matched_candidates)[:1900],
+                        content=format_group_match_amount_mismatch(
+                            matched_item,
+                            matched_candidates,
+                            reconciliation_id=reconciliation_id,
+                            action_ids=action_ids,
+                        )[:1900],
+                        view=BankReconciliationGroupAdjustView(
+                            matched_candidates,
+                            handle_action,
+                            group_index=group_index,
+                            bank_amount=abs(matched_item.transaction.amount),
+                        ),
                         ephemeral=True,
                     )
                     return
-                if status != "matched":
+                if status not in {"matched", "matched_adjusted"}:
                     await action_interaction.followup.send(
                         content=f"Could not match that grouped suggestion yet: `{status}`.",
                         ephemeral=True,
@@ -269,6 +327,10 @@ async def send_bank_reconciliation_detail(
                     ),
                     ephemeral=True,
                 )
+                return
+
+            if action == "cancel":
+                await action_interaction.followup.send("Canceled.", ephemeral=True)
                 return
 
             if action == "skip":

@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from contextlib import contextmanager
-from datetime import datetime, timezone
+from datetime import date, datetime, timedelta, timezone
 import json
 from pathlib import Path
 import sqlite3
@@ -790,12 +790,28 @@ class BankStore:
             raise RuntimeError("Failed to load stored reconciliation item")
         return _reconciliation_item_from_row(row)
 
-    def unresolved_reconciliation_items(self, owner_key: str, limit: int = 25) -> list[ReconciliationItem]:
+    def unresolved_reconciliation_items(
+        self,
+        owner_key: str,
+        limit: int = 25,
+        *,
+        max_age_days: int | None = None,
+    ) -> list[ReconciliationItem]:
         safe_limit = max(1, min(int(limit), 100))
+        cutoff_date = None
+        if max_age_days is not None:
+            cutoff_date = (date.today() - timedelta(days=max(1, int(max_age_days)))).isoformat()
+        date_filter = ""
+        params: tuple[Any, ...]
+        if cutoff_date:
+            date_filter = " AND COALESCE(t.date, t.authorized_date, '') >= ?"
+            params = (owner_key, cutoff_date, safe_limit)
+        else:
+            params = (owner_key, safe_limit)
         self.initialize()
         with self.connect() as conn:
             rows = conn.execute(
-                """
+                f"""
                 SELECT
                     r.*,
                     t.provider_transaction_id,
@@ -819,10 +835,11 @@ class BankStore:
                   AND t.pending = 0
                   AND (t.account_id IS NULL OR COALESCE(a.watched, 1) = 1)
                   AND r.status IN ('needs_review', 'pending_user', 'conflict')
+                  {date_filter}
                 ORDER BY COALESCE(t.date, t.authorized_date, '') DESC, r.id DESC
                 LIMIT ?
                 """,
-                (owner_key, safe_limit),
+                params,
             ).fetchall()
         return [_reconciliation_item_from_row(row) for row in rows]
 
@@ -1015,7 +1032,13 @@ class BankStore:
             )
         return self.get_reconciliation_item(owner_key, reconciliation_id)
 
-    def reopen_reconciliation_item(self, owner_key: str, reconciliation_id: int) -> ReconciliationItem | None:
+    def reopen_reconciliation_item(
+        self,
+        owner_key: str,
+        reconciliation_id: int,
+        *,
+        notes: str = "reopened for review",
+    ) -> ReconciliationItem | None:
         now = utc_now_iso()
         self.initialize()
         with self.connect() as conn:
@@ -1042,15 +1065,54 @@ class BankStore:
                     ignored_at = NULL,
                     last_seen_at = ?,
                     notes = CASE
-                        WHEN notes IS NULL OR notes = '' THEN 'reopened for review'
-                        ELSE notes || '; reopened for review'
+                        WHEN notes IS NULL OR notes = '' THEN ?
+                        ELSE notes || '; ' || ?
                     END
                 WHERE id = ?
                   AND owner_key = ?
                 """,
-                (now, int(reconciliation_id), owner_key),
+                (now, notes, notes, int(reconciliation_id), owner_key),
             )
         return self.get_reconciliation_item(owner_key, reconciliation_id)
+
+    def reopen_reconciliation_items_for_action_ids(
+        self,
+        owner_key: str,
+        action_ids: set[str],
+        *,
+        notes: str = "reopened because matched action changed",
+    ) -> list[ReconciliationItem]:
+        ids = {str(action_id).strip() for action_id in action_ids if str(action_id).strip()}
+        if not ids:
+            return []
+        self.initialize()
+        with self.connect() as conn:
+            rows = conn.execute(
+                """
+                SELECT r.id, r.matched_action_log_id
+                FROM bank_reconciliation_items r
+                JOIN bank_transactions t ON t.id = r.bank_transaction_id
+                WHERE r.owner_key = ?
+                  AND t.removed_at IS NULL
+                  AND r.matched_action_log_id IS NOT NULL
+                  AND r.matched_action_log_id != ''
+                  AND r.status IN ('matched', 'confirmed', 'import_requested')
+                """,
+                (owner_key,),
+            ).fetchall()
+
+        reopened: list[ReconciliationItem] = []
+        for row in rows:
+            matched_ids = {
+                part.strip()
+                for part in str(row["matched_action_log_id"]).split("+")
+                if part.strip()
+            }
+            if matched_ids & ids:
+                item = self.reopen_reconciliation_item(owner_key, int(row["id"]), notes=notes)
+                if item is not None:
+                    reopened.append(item)
+        return reopened
 
     def status(self, configured: bool, plaid_env: str) -> BankStatus:
         self.initialize()

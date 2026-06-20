@@ -1,6 +1,6 @@
 # Finance Operations Workstream
 
-Last updated: 2026-06-18
+Last updated: 2026-06-20
 
 ## Goal
 
@@ -18,12 +18,12 @@ Task execution and documentation update rules live in `.Agents`.
 2. Moved expenses may not be movable again because the latest visible action has type `move`, not `expense`.
 3. Deleting an updated action is risky because delete accepts `update` actions and compacts the current row, but the original source action may remain active or stale.
 4. Deleting a moved action can leave source/destination lineage difficult to reason about unless the canonical sheet row is resolved first.
-5. The UI does not expose date updates, even though parser and update entities include `date`.
+5. The UI does not expose date updates, and user-entered date updates are now rejected. Fixed 2026-06-20; reconciliation-origin automation may still set dates from bank transaction dates.
 6. Pending selections live only in process memory, so deploys, restarts, or long pauses lose context.
 7. Component views time out after 120 seconds while pending text state may still exist. Fixed 2026-06-18.
 8. Income, Need expenses, payments, and savings appear in recent actions but have inconsistent edit/move/delete capabilities.
 9. Match-text search only checks the latest 10 recent actions, so targeted commands can miss older actions.
-10. Reconciled actions can be updated, moved, deleted, or undone without updating/reopening reconciliation state.
+10. Reconciled actions can be updated, moved, deleted, or undone without updating/reopening reconciliation state. Fixed first pass 2026-06-20 by reopening linked reconciliation items.
 
 ## Recent Transactions - What Currently Works
 
@@ -107,6 +107,16 @@ Status: Complete for active recent-action lineages as of 2026-06-18.
 
 Manual verification steps are tracked in `.agent/STATUS.md`.
 
+### 2026-06-20
+
+- User-entered date updates are hidden/rejected in recent-action update handling; date mutation is reserved for reconciliation-origin automation that can use the bank transaction's reported date.
+- Recent-action update, move, delete, and undo now attempt to reopen linked reconciliation items by action-log ID.
+- Store-level reconciliation reopening can find grouped matched action IDs such as `action-a+action-b`.
+- Normal unresolved reconciliation views now apply a default 60-day transaction age cutoff through `BOOKIEBOT_RECONCILIATION_MAX_AGE_DAYS`.
+- Added regression coverage for user date rejection, recent-action reconciliation sync hooks, grouped matched-action reopening, and max-age filtering.
+
+Manual verification steps are tracked in `.agent/STATUS.md`.
+
 ### Slice D - Pending State Hardening
 
 - Add TTLs for pending update/delete/move selections.
@@ -123,11 +133,15 @@ Status: Complete for in-process pending state as of 2026-06-18. Pending selectio
 - If date is not supported, remove it from parser guidance and handler copy.
 - Make category-specific missing fields clear, especially grocery/gas versus food/shopping.
 
+Status: Date decision complete as of 2026-06-20. User-entered date updates are not exposed and are rejected if parsed. Reconciliation-origin code can still provide a date automatically from the bank transaction. Category-specific move prompts now explain when a destination category requires an item name.
+
 ### Slice F - Reconciliation Link Synchronization
 
 - When a reconciled action lineage is updated, moved, deleted, or undone, update or reopen the reconciliation item.
 - Prefer stable action IDs over sheet row refs where possible.
 - Add tests for reconciled row update, move, delete, and undo.
+
+Status: Complete first pass as of 2026-06-20. Recent-action update, move, delete, and undo reopen linked reconciliation items by matched action-log ID, including grouped IDs. Future refinement can decide whether some unchanged moves should stay confirmed instead of reopening.
 
 ## Bank Reconciliation - Known Problems
 
@@ -136,7 +150,7 @@ Status: Complete for in-process pending state as of 2026-06-18. Pending selectio
 3. The transaction inbox can surface very old unresolved bank transactions.
 4. Event logging exists only as sheet-backed system-state entries, which is weak for debugging and auditing.
 5. Reconciliation item statuses do not clearly separate new, presented, auto-matched, confirmed, ignored, stale, and failed states.
-6. Confirming a reconciliation candidate can auto-update a sheet amount when the bank amount differs.
+6. Confirming a reconciliation candidate updates the sheet amount to the bank amount when the user intentionally selects that row as the match. This is intended behavior.
 7. Updating, moving, or deleting a recent action can leave reconciliation references stale unless explicitly coordinated.
 8. Reconciliation behavior is spread across several modules, which makes lifecycle guarantees harder to reason about.
 
@@ -159,6 +173,8 @@ Status: Complete for in-process pending state as of 2026-06-18. Pending selectio
 - Add query filters so normal unresolved inbox excludes transactions before the cutoff.
 - Add a `stale` or `hidden_stale` reconciliation state, or a computed exclusion with explicit debug visibility.
 - Add tests proving old transactions do not appear in normal digest/session flows.
+
+Status: Complete first pass as of 2026-06-20. Normal unresolved views use a 60-day max age cutoff by default. Old records are hidden from normal review but are not yet marked with an explicit stale status.
 
 ### Slice 2 - Digest Lifecycle
 
@@ -183,10 +199,13 @@ Status: Complete for in-process pending state as of 2026-06-18. Pending selectio
 
 ### Slice 5 - Safer Match Confirmation
 
-- Replace automatic amount update during match confirmation with an explicit user choice.
-- Present mismatch options: match without update, update sheet amount, choose another row, group rows, or cancel.
-- Log whichever path the user chooses.
+- Treat the user's match selection as explicit confirmation that the selected sheet row represents the bank transaction.
+- If the selected row amount differs, update the sheet/action amount to the bank transaction amount after that confirmation.
+- Keep grouped matches strict by default, but allow an explicit selected-row adjustment to make the grouped total match the bank transaction.
+- Log whichever path the user chooses if structured event logging is added later.
 - Add tests for mismatch flows.
+
+Status: Complete first pass as of 2026-06-20. Existing-row match confirmation updates the sheet/action amount to the bank amount after the user selects the row as the match. Grouped matches still reject total mismatches by default, and now provide a button-based row adjustment path plus an internal `adjust_action_id` tool path to update one selected row and confirm the group.
 
 ### Slice 6 - Simplify Module Boundaries
 
@@ -199,11 +218,11 @@ Status: Complete for in-process pending state as of 2026-06-18. Pending selectio
 
 - What should the canonical recent-action lineage model look like?
 - Should updated/moved actions replace the source action or remain separate visible events?
-- Should date updates be supported in the UI?
+- Should date updates be supported in the UI? Decided 2026-06-20: no user-entered date updates; reconciliation-origin automation only.
 - How long should pending selections remain valid?
 - Should old unresolved bank items be automatically ignored, marked stale, or hidden until manually reviewed?
-- What is the right default freshness window: 30, 45, 60, or 90 days?
-- Should amount mismatches default to asking every time?
+- What is the right default freshness window: 30, 45, 60, or 90 days? Decided first pass 2026-06-20: 60 days.
+- Should amount mismatches default to asking every time? Decided 2026-06-20: selecting the matching row is the confirmation; after that, use the bank amount as source of truth for single-row matches.
 - Should a moved reconciled expense stay confirmed automatically if amount/date/person are unchanged?
 - How much event state should live in Google Sheets versus the banking database?
 

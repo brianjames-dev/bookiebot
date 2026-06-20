@@ -271,3 +271,51 @@ async def test_on_message_dm_reply_updates_pending_recent_field(monkeypatch):
         {"action_id": "abc123", "updates": {"item": "Coffee beans"}},
         message,
     )
+
+
+@pytest.mark.asyncio
+async def test_on_message_pending_move_item_can_be_canceled(monkeypatch):
+    import bookiebot.core.message_router as router
+    import bookiebot.sheets.undo as undo
+    from bookiebot.sheets.routing import resolve_actor_key
+
+    class DummyClient:
+        def __init__(self):
+            self.user = SimpleNamespace(id=1)
+            self.events = {}
+
+        def event(self, func):
+            self.events[func.__name__] = func
+            return func
+
+    class DummyDMChannel:
+        id = 999
+        guild = None
+
+        def __init__(self):
+            self.sent = []
+
+        async def send(self, content=None, **kwargs):
+            self.sent.append((content, kwargs))
+
+    monkeypatch.setattr(router.config, "CHANNEL_ID", 123)
+    handle_intent = AsyncMock()
+    monkeypatch.setattr(router, "handle_intent", handle_intent)
+
+    client = DummyClient()
+    router.register_events(client, SimpleNamespace())
+
+    actor_key = resolve_actor_key(830984827904851969, "hannerish")
+    undo.set_pending_move_item(actor_key, "abc123", "food")
+
+    message = SimpleNamespace(
+        content="cancel",
+        author=SimpleNamespace(id=830984827904851969, name="hannerish"),
+        channel=DummyDMChannel(),
+    )
+
+    await client.events["on_message"](message)
+
+    assert message.channel.sent == [("Canceled.", {})]
+    assert undo.pending_move_item(actor_key) is None
+    handle_intent.assert_not_awaited()

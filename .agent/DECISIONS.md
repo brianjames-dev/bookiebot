@@ -68,10 +68,38 @@ Decision: Reconciliation and bills/subscriptions digests should send detailed fi
 
 Rationale: DM delivery avoids exposing finance details in shared channels. Keeping `Ignore All` on the inbox list makes the destructive bulk action apply only to the displayed batch, while one-at-a-time reconciliation stays focused on the current transaction.
 
+## 2026-06-20 - Do Not Expose User-Entered Date Updates
+
+Decision: Recent transaction update flows should not ask users for dates or accept parsed user-entered `date` updates. Date mutation is only allowed for reconciliation-origin automation that can use the bank transaction's reported date.
+
+Rationale: Users should not have to reason about sheet dates manually during update/move/delete workflows. Reconciliation has the authoritative bank transaction date, so any automatic date correction should happen there.
+
+## 2026-06-20 - Reopen Reconciliation Links After Recent-Action Mutation
+
+Decision: When a recent action linked to reconciliation is updated, moved, deleted, or undone, reopen matching reconciliation items by action-log ID rather than leaving them confirmed/matched.
+
+Rationale: A sheet mutation can invalidate the prior reconciliation decision. Reopening keeps the system conservative and visible until a later state-machine pass decides which unchanged mutations can safely stay confirmed.
+
+## 2026-06-20 - Use 60 Days For Normal Reconciliation Freshness
+
+Decision: Normal unresolved reconciliation digest, inbox, and session views should exclude posted bank transactions older than 60 days by default through `BOOKIEBOT_RECONCILIATION_MAX_AGE_DAYS`.
+
+Rationale: Old Plaid or cached transactions were resurfacing as if they were current work. Hiding older items from normal review keeps the inbox actionable without deleting historical records.
+
+## 2026-06-20 - Use Bank Amount After User Confirms A Match
+
+Decision: Confirming an existing sheet/action row during reconciliation is the user's approval that the row represents the bank transaction. If that row's amount differs, BookieBot should update the sheet/action amount to the bank transaction amount and then confirm the reconciliation item.
+
+Rationale: The human-in-the-loop step is selecting the matching row. After that selection, the bank transaction is the source of truth for the amount, and the user should not have to manually edit the price before reconciliation can complete.
+
+## 2026-06-20 - Require Explicit Row Choice For Grouped Amount Adjustments
+
+Decision: Grouped reconciliation matches should still reject mismatched totals by default. If the user chooses one row in the group to absorb the difference, BookieBot may update that row amount to make the grouped total match the bank transaction and then confirm the group.
+
+Rationale: Grouped matches involve multiple sheet rows, so BookieBot should not guess which row should change. The human confirmation is selecting both the group and the specific row to adjust.
+
 ## Pending Decisions
 
 - Where should durable system events live: banking database only, Google Sheets only, or dual-write during transition?
-- What is the default freshness window for normal reconciliation review?
-- Should amount mismatches ever auto-update sheet rows, or should they always require explicit user confirmation?
 - What exact reconciliation states should replace or extend the current status set?
 - What should the canonical model be for recent-action lineages after update, move, delete, and undo?

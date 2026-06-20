@@ -1441,7 +1441,7 @@ def test_confirm_reconciliation_action_match_marks_existing_row(monkeypatch, tmp
     assert confirmed.matched_sheet_ref == "expense!row 12"
 
 
-def test_confirm_reconciliation_action_match_updates_sheet_amount_when_needed(monkeypatch, tmp_path):
+def test_confirm_reconciliation_action_match_updates_sheet_amount_after_user_match(monkeypatch, tmp_path):
     action = LoggedAction(
         id="abc123",
         created_at="2026-05-17T12:00:00",
@@ -1857,3 +1857,101 @@ def test_confirm_reconciliation_action_group_match_rejects_total_mismatch(monkey
     assert len(candidates) == 2
     assert confirmed is not None
     assert confirmed.status == "needs_review"
+
+
+def test_confirm_reconciliation_action_group_match_can_adjust_selected_row(monkeypatch, tmp_path):
+    actions = [
+        LoggedAction(
+            id="minted123",
+            created_at="2026-05-15T12:00:00",
+            user_key="676638528590970917",
+            action=UndoAction(
+                worksheet="expense",
+                kind="clear_cells",
+                row=12,
+                columns=[14, 15, 16, 17, 18],
+                previous_values=["", "", "", "", ""],
+                new_values=["5/15/2026", "graduation invites", "135.93", "Minted", "Brian (BofA)"],
+                metadata={"type": "expense", "category": "shopping", "person": "Brian (BofA)"},
+                description="shopping expense $135.93 for Brian (BofA)",
+            ),
+        ),
+        LoggedAction(
+            id="wrong123",
+            created_at="2026-05-15T12:00:00",
+            user_key="676638528590970917",
+            action=UndoAction(
+                worksheet="expense",
+                kind="clear_cells",
+                row=13,
+                columns=[14, 15, 16, 17, 18],
+                previous_values=["", "", "", "", ""],
+                new_values=["5/15/2026", "graduation announcements", "38.00", "Zazzle", "Brian (BofA)"],
+                metadata={"type": "expense", "category": "shopping", "person": "Brian (BofA)"},
+                description="shopping expense $38.00 for Brian (BofA)",
+            ),
+        ),
+    ]
+    adjusted_action = LoggedAction(
+        id="wrong123",
+        created_at="2026-05-15T12:00:00",
+        user_key="676638528590970917",
+        action=UndoAction(
+            worksheet="expense",
+            kind="clear_cells",
+            row=13,
+            columns=[14, 15, 16, 17, 18],
+            previous_values=["", "", "", "", ""],
+            new_values=["5/15/2026", "graduation announcements", "37.66", "Zazzle", "Brian (BofA)"],
+            metadata={"type": "expense", "category": "shopping", "person": "Brian (BofA)"},
+            description="shopping expense $37.66 for Brian (BofA)",
+        ),
+    )
+    update_calls = []
+
+    def fake_update_recent_action(user_key, *, updates, action_id=None, **_kwargs):
+        update_calls.append((user_key, updates, action_id))
+        actions[1] = adjusted_action
+        return True, "Updated logged action"
+
+    monkeypatch.setattr(banking_service, "read_active_logged_actions", lambda _actor_key: actions)
+    monkeypatch.setattr(banking_service, "update_recent_action", fake_update_recent_action)
+    store = BankStore(tmp_path / "banking.sqlite3", TokenCipher("test-secret-key"))
+    service = BankingService(
+        config=BankingConfig(
+            plaid_client_id="client",
+            plaid_secret="secret",
+            plaid_env="sandbox",
+            token_encryption_key="test-secret-key",
+            sqlite_path=Path("unused.sqlite3"),
+        ),
+        store=store,
+        plaid=PlaidClient(
+            BankingConfig(
+                plaid_client_id="client",
+                plaid_secret="secret",
+                plaid_env="sandbox",
+                token_encryption_key="test-secret-key",
+                sqlite_path=Path("unused.sqlite3"),
+            )
+        ),
+    )
+    service.seed_unmatched_debug_transaction("brian", name="Venmo", amount=173.59, date="2026-05-18")
+    item = service.reconciliation_preview("brian", force=True).items[0]
+
+    confirmed, candidates, status = service.confirm_reconciliation_action_group_match(
+        "brian",
+        item.id,
+        actor_key="676638528590970917",
+        action_ids=["minted123", "wrong123"],
+        adjust_action_id="wrong123",
+    )
+
+    assert status == "matched_adjusted"
+    assert [candidate.amount for candidate in candidates] == [135.93, 37.66]
+    assert confirmed is not None
+    assert confirmed.status == "confirmed"
+    assert confirmed.matched_action_log_id == "minted123+wrong123"
+    assert update_calls == [
+        ("676638528590970917", {"amount": "37.66"}, "wrong123"),
+    ]

@@ -1121,12 +1121,22 @@ def register_commands(tree: app_commands.CommandTree):
             return
 
         transaction = item.transaction
+        if status not in {"matched", "matched_updated"}:
+            await interaction.followup.send(
+                content=f"Could not match bank review item `{item.id}` yet: `{status}`.",
+                ephemeral=True,
+            )
+            return
+        update_note = ""
+        if status == "matched_updated":
+            update_note = f"\nUpdated sheet amount to `${abs(transaction.amount):.2f}`."
         await interaction.followup.send(
             content=(
                 f"Matched bank reconciliation item `{item.id}` to existing `{candidate.action_type}` row "
                 f"`{candidate.action_id}` for {owner.name}.\n"
                 f"Bank: `{transaction.name} - ${abs(transaction.amount):.2f}`\n"
                 f"Sheet: `{candidate.label} - ${candidate.amount:.2f} - {candidate.sheet_ref}`"
+                f"{update_note}"
             ),
             ephemeral=True,
         )
@@ -1135,14 +1145,21 @@ def register_commands(tree: app_commands.CommandTree):
     @app_commands.describe(
         reconciliation_id="ID shown by /debug_bank_review",
         action_ids="Comma-separated Action IDs shown by /debug_bank_review_detail",
+        adjust_action_id="Optional Action ID in the group to adjust to make the total match",
     )
-    async def debug_bank_match_group(interaction: discord.Interaction, reconciliation_id: int, action_ids: str):
+    async def debug_bank_match_group(
+        interaction: discord.Interaction,
+        reconciliation_id: int,
+        action_ids: str,
+        adjust_action_id: str | None = None,
+    ):
         if not auth.is_debug_allowed(interaction.user):
             await interaction.response.send_message("❌ Not authorized.", ephemeral=True)
             return
 
         await interaction.response.defer(ephemeral=True)
         cleaned_ids = [_clean_command_text(part) for part in action_ids.split(",")]
+        clean_adjust_action_id = _clean_command_text(adjust_action_id) if adjust_action_id else None
         try:
             owner = get_user_config(interaction.user.id)
             service = build_banking_service()
@@ -1152,6 +1169,7 @@ def register_commands(tree: app_commands.CommandTree):
                 reconciliation_id,
                 actor_key=str(interaction.user.id),
                 action_ids=cleaned_ids,
+                adjust_action_id=clean_adjust_action_id,
             )
         except Exception as exc:
             await interaction.followup.send(
@@ -1194,17 +1212,39 @@ def register_commands(tree: app_commands.CommandTree):
         bank_amount = abs(item.transaction.amount)
         if status == "amount_mismatch":
             await interaction.followup.send(
-                content=bank_formatting.format_group_match_amount_mismatch(item, candidates)[:1900],
+                content=bank_formatting.format_group_match_amount_mismatch(
+                    item,
+                    candidates,
+                    reconciliation_id=reconciliation_id,
+                    action_ids=cleaned_ids,
+                    include_commands=True,
+                )[:1900],
+                ephemeral=True,
+            )
+            return
+        if status in {"adjust_action_not_in_group", "adjustment_negative"}:
+            await interaction.followup.send(
+                content=f"Could not adjust that grouped match: `{status}`.",
+                ephemeral=True,
+            )
+            return
+        if status not in {"matched", "matched_adjusted"}:
+            await interaction.followup.send(
+                content=f"Could not group-match bank review item `{item.id}` yet: `{status}`.",
                 ephemeral=True,
             )
             return
 
+        adjustment_note = ""
+        if status == "matched_adjusted" and clean_adjust_action_id:
+            adjustment_note = f"\nAdjusted row: `{clean_adjust_action_id}`"
         await interaction.followup.send(
             content=(
                 f"Matched bank reconciliation item `{item.id}` to `{len(candidates)}` existing rows for {owner.name}.\n"
                 f"Bank: `{item.transaction.name} - ${bank_amount:.2f}`\n"
                 f"Rows total: `${total:.2f}`\n"
                 f"Rows: `{', '.join(candidate.action_id for candidate in candidates)}`"
+                f"{adjustment_note}"
             ),
             ephemeral=True,
         )

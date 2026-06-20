@@ -12,7 +12,7 @@ from uuid import uuid4
 from openpyxl.utils import get_column_letter
 
 from bookiebot.sheets.repo import get_sheets_repo
-from bookiebot.sheets.routing import actor_key_aliases
+from bookiebot.sheets.routing import actor_key_aliases, get_user_config
 
 logger = logging.getLogger(__name__)
 
@@ -831,6 +831,13 @@ def editable_fields_for_action(action: UndoAction) -> list[str]:
     return [field for field in fields if field != "date"]
 
 
+def _allowed_update_fields(action: UndoAction, metadata_extra: dict[str, str] | None = None) -> set[str]:
+    allowed = set(editable_fields_for_action(action))
+    if (metadata_extra or {}).get("origin") == "bank_reconciliation" and "date" in _field_columns_for_action(action):
+        allowed.add("date")
+    return allowed
+
+
 def action_capabilities(action: UndoAction) -> ActionCapabilities:
     action_type = action.metadata.get("type")
     editable_fields = editable_fields_for_action(action)
@@ -868,6 +875,46 @@ def action_capabilities(action: UndoAction) -> ActionCapabilities:
         move_reason=move_reason,
         delete_reason=delete_reason,
     )
+
+
+def _sync_reconciliation_after_action_mutation(
+    user_key: str | None,
+    action_ids: set[str],
+    *,
+    reason: str,
+    metadata_extra: dict[str, str] | None = None,
+) -> None:
+    if not user_key or not action_ids:
+        return
+    if (metadata_extra or {}).get("origin") == "bank_reconciliation":
+        return
+    try:
+        from bookiebot.banking.service import build_banking_service
+
+        owner_key = get_user_config(user_key).budget_owner_key
+        service = build_banking_service()
+        service.reopen_reconciliation_items_for_action_ids(
+            owner_key,
+            {str(action_id) for action_id in action_ids if str(action_id).strip()},
+            notes=f"reopened because matched action was {reason}",
+        )
+    except Exception:
+        logger.exception(
+            "Failed to synchronize reconciliation links after recent-action mutation",
+            extra={"user_key": user_key, "action_ids": sorted(action_ids), "reason": reason},
+        )
+
+
+def _sync_action_ids_for_undo_action(action: UndoAction, logged_id: str) -> set[str]:
+    action_ids = {logged_id}
+    updated_action_id = action.metadata.get("updated_action_id")
+    if updated_action_id:
+        action_ids.add(updated_action_id)
+    source_action_id = action.metadata.get("source_action_id")
+    if source_action_id:
+        action_ids.add(source_action_id)
+    action_ids.update(_deleted_action_ids(action))
+    return {action_id for action_id in action_ids if action_id}
 
 
 def _field_values_for_action(action: UndoAction, values: list[str] | None = None) -> dict[str, str]:
@@ -1164,6 +1211,31 @@ def _missing_required_move_fields(values: dict[str, str], destination_category: 
     return [field for field in required if field in values and not str(values[field]).strip()]
 
 
+def _move_item_prompt(source_category: str, destination_category: str) -> str:
+    return (
+        f"To move this {source_category} expense to {destination_category}, "
+        f"reply with the item name to use in {destination_category}."
+    )
+
+
+def _missing_move_fields_message(missing: list[str], source_category: str, destination_category: str) -> str:
+    if "date" in missing:
+        return (
+            f"I cannot move this {source_category} expense to {destination_category} because the source row is missing a date. "
+            "BookieBot should not ask you to enter dates manually; fix the source row or reconcile it from the bank transaction first."
+        )
+    labels = {
+        "amount": "amount",
+        "person": "person/card",
+        "item": "item name",
+    }
+    readable = ", ".join(labels.get(field, field) for field in missing)
+    return (
+        f"I cannot move this {source_category} expense to {destination_category} yet because the source row is missing: "
+        f"{readable}."
+    )
+
+
 def move_recent_action(
     user_key: str | None,
     *,
@@ -1231,8 +1303,8 @@ def move_recent_action(
     if missing:
         if missing == ["item"]:
             set_pending_move_item(user_key, logged.id, destination_category)
-            return False, "What is the name of the item?"
-        return False, f"I can move it to {destination_category}, but I still need: {', '.join(missing)}."
+            return False, _move_item_prompt(source_category, destination_category)
+        return False, _missing_move_fields_message(missing, source_category, destination_category)
 
     source_end_row = max(action.row, _last_occupied_category_row(ws, source_category))
     source_snapshot = _category_snapshot(ws, range(action.row, source_end_row + 1), source_category_columns)
@@ -1303,6 +1375,7 @@ def move_recent_action(
             description=f"moved {source_category} expense to {destination_category}",
         ),
     )
+    _sync_reconciliation_after_action_mutation(user_key, {logged.id}, reason="moved")
     destination_display_action = UndoAction(
         worksheet="expense",
         kind="clear_cells",
@@ -1377,9 +1450,10 @@ def update_recent_action(
     if not capabilities.can_update or not field_columns:
         return False, capabilities.update_reason
 
-    unknown = sorted(set(normalized_updates) - set(field_columns))
+    allowed_fields = _allowed_update_fields(logged.action, metadata_extra)
+    unknown = sorted(set(normalized_updates) - allowed_fields)
     if unknown:
-        available = ", ".join(sorted(field_columns))
+        available = ", ".join(sorted(allowed_fields))
         return False, f"I can update {available} for that action, but not: {', '.join(unknown)}."
 
     if not normalized_updates:
@@ -1432,6 +1506,12 @@ def update_recent_action(
             },
             description=f"updated {logged.action.description}",
         ),
+    )
+    _sync_reconciliation_after_action_mutation(
+        user_key,
+        {logged.id},
+        reason="updated",
+        metadata_extra=metadata_extra,
     )
     return (
         True,
@@ -1578,6 +1658,7 @@ def _delete_expense_action_with_compaction(user_key: str | None, logged: LoggedA
             description=f"deleted {action.description}",
         ),
     )
+    _sync_reconciliation_after_action_mutation(user_key, set(lineage_ids), reason="deleted")
     return True, f"Deleted: {action.description}"
 
 
@@ -1635,6 +1716,7 @@ def delete_recent_action(
     _mark_undone(logged.id)
     if key:
         _PENDING_DELETE_IDS_BY_USER.pop(key, None)
+    _sync_reconciliation_after_action_mutation(user_key, {logged.id}, reason="deleted")
     return True, f"Deleted: {logged.action.description}"
 
 
@@ -1668,6 +1750,11 @@ def undo_logged_action(user_key: str | None, action_id: str) -> tuple[bool, str]
     if source_action_id and logged.action.kind == "move_expense":
         _mark_active(source_action_id, log_data)
     _mark_undone(logged.id, log_data)
+    _sync_reconciliation_after_action_mutation(
+        key,
+        _sync_action_ids_for_undo_action(logged.action, logged.id),
+        reason="undone",
+    )
     return True, detail
 
 
@@ -1714,6 +1801,11 @@ def undo_last_action(user_key: str | None) -> tuple[bool, str]:
         if source_action_id and action.kind == "move_expense":
             _mark_active(source_action_id, log_data)
         _mark_undone(logged.id, log_data)
+        _sync_reconciliation_after_action_mutation(
+            key,
+            _sync_action_ids_for_undo_action(action, logged.id),
+            reason="undone",
+        )
     if _GLOBAL_LAST_ACTION is action:
         _GLOBAL_LAST_ACTION = None
     return True, detail

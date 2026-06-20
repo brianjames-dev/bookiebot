@@ -48,6 +48,14 @@ def _schedule_cache_ttl_seconds() -> int:
         return 900
 
 
+def _reconciliation_max_age_days() -> int:
+    raw = os.getenv("BOOKIEBOT_RECONCILIATION_MAX_AGE_DAYS", "60").strip()
+    try:
+        return max(1, int(raw))
+    except ValueError:
+        return 60
+
+
 def _schedule_sources_for_actor(actor_key: str) -> tuple[list[Any], list[tuple[Any, bool, float]]]:
     cached = _SCHEDULE_SOURCE_CACHE.get(actor_key)
     now = time.monotonic()
@@ -466,8 +474,16 @@ class BankingService:
             raise RuntimeError("Failed to seed unmatched debug transaction")
         return transactions[0]
 
-    def unresolved_reconciliation_items(self, owner_key: str, limit: int = 25) -> list:
-        return self.store.unresolved_reconciliation_items(owner_key, limit=limit)
+    def unresolved_reconciliation_items(
+        self,
+        owner_key: str,
+        limit: int = 25,
+        *,
+        max_age_days: int | None = None,
+    ) -> list:
+        if max_age_days is None:
+            max_age_days = _reconciliation_max_age_days()
+        return self.store.unresolved_reconciliation_items(owner_key, limit=limit, max_age_days=max_age_days)
 
     def resolved_reconciliation_items(self, owner_key: str, limit: int = 25) -> list:
         return self.store.resolved_reconciliation_items(owner_key, limit=limit)
@@ -475,8 +491,17 @@ class BankingService:
     def ignore_reconciliation_item(self, owner_key: str, reconciliation_id: int):
         return self.store.ignore_reconciliation_item(owner_key, reconciliation_id)
 
-    def reopen_reconciliation_item(self, owner_key: str, reconciliation_id: int):
-        return self.store.reopen_reconciliation_item(owner_key, reconciliation_id)
+    def reopen_reconciliation_item(self, owner_key: str, reconciliation_id: int, *, notes: str = "reopened for review"):
+        return self.store.reopen_reconciliation_item(owner_key, reconciliation_id, notes=notes)
+
+    def reopen_reconciliation_items_for_action_ids(
+        self,
+        owner_key: str,
+        action_ids: set[str],
+        *,
+        notes: str = "reopened because matched action changed",
+    ):
+        return self.store.reopen_reconciliation_items_for_action_ids(owner_key, action_ids, notes=notes)
 
     def get_reconciliation_item(self, owner_key: str, reconciliation_id: int):
         return self.store.get_reconciliation_item(owner_key, reconciliation_id)
@@ -784,6 +809,7 @@ class BankingService:
         *,
         actor_key: str,
         action_ids: list[str],
+        adjust_action_id: str | None = None,
     ) -> tuple[ReconciliationItem | None, list[ActionLogCandidate], str]:
         item = self.get_reconciliation_item(owner_key, reconciliation_id)
         if item is None:
@@ -818,7 +844,46 @@ class BankingService:
         total_cents = sum(round(candidate.amount * 100) for candidate in candidates)
         bank_cents = round(abs(item.transaction.amount) * 100)
         if abs(total_cents - bank_cents) > 1:
-            return item, candidates, "amount_mismatch"
+            adjust_id = (adjust_action_id or "").strip()
+            if not adjust_id:
+                return item, candidates, "amount_mismatch"
+            adjust_candidate = next((candidate for candidate in candidates if candidate.action_id == adjust_id), None)
+            if adjust_candidate is None:
+                return item, candidates, "adjust_action_not_in_group"
+            suggested_cents = round(adjust_candidate.amount * 100) + (bank_cents - total_cents)
+            if suggested_cents < 0:
+                return item, candidates, "adjustment_negative"
+            suggested_amount = suggested_cents / 100
+            success, detail = update_recent_action(
+                actor_key,
+                updates={"amount": f"{suggested_amount:.2f}"},
+                action_id=adjust_candidate.action_id,
+                metadata_extra={
+                    "origin": "bank_reconciliation",
+                    "bank_reconciliation_id": str(reconciliation_id),
+                    "bank_reconciliation_group_adjustment": "true",
+                },
+            )
+            if not success:
+                return item, candidates, f"amount_update_failed: {detail}"
+
+            action_by_id = {logged.id: logged for logged in read_active_logged_actions(actor_key)}
+            adjusted_candidates: list[ActionLogCandidate] = []
+            for action_id in cleaned_ids:
+                logged = action_by_id.get(action_id)
+                if logged is None:
+                    return item, candidates, "action_not_found_after_adjustment"
+                candidate = action_log_candidate_by_id(logged)
+                if candidate is None:
+                    return item, candidates, "action_not_reconcilable_after_adjustment"
+                adjusted_candidates.append(candidate)
+            candidates = adjusted_candidates
+            total_cents = sum(round(candidate.amount * 100) for candidate in candidates)
+            if abs(total_cents - bank_cents) > 1:
+                return item, candidates, "amount_mismatch_after_adjustment"
+            status = "matched_adjusted"
+        else:
+            status = "matched"
 
         match_id = "+".join(candidate.action_id for candidate in candidates)
         sheet_ref = " + ".join(candidate.sheet_ref for candidate in candidates)
@@ -829,7 +894,7 @@ class BankingService:
             matched_sheet_ref=sheet_ref,
             notes=f"matched existing grouped rows totaling ${total_cents / 100:.2f}",
         )
-        return confirmed, candidates, "matched"
+        return confirmed, candidates, status
 
     def reconciliation_preview(
         self,

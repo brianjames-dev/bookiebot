@@ -1,3 +1,5 @@
+from datetime import date, timedelta
+
 from bookiebot.banking.crypto import TokenCipher
 from bookiebot.banking.models import BankAccount
 from bookiebot.banking.store import BankStore
@@ -682,6 +684,77 @@ def test_unresolved_reconciliation_items_only_returns_open_items(tmp_path):
     assert unresolved[0].transaction.name == "Unlogged Coffee"
 
 
+def test_unresolved_reconciliation_items_can_filter_by_max_age(tmp_path):
+    store = _store(tmp_path)
+    item = store.upsert_item(
+        owner_key="brian",
+        provider="plaid",
+        item_id="item-brian",
+        access_token="access-sandbox-brian",
+        institution_name="Plaid Sandbox",
+    )
+    store.upsert_accounts(
+        [
+            BankAccount(
+                item_id=item.id,
+                provider_account_id="account-brian",
+                owner_key="brian",
+                name="Brian Checking",
+                mask="1111",
+                type="depository",
+                subtype="checking",
+                official_name=None,
+                current_balance=500.0,
+                available_balance=450.0,
+            )
+        ]
+    )
+    current_date = date.today().isoformat()
+    old_date = (date.today() - timedelta(days=61)).isoformat()
+    store.upsert_transactions(
+        [
+            {
+                "transaction_id": "txn-current",
+                "account_id": "account-brian",
+                "date": current_date,
+                "name": "Current Coffee",
+                "amount": 4.33,
+                "pending": False,
+            },
+            {
+                "transaction_id": "txn-old",
+                "account_id": "account-brian",
+                "date": old_date,
+                "name": "Old Coffee",
+                "amount": 5.55,
+                "pending": False,
+            },
+        ],
+        owner_key="brian",
+    )
+    by_name = {transaction.name: transaction for transaction in store.recent_transactions("brian", limit=2)}
+    current_item = store.upsert_reconciliation_item(
+        owner_key="brian",
+        transaction=by_name["Current Coffee"],
+        classification="expense",
+        status="needs_review",
+        confidence=0.6,
+    )
+    old_item = store.upsert_reconciliation_item(
+        owner_key="brian",
+        transaction=by_name["Old Coffee"],
+        classification="expense",
+        status="needs_review",
+        confidence=0.6,
+    )
+
+    all_items = store.unresolved_reconciliation_items("brian")
+    recent_items = store.unresolved_reconciliation_items("brian", max_age_days=60)
+
+    assert {item.id for item in all_items} == {current_item.id, old_item.id}
+    assert [item.id for item in recent_items] == [current_item.id]
+
+
 def test_unreconciled_transactions_skip_pending_items(tmp_path):
     store = _store(tmp_path)
     item = store.upsert_item(
@@ -1069,6 +1142,71 @@ def test_reopen_reconciliation_item_returns_confirmed_item_to_review(tmp_path):
     assert reopened.matched_sheet_ref is None
     assert store.matched_action_log_ids("brian") == set()
     assert [item.id for item in store.unresolved_reconciliation_items("brian")] == [open_item.id]
+
+
+def test_reopen_reconciliation_items_for_action_ids_handles_group_matches(tmp_path):
+    store = _store(tmp_path)
+    item = store.upsert_item(
+        owner_key="brian",
+        provider="plaid",
+        item_id="item-brian",
+        access_token="access-sandbox-brian",
+        institution_name="Plaid Sandbox",
+    )
+    store.upsert_accounts(
+        [
+            BankAccount(
+                item_id=item.id,
+                provider_account_id="account-brian",
+                owner_key="brian",
+                name="Brian Checking",
+                mask="1111",
+                type="depository",
+                subtype="checking",
+                official_name=None,
+                current_balance=500.0,
+                available_balance=450.0,
+            )
+        ]
+    )
+    store.upsert_transactions(
+        [
+            {
+                "transaction_id": "txn-group",
+                "account_id": "account-brian",
+                "date": "2026-05-17",
+                "name": "Grouped Purchases",
+                "amount": 25.00,
+                "pending": False,
+            }
+        ],
+        owner_key="brian",
+    )
+    transaction = store.recent_transactions("brian", limit=1)[0]
+    open_item = store.upsert_reconciliation_item(
+        owner_key="brian",
+        transaction=transaction,
+        classification="expense",
+        status="needs_review",
+        confidence=0.6,
+    )
+    store.confirm_reconciliation_item(
+        "brian",
+        open_item.id,
+        matched_action_log_id="abc123+def456",
+        matched_sheet_ref="expense!row 5 + expense!row 6",
+    )
+
+    reopened = store.reopen_reconciliation_items_for_action_ids(
+        "brian",
+        {"def456"},
+        notes="reopened because matched action was updated",
+    )
+
+    assert [item.id for item in reopened] == [open_item.id]
+    assert reopened[0].status == "needs_review"
+    assert reopened[0].matched_action_log_id is None
+    assert "reopened because matched action was updated" in (reopened[0].notes or "")
 
 
 def test_matched_action_log_ids_splits_group_matches(tmp_path):

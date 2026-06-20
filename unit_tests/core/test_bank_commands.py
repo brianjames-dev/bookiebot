@@ -16,7 +16,11 @@ from bookiebot.banking.formatting import (
 from bookiebot.banking.reconciliation import ActionLogCandidate
 from bookiebot.banking.reconciliation import ActionLogCandidateGroup
 from bookiebot.core.commands import _clean_command_text
-from bookiebot.ui.bank_reconciliation import BankExpenseFixedFieldsView, BankReconciliationDetailView
+from bookiebot.ui.bank_reconciliation import (
+    BankExpenseFixedFieldsView,
+    BankReconciliationDetailView,
+    BankReconciliationGroupAdjustView,
+)
 
 
 def test_clean_command_text_strips_matching_outer_quotes():
@@ -179,13 +183,41 @@ def test_format_group_match_amount_mismatch_shows_update_choices():
         ActionLogCandidate("zazzle123", "expense!row 13", "expense", date(2026, 5, 15), 38.00, "Zazzle", 0.9, ""),
     ]
 
-    output = format_group_match_amount_mismatch(item, candidates)
+    output = format_group_match_amount_mismatch(
+        item,
+        candidates,
+        reconciliation_id=126,
+        action_ids=["minted123", "zazzle123"],
+        include_commands=True,
+    )
 
     assert "Bank: `$173.59`" in output
     assert "Selected rows: `$173.93`" in output
     assert "Difference: `$-0.34`" in output
     assert "Selected sheet rows:" in output
-    assert "`/debug_bank_update_action_amount action_id:zazzle123 amount:37.66`" in output
+    assert (
+        "`/debug_bank_match_group reconciliation_id:126 action_ids:minted123,zazzle123 "
+        "adjust_action_id:zazzle123` -> sets `zazzle123` to `$37.66`"
+    ) in output
+
+
+@pytest.mark.asyncio
+async def test_group_adjust_view_offers_deterministic_row_adjustment_buttons():
+    candidates = [
+        ActionLogCandidate("minted123", "expense!row 12", "expense", date(2026, 5, 15), 135.93, "Minted", 0.9, ""),
+        ActionLogCandidate("zazzle123", "expense!row 13", "expense", date(2026, 5, 15), 38.00, "Zazzle", 0.9, ""),
+    ]
+
+    async def noop(*_args):
+        return None
+
+    view = BankReconciliationGroupAdjustView(candidates, noop, group_index=2, bank_amount=173.59)
+
+    labels = [child.label for child in view.children]
+    actions = [child.action for child in view.children]
+    assert labels[:2] == ["Adjust Minted to $135.59", "Adjust Zazzle to $37.66"]
+    assert actions[:2] == ["group_adjust:2:minted123", "group_adjust:2:zazzle123"]
+    assert labels[-1] == "Cancel"
 
 
 def test_format_reconciliation_detail_can_hide_debug_commands_for_button_flow():

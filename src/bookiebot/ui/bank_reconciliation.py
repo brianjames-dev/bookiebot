@@ -136,6 +136,33 @@ class BankReconciliationLogChoiceView(ViewBase):  # type: ignore[misc]
         self.add_item(BankReconciliationButton("Log as income/refund", "log:income", callback_func))
 
 
+class BankReconciliationGroupAdjustView(ViewBase):  # type: ignore[misc]
+    def __init__(
+        self,
+        candidates: list[ActionLogCandidate],
+        callback_func: Callable,
+        *,
+        group_index: int,
+        bank_amount: float,
+    ):
+        super().__init__(timeout=600)
+        selected_total = sum(candidate.amount for candidate in candidates)
+        difference = bank_amount - selected_total
+        for candidate in candidates[:4]:
+            suggested_amount = candidate.amount + difference
+            if suggested_amount < 0:
+                continue
+            label = f"Adjust {candidate.label[:38]} to ${suggested_amount:.2f}"[:80]
+            self.add_item(
+                BankReconciliationButton(
+                    label,
+                    f"group_adjust:{group_index}:{candidate.action_id}",
+                    callback_func,
+                )
+            )
+        self.add_item(BankReconciliationButton("Cancel", "cancel", callback_func))
+
+
 class BankExpenseCategorySelect(SelectBase):  # type: ignore[misc]
     def __init__(self, callback_func: Callable, *, default_category: str):
         options = [

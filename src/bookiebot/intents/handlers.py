@@ -355,7 +355,7 @@ def _recent_action_select_view(actor_key: str | None, actions: list[Any], *, des
                     return
                 set_pending_move_selection(actor_key, action_id)
                 await decision_interaction.response.send_message(
-                    _with_component_spacer("Which category would you like to move this transaction to?", True),
+                    _with_component_spacer(_move_category_prompt(actor_key, action_id), True),
                     view=_move_category_view(actor_key, action_id),
                     ephemeral=True,
                 )
@@ -491,7 +491,7 @@ def _move_confirm_view(
                 await _send_interaction_action_result(interaction, success, detail)
                 return
             await interaction.response.send_message(
-                _with_component_spacer("Which category would you like to move this transaction to?", True),
+                _with_component_spacer(_move_category_prompt(actor_key, action_id), True),
                 view=_move_category_view(actor_key, action_id, updates),
                 ephemeral=True,
             )
@@ -518,7 +518,17 @@ def _move_category_view(actor_key: str | None, action_id: str, updates: dict[str
         )
         await _send_interaction_action_result(interaction, success, detail)
 
-    return MoveCategoryView(handle_category)
+    logged = select_recent_action(actor_key, action_id=action_id)
+    source_category = logged.action.metadata.get("category") if logged else None
+    return MoveCategoryView(handle_category, exclude_category=source_category)
+
+
+def _move_category_prompt(actor_key: str | None, action_id: str) -> str:
+    logged = select_recent_action(actor_key, action_id=action_id)
+    source_category = logged.action.metadata.get("category") if logged else None
+    if source_category:
+        return f"Move this {source_category} expense to which category?"
+    return "Which category would you like to move this transaction to?"
 
 
 async def _send_update_field_prompt(target: Any, actor_key: str | None, action_id: str) -> None:
@@ -609,7 +619,7 @@ async def update_recent_action_handler(entities: IntentEntities, message: Any) -
     if not isinstance(updates, dict):
         updates = {}
 
-    for field in ("amount", "location", "item", "person", "date", "source"):
+    for field in ("amount", "location", "item", "person", "source"):
         if field in entities and field not in updates:
             updates[field] = entities[field]
     has_update_values = any(value not in (None, "") for value in updates.values())
@@ -662,7 +672,7 @@ async def move_recent_action_handler(entities: IntentEntities, message: Any) -> 
     updates = entities.get("updates") or {}
     if not isinstance(updates, dict):
         updates = {}
-    for field in ("amount", "location", "item", "person", "date", "source"):
+    for field in ("amount", "location", "item", "person", "source"):
         if field in entities and field not in updates:
             updates[field] = entities[field]
 
@@ -705,7 +715,7 @@ async def _send_action_result(message: Any, success: bool, detail: str) -> None:
     if detail.startswith("Recent logged actions") or detail.startswith("I do not have more recent logged actions"):
         await _send_recent_private_message(message, detail)
         return
-    if detail == "What is the name of the item?":
+    if _is_move_item_prompt(detail):
         await _send_recent_private_message(message, detail)
         return
     prefix = "✅" if success else "❌"
@@ -713,11 +723,15 @@ async def _send_action_result(message: Any, success: bool, detail: str) -> None:
 
 
 async def _send_interaction_action_result(interaction: Any, success: bool, detail: str) -> None:
-    if detail == "What is the name of the item?":
+    if _is_move_item_prompt(detail):
         await interaction.followup.send(detail, ephemeral=True)
         return
     prefix = "✅" if success else "❌"
     await interaction.followup.send(f"{prefix} {detail}", ephemeral=True)
+
+
+def _is_move_item_prompt(detail: str) -> bool:
+    return detail.startswith("To move this ") and "reply with the item name" in detail
 
 
 def _with_component_spacer(content: str, view: Any | None) -> str:

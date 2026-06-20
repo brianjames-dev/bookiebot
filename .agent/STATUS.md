@@ -1,16 +1,33 @@
 # Agent Status
 
-Last updated: 2026-06-18
+Last updated: 2026-06-20
 
 ## Active Focus
 
-Harden the recent transactions flow where a user chooses a logged action and updates, moves, or deletes it.
+Grouped reconciliation amount mismatch handling is now in verification/manual-test mode.
 
 ## On Deck
 
-1. Decide whether date updates should be exposed in the UI.
-2. Synchronize reconciled action mutation with reconciliation items.
-3. Add regression tests for date update behavior and reconciled action mutation.
+1. Keep structured reconciliation event logging deferred unless Railway/app logs prove insufficient for debugging.
+2. Revisit reconciliation state-machine cleanup only if current statuses become confusing again.
+3. Consider a richer Discord button flow for grouped amount adjustments if the debug command path feels too manual.
+
+## Completed 2026-06-20
+
+- User-entered date updates are no longer accepted in the recent transaction update flow; the date field is reserved for reconciliation-origin automation that can use the bank transaction date.
+- Recent-action update, move, delete, and undo paths now reopen linked reconciliation items by action-log ID so confirmed/matched bank items do not stay stale after the sheet row changes.
+- Reconciliation action-link reopening supports grouped match IDs such as `id1+id2`.
+- Normal unresolved reconciliation inbox/digest/session views now use a 60-day max transaction age through `BOOKIEBOT_RECONCILIATION_MAX_AGE_DAYS`.
+- Old unresolved reconciliation records remain in storage, but they are excluded from normal unresolved review views unless lower-level/admin code asks without an age cutoff.
+- Added regression tests for date rejection, reconciliation reopen hooks after recent-action mutations, grouped action-link reopening, and the 60-day unresolved-item cutoff.
+- Existing-row reconciliation amount mismatches are resolved by the user's match confirmation: once the user chooses the matching row, BookieBot updates the sheet amount to the bank transaction amount and confirms the reconciliation item.
+- Added regression coverage proving single-row mismatch confirmation updates the matched sheet/action row to the bank amount after the user selects the match.
+- Recent-action move prompts now explain when an item name is needed because the destination category requires it.
+- Pending move-item replies can now be canceled without using `cancel` as the item name.
+- Recent-action move no longer asks users to supply missing dates manually; missing source-row dates produce a system/source-row correction message.
+- Move category buttons now omit the transaction's current category and use source-category-aware prompt copy.
+- Grouped reconciliation amount mismatches now offer a normal button-based adjustment path: choose one selected row to absorb the delta, update it to the bank-total-compatible amount, and confirm the group.
+- Added regression coverage for grouped match adjustment, adjustment buttons, and updated mismatch guidance.
 
 ## Completed 2026-06-18
 
@@ -45,7 +62,9 @@ Harden the recent transactions flow where a user chooses a logged action and upd
 
 - The broader backlog now lives in `.agent/WORKSTREAM_FINANCE_OPS.md`.
 - The task execution/update process lives in `.Agents`.
-- Reconciliation freshness, digest lifecycle, and event logging remain important, but they are not the immediate implementation focus.
+- Reconciliation freshness and digest lifecycle remain important, but they are not the immediate implementation focus.
+- Structured event logging is deferred. Railway/app logs are enough for now unless future debugging gaps prove otherwise.
+- We decided not to add a stale status right now; normal unresolved review uses the 60-day freshness filter only.
 - The current recent-action tests pass for existing happy paths:
   - listing and paging
   - updating normal expense fields
@@ -101,6 +120,28 @@ Use a test row or low-risk real row in Discord:
    - Expected: cash-pull details appear in the target user's DM, not the shared channel.
 22. Trigger or wait for a Plaid sync after the morning window.
    - Expected: new unresolved items do not cause a daily digest to appear in the channel later that day.
+23. Try to update a recent transaction's date through text or parsed entities.
+   - Expected: BookieBot rejects `date` as an editable field and the sheet date cell does not change.
+24. Reconcile a bank transaction to an existing recent action, then update that recent action's amount/item/location.
+   - Expected: the linked reconciliation item is reopened for review instead of staying silently confirmed.
+25. Reconcile a bank transaction to an existing recent action, then move, delete, or undo that recent action.
+   - Expected: the linked reconciliation item returns to the inbox/review state so the user can confirm what should happen next.
+26. Add or leave an unresolved posted bank transaction older than 60 days, then open the normal reconciliation digest or inbox.
+   - Expected: the old transaction does not appear in the normal unresolved list; recent unresolved transactions still appear.
+27. Confirm an existing sheet/action row whose amount does not match the bank transaction.
+   - Expected: BookieBot treats your match selection as confirmation, updates the sheet amount to the bank transaction amount, and confirms the reconciliation item.
+28. Move a grocery or gas transaction into food without providing an item name.
+   - Expected: BookieBot asks for the item name and explains it is needed for the destination category.
+29. Reply `cancel` to a pending move item-name prompt.
+   - Expected: BookieBot cancels the move and does not write `cancel` as the item name.
+30. Try moving a source row that is missing its date.
+   - Expected: BookieBot refuses the move with a source-row/date correction message instead of asking you to type a date.
+31. Start a move from a grocery transaction using the move controls.
+   - Expected: the destination category buttons do not include `Grocery`.
+32. Try a grouped reconciliation match whose selected rows do not exactly total the bank transaction.
+   - Expected: BookieBot shows the mismatch and offers buttons for which selected row should absorb the difference.
+33. Click the row that should absorb the difference.
+   - Expected: BookieBot updates that row amount to make the group total match, then confirms the grouped reconciliation item.
 
 ## Verification Baseline
 
@@ -115,13 +156,13 @@ Latest verification:
 
 ```bash
 python -m pytest unit_tests -q
-# 306 passed
+# 321 passed
 
 python -m pytest unit_tests/banking/test_reconciliation.py unit_tests/banking/test_store.py unit_tests/core/test_bank_reconciliation.py -q
-# 80 passed
+# 81 passed
 
 python -m pytest unit_tests/intents/test_handlers.py unit_tests/core/test_message_router.py -q
-# 100 passed
+# 111 passed
 
 python -m pyright
 # Did not run: pyright is not installed in the current Python environment.

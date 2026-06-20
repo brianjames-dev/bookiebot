@@ -1,3 +1,5 @@
+import json
+
 import pytest
 from types import SimpleNamespace
 from unittest.mock import AsyncMock, MagicMock, patch
@@ -527,6 +529,105 @@ async def test_update_recent_action_changes_logged_expense_amount(monkeypatch, m
 
     assert any("Before:\n```" in (msg or "") for msg, _ in message.channel.sent)
     assert any("Amount: $12.50" in (msg or "") and "Amount: $14.75" in (msg or "") for msg, _ in message.channel.sent)
+
+
+@pytest.mark.asyncio
+async def test_update_recent_action_rejects_user_entered_date(monkeypatch, message):
+    import bookiebot.sheets.writer as writer
+
+    monkeypatch.setattr(writer, "resolve_query_persons", lambda user, person=None, user_id=None: ["Hannah"])
+    repo = SheetsRepoStub(expense_rows=[[], []])
+
+    with repo.patched():
+        await ih.handle_intent(
+            "log_expense",
+            {"type": "expense", "category": "food", "amount": 12.5, "item": "Burrito", "location": "Chipotle"},
+            message,
+        )
+
+        original_date = repo.expense.cell(3, 14).value
+        await ih.handle_intent("update_recent_action", {"index": 1, "updates": {"date": "1/1/2020"}}, message)
+
+        assert repo.expense.cell(3, 14).value == original_date
+
+    reply = message.channel.sent[-1][0] or ""
+    assert "not: date" in reply
+
+
+@pytest.mark.asyncio
+async def test_update_recent_action_reopens_reconciliation_links(monkeypatch, message):
+    import bookiebot.sheets.undo as undo
+    import bookiebot.sheets.writer as writer
+
+    synced = []
+    monkeypatch.setattr(writer, "resolve_query_persons", lambda user, person=None, user_id=None: ["Hannah"])
+    monkeypatch.setattr(
+        undo,
+        "_sync_reconciliation_after_action_mutation",
+        lambda user_key, action_ids, **kwargs: synced.append((user_key, action_ids, kwargs)),
+    )
+    repo = SheetsRepoStub(expense_rows=[[], []])
+
+    with repo.patched():
+        await ih.handle_intent(
+            "log_expense",
+            {"type": "expense", "category": "food", "amount": 12.5, "item": "Burrito", "location": "Chipotle"},
+            message,
+        )
+        from bookiebot.sheets.undo import recent_actions
+
+        action_id = recent_actions(str(message.author.id), 1)[0].id
+        await ih.handle_intent("update_recent_action", {"index": 1, "updates": {"amount": 14.75}}, message)
+
+    assert synced[-1] == (
+        str(message.author.id),
+        {action_id},
+        {"reason": "updated", "metadata_extra": None},
+    )
+
+
+@pytest.mark.asyncio
+async def test_move_delete_and_undo_recent_actions_reopen_reconciliation_links(monkeypatch, message):
+    import bookiebot.sheets.undo as undo
+    import bookiebot.sheets.writer as writer
+
+    synced = []
+    monkeypatch.setattr(writer, "resolve_query_persons", lambda user, person=None, user_id=None: ["Hannah"])
+    monkeypatch.setattr(
+        undo,
+        "_sync_reconciliation_after_action_mutation",
+        lambda user_key, action_ids, **kwargs: synced.append((user_key, action_ids, kwargs)),
+    )
+    repo = SheetsRepoStub(expense_rows=[[], []])
+
+    with repo.patched():
+        await ih.handle_intent(
+            "log_expense",
+            {
+                "type": "expense",
+                "category": "grocery",
+                "amount": 12.5,
+                "item": "Apples",
+                "location": "Safeway",
+                "person": "Hannah",
+            },
+            message,
+        )
+        from bookiebot.sheets.undo import _latest_raw_logged_action, recent_actions
+
+        source_action_id = recent_actions(str(message.author.id), 1)[0].id
+        await ih.handle_intent("move_recent_action", {"index": 1, "category": "food", "updates": {"item": "Snacks"}}, message)
+        move_action_id = recent_actions(str(message.author.id), 1)[0].id
+        await ih.handle_intent("delete_recent_action", {"index": 1}, message)
+        delete_action = _latest_raw_logged_action(str(message.author.id))
+        assert delete_action is not None
+        delete_action_id = delete_action.id
+        deleted_action_ids = set(json.loads(delete_action.action.metadata["deleted_action_ids"]))
+        await ih.handle_intent("undo_last_transaction", {}, message)
+
+    assert (str(message.author.id), {source_action_id}, {"reason": "moved"}) in synced
+    assert (str(message.author.id), deleted_action_ids, {"reason": "deleted"}) in synced
+    assert (str(message.author.id), {delete_action_id, *deleted_action_ids}, {"reason": "undone"}) in synced
 
 
 @pytest.mark.asyncio
@@ -1201,8 +1302,65 @@ async def test_move_recent_action_asks_for_item_when_destination_requires_it(mon
         assert repo.expense.cell(3, 16).value == "$12.50"
         assert repo.expense.cell(3, 17).value == "Chipotle"
 
-    assert any((msg or "") == "What is the name of the item?" for msg, _ in message.channel.sent)
+    assert any(
+        (msg or "") == "To move this grocery expense to food, reply with the item name to use in food."
+        for msg, _ in message.channel.sent
+    )
     assert any("Moved logged expense" in (msg or "") for msg, _ in message.channel.sent)
+
+
+@pytest.mark.asyncio
+async def test_move_recent_action_does_not_ask_user_for_missing_date(monkeypatch, message):
+    import bookiebot.sheets.writer as writer
+
+    monkeypatch.setattr(writer, "resolve_query_persons", lambda user, person=None, user_id=None: ["Hannah"])
+    repo = SheetsRepoStub(expense_rows=[[], []])
+
+    with repo.patched():
+        await ih.handle_intent(
+            "log_expense",
+            {"type": "expense", "category": "grocery", "amount": 12.5, "item": "Groceries", "location": "Chipotle"},
+            message,
+        )
+        repo.expense.update_cell(3, 1, "")
+
+        await ih.handle_intent(
+            "move_recent_action",
+            {"index": 1, "category": "food", "updates": {"item": "Burrito"}},
+            message,
+        )
+
+        assert repo.expense.cell(3, 1).value == ""
+        assert repo.expense.cell(3, 15).value == ""
+
+    assert any(
+        "missing a date" in (msg or "") and "should not ask you to enter dates manually" in (msg or "")
+        for msg, _ in message.channel.sent
+    )
+    assert not any((msg or "").startswith("To move this grocery expense") for msg, _ in message.channel.sent)
+
+
+@pytest.mark.asyncio
+async def test_move_category_view_excludes_current_category(monkeypatch, message):
+    import bookiebot.sheets.writer as writer
+
+    monkeypatch.setattr(writer, "resolve_query_persons", lambda user, person=None, user_id=None: ["Hannah"])
+    repo = SheetsRepoStub(expense_rows=[[], []])
+
+    with repo.patched():
+        await ih.handle_intent(
+            "log_expense",
+            {"type": "expense", "category": "grocery", "amount": 12.5, "item": "Groceries", "location": "Chipotle"},
+            message,
+        )
+        from bookiebot.sheets.undo import recent_actions
+
+        action_id = recent_actions(str(message.author.id), 1)[0].id
+        view = ih._move_category_view(str(message.author.id), action_id)
+
+    labels = [child.label for child in view.children]
+    assert "Grocery" not in labels
+    assert labels == ["Gas", "Food", "Shopping"]
 
 
 @pytest.mark.asyncio

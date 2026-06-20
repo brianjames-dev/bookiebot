@@ -79,9 +79,12 @@ class UpdateConfirmView(ViewBase):  # type: ignore[misc]
 
 
 class MoveCategoryView(ViewBase):  # type: ignore[misc]
-    def __init__(self, callback_func: Callable):
+    def __init__(self, callback_func: Callable, *, exclude_category: str | None = None):
         super().__init__(timeout=300)
+        excluded = (exclude_category or "").strip().lower()
         for category in ["Grocery", "Gas", "Food", "Shopping"]:
+            if category.lower() == excluded:
+                continue
             self.add_item(RecentActionButton(category, category.lower(), callback_func))
 
 
