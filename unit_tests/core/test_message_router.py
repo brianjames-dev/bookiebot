@@ -155,6 +155,23 @@ def test_processing_error_reply_includes_context_for_income():
     assert "sheet may already have been updated" in reply
 
 
+def test_bot_identifies_discord_login_rate_limit():
+    from bookiebot.core import bot
+
+    assert bot._is_discord_login_rate_limit(Exception("429 You are being rate limited 1015")) is True
+    assert bot._is_discord_login_rate_limit(Exception("regular startup failure")) is False
+
+
+def test_bot_login_retry_seconds_has_minimum(monkeypatch):
+    from bookiebot.core import bot
+
+    monkeypatch.setenv("BOOKIEBOT_DISCORD_LOGIN_RETRY_SECONDS", "5")
+    assert bot._login_retry_seconds() == 60
+
+    monkeypatch.setenv("BOOKIEBOT_DISCORD_LOGIN_RETRY_SECONDS", "abc")
+    assert bot._login_retry_seconds() == 900
+
+
 @pytest.mark.asyncio
 async def test_on_message_numeric_reply_reports_expired_pending_selection(monkeypatch):
     import bookiebot.core.message_router as router
