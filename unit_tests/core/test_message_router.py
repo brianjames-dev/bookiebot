@@ -124,6 +124,15 @@ def test_recent_query_show_more():
     )
 
 
+def test_recent_query_single_word_routes_without_llm():
+    from bookiebot.core.message_router import _recent_query_intent
+
+    assert _recent_query_intent("Recent") == (
+        "query_recent_actions",
+        {"n": 5},
+    )
+
+
 def test_recent_query_explicit_n_is_preserved():
     from bookiebot.core.message_router import _recent_query_intent
 

@@ -228,6 +228,37 @@ async def test_query_recent_actions_sends_transaction_list_privately(monkeypatch
 
 
 @pytest.mark.asyncio
+async def test_query_recent_actions_chunks_large_private_list(monkeypatch):
+    import bookiebot.sheets.writer as writer
+
+    monkeypatch.setattr(writer, "resolve_query_persons", lambda user, person=None, user_id=None: ["Hannah"])
+    author = PrivateAuthor()
+    message = SimpleNamespace(content="hi", author=author, channel=DummyChannel())
+    repo = SheetsRepoStub(expense_rows=[[], []])
+
+    with repo.patched():
+        for index in range(25):
+            await ih.handle_intent(
+                "log_expense",
+                {
+                    "type": "expense",
+                    "category": "food",
+                    "amount": float(index + 1),
+                    "item": f"Very long item name number {index + 1} with enough detail to lengthen the recent list",
+                    "location": "A very descriptive test location",
+                },
+                message,
+            )
+        await ih.handle_intent("query_recent_actions", {"n": 25, "explicit_n": True}, message)
+
+    assert len(author.dm_sent) > 1
+    assert all(len(content or "") <= 1900 for content, _kwargs in author.dm_sent)
+    assert not any("recent transaction workflow privately" in (msg or "") for msg, _ in message.channel.sent)
+    assert author.dm_sent[-1][1].get("view") is not None
+    assert all(not kwargs.get("view") for _content, kwargs in author.dm_sent[:-1])
+
+
+@pytest.mark.asyncio
 async def test_recent_interaction_rejects_non_owner():
     class Response:
         def __init__(self):
@@ -410,6 +441,30 @@ async def test_update_recent_income_changes_source_and_amount(message):
 
         assert repo.income.cell(1, 2).value == "Sonic"
         assert repo.income.cell(1, 3).value == "1639.9"
+
+
+@pytest.mark.asyncio
+async def test_updated_income_recent_display_keeps_amount_when_only_source_changes(message):
+    repo = SheetsRepoStub(income_rows=[["", "Existing Income", "100"], ["", "Monthly Income:", ""]])
+
+    with repo.patched():
+        await ih.handle_intent(
+            "log_income",
+            {"type": "income", "amount": 653.69, "source": "ACH payroll"},
+            message,
+        )
+        await ih.handle_intent(
+            "update_recent_action",
+            {"index": 1, "updates": {"source": "xAI income"}},
+            message,
+        )
+        await ih.handle_intent("query_recent_actions", {"n": 5}, message)
+
+    recent_reply = message.channel.sent[-1][0] or ""
+    assert "Updated: Income" in recent_reply
+    assert "   Income: $653.69 from xAI income" in recent_reply
+    assert "Amount: $xAI income" not in recent_reply
+    assert "Updated: Transaction Expense" not in recent_reply
 
 
 @pytest.mark.asyncio

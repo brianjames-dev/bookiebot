@@ -20,6 +20,20 @@ logger = logging.getLogger(__name__)
 # Temporary memory for user interactions (used for dropdown callbacks)
 pending_data_by_user = {}
 
+
+async def _expense_sheet_with_retry(attempts: int = 2):
+    last_error: Exception | None = None
+    for attempt in range(max(1, attempts)):
+        try:
+            return get_sheets_repo().expense_sheet()
+        except Exception as exc:
+            last_error = exc
+            if attempt < attempts - 1:
+                await asyncio.sleep(0.75)
+    assert last_error is not None
+    raise last_error
+
+
 async def write_to_sheet(data, message):
     if data["type"] == "income":
         await write_income_to_sheet(data, message)
@@ -136,15 +150,15 @@ async def write_expense_to_sheet(data, message):
 
     ws = None
     try:
-        ws = get_sheets_repo().expense_sheet()
+        ws = await _expense_sheet_with_retry()
     except Exception as e:
-        logger.error("Could not access expense sheet", extra={"exception": str(e)})
+        logger.exception("Could not access expense sheet", extra={"exception": str(e), "category": category})
         if message:
-            await message.channel.send("Error accessing expense sheet.")
+            await message.channel.send("❌ I could not access the expense sheet. Please try again in a moment.")
         return
     if ws is None:
         if message:
-            await message.channel.send("Error accessing expense sheet.")
+            await message.channel.send("❌ I could not access the expense sheet. Please try again in a moment.")
         return
 
     discord_user = getattr(message.author, "name", "").lower()

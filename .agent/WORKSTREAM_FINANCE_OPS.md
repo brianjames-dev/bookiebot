@@ -207,6 +207,11 @@ Status: Complete first pass as of 2026-06-20. Normal unresolved views use a 60-d
 
 Status: Complete first pass as of 2026-06-20. Existing-row match confirmation updates the sheet/action amount to the bank amount after the user selects the row as the match. Grouped matches still reject total mismatches by default, and now provide a button-based row adjustment path plus an internal `adjust_action_id` tool path to update one selected row and confirm the group.
 
+### 2026-06-20 Reliability Follow-Up
+
+- One-word `recent` now routes directly to recent actions before LLM parsing, preventing misclassification into unrelated logging flows.
+- Expense sheet access during logging now retries once before returning a user-facing sheet access failure.
+
 ### Slice 6 - Simplify Module Boundaries
 
 - Keep matching/scoring in a reconciliation engine module.

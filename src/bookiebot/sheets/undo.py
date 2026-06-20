@@ -511,6 +511,8 @@ def action_title(action: UndoAction) -> str:
     if action_type == "expense":
         return f"{category or 'expense'} expense".title()
     if action_type == "update":
+        if _is_income_display_action(action):
+            return "Updated: Income"
         return f"Updated: {(category or 'transaction').capitalize()} Expense"
     if action_type == "move":
         source = action.metadata.get("source_category", "unknown")
@@ -953,11 +955,11 @@ def format_action_detail_block(action: UndoAction) -> str:
 
 def _format_action_data_lines(action: UndoAction, values: list[str] | None = None) -> list[str]:
     field_values = _field_values_for_action(action, values)
+    if _is_income_display_action(action):
+        return _income_data_lines(action, values)
+
     if action.metadata.get("type") in {"expense", "update", "move"}:
         return _field_data_lines(field_values, action)
-
-    if action.metadata.get("type") == "income":
-        return _income_data_lines(action, values)
 
     if action.metadata.get("type") in {"payment", "savings"}:
         amount = field_values.get("amount", "")
@@ -972,7 +974,7 @@ def _format_action_list_item(index: int, action: UndoAction) -> tuple[str, list[
     field_values = _field_values_for_action(action)
     title = action_title(action)
 
-    if action.metadata.get("type") == "income":
+    if _is_income_display_action(action):
         lines = _income_data_lines(action)
     elif action.metadata.get("type") in {"payment", "savings"}:
         lines = _format_action_data_lines(action)
@@ -983,13 +985,29 @@ def _format_action_list_item(index: int, action: UndoAction) -> tuple[str, list[
     return f"{index}. {title}", lines
 
 
+def _is_income_display_action(action: UndoAction) -> bool:
+    return action.metadata.get("type") == "income" or (
+        action.metadata.get("type") == "update"
+        and (action.metadata.get("source_type") == "income" or action.worksheet == "income")
+    )
+
+
 def _income_data_lines(action: UndoAction, values: list[str] | None = None) -> list[str]:
     source_values = list(values if values is not None else action.new_values)
-    while len(source_values) < 3:
-        source_values.append("")
-    description = _sheet_value(source_values[1]).strip()
-    amount = _money_display_value(source_values[2])
-    source = action.metadata.get("source") or description
+    display_fields = action.metadata.get("display_fields")
+    if values is not None and len(source_values) == 2:
+        description = _sheet_value(source_values[0]).strip()
+        amount = _money_display_value(source_values[1])
+    elif display_fields:
+        field_values = _field_values_for_action(action, values)
+        description = (field_values.get("source") or "").strip()
+        amount = _money_display_value(field_values.get("amount"))
+    else:
+        while len(source_values) < 3:
+            source_values.append("")
+        description = _sheet_value(source_values[1]).strip()
+        amount = _money_display_value(source_values[2])
+    source = description or action.metadata.get("source")
     if amount and source:
         return [f"   Income: {amount} from {source}"]
     if amount:
@@ -1459,12 +1477,13 @@ def update_recent_action(
     if not normalized_updates:
         return False, f"I found {_format_action_snapshot(logged.action)}. Please specify the new value."
 
-    ws = _worksheet(logged.action.worksheet)
     display_fields = list(field_columns.keys())
-    before_values = list(logged.action.new_values)
+    ws = _worksheet(logged.action.worksheet)
+    before_values = [
+        _sheet_value(ws.cell(logged.action.row, col).value)
+        for col in field_columns.values()
+    ]
     after_values = list(before_values)
-    while len(after_values) < len(field_columns):
-        after_values.append("")
     previous_values: list[str] = []
     columns: list[int] = []
     values: list[str] = []
@@ -1500,6 +1519,7 @@ def update_recent_action(
             metadata={
                 **logged.action.metadata,
                 "type": "update",
+                "source_type": logged.action.metadata.get("type", ""),
                 "updated_action_id": logged.id,
                 "display_fields": json.dumps(display_fields),
                 **(metadata_extra or {}),

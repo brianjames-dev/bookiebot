@@ -28,6 +28,10 @@ Grouped reconciliation amount mismatch handling is now in verification/manual-te
 - Move category buttons now omit the transaction's current category and use source-category-aware prompt copy.
 - Grouped reconciliation amount mismatches now offer a normal button-based adjustment path: choose one selected row to absorb the delta, update it to the bank-total-compatible amount, and confirm the group.
 - Added regression coverage for grouped match adjustment, adjustment buttons, and updated mismatch guidance.
+- One-word `recent` now routes directly to recent transactions instead of falling through to LLM parsing.
+- Expense sheet access now retries once before failing, which protects normal expense logging from a transient Google Sheets access miss.
+- Updated income recent-action rows now display as income and keep the amount/source in the correct fields after source-only updates.
+- Large recent-action DM lists are now split into Discord-safe chunks, with controls attached to the final chunk.
 
 ## Completed 2026-06-18
 
@@ -142,6 +146,14 @@ Use a test row or low-risk real row in Discord:
    - Expected: BookieBot shows the mismatch and offers buttons for which selected row should absorb the difference.
 33. Click the row that should absorb the difference.
    - Expected: BookieBot updates that row amount to make the group total match, then confirms the grouped reconciliation item.
+34. Type `recent`.
+   - Expected: BookieBot shows recent transactions directly and does not attempt to log or access the expense sheet.
+35. If Google Sheets has a one-time access hiccup while logging an expense.
+   - Expected: BookieBot retries once before reporting a sheet access failure.
+36. Update only the source/name on a recent income row, then run `recent`.
+   - Expected: the row displays as `Updated: Income` and still shows the original amount with the updated source.
+37. Run `show 20 recent transactions` or `show 25 recent transactions`.
+   - Expected: BookieBot sends the list privately across multiple DM messages instead of failing with a DM-settings error due to message length.
 
 ## Verification Baseline
 
@@ -156,13 +168,13 @@ Latest verification:
 
 ```bash
 python -m pytest unit_tests -q
-# 321 passed
+# 325 passed
 
 python -m pytest unit_tests/banking/test_reconciliation.py unit_tests/banking/test_store.py unit_tests/core/test_bank_reconciliation.py -q
 # 81 passed
 
 python -m pytest unit_tests/intents/test_handlers.py unit_tests/core/test_message_router.py -q
-# 111 passed
+# 114 passed
 
 python -m pyright
 # Did not run: pyright is not installed in the current Python environment.

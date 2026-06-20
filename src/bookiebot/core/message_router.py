@@ -255,6 +255,7 @@ def _recent_query_intent(content: str) -> tuple[str, dict] | None:
     if text == "show more":
         return "query_recent_actions", {"more": True}
     if text in {
+        "recent",
         "recent actions",
         "recent logged actions",
         "show recent actions",

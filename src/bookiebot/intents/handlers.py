@@ -261,15 +261,47 @@ async def query_recent_actions_handler(entities: IntentEntities, message: Any) -
 
 
 async def _send_recent_private_message(message: Any, content: str, **kwargs: Any) -> None:
+    chunks = _discord_message_chunks(content)
     author_send = getattr(getattr(message, "author", None), "send", None)
     if callable(author_send):
         try:
-            await author_send(content, **kwargs)
+            for index, chunk in enumerate(chunks):
+                chunk_kwargs = kwargs if index == len(chunks) - 1 else {}
+                await author_send(chunk, **chunk_kwargs)
         except Exception:
             await message.channel.send("❌ I could not send that recent transaction workflow privately. Please check your DM settings.")
             return
         return
-    await message.channel.send(content, **kwargs)
+    for index, chunk in enumerate(chunks):
+        chunk_kwargs = kwargs if index == len(chunks) - 1 else {}
+        await message.channel.send(chunk, **chunk_kwargs)
+
+
+def _discord_message_chunks(content: str, *, max_chars: int = 1900) -> list[str]:
+    if len(content) <= max_chars:
+        return [content]
+    chunks: list[str] = []
+    current: list[str] = []
+    current_len = 0
+    for line in content.splitlines():
+        line_len = len(line) + 1
+        if current and current_len + line_len > max_chars:
+            chunks.append("\n".join(current))
+            current = []
+            current_len = 0
+        if line_len > max_chars:
+            if current:
+                chunks.append("\n".join(current))
+                current = []
+                current_len = 0
+            for start in range(0, len(line), max_chars):
+                chunks.append(line[start : start + max_chars])
+            continue
+        current.append(line)
+        current_len += line_len
+    if current:
+        chunks.append("\n".join(current))
+    return chunks or [""]
 
 
 def _interaction_actor_key(interaction: Any) -> str | None:
