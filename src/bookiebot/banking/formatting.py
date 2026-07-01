@@ -117,6 +117,21 @@ def format_reconciliation_review(items: list[ReconciliationItem]) -> str:
     return "Unresolved bank reconciliation items:\n```text\n" + "\n".join([header, divider, *rows]) + "\n```"
 
 
+def format_reconciliation_match_report(items: list[ReconciliationItem], *, max_items: int = 12) -> str:
+    matched = [item for item in items if item.status in {"matched", "confirmed", "import_requested"}]
+    if not matched:
+        return "Confirmed matches this run: `0`"
+    header = f"{'ID':>4}  {'Date':<5}  {'Amt':>8}  {'Match':<12}  Name"
+    divider = "-" * len(header)
+    shown = matched[: max(1, max_items)]
+    rows = [_format_reconciliation_match_report_row(item) for item in shown]
+    lines = ["Confirmed matches this run:", _code_table([header, divider, *rows])]
+    omitted = len(matched) - len(shown)
+    if omitted:
+        lines.append(f"...and `{omitted}` more confirmed match(es).")
+    return "\n".join(lines)
+
+
 def format_reconciliation_review_chunks(
     items: list[ReconciliationItem],
     *,
@@ -462,6 +477,21 @@ def _format_reconciliation_review_row(item: ReconciliationItem) -> str:
     )
 
 
+def _format_reconciliation_match_report_row(item: ReconciliationItem) -> str:
+    transaction = item.transaction
+    date = transaction.date or transaction.authorized_date or "unknown"
+    amount = abs(transaction.amount)
+    name = transaction.merchant_name or transaction.name
+    match = item.matched_action_log_id or item.matched_sheet_ref or item.notes or item.classification
+    return (
+        f"{item.id:>4}  "
+        f"{_short_date(date):<5}  "
+        f"{_short_money(amount):>8}  "
+        f"{_clip(match, 12):<12}  "
+        f"{_clip(name, 22)}"
+    )
+
+
 def _format_resolved_reconciliation_review_row(item: ReconciliationItem) -> str:
     transaction = item.transaction
     date = transaction.date or transaction.authorized_date or "unknown"
@@ -479,7 +509,7 @@ def _format_resolved_reconciliation_review_row(item: ReconciliationItem) -> str:
 
 
 def _status_group(item: ReconciliationItem) -> str:
-    return "matched" if item.status == "matched" and item.matched_action_log_id else "needs_review"
+    return "matched" if item.status == "matched" else "needs_review"
 
 
 def _section_label(classification: str, status_group: str) -> str:

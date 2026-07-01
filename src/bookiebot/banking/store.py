@@ -13,6 +13,7 @@ from bookiebot.banking.models import (
     BankStatus,
     BankTransaction,
     LinkedBankItem,
+    PlaidWebhookEvent,
     ReconciliationCacheBuckets,
     ReconciliationClassification,
     ReconciliationItem,
@@ -98,6 +99,7 @@ class BankStore:
                     pending INTEGER NOT NULL,
                     category TEXT,
                     payment_channel TEXT,
+                    pending_transaction_id TEXT,
                     raw_json TEXT NOT NULL,
                     created_at TEXT NOT NULL,
                     updated_at TEXT NOT NULL,
@@ -111,6 +113,19 @@ class BankStore:
                     last_success_at TEXT,
                     last_error TEXT,
                     webhook_pending INTEGER NOT NULL DEFAULT 0
+                );
+
+                CREATE TABLE IF NOT EXISTS bank_webhook_events (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    provider TEXT NOT NULL,
+                    item_id TEXT,
+                    webhook_type TEXT,
+                    webhook_code TEXT,
+                    payload TEXT NOT NULL,
+                    status TEXT NOT NULL DEFAULT 'pending',
+                    received_at TEXT NOT NULL,
+                    processed_at TEXT,
+                    error TEXT
                 );
 
                 CREATE TABLE IF NOT EXISTS bank_reconciliation_items (
@@ -132,10 +147,18 @@ class BankStore:
                 """
             )
             self._ensure_account_watch_column(conn)
+            self._ensure_transaction_pending_link_column(conn)
 
     def _ensure_account_watch_column(self, conn: BankStoreConnection) -> None:
         try:
             conn.execute("ALTER TABLE bank_accounts ADD COLUMN watched INTEGER NOT NULL DEFAULT 1")
+        except sqlite3.OperationalError as exc:
+            if "duplicate column name" not in str(exc).lower():
+                raise
+
+    def _ensure_transaction_pending_link_column(self, conn: BankStoreConnection) -> None:
+        try:
+            conn.execute("ALTER TABLE bank_transactions ADD COLUMN pending_transaction_id TEXT")
         except sqlite3.OperationalError as exc:
             if "duplicate column name" not in str(exc).lower():
                 raise
@@ -203,6 +226,15 @@ class BankStore:
             row = conn.execute(
                 "SELECT * FROM bank_items WHERE id = ? AND owner_key = ?",
                 (int(item_db_id), owner_key),
+            ).fetchone()
+        return _linked_item_from_row(row) if row else None
+
+    def get_item_by_provider_item_id(self, item_id: str) -> LinkedBankItem | None:
+        self.initialize()
+        with self.connect() as conn:
+            row = conn.execute(
+                "SELECT * FROM bank_items WHERE item_id = ? AND status = 'active'",
+                (item_id,),
             ).fetchone()
         return _linked_item_from_row(row) if row else None
 
@@ -379,6 +411,7 @@ class BankStore:
                     transactions_cursor = excluded.transactions_cursor,
                     last_sync_at = excluded.last_sync_at,
                     last_success_at = excluded.last_success_at,
+                    webhook_pending = 0,
                     last_error = NULL
                 """,
                 (item_db_id, cursor, now, now),
@@ -517,10 +550,10 @@ class BankStore:
                     """
                     INSERT INTO bank_transactions (
                         provider_transaction_id, account_id, owner_key, date, authorized_date,
-                        name, merchant_name, amount, pending, category, payment_channel,
+                        name, merchant_name, amount, pending, category, payment_channel, pending_transaction_id,
                         raw_json, created_at, updated_at, removed_at
                     )
-                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL)
                     ON CONFLICT(provider_transaction_id) DO UPDATE SET
                         account_id = excluded.account_id,
                         owner_key = excluded.owner_key,
@@ -532,6 +565,7 @@ class BankStore:
                         pending = excluded.pending,
                         category = excluded.category,
                         payment_channel = excluded.payment_channel,
+                        pending_transaction_id = excluded.pending_transaction_id,
                         raw_json = excluded.raw_json,
                         updated_at = excluded.updated_at,
                         removed_at = NULL
@@ -548,6 +582,7 @@ class BankStore:
                         1 if txn.get("pending") else 0,
                         json.dumps(category, sort_keys=True) if category is not None else None,
                         txn.get("payment_channel"),
+                        txn.get("pending_transaction_id"),
                         json.dumps(txn, sort_keys=True),
                         now,
                         now,
@@ -571,6 +606,133 @@ class BankStore:
             )
         return len(ids)
 
+    def enqueue_plaid_webhook(self, payload: dict[str, Any]) -> PlaidWebhookEvent:
+        now = utc_now_iso()
+        item_id = str(payload.get("item_id") or "").strip() or None
+        webhook_type = str(payload.get("webhook_type") or "").strip() or None
+        webhook_code = str(payload.get("webhook_code") or "").strip() or None
+        self.initialize()
+        with self.connect() as conn:
+            conn.execute(
+                """
+                INSERT INTO bank_webhook_events (
+                    provider, item_id, webhook_type, webhook_code, payload, status, received_at
+                )
+                VALUES ('plaid', ?, ?, ?, ?, 'pending', ?)
+                """,
+                (item_id, webhook_type, webhook_code, json.dumps(payload, sort_keys=True), now),
+            )
+            if item_id:
+                conn.execute(
+                    """
+                    UPDATE bank_sync_state
+                    SET webhook_pending = 1,
+                        last_sync_at = ?
+                    WHERE item_id IN (
+                        SELECT id FROM bank_items WHERE item_id = ?
+                    )
+                    """,
+                    (now, item_id),
+                )
+            row = conn.execute(
+                """
+                SELECT *
+                FROM bank_webhook_events
+                WHERE provider = 'plaid'
+                  AND received_at = ?
+                ORDER BY id DESC
+                LIMIT 1
+                """,
+                (now,),
+            ).fetchone()
+        if row is None:
+            raise RuntimeError("Failed to load stored Plaid webhook event")
+        return _plaid_webhook_event_from_row(row)
+
+    def pending_plaid_webhook_events(self, limit: int = 25) -> list[tuple[PlaidWebhookEvent, dict[str, Any]]]:
+        safe_limit = max(1, min(int(limit), 100))
+        self.initialize()
+        with self.connect() as conn:
+            rows = conn.execute(
+                """
+                SELECT *
+                FROM bank_webhook_events
+                WHERE provider = 'plaid'
+                  AND status IN ('pending', 'failed')
+                ORDER BY received_at, id
+                LIMIT ?
+                """,
+                (safe_limit,),
+            ).fetchall()
+        events: list[tuple[PlaidWebhookEvent, dict[str, Any]]] = []
+        for row in rows:
+            payload = json.loads(str(row["payload"]))
+            events.append((_plaid_webhook_event_from_row(row), payload if isinstance(payload, dict) else {}))
+        return events
+
+    def mark_plaid_webhook_processing(self, event_id: int) -> None:
+        self.initialize()
+        with self.connect() as conn:
+            conn.execute(
+                """
+                UPDATE bank_webhook_events
+                SET status = 'processing',
+                    error = NULL
+                WHERE id = ?
+                """,
+                (int(event_id),),
+            )
+
+    def mark_plaid_webhook_processed(self, event_id: int, item_id: str | None = None) -> None:
+        now = utc_now_iso()
+        self.initialize()
+        with self.connect() as conn:
+            conn.execute(
+                """
+                UPDATE bank_webhook_events
+                SET status = 'processed',
+                    processed_at = ?,
+                    error = NULL
+                WHERE id = ?
+                """,
+                (now, int(event_id)),
+            )
+            if item_id:
+                remaining = conn.execute(
+                    """
+                    SELECT COUNT(*) AS count
+                    FROM bank_webhook_events
+                    WHERE provider = 'plaid'
+                      AND item_id = ?
+                      AND status IN ('pending', 'failed', 'processing')
+                    """,
+                    (item_id,),
+                ).fetchone()
+                if remaining is not None and int(remaining["count"]) == 0:
+                    conn.execute(
+                        """
+                        UPDATE bank_sync_state
+                        SET webhook_pending = 0
+                        WHERE item_id IN (
+                            SELECT id FROM bank_items WHERE item_id = ?
+                        )
+                        """,
+                        (item_id,),
+                    )
+
+    def mark_plaid_webhook_failed(self, event_id: int, error: str) -> None:
+        self.initialize()
+        with self.connect() as conn:
+            conn.execute(
+                """
+                UPDATE bank_webhook_events
+                SET status = 'failed',
+                    error = ?
+                WHERE id = ?
+                """,
+                (error[:1000], int(event_id)),
+            )
+
     def recent_transactions(self, owner_key: str, limit: int = 10) -> list[BankTransaction]:
         safe_limit = max(1, min(int(limit), 25))
         self.initialize()
@@ -588,6 +750,7 @@ class BankStore:
                     t.amount,
                     t.pending,
                     t.payment_channel,
+                    t.pending_transaction_id,
                     t.updated_at,
                     a.name AS account_name,
                     a.mask AS account_mask,
@@ -691,6 +854,7 @@ class BankStore:
                     t.amount,
                     t.pending,
                     t.payment_channel,
+                    t.pending_transaction_id,
                     t.updated_at,
                     a.name AS account_name,
                     a.mask AS account_mask,
@@ -774,6 +938,7 @@ class BankStore:
                     t.amount,
                     t.pending,
                     t.payment_channel,
+                    t.pending_transaction_id,
                     t.updated_at,
                     a.name AS account_name,
                     a.mask AS account_mask,
@@ -822,6 +987,7 @@ class BankStore:
                     t.amount,
                     t.pending,
                     t.payment_channel,
+                    t.pending_transaction_id,
                     t.updated_at,
                     a.name AS account_name,
                     a.mask AS account_mask,
@@ -859,6 +1025,7 @@ class BankStore:
                     t.amount,
                     t.pending,
                     t.payment_channel,
+                    t.pending_transaction_id,
                     t.updated_at,
                     a.name AS account_name,
                     a.mask AS account_mask,
@@ -893,6 +1060,7 @@ class BankStore:
                     t.amount,
                     t.pending,
                     t.payment_channel,
+                    t.pending_transaction_id,
                     t.updated_at,
                     a.name AS account_name,
                     a.mask AS account_mask,
@@ -936,6 +1104,7 @@ class BankStore:
                     t.amount,
                     t.pending,
                     t.payment_channel,
+                    t.pending_transaction_id,
                     t.updated_at,
                     a.name AS account_name,
                     a.mask AS account_mask,
@@ -965,6 +1134,7 @@ class BankStore:
                     t.amount,
                     t.pending,
                     t.payment_channel,
+                    t.pending_transaction_id,
                     t.updated_at,
                     a.name AS account_name,
                     a.mask AS account_mask,
@@ -1191,6 +1361,7 @@ def _bank_transaction_from_row(row: sqlite3.Row) -> BankTransaction:
         pending=bool(row["pending"]),
         payment_channel=row["payment_channel"],
         updated_at=str(row["updated_at"]),
+        pending_transaction_id=row["pending_transaction_id"],
     )
 
 
@@ -1211,6 +1382,7 @@ def _reconciliation_item_from_row(row: sqlite3.Row) -> ReconciliationItem:
         pending=bool(row["pending"]),
         payment_channel=row["payment_channel"],
         updated_at=str(row["updated_at"]),
+        pending_transaction_id=row["pending_transaction_id"],
     )
     return ReconciliationItem(
         id=int(row["id"]),
@@ -1228,4 +1400,17 @@ def _reconciliation_item_from_row(row: sqlite3.Row) -> ReconciliationItem:
         ignored_at=row["ignored_at"],
         notes=row["notes"],
         transaction=transaction,
+    )
+
+
+def _plaid_webhook_event_from_row(row: sqlite3.Row) -> PlaidWebhookEvent:
+    return PlaidWebhookEvent(
+        id=int(row["id"]),
+        item_id=row["item_id"],
+        webhook_type=row["webhook_type"],
+        webhook_code=row["webhook_code"],
+        status=str(row["status"]),
+        received_at=str(row["received_at"]),
+        processed_at=row["processed_at"],
+        error=row["error"],
     )

@@ -57,6 +57,61 @@ async def test_create_link_token_includes_redirect_uri_when_configured(tmp_path)
 
 
 @pytest.mark.asyncio
+async def test_create_link_token_includes_webhook_when_configured(tmp_path):
+    config = BankingConfig(
+        plaid_client_id="client",
+        plaid_secret="secret",
+        plaid_env="sandbox",
+        token_encryption_key="key",
+        sqlite_path=tmp_path / "banking.sqlite3",
+        plaid_webhook_url="https://example.test/bank/plaid-webhook?secret=test",
+    )
+    client = PlaidClient(config)
+    captured = {}
+
+    async def fake_post(path, payload):
+        captured["payload"] = payload
+        return {"link_token": "link-sandbox-123"}
+
+    client._post = fake_post
+
+    await client.create_link_token(owner_key="brian")
+
+    assert captured["payload"]["webhook"] == "https://example.test/bank/plaid-webhook?secret=test"
+
+
+@pytest.mark.asyncio
+async def test_update_item_webhook_calls_plaid_item_webhook_update(tmp_path):
+    config = BankingConfig(
+        plaid_client_id="client",
+        plaid_secret="secret",
+        plaid_env="sandbox",
+        token_encryption_key="key",
+        sqlite_path=tmp_path / "banking.sqlite3",
+    )
+    client = PlaidClient(config)
+    captured = {}
+
+    async def fake_post(path, payload):
+        captured["path"] = path
+        captured["payload"] = payload
+        return {"webhook": payload["webhook"]}
+
+    client._post = fake_post
+
+    response = await client.update_item_webhook("access-sandbox-123", "https://example.test/bank/plaid-webhook")
+
+    assert response == {"webhook": "https://example.test/bank/plaid-webhook"}
+    assert captured == {
+        "path": "/item/webhook/update",
+        "payload": {
+            "access_token": "access-sandbox-123",
+            "webhook": "https://example.test/bank/plaid-webhook",
+        },
+    }
+
+
+@pytest.mark.asyncio
 async def test_remove_item_calls_plaid_item_remove(tmp_path):
     config = BankingConfig(
         plaid_client_id="client",

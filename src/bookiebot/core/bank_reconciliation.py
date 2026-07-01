@@ -10,7 +10,7 @@ from typing import Any, Awaitable, cast
 
 import discord
 
-from bookiebot.banking.formatting import format_reconciliation_review
+from bookiebot.banking.formatting import format_reconciliation_match_report, format_reconciliation_review
 from bookiebot.banking.models import ReconciliationPreview
 from bookiebot.banking.service import build_banking_service
 from bookiebot.core.bank_reconciliation_flow import send_next_bank_reconciliation_item
@@ -402,14 +402,19 @@ def prepare_bank_reconciliation_digest_messages(
         return None
 
     unresolved_count = len(unresolved)
-    if not unresolved_count:
+    matched_count = len([item for item in preview.items if item.status == "matched"])
+    if not unresolved_count and not matched_count:
         return None
 
     if mark_sent:
         if not record_system_event(
             actor_key,
             "bank_reconciliation_digest_sent",
-            {**metadata, "unresolved_count": str(len(unresolved))},
+            {
+                **metadata,
+                "unresolved_count": str(len(unresolved)),
+                "matched_count": str(matched_count),
+            },
             f"Bank reconciliation digest sent for {current.isoformat()}",
         ):
             return None
@@ -418,6 +423,7 @@ def prepare_bank_reconciliation_digest_messages(
         public_message=format_bank_reconciliation_public_prompt(
             mention,
             unresolved_count,
+            matched_count=matched_count,
             sync_error=sync_error,
         ),
         detail_message=format_bank_reconciliation_digest(mention, preview, unresolved, sync_error=sync_error),
@@ -431,14 +437,22 @@ def format_bank_reconciliation_public_prompt(
     mention: str,
     unresolved_count: int,
     *,
+    matched_count: int = 0,
     sync_error: str | None = None,
 ) -> str:
     noun = "item" if unresolved_count == 1 else "items"
     verb = "needs" if unresolved_count == 1 else "need"
-    lines = [
-        f"{mention} bank reconciliation has `{unresolved_count}` {noun} that {verb} review.",
-        "Use `Reconcile Now` to review one transaction at a time, or `View Inbox` to see the full inbox first.",
-    ]
+    if unresolved_count:
+        lines = [
+            f"{mention} bank reconciliation has `{unresolved_count}` {noun} that {verb} review.",
+            "Use `Reconcile Now` to review one transaction at a time, or `View Inbox` to see the full inbox first.",
+        ]
+    else:
+        match_noun = "match" if matched_count == 1 else "matches"
+        lines = [
+            f"{mention} bank reconciliation confirmed `{matched_count}` automatic {match_noun}.",
+            "Use `View Inbox` to inspect the reconciliation report.",
+        ]
     if sync_error:
         lines.append("Bank sync warning: using cached bank data.")
     return "\n".join(lines)
@@ -451,11 +465,18 @@ def format_bank_reconciliation_digest(
     *,
     sync_error: str | None = None,
 ) -> str:
-    noun = "item" if len(unresolved) == 1 else "items"
-    verb = "needs" if len(unresolved) == 1 else "need"
-    lines = [
-        f"{mention} bank reconciliation found `{len(unresolved)}` {noun} that {verb} review.",
-    ]
+    matched_count = len([item for item in preview.items if item.status == "matched"])
+    if unresolved:
+        noun = "item" if len(unresolved) == 1 else "items"
+        verb = "needs" if len(unresolved) == 1 else "need"
+        lines = [
+            f"{mention} bank reconciliation found `{len(unresolved)}` {noun} that {verb} review.",
+        ]
+    else:
+        match_noun = "match" if matched_count == 1 else "matches"
+        lines = [
+            f"{mention} bank reconciliation found no unresolved items and confirmed `{matched_count}` automatic {match_noun}.",
+        ]
     if sync_error:
         lines.extend(["", "Bank sync warning: using cached bank data for this digest."])
     buckets = preview.cache_buckets
@@ -469,10 +490,13 @@ def format_bank_reconciliation_digest(
             f"- Confirmed/logged: `{buckets.confirmed}`",
             f"- Ignored: `{buckets.ignored}`",
             f"- Pending: `{buckets.pending}`",
+            "  Pending Plaid transactions are cached but held out of reconciliation until Plaid posts or removes them.",
             f"- Not reviewed yet: `{buckets.not_reviewed}`",
             f"- Unwatched accounts: `{buckets.unwatched}`",
             f"- Other: `{buckets.other}`",
             f"- Checked this run: `{preview.candidate_transaction_count}`",
+            "",
+            format_reconciliation_match_report(preview.items),
             "",
             format_reconciliation_review(unresolved),
         ]

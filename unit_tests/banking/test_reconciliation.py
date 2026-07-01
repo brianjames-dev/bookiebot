@@ -1024,6 +1024,11 @@ def test_reconciliation_match_candidates_excludes_already_matched_actions(monkey
         "read_active_logged_actions",
         lambda _actor_key: [matched_action, available_action],
     )
+    monkeypatch.setattr(
+        banking_service,
+        "_scheduled_pulls_for_transactions",
+        lambda *_args, **_kwargs: [],
+    )
     store = BankStore(tmp_path / "banking.sqlite3", TokenCipher("test-secret-key"))
     service = BankingService(
         config=BankingConfig(

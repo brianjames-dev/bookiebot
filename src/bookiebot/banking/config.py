@@ -21,6 +21,7 @@ class BankingConfig:
     database_url: str | None = None
     public_base_url: str | None = None
     plaid_redirect_uri: str | None = None
+    plaid_webhook_url: str | None = None
 
     @property
     def plaid_base_url(self) -> str:
@@ -46,4 +47,5 @@ def load_banking_config() -> BankingConfig:
         database_url=os.getenv("BANK_DATABASE_URL", "").strip() or None,
         public_base_url=os.getenv("PUBLIC_BASE_URL", "").strip() or None,
         plaid_redirect_uri=os.getenv("PLAID_REDIRECT_URI", "").strip() or None,
+        plaid_webhook_url=os.getenv("PLAID_WEBHOOK_URL", "").strip() or None,
     )

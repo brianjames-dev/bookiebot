@@ -357,6 +357,15 @@ class BankingService:
         latest_cursor = cursor
 
         try:
+            if self.config.plaid_webhook_url:
+                try:
+                    await self.plaid.update_item_webhook(access_token, self.config.plaid_webhook_url)
+                except Exception:
+                    logger.warning(
+                        "Failed to update Plaid item webhook; continuing transaction sync",
+                        extra={"item_id": item.id},
+                        exc_info=True,
+                    )
             accounts = await self._fetch_accounts_for_item(item, access_token=access_token)
             self.store.upsert_accounts(accounts)
 
@@ -390,6 +399,53 @@ class BankingService:
             logger.warning("Bank sync failed", extra={"item_id": item.id, "exception": str(exc)})
             self.store.mark_sync_error(item.id, f"{type(exc).__name__}: {exc}")
             raise
+
+    def receive_plaid_webhook(self, payload: dict[str, Any]):
+        return self.store.enqueue_plaid_webhook(payload)
+
+    async def process_plaid_webhook_inbox(self, limit: int = 25) -> dict[str, int]:
+        self.store.initialize()
+        processed = 0
+        failed = 0
+        skipped = 0
+        for event, payload in self.store.pending_plaid_webhook_events(limit=limit):
+            self.store.mark_plaid_webhook_processing(event.id)
+            item_id = event.item_id or str(payload.get("item_id") or "").strip() or None
+            try:
+                webhook_type = (event.webhook_type or "").upper()
+                webhook_code = (event.webhook_code or "").upper()
+                if webhook_type != "TRANSACTIONS":
+                    skipped += 1
+                    self.store.mark_plaid_webhook_processed(event.id, item_id)
+                    continue
+                if webhook_code not in {
+                    "SYNC_UPDATES_AVAILABLE",
+                    "DEFAULT_UPDATE",
+                    "HISTORICAL_UPDATE",
+                    "INITIAL_UPDATE",
+                }:
+                    skipped += 1
+                    self.store.mark_plaid_webhook_processed(event.id, item_id)
+                    continue
+                if not item_id:
+                    skipped += 1
+                    self.store.mark_plaid_webhook_processed(event.id, item_id)
+                    continue
+                item = self.store.get_item_by_provider_item_id(item_id)
+                if item is None:
+                    raise RuntimeError(f"Unknown Plaid item_id {item_id}")
+                await self.sync_item(item)
+                self.store.mark_plaid_webhook_processed(event.id, item_id)
+                processed += 1
+            except Exception as exc:
+                failed += 1
+                self.store.mark_plaid_webhook_failed(event.id, f"{type(exc).__name__}: {exc}")
+                logger.warning(
+                    "Failed to process Plaid webhook event",
+                    extra={"event_id": event.id, "item_id": item_id, "exception": str(exc)},
+                    exc_info=True,
+                )
+        return {"processed": processed, "failed": failed, "skipped": skipped}
 
     def status(self) -> BankStatus:
         return self.store.status(configured=self.config.configured, plaid_env=self.config.plaid_env)

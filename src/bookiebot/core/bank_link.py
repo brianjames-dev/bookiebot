@@ -22,6 +22,10 @@ def _signing_secret() -> str:
     return os.getenv("BANK_LINK_SIGNING_SECRET", "").strip() or os.getenv("BANK_TOKEN_ENCRYPTION_KEY", "").strip()
 
 
+def _plaid_webhook_secret() -> str:
+    return os.getenv("PLAID_WEBHOOK_SECRET", "").strip()
+
+
 def _b64encode(data: bytes) -> str:
     return base64.urlsafe_b64encode(data).decode("ascii").rstrip("=")
 
@@ -82,6 +86,7 @@ def create_bank_link_app() -> web.Application:
     app.router.add_get("/bank/link", _bank_link_page)
     app.router.add_post("/bank/link-token", _bank_link_token)
     app.router.add_post("/bank/exchange-public-token", _bank_exchange_public_token)
+    app.router.add_post("/bank/plaid-webhook", _bank_plaid_webhook)
     return app
 
 
@@ -142,6 +147,22 @@ async def _bank_exchange_public_token(request: web.Request) -> web.Response:
         return _json_error(exc.text or exc.reason, status=exc.status)
     except PlaidApiError as exc:
         return _json_error(str(exc), status=502)
+    except Exception as exc:
+        return _json_error(f"{type(exc).__name__}: {exc}", status=500)
+
+
+async def _bank_plaid_webhook(request: web.Request) -> web.Response:
+    try:
+        secret = _plaid_webhook_secret()
+        if secret:
+            supplied = request.headers.get("X-BookieBot-Webhook-Secret", "").strip()
+            supplied = supplied or request.query.get("secret", "").strip()
+            if not hmac.compare_digest(supplied, secret):
+                return _json_error("Invalid webhook secret", status=401)
+        body = await _request_json(request)
+        service = build_banking_service()
+        event = service.receive_plaid_webhook(body)
+        return web.json_response({"ok": True, "event_id": event.id})
     except Exception as exc:
         return _json_error(f"{type(exc).__name__}: {exc}", status=500)
 

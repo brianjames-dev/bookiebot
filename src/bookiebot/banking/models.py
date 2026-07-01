@@ -68,6 +68,7 @@ class BankTransaction:
     pending: bool
     payment_channel: str | None
     updated_at: str
+    pending_transaction_id: str | None = None
 
 
 @dataclass(frozen=True)
@@ -133,3 +134,15 @@ class ReconciliationPreview:
     cached_transaction_count: int = 0
     candidate_transaction_count: int = 0
     cache_buckets: ReconciliationCacheBuckets = ReconciliationCacheBuckets()
+
+
+@dataclass(frozen=True)
+class PlaidWebhookEvent:
+    id: int
+    item_id: str | None
+    webhook_type: str | None
+    webhook_code: str | None
+    status: str
+    received_at: str
+    processed_at: str | None
+    error: str | None

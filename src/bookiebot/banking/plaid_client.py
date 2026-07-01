@@ -45,6 +45,8 @@ class PlaidClient:
         }
         if self.config.plaid_redirect_uri:
             payload["redirect_uri"] = self.config.plaid_redirect_uri
+        if self.config.plaid_webhook_url:
+            payload["webhook"] = self.config.plaid_webhook_url
         data = await self._post("/link/token/create", payload)
         return str(data["link_token"])
 
@@ -70,6 +72,9 @@ class PlaidClient:
         if cursor:
             payload["cursor"] = cursor
         return await self._post("/transactions/sync", payload)
+
+    async def update_item_webhook(self, access_token: str, webhook: str) -> dict[str, Any]:
+        return await self._post("/item/webhook/update", {"access_token": access_token, "webhook": webhook})
 
     async def remove_item(self, access_token: str) -> dict[str, Any]:
         return await self._post("/item/remove", {"access_token": access_token})

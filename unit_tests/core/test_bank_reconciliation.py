@@ -187,6 +187,57 @@ def test_format_bank_reconciliation_digest_lists_unresolved_items():
     assert "  42  05-18    $12.34  expense   Unlogged Coffee" in output
 
 
+def test_format_bank_reconciliation_digest_lists_confirmed_run_matches():
+    transaction = BankTransaction(
+        id=1,
+        provider_transaction_id="txn-1",
+        owner_key="brian",
+        account_name="Checking",
+        account_mask="0000",
+        account_type="depository",
+        account_subtype="checking",
+        date="2026-05-18",
+        authorized_date=None,
+        name="CREDIT CARD 3333 PAYMENT",
+        merchant_name=None,
+        amount=25.0,
+        pending=False,
+        payment_channel="bookiebot_debug",
+        updated_at="2026-05-18T00:00:00+00:00",
+    )
+    item = ReconciliationItem(
+        id=43,
+        owner_key="brian",
+        bank_transaction_id=1,
+        provider_transaction_id="txn-1",
+        classification="transfer_or_payment",
+        status="matched",
+        confidence=0.95,
+        matched_action_log_id=None,
+        matched_sheet_ref=None,
+        first_seen_at="2026-05-18T00:00:00+00:00",
+        last_seen_at="2026-05-18T00:00:00+00:00",
+        resolved_at=None,
+        ignored_at=None,
+        notes="transfer/payment pattern",
+        transaction=transaction,
+    )
+    preview = ReconciliationPreview(
+        owner_key="brian",
+        items=[item],
+        candidate_transaction_count=1,
+        cache_buckets=ReconciliationCacheBuckets(stored=2, matched=1, pending=1),
+    )
+
+    output = format_bank_reconciliation_digest("<@123>", preview, [])
+
+    assert "confirmed `1` automatic match" in output
+    assert "Pending Plaid transactions are cached but held out of reconciliation until Plaid posts or removes them." in output
+    assert "Confirmed matches this run:" in output
+    assert "transfer/pa~" in output
+    assert "CREDIT CARD 3333 PAYM~" in output
+
+
 def test_format_bank_reconciliation_public_prompt_hides_transaction_details():
     output = format_bank_reconciliation_public_prompt("<@123>", 2)
 

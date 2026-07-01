@@ -244,6 +244,36 @@ def test_store_purge_disconnected_item_is_owner_scoped(tmp_path):
     assert len(store.list_items("brian")) == 1
 
 
+def test_store_queues_plaid_webhook_events(tmp_path):
+    store = _store(tmp_path)
+    item = store.upsert_item(
+        owner_key="brian",
+        provider="plaid",
+        item_id="plaid-item-1",
+        access_token="access-sandbox-brian",
+        institution_name="Plaid Sandbox",
+    )
+
+    event = store.enqueue_plaid_webhook(
+        {
+            "webhook_type": "TRANSACTIONS",
+            "webhook_code": "SYNC_UPDATES_AVAILABLE",
+            "item_id": "plaid-item-1",
+        }
+    )
+    pending = store.pending_plaid_webhook_events()
+
+    assert event.item_id == "plaid-item-1"
+    assert event.webhook_code == "SYNC_UPDATES_AVAILABLE"
+    assert len(pending) == 1
+    assert pending[0][0].id == event.id
+    assert pending[0][1]["item_id"] == "plaid-item-1"
+
+    store.mark_plaid_webhook_processed(event.id, item.item_id)
+
+    assert store.pending_plaid_webhook_events() == []
+
+
 def test_store_purges_transactions_before_cutoff_without_touching_accounts(tmp_path):
     store = _store(tmp_path)
     item = store.upsert_item(
