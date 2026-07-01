@@ -397,6 +397,12 @@ def prepare_bank_reconciliation_digest_messages(
             actor_key=actor_key,
         )
         unresolved = service.unresolved_reconciliation_items(owner.budget_owner_key, limit=25)
+        report_matches = service.reconciliation_report_matches(
+            owner.budget_owner_key,
+            preview.items,
+            actor_key=actor_key,
+            limit=12,
+        )
     except Exception:
         logger.exception("Failed to prepare bank reconciliation digest", extra={"actor_key": actor_key})
         return None
@@ -426,7 +432,13 @@ def prepare_bank_reconciliation_digest_messages(
             matched_count=matched_count,
             sync_error=sync_error,
         ),
-        detail_message=format_bank_reconciliation_digest(mention, preview, unresolved, sync_error=sync_error),
+        detail_message=format_bank_reconciliation_digest(
+            mention,
+            preview,
+            unresolved,
+            report_matches=report_matches,
+            sync_error=sync_error,
+        ),
         item_ids=tuple(int(item.id) for item in unresolved),
         owner_key=owner.budget_owner_key,
         owner_name=getattr(owner, "name", str(actor_key)),
@@ -463,6 +475,7 @@ def format_bank_reconciliation_digest(
     preview: ReconciliationPreview,
     unresolved: list,
     *,
+    report_matches: list | None = None,
     sync_error: str | None = None,
 ) -> str:
     matched_count = len([item for item in preview.items if item.status == "matched"])
@@ -496,7 +509,7 @@ def format_bank_reconciliation_digest(
             f"- Other: `{buckets.other}`",
             f"- Checked this run: `{preview.candidate_transaction_count}`",
             "",
-            format_reconciliation_match_report(preview.items),
+            format_reconciliation_match_report(report_matches or []),
             "",
             format_reconciliation_review(unresolved),
         ]

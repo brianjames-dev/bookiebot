@@ -9,7 +9,16 @@ from uuid import uuid4
 
 from bookiebot.banking.config import BankingConfig, load_banking_config
 from bookiebot.banking.crypto import TokenCipher
-from bookiebot.banking.models import BankAccount, BankStatus, BankTransaction, LinkedBankItem, ReconciliationItem, ReconciliationPreview, SyncResult
+from bookiebot.banking.models import (
+    BankAccount,
+    BankStatus,
+    BankTransaction,
+    LinkedBankItem,
+    ReconciliationItem,
+    ReconciliationPreview,
+    ReconciliationReportMatch,
+    SyncResult,
+)
 from bookiebot.banking.plaid_client import PlaidClient
 from bookiebot.banking.reconciliation import (
     ActionLogCandidate,
@@ -280,6 +289,16 @@ def _transaction_local_date(transaction: BankTransaction) -> local_date | None:
         return local_date.fromisoformat(raw[:10])
     except ValueError:
         return None
+
+
+def _report_source_type(item: ReconciliationItem, matched: ActionLogCandidate | None) -> str:
+    if matched is None:
+        return "automatic rule"
+    if matched.action_type == "schedule" or matched.action_id.startswith("schedule:"):
+        return "schedule"
+    if matched.action_type == "group":
+        return "spreadsheet group"
+    return "spreadsheet row"
 
 
 class BankingService:
@@ -697,6 +716,89 @@ class BankingService:
         else:
             lines.extend(["", "Final schedule candidates: `0`"])
         return "\n".join(lines)[:1900]
+
+    def reconciliation_report_matches(
+        self,
+        owner_key: str,
+        items: list[ReconciliationItem],
+        *,
+        actor_key: str | None,
+        limit: int = 12,
+    ) -> list[ReconciliationReportMatch]:
+        del owner_key
+        matched_items = [
+            item for item in items if item.status in {"matched", "confirmed", "import_requested"}
+        ][: max(1, limit)]
+        if not matched_items:
+            return []
+
+        action_candidates: dict[str, ActionLogCandidate] = {}
+        if actor_key:
+            for logged in read_active_logged_actions(actor_key):
+                candidate = action_log_candidate_by_id(logged)
+                if candidate is not None:
+                    action_candidates[logged.id] = candidate
+
+        scheduled_pulls = _scheduled_pulls_for_transactions(
+            [item.transaction for item in matched_items],
+            actor_key=actor_key,
+            window_days=14,
+        )
+
+        report: list[ReconciliationReportMatch] = []
+        for item in matched_items:
+            matched = self._matched_report_candidate(item, action_candidates, scheduled_pulls)
+            transaction = item.transaction
+            report.append(
+                ReconciliationReportMatch(
+                    bank_date=transaction.date or transaction.authorized_date or "unknown",
+                    bank_name=transaction.merchant_name or transaction.name,
+                    bank_amount=abs(transaction.amount),
+                    matched_date=matched.date.isoformat() if matched else None,
+                    matched_name=matched.label if matched else None,
+                    matched_amount=matched.amount if matched else None,
+                    source_type=_report_source_type(item, matched),
+                    reason=item.notes or "automatic reconciliation rule",
+                    confidence=item.confidence,
+                )
+            )
+        return report
+
+    def _matched_report_candidate(
+        self,
+        item: ReconciliationItem,
+        action_candidates: dict[str, ActionLogCandidate],
+        scheduled_pulls: list[ScheduledPullCandidate],
+    ) -> ActionLogCandidate | None:
+        if item.matched_action_log_id:
+            action_ids = [part.strip() for part in item.matched_action_log_id.split("+") if part.strip()]
+            candidates = [action_candidates[action_id] for action_id in action_ids if action_id in action_candidates]
+            if len(candidates) == 1:
+                return candidates[0]
+            if len(candidates) > 1:
+                return ActionLogCandidate(
+                    action_id="+".join(candidate.action_id for candidate in candidates),
+                    sheet_ref=" + ".join(candidate.sheet_ref for candidate in candidates),
+                    action_type="group",
+                    date=min(candidate.date for candidate in candidates),
+                    amount=sum(candidate.amount for candidate in candidates),
+                    label=" + ".join(candidate.label for candidate in candidates),
+                    confidence=sum(candidate.confidence for candidate in candidates) / len(candidates),
+                    notes="grouped spreadsheet rows",
+                )
+
+        if item.matched_sheet_ref:
+            candidates = find_scheduled_pull_candidates(
+                item.transaction,
+                scheduled_pulls,
+                window_days=14,
+                limit=25,
+            )
+            return next(
+                (candidate for candidate in candidates if candidate.sheet_ref == item.matched_sheet_ref),
+                None,
+            )
+        return None
 
     def confirm_reconciliation_schedule_match(
         self,

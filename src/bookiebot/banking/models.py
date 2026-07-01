@@ -137,6 +137,19 @@ class ReconciliationPreview:
 
 
 @dataclass(frozen=True)
+class ReconciliationReportMatch:
+    bank_date: str
+    bank_name: str
+    bank_amount: float
+    matched_date: str | None
+    matched_name: str | None
+    matched_amount: float | None
+    source_type: str
+    reason: str
+    confidence: float
+
+
+@dataclass(frozen=True)
 class PlaidWebhookEvent:
     id: int
     item_id: str | None

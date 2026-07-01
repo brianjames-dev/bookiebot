@@ -2,7 +2,13 @@ from datetime import date, datetime
 from types import SimpleNamespace
 import pytest
 
-from bookiebot.banking.models import BankTransaction, ReconciliationCacheBuckets, ReconciliationItem, ReconciliationPreview
+from bookiebot.banking.models import (
+    BankTransaction,
+    ReconciliationCacheBuckets,
+    ReconciliationItem,
+    ReconciliationPreview,
+    ReconciliationReportMatch,
+)
 import bookiebot.core.bank_reconciliation as bank_reconciliation
 from bookiebot.core.bank_reconciliation import (
     _is_eligible,
@@ -170,7 +176,7 @@ def test_format_bank_reconciliation_digest_lists_unresolved_items():
         ),
     )
 
-    output = format_bank_reconciliation_digest("<@123>", preview, [item])
+    output = format_bank_reconciliation_digest("<@123>", preview, [item], report_matches=[])
 
     assert "<@123> bank reconciliation found `1` item that needs review." in output
     assert "Bank cache:" in output
@@ -229,13 +235,94 @@ def test_format_bank_reconciliation_digest_lists_confirmed_run_matches():
         cache_buckets=ReconciliationCacheBuckets(stored=2, matched=1, pending=1),
     )
 
-    output = format_bank_reconciliation_digest("<@123>", preview, [])
+    output = format_bank_reconciliation_digest(
+        "<@123>",
+        preview,
+        [],
+        report_matches=[
+            ReconciliationReportMatch(
+                bank_date="2026-05-18",
+                bank_name="CREDIT CARD 3333 PAYMENT",
+                bank_amount=25.0,
+                matched_date=None,
+                matched_name=None,
+                matched_amount=None,
+                source_type="automatic rule",
+                reason="transfer/payment pattern",
+                confidence=0.95,
+            )
+        ],
+    )
 
     assert "confirmed `1` automatic match" in output
     assert "Pending Plaid transactions are cached but held out of reconciliation until Plaid posts or removes them." in output
     assert "Confirmed matches this run:" in output
-    assert "transfer/pa~" in output
-    assert "CREDIT CARD 3333 PAYM~" in output
+    assert "Bank:   05-18    $25.00  CREDIT CARD 3333 PAYMENT" in output
+    assert "Sheet:  no spreadsheet row (automatic rule)" in output
+    assert "Reason: transfer/payment pattern" in output
+    assert "Conf:   95%" in output
+
+
+def test_format_bank_reconciliation_digest_compares_bank_and_sheet_match():
+    transaction = BankTransaction(
+        id=1,
+        provider_transaction_id="txn-1",
+        owner_key="brian",
+        account_name="Checking",
+        account_mask="0000",
+        account_type="depository",
+        account_subtype="checking",
+        date="2026-05-18",
+        authorized_date=None,
+        name="Amazon",
+        merchant_name=None,
+        amount=76.90,
+        pending=False,
+        payment_channel="bookiebot_debug",
+        updated_at="2026-05-18T00:00:00+00:00",
+    )
+    item = ReconciliationItem(
+        id=44,
+        owner_key="brian",
+        bank_transaction_id=1,
+        provider_transaction_id="txn-1",
+        classification="expense",
+        status="matched",
+        confidence=0.92,
+        matched_action_log_id="expense123",
+        matched_sheet_ref="expense!row 42",
+        first_seen_at="2026-05-18T00:00:00+00:00",
+        last_seen_at="2026-05-18T00:00:00+00:00",
+        resolved_at=None,
+        ignored_at=None,
+        notes="matched expense action within 1d",
+        transaction=transaction,
+    )
+    preview = ReconciliationPreview(owner_key="brian", items=[item], candidate_transaction_count=1)
+
+    output = format_bank_reconciliation_digest(
+        "<@123>",
+        preview,
+        [],
+        report_matches=[
+            ReconciliationReportMatch(
+                bank_date="2026-05-18",
+                bank_name="Amazon",
+                bank_amount=76.90,
+                matched_date="2026-05-17",
+                matched_name="Baby registry stuff at Amazon",
+                matched_amount=76.90,
+                source_type="spreadsheet row",
+                reason="matched expense action within 1d",
+                confidence=0.92,
+            )
+        ],
+    )
+
+    assert "Bank:   05-18    $76.90  Amazon" in output
+    assert "Sheet:  05-17    $76.90  Baby registry stuff at Amazon" in output
+    assert "Reason: matched expense action within 1d" in output
+    assert "Conf:   92%" in output
 
 
 def test_format_bank_reconciliation_public_prompt_hides_transaction_details():
@@ -355,6 +442,9 @@ def test_prepare_bank_reconciliation_digest_uses_cached_items_when_sync_fails(mo
         def unresolved_reconciliation_items(self, _owner_key, *, limit):
             return [item]
 
+        def reconciliation_report_matches(self, _owner_key, _items, *, actor_key, limit):
+            return []
+
     monkeypatch.setattr(
         bank_reconciliation,
         "get_user_config",
@@ -402,6 +492,9 @@ async def test_bank_reconciliation_inbox_ignore_all_ignores_displayed_batch(monk
 
         def unresolved_reconciliation_items(self, owner_key, *, limit):
             return [item for item in items if item.id not in ignored_ids]
+
+        def reconciliation_report_matches(self, _owner_key, _items, *, actor_key, limit):
+            return []
 
         def ignore_reconciliation_item(self, owner_key, reconciliation_id):
             item = next((item for item in items if item.id == reconciliation_id), None)

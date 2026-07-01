@@ -2,7 +2,12 @@ from __future__ import annotations
 
 from collections import defaultdict
 
-from bookiebot.banking.models import BankTransaction, ReconciliationItem, ReconciliationPreview
+from bookiebot.banking.models import (
+    BankTransaction,
+    ReconciliationItem,
+    ReconciliationPreview,
+    ReconciliationReportMatch,
+)
 from bookiebot.banking.reconciliation import ActionLogCandidate, ActionLogCandidateGroup
 
 
@@ -117,16 +122,20 @@ def format_reconciliation_review(items: list[ReconciliationItem]) -> str:
     return "Unresolved bank reconciliation items:\n```text\n" + "\n".join([header, divider, *rows]) + "\n```"
 
 
-def format_reconciliation_match_report(items: list[ReconciliationItem], *, max_items: int = 12) -> str:
-    matched = [item for item in items if item.status in {"matched", "confirmed", "import_requested"}]
-    if not matched:
+def format_reconciliation_match_report(
+    matches: list[ReconciliationReportMatch],
+    *,
+    max_items: int = 12,
+) -> str:
+    if not matches:
         return "Confirmed matches this run: `0`"
-    header = f"{'ID':>4}  {'Date':<5}  {'Amt':>8}  {'Match':<12}  Name"
-    divider = "-" * len(header)
-    shown = matched[: max(1, max_items)]
-    rows = [_format_reconciliation_match_report_row(item) for item in shown]
-    lines = ["Confirmed matches this run:", _code_table([header, divider, *rows])]
-    omitted = len(matched) - len(shown)
+    shown = matches[: max(1, max_items)]
+    lines = ["Confirmed matches this run:"]
+    for index, match in enumerate(shown, start=1):
+        if index > 1:
+            lines.append("")
+        lines.extend(_format_reconciliation_match_report_entry(match))
+    omitted = len(matches) - len(shown)
     if omitted:
         lines.append(f"...and `{omitted}` more confirmed match(es).")
     return "\n".join(lines)
@@ -477,19 +486,22 @@ def _format_reconciliation_review_row(item: ReconciliationItem) -> str:
     )
 
 
-def _format_reconciliation_match_report_row(item: ReconciliationItem) -> str:
-    transaction = item.transaction
-    date = transaction.date or transaction.authorized_date or "unknown"
-    amount = abs(transaction.amount)
-    name = transaction.merchant_name or transaction.name
-    match = item.matched_action_log_id or item.matched_sheet_ref or item.notes or item.classification
-    return (
-        f"{item.id:>4}  "
-        f"{_short_date(date):<5}  "
-        f"{_short_money(amount):>8}  "
-        f"{_clip(match, 12):<12}  "
-        f"{_clip(name, 22)}"
-    )
+def _format_reconciliation_match_report_entry(match: ReconciliationReportMatch) -> list[str]:
+    bank = f"{_short_date(match.bank_date)}  {_short_money(match.bank_amount):>8}  {_clip(match.bank_name, 46)}"
+    if match.matched_name and match.matched_date and match.matched_amount is not None:
+        sheet = (
+            f"{_short_date(match.matched_date)}  "
+            f"{_short_money(match.matched_amount):>8}  "
+            f"{_clip(match.matched_name, 46)}"
+        )
+    else:
+        sheet = f"no spreadsheet row ({match.source_type})"
+    return [
+        f"Bank:   {bank}",
+        f"Sheet:  {sheet}",
+        f"Reason: {_clip(match.reason, 54)}",
+        f"Conf:   {match.confidence:.0%}",
+    ]
 
 
 def _format_resolved_reconciliation_review_row(item: ReconciliationItem) -> str:
