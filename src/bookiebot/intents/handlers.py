@@ -9,9 +9,13 @@ os.environ.setdefault("DISCORD_AUDIO_DISABLE", "1")
 
 from bookiebot.sheets.writer import write_to_sheet
 import bookiebot.sheets.utils as su
+from bookiebot.charts import (
+    ChartRenderError,
+    build_daily_spending_figure,
+    build_expense_breakdown_figure,
+    figure_to_discord_file,
+)
 import openai
-import matplotlib.pyplot as plt
-import io
 from datetime import datetime
 from collections.abc import Awaitable, Callable
 from typing import Any, AsyncContextManager, cast
@@ -56,31 +60,8 @@ from bookiebot.ui.recent_actions import (
     UpdateFieldView,
 )
 
-try:
-    import discord
-except ImportError:  # pragma: no cover - fallback for tests without discord.py
-    class _Discord:
-        class File:
-            def __init__(self, fp, filename):
-                self.fp = fp
-                self.filename = filename
-
-    discord = _Discord()
-
 IntentEntities = dict[str, Any]
 IntentHandler = Callable[[IntentEntities, Any], Awaitable[None]]
-
-
-def _pie_result_parts(pie_result: Any) -> tuple[list[Any], list[Any], list[Any]]:
-    if isinstance(pie_result, tuple):
-        wedges = list(pie_result[0]) if len(pie_result) > 0 else []
-        texts = list(pie_result[1]) if len(pie_result) > 1 else []
-        autotexts = list(pie_result[2]) if len(pie_result) > 2 else []
-        return wedges, texts, autotexts
-    wedges = list(getattr(pie_result, "patches", []) or [])
-    texts = list(getattr(pie_result, "texts", []) or [])
-    autotexts = list(getattr(pie_result, "autotexts", []) or [])
-    return wedges, texts, autotexts
 
 
 @asynccontextmanager
@@ -1029,78 +1010,45 @@ async def query_expense_breakdown_handler(entities, message):
         await message.channel.send("❌ Could not calculate expense breakdown.")
         return
 
-    # Prepare data
-    labels = []
-    amounts = []
     lines = []
+    non_zero_categories = {}
 
     for category, info in breakdown["categories"].items():
         amt = info["amount"]
         pct = info["percentage"]
 
         if amt == 0:
-            continue  # 🚨 skip 0 categories
+            continue
 
-        labels.append(f"{category.capitalize()}\n(${amt:.2f})")
-        amounts.append(amt)
+        non_zero_categories[category] = info
         lines.append(f"{category.capitalize()}: ${amt:.2f} ({pct:.2f}%)")
 
-    if not amounts:
+    if not non_zero_categories:
         await message.channel.send("❌ Could not calculate expense breakdown.")
         return
 
     people_str = ", ".join(persons)
     grand_total = breakdown["grand_total"]
-
-    # Build text breakdown
-    text = "\n".join(lines)
-    text = f"📊 Expense breakdown for {people_str}:\n{text}\n\n💵 Total: ${grand_total:.2f}"
-
-    # Pie Chart
-    fig, ax = plt.subplots(figsize=(6, 6))
-    cmap = plt.get_cmap('Pastel1')
-    colors = getattr(cmap, "colors", None)
-
-    largest_idx = amounts.index(max(amounts))
-    explode = [0.1 if i == largest_idx else 0 for i in range(len(amounts))]
-
-    pie_result = ax.pie(
-        amounts,
-        labels=labels,
-        autopct='%1.1f%%',
-        startangle=140,
-        shadow=True,
-        colors=colors,
-        explode=explode,
-        radius=0.9,
-        textprops={'fontsize': 10}
+    text = (
+        f"📊 Expense breakdown for {people_str}:\n"
+        + "\n".join(lines)
+        + f"\n\n💵 Total: ${grand_total:.2f}"
     )
 
-    _wedges, _texts, autotexts = _pie_result_parts(pie_result)
+    try:
+        fig = build_expense_breakdown_figure(
+            non_zero_categories,
+            grand_total,
+            title=f"Expense Breakdown — Total: ${grand_total:,.2f}",
+        )
+        chart_file = await figure_to_discord_file(fig, "expense_breakdown.png")
+    except (ChartRenderError, ValueError) as exc:
+        await message.channel.send(
+            content=f"{text}\n\n⚠️ Could not render chart image: {exc}"
+        )
+        return
 
-    for autotext in autotexts:
-        autotext.set_fontsize(11)
-        autotext.set_fontweight('bold')
-
-    ax.set_title(
-        f"Expense Breakdown\nTotal: ${grand_total:.2f}",
-        fontsize=16,
-        fontweight='bold',
-        pad=10
-    )
-
-    ax.axis('equal')
-
-    plt.tight_layout()
-
-    buf = io.BytesIO()
-    plt.savefig(buf, format='png', dpi=150)
-    buf.seek(0)
-    plt.close(fig)
-
-    file = discord.File(fp=buf, filename="expense_breakdown.png")
-
-    await message.channel.send(content=text, file=file)
+    await message.channel.send(content=text, file=chart_file)
 
 
 async def query_total_for_category_handler(entities, message):
@@ -1239,11 +1187,26 @@ async def query_daily_spending_calendar_handler(entities: IntentEntities, messag
         await message.channel.send("❌ Could not determine person(s) to query.")
         return
 
-    text_summary, chart_file = await su.daily_spending_calendar(persons)
-    await message.channel.send(
-        content=f"📆 Here is your daily spending calendar:\n\n{text_summary}",
-        file=chart_file
-    )
+    series = await su.daily_spending_series(persons)
+    text_summary = series["text_summary"]
+    content = f"📆 Here is your daily spending calendar:\n\n{text_summary}"
+    points = series.get("points") or []
+    if not points:
+        await message.channel.send(content)
+        return
+
+    try:
+        fig = build_daily_spending_figure(
+            [point["day"] for point in points],
+            [point["amount"] for point in points],
+            series["month_label"],
+        )
+        chart_file = await figure_to_discord_file(fig, "daily_spending_calendar.png")
+    except (ChartRenderError, ValueError) as exc:
+        await message.channel.send(content=f"{content}\n\n⚠️ Could not render chart image: {exc}")
+        return
+
+    await message.channel.send(content=content, file=chart_file)
 
 
 async def query_best_worst_day_of_week_handler(entities, message):

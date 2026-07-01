@@ -1580,7 +1580,6 @@ async def test_query_rent_paid(monkeypatch, message):
         ("query_weekend_vs_weekday", "weekend_vs_weekday", (10.0, 20.0), "10.00"),
         ("query_no_spend_days", "no_spend_days", (3, [1, 2, 3]), "3"),
         ("query_total_for_item", "total_spent_on_item", (15.0, []), "15.00"),
-        ("query_daily_spending_calendar", "daily_spending_calendar", ("summary", MagicMock(filename="x.png")), "summary"),
         ("query_best_worst_day_of_week", "best_worst_day_of_week", {"best": ("Mon", 1.0), "worst": ("Fri", 5.0)}, "Mon"),
         ("query_longest_no_spend_streak", "longest_no_spend_streak", (2, 1, 2), "longest"),
         ("query_days_budget_lasts", "days_budget_lasts", 5.0, "5.0"),
@@ -1595,11 +1594,68 @@ async def test_simple_queries(monkeypatch, message, intent, su_attr, return_valu
     entities: dict[str, object] = {"category": "food", "store": "Costco"}
     if intent == "query_total_for_item":
         entities["item"] = "Coffee"
-    if intent == "query_daily_spending_calendar":
-        entities["persons"] = ["Hannah"]
     await ih.handle_intent(intent, entities, message)
 
     assert any(expected_sub.lower() in (msg or "").lower() for msg, _ in message.channel.sent)
+
+
+@pytest.mark.asyncio
+async def test_query_daily_spending_calendar(monkeypatch, message):
+    monkeypatch.setattr(
+        ih.su,
+        "daily_spending_series",
+        AsyncMock(
+            return_value={
+                "month_label": "May 2025",
+                "text_summary": "May 2025 Daily Spending:\n01: $0.00\n05: $12.00",
+                "points": [{"day": 1, "amount": 0.0}, {"day": 5, "amount": 12.0}],
+            }
+        ),
+    )
+    chart_file = MagicMock(filename="daily_spending_calendar.png")
+    monkeypatch.setattr(ih, "build_daily_spending_figure", MagicMock(return_value=object()))
+    monkeypatch.setattr(ih, "figure_to_discord_file", AsyncMock(return_value=chart_file))
+
+    await ih.handle_intent(
+        "query_daily_spending_calendar",
+        {"persons": ["Hannah"]},
+        message,
+    )
+
+    assert any("daily spending" in (msg or "").lower() for msg, _ in message.channel.sent)
+    assert message.channel.sent[-1][1].get("file") is chart_file
+
+
+@pytest.mark.asyncio
+async def test_query_daily_spending_calendar_render_failure(monkeypatch, message):
+    monkeypatch.setattr(
+        ih.su,
+        "daily_spending_series",
+        AsyncMock(
+            return_value={
+                "month_label": "May 2025",
+                "text_summary": "May 2025 Daily Spending:\n05: $12.00",
+                "points": [{"day": 5, "amount": 12.0}],
+            }
+        ),
+    )
+    monkeypatch.setattr(ih, "build_daily_spending_figure", MagicMock(return_value=object()))
+    monkeypatch.setattr(
+        ih,
+        "figure_to_discord_file",
+        AsyncMock(side_effect=ih.ChartRenderError("kaleido missing")),
+    )
+
+    await ih.handle_intent(
+        "query_daily_spending_calendar",
+        {"persons": ["Hannah"]},
+        message,
+    )
+
+    content, kwargs = message.channel.sent[-1]
+    assert "daily spending" in content.lower()
+    assert "could not render chart image" in content.lower()
+    assert "file" not in kwargs
 
 
 @pytest.mark.asyncio
@@ -1629,13 +1685,38 @@ async def test_query_expense_breakdown(monkeypatch, message):
     assert any("could not calculate expense breakdown".lower() in (msg or "").lower() for msg, _ in message.channel.sent)
 
 
-def test_pie_result_parts_handles_container_without_len():
-    class FakePieContainer:
-        patches = ["wedge"]
-        texts = ["label"]
-        autotexts = ["percent"]
+@pytest.mark.asyncio
+async def test_query_expense_breakdown_sends_chart(monkeypatch, message):
+    monkeypatch.setattr(
+        ih.su,
+        "expense_breakdown_percentages",
+        AsyncMock(
+            return_value={
+                "grand_total": 100.0,
+                "categories": {
+                    "food": {"amount": 60.0, "percentage": 60.0},
+                    "gas": {"amount": 40.0, "percentage": 40.0},
+                    "shopping": {"amount": 0.0, "percentage": 0.0},
+                },
+            }
+        ),
+    )
+    chart_file = MagicMock(filename="expense_breakdown.png")
+    build_fig = MagicMock(return_value=object())
+    monkeypatch.setattr(ih, "build_expense_breakdown_figure", build_fig)
+    monkeypatch.setattr(ih, "figure_to_discord_file", AsyncMock(return_value=chart_file))
 
-    assert ih._pie_result_parts(FakePieContainer()) == (["wedge"], ["label"], ["percent"])
+    await ih.handle_intent(
+        "query_expense_breakdown_percentages",
+        {"persons": ["Hannah"]},
+        message,
+    )
+
+    content, kwargs = message.channel.sent[-1]
+    assert "Expense breakdown for Hannah" in content
+    assert "Food: $60.00 (60.00%)" in content
+    assert kwargs.get("file") is chart_file
+    assert "shopping" not in build_fig.call_args.args[0]
 
 
 @pytest.mark.asyncio

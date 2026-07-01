@@ -19,6 +19,7 @@ It leverages agentic AI to understand natural language commands, update a Google
 - **Discord.py** — Discord bot framework
 - **Google Sheets API** — data storage and retrieval
 - **OpenAI API** — natural language understanding
+- **Plotly + Kaleido** — chart rendering for Discord image attachments
 - **AsyncIO** — asynchronous event loop and I/O
 - **Railway** — deployment platform
 

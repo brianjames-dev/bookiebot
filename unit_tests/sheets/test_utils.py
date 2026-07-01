@@ -443,16 +443,33 @@ async def test_projected_spending(mock_ws_func, mock_ws, persons):
 
 @pytest.mark.asyncio
 @patch("bookiebot.sheets.utils.get_expense_worksheet")
-async def test_daily_spending_calendar(mock_ws_func, mock_ws, persons):
+async def test_daily_spending_series(mock_ws_func, mock_ws, persons):
     mock_ws_func.return_value = mock_ws
     mock_ws.get_all_values.return_value = [
         ["hdr"] * 26,
         ["hdr"] * 26,
         _food_row("05/05/2025", 12, "Hannah"),
     ]
-    summary, chart_file = await su.daily_spending_calendar(persons)
-    assert "05: $12.00" in summary
-    assert getattr(chart_file, "filename", "") == "daily_spending_calendar.png"
+    series = await su.daily_spending_series(persons)
+    assert series["month_label"] == "May 2025"
+    assert "05: $12.00" in series["text_summary"]
+    assert series["points"][4] == {"day": 5, "amount": 12.0}
+    assert series["points"][0] == {"day": 1, "amount": 0.0}
+    assert len(series["points"]) == 15
+
+
+@pytest.mark.asyncio
+@patch("bookiebot.sheets.utils.get_expense_worksheet")
+async def test_daily_spending_calendar_alias(mock_ws_func, mock_ws, persons):
+    mock_ws_func.return_value = mock_ws
+    mock_ws.get_all_values.return_value = [
+        ["hdr"] * 26,
+        ["hdr"] * 26,
+        _food_row("05/05/2025", 12, "Hannah"),
+    ]
+    series = await su.daily_spending_calendar(persons)
+    assert series["month_label"] == "May 2025"
+    assert "05: $12.00" in series["text_summary"]
 
 
 @pytest.mark.asyncio

@@ -8,23 +8,7 @@ from zoneinfo import ZoneInfo
 from bookiebot.sheets.config import get_category_columns
 from dateutil import parser as dateparser
 from collections import defaultdict, Counter
-import matplotlib.pyplot as plt
-import io
 from bookiebot.sheets.routing import get_user_config, resolve_actor_key, UnknownDiscordUserError
-
-# Disable discord voice/audio stack to avoid loading audioop (deprecated in Python 3.13)
-os.environ.setdefault("DISCORD_AUDIO_DISABLE", "1")
-
-try:
-    import discord
-except ImportError:  # pragma: no cover - fallback for tests
-    class _Discord:
-        class File:
-            def __init__(self, fp, filename):
-                self.fp = fp
-                self.filename = filename
-
-    discord = _Discord()
 
 import gspread
 from bookiebot.sheets.repo import get_sheets_repo
@@ -1033,20 +1017,21 @@ async def total_spent_on_item(item, persons, top_n=5):
     return total, matches[:top_n]
 
 
-async def daily_spending_calendar(persons: list[str]) -> tuple[str, Any]:
+async def daily_spending_series(persons: list[str]) -> dict[str, Any]:
+    """Return daily spending totals and a text summary for the current month."""
     ws = _expense_ws()
     today = get_local_today()
-    daily_totals = defaultdict(float)
+    daily_totals: dict[int, float] = defaultdict(float)
 
     category_columns = get_category_columns
 
-    for category, config in category_columns.items():
+    for _category, config in category_columns.items():
         start_row = config["start_row"]
         date_col_letter = config["columns"]["date"]
         amount_col_letter = config["columns"]["amount"]
         person_col_letter = config["columns"].get("person")
 
-    # skip categories without person
+        # skip categories without person
         if not person_col_letter:
             continue
 
@@ -1079,39 +1064,28 @@ async def daily_spending_calendar(persons: list[str]) -> tuple[str, Any]:
                 print(f"[WARN] Skipping row: {e}")
                 continue
 
-    # Fill missing days with 0
     for day in range(1, today.day + 1):
         daily_totals.setdefault(day, 0.0)
 
-    # Prepare sorted list
-    sorted_days = sorted(daily_totals.items())
+    points = [
+        {"day": day, "amount": round(amount, 2)}
+        for day, amount in sorted(daily_totals.items())
+    ]
+    month_label = today.strftime("%B %Y")
+    text_lines = [f"{month_label} Daily Spending:"]
+    for point in points:
+        text_lines.append(f"{point['day']:02d}: ${point['amount']:.2f}")
 
-    # Text summary
-    text_lines = [f"{today.strftime('%B %Y')} Daily Spending:"]
-    for day, amt in sorted_days:
-        text_lines.append(f"{day:02d}: ${amt:.2f}")
-    text_summary = "\n".join(text_lines)
+    return {
+        "month_label": month_label,
+        "text_summary": "\n".join(text_lines),
+        "points": points,
+    }
 
-    # Plot
-    days = [day for day, _ in sorted_days]
-    amounts = [amt for _, amt in sorted_days]
 
-    fig, ax = plt.subplots(figsize=(10, 5))
-    ax.bar(days, amounts, color='skyblue')
-    ax.set_xlabel("Day of Month")
-    ax.set_ylabel("Amount Spent ($)")
-    ax.set_title(f"Daily Spending — {today.strftime('%B %Y')}")
-    ax.set_xticks(days)
-    plt.tight_layout()
-
-    buf = io.BytesIO()
-    plt.savefig(buf, format='png', dpi=150)
-    buf.seek(0)
-    plt.close(fig)
-
-    chart_file = discord.File(fp=buf, filename="daily_spending_calendar.png")
-
-    return text_summary, chart_file
+async def daily_spending_calendar(persons: list[str]) -> dict[str, Any]:
+    """Backward-compatible alias for :func:`daily_spending_series`."""
+    return await daily_spending_series(persons)
 
 
 async def best_worst_day_of_week(persons):
