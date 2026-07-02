@@ -159,3 +159,35 @@ def test_get_month_worksheet_errors_when_spreadsheet_cannot_be_opened():
 
     with pytest.raises(routing.SpreadsheetAccessError, match="Could not open spreadsheet 'sheet-id'"):
         routing.get_month_worksheet(gc, "sheet-id", "May")
+
+
+def test_resolve_message_actor_key_ignores_mentions_for_normal_users():
+    from types import SimpleNamespace
+    from bookiebot.sheets.routing import (
+        DEFAULT_BRIAN_DISCORD_USER_IDS,
+        DEFAULT_HANNAH_DISCORD_USER_IDS,
+        resolve_message_actor_key,
+    )
+
+    message = SimpleNamespace(
+        author=SimpleNamespace(id=DEFAULT_HANNAH_DISCORD_USER_IDS[0], name="hannerish", display_name="Hannah", bot=False),
+        mentions=[SimpleNamespace(id=DEFAULT_BRIAN_DISCORD_USER_IDS[0], name="deebers", display_name="Brian", bot=False)],
+    )
+
+    assert resolve_message_actor_key(message) == DEFAULT_HANNAH_DISCORD_USER_IDS[0]
+
+
+def test_resolve_message_actor_key_allows_mentions_for_shortcut_relay():
+    from types import SimpleNamespace
+    from bookiebot.sheets.routing import (
+        APPLE_SHORTCUT_RELAY_USER_ID,
+        DEFAULT_BRIAN_DISCORD_USER_IDS,
+        resolve_message_actor_key,
+    )
+
+    message = SimpleNamespace(
+        author=SimpleNamespace(id=APPLE_SHORTCUT_RELAY_USER_ID, name="shortcut-bot", display_name="Shortcut", bot=True),
+        mentions=[SimpleNamespace(id=DEFAULT_BRIAN_DISCORD_USER_IDS[0], name="deebers", display_name="Brian", bot=False)],
+    )
+
+    assert resolve_message_actor_key(message) == DEFAULT_BRIAN_DISCORD_USER_IDS[0]
