@@ -103,3 +103,10 @@ Rationale: Grouped matches involve multiple sheet rows, so BookieBot should not 
 - Where should durable system events live: banking database only, Google Sheets only, or dual-write during transition?
 - What exact reconciliation states should replace or extend the current status set?
 - What should the canonical model be for recent-action lineages after update, move, delete, and undo?
+
+## 2026-07-02 - Require Single Replica Until Pending State Is Durable
+
+Decision: Keep recent-action and card-selection pending workflow state in process memory and require a single bot replica in production until that state is persisted (for example in Postgres) with expiry.
+
+Rationale: Multi-replica deploys can accept text replies on an instance that does not hold the pending selection, and restarts invalidate still-visible Discord prompts. Documenting the topology constraint preserves correctness without blocking trusted single-instance operation.
+

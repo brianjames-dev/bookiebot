@@ -175,3 +175,10 @@ The first production-facing goal is reconciliation: matching bank transactions a
 ## 📄 License
 
 MIT License
+
+## Runtime Topology
+
+BookieBot currently keeps recent-action selections, update-field prompts, move-item prompts, and card-selection prompts in process memory with a 300-second TTL. Run a **single bot replica** on Railway (or any host). Multiple replicas can split pending state and apply numeric replies on the wrong instance after deploys. Pending prompts that survive a restart expire with a clear "selection expired" message instead of mutating the wrong row.
+
+Persist pending workflow state before enabling horizontal scale-out.
+

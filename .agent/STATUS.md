@@ -181,3 +181,4 @@ python -m pytest unit_tests/intents/test_handlers.py unit_tests/core/test_messag
 python -m pyright
 # Did not run: pyright is not installed in the current Python environment.
 ```
+- Pending recent-action/card state remains in-memory; production must run a single replica until durable pending state ships.
