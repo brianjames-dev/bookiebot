@@ -16,3 +16,4 @@ vcrpy
 aiohttp
 audioop-lts; python_version >= "3.13"
 psycopg[binary]==3.2.3
+cryptography>=42.0.0
