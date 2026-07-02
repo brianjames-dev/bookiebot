@@ -160,12 +160,14 @@ async def send_due_bank_reconciliation_digest(client: Any, today: date | None = 
     current = today or current_time.date()
     sent = 0
     for actor_key, mention in _notification_users():
+        sync_error_message = await _sync_owner_for_digest(actor_key)
         digest = await asyncio.to_thread(
             prepare_bank_reconciliation_digest_messages,
             actor_key,
             mention,
             current,
             mark_sent=False,
+            sync_error_message=sync_error_message,
         )
         if not digest:
             continue
@@ -215,6 +217,7 @@ async def _start_bank_reconciliation_from_prompt(interaction: Any, actor_key: st
 
 
 async def _send_bank_reconciliation_inbox(interaction: Any, actor_key: str) -> None:
+    sync_error_message = await _sync_owner_for_digest(actor_key)
     digest = await asyncio.to_thread(
         prepare_bank_reconciliation_digest_messages,
         actor_key,
@@ -222,6 +225,7 @@ async def _send_bank_reconciliation_inbox(interaction: Any, actor_key: str) -> N
         now_pacific().date(),
         mark_sent=False,
         force=True,
+        sync_error_message=sync_error_message,
     )
     if not digest:
         await interaction.followup.send(
@@ -347,6 +351,24 @@ async def _clear_digest_prompt_buttons(interaction: Any) -> None:
         logger.exception("Failed to clear bank reconciliation digest buttons")
 
 
+
+async def _sync_owner_for_digest(actor_key: str) -> str | None:
+    owner = get_user_config(actor_key)
+    service = build_banking_service()
+    if not service.config.configured:
+        return None
+    try:
+        await service.sync_owner(owner.budget_owner_key)
+    except Exception as exc:
+        sync_error = f"{type(exc).__name__}: {exc}"
+        logger.warning(
+            "Bank sync failed before reconciliation digest; using cached data",
+            extra={"actor_key": actor_key, "error": sync_error},
+        )
+        return sync_error
+    return None
+
+
 def prepare_bank_reconciliation_digest(
     actor_key: str,
     mention: str,
@@ -354,6 +376,7 @@ def prepare_bank_reconciliation_digest(
     *,
     mark_sent: bool,
     force: bool = False,
+    sync_error_message: str | None = None,
 ) -> str | None:
     digest = prepare_bank_reconciliation_digest_messages(
         actor_key,
@@ -361,6 +384,7 @@ def prepare_bank_reconciliation_digest(
         current,
         mark_sent=mark_sent,
         force=force,
+        sync_error_message=sync_error_message,
     )
     return digest.detail_message if digest else None
 
@@ -372,6 +396,7 @@ def prepare_bank_reconciliation_digest_messages(
     *,
     mark_sent: bool,
     force: bool = False,
+    sync_error_message: str | None = None,
 ) -> PreparedBankReconciliationDigest | None:
     metadata = _digest_metadata(current)
     if not force and has_system_event(actor_key, "bank_reconciliation_digest_sent", metadata):
@@ -379,16 +404,7 @@ def prepare_bank_reconciliation_digest_messages(
 
     owner = get_user_config(actor_key)
     service = build_banking_service()
-    sync_error: str | None = None
-    if service.config.configured:
-        try:
-            asyncio.run(service.sync_owner(owner.budget_owner_key))
-        except Exception as exc:
-            sync_error = f"{type(exc).__name__}: {exc}"
-            logger.warning(
-                "Bank sync failed before reconciliation digest; using cached data",
-                extra={"actor_key": actor_key, "error": sync_error},
-            )
+    sync_error = sync_error_message
 
     try:
         preview = service.reconciliation_preview(
