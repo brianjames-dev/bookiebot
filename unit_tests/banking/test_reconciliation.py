@@ -63,14 +63,25 @@ def test_classify_credit_card_account_purchase_as_expense():
     assert notes == "outflow transaction"
 
 
-def test_classify_transfer_payment_as_matched():
+def test_classify_transfer_payment_as_needs_review():
     classification, status, confidence, notes = classify_transaction(
         _transaction("CREDIT CARD 3333 PAYMENT", 25.0)
     )
 
     assert classification == "transfer_or_payment"
-    assert status == "matched"
-    assert confidence == 0.95
+    assert status == "needs_review"
+    assert confidence == 0.85
+    assert notes == "transfer/payment pattern"
+
+
+def test_classify_merchant_with_payment_substring_stays_visible():
+    """Broad transfer patterns must not hide ordinary merchant outflows from review."""
+    classification, status, _confidence, notes = classify_transaction(
+        _transaction("PAYMENT TO VENDOR XYZ", 42.0)
+    )
+
+    assert classification == "transfer_or_payment"
+    assert status == "needs_review"
     assert notes == "transfer/payment pattern"
 
 
@@ -130,6 +141,30 @@ def test_reconcile_matches_logged_expense_by_amount_and_date():
     assert decision.matched_action_log_id == "abc123"
     assert decision.matched_sheet_ref == "expense!row 12"
     assert decision.notes == "matched expense action"
+
+
+def test_reconcile_does_not_auto_match_expense_on_amount_only():
+    action = LoggedAction(
+        id="wrong123",
+        created_at="2026-05-17T12:00:00",
+        user_key="676638528590970917",
+        action=UndoAction(
+            worksheet="expense",
+            kind="clear_cells",
+            row=12,
+            columns=[14, 15, 16, 17, 18],
+            previous_values=["", "", "", "", ""],
+            new_values=["5/17/2026", "lunch", "12.00", "Local Cafe", "Brian (BofA)"],
+            metadata={"type": "expense", "category": "food", "person": "Brian (BofA)"},
+            description="food expense $12.00 for Brian (BofA)",
+        ),
+    )
+
+    decision = reconcile_transaction(_transaction("Uber Trip", 12.00), [action])
+
+    assert decision.status == "needs_review"
+    assert decision.matched_action_log_id is None
+    assert decision.matched_sheet_ref is None
 
 
 def test_find_action_log_candidates_allows_fuzzy_amount_and_seven_day_window():
@@ -595,7 +630,7 @@ def test_reconciliation_preview_persists_items(tmp_path):
     assert by_name["Starbucks"].classification == "expense"
     assert by_name["Starbucks"].status == "needs_review"
     assert by_name["CREDIT CARD 3333 PAYMENT"].classification == "transfer_or_payment"
-    assert by_name["CREDIT CARD 3333 PAYMENT"].status == "matched"
+    assert by_name["CREDIT CARD 3333 PAYMENT"].status == "needs_review"
 
 
 def test_reconciliation_preview_force_rechecks_already_matched_items(tmp_path):
@@ -662,8 +697,10 @@ def test_reconciliation_preview_force_rechecks_already_matched_items(tmp_path):
     forced_preview = service.reconciliation_preview("brian", force=True)
 
     assert len(first_preview.items) == 1
-    assert first_preview.items[0].status == "matched"
-    assert second_preview.items == []
+    assert first_preview.items[0].status == "needs_review"
+    assert first_preview.items[0].classification == "transfer_or_payment"
+    # Unresolved items are returned again on subsequent previews until resolved.
+    assert len(second_preview.items) == 1
     assert len(forced_preview.items) == 1
     assert forced_preview.items[0].classification == "transfer_or_payment"
 

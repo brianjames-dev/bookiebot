@@ -111,7 +111,9 @@ def classify_transaction(transaction: BankTransaction) -> tuple[ReconciliationCl
         return "needs_review", "needs_review", 0.40, "pending transaction"
 
     if _contains_any(transaction_text, TRANSFER_PATTERNS):
-        return "transfer_or_payment", "matched", 0.95, "transfer/payment pattern"
+        # Keep the transfer/payment classification, but do not auto-clear from review.
+        # Broad substrings like "payment" / "transfer" can appear on real expenses.
+        return "transfer_or_payment", "needs_review", 0.85, "transfer/payment pattern"
 
     if transaction.amount > 0 and _contains_any(transaction_text, SUBSCRIPTION_PATTERNS):
         return "subscription_or_bill", "needs_review", 0.75, "possible subscription or bill"
@@ -177,11 +179,12 @@ def match_action_log(
         day_delta = abs((candidate["date"] - transaction_date).days)
         if day_delta > 7:
             continue
-        score = 0.86 - (day_delta * 0.05)
         name_score = _name_score(transaction, candidate["text"])
-        if candidate["type"] == "income" and name_score <= 0:
+        # Require some name evidence for automatic matches. Amount+date alone can attach
+        # a bank txn to the wrong same-day same-amount sheet row (especially expenses).
+        if name_score <= 0:
             continue
-        score += name_score * 0.10
+        score = 0.86 - (day_delta * 0.05) + (name_score * 0.10)
         candidates.append((score, day_delta, candidate, logged))
 
     if not candidates:
@@ -638,8 +641,9 @@ def _parse_date(value: str) -> date | None:
 
 
 def _name_score(transaction: BankTransaction, action_text: str) -> float:
-    bank_text = _normalized_transaction_text(transaction)
-    action_normalized = re.sub(r"[^a-z0-9]+", " ", action_text.lower()).strip()
+    # Normalize the same way as schedule matching so "PG&E" / "pg&e" share tokens.
+    bank_text = _normalize_schedule_text(_normalized_transaction_text(transaction))
+    action_normalized = _normalize_schedule_text(action_text)
     if not bank_text or not action_normalized:
         return 0.0
     bank_tokens = {token for token in re.split(r"\s+", bank_text) if len(token) >= 3}
