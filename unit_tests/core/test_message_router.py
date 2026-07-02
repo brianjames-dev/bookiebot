@@ -328,3 +328,97 @@ async def test_on_message_pending_move_item_can_be_canceled(monkeypatch):
     assert message.channel.sent == [("Canceled.", {})]
     assert undo.pending_move_item(actor_key) is None
     handle_intent.assert_not_awaited()
+
+
+class _FakeClient:
+    def __init__(self):
+        self.user = type("User", (), {"id": 1})()
+        self._events = {}
+
+    def event(self, func):
+        self._events[func.__name__] = func
+        setattr(self, func.__name__, func)
+        return func
+
+
+@pytest.mark.asyncio
+async def test_on_message_ignores_unmapped_dm_before_llm(monkeypatch):
+    from types import SimpleNamespace
+    from bookiebot.core import message_router
+    from bookiebot.sheets.routing import UnknownDiscordUserError
+
+    parse = AsyncMock()
+    sends = []
+
+    class Channel:
+        guild = None
+        name = "dm"
+        id = 1
+
+        async def send(self, content):
+            sends.append(content)
+
+    class Message:
+        def __init__(self):
+            self.author = SimpleNamespace(id=999, name="stranger", display_name="Stranger", bot=False)
+            self.channel = Channel()
+            self.content = "how much did I spend?"
+
+    client = _FakeClient()
+    monkeypatch.setattr(message_router, "parse_message_llm", parse)
+    monkeypatch.setattr(message_router, "resolve_message_actor_key", lambda message: "999")
+    monkeypatch.setattr(
+        message_router,
+        "get_user_config",
+        lambda actor_key: (_ for _ in ()).throw(UnknownDiscordUserError("unmapped")),
+    )
+    monkeypatch.setattr(message_router, "register_persistent_bank_reconciliation_views", lambda client: None)
+    monkeypatch.setattr(message_router, "ensure_web_server", lambda client: None)
+    monkeypatch.setattr(message_router, "ensure_bank_reconciliation_loop", lambda client: None)
+    monkeypatch.setattr(message_router, "ensure_subscription_reminder_loop", lambda client: None)
+    message_router.register_events(client, SimpleNamespace(sync=AsyncMock()))
+    await client.on_message(Message())
+    parse.assert_not_awaited()
+    assert sends == []
+
+
+@pytest.mark.asyncio
+async def test_on_message_rejects_unmapped_guild_user_before_llm(monkeypatch):
+    from types import SimpleNamespace
+    from bookiebot.core import message_router
+    from bookiebot.sheets.routing import UnknownDiscordUserError
+
+    parse = AsyncMock()
+    sends = []
+
+    class Channel:
+        guild = object()
+        name = "budget"
+        id = 42
+
+        async def send(self, content):
+            sends.append(content)
+
+    class Message:
+        def __init__(self):
+            self.author = SimpleNamespace(id=999, name="stranger", display_name="Stranger", bot=False)
+            self.channel = Channel()
+            self.content = "log 12 lunch"
+
+    client = _FakeClient()
+    monkeypatch.setattr(message_router.config, "CHANNEL_ID", 42)
+    monkeypatch.setattr(message_router, "parse_message_llm", parse)
+    monkeypatch.setattr(message_router, "resolve_message_actor_key", lambda message: "999")
+    monkeypatch.setattr(
+        message_router,
+        "get_user_config",
+        lambda actor_key: (_ for _ in ()).throw(UnknownDiscordUserError("unmapped")),
+    )
+    monkeypatch.setattr(message_router, "register_persistent_bank_reconciliation_views", lambda client: None)
+    monkeypatch.setattr(message_router, "ensure_web_server", lambda client: None)
+    monkeypatch.setattr(message_router, "ensure_bank_reconciliation_loop", lambda client: None)
+    monkeypatch.setattr(message_router, "ensure_subscription_reminder_loop", lambda client: None)
+    message_router.register_events(client, SimpleNamespace(sync=AsyncMock()))
+    await client.on_message(Message())
+    parse.assert_not_awaited()
+    assert sends == ["unmapped"]

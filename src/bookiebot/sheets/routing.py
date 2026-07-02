@@ -163,6 +163,27 @@ def actor_key_aliases(actor_key: str | None) -> set[str]:
     }
 
 
+
+def is_actor_relay_user(discord_user_id: Any) -> bool:
+    return normalize_discord_user_id(discord_user_id) == APPLE_SHORTCUT_RELAY_USER_ID
+
+
+def resolve_message_actor_key(message: Any) -> str | None:
+    author = getattr(message, "author", None)
+    author_id = getattr(author, "id", None)
+    author_name = getattr(author, "name", None) or getattr(author, "display_name", None)
+    if is_actor_relay_user(author_id):
+        for mentioned in getattr(message, "mentions", []) or []:
+            if getattr(mentioned, "bot", False):
+                continue
+            mentioned_id = getattr(mentioned, "id", None)
+            mentioned_name = getattr(mentioned, "name", None) or getattr(mentioned, "display_name", None)
+            mentioned_key = resolve_actor_key(mentioned_id, mentioned_name)
+            if mentioned_key and not is_actor_relay_user(mentioned_key):
+                return mentioned_key
+        return resolve_actor_key(author_id, author_name)
+    return resolve_actor_key(author_id, author_name)
+
 def get_user_config(discord_user_id: Any, discord_user: str | None = None) -> DiscordUserConfig:
     actor_key = resolve_actor_key(discord_user_id, discord_user)
     if not actor_key:
