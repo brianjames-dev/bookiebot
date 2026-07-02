@@ -25,7 +25,9 @@ from bookiebot.sheets.routing import (
     UnknownDiscordUserError,
     actor_key_aliases,
     get_user_config,
+    interaction_belongs_to_actor as routing_interaction_belongs_to_actor,
     resolve_actor_key,
+    resolve_message_actor_key,
     sheet_user_context,
 )
 from bookiebot.sheets.undo import (
@@ -133,17 +135,7 @@ async def write_transaction_to_sheet(transaction_type: str, entities: IntentEnti
 
 
 def _message_actor_key(message) -> str | None:
-    for mentioned in getattr(message, "mentions", []) or []:
-        if getattr(mentioned, "bot", False):
-            continue
-        mentioned_id = getattr(mentioned, "id", None)
-        mentioned_name = getattr(mentioned, "name", None) or getattr(mentioned, "display_name", None)
-        return resolve_actor_key(mentioned_id, mentioned_name)
-
-    author = getattr(message, "author", None)
-    author_id = getattr(author, "id", None)
-    author_name = getattr(author, "name", None) or getattr(author, "display_name", None)
-    return resolve_actor_key(author_id, author_name)
+    return resolve_message_actor_key(message)
 
 
 def _budget_profile_name(message) -> str:
@@ -375,7 +367,7 @@ def _interaction_belongs_to_actor(interaction: Any, actor_key: str | None) -> bo
     interaction_actor = _interaction_actor_key(interaction)
     if not interaction_actor:
         return True
-    return interaction_actor in actor_key_aliases(str(actor_key))
+    return routing_interaction_belongs_to_actor(interaction, actor_key)
 
 
 async def _reject_unowned_recent_interaction(interaction: Any, actor_key: str | None) -> bool:

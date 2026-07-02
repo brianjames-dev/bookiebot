@@ -11,7 +11,7 @@ from zoneinfo import ZoneInfo
 from bookiebot.sheets.config import get_category_columns
 from bookiebot.sheets.utils import resolve_query_persons
 from bookiebot.sheets.repo import get_sheets_repo
-from bookiebot.sheets.routing import get_current_discord_user_id
+from bookiebot.sheets.routing import get_current_discord_user_id, resolve_message_actor_key
 from bookiebot.sheets.undo import UndoAction, _sheet_user_entered_value, _update_contiguous_row, record_undo_action
 
 logger = logging.getLogger(__name__)
@@ -161,21 +161,18 @@ async def write_expense_to_sheet(data, message):
             await message.channel.send("❌ I could not access the expense sheet. Please try again in a moment.")
         return
 
-    discord_user = getattr(message.author, "name", "").lower()
-    discord_user_id = getattr(message.author, "id", None)
-    discord_user_id = str(discord_user_id) if discord_user_id is not None else None
-
-    # If the message explicitly mentions a non-bot user, treat that mention as the actor.
-    # This lets people post via shortcuts/webhooks and still log under the correct account.
-    for mentioned in getattr(message, "mentions", []) or []:
-        if getattr(mentioned, "bot", False):
-            continue
-        discord_user = (getattr(mentioned, "name", None) or getattr(mentioned, "display_name", "")).lower()
-        mentioned_id = getattr(mentioned, "id", discord_user_id)
-        discord_user_id = str(mentioned_id) if mentioned_id is not None else None
-        logger.debug("Using mentioned user for resolution", extra={"user": discord_user, "user_id": discord_user_id})
-        break
-    logger.debug("Discord user", extra={"user": discord_user})
+    actor_key = resolve_message_actor_key(message)
+    author = getattr(message, "author", None)
+    discord_user = (getattr(author, "name", None) or getattr(author, "display_name", "") or "").lower()
+    if actor_key is not None:
+        discord_user_id = str(actor_key)
+    else:
+        author_id = getattr(author, "id", None)
+        discord_user_id = str(author_id) if author_id is not None else None
+    logger.debug(
+        "Discord user",
+        extra={"user": discord_user, "user_id": discord_user_id, "actor_key": actor_key},
+    )
 
     # Determine `person(s)` to log
     person = (data.get("person") or "").strip()
