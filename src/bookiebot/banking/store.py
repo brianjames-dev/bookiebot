@@ -380,12 +380,18 @@ class BankStore:
             "reconciliation_items": reconciliation_count,
         }
 
-    def get_access_token(self, item_db_id: int) -> str:
+    def get_access_token(self, item_db_id: int, owner_key: str | None = None) -> str:
         with self.connect() as conn:
-            row = conn.execute(
-                "SELECT encrypted_access_token FROM bank_items WHERE id = ?",
-                (item_db_id,),
-            ).fetchone()
+            if owner_key:
+                row = conn.execute(
+                    "SELECT encrypted_access_token FROM bank_items WHERE id = ? AND owner_key = ?",
+                    (item_db_id, owner_key),
+                ).fetchone()
+            else:
+                row = conn.execute(
+                    "SELECT encrypted_access_token FROM bank_items WHERE id = ?",
+                    (item_db_id,),
+                ).fetchone()
         if row is None:
             raise KeyError(f"Unknown bank item id {item_db_id}")
         return self.cipher.decrypt(str(row["encrypted_access_token"]))
@@ -901,17 +907,37 @@ class BankStore:
                 )
                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 ON CONFLICT(bank_transaction_id) DO UPDATE SET
-                    classification = excluded.classification,
+                    classification = CASE
+                        WHEN bank_reconciliation_items.status IN ('confirmed', 'ignored', 'import_requested')
+                        THEN bank_reconciliation_items.classification
+                        ELSE excluded.classification
+                    END,
                     status = CASE
                         WHEN bank_reconciliation_items.status IN ('confirmed', 'ignored', 'import_requested')
                         THEN bank_reconciliation_items.status
                         ELSE excluded.status
                     END,
-                    matched_action_log_id = excluded.matched_action_log_id,
-                    matched_sheet_ref = excluded.matched_sheet_ref,
-                    confidence = excluded.confidence,
+                    matched_action_log_id = CASE
+                        WHEN bank_reconciliation_items.status IN ('confirmed', 'ignored', 'import_requested')
+                        THEN bank_reconciliation_items.matched_action_log_id
+                        ELSE excluded.matched_action_log_id
+                    END,
+                    matched_sheet_ref = CASE
+                        WHEN bank_reconciliation_items.status IN ('confirmed', 'ignored', 'import_requested')
+                        THEN bank_reconciliation_items.matched_sheet_ref
+                        ELSE excluded.matched_sheet_ref
+                    END,
+                    confidence = CASE
+                        WHEN bank_reconciliation_items.status IN ('confirmed', 'ignored', 'import_requested')
+                        THEN bank_reconciliation_items.confidence
+                        ELSE excluded.confidence
+                    END,
                     last_seen_at = excluded.last_seen_at,
-                    notes = excluded.notes
+                    notes = CASE
+                        WHEN bank_reconciliation_items.status IN ('confirmed', 'ignored', 'import_requested')
+                        THEN bank_reconciliation_items.notes
+                        ELSE excluded.notes
+                    END
                 """,
                 (
                     owner_key,
@@ -1183,7 +1209,7 @@ class BankStore:
         now = utc_now_iso()
         self.initialize()
         with self.connect() as conn:
-            conn.execute(
+            row = conn.execute(
                 """
                 UPDATE bank_reconciliation_items
                 SET status = 'confirmed',
@@ -1197,9 +1223,13 @@ class BankStore:
                     END
                 WHERE id = ?
                   AND owner_key = ?
+                  AND status IN ('needs_review', 'pending_user', 'conflict', 'matched')
+                RETURNING id
                 """,
                 (now, now, matched_action_log_id, matched_sheet_ref, notes, notes, int(reconciliation_id), owner_key),
-            )
+            ).fetchone()
+        if row is None:
+            return None
         return self.get_reconciliation_item(owner_key, reconciliation_id)
 
     def reopen_reconciliation_item(
