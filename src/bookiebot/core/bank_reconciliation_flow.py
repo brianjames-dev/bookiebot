@@ -14,6 +14,7 @@ from bookiebot.banking.service import build_banking_service
 from bookiebot.sheets.config import get_category_columns
 from bookiebot.sheets.repo import get_sheets_repo
 from bookiebot.sheets.routing import sheet_user_context
+from bookiebot.sheets.undo import undo_last_action
 from bookiebot.sheets.writer import log_category_row, log_income_row, record_expense_undo
 from bookiebot.ui.bank_reconciliation import (
     BankExpenseFixedFieldsView,
@@ -522,14 +523,22 @@ class _BankExpenseLogModal(discord.ui.Modal, title="Log bank item as expense"):
                     },
                 )
             service = build_banking_service()
-            confirmed = await asyncio.to_thread(
-                service.confirm_reconciliation_item,
-                self.owner_key,
-                self.item.id,
-                matched_action_log_id=action_id,
-                matched_sheet_ref=f"expense!row {row}",
-                notes="logged as expense from bank reconciliation",
-            )
+            try:
+                confirmed = await asyncio.to_thread(
+                    service.confirm_reconciliation_item,
+                    self.owner_key,
+                    self.item.id,
+                    matched_action_log_id=action_id,
+                    matched_sheet_ref=f"expense!row {row}",
+                    notes="logged as expense from bank reconciliation",
+                )
+            except Exception:
+                with sheet_user_context(self.actor_key):
+                    await asyncio.to_thread(undo_last_action, self.actor_key)
+                raise
+            if confirmed is None:
+                with sheet_user_context(self.actor_key):
+                    await asyncio.to_thread(undo_last_action, self.actor_key)
         except Exception as exc:
             await interaction.response.send_message(
                 f"Could not log expense: {type(exc).__name__}: {exc}",
@@ -537,7 +546,11 @@ class _BankExpenseLogModal(discord.ui.Modal, title="Log bank item as expense"):
             )
             return
         if confirmed is None:
-            await interaction.response.send_message("That bank reconciliation item was no longer available.", ephemeral=True)
+            await interaction.response.send_message(
+                "That bank reconciliation item was no longer available. "
+                "Any sheet row just written was undone to avoid a double log.",
+                ephemeral=True,
+            )
             return
         await interaction.response.send_message(
             f"Logged `{transaction.name}` as `{category}` expense: `${abs(transaction.amount):.2f}`.",
@@ -582,14 +595,22 @@ class _BankIncomeLogModal(discord.ui.Modal, title="Log bank item as income/refun
                     },
                 )
             service = build_banking_service()
-            confirmed = await asyncio.to_thread(
-                service.confirm_reconciliation_item,
-                self.owner_key,
-                self.item.id,
-                matched_action_log_id=action_id,
-                matched_sheet_ref=f"income!row {row}",
-                notes="logged as income/refund from bank reconciliation",
-            )
+            try:
+                confirmed = await asyncio.to_thread(
+                    service.confirm_reconciliation_item,
+                    self.owner_key,
+                    self.item.id,
+                    matched_action_log_id=action_id,
+                    matched_sheet_ref=f"income!row {row}",
+                    notes="logged as income/refund from bank reconciliation",
+                )
+            except Exception:
+                with sheet_user_context(self.actor_key):
+                    await asyncio.to_thread(undo_last_action, self.actor_key)
+                raise
+            if confirmed is None:
+                with sheet_user_context(self.actor_key):
+                    await asyncio.to_thread(undo_last_action, self.actor_key)
         except Exception as exc:
             await interaction.response.send_message(
                 f"Could not log income/refund: {type(exc).__name__}: {exc}",
@@ -597,7 +618,11 @@ class _BankIncomeLogModal(discord.ui.Modal, title="Log bank item as income/refun
             )
             return
         if confirmed is None:
-            await interaction.response.send_message("That bank reconciliation item was no longer available.", ephemeral=True)
+            await interaction.response.send_message(
+                "That bank reconciliation item was no longer available. "
+                "Any sheet row just written was undone to avoid a double log.",
+                ephemeral=True,
+            )
             return
         await interaction.response.send_message(
             f"Logged `{transaction.name}` as income/refund: `${abs(transaction.amount):.2f}`.",
