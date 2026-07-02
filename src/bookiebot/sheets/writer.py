@@ -196,17 +196,28 @@ async def write_expense_to_sheet(data, message):
 
     # If multiple (ambiguous Brian), ask which card
     if len(persons_to_log) > 1:
-        pending_data_by_user[discord_user] = {
+        pending_key = discord_user_id or discord_user
+        owner_user_id = str(getattr(message.author, "id", "") or "") or None
+        pending_data_by_user[pending_key] = {
             "data": data,
             "worksheet": ws,
             "category": category,
             "undo_user_key": get_current_discord_user_id() or discord_user_id,
+            "owner_user_id": owner_user_id,
         }
 
         async def handle_selection(interaction, selected_card):
-            stored = pending_data_by_user.pop(discord_user, None)
+            user = getattr(interaction, "user", None)
+            user_id = str(getattr(user, "id", "")) if user is not None else ""
+            if owner_user_id and user_id != owner_user_id:
+                await interaction.response.send_message(
+                    "This card selection belongs to another user.",
+                    ephemeral=True,
+                )
+                return
+            stored = pending_data_by_user.pop(pending_key, None)
             if not stored:
-                await interaction.response.send_message("❌ Session expired.")
+                await interaction.response.send_message("❌ Session expired.", ephemeral=True)
                 return
 
             # Acknowledge quickly to avoid "Unknown interaction" errors, then send follow-up.
@@ -218,9 +229,9 @@ async def write_expense_to_sheet(data, message):
 
             stored["data"]["person"] = selected_card
             values = normalize_expense_data(stored["data"], selected_card)
-            row = log_category_row(values, ws, category)
+            row = log_category_row(values, stored["worksheet"], stored["category"])
             record_expense_undo(
-                category,
+                stored["category"],
                 row,
                 values,
                 selected_card,
@@ -228,10 +239,11 @@ async def write_expense_to_sheet(data, message):
             )
 
             await interaction.followup.send(
-                f"✅ Logged {category} expense: ${stored['data']['amount']} for {selected_card}"
+                f"✅ Logged {stored['category']} expense: ${stored['data']['amount']} for {selected_card}",
+                ephemeral=True,
             )
 
-        view = CardButtonView(handle_selection)
+        view = CardButtonView(handle_selection, owner_user_id=owner_user_id)
         await message.channel.send(
             f"{message.author.mention}, which card did you use?",
             view=view

@@ -128,6 +128,12 @@ async def send_bank_reconciliation_detail(
             )
 
     async def handle_action(action_interaction: Any, action: str) -> None:
+        if not interaction_belongs_to_actor(action_interaction, actor_key):
+            await action_interaction.response.send_message(
+                "This bank reconciliation workflow belongs to another user.",
+                ephemeral=True,
+            )
+            return
         await action_interaction.response.defer(ephemeral=True)
         try:
             if action.startswith("group_adjust:"):
@@ -488,6 +494,12 @@ class _BankExpenseLogModal(discord.ui.Modal, title="Log bank item as expense"):
         self.location.default = source_name
 
     async def on_submit(self, interaction: discord.Interaction) -> None:
+        if not interaction_belongs_to_actor(interaction, self.actor_key):
+            await interaction.response.send_message(
+                "This bank reconciliation workflow belongs to another user.",
+                ephemeral=True,
+            )
+            return
         category = self.category
         if category not in get_category_columns:
             available = ", ".join(sorted(get_category_columns))
@@ -562,6 +574,12 @@ class _BankIncomeLogModal(discord.ui.Modal, title="Log bank item as income/refun
         self.label.default = "refund"
 
     async def on_submit(self, interaction: discord.Interaction) -> None:
+        if not interaction_belongs_to_actor(interaction, self.actor_key):
+            await interaction.response.send_message(
+                "This bank reconciliation workflow belongs to another user.",
+                ephemeral=True,
+            )
+            return
         transaction = self.item.transaction
         values = {
             "source": str(self.source.value).strip(),
