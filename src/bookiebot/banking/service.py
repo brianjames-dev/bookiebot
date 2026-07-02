@@ -1105,7 +1105,11 @@ class BankingService:
 
 def build_banking_service() -> BankingService:
     config = load_banking_config()
-    cipher = TokenCipher(config.token_encryption_key or "missing-dev-key")
+    if not config.token_encryption_key:
+        raise ValueError(
+            "BANK_TOKEN_ENCRYPTION_KEY is required before using the banking service"
+        )
+    cipher = TokenCipher(config.token_encryption_key)
     if config.database_url:
         from bookiebot.banking.postgres_store import PostgresBankStore
 

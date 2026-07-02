@@ -24,3 +24,18 @@ def test_postgres_sql_translates_sqlite_placeholders():
     assert _postgres_sql("SELECT * FROM bank_items WHERE id = ? AND owner_key = ?") == (
         "SELECT * FROM bank_items WHERE id = %s AND owner_key = %s"
     )
+
+
+def test_build_banking_service_requires_encryption_key(monkeypatch):
+    from bookiebot.banking import service as banking_service
+
+    monkeypatch.setenv("PLAID_CLIENT_ID", "client")
+    monkeypatch.setenv("PLAID_SECRET", "secret")
+    monkeypatch.delenv("BANK_TOKEN_ENCRYPTION_KEY", raising=False)
+    monkeypatch.delenv("BANK_DATABASE_URL", raising=False)
+
+    try:
+        banking_service.build_banking_service()
+        assert False, "expected ValueError"
+    except ValueError as exc:
+        assert "BANK_TOKEN_ENCRYPTION_KEY" in str(exc)
