@@ -530,6 +530,9 @@ class _BankExpenseLogModal(discord.ui.Modal, title="Log bank item as expense"):
                 matched_sheet_ref=f"expense!row {row}",
                 notes="logged as expense from bank reconciliation",
             )
+            if confirmed is None and action_id:
+                with sheet_user_context(self.actor_key):
+                    await asyncio.to_thread(undo_logged_action, self.actor_key, action_id)
         except Exception as exc:
             await interaction.response.send_message(
                 f"Could not log expense: {type(exc).__name__}: {exc}",
@@ -537,7 +540,10 @@ class _BankExpenseLogModal(discord.ui.Modal, title="Log bank item as expense"):
             )
             return
         if confirmed is None:
-            await interaction.response.send_message("That bank reconciliation item was no longer available.", ephemeral=True)
+            await interaction.response.send_message(
+                "That bank reconciliation item was no longer available. I reversed the sheet entry so it is not double-logged.",
+                ephemeral=True,
+            )
             return
         await interaction.response.send_message(
             f"Logged `{transaction.name}` as `{category}` expense: `${abs(transaction.amount):.2f}`.",
@@ -590,6 +596,9 @@ class _BankIncomeLogModal(discord.ui.Modal, title="Log bank item as income/refun
                 matched_sheet_ref=f"income!row {row}",
                 notes="logged as income/refund from bank reconciliation",
             )
+            if confirmed is None and action_id:
+                with sheet_user_context(self.actor_key):
+                    await asyncio.to_thread(undo_logged_action, self.actor_key, action_id)
         except Exception as exc:
             await interaction.response.send_message(
                 f"Could not log income/refund: {type(exc).__name__}: {exc}",
@@ -597,7 +606,10 @@ class _BankIncomeLogModal(discord.ui.Modal, title="Log bank item as income/refun
             )
             return
         if confirmed is None:
-            await interaction.response.send_message("That bank reconciliation item was no longer available.", ephemeral=True)
+            await interaction.response.send_message(
+                "That bank reconciliation item was no longer available. I reversed the sheet entry so it is not double-logged.",
+                ephemeral=True,
+            )
             return
         await interaction.response.send_message(
             f"Logged `{transaction.name}` as income/refund: `${abs(transaction.amount):.2f}`.",

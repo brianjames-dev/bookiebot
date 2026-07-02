@@ -865,6 +865,8 @@ class BankingService:
             return item, None, "action_not_reconcilable"
 
         bank_amount = abs(item.transaction.amount)
+        original_amount = candidate.amount
+        amount_updated = False
         if round(candidate.amount * 100) != round(bank_amount * 100):
             success, detail = update_recent_action(
                 actor_key,
@@ -877,6 +879,7 @@ class BankingService:
             )
             if not success:
                 return item, candidate, f"amount_update_failed: {detail}"
+            amount_updated = True
             updated_logged = {entry.id: entry for entry in read_active_logged_actions(actor_key)}.get(action_id)
             updated_candidate = action_log_candidate_by_id(updated_logged) if updated_logged else None
             if updated_candidate is not None:
@@ -892,6 +895,17 @@ class BankingService:
             matched_sheet_ref=candidate.sheet_ref,
             notes="matched existing sheet/action-log row",
         )
+        if confirmed is None and amount_updated:
+            update_recent_action(
+                actor_key,
+                updates={"amount": f"{original_amount:.2f}"},
+                action_id=candidate.action_id,
+                metadata_extra={
+                    "origin": "bank_reconciliation_compensation",
+                    "bank_reconciliation_id": str(reconciliation_id),
+                },
+            )
+            return item, candidate, "confirm_failed"
         return confirmed, candidate, update_status
 
     def revert_reconciliation_item(
