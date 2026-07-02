@@ -1021,7 +1021,12 @@ async def query_expense_breakdown_handler(entities, message):
             continue
 
         non_zero_categories[category] = info
-        lines.append(f"{category.capitalize()}: ${amt:.2f} ({pct:.2f}%)")
+        label = (
+            str(info["label"]).strip()
+            if info.get("label")
+            else str(category).replace("_", " ").title()
+        )
+        lines.append(f"{label}: ${amt:.2f} ({pct:.2f}%)")
 
     if not non_zero_categories:
         await message.channel.send("❌ Could not calculate expense breakdown.")

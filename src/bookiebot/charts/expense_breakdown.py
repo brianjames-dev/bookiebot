@@ -24,7 +24,11 @@ def build_expense_breakdown_figure(
         if amount <= 0:
             continue
         percentage = float(info.get("percentage") or 0.0)
-        label = str(category).replace("_", " ").strip().title()
+        label = (
+            str(info["label"]).strip()
+            if info.get("label")
+            else str(category).replace("_", " ").strip().title()
+        )
         labels.append(label)
         values.append(amount)
         customdata.append([amount, percentage])

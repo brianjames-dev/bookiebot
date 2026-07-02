@@ -474,20 +474,30 @@ async def expense_breakdown_percentages(persons: list[str] | None = None):
     ws = _expense_ws()
     if ws is None:
         return {}
-    category_amounts = {'grocery': 0.0, 'gas': 0.0, 'food': 0.0, 'shopping': 0.0}
-    grand_total = 0.0
+    category_amounts = {
+        "rent": 0.0,
+        "bills_utilities": 0.0,
+        "subscriptions": 0.0,
+        "grocery": 0.0,
+        "gas": 0.0,
+        "food": 0.0,
+        "shopping": 0.0,
+    }
+    category_labels = {
+        "rent": "Rent",
+        "bills_utilities": "Bills & Utilities",
+        "subscriptions": "Subscriptions",
+        "grocery": "Grocery",
+        "gas": "Gas",
+        "food": "Food",
+        "shopping": "Shopping",
+    }
 
-    # per-person row and total cell maps
+    # per-person summary rows for discretionary category totals
     person_row_map = {
         "Brian (AL)": 3,
         "Brian (BofA)": 4,
         "Hannah": 5
-    }
-
-    total_cell_map = {
-        "Brian (AL)": "AE27",
-        "Brian (BofA)": "AE28",
-        "Hannah": "AE31"
     }
 
     category_cells = {
@@ -497,17 +507,17 @@ async def expense_breakdown_percentages(persons: list[str] | None = None):
         'shopping': 'AB{}'
     }
 
-    # sum categories & total over all persons
+    category_amounts["rent"] = _payment_total_for_labels(["Rent"])
+    category_amounts["bills_utilities"] = _bills_and_utilities_total()
+    category_amounts["subscriptions"] = await _subscriptions_expense_total()
+
+    # sum discretionary categories over all requested persons
     for person in persons:
         row = person_row_map.get(person)
-        total_cell = total_cell_map.get(person)
 
-        if not row or not total_cell:
+        if not row:
             print(f"[ERROR] Unknown person: {person}")
             continue
-
-        total_val = ws.acell(total_cell).value
-        grand_total += clean_money(total_val)
 
         for category, cell_fmt in category_cells.items():
             cell_ref = cell_fmt.format(row)
@@ -517,6 +527,7 @@ async def expense_breakdown_percentages(persons: list[str] | None = None):
             amount = clean_money(val)
             category_amounts[category] += amount
 
+    grand_total = sum(category_amounts.values())
     if grand_total == 0:
         print(f"[WARN] Combined total for {persons} is 0. Cannot calculate breakdown.")
         return {}
@@ -527,7 +538,8 @@ async def expense_breakdown_percentages(persons: list[str] | None = None):
         pct = round(amt / grand_total * 100, 2) if grand_total > 0 else 0
         breakdown[cat] = {
             "amount": round(amt, 2),
-            "percentage": pct
+            "percentage": pct,
+            "label": category_labels[cat],
         }
 
     result = {
@@ -536,6 +548,59 @@ async def expense_breakdown_percentages(persons: list[str] | None = None):
     }
 
     return result
+
+
+def _payment_total_for_labels(labels: list[str]) -> float:
+    ws = _income_ws()
+    if ws is None:
+        return 0.0
+
+    total = 0.0
+    seen_cells: set[tuple[int, int]] = set()
+    for label in labels:
+        try:
+            cell = ws.find(label)
+            cell_key = (cell.row, cell.col)
+            if cell_key in seen_cells:
+                continue
+            seen_cells.add(cell_key)
+            amount_cell = ws.cell(cell.row, cell.col + 1).value
+            total += clean_money(amount_cell or "")
+        except Exception:
+            continue
+
+    return round(total, 2)
+
+
+def _normalized_bill_label(value: str) -> str:
+    return re.sub(r"[^a-z0-9]+", "_", value.strip().lower()).strip("_")
+
+
+def _bills_and_utilities_total() -> float:
+    labels = ["PG&E", "PGE", "Recology", "Trash", "Garbage", "Waste", "Water", "Student Loan Payment"]
+    try:
+        from bookiebot.sheets.bills import list_bill_schedules
+
+        rows = get_sheets_repo().bill_schedule_sheet().get_all_values()
+        for bill in list_bill_schedules(rows):
+            bill_labels = [bill.bill_key, bill.display_name, bill.source_label]
+            if any(_normalized_bill_label(label) == "rent" for label in bill_labels):
+                continue
+            labels.append(bill.source_label or bill.display_name)
+    except Exception:
+        logger.debug("Could not read bill schedule for expense breakdown", exc_info=True)
+
+    return _payment_total_for_labels(labels)
+
+
+async def _subscriptions_expense_total() -> float:
+    try:
+        _needs, needs_total, _wants, wants_total = await list_subscriptions()
+    except Exception:
+        logger.debug("Could not read subscriptions for expense breakdown", exc_info=True)
+        return 0.0
+
+    return round(needs_total + wants_total, 2)
 
 
 async def total_for_category(category, persons=None):

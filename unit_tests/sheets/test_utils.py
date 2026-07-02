@@ -305,17 +305,11 @@ async def test_total_income_missing_cell(mock_get_income_worksheet):
 
 
 @pytest.mark.asyncio
+@patch("bookiebot.sheets.utils.get_subscriptions_worksheet")
+@patch("bookiebot.sheets.utils.get_income_worksheet")
 @patch("bookiebot.sheets.utils.get_expense_worksheet")
-async def test_expense_breakdown_percentages(mock_ws_func, mock_ws):
+async def test_expense_breakdown_percentages(mock_ws_func, mock_income_ws_func, mock_subs_ws_func, mock_ws):
     mock_ws_func.return_value = mock_ws
-    # prepare totals for Brian (BofA) and Hannah
-    totals = {
-        "AE28": "50",   # Brian total
-        "AE31": "100",  # Hannah total
-    }
-
-    def _acell(cell_ref):
-        return type("Cell", (), {"value": totals.get(cell_ref, "0")})
 
     def _cell(r, c):
         # map row/col to values for grocery/gas/food/shopping
@@ -333,13 +327,55 @@ async def test_expense_breakdown_percentages(mock_ws_func, mock_ws):
         }
         return type("Cell", (), {"value": mapping.get((r, c), "0")})
 
-    mock_ws.acell.side_effect = _acell
     mock_ws.cell.side_effect = _cell
+
+    income_ws = MagicMock()
+    income_rows = {
+        "rent": (1, 1, "1200"),
+        "pg&e": (2, 1, "100"),
+        "recology": (3, 1, "30"),
+        "water": (4, 1, "40"),
+        "student loan payment": (5, 1, "200"),
+    }
+
+    def _find_income(label):
+        normalized = label.strip().lower()
+        if normalized not in income_rows:
+            raise ValueError("not found")
+        row, col, _amount = income_rows[normalized]
+        return type("Cell", (), {"row": row, "col": col, "value": label})
+
+    def _income_cell(row, col):
+        for known_row, known_col, amount in income_rows.values():
+            if row == known_row and col == known_col + 1:
+                return type("Cell", (), {"value": amount})
+        return type("Cell", (), {"value": ""})
+
+    income_ws.find.side_effect = _find_income
+    income_ws.cell.side_effect = _income_cell
+    mock_income_ws_func.return_value = income_ws
+
+    subs_ws = MagicMock()
+    subs_ws.get_all_values.return_value = [
+        [],
+        ["", "SUBSCRIPTIONS"],
+        [],
+        ["Needs", "", "(Monthly)", "", "Wants", "", "(Monthly)"],
+        ["", "", "", "", "", "", ""],
+        ["Recurring:", "Name:", "Amount:", "", "Recurring:", "Name:", "Amount:"],
+        ["5th", "Netflix", "$15.00", "", "10th", "Spotify", "$10.00"],
+    ]
+    mock_subs_ws_func.return_value = subs_ws
 
     result = await su.expense_breakdown_percentages(["Brian (BofA)", "Hannah"])
     cats = result["categories"]
+    assert result["grand_total"] == 1745.0
+    assert cats["rent"]["amount"] == 1200.0
+    assert cats["bills_utilities"]["amount"] == 370.0
+    assert cats["bills_utilities"]["label"] == "Bills & Utilities"
+    assert cats["subscriptions"]["amount"] == 25.0
     assert cats["grocery"]["amount"] == 75.0
-    assert cats["food"]["percentage"] == pytest.approx(26.67, rel=1e-2)
+    assert cats["food"]["percentage"] == pytest.approx(2.29, rel=1e-2)
 
 
 @pytest.mark.asyncio
