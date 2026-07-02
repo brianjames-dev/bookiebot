@@ -41,7 +41,14 @@ def figure_to_png_bytes_sync(
     try:
         image_bytes = fig.to_image(format="png", width=width, height=height, scale=scale)
     except Exception as exc:  # pragma: no cover - depends on kaleido runtime
-        raise ChartRenderError(f"Failed to render chart image: {exc}") from exc
+        message = str(exc).strip() or exc.__class__.__name__
+        if "Chrome" in message or "chrome" in message:
+            message = (
+                f"{message} "
+                "(BookieBot pins kaleido 0.2.1 to avoid a system Chrome dependency; "
+                "redeploy if the host is still on kaleido 1.x.)"
+            )
+        raise ChartRenderError(f"Failed to render chart image: {message}") from exc
     if not image_bytes:
         raise ChartRenderError("Chart image export returned empty output")
     return bytes(image_bytes)

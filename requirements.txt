@@ -5,8 +5,10 @@ oauth2client==4.1.3
 python-dotenv==1.0.1
 openpyxl
 python-dateutil==2.9.0.post0
-plotly==6.8.0
-kaleido==1.3.0
+# Kaleido 1.x requires a system Chrome install (breaks on bare Railway images).
+# 0.2.1 ships a self-contained headless browser for fig.to_image().
+plotly==5.24.1
+kaleido==0.2.1
 rapidfuzz
 pytest
 pytest-asyncio==0.23.8

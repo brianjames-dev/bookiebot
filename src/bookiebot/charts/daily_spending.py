@@ -37,7 +37,7 @@ def build_daily_spending_figure(
             go.Bar(
                 x=day_list,
                 y=amount_list,
-                marker=dict(color=colors, line=dict(width=0), cornerradius=6),
+                marker=dict(color=colors, line=dict(width=0)),
                 hovertemplate="Day %{x}<br>Spent: $%{y:.2f}<extra></extra>",
                 text=[f"${amount:.0f}" if amount >= 1 else "" for amount in amount_list],
                 textposition="outside",
