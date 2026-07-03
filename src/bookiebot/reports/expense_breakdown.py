@@ -104,7 +104,9 @@ class ExpenseReportPage:
 
 
 CATEGORY_LABELS = {
-    "static_bills_subscriptions_needs": "Static Bills & Subscriptions (Needs)",
+    "rent": "Rent",
+    "bills_utilities": "Bills & Utilities",
+    "static_bills_subscriptions_needs": "Subscriptions (Needs)",
     "subscriptions_wants": "Subscriptions (Wants)",
     "grocery": "Grocery",
     "gas": "Gas",
@@ -113,6 +115,8 @@ CATEGORY_LABELS = {
 }
 
 CATEGORY_COLORS = {
+    "rent": "#dc2626",
+    "bills_utilities": "#0d9488",
     "static_bills_subscriptions_needs": "#2563eb",
     "subscriptions_wants": "#7c3aed",
     "grocery": "#16a34a",
@@ -122,16 +126,23 @@ CATEGORY_COLORS = {
 }
 
 PAYMENT_GROUPS = {
-    "rent": ("static_bills_subscriptions_needs", "Rent"),
-    "pg&e": ("static_bills_subscriptions_needs", "PG&E"),
-    "pge": ("static_bills_subscriptions_needs", "PGE"),
-    "recology": ("static_bills_subscriptions_needs", "Recology"),
-    "trash": ("static_bills_subscriptions_needs", "Trash"),
-    "garbage": ("static_bills_subscriptions_needs", "Garbage"),
-    "waste": ("static_bills_subscriptions_needs", "Waste"),
-    "water": ("static_bills_subscriptions_needs", "Water"),
-    "student loan payment": ("static_bills_subscriptions_needs", "Student Loan Payment"),
-    "student loan": ("static_bills_subscriptions_needs", "Student Loan"),
+    "rent": ("rent", "Rent"),
+    "pg&e": ("bills_utilities", "PG&E"),
+    "pge": ("bills_utilities", "PGE"),
+    "recology": ("bills_utilities", "Recology"),
+    "trash": ("bills_utilities", "Trash"),
+    "garbage": ("bills_utilities", "Garbage"),
+    "waste": ("bills_utilities", "Waste"),
+    "water": ("bills_utilities", "Water"),
+    "student loan payment": ("bills_utilities", "Student Loan Payment"),
+    "student loan": ("bills_utilities", "Student Loan"),
+}
+
+BUDGET_SHARED_CATEGORY_LABELS = {
+    "grocery": ("Groceries", "Grocery"),
+    "gas": ("Auto/Gas", "Gas"),
+    "food": ("Eating out", "Food"),
+    "shopping": ("Shopping",),
 }
 
 
@@ -245,13 +256,21 @@ def build_expense_breakdown_report(
     subscriptions = _subscription_items(subscription_rows, month)
     income_entries, income_total = _income_entries(personal_rows)
     remaining_budget = _remaining_budget(personal_rows)
-    static_needs_total, wants_total = _subscription_bucket_totals(personal_rows, payments, subscriptions)
+    static_needs_total, wants_total = _subscription_bucket_totals(personal_rows, subscriptions)
+    payment_totals = _payment_totals_by_group(payments)
+    budget_shared_totals = _budget_shared_category_totals(personal_rows)
+    itemized_shared_totals = _entry_totals_by_category(entries)
 
     breakdown_amounts = _ordered_breakdown_amounts()
+    breakdown_amounts["rent"] = payment_totals["rent"]
+    breakdown_amounts["bills_utilities"] = payment_totals["bills_utilities"]
     breakdown_amounts["static_bills_subscriptions_needs"] = static_needs_total
     breakdown_amounts["subscriptions_wants"] = wants_total
-    for entry in entries:
-        breakdown_amounts[entry.category] += entry.amount
+    for category in BUDGET_SHARED_CATEGORY_LABELS:
+        if category in budget_shared_totals:
+            breakdown_amounts[category] = budget_shared_totals[category]
+        else:
+            breakdown_amounts[category] = itemized_shared_totals[category]
 
     grand_total = round(sum(breakdown_amounts.values()), 2)
     breakdown = {
@@ -264,7 +283,7 @@ def build_expense_breakdown_report(
     }
 
     shared_total = round(sum(entry.amount for entry in entries), 2)
-    personal_total = round(static_needs_total + wants_total, 2)
+    personal_total = grand_total
 
     return ExpenseBreakdownReport(
         actor_key=actor_key,
@@ -459,7 +478,18 @@ def render_expense_breakdown_html(report: ExpenseBreakdownReport) -> str:
 
     <section class="grid two">
       <div>
-        <h2>Static Bills & Subscriptions (Needs)</h2>
+        <h2>Rent</h2>
+        {_payments_table(_payments_for_group(report.payments, "rent"))}
+      </div>
+      <div>
+        <h2>Bills & Utilities</h2>
+        {_payments_table(_payments_for_group(report.payments, "bills_utilities"))}
+      </div>
+    </section>
+
+    <section class="grid two">
+      <div>
+        <h2>Subscriptions (Needs)</h2>
         {_subscriptions_table(_subscriptions_for_bucket(report.subscriptions, "static_bills_subscriptions_needs"))}
       </div>
       <div>
@@ -582,8 +612,9 @@ def _bill_schedule_labels(rows: list[list[str]], month: BudgetMonth) -> dict[str
             for label in {bill.bill_key, bill.display_name, bill.source_label}:
                 normalized = _normalize_label(label)
                 if normalized:
+                    group = _payment_group_for_label(normalized) or "bills_utilities"
                     labels[normalized] = (
-                        "static_bills_subscriptions_needs",
+                        group,
                         bill.display_name or bill.source_label or bill.bill_key,
                     )
         return labels
@@ -593,19 +624,17 @@ def _bill_schedule_labels(rows: list[list[str]], month: BudgetMonth) -> dict[str
 
 def _subscription_bucket_totals(
     rows: list[list[str]],
-    payments: list[PaymentItem],
     subscriptions: list[SubscriptionItem],
 ) -> tuple[float, float]:
-    static_needs_total = _amount_for_label(rows, "Static Bills & Subscriptions (Needs)")
-    wants_total = _amount_for_label(rows, "Subscriptions (Wants)")
+    static_needs_found, static_needs_total = _amount_for_any_label(rows, ("Static Bills & Subscriptions (Needs)",))
+    wants_found, wants_total = _amount_for_any_label(rows, ("Subscriptions (Wants)",))
 
-    if static_needs_total <= 0:
+    if not static_needs_found:
         static_needs_total = round(
-            sum(payment.amount for payment in payments)
-            + sum(item.amount for item in subscriptions if _subscription_bucket(item) == "static_bills_subscriptions_needs"),
+            sum(item.amount for item in subscriptions if _subscription_bucket(item) == "static_bills_subscriptions_needs"),
             2,
         )
-    if wants_total <= 0:
+    if not wants_found:
         wants_total = round(
             sum(item.amount for item in subscriptions if _subscription_bucket(item) == "subscriptions_wants"),
             2,
@@ -614,16 +643,48 @@ def _subscription_bucket_totals(
     return round(static_needs_total, 2), round(wants_total, 2)
 
 
+def _payment_totals_by_group(payments: list[PaymentItem]) -> dict[str, float]:
+    totals = {"rent": 0.0, "bills_utilities": 0.0}
+    for payment in payments:
+        if payment.group not in totals:
+            continue
+        totals[payment.group] += payment.amount
+    return {group: round(amount, 2) for group, amount in totals.items()}
+
+
+def _budget_shared_category_totals(rows: list[list[str]]) -> dict[str, float]:
+    totals: dict[str, float] = {}
+    for category, labels in BUDGET_SHARED_CATEGORY_LABELS.items():
+        found, amount = _amount_for_any_label(rows, labels)
+        if found:
+            totals[category] = amount
+    return totals
+
+
+def _entry_totals_by_category(entries: list[ExpenseEntry]) -> dict[str, float]:
+    totals = {category: 0.0 for category in BUDGET_SHARED_CATEGORY_LABELS}
+    for entry in entries:
+        if entry.category not in totals:
+            continue
+        totals[entry.category] += entry.amount
+    return {category: round(amount, 2) for category, amount in totals.items()}
+
+
 def _amount_for_label(rows: list[list[str]], label: str) -> float:
-    target = _normalize_label(label)
+    _found, amount = _amount_for_any_label(rows, (label,))
+    return amount
+
+
+def _amount_for_any_label(rows: list[list[str]], labels: tuple[str, ...]) -> tuple[bool, float]:
+    targets = tuple(_normalize_label(label) for label in labels)
     for row in rows:
         for index, value in enumerate(row):
             normalized = _normalize_label(value)
             if not normalized:
                 continue
-            if normalized == target or target in normalized:
-                return round(_next_money(row, index + 1), 2)
-    return 0.0
+            if any(_labels_match(normalized, target) for target in targets):
+                return True, round(_next_money(row, index + 1), 2)
+    return False, 0.0
 
 
 def _subscription_bucket(item: SubscriptionItem) -> str:
@@ -754,9 +815,30 @@ def _looks_like_income_label(label: str) -> bool:
 
 def _matched_payment_label(label_text: str, labels: dict[str, tuple[str, str]]) -> tuple[str, str] | None:
     for label, value in labels.items():
-        if label and (label_text == label or label in label_text or label_text in label):
+        if _labels_match(label_text, label):
             return value
     return None
+
+
+def _payment_group_for_label(label_text: str) -> str | None:
+    for label, value in PAYMENT_GROUPS.items():
+        if _labels_match(label_text, _normalize_label(label)):
+            return value[0]
+    return None
+
+
+def _labels_match(label_text: str, label: str) -> bool:
+    if not label_text or not label:
+        return False
+    return (
+        label_text == label
+        or _contains_normalized_phrase(label_text, label)
+        or _contains_normalized_phrase(label, label_text)
+    )
+
+
+def _contains_normalized_phrase(text: str, phrase: str) -> bool:
+    return re.search(rf"(?:^| ){re.escape(phrase)}(?: |$)", text) is not None
 
 
 def _next_money(row: list[str], start_index: int, *, window: int = 4) -> float:
@@ -922,6 +1004,10 @@ def _payments_table(items: list[PaymentItem]) -> str:
   <thead><tr><th>Label</th><th>Group</th><th>Amount</th></tr></thead>
   <tbody>{rows}</tbody>
 </table></div>"""
+
+
+def _payments_for_group(items: list[PaymentItem], group: str) -> list[PaymentItem]:
+    return [item for item in items if item.group == group]
 
 
 def _subscriptions_table(items: list[SubscriptionItem]) -> str:

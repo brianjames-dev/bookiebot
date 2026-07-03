@@ -47,7 +47,14 @@ def test_build_expense_breakdown_report_aggregates_shared_and_personal_data():
         ["", "Paycheck", "$3,000.00"],
         ["", "Side Gig", "$500.00"],
         ["", "Monthly Income:", ""],
+        ["Rent", "$1,750.00"],
+        ["PG&E", "$140.00"],
+        ["Water", "$60.00"],
+        ["Groceries", "$55.00"],
+        ["Auto/Gas", "$12.00"],
         ["Static Bills & Subscriptions (Needs)", "$1,410.00"],
+        ["Eating out", "$30.00"],
+        ["Shopping", "$15.00"],
         ["Subscriptions (Wants)", "$10.00"],
         ["Monthly Income", "$3,500.00"],
         ["Margins:", "", "$2,000.00"],
@@ -74,15 +81,19 @@ def test_build_expense_breakdown_report_aggregates_shared_and_personal_data():
         ),
     )
 
-    assert report.grand_total == 1495.0
+    assert report.grand_total == 3482.0
     assert report.shared_total == 75.0
-    assert report.personal_total == 1420.0
+    assert report.personal_total == 3482.0
     assert report.income_total == 3500.0
     assert report.remaining_budget == 2000.0
+    assert report.breakdown["rent"]["amount"] == 1750.0
+    assert report.breakdown["bills_utilities"]["amount"] == 200.0
     assert report.breakdown["static_bills_subscriptions_needs"]["amount"] == 1410.0
     assert report.breakdown["subscriptions_wants"]["amount"] == 10.0
-    assert report.breakdown["grocery"]["amount"] == 50.0
-    assert report.breakdown["food"]["amount"] == 25.0
+    assert report.breakdown["grocery"]["amount"] == 55.0
+    assert report.breakdown["gas"]["amount"] == 12.0
+    assert report.breakdown["food"]["amount"] == 30.0
+    assert report.breakdown["shopping"]["amount"] == 15.0
     assert [entry.location for entry in report.entries] == ["Chipotle", "Trader Joe's"]
     assert [entry.location for entry in report.entries if entry.person == "Brian (AL)"] == []
     assert [(entry.label, entry.amount) for entry in report.income_entries] == [
@@ -93,6 +104,10 @@ def test_build_expense_breakdown_report_aggregates_shared_and_personal_data():
     html = render_expense_breakdown_html(report)
     assert "Expense Breakdown" in html
     assert "Daily Spending" in html
+    assert "Rent" in html
+    assert "Bills &amp; Utilities" in html
+    assert "$1,750.00" in html
+    assert "$200.00" in html
     assert "All Shared Expense Transactions" not in html
     assert "Source Sheet Data" not in html
     assert "Personal Budget" not in html
