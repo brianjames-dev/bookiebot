@@ -156,6 +156,12 @@ async def parse_message_llm(user_message: str, *, llm_client: Optional[LLMClient
     - intent: one of the query intents from the list above
     - entities: JSON with any useful parameters (e.g., "store" for a store query, "category", "vendor", "n" for top-n queries), or empty if none.
 
+    If a query mentions a month or period, include it as `"month"` using the user's wording when possible, such as:
+    - "June" → entities includes {{ "month": "June" }}
+    - "June 2026" → entities includes {{ "month": "June 2026" }}
+    - "last month" → entities includes {{ "month": "last month" }}
+    If no month is mentioned, omit `"month"` so the app can default to the current month.
+
     Always return ONLY a valid JSON object with the correct keys and values. Do not explain anything.  
 
     Now parse this:

@@ -1678,7 +1678,13 @@ async def test_query_highest_expense_category(monkeypatch, message):
 
 @pytest.mark.asyncio
 async def test_query_expense_breakdown(monkeypatch, message):
-    monkeypatch.setattr(ih.su, "expense_breakdown_percentages", AsyncMock(return_value={}))
+    report = SimpleNamespace(
+        month=SimpleNamespace(label="May 2026"),
+        breakdown={},
+        grand_total=0.0,
+    )
+    monkeypatch.setattr(ih, "build_expense_breakdown_report", MagicMock(return_value=report))
+    monkeypatch.setattr(ih, "write_expense_breakdown_report", MagicMock(return_value=SimpleNamespace(url="https://example.test/report.html")))
 
     await ih.handle_intent("query_expense_breakdown_percentages", {}, message)
 
@@ -1687,20 +1693,18 @@ async def test_query_expense_breakdown(monkeypatch, message):
 
 @pytest.mark.asyncio
 async def test_query_expense_breakdown_sends_chart(monkeypatch, message):
-    monkeypatch.setattr(
-        ih.su,
-        "expense_breakdown_percentages",
-        AsyncMock(
-            return_value={
-                "grand_total": 100.0,
-                "categories": {
-                    "food": {"amount": 60.0, "percentage": 60.0},
-                    "gas": {"amount": 40.0, "percentage": 40.0},
-                    "shopping": {"amount": 0.0, "percentage": 0.0},
-                },
-            }
-        ),
+    report = SimpleNamespace(
+        month=SimpleNamespace(label="May 2026"),
+        grand_total=100.0,
+        breakdown={
+            "food": {"amount": 60.0, "percentage": 60.0, "label": "Food"},
+            "gas": {"amount": 40.0, "percentage": 40.0, "label": "Gas"},
+            "shopping": {"amount": 0.0, "percentage": 0.0, "label": "Shopping"},
+        },
     )
+    build_report = MagicMock(return_value=report)
+    monkeypatch.setattr(ih, "build_expense_breakdown_report", build_report)
+    monkeypatch.setattr(ih, "write_expense_breakdown_report", MagicMock(return_value=SimpleNamespace(url="https://example.test/report.html")))
     chart_file = MagicMock(filename="expense_breakdown.png")
     build_fig = MagicMock(return_value=object())
     monkeypatch.setattr(ih, "build_expense_breakdown_figure", build_fig)
@@ -1708,36 +1712,35 @@ async def test_query_expense_breakdown_sends_chart(monkeypatch, message):
 
     await ih.handle_intent(
         "query_expense_breakdown_percentages",
-        {"persons": ["Hannah"]},
+        {"persons": ["Hannah"], "month": "May 2026"},
         message,
     )
 
     content, kwargs = message.channel.sent[-1]
-    assert "Expense breakdown for Hannah" in content
+    assert "Expense breakdown for Hannah (May 2026)" in content
     assert "Food: $60.00 (60.00%)" in content
+    assert "Full report: https://example.test/report.html" in content
     assert kwargs.get("file") is chart_file
     assert "shopping" not in build_fig.call_args.args[0]
+    assert build_report.call_args.kwargs["month"].label == "May 2026"
 
 
 @pytest.mark.asyncio
 async def test_query_expense_breakdown_handles_zero_categories(monkeypatch, message):
-    monkeypatch.setattr(
-        ih.su,
-        "expense_breakdown_percentages",
-        AsyncMock(
-            return_value={
-                "grand_total": 0.0,
-                "categories": {
-                    "food": {"amount": 0.0, "percentage": 0.0},
-                    "gas": {"amount": 0.0, "percentage": 0.0},
-                },
-            }
-        ),
+    report = SimpleNamespace(
+        month=SimpleNamespace(label="May 2026"),
+        grand_total=0.0,
+        breakdown={
+            "food": {"amount": 0.0, "percentage": 0.0, "label": "Food"},
+            "gas": {"amount": 0.0, "percentage": 0.0, "label": "Gas"},
+        },
     )
+    monkeypatch.setattr(ih, "build_expense_breakdown_report", MagicMock(return_value=report))
+    monkeypatch.setattr(ih, "write_expense_breakdown_report", MagicMock(return_value=SimpleNamespace(url="https://example.test/report.html")))
 
     await ih.handle_intent("query_expense_breakdown_percentages", {"persons": ["Hannah"]}, message)
 
-    assert any("could not calculate expense breakdown".lower() in (msg or "").lower() for msg, _ in message.channel.sent)
+    assert any("No expenses found" in (msg or "") and "https://example.test/report.html" in (msg or "") for msg, _ in message.channel.sent)
 
 
 @pytest.mark.asyncio

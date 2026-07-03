@@ -49,6 +49,10 @@ def _get_gc():
     return _GC
 
 
+def get_gspread_client():
+    return _get_gc()
+
+
 def _open_month_sheet(spreadsheet_id: str):
     return get_month_worksheet(_get_gc(), spreadsheet_id, get_current_month_name())
 

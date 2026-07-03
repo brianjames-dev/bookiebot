@@ -38,7 +38,7 @@ def build_expense_breakdown_figure(
 
     pull = [0.08 if amount == max(values) else 0.0 for amount in values]
     colors = [COLORWAY[i % len(COLORWAY)] for i in range(len(values))]
-    chart_title = title or f"Expense Breakdown — Total: ${grand_total:,.2f}"
+    chart_title = title or "Expense Breakdown"
 
     fig = go.Figure(
         data=[
@@ -66,6 +66,13 @@ def build_expense_breakdown_figure(
     fig.update_layout(
         title=dict(text=chart_title),
         showlegend=True,
+        legend=dict(
+            orientation="h",
+            yanchor="top",
+            y=-0.14,
+            xanchor="center",
+            x=0.5,
+        ),
         annotations=[
             dict(
                 text=f"<b>${grand_total:,.2f}</b><br>total",
@@ -75,6 +82,6 @@ def build_expense_breakdown_figure(
                 showarrow=False,
             )
         ],
-        margin=dict(l=40, r=40, t=80, b=40),
+        margin=dict(l=40, r=40, t=80, b=120),
     )
     return fig

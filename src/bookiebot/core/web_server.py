@@ -9,6 +9,7 @@ from aiohttp import web
 
 from bookiebot.core.bank_link import create_bank_link_app
 from bookiebot.banking.service import build_banking_service
+from bookiebot.reports.web import register_report_routes
 
 logger = logging.getLogger(__name__)
 
@@ -41,6 +42,7 @@ async def run_plaid_webhook_worker() -> None:
 async def run_web_server() -> None:
     global _PLAID_WEBHOOK_WORKER_TASK
     app = create_bank_link_app()
+    register_report_routes(app)
     runner = web.AppRunner(app)
     await runner.setup()
     port = int(os.getenv("PORT", "8080"))

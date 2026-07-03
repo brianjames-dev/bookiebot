@@ -15,6 +15,11 @@ from bookiebot.charts import (
     build_expense_breakdown_figure,
     figure_to_discord_file,
 )
+from bookiebot.reports.expense_breakdown import (
+    build_expense_breakdown_report,
+    month_from_entities_or_message,
+    write_expense_breakdown_report,
+)
 import openai
 from datetime import datetime
 from collections.abc import Awaitable, Callable
@@ -1004,16 +1009,29 @@ async def query_expense_breakdown_handler(entities, message):
         await message.channel.send("❌ Could not determine person(s) to query.")
         return
 
-    breakdown = await su.expense_breakdown_percentages(persons)
+    try:
+        report_month = month_from_entities_or_message(entities, getattr(message, "content", ""))
+    except ValueError as exc:
+        await message.channel.send(f"❌ {exc}")
+        return
 
-    if not breakdown:
-        await message.channel.send("❌ Could not calculate expense breakdown.")
+    actor_key = _message_actor_key(message)
+    report = build_expense_breakdown_report(
+        actor_key=actor_key or "",
+        owner_name=_budget_profile_name(message),
+        persons=persons,
+        month=report_month,
+    )
+    report_page = write_expense_breakdown_report(report)
+
+    if not report.breakdown:
+        await message.channel.send(f"❌ Could not calculate expense breakdown.\n\nFull report: {report_page.url}")
         return
 
     lines = []
     non_zero_categories = {}
 
-    for category, info in breakdown["categories"].items():
+    for category, info in report.breakdown.items():
         amt = info["amount"]
         pct = info["percentage"]
 
@@ -1029,22 +1047,25 @@ async def query_expense_breakdown_handler(entities, message):
         lines.append(f"{label}: ${amt:.2f} ({pct:.2f}%)")
 
     if not non_zero_categories:
-        await message.channel.send("❌ Could not calculate expense breakdown.")
+        await message.channel.send(
+            f"📊 No expenses found for {', '.join(persons)} in {report.month.label}.\n\n"
+            f"Full report: {report_page.url}"
+        )
         return
 
     people_str = ", ".join(persons)
-    grand_total = breakdown["grand_total"]
+    grand_total = report.grand_total
     text = (
-        f"📊 Expense breakdown for {people_str}:\n"
+        f"📊 Expense breakdown for {people_str} ({report.month.label}):\n"
         + "\n".join(lines)
         + f"\n\n💵 Total: ${grand_total:.2f}"
+        + f"\n🌐 Full report: {report_page.url}"
     )
 
     try:
         fig = build_expense_breakdown_figure(
             non_zero_categories,
             grand_total,
-            title=f"Expense Breakdown — Total: ${grand_total:,.2f}",
         )
         chart_file = await figure_to_discord_file(fig, "expense_breakdown.png")
     except (ChartRenderError, ValueError) as exc:
