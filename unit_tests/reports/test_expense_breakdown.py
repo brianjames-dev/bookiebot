@@ -1,4 +1,5 @@
 from datetime import datetime
+import os
 
 from bookiebot.reports.expense_breakdown import (
     BudgetMonth,
@@ -8,7 +9,7 @@ from bookiebot.reports.expense_breakdown import (
     render_expense_breakdown_html,
     write_expense_breakdown_report,
 )
-from bookiebot.reports.web import _verify_expense_report_token
+from bookiebot.reports.web import _static_report_path_for_payload, _verify_expense_report_token
 from bookiebot.sheets import routing
 from unit_tests.support.sheets_repo_stub import InMemoryWorksheet
 
@@ -129,3 +130,45 @@ def test_write_expense_breakdown_report_returns_public_url(tmp_path, monkeypatch
     assert payload["persons"] == ["Hannah"]
     assert payload["year"] == 2026
     assert payload["month"] == 5
+    assert payload["filename"] == page.path.name
+
+
+def test_expense_report_payload_resolves_exact_snapshot(tmp_path, monkeypatch):
+    monkeypatch.setenv("BOOKIEBOT_REPORT_DIR", str(tmp_path))
+    filename = "expense-breakdown-brian-2026-06-snapshot.html"
+    snapshot = tmp_path / filename
+    snapshot.write_text("<html>snapshot</html>", encoding="utf-8")
+
+    payload = {
+        "actor_key": "brian",
+        "owner_name": "Brian",
+        "persons": ["Brian (BofA)"],
+        "year": 2026,
+        "month": 6,
+        "filename": filename,
+    }
+
+    assert _static_report_path_for_payload(payload) == snapshot
+
+
+def test_expense_report_payload_falls_back_to_latest_matching_snapshot(tmp_path, monkeypatch):
+    monkeypatch.setenv("BOOKIEBOT_REPORT_DIR", str(tmp_path))
+    older = tmp_path / "expense-breakdown-brian-2026-06-older.html"
+    newer = tmp_path / "expense-breakdown-brian-2026-06-newer.html"
+    other_month = tmp_path / "expense-breakdown-brian-2026-05-other.html"
+    older.write_text("<html>older</html>", encoding="utf-8")
+    newer.write_text("<html>newer</html>", encoding="utf-8")
+    other_month.write_text("<html>other</html>", encoding="utf-8")
+    os.utime(older, (100, 100))
+    os.utime(newer, (200, 200))
+    os.utime(other_month, (300, 300))
+
+    payload = {
+        "actor_key": "brian",
+        "owner_name": "Brian",
+        "persons": ["Brian (BofA)"],
+        "year": 2026,
+        "month": 6,
+    }
+
+    assert _static_report_path_for_payload(payload) == newer

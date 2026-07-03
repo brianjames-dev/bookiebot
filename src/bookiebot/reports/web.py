@@ -55,6 +55,7 @@ def create_expense_report_token(
     persons: list[str],
     year: int,
     month: int,
+    filename: str | None = None,
     ttl_seconds: int = 604800,
 ) -> str:
     payload = {
@@ -65,6 +66,8 @@ def create_expense_report_token(
         "month": int(month),
         "exp": int(time.time()) + max(60, int(ttl_seconds)),
     }
+    if filename:
+        payload["filename"] = str(filename)
     payload_bytes = json.dumps(payload, sort_keys=True, separators=(",", ":")).encode("utf-8")
     signature = hmac.new(_report_secret().encode("utf-8"), payload_bytes, hashlib.sha256).digest()
     return f"{_b64encode(payload_bytes)}.{_b64encode(signature)}"
@@ -98,6 +101,9 @@ async def _serve_expense_breakdown_report(request: web.Request) -> web.Response:
     except web.HTTPException:
         raise
     except Exception as exc:
+        snapshot_path = _static_report_path_for_payload(payload)
+        if snapshot_path is not None:
+            return _report_file_response(snapshot_path)
         raise web.HTTPInternalServerError(text=f"Could not render expense report: {type(exc).__name__}: {exc}") from exc
 
 
@@ -115,6 +121,10 @@ async def _serve_report(request: web.Request) -> web.StreamResponse:
     if not path.is_file():
         raise web.HTTPNotFound()
 
+    return _report_file_response(path)
+
+
+def _report_file_response(path: Path) -> web.FileResponse:
     return web.FileResponse(
         path,
         headers={"Cache-Control": "private, max-age=86400"},
@@ -145,6 +155,51 @@ def _verify_expense_report_token(token: str) -> dict:
     if not payload.get("actor_key") or not payload.get("owner_name") or not payload.get("persons"):
         raise ValueError("Report token is missing required context")
     return payload
+
+
+def _static_report_path_for_payload(payload: dict) -> Path | None:
+    filename = str(payload.get("filename") or "").strip()
+    if filename:
+        exact = _safe_report_path(filename)
+        if exact is not None and exact.is_file():
+            return exact
+
+    return _latest_matching_expense_report_path(payload)
+
+
+def _safe_report_path(filename: str) -> Path | None:
+    if not _REPORT_NAME_RE.fullmatch(filename):
+        return None
+    root = reports_dir()
+    path = (root / filename).resolve()
+    try:
+        path.relative_to(root)
+    except ValueError:
+        return None
+    return path
+
+
+def _latest_matching_expense_report_path(payload: dict) -> Path | None:
+    try:
+        year = int(payload["year"])
+        month = int(payload["month"])
+    except (KeyError, TypeError, ValueError):
+        return None
+
+    owner = _expense_report_owner_slug(str(payload.get("owner_name") or ""))
+    prefix = f"expense-breakdown-{owner}-{year}-{month:02d}-"
+    matches = [
+        path
+        for path in reports_dir().glob(f"{prefix}*.html")
+        if _REPORT_NAME_RE.fullmatch(path.name) and path.is_file()
+    ]
+    if not matches:
+        return None
+    return max(matches, key=lambda path: path.stat().st_mtime)
+
+
+def _expense_report_owner_slug(owner_name: str) -> str:
+    return re.sub(r"[^a-z0-9]+", "-", owner_name.lower()).strip("-") or "budget"
 
 
 def _report_secret() -> str:

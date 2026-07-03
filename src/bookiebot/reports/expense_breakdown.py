@@ -304,6 +304,7 @@ def write_expense_breakdown_report(report: ExpenseBreakdownReport, *, report_dir
         persons=report.persons,
         year=report.month.year,
         month=report.month.month,
+        filename=filename,
     )
     return ExpenseReportPage(path=path, url=public_expense_report_url(token))
 
