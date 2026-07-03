@@ -45,12 +45,14 @@ def build_expense_breakdown_figure(
             go.Pie(
                 labels=labels,
                 values=values,
+                domain=dict(x=[0.02, 0.72], y=[0.02, 0.92]),
                 hole=0.42,
                 pull=pull,
                 marker=dict(colors=colors, line=dict(color="#FFFFFF", width=2)),
-                textinfo="label+percent",
-                textposition="outside",
-                texttemplate="%{label}<br>%{percent}<br>$%{customdata[0]:.2f}",
+                textinfo="percent",
+                textposition="inside",
+                texttemplate="%{percent}",
+                insidetextorientation="radial",
                 hovertemplate=(
                     "<b>%{label}</b><br>"
                     "Amount: $%{customdata[0]:.2f}<br>"
@@ -67,21 +69,23 @@ def build_expense_breakdown_figure(
         title=dict(text=chart_title),
         showlegend=True,
         legend=dict(
-            orientation="h",
-            yanchor="top",
-            y=-0.14,
-            xanchor="center",
-            x=0.5,
+            orientation="v",
+            yanchor="middle",
+            y=0.5,
+            xanchor="left",
+            x=0.8,
+            bgcolor="rgba(0,0,0,0)",
         ),
+        uniformtext=dict(minsize=11, mode="hide"),
         annotations=[
             dict(
                 text=f"<b>${grand_total:,.2f}</b><br>total",
-                x=0.5,
-                y=0.5,
+                x=0.37,
+                y=0.47,
                 font=dict(size=16),
                 showarrow=False,
             )
         ],
-        margin=dict(l=40, r=40, t=80, b=120),
+        margin=dict(l=40, r=260, t=70, b=40),
     )
     return fig
