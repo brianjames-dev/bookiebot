@@ -107,6 +107,7 @@ def test_build_expense_breakdown_report_aggregates_shared_and_personal_data():
     assert "Expense Breakdown" in html
     assert "Budget Charts" in html
     assert 'id="bookiebot-expense-report-root"' in html
+    assert "window.process = window.process ||" in html
     payload_match = re.search(
         r'<script id="bookiebot-expense-report-data" type="application/json">(.*?)</script>',
         html,

@@ -377,6 +377,7 @@ def render_expense_breakdown_html(report: ExpenseBreakdownReport) -> str:
   <div id="bookiebot-expense-report-root"></div>
   <noscript>This report requires JavaScript to render the React expense dashboard.</noscript>
   <script id="bookiebot-expense-report-data" type="application/json">{_json_script_payload(payload)}</script>
+  <script>window.process = window.process || {{ env: {{ NODE_ENV: "production" }} }}; window.process.env = window.process.env || {{ NODE_ENV: "production" }};</script>
   <script>{_report_asset_text("expense-report-app.js")}</script>
 </body>
 </html>

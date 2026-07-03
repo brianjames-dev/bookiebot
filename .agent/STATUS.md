@@ -1,6 +1,6 @@
 # Agent Status
 
-Last updated: 2026-06-20
+Last updated: 2026-07-03
 
 ## Active Focus
 
@@ -13,6 +13,12 @@ Recent transactions and reconciliation are in manual verification mode after the
 3. Harden recent-action pending state across restarts/deploys, since selections currently live only in process memory.
 4. Improve targeted recent-action search so commands can find older matches, not only the latest 10 recent actions.
 5. Explore clarifying questions before logging when BookieBot is uncertain instead of guessing or silently failing.
+
+## Completed 2026-07-03
+
+- Expense breakdown report pages now define a browser-safe `window.process.env.NODE_ENV` shim before loading the embedded React bundle.
+- The expense report Vite build now replaces `process.env.NODE_ENV` with `"production"`, preventing Node-style dependency checks from crashing report pages in Chrome.
+- Rebuilt the committed React expense report asset and added regression coverage for the process shim in rendered report HTML.
 
 ## Completed 2026-06-20
 
@@ -156,6 +162,8 @@ Use a test row or low-risk real row in Discord:
    - Expected: the row displays as `Updated: Income` and still shows the original amount with the updated source.
 37. Run `show 15 recent transactions`, `show 20 recent transactions`, or `show 25 recent transactions`.
    - Expected: BookieBot sends the list privately across multiple DM messages, each transaction stays within a single DM message, code blocks render cleanly, controls appear on the final DM, and the public channel gets a generic sent-to-DMs acknowledgement.
+38. Run the expense breakdown command for a recent month and open the generated report link in Chrome.
+   - Expected: the React expense dashboard renders instead of a blank page, and the console does not show `process is not defined`.
 
 ## Verification Baseline
 
@@ -169,15 +177,24 @@ python -m pytest unit_tests/intents/test_handlers.py unit_tests/core/test_messag
 Latest verification:
 
 ```bash
-python -m pytest unit_tests -q
-# 326 passed
+cd web/expense-report && npm run typecheck
+# passed
 
-python -m pytest unit_tests/banking/test_reconciliation.py unit_tests/banking/test_store.py unit_tests/core/test_bank_reconciliation.py -q
-# 81 passed
+cd web/expense-report && npm run build
+# passed
 
-python -m pytest unit_tests/intents/test_handlers.py unit_tests/core/test_message_router.py -q
-# 114 passed
+python -m py_compile src/bookiebot/reports/expense_breakdown.py
+# passed
+
+python -m pytest unit_tests/reports/test_expense_breakdown.py
+# 5 passed
+
+python -m pytest unit_tests
+# 348 passed, 1 skipped
+
+git diff --check
+# passed
 
 python -m pyright
-# Did not run: pyright is not installed in the current Python environment.
+# Failed: pyright is not installed in the current Python environment.
 ```
