@@ -291,14 +291,21 @@ def build_expense_breakdown_report(
 
 
 def write_expense_breakdown_report(report: ExpenseBreakdownReport, *, report_dir: Path | None = None) -> ExpenseReportPage:
-    from bookiebot.reports.web import public_report_url, reports_dir
+    from bookiebot.reports.web import create_expense_report_token, public_expense_report_url, reports_dir
 
     directory = report_dir or reports_dir()
     directory.mkdir(parents=True, exist_ok=True)
     filename = _report_filename(report)
     path = directory / filename
     path.write_text(render_expense_breakdown_html(report), encoding="utf-8")
-    return ExpenseReportPage(path=path, url=public_report_url(filename))
+    token = create_expense_report_token(
+        actor_key=report.actor_key,
+        owner_name=report.owner_name,
+        persons=report.persons,
+        year=report.month.year,
+        month=report.month.month,
+    )
+    return ExpenseReportPage(path=path, url=public_expense_report_url(token))
 
 
 def render_expense_breakdown_html(report: ExpenseBreakdownReport) -> str:

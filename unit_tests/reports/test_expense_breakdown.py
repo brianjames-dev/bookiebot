@@ -8,6 +8,7 @@ from bookiebot.reports.expense_breakdown import (
     render_expense_breakdown_html,
     write_expense_breakdown_report,
 )
+from bookiebot.reports.web import _verify_expense_report_token
 from bookiebot.sheets import routing
 from unit_tests.support.sheets_repo_stub import InMemoryWorksheet
 
@@ -102,6 +103,7 @@ def test_build_expense_breakdown_report_aggregates_shared_and_personal_data():
 
 def test_write_expense_breakdown_report_returns_public_url(tmp_path, monkeypatch):
     monkeypatch.setenv("BOOKIEBOT_PUBLIC_BASE_URL", "https://bookiebot.example")
+    monkeypatch.setenv("BOOKIEBOT_REPORT_SIGNING_SECRET", "test-secret")
     report = build_expense_breakdown_report(
         actor_key="hannah",
         owner_name="Hannah",
@@ -118,5 +120,12 @@ def test_write_expense_breakdown_report_returns_public_url(tmp_path, monkeypatch
 
     assert page.path.exists()
     assert page.path.parent == tmp_path
-    assert page.url.startswith("https://bookiebot.example/reports/expense-breakdown-hannah-2026-05-")
-    assert page.url.endswith(".html")
+    assert page.url.startswith("https://bookiebot.example/reports/expense-breakdown?token=")
+
+    token = page.url.split("token=", 1)[1]
+    payload = _verify_expense_report_token(token)
+    assert payload["actor_key"] == "hannah"
+    assert payload["owner_name"] == "Hannah"
+    assert payload["persons"] == ["Hannah"]
+    assert payload["year"] == 2026
+    assert payload["month"] == 5
