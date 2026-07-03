@@ -5,6 +5,7 @@ from dataclasses import dataclass, field
 from datetime import datetime
 import calendar
 import html
+import json
 from pathlib import Path
 import re
 import secrets
@@ -353,6 +354,16 @@ def render_expense_breakdown_html(report: ExpenseBreakdownReport) -> str:
     daily_totals = _daily_totals(report.entries)
     budget_group_totals = _budget_group_totals(report.breakdown)
     balance_after_expenses = report.income_total - report.grand_total if report.income_total else None
+    payload = _report_client_payload(
+        report=report,
+        breakdown_items=non_zero_breakdown,
+        daily_totals=daily_totals,
+        budget_group_totals=budget_group_totals,
+        person_totals=person_totals,
+        merchant_totals=merchant_totals,
+        top_entries=top_entries,
+        balance_after_expenses=balance_after_expenses,
+    )
 
     return f"""<!doctype html>
 <html lang="en">
@@ -360,288 +371,13 @@ def render_expense_breakdown_html(report: ExpenseBreakdownReport) -> str:
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Expense Breakdown - {_escape(report.month.label)}</title>
-  <style>
-    :root {{
-      color-scheme: light;
-      --bg: #f8fafc;
-      --panel: #ffffff;
-      --ink: #0f172a;
-      --muted: #64748b;
-      --line: #e2e8f0;
-      --accent: #2563eb;
-      --good: #15803d;
-      --bad: #b91c1c;
-      --chart-grid: #f1f5f9;
-      --chart-1: #2563eb;
-      --chart-2: #16a34a;
-      --chart-3: #f59e0b;
-    }}
-    * {{ box-sizing: border-box; }}
-    body {{
-      margin: 0;
-      background: var(--bg);
-      color: var(--ink);
-      font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-      line-height: 1.45;
-    }}
-    header {{
-      padding: 32px 24px 20px;
-      border-bottom: 1px solid var(--line);
-      background: var(--panel);
-    }}
-    main {{
-      width: min(1180px, calc(100vw - 32px));
-      margin: 24px auto 48px;
-    }}
-    h1, h2, h3 {{ margin: 0; letter-spacing: 0; }}
-    h1 {{ font-size: 30px; }}
-    h2 {{ font-size: 18px; margin-bottom: 14px; }}
-    h3 {{ font-size: 15px; margin-bottom: 10px; }}
-    .subhead {{ margin-top: 6px; color: var(--muted); }}
-    .grid {{ display: grid; gap: 16px; }}
-    .cards {{ grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); }}
-    .two {{ grid-template-columns: minmax(280px, 0.9fr) minmax(320px, 1.1fr); align-items: stretch; }}
-    section, .card {{
-      background: var(--panel);
-      border: 1px solid var(--line);
-      border-radius: 8px;
-      padding: 18px;
-    }}
-    section {{ margin-top: 16px; }}
-    .metric-label {{ color: var(--muted); font-size: 13px; }}
-    .metric-value {{ margin-top: 5px; font-size: 24px; font-weight: 750; }}
-    .metric-note {{ margin-top: 4px; color: var(--muted); font-size: 12px; }}
-    .analytics {{
-      padding: 0;
-      overflow: hidden;
-    }}
-    .analytics-head {{
-      display: flex;
-      align-items: flex-start;
-      justify-content: space-between;
-      gap: 16px;
-      padding: 18px 18px 0;
-    }}
-    .analytics-meta {{ margin-top: 4px; color: var(--muted); font-size: 13px; }}
-    .chart-tabs {{
-      display: inline-flex;
-      gap: 2px;
-      padding: 3px;
-      border: 1px solid var(--line);
-      border-radius: 8px;
-      background: #f8fafc;
-      white-space: nowrap;
-    }}
-    .chart-tab {{
-      appearance: none;
-      border: 0;
-      border-radius: 6px;
-      background: transparent;
-      color: var(--muted);
-      cursor: pointer;
-      font: inherit;
-      font-size: 13px;
-      padding: 7px 10px;
-    }}
-    .chart-tab.is-active {{
-      background: var(--panel);
-      color: var(--ink);
-      box-shadow: 0 1px 2px rgba(15, 23, 42, 0.08);
-    }}
-    .chart-panel {{
-      display: none;
-      padding: 18px;
-    }}
-    .chart-panel.is-active {{ display: block; }}
-    .chart-grid {{
-      display: grid;
-      grid-template-columns: minmax(260px, 0.9fr) minmax(280px, 1.1fr);
-      gap: 24px;
-      align-items: center;
-      min-height: 340px;
-    }}
-    .pie {{
-      width: min(330px, 72vw);
-      aspect-ratio: 1;
-      border-radius: 50%;
-      margin: 8px auto;
-      background: {_pie_gradient(non_zero_breakdown)};
-      border: 1px solid var(--line);
-      box-shadow: inset 0 0 0 54px var(--panel);
-    }}
-    .legend {{ display: grid; gap: 8px; }}
-    .legend-row {{
-      display: grid;
-      grid-template-columns: 18px minmax(110px, 1fr) auto;
-      align-items: center;
-      gap: 8px;
-      font-size: 13px;
-    }}
-    .swatch {{ width: 12px; height: 12px; border-radius: 3px; }}
-    .chart-copy {{ display: grid; gap: 14px; }}
-    .chart-kicker {{ color: var(--muted); font-size: 13px; }}
-    .chart-total {{ font-size: 30px; font-weight: 780; line-height: 1; }}
-    .chart-bars {{
-      display: grid;
-      grid-auto-flow: column;
-      grid-auto-columns: minmax(18px, 1fr);
-      align-items: end;
-      gap: 8px;
-      min-height: 270px;
-      overflow-x: auto;
-      padding: 18px 12px 8px;
-      border: 1px solid var(--line);
-      border-radius: 8px;
-      background:
-        linear-gradient(to top, var(--line) 1px, transparent 1px) 0 0 / 100% 25%,
-        var(--panel);
-    }}
-    .bar-item {{
-      display: grid;
-      grid-template-rows: 1fr auto;
-      align-items: end;
-      gap: 7px;
-      min-width: 18px;
-      height: 244px;
-    }}
-    .bar-fill {{
-      width: 100%;
-      min-height: 3px;
-      border-radius: 6px 6px 2px 2px;
-      background: var(--accent);
-    }}
-    .bar-label {{
-      color: var(--muted);
-      font-size: 11px;
-      line-height: 1;
-      text-align: center;
-    }}
-    .stat-list {{ display: grid; gap: 10px; }}
-    .stat-row {{
-      display: flex;
-      justify-content: space-between;
-      gap: 12px;
-      border-bottom: 1px solid var(--line);
-      padding-bottom: 10px;
-      font-size: 13px;
-    }}
-    .stat-row:last-child {{ border-bottom: 0; padding-bottom: 0; }}
-    .stat-row span:first-child {{ color: var(--muted); }}
-    .stacked-bar {{
-      display: flex;
-      height: 24px;
-      overflow: hidden;
-      border: 1px solid var(--line);
-      border-radius: 999px;
-      background: #f8fafc;
-    }}
-    .stack-segment {{ min-width: 2px; }}
-    .group-bars {{ display: grid; gap: 18px; }}
-    .group-row {{ display: grid; gap: 7px; }}
-    .group-row-head {{
-      display: flex;
-      justify-content: space-between;
-      gap: 12px;
-      font-size: 13px;
-    }}
-    .group-track {{
-      height: 12px;
-      overflow: hidden;
-      border-radius: 999px;
-      background: var(--chart-grid);
-    }}
-    .group-fill {{
-      height: 100%;
-      border-radius: inherit;
-    }}
-    .amount {{ font-variant-numeric: tabular-nums; }}
-    .txn-list {{ display: grid; gap: 6px; }}
-    .txn {{ display: flex; flex-wrap: wrap; gap: 6px 10px; align-items: baseline; }}
-    .txn-meta {{ color: var(--muted); }}
-    table {{ width: 100%; border-collapse: collapse; font-size: 13px; }}
-    th, td {{ padding: 9px 8px; border-bottom: 1px solid var(--line); text-align: left; vertical-align: top; }}
-    th {{ color: var(--muted); font-weight: 650; background: #f8fafc; }}
-    tr:last-child td {{ border-bottom: 0; }}
-    .table-wrap {{ overflow-x: auto; }}
-    .empty {{ color: var(--muted); font-size: 13px; }}
-    .positive {{ color: var(--good); }}
-    .negative {{ color: var(--bad); }}
-    @media (max-width: 820px) {{
-      .two {{ grid-template-columns: 1fr; }}
-      .analytics-head {{ display: grid; }}
-      .chart-tabs {{ overflow-x: auto; width: 100%; }}
-      .chart-grid {{ grid-template-columns: 1fr; min-height: 0; }}
-      header {{ padding: 24px 16px 18px; }}
-      main {{ width: min(100vw - 20px, 1180px); margin-top: 12px; }}
-    }}
-  </style>
+  <style>{_report_asset_text("expense-report-app.css")}</style>
 </head>
 <body>
-  <header>
-    <h1>Expense Breakdown</h1>
-    <div class="subhead">{_escape(report.month.label)} budget report for {_escape(report.owner_name)}. Generated {_escape(report.generated_at.strftime("%b %-d, %Y %-I:%M %p %Z"))}.</div>
-  </header>
-  <main>
-    <div class="grid cards">
-      {_metric_card("Total Expenses", report.grand_total)}
-      {_metric_card("Shared Expenses", report.shared_total, "from the shared expense tab")}
-      {_metric_card("Personal Outflows", report.personal_total, "from the personal budget tab")}
-      {_metric_card("Monthly Income", report.income_total)}
-      {_metric_card("Remaining Budget", report.remaining_budget)}
-      {_metric_card("Income After Expenses", balance_after_expenses)}
-    </div>
-
-    {_analytics_section(non_zero_breakdown, daily_totals, budget_group_totals, report)}
-
-    <section class="grid two">
-      <div>
-        <h2>Spending By Person / Card</h2>
-        {_simple_amount_table(["Person", "Amount"], [(person, total) for person, total in person_totals])}
-      </div>
-      <div>
-        <h2>Frequent Merchants / Locations</h2>
-        {_simple_amount_table(["Merchant", "Amount"], merchant_totals)}
-      </div>
-    </section>
-
-    <section>
-      <h2>Daily Spending</h2>
-      {_daily_spending_table(report.entries)}
-    </section>
-
-    <section>
-      <h2>Largest Shared Expenses</h2>
-      {_entries_table(top_entries)}
-    </section>
-
-    <section class="grid two">
-      <div>
-        <h2>Rent</h2>
-        {_payments_table(_payments_for_group(report.payments, "rent"))}
-      </div>
-      <div>
-        <h2>Bills & Utilities</h2>
-        {_payments_table(_payments_for_group(report.payments, "bills_utilities"))}
-      </div>
-    </section>
-
-    <section class="grid two">
-      <div>
-        <h2>Subscriptions (Needs)</h2>
-        {_subscriptions_table(_subscriptions_for_bucket(report.subscriptions, "static_bills_subscriptions_needs"))}
-      </div>
-      <div>
-        <h2>Subscriptions (Wants)</h2>
-        {_subscriptions_table(_subscriptions_for_bucket(report.subscriptions, "subscriptions_wants"))}
-      </div>
-    </section>
-
-    <section>
-      <h2>Income Entries</h2>
-      {_payments_table(report.income_entries)}
-    </section>
-  </main>
-  {_chart_tabs_script()}
+  <div id="bookiebot-expense-report-root"></div>
+  <noscript>This report requires JavaScript to render the React expense dashboard.</noscript>
+  <script id="bookiebot-expense-report-data" type="application/json">{_json_script_payload(payload)}</script>
+  <script>{_report_asset_text("expense-report-app.js")}</script>
 </body>
 </html>
 """
@@ -1070,6 +806,115 @@ def _metric_card(label: str, value: float | None, note: str = "") -> str:
   <div class="metric-value{css_class}">{_money(value)}</div>
   {note_html}
 </div>"""
+
+
+def _report_client_payload(
+    *,
+    report: ExpenseBreakdownReport,
+    breakdown_items: list[tuple[str, dict[str, Any]]],
+    daily_totals: list[tuple[str, float]],
+    budget_group_totals: dict[str, float],
+    person_totals: list[tuple[str, float]],
+    merchant_totals: list[tuple[str, float]],
+    top_entries: list[ExpenseEntry],
+    balance_after_expenses: float | None,
+) -> dict[str, Any]:
+    return {
+        "ownerName": report.owner_name,
+        "monthLabel": report.month.label,
+        "generatedAt": report.generated_at.strftime("%b %-d, %Y %-I:%M %p %Z"),
+        "metrics": {
+            "totalExpenses": report.grand_total,
+            "sharedExpenses": report.shared_total,
+            "personalOutflows": report.personal_total,
+            "monthlyIncome": report.income_total,
+            "remainingBudget": report.remaining_budget,
+            "incomeAfterExpenses": balance_after_expenses,
+        },
+        "breakdown": [
+            {
+                "key": key,
+                "label": str(info.get("label") or key),
+                "amount": round(float(info.get("amount") or 0.0), 2),
+                "percentage": round(float(info.get("percentage") or 0.0), 2),
+                "color": CATEGORY_COLORS.get(key, "#64748b"),
+            }
+            for key, info in breakdown_items
+        ],
+        "dailyTotals": [_amount_row(label, amount) for label, amount in daily_totals],
+        "budgetGroups": [_amount_row(label, amount) for label, amount in budget_group_totals.items()],
+        "personTotals": [_amount_row(label, amount) for label, amount in person_totals],
+        "merchantTotals": [_amount_row(label, amount) for label, amount in merchant_totals],
+        "topEntries": [_expense_entry_payload(entry) for entry in top_entries],
+        "dailyEntries": [_expense_entry_payload(entry) for entry in report.entries],
+        "rentPayments": [_payment_payload(item) for item in _payments_for_group(report.payments, "rent")],
+        "utilityPayments": [_payment_payload(item) for item in _payments_for_group(report.payments, "bills_utilities")],
+        "subscriptionsNeeds": [
+            _subscription_payload(item)
+            for item in _subscriptions_for_bucket(report.subscriptions, "static_bills_subscriptions_needs")
+        ],
+        "subscriptionsWants": [
+            _subscription_payload(item)
+            for item in _subscriptions_for_bucket(report.subscriptions, "subscriptions_wants")
+        ],
+        "incomeEntries": [_payment_payload(item) for item in report.income_entries],
+    }
+
+
+def _amount_row(label: str, amount: float) -> dict[str, Any]:
+    return {"label": str(label), "amount": round(float(amount or 0.0), 2)}
+
+
+def _expense_entry_payload(entry: ExpenseEntry) -> dict[str, Any]:
+    return {
+        "date": entry.date,
+        "category": CATEGORY_LABELS.get(entry.category, entry.category.title()),
+        "amount": round(entry.amount, 2),
+        "person": entry.person,
+        "item": entry.item,
+        "location": entry.location,
+    }
+
+
+def _payment_payload(item: PaymentItem) -> dict[str, Any]:
+    return {
+        "label": item.label,
+        "amount": round(item.amount, 2),
+        "group": CATEGORY_LABELS.get(item.group, item.group.title()),
+        "status": item.status,
+    }
+
+
+def _subscription_payload(item: SubscriptionItem) -> dict[str, Any]:
+    return {
+        "name": item.name,
+        "label": item.name,
+        "amount": round(item.amount, 2),
+        "cadence": item.cadence,
+        "kind": item.kind,
+        "pullDay": item.pull_day,
+        "pullMonth": item.pull_month,
+    }
+
+
+def _json_script_payload(payload: dict[str, Any]) -> str:
+    return (
+        json.dumps(payload, ensure_ascii=False, separators=(",", ":"))
+        .replace("&", "\\u0026")
+        .replace("<", "\\u003c")
+        .replace(">", "\\u003e")
+    )
+
+
+def _report_asset_text(filename: str) -> str:
+    path = Path(__file__).resolve().parent / "assets" / filename
+    try:
+        return path.read_text(encoding="utf-8")
+    except FileNotFoundError as exc:
+        raise RuntimeError(
+            f"Expense report frontend asset '{filename}' is missing. "
+            "Run `npm install && npm run build` in web/expense-report."
+        ) from exc
 
 
 def _analytics_section(

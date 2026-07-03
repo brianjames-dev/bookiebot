@@ -1,5 +1,7 @@
 from datetime import datetime
+import json
 import os
+import re
 
 from bookiebot.reports.expense_breakdown import (
     BudgetMonth,
@@ -104,24 +106,40 @@ def test_build_expense_breakdown_report_aggregates_shared_and_personal_data():
     html = render_expense_breakdown_html(report)
     assert "Expense Breakdown" in html
     assert "Budget Charts" in html
-    assert 'data-chart-tab="category"' in html
-    assert 'data-chart-tab="daily"' in html
-    assert 'data-chart-tab="groups"' in html
+    assert 'id="bookiebot-expense-report-root"' in html
+    payload_match = re.search(
+        r'<script id="bookiebot-expense-report-data" type="application/json">(.*?)</script>',
+        html,
+    )
+    assert payload_match is not None
+    payload = json.loads(payload_match.group(1))
+    assert [item["label"] for item in payload["breakdown"]][:3] == [
+        "Rent",
+        "Bills & Utilities",
+        "Subscriptions (Needs)",
+    ]
+    assert payload["dailyTotals"] == [
+        {"label": "1", "amount": 50.0},
+        {"label": "2", "amount": 25.0},
+    ]
+    assert payload["budgetGroups"][0]["label"] == "Needs"
     assert "Needs vs Wants" in html
     assert "Highest day" in html
-    assert "chart-bars" in html
     assert "Daily Spending" in html
     assert "Rent" in html
-    assert "Bills &amp; Utilities" in html
-    assert "$1,750.00" in html
-    assert "$200.00" in html
+    assert any(item["label"] == "Bills & Utilities" for item in payload["breakdown"])
+    assert payload["rentPayments"] == [{"label": "Rent", "amount": 1750.0, "group": "Rent", "status": "entered"}]
+    assert payload["utilityPayments"] == [
+        {"label": "PG&E", "amount": 140.0, "group": "Bills & Utilities", "status": "entered"},
+        {"label": "Water", "amount": 60.0, "group": "Bills & Utilities", "status": "entered"},
+    ]
     assert "All Shared Expense Transactions" not in html
     assert "Source Sheet Data" not in html
     assert "Personal Budget" not in html
-    assert "Netflix" in html
-    assert "Spotify" in html
-    assert "Trader Joe" in html
-    assert "Paycheck" in html
+    assert [item["name"] for item in payload["subscriptionsNeeds"]] == ["Netflix"]
+    assert [item["name"] for item in payload["subscriptionsWants"]] == ["Spotify"]
+    assert any(entry["location"] == "Trader Joe's" for entry in payload["dailyEntries"])
+    assert [entry["label"] for entry in payload["incomeEntries"]] == ["Paycheck", "Side Gig"]
 
 
 def test_write_expense_breakdown_report_returns_public_url(tmp_path, monkeypatch):
