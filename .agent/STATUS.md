@@ -21,6 +21,7 @@ Recent transactions and reconciliation are in manual verification mode after the
 - Rebuilt the committed React expense report asset and added regression coverage for the process shim in rendered report HTML.
 - Expense breakdown report mobile styling now uses a shared responsive page gutter for the header and content cards.
 - Report cards, grids, tabs, charts, and table wrappers now shrink within the viewport on narrow phones, with dense tables scrolling inside their cards instead of pushing the page sideways.
+- Expense report metric cards now render two per row on narrow mobile, producing three compact rows without overflowing 320px-wide viewports.
 
 ## Completed 2026-06-20
 
@@ -167,7 +168,7 @@ Use a test row or low-risk real row in Discord:
 38. Run the expense breakdown command for a recent month and open the generated report link in Chrome.
    - Expected: the React expense dashboard renders instead of a blank page, and the console does not show `process is not defined`.
 39. Open the expense breakdown report on a narrow mobile viewport, such as 320px or 390px wide.
-   - Expected: the title card and content cards have matching left/right gutters, metric cards stack when needed, and the page has no document-level horizontal scroll.
+   - Expected: the title card and content cards have matching left/right gutters, the six metric cards render as three two-card rows, and the page has no document-level horizontal scroll.
 
 ## Verification Baseline
 
@@ -194,7 +195,7 @@ python -m pytest unit_tests/reports/test_expense_breakdown.py
 # 5 passed
 
 Headless Chrome mobile emulation for generated report HTML at 320px and 390px
-# document scrollWidth matched viewport width; header, main, metric cards, and analytics card shared matching gutters.
+# document scrollWidth matched viewport width; metric cards rendered as two equal columns with no metric value overflow.
 
 python -m pytest unit_tests
 # 348 passed, 1 skipped

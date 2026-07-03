@@ -415,7 +415,8 @@ tr:last-child td {
   }
 
   .bb-metrics-grid {
-    grid-template-columns: 1fr;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 10px;
   }
 
   .bb-page-header,
@@ -438,7 +439,26 @@ tr:last-child td {
   }
 
   .bb-metric-card {
-    padding: 14px;
+    min-height: 102px;
+    padding: 12px 10px;
+  }
+
+  .bb-metric-label,
+  .bb-metric-note {
+    line-height: 1.25;
+  }
+
+  .bb-metric-label {
+    font-size: 12px;
+  }
+
+  .bb-metric-value {
+    font-size: 20px;
+    line-height: 1.1;
+  }
+
+  .bb-metric-note {
+    font-size: 11px;
   }
 
   .bb-chart-total {
