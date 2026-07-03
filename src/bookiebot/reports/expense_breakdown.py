@@ -145,6 +145,19 @@ BUDGET_SHARED_CATEGORY_LABELS = {
     "shopping": ("Shopping",),
 }
 
+NEEDS_BREAKDOWN_KEYS = (
+    "rent",
+    "bills_utilities",
+    "static_bills_subscriptions_needs",
+    "grocery",
+    "gas",
+)
+WANTS_BREAKDOWN_KEYS = (
+    "subscriptions_wants",
+    "food",
+    "shopping",
+)
+
 
 def parse_budget_month(value: Any = None, *, now: datetime | None = None) -> BudgetMonth:
     current = now or now_pacific()
@@ -337,6 +350,8 @@ def render_expense_breakdown_html(report: ExpenseBreakdownReport) -> str:
     top_entries = sorted(report.entries, key=lambda entry: entry.amount, reverse=True)[:10]
     person_totals = _person_totals(report.entries)
     merchant_totals = _merchant_totals(report.entries)
+    daily_totals = _daily_totals(report.entries)
+    budget_group_totals = _budget_group_totals(report.breakdown)
     balance_after_expenses = report.income_total - report.grand_total if report.income_total else None
 
     return f"""<!doctype html>
@@ -356,6 +371,10 @@ def render_expense_breakdown_html(report: ExpenseBreakdownReport) -> str:
       --accent: #2563eb;
       --good: #15803d;
       --bad: #b91c1c;
+      --chart-grid: #f1f5f9;
+      --chart-1: #2563eb;
+      --chart-2: #16a34a;
+      --chart-3: #f59e0b;
     }}
     * {{ box-sizing: border-box; }}
     body {{
@@ -382,7 +401,6 @@ def render_expense_breakdown_html(report: ExpenseBreakdownReport) -> str:
     .grid {{ display: grid; gap: 16px; }}
     .cards {{ grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); }}
     .two {{ grid-template-columns: minmax(280px, 0.9fr) minmax(320px, 1.1fr); align-items: stretch; }}
-    .pie-layout {{ display: grid; grid-template-columns: minmax(240px, 360px) minmax(260px, 1fr); gap: 24px; align-items: center; }}
     section, .card {{
       background: var(--panel);
       border: 1px solid var(--line);
@@ -393,13 +411,63 @@ def render_expense_breakdown_html(report: ExpenseBreakdownReport) -> str:
     .metric-label {{ color: var(--muted); font-size: 13px; }}
     .metric-value {{ margin-top: 5px; font-size: 24px; font-weight: 750; }}
     .metric-note {{ margin-top: 4px; color: var(--muted); font-size: 12px; }}
+    .analytics {{
+      padding: 0;
+      overflow: hidden;
+    }}
+    .analytics-head {{
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 16px;
+      padding: 18px 18px 0;
+    }}
+    .analytics-meta {{ margin-top: 4px; color: var(--muted); font-size: 13px; }}
+    .chart-tabs {{
+      display: inline-flex;
+      gap: 2px;
+      padding: 3px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: #f8fafc;
+      white-space: nowrap;
+    }}
+    .chart-tab {{
+      appearance: none;
+      border: 0;
+      border-radius: 6px;
+      background: transparent;
+      color: var(--muted);
+      cursor: pointer;
+      font: inherit;
+      font-size: 13px;
+      padding: 7px 10px;
+    }}
+    .chart-tab.is-active {{
+      background: var(--panel);
+      color: var(--ink);
+      box-shadow: 0 1px 2px rgba(15, 23, 42, 0.08);
+    }}
+    .chart-panel {{
+      display: none;
+      padding: 18px;
+    }}
+    .chart-panel.is-active {{ display: block; }}
+    .chart-grid {{
+      display: grid;
+      grid-template-columns: minmax(260px, 0.9fr) minmax(280px, 1.1fr);
+      gap: 24px;
+      align-items: center;
+      min-height: 340px;
+    }}
     .pie {{
-      width: min(340px, 72vw);
+      width: min(330px, 72vw);
       aspect-ratio: 1;
       border-radius: 50%;
-      margin: 8px auto 18px;
+      margin: 8px auto;
       background: {_pie_gradient(non_zero_breakdown)};
       border: 1px solid var(--line);
+      box-shadow: inset 0 0 0 54px var(--panel);
     }}
     .legend {{ display: grid; gap: 8px; }}
     .legend-row {{
@@ -410,6 +478,82 @@ def render_expense_breakdown_html(report: ExpenseBreakdownReport) -> str:
       font-size: 13px;
     }}
     .swatch {{ width: 12px; height: 12px; border-radius: 3px; }}
+    .chart-copy {{ display: grid; gap: 14px; }}
+    .chart-kicker {{ color: var(--muted); font-size: 13px; }}
+    .chart-total {{ font-size: 30px; font-weight: 780; line-height: 1; }}
+    .chart-bars {{
+      display: grid;
+      grid-auto-flow: column;
+      grid-auto-columns: minmax(18px, 1fr);
+      align-items: end;
+      gap: 8px;
+      min-height: 270px;
+      overflow-x: auto;
+      padding: 18px 12px 8px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background:
+        linear-gradient(to top, var(--line) 1px, transparent 1px) 0 0 / 100% 25%,
+        var(--panel);
+    }}
+    .bar-item {{
+      display: grid;
+      grid-template-rows: 1fr auto;
+      align-items: end;
+      gap: 7px;
+      min-width: 18px;
+      height: 244px;
+    }}
+    .bar-fill {{
+      width: 100%;
+      min-height: 3px;
+      border-radius: 6px 6px 2px 2px;
+      background: var(--accent);
+    }}
+    .bar-label {{
+      color: var(--muted);
+      font-size: 11px;
+      line-height: 1;
+      text-align: center;
+    }}
+    .stat-list {{ display: grid; gap: 10px; }}
+    .stat-row {{
+      display: flex;
+      justify-content: space-between;
+      gap: 12px;
+      border-bottom: 1px solid var(--line);
+      padding-bottom: 10px;
+      font-size: 13px;
+    }}
+    .stat-row:last-child {{ border-bottom: 0; padding-bottom: 0; }}
+    .stat-row span:first-child {{ color: var(--muted); }}
+    .stacked-bar {{
+      display: flex;
+      height: 24px;
+      overflow: hidden;
+      border: 1px solid var(--line);
+      border-radius: 999px;
+      background: #f8fafc;
+    }}
+    .stack-segment {{ min-width: 2px; }}
+    .group-bars {{ display: grid; gap: 18px; }}
+    .group-row {{ display: grid; gap: 7px; }}
+    .group-row-head {{
+      display: flex;
+      justify-content: space-between;
+      gap: 12px;
+      font-size: 13px;
+    }}
+    .group-track {{
+      height: 12px;
+      overflow: hidden;
+      border-radius: 999px;
+      background: var(--chart-grid);
+    }}
+    .group-fill {{
+      height: 100%;
+      border-radius: inherit;
+    }}
     .amount {{ font-variant-numeric: tabular-nums; }}
     .txn-list {{ display: grid; gap: 6px; }}
     .txn {{ display: flex; flex-wrap: wrap; gap: 6px 10px; align-items: baseline; }}
@@ -424,7 +568,9 @@ def render_expense_breakdown_html(report: ExpenseBreakdownReport) -> str:
     .negative {{ color: var(--bad); }}
     @media (max-width: 820px) {{
       .two {{ grid-template-columns: 1fr; }}
-      .pie-layout {{ grid-template-columns: 1fr; }}
+      .analytics-head {{ display: grid; }}
+      .chart-tabs {{ overflow-x: auto; width: 100%; }}
+      .chart-grid {{ grid-template-columns: 1fr; min-height: 0; }}
       header {{ padding: 24px 16px 18px; }}
       main {{ width: min(100vw - 20px, 1180px); margin-top: 12px; }}
     }}
@@ -445,15 +591,7 @@ def render_expense_breakdown_html(report: ExpenseBreakdownReport) -> str:
       {_metric_card("Income After Expenses", balance_after_expenses)}
     </div>
 
-    <section>
-      <h2>Category Mix</h2>
-      <div class="pie-layout">
-        <div class="pie" role="img" aria-label="Expense category pie chart"></div>
-        <div class="legend">
-          {_legend_rows(non_zero_breakdown)}
-        </div>
-      </div>
-    </section>
+    {_analytics_section(non_zero_breakdown, daily_totals, budget_group_totals, report)}
 
     <section class="grid two">
       <div>
@@ -503,6 +641,7 @@ def render_expense_breakdown_html(report: ExpenseBreakdownReport) -> str:
       {_payments_table(report.income_entries)}
     </section>
   </main>
+  {_chart_tabs_script()}
 </body>
 </html>
 """
@@ -931,6 +1070,183 @@ def _metric_card(label: str, value: float | None, note: str = "") -> str:
   <div class="metric-value{css_class}">{_money(value)}</div>
   {note_html}
 </div>"""
+
+
+def _analytics_section(
+    breakdown_items: list[tuple[str, dict[str, Any]]],
+    daily_totals: list[tuple[str, float]],
+    budget_group_totals: dict[str, float],
+    report: ExpenseBreakdownReport,
+) -> str:
+    return f"""<section class="analytics">
+  <div class="analytics-head">
+    <div>
+      <h2>Budget Charts</h2>
+      <div class="analytics-meta">{_escape(report.month.label)} expense signal from Budget and Shared Expenses data.</div>
+    </div>
+    <div class="chart-tabs" role="tablist" aria-label="Budget charts">
+      <button type="button" class="chart-tab is-active" role="tab" aria-selected="true" aria-controls="chart-category" data-chart-tab="category">Category Mix</button>
+      <button type="button" class="chart-tab" role="tab" aria-selected="false" aria-controls="chart-daily" data-chart-tab="daily">Daily Spending</button>
+      <button type="button" class="chart-tab" role="tab" aria-selected="false" aria-controls="chart-groups" data-chart-tab="groups">Needs vs Wants</button>
+    </div>
+  </div>
+  {_category_chart_panel(breakdown_items, report.grand_total)}
+  {_daily_chart_panel(daily_totals, report.shared_total)}
+  {_budget_group_chart_panel(budget_group_totals)}
+</section>"""
+
+
+def _category_chart_panel(items: list[tuple[str, dict[str, Any]]], grand_total: float) -> str:
+    return f"""<div id="chart-category" class="chart-panel is-active" role="tabpanel" data-chart-panel="category">
+  <div class="chart-grid">
+    <div class="pie" role="img" aria-label="Expense category donut chart"></div>
+    <div class="chart-copy">
+      <div>
+        <div class="chart-kicker">Category Mix</div>
+        <div class="chart-total">{_money(grand_total)}</div>
+      </div>
+      <div class="legend">
+        {_legend_rows(items)}
+      </div>
+    </div>
+  </div>
+</div>"""
+
+
+def _daily_chart_panel(daily_totals: list[tuple[str, float]], shared_total: float) -> str:
+    return f"""<div id="chart-daily" class="chart-panel" role="tabpanel" data-chart-panel="daily" hidden>
+  <div class="chart-grid">
+    {_daily_bar_chart(daily_totals)}
+    <div class="chart-copy">
+      <div>
+        <div class="chart-kicker">Daily Spending</div>
+        <div class="chart-total">{_money(shared_total)}</div>
+      </div>
+      {_daily_stat_rows(daily_totals)}
+    </div>
+  </div>
+</div>"""
+
+
+def _budget_group_chart_panel(group_totals: dict[str, float]) -> str:
+    total = round(sum(group_totals.values()), 2)
+    needs = round(group_totals.get("Needs", 0.0), 2)
+    wants = round(group_totals.get("Wants", 0.0), 2)
+    needs_pct = _percentage(needs, total)
+    wants_pct = _percentage(wants, total)
+    return f"""<div id="chart-groups" class="chart-panel" role="tabpanel" data-chart-panel="groups" hidden>
+  <div class="chart-grid">
+    <div class="group-bars">
+      <div class="stacked-bar" role="img" aria-label="Needs and wants spending split">
+        <span class="stack-segment" style="width:{needs_pct:.2f}%; background:var(--chart-1)"></span>
+        <span class="stack-segment" style="width:{wants_pct:.2f}%; background:var(--chart-3)"></span>
+      </div>
+      {_group_bar("Needs", needs, total, "var(--chart-1)")}
+      {_group_bar("Wants", wants, total, "var(--chart-3)")}
+    </div>
+    <div class="chart-copy">
+      <div>
+        <div class="chart-kicker">Needs vs Wants</div>
+        <div class="chart-total">{_money(total)}</div>
+      </div>
+      <div class="stat-list">
+        <div class="stat-row"><span>Needs share</span><strong>{needs_pct:.2f}%</strong></div>
+        <div class="stat-row"><span>Wants share</span><strong>{wants_pct:.2f}%</strong></div>
+        <div class="stat-row"><span>Difference</span><strong>{_money(abs(needs - wants))}</strong></div>
+      </div>
+    </div>
+  </div>
+</div>"""
+
+
+def _daily_bar_chart(daily_totals: list[tuple[str, float]]) -> str:
+    if not daily_totals:
+        return '<div class="empty">No daily spending found.</div>'
+    max_total = max(amount for _label, amount in daily_totals)
+    bars = "\n".join(
+        f"""<div class="bar-item" title="{_escape(label)}: {_money(amount)}">
+  <div class="bar-fill" style="height:{_percentage(amount, max_total):.2f}%"></div>
+  <div class="bar-label">{_escape(_short_day_label(label))}</div>
+</div>"""
+        for label, amount in daily_totals
+    )
+    return f'<div class="chart-bars" role="img" aria-label="Daily spending bar chart">{bars}</div>'
+
+
+def _daily_stat_rows(daily_totals: list[tuple[str, float]]) -> str:
+    if not daily_totals:
+        return '<div class="empty">No daily spending found.</div>'
+    total = round(sum(amount for _label, amount in daily_totals), 2)
+    average = round(total / len(daily_totals), 2)
+    peak_label, peak_amount = max(daily_totals, key=lambda item: item[1])
+    return f"""<div class="stat-list">
+  <div class="stat-row"><span>Tracked days</span><strong>{len(daily_totals)}</strong></div>
+  <div class="stat-row"><span>Average active day</span><strong>{_money(average)}</strong></div>
+  <div class="stat-row"><span>Highest day</span><strong>{_escape(peak_label)} - {_money(peak_amount)}</strong></div>
+</div>"""
+
+
+def _group_bar(label: str, amount: float, total: float, color: str) -> str:
+    return f"""<div class="group-row">
+  <div class="group-row-head"><span>{_escape(label)}</span><strong>{_money(amount)}</strong></div>
+  <div class="group-track"><div class="group-fill" style="width:{_percentage(amount, total):.2f}%; background:{color}"></div></div>
+</div>"""
+
+
+def _chart_tabs_script() -> str:
+    return """<script>
+(() => {
+  const tabs = Array.from(document.querySelectorAll("[data-chart-tab]"));
+  const panels = Array.from(document.querySelectorAll("[data-chart-panel]"));
+  for (const tab of tabs) {
+    tab.addEventListener("click", () => {
+      const target = tab.dataset.chartTab;
+      for (const item of tabs) {
+        const active = item.dataset.chartTab === target;
+        item.classList.toggle("is-active", active);
+        item.setAttribute("aria-selected", active ? "true" : "false");
+      }
+      for (const panel of panels) {
+        const active = panel.dataset.chartPanel === target;
+        panel.classList.toggle("is-active", active);
+        panel.hidden = !active;
+      }
+    });
+  }
+})();
+</script>"""
+
+
+def _daily_totals(entries: list[ExpenseEntry]) -> list[tuple[str, float]]:
+    grouped: dict[int, float] = defaultdict(float)
+    undated = 0.0
+    for entry in entries:
+        parsed = _parse_date(entry.date)
+        if parsed is None:
+            undated += entry.amount
+            continue
+        grouped[parsed.day] += entry.amount
+
+    totals = [(str(day), round(amount, 2)) for day, amount in sorted(grouped.items()) if amount > 0]
+    if undated > 0:
+        totals.append(("No date", round(undated, 2)))
+    return totals
+
+
+def _budget_group_totals(breakdown: dict[str, dict[str, Any]]) -> dict[str, float]:
+    needs = sum(float(breakdown.get(key, {}).get("amount") or 0.0) for key in NEEDS_BREAKDOWN_KEYS)
+    wants = sum(float(breakdown.get(key, {}).get("amount") or 0.0) for key in WANTS_BREAKDOWN_KEYS)
+    return {"Needs": round(needs, 2), "Wants": round(wants, 2)}
+
+
+def _percentage(amount: float, total: float) -> float:
+    if total <= 0:
+        return 0.0
+    return max(0.0, min(100.0, amount / total * 100))
+
+
+def _short_day_label(label: str) -> str:
+    return label if label.isdigit() else "?"
 
 
 def _pie_gradient(items: list[tuple[str, dict[str, Any]]]) -> str:

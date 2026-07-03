@@ -103,6 +103,13 @@ def test_build_expense_breakdown_report_aggregates_shared_and_personal_data():
 
     html = render_expense_breakdown_html(report)
     assert "Expense Breakdown" in html
+    assert "Budget Charts" in html
+    assert 'data-chart-tab="category"' in html
+    assert 'data-chart-tab="daily"' in html
+    assert 'data-chart-tab="groups"' in html
+    assert "Needs vs Wants" in html
+    assert "Highest day" in html
+    assert "chart-bars" in html
     assert "Daily Spending" in html
     assert "Rent" in html
     assert "Bills &amp; Utilities" in html
