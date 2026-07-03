@@ -17,6 +17,8 @@
   --chart-4: 326 78% 52%;
   --chart-5: 199 89% 48%;
   --radius: 0.5rem;
+  --bb-content-max: 1180px;
+  --bb-page-gutter: clamp(12px, 4vw, 24px);
 }
 
 * {
@@ -28,6 +30,12 @@ body {
   background: hsl(var(--background));
   color: hsl(var(--foreground));
   font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  overflow-x: hidden;
+}
+
+.bb-page {
+  min-height: 100vh;
+  padding: 16px var(--bb-page-gutter) 48px;
 }
 
 .bb-page-header {
@@ -35,9 +43,18 @@ body {
   align-items: flex-start;
   justify-content: space-between;
   gap: 16px;
-  padding: 32px 24px 20px;
-  border-bottom: 1px solid hsl(var(--border));
+  width: min(var(--bb-content-max), 100%);
+  min-width: 0;
+  margin: 0 auto;
+  padding: 24px;
+  border: 1px solid hsl(var(--border));
+  border-radius: var(--radius);
   background: hsl(var(--card));
+  box-shadow: 0 1px 2px rgb(15 23 42 / 0.04);
+}
+
+.bb-page-header > div {
+  min-width: 0;
 }
 
 .bb-page-header h1 {
@@ -52,13 +69,16 @@ body {
 }
 
 .bb-main {
-  width: min(1180px, calc(100vw - 32px));
-  margin: 24px auto 48px;
+  width: min(var(--bb-content-max), 100%);
+  margin: 16px auto 0;
   display: grid;
   gap: 16px;
 }
 
 .bb-card {
+  min-width: 0;
+  max-width: 100%;
+  overflow: hidden;
   border: 1px solid hsl(var(--border));
   border-radius: var(--radius);
   background: hsl(var(--card));
@@ -85,6 +105,7 @@ body {
 }
 
 .bb-card-content {
+  min-width: 0;
   padding: 18px;
 }
 
@@ -115,8 +136,13 @@ body {
 
 .bb-metrics-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(min(170px, 100%), 1fr));
   gap: 16px;
+}
+
+.bb-metrics-grid > *,
+.bb-two-grid > * {
+  min-width: 0;
 }
 
 .bb-metric-card {
@@ -156,6 +182,7 @@ body {
 .bb-tabs-list {
   display: inline-flex;
   gap: 2px;
+  max-width: 100%;
   padding: 3px;
   border: 1px solid hsl(var(--border));
   border-radius: var(--radius);
@@ -189,11 +216,13 @@ body {
   grid-template-columns: minmax(360px, 1.35fr) minmax(260px, 0.65fr);
   gap: 22px;
   align-items: center;
+  min-width: 0;
   min-height: 360px;
 }
 
 .bb-chart-box {
   width: 100%;
+  min-width: 0;
   min-height: 320px;
 }
 
@@ -204,6 +233,7 @@ body {
 .bb-chart-side {
   display: grid;
   gap: 16px;
+  min-width: 0;
 }
 
 .bb-chart-kicker {
@@ -233,6 +263,12 @@ body {
   border-bottom: 1px solid hsl(var(--border));
   padding-bottom: 9px;
   font-size: 13px;
+  min-width: 0;
+}
+
+.bb-legend-row span,
+.bb-stat-row span {
+  min-width: 0;
 }
 
 .bb-stat-row {
@@ -287,10 +323,15 @@ body {
   grid-template-columns: minmax(280px, 0.9fr) minmax(320px, 1.1fr);
   align-items: stretch;
   gap: 16px;
+  min-width: 0;
 }
 
 .bb-table-wrap {
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
   overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
 }
 
 table {
@@ -329,6 +370,7 @@ tr:last-child td {
 .bb-transaction-list {
   display: grid;
   gap: 6px;
+  min-width: 0;
 }
 
 .bb-transaction-list span {
@@ -344,12 +386,11 @@ tr:last-child td {
 
   .bb-page-header {
     display: grid;
-    padding: 24px 16px 18px;
+    padding: 18px;
   }
 
-  .bb-main {
-    width: min(100vw - 20px, 1180px);
-    margin-top: 12px;
+  .bb-page-header .bb-badge {
+    justify-self: start;
   }
 
   .bb-tabs-list {
@@ -359,5 +400,56 @@ tr:last-child td {
 
   .bb-chart-layout {
     min-height: 0;
+  }
+}
+
+@media (max-width: 420px) {
+  .bb-page {
+    padding-top: 12px;
+    padding-bottom: 32px;
+  }
+
+  .bb-page-header,
+  .bb-card-content {
+    padding: 14px;
+  }
+
+  .bb-metrics-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .bb-page-header,
+  .bb-main,
+  .bb-main > *,
+  .bb-card,
+  .bb-metrics-grid,
+  .bb-two-grid,
+  .bb-chart-layout {
+    width: 100%;
+    max-width: 100%;
+  }
+
+  .bb-card-header {
+    padding: 14px 14px 0;
+  }
+
+  .bb-page-header h1 {
+    font-size: 26px;
+  }
+
+  .bb-metric-card {
+    padding: 14px;
+  }
+
+  .bb-chart-total {
+    font-size: 28px;
+  }
+
+  .bb-chart-layout {
+    gap: 14px;
+  }
+
+  .bb-chart-box {
+    min-height: 260px;
   }
 }

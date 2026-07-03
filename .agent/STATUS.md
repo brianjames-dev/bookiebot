@@ -19,6 +19,8 @@ Recent transactions and reconciliation are in manual verification mode after the
 - Expense breakdown report pages now define a browser-safe `window.process.env.NODE_ENV` shim before loading the embedded React bundle.
 - The expense report Vite build now replaces `process.env.NODE_ENV` with `"production"`, preventing Node-style dependency checks from crashing report pages in Chrome.
 - Rebuilt the committed React expense report asset and added regression coverage for the process shim in rendered report HTML.
+- Expense breakdown report mobile styling now uses a shared responsive page gutter for the header and content cards.
+- Report cards, grids, tabs, charts, and table wrappers now shrink within the viewport on narrow phones, with dense tables scrolling inside their cards instead of pushing the page sideways.
 
 ## Completed 2026-06-20
 
@@ -164,6 +166,8 @@ Use a test row or low-risk real row in Discord:
    - Expected: BookieBot sends the list privately across multiple DM messages, each transaction stays within a single DM message, code blocks render cleanly, controls appear on the final DM, and the public channel gets a generic sent-to-DMs acknowledgement.
 38. Run the expense breakdown command for a recent month and open the generated report link in Chrome.
    - Expected: the React expense dashboard renders instead of a blank page, and the console does not show `process is not defined`.
+39. Open the expense breakdown report on a narrow mobile viewport, such as 320px or 390px wide.
+   - Expected: the title card and content cards have matching left/right gutters, metric cards stack when needed, and the page has no document-level horizontal scroll.
 
 ## Verification Baseline
 
@@ -188,6 +192,9 @@ python -m py_compile src/bookiebot/reports/expense_breakdown.py
 
 python -m pytest unit_tests/reports/test_expense_breakdown.py
 # 5 passed
+
+Headless Chrome mobile emulation for generated report HTML at 320px and 390px
+# document scrollWidth matched viewport width; header, main, metric cards, and analytics card shared matching gutters.
 
 python -m pytest unit_tests
 # 348 passed, 1 skipped
