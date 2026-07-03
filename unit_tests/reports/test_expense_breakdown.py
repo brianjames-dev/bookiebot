@@ -39,13 +39,15 @@ def test_build_expense_breakdown_report_aggregates_shared_and_personal_data():
         _row({"A": "05/01/2026", "B": "50", "C": "Trader Joe's", "D": "Hannah"}),
         _row({"N": "05/02/2026", "O": "Burrito", "P": "25", "Q": "Chipotle", "R": "Hannah"}),
         _row({"V": "05/03/2026", "W": "Desk", "X": "100", "Y": "IKEA", "Z": "Brian (BofA)"}),
+        _row({"V": "05/04/2026", "W": "Camera", "X": "300", "Y": "B&H", "Z": "Brian (AL)"}),
     ]
     personal_rows = [
-        ["Rent", "$1,200.00"],
-        ["PG&E", "$100.00"],
-        ["Water", "$40.00"],
-        ["Bus Ticket", "$45.00"],
-        ["Monthly Income", "$5,000.00"],
+        ["", "Paycheck", "$3,000.00"],
+        ["", "Side Gig", "$500.00"],
+        ["", "Monthly Income:", ""],
+        ["Static Bills & Subscriptions (Needs)", "$1,410.00"],
+        ["Subscriptions (Wants)", "$10.00"],
+        ["Monthly Income", "$3,500.00"],
         ["Margins:", "", "$2,000.00"],
     ]
     subscriptions_rows = [
@@ -70,25 +72,32 @@ def test_build_expense_breakdown_report_aggregates_shared_and_personal_data():
         ),
     )
 
-    assert report.grand_total == 1485.0
+    assert report.grand_total == 1495.0
     assert report.shared_total == 75.0
-    assert report.personal_total == 1410.0
-    assert report.income_total == 5000.0
+    assert report.personal_total == 1420.0
+    assert report.income_total == 3500.0
     assert report.remaining_budget == 2000.0
-    assert report.breakdown["rent"]["amount"] == 1200.0
-    assert report.breakdown["bills_utilities"]["amount"] == 140.0
-    assert report.breakdown["subscriptions"]["amount"] == 25.0
-    assert report.breakdown["need_expenses"]["amount"] == 45.0
+    assert report.breakdown["static_bills_subscriptions_needs"]["amount"] == 1410.0
+    assert report.breakdown["subscriptions_wants"]["amount"] == 10.0
     assert report.breakdown["grocery"]["amount"] == 50.0
     assert report.breakdown["food"]["amount"] == 25.0
     assert [entry.location for entry in report.entries] == ["Chipotle", "Trader Joe's"]
+    assert [entry.location for entry in report.entries if entry.person == "Brian (AL)"] == []
+    assert [(entry.label, entry.amount) for entry in report.income_entries] == [
+        ("Paycheck", 3000.0),
+        ("Side Gig", 500.0),
+    ]
 
     html = render_expense_breakdown_html(report)
     assert "Expense Breakdown" in html
-    assert "All Shared Expense Transactions" in html
-    assert "Source Sheet Data" in html
+    assert "Daily Spending" in html
+    assert "All Shared Expense Transactions" not in html
+    assert "Source Sheet Data" not in html
+    assert "Personal Budget" not in html
     assert "Netflix" in html
+    assert "Spotify" in html
     assert "Trader Joe" in html
+    assert "Paycheck" in html
 
 
 def test_write_expense_breakdown_report_returns_public_url(tmp_path, monkeypatch):

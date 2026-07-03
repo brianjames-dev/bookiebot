@@ -1008,6 +1008,8 @@ async def query_expense_breakdown_handler(entities, message):
     if not persons:
         await message.channel.send("❌ Could not determine person(s) to query.")
         return
+    owner_name = _budget_profile_name(message)
+    persons = _expense_breakdown_persons(owner_name, persons, entities.get("person"))
 
     try:
         report_month = month_from_entities_or_message(entities, getattr(message, "content", ""))
@@ -1018,7 +1020,7 @@ async def query_expense_breakdown_handler(entities, message):
     actor_key = _message_actor_key(message)
     report = build_expense_breakdown_report(
         actor_key=actor_key or "",
-        owner_name=_budget_profile_name(message),
+        owner_name=owner_name,
         persons=persons,
         month=report_month,
     )
@@ -1075,6 +1077,14 @@ async def query_expense_breakdown_handler(entities, message):
         return
 
     await message.channel.send(content=text, file=chart_file)
+
+
+def _expense_breakdown_persons(owner_name: str, persons: list[str], requested_person: Any) -> list[str]:
+    requested = str(requested_person or "").strip().lower()
+    brian_cards = {"Brian (BofA)", "Brian (AL)"}
+    if owner_name == "Brian" and set(persons) == brian_cards and requested in {"", "brian"}:
+        return ["Brian (BofA)"]
+    return persons
 
 
 async def query_total_for_category_handler(entities, message):

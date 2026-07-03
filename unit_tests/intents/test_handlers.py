@@ -1743,6 +1743,16 @@ async def test_query_expense_breakdown_handles_zero_categories(monkeypatch, mess
     assert any("No expenses found" in (msg or "") and "https://example.test/report.html" in (msg or "") for msg, _ in message.channel.sent)
 
 
+def test_expense_breakdown_defaults_brian_to_bofa_only():
+    assert ih._expense_breakdown_persons("Brian", ["Brian (BofA)", "Brian (AL)"], None) == ["Brian (BofA)"]
+    assert ih._expense_breakdown_persons("Brian", ["Brian (BofA)", "Brian (AL)"], "Brian") == ["Brian (BofA)"]
+    assert ih._expense_breakdown_persons("Brian", ["Brian (BofA)", "Brian (AL)", "Hannah"], "total") == [
+        "Brian (BofA)",
+        "Brian (AL)",
+        "Hannah",
+    ]
+
+
 @pytest.mark.asyncio
 async def test_query_total_for_category(monkeypatch, message):
     monkeypatch.setattr(ih.su, "total_for_category", AsyncMock(return_value=25.0))

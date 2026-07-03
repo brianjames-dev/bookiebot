@@ -72,12 +72,6 @@ class SubscriptionItem:
 
 
 @dataclass(frozen=True)
-class NeedExpense:
-    description: str
-    amount: float
-
-
-@dataclass(frozen=True)
 class RawSheet:
     title: str
     rows: list[list[str]]
@@ -99,7 +93,6 @@ class ExpenseBreakdownReport:
     entries: list[ExpenseEntry] = field(default_factory=list)
     payments: list[PaymentItem] = field(default_factory=list)
     subscriptions: list[SubscriptionItem] = field(default_factory=list)
-    need_expenses: list[NeedExpense] = field(default_factory=list)
     income_entries: list[PaymentItem] = field(default_factory=list)
     raw_sheets: list[RawSheet] = field(default_factory=list)
 
@@ -111,10 +104,8 @@ class ExpenseReportPage:
 
 
 CATEGORY_LABELS = {
-    "rent": "Rent",
-    "bills_utilities": "Bills & Utilities",
-    "subscriptions": "Subscriptions",
-    "need_expenses": "Need Expenses",
+    "static_bills_subscriptions_needs": "Static Bills & Subscriptions (Needs)",
+    "subscriptions_wants": "Subscriptions (Wants)",
     "grocery": "Grocery",
     "gas": "Gas",
     "food": "Food",
@@ -122,10 +113,8 @@ CATEGORY_LABELS = {
 }
 
 CATEGORY_COLORS = {
-    "rent": "#2563eb",
-    "bills_utilities": "#0f766e",
-    "subscriptions": "#7c3aed",
-    "need_expenses": "#dc2626",
+    "static_bills_subscriptions_needs": "#2563eb",
+    "subscriptions_wants": "#7c3aed",
     "grocery": "#16a34a",
     "gas": "#f59e0b",
     "food": "#db2777",
@@ -133,16 +122,16 @@ CATEGORY_COLORS = {
 }
 
 PAYMENT_GROUPS = {
-    "rent": ("rent", "Rent"),
-    "pg&e": ("bills_utilities", "PG&E"),
-    "pge": ("bills_utilities", "PGE"),
-    "recology": ("bills_utilities", "Recology"),
-    "trash": ("bills_utilities", "Trash"),
-    "garbage": ("bills_utilities", "Garbage"),
-    "waste": ("bills_utilities", "Waste"),
-    "water": ("bills_utilities", "Water"),
-    "student loan payment": ("bills_utilities", "Student Loan Payment"),
-    "student loan": ("bills_utilities", "Student Loan"),
+    "rent": ("static_bills_subscriptions_needs", "Rent"),
+    "pg&e": ("static_bills_subscriptions_needs", "PG&E"),
+    "pge": ("static_bills_subscriptions_needs", "PGE"),
+    "recology": ("static_bills_subscriptions_needs", "Recology"),
+    "trash": ("static_bills_subscriptions_needs", "Trash"),
+    "garbage": ("static_bills_subscriptions_needs", "Garbage"),
+    "waste": ("static_bills_subscriptions_needs", "Waste"),
+    "water": ("static_bills_subscriptions_needs", "Water"),
+    "student loan payment": ("static_bills_subscriptions_needs", "Student Loan Payment"),
+    "student loan": ("static_bills_subscriptions_needs", "Student Loan"),
 }
 
 
@@ -254,19 +243,15 @@ def build_expense_breakdown_report(
     entries = _shared_expense_entries(shared_rows, persons, month)
     payments = _payment_items(personal_rows, bill_schedule_rows, month)
     subscriptions = _subscription_items(subscription_rows, month)
-    need_expenses = _need_expenses(personal_rows)
     income_entries, income_total = _income_entries(personal_rows)
     remaining_budget = _remaining_budget(personal_rows)
+    static_needs_total, wants_total = _subscription_bucket_totals(personal_rows, payments, subscriptions)
 
     breakdown_amounts = _ordered_breakdown_amounts()
+    breakdown_amounts["static_bills_subscriptions_needs"] = static_needs_total
+    breakdown_amounts["subscriptions_wants"] = wants_total
     for entry in entries:
         breakdown_amounts[entry.category] += entry.amount
-    for payment in payments:
-        breakdown_amounts[payment.group] += payment.amount
-    for subscription in subscriptions:
-        breakdown_amounts["subscriptions"] += subscription.amount
-    for need in need_expenses:
-        breakdown_amounts["need_expenses"] += need.amount
 
     grand_total = round(sum(breakdown_amounts.values()), 2)
     breakdown = {
@@ -279,12 +264,7 @@ def build_expense_breakdown_report(
     }
 
     shared_total = round(sum(entry.amount for entry in entries), 2)
-    personal_total = round(
-        sum(payment.amount for payment in payments)
-        + sum(subscription.amount for subscription in subscriptions)
-        + sum(need.amount for need in need_expenses),
-        2,
-    )
+    personal_total = round(static_needs_total + wants_total, 2)
 
     return ExpenseBreakdownReport(
         actor_key=actor_key,
@@ -301,7 +281,6 @@ def build_expense_breakdown_report(
         entries=entries,
         payments=payments,
         subscriptions=subscriptions,
-        need_expenses=need_expenses,
         income_entries=income_entries,
         raw_sheets=[
             RawSheet("Shared Expenses", _compact_rows(shared_rows)),
@@ -330,7 +309,6 @@ def render_expense_breakdown_html(report: ExpenseBreakdownReport) -> str:
     ]
     top_entries = sorted(report.entries, key=lambda entry: entry.amount, reverse=True)[:10]
     person_totals = _person_totals(report.entries)
-    daily_totals = _daily_totals(report.entries)
     merchant_totals = _merchant_totals(report.entries)
     balance_after_expenses = report.income_total - report.grand_total if report.income_total else None
 
@@ -377,6 +355,7 @@ def render_expense_breakdown_html(report: ExpenseBreakdownReport) -> str:
     .grid {{ display: grid; gap: 16px; }}
     .cards {{ grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); }}
     .two {{ grid-template-columns: minmax(280px, 0.9fr) minmax(320px, 1.1fr); align-items: stretch; }}
+    .pie-layout {{ display: grid; grid-template-columns: minmax(240px, 360px) minmax(260px, 1fr); gap: 24px; align-items: center; }}
     section, .card {{
       background: var(--panel);
       border: 1px solid var(--line);
@@ -396,7 +375,7 @@ def render_expense_breakdown_html(report: ExpenseBreakdownReport) -> str:
       border: 1px solid var(--line);
     }}
     .legend {{ display: grid; gap: 8px; }}
-    .legend-row, .bar-row {{
+    .legend-row {{
       display: grid;
       grid-template-columns: 18px minmax(110px, 1fr) auto;
       align-items: center;
@@ -405,20 +384,20 @@ def render_expense_breakdown_html(report: ExpenseBreakdownReport) -> str:
     }}
     .swatch {{ width: 12px; height: 12px; border-radius: 3px; }}
     .amount {{ font-variant-numeric: tabular-nums; }}
-    .bar-row {{ grid-template-columns: minmax(110px, 150px) 1fr auto; margin: 8px 0; }}
-    .bar-track {{ height: 9px; background: #e5e7eb; border-radius: 999px; overflow: hidden; }}
-    .bar-fill {{ height: 100%; border-radius: 999px; }}
+    .txn-list {{ display: grid; gap: 6px; }}
+    .txn {{ display: flex; flex-wrap: wrap; gap: 6px 10px; align-items: baseline; }}
+    .txn-meta {{ color: var(--muted); }}
     table {{ width: 100%; border-collapse: collapse; font-size: 13px; }}
     th, td {{ padding: 9px 8px; border-bottom: 1px solid var(--line); text-align: left; vertical-align: top; }}
     th {{ color: var(--muted); font-weight: 650; background: #f8fafc; }}
     tr:last-child td {{ border-bottom: 0; }}
     .table-wrap {{ overflow-x: auto; }}
     .empty {{ color: var(--muted); font-size: 13px; }}
-    .raw td {{ white-space: nowrap; }}
     .positive {{ color: var(--good); }}
     .negative {{ color: var(--bad); }}
     @media (max-width: 820px) {{
       .two {{ grid-template-columns: 1fr; }}
+      .pie-layout {{ grid-template-columns: 1fr; }}
       header {{ padding: 24px 16px 18px; }}
       main {{ width: min(100vw - 20px, 1180px); margin-top: 12px; }}
     }}
@@ -439,17 +418,13 @@ def render_expense_breakdown_html(report: ExpenseBreakdownReport) -> str:
       {_metric_card("Income After Expenses", balance_after_expenses)}
     </div>
 
-    <section class="grid two">
-      <div>
-        <h2>Category Mix</h2>
+    <section>
+      <h2>Category Mix</h2>
+      <div class="pie-layout">
         <div class="pie" role="img" aria-label="Expense category pie chart"></div>
         <div class="legend">
           {_legend_rows(non_zero_breakdown)}
         </div>
-      </div>
-      <div>
-        <h2>Category Totals</h2>
-        {_category_bars(non_zero_breakdown)}
       </div>
     </section>
 
@@ -459,9 +434,14 @@ def render_expense_breakdown_html(report: ExpenseBreakdownReport) -> str:
         {_simple_amount_table(["Person", "Amount"], [(person, total) for person, total in person_totals])}
       </div>
       <div>
-        <h2>Daily Shared Spending</h2>
-        {_simple_amount_table(["Day", "Amount"], [(str(day), amount) for day, amount in daily_totals])}
+        <h2>Frequent Merchants / Locations</h2>
+        {_simple_amount_table(["Merchant", "Amount"], merchant_totals)}
       </div>
+    </section>
+
+    <section>
+      <h2>Daily Spending</h2>
+      {_daily_spending_table(report.entries)}
     </section>
 
     <section>
@@ -471,39 +451,18 @@ def render_expense_breakdown_html(report: ExpenseBreakdownReport) -> str:
 
     <section class="grid two">
       <div>
-        <h2>Frequent Merchants / Locations</h2>
-        {_simple_amount_table(["Merchant", "Amount"], merchant_totals)}
+        <h2>Static Bills & Subscriptions (Needs)</h2>
+        {_subscriptions_table(_subscriptions_for_bucket(report.subscriptions, "static_bills_subscriptions_needs"))}
       </div>
       <div>
-        <h2>Bills, Utilities, Rent</h2>
-        {_payments_table(report.payments)}
-      </div>
-    </section>
-
-    <section class="grid two">
-      <div>
-        <h2>Subscriptions</h2>
-        {_subscriptions_table(report.subscriptions)}
-      </div>
-      <div>
-        <h2>Need Expenses</h2>
-        {_needs_table(report.need_expenses)}
+        <h2>Subscriptions (Wants)</h2>
+        {_subscriptions_table(_subscriptions_for_bucket(report.subscriptions, "subscriptions_wants"))}
       </div>
     </section>
 
     <section>
       <h2>Income Entries</h2>
       {_payments_table(report.income_entries)}
-    </section>
-
-    <section>
-      <h2>All Shared Expense Transactions</h2>
-      {_entries_table(report.entries)}
-    </section>
-
-    <section>
-      <h2>Source Sheet Data</h2>
-      {_raw_sheets(report.raw_sheets)}
     </section>
   </main>
 </body>
@@ -612,14 +571,58 @@ def _bill_schedule_labels(rows: list[list[str]], month: BudgetMonth) -> dict[str
         for bill in list_bill_schedules(rows):
             if bill.recurrence == "quarterly" and month.month not in bill.pull_months:
                 continue
-            group = "rent" if _normalize_label(bill.bill_key) == "rent" else "bills_utilities"
             for label in {bill.bill_key, bill.display_name, bill.source_label}:
                 normalized = _normalize_label(label)
                 if normalized:
-                    labels[normalized] = (group, bill.display_name or bill.source_label or bill.bill_key)
+                    labels[normalized] = (
+                        "static_bills_subscriptions_needs",
+                        bill.display_name or bill.source_label or bill.bill_key,
+                    )
         return labels
     except Exception:
         return {}
+
+
+def _subscription_bucket_totals(
+    rows: list[list[str]],
+    payments: list[PaymentItem],
+    subscriptions: list[SubscriptionItem],
+) -> tuple[float, float]:
+    static_needs_total = _amount_for_label(rows, "Static Bills & Subscriptions (Needs)")
+    wants_total = _amount_for_label(rows, "Subscriptions (Wants)")
+
+    if static_needs_total <= 0:
+        static_needs_total = round(
+            sum(payment.amount for payment in payments)
+            + sum(item.amount for item in subscriptions if _subscription_bucket(item) == "static_bills_subscriptions_needs"),
+            2,
+        )
+    if wants_total <= 0:
+        wants_total = round(
+            sum(item.amount for item in subscriptions if _subscription_bucket(item) == "subscriptions_wants"),
+            2,
+        )
+
+    return round(static_needs_total, 2), round(wants_total, 2)
+
+
+def _amount_for_label(rows: list[list[str]], label: str) -> float:
+    target = _normalize_label(label)
+    for row in rows:
+        for index, value in enumerate(row):
+            normalized = _normalize_label(value)
+            if not normalized:
+                continue
+            if normalized == target or target in normalized:
+                return round(_next_money(row, index + 1), 2)
+    return 0.0
+
+
+def _subscription_bucket(item: SubscriptionItem) -> str:
+    kind = _normalize_label(item.kind)
+    if kind in {"want", "wants"}:
+        return "subscriptions_wants"
+    return "static_bills_subscriptions_needs"
 
 
 def _subscription_items(rows: list[list[str]], month: BudgetMonth) -> list[SubscriptionItem]:
@@ -649,81 +652,77 @@ def _subscription_items(rows: list[list[str]], month: BudgetMonth) -> list[Subsc
         return []
 
 
-def _need_expenses(rows: list[list[str]]) -> list[NeedExpense]:
-    marker_index = _need_marker_index(rows)
+def _income_entries(rows: list[list[str]]) -> tuple[list[PaymentItem], float]:
+    summary_total = _monthly_income_summary(rows)
+    marker_index = _monthly_income_marker_index(rows)
+    items: list[PaymentItem] = []
+
     if marker_index is not None:
-        needs_from_marker: list[NeedExpense] = []
-        for row in reversed(rows[:marker_index]):
-            description = _cell(row, 1)
-            amount = clean_money(_cell(row, 2))
-            if amount <= 0:
-                if needs_from_marker:
-                    break
-                continue
-            if not description or description.lower() in {"description", "need", "needs"}:
-                continue
-            needs_from_marker.append(NeedExpense(description=description, amount=round(amount, 2)))
-        return list(reversed(needs_from_marker))
+        for row in rows[:marker_index]:
+            item = _income_entry_from_row(row)
+            if item:
+                items.append(item)
+    else:
+        for row in rows:
+            item = _income_entry_from_row(row, require_income_like_label=True)
+            if item:
+                items.append(item)
 
-    needs: list[NeedExpense] = []
+    total = summary_total or round(sum(item.amount for item in items), 2)
+    return items, round(total, 2)
+
+
+def _monthly_income_summary(rows: list[list[str]]) -> float:
+    summary_total = 0.0
     for row in rows:
-        for index, value in enumerate(row[:-1]):
-            description = str(value).strip()
-            if not description or description.lower() in {"<enter transaction>", "description"}:
+        for index, value in enumerate(row):
+            normalized = _normalize_label(value)
+            if "monthly income" not in normalized:
                 continue
-            amount = clean_money(row[index + 1])
-            if amount > 0 and _looks_like_need_row(row, index):
-                needs.append(NeedExpense(description=description, amount=round(amount, 2)))
-    return needs
+            amount = _next_money(row, index + 1)
+            if amount > 0:
+                summary_total = max(summary_total, amount)
+    return round(summary_total, 2)
 
 
-def _looks_like_need_row(row: list[str], index: int) -> bool:
-    left_context = " ".join(row[max(0, index - 3) : index + 1]).lower()
-    right_context = " ".join(row[index : min(len(row), index + 4)]).lower()
-    context = f"{left_context} {right_context}"
-    excluded = {
-        "rent",
-        "pg&e",
-        "pge",
-        "recology",
-        "water",
-        "student loan",
-        "income",
-        "paycheck",
-        "deposit",
-        "salary",
-        "refund",
-        "margins",
-    }
-    if any(term in context for term in excluded):
-        return False
-    return True
-
-
-def _need_marker_index(rows: list[list[str]]) -> int | None:
+def _monthly_income_marker_index(rows: list[list[str]]) -> int | None:
     for row_index, row in enumerate(rows):
-        if any(str(value).strip().lower() == "<enter transaction>" for value in row):
+        if any(str(value).strip().lower() == "monthly income:" for value in row):
             return row_index
     return None
 
 
-def _income_entries(rows: list[list[str]]) -> tuple[list[PaymentItem], float]:
-    items: list[PaymentItem] = []
-    summary_total = 0.0
-    for row in rows:
-        for index, value in enumerate(row[:-1]):
-            label = str(value).strip()
-            normalized = _normalize_label(label)
-            if not normalized:
-                continue
-            amount = _next_money(row, index + 1)
-            if "monthly income" in normalized and amount > 0:
-                summary_total = max(summary_total, amount)
-                continue
-            if amount > 0 and _looks_like_income_label(label):
-                items.append(PaymentItem(label=label, amount=round(amount, 2), group="income"))
-    total = summary_total or round(sum(item.amount for item in items), 2)
-    return items, round(total, 2)
+def _income_entry_from_row(row: list[str], *, require_income_like_label: bool = False) -> PaymentItem | None:
+    for amount_index, value in enumerate(row):
+        amount = clean_money(str(value))
+        if amount <= 0:
+            continue
+        label = _nearest_left_label(row, amount_index)
+        if not label or _is_non_income_label(label):
+            continue
+        if require_income_like_label and not _looks_like_income_label(label):
+            continue
+        return PaymentItem(label=label, amount=round(amount, 2), group="income")
+    return None
+
+
+def _nearest_left_label(row: list[str], index: int) -> str:
+    for value in reversed(row[:index]):
+        text = str(value).strip()
+        if text:
+            return text
+    return ""
+
+
+def _is_non_income_label(label: str) -> bool:
+    normalized = _normalize_label(label)
+    if not normalized:
+        return True
+    if "monthly income" in normalized or "margin" in normalized:
+        return True
+    if any(key and (normalized == key or key in normalized or normalized in key) for key in PAYMENT_GROUPS):
+        return True
+    return False
 
 
 def _remaining_budget(rows: list[list[str]]) -> float | None:
@@ -806,15 +805,6 @@ def _person_totals(entries: list[ExpenseEntry]) -> list[tuple[str, float]]:
     return sorted(((person, round(amount, 2)) for person, amount in totals.items()), key=lambda item: item[1], reverse=True)
 
 
-def _daily_totals(entries: list[ExpenseEntry]) -> list[tuple[int, float]]:
-    totals: dict[int, float] = defaultdict(float)
-    for entry in entries:
-        parsed = _parse_date(entry.date)
-        if parsed:
-            totals[parsed.day] += entry.amount
-    return sorted((day, round(amount, 2)) for day, amount in totals.items())
-
-
 def _merchant_totals(entries: list[ExpenseEntry]) -> list[tuple[str, float]]:
     totals: Counter[str] = Counter()
     for entry in entries:
@@ -880,24 +870,6 @@ def _legend_rows(items: list[tuple[str, dict[str, Any]]]) -> str:
     )
 
 
-def _category_bars(items: list[tuple[str, dict[str, Any]]]) -> str:
-    if not items:
-        return '<div class="empty">No expenses found.</div>'
-    max_amount = max(float(info.get("amount") or 0.0) for _key, info in items) or 1.0
-    rows = []
-    for key, info in items:
-        amount = float(info.get("amount") or 0.0)
-        width = amount / max_amount * 100
-        rows.append(
-            f"""<div class="bar-row">
-  <span>{_escape(info.get("label", key))}</span>
-  <span class="bar-track"><span class="bar-fill" style="width:{width:.1f}%; background:{CATEGORY_COLORS.get(key, "#64748b")}"></span></span>
-  <span class="amount">{_money(amount)}</span>
-</div>"""
-        )
-    return "\n".join(rows)
-
-
 def _simple_amount_table(headers: list[str], rows: list[tuple[str, float]]) -> str:
     if not rows:
         return '<div class="empty">No data found.</div>'
@@ -946,7 +918,7 @@ def _payments_table(items: list[PaymentItem]) -> str:
 
 def _subscriptions_table(items: list[SubscriptionItem]) -> str:
     if not items:
-        return '<div class="empty">No active subscriptions found for this month.</div>'
+        return '<div class="empty">No matching subscriptions found for this month.</div>'
     rows = "\n".join(
         f"""<tr>
   <td>{_escape(item.name)}</td>
@@ -963,32 +935,49 @@ def _subscriptions_table(items: list[SubscriptionItem]) -> str:
 </table></div>"""
 
 
-def _needs_table(items: list[NeedExpense]) -> str:
-    if not items:
-        return '<div class="empty">No need expenses found.</div>'
-    rows = "\n".join(
-        f"<tr><td>{_escape(item.description)}</td><td class=\"amount\">{_money(item.amount)}</td></tr>"
-        for item in items
-    )
+def _subscriptions_for_bucket(items: list[SubscriptionItem], bucket: str) -> list[SubscriptionItem]:
+    return [item for item in items if _subscription_bucket(item) == bucket]
+
+
+def _daily_spending_table(entries: list[ExpenseEntry]) -> str:
+    if not entries:
+        return '<div class="empty">No shared expense entries found.</div>'
+
+    grouped: dict[int, list[ExpenseEntry]] = defaultdict(list)
+    undated: list[ExpenseEntry] = []
+    for entry in entries:
+        parsed = _parse_date(entry.date)
+        if parsed is None:
+            undated.append(entry)
+            continue
+        grouped[parsed.day].append(entry)
+
+    rows: list[str] = []
+    for day in sorted(grouped):
+        day_entries = sorted(grouped[day], key=lambda entry: entry.amount, reverse=True)
+        total = round(sum(entry.amount for entry in day_entries), 2)
+        rows.append(_daily_spending_row(str(day), total, day_entries))
+    if undated:
+        total = round(sum(entry.amount for entry in undated), 2)
+        rows.append(_daily_spending_row("No date", total, undated))
+
     return f"""<div class="table-wrap"><table>
-  <thead><tr><th>Description</th><th>Amount</th></tr></thead>
-  <tbody>{rows}</tbody>
+  <thead><tr><th>Day</th><th>Total</th><th>Transactions</th></tr></thead>
+  <tbody>{''.join(rows)}</tbody>
 </table></div>"""
 
 
-def _raw_sheets(sheets: list[RawSheet]) -> str:
-    parts: list[str] = []
-    for sheet in sheets:
-        if not sheet.rows:
-            continue
-        rows = "\n".join(
-            "<tr>"
-            + "".join(f"<td>{_escape(value)}</td>" for value in row)
-            + "</tr>"
-            for row in sheet.rows
-        )
-        parts.append(
-            f"""<h3>{_escape(sheet.title)}</h3>
-<div class="table-wrap"><table class="raw"><tbody>{rows}</tbody></table></div>"""
-        )
-    return "\n".join(parts) if parts else '<div class="empty">No source rows found.</div>'
+def _daily_spending_row(day_label: str, total: float, entries: list[ExpenseEntry]) -> str:
+    transactions = "\n".join(
+        f"""<div class="txn">
+  <strong>{_money(entry.amount)}</strong>
+  <span>{_escape(entry.location or entry.item or CATEGORY_LABELS.get(entry.category, entry.category.title()))}</span>
+  <span class="txn-meta">{_escape(CATEGORY_LABELS.get(entry.category, entry.category.title()))} / {_escape(entry.person)}</span>
+</div>"""
+        for entry in entries
+    )
+    return f"""<tr>
+  <td>{_escape(day_label)}</td>
+  <td class="amount">{_money(total)}</td>
+  <td><div class="txn-list">{transactions}</div></td>
+</tr>"""
