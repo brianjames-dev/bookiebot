@@ -38,21 +38,19 @@ def build_expense_breakdown_figure(
 
     pull = [0.08 if amount == max(values) else 0.0 for amount in values]
     colors = [COLORWAY[i % len(COLORWAY)] for i in range(len(values))]
-    chart_title = title or "Expense Breakdown"
 
     fig = go.Figure(
         data=[
             go.Pie(
                 labels=labels,
                 values=values,
-                domain=dict(x=[0.02, 0.72], y=[0.02, 0.92]),
+                domain=dict(x=[0.08, 0.92], y=[0.04, 0.96]),
                 hole=0.42,
                 pull=pull,
                 marker=dict(colors=colors, line=dict(color="#FFFFFF", width=2)),
-                textinfo="percent",
-                textposition="inside",
-                texttemplate="%{percent}",
-                insidetextorientation="radial",
+                textinfo="label+percent",
+                textposition="outside",
+                texttemplate="%{label}<br>%{percent}<br>$%{customdata[0]:.2f}",
                 hovertemplate=(
                     "<b>%{label}</b><br>"
                     "Amount: $%{customdata[0]:.2f}<br>"
@@ -66,26 +64,17 @@ def build_expense_breakdown_figure(
     )
     apply_theme(fig, width=DEFAULT_WIDTH, height=DEFAULT_HEIGHT)
     fig.update_layout(
-        title=dict(text=chart_title),
-        showlegend=True,
-        legend=dict(
-            orientation="v",
-            yanchor="middle",
-            y=0.5,
-            xanchor="left",
-            x=0.8,
-            bgcolor="rgba(0,0,0,0)",
-        ),
-        uniformtext=dict(minsize=11, mode="hide"),
+        title=dict(text=""),
+        showlegend=False,
         annotations=[
             dict(
                 text=f"<b>${grand_total:,.2f}</b><br>total",
-                x=0.37,
-                y=0.47,
+                x=0.5,
+                y=0.5,
                 font=dict(size=16),
                 showarrow=False,
             )
         ],
-        margin=dict(l=40, r=260, t=70, b=40),
+        margin=dict(l=110, r=110, t=48, b=48),
     )
     return fig
