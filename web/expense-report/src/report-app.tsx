@@ -15,7 +15,7 @@ import {
 
 import { Badge } from "./components/ui/badge"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "./components/ui/card"
-import { ChartContainer, ChartTooltip, ChartTooltipContent, type ChartConfig } from "./components/ui/chart"
+import { ChartContainer, ChartTooltip, ChartTooltipContent } from "./components/ui/chart"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "./components/ui/tabs"
 import type { AmountRow, BreakdownItem, BurnRate, BurnRatePoint, ExpenseEntry, ExpenseReportData, PaymentItem, SubscriptionItem } from "./types"
 
@@ -82,7 +82,7 @@ export function ExpenseReportApp({ report }: { report: ExpenseReportData }) {
               </TabsContent>
               {report.burnRate ? (
                 <TabsContent value="burn-rate">
-                  <BurnRateChart burnRate={report.burnRate} monthLabel={report.monthLabel} />
+                  <BurnRateChart burnRate={report.burnRate} />
                 </TabsContent>
               ) : null}
               <TabsContent value="groups">
@@ -136,63 +136,43 @@ export function ExpenseReportApp({ report }: { report: ExpenseReportData }) {
   )
 }
 
-function BurnRateChart({ burnRate, monthLabel }: { burnRate: BurnRate; monthLabel: string }) {
+function BurnRateChart({ burnRate }: { burnRate: BurnRate }) {
   const isOver = burnRate.status === "over"
   const isNotStarted = burnRate.status === "not_started"
   const statusLabel = isNotStarted ? "Not started" : isOver ? "Over pace" : "Under pace"
   const differenceLabel = isNotStarted ? "No elapsed days" : formatMoney(Math.abs(burnRate.totalDifference))
   const dailyDifference = isNotStarted ? "No daily pace yet" : `${burnRate.dailyDifference >= 0 ? "+" : ""}${formatMoney(burnRate.dailyDifference)}/day`
-  const recordedPoints = burnRate.series.filter((point): point is BurnRatePoint & { variance: number } => point.variance !== null)
-  const segments = recordedPoints.slice(1).map((point, index) => ({
-    key: `segment${index}`,
-    label: point.variance > 0 ? "Over pace" : "Under pace",
-    color: point.variance > 0 ? "hsl(var(--destructive))" : "hsl(var(--success))",
-    fromDay: recordedPoints[index].day,
-    toDay: point.day,
-    fromVariance: recordedPoints[index].variance,
-    toVariance: point.variance,
-  }))
-  const chartData = burnRate.series.map((point) => {
-    const row: Record<string, string | number | null> = {
-      ...point,
-    }
-    for (const segment of segments) {
-      row[segment.key] = point.day === segment.fromDay ? segment.fromVariance : point.day === segment.toDay ? segment.toVariance : null
-    }
-    return row
-  })
-  const segmentConfig: ChartConfig = Object.fromEntries(
-    segments.map((segment) => [segment.key, { label: segment.label, color: segment.color }]),
-  )
+  const lineColor = isNotStarted ? "hsl(var(--chart-1))" : isOver ? "hsl(var(--destructive))" : "hsl(var(--success))"
 
   return (
     <div className="bb-chart-layout">
       <ChartContainer
-        config={segmentConfig}
+        config={{ variance: { label: "Variance", color: lineColor } }}
         className="bb-chart-box"
       >
         <ResponsiveContainer width="100%" height={320}>
-          <LineChart data={chartData} margin={{ top: 20, right: 22, left: 0, bottom: 8 }}>
+          <LineChart data={burnRate.series} margin={{ top: 20, right: 22, left: 0, bottom: 8 }}>
             <CartesianGrid vertical={false} strokeDasharray="3 3" />
             <XAxis dataKey="label" tickLine={false} axisLine={false} interval="preserveStartEnd" />
             <YAxis tickFormatter={(value) => `$${value}`} tickLine={false} axisLine={false} width={58} />
             <ReferenceLine y={0} stroke="hsl(var(--foreground))" strokeOpacity={0.45} strokeWidth={1.5} />
             <ChartTooltip content={<BurnRateTooltipContent />} />
-            {segments.map((segment) => (
-              <Line
-                key={segment.key}
-                type="linear"
-                dataKey={segment.key}
-                name={segment.label}
-                stroke={segment.color}
-                strokeWidth={3}
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                dot={false}
-                activeDot={{ r: 4 }}
-                isAnimationActive={false}
-              />
-            ))}
+            <Line
+              type="monotone"
+              dataKey="variance"
+              name="Variance"
+              stroke={lineColor}
+              strokeWidth={3}
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              dot={false}
+              activeDot={{ r: 4 }}
+              connectNulls={false}
+              isAnimationActive
+              animationBegin={0}
+              animationDuration={900}
+              animationEasing="ease-out"
+            />
           </LineChart>
         </ResponsiveContainer>
       </ChartContainer>
@@ -208,10 +188,6 @@ function BurnRateChart({ burnRate, monthLabel }: { burnRate: BurnRate; monthLabe
           <div className={isOver ? "bb-burn-rate-pill bb-burn-rate-pill-danger" : "bb-burn-rate-pill"}>
             {dailyDifference}
           </div>
-        </div>
-        <div>
-          <div className="bb-chart-kicker">Wants Burn Rate</div>
-          <div className="bb-burn-rate-note">Food and shopping pace for {monthLabel}.</div>
         </div>
         <StatList
           rows={[

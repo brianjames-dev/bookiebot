@@ -30,6 +30,7 @@ Recent transactions and reconciliation are in manual verification mode after the
 - Burn Rate chart rendering now uses continuous day-to-day colored segments so the mobile line does not visually disconnect when switching between over-pace and under-pace days.
 - Burn Rate tooltips now render one active-day variance row and shared chart tooltips filter duplicate payload rows, preventing duplicate values from accumulating while tapping nodes on mobile.
 - Burn Rate tooltips now explain each selected day with day spent, cumulative spent, and expected-by-day values, while the static side stats no longer duplicate expected spend against the monthly wants target.
+- Burn Rate tab now removes the redundant title/description side copy and uses a smoothed animated line chart so first-open behavior matches the other Recharts views more closely.
 
 ## Completed 2026-07-03
 
