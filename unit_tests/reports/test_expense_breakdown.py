@@ -59,7 +59,8 @@ def test_build_expense_breakdown_report_aggregates_shared_and_personal_data():
         ["Shopping", "$15.00"],
         ["Subscriptions (Wants)", "$10.00"],
         ["Monthly Income", "$3,500.00"],
-        ["Margins:", "", "$2,000.00"],
+        ["Margins:", "", "$2,000.00", "", "$750.00"],
+        ["Check 1 Deposit", "$250.00", "Check 2 Deposit", "$350.00"],
     ]
     subscriptions_rows = [
         [],
@@ -88,6 +89,8 @@ def test_build_expense_breakdown_report_aggregates_shared_and_personal_data():
     assert report.personal_total == 3482.0
     assert report.income_total == 3500.0
     assert report.remaining_budget == 2000.0
+    assert report.remaining_wants_budget == 750.0
+    assert report.amount_saved == 600.0
     assert report.breakdown["rent"]["amount"] == 1750.0
     assert report.breakdown["bills_utilities"]["amount"] == 200.0
     assert report.breakdown["static_bills_subscriptions_needs"]["amount"] == 1410.0
@@ -124,6 +127,9 @@ def test_build_expense_breakdown_report_aggregates_shared_and_personal_data():
         {"label": "2", "amount": 25.0},
     ]
     assert payload["budgetGroups"][0]["label"] == "Needs"
+    assert payload["metrics"]["remainingNeedsBudget"] == 2000.0
+    assert payload["metrics"]["remainingWantsBudget"] == 750.0
+    assert payload["metrics"]["amountSaved"] == 600.0
     assert "Needs vs Wants" in html
     assert "Highest day" in html
     assert "Daily Spending" in html

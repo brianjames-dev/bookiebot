@@ -377,6 +377,10 @@ tr:last-child td {
   color: hsl(var(--muted-foreground));
 }
 
+.bb-transaction-category {
+  font-weight: 700;
+}
+
 @media (max-width: 860px) {
   .bb-page-header,
   .bb-chart-layout,

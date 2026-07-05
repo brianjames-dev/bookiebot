@@ -91,6 +91,8 @@ class ExpenseBreakdownReport:
     personal_total: float
     income_total: float
     remaining_budget: float | None
+    remaining_wants_budget: float | None
+    amount_saved: float | None
     entries: list[ExpenseEntry] = field(default_factory=list)
     payments: list[PaymentItem] = field(default_factory=list)
     subscriptions: list[SubscriptionItem] = field(default_factory=list)
@@ -269,7 +271,8 @@ def build_expense_breakdown_report(
     payments = _payment_items(personal_rows, bill_schedule_rows, month)
     subscriptions = _subscription_items(subscription_rows, month)
     income_entries, income_total = _income_entries(personal_rows)
-    remaining_budget = _remaining_budget(personal_rows)
+    remaining_budget, remaining_wants_budget = _margin_amounts(personal_rows)
+    amount_saved = _amount_saved(personal_rows)
     static_needs_total, wants_total = _subscription_bucket_totals(personal_rows, subscriptions)
     payment_totals = _payment_totals_by_group(payments)
     budget_shared_totals = _budget_shared_category_totals(personal_rows)
@@ -311,6 +314,8 @@ def build_expense_breakdown_report(
         personal_total=personal_total,
         income_total=income_total,
         remaining_budget=remaining_budget,
+        remaining_wants_budget=remaining_wants_budget,
+        amount_saved=amount_saved,
         entries=entries,
         payments=payments,
         subscriptions=subscriptions,
@@ -671,13 +676,62 @@ def _is_non_income_label(label: str) -> bool:
 
 
 def _remaining_budget(rows: list[list[str]]) -> float | None:
+    remaining_needs_budget, _remaining_wants_budget = _margin_amounts(rows)
+    return remaining_needs_budget
+
+
+def _margin_amounts(rows: list[list[str]]) -> tuple[float | None, float | None]:
     for row in rows:
         for index, value in enumerate(row):
             if "margins" not in str(value).strip().lower():
                 continue
-            amount = _next_money(row, index + 1)
-            return round(amount, 2)
-    return None
+            amounts = _money_values(row, index + 1)
+            needs_budget = amounts[0] if amounts else None
+            wants_budget = amounts[1] if len(amounts) > 1 else None
+            return needs_budget, wants_budget
+    return None, None
+
+
+def _amount_saved(rows: list[list[str]]) -> float | None:
+    total = 0.0
+    found_checks: set[int] = set()
+    for row in rows:
+        normalized_cells = [_normalize_label(value) for value in row]
+        row_text = " ".join(cell for cell in normalized_cells if cell)
+        if "deposit" not in row_text:
+            continue
+        for check_number in (1, 2):
+            if check_number in found_checks:
+                continue
+            for index, normalized in enumerate(normalized_cells):
+                if not _is_check_deposit_label(normalized_cells, index, check_number):
+                    continue
+                amount = _next_money(row, index + 1, window=max(len(row) - index - 1, 0))
+                if amount:
+                    total += amount
+                    found_checks.add(check_number)
+                break
+    return round(total, 2) if found_checks else None
+
+
+def _is_check_deposit_label(normalized_cells: list[str], index: int, check_number: int) -> bool:
+    normalized = normalized_cells[index]
+    if not _contains_normalized_phrase(normalized, f"check {check_number}"):
+        return False
+    nearby_label = " ".join(normalized_cells[index : index + 3])
+    return "deposit" in nearby_label
+
+
+def _money_values(row: list[str], start_index: int) -> list[float]:
+    values: list[float] = []
+    for value in row[start_index:]:
+        text = str(value).strip()
+        if not text or not re.search(r"\d", text):
+            continue
+        amount = clean_money(text)
+        if amount:
+            values.append(round(amount, 2))
+    return values
 
 
 def _looks_like_income_label(label: str) -> bool:
@@ -830,6 +884,9 @@ def _report_client_payload(
             "personalOutflows": report.personal_total,
             "monthlyIncome": report.income_total,
             "remainingBudget": report.remaining_budget,
+            "remainingNeedsBudget": report.remaining_budget,
+            "remainingWantsBudget": report.remaining_wants_budget,
+            "amountSaved": report.amount_saved,
             "incomeAfterExpenses": balance_after_expenses,
         },
         "breakdown": [

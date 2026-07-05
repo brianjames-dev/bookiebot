@@ -33,6 +33,8 @@ function formatPct(value: number) {
 }
 
 export function ExpenseReportApp({ report }: { report: ExpenseReportData }) {
+  const categoryColors: Record<string, string> = Object.fromEntries(report.breakdown.map((item) => [item.label, item.color]))
+
   return (
     <div className="bb-page">
       <header className="bb-page-header">
@@ -47,11 +49,13 @@ export function ExpenseReportApp({ report }: { report: ExpenseReportData }) {
 
       <main className="bb-main">
         <section className="bb-metrics-grid" aria-label="Budget metrics">
-          <MetricCard label="Total Expenses" value={report.metrics.totalExpenses} />
-          <MetricCard label="Shared Expenses" value={report.metrics.sharedExpenses} description="from the shared expense tab" />
-          <MetricCard label="Personal Outflows" value={report.metrics.personalOutflows} description="from the Budget sheet" />
+          <MetricCard label="Monthly Expenses" value={report.metrics.totalExpenses} />
           <MetricCard label="Monthly Income" value={report.metrics.monthlyIncome} />
-          <MetricCard label="Remaining Budget" value={report.metrics.remainingBudget} />
+          <MetricCard label="Personal Outflows" value={report.metrics.personalOutflows} />
+          <MetricCard label="Shared Expenses" value={report.metrics.sharedExpenses} />
+          <MetricCard label="Remaining Needs Budget" value={report.metrics.remainingNeedsBudget ?? report.metrics.remainingBudget} accent />
+          <MetricCard label="Remaining Wants Budget" value={report.metrics.remainingWantsBudget} accent />
+          <MetricCard label="Amount Saved" value={report.metrics.amountSaved} accent />
           <MetricCard label="Income After Expenses" value={report.metrics.incomeAfterExpenses} accent />
         </section>
 
@@ -97,7 +101,7 @@ export function ExpenseReportApp({ report }: { report: ExpenseReportData }) {
             <CardDescription>Shared transaction activity grouped by day.</CardDescription>
           </CardHeader>
           <CardContent>
-            <DailyEntriesTable entries={report.dailyEntries} />
+            <DailyEntriesTable entries={report.dailyEntries} categoryColors={categoryColors} />
           </CardContent>
         </Card>
 
@@ -362,7 +366,7 @@ function ExpenseEntriesTable({ entries }: { entries: ExpenseEntry[] }) {
   )
 }
 
-function DailyEntriesTable({ entries }: { entries: ExpenseEntry[] }) {
+function DailyEntriesTable({ entries, categoryColors }: { entries: ExpenseEntry[]; categoryColors: Record<string, string> }) {
   if (!entries.length) {
     return <div className="bb-empty">No shared expense entries found.</div>
   }
@@ -394,7 +398,10 @@ function DailyEntriesTable({ entries }: { entries: ExpenseEntry[] }) {
                   <div className="bb-transaction-list">
                     {dayEntries.map((entry, index) => (
                       <div key={`${entry.category}-${entry.amount}-${index}`}>
-                        <strong>{entry.category}</strong> {entry.item || entry.location || "Transaction"} - {formatMoney(entry.amount)}
+                        <strong className="bb-transaction-category" style={{ color: categoryColors[entry.category] }}>
+                          {entry.category}
+                        </strong>{" "}
+                        {entry.item || entry.location || "Transaction"} - {formatMoney(entry.amount)}
                         <span> ({entry.person})</span>
                       </div>
                     ))}

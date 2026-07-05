@@ -1,6 +1,6 @@
 # Agent Status
 
-Last updated: 2026-07-03
+Last updated: 2026-07-05
 
 ## Active Focus
 
@@ -13,6 +13,12 @@ Recent transactions and reconciliation are in manual verification mode after the
 3. Harden recent-action pending state across restarts/deploys, since selections currently live only in process memory.
 4. Improve targeted recent-action search so commands can find older matches, not only the latest 10 recent actions.
 5. Explore clarifying questions before logging when BookieBot is uncertain instead of guessing or silently failing.
+
+## Completed 2026-07-05
+
+- Daily Spending transaction category labels now use the same category colors as the expense breakdown pie chart.
+- Expense report top metrics now render in the requested order: Monthly Expenses, Monthly Income, Personal Outflows, Shared Expenses, Remaining Needs Budget, Remaining Wants Budget, Amount Saved, and Income After Expenses.
+- Remaining Wants Budget is pulled from the second money value on the Budget sheet margins row, and Amount Saved sums Check 1 Deposit and Check 2 Deposit cells from the Budget sheet.
 
 ## Completed 2026-07-03
 
@@ -168,7 +174,9 @@ Use a test row or low-risk real row in Discord:
 38. Run the expense breakdown command for a recent month and open the generated report link in Chrome.
    - Expected: the React expense dashboard renders instead of a blank page, and the console does not show `process is not defined`.
 39. Open the expense breakdown report on a narrow mobile viewport, such as 320px or 390px wide.
-   - Expected: the title card and content cards have matching left/right gutters, the six metric cards render as three two-card rows, and the page has no document-level horizontal scroll.
+   - Expected: the title card and content cards have matching left/right gutters, the eight metric cards render as four two-card rows, and the page has no document-level horizontal scroll.
+40. Open the Daily Spending table in the expense breakdown report.
+   - Expected: each bold category label uses the same color as that category in the breakdown pie chart and legend.
 
 ## Verification Baseline
 
@@ -196,6 +204,9 @@ python -m pytest unit_tests/reports/test_expense_breakdown.py
 
 Headless Chrome mobile emulation for generated report HTML at 320px and 390px
 # document scrollWidth matched viewport width; metric cards rendered as two equal columns with no metric value overflow.
+
+Headless Chrome mobile emulation for generated report HTML at 390px
+# top metric card labels/values matched requested order; Daily Spending category colors matched breakdown legend colors.
 
 python -m pytest unit_tests
 # 348 passed, 1 skipped

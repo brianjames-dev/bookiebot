@@ -37,6 +37,9 @@ export interface Metrics {
   personalOutflows: number
   monthlyIncome: number
   remainingBudget: number | null
+  remainingNeedsBudget: number | null
+  remainingWantsBudget: number | null
+  amountSaved: number | null
   incomeAfterExpenses: number | null
 }
 
