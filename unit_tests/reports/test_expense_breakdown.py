@@ -148,7 +148,9 @@ def test_build_expense_breakdown_report_aggregates_shared_and_personal_data():
     assert payload["metrics"]["remainingNeedsBudget"] == 2000.0
     assert payload["metrics"]["remainingWantsBudget"] == 750.0
     assert payload["metrics"]["amountSaved"] == 600.0
-    assert payload["burnRate"] == {
+    burn_rate = payload["burnRate"]
+    burn_rate_series = burn_rate.pop("series")
+    assert burn_rate == {
         "budget": 795.0,
         "spent": 45.0,
         "remaining": 750.0,
@@ -160,6 +162,28 @@ def test_build_expense_breakdown_report_aggregates_shared_and_personal_data():
         "dailyDifference": -24.2,
         "totalDifference": -750.0,
         "status": "under",
+    }
+    assert len(burn_rate_series) == 31
+    assert burn_rate_series[0] == {
+        "day": 1,
+        "label": "1",
+        "actualSpend": 0.0,
+        "expectedSpend": 25.65,
+        "variance": -25.65,
+    }
+    assert burn_rate_series[1] == {
+        "day": 2,
+        "label": "2",
+        "actualSpend": 45.0,
+        "expectedSpend": 51.29,
+        "variance": -6.29,
+    }
+    assert burn_rate_series[-1] == {
+        "day": 31,
+        "label": "31",
+        "actualSpend": 45.0,
+        "expectedSpend": 795.0,
+        "variance": -750.0,
     }
     assert "Needs vs Wants" in html
     assert "Highest day" in html

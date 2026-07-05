@@ -110,6 +110,12 @@ Decision: The expense breakdown web report burn rate tracks food plus shopping s
 
 Rationale: Subscriptions are wants in the category rollup, but they are fixed commitments rather than day-to-day discretionary burn. Keeping the web report burn rate scoped to variable wants makes the pace signal match how the budget is used.
 
+## 2026-07-05 - Use Budget Totals For Burn-Rate Amounts
+
+Decision: The expense breakdown burn-rate line uses itemized food/shopping entries for daily pacing shape, but scales the series to the Budget sheet's food/shopping total when itemized rows and Budget totals differ.
+
+Rationale: The Budget sheet is the authoritative aggregate for the report, while the shared expense rows provide the best available daily timing. Scaling keeps the line chart consistent with the headline burn-rate totals without hiding daily spending patterns.
+
 ## Pending Decisions
 
 - Where should durable system events live: banking database only, Google Sheets only, or dual-write during transition?

@@ -25,6 +25,8 @@ Recent transactions and reconciliation are in manual verification mode after the
 - Expense breakdown report pages now include a `Burn Rate` tab in the Budget Charts toggle, with a comparison chart for actual food plus shopping spend, expected spend, and the selected month's remaining-wants-budget-derived target.
 - Rebuilt the embedded React expense report assets and added regression coverage for the burn-rate payload math.
 - Spreadsheet access errors now include the active service account email when available, making deployed Google Sheets permission or credential mismatches easier to diagnose.
+- Daily Spending chart now appears at the top of the Daily Spending transaction card instead of inside the Budget Charts toggle.
+- Burn Rate now renders as a full-month daily variance line chart with a zero baseline, red over-pace values above zero, and green under-pace values below zero.
 
 ## Completed 2026-07-03
 
@@ -142,7 +144,7 @@ Use a test row or low-risk real row in Discord:
 19. Click `View Inbox` on the reconciliation digest.
    - Expected: the DM/private inbox list shows unresolved transactions with `Reconcile Now` and `Ignore All`.
 20. Run the expense breakdown command for the current month and for a completed prior month.
-   - Expected: the report link opens a page with a `Burn Rate` tab inside Budget Charts; current-month pace counts elapsed days, completed months count every day in that month, and Amount Saved equals the two paycheck deposit values from column `E` without double-counting the savings total row.
+   - Expected: the report link opens a page with a `Burn Rate` tab inside Budget Charts; the tab shows a full-month daily variance line with red values above the zero baseline and green values below it; current-month pace counts elapsed days, completed months count every day in that month, and Amount Saved equals the two paycheck deposit values from column `E` without double-counting the savings total row.
 21. If the expense breakdown command reports that a spreadsheet cannot be opened.
    - Expected: the error includes the active Google service account email so the spreadsheet share settings or deployment credential can be checked directly.
 22. Click `Reconcile Now` from either the digest or inbox view.
@@ -186,7 +188,7 @@ Use a test row or low-risk real row in Discord:
 41. Open the expense breakdown report on a narrow mobile viewport, such as 320px or 390px wide.
    - Expected: the title card and content cards have matching left/right gutters, the eight metric cards render as four two-card rows, and the page has no document-level horizontal scroll.
 42. Open the Daily Spending table in the expense breakdown report.
-   - Expected: each bold category label uses the same color as that category in the breakdown pie chart and legend.
+   - Expected: the Daily Spending chart appears above the itemized day-by-day transaction table, and each bold category label uses the same color as that category in the breakdown pie chart and legend.
 43. Open the Daily Spending chart in a report for a known month.
    - Expected: Average day equals shared spending divided by the total calendar days in that selected month.
 44. Run `budgetSystemRollover` from Apps Script on a test copy or after making a safe template backup.

@@ -3,8 +3,11 @@ import {
   BarChart,
   CartesianGrid,
   Cell,
+  Line,
+  LineChart,
   Pie,
   PieChart,
+  ReferenceLine,
   ResponsiveContainer,
   XAxis,
   YAxis,
@@ -70,16 +73,12 @@ export function ExpenseReportApp({ report }: { report: ExpenseReportData }) {
             <Tabs defaultValue="category">
               <TabsList>
                 <TabsTrigger value="category">Category Mix</TabsTrigger>
-                <TabsTrigger value="daily">Daily Spending</TabsTrigger>
                 {report.burnRate ? <TabsTrigger value="burn-rate">Burn Rate</TabsTrigger> : null}
                 <TabsTrigger value="groups">Needs vs Wants</TabsTrigger>
                 <TabsTrigger value="merchants">Merchants</TabsTrigger>
               </TabsList>
               <TabsContent value="category">
                 <CategoryMixChart data={report.breakdown} total={report.metrics.totalExpenses} />
-              </TabsContent>
-              <TabsContent value="daily">
-                <DailySpendingChart data={report.dailyTotals} total={report.metrics.sharedExpenses} daysInMonth={report.daysInMonth} />
               </TabsContent>
               {report.burnRate ? (
                 <TabsContent value="burn-rate">
@@ -106,7 +105,8 @@ export function ExpenseReportApp({ report }: { report: ExpenseReportData }) {
             <CardTitle>Daily Spending</CardTitle>
             <CardDescription>Shared transaction activity grouped by day.</CardDescription>
           </CardHeader>
-          <CardContent>
+          <CardContent className="bb-daily-spending-content">
+            <DailySpendingChart data={report.dailyTotals} total={report.metrics.sharedExpenses} daysInMonth={report.daysInMonth} />
             <DailyEntriesTable entries={report.dailyEntries} categoryColors={categoryColors} />
           </CardContent>
         </Card>
@@ -142,39 +142,47 @@ function BurnRateChart({ burnRate, monthLabel }: { burnRate: BurnRate; monthLabe
   const statusLabel = isNotStarted ? "Not started" : isOver ? "Over pace" : "Under pace"
   const differenceLabel = isNotStarted ? "No elapsed days" : formatMoney(Math.abs(burnRate.totalDifference))
   const dailyDifference = isNotStarted ? "No daily pace yet" : `${burnRate.dailyDifference >= 0 ? "+" : ""}${formatMoney(burnRate.dailyDifference)}/day`
-  const chartData = [
-    {
-      label: "Actual spent",
-      amount: burnRate.spent,
-      color: isOver ? "hsl(var(--destructive))" : "hsl(var(--success))",
-    },
-    {
-      label: "Expected by now",
-      amount: burnRate.expectedSpend,
-      color: "hsl(var(--chart-2))",
-    },
-    {
-      label: "Variable target",
-      amount: burnRate.budget,
-      color: "hsl(var(--chart-5))",
-    },
-  ]
+  const chartData = burnRate.series.map((point) => ({
+    ...point,
+    overVariance: point.variance !== null && point.variance > 0 ? point.variance : null,
+    underVariance: point.variance !== null && point.variance <= 0 ? point.variance : null,
+  }))
 
   return (
     <div className="bb-chart-layout">
-      <ChartContainer config={chartConfig(chartData)} className="bb-chart-box">
+      <ChartContainer
+        config={{
+          overVariance: { label: "Over pace", color: "hsl(var(--destructive))" },
+          underVariance: { label: "Under pace", color: "hsl(var(--success))" },
+        }}
+        className="bb-chart-box"
+      >
         <ResponsiveContainer width="100%" height={320}>
-          <BarChart data={chartData} layout="vertical" margin={{ top: 18, right: 28, left: 18, bottom: 18 }}>
-            <CartesianGrid horizontal={false} strokeDasharray="3 3" />
-            <XAxis type="number" tickFormatter={(value) => `$${value}`} tickLine={false} axisLine={false} />
-            <YAxis dataKey="label" type="category" width={126} tickLine={false} axisLine={false} />
+          <LineChart data={chartData} margin={{ top: 20, right: 22, left: 0, bottom: 8 }}>
+            <CartesianGrid vertical={false} strokeDasharray="3 3" />
+            <XAxis dataKey="label" tickLine={false} axisLine={false} interval="preserveStartEnd" />
+            <YAxis tickFormatter={(value) => `$${value}`} tickLine={false} axisLine={false} width={58} />
+            <ReferenceLine y={0} stroke="hsl(var(--foreground))" strokeOpacity={0.45} strokeWidth={1.5} />
             <ChartTooltip content={<ChartTooltipContent />} />
-            <Bar dataKey="amount" name="Burn rate" radius={[0, 6, 6, 0]}>
-              {chartData.map((item) => (
-                <Cell key={item.label} fill={item.color} />
-              ))}
-            </Bar>
-          </BarChart>
+            <Line
+              type="monotone"
+              dataKey="overVariance"
+              name="Over pace"
+              stroke="hsl(var(--destructive))"
+              strokeWidth={3}
+              dot={false}
+              activeDot={{ r: 4 }}
+            />
+            <Line
+              type="monotone"
+              dataKey="underVariance"
+              name="Under pace"
+              stroke="hsl(var(--success))"
+              strokeWidth={3}
+              dot={false}
+              activeDot={{ r: 4 }}
+            />
+          </LineChart>
         </ResponsiveContainer>
       </ChartContainer>
       <div className="bb-chart-side">

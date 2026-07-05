@@ -55,6 +55,15 @@ export interface BurnRate {
   dailyDifference: number
   totalDifference: number
   status: "over" | "under" | "not_started"
+  series: BurnRatePoint[]
+}
+
+export interface BurnRatePoint {
+  day: number
+  label: string
+  actualSpend: number | null
+  expectedSpend: number
+  variance: number | null
 }
 
 export interface ExpenseReportData {

@@ -213,6 +213,11 @@ body {
   color: hsl(var(--destructive));
 }
 
+.bb-daily-spending-content {
+  display: grid;
+  gap: 20px;
+}
+
 .bb-analytics-card .bb-card-content {
   padding-top: 14px;
 }

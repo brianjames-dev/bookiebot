@@ -1188,6 +1188,13 @@ def _burn_rate_payload(report: ExpenseBreakdownReport) -> dict[str, Any] | None:
     actual_daily_average = round(wants_spent / elapsed_days, 2) if elapsed_days else 0.0
     daily_difference = round(actual_daily_average - allowed_daily_average, 2)
     total_difference = round(wants_spent - expected_spend, 2)
+    series = _burn_rate_series(
+        report=report,
+        days_in_month=days_in_month,
+        elapsed_days=elapsed_days,
+        wants_spent=wants_spent,
+        wants_budget=wants_budget,
+    )
 
     if elapsed_days == 0:
         status = "not_started"
@@ -1208,7 +1215,67 @@ def _burn_rate_payload(report: ExpenseBreakdownReport) -> dict[str, Any] | None:
         "dailyDifference": daily_difference,
         "totalDifference": total_difference,
         "status": status,
+        "series": series,
     }
+
+
+def _burn_rate_series(
+    *,
+    report: ExpenseBreakdownReport,
+    days_in_month: int,
+    elapsed_days: int,
+    wants_spent: float,
+    wants_budget: float,
+) -> list[dict[str, Any]]:
+    daily_amounts = _burn_rate_daily_amounts(report, wants_spent, elapsed_days)
+    cumulative_actual = 0.0
+    series: list[dict[str, Any]] = []
+
+    for day in range(1, days_in_month + 1):
+        expected_spend = round(wants_budget * (day / days_in_month), 2) if days_in_month else 0.0
+        if day <= elapsed_days:
+            cumulative_actual = round(cumulative_actual + daily_amounts.get(day, 0.0), 2)
+            actual_spend: float | None = cumulative_actual
+            variance: float | None = round(cumulative_actual - expected_spend, 2)
+        else:
+            actual_spend = None
+            variance = None
+
+        series.append(
+            {
+                "day": day,
+                "label": str(day),
+                "actualSpend": actual_spend,
+                "expectedSpend": expected_spend,
+                "variance": variance,
+            }
+        )
+
+    return series
+
+
+def _burn_rate_daily_amounts(report: ExpenseBreakdownReport, wants_spent: float, elapsed_days: int) -> dict[int, float]:
+    raw_amounts: dict[int, float] = defaultdict(float)
+    for entry in report.entries:
+        if entry.category not in WANTS_BURN_RATE_KEYS:
+            continue
+        parsed = _parse_date(entry.date)
+        if parsed is None:
+            continue
+        raw_amounts[parsed.day] += entry.amount
+
+    raw_total = round(sum(raw_amounts.values()), 2)
+    if raw_total > 0:
+        scale = wants_spent / raw_total
+        scaled = {day: round(amount * scale, 2) for day, amount in raw_amounts.items()}
+        rounding_delta = round(wants_spent - sum(scaled.values()), 2)
+        if rounding_delta:
+            scaled[max(scaled)] = round(scaled[max(scaled)] + rounding_delta, 2)
+        return scaled
+
+    if wants_spent > 0 and elapsed_days > 0:
+        return {elapsed_days: wants_spent}
+    return {}
 
 
 def _elapsed_days_for_month(month: BudgetMonth) -> int:
