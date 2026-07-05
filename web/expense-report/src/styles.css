@@ -175,6 +175,49 @@ body {
   color: hsl(var(--destructive));
 }
 
+.bb-burn-rate-card .bb-card-content {
+  display: grid;
+  gap: 16px;
+}
+
+.bb-burn-rate-summary {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.bb-burn-rate-value {
+  margin-top: 4px;
+  font-size: 28px;
+  font-weight: 780;
+  line-height: 1;
+}
+
+.bb-burn-rate-note {
+  margin-top: 7px;
+  color: hsl(var(--muted-foreground));
+  font-size: 13px;
+}
+
+.bb-burn-rate-pill {
+  border: 1px solid hsl(var(--success) / 0.28);
+  border-radius: 999px;
+  background: hsl(var(--success) / 0.1);
+  color: hsl(var(--success));
+  flex: 0 0 auto;
+  font-size: 13px;
+  font-weight: 700;
+  padding: 8px 10px;
+  white-space: nowrap;
+}
+
+.bb-burn-rate-pill-danger {
+  border-color: hsl(var(--destructive) / 0.28);
+  background: hsl(var(--destructive) / 0.1);
+  color: hsl(var(--destructive));
+}
+
 .bb-analytics-card .bb-card-content {
   padding-top: 14px;
 }
@@ -440,6 +483,18 @@ tr:last-child td {
 
   .bb-page-header h1 {
     font-size: 26px;
+  }
+
+  .bb-burn-rate-summary {
+    display: grid;
+  }
+
+  .bb-burn-rate-value {
+    font-size: 24px;
+  }
+
+  .bb-burn-rate-pill {
+    justify-self: start;
   }
 
   .bb-metric-card {

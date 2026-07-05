@@ -18,10 +18,12 @@ Recent transactions and reconciliation are in manual verification mode after the
 
 - Daily Spending transaction category labels now use the same category colors as the expense breakdown pie chart.
 - Expense report top metrics now render in the requested order: Monthly Expenses, Monthly Income, Personal Outflows, Shared Expenses, Remaining Needs Budget, Remaining Wants Budget, Amount Saved, and Income After Expenses.
-- Remaining Wants Budget is pulled from the second money value on the Budget sheet margins row, and Amount Saved sums Check 1 Deposit and Check 2 Deposit cells from the Budget sheet.
+- Remaining Wants Budget is pulled from the second money value on the Budget sheet margins row, and Amount Saved sums the column `E` values on the `Enter 1st Paycheck Deposit` and `Enter 2nd Paycheck Deposit` rows while ignoring the separate savings total row.
 - Daily Spending chart average now divides shared spending by every calendar day in the selected month instead of only days with logged expenses.
 - Google Apps Script monthly rollover now snapshots previous-month personal budget Burn Rate and subscription total formula outputs into static cell values before creating/relinking the new month.
 - Monthly tab creation no longer fails when a copied template is missing the exact `Month` placeholder; it falls back to a top-left existing month label and logs instead of aborting if no label can be found.
+- Expense breakdown report pages now include a Wants Burn Rate card that compares food plus shopping spend against the selected month's remaining-wants-budget-derived target.
+- Rebuilt the embedded React expense report assets and added regression coverage for the burn-rate payload math.
 
 ## Completed 2026-07-03
 
@@ -138,51 +140,53 @@ Use a test row or low-risk real row in Discord:
    - Expected: the digest appears in the target user's DM with `Reconcile Now` and `View Inbox`.
 19. Click `View Inbox` on the reconciliation digest.
    - Expected: the DM/private inbox list shows unresolved transactions with `Reconcile Now` and `Ignore All`.
-20. Click `Reconcile Now` from either the digest or inbox view.
+20. Run the expense breakdown command for the current month and for a completed prior month.
+   - Expected: the report link opens a page with a `Wants Burn Rate` card; current-month pace counts elapsed days, completed months count every day in that month, and Amount Saved equals the two paycheck deposit values from column `E` without double-counting the savings total row.
+21. Click `Reconcile Now` from either the digest or inbox view.
    - Expected: the one-at-a-time transaction review appears, and individual transaction cards do not include `Ignore All`.
-21. Let the scheduled bills/subscriptions digest run.
+22. Let the scheduled bills/subscriptions digest run.
    - Expected: cash-pull details appear in the target user's DM, not the shared channel.
-22. Trigger or wait for a Plaid sync after the morning window.
+23. Trigger or wait for a Plaid sync after the morning window.
    - Expected: new unresolved items do not cause a daily digest to appear in the channel later that day.
-23. Try to update a recent transaction's date through text or parsed entities.
+24. Try to update a recent transaction's date through text or parsed entities.
    - Expected: BookieBot rejects `date` as an editable field and the sheet date cell does not change.
-24. Reconcile a bank transaction to an existing recent action, then update that recent action's amount/item/location.
+25. Reconcile a bank transaction to an existing recent action, then update that recent action's amount/item/location.
    - Expected: the linked reconciliation item is reopened for review instead of staying silently confirmed.
-25. Reconcile a bank transaction to an existing recent action, then move, delete, or undo that recent action.
+26. Reconcile a bank transaction to an existing recent action, then move, delete, or undo that recent action.
    - Expected: the linked reconciliation item returns to the inbox/review state so the user can confirm what should happen next.
-26. Add or leave an unresolved posted bank transaction older than 60 days, then open the normal reconciliation digest or inbox.
+27. Add or leave an unresolved posted bank transaction older than 60 days, then open the normal reconciliation digest or inbox.
    - Expected: the old transaction does not appear in the normal unresolved list; recent unresolved transactions still appear.
-27. Confirm an existing sheet/action row whose amount does not match the bank transaction.
+28. Confirm an existing sheet/action row whose amount does not match the bank transaction.
    - Expected: BookieBot treats your match selection as confirmation, updates the sheet amount to the bank transaction amount, and confirms the reconciliation item.
-28. Move a grocery or gas transaction into food without providing an item name.
+29. Move a grocery or gas transaction into food without providing an item name.
    - Expected: BookieBot asks for the item name and explains it is needed for the destination category.
-29. Reply `cancel` to a pending move item-name prompt.
+30. Reply `cancel` to a pending move item-name prompt.
    - Expected: BookieBot cancels the move and does not write `cancel` as the item name.
-30. Try moving a source row that is missing its date.
+31. Try moving a source row that is missing its date.
    - Expected: BookieBot refuses the move with a source-row/date correction message instead of asking you to type a date.
-31. Start a move from a grocery transaction using the move controls.
+32. Start a move from a grocery transaction using the move controls.
    - Expected: the destination category buttons do not include `Grocery`.
-32. Try a grouped reconciliation match whose selected rows do not exactly total the bank transaction.
+33. Try a grouped reconciliation match whose selected rows do not exactly total the bank transaction.
    - Expected: BookieBot shows the mismatch and offers buttons for which selected row should absorb the difference.
-33. Click the row that should absorb the difference.
+34. Click the row that should absorb the difference.
    - Expected: BookieBot updates that row amount to make the group total match, then confirms the grouped reconciliation item.
-34. Type `recent`.
+35. Type `recent`.
    - Expected: BookieBot shows recent transactions directly and does not attempt to log or access the expense sheet.
-35. If Google Sheets has a one-time access hiccup while logging an expense.
+36. If Google Sheets has a one-time access hiccup while logging an expense.
    - Expected: BookieBot retries once before reporting a sheet access failure.
-36. Update only the source/name on a recent income row, then run `recent`.
+37. Update only the source/name on a recent income row, then run `recent`.
    - Expected: the row displays as `Updated: Income` and still shows the original amount with the updated source.
-37. Run `show 15 recent transactions`, `show 20 recent transactions`, or `show 25 recent transactions`.
+38. Run `show 15 recent transactions`, `show 20 recent transactions`, or `show 25 recent transactions`.
    - Expected: BookieBot sends the list privately across multiple DM messages, each transaction stays within a single DM message, code blocks render cleanly, controls appear on the final DM, and the public channel gets a generic sent-to-DMs acknowledgement.
-38. Run the expense breakdown command for a recent month and open the generated report link in Chrome.
+39. Run the expense breakdown command for a recent month and open the generated report link in Chrome.
    - Expected: the React expense dashboard renders instead of a blank page, and the console does not show `process is not defined`.
-39. Open the expense breakdown report on a narrow mobile viewport, such as 320px or 390px wide.
+40. Open the expense breakdown report on a narrow mobile viewport, such as 320px or 390px wide.
    - Expected: the title card and content cards have matching left/right gutters, the eight metric cards render as four two-card rows, and the page has no document-level horizontal scroll.
-40. Open the Daily Spending table in the expense breakdown report.
+41. Open the Daily Spending table in the expense breakdown report.
    - Expected: each bold category label uses the same color as that category in the breakdown pie chart and legend.
-41. Open the Daily Spending chart in a report for a known month.
+42. Open the Daily Spending chart in a report for a known month.
    - Expected: Average day equals shared spending divided by the total calendar days in that selected month.
-42. Run `budgetSystemRollover` from Apps Script on a test copy or after making a safe template backup.
+43. Run `budgetSystemRollover` from Apps Script on a test copy or after making a safe template backup.
    - Expected: the previous personal budget month has static values in Burn Rate, Static Bills & Subscriptions (Needs), and Subscriptions (Wants) formula output cells; the current month tab exists even if the copied template did not contain an exact `Month` placeholder.
 
 ## Verification Baseline

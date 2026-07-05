@@ -104,6 +104,12 @@ Decision: Monthly Google Apps Script rollover should freeze previous-month perso
 
 Rationale: Closed-month review cells should remain auditable snapshots. Live formulas such as burn rate and subscription totals can recalculate after the calendar rolls forward, making historical months misleading.
 
+## 2026-07-05 - Scope Expense Report Burn Rate To Variable Wants
+
+Decision: The expense breakdown web report burn rate tracks food plus shopping spend against the selected month's wants target, computed as current food/shopping spend plus the Budget sheet's remaining wants budget.
+
+Rationale: Subscriptions are wants in the category rollup, but they are fixed commitments rather than day-to-day discretionary burn. Keeping the web report burn rate scoped to variable wants makes the pace signal match how the budget is used.
+
 ## Pending Decisions
 
 - Where should durable system events live: banking database only, Google Sheets only, or dual-write during transition?

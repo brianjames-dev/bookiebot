@@ -160,6 +160,26 @@ WANTS_BREAKDOWN_KEYS = (
     "food",
     "shopping",
 )
+WANTS_BURN_RATE_KEYS = ("food", "shopping")
+SAVINGS_AMOUNT_COLUMN_INDEX = 4
+SAVINGS_DEPOSIT_LABEL_PHRASES = {
+    1: (
+        "enter 1st paycheck deposit",
+        "1st paycheck deposit",
+        "first paycheck deposit",
+        "check 1 deposit",
+        "1st savings deposit",
+        "first savings deposit",
+    ),
+    2: (
+        "enter 2nd paycheck deposit",
+        "2nd paycheck deposit",
+        "second paycheck deposit",
+        "check 2 deposit",
+        "2nd savings deposit",
+        "second savings deposit",
+    ),
+}
 
 
 def parse_budget_month(value: Any = None, *, now: datetime | None = None) -> BudgetMonth:
@@ -703,10 +723,10 @@ def _amount_saved(rows: list[list[str]]) -> float | None:
         for check_number in (1, 2):
             if check_number in found_checks:
                 continue
-            for index, normalized in enumerate(normalized_cells):
+            for index in range(len(normalized_cells)):
                 if not _is_check_deposit_label(normalized_cells, index, check_number):
                     continue
-                amount = _next_money(row, index + 1, window=max(len(row) - index - 1, 0))
+                amount = _savings_deposit_amount(row, index)
                 if amount:
                     total += amount
                     found_checks.add(check_number)
@@ -714,12 +734,19 @@ def _amount_saved(rows: list[list[str]]) -> float | None:
     return round(total, 2) if found_checks else None
 
 
+def _savings_deposit_amount(row: list[str], label_index: int) -> float:
+    amount = clean_money(_cell(row, SAVINGS_AMOUNT_COLUMN_INDEX))
+    if amount:
+        return amount
+    return clean_money(_cell(row, label_index + 3))
+
+
 def _is_check_deposit_label(normalized_cells: list[str], index: int, check_number: int) -> bool:
-    normalized = normalized_cells[index]
-    if not _contains_normalized_phrase(normalized, f"check {check_number}"):
-        return False
-    nearby_label = " ".join(normalized_cells[index : index + 3])
-    return "deposit" in nearby_label
+    nearby_label = " ".join(cell for cell in normalized_cells[max(index - 1, 0) : index + 3] if cell)
+    return any(
+        _contains_normalized_phrase(nearby_label, phrase)
+        for phrase in SAVINGS_DEPOSIT_LABEL_PHRASES[check_number]
+    )
 
 
 def _money_values(row: list[str], start_index: int) -> list[float]:
@@ -890,6 +917,7 @@ def _report_client_payload(
             "amountSaved": report.amount_saved,
             "incomeAfterExpenses": balance_after_expenses,
         },
+        "burnRate": _burn_rate_payload(report),
         "breakdown": [
             {
                 "key": key,
@@ -1141,6 +1169,59 @@ def _budget_group_totals(breakdown: dict[str, dict[str, Any]]) -> dict[str, floa
     needs = sum(float(breakdown.get(key, {}).get("amount") or 0.0) for key in NEEDS_BREAKDOWN_KEYS)
     wants = sum(float(breakdown.get(key, {}).get("amount") or 0.0) for key in WANTS_BREAKDOWN_KEYS)
     return {"Needs": round(needs, 2), "Wants": round(wants, 2)}
+
+
+def _burn_rate_payload(report: ExpenseBreakdownReport) -> dict[str, Any] | None:
+    if report.remaining_wants_budget is None:
+        return None
+
+    days_in_month = calendar.monthrange(report.month.year, report.month.month)[1]
+    elapsed_days = _elapsed_days_for_month(report.month)
+    wants_spent = round(
+        sum(float(report.breakdown.get(key, {}).get("amount") or 0.0) for key in WANTS_BURN_RATE_KEYS),
+        2,
+    )
+    remaining_wants_budget = round(report.remaining_wants_budget, 2)
+    wants_budget = round(wants_spent + remaining_wants_budget, 2)
+    expected_spend = round(wants_budget * (elapsed_days / days_in_month), 2) if days_in_month else 0.0
+    allowed_daily_average = round(wants_budget / days_in_month, 2) if days_in_month else 0.0
+    actual_daily_average = round(wants_spent / elapsed_days, 2) if elapsed_days else 0.0
+    daily_difference = round(actual_daily_average - allowed_daily_average, 2)
+    total_difference = round(wants_spent - expected_spend, 2)
+
+    if elapsed_days == 0:
+        status = "not_started"
+    elif total_difference > 0:
+        status = "over"
+    else:
+        status = "under"
+
+    return {
+        "budget": wants_budget,
+        "spent": wants_spent,
+        "remaining": remaining_wants_budget,
+        "daysInMonth": days_in_month,
+        "elapsedDays": elapsed_days,
+        "expectedSpend": expected_spend,
+        "allowedDailyAverage": allowed_daily_average,
+        "actualDailyAverage": actual_daily_average,
+        "dailyDifference": daily_difference,
+        "totalDifference": total_difference,
+        "status": status,
+    }
+
+
+def _elapsed_days_for_month(month: BudgetMonth) -> int:
+    days_in_month = calendar.monthrange(month.year, month.month)[1]
+    today = now_pacific().date()
+    first_day = month.as_datetime().date()
+    last_day = datetime(month.year, month.month, days_in_month, tzinfo=PACIFIC_TZ).date()
+
+    if today < first_day:
+        return 0
+    if today > last_day:
+        return days_in_month
+    return today.day
 
 
 def _percentage(amount: float, total: float) -> float:

@@ -14,7 +14,7 @@ import { Badge } from "./components/ui/badge"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "./components/ui/card"
 import { ChartContainer, ChartTooltip, ChartTooltipContent } from "./components/ui/chart"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "./components/ui/tabs"
-import type { AmountRow, BreakdownItem, ExpenseEntry, ExpenseReportData, PaymentItem, SubscriptionItem } from "./types"
+import type { AmountRow, BreakdownItem, BurnRate, ExpenseEntry, ExpenseReportData, PaymentItem, SubscriptionItem } from "./types"
 
 const money = new Intl.NumberFormat("en-US", {
   style: "currency",
@@ -58,6 +58,8 @@ export function ExpenseReportApp({ report }: { report: ExpenseReportData }) {
           <MetricCard label="Amount Saved" value={report.metrics.amountSaved} accent />
           <MetricCard label="Income After Expenses" value={report.metrics.incomeAfterExpenses} accent />
         </section>
+
+        {report.burnRate ? <BurnRateCard burnRate={report.burnRate} monthLabel={report.monthLabel} /> : null}
 
         <Card className="bb-analytics-card">
           <CardHeader className="bb-analytics-header">
@@ -127,6 +129,47 @@ export function ExpenseReportApp({ report }: { report: ExpenseReportData }) {
         <PaymentTable title="Income Entries" items={report.incomeEntries} />
       </main>
     </div>
+  )
+}
+
+function BurnRateCard({ burnRate, monthLabel }: { burnRate: BurnRate; monthLabel: string }) {
+  const isOver = burnRate.status === "over"
+  const isNotStarted = burnRate.status === "not_started"
+  const statusLabel = isNotStarted ? "Not started" : isOver ? "Over pace" : "Under pace"
+  const differenceLabel = isNotStarted ? "No elapsed days" : formatMoney(Math.abs(burnRate.totalDifference))
+  const dailyDifference = isNotStarted ? "No daily pace yet" : `${burnRate.dailyDifference >= 0 ? "+" : ""}${formatMoney(burnRate.dailyDifference)}/day`
+
+  return (
+    <Card className="bb-burn-rate-card">
+      <CardHeader>
+        <CardTitle>Wants Burn Rate</CardTitle>
+        <CardDescription>Food and shopping pace for {monthLabel}.</CardDescription>
+      </CardHeader>
+      <CardContent>
+        <div className="bb-burn-rate-summary">
+          <div>
+            <div className="bb-chart-kicker">{statusLabel}</div>
+            <div className={isOver ? "bb-burn-rate-value bb-negative" : "bb-burn-rate-value bb-positive"}>{differenceLabel}</div>
+            <div className="bb-burn-rate-note">
+              {burnRate.elapsedDays} of {burnRate.daysInMonth} days counted
+            </div>
+          </div>
+          <div className={isOver ? "bb-burn-rate-pill bb-burn-rate-pill-danger" : "bb-burn-rate-pill"}>
+            {dailyDifference}
+          </div>
+        </div>
+        <StatList
+          rows={[
+            ["Variable wants target", formatMoney(burnRate.budget)],
+            ["Food + shopping spent", formatMoney(burnRate.spent)],
+            ["Expected spend", formatMoney(burnRate.expectedSpend)],
+            ["Remaining wants budget", formatMoney(burnRate.remaining)],
+            ["Allowed daily average", formatMoney(burnRate.allowedDailyAverage)],
+            ["Actual daily average", formatMoney(burnRate.actualDailyAverage)],
+          ]}
+        />
+      </CardContent>
+    </Card>
   )
 }
 

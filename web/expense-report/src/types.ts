@@ -43,12 +43,27 @@ export interface Metrics {
   incomeAfterExpenses: number | null
 }
 
+export interface BurnRate {
+  budget: number
+  spent: number
+  remaining: number
+  daysInMonth: number
+  elapsedDays: number
+  expectedSpend: number
+  allowedDailyAverage: number
+  actualDailyAverage: number
+  dailyDifference: number
+  totalDifference: number
+  status: "over" | "under" | "not_started"
+}
+
 export interface ExpenseReportData {
   ownerName: string
   monthLabel: string
   daysInMonth: number
   generatedAt: string
   metrics: Metrics
+  burnRate: BurnRate | null
   breakdown: BreakdownItem[]
   dailyTotals: AmountRow[]
   budgetGroups: AmountRow[]

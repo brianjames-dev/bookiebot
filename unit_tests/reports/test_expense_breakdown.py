@@ -60,7 +60,23 @@ def test_build_expense_breakdown_report_aggregates_shared_and_personal_data():
         ["Subscriptions (Wants)", "$10.00"],
         ["Monthly Income", "$3,500.00"],
         ["Margins:", "", "$2,000.00", "", "$750.00"],
-        ["Check 1 Deposit", "$250.00", "Check 2 Deposit", "$350.00"],
+        _row(
+            {
+                "B": "Enter 1st Paycheck Deposit",
+                "C": "Ideal $900.00",
+                "D": "Minimum $250.00",
+                "E": "$250.00",
+            }
+        ),
+        _row(
+            {
+                "B": "Enter 2nd Paycheck Deposit",
+                "C": "Minimum $250.00",
+                "D": "Ignore this $999.00",
+                "E": "$350.00",
+            }
+        ),
+        _row({"B": "Total Savings Deposited", "E": "$600.00"}),
     ]
     subscriptions_rows = [
         [],
@@ -131,6 +147,19 @@ def test_build_expense_breakdown_report_aggregates_shared_and_personal_data():
     assert payload["metrics"]["remainingNeedsBudget"] == 2000.0
     assert payload["metrics"]["remainingWantsBudget"] == 750.0
     assert payload["metrics"]["amountSaved"] == 600.0
+    assert payload["burnRate"] == {
+        "budget": 795.0,
+        "spent": 45.0,
+        "remaining": 750.0,
+        "daysInMonth": 31,
+        "elapsedDays": 31,
+        "expectedSpend": 795.0,
+        "allowedDailyAverage": 25.65,
+        "actualDailyAverage": 1.45,
+        "dailyDifference": -24.2,
+        "totalDifference": -750.0,
+        "status": "under",
+    }
     assert "Needs vs Wants" in html
     assert "Highest day" in html
     assert "Daily Spending" in html
