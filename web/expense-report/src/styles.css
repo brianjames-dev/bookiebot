@@ -377,6 +377,33 @@ body {
   border-radius: 999px;
 }
 
+.bb-burn-rate-active-dot {
+  filter: drop-shadow(0 1px 2px rgb(15 23 42 / 0.18));
+}
+
+.bb-pie-metric-label {
+  fill: hsl(var(--foreground));
+  font-size: 12px;
+  font-weight: 650;
+  opacity: 0;
+  pointer-events: none;
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: bb-pie-label-in 420ms ease-out forwards;
+}
+
+@keyframes bb-pie-label-in {
+  from {
+    opacity: 0;
+    transform: translateY(-3px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
 .bb-two-grid {
   display: grid;
   grid-template-columns: minmax(280px, 0.9fr) minmax(320px, 1.1fr);

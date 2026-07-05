@@ -167,7 +167,7 @@ function BurnRateChart({ burnRate }: { burnRate: BurnRate }) {
               strokeLinecap="round"
               strokeLinejoin="round"
               dot={false}
-              activeDot={{ r: 4 }}
+              activeDot={renderBurnRateActiveDot}
               connectNulls={false}
               isAnimationActive
               animationBegin={0}
@@ -240,6 +240,39 @@ function burnRateGradientStops(series: BurnRatePoint[]) {
   ]
 }
 
+function burnRatePointColor(value: number) {
+  if (value > 0) {
+    return "hsl(var(--destructive))"
+  }
+  if (value < 0) {
+    return "hsl(var(--success))"
+  }
+  return "hsl(var(--foreground))"
+}
+
+function renderBurnRateActiveDot(props: unknown) {
+  const { cx, cy, payload } = props as {
+    cx?: number
+    cy?: number
+    payload?: BurnRatePoint
+  }
+  if (cx === undefined || cy === undefined || payload?.variance === null || payload?.variance === undefined) {
+    return null
+  }
+
+  return (
+    <circle
+      className="bb-burn-rate-active-dot"
+      cx={cx}
+      cy={cy}
+      r={5}
+      fill={burnRatePointColor(payload.variance)}
+      stroke="hsl(var(--card))"
+      strokeWidth={2}
+    />
+  )
+}
+
 type BurnRateTooltipPayload = {
   payload?: BurnRatePoint
 }
@@ -258,7 +291,7 @@ function BurnRateTooltipContent({
 
   const isOver = point.variance > 0
   const label = isOver ? "Over pace" : "Under pace"
-  const color = isOver ? "hsl(var(--destructive))" : "hsl(var(--success))"
+  const color = burnRatePointColor(point.variance)
 
   return (
     <div className="bb-chart-tooltip">
@@ -388,14 +421,29 @@ function CategoryMixChart({ data, total }: { data: BreakdownItem[]; total: numbe
 }
 
 function renderPieMetricLabel(props: unknown) {
-  const { name, value, payload } = props as {
+  const { name, value, payload, x, y, textAnchor, index } = props as {
     name?: string
     value?: number
     payload?: BreakdownItem
+    x?: number | string
+    y?: number | string
+    textAnchor?: "start" | "middle" | "end" | "inherit"
+    index?: number
   }
   const label = payload?.label ?? name ?? ""
   const amount = payload?.amount ?? Number(value ?? 0)
-  return `${label} ${formatMoney(amount)}`
+  return (
+    <text
+      x={x}
+      y={y}
+      textAnchor={textAnchor}
+      dominantBaseline="central"
+      className="bb-pie-metric-label"
+      style={{ animationDelay: `${Math.min(index ?? 0, 8) * 45 + 180}ms` }}
+    >
+      {`${label} ${formatMoney(amount)}`}
+    </text>
+  )
 }
 
 function DailySpendingChart({ data, total, daysInMonth }: { data: AmountRow[]; total: number; daysInMonth: number }) {

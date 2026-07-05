@@ -103,6 +103,24 @@ function formatMoney(value: number) {
   }).format(value)
 }
 
-const ChartTooltip = RechartsPrimitive.Tooltip
+type ChartTooltipProps = React.ComponentProps<typeof RechartsPrimitive.Tooltip>
+
+function ChartTooltip({
+  isAnimationActive = false,
+  wrapperStyle,
+  ...props
+}: ChartTooltipProps) {
+  return (
+    <RechartsPrimitive.Tooltip
+      {...props}
+      isAnimationActive={isAnimationActive}
+      wrapperStyle={{
+        outline: "none",
+        transition: "none",
+        ...wrapperStyle,
+      }}
+    />
+  )
+}
 
 export { ChartContainer, ChartTooltip, ChartTooltipContent }
