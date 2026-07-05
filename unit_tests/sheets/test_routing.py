@@ -159,3 +159,11 @@ def test_get_month_worksheet_errors_when_spreadsheet_cannot_be_opened():
 
     with pytest.raises(routing.SpreadsheetAccessError, match="Could not open spreadsheet 'sheet-id'"):
         routing.get_month_worksheet(gc, "sheet-id", "May")
+
+
+def test_get_month_worksheet_access_error_includes_service_account_email():
+    gc = FakeGC({})
+    gc.bookiebot_service_account_email = "bookiebot-writer@example.test"
+
+    with pytest.raises(routing.SpreadsheetAccessError, match="bookiebot-writer@example.test"):
+        routing.get_month_worksheet(gc, "sheet-id", "May")

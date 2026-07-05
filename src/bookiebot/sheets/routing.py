@@ -267,9 +267,12 @@ def get_month_worksheet(gc: Any, spreadsheet_id: str, month_name: str) -> Any:
     try:
         spreadsheet = gc.open_by_key(spreadsheet_id)
     except Exception as exc:
+        service_account_email = str(getattr(gc, "bookiebot_service_account_email", "") or "").strip()
+        account_hint = f" Active service account: {service_account_email}." if service_account_email else ""
         raise SpreadsheetAccessError(
             f"Could not open spreadsheet '{spreadsheet_id}'. "
             "Check that the Google service account has access to this file."
+            f"{account_hint}"
         ) from exc
 
     try:

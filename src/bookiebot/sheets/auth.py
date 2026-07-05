@@ -46,6 +46,10 @@ def _get_gc():
         info = json.loads(service_account_json)
         creds = Credentials.from_service_account_info(info, scopes=SCOPES)
         _GC = gspread.authorize(creds)
+        try:
+            _GC.bookiebot_service_account_email = str(info.get("client_email") or "")
+        except Exception:
+            pass
     return _GC
 
 
