@@ -391,6 +391,7 @@ function CategoryMixChart({ data, total }: { data: BreakdownItem[]; total: numbe
               outerRadius={122}
               paddingAngle={1}
               label={renderPieMetricLabel}
+              labelLine={renderPieMetricLabelLine}
             >
               {data.map((item) => (
                 <Cell key={item.key} fill={item.color} />
@@ -420,11 +421,20 @@ function CategoryMixChart({ data, total }: { data: BreakdownItem[]; total: numbe
   )
 }
 
+function pieMetricAnimationDelay(index: number | undefined) {
+  return `${Math.min(index ?? 0, 8) * 45 + 180}ms`
+}
+
+function pieMetricColor(payload: BreakdownItem | undefined, fallback: string | undefined) {
+  return payload?.color ?? fallback ?? "hsl(var(--foreground))"
+}
+
 function renderPieMetricLabel(props: unknown) {
-  const { name, value, payload, x, y, textAnchor, index } = props as {
+  const { name, value, payload, fill, x, y, textAnchor, index } = props as {
     name?: string
     value?: number
     payload?: BreakdownItem
+    fill?: string
     x?: number | string
     y?: number | string
     textAnchor?: "start" | "middle" | "end" | "inherit"
@@ -439,10 +449,36 @@ function renderPieMetricLabel(props: unknown) {
       textAnchor={textAnchor}
       dominantBaseline="central"
       className="bb-pie-metric-label"
-      style={{ animationDelay: `${Math.min(index ?? 0, 8) * 45 + 180}ms` }}
+      style={{ animationDelay: pieMetricAnimationDelay(index), fill: pieMetricColor(payload, fill) }}
     >
       {`${label} ${formatMoney(amount)}`}
     </text>
+  )
+}
+
+function renderPieMetricLabelLine(props: unknown) {
+  const { points, payload, stroke, index } = props as {
+    points?: Array<{ x?: number | string; y?: number | string }>
+    payload?: BreakdownItem
+    stroke?: string
+    index?: number
+  }
+  const [start, end] = points ?? []
+  if (start?.x === undefined || start?.y === undefined || end?.x === undefined || end?.y === undefined) {
+    return <path className="bb-pie-metric-label-line" d="" fill="none" opacity={0} />
+  }
+
+  return (
+    <path
+      className="bb-pie-metric-label-line"
+      d={`M${start.x},${start.y}L${end.x},${end.y}`}
+      fill="none"
+      pathLength={1}
+      stroke={pieMetricColor(payload, stroke)}
+      strokeLinecap="round"
+      strokeWidth={1.5}
+      style={{ animationDelay: pieMetricAnimationDelay(index) }}
+    />
   )
 }
 

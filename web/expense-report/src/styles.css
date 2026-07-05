@@ -382,7 +382,6 @@ body {
 }
 
 .bb-pie-metric-label {
-  fill: hsl(var(--foreground));
   font-size: 12px;
   font-weight: 650;
   opacity: 0;
@@ -390,6 +389,14 @@ body {
   transform-box: fill-box;
   transform-origin: center;
   animation: bb-pie-label-in 420ms ease-out forwards;
+}
+
+.bb-pie-metric-label-line {
+  opacity: 0;
+  pointer-events: none;
+  stroke-dasharray: 1;
+  stroke-dashoffset: 1;
+  animation: bb-pie-label-line-in 420ms ease-out forwards;
 }
 
 @keyframes bb-pie-label-in {
@@ -401,6 +408,18 @@ body {
   to {
     opacity: 1;
     transform: translateY(0);
+  }
+}
+
+@keyframes bb-pie-label-line-in {
+  from {
+    opacity: 0;
+    stroke-dashoffset: 1;
+  }
+
+  to {
+    opacity: 1;
+    stroke-dashoffset: 0;
   }
 }
 
