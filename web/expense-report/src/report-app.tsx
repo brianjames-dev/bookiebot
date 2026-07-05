@@ -215,9 +215,8 @@ function BurnRateChart({ burnRate, monthLabel }: { burnRate: BurnRate; monthLabe
         </div>
         <StatList
           rows={[
-            ["Variable wants target", formatMoney(burnRate.budget)],
+            ["Monthly wants target", formatMoney(burnRate.budget)],
             ["Food + shopping spent", formatMoney(burnRate.spent)],
-            ["Expected spend", formatMoney(burnRate.expectedSpend)],
             ["Remaining wants budget", formatMoney(burnRate.remaining)],
             ["Allowed daily average", formatMoney(burnRate.allowedDailyAverage)],
             ["Actual daily average", formatMoney(burnRate.actualDailyAverage)],
@@ -250,10 +249,26 @@ function BurnRateTooltipContent({
 
   return (
     <div className="bb-chart-tooltip">
+      <div className="bb-chart-tooltip-title">Day {point.label}</div>
       <div className="bb-chart-tooltip-row">
         <span className="bb-chart-tooltip-dot" style={{ background: color }} />
         <span>{label}</span>
         <strong>{formatMoney(point.variance)}</strong>
+      </div>
+      <div className="bb-chart-tooltip-row">
+        <span />
+        <span>Day spent</span>
+        <strong>{formatMoney(point.dailySpend)}</strong>
+      </div>
+      <div className="bb-chart-tooltip-row">
+        <span />
+        <span>Cumulative spent</span>
+        <strong>{formatMoney(point.actualSpend)}</strong>
+      </div>
+      <div className="bb-chart-tooltip-row">
+        <span />
+        <span>Expected by day</span>
+        <strong>{formatMoney(point.expectedSpend)}</strong>
       </div>
     </div>
   )

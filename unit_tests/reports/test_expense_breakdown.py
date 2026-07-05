@@ -167,6 +167,7 @@ def test_build_expense_breakdown_report_aggregates_shared_and_personal_data():
     assert burn_rate_series[0] == {
         "day": 1,
         "label": "1",
+        "dailySpend": 0.0,
         "actualSpend": 0.0,
         "expectedSpend": 25.65,
         "variance": -25.65,
@@ -174,6 +175,7 @@ def test_build_expense_breakdown_report_aggregates_shared_and_personal_data():
     assert burn_rate_series[1] == {
         "day": 2,
         "label": "2",
+        "dailySpend": 45.0,
         "actualSpend": 45.0,
         "expectedSpend": 51.29,
         "variance": -6.29,
@@ -181,6 +183,7 @@ def test_build_expense_breakdown_report_aggregates_shared_and_personal_data():
     assert burn_rate_series[-1] == {
         "day": 31,
         "label": "31",
+        "dailySpend": 0.0,
         "actualSpend": 45.0,
         "expectedSpend": 795.0,
         "variance": -750.0,

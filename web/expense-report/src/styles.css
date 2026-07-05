@@ -347,6 +347,11 @@ body {
   box-shadow: 0 8px 22px rgb(15 23 42 / 0.12);
 }
 
+.bb-chart-tooltip-title {
+  font-size: 12px;
+  font-weight: 700;
+}
+
 .bb-chart-tooltip-row {
   display: grid;
   grid-template-columns: auto 1fr auto;

@@ -61,6 +61,7 @@ export interface BurnRate {
 export interface BurnRatePoint {
   day: number
   label: string
+  dailySpend: number | null
   actualSpend: number | null
   expectedSpend: number
   variance: number | null
