@@ -98,6 +98,12 @@ Decision: Grouped reconciliation matches should still reject mismatched totals b
 
 Rationale: Grouped matches involve multiple sheet rows, so BookieBot should not guess which row should change. The human confirmation is selecting both the group and the specific row to adjust.
 
+## 2026-07-05 - Snapshot Closed-Month Formula Outputs
+
+Decision: Monthly Google Apps Script rollover should freeze previous-month personal budget formula outputs for Burn Rate and subscription totals as static values before creating or relinking the new month.
+
+Rationale: Closed-month review cells should remain auditable snapshots. Live formulas such as burn rate and subscription totals can recalculate after the calendar rolls forward, making historical months misleading.
+
 ## Pending Decisions
 
 - Where should durable system events live: banking database only, Google Sheets only, or dual-write during transition?

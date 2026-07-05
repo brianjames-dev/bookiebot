@@ -20,6 +20,8 @@ Recent transactions and reconciliation are in manual verification mode after the
 - Expense report top metrics now render in the requested order: Monthly Expenses, Monthly Income, Personal Outflows, Shared Expenses, Remaining Needs Budget, Remaining Wants Budget, Amount Saved, and Income After Expenses.
 - Remaining Wants Budget is pulled from the second money value on the Budget sheet margins row, and Amount Saved sums Check 1 Deposit and Check 2 Deposit cells from the Budget sheet.
 - Daily Spending chart average now divides shared spending by every calendar day in the selected month instead of only days with logged expenses.
+- Google Apps Script monthly rollover now snapshots previous-month personal budget Burn Rate and subscription total formula outputs into static cell values before creating/relinking the new month.
+- Monthly tab creation no longer fails when a copied template is missing the exact `Month` placeholder; it falls back to a top-left existing month label and logs instead of aborting if no label can be found.
 
 ## Completed 2026-07-03
 
@@ -180,6 +182,8 @@ Use a test row or low-risk real row in Discord:
    - Expected: each bold category label uses the same color as that category in the breakdown pie chart and legend.
 41. Open the Daily Spending chart in a report for a known month.
    - Expected: Average day equals shared spending divided by the total calendar days in that selected month.
+42. Run `budgetSystemRollover` from Apps Script on a test copy or after making a safe template backup.
+   - Expected: the previous personal budget month has static values in Burn Rate, Static Bills & Subscriptions (Needs), and Subscriptions (Wants) formula output cells; the current month tab exists even if the copied template did not contain an exact `Month` placeholder.
 
 ## Verification Baseline
 
@@ -200,6 +204,9 @@ cd web/expense-report && npm run build
 # passed
 
 python -m py_compile src/bookiebot/reports/expense_breakdown.py
+# passed
+
+node --check --input-type=commonjs < scripts/google-apps-script/budget-system-automation.gs
 # passed
 
 python -m pytest unit_tests/reports/test_expense_breakdown.py

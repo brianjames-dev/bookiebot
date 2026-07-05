@@ -61,6 +61,28 @@ const MONTH_NAMES = [
 const MONTH_TEMPLATE_SHEET_NAMES = ["Template"];
 
 const MONTH_LABEL_PLACEHOLDER = "Month";
+const MONTH_LABEL_SEARCH_ROWS = 10;
+const MONTH_LABEL_SEARCH_COLUMNS = 10;
+
+const PERSONAL_BUDGET_SNAPSHOT_LABELS = [
+  {
+    label: "Burn Rate",
+    searchMode: "contains",
+    targetColumnOffsetFromLabel: 1,
+  },
+  {
+    label: "Static Bills & Subscriptions (Needs)",
+    searchMode: "exact",
+    targetColumnOffsetFromLabel: null,
+  },
+  {
+    label: "Subscriptions (Wants)",
+    searchMode: "exact",
+    targetColumnOffsetFromLabel: null,
+  },
+];
+
+const SNAPSHOT_SEARCH_WINDOW_COLUMNS = 6;
 
 /**
  * Formula linking rules.
@@ -156,6 +178,8 @@ function budgetSystemRollover() {
   const today = new Date();
   const year = getYear(today);
   const monthName = getMonthName(today);
+
+  snapshotPreviousMonthPersonalBudgetOutputs(today);
 
   const yearConfig = getOrCreateYearFiles(year);
 
@@ -276,6 +300,148 @@ function relinkCurrentYearPersonalBudgetFormulas() {
     yearConfig.sharedExpensesId,
     "hannah",
   );
+}
+
+/**
+ * Optional manual helper.
+ * Freezes previous-month personal budget formula outputs that should not
+ * keep recalculating after the month closes.
+ */
+function snapshotPreviousMonthOutputs() {
+  seedKnown2026ConfigIfMissing();
+  snapshotPreviousMonthPersonalBudgetOutputs(new Date());
+}
+
+function snapshotPreviousMonthPersonalBudgetOutputs(today) {
+  const previousMonthDate = getPreviousMonthDate(today);
+  const previousYear = getYear(previousMonthDate);
+  const previousMonthName = getMonthName(previousMonthDate);
+  const previousYearConfig = getYearConfig(previousYear);
+
+  if (!previousYearConfig) {
+    Logger.log(
+      `No stored year config for ${previousYear}; skipping ${previousMonthName} formula snapshots.`,
+    );
+    return;
+  }
+
+  snapshotPersonalBudgetMonthOutputs(
+    previousYearConfig.brianBudgetId,
+    previousMonthName,
+    "Brian",
+  );
+
+  snapshotPersonalBudgetMonthOutputs(
+    previousYearConfig.hannahBudgetId,
+    previousMonthName,
+    "Hannah",
+  );
+}
+
+function snapshotPersonalBudgetMonthOutputs(
+  personalBudgetSpreadsheetId,
+  monthName,
+  ownerName,
+) {
+  const ss = SpreadsheetApp.openById(personalBudgetSpreadsheetId);
+  const sheet = ss.getSheetByName(monthName);
+
+  if (!sheet) {
+    Logger.log(
+      `Could not find ${ownerName} personal budget sheet "${monthName}" for formula snapshots.`,
+    );
+    return 0;
+  }
+
+  let snapshotCount = 0;
+
+  PERSONAL_BUDGET_SNAPSHOT_LABELS.forEach(function (rule) {
+    if (snapshotPersonalBudgetFormulaOutput(sheet, rule)) {
+      snapshotCount += 1;
+    }
+  });
+
+  Logger.log(
+    `Snapshotted ${snapshotCount} formula output cells on ${ownerName} ${monthName}.`,
+  );
+
+  return snapshotCount;
+}
+
+function snapshotPersonalBudgetFormulaOutput(sheet, rule) {
+  const labelCell =
+    rule.searchMode === "contains"
+      ? findCellContainingText(sheet, rule.label)
+      : findCellByExactText(sheet, rule.label);
+
+  if (!labelCell) {
+    Logger.log(
+      `Could not find snapshot label "${rule.label}" on sheet "${sheet.getName()}".`,
+    );
+    return false;
+  }
+
+  const targetCell =
+    rule.targetColumnOffsetFromLabel === null
+      ? findFirstFormulaCellToRight(labelCell, SNAPSHOT_SEARCH_WINDOW_COLUMNS)
+      : labelCell.offset(0, rule.targetColumnOffsetFromLabel);
+
+  if (!targetCell) {
+    Logger.log(
+      `Could not find formula output cell for "${rule.label}" on sheet "${sheet.getName()}".`,
+    );
+    return false;
+  }
+
+  if (snapshotFormulaCellValue(targetCell, rule.label)) {
+    return true;
+  }
+
+  if (labelCell.getFormula()) {
+    return snapshotFormulaCellValue(labelCell, rule.label);
+  }
+
+  return false;
+}
+
+function findFirstFormulaCellToRight(labelCell, maxColumns) {
+  const sheet = labelCell.getSheet();
+  const startColumn = labelCell.getColumn() + 1;
+  const availableColumns = sheet.getMaxColumns() - labelCell.getColumn();
+  const width = Math.min(maxColumns, availableColumns);
+
+  if (width <= 0) {
+    return null;
+  }
+
+  const formulas = sheet
+    .getRange(labelCell.getRow(), startColumn, 1, width)
+    .getFormulas()[0];
+
+  for (let i = 0; i < formulas.length; i++) {
+    if (formulas[i]) {
+      return sheet.getRange(labelCell.getRow(), startColumn + i);
+    }
+  }
+
+  return null;
+}
+
+function snapshotFormulaCellValue(cell, label) {
+  if (!cell.getFormula()) {
+    return false;
+  }
+
+  const value = cell.getValue();
+  const displayValue = cell.getDisplayValue();
+
+  cell.setValue(value);
+
+  Logger.log(
+    `Snapshotted ${label} on ${cell.getSheet().getName()}!${cell.getA1Notation()} as "${displayValue}".`,
+  );
+
+  return true;
 }
 
 /***********************
@@ -414,6 +580,8 @@ function ensureMonthExistsInPersonalBudget(
      * - Do update formulas so they point to the correct yearly shared
      *   expense file and owner-specific row.
      */
+    ensureMonthLabel(sheet, monthName);
+
     updatePersonalBudgetImportRanges(
       sheet,
       sharedExpensesSpreadsheetId,
@@ -462,6 +630,8 @@ function ensureMonthExistsInSharedExpenses(
      * Existing sheet:
      * - Do NOT clear/reset rows.
      */
+    ensureMonthLabel(sheet, monthName);
+
     return {
       sheet: sheet,
       created: false,
@@ -518,15 +688,27 @@ function getMonthlyTemplateSheet(ss) {
 }
 
 function setMonthLabel(sheet, monthName) {
-  const monthLabelCell = findCellByExactText(sheet, MONTH_LABEL_PLACEHOLDER);
+  const monthLabelCell =
+    findCellByExactText(sheet, MONTH_LABEL_PLACEHOLDER) ||
+    findCellByAnyExactTextInTopLeft(sheet, MONTH_NAMES);
 
   if (!monthLabelCell) {
-    throw new Error(
-      `Could not find month label placeholder "${MONTH_LABEL_PLACEHOLDER}" on template copy "${sheet.getName()}".`,
+    Logger.log(
+      `Could not find month label placeholder "${MONTH_LABEL_PLACEHOLDER}" or an existing month label on template copy "${sheet.getName()}"; leaving copied sheet label unchanged.`,
     );
+    return false;
   }
 
   monthLabelCell.setValue(monthName);
+  return true;
+}
+
+function ensureMonthLabel(sheet, monthName) {
+  if (findCellByAnyExactTextInTopLeft(sheet, [monthName])) {
+    return true;
+  }
+
+  return setMonthLabel(sheet, monthName);
 }
 
 /***********************
@@ -599,6 +781,38 @@ function findCellByExactText(sheet, searchText) {
   const finder = sheet
     .createTextFinder(searchText)
     .matchEntireCell(true)
+    .matchCase(false);
+
+  return finder.findNext();
+}
+
+function findCellByAnyExactTextInTopLeft(sheet, searchTexts) {
+  const rowCount = Math.min(MONTH_LABEL_SEARCH_ROWS, sheet.getMaxRows());
+  const columnCount = Math.min(
+    MONTH_LABEL_SEARCH_COLUMNS,
+    sheet.getMaxColumns(),
+  );
+  const searchRange = sheet.getRange(1, 1, rowCount, columnCount);
+
+  for (let i = 0; i < searchTexts.length; i++) {
+    const finder = searchRange
+      .createTextFinder(searchTexts[i])
+      .matchEntireCell(true)
+      .matchCase(false);
+    const cell = finder.findNext();
+
+    if (cell) {
+      return cell;
+    }
+  }
+
+  return null;
+}
+
+function findCellContainingText(sheet, searchText) {
+  const finder = sheet
+    .createTextFinder(searchText)
+    .matchEntireCell(false)
     .matchCase(false);
 
   return finder.findNext();
@@ -788,4 +1002,8 @@ function getYear(date) {
 
 function getMonthName(date) {
   return Utilities.formatDate(date, Session.getScriptTimeZone(), "MMMM");
+}
+
+function getPreviousMonthDate(date) {
+  return new Date(date.getFullYear(), date.getMonth() - 1, 1);
 }
