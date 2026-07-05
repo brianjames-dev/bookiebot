@@ -125,6 +125,7 @@ def test_build_expense_breakdown_report_aggregates_shared_and_personal_data():
     html = render_expense_breakdown_html(report)
     assert "Expense Breakdown" in html
     assert "Budget Charts" in html
+    assert "Burn Rate" in html
     assert 'id="bookiebot-expense-report-root"' in html
     assert "window.process = window.process ||" in html
     payload_match = re.search(

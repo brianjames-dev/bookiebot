@@ -175,11 +175,6 @@ body {
   color: hsl(var(--destructive));
 }
 
-.bb-burn-rate-card .bb-card-content {
-  display: grid;
-  gap: 16px;
-}
-
 .bb-burn-rate-summary {
   display: flex;
   align-items: flex-start;

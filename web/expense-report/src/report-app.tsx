@@ -59,8 +59,6 @@ export function ExpenseReportApp({ report }: { report: ExpenseReportData }) {
           <MetricCard label="Income After Expenses" value={report.metrics.incomeAfterExpenses} accent />
         </section>
 
-        {report.burnRate ? <BurnRateCard burnRate={report.burnRate} monthLabel={report.monthLabel} /> : null}
-
         <Card className="bb-analytics-card">
           <CardHeader className="bb-analytics-header">
             <div>
@@ -73,6 +71,7 @@ export function ExpenseReportApp({ report }: { report: ExpenseReportData }) {
               <TabsList>
                 <TabsTrigger value="category">Category Mix</TabsTrigger>
                 <TabsTrigger value="daily">Daily Spending</TabsTrigger>
+                {report.burnRate ? <TabsTrigger value="burn-rate">Burn Rate</TabsTrigger> : null}
                 <TabsTrigger value="groups">Needs vs Wants</TabsTrigger>
                 <TabsTrigger value="merchants">Merchants</TabsTrigger>
               </TabsList>
@@ -82,6 +81,11 @@ export function ExpenseReportApp({ report }: { report: ExpenseReportData }) {
               <TabsContent value="daily">
                 <DailySpendingChart data={report.dailyTotals} total={report.metrics.sharedExpenses} daysInMonth={report.daysInMonth} />
               </TabsContent>
+              {report.burnRate ? (
+                <TabsContent value="burn-rate">
+                  <BurnRateChart burnRate={report.burnRate} monthLabel={report.monthLabel} />
+                </TabsContent>
+              ) : null}
               <TabsContent value="groups">
                 <BudgetGroupChart data={report.budgetGroups} />
               </TabsContent>
@@ -132,20 +136,48 @@ export function ExpenseReportApp({ report }: { report: ExpenseReportData }) {
   )
 }
 
-function BurnRateCard({ burnRate, monthLabel }: { burnRate: BurnRate; monthLabel: string }) {
+function BurnRateChart({ burnRate, monthLabel }: { burnRate: BurnRate; monthLabel: string }) {
   const isOver = burnRate.status === "over"
   const isNotStarted = burnRate.status === "not_started"
   const statusLabel = isNotStarted ? "Not started" : isOver ? "Over pace" : "Under pace"
   const differenceLabel = isNotStarted ? "No elapsed days" : formatMoney(Math.abs(burnRate.totalDifference))
   const dailyDifference = isNotStarted ? "No daily pace yet" : `${burnRate.dailyDifference >= 0 ? "+" : ""}${formatMoney(burnRate.dailyDifference)}/day`
+  const chartData = [
+    {
+      label: "Actual spent",
+      amount: burnRate.spent,
+      color: isOver ? "hsl(var(--destructive))" : "hsl(var(--success))",
+    },
+    {
+      label: "Expected by now",
+      amount: burnRate.expectedSpend,
+      color: "hsl(var(--chart-2))",
+    },
+    {
+      label: "Variable target",
+      amount: burnRate.budget,
+      color: "hsl(var(--chart-5))",
+    },
+  ]
 
   return (
-    <Card className="bb-burn-rate-card">
-      <CardHeader>
-        <CardTitle>Wants Burn Rate</CardTitle>
-        <CardDescription>Food and shopping pace for {monthLabel}.</CardDescription>
-      </CardHeader>
-      <CardContent>
+    <div className="bb-chart-layout">
+      <ChartContainer config={chartConfig(chartData)} className="bb-chart-box">
+        <ResponsiveContainer width="100%" height={320}>
+          <BarChart data={chartData} layout="vertical" margin={{ top: 18, right: 28, left: 18, bottom: 18 }}>
+            <CartesianGrid horizontal={false} strokeDasharray="3 3" />
+            <XAxis type="number" tickFormatter={(value) => `$${value}`} tickLine={false} axisLine={false} />
+            <YAxis dataKey="label" type="category" width={126} tickLine={false} axisLine={false} />
+            <ChartTooltip content={<ChartTooltipContent />} />
+            <Bar dataKey="amount" name="Burn rate" radius={[0, 6, 6, 0]}>
+              {chartData.map((item) => (
+                <Cell key={item.label} fill={item.color} />
+              ))}
+            </Bar>
+          </BarChart>
+        </ResponsiveContainer>
+      </ChartContainer>
+      <div className="bb-chart-side">
         <div className="bb-burn-rate-summary">
           <div>
             <div className="bb-chart-kicker">{statusLabel}</div>
@@ -158,6 +190,10 @@ function BurnRateCard({ burnRate, monthLabel }: { burnRate: BurnRate; monthLabel
             {dailyDifference}
           </div>
         </div>
+        <div>
+          <div className="bb-chart-kicker">Wants Burn Rate</div>
+          <div className="bb-burn-rate-note">Food and shopping pace for {monthLabel}.</div>
+        </div>
         <StatList
           rows={[
             ["Variable wants target", formatMoney(burnRate.budget)],
@@ -168,8 +204,8 @@ function BurnRateCard({ burnRate, monthLabel }: { burnRate: BurnRate; monthLabel
             ["Actual daily average", formatMoney(burnRate.actualDailyAverage)],
           ]}
         />
-      </CardContent>
-    </Card>
+      </div>
+    </div>
   )
 }
 

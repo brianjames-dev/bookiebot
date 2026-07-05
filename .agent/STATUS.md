@@ -22,7 +22,7 @@ Recent transactions and reconciliation are in manual verification mode after the
 - Daily Spending chart average now divides shared spending by every calendar day in the selected month instead of only days with logged expenses.
 - Google Apps Script monthly rollover now snapshots previous-month personal budget Burn Rate and subscription total formula outputs into static cell values before creating/relinking the new month.
 - Monthly tab creation no longer fails when a copied template is missing the exact `Month` placeholder; it falls back to a top-left existing month label and logs instead of aborting if no label can be found.
-- Expense breakdown report pages now include a Wants Burn Rate card that compares food plus shopping spend against the selected month's remaining-wants-budget-derived target.
+- Expense breakdown report pages now include a `Burn Rate` tab in the Budget Charts toggle, with a comparison chart for actual food plus shopping spend, expected spend, and the selected month's remaining-wants-budget-derived target.
 - Rebuilt the embedded React expense report assets and added regression coverage for the burn-rate payload math.
 
 ## Completed 2026-07-03
@@ -141,7 +141,7 @@ Use a test row or low-risk real row in Discord:
 19. Click `View Inbox` on the reconciliation digest.
    - Expected: the DM/private inbox list shows unresolved transactions with `Reconcile Now` and `Ignore All`.
 20. Run the expense breakdown command for the current month and for a completed prior month.
-   - Expected: the report link opens a page with a `Wants Burn Rate` card; current-month pace counts elapsed days, completed months count every day in that month, and Amount Saved equals the two paycheck deposit values from column `E` without double-counting the savings total row.
+   - Expected: the report link opens a page with a `Burn Rate` tab inside Budget Charts; current-month pace counts elapsed days, completed months count every day in that month, and Amount Saved equals the two paycheck deposit values from column `E` without double-counting the savings total row.
 21. Click `Reconcile Now` from either the digest or inbox view.
    - Expected: the one-at-a-time transaction review appears, and individual transaction cards do not include `Ignore All`.
 22. Let the scheduled bills/subscriptions digest run.
