@@ -28,6 +28,7 @@ Recent transactions and reconciliation are in manual verification mode after the
 - Daily Spending chart now appears at the top of the Daily Spending transaction card instead of inside the Budget Charts toggle.
 - Burn Rate now renders as a full-month daily variance line chart with a zero baseline, red over-pace values above zero, and green under-pace values below zero.
 - Burn Rate chart rendering now uses continuous day-to-day colored segments so the mobile line does not visually disconnect when switching between over-pace and under-pace days.
+- Burn Rate tooltips now render one active-day variance row and shared chart tooltips filter duplicate payload rows, preventing duplicate values from accumulating while tapping nodes on mobile.
 
 ## Completed 2026-07-03
 
@@ -145,7 +146,7 @@ Use a test row or low-risk real row in Discord:
 19. Click `View Inbox` on the reconciliation digest.
    - Expected: the DM/private inbox list shows unresolved transactions with `Reconcile Now` and `Ignore All`.
 20. Run the expense breakdown command for the current month and for a completed prior month.
-   - Expected: the report link opens a page with a `Burn Rate` tab inside Budget Charts; the tab shows a full-month daily variance line with red values above the zero baseline and green values below it, and the elapsed portion stays visually connected on mobile even when the color changes; current-month pace counts elapsed days, completed months count every day in that month, and Amount Saved equals the two paycheck deposit values from column `E` without double-counting the savings total row.
+   - Expected: the report link opens a page with a `Burn Rate` tab inside Budget Charts; the tab shows a full-month daily variance line with red values above the zero baseline and green values below it, and the elapsed portion stays visually connected on mobile even when the color changes; tapping several burn-rate nodes in succession shows one tooltip value for the active day without duplicate rows accumulating; current-month pace counts elapsed days, completed months count every day in that month, and Amount Saved equals the two paycheck deposit values from column `E` without double-counting the savings total row.
 21. If the expense breakdown command reports that a spreadsheet cannot be opened.
    - Expected: the error includes the active Google service account email so the spreadsheet share settings or deployment credential can be checked directly.
 22. Click `Reconcile Now` from either the digest or inbox view.

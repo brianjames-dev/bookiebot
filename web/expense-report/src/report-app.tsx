@@ -177,7 +177,7 @@ function BurnRateChart({ burnRate, monthLabel }: { burnRate: BurnRate; monthLabe
             <XAxis dataKey="label" tickLine={false} axisLine={false} interval="preserveStartEnd" />
             <YAxis tickFormatter={(value) => `$${value}`} tickLine={false} axisLine={false} width={58} />
             <ReferenceLine y={0} stroke="hsl(var(--foreground))" strokeOpacity={0.45} strokeWidth={1.5} />
-            <ChartTooltip content={<ChartTooltipContent />} />
+            <ChartTooltip content={<BurnRateTooltipContent />} />
             {segments.map((segment) => (
               <Line
                 key={segment.key}
@@ -223,6 +223,37 @@ function BurnRateChart({ burnRate, monthLabel }: { burnRate: BurnRate; monthLabe
             ["Actual daily average", formatMoney(burnRate.actualDailyAverage)],
           ]}
         />
+      </div>
+    </div>
+  )
+}
+
+type BurnRateTooltipPayload = {
+  payload?: BurnRatePoint
+}
+
+function BurnRateTooltipContent({
+  active,
+  payload,
+}: {
+  active?: boolean
+  payload?: BurnRateTooltipPayload[]
+}) {
+  const point = payload?.find((item) => item.payload?.variance !== null && item.payload?.variance !== undefined)?.payload
+  if (!active || !point || point.variance === null) {
+    return null
+  }
+
+  const isOver = point.variance > 0
+  const label = isOver ? "Over pace" : "Under pace"
+  const color = isOver ? "hsl(var(--destructive))" : "hsl(var(--success))"
+
+  return (
+    <div className="bb-chart-tooltip">
+      <div className="bb-chart-tooltip-row">
+        <span className="bb-chart-tooltip-dot" style={{ background: color }} />
+        <span>{label}</span>
+        <strong>{formatMoney(point.variance)}</strong>
       </div>
     </div>
   )

@@ -54,7 +54,7 @@ function ChartStyle({ id, config }: { id: string; config: ChartConfig }) {
 
 type ChartTooltipPayload = {
   name?: string | number
-  value?: string | number
+  value?: string | number | null
   color?: string
 }
 
@@ -68,11 +68,25 @@ function ChartTooltipContent({
   if (!active || !payload?.length) {
     return null
   }
+  const rows = payload.reduce<ChartTooltipPayload[]>((dedupedRows, item) => {
+    if (item.value === null || item.value === undefined) {
+      return dedupedRows
+    }
+    const alreadyShown = dedupedRows.some((row) => row.name === item.name && row.value === item.value && row.color === item.color)
+    if (!alreadyShown) {
+      dedupedRows.push(item)
+    }
+    return dedupedRows
+  }, [])
+
+  if (!rows.length) {
+    return null
+  }
 
   return (
     <div className="bb-chart-tooltip">
-      {payload.map((item: ChartTooltipPayload) => (
-        <div className="bb-chart-tooltip-row" key={`${item.name}-${item.value}`}>
+      {rows.map((item: ChartTooltipPayload, index) => (
+        <div className="bb-chart-tooltip-row" key={`${item.name}-${item.value}-${index}`}>
           <span className="bb-chart-tooltip-dot" style={{ background: item.color }} />
           <span>{item.name}</span>
           <strong>{formatMoney(Number(item.value || 0))}</strong>
