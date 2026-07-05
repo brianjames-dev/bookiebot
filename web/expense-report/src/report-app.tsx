@@ -15,9 +15,9 @@ import {
 
 import { Badge } from "./components/ui/badge"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "./components/ui/card"
-import { ChartContainer, ChartTooltip, ChartTooltipContent } from "./components/ui/chart"
+import { ChartContainer, ChartTooltip, ChartTooltipContent, type ChartConfig } from "./components/ui/chart"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "./components/ui/tabs"
-import type { AmountRow, BreakdownItem, BurnRate, ExpenseEntry, ExpenseReportData, PaymentItem, SubscriptionItem } from "./types"
+import type { AmountRow, BreakdownItem, BurnRate, BurnRatePoint, ExpenseEntry, ExpenseReportData, PaymentItem, SubscriptionItem } from "./types"
 
 const money = new Intl.NumberFormat("en-US", {
   style: "currency",
@@ -142,19 +142,33 @@ function BurnRateChart({ burnRate, monthLabel }: { burnRate: BurnRate; monthLabe
   const statusLabel = isNotStarted ? "Not started" : isOver ? "Over pace" : "Under pace"
   const differenceLabel = isNotStarted ? "No elapsed days" : formatMoney(Math.abs(burnRate.totalDifference))
   const dailyDifference = isNotStarted ? "No daily pace yet" : `${burnRate.dailyDifference >= 0 ? "+" : ""}${formatMoney(burnRate.dailyDifference)}/day`
-  const chartData = burnRate.series.map((point) => ({
-    ...point,
-    overVariance: point.variance !== null && point.variance > 0 ? point.variance : null,
-    underVariance: point.variance !== null && point.variance <= 0 ? point.variance : null,
+  const recordedPoints = burnRate.series.filter((point): point is BurnRatePoint & { variance: number } => point.variance !== null)
+  const segments = recordedPoints.slice(1).map((point, index) => ({
+    key: `segment${index}`,
+    label: point.variance > 0 ? "Over pace" : "Under pace",
+    color: point.variance > 0 ? "hsl(var(--destructive))" : "hsl(var(--success))",
+    fromDay: recordedPoints[index].day,
+    toDay: point.day,
+    fromVariance: recordedPoints[index].variance,
+    toVariance: point.variance,
   }))
+  const chartData = burnRate.series.map((point) => {
+    const row: Record<string, string | number | null> = {
+      ...point,
+    }
+    for (const segment of segments) {
+      row[segment.key] = point.day === segment.fromDay ? segment.fromVariance : point.day === segment.toDay ? segment.toVariance : null
+    }
+    return row
+  })
+  const segmentConfig: ChartConfig = Object.fromEntries(
+    segments.map((segment) => [segment.key, { label: segment.label, color: segment.color }]),
+  )
 
   return (
     <div className="bb-chart-layout">
       <ChartContainer
-        config={{
-          overVariance: { label: "Over pace", color: "hsl(var(--destructive))" },
-          underVariance: { label: "Under pace", color: "hsl(var(--success))" },
-        }}
+        config={segmentConfig}
         className="bb-chart-box"
       >
         <ResponsiveContainer width="100%" height={320}>
@@ -164,24 +178,21 @@ function BurnRateChart({ burnRate, monthLabel }: { burnRate: BurnRate; monthLabe
             <YAxis tickFormatter={(value) => `$${value}`} tickLine={false} axisLine={false} width={58} />
             <ReferenceLine y={0} stroke="hsl(var(--foreground))" strokeOpacity={0.45} strokeWidth={1.5} />
             <ChartTooltip content={<ChartTooltipContent />} />
-            <Line
-              type="monotone"
-              dataKey="overVariance"
-              name="Over pace"
-              stroke="hsl(var(--destructive))"
-              strokeWidth={3}
-              dot={false}
-              activeDot={{ r: 4 }}
-            />
-            <Line
-              type="monotone"
-              dataKey="underVariance"
-              name="Under pace"
-              stroke="hsl(var(--success))"
-              strokeWidth={3}
-              dot={false}
-              activeDot={{ r: 4 }}
-            />
+            {segments.map((segment) => (
+              <Line
+                key={segment.key}
+                type="linear"
+                dataKey={segment.key}
+                name={segment.label}
+                stroke={segment.color}
+                strokeWidth={3}
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                dot={false}
+                activeDot={{ r: 4 }}
+                isAnimationActive={false}
+              />
+            ))}
           </LineChart>
         </ResponsiveContainer>
       </ChartContainer>
