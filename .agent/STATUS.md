@@ -17,7 +17,7 @@ Recent transactions and reconciliation are in manual verification mode after the
 ## Completed 2026-07-05
 
 - Daily Spending transaction category labels now use the same category colors as the expense breakdown pie chart.
-- Expense report top metrics now render in the requested order: Monthly Expenses, Monthly Income, Personal Outflows, Shared Expenses, Remaining Needs Budget, Remaining Wants Budget, Amount Saved, and Income After Expenses.
+- Expense report top metrics now render in the requested order: Monthly Income, Monthly Expenses, Personal Outflows, Burn Rate, Remaining Needs Budget, Remaining Wants Budget, Amount Saved, and Income After Expenses.
 - Remaining Wants Budget is pulled from the second money value on the Budget sheet margins row, and Amount Saved sums the column `E` values on the `Enter 1st Paycheck Deposit` and `Enter 2nd Paycheck Deposit` rows while ignoring the separate savings total row.
 - Daily Spending chart average now divides shared spending by every calendar day in the selected month instead of only days with logged expenses.
 - Google Apps Script monthly rollover now snapshots previous-month personal budget Burn Rate and subscription total formula outputs into static cell values before creating/relinking the new month.
@@ -31,6 +31,9 @@ Recent transactions and reconciliation are in manual verification mode after the
 - Burn Rate tooltips now render one active-day variance row and shared chart tooltips filter duplicate payload rows, preventing duplicate values from accumulating while tapping nodes on mobile.
 - Burn Rate tooltips now explain each selected day with day spent, cumulative spent, and expected-by-day values, while the static side stats no longer duplicate expected spend against the monthly wants target.
 - Burn Rate tab now removes the redundant title/description side copy and uses a smoothed animated line chart so first-open behavior matches the other Recharts views more closely.
+- Category Mix pie slices now label category plus dollar amount directly, and the burn-rate line uses a smooth baseline-aware gradient so over-zero sections render red and under-zero sections render green.
+- Merchant analysis now lives above the Frequent Merchants / Locations table, shows the top 10 merchants, and no longer appears as a Budget Charts tab or side-stat panel.
+- The Spending By Person / Card panel has been removed, and zero-dollar paycheck savings deposits now render Amount Saved as `$0.00` instead of `N/A`.
 
 ## Completed 2026-07-03
 
@@ -148,7 +151,7 @@ Use a test row or low-risk real row in Discord:
 19. Click `View Inbox` on the reconciliation digest.
    - Expected: the DM/private inbox list shows unresolved transactions with `Reconcile Now` and `Ignore All`.
 20. Run the expense breakdown command for the current month and for a completed prior month.
-   - Expected: the report link opens a page with a `Burn Rate` tab inside Budget Charts; the tab shows a full-month daily variance line with red values above the zero baseline and green values below it, and the elapsed portion stays visually connected on mobile even when the color changes; tapping several burn-rate nodes in succession shows one tooltip for the active day with variance, day spent, cumulative spent, and expected-by-day values, without duplicate rows accumulating; the side stats show the monthly wants target without a duplicate expected-spend row; current-month pace counts elapsed days, completed months count every day in that month, and Amount Saved equals the two paycheck deposit values from column `E` without double-counting the savings total row.
+   - Expected: the report link opens a page with a `Burn Rate` tab inside Budget Charts; the tab shows a smoothed full-month daily variance line with red values above the zero baseline and green values below it; tapping several burn-rate nodes in succession shows one tooltip for the active day with variance, day spent, cumulative spent, and expected-by-day values; Category Mix pie labels show category plus amount; the top cards begin Monthly Income, Monthly Expenses, Personal Outflows, Burn Rate; the merchant chart appears above the Frequent Merchants / Locations table with 10 merchants; Spending By Person / Card is absent; current-month pace counts elapsed days, completed months count every day in that month, and Amount Saved equals the two paycheck deposit values from column `E`, including `$0.00` when those rows are present with zero deposits.
 21. If the expense breakdown command reports that a spreadsheet cannot be opened.
    - Expected: the error includes the active Google service account email so the spreadsheet share settings or deployment credential can be checked directly.
 22. Click `Reconcile Now` from either the digest or inbox view.

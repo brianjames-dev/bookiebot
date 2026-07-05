@@ -727,9 +727,8 @@ def _amount_saved(rows: list[list[str]]) -> float | None:
                 if not _is_check_deposit_label(normalized_cells, index, check_number):
                     continue
                 amount = _savings_deposit_amount(row, index)
-                if amount:
-                    total += amount
-                    found_checks.add(check_number)
+                total += amount
+                found_checks.add(check_number)
                 break
     return round(total, 2) if found_checks else None
 

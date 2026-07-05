@@ -218,6 +218,17 @@ body {
   gap: 20px;
 }
 
+.bb-merchant-summary-content {
+  display: grid;
+  gap: 18px;
+}
+
+.bb-merchant-chart-box {
+  width: 100%;
+  min-width: 0;
+  min-height: 360px;
+}
+
 .bb-analytics-card .bb-card-content {
   padding-top: 14px;
 }
@@ -535,5 +546,9 @@ tr:last-child td {
 
   .bb-chart-box {
     min-height: 260px;
+  }
+
+  .bb-merchant-chart-box {
+    min-height: 300px;
   }
 }

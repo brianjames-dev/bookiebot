@@ -127,6 +127,8 @@ def test_build_expense_breakdown_report_aggregates_shared_and_personal_data():
     assert "Budget Charts" in html
     assert "Burn Rate" in html
     assert "Food and shopping pace" not in html
+    assert "Merchant Concentration" not in html
+    assert "Spending By Person / Card" not in html
     assert 'id="bookiebot-expense-report-root"' in html
     assert "window.process = window.process ||" in html
     payload_match = re.search(
@@ -206,6 +208,36 @@ def test_build_expense_breakdown_report_aggregates_shared_and_personal_data():
     assert [item["name"] for item in payload["subscriptionsWants"]] == ["Spotify"]
     assert any(entry["location"] == "Trader Joe's" for entry in payload["dailyEntries"])
     assert [entry["label"] for entry in payload["incomeEntries"]] == ["Paycheck", "Side Gig"]
+
+
+def test_build_expense_breakdown_report_reports_zero_savings_deposits():
+    report = build_expense_breakdown_report(
+        actor_key="hannah",
+        owner_name="Hannah",
+        persons=["Hannah"],
+        month=BudgetMonth(2026, 5),
+        worksheets=ReportWorksheets(
+            shared_expenses=InMemoryWorksheet([["hdr"] * 28, ["hdr"] * 28]),
+            personal_budget=InMemoryWorksheet(
+                [
+                    _row({"B": "Enter 1st Paycheck Deposit", "E": "$0.00"}),
+                    _row({"B": "Enter 2nd Paycheck Deposit", "E": "$0.00"}),
+                    _row({"B": "Total Savings Deposited", "E": "$0.00"}),
+                ]
+            ),
+            subscriptions=InMemoryWorksheet([]),
+        ),
+    )
+
+    assert report.amount_saved == 0.0
+    html = render_expense_breakdown_html(report)
+    payload_match = re.search(
+        r'<script id="bookiebot-expense-report-data" type="application/json">(.*?)</script>',
+        html,
+    )
+    assert payload_match is not None
+    payload = json.loads(payload_match.group(1))
+    assert payload["metrics"]["amountSaved"] == 0.0
 
 
 def test_write_expense_breakdown_report_returns_public_url(tmp_path, monkeypatch):

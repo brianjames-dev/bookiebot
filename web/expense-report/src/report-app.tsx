@@ -52,10 +52,10 @@ export function ExpenseReportApp({ report }: { report: ExpenseReportData }) {
 
       <main className="bb-main">
         <section className="bb-metrics-grid" aria-label="Budget metrics">
-          <MetricCard label="Monthly Expenses" value={report.metrics.totalExpenses} />
           <MetricCard label="Monthly Income" value={report.metrics.monthlyIncome} />
+          <MetricCard label="Monthly Expenses" value={report.metrics.totalExpenses} />
           <MetricCard label="Personal Outflows" value={report.metrics.personalOutflows} />
-          <MetricCard label="Shared Expenses" value={report.metrics.sharedExpenses} />
+          <BurnRateMetricCard burnRate={report.burnRate} />
           <MetricCard label="Remaining Needs Budget" value={report.metrics.remainingNeedsBudget ?? report.metrics.remainingBudget} accent />
           <MetricCard label="Remaining Wants Budget" value={report.metrics.remainingWantsBudget} accent />
           <MetricCard label="Amount Saved" value={report.metrics.amountSaved} accent />
@@ -75,7 +75,6 @@ export function ExpenseReportApp({ report }: { report: ExpenseReportData }) {
                 <TabsTrigger value="category">Category Mix</TabsTrigger>
                 {report.burnRate ? <TabsTrigger value="burn-rate">Burn Rate</TabsTrigger> : null}
                 <TabsTrigger value="groups">Needs vs Wants</TabsTrigger>
-                <TabsTrigger value="merchants">Merchants</TabsTrigger>
               </TabsList>
               <TabsContent value="category">
                 <CategoryMixChart data={report.breakdown} total={report.metrics.totalExpenses} />
@@ -88,17 +87,11 @@ export function ExpenseReportApp({ report }: { report: ExpenseReportData }) {
               <TabsContent value="groups">
                 <BudgetGroupChart data={report.budgetGroups} />
               </TabsContent>
-              <TabsContent value="merchants">
-                <MerchantChart data={report.merchantTotals} />
-              </TabsContent>
             </Tabs>
           </CardContent>
         </Card>
 
-        <section className="bb-two-grid">
-          <ReportTable title="Spending By Person / Card" columns={["Person", "Amount"]} rows={report.personTotals} />
-          <ReportTable title="Frequent Merchants / Locations" columns={["Merchant", "Amount"]} rows={report.merchantTotals} />
-        </section>
+        <MerchantSummaryCard rows={report.merchantTotals} />
 
         <Card>
           <CardHeader>
@@ -142,7 +135,8 @@ function BurnRateChart({ burnRate }: { burnRate: BurnRate }) {
   const statusLabel = isNotStarted ? "Not started" : isOver ? "Over pace" : "Under pace"
   const differenceLabel = isNotStarted ? "No elapsed days" : formatMoney(Math.abs(burnRate.totalDifference))
   const dailyDifference = isNotStarted ? "No daily pace yet" : `${burnRate.dailyDifference >= 0 ? "+" : ""}${formatMoney(burnRate.dailyDifference)}/day`
-  const lineColor = isNotStarted ? "hsl(var(--chart-1))" : isOver ? "hsl(var(--destructive))" : "hsl(var(--success))"
+  const gradientStops = burnRateGradientStops(burnRate.series)
+  const lineColor = isNotStarted ? "hsl(var(--chart-1))" : "url(#burn-rate-variance-gradient)"
 
   return (
     <div className="bb-chart-layout">
@@ -152,6 +146,13 @@ function BurnRateChart({ burnRate }: { burnRate: BurnRate }) {
       >
         <ResponsiveContainer width="100%" height={320}>
           <LineChart data={burnRate.series} margin={{ top: 20, right: 22, left: 0, bottom: 8 }}>
+            <defs>
+              <linearGradient id="burn-rate-variance-gradient" x1="0" y1="0" x2="0" y2="1">
+                {gradientStops.map((stop, index) => (
+                  <stop key={`${stop.offset}-${index}`} offset={stop.offset} stopColor={stop.color} />
+                ))}
+              </linearGradient>
+            </defs>
             <CartesianGrid vertical={false} strokeDasharray="3 3" />
             <XAxis dataKey="label" tickLine={false} axisLine={false} interval="preserveStartEnd" />
             <YAxis tickFormatter={(value) => `$${value}`} tickLine={false} axisLine={false} width={58} />
@@ -203,6 +204,42 @@ function BurnRateChart({ burnRate }: { burnRate: BurnRate }) {
   )
 }
 
+function burnRateGradientStops(series: BurnRatePoint[]) {
+  const values = series
+    .map((point) => point.variance)
+    .filter((value): value is number => value !== null && value !== undefined)
+
+  if (!values.length) {
+    return [
+      { offset: "0%", color: "hsl(var(--chart-1))" },
+      { offset: "100%", color: "hsl(var(--chart-1))" },
+    ]
+  }
+
+  const min = Math.min(...values)
+  const max = Math.max(...values)
+  if (max <= 0) {
+    return [
+      { offset: "0%", color: "hsl(var(--success))" },
+      { offset: "100%", color: "hsl(var(--success))" },
+    ]
+  }
+  if (min >= 0) {
+    return [
+      { offset: "0%", color: "hsl(var(--destructive))" },
+      { offset: "100%", color: "hsl(var(--destructive))" },
+    ]
+  }
+
+  const zeroOffset = `${(max / (max - min)) * 100}%`
+  return [
+    { offset: "0%", color: "hsl(var(--destructive))" },
+    { offset: zeroOffset, color: "hsl(var(--destructive))" },
+    { offset: zeroOffset, color: "hsl(var(--success))" },
+    { offset: "100%", color: "hsl(var(--success))" },
+  ]
+}
+
 type BurnRateTooltipPayload = {
   payload?: BurnRatePoint
 }
@@ -250,6 +287,36 @@ function BurnRateTooltipContent({
   )
 }
 
+function BurnRateMetricCard({ burnRate }: { burnRate: BurnRate | null }) {
+  if (!burnRate) {
+    return <MetricCard label="Burn Rate" value={null} />
+  }
+
+  const isOver = burnRate.status === "over"
+  const isNotStarted = burnRate.status === "not_started"
+  const isOnPace = !isNotStarted && burnRate.totalDifference === 0
+  const statusLabel = isNotStarted
+    ? "Not started"
+    : isOnPace
+      ? "On pace"
+      : `${isOver ? "Over" : "Under"} ${formatMoney(Math.abs(burnRate.totalDifference))}`
+  const dailyLabel = isNotStarted
+    ? "No daily pace yet"
+    : `${burnRate.dailyDifference >= 0 ? "+" : ""}${formatMoney(burnRate.dailyDifference)}/day`
+
+  return (
+    <Card>
+      <CardContent className="bb-metric-card">
+        <div className="bb-metric-label">Burn Rate</div>
+        <div className={isOver ? "bb-metric-value bb-negative" : "bb-metric-value bb-positive"}>
+          {statusLabel}
+        </div>
+        <div className="bb-metric-note">{dailyLabel}</div>
+      </CardContent>
+    </Card>
+  )
+}
+
 function MetricCard({
   label,
   value,
@@ -283,7 +350,15 @@ function CategoryMixChart({ data, total }: { data: BreakdownItem[]; total: numbe
         <ResponsiveContainer width="100%" height={330}>
           <PieChart>
             <ChartTooltip content={<ChartTooltipContent />} />
-            <Pie data={data} dataKey="amount" nameKey="label" innerRadius={72} outerRadius={122} paddingAngle={1}>
+            <Pie
+              data={data}
+              dataKey="amount"
+              nameKey="label"
+              innerRadius={72}
+              outerRadius={122}
+              paddingAngle={1}
+              label={renderPieMetricLabel}
+            >
               {data.map((item) => (
                 <Cell key={item.key} fill={item.color} />
               ))}
@@ -310,6 +385,17 @@ function CategoryMixChart({ data, total }: { data: BreakdownItem[]; total: numbe
       </div>
     </div>
   )
+}
+
+function renderPieMetricLabel(props: unknown) {
+  const { name, value, payload } = props as {
+    name?: string
+    value?: number
+    payload?: BreakdownItem
+  }
+  const label = payload?.label ?? name ?? ""
+  const amount = payload?.amount ?? Number(value ?? 0)
+  return `${label} ${formatMoney(amount)}`
 }
 
 function DailySpendingChart({ data, total, daysInMonth }: { data: AmountRow[]; total: number; daysInMonth: number }) {
@@ -376,28 +462,33 @@ function BudgetGroupChart({ data }: { data: AmountRow[] }) {
 }
 
 function MerchantChart({ data }: { data: AmountRow[] }) {
-  const rows = data.slice(0, 8)
+  const rows = data.slice(0, 10)
   return (
-    <div className="bb-chart-layout">
-      <ChartContainer config={{ amount: { label: "Amount", color: "hsl(var(--chart-4))" } }} className="bb-chart-box">
-        <ResponsiveContainer width="100%" height={340}>
-          <BarChart data={rows} layout="vertical" margin={{ top: 12, right: 20, left: 20, bottom: 12 }}>
-            <CartesianGrid horizontal={false} strokeDasharray="3 3" />
-            <XAxis type="number" tickFormatter={(value) => `$${value}`} tickLine={false} axisLine={false} />
-            <YAxis dataKey="label" type="category" width={128} tickLine={false} axisLine={false} />
-            <ChartTooltip content={<ChartTooltipContent />} />
-            <Bar dataKey="amount" name="Merchant total" fill="hsl(var(--chart-4))" radius={[0, 6, 6, 0]} />
-          </BarChart>
-        </ResponsiveContainer>
-      </ChartContainer>
-      <div className="bb-chart-side">
-        <div>
-          <div className="bb-chart-kicker">Merchant Concentration</div>
-          <div className="bb-chart-total">{rows.length}</div>
-        </div>
-        <StatList rows={rows.slice(0, 4).map((item) => [item.label, formatMoney(item.amount)])} />
-      </div>
-    </div>
+    <ChartContainer config={{ amount: { label: "Amount", color: "hsl(var(--chart-4))" } }} className="bb-merchant-chart-box">
+      <ResponsiveContainer width="100%" height={360}>
+        <BarChart data={rows} layout="vertical" margin={{ top: 12, right: 22, left: 20, bottom: 12 }}>
+          <CartesianGrid horizontal={false} strokeDasharray="3 3" />
+          <XAxis type="number" tickFormatter={(value) => `$${value}`} tickLine={false} axisLine={false} />
+          <YAxis dataKey="label" type="category" width={148} tickLine={false} axisLine={false} />
+          <ChartTooltip content={<ChartTooltipContent />} />
+          <Bar dataKey="amount" name="Merchant total" fill="hsl(var(--chart-4))" radius={[0, 6, 6, 0]} />
+        </BarChart>
+      </ResponsiveContainer>
+    </ChartContainer>
+  )
+}
+
+function MerchantSummaryCard({ rows }: { rows: AmountRow[] }) {
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle>Frequent Merchants / Locations</CardTitle>
+      </CardHeader>
+      <CardContent className="bb-merchant-summary-content">
+        <MerchantChart data={rows} />
+        <AmountTable columns={["Merchant", "Amount"]} rows={rows} />
+      </CardContent>
+    </Card>
   )
 }
 
@@ -411,19 +502,6 @@ function StatList({ rows }: { rows: [string, string][] }) {
         </div>
       ))}
     </div>
-  )
-}
-
-function ReportTable({ title, columns, rows }: { title: string; columns: [string, string]; rows: AmountRow[] }) {
-  return (
-    <Card>
-      <CardHeader>
-        <CardTitle>{title}</CardTitle>
-      </CardHeader>
-      <CardContent>
-        <AmountTable columns={columns} rows={rows} />
-      </CardContent>
-    </Card>
   )
 }
 
