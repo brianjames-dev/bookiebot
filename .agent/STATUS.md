@@ -19,6 +19,7 @@ Recent transactions and reconciliation are in manual verification mode after the
 - Daily Spending transaction category labels now use the same category colors as the expense breakdown pie chart.
 - Expense report top metrics now render in the requested order: Monthly Expenses, Monthly Income, Personal Outflows, Shared Expenses, Remaining Needs Budget, Remaining Wants Budget, Amount Saved, and Income After Expenses.
 - Remaining Wants Budget is pulled from the second money value on the Budget sheet margins row, and Amount Saved sums Check 1 Deposit and Check 2 Deposit cells from the Budget sheet.
+- Daily Spending chart average now divides shared spending by every calendar day in the selected month instead of only days with logged expenses.
 
 ## Completed 2026-07-03
 
@@ -177,6 +178,8 @@ Use a test row or low-risk real row in Discord:
    - Expected: the title card and content cards have matching left/right gutters, the eight metric cards render as four two-card rows, and the page has no document-level horizontal scroll.
 40. Open the Daily Spending table in the expense breakdown report.
    - Expected: each bold category label uses the same color as that category in the breakdown pie chart and legend.
+41. Open the Daily Spending chart in a report for a known month.
+   - Expected: Average day equals shared spending divided by the total calendar days in that selected month.
 
 ## Verification Baseline
 
@@ -207,6 +210,9 @@ Headless Chrome mobile emulation for generated report HTML at 320px and 390px
 
 Headless Chrome mobile emulation for generated report HTML at 390px
 # top metric card labels/values matched requested order; Daily Spending category colors matched breakdown legend colors.
+
+Headless Chrome mobile emulation for generated June report HTML
+# Daily Spending tab showed Average day $10.00 for $300 shared spending across 30 calendar days.
 
 python -m pytest unit_tests
 # 348 passed, 1 skipped

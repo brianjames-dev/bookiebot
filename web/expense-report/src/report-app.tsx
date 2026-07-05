@@ -78,7 +78,7 @@ export function ExpenseReportApp({ report }: { report: ExpenseReportData }) {
                 <CategoryMixChart data={report.breakdown} total={report.metrics.totalExpenses} />
               </TabsContent>
               <TabsContent value="daily">
-                <DailySpendingChart data={report.dailyTotals} total={report.metrics.sharedExpenses} />
+                <DailySpendingChart data={report.dailyTotals} total={report.metrics.sharedExpenses} daysInMonth={report.daysInMonth} />
               </TabsContent>
               <TabsContent value="groups">
                 <BudgetGroupChart data={report.budgetGroups} />
@@ -192,8 +192,9 @@ function CategoryMixChart({ data, total }: { data: BreakdownItem[]; total: numbe
   )
 }
 
-function DailySpendingChart({ data, total }: { data: AmountRow[]; total: number }) {
+function DailySpendingChart({ data, total, daysInMonth }: { data: AmountRow[]; total: number; daysInMonth: number }) {
   const peak = data.reduce<AmountRow | null>((best, item) => (!best || item.amount > best.amount ? item : best), null)
+  const averageDaySpend = daysInMonth ? total / daysInMonth : 0
   return (
     <div className="bb-chart-layout">
       <ChartContainer config={{ amount: { label: "Amount", color: "hsl(var(--chart-1))" } }} className="bb-chart-box">
@@ -215,7 +216,7 @@ function DailySpendingChart({ data, total }: { data: AmountRow[]; total: number 
         <StatList
           rows={[
             ["Tracked days", String(data.length)],
-            ["Average active day", formatMoney(data.length ? total / data.length : 0)],
+            ["Average day", formatMoney(averageDaySpend)],
             ["Highest day", peak ? `${peak.label} - ${formatMoney(peak.amount)}` : "N/A"],
           ]}
         />

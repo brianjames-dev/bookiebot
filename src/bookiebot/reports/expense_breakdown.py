@@ -877,6 +877,7 @@ def _report_client_payload(
     return {
         "ownerName": report.owner_name,
         "monthLabel": report.month.label,
+        "daysInMonth": calendar.monthrange(report.month.year, report.month.month)[1],
         "generatedAt": report.generated_at.strftime("%b %-d, %Y %-I:%M %p %Z"),
         "metrics": {
             "totalExpenses": report.grand_total,
@@ -994,7 +995,7 @@ def _analytics_section(
     </div>
   </div>
   {_category_chart_panel(breakdown_items, report.grand_total)}
-  {_daily_chart_panel(daily_totals, report.shared_total)}
+  {_daily_chart_panel(daily_totals, report.shared_total, calendar.monthrange(report.month.year, report.month.month)[1])}
   {_budget_group_chart_panel(budget_group_totals)}
 </section>"""
 
@@ -1016,7 +1017,7 @@ def _category_chart_panel(items: list[tuple[str, dict[str, Any]]], grand_total: 
 </div>"""
 
 
-def _daily_chart_panel(daily_totals: list[tuple[str, float]], shared_total: float) -> str:
+def _daily_chart_panel(daily_totals: list[tuple[str, float]], shared_total: float, days_in_month: int) -> str:
     return f"""<div id="chart-daily" class="chart-panel" role="tabpanel" data-chart-panel="daily" hidden>
   <div class="chart-grid">
     {_daily_bar_chart(daily_totals)}
@@ -1025,7 +1026,7 @@ def _daily_chart_panel(daily_totals: list[tuple[str, float]], shared_total: floa
         <div class="chart-kicker">Daily Spending</div>
         <div class="chart-total">{_money(shared_total)}</div>
       </div>
-      {_daily_stat_rows(daily_totals)}
+      {_daily_stat_rows(daily_totals, days_in_month)}
     </div>
   </div>
 </div>"""
@@ -1076,15 +1077,15 @@ def _daily_bar_chart(daily_totals: list[tuple[str, float]]) -> str:
     return f'<div class="chart-bars" role="img" aria-label="Daily spending bar chart">{bars}</div>'
 
 
-def _daily_stat_rows(daily_totals: list[tuple[str, float]]) -> str:
+def _daily_stat_rows(daily_totals: list[tuple[str, float]], days_in_month: int) -> str:
     if not daily_totals:
         return '<div class="empty">No daily spending found.</div>'
     total = round(sum(amount for _label, amount in daily_totals), 2)
-    average = round(total / len(daily_totals), 2)
+    average = round(total / days_in_month, 2) if days_in_month else 0.0
     peak_label, peak_amount = max(daily_totals, key=lambda item: item[1])
     return f"""<div class="stat-list">
   <div class="stat-row"><span>Tracked days</span><strong>{len(daily_totals)}</strong></div>
-  <div class="stat-row"><span>Average active day</span><strong>{_money(average)}</strong></div>
+  <div class="stat-row"><span>Average day</span><strong>{_money(average)}</strong></div>
   <div class="stat-row"><span>Highest day</span><strong>{_escape(peak_label)} - {_money(peak_amount)}</strong></div>
 </div>"""
 

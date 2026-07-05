@@ -46,6 +46,7 @@ export interface Metrics {
 export interface ExpenseReportData {
   ownerName: string
   monthLabel: string
+  daysInMonth: number
   generatedAt: string
   metrics: Metrics
   breakdown: BreakdownItem[]

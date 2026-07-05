@@ -122,6 +122,7 @@ def test_build_expense_breakdown_report_aggregates_shared_and_personal_data():
         "Bills & Utilities",
         "Subscriptions (Needs)",
     ]
+    assert payload["daysInMonth"] == 31
     assert payload["dailyTotals"] == [
         {"label": "1", "amount": 50.0},
         {"label": "2", "amount": 25.0},
