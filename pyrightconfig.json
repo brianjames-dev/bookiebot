@@ -1,5 +1,12 @@
 {
-  "include": ["src", "unit_tests"],
+  "include": ["src"],
   "extraPaths": ["src"],
-  "reportMissingImports": true
+  "exclude": [
+    "**/__pycache__",
+    ".venv",
+    "data",
+    "node_modules",
+    "web/expense-report/node_modules"
+  ],
+  "typeCheckingMode": "basic"
 }

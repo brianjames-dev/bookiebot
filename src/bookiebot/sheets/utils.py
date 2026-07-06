@@ -11,6 +11,7 @@ from collections import defaultdict, Counter
 from bookiebot.sheets.routing import get_user_config, resolve_actor_key, UnknownDiscordUserError
 
 import gspread
+from gspread.utils import rowcol_to_a1
 from bookiebot.sheets.repo import get_sheets_repo
 from bookiebot.sheets.routing import get_current_discord_user_id
 from bookiebot.sheets.undo import UndoAction, record_undo_action
@@ -1507,7 +1508,7 @@ def log_payment(category_label, amount):
         label_cell = row[1].strip().lower()  # Column B
         if label_cell.startswith(category_label.lower()):
             # Write to column C (3)
-            cell_to_update = gspread.utils.rowcol_to_a1(row_idx + 1, 3)
+            cell_to_update = rowcol_to_a1(row_idx + 1, 3)
             previous_value = ws.acell(cell_to_update).value
             ws.update_acell(cell_to_update, str(amount))
 
@@ -1675,7 +1676,7 @@ def log_1st_savings(amount):
             raise ValueError("Could not find 'Enter 1st Paycheck Deposit'")
 
         row, col = cell.row, cell.col
-        target_cell = gspread.utils.rowcol_to_a1(row, col + 3)
+        target_cell = rowcol_to_a1(row, col + 3)
         previous_value = ws.acell(target_cell).value
 
         ws.update_acell(target_cell, str(amount))
@@ -1712,7 +1713,7 @@ def log_2nd_savings(amount):
             raise ValueError("Could not find 'Enter 2nd Paycheck Deposit'")
 
         row, col = cell.row, cell.col
-        target_cell = gspread.utils.rowcol_to_a1(row, col + 3)
+        target_cell = rowcol_to_a1(row, col + 3)
         previous_value = ws.acell(target_cell).value
 
         ws.update_acell(target_cell, str(amount))

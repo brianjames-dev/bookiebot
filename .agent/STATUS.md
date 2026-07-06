@@ -22,6 +22,7 @@ Recent transactions and reconciliation are in manual verification mode after the
 - Expense report subscription tables now include all active subscriptions from the Subscriptions sheet, including yearly items outside the selected report month such as Amazon Prime and MacroFactor, while fallback monthly bucket totals remain selected-month scoped.
 - Rebuilt the embedded React expense report assets and added regression coverage for fixed commitments, subscription table completeness, and the combined expense highlights card labels.
 - Expense report subscriptions now render as one tabbed Needs/Wants card with a selected-month calendar visual above each source-of-truth itemized list; monthly subscriptions appear in the selected month, while yearly subscriptions only appear on the calendar for their pull month.
+- Pyright is now installed through `requirements.txt` with a source-focused `basic` config, and the source modules touched to satisfy the initial gate now pass `python -m pyright`.
 
 ## Completed 2026-07-05
 
@@ -233,17 +234,17 @@ cd web/expense-report && npm run build
 python -m pytest unit_tests/reports/test_expense_breakdown.py
 # passed: 8 passed
 
-python -m py_compile src/bookiebot/reports/expense_breakdown.py
+python -m py_compile src/bookiebot/core/bank_reconciliation.py src/bookiebot/core/subscription_reminders.py src/bookiebot/intents/handlers.py src/bookiebot/reports/expense_breakdown.py src/bookiebot/reports/web.py src/bookiebot/sheets/auth.py src/bookiebot/sheets/utils.py
 # passed
 
-git diff --check
+python -m pyright
 # passed
 
 python -m pytest unit_tests
 # passed: 352 passed, 1 skipped
 
-python -m pyright
-# failed: /opt/anaconda3/bin/python: No module named pyright
+git diff --check
+# passed
 ```
 
 Previous supporting checks:

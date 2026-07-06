@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from collections import Counter, defaultdict
+from collections import defaultdict
 from dataclasses import dataclass, field
 from datetime import datetime
 import calendar
@@ -865,11 +865,14 @@ def _person_totals(entries: list[ExpenseEntry]) -> list[tuple[str, float]]:
 
 
 def _merchant_totals(entries: list[ExpenseEntry]) -> list[tuple[str, float]]:
-    totals: Counter[str] = Counter()
+    totals: dict[str, float] = defaultdict(float)
     for entry in entries:
         merchant = entry.location or entry.item or entry.category
         totals[merchant] += entry.amount
-    return [(name, round(amount, 2)) for name, amount in totals.most_common(10)]
+    return [
+        (name, round(amount, 2))
+        for name, amount in sorted(totals.items(), key=lambda item: item[1], reverse=True)[:10]
+    ]
 
 
 def _report_filename(report: ExpenseBreakdownReport) -> str:

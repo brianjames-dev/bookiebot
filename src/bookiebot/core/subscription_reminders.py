@@ -6,7 +6,8 @@ from dataclasses import dataclass
 from datetime import date, datetime
 import logging
 import os
-from typing import Any
+from collections.abc import Awaitable, Callable
+from typing import Any, cast
 
 from bookiebot.sheets.routing import (
     APPLE_SHORTCUT_RELAY_USER_ID,
@@ -166,7 +167,8 @@ async def _target_user(client: Any, actor_key: str) -> Any | None:
             return user
     fetch_user = getattr(client, "fetch_user", None)
     if callable(fetch_user):
-        return await fetch_user(user_id)
+        async_fetch_user = cast(Callable[[int], Awaitable[Any]], fetch_user)
+        return await async_fetch_user(user_id)
     return None
 
 
@@ -176,7 +178,8 @@ async def _send_user_dm(client: Any, actor_key: str, content: str, **kwargs: Any
     if not callable(send):
         return False
     try:
-        await send(content, **kwargs)
+        async_send = cast(Callable[..., Awaitable[Any]], send)
+        await async_send(content, **kwargs)
         return True
     except Exception:
         logger.exception("Failed to send subscription reminder DM", extra={"actor_key": actor_key})

@@ -78,7 +78,7 @@ def register_report_routes(app: web.Application) -> None:
     app.router.add_get("/reports/{name}", _serve_report)
 
 
-async def _serve_expense_breakdown_report(request: web.Request) -> web.Response:
+async def _serve_expense_breakdown_report(request: web.Request) -> web.StreamResponse:
     token = request.query.get("token", "").strip()
     try:
         payload = _verify_expense_report_token(token)

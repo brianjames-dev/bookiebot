@@ -1,5 +1,6 @@
 import json
 import os
+from typing import Any, cast
 
 try:
     import gspread
@@ -29,7 +30,7 @@ from bookiebot.sheets.routing import (
 load_dotenv()
 
 SCOPES = ["https://www.googleapis.com/auth/spreadsheets"]
-_GC = None
+_GC: Any = None
 _ACTION_LOG_WORKSHEET_BY_TITLE = {}
 _SUBSCRIPTION_SCHEDULE_WORKSHEET_BY_KEY = {}
 _BILL_SCHEDULE_WORKSHEET_BY_KEY = {}
@@ -45,9 +46,10 @@ def _get_gc():
             raise RuntimeError("GOOGLE_SERVICE_ACCOUNT_JSON not set in environment.")
         info = json.loads(service_account_json)
         creds = Credentials.from_service_account_info(info, scopes=SCOPES)
-        _GC = gspread.authorize(creds)
+        gspread_client = cast(Any, gspread)
+        _GC = gspread_client.authorize(creds)
         try:
-            _GC.bookiebot_service_account_email = str(info.get("client_email") or "")
+            setattr(_GC, "bookiebot_service_account_email", str(info.get("client_email") or ""))
         except Exception:
             pass
     return _GC

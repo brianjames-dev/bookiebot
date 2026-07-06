@@ -12,6 +12,7 @@ kaleido==0.2.1
 rapidfuzz
 pytest
 pytest-asyncio==0.23.8
+pyright
 vcrpy
 aiohttp
 audioop-lts; python_version >= "3.13"

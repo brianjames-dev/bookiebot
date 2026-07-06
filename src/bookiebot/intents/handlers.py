@@ -256,10 +256,11 @@ async def _send_recent_private_message(message: Any, content: str, public_ack: s
     chunks = _discord_message_chunks(content)
     author_send = getattr(getattr(message, "author", None), "send", None)
     if callable(author_send):
+        async_author_send = cast(Callable[..., Awaitable[Any]], author_send)
         try:
             for index, chunk in enumerate(chunks):
                 chunk_kwargs = kwargs if index == len(chunks) - 1 else {}
-                await author_send(chunk, **chunk_kwargs)
+                await async_author_send(chunk, **chunk_kwargs)
         except Exception:
             await message.channel.send("❌ I could not send that recent transaction workflow privately. Please check your DM settings.")
             return
