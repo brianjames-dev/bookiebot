@@ -230,6 +230,130 @@ body {
   min-height: 360px;
 }
 
+.bb-subscription-card-content,
+.bb-subscription-panel {
+  display: grid;
+  gap: 18px;
+}
+
+.bb-subscription-summary {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 14px;
+  min-width: 0;
+}
+
+.bb-subscription-total {
+  margin-top: 4px;
+  font-size: 28px;
+  font-weight: 780;
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+}
+
+.bb-subscription-calendar {
+  display: grid;
+  gap: 8px;
+  min-width: 0;
+}
+
+.bb-calendar-head,
+.bb-calendar-grid {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  gap: 6px;
+}
+
+.bb-calendar-head span {
+  color: hsl(var(--muted-foreground));
+  font-size: 12px;
+  font-weight: 700;
+  text-align: center;
+}
+
+.bb-calendar-day {
+  display: grid;
+  align-content: start;
+  gap: 6px;
+  min-width: 0;
+  min-height: 92px;
+  padding: 7px;
+  border: 1px solid hsl(var(--border));
+  border-radius: var(--radius);
+  background: hsl(var(--card));
+}
+
+.bb-calendar-day-muted {
+  background: hsl(var(--muted) / 0.08);
+  opacity: 0.5;
+}
+
+.bb-calendar-day-has-items {
+  border-color: hsl(var(--muted) / 0.42);
+  box-shadow: inset 0 0 0 1px hsl(var(--muted) / 0.08);
+}
+
+.bb-calendar-day-number {
+  color: hsl(var(--muted-foreground));
+  font-size: 12px;
+  font-weight: 750;
+  line-height: 1;
+}
+
+.bb-calendar-marker-stack {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+}
+
+.bb-subscription-marker {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  width: 100%;
+  min-width: 0;
+  min-height: 22px;
+  padding: 3px 6px;
+  border: 1px solid currentColor;
+  border-radius: 999px;
+  cursor: help;
+  font: inherit;
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 1;
+  overflow: hidden;
+  text-align: left;
+  white-space: nowrap;
+}
+
+.bb-subscription-marker-dot {
+  width: 6px;
+  height: 6px;
+  flex: 0 0 auto;
+  border-radius: 999px;
+  background: currentColor;
+}
+
+.bb-subscription-marker-name,
+.bb-subscription-marker-amount {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.bb-subscription-marker-name {
+  min-width: 0;
+}
+
+.bb-subscription-marker-amount {
+  flex: 0 0 auto;
+  font-variant-numeric: tabular-nums;
+}
+
+.bb-subscription-marker-more {
+  justify-content: center;
+}
+
 .bb-analytics-card .bb-card-content {
   padding-top: 14px;
 }
@@ -597,5 +721,72 @@ tr:last-child td {
 
   .bb-insight-chart-box {
     min-height: 300px;
+  }
+}
+
+@media (max-width: 640px) {
+  .bb-subscription-summary {
+    display: grid;
+  }
+
+  .bb-subscription-total {
+    font-size: 24px;
+  }
+
+  .bb-calendar-day {
+    min-height: 72px;
+    padding: 6px;
+  }
+
+  .bb-subscription-marker {
+    padding-inline: 5px;
+  }
+
+  .bb-subscription-marker-amount {
+    display: none;
+  }
+}
+
+@media (max-width: 520px) {
+  .bb-calendar-head,
+  .bb-calendar-grid {
+    gap: 4px;
+  }
+
+  .bb-calendar-head span {
+    font-size: 10px;
+  }
+
+  .bb-calendar-day {
+    min-height: 54px;
+    padding: 5px;
+  }
+
+  .bb-calendar-day-number {
+    font-size: 11px;
+  }
+
+  .bb-calendar-marker-stack {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 3px;
+  }
+
+  .bb-subscription-marker {
+    width: 20px;
+    min-height: 18px;
+    justify-content: center;
+    padding: 0;
+  }
+
+  .bb-subscription-marker-name {
+    display: none;
+  }
+
+  .bb-subscription-marker-more {
+    width: auto;
+    min-width: 20px;
+    padding: 0 4px;
+    font-size: 10px;
   }
 }

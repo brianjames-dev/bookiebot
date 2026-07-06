@@ -146,6 +146,8 @@ def test_build_expense_breakdown_report_aggregates_shared_and_personal_data():
         "Bills & Utilities",
         "Subscriptions (Needs)",
     ]
+    assert payload["year"] == 2026
+    assert payload["month"] == 5
     assert payload["daysInMonth"] == 31
     assert payload["elapsedDays"] == 31
     assert payload["dailyTotals"] == [
@@ -205,6 +207,8 @@ def test_build_expense_breakdown_report_aggregates_shared_and_personal_data():
     assert "Frequent Merchants" in html
     assert "Largest Shared Expenses" not in html
     assert "Frequent Merchants / Locations" not in html
+    assert "Subscription calendar" in html
+    assert "bb-subscription-calendar" in html
     assert "Highest day" in html
     assert "Days counted" in html
     assert "Daily Spending" in html

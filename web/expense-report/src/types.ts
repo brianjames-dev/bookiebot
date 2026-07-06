@@ -71,6 +71,8 @@ export interface BurnRatePoint {
 export interface ExpenseReportData {
   ownerName: string
   monthLabel: string
+  year: number
+  month: number
   daysInMonth: number
   elapsedDays: number
   generatedAt: string

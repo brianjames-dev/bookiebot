@@ -919,6 +919,8 @@ def _report_client_payload(
     return {
         "ownerName": report.owner_name,
         "monthLabel": report.month.label,
+        "year": report.month.year,
+        "month": report.month.month,
         "daysInMonth": days_in_month,
         "elapsedDays": elapsed_days,
         "generatedAt": report.generated_at.strftime("%b %-d, %Y %-I:%M %p %Z"),

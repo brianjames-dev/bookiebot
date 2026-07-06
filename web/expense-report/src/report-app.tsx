@@ -131,10 +131,13 @@ export function ExpenseReportApp({ report }: { report: ExpenseReportData }) {
           <PaymentTable title="Bills & Utilities" items={report.utilityPayments} />
         </section>
 
-        <section className="bb-two-grid">
-          <SubscriptionTable title="Subscriptions (Needs)" items={report.subscriptionsNeeds} />
-          <SubscriptionTable title="Subscriptions (Wants)" items={report.subscriptionsWants} />
-        </section>
+        <SubscriptionCalendarCard
+          year={report.year}
+          month={report.month}
+          monthLabel={report.monthLabel}
+          needs={report.subscriptionsNeeds}
+          wants={report.subscriptionsWants}
+        />
 
         <PaymentTable title="Income Entries" items={report.incomeEntries} />
       </main>
@@ -916,44 +919,253 @@ function PaymentTable({ title, items }: { title: string; items: PaymentItem[] })
   )
 }
 
-function SubscriptionTable({ title, items }: { title: string; items: SubscriptionItem[] }) {
+type SubscriptionTone = "needs" | "wants"
+
+const SUBSCRIPTION_TONES: Record<SubscriptionTone, { label: string; color: string; background: string }> = {
+  needs: {
+    label: "Needs",
+    color: "#2563eb",
+    background: "rgb(37 99 235 / 0.1)",
+  },
+  wants: {
+    label: "Wants",
+    color: "#7c3aed",
+    background: "rgb(124 58 237 / 0.1)",
+  },
+}
+
+const WEEKDAY_LABELS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"]
+
+function SubscriptionCalendarCard({
+  year,
+  month,
+  monthLabel,
+  needs,
+  wants,
+}: {
+  year: number
+  month: number
+  monthLabel: string
+  needs: SubscriptionItem[]
+  wants: SubscriptionItem[]
+}) {
   return (
     <Card>
       <CardHeader>
-        <CardTitle>{title}</CardTitle>
+        <CardTitle>Subscriptions</CardTitle>
+        <CardDescription>Subscription calendar and source-of-truth itemized lists for {monthLabel}.</CardDescription>
       </CardHeader>
-      <CardContent>
-        {!items.length ? (
-          <div className="bb-empty">No matching subscriptions found.</div>
-        ) : (
-          <div className="bb-table-wrap">
-            <table>
-              <thead>
-                <tr>
-                  <th>Name</th>
-                  <th>Kind</th>
-                  <th>Cadence</th>
-                  <th>Pull Day</th>
-                  <th>Amount</th>
-                </tr>
-              </thead>
-              <tbody>
-                {items.map((item) => (
-                  <tr key={`${item.name}-${item.amount}`}>
-                    <td>{item.name}</td>
-                    <td>{item.kind || "-"}</td>
-                    <td>{item.cadence}</td>
-                    <td>{item.pullDay || "-"}</td>
-                    <td className="bb-amount">{formatMoney(item.amount)}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
+      <CardContent className="bb-subscription-card-content">
+        <Tabs defaultValue="needs">
+          <TabsList>
+            <TabsTrigger value="needs">Needs</TabsTrigger>
+            <TabsTrigger value="wants">Wants</TabsTrigger>
+          </TabsList>
+          <TabsContent value="needs">
+            <SubscriptionPanel year={year} month={month} monthLabel={monthLabel} items={needs} tone="needs" />
+          </TabsContent>
+          <TabsContent value="wants">
+            <SubscriptionPanel year={year} month={month} monthLabel={monthLabel} items={wants} tone="wants" />
+          </TabsContent>
+        </Tabs>
       </CardContent>
     </Card>
   )
+}
+
+function SubscriptionPanel({
+  year,
+  month,
+  monthLabel,
+  items,
+  tone,
+}: {
+  year: number
+  month: number
+  monthLabel: string
+  items: SubscriptionItem[]
+  tone: SubscriptionTone
+}) {
+  const total = items.reduce((sum, item) => sum + item.amount, 0)
+  const scheduledCount = items.filter((item) => subscriptionDayInMonth(item, year, month) !== null).length
+  const toneConfig = SUBSCRIPTION_TONES[tone]
+
+  return (
+    <div className="bb-subscription-panel">
+      <div className="bb-subscription-summary">
+        <div>
+          <div className="bb-chart-kicker">{toneConfig.label} subscriptions</div>
+          <div className="bb-subscription-total" style={{ color: toneConfig.color }}>
+            {formatMoney(total)}
+          </div>
+        </div>
+        <Badge variant="secondary">
+          {scheduledCount} in {monthLabel}
+        </Badge>
+      </div>
+      <SubscriptionCalendar year={year} month={month} items={items} tone={tone} />
+      <SubscriptionItemsTable items={items} />
+    </div>
+  )
+}
+
+function SubscriptionCalendar({
+  year,
+  month,
+  items,
+  tone,
+}: {
+  year: number
+  month: number
+  items: SubscriptionItem[]
+  tone: SubscriptionTone
+}) {
+  const toneConfig = SUBSCRIPTION_TONES[tone]
+  const daysInMonth = new Date(year, month, 0).getDate()
+  const leadingBlankDays = new Date(year, month - 1, 1).getDay()
+  const cellCount = Math.ceil((leadingBlankDays + daysInMonth) / 7) * 7
+  const days = Array.from({ length: cellCount }, (_, index) => {
+    const day = index - leadingBlankDays + 1
+    return day >= 1 && day <= daysInMonth ? day : null
+  })
+  const itemsByDay = subscriptionsByDay(items, year, month)
+
+  return (
+    <div className="bb-subscription-calendar" aria-label={`${toneConfig.label} subscription calendar`}>
+      <div className="bb-calendar-head" aria-hidden="true">
+        {WEEKDAY_LABELS.map((label) => (
+          <span key={label}>{label}</span>
+        ))}
+      </div>
+      <div className="bb-calendar-grid">
+        {days.map((day, index) => {
+          const dayItems = day === null ? [] : itemsByDay.get(day) ?? []
+          const visibleItems = dayItems.slice(0, 3)
+          const hiddenCount = Math.max(dayItems.length - visibleItems.length, 0)
+          return (
+            <div
+              key={`${day ?? "blank"}-${index}`}
+              className={[
+                "bb-calendar-day",
+                day === null ? "bb-calendar-day-muted" : "",
+                dayItems.length ? "bb-calendar-day-has-items" : "",
+              ].filter(Boolean).join(" ")}
+              aria-hidden={day === null}
+            >
+              {day === null ? null : (
+                <>
+                  <div className="bb-calendar-day-number">{day}</div>
+                  <div className="bb-calendar-marker-stack">
+                    {visibleItems.map((item, itemIndex) => (
+                      <button
+                        type="button"
+                        key={`${item.name}-${item.amount}-${itemIndex}`}
+                        className="bb-subscription-marker"
+                        style={{
+                          color: toneConfig.color,
+                          backgroundColor: toneConfig.background,
+                          borderColor: toneConfig.color,
+                        }}
+                        title={subscriptionMarkerTitle(item)}
+                        aria-label={subscriptionMarkerTitle(item)}
+                      >
+                        <span className="bb-subscription-marker-dot" />
+                        <span className="bb-subscription-marker-name">{item.name}</span>
+                        <span className="bb-subscription-marker-amount">{formatMoney(item.amount)}</span>
+                      </button>
+                    ))}
+                    {hiddenCount ? (
+                      <span
+                        className="bb-subscription-marker bb-subscription-marker-more"
+                        style={{
+                          color: toneConfig.color,
+                          backgroundColor: toneConfig.background,
+                          borderColor: toneConfig.color,
+                        }}
+                        title={`${hiddenCount} more subscription${hiddenCount === 1 ? "" : "s"} on day ${day}`}
+                      >
+                        +{hiddenCount} more
+                      </span>
+                    ) : null}
+                  </div>
+                </>
+              )}
+            </div>
+          )
+        })}
+      </div>
+    </div>
+  )
+}
+
+function SubscriptionItemsTable({ items }: { items: SubscriptionItem[] }) {
+  if (!items.length) {
+    return <div className="bb-empty">No matching subscriptions found.</div>
+  }
+
+  return (
+    <div className="bb-table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>Name</th>
+            <th>Kind</th>
+            <th>Cadence</th>
+            <th>Pull Date</th>
+            <th>Amount</th>
+          </tr>
+        </thead>
+        <tbody>
+          {items.map((item, index) => (
+            <tr key={`${item.name}-${item.amount}-${index}`}>
+              <td>{item.name}</td>
+              <td>{item.kind || "-"}</td>
+              <td>{item.cadence}</td>
+              <td>{subscriptionPullLabel(item)}</td>
+              <td className="bb-amount">{formatMoney(item.amount)}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  )
+}
+
+function subscriptionsByDay(items: SubscriptionItem[], year: number, month: number) {
+  const grouped = new Map<number, SubscriptionItem[]>()
+  for (const item of items) {
+    const day = subscriptionDayInMonth(item, year, month)
+    if (day === null) {
+      continue
+    }
+    grouped.set(day, [...(grouped.get(day) ?? []), item])
+  }
+  return grouped
+}
+
+function subscriptionDayInMonth(item: SubscriptionItem, year: number, month: number) {
+  if (!item.pullDay) {
+    return null
+  }
+  if (item.cadence === "yearly" && item.pullMonth !== month) {
+    return null
+  }
+  const daysInMonth = new Date(year, month, 0).getDate()
+  return Math.min(item.pullDay, daysInMonth)
+}
+
+function subscriptionPullLabel(item: SubscriptionItem) {
+  if (!item.pullDay) {
+    return "-"
+  }
+  if (item.cadence === "yearly" && item.pullMonth) {
+    return `${item.pullMonth}/${item.pullDay}`
+  }
+  return String(item.pullDay)
+}
+
+function subscriptionMarkerTitle(item: SubscriptionItem) {
+  return `${item.name} - ${formatMoney(item.amount)} - ${subscriptionPullLabel(item)}`
 }
 
 function chartConfig(items: Array<AmountRow | BreakdownItem>) {
