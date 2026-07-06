@@ -433,8 +433,8 @@ function CategoryMixChart({ data, total }: { data: BreakdownItem[]; total: numbe
               innerRadius={pieLayout.innerRadius}
               outerRadius={pieLayout.outerRadius}
               paddingAngle={1}
-              label={(props) => renderPieMetricLabel(props, pieLayout)}
-              labelLine={(props) => renderPieMetricLabelLine(props, pieLayout)}
+              label={pieLayout.showLabels ? (props) => renderPieMetricLabel(props, pieLayout) : false}
+              labelLine={pieLayout.showLabels ? (props) => renderPieMetricLabelLine(props, pieLayout) : false}
             >
               {data.map((item) => (
                 <Cell key={item.key} fill={item.color} />
@@ -466,29 +466,6 @@ function CategoryMixChart({ data, total }: { data: BreakdownItem[]; total: numbe
 
 function useExpensePieLayout() {
   const isPhone = useMediaQuery("(max-width: 520px)")
-  const isNarrowPhone = useMediaQuery("(max-width: 360px)")
-
-  if (isNarrowPhone) {
-    return {
-      chartHeight: 220,
-      innerRadius: 22,
-      outerRadius: 32,
-      labelOffset: 6,
-      labelGap: 4,
-      compactLabel: true,
-    }
-  }
-
-  if (isPhone) {
-    return {
-      chartHeight: 250,
-      innerRadius: 30,
-      outerRadius: 46,
-      labelOffset: 8,
-      labelGap: 6,
-      compactLabel: true,
-    }
-  }
 
   return {
     chartHeight: 330,
@@ -497,6 +474,7 @@ function useExpensePieLayout() {
     labelOffset: 20,
     labelGap: PIE_METRIC_LABEL_GAP,
     compactLabel: false,
+    showLabels: !isPhone,
   }
 }
 
