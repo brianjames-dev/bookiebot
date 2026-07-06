@@ -15,7 +15,7 @@ import {
 } from "recharts"
 
 import { Badge } from "./components/ui/badge"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "./components/ui/card"
+import { Card, CardContent, CardHeader, CardTitle } from "./components/ui/card"
 import { ChartContainer, ChartTooltip, ChartTooltipContent } from "./components/ui/chart"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "./components/ui/tabs"
 import type { AmountRow, BreakdownItem, BurnRate, BurnRatePoint, ExpenseEntry, ExpenseReportData, PaymentItem, SubscriptionItem } from "./types"
@@ -34,6 +34,11 @@ function formatMoney(value: number | null | undefined) {
 
 function formatPct(value: number) {
   return `${value.toFixed(1)}%`
+}
+
+function generatedTimeLabel(value: string) {
+  const match = value.match(/(\d{1,2}:\d{2}\s+[AP]M(?:\s+[A-Z]+)?)$/)
+  return match?.[1] ?? value
 }
 
 function useMediaQuery(query: string) {
@@ -65,11 +70,9 @@ export function ExpenseReportApp({ report }: { report: ExpenseReportData }) {
       <header className="bb-page-header">
         <div>
           <h1>Expense Breakdown</h1>
-          <p>
-            {report.monthLabel} budget report for {report.ownerName}. Generated {report.generatedAt}.
-          </p>
+          <p>{report.monthLabel} budget report for {report.ownerName}.</p>
         </div>
-        <Badge variant="outline">React + shadcn/ui</Badge>
+        <Badge variant="outline">Generated {generatedTimeLabel(report.generatedAt)}</Badge>
       </header>
 
       <main className="bb-main">
@@ -88,7 +91,6 @@ export function ExpenseReportApp({ report }: { report: ExpenseReportData }) {
           <CardHeader className="bb-analytics-header">
             <div>
               <CardTitle>Budget Charts</CardTitle>
-              <CardDescription>Interactive views powered by shadcn/ui patterns and Recharts.</CardDescription>
             </div>
           </CardHeader>
           <CardContent>
@@ -116,7 +118,6 @@ export function ExpenseReportApp({ report }: { report: ExpenseReportData }) {
         <Card>
           <CardHeader>
             <CardTitle>Daily Spending</CardTitle>
-            <CardDescription>Shared transaction activity grouped by day.</CardDescription>
           </CardHeader>
           <CardContent className="bb-daily-spending-content">
             <DailySpendingChart data={report.dailyTotals} total={report.metrics.sharedExpenses} elapsedDays={report.elapsedDays} />
@@ -626,7 +627,7 @@ function DailySpendingChart({ data, total, elapsedDays }: { data: AmountRow[]; t
             <CartesianGrid vertical={false} strokeDasharray="3 3" />
             <XAxis dataKey="label" tickLine={false} axisLine={false} />
             <YAxis tickFormatter={(value) => `$${value}`} tickLine={false} axisLine={false} width={52} />
-            <ChartTooltip content={<ChartTooltipContent />} cursor={{ fill: "hsl(var(--muted) / 0.08)" }} />
+            <ChartTooltip content={<ChartTooltipContent />} cursor={{ fill: "hsl(var(--primary) / 0.1)" }} />
             <Bar dataKey="amount" name="Daily spending" fill="hsl(var(--chart-1))" radius={[6, 6, 2, 2]} />
           </BarChart>
         </ResponsiveContainer>
@@ -726,8 +727,8 @@ function ExpenseInsightsCard({ topEntries, merchantTotals }: { topEntries: Expen
       <CardContent className="bb-expense-insights-content">
         <Tabs defaultValue="largest">
           <TabsList>
-            <TabsTrigger value="largest">Largest Expenses</TabsTrigger>
-            <TabsTrigger value="merchants">Frequent Merchants</TabsTrigger>
+            <TabsTrigger value="largest">Largest</TabsTrigger>
+            <TabsTrigger value="merchants">Most Frequent</TabsTrigger>
           </TabsList>
           <TabsContent value="largest">
             <div className="bb-insight-panel">
@@ -919,9 +920,14 @@ function PaymentTable({ title, items }: { title: string; items: PaymentItem[] })
   )
 }
 
-type SubscriptionTone = "needs" | "wants"
+type SubscriptionTone = "all" | "needs" | "wants"
 
 const SUBSCRIPTION_TONES: Record<SubscriptionTone, { label: string; color: string; background: string }> = {
+  all: {
+    label: "All",
+    color: "hsl(var(--foreground))",
+    background: "hsl(var(--muted) / 0.12)",
+  },
   needs: {
     label: "Needs",
     color: "#2563eb",
@@ -949,18 +955,23 @@ function SubscriptionCalendarCard({
   needs: SubscriptionItem[]
   wants: SubscriptionItem[]
 }) {
+  const allSubscriptions = [...needs, ...wants]
+
   return (
     <Card>
       <CardHeader>
         <CardTitle>Subscriptions</CardTitle>
-        <CardDescription>Subscription calendar and source-of-truth itemized lists for {monthLabel}.</CardDescription>
       </CardHeader>
       <CardContent className="bb-subscription-card-content">
-        <Tabs defaultValue="needs">
+        <Tabs defaultValue="all">
           <TabsList>
+            <TabsTrigger value="all">All</TabsTrigger>
             <TabsTrigger value="needs">Needs</TabsTrigger>
             <TabsTrigger value="wants">Wants</TabsTrigger>
           </TabsList>
+          <TabsContent value="all">
+            <SubscriptionPanel year={year} month={month} monthLabel={monthLabel} items={allSubscriptions} tone="all" />
+          </TabsContent>
           <TabsContent value="needs">
             <SubscriptionPanel year={year} month={month} monthLabel={monthLabel} items={needs} tone="needs" />
           </TabsContent>
@@ -1056,24 +1067,28 @@ function SubscriptionCalendar({
                 <>
                   <div className="bb-calendar-day-number">{day}</div>
                   <div className="bb-calendar-marker-stack">
-                    {visibleItems.map((item, itemIndex) => (
-                      <button
-                        type="button"
-                        key={`${item.name}-${item.amount}-${itemIndex}`}
-                        className="bb-subscription-marker"
-                        style={{
-                          color: toneConfig.color,
-                          backgroundColor: toneConfig.background,
-                          borderColor: toneConfig.color,
-                        }}
-                        title={subscriptionMarkerTitle(item)}
-                        aria-label={subscriptionMarkerTitle(item)}
-                      >
-                        <span className="bb-subscription-marker-dot" />
-                        <span className="bb-subscription-marker-name">{item.name}</span>
-                        <span className="bb-subscription-marker-amount">{formatMoney(item.amount)}</span>
-                      </button>
-                    ))}
+                    {visibleItems.map((item, itemIndex) => {
+                      const markerTone = tone === "all" ? subscriptionToneForItem(item) : tone
+                      const markerToneConfig = SUBSCRIPTION_TONES[markerTone]
+                      return (
+                        <button
+                          type="button"
+                          key={`${item.name}-${item.amount}-${itemIndex}`}
+                          className="bb-subscription-marker"
+                          style={{
+                            color: markerToneConfig.color,
+                            backgroundColor: markerToneConfig.background,
+                            borderColor: markerToneConfig.color,
+                          }}
+                          title={subscriptionMarkerTitle(item)}
+                          aria-label={subscriptionMarkerTitle(item)}
+                        >
+                          <span className="bb-subscription-marker-dot" />
+                          <span className="bb-subscription-marker-name">{item.name}</span>
+                          <span className="bb-subscription-marker-amount">{formatMoney(item.amount)}</span>
+                        </button>
+                      )
+                    })}
                     {hiddenCount ? (
                       <span
                         className="bb-subscription-marker bb-subscription-marker-more"
@@ -1164,8 +1179,13 @@ function subscriptionPullLabel(item: SubscriptionItem) {
   return String(item.pullDay)
 }
 
+function subscriptionToneForItem(item: SubscriptionItem): Exclude<SubscriptionTone, "all"> {
+  const kind = item.kind.trim().toLowerCase()
+  return kind === "want" || kind === "wants" ? "wants" : "needs"
+}
+
 function subscriptionMarkerTitle(item: SubscriptionItem) {
-  return `${item.name} - ${formatMoney(item.amount)} - ${subscriptionPullLabel(item)}`
+  return `${item.name} - ${item.kind || "Subscription"} - ${formatMoney(item.amount)} - ${subscriptionPullLabel(item)}`
 }
 
 function chartConfig(items: Array<AmountRow | BreakdownItem>) {

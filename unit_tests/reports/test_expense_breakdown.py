@@ -203,12 +203,18 @@ def test_build_expense_breakdown_report_aggregates_shared_and_personal_data():
     assert "Fixed Commitments" in html
     assert "Personal Outflows" not in html
     assert "Expense Highlights" in html
-    assert "Largest Expenses" in html
-    assert "Frequent Merchants" in html
+    assert "Largest" in html
+    assert "Most Frequent" in html
+    assert "Largest Expenses" not in html
+    assert "Frequent Merchants" not in html
     assert "Largest Shared Expenses" not in html
     assert "Frequent Merchants / Locations" not in html
-    assert "Subscription calendar" in html
     assert "bb-subscription-calendar" in html
+    assert "Subscription calendar and source-of-truth itemized lists" not in html
+    assert "Interactive views powered by shadcn/ui patterns and Recharts" not in html
+    assert "Shared transaction activity grouped by day" not in html
+    assert "React + shadcn/ui" not in html
+    assert "Generated " in html
     assert "Highest day" in html
     assert "Days counted" in html
     assert "Daily Spending" in html
