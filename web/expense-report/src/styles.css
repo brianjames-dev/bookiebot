@@ -218,12 +218,13 @@ body {
   gap: 20px;
 }
 
-.bb-merchant-summary-content {
+.bb-expense-insights-content,
+.bb-insight-panel {
   display: grid;
   gap: 18px;
 }
 
-.bb-merchant-chart-box {
+.bb-insight-chart-box {
   width: 100%;
   min-width: 0;
   min-height: 360px;
@@ -594,7 +595,7 @@ tr:last-child td {
     min-height: 260px;
   }
 
-  .bb-merchant-chart-box {
+  .bb-insight-chart-box {
     min-height: 300px;
   }
 }

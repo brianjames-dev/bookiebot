@@ -124,16 +124,7 @@ export function ExpenseReportApp({ report }: { report: ExpenseReportData }) {
           </CardContent>
         </Card>
 
-        <MerchantSummaryCard rows={report.merchantTotals} />
-
-        <Card>
-          <CardHeader>
-            <CardTitle>Largest Expenses</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <ExpenseEntriesTable entries={report.topEntries} />
-          </CardContent>
-        </Card>
+        <ExpenseInsightsCard topEntries={report.topEntries} merchantTotals={report.merchantTotals} />
 
         <section className="bb-two-grid">
           <PaymentTable title="Rent" items={report.rentPayments} />
@@ -685,10 +676,31 @@ function BudgetGroupChart({ data }: { data: AmountRow[] }) {
   )
 }
 
+function TopExpensesChart({ entries }: { entries: ExpenseEntry[] }) {
+  const rows = entries.slice(0, 10).map((entry) => ({
+    label: expenseEntryItemLabel(entry),
+    amount: entry.amount,
+  }))
+
+  return (
+    <ChartContainer config={{ amount: { label: "Amount", color: "hsl(var(--chart-2))" } }} className="bb-insight-chart-box">
+      <ResponsiveContainer width="100%" height={360}>
+        <BarChart data={rows} layout="vertical" margin={{ top: 12, right: 22, left: 20, bottom: 12 }}>
+          <CartesianGrid horizontal={false} strokeDasharray="3 3" />
+          <XAxis type="number" tickFormatter={(value) => `$${value}`} tickLine={false} axisLine={false} />
+          <YAxis dataKey="label" type="category" width={148} tickLine={false} axisLine={false} />
+          <ChartTooltip content={<ChartTooltipContent />} />
+          <Bar dataKey="amount" name="Expense amount" fill="hsl(var(--chart-2))" radius={[0, 6, 6, 0]} />
+        </BarChart>
+      </ResponsiveContainer>
+    </ChartContainer>
+  )
+}
+
 function MerchantChart({ data }: { data: AmountRow[] }) {
   const rows = data.slice(0, 10)
   return (
-    <ChartContainer config={{ amount: { label: "Amount", color: "hsl(var(--chart-4))" } }} className="bb-merchant-chart-box">
+    <ChartContainer config={{ amount: { label: "Amount", color: "hsl(var(--chart-4))" } }} className="bb-insight-chart-box">
       <ResponsiveContainer width="100%" height={360}>
         <BarChart data={rows} layout="vertical" margin={{ top: 12, right: 22, left: 20, bottom: 12 }}>
           <CartesianGrid horizontal={false} strokeDasharray="3 3" />
@@ -702,15 +714,31 @@ function MerchantChart({ data }: { data: AmountRow[] }) {
   )
 }
 
-function MerchantSummaryCard({ rows }: { rows: AmountRow[] }) {
+function ExpenseInsightsCard({ topEntries, merchantTotals }: { topEntries: ExpenseEntry[]; merchantTotals: AmountRow[] }) {
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Frequent Merchants / Locations</CardTitle>
+        <CardTitle>Expense Highlights</CardTitle>
       </CardHeader>
-      <CardContent className="bb-merchant-summary-content">
-        <MerchantChart data={rows} />
-        <AmountTable columns={["Merchant", "Amount"]} rows={rows} />
+      <CardContent className="bb-expense-insights-content">
+        <Tabs defaultValue="largest">
+          <TabsList>
+            <TabsTrigger value="largest">Largest Expenses</TabsTrigger>
+            <TabsTrigger value="merchants">Frequent Merchants</TabsTrigger>
+          </TabsList>
+          <TabsContent value="largest">
+            <div className="bb-insight-panel">
+              <TopExpensesChart entries={topEntries} />
+              <TopExpensesTable entries={topEntries} />
+            </div>
+          </TabsContent>
+          <TabsContent value="merchants">
+            <div className="bb-insight-panel">
+              <MerchantChart data={merchantTotals} />
+              <AmountTable columns={["Merchant", "Amount"]} rows={merchantTotals} />
+            </div>
+          </TabsContent>
+        </Tabs>
       </CardContent>
     </Card>
   )
@@ -755,7 +783,11 @@ function AmountTable({ columns, rows }: { columns: [string, string]; rows: Amoun
   )
 }
 
-function ExpenseEntriesTable({ entries }: { entries: ExpenseEntry[] }) {
+function expenseEntryItemLabel(entry: ExpenseEntry) {
+  return entry.item || entry.location || "Transaction"
+}
+
+function TopExpensesTable({ entries }: { entries: ExpenseEntry[] }) {
   if (!entries.length) {
     return <div className="bb-empty">No shared expense entries found.</div>
   }
@@ -764,22 +796,16 @@ function ExpenseEntriesTable({ entries }: { entries: ExpenseEntry[] }) {
       <table>
         <thead>
           <tr>
-            <th>Date</th>
-            <th>Category</th>
             <th>Item</th>
-            <th>Location</th>
-            <th>Person</th>
+            <th>Category</th>
             <th>Amount</th>
           </tr>
         </thead>
         <tbody>
           {entries.map((entry, index) => (
             <tr key={`${entry.date}-${entry.category}-${entry.amount}-${index}`}>
-              <td>{entry.date}</td>
+              <td>{expenseEntryItemLabel(entry)}</td>
               <td>{entry.category}</td>
-              <td>{entry.item}</td>
-              <td>{entry.location}</td>
-              <td>{entry.person}</td>
               <td className="bb-amount">{formatMoney(entry.amount)}</td>
             </tr>
           ))}
