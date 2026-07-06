@@ -1,6 +1,6 @@
 # Agent Status
 
-Last updated: 2026-07-05
+Last updated: 2026-07-06
 
 ## Active Focus
 
@@ -13,6 +13,13 @@ Recent transactions and reconciliation are in manual verification mode after the
 3. Harden recent-action pending state across restarts/deploys, since selections currently live only in process memory.
 4. Improve targeted recent-action search so commands can find older matches, not only the latest 10 recent actions.
 5. Explore clarifying questions before logging when BookieBot is uncertain instead of guessing or silently failing.
+
+## Completed 2026-07-06
+
+- Expense report top metrics now replace the redundant `Personal Outflows` card with `Fixed Commitments`, calculated from rent, bills/utilities, subscriptions needs, and subscriptions wants.
+- Expense report pages now show Daily Spending before Frequent Merchants / Locations, and the shared-sheet largest transaction card is titled `Largest Expenses`.
+- Expense report subscription tables now include all active subscriptions from the Subscriptions sheet, including yearly items outside the selected report month such as Amazon Prime and MacroFactor, while fallback monthly bucket totals remain selected-month scoped.
+- Rebuilt the embedded React expense report assets and added regression coverage for fixed commitments and subscription table completeness.
 
 ## Completed 2026-07-05
 
@@ -153,7 +160,7 @@ Use a test row or low-risk real row in Discord:
 19. Click `View Inbox` on the reconciliation digest.
    - Expected: the DM/private inbox list shows unresolved transactions with `Reconcile Now` and `Ignore All`.
 20. Run the expense breakdown command for the current month and for a completed prior month.
-   - Expected: the report link opens a page with a `Burn Rate` tab inside Budget Charts; the tab shows a smoothed full-month daily variance line with red values above the zero baseline and green values below it; for the current month, the x-axis only includes elapsed days and the `$0` baseline remains visible even if all variance values are above or below zero; tapping several burn-rate nodes in succession shows one tooltip for the active day with variance, day spent, cumulative spent, and expected-by-day values; the active hover dot matches the red/green line color at that point and the tooltip appears at the cursor without flying in from the page corner; Category Mix pie labels show category plus amount, match their slice colors, fade in smoothly with their connector lines, and have visible spacing between text and stems on desktop widths; on phone widths, the Category Mix donut keeps the full-size chart while hiding pie labels and connector stems; the top cards begin Monthly Income, Monthly Expenses, Personal Outflows, Burn Rate; the merchant chart appears above the Frequent Merchants / Locations table with 10 merchants; Spending By Person / Card is absent; current-month pace counts elapsed days, completed months count every day in that month, and Amount Saved equals the two paycheck deposit values from column `E`, including `$0.00` when those rows are present with zero deposits.
+   - Expected: the report link opens a page with a `Burn Rate` tab inside Budget Charts; the tab shows a smoothed full-month daily variance line with red values above the zero baseline and green values below it; for the current month, the x-axis only includes elapsed days and the `$0` baseline remains visible even if all variance values are above or below zero; tapping several burn-rate nodes in succession shows one tooltip for the active day with variance, day spent, cumulative spent, and expected-by-day values; the active hover dot matches the red/green line color at that point and the tooltip appears at the cursor without flying in from the page corner; Category Mix pie labels show category plus amount, match their slice colors, fade in smoothly with their connector lines, and have visible spacing between text and stems on desktop widths; on phone widths, the Category Mix donut keeps the full-size chart while hiding pie labels and connector stems; the top cards begin Monthly Income, Monthly Expenses, Fixed Commitments, Burn Rate; Daily Spending appears before Frequent Merchants / Locations; the merchant chart appears above the Frequent Merchants / Locations table with 10 merchants; the largest shared-sheet transaction card is titled `Largest Expenses`; Spending By Person / Card is absent; current-month pace counts elapsed days, completed months count every day in that month, Amount Saved equals the two paycheck deposit values from column `E`, including `$0.00` when those rows are present with zero deposits, and subscription tables include active yearly subscriptions even when they do not pull in the selected month.
 21. If the expense breakdown command reports that a spreadsheet cannot be opened.
    - Expected: the error includes the active Google service account email so the spreadsheet share settings or deployment credential can be checked directly.
 22. Click `Reconcile Now` from either the digest or inbox view.
@@ -222,7 +229,7 @@ cd web/expense-report && npm run build
 # passed
 
 python -m pytest unit_tests/reports/test_expense_breakdown.py
-# passed: 7 passed
+# passed: 8 passed
 
 python -m py_compile src/bookiebot/reports/expense_breakdown.py
 # passed
@@ -231,7 +238,7 @@ git diff --check
 # passed
 
 python -m pytest unit_tests
-# passed: 351 passed, 1 skipped
+# passed: 352 passed, 1 skipped
 
 python -m pyright
 # failed: /opt/anaconda3/bin/python: No module named pyright

@@ -76,7 +76,7 @@ export function ExpenseReportApp({ report }: { report: ExpenseReportData }) {
         <section className="bb-metrics-grid" aria-label="Budget metrics">
           <MetricCard label="Monthly Income" value={report.metrics.monthlyIncome} />
           <MetricCard label="Monthly Expenses" value={report.metrics.totalExpenses} />
-          <MetricCard label="Personal Outflows" value={report.metrics.personalOutflows} />
+          <MetricCard label="Fixed Commitments" value={report.metrics.fixedCommitments} />
           <BurnRateMetricCard burnRate={report.burnRate} />
           <MetricCard label="Remaining Needs Budget" value={report.metrics.remainingNeedsBudget ?? report.metrics.remainingBudget} accent />
           <MetricCard label="Remaining Wants Budget" value={report.metrics.remainingWantsBudget} accent />
@@ -113,8 +113,6 @@ export function ExpenseReportApp({ report }: { report: ExpenseReportData }) {
           </CardContent>
         </Card>
 
-        <MerchantSummaryCard rows={report.merchantTotals} />
-
         <Card>
           <CardHeader>
             <CardTitle>Daily Spending</CardTitle>
@@ -126,9 +124,11 @@ export function ExpenseReportApp({ report }: { report: ExpenseReportData }) {
           </CardContent>
         </Card>
 
+        <MerchantSummaryCard rows={report.merchantTotals} />
+
         <Card>
           <CardHeader>
-            <CardTitle>Largest Shared Expenses</CardTitle>
+            <CardTitle>Largest Expenses</CardTitle>
           </CardHeader>
           <CardContent>
             <ExpenseEntriesTable entries={report.topEntries} />
@@ -898,7 +898,7 @@ function SubscriptionTable({ title, items }: { title: string; items: Subscriptio
       </CardHeader>
       <CardContent>
         {!items.length ? (
-          <div className="bb-empty">No matching subscriptions found for this month.</div>
+          <div className="bb-empty">No matching subscriptions found.</div>
         ) : (
           <div className="bb-table-wrap">
             <table>

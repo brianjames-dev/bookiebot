@@ -83,10 +83,10 @@ def test_build_expense_breakdown_report_aggregates_shared_and_personal_data():
         [],
         ["", "SUBSCRIPTIONS"],
         [],
-        ["Needs", "", "(Monthly)", "", "Wants", "", "(Monthly)", "", "Needs", "", "(Yearly)"],
-        ["", "", "", "", "", "", "", "", "", "", ""],
-        ["Recurring:", "Name:", "Amount:", "", "Recurring:", "Name:", "Amount:", "", "Date:", "Name:", "Amount:"],
-        ["5th", "Netflix", "$15.00", "", "10th", "Spotify", "$10.00", "", "6/10", "Annual App", "$99.00"],
+        ["Needs", "", "(Monthly)", "", "Wants", "", "(Monthly)", "", "Needs", "", "(Yearly)", "", "Wants", "", "(Yearly)"],
+        ["", "", "", "", "", "", "", "", "", "", "", "", "", "", ""],
+        ["Recurring:", "Name:", "Amount:", "", "Recurring:", "Name:", "Amount:", "", "Date:", "Name:", "Amount:", "", "Date:", "Name:", "Amount:"],
+        ["5th", "Netflix", "$15.00", "", "10th", "Spotify", "$10.00", "", "10/29", "Amazon Prime", "$152.90", "", "2/4", "MacroFactor", "$71.99"],
     ]
 
     report = build_expense_breakdown_report(
@@ -153,6 +153,7 @@ def test_build_expense_breakdown_report_aggregates_shared_and_personal_data():
         {"label": "2", "amount": 25.0},
     ]
     assert payload["budgetGroups"][0]["label"] == "Needs"
+    assert payload["metrics"]["fixedCommitments"] == 3370.0
     assert payload["metrics"]["remainingNeedsBudget"] == 2000.0
     assert payload["metrics"]["remainingWantsBudget"] == 750.0
     assert payload["metrics"]["amountSaved"] == 600.0
@@ -197,6 +198,10 @@ def test_build_expense_breakdown_report_aggregates_shared_and_personal_data():
         "variance": -750.0,
     }
     assert "Needs vs Wants" in html
+    assert "Fixed Commitments" in html
+    assert "Personal Outflows" not in html
+    assert "Largest Expenses" in html
+    assert "Largest Shared Expenses" not in html
     assert "Highest day" in html
     assert "Days counted" in html
     assert "Daily Spending" in html
@@ -210,10 +215,46 @@ def test_build_expense_breakdown_report_aggregates_shared_and_personal_data():
     assert "All Shared Expense Transactions" not in html
     assert "Source Sheet Data" not in html
     assert "Personal Budget" not in html
-    assert [item["name"] for item in payload["subscriptionsNeeds"]] == ["Netflix"]
-    assert [item["name"] for item in payload["subscriptionsWants"]] == ["Spotify"]
+    assert [item["name"] for item in payload["subscriptionsNeeds"]] == ["Amazon Prime", "Netflix"]
+    assert [item["name"] for item in payload["subscriptionsWants"]] == ["MacroFactor", "Spotify"]
     assert any(entry["location"] == "Trader Joe's" for entry in payload["dailyEntries"])
     assert [entry["label"] for entry in payload["incomeEntries"]] == ["Paycheck", "Side Gig"]
+
+
+def test_subscription_tables_include_yearly_items_outside_selected_month_without_changing_fallback_totals():
+    subscriptions_rows = [
+        [],
+        ["", "SUBSCRIPTIONS"],
+        [],
+        ["Needs", "", "(Monthly)", "", "Wants", "", "(Monthly)", "", "Needs", "", "(Yearly)", "", "Wants", "", "(Yearly)"],
+        ["", "", "", "", "", "", "", "", "", "", "", "", "", "", ""],
+        ["Recurring:", "Name:", "Amount:", "", "Recurring:", "Name:", "Amount:", "", "Date:", "Name:", "Amount:", "", "Date:", "Name:", "Amount:"],
+        ["5th", "Netflix", "$15.00", "", "10th", "Spotify", "$10.00", "", "10/29", "Amazon Prime", "$152.90", "", "2/4", "MacroFactor", "$71.99"],
+    ]
+    report = build_expense_breakdown_report(
+        actor_key="hannah",
+        owner_name="Hannah",
+        persons=["Hannah"],
+        month=BudgetMonth(2026, 5),
+        worksheets=ReportWorksheets(
+            shared_expenses=InMemoryWorksheet([["hdr"] * 28, ["hdr"] * 28]),
+            personal_budget=InMemoryWorksheet([]),
+            subscriptions=InMemoryWorksheet(subscriptions_rows),
+        ),
+    )
+
+    assert report.breakdown["static_bills_subscriptions_needs"]["amount"] == 15.0
+    assert report.breakdown["subscriptions_wants"]["amount"] == 10.0
+
+    html = render_expense_breakdown_html(report)
+    payload_match = re.search(
+        r'<script id="bookiebot-expense-report-data" type="application/json">(.*?)</script>',
+        html,
+    )
+    assert payload_match is not None
+    payload = json.loads(payload_match.group(1))
+    assert [item["name"] for item in payload["subscriptionsNeeds"]] == ["Amazon Prime", "Netflix"]
+    assert [item["name"] for item in payload["subscriptionsWants"]] == ["MacroFactor", "Spotify"]
 
 
 def test_current_month_burn_rate_series_only_includes_elapsed_days(monkeypatch):

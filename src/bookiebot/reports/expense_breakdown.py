@@ -161,6 +161,12 @@ WANTS_BREAKDOWN_KEYS = (
     "shopping",
 )
 WANTS_BURN_RATE_KEYS = ("food", "shopping")
+FIXED_COMMITMENT_KEYS = (
+    "rent",
+    "bills_utilities",
+    "static_bills_subscriptions_needs",
+    "subscriptions_wants",
+)
 SAVINGS_AMOUNT_COLUMN_INDEX = 4
 SAVINGS_DEPOSIT_LABEL_PHRASES = {
     1: (
@@ -289,11 +295,12 @@ def build_expense_breakdown_report(
 
     entries = _shared_expense_entries(shared_rows, persons, month)
     payments = _payment_items(personal_rows, bill_schedule_rows, month)
-    subscriptions = _subscription_items(subscription_rows, month)
+    subscriptions = _subscription_items(subscription_rows)
+    current_month_subscriptions = _current_month_subscription_items(subscriptions, month)
     income_entries, income_total = _income_entries(personal_rows)
     remaining_budget, remaining_wants_budget = _margin_amounts(personal_rows)
     amount_saved = _amount_saved(personal_rows)
-    static_needs_total, wants_total = _subscription_bucket_totals(personal_rows, subscriptions)
+    static_needs_total, wants_total = _subscription_bucket_totals(personal_rows, current_month_subscriptions)
     payment_totals = _payment_totals_by_group(payments)
     budget_shared_totals = _budget_shared_category_totals(personal_rows)
     itemized_shared_totals = _entry_totals_by_category(entries)
@@ -595,7 +602,7 @@ def _subscription_bucket(item: SubscriptionItem) -> str:
     return "static_bills_subscriptions_needs"
 
 
-def _subscription_items(rows: list[list[str]], month: BudgetMonth) -> list[SubscriptionItem]:
+def _subscription_items(rows: list[list[str]]) -> list[SubscriptionItem]:
     if not rows:
         return []
     try:
@@ -603,8 +610,6 @@ def _subscription_items(rows: list[list[str]], month: BudgetMonth) -> list[Subsc
 
         items: list[SubscriptionItem] = []
         for subscription in list_subscription_schedules(rows):
-            if subscription.cadence == "yearly" and subscription.pull_month != month.month:
-                continue
             if subscription.amount <= 0:
                 continue
             items.append(
@@ -620,6 +625,14 @@ def _subscription_items(rows: list[list[str]], month: BudgetMonth) -> list[Subsc
         return sorted(items, key=lambda item: (item.kind, item.name.lower()))
     except Exception:
         return []
+
+
+def _current_month_subscription_items(items: list[SubscriptionItem], month: BudgetMonth) -> list[SubscriptionItem]:
+    return [
+        item
+        for item in items
+        if item.cadence != "yearly" or item.pull_month == month.month
+    ]
 
 
 def _income_entries(rows: list[list[str]]) -> tuple[list[PaymentItem], float]:
@@ -913,6 +926,7 @@ def _report_client_payload(
             "totalExpenses": report.grand_total,
             "sharedExpenses": report.shared_total,
             "personalOutflows": report.personal_total,
+            "fixedCommitments": _fixed_commitments_total(report.breakdown),
             "monthlyIncome": report.income_total,
             "remainingBudget": report.remaining_budget,
             "remainingNeedsBudget": report.remaining_budget,
@@ -1174,6 +1188,13 @@ def _budget_group_totals(breakdown: dict[str, dict[str, Any]]) -> dict[str, floa
     return {"Needs": round(needs, 2), "Wants": round(wants, 2)}
 
 
+def _fixed_commitments_total(breakdown: dict[str, dict[str, Any]]) -> float:
+    return round(
+        sum(float(breakdown.get(key, {}).get("amount") or 0.0) for key in FIXED_COMMITMENT_KEYS),
+        2,
+    )
+
+
 def _burn_rate_payload(report: ExpenseBreakdownReport) -> dict[str, Any] | None:
     if report.remaining_wants_budget is None:
         return None
@@ -1381,7 +1402,7 @@ def _payments_for_group(items: list[PaymentItem], group: str) -> list[PaymentIte
 
 def _subscriptions_table(items: list[SubscriptionItem]) -> str:
     if not items:
-        return '<div class="empty">No matching subscriptions found for this month.</div>'
+        return '<div class="empty">No matching subscriptions found.</div>'
     rows = "\n".join(
         f"""<tr>
   <td>{_escape(item.name)}</td>
