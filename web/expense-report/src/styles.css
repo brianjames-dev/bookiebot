@@ -586,6 +586,10 @@ tr:last-child td {
     font-size: 28px;
   }
 
+  .bb-pie-metric-label {
+    font-size: 10px;
+  }
+
   .bb-chart-layout {
     gap: 14px;
   }

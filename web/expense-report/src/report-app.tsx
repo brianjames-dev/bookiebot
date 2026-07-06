@@ -1,3 +1,4 @@
+import { useEffect, useState } from "react"
 import {
   Bar,
   BarChart,
@@ -33,6 +34,27 @@ function formatMoney(value: number | null | undefined) {
 
 function formatPct(value: number) {
   return `${value.toFixed(1)}%`
+}
+
+function useMediaQuery(query: string) {
+  const [matches, setMatches] = useState(() => (typeof window === "undefined" ? false : window.matchMedia(query).matches))
+
+  useEffect(() => {
+    if (typeof window === "undefined") {
+      return undefined
+    }
+    const media = window.matchMedia(query)
+    const handleChange = () => setMatches(media.matches)
+    handleChange()
+    if (media.addEventListener) {
+      media.addEventListener("change", handleChange)
+      return () => media.removeEventListener("change", handleChange)
+    }
+    media.addListener(handleChange)
+    return () => media.removeListener(handleChange)
+  }, [query])
+
+  return matches
 }
 
 export function ExpenseReportApp({ report }: { report: ExpenseReportData }) {
@@ -135,8 +157,10 @@ function BurnRateChart({ burnRate }: { burnRate: BurnRate }) {
   const statusLabel = isNotStarted ? "Not started" : isOver ? "Over pace" : "Under pace"
   const differenceLabel = isNotStarted ? "No elapsed days" : formatMoney(Math.abs(burnRate.totalDifference))
   const dailyDifference = isNotStarted ? "No daily pace yet" : `${burnRate.dailyDifference >= 0 ? "+" : ""}${formatMoney(burnRate.dailyDifference)}/day`
-  const gradientStops = burnRateGradientStops(burnRate.series)
+  const chartSeries = burnRate.series
+  const gradientStops = burnRateGradientStops(chartSeries)
   const lineColor = isNotStarted ? "hsl(var(--chart-1))" : "url(#burn-rate-variance-gradient)"
+  const yAxisDomain = burnRateYAxisDomain(chartSeries)
 
   return (
     <div className="bb-chart-layout">
@@ -145,7 +169,7 @@ function BurnRateChart({ burnRate }: { burnRate: BurnRate }) {
         className="bb-chart-box"
       >
         <ResponsiveContainer width="100%" height={320}>
-          <LineChart data={burnRate.series} margin={{ top: 20, right: 22, left: 0, bottom: 8 }}>
+          <LineChart data={chartSeries} margin={{ top: 20, right: 22, left: 0, bottom: 8 }}>
             <defs>
               <linearGradient id="burn-rate-variance-gradient" x1="0" y1="0" x2="0" y2="1">
                 {gradientStops.map((stop, index) => (
@@ -155,7 +179,7 @@ function BurnRateChart({ burnRate }: { burnRate: BurnRate }) {
             </defs>
             <CartesianGrid vertical={false} strokeDasharray="3 3" />
             <XAxis dataKey="label" tickLine={false} axisLine={false} interval="preserveStartEnd" />
-            <YAxis tickFormatter={(value) => `$${value}`} tickLine={false} axisLine={false} width={58} />
+            <YAxis domain={yAxisDomain} tickFormatter={(value) => `$${value}`} tickLine={false} axisLine={false} width={58} />
             <ReferenceLine y={0} stroke="hsl(var(--foreground))" strokeOpacity={0.45} strokeWidth={1.5} />
             <ChartTooltip content={<BurnRateTooltipContent />} />
             <Line
@@ -237,6 +261,23 @@ function burnRateGradientStops(series: BurnRatePoint[]) {
     { offset: zeroOffset, color: "hsl(var(--destructive))" },
     { offset: zeroOffset, color: "hsl(var(--success))" },
     { offset: "100%", color: "hsl(var(--success))" },
+  ]
+}
+
+function burnRateYAxisDomain(series: BurnRatePoint[]): [number, number] {
+  const values = series
+    .map((point) => point.variance)
+    .filter((value): value is number => value !== null && value !== undefined)
+
+  values.push(0)
+
+  const min = Math.min(...values)
+  const max = Math.max(...values)
+  const span = Math.max(max - min, 1)
+  const padding = Math.max(span * 0.08, 5)
+  return [
+    Math.floor((min - padding) / 5) * 5,
+    Math.ceil((max + padding) / 5) * 5,
   ]
 }
 
@@ -377,21 +418,23 @@ function MetricCard({
 }
 
 function CategoryMixChart({ data, total }: { data: BreakdownItem[]; total: number }) {
+  const pieLayout = useExpensePieLayout()
+
   return (
     <div className="bb-chart-layout">
       <ChartContainer config={chartConfig(data)} className="bb-chart-box">
-        <ResponsiveContainer width="100%" height={330}>
+        <ResponsiveContainer width="100%" height={pieLayout.chartHeight}>
           <PieChart>
             <ChartTooltip content={<ChartTooltipContent />} />
             <Pie
               data={data}
               dataKey="amount"
               nameKey="label"
-              innerRadius={72}
-              outerRadius={122}
+              innerRadius={pieLayout.innerRadius}
+              outerRadius={pieLayout.outerRadius}
               paddingAngle={1}
-              label={renderPieMetricLabel}
-              labelLine={renderPieMetricLabelLine}
+              label={(props) => renderPieMetricLabel(props, pieLayout)}
+              labelLine={(props) => renderPieMetricLabelLine(props, pieLayout)}
             >
               {data.map((item) => (
                 <Cell key={item.key} fill={item.color} />
@@ -421,6 +464,42 @@ function CategoryMixChart({ data, total }: { data: BreakdownItem[]; total: numbe
   )
 }
 
+function useExpensePieLayout() {
+  const isPhone = useMediaQuery("(max-width: 520px)")
+  const isNarrowPhone = useMediaQuery("(max-width: 360px)")
+
+  if (isNarrowPhone) {
+    return {
+      chartHeight: 220,
+      innerRadius: 22,
+      outerRadius: 32,
+      labelOffset: 6,
+      labelGap: 4,
+      compactLabel: true,
+    }
+  }
+
+  if (isPhone) {
+    return {
+      chartHeight: 250,
+      innerRadius: 30,
+      outerRadius: 46,
+      labelOffset: 8,
+      labelGap: 6,
+      compactLabel: true,
+    }
+  }
+
+  return {
+    chartHeight: 330,
+    innerRadius: 72,
+    outerRadius: 122,
+    labelOffset: 20,
+    labelGap: PIE_METRIC_LABEL_GAP,
+    compactLabel: false,
+  }
+}
+
 function pieMetricAnimationDelay(index: number | undefined) {
   return `${Math.min(index ?? 0, 8) * 45 + 180}ms`
 }
@@ -433,63 +512,76 @@ type PieMetricTextAnchor = "start" | "middle" | "end" | "inherit"
 
 const PIE_METRIC_LABEL_GAP = 10
 
-function pieMetricLabelX(x: number | string | undefined, textAnchor: PieMetricTextAnchor | undefined) {
+type ExpensePieLayout = ReturnType<typeof useExpensePieLayout>
+
+function pieMetricLabelX(x: number | string | undefined, textAnchor: PieMetricTextAnchor | undefined, gap: number) {
   const numericX = typeof x === "number" ? x : typeof x === "string" && x.trim() ? Number(x) : Number.NaN
   if (!Number.isFinite(numericX)) {
     return x
   }
   if (textAnchor === "start") {
-    return numericX + PIE_METRIC_LABEL_GAP
+    return numericX + gap
   }
   if (textAnchor === "end") {
-    return numericX - PIE_METRIC_LABEL_GAP
+    return numericX - gap
   }
   return x
 }
 
-function renderPieMetricLabel(props: unknown) {
-  const { name, value, payload, fill, x, y, textAnchor, index } = props as {
+function renderPieMetricLabel(props: unknown, layout: ExpensePieLayout) {
+  const { name, value, payload, fill, index } = props as {
     name?: string
     value?: number
     payload?: BreakdownItem
     fill?: string
-    x?: number | string
-    y?: number | string
-    textAnchor?: PieMetricTextAnchor
     index?: number
   }
+  const position = pieMetricLabelPosition(props, layout)
   const label = payload?.label ?? name ?? ""
   const amount = payload?.amount ?? Number(value ?? 0)
+  const labelX = pieMetricLabelX(position.x, position.textAnchor, layout.labelGap)
+  const amountLabel = formatMoney(amount)
+
   return (
     <text
-      x={pieMetricLabelX(x, textAnchor)}
-      y={y}
-      textAnchor={textAnchor}
+      x={labelX}
+      y={position.y}
+      textAnchor={position.textAnchor}
       dominantBaseline="central"
       className="bb-pie-metric-label"
       style={{ animationDelay: pieMetricAnimationDelay(index), fill: pieMetricColor(payload, fill) }}
     >
-      {`${label} ${formatMoney(amount)}`}
+      {layout.compactLabel ? (
+        <>
+          <tspan x={labelX} dy="-0.35em">
+            {label}
+          </tspan>
+          <tspan x={labelX} dy="1.25em">
+            {amountLabel}
+          </tspan>
+        </>
+      ) : (
+        `${label} ${amountLabel}`
+      )}
     </text>
   )
 }
 
-function renderPieMetricLabelLine(props: unknown) {
-  const { points, payload, stroke, index } = props as {
-    points?: Array<{ x?: number | string; y?: number | string }>
+function renderPieMetricLabelLine(props: unknown, layout: ExpensePieLayout) {
+  const { payload, stroke, index } = props as {
     payload?: BreakdownItem
     stroke?: string
     index?: number
   }
-  const [start, end] = points ?? []
-  if (start?.x === undefined || start?.y === undefined || end?.x === undefined || end?.y === undefined) {
+  const line = pieMetricLinePosition(props, layout)
+  if (!line) {
     return <path className="bb-pie-metric-label-line" d="" fill="none" opacity={0} />
   }
 
   return (
     <path
       className="bb-pie-metric-label-line"
-      d={`M${start.x},${start.y}L${end.x},${end.y}`}
+      d={`M${line.start.x},${line.start.y}L${line.end.x},${line.end.y}`}
       fill="none"
       pathLength={1}
       stroke={pieMetricColor(payload, stroke)}
@@ -498,6 +590,57 @@ function renderPieMetricLabelLine(props: unknown) {
       style={{ animationDelay: pieMetricAnimationDelay(index) }}
     />
   )
+}
+
+function pieMetricLabelPosition(props: unknown, layout: ExpensePieLayout) {
+  const { x, y, textAnchor } = props as {
+    x?: number | string
+    y?: number | string
+    textAnchor?: PieMetricTextAnchor
+  }
+  const computed = pieMetricPolarPoint(props, layout.outerRadius + layout.labelOffset)
+  if (computed) {
+    return {
+      x: computed.x,
+      y: computed.y,
+      textAnchor: computed.x > computed.cx ? "start" as const : "end" as const,
+    }
+  }
+  return { x, y, textAnchor }
+}
+
+function pieMetricLinePosition(props: unknown, layout: ExpensePieLayout) {
+  const start = pieMetricPolarPoint(props, layout.outerRadius)
+  const end = pieMetricPolarPoint(props, layout.outerRadius + layout.labelOffset)
+  if (start && end) {
+    return { start, end }
+  }
+
+  const { points } = props as {
+    points?: Array<{ x?: number | string; y?: number | string }>
+  }
+  const [fallbackStart, fallbackEnd] = points ?? []
+  if (fallbackStart?.x === undefined || fallbackStart?.y === undefined || fallbackEnd?.x === undefined || fallbackEnd?.y === undefined) {
+    return null
+  }
+  return { start: fallbackStart, end: fallbackEnd }
+}
+
+function pieMetricPolarPoint(props: unknown, radius: number) {
+  const { cx, cy, midAngle } = props as {
+    cx?: number
+    cy?: number
+    midAngle?: number
+  }
+  if (cx === undefined || cy === undefined || midAngle === undefined) {
+    return null
+  }
+  const radians = (-midAngle * Math.PI) / 180
+  return {
+    cx,
+    x: cx + Math.cos(radians) * radius,
+    y: cy + Math.sin(radians) * radius,
+  }
 }
 
 function DailySpendingChart({ data, total, daysInMonth }: { data: AmountRow[]; total: number; daysInMonth: number }) {

@@ -1230,17 +1230,12 @@ def _burn_rate_series(
     cumulative_actual = 0.0
     series: list[dict[str, Any]] = []
 
-    for day in range(1, days_in_month + 1):
+    for day in range(1, elapsed_days + 1):
         expected_spend = round(wants_budget * (day / days_in_month), 2) if days_in_month else 0.0
-        if day <= elapsed_days:
-            daily_spend: float | None = round(daily_amounts.get(day, 0.0), 2)
-            cumulative_actual = round(cumulative_actual + daily_spend, 2)
-            actual_spend: float | None = cumulative_actual
-            variance: float | None = round(cumulative_actual - expected_spend, 2)
-        else:
-            daily_spend = None
-            actual_spend = None
-            variance = None
+        daily_spend = round(daily_amounts.get(day, 0.0), 2)
+        cumulative_actual = round(cumulative_actual + daily_spend, 2)
+        actual_spend = cumulative_actual
+        variance = round(cumulative_actual - expected_spend, 2)
 
         series.append(
             {

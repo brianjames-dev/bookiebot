@@ -3,6 +3,7 @@ import json
 import os
 import re
 
+import bookiebot.reports.expense_breakdown as expense_breakdown
 from bookiebot.reports.expense_breakdown import (
     BudgetMonth,
     ReportWorksheets,
@@ -211,6 +212,51 @@ def test_build_expense_breakdown_report_aggregates_shared_and_personal_data():
     assert [item["name"] for item in payload["subscriptionsWants"]] == ["Spotify"]
     assert any(entry["location"] == "Trader Joe's" for entry in payload["dailyEntries"])
     assert [entry["label"] for entry in payload["incomeEntries"]] == ["Paycheck", "Side Gig"]
+
+
+def test_current_month_burn_rate_series_only_includes_elapsed_days(monkeypatch):
+    monkeypatch.setattr(
+        expense_breakdown,
+        "now_pacific",
+        lambda: datetime(2026, 7, 5, 12, 0, tzinfo=routing.PACIFIC_TZ),
+    )
+    shared_rows = [
+        ["hdr"] * 28,
+        ["hdr"] * 28,
+        _row({"N": "07/02/2026", "O": "Lunch", "P": "30", "Q": "Cafe", "R": "Hannah"}),
+        _row({"V": "07/05/2026", "W": "Book", "X": "20", "Y": "Bookstore", "Z": "Hannah"}),
+    ]
+    personal_rows = [
+        ["Eating out", "$30.00"],
+        ["Shopping", "$20.00"],
+        ["Margins:", "", "$10.00", "", "$100.00"],
+    ]
+
+    report = build_expense_breakdown_report(
+        actor_key="hannah",
+        owner_name="Hannah",
+        persons=["Hannah"],
+        month=BudgetMonth(2026, 7),
+        worksheets=ReportWorksheets(
+            shared_expenses=InMemoryWorksheet(shared_rows),
+            personal_budget=InMemoryWorksheet(personal_rows),
+            subscriptions=InMemoryWorksheet([]),
+        ),
+    )
+
+    html = render_expense_breakdown_html(report)
+    payload_match = re.search(
+        r'<script id="bookiebot-expense-report-data" type="application/json">(.*?)</script>',
+        html,
+    )
+    assert payload_match is not None
+    payload = json.loads(payload_match.group(1))
+    burn_rate = payload["burnRate"]
+
+    assert burn_rate["daysInMonth"] == 31
+    assert burn_rate["elapsedDays"] == 5
+    assert [point["day"] for point in burn_rate["series"]] == [1, 2, 3, 4, 5]
+    assert all(point["variance"] is not None for point in burn_rate["series"])
 
 
 def test_build_expense_breakdown_report_reports_zero_savings_deposits():
