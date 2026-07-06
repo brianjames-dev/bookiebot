@@ -19,7 +19,7 @@ Recent transactions and reconciliation are in manual verification mode after the
 - Daily Spending transaction category labels now use the same category colors as the expense breakdown pie chart.
 - Expense report top metrics now render in the requested order: Monthly Income, Monthly Expenses, Personal Outflows, Burn Rate, Remaining Needs Budget, Remaining Wants Budget, Amount Saved, and Income After Expenses.
 - Remaining Wants Budget is pulled from the second money value on the Budget sheet margins row, and Amount Saved sums the column `E` values on the `Enter 1st Paycheck Deposit` and `Enter 2nd Paycheck Deposit` rows while ignoring the separate savings total row.
-- Daily Spending chart average now divides shared spending by every calendar day in the selected month instead of only days with logged expenses.
+- Daily Spending chart average now divides shared spending by elapsed days for the selected month, using the full calendar month only for completed months.
 - Google Apps Script monthly rollover now snapshots previous-month personal budget Burn Rate and subscription total formula outputs into static cell values before creating/relinking the new month.
 - Monthly tab creation no longer fails when a copied template is missing the exact `Month` placeholder; it falls back to a top-left existing month label and logs instead of aborting if no label can be found.
 - Expense breakdown report pages now include a `Burn Rate` tab in the Budget Charts toggle, with a comparison chart for actual food plus shopping spend, expected spend, and the selected month's remaining-wants-budget-derived target.
@@ -199,7 +199,7 @@ Use a test row or low-risk real row in Discord:
 42. Open the Daily Spending table in the expense breakdown report.
    - Expected: the Daily Spending chart appears above the itemized day-by-day transaction table, and each bold category label uses the same color as that category in the breakdown pie chart and legend.
 43. Open the Daily Spending chart in a report for a known month.
-   - Expected: Average day equals shared spending divided by the total calendar days in that selected month.
+   - Expected: Average day equals shared spending divided by elapsed days for the selected month, while completed months use every calendar day in that month.
 44. Run `budgetSystemRollover` from Apps Script on a test copy or after making a safe template backup.
    - Expected: the previous personal budget month has static values in Burn Rate, Static Bills & Subscriptions (Needs), and Subscriptions (Wants) formula output cells; the current month tab exists even if the copied template did not contain an exact `Month` placeholder.
 

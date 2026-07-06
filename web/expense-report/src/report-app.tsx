@@ -121,7 +121,7 @@ export function ExpenseReportApp({ report }: { report: ExpenseReportData }) {
             <CardDescription>Shared transaction activity grouped by day.</CardDescription>
           </CardHeader>
           <CardContent className="bb-daily-spending-content">
-            <DailySpendingChart data={report.dailyTotals} total={report.metrics.sharedExpenses} daysInMonth={report.daysInMonth} />
+            <DailySpendingChart data={report.dailyTotals} total={report.metrics.sharedExpenses} elapsedDays={report.elapsedDays} />
             <DailyEntriesTable entries={report.dailyEntries} categoryColors={categoryColors} />
           </CardContent>
         </Card>
@@ -621,9 +621,9 @@ function pieMetricPolarPoint(props: unknown, radius: number) {
   }
 }
 
-function DailySpendingChart({ data, total, daysInMonth }: { data: AmountRow[]; total: number; daysInMonth: number }) {
+function DailySpendingChart({ data, total, elapsedDays }: { data: AmountRow[]; total: number; elapsedDays: number }) {
   const peak = data.reduce<AmountRow | null>((best, item) => (!best || item.amount > best.amount ? item : best), null)
-  const averageDaySpend = daysInMonth ? total / daysInMonth : 0
+  const averageDaySpend = elapsedDays ? total / elapsedDays : 0
   return (
     <div className="bb-chart-layout">
       <ChartContainer config={{ amount: { label: "Amount", color: "hsl(var(--chart-1))" } }} className="bb-chart-box">
@@ -646,6 +646,7 @@ function DailySpendingChart({ data, total, daysInMonth }: { data: AmountRow[]; t
           rows={[
             ["Tracked days", String(data.length)],
             ["Average day", formatMoney(averageDaySpend)],
+            ["Days counted", String(elapsedDays)],
             ["Highest day", peak ? `${peak.label} - ${formatMoney(peak.amount)}` : "N/A"],
           ]}
         />

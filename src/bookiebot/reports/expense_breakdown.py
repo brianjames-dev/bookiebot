@@ -900,10 +900,14 @@ def _report_client_payload(
     top_entries: list[ExpenseEntry],
     balance_after_expenses: float | None,
 ) -> dict[str, Any]:
+    days_in_month = calendar.monthrange(report.month.year, report.month.month)[1]
+    elapsed_days = _elapsed_days_for_month(report.month)
+
     return {
         "ownerName": report.owner_name,
         "monthLabel": report.month.label,
-        "daysInMonth": calendar.monthrange(report.month.year, report.month.month)[1],
+        "daysInMonth": days_in_month,
+        "elapsedDays": elapsed_days,
         "generatedAt": report.generated_at.strftime("%b %-d, %Y %-I:%M %p %Z"),
         "metrics": {
             "totalExpenses": report.grand_total,

@@ -71,6 +71,7 @@ export interface ExpenseReportData {
   ownerName: string
   monthLabel: string
   daysInMonth: number
+  elapsedDays: number
   generatedAt: string
   metrics: Metrics
   burnRate: BurnRate | null

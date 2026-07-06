@@ -147,6 +147,7 @@ def test_build_expense_breakdown_report_aggregates_shared_and_personal_data():
         "Subscriptions (Needs)",
     ]
     assert payload["daysInMonth"] == 31
+    assert payload["elapsedDays"] == 31
     assert payload["dailyTotals"] == [
         {"label": "1", "amount": 50.0},
         {"label": "2", "amount": 25.0},
@@ -197,6 +198,7 @@ def test_build_expense_breakdown_report_aggregates_shared_and_personal_data():
     }
     assert "Needs vs Wants" in html
     assert "Highest day" in html
+    assert "Days counted" in html
     assert "Daily Spending" in html
     assert "Rent" in html
     assert any(item["label"] == "Bills & Utilities" for item in payload["breakdown"])
@@ -255,6 +257,7 @@ def test_current_month_burn_rate_series_only_includes_elapsed_days(monkeypatch):
 
     assert burn_rate["daysInMonth"] == 31
     assert burn_rate["elapsedDays"] == 5
+    assert payload["elapsedDays"] == 5
     assert [point["day"] for point in burn_rate["series"]] == [1, 2, 3, 4, 5]
     assert all(point["variance"] is not None for point in burn_rate["series"])
 
