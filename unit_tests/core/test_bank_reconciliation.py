@@ -459,12 +459,33 @@ def test_prepare_bank_reconciliation_digest_uses_cached_items_when_sync_fails(mo
         date(2026, 5, 20),
         mark_sent=False,
         force=False,
+        sync_error_message="RuntimeError: Plaid unavailable",
     )
 
     assert output is not None
     assert "bank reconciliation found `1` item" in output
     assert "Bank sync warning: using cached bank data for this digest." in output
     assert "Unlogged Coffee" in output
+
+
+@pytest.mark.asyncio
+async def test_sync_owner_for_digest_returns_error_message(monkeypatch):
+    class FakeService:
+        config = SimpleNamespace(configured=True)
+
+        async def sync_owner(self, _owner_key):
+            raise RuntimeError("Plaid unavailable")
+
+    monkeypatch.setattr(
+        bank_reconciliation,
+        "get_user_config",
+        lambda _actor_key: SimpleNamespace(budget_owner_key="brian"),
+    )
+    monkeypatch.setattr(bank_reconciliation, "build_banking_service", lambda: FakeService())
+
+    message = await bank_reconciliation._sync_owner_for_digest("123")
+
+    assert message == "RuntimeError: Plaid unavailable"
 
 
 @pytest.mark.asyncio
