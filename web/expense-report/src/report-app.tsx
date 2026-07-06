@@ -429,6 +429,24 @@ function pieMetricColor(payload: BreakdownItem | undefined, fallback: string | u
   return payload?.color ?? fallback ?? "hsl(var(--foreground))"
 }
 
+type PieMetricTextAnchor = "start" | "middle" | "end" | "inherit"
+
+const PIE_METRIC_LABEL_GAP = 10
+
+function pieMetricLabelX(x: number | string | undefined, textAnchor: PieMetricTextAnchor | undefined) {
+  const numericX = typeof x === "number" ? x : typeof x === "string" && x.trim() ? Number(x) : Number.NaN
+  if (!Number.isFinite(numericX)) {
+    return x
+  }
+  if (textAnchor === "start") {
+    return numericX + PIE_METRIC_LABEL_GAP
+  }
+  if (textAnchor === "end") {
+    return numericX - PIE_METRIC_LABEL_GAP
+  }
+  return x
+}
+
 function renderPieMetricLabel(props: unknown) {
   const { name, value, payload, fill, x, y, textAnchor, index } = props as {
     name?: string
@@ -437,14 +455,14 @@ function renderPieMetricLabel(props: unknown) {
     fill?: string
     x?: number | string
     y?: number | string
-    textAnchor?: "start" | "middle" | "end" | "inherit"
+    textAnchor?: PieMetricTextAnchor
     index?: number
   }
   const label = payload?.label ?? name ?? ""
   const amount = payload?.amount ?? Number(value ?? 0)
   return (
     <text
-      x={x}
+      x={pieMetricLabelX(x, textAnchor)}
       y={y}
       textAnchor={textAnchor}
       dominantBaseline="central"
