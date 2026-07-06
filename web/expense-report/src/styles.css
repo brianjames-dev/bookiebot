@@ -258,6 +258,43 @@ body {
   min-width: 0;
 }
 
+.bb-subscription-all-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+  min-width: 0;
+}
+
+.bb-subscription-compact-group {
+  display: grid;
+  gap: 10px;
+  min-width: 0;
+  padding: 12px;
+  border: 1px solid hsl(var(--border));
+  border-radius: var(--radius);
+  background: hsl(var(--background) / 0.5);
+}
+
+.bb-subscription-compact-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  min-width: 0;
+  font-size: 13px;
+  font-weight: 750;
+}
+
+.bb-subscription-compact-heading strong {
+  flex: 0 0 auto;
+  font-variant-numeric: tabular-nums;
+}
+
+.bb-subscription-compact-table th,
+.bb-subscription-compact-table td {
+  padding-inline: 6px;
+}
+
 .bb-calendar-head,
 .bb-calendar-grid {
   display: grid;
@@ -308,6 +345,7 @@ body {
 }
 
 .bb-subscription-marker {
+  position: relative;
   display: inline-flex;
   align-items: center;
   gap: 5px;
@@ -322,9 +360,15 @@ body {
   font-size: 11px;
   font-weight: 700;
   line-height: 1;
-  overflow: hidden;
+  overflow: visible;
   text-align: left;
   white-space: nowrap;
+  z-index: 1;
+}
+
+.bb-subscription-marker:hover,
+.bb-subscription-marker:focus {
+  z-index: 30;
 }
 
 .bb-subscription-marker-dot {
@@ -352,6 +396,71 @@ body {
 
 .bb-subscription-marker-more {
   justify-content: center;
+}
+
+.bb-subscription-tooltip {
+  position: absolute;
+  top: calc(100% + 7px);
+  left: 50%;
+  z-index: 50;
+  display: grid;
+  gap: 4px;
+  min-width: 190px;
+  max-width: min(250px, 80vw);
+  padding: 9px;
+  border: 1px solid hsl(var(--border));
+  border-radius: var(--radius);
+  background: hsl(var(--card));
+  box-shadow: 0 10px 26px rgb(15 23 42 / 0.16);
+  color: hsl(var(--foreground));
+  font-size: 12px;
+  font-weight: 500;
+  line-height: 1.25;
+  opacity: 0;
+  pointer-events: none;
+  text-align: left;
+  transform: translate(-50%, 4px);
+  transition: opacity 140ms ease-out, transform 140ms ease-out, visibility 140ms ease-out;
+  visibility: hidden;
+  white-space: normal;
+}
+
+.bb-subscription-tooltip strong {
+  font-weight: 750;
+}
+
+.bb-subscription-tooltip-amount {
+  font-weight: 750;
+  font-variant-numeric: tabular-nums;
+}
+
+.bb-subscription-tooltip-wide {
+  min-width: 220px;
+}
+
+.bb-subscription-marker:hover .bb-subscription-tooltip,
+.bb-subscription-marker:focus .bb-subscription-tooltip {
+  opacity: 1;
+  transform: translate(-50%, 0);
+  visibility: visible;
+}
+
+.bb-calendar-day:nth-child(7n + 1) .bb-subscription-tooltip {
+  left: 0;
+  transform: translateY(4px);
+}
+
+.bb-calendar-day:nth-child(7n) .bb-subscription-tooltip {
+  right: 0;
+  left: auto;
+  transform: translateY(4px);
+}
+
+.bb-calendar-day:nth-child(7n + 1) .bb-subscription-marker:hover .bb-subscription-tooltip,
+.bb-calendar-day:nth-child(7n + 1) .bb-subscription-marker:focus .bb-subscription-tooltip,
+.bb-calendar-day:nth-child(7n) .bb-subscription-marker:hover .bb-subscription-tooltip,
+.bb-calendar-day:nth-child(7n) .bb-subscription-marker:focus .bb-subscription-tooltip {
+  transform: translateY(0);
 }
 
 .bb-analytics-card .bb-card-content {
@@ -729,6 +838,10 @@ tr:last-child td {
     display: grid;
   }
 
+  .bb-subscription-all-grid {
+    grid-template-columns: 1fr;
+  }
+
   .bb-subscription-total {
     font-size: 24px;
   }
@@ -777,6 +890,11 @@ tr:last-child td {
     min-height: 18px;
     justify-content: center;
     padding: 0;
+  }
+
+  .bb-subscription-tooltip {
+    min-width: 170px;
+    max-width: calc(100vw - 48px);
   }
 
   .bb-subscription-marker-name {

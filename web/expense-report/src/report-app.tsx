@@ -1015,7 +1015,7 @@ function SubscriptionPanel({
         </Badge>
       </div>
       <SubscriptionCalendar year={year} month={month} items={items} tone={tone} />
-      <SubscriptionItemsTable items={items} />
+      {tone === "all" ? <SubscriptionAllItemsGrid items={items} /> : <SubscriptionItemsTable items={items} />}
     </div>
   )
 }
@@ -1080,27 +1080,29 @@ function SubscriptionCalendar({
                             backgroundColor: markerToneConfig.background,
                             borderColor: markerToneConfig.color,
                           }}
-                          title={subscriptionMarkerTitle(item)}
-                          aria-label={subscriptionMarkerTitle(item)}
+                          aria-label={subscriptionMarkerLabel(item)}
                         >
                           <span className="bb-subscription-marker-dot" />
                           <span className="bb-subscription-marker-name">{item.name}</span>
                           <span className="bb-subscription-marker-amount">{formatMoney(item.amount)}</span>
+                          <SubscriptionTooltip item={item} />
                         </button>
                       )
                     })}
                     {hiddenCount ? (
-                      <span
+                      <button
+                        type="button"
                         className="bb-subscription-marker bb-subscription-marker-more"
                         style={{
                           color: toneConfig.color,
                           backgroundColor: toneConfig.background,
                           borderColor: toneConfig.color,
                         }}
-                        title={`${hiddenCount} more subscription${hiddenCount === 1 ? "" : "s"} on day ${day}`}
+                        aria-label={`${hiddenCount} more subscription${hiddenCount === 1 ? "" : "s"} on day ${day}`}
                       >
                         +{hiddenCount} more
-                      </span>
+                        <SubscriptionOverflowTooltip items={dayItems.slice(visibleItems.length)} day={day} />
+                      </button>
                     ) : null}
                   </div>
                 </>
@@ -1110,6 +1112,87 @@ function SubscriptionCalendar({
         })}
       </div>
     </div>
+  )
+}
+
+function SubscriptionTooltip({ item }: { item: SubscriptionItem }) {
+  return (
+    <span className="bb-subscription-tooltip" role="tooltip">
+      <strong>{item.name}</strong>
+      <span>{subscriptionPullDescription(item)}</span>
+      <span className="bb-subscription-tooltip-amount">{formatMoney(item.amount)}</span>
+    </span>
+  )
+}
+
+function SubscriptionOverflowTooltip({ items, day }: { items: SubscriptionItem[]; day: number }) {
+  return (
+    <span className="bb-subscription-tooltip bb-subscription-tooltip-wide" role="tooltip">
+      <strong>More on day {day}</strong>
+      {items.map((item, index) => (
+        <span key={`${item.name}-${item.amount}-${index}`}>
+          {item.name} - {formatMoney(item.amount)}
+        </span>
+      ))}
+    </span>
+  )
+}
+
+function SubscriptionAllItemsGrid({ items }: { items: SubscriptionItem[] }) {
+  const needs = items.filter((item) => subscriptionToneForItem(item) === "needs")
+  const wants = items.filter((item) => subscriptionToneForItem(item) === "wants")
+
+  return (
+    <div className="bb-subscription-all-grid">
+      <SubscriptionCompactTable title="Needs" items={needs} tone="needs" />
+      <SubscriptionCompactTable title="Wants" items={wants} tone="wants" />
+    </div>
+  )
+}
+
+function SubscriptionCompactTable({
+  title,
+  items,
+  tone,
+}: {
+  title: string
+  items: SubscriptionItem[]
+  tone: Exclude<SubscriptionTone, "all">
+}) {
+  const toneConfig = SUBSCRIPTION_TONES[tone]
+  const total = items.reduce((sum, item) => sum + item.amount, 0)
+
+  return (
+    <section className="bb-subscription-compact-group" aria-label={`${title} subscriptions`}>
+      <div className="bb-subscription-compact-heading">
+        <span style={{ color: toneConfig.color }}>{title}</span>
+        <strong>{formatMoney(total)}</strong>
+      </div>
+      {!items.length ? (
+        <div className="bb-empty">No matching subscriptions found.</div>
+      ) : (
+        <div className="bb-table-wrap">
+          <table className="bb-subscription-compact-table">
+            <thead>
+              <tr>
+                <th>Name</th>
+                <th>Cadence</th>
+                <th>Amount</th>
+              </tr>
+            </thead>
+            <tbody>
+              {items.map((item, index) => (
+                <tr key={`${item.name}-${item.amount}-${index}`}>
+                  <td>{item.name}</td>
+                  <td>{item.cadence}</td>
+                  <td className="bb-amount">{formatMoney(item.amount)}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </section>
   )
 }
 
@@ -1179,13 +1262,18 @@ function subscriptionPullLabel(item: SubscriptionItem) {
   return String(item.pullDay)
 }
 
+function subscriptionPullDescription(item: SubscriptionItem) {
+  const cadence = item.cadence ? `${item.cadence} pull` : "Pull"
+  return `${item.kind || "Subscription"} - ${cadence} - ${subscriptionPullLabel(item)}`
+}
+
 function subscriptionToneForItem(item: SubscriptionItem): Exclude<SubscriptionTone, "all"> {
   const kind = item.kind.trim().toLowerCase()
   return kind === "want" || kind === "wants" ? "wants" : "needs"
 }
 
-function subscriptionMarkerTitle(item: SubscriptionItem) {
-  return `${item.name} - ${item.kind || "Subscription"} - ${formatMoney(item.amount)} - ${subscriptionPullLabel(item)}`
+function subscriptionMarkerLabel(item: SubscriptionItem) {
+  return `${item.name} - ${subscriptionPullDescription(item)} - ${formatMoney(item.amount)}`
 }
 
 function chartConfig(items: Array<AmountRow | BreakdownItem>) {

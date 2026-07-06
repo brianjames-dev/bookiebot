@@ -210,6 +210,9 @@ def test_build_expense_breakdown_report_aggregates_shared_and_personal_data():
     assert "Largest Shared Expenses" not in html
     assert "Frequent Merchants / Locations" not in html
     assert "bb-subscription-calendar" in html
+    assert "bb-subscription-all-grid" in html
+    assert "bb-subscription-compact-table" in html
+    assert "bb-subscription-tooltip" in html
     assert "Subscription calendar and source-of-truth itemized lists" not in html
     assert "Interactive views powered by shadcn/ui patterns and Recharts" not in html
     assert "Shared transaction activity grouped by day" not in html
