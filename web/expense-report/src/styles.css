@@ -245,11 +245,25 @@ body {
 }
 
 .bb-subscription-total {
-  margin-top: 4px;
   font-size: 28px;
   font-weight: 780;
   line-height: 1;
   font-variant-numeric: tabular-nums;
+}
+
+.bb-subscription-tab-content[data-state="active"] {
+  animation: bb-subscription-tab-in 260ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.bb-subscription-tab-content[data-state="active"] .bb-subscription-calendar,
+.bb-subscription-tab-content[data-state="active"] .bb-subscription-all-grid,
+.bb-subscription-tab-content[data-state="active"] .bb-table-wrap {
+  animation: bb-subscription-section-in 320ms cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+.bb-subscription-tab-content[data-state="active"] .bb-subscription-all-grid,
+.bb-subscription-tab-content[data-state="active"] .bb-table-wrap {
+  animation-delay: 70ms;
 }
 
 .bb-subscription-calendar {
@@ -260,6 +274,7 @@ body {
 
 .bb-subscription-all-grid {
   display: grid;
+  align-items: start;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 14px;
   min-width: 0;
@@ -267,6 +282,8 @@ body {
 
 .bb-subscription-compact-group {
   display: grid;
+  align-content: start;
+  align-self: start;
   gap: 10px;
   min-width: 0;
   padding: 12px;
@@ -293,6 +310,30 @@ body {
 .bb-subscription-compact-table th,
 .bb-subscription-compact-table td {
   padding-inline: 6px;
+}
+
+@keyframes bb-subscription-tab-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px) scale(0.995);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@keyframes bb-subscription-section-in {
+  from {
+    opacity: 0;
+    transform: translateY(7px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
 .bb-calendar-head,

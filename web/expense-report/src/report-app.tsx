@@ -969,13 +969,13 @@ function SubscriptionCalendarCard({
             <TabsTrigger value="needs">Needs</TabsTrigger>
             <TabsTrigger value="wants">Wants</TabsTrigger>
           </TabsList>
-          <TabsContent value="all">
+          <TabsContent value="all" className="bb-subscription-tab-content">
             <SubscriptionPanel year={year} month={month} monthLabel={monthLabel} items={allSubscriptions} tone="all" />
           </TabsContent>
-          <TabsContent value="needs">
+          <TabsContent value="needs" className="bb-subscription-tab-content">
             <SubscriptionPanel year={year} month={month} monthLabel={monthLabel} items={needs} tone="needs" />
           </TabsContent>
-          <TabsContent value="wants">
+          <TabsContent value="wants" className="bb-subscription-tab-content">
             <SubscriptionPanel year={year} month={month} monthLabel={monthLabel} items={wants} tone="wants" />
           </TabsContent>
         </Tabs>
@@ -1004,11 +1004,8 @@ function SubscriptionPanel({
   return (
     <div className="bb-subscription-panel">
       <div className="bb-subscription-summary">
-        <div>
-          <div className="bb-chart-kicker">{toneConfig.label} subscriptions</div>
-          <div className="bb-subscription-total" style={{ color: toneConfig.color }}>
-            {formatMoney(total)}
-          </div>
+        <div className="bb-subscription-total" style={{ color: toneConfig.color }}>
+          {formatMoney(total)}
         </div>
         <Badge variant="secondary">
           {scheduledCount} in {monthLabel}
@@ -1177,6 +1174,7 @@ function SubscriptionCompactTable({
               <tr>
                 <th>Name</th>
                 <th>Cadence</th>
+                <th>Pull Date</th>
                 <th>Amount</th>
               </tr>
             </thead>
@@ -1185,6 +1183,7 @@ function SubscriptionCompactTable({
                 <tr key={`${item.name}-${item.amount}-${index}`}>
                   <td>{item.name}</td>
                   <td>{item.cadence}</td>
+                  <td>{subscriptionPullLabel(item)}</td>
                   <td className="bb-amount">{formatMoney(item.amount)}</td>
                 </tr>
               ))}
@@ -1207,7 +1206,6 @@ function SubscriptionItemsTable({ items }: { items: SubscriptionItem[] }) {
         <thead>
           <tr>
             <th>Name</th>
-            <th>Kind</th>
             <th>Cadence</th>
             <th>Pull Date</th>
             <th>Amount</th>
@@ -1217,7 +1215,6 @@ function SubscriptionItemsTable({ items }: { items: SubscriptionItem[] }) {
           {items.map((item, index) => (
             <tr key={`${item.name}-${item.amount}-${index}`}>
               <td>{item.name}</td>
-              <td>{item.kind || "-"}</td>
               <td>{item.cadence}</td>
               <td>{subscriptionPullLabel(item)}</td>
               <td className="bb-amount">{formatMoney(item.amount)}</td>
