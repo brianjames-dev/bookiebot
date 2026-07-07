@@ -8,6 +8,7 @@ import os
 from pathlib import Path
 import re
 import time
+from typing import Any
 from urllib.parse import quote
 
 from aiohttp import web
@@ -84,6 +85,10 @@ async def _serve_expense_breakdown_report(request: web.Request) -> web.StreamRes
         payload = _verify_expense_report_token(token)
     except ValueError as exc:
         raise web.HTTPNotFound(text=str(exc)) from exc
+
+    snapshot_path = _static_report_path_for_request(payload, request.query)
+    if snapshot_path is not None:
+        return _report_file_response(snapshot_path)
 
     try:
         from bookiebot.reports.expense_breakdown import BudgetMonth, build_expense_breakdown_report, render_expense_breakdown_html
@@ -165,6 +170,17 @@ def _static_report_path_for_payload(payload: dict) -> Path | None:
             return exact
 
     return _latest_matching_expense_report_path(payload)
+
+
+def _static_report_path_for_request(payload: dict, query: Any) -> Path | None:
+    if _live_expense_report_requested(query):
+        return None
+    return _static_report_path_for_payload(payload)
+
+
+def _live_expense_report_requested(query: Any) -> bool:
+    value = str(query.get("live", "") if hasattr(query, "get") else "").strip().lower()
+    return value in {"1", "true", "yes", "y"}
 
 
 def _safe_report_path(filename: str) -> Path | None:

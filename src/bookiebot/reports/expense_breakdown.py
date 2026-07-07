@@ -294,13 +294,13 @@ def load_report_worksheets(actor_key: str, month: BudgetMonth) -> ReportWorkshee
 
     gc = get_gspread_client()
     context = resolve_sheet_context(actor_key, gc, month.as_datetime())
-    personal_spreadsheet = gc.open_by_key(context.personal_budget_spreadsheet_id)
+    personal_spreadsheet = _optional_spreadsheet_by_key(gc, context.personal_budget_spreadsheet_id)
     return ReportWorksheets(
         shared_expenses=context.shared_expenses_worksheet,
         personal_budget=context.personal_budget_worksheet,
-        subscriptions=_worksheet_by_name(personal_spreadsheet, "Subscriptions"),
-        bill_schedule=_worksheet_by_name(personal_spreadsheet, "_BookieBot Bill Schedule"),
-        budget_history=_budget_history_from_spreadsheet(personal_spreadsheet, month),
+        subscriptions=_worksheet_by_name(personal_spreadsheet, "Subscriptions") if personal_spreadsheet is not None else None,
+        bill_schedule=_worksheet_by_name(personal_spreadsheet, "_BookieBot Bill Schedule") if personal_spreadsheet is not None else None,
+        budget_history=_budget_history_from_spreadsheet(personal_spreadsheet, month) if personal_spreadsheet is not None else (),
     )
 
 
@@ -468,6 +468,13 @@ def _optional_sheet(factory: Any) -> Any | None:
 def _worksheet_by_name(spreadsheet: Any, title: str) -> Any | None:
     try:
         return spreadsheet.worksheet(title)
+    except Exception:
+        return None
+
+
+def _optional_spreadsheet_by_key(gc: Any, spreadsheet_id: str) -> Any | None:
+    try:
+        return gc.open_by_key(spreadsheet_id)
     except Exception:
         return None
 

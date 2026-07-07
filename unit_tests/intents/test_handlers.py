@@ -1692,6 +1692,21 @@ async def test_query_expense_breakdown(monkeypatch, message):
 
 
 @pytest.mark.asyncio
+async def test_query_expense_breakdown_reports_sheet_access_errors(monkeypatch, message):
+    monkeypatch.setattr(
+        ih,
+        "build_expense_breakdown_report",
+        MagicMock(side_effect=SpreadsheetAccessError("Could not open spreadsheet 'abc'.")),
+    )
+
+    await ih.handle_intent("query_expense_breakdown_percentages", {}, message)
+
+    reply = message.channel.sent[-1][0] or ""
+    assert "Could not calculate expense breakdown" in reply
+    assert "Could not open spreadsheet 'abc'." in reply
+
+
+@pytest.mark.asyncio
 async def test_query_expense_breakdown_sends_chart(monkeypatch, message):
     report = SimpleNamespace(
         month=SimpleNamespace(label="May 2026"),

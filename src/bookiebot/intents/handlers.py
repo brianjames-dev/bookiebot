@@ -1019,13 +1019,17 @@ async def query_expense_breakdown_handler(entities, message):
         return
 
     actor_key = _message_actor_key(message)
-    report = build_expense_breakdown_report(
-        actor_key=actor_key or "",
-        owner_name=owner_name,
-        persons=persons,
-        month=report_month,
-    )
-    report_page = write_expense_breakdown_report(report)
+    try:
+        report = build_expense_breakdown_report(
+            actor_key=actor_key or "",
+            owner_name=owner_name,
+            persons=persons,
+            month=report_month,
+        )
+        report_page = write_expense_breakdown_report(report)
+    except SheetRoutingError as exc:
+        await message.channel.send(f"❌ Could not calculate expense breakdown.\n\n{exc}")
+        return
 
     if not report.breakdown:
         await message.channel.send(f"❌ Could not calculate expense breakdown.\n\nFull report: {report_page.url}")

@@ -13,7 +13,7 @@ from bookiebot.reports.expense_breakdown import (
     render_expense_breakdown_html,
     write_expense_breakdown_report,
 )
-from bookiebot.reports.web import _static_report_path_for_payload, _verify_expense_report_token
+from bookiebot.reports.web import _static_report_path_for_payload, _static_report_path_for_request, _verify_expense_report_token
 from bookiebot.sheets import routing
 from unit_tests.support.sheets_repo_stub import InMemoryWorksheet
 
@@ -28,6 +28,35 @@ def _row(values: dict[str, str], width: int = 28) -> list[str]:
     return row
 
 
+class FakeSpreadsheet:
+    def __init__(self, worksheets: dict[str, InMemoryWorksheet]):
+        self._worksheets = worksheets
+
+    def worksheet(self, title: str):
+        if title not in self._worksheets:
+            raise ValueError(title)
+        return self._worksheets[title]
+
+
+class FailingOptionalOpenGC:
+    def __init__(self, personal_id: str, shared_id: str, personal_sheet: InMemoryWorksheet, shared_sheet: InMemoryWorksheet):
+        self.personal_id = personal_id
+        self.shared_id = shared_id
+        self.personal_sheet = personal_sheet
+        self.shared_sheet = shared_sheet
+        self.open_counts: dict[str, int] = {}
+
+    def open_by_key(self, key: str):
+        self.open_counts[key] = self.open_counts.get(key, 0) + 1
+        if key == self.personal_id:
+            if self.open_counts[key] > 1:
+                raise RuntimeError("optional workbook open failed")
+            return FakeSpreadsheet({"May": self.personal_sheet})
+        if key == self.shared_id:
+            return FakeSpreadsheet({"May": self.shared_sheet})
+        raise RuntimeError(key)
+
+
 def test_parse_budget_month_accepts_names_and_relative_months():
     now = datetime(2026, 7, 2, 12, 0, tzinfo=routing.PACIFIC_TZ)
 
@@ -36,6 +65,28 @@ def test_parse_budget_month_accepts_names_and_relative_months():
     assert parse_budget_month("June 2025", now=now) == BudgetMonth(2025, 6)
     assert parse_budget_month("2026-05", now=now) == BudgetMonth(2026, 5)
     assert parse_budget_month("last month", now=now) == BudgetMonth(2026, 6)
+
+
+def test_load_report_worksheets_uses_resolved_month_tabs_when_optional_workbook_open_fails(monkeypatch):
+    month = BudgetMonth(2026, 5)
+    personal_id = routing.get_budget_spreadsheet_id_for_user(routing.DEFAULT_BRIAN_DISCORD_USER_IDS[0], month.year)
+    shared_id = routing.get_shared_expenses_spreadsheet_id(month.year)
+    personal_sheet = InMemoryWorksheet([["Monthly Income", "$5,000.00"]], title="May")
+    shared_sheet = InMemoryWorksheet([["hdr"] * 28, ["hdr"] * 28], title="May")
+    gc = FailingOptionalOpenGC(personal_id, shared_id, personal_sheet, shared_sheet)
+
+    monkeypatch.setattr("bookiebot.sheets.auth.get_gspread_client", lambda: gc)
+
+    worksheets = expense_breakdown.load_report_worksheets(
+        routing.DEFAULT_BRIAN_DISCORD_USER_IDS[0],
+        month,
+    )
+
+    assert worksheets.personal_budget is personal_sheet
+    assert worksheets.shared_expenses is shared_sheet
+    assert worksheets.subscriptions is None
+    assert worksheets.bill_schedule is None
+    assert worksheets.budget_history == ()
 
 
 def test_build_expense_breakdown_report_aggregates_shared_and_personal_data():
@@ -155,6 +206,8 @@ def test_build_expense_breakdown_report_aggregates_shared_and_personal_data():
     assert "bb-chart-stack" in html
     assert "bb-panel-head" in html
     assert "bb-burn-rate-summary" in html
+    assert "bb-signal-strip" in html
+    assert "bb-details-panel" in html
     payload_match = re.search(
         r'<script id="bookiebot-expense-report-data" type="application/json">(.*?)</script>',
         html,
@@ -223,6 +276,12 @@ def test_build_expense_breakdown_report_aggregates_shared_and_personal_data():
     assert "Needs vs Wants" not in html
     assert "Fixed Commitments" not in html
     assert "Personal Outflows" not in html
+    assert "Remaining Needs Budget" not in html
+    assert "Remaining Wants Budget" not in html
+    assert "Income After Expenses" not in html
+    assert "After expenses" in html
+    assert "Wants Left" in html
+    assert "View all" in html
     assert "Expense Highlights" in html
     assert "Largest" in html
     assert "Most Frequent" in html
@@ -458,6 +517,24 @@ def test_expense_report_payload_resolves_exact_snapshot(tmp_path, monkeypatch):
     }
 
     assert _static_report_path_for_payload(payload) == snapshot
+
+
+def test_expense_report_request_prefers_snapshot_unless_live_requested(tmp_path, monkeypatch):
+    monkeypatch.setenv("BOOKIEBOT_REPORT_DIR", str(tmp_path))
+    filename = "expense-breakdown-brian-2026-06-snapshot.html"
+    snapshot = tmp_path / filename
+    snapshot.write_text("<html>snapshot</html>", encoding="utf-8")
+    payload = {
+        "actor_key": "brian",
+        "owner_name": "Brian",
+        "persons": ["Brian (BofA)"],
+        "year": 2026,
+        "month": 6,
+        "filename": filename,
+    }
+
+    assert _static_report_path_for_request(payload, {"token": "abc"}) == snapshot
+    assert _static_report_path_for_request(payload, {"token": "abc", "live": "1"}) is None
 
 
 def test_expense_report_payload_falls_back_to_latest_matching_snapshot(tmp_path, monkeypatch):

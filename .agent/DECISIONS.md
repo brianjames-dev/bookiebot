@@ -116,6 +116,12 @@ Decision: The expense breakdown burn-rate line uses itemized food/shopping entri
 
 Rationale: The Budget sheet is the authoritative aggregate for the report, while the shared expense rows provide the best available daily timing. Scaling keeps the line chart consistent with the headline burn-rate totals without hiding daily spending patterns.
 
+## 2026-07-07 - Serve Expense Report Snapshots By Default
+
+Decision: Signed expense report links should serve the saved HTML snapshot first, and only perform a live Google Sheets rerender when no snapshot exists or the URL includes `live=1`.
+
+Rationale: Reports generated from Discord should remain openable even if Google Sheets permissions or service-account access drift later. Live dashboard behavior belongs behind an explicit request until the report becomes a true app API surface with caching and refresh controls.
+
 ## Pending Decisions
 
 - Where should durable system events live: banking database only, Google Sheets only, or dual-write during transition?

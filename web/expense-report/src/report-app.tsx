@@ -158,6 +158,7 @@ function useMediaQuery(query: string) {
 export function ExpenseReportApp({ report }: { report: ExpenseReportData }) {
   const { theme, toggleTheme } = useExpenseReportTheme()
   const categoryColors: Record<string, string> = Object.fromEntries(report.breakdown.map((item) => [item.label, item.color]))
+  const defaultChartTab = report.burnRate ? "burn-rate" : "category"
 
   return (
     <div className="bb-page">
@@ -174,18 +175,18 @@ export function ExpenseReportApp({ report }: { report: ExpenseReportData }) {
 
       <main className="bb-main">
         <section className="bb-metrics-grid" aria-label="Budget metrics">
-          <MetricCard label="Monthly Income" value={report.metrics.monthlyIncome} />
-          <MetricCard label="Monthly Expenses" value={report.metrics.totalExpenses} />
-          <MetricCard label="Remaining Needs Budget" value={report.metrics.remainingNeedsBudget ?? report.metrics.remainingBudget} accent />
-          <MetricCard label="Remaining Wants Budget" value={report.metrics.remainingWantsBudget} accent />
+          <MetricCard label="Income" value={report.metrics.monthlyIncome} />
+          <MetricCard label="Spent" value={report.metrics.totalExpenses} />
+          <MetricCard label="Left" value={report.metrics.incomeAfterExpenses} description="After expenses" accent />
           <MetricCard
-            label="Amount Saved"
+            label="Saved"
             value={report.metrics.amountSaved}
             description={report.metrics.savingsGoal ? `Goal ${formatMoney(report.metrics.savingsGoal)}` : undefined}
             accent={isSavingsNearGoal(report.metrics.amountSaved, report.metrics.savingsGoal)}
           />
-          <MetricCard label="Income After Expenses" value={report.metrics.incomeAfterExpenses} accent />
         </section>
+
+        <MonthlySignalStrip report={report} />
 
         <Card className="bb-analytics-card">
           <CardHeader className="bb-analytics-header">
@@ -194,7 +195,7 @@ export function ExpenseReportApp({ report }: { report: ExpenseReportData }) {
             </div>
           </CardHeader>
           <CardContent>
-            <Tabs defaultValue="category">
+            <Tabs defaultValue={defaultChartTab}>
               <TabsList>
                 <TabsTrigger value="category">Category Mix</TabsTrigger>
                 {report.burnRate ? <TabsTrigger value="burn-rate">Burn Rate</TabsTrigger> : null}
@@ -253,6 +254,48 @@ function ThemeToggle({ theme, onToggle }: { theme: ThemeMode; onToggle: () => vo
       </span>
       <span className="bb-theme-toggle-label">Dark mode</span>
     </button>
+  )
+}
+
+function MonthlySignalStrip({ report }: { report: ExpenseReportData }) {
+  const burnRate = report.burnRate
+  const isOver = burnRate?.status === "over"
+  const paceLabel = !burnRate
+    ? "No pace data"
+    : burnRate.status === "not_started"
+      ? "Not started"
+      : `${isOver ? "Over" : "Under"} ${formatMoney(Math.abs(burnRate.totalDifference))}`
+  const paceMeta = burnRate && burnRate.status !== "not_started"
+    ? `${burnRate.dailyDifference >= 0 ? "+" : ""}${formatMoney(burnRate.dailyDifference)}/day`
+    : "Wants pace"
+
+  return (
+    <section className="bb-signal-strip" aria-label="This month">
+      <SignalItem label="Pace" value={paceLabel} meta={paceMeta} tone={isOver ? "negative" : burnRate ? "positive" : "neutral"} />
+      <SignalItem label="Wants Left" value={formatMoney(report.metrics.remainingWantsBudget)} meta="Variable budget" />
+      <SignalItem label="Saved" value={formatMoney(report.metrics.amountSaved)} meta={report.metrics.savingsGoal ? `Goal ${formatMoney(report.metrics.savingsGoal)}` : "This month"} />
+    </section>
+  )
+}
+
+function SignalItem({
+  label,
+  value,
+  meta,
+  tone = "neutral",
+}: {
+  label: string
+  value: string
+  meta: string
+  tone?: "positive" | "negative" | "neutral"
+}) {
+  const valueClass = tone === "positive" ? "bb-signal-value bb-positive" : tone === "negative" ? "bb-signal-value bb-negative" : "bb-signal-value"
+  return (
+    <div className="bb-signal-item">
+      <span>{label}</span>
+      <strong className={valueClass}>{value}</strong>
+      <small>{meta}</small>
+    </div>
   )
 }
 
@@ -318,15 +361,17 @@ function BurnRateChart({ burnRate }: { burnRate: BurnRate }) {
           </LineChart>
         </ResponsiveContainer>
       </ChartContainer>
-      <StatList
-        rows={[
-          ["Monthly wants target", formatMoney(burnRate.budget)],
-          ["Food + shopping spent", formatMoney(burnRate.spent)],
-          ["Remaining wants budget", formatMoney(burnRate.remaining)],
-          ["Allowed daily average", formatMoney(burnRate.allowedDailyAverage)],
-          ["Actual daily average", formatMoney(burnRate.actualDailyAverage)],
-        ]}
-      />
+      <DetailsPanel summary="Details">
+        <StatList
+          rows={[
+            ["Wants target", formatMoney(burnRate.budget)],
+            ["Food + shopping", formatMoney(burnRate.spent)],
+            ["Wants left", formatMoney(burnRate.remaining)],
+            ["Allowed/day", formatMoney(burnRate.allowedDailyAverage)],
+            ["Actual/day", formatMoney(burnRate.actualDailyAverage)],
+          ]}
+        />
+      </DetailsPanel>
     </div>
   )
 }
@@ -726,14 +771,16 @@ function DailySpendingChart({ data, total, elapsedDays }: { data: AmountRow[]; t
           <div className="bb-chart-kicker">Daily Spending</div>
           <div className="bb-chart-total">{formatMoney(total)}</div>
         </div>
-        <StatList
-          rows={[
-            ["Tracked days", String(data.length)],
-            ["Average day", formatMoney(averageDaySpend)],
-            ["Days counted", String(elapsedDays)],
-            ["Highest day", peak ? `${peak.label} - ${formatMoney(peak.amount)}` : "N/A"],
-          ]}
-        />
+        <DetailsPanel summary="Details">
+          <StatList
+            rows={[
+              ["Tracked days", String(data.length)],
+              ["Avg/day", formatMoney(averageDaySpend)],
+              ["Days counted", String(elapsedDays)],
+              ["Highest day", peak ? `${peak.label} - ${formatMoney(peak.amount)}` : "N/A"],
+            ]}
+          />
+        </DetailsPanel>
       </div>
     </div>
   )
@@ -806,7 +853,7 @@ function ExpenseInsightsCard({ topEntries, merchantTotals }: { topEntries: Expen
           <TabsContent value="merchants">
             <div className="bb-insight-panel">
               <MerchantChart data={merchantTotals} />
-              <AmountTable columns={["Merchant", "Amount"]} rows={merchantTotals} />
+              <AmountTable columns={["Merchant", "Amount"]} rows={merchantTotals} limit={5} />
             </div>
           </TabsContent>
         </Tabs>
@@ -828,10 +875,35 @@ function StatList({ rows }: { rows: [string, string][] }) {
   )
 }
 
-function AmountTable({ columns, rows }: { columns: [string, string]; rows: AmountRow[] }) {
+function DetailsPanel({ summary, children }: { summary: string; children: React.ReactNode }) {
+  return (
+    <details className="bb-details-panel">
+      <summary>{summary}</summary>
+      <div>{children}</div>
+    </details>
+  )
+}
+
+function AmountTable({ columns, rows, limit }: { columns: [string, string]; rows: AmountRow[]; limit?: number }) {
   if (!rows.length) {
     return <div className="bb-empty">No data found.</div>
   }
+  const visibleRows = limit ? rows.slice(0, limit) : rows
+  const hasMore = limit !== undefined && rows.length > visibleRows.length
+
+  return (
+    <>
+      <AmountRowsTable columns={columns} rows={visibleRows} />
+      {hasMore ? (
+        <DetailsPanel summary={`View all ${rows.length}`}>
+          <AmountRowsTable columns={columns} rows={rows} />
+        </DetailsPanel>
+      ) : null}
+    </>
+  )
+}
+
+function AmountRowsTable({ columns, rows }: { columns: [string, string]; rows: AmountRow[] }) {
   return (
     <div className="bb-table-wrap">
       <table>
@@ -862,6 +934,22 @@ function TopExpensesTable({ entries }: { entries: ExpenseEntry[] }) {
   if (!entries.length) {
     return <div className="bb-empty">No shared expense entries found.</div>
   }
+  const visibleEntries = entries.slice(0, 5)
+  const hasMore = entries.length > visibleEntries.length
+
+  return (
+    <>
+      <TopExpensesRowsTable entries={visibleEntries} />
+      {hasMore ? (
+        <DetailsPanel summary={`View all ${entries.length}`}>
+          <TopExpensesRowsTable entries={entries} />
+        </DetailsPanel>
+      ) : null}
+    </>
+  )
+}
+
+function TopExpensesRowsTable({ entries }: { entries: ExpenseEntry[] }) {
   return (
     <div className="bb-table-wrap">
       <table>
@@ -966,7 +1054,7 @@ function NeedExpensesCard({ items }: { items: PaymentItem[] }) {
         {!items.length ? (
           <div className="bb-empty">No need expenses found.</div>
         ) : (
-          <AmountTable columns={["Item", "Amount"]} rows={items} />
+          <AmountTable columns={["Item", "Amount"]} rows={items} limit={5} />
         )}
       </CardContent>
     </Card>
@@ -990,7 +1078,9 @@ function BillsUtilitiesPanel({ items }: { items: UtilityHistoryItem[] }) {
       ) : (
         <>
           <BillsUtilitiesChart items={items} />
-          <BillsUtilitiesSummary items={items} />
+          <DetailsPanel summary="Bill details">
+            <BillsUtilitiesSummary items={items} />
+          </DetailsPanel>
         </>
       )}
     </div>
@@ -1309,6 +1399,8 @@ function SubscriptionCompactTable({
 }) {
   const toneConfig = SUBSCRIPTION_TONES[tone]
   const total = items.reduce((sum, item) => sum + item.amount, 0)
+  const visibleItems = items.slice(0, 5)
+  const hasMore = items.length > visibleItems.length
 
   return (
     <section className="bb-subscription-compact-group" aria-label={`${title} subs`}>
@@ -1319,28 +1411,14 @@ function SubscriptionCompactTable({
       {!items.length ? (
         <div className="bb-empty">No matching subs found.</div>
       ) : (
-        <div className="bb-table-wrap">
-          <table className="bb-subscription-compact-table">
-            <thead>
-              <tr>
-                <th>Name</th>
-                <th>Cadence</th>
-                <th>Pull Date</th>
-                <th>Amount</th>
-              </tr>
-            </thead>
-            <tbody>
-              {items.map((item, index) => (
-                <tr key={`${item.name}-${item.amount}-${index}`}>
-                  <td>{item.name}</td>
-                  <td>{item.cadence}</td>
-                  <td>{subscriptionPullLabel(item)}</td>
-                  <td className="bb-amount">{formatMoney(item.amount)}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+        <>
+          <SubscriptionRowsTable items={visibleItems} compact />
+          {hasMore ? (
+            <DetailsPanel summary={`View all ${items.length}`}>
+              <SubscriptionRowsTable items={items} compact />
+            </DetailsPanel>
+          ) : null}
+        </>
       )}
     </section>
   )
@@ -1350,10 +1428,25 @@ function SubscriptionItemsTable({ items }: { items: SubscriptionItem[] }) {
   if (!items.length) {
     return <div className="bb-empty">No matching subs found.</div>
   }
+  const visibleItems = items.slice(0, 5)
+  const hasMore = items.length > visibleItems.length
 
   return (
+    <>
+      <SubscriptionRowsTable items={visibleItems} />
+      {hasMore ? (
+        <DetailsPanel summary={`View all ${items.length}`}>
+          <SubscriptionRowsTable items={items} />
+        </DetailsPanel>
+      ) : null}
+    </>
+  )
+}
+
+function SubscriptionRowsTable({ items, compact = false }: { items: SubscriptionItem[]; compact?: boolean }) {
+  return (
     <div className="bb-table-wrap">
-      <table>
+      <table className={compact ? "bb-subscription-compact-table" : undefined}>
         <thead>
           <tr>
             <th>Name</th>
