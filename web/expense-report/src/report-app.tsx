@@ -176,8 +176,6 @@ export function ExpenseReportApp({ report }: { report: ExpenseReportData }) {
         <section className="bb-metrics-grid" aria-label="Budget metrics">
           <MetricCard label="Monthly Income" value={report.metrics.monthlyIncome} />
           <MetricCard label="Monthly Expenses" value={report.metrics.totalExpenses} />
-          <MetricCard label="Fixed Commitments" value={report.metrics.fixedCommitments} />
-          <BurnRateMetricCard burnRate={report.burnRate} />
           <MetricCard label="Remaining Needs Budget" value={report.metrics.remainingNeedsBudget ?? report.metrics.remainingBudget} accent />
           <MetricCard label="Remaining Wants Budget" value={report.metrics.remainingWantsBudget} accent />
           <MetricCard
@@ -270,10 +268,22 @@ function BurnRateChart({ burnRate }: { burnRate: BurnRate }) {
   const yAxisDomain = burnRateYAxisDomain(chartSeries)
 
   return (
-    <div className="bb-chart-layout">
+    <div className="bb-chart-stack">
+      <div className="bb-panel-head bb-burn-rate-summary">
+        <div>
+          <div className="bb-chart-kicker">{statusLabel}</div>
+          <div className={isOver ? "bb-burn-rate-value bb-negative" : "bb-burn-rate-value bb-positive"}>{differenceLabel}</div>
+          <div className="bb-burn-rate-note">
+            {burnRate.elapsedDays} of {burnRate.daysInMonth} days counted
+          </div>
+        </div>
+        <div className={isOver ? "bb-burn-rate-pill bb-burn-rate-pill-danger" : "bb-burn-rate-pill"}>
+          {dailyDifference}
+        </div>
+      </div>
       <ChartContainer
         config={{ variance: { label: "Variance", color: lineColor } }}
-        className="bb-chart-box"
+        className="bb-chart-box bb-chart-box-wide"
       >
         <ResponsiveContainer width="100%" height={320}>
           <LineChart data={chartSeries} margin={{ top: 20, right: 22, left: 0, bottom: 8 }}>
@@ -308,29 +318,15 @@ function BurnRateChart({ burnRate }: { burnRate: BurnRate }) {
           </LineChart>
         </ResponsiveContainer>
       </ChartContainer>
-      <div className="bb-chart-side">
-        <div className="bb-burn-rate-summary">
-          <div>
-            <div className="bb-chart-kicker">{statusLabel}</div>
-            <div className={isOver ? "bb-burn-rate-value bb-negative" : "bb-burn-rate-value bb-positive"}>{differenceLabel}</div>
-            <div className="bb-burn-rate-note">
-              {burnRate.elapsedDays} of {burnRate.daysInMonth} days counted
-            </div>
-          </div>
-          <div className={isOver ? "bb-burn-rate-pill bb-burn-rate-pill-danger" : "bb-burn-rate-pill"}>
-            {dailyDifference}
-          </div>
-        </div>
-        <StatList
-          rows={[
-            ["Monthly wants target", formatMoney(burnRate.budget)],
-            ["Food + shopping spent", formatMoney(burnRate.spent)],
-            ["Remaining wants budget", formatMoney(burnRate.remaining)],
-            ["Allowed daily average", formatMoney(burnRate.allowedDailyAverage)],
-            ["Actual daily average", formatMoney(burnRate.actualDailyAverage)],
-          ]}
-        />
-      </div>
+      <StatList
+        rows={[
+          ["Monthly wants target", formatMoney(burnRate.budget)],
+          ["Food + shopping spent", formatMoney(burnRate.spent)],
+          ["Remaining wants budget", formatMoney(burnRate.remaining)],
+          ["Allowed daily average", formatMoney(burnRate.allowedDailyAverage)],
+          ["Actual daily average", formatMoney(burnRate.actualDailyAverage)],
+        ]}
+      />
     </div>
   )
 }
@@ -468,36 +464,6 @@ function BurnRateTooltipContent({
   )
 }
 
-function BurnRateMetricCard({ burnRate }: { burnRate: BurnRate | null }) {
-  if (!burnRate) {
-    return <MetricCard label="Burn Rate" value={null} />
-  }
-
-  const isOver = burnRate.status === "over"
-  const isNotStarted = burnRate.status === "not_started"
-  const isOnPace = !isNotStarted && burnRate.totalDifference === 0
-  const statusLabel = isNotStarted
-    ? "Not started"
-    : isOnPace
-      ? "On pace"
-      : `${isOver ? "Over" : "Under"} ${formatMoney(Math.abs(burnRate.totalDifference))}`
-  const dailyLabel = isNotStarted
-    ? "No daily pace yet"
-    : `${burnRate.dailyDifference >= 0 ? "+" : ""}${formatMoney(burnRate.dailyDifference)}/day`
-
-  return (
-    <Card>
-      <CardContent className="bb-metric-card">
-        <div className="bb-metric-label">Burn Rate</div>
-        <div className={isOver ? "bb-metric-value bb-negative" : "bb-metric-value bb-positive"}>
-          {statusLabel}
-        </div>
-        <div className="bb-metric-note">{dailyLabel}</div>
-      </CardContent>
-    </Card>
-  )
-}
-
 function MetricCard({
   label,
   value,
@@ -535,43 +501,47 @@ function CategoryMixChart({ data, total }: { data: BreakdownItem[]; total: numbe
   const pieLayout = useExpensePieLayout()
 
   return (
-    <div className="bb-chart-layout">
-      <ChartContainer config={chartConfig(data)} className="bb-chart-box">
-        <ResponsiveContainer width="100%" height={pieLayout.chartHeight}>
-          <PieChart>
-            <ChartTooltip content={<ChartTooltipContent />} />
-            <Pie
-              data={data}
-              dataKey="amount"
-              nameKey="label"
-              innerRadius={pieLayout.innerRadius}
-              outerRadius={pieLayout.outerRadius}
-              paddingAngle={1}
-              label={pieLayout.showLabels ? (props) => renderPieMetricLabel(props, pieLayout) : false}
-              labelLine={pieLayout.showLabels ? (props) => renderPieMetricLabelLine(props, pieLayout) : false}
-            >
-              {data.map((item) => (
-                <Cell key={item.key} fill={item.color} />
-              ))}
-            </Pie>
-          </PieChart>
-        </ResponsiveContainer>
-      </ChartContainer>
-      <div className="bb-chart-side">
+    <div className="bb-chart-stack">
+      <div className="bb-panel-head">
         <div>
           <div className="bb-chart-kicker">Category Mix</div>
           <div className="bb-chart-total">{formatMoney(total)}</div>
         </div>
-        <div className="bb-legend-list">
-          {data.map((item) => (
-            <div className="bb-legend-row" key={item.key}>
-              <span className="bb-swatch" style={{ backgroundColor: item.color }} />
-              <span>{item.label}</span>
-              <strong>
-                {formatMoney(item.amount)} <span>{formatPct(item.percentage)}</span>
-              </strong>
-            </div>
-          ))}
+      </div>
+      <div className="bb-chart-layout">
+        <ChartContainer config={chartConfig(data)} className="bb-chart-box">
+          <ResponsiveContainer width="100%" height={pieLayout.chartHeight}>
+            <PieChart>
+              <ChartTooltip content={<ChartTooltipContent />} />
+              <Pie
+                data={data}
+                dataKey="amount"
+                nameKey="label"
+                innerRadius={pieLayout.innerRadius}
+                outerRadius={pieLayout.outerRadius}
+                paddingAngle={1}
+                label={pieLayout.showLabels ? (props) => renderPieMetricLabel(props, pieLayout) : false}
+                labelLine={pieLayout.showLabels ? (props) => renderPieMetricLabelLine(props, pieLayout) : false}
+              >
+                {data.map((item) => (
+                  <Cell key={item.key} fill={item.color} />
+                ))}
+              </Pie>
+            </PieChart>
+          </ResponsiveContainer>
+        </ChartContainer>
+        <div className="bb-chart-side">
+          <div className="bb-legend-list">
+            {data.map((item) => (
+              <div className="bb-legend-row" key={item.key}>
+                <span className="bb-swatch" style={{ backgroundColor: item.color }} />
+                <span>{item.label}</span>
+                <strong>
+                  {formatMoney(item.amount)} <span>{formatPct(item.percentage)}</span>
+                </strong>
+              </div>
+            ))}
+          </div>
         </div>
       </div>
     </div>
@@ -1008,7 +978,7 @@ function BillsUtilitiesPanel({ items }: { items: UtilityHistoryItem[] }) {
 
   return (
     <div className="bb-bills-analytics">
-      <div className="bb-bills-analytics-head">
+      <div className="bb-panel-head bb-bills-analytics-head">
         <div>
           <div className="bb-chart-kicker">Bills & Utilities</div>
           <div className="bb-chart-total">{formatMoney(currentTotal)}</div>
@@ -1181,9 +1151,12 @@ function SubscriptionPanel({
 
   return (
     <div className="bb-subscription-panel">
-      <div className="bb-subscription-summary">
-        <div className="bb-subscription-total" style={{ color: toneConfig.color }}>
-          {formatMoney(total)}
+      <div className="bb-panel-head bb-subscription-summary">
+        <div>
+          <div className="bb-chart-kicker">{monthLabel} subs</div>
+          <div className="bb-subscription-total" style={{ color: toneConfig.color }}>
+            {formatMoney(total)}
+          </div>
         </div>
         <Badge variant="secondary">
           {scheduledCount} in {monthLabel}

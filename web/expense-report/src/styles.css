@@ -664,6 +664,30 @@ body {
   margin-top: 18px;
 }
 
+.bb-chart-stack {
+  display: grid;
+  gap: 16px;
+  min-width: 0;
+}
+
+.bb-panel-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 14px;
+  min-width: 0;
+}
+
+.bb-panel-head > :first-child {
+  min-width: 0;
+}
+
+.bb-panel-head > .bb-badge,
+.bb-panel-head > .bb-burn-rate-pill {
+  margin-left: auto;
+}
+
 .bb-chart-layout {
   display: grid;
   grid-template-columns: minmax(360px, 1.35fr) minmax(260px, 0.65fr);
@@ -1015,16 +1039,8 @@ tr:last-child td {
     gap: 8px;
   }
 
-  .bb-burn-rate-summary {
-    display: grid;
-  }
-
   .bb-burn-rate-value {
     font-size: 24px;
-  }
-
-  .bb-burn-rate-pill {
-    justify-self: start;
   }
 
   .bb-metric-card {
@@ -1068,10 +1084,6 @@ tr:last-child td {
 }
 
 @media (max-width: 640px) {
-  .bb-subscription-summary {
-    display: grid;
-  }
-
   .bb-subscription-all-grid {
     grid-template-columns: 1fr;
   }

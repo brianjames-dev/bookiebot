@@ -152,6 +152,9 @@ def test_build_expense_breakdown_report_aggregates_shared_and_personal_data():
     assert "Spending By Person / Card" not in html
     assert 'id="bookiebot-expense-report-root"' in html
     assert "window.process = window.process ||" in html
+    assert "bb-chart-stack" in html
+    assert "bb-panel-head" in html
+    assert "bb-burn-rate-summary" in html
     payload_match = re.search(
         r'<script id="bookiebot-expense-report-data" type="application/json">(.*?)</script>',
         html,
@@ -218,7 +221,7 @@ def test_build_expense_breakdown_report_aggregates_shared_and_personal_data():
         "variance": -750.0,
     }
     assert "Needs vs Wants" not in html
-    assert "Fixed Commitments" in html
+    assert "Fixed Commitments" not in html
     assert "Personal Outflows" not in html
     assert "Expense Highlights" in html
     assert "Largest" in html
@@ -230,6 +233,7 @@ def test_build_expense_breakdown_report_aggregates_shared_and_personal_data():
     assert "bb-subscription-calendar" in html
     assert "bb-subscription-analytics" in html
     assert "Subs" in html
+    assert "bb-subscription-summary" in html
     assert "bb-subscription-all-grid" in html
     assert "bb-subscription-compact-table" in html
     assert "bb-subscription-tab-content" in html
