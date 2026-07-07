@@ -200,7 +200,7 @@ export function ExpenseReportApp({ report }: { report: ExpenseReportData }) {
               <TabsList>
                 <TabsTrigger value="category">Category Mix</TabsTrigger>
                 {report.burnRate ? <TabsTrigger value="burn-rate">Burn Rate</TabsTrigger> : null}
-                <TabsTrigger value="subscriptions">Subscriptions</TabsTrigger>
+                <TabsTrigger value="subscriptions">Subs</TabsTrigger>
                 <TabsTrigger value="bills">Bills & Utilities</TabsTrigger>
               </TabsList>
               <TabsContent value="category">
@@ -1217,7 +1217,7 @@ function SubscriptionCalendar({
   const itemsByDay = subscriptionsByDay(items, year, month)
 
   return (
-    <div className="bb-subscription-calendar" aria-label={`${toneConfig.label} subscription calendar`}>
+    <div className="bb-subscription-calendar" aria-label={`${toneConfig.label} subs calendar`}>
       <div className="bb-calendar-head" aria-hidden="true">
         {WEEKDAY_LABELS.map((label) => (
           <span key={label}>{label}</span>
@@ -1273,7 +1273,7 @@ function SubscriptionCalendar({
                           backgroundColor: toneConfig.background,
                           borderColor: toneConfig.color,
                         }}
-                        aria-label={`${hiddenCount} more subscription${hiddenCount === 1 ? "" : "s"} on day ${day}`}
+                        aria-label={`${hiddenCount} more sub${hiddenCount === 1 ? "" : "s"} on day ${day}`}
                       >
                         +{hiddenCount} more
                         <SubscriptionOverflowTooltip items={dayItems.slice(visibleItems.length)} day={day} />
@@ -1338,13 +1338,13 @@ function SubscriptionCompactTable({
   const total = items.reduce((sum, item) => sum + item.amount, 0)
 
   return (
-    <section className="bb-subscription-compact-group" aria-label={`${title} subscriptions`}>
+    <section className="bb-subscription-compact-group" aria-label={`${title} subs`}>
       <div className="bb-subscription-compact-heading">
         <span style={{ color: toneConfig.color }}>{title}</span>
         <strong>{formatMoney(total)}</strong>
       </div>
       {!items.length ? (
-        <div className="bb-empty">No matching subscriptions found.</div>
+        <div className="bb-empty">No matching subs found.</div>
       ) : (
         <div className="bb-table-wrap">
           <table className="bb-subscription-compact-table">
@@ -1375,7 +1375,7 @@ function SubscriptionCompactTable({
 
 function SubscriptionItemsTable({ items }: { items: SubscriptionItem[] }) {
   if (!items.length) {
-    return <div className="bb-empty">No matching subscriptions found.</div>
+    return <div className="bb-empty">No matching subs found.</div>
   }
 
   return (
@@ -1439,7 +1439,7 @@ function subscriptionPullLabel(item: SubscriptionItem) {
 
 function subscriptionPullDescription(item: SubscriptionItem) {
   const cadence = item.cadence ? `${item.cadence} pull` : "Pull"
-  return `${item.kind || "Subscription"} - ${cadence} - ${subscriptionPullLabel(item)}`
+  return `${item.kind || "Sub"} - ${cadence} - ${subscriptionPullLabel(item)}`
 }
 
 function subscriptionToneForItem(item: SubscriptionItem): Exclude<SubscriptionTone, "all"> {

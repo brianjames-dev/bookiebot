@@ -161,7 +161,7 @@ def test_build_expense_breakdown_report_aggregates_shared_and_personal_data():
     assert [item["label"] for item in payload["breakdown"]][:3] == [
         "Rent",
         "Bills & Utilities",
-        "Subscriptions (Needs)",
+        "Subs (Needs)",
     ]
     assert payload["year"] == 2026
     assert payload["month"] == 5
@@ -229,6 +229,7 @@ def test_build_expense_breakdown_report_aggregates_shared_and_personal_data():
     assert "Frequent Merchants / Locations" not in html
     assert "bb-subscription-calendar" in html
     assert "bb-subscription-analytics" in html
+    assert "Subs" in html
     assert "bb-subscription-all-grid" in html
     assert "bb-subscription-compact-table" in html
     assert "bb-subscription-tab-content" in html

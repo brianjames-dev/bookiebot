@@ -129,9 +129,9 @@ class ExpenseReportPage:
 CATEGORY_LABELS = {
     "rent": "Rent",
     "bills_utilities": "Bills & Utilities",
-    "static_bills_subscriptions_needs": "Subscriptions (Needs)",
+    "static_bills_subscriptions_needs": "Subs (Needs)",
     "need_expenses": "Need Expenses",
-    "subscriptions_wants": "Subscriptions (Wants)",
+    "subscriptions_wants": "Subs (Wants)",
     "grocery": "Grocery",
     "gas": "Gas",
     "food": "Food",
@@ -1637,7 +1637,7 @@ def _payments_for_group(items: list[PaymentItem], group: str) -> list[PaymentIte
 
 def _subscriptions_table(items: list[SubscriptionItem]) -> str:
     if not items:
-        return '<div class="empty">No matching subscriptions found.</div>'
+        return '<div class="empty">No matching subs found.</div>'
     rows = "\n".join(
         f"""<tr>
   <td>{_escape(item.name)}</td>
