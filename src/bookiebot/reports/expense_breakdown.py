@@ -403,6 +403,7 @@ def render_expense_breakdown_html(report: ExpenseBreakdownReport) -> str:
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Expense Breakdown - {_escape(report.month.label)}</title>
+  <script>{_theme_bootstrap_script()}</script>
   <style>{_report_asset_text("expense-report-app.css")}</style>
 </head>
 <body>
@@ -1013,6 +1014,21 @@ def _json_script_payload(payload: dict[str, Any]) -> str:
         .replace("<", "\\u003c")
         .replace(">", "\\u003e")
     )
+
+
+def _theme_bootstrap_script() -> str:
+    return """(() => {
+  try {
+    const key = "bookiebot-expense-report-theme";
+    const stored = window.localStorage.getItem(key);
+    const theme = stored === "dark" || stored === "light"
+      ? stored
+      : window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
+    document.documentElement.dataset.theme = theme;
+    document.documentElement.style.colorScheme = theme;
+  } catch (_) {
+  }
+})();"""
 
 
 def _report_asset_text(filename: str) -> str:

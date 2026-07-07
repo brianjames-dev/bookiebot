@@ -41,6 +41,99 @@ function generatedTimeLabel(value: string) {
   return match?.[1] ?? value
 }
 
+type ThemeMode = "light" | "dark"
+
+type ThemeState = {
+  theme: ThemeMode
+  hasOverride: boolean
+}
+
+const THEME_STORAGE_KEY = "bookiebot-expense-report-theme"
+
+function systemTheme(): ThemeMode {
+  if (typeof window !== "undefined" && window.matchMedia("(prefers-color-scheme: dark)").matches) {
+    return "dark"
+  }
+  return "light"
+}
+
+function storedTheme(): ThemeMode | null {
+  if (typeof window === "undefined") {
+    return null
+  }
+  try {
+    const value = window.localStorage.getItem(THEME_STORAGE_KEY)
+    return value === "dark" || value === "light" ? value : null
+  } catch {
+    return null
+  }
+}
+
+function initialThemeState(): ThemeState {
+  const stored = storedTheme()
+  return {
+    theme: stored ?? systemTheme(),
+    hasOverride: stored !== null,
+  }
+}
+
+function applyTheme(theme: ThemeMode) {
+  if (typeof document === "undefined") {
+    return
+  }
+  document.documentElement.dataset.theme = theme
+  document.documentElement.style.colorScheme = theme
+}
+
+function persistTheme(theme: ThemeMode) {
+  if (typeof window === "undefined") {
+    return
+  }
+  try {
+    window.localStorage.setItem(THEME_STORAGE_KEY, theme)
+  } catch {
+    // Ignore storage failures so the report remains usable in restricted browser contexts.
+  }
+}
+
+function useExpenseReportTheme() {
+  const [{ theme, hasOverride }, setThemeState] = useState<ThemeState>(initialThemeState)
+
+  useEffect(() => {
+    applyTheme(theme)
+  }, [theme])
+
+  useEffect(() => {
+    if (typeof window === "undefined" || hasOverride) {
+      return undefined
+    }
+
+    const media = window.matchMedia("(prefers-color-scheme: dark)")
+    const handleChange = () => {
+      setThemeState({ theme: media.matches ? "dark" : "light", hasOverride: false })
+    }
+
+    handleChange()
+    if (media.addEventListener) {
+      media.addEventListener("change", handleChange)
+      return () => media.removeEventListener("change", handleChange)
+    }
+
+    media.addListener(handleChange)
+    return () => media.removeListener(handleChange)
+  }, [hasOverride])
+
+  const toggleTheme = () => {
+    setThemeState((current) => {
+      const nextTheme: ThemeMode = current.theme === "dark" ? "light" : "dark"
+      persistTheme(nextTheme)
+      return { theme: nextTheme, hasOverride: true }
+    })
+  }
+
+  return { theme, toggleTheme }
+}
+
 function useMediaQuery(query: string) {
   const [matches, setMatches] = useState(() => (typeof window === "undefined" ? false : window.matchMedia(query).matches))
 
@@ -63,6 +156,7 @@ function useMediaQuery(query: string) {
 }
 
 export function ExpenseReportApp({ report }: { report: ExpenseReportData }) {
+  const { theme, toggleTheme } = useExpenseReportTheme()
   const categoryColors: Record<string, string> = Object.fromEntries(report.breakdown.map((item) => [item.label, item.color]))
 
   return (
@@ -72,7 +166,10 @@ export function ExpenseReportApp({ report }: { report: ExpenseReportData }) {
           <h1>Expense Breakdown</h1>
           <p>{report.monthLabel} budget report for {report.ownerName}.</p>
         </div>
-        <Badge variant="outline">Generated {generatedTimeLabel(report.generatedAt)}</Badge>
+        <div className="bb-header-actions">
+          <ThemeToggle theme={theme} onToggle={toggleTheme} />
+          <Badge variant="outline">Generated {generatedTimeLabel(report.generatedAt)}</Badge>
+        </div>
       </header>
 
       <main className="bb-main">
@@ -143,6 +240,18 @@ export function ExpenseReportApp({ report }: { report: ExpenseReportData }) {
         <PaymentTable title="Income Entries" items={report.incomeEntries} />
       </main>
     </div>
+  )
+}
+
+function ThemeToggle({ theme, onToggle }: { theme: ThemeMode; onToggle: () => void }) {
+  const isDark = theme === "dark"
+  return (
+    <button type="button" className="bb-theme-toggle" aria-pressed={isDark} aria-label={`Turn dark mode ${isDark ? "off" : "on"}`} onClick={onToggle}>
+      <span className="bb-theme-toggle-track" aria-hidden="true">
+        <span className="bb-theme-toggle-thumb" />
+      </span>
+      <span className="bb-theme-toggle-label">Dark mode</span>
+    </button>
   )
 }
 

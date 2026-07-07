@@ -221,6 +221,10 @@ def test_build_expense_breakdown_report_aggregates_shared_and_personal_data():
     assert "Shared transaction activity grouped by day" not in html
     assert "React + shadcn/ui" not in html
     assert "Generated " in html
+    assert "bb-theme-toggle" in html
+    assert "bookiebot-expense-report-theme" in html
+    assert "prefers-color-scheme: dark" in html
+    assert "data-theme" in html
     assert "Highest day" in html
     assert "Days counted" in html
     assert "Daily Spending" in html
