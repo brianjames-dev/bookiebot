@@ -217,7 +217,7 @@ def test_build_expense_breakdown_report_aggregates_shared_and_personal_data():
         "expectedSpend": 795.0,
         "variance": -750.0,
     }
-    assert "Needs vs Wants" in html
+    assert "Needs vs Wants" not in html
     assert "Fixed Commitments" in html
     assert "Personal Outflows" not in html
     assert "Expense Highlights" in html
@@ -228,6 +228,7 @@ def test_build_expense_breakdown_report_aggregates_shared_and_personal_data():
     assert "Largest Shared Expenses" not in html
     assert "Frequent Merchants / Locations" not in html
     assert "bb-subscription-calendar" in html
+    assert "bb-subscription-analytics" in html
     assert "bb-subscription-all-grid" in html
     assert "bb-subscription-compact-table" in html
     assert "bb-subscription-tab-content" in html
@@ -279,6 +280,8 @@ def test_build_expense_breakdown_report_aggregates_shared_and_personal_data():
     assert "rentPayments" not in payload
     assert "incomeEntries" not in payload
     assert "Income Entries" not in html
+    assert "bb-bills-analytics" in html
+    assert "bb-bills-analytics-head" in html
     assert "bb-bills-chart-box" in html
     assert "bb-bill-history-list" in html
     assert "width:fit-content" in html

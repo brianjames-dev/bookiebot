@@ -350,7 +350,7 @@ body {
   min-height: 360px;
 }
 
-.bb-subscription-card-content,
+.bb-subscription-analytics,
 .bb-subscription-panel {
   display: grid;
   gap: 18px;
@@ -683,9 +683,17 @@ body {
   position: relative;
 }
 
-.bb-bills-card-content {
+.bb-bills-analytics {
   display: grid;
   gap: 16px;
+}
+
+.bb-bills-analytics-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 14px;
+  min-width: 0;
 }
 
 .bb-bills-chart-box {

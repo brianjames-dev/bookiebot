@@ -200,7 +200,8 @@ export function ExpenseReportApp({ report }: { report: ExpenseReportData }) {
               <TabsList>
                 <TabsTrigger value="category">Category Mix</TabsTrigger>
                 {report.burnRate ? <TabsTrigger value="burn-rate">Burn Rate</TabsTrigger> : null}
-                <TabsTrigger value="groups">Needs vs Wants</TabsTrigger>
+                <TabsTrigger value="subscriptions">Subscriptions</TabsTrigger>
+                <TabsTrigger value="bills">Bills & Utilities</TabsTrigger>
               </TabsList>
               <TabsContent value="category">
                 <CategoryMixChart data={report.breakdown} total={report.metrics.totalExpenses} />
@@ -210,8 +211,17 @@ export function ExpenseReportApp({ report }: { report: ExpenseReportData }) {
                   <BurnRateChart burnRate={report.burnRate} />
                 </TabsContent>
               ) : null}
-              <TabsContent value="groups">
-                <BudgetGroupChart data={report.budgetGroups} />
+              <TabsContent value="subscriptions">
+                <SubscriptionAnalyticsPanel
+                  year={report.year}
+                  month={report.month}
+                  monthLabel={report.monthLabel}
+                  needs={report.subscriptionsNeeds}
+                  wants={report.subscriptionsWants}
+                />
+              </TabsContent>
+              <TabsContent value="bills">
+                <BillsUtilitiesPanel items={report.utilityHistory} />
               </TabsContent>
             </Tabs>
           </CardContent>
@@ -229,18 +239,7 @@ export function ExpenseReportApp({ report }: { report: ExpenseReportData }) {
 
         <ExpenseInsightsCard topEntries={report.topEntries} merchantTotals={report.merchantTotals} />
 
-        <section className="bb-two-grid">
-          <NeedExpensesCard items={report.needExpenses} />
-          <BillsUtilitiesCard items={report.utilityHistory} />
-        </section>
-
-        <SubscriptionCalendarCard
-          year={report.year}
-          month={report.month}
-          monthLabel={report.monthLabel}
-          needs={report.subscriptionsNeeds}
-          wants={report.subscriptionsWants}
-        />
+        <NeedExpensesCard items={report.needExpenses} />
 
       </main>
     </div>
@@ -770,36 +769,6 @@ function DailySpendingChart({ data, total, elapsedDays }: { data: AmountRow[]; t
   )
 }
 
-function BudgetGroupChart({ data }: { data: AmountRow[] }) {
-  const total = data.reduce((sum, item) => sum + item.amount, 0)
-  return (
-    <div className="bb-chart-layout">
-      <ChartContainer config={chartConfig(data)} className="bb-chart-box">
-        <ResponsiveContainer width="100%" height={300}>
-          <BarChart data={data} layout="vertical" margin={{ top: 24, right: 32, left: 24, bottom: 24 }}>
-            <CartesianGrid horizontal={false} strokeDasharray="3 3" />
-            <XAxis type="number" tickFormatter={(value) => `$${value}`} tickLine={false} axisLine={false} />
-            <YAxis dataKey="label" type="category" tickLine={false} axisLine={false} width={86} />
-            <ChartTooltip content={<ChartTooltipContent />} />
-            <Bar dataKey="amount" name="Budget group" radius={[0, 6, 6, 0]}>
-              {data.map((item, index) => (
-                <Cell key={item.label} fill={`hsl(var(--chart-${index + 1}))`} />
-              ))}
-            </Bar>
-          </BarChart>
-        </ResponsiveContainer>
-      </ChartContainer>
-      <div className="bb-chart-side">
-        <div>
-          <div className="bb-chart-kicker">Needs vs Wants</div>
-          <div className="bb-chart-total">{formatMoney(total)}</div>
-        </div>
-        <StatList rows={data.map((item) => [item.label, `${formatMoney(item.amount)} (${formatPct((item.amount / total) * 100 || 0)})`])} />
-      </div>
-    </div>
-  )
-}
-
 function TopExpensesChart({ entries }: { entries: ExpenseEntry[] }) {
   const rows = entries.slice(0, 10).map((entry) => ({
     label: expenseEntryItemLabel(entry),
@@ -1034,28 +1003,27 @@ function NeedExpensesCard({ items }: { items: PaymentItem[] }) {
   )
 }
 
-function BillsUtilitiesCard({ items }: { items: UtilityHistoryItem[] }) {
+function BillsUtilitiesPanel({ items }: { items: UtilityHistoryItem[] }) {
   const currentTotal = items.reduce((sum, item) => sum + item.currentAmount, 0)
 
   return (
-    <Card>
-      <CardHeader>
-        <div className="bb-card-title-row">
-          <CardTitle>Bills & Utilities</CardTitle>
-          <Badge variant="secondary">{formatMoney(currentTotal)}</Badge>
+    <div className="bb-bills-analytics">
+      <div className="bb-bills-analytics-head">
+        <div>
+          <div className="bb-chart-kicker">Bills & Utilities</div>
+          <div className="bb-chart-total">{formatMoney(currentTotal)}</div>
         </div>
-      </CardHeader>
-      <CardContent className="bb-bills-card-content">
-        {!items.length ? (
-          <div className="bb-empty">No bill history found.</div>
-        ) : (
-          <>
-            <BillsUtilitiesChart items={items} />
-            <BillsUtilitiesSummary items={items} />
-          </>
-        )}
-      </CardContent>
-    </Card>
+        <Badge variant="secondary">{items.length} tracked</Badge>
+      </div>
+      {!items.length ? (
+        <div className="bb-empty">No bill history found.</div>
+      ) : (
+        <>
+          <BillsUtilitiesChart items={items} />
+          <BillsUtilitiesSummary items={items} />
+        </>
+      )}
+    </div>
   )
 }
 
@@ -1157,7 +1125,7 @@ const SUBSCRIPTION_TONES: Record<SubscriptionTone, { label: string; color: strin
 
 const WEEKDAY_LABELS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"]
 
-function SubscriptionCalendarCard({
+function SubscriptionAnalyticsPanel({
   year,
   month,
   monthLabel,
@@ -1173,29 +1141,24 @@ function SubscriptionCalendarCard({
   const allSubscriptions = [...needs, ...wants]
 
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle>Subscriptions</CardTitle>
-      </CardHeader>
-      <CardContent className="bb-subscription-card-content">
-        <Tabs defaultValue="all">
-          <TabsList>
-            <TabsTrigger value="all">All</TabsTrigger>
-            <TabsTrigger value="needs">Needs</TabsTrigger>
-            <TabsTrigger value="wants">Wants</TabsTrigger>
-          </TabsList>
-          <TabsContent value="all" className="bb-subscription-tab-content">
-            <SubscriptionPanel year={year} month={month} monthLabel={monthLabel} items={allSubscriptions} tone="all" />
-          </TabsContent>
-          <TabsContent value="needs" className="bb-subscription-tab-content">
-            <SubscriptionPanel year={year} month={month} monthLabel={monthLabel} items={needs} tone="needs" />
-          </TabsContent>
-          <TabsContent value="wants" className="bb-subscription-tab-content">
-            <SubscriptionPanel year={year} month={month} monthLabel={monthLabel} items={wants} tone="wants" />
-          </TabsContent>
-        </Tabs>
-      </CardContent>
-    </Card>
+    <div className="bb-subscription-analytics">
+      <Tabs defaultValue="all">
+        <TabsList>
+          <TabsTrigger value="all">All</TabsTrigger>
+          <TabsTrigger value="needs">Needs</TabsTrigger>
+          <TabsTrigger value="wants">Wants</TabsTrigger>
+        </TabsList>
+        <TabsContent value="all" className="bb-subscription-tab-content">
+          <SubscriptionPanel year={year} month={month} monthLabel={monthLabel} items={allSubscriptions} tone="all" />
+        </TabsContent>
+        <TabsContent value="needs" className="bb-subscription-tab-content">
+          <SubscriptionPanel year={year} month={month} monthLabel={monthLabel} items={needs} tone="needs" />
+        </TabsContent>
+        <TabsContent value="wants" className="bb-subscription-tab-content">
+          <SubscriptionPanel year={year} month={month} monthLabel={monthLabel} items={wants} tone="wants" />
+        </TabsContent>
+      </Tabs>
+    </div>
   )
 }
 
