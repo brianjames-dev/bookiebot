@@ -206,7 +206,7 @@ def test_build_expense_breakdown_report_aggregates_shared_and_personal_data():
     assert "bb-chart-stack" in html
     assert "bb-panel-head" in html
     assert "bb-burn-rate-summary" in html
-    assert "bb-signal-strip" in html
+    assert "bb-signal-strip" not in html
     assert "bb-details-panel" in html
     payload_match = re.search(
         r'<script id="bookiebot-expense-report-data" type="application/json">(.*?)</script>',
@@ -226,6 +226,7 @@ def test_build_expense_breakdown_report_aggregates_shared_and_personal_data():
     assert payload["dailyTotals"] == [
         {"label": "1", "amount": 50.0},
         {"label": "2", "amount": 25.0},
+        {"label": "No date", "amount": 184.0},
     ]
     assert payload["budgetGroups"][0]["label"] == "Needs"
     assert payload["metrics"]["fixedCommitments"] == 3370.0
@@ -280,7 +281,7 @@ def test_build_expense_breakdown_report_aggregates_shared_and_personal_data():
     assert "Remaining Wants Budget" not in html
     assert "Income After Expenses" not in html
     assert "After expenses" in html
-    assert "Wants Left" in html
+    assert "Wants Left" not in html
     assert "View all" in html
     assert "Expense Highlights" in html
     assert "Largest" in html
@@ -317,6 +318,15 @@ def test_build_expense_breakdown_report_aggregates_shared_and_personal_data():
     assert payload["needExpenses"] == [
         {"label": "DMV Registration", "amount": 184.0, "group": "Need Expenses", "status": "entered"}
     ]
+    assert payload["topEntries"][0] == {
+        "date": "",
+        "category": "Need Expenses",
+        "amount": 184.0,
+        "person": "Hannah",
+        "item": "DMV Registration",
+        "location": "",
+    }
+    assert payload["merchantTotals"][0] == {"label": "DMV Registration", "amount": 184.0}
     assert {item["label"]: item for item in payload["utilityHistory"]} == {
         "PG&E": {
             "key": "pg_e",
@@ -356,6 +366,12 @@ def test_build_expense_breakdown_report_aggregates_shared_and_personal_data():
     assert [item["name"] for item in payload["subscriptionsNeeds"]] == ["Amazon Prime", "Netflix"]
     assert [item["name"] for item in payload["subscriptionsWants"]] == ["MacroFactor", "Spotify"]
     assert any(entry["location"] == "Trader Joe's" for entry in payload["dailyEntries"])
+    assert any(
+        entry["category"] == "Need Expenses"
+        and entry["item"] == "DMV Registration"
+        and entry["date"] == ""
+        for entry in payload["dailyEntries"]
+    )
 
 
 def test_subscription_tables_include_yearly_items_outside_selected_month_without_changing_fallback_totals():

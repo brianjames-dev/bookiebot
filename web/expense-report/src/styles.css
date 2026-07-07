@@ -287,38 +287,6 @@ body {
   font-size: 12px;
 }
 
-.bb-signal-strip {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 1px;
-  overflow: hidden;
-  border: 1px solid hsl(var(--border));
-  border-radius: var(--radius);
-  background: hsl(var(--border));
-}
-
-.bb-signal-item {
-  display: grid;
-  gap: 4px;
-  min-width: 0;
-  padding: 13px 14px;
-  background: hsl(var(--card));
-}
-
-.bb-signal-item span,
-.bb-signal-item small {
-  color: hsl(var(--muted-foreground));
-  font-size: 12px;
-}
-
-.bb-signal-value {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  font-size: 18px;
-  line-height: 1.1;
-  white-space: nowrap;
-}
-
 .bb-positive {
   color: hsl(var(--success));
 }
@@ -1065,10 +1033,6 @@ tr:last-child td {
   .bb-metrics-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
     gap: 10px;
-  }
-
-  .bb-signal-strip {
-    grid-template-columns: 1fr;
   }
 
   .bb-page-header,

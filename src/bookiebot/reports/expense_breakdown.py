@@ -416,14 +416,16 @@ def render_expense_breakdown_html(report: ExpenseBreakdownReport) -> str:
         for key, info in report.breakdown.items()
         if float(info.get("amount") or 0.0) > 0
     ]
-    top_entries = sorted(report.entries, key=lambda entry: entry.amount, reverse=True)[:10]
-    person_totals = _person_totals(report.entries)
-    merchant_totals = _merchant_totals(report.entries)
-    daily_totals = _daily_totals(report.entries)
+    activity_entries = _report_activity_entries(report)
+    top_entries = sorted(activity_entries, key=lambda entry: entry.amount, reverse=True)[:10]
+    person_totals = _person_totals(activity_entries)
+    merchant_totals = _merchant_totals(activity_entries)
+    daily_totals = _daily_totals(activity_entries)
     budget_group_totals = _budget_group_totals(report.breakdown)
     balance_after_expenses = report.income_total - report.grand_total if report.income_total else None
     payload = _report_client_payload(
         report=report,
+        activity_entries=activity_entries,
         breakdown_items=non_zero_breakdown,
         daily_totals=daily_totals,
         budget_group_totals=budget_group_totals,
@@ -1083,6 +1085,25 @@ def _merchant_totals(entries: list[ExpenseEntry]) -> list[tuple[str, float]]:
     ]
 
 
+def _report_activity_entries(report: ExpenseBreakdownReport) -> list[ExpenseEntry]:
+    entries = [*report.entries, *_need_expense_entries(report)]
+    return sorted(entries, key=lambda entry: (_entry_sort_date(entry.date), entry.amount), reverse=True)
+
+
+def _need_expense_entries(report: ExpenseBreakdownReport) -> list[ExpenseEntry]:
+    return [
+        ExpenseEntry(
+            date="",
+            category="need_expenses",
+            amount=item.amount,
+            person=report.owner_name,
+            item=item.label,
+            location="",
+        )
+        for item in report.need_expenses
+    ]
+
+
 def _report_filename(report: ExpenseBreakdownReport) -> str:
     owner = re.sub(r"[^a-z0-9]+", "-", report.owner_name.lower()).strip("-") or "budget"
     suffix = secrets.token_urlsafe(12)
@@ -1116,6 +1137,7 @@ def _metric_card(label: str, value: float | None, note: str = "") -> str:
 def _report_client_payload(
     *,
     report: ExpenseBreakdownReport,
+    activity_entries: list[ExpenseEntry],
     breakdown_items: list[tuple[str, dict[str, Any]]],
     daily_totals: list[tuple[str, float]],
     budget_group_totals: dict[str, float],
@@ -1164,7 +1186,7 @@ def _report_client_payload(
         "personTotals": [_amount_row(label, amount) for label, amount in person_totals],
         "merchantTotals": [_amount_row(label, amount) for label, amount in merchant_totals],
         "topEntries": [_expense_entry_payload(entry) for entry in top_entries],
-        "dailyEntries": [_expense_entry_payload(entry) for entry in report.entries],
+        "dailyEntries": [_expense_entry_payload(entry) for entry in activity_entries],
         "needExpenses": [_payment_payload(item) for item in report.need_expenses],
         "utilityHistory": [_utility_history_payload(item) for item in report.utility_history],
         "subscriptionsNeeds": [
