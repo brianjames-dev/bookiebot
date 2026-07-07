@@ -23,6 +23,19 @@ export interface PaymentItem extends AmountRow {
   status?: string
 }
 
+export interface UtilityHistoryPoint extends AmountRow {
+  month: number
+}
+
+export interface UtilityHistoryItem {
+  key: string
+  label: string
+  currentAmount: number
+  averageAmount: number
+  deltaAmount: number
+  history: UtilityHistoryPoint[]
+}
+
 export interface SubscriptionItem extends AmountRow {
   name: string
   cadence: string
@@ -41,6 +54,7 @@ export interface Metrics {
   remainingNeedsBudget: number | null
   remainingWantsBudget: number | null
   amountSaved: number | null
+  savingsGoal: number | null
   incomeAfterExpenses: number | null
 }
 
@@ -85,9 +99,8 @@ export interface ExpenseReportData {
   merchantTotals: AmountRow[]
   topEntries: ExpenseEntry[]
   dailyEntries: ExpenseEntry[]
-  rentPayments: PaymentItem[]
-  utilityPayments: PaymentItem[]
+  needExpenses: PaymentItem[]
+  utilityHistory: UtilityHistoryItem[]
   subscriptionsNeeds: SubscriptionItem[]
   subscriptionsWants: SubscriptionItem[]
-  incomeEntries: PaymentItem[]
 }

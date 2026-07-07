@@ -18,7 +18,7 @@ import { Badge } from "./components/ui/badge"
 import { Card, CardContent, CardHeader, CardTitle } from "./components/ui/card"
 import { ChartContainer, ChartTooltip, ChartTooltipContent } from "./components/ui/chart"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "./components/ui/tabs"
-import type { AmountRow, BreakdownItem, BurnRate, BurnRatePoint, ExpenseEntry, ExpenseReportData, PaymentItem, SubscriptionItem } from "./types"
+import type { AmountRow, BreakdownItem, BurnRate, BurnRatePoint, ExpenseEntry, ExpenseReportData, PaymentItem, SubscriptionItem, UtilityHistoryItem } from "./types"
 
 const money = new Intl.NumberFormat("en-US", {
   style: "currency",
@@ -180,7 +180,12 @@ export function ExpenseReportApp({ report }: { report: ExpenseReportData }) {
           <BurnRateMetricCard burnRate={report.burnRate} />
           <MetricCard label="Remaining Needs Budget" value={report.metrics.remainingNeedsBudget ?? report.metrics.remainingBudget} accent />
           <MetricCard label="Remaining Wants Budget" value={report.metrics.remainingWantsBudget} accent />
-          <MetricCard label="Amount Saved" value={report.metrics.amountSaved} accent />
+          <MetricCard
+            label="Amount Saved"
+            value={report.metrics.amountSaved}
+            description={report.metrics.savingsGoal ? `Goal ${formatMoney(report.metrics.savingsGoal)}` : undefined}
+            accent={isSavingsNearGoal(report.metrics.amountSaved, report.metrics.savingsGoal)}
+          />
           <MetricCard label="Income After Expenses" value={report.metrics.incomeAfterExpenses} accent />
         </section>
 
@@ -225,8 +230,8 @@ export function ExpenseReportApp({ report }: { report: ExpenseReportData }) {
         <ExpenseInsightsCard topEntries={report.topEntries} merchantTotals={report.merchantTotals} />
 
         <section className="bb-two-grid">
-          <PaymentTable title="Rent" items={report.rentPayments} />
-          <PaymentTable title="Bills & Utilities" items={report.utilityPayments} />
+          <NeedExpensesCard items={report.needExpenses} />
+          <BillsUtilitiesCard items={report.utilityHistory} />
         </section>
 
         <SubscriptionCalendarCard
@@ -237,7 +242,6 @@ export function ExpenseReportApp({ report }: { report: ExpenseReportData }) {
           wants={report.subscriptionsWants}
         />
 
-        <PaymentTable title="Income Entries" items={report.incomeEntries} />
       </main>
     </div>
   )
@@ -521,6 +525,13 @@ function MetricCard({
   )
 }
 
+function isSavingsNearGoal(value: number | null | undefined, goal: number | null | undefined) {
+  if (value === null || value === undefined || goal === null || goal === undefined || goal <= 0) {
+    return false
+  }
+  return value >= goal * 0.9
+}
+
 function CategoryMixChart({ data, total }: { data: BreakdownItem[]; total: number }) {
   const pieLayout = useExpensePieLayout()
 
@@ -801,13 +812,21 @@ function TopExpensesChart({ entries }: { entries: ExpenseEntry[] }) {
         <BarChart data={rows} layout="vertical" margin={{ top: 12, right: 22, left: 20, bottom: 12 }}>
           <CartesianGrid horizontal={false} strokeDasharray="3 3" />
           <XAxis type="number" tickFormatter={(value) => `$${value}`} tickLine={false} axisLine={false} />
-          <YAxis dataKey="label" type="category" width={148} tickLine={false} axisLine={false} />
+          <YAxis dataKey="label" type="category" width={148} tickFormatter={(value) => truncateChartLabel(value, 22)} tickLine={false} axisLine={false} />
           <ChartTooltip content={<ChartTooltipContent />} />
           <Bar dataKey="amount" name="Expense amount" fill="hsl(var(--chart-2))" radius={[0, 6, 6, 0]} />
         </BarChart>
       </ResponsiveContainer>
     </ChartContainer>
   )
+}
+
+function truncateChartLabel(value: unknown, maxLength: number) {
+  const text = String(value ?? "")
+  if (text.length <= maxLength) {
+    return text
+  }
+  return `${text.slice(0, Math.max(maxLength - 3, 0))}...`
 }
 
 function MerchantChart({ data }: { data: AmountRow[] }) {
@@ -993,39 +1012,126 @@ function compareDayGroups([left]: [string, ExpenseEntry[]], [right]: [string, Ex
   return left.localeCompare(right)
 }
 
-function PaymentTable({ title, items }: { title: string; items: PaymentItem[] }) {
+function NeedExpensesCard({ items }: { items: PaymentItem[] }) {
+  const total = items.reduce((sum, item) => sum + item.amount, 0)
+
   return (
     <Card>
       <CardHeader>
-        <CardTitle>{title}</CardTitle>
+        <div className="bb-card-title-row">
+          <CardTitle>Need Expenses</CardTitle>
+          <Badge variant="secondary">{formatMoney(total)}</Badge>
+        </div>
       </CardHeader>
       <CardContent>
         {!items.length ? (
-          <div className="bb-empty">No entries found.</div>
+          <div className="bb-empty">No need expenses found.</div>
         ) : (
-          <div className="bb-table-wrap">
-            <table>
-              <thead>
-                <tr>
-                  <th>Label</th>
-                  <th>Group</th>
-                  <th>Amount</th>
-                </tr>
-              </thead>
-              <tbody>
-                {items.map((item) => (
-                  <tr key={`${item.label}-${item.amount}`}>
-                    <td>{item.label}</td>
-                    <td>{item.group}</td>
-                    <td className="bb-amount">{formatMoney(item.amount)}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+          <AmountTable columns={["Item", "Amount"]} rows={items} />
         )}
       </CardContent>
     </Card>
+  )
+}
+
+function BillsUtilitiesCard({ items }: { items: UtilityHistoryItem[] }) {
+  const currentTotal = items.reduce((sum, item) => sum + item.currentAmount, 0)
+
+  return (
+    <Card>
+      <CardHeader>
+        <div className="bb-card-title-row">
+          <CardTitle>Bills & Utilities</CardTitle>
+          <Badge variant="secondary">{formatMoney(currentTotal)}</Badge>
+        </div>
+      </CardHeader>
+      <CardContent className="bb-bills-card-content">
+        {!items.length ? (
+          <div className="bb-empty">No bill history found.</div>
+        ) : (
+          <>
+            <BillsUtilitiesChart items={items} />
+            <BillsUtilitiesSummary items={items} />
+          </>
+        )}
+      </CardContent>
+    </Card>
+  )
+}
+
+function BillsUtilitiesChart({ items }: { items: UtilityHistoryItem[] }) {
+  const rows = utilityHistoryChartRows(items)
+
+  return (
+    <ChartContainer config={utilityHistoryChartConfig(items)} className="bb-bills-chart-box">
+      <ResponsiveContainer width="100%" height={300}>
+        <LineChart data={rows} margin={{ top: 12, right: 20, left: 0, bottom: 6 }}>
+          <CartesianGrid vertical={false} strokeDasharray="3 3" />
+          <XAxis dataKey="label" tickLine={false} axisLine={false} />
+          <YAxis tickFormatter={(value) => `$${value}`} tickLine={false} axisLine={false} width={54} />
+          <ChartTooltip content={<ChartTooltipContent />} />
+          {items.map((item, index) => (
+            <Line
+              key={item.key}
+              type="monotone"
+              dataKey={item.key}
+              name={item.label}
+              stroke={chartColor(index)}
+              strokeWidth={2.5}
+              dot={{ r: 3 }}
+              activeDot={{ r: 5 }}
+            />
+          ))}
+        </LineChart>
+      </ResponsiveContainer>
+    </ChartContainer>
+  )
+}
+
+function utilityHistoryChartRows(items: UtilityHistoryItem[]) {
+  const rowsByMonth = new Map<number, Record<string, string | number>>()
+  for (const item of items) {
+    for (const point of item.history) {
+      const row = rowsByMonth.get(point.month) ?? { label: point.label, month: point.month }
+      row[item.key] = point.amount
+      rowsByMonth.set(point.month, row)
+    }
+  }
+  return Array.from(rowsByMonth.entries())
+    .sort(([left], [right]) => left - right)
+    .map(([, row]) => row)
+}
+
+function utilityHistoryChartConfig(items: UtilityHistoryItem[]) {
+  return Object.fromEntries(
+    items.map((item, index) => [item.key, { label: item.label, color: chartColor(index) }]),
+  )
+}
+
+function chartColor(index: number) {
+  return `hsl(var(--chart-${(index % 5) + 1}))`
+}
+
+function BillsUtilitiesSummary({ items }: { items: UtilityHistoryItem[] }) {
+  return (
+    <div className="bb-bill-history-list">
+      {items.map((item) => {
+        const hasAverage = item.averageAmount > 0
+        const deltaClass = hasAverage && item.deltaAmount > 0 ? "bb-negative" : hasAverage && item.deltaAmount < 0 ? "bb-positive" : ""
+        return (
+          <div className="bb-bill-history-row" key={item.key}>
+            <span>
+              <strong>{item.label}</strong>
+              <small>{hasAverage ? `Avg ${formatMoney(item.averageAmount)}` : "No prior average"}</small>
+            </span>
+            <span>
+              <strong>{formatMoney(item.currentAmount)}</strong>
+              <small className={deltaClass}>{hasAverage ? `${item.deltaAmount >= 0 ? "+" : ""}${formatMoney(item.deltaAmount)} vs avg` : "Current"}</small>
+            </span>
+          </div>
+        )
+      })}
+    </div>
   )
 }
 

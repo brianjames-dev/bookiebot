@@ -42,6 +42,13 @@ class ReportWorksheets:
     personal_budget: Any
     subscriptions: Any | None = None
     bill_schedule: Any | None = None
+    budget_history: tuple[BudgetHistoryRows, ...] = ()
+
+
+@dataclass(frozen=True)
+class BudgetHistoryRows:
+    month: BudgetMonth
+    rows: list[list[str]]
 
 
 @dataclass(frozen=True)
@@ -60,6 +67,16 @@ class PaymentItem:
     amount: float
     group: str
     status: str = "entered"
+
+
+@dataclass(frozen=True)
+class UtilityHistoryItem:
+    key: str
+    label: str
+    current_amount: float
+    average_amount: float
+    delta_amount: float
+    history: list[tuple[str, int, float]]
 
 
 @dataclass(frozen=True)
@@ -93,8 +110,11 @@ class ExpenseBreakdownReport:
     remaining_budget: float | None
     remaining_wants_budget: float | None
     amount_saved: float | None
+    savings_goal: float | None
     entries: list[ExpenseEntry] = field(default_factory=list)
+    need_expenses: list[PaymentItem] = field(default_factory=list)
     payments: list[PaymentItem] = field(default_factory=list)
+    utility_history: list[UtilityHistoryItem] = field(default_factory=list)
     subscriptions: list[SubscriptionItem] = field(default_factory=list)
     income_entries: list[PaymentItem] = field(default_factory=list)
     raw_sheets: list[RawSheet] = field(default_factory=list)
@@ -110,6 +130,7 @@ CATEGORY_LABELS = {
     "rent": "Rent",
     "bills_utilities": "Bills & Utilities",
     "static_bills_subscriptions_needs": "Subscriptions (Needs)",
+    "need_expenses": "Need Expenses",
     "subscriptions_wants": "Subscriptions (Wants)",
     "grocery": "Grocery",
     "gas": "Gas",
@@ -121,6 +142,7 @@ CATEGORY_COLORS = {
     "rent": "#dc2626",
     "bills_utilities": "#0d9488",
     "static_bills_subscriptions_needs": "#2563eb",
+    "need_expenses": "#475569",
     "subscriptions_wants": "#7c3aed",
     "grocery": "#16a34a",
     "gas": "#f59e0b",
@@ -152,6 +174,7 @@ NEEDS_BREAKDOWN_KEYS = (
     "rent",
     "bills_utilities",
     "static_bills_subscriptions_needs",
+    "need_expenses",
     "grocery",
     "gas",
 )
@@ -264,6 +287,7 @@ def load_report_worksheets(actor_key: str, month: BudgetMonth) -> ReportWorkshee
             personal_budget=repo.income_sheet(),
             subscriptions=_optional_sheet(repo.subscriptions_sheet),
             bill_schedule=_optional_sheet(repo.bill_schedule_sheet),
+            budget_history=_optional_budget_history(actor_key, month),
         )
 
     from bookiebot.sheets.auth import get_gspread_client
@@ -276,6 +300,7 @@ def load_report_worksheets(actor_key: str, month: BudgetMonth) -> ReportWorkshee
         personal_budget=context.personal_budget_worksheet,
         subscriptions=_worksheet_by_name(personal_spreadsheet, "Subscriptions"),
         bill_schedule=_worksheet_by_name(personal_spreadsheet, "_BookieBot Bill Schedule"),
+        budget_history=_budget_history_from_spreadsheet(personal_spreadsheet, month),
     )
 
 
@@ -300,8 +325,15 @@ def build_expense_breakdown_report(
     income_entries, income_total = _income_entries(personal_rows)
     remaining_budget, remaining_wants_budget = _margin_amounts(personal_rows)
     amount_saved = _amount_saved(personal_rows)
+    savings_goal = _savings_goal(personal_rows)
+    need_expenses = _need_expense_items(personal_rows)
     static_needs_total, wants_total = _subscription_bucket_totals(personal_rows, current_month_subscriptions)
     payment_totals = _payment_totals_by_group(payments)
+    utility_history = _utility_history_items(
+        selected.budget_history or (BudgetHistoryRows(month, personal_rows),),
+        bill_schedule_rows,
+        month,
+    )
     budget_shared_totals = _budget_shared_category_totals(personal_rows)
     itemized_shared_totals = _entry_totals_by_category(entries)
 
@@ -309,6 +341,7 @@ def build_expense_breakdown_report(
     breakdown_amounts["rent"] = payment_totals["rent"]
     breakdown_amounts["bills_utilities"] = payment_totals["bills_utilities"]
     breakdown_amounts["static_bills_subscriptions_needs"] = static_needs_total
+    breakdown_amounts["need_expenses"] = round(sum(item.amount for item in need_expenses), 2)
     breakdown_amounts["subscriptions_wants"] = wants_total
     for category in BUDGET_SHARED_CATEGORY_LABELS:
         if category in budget_shared_totals:
@@ -343,8 +376,11 @@ def build_expense_breakdown_report(
         remaining_budget=remaining_budget,
         remaining_wants_budget=remaining_wants_budget,
         amount_saved=amount_saved,
+        savings_goal=savings_goal,
         entries=entries,
+        need_expenses=need_expenses,
         payments=payments,
+        utility_history=utility_history,
         subscriptions=subscriptions,
         income_entries=income_entries,
         raw_sheets=[
@@ -434,6 +470,28 @@ def _worksheet_by_name(spreadsheet: Any, title: str) -> Any | None:
         return spreadsheet.worksheet(title)
     except Exception:
         return None
+
+
+def _optional_budget_history(actor_key: str, month: BudgetMonth) -> tuple[BudgetHistoryRows, ...]:
+    try:
+        from bookiebot.sheets.auth import get_gspread_client
+        from bookiebot.sheets.routing import get_budget_spreadsheet_id_for_user
+
+        spreadsheet_id = get_budget_spreadsheet_id_for_user(actor_key, month.year)
+        spreadsheet = get_gspread_client().open_by_key(spreadsheet_id)
+        return _budget_history_from_spreadsheet(spreadsheet, month)
+    except Exception:
+        return ()
+
+
+def _budget_history_from_spreadsheet(spreadsheet: Any, month: BudgetMonth) -> tuple[BudgetHistoryRows, ...]:
+    history: list[BudgetHistoryRows] = []
+    for month_number in range(1, month.month + 1):
+        worksheet = _worksheet_by_name(spreadsheet, calendar.month_name[month_number])
+        if worksheet is None:
+            continue
+        history.append(BudgetHistoryRows(BudgetMonth(month.year, month_number), _rows(worksheet)))
+    return tuple(history)
 
 
 def _rows(ws: Any) -> list[list[str]]:
@@ -678,7 +736,7 @@ def _monthly_income_marker_index(rows: list[list[str]]) -> int | None:
 
 def _income_entry_from_row(row: list[str], *, require_income_like_label: bool = False) -> PaymentItem | None:
     for amount_index, value in enumerate(row):
-        amount = clean_money(str(value))
+        amount = _cell_money(value)
         if amount <= 0:
             continue
         label = _nearest_left_label(row, amount_index)
@@ -747,11 +805,143 @@ def _amount_saved(rows: list[list[str]]) -> float | None:
     return round(total, 2) if found_checks else None
 
 
+def _savings_goal(rows: list[list[str]]) -> float | None:
+    for row in rows:
+        if not any("budget" in _normalize_label(value) for value in row):
+            continue
+        amounts = _money_values(row, 0)
+        if len(amounts) >= 4:
+            return amounts[3]
+        if len(amounts) >= 3:
+            return amounts[-1]
+
+    total = 0.0
+    found = False
+    for row in rows:
+        normalized_cells = [_normalize_label(value) for value in row]
+        row_text = " ".join(cell for cell in normalized_cells if cell)
+        if "paycheck deposit" not in row_text or "ideal" not in row_text:
+            continue
+        for index, cell in enumerate(normalized_cells):
+            if cell.startswith("ideal"):
+                amount = _cell_money(_cell(row, index))
+                if amount:
+                    total += amount
+                    found = True
+                break
+    return round(total, 2) if found else None
+
+
+def _need_expense_items(rows: list[list[str]]) -> list[PaymentItem]:
+    items: list[PaymentItem] = []
+    in_needs_section = False
+
+    for row in rows:
+        row_text = " ".join(_normalize_label(value) for value in row if str(value).strip())
+        if not in_needs_section:
+            if "needs" in row_text and "wants" in row_text and "savings" in row_text:
+                in_needs_section = True
+            continue
+        if "needs subtotal" in row_text:
+            break
+        item = _need_expense_item_from_row(row)
+        if item is not None:
+            items.append(item)
+
+    return items
+
+
+def _need_expense_item_from_row(row: list[str]) -> PaymentItem | None:
+    for amount_index, value in enumerate(row):
+        amount = _cell_money(value)
+        if amount <= 0:
+            continue
+        label = _nearest_left_label(row, amount_index)
+        if not label or _is_excluded_need_expense_label(label):
+            continue
+        return PaymentItem(label=label, amount=round(amount, 2), group="need_expenses")
+    return None
+
+
+def _is_excluded_need_expense_label(label: str) -> bool:
+    normalized = _normalize_label(label)
+    if not normalized:
+        return True
+    if any(term in normalized for term in {"enter transaction", "subtotal", "budget", "name"}):
+        return True
+    if ("static bills" in normalized and "subscriptions" in normalized) or normalized == "subscriptions wants":
+        return True
+    if any(_labels_match(normalized, _normalize_label(candidate)) for candidates in BUDGET_SHARED_CATEGORY_LABELS.values() for candidate in candidates):
+        return True
+    if any(_labels_match(normalized, payment_label) for payment_label in PAYMENT_GROUPS):
+        return True
+    return False
+
+
+def _utility_history_items(
+    budget_history: tuple[BudgetHistoryRows, ...],
+    bill_schedule_rows: list[list[str]],
+    selected_month: BudgetMonth,
+) -> list[UtilityHistoryItem]:
+    history = sorted(
+        (item for item in budget_history if item.month.year == selected_month.year and item.month.month <= selected_month.month),
+        key=lambda item: item.month.month,
+    )
+    if not history:
+        return []
+
+    by_label: dict[str, dict[str, Any]] = {}
+    for history_item in history:
+        monthly_items = _payment_items(history_item.rows, bill_schedule_rows, history_item.month)
+        monthly_amounts = {
+            _normalize_label(item.label): item
+            for item in monthly_items
+            if item.group == "bills_utilities"
+        }
+        for key, item in monthly_amounts.items():
+            by_label.setdefault(key, {"label": item.label, "amounts": {}})
+        for key, bucket in by_label.items():
+            item = monthly_amounts.get(key)
+            bucket["amounts"][history_item.month.month] = round(item.amount if item else 0.0, 2)
+
+    items: list[UtilityHistoryItem] = []
+    month_labels = {
+        history_item.month.month: calendar.month_abbr[history_item.month.month]
+        for history_item in history
+    }
+    for index, (key, bucket) in enumerate(sorted(by_label.items(), key=lambda item: item[1]["label"].lower())):
+        amounts_by_month = bucket["amounts"]
+        points = [
+            (month_labels[history_item.month.month], history_item.month.month, round(float(amounts_by_month.get(history_item.month.month, 0.0)), 2))
+            for history_item in history
+        ]
+        current_amount = round(float(amounts_by_month.get(selected_month.month, 0.0)), 2)
+        prior_amounts = [amount for _label, month_number, amount in points if month_number < selected_month.month and amount > 0]
+        average_amount = round(sum(prior_amounts) / len(prior_amounts), 2) if prior_amounts else 0.0
+        delta_amount = round(current_amount - average_amount, 2) if prior_amounts else 0.0
+        items.append(
+            UtilityHistoryItem(
+                key=_series_key(bucket["label"], index),
+                label=bucket["label"],
+                current_amount=current_amount,
+                average_amount=average_amount,
+                delta_amount=delta_amount,
+                history=points,
+            )
+        )
+    return items
+
+
+def _series_key(label: str, index: int) -> str:
+    normalized = re.sub(r"[^a-z0-9]+", "_", label.lower()).strip("_")
+    return normalized or f"series_{index + 1}"
+
+
 def _savings_deposit_amount(row: list[str], label_index: int) -> float:
-    amount = clean_money(_cell(row, SAVINGS_AMOUNT_COLUMN_INDEX))
-    if amount:
-        return amount
-    return clean_money(_cell(row, label_index + 3))
+    amount_cell = _cell(row, SAVINGS_AMOUNT_COLUMN_INDEX)
+    if amount_cell:
+        return _cell_money(amount_cell)
+    return _cell_money(_cell(row, label_index + 3))
 
 
 def _is_check_deposit_label(normalized_cells: list[str], index: int, check_number: int) -> bool:
@@ -768,10 +958,20 @@ def _money_values(row: list[str], start_index: int) -> list[float]:
         text = str(value).strip()
         if not text or not re.search(r"\d", text):
             continue
-        amount = clean_money(text)
+        amount = _cell_money(text)
         if amount:
             values.append(round(amount, 2))
     return values
+
+
+def _cell_money(value: Any) -> float:
+    text = str(value).strip()
+    if not text or not re.search(r"\d", text):
+        return 0.0
+    match = re.search(r"-?\$?\s*\d[\d,]*(?:\.\d+)?", text)
+    if match is None:
+        return 0.0
+    return clean_money(match.group(0).replace(" ", ""))
 
 
 def _looks_like_income_label(label: str) -> bool:
@@ -813,7 +1013,7 @@ def _contains_normalized_phrase(text: str, phrase: str) -> bool:
 
 def _next_money(row: list[str], start_index: int, *, window: int = 4) -> float:
     for value in row[start_index : start_index + window]:
-        amount = clean_money(str(value))
+        amount = _cell_money(value)
         if amount:
             return amount
     return 0.0
@@ -938,6 +1138,7 @@ def _report_client_payload(
             "remainingNeedsBudget": report.remaining_budget,
             "remainingWantsBudget": report.remaining_wants_budget,
             "amountSaved": report.amount_saved,
+            "savingsGoal": report.savings_goal,
             "incomeAfterExpenses": balance_after_expenses,
         },
         "burnRate": _burn_rate_payload(report),
@@ -957,8 +1158,8 @@ def _report_client_payload(
         "merchantTotals": [_amount_row(label, amount) for label, amount in merchant_totals],
         "topEntries": [_expense_entry_payload(entry) for entry in top_entries],
         "dailyEntries": [_expense_entry_payload(entry) for entry in report.entries],
-        "rentPayments": [_payment_payload(item) for item in _payments_for_group(report.payments, "rent")],
-        "utilityPayments": [_payment_payload(item) for item in _payments_for_group(report.payments, "bills_utilities")],
+        "needExpenses": [_payment_payload(item) for item in report.need_expenses],
+        "utilityHistory": [_utility_history_payload(item) for item in report.utility_history],
         "subscriptionsNeeds": [
             _subscription_payload(item)
             for item in _subscriptions_for_bucket(report.subscriptions, "static_bills_subscriptions_needs")
@@ -967,7 +1168,6 @@ def _report_client_payload(
             _subscription_payload(item)
             for item in _subscriptions_for_bucket(report.subscriptions, "subscriptions_wants")
         ],
-        "incomeEntries": [_payment_payload(item) for item in report.income_entries],
     }
 
 
@@ -992,6 +1192,20 @@ def _payment_payload(item: PaymentItem) -> dict[str, Any]:
         "amount": round(item.amount, 2),
         "group": CATEGORY_LABELS.get(item.group, item.group.title()),
         "status": item.status,
+    }
+
+
+def _utility_history_payload(item: UtilityHistoryItem) -> dict[str, Any]:
+    return {
+        "key": item.key,
+        "label": item.label,
+        "currentAmount": round(item.current_amount, 2),
+        "averageAmount": round(item.average_amount, 2),
+        "deltaAmount": round(item.delta_amount, 2),
+        "history": [
+            {"label": label, "month": month, "amount": round(amount, 2)}
+            for label, month, amount in item.history
+        ],
     }
 
 

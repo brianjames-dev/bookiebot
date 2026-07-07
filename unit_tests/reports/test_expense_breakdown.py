@@ -5,6 +5,7 @@ import re
 
 import bookiebot.reports.expense_breakdown as expense_breakdown
 from bookiebot.reports.expense_breakdown import (
+    BudgetHistoryRows,
     BudgetMonth,
     ReportWorksheets,
     build_expense_breakdown_report,
@@ -50,12 +51,15 @@ def test_build_expense_breakdown_report_aggregates_shared_and_personal_data():
         ["", "Paycheck", "$3,000.00"],
         ["", "Side Gig", "$500.00"],
         ["", "Monthly Income:", ""],
+        ["Name:", "Needs (50%):", "Wants (30%):", "Savings (20%):"],
         ["Rent", "$1,750.00"],
         ["PG&E", "$140.00"],
         ["Water", "$60.00"],
         ["Groceries", "$55.00"],
         ["Auto/Gas", "$12.00"],
         ["Static Bills & Subscriptions (Needs)", "$1,410.00"],
+        ["DMV Registration", "$184.00"],
+        ["(Needs) Subtotal:", "$0.00"],
         ["Eating out", "$30.00"],
         ["Shopping", "$15.00"],
         ["Subscriptions (Wants)", "$10.00"],
@@ -98,24 +102,37 @@ def test_build_expense_breakdown_report_aggregates_shared_and_personal_data():
             shared_expenses=InMemoryWorksheet(shared_rows),
             personal_budget=InMemoryWorksheet(personal_rows),
             subscriptions=InMemoryWorksheet(subscriptions_rows),
+            budget_history=(
+                BudgetHistoryRows(
+                    BudgetMonth(2026, 4),
+                    [
+                        ["PG&E", "$120.00"],
+                        ["Water", "$50.00"],
+                    ],
+                ),
+                BudgetHistoryRows(BudgetMonth(2026, 5), personal_rows),
+            ),
         ),
     )
 
-    assert report.grand_total == 3482.0
+    assert report.grand_total == 3666.0
     assert report.shared_total == 75.0
-    assert report.personal_total == 3482.0
+    assert report.personal_total == 3666.0
     assert report.income_total == 3500.0
     assert report.remaining_budget == 2000.0
     assert report.remaining_wants_budget == 750.0
     assert report.amount_saved == 600.0
+    assert report.savings_goal == 900.0
     assert report.breakdown["rent"]["amount"] == 1750.0
     assert report.breakdown["bills_utilities"]["amount"] == 200.0
     assert report.breakdown["static_bills_subscriptions_needs"]["amount"] == 1410.0
+    assert report.breakdown["need_expenses"]["amount"] == 184.0
     assert report.breakdown["subscriptions_wants"]["amount"] == 10.0
     assert report.breakdown["grocery"]["amount"] == 55.0
     assert report.breakdown["gas"]["amount"] == 12.0
     assert report.breakdown["food"]["amount"] == 30.0
     assert report.breakdown["shopping"]["amount"] == 15.0
+    assert [(item.label, item.amount) for item in report.need_expenses] == [("DMV Registration", 184.0)]
     assert [entry.location for entry in report.entries] == ["Chipotle", "Trader Joe's"]
     assert [entry.location for entry in report.entries if entry.person == "Brian (AL)"] == []
     assert [(entry.label, entry.amount) for entry in report.income_entries] == [
@@ -159,6 +176,7 @@ def test_build_expense_breakdown_report_aggregates_shared_and_personal_data():
     assert payload["metrics"]["remainingNeedsBudget"] == 2000.0
     assert payload["metrics"]["remainingWantsBudget"] == 750.0
     assert payload["metrics"]["amountSaved"] == 600.0
+    assert payload["metrics"]["savingsGoal"] == 900.0
     burn_rate = payload["burnRate"]
     burn_rate_series = burn_rate.pop("series")
     assert burn_rate == {
@@ -228,20 +246,49 @@ def test_build_expense_breakdown_report_aggregates_shared_and_personal_data():
     assert "Highest day" in html
     assert "Days counted" in html
     assert "Daily Spending" in html
+    assert "Need Expenses" in html
     assert "Rent" in html
     assert any(item["label"] == "Bills & Utilities" for item in payload["breakdown"])
-    assert payload["rentPayments"] == [{"label": "Rent", "amount": 1750.0, "group": "Rent", "status": "entered"}]
-    assert payload["utilityPayments"] == [
-        {"label": "PG&E", "amount": 140.0, "group": "Bills & Utilities", "status": "entered"},
-        {"label": "Water", "amount": 60.0, "group": "Bills & Utilities", "status": "entered"},
+    assert payload["needExpenses"] == [
+        {"label": "DMV Registration", "amount": 184.0, "group": "Need Expenses", "status": "entered"}
     ]
+    assert {item["label"]: item for item in payload["utilityHistory"]} == {
+        "PG&E": {
+            "key": "pg_e",
+            "label": "PG&E",
+            "currentAmount": 140.0,
+            "averageAmount": 120.0,
+            "deltaAmount": 20.0,
+            "history": [
+                {"label": "Apr", "month": 4, "amount": 120.0},
+                {"label": "May", "month": 5, "amount": 140.0},
+            ],
+        },
+        "Water": {
+            "key": "water",
+            "label": "Water",
+            "currentAmount": 60.0,
+            "averageAmount": 50.0,
+            "deltaAmount": 10.0,
+            "history": [
+                {"label": "Apr", "month": 4, "amount": 50.0},
+                {"label": "May", "month": 5, "amount": 60.0},
+            ],
+        },
+    }
+    assert "rentPayments" not in payload
+    assert "incomeEntries" not in payload
+    assert "Income Entries" not in html
+    assert "bb-bills-chart-box" in html
+    assert "bb-bill-history-list" in html
+    assert "width:fit-content" in html
+    assert "bb-card-title-row" in html
     assert "All Shared Expense Transactions" not in html
     assert "Source Sheet Data" not in html
     assert "Personal Budget" not in html
     assert [item["name"] for item in payload["subscriptionsNeeds"]] == ["Amazon Prime", "Netflix"]
     assert [item["name"] for item in payload["subscriptionsWants"]] == ["MacroFactor", "Spotify"]
     assert any(entry["location"] == "Trader Joe's" for entry in payload["dailyEntries"])
-    assert [entry["label"] for entry in payload["incomeEntries"]] == ["Paycheck", "Side Gig"]
 
 
 def test_subscription_tables_include_yearly_items_outside_selected_month_without_changing_fallback_totals():

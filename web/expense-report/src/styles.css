@@ -216,6 +216,14 @@ body {
   font-size: 13px;
 }
 
+.bb-card-title-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  min-width: 0;
+}
+
 .bb-card-content {
   min-width: 0;
   padding: 18px;
@@ -622,8 +630,12 @@ body {
 
 .bb-tabs-list {
   display: inline-flex;
+  align-self: start;
+  justify-self: start;
   gap: 2px;
+  width: fit-content;
   max-width: 100%;
+  overflow-x: auto;
   padding: 3px;
   border: 1px solid hsl(var(--border));
   border-radius: var(--radius);
@@ -669,6 +681,59 @@ body {
 
 .bb-chart-container {
   position: relative;
+}
+
+.bb-bills-card-content {
+  display: grid;
+  gap: 16px;
+}
+
+.bb-bills-chart-box {
+  width: 100%;
+  min-width: 0;
+  min-height: 300px;
+}
+
+.bb-bill-history-list {
+  display: grid;
+  gap: 10px;
+}
+
+.bb-bill-history-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 12px;
+  border-bottom: 1px solid hsl(var(--border));
+  padding-bottom: 10px;
+  font-size: 13px;
+}
+
+.bb-bill-history-row:last-child {
+  border-bottom: 0;
+  padding-bottom: 0;
+}
+
+.bb-bill-history-row > span {
+  display: grid;
+  gap: 3px;
+  min-width: 0;
+}
+
+.bb-bill-history-row > span:last-child {
+  justify-items: end;
+  text-align: right;
+}
+
+.bb-bill-history-row strong {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.bb-bill-history-row small {
+  color: hsl(var(--muted-foreground));
+  font-size: 12px;
 }
 
 .bb-chart-side {
@@ -894,8 +959,8 @@ tr:last-child td {
   }
 
   .bb-tabs-list {
-    width: 100%;
     overflow-x: auto;
+    width: fit-content;
   }
 
   .bb-chart-layout {
