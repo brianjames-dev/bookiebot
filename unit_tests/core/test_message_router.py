@@ -168,6 +168,12 @@ def test_bot_identifies_discord_login_rate_limit():
     from bookiebot.core import bot
 
     assert bot._is_discord_login_rate_limit(Exception("429 You are being rate limited 1015")) is True
+    assert (
+        bot._is_discord_login_rate_limit(
+            Exception("429 Too Many Requests: exceeding global rate limits")
+        )
+        is True
+    )
     assert bot._is_discord_login_rate_limit(Exception("regular startup failure")) is False
 
 
@@ -178,7 +184,64 @@ def test_bot_login_retry_seconds_has_minimum(monkeypatch):
     assert bot._login_retry_seconds() == 60
 
     monkeypatch.setenv("BOOKIEBOT_DISCORD_LOGIN_RETRY_SECONDS", "abc")
-    assert bot._login_retry_seconds() == 900
+    assert bot._login_retry_seconds() == 300
+
+
+def test_bot_login_retry_seconds_uses_attempts_and_cap(monkeypatch):
+    from bookiebot.core import bot
+
+    monkeypatch.setenv("BOOKIEBOT_DISCORD_LOGIN_RETRY_SECONDS", "100")
+    monkeypatch.setenv("BOOKIEBOT_DISCORD_LOGIN_RETRY_MAX_SECONDS", "250")
+
+    assert bot._login_retry_seconds(attempt=1) == 100
+    assert bot._login_retry_seconds(attempt=2) == 200
+    assert bot._login_retry_seconds(attempt=3) == 250
+
+
+def test_bot_login_retry_seconds_respects_retry_after(monkeypatch):
+    from bookiebot.core import bot
+
+    monkeypatch.setenv("BOOKIEBOT_DISCORD_LOGIN_RETRY_SECONDS", "100")
+    monkeypatch.setenv("BOOKIEBOT_DISCORD_LOGIN_RETRY_MAX_SECONDS", "250")
+
+    assert bot._login_retry_seconds(attempt=3, retry_after_seconds=123) == 123
+    assert bot._login_retry_seconds(attempt=3, retry_after_seconds=999) == 250
+    assert bot._login_retry_seconds(attempt=3, retry_after_seconds=10) == 60
+
+
+def test_bot_extracts_discord_retry_after_header():
+    from bookiebot.core import bot
+
+    exc = Exception("429 Too Many Requests")
+    exc.response = SimpleNamespace(headers={"Retry-After": "12.4"})  # type: ignore[attr-defined]
+
+    assert bot._discord_retry_after_seconds(exc) == 13
+
+
+def test_bot_extracts_retry_after_from_exception_text():
+    from bookiebot.core import bot
+
+    exc = Exception("429 Too Many Requests retry_after: 8.2")
+
+    assert bot._discord_retry_after_seconds(exc) == 9
+
+
+def test_bot_login_retry_sleep_reports_progress(monkeypatch):
+    from bookiebot.core import bot
+
+    sleeps: list[float] = []
+    now = 0.0
+
+    def fake_sleep(seconds: float) -> None:
+        nonlocal now
+        sleeps.append(seconds)
+        now += seconds
+
+    monkeypatch.setattr(bot, "LOGIN_RETRY_PROGRESS_INTERVAL_SECONDS", 60)
+
+    bot._sleep_before_login_retry(125, sleep_fn=fake_sleep, monotonic_fn=lambda: now)
+
+    assert sleeps == [60, 60, 5]
 
 
 @pytest.mark.asyncio

@@ -25,6 +25,7 @@ Recent transactions and reconciliation are in manual verification mode after the
 - Expense report top metrics now remove the Fixed Commitments and Burn Rate cards; Budget Charts panels now place their primary totals/status above each graph with right-aligned pills for Burn Rate, Subs, and Bills & Utilities.
 - Expense report links now serve the saved HTML snapshot before attempting a live Google Sheets rerender, optional historical workbook reads no longer block reports after the month tabs are resolved, and the Discord handler reports sheet access errors cleanly.
 - Expense report dashboard now uses four top cards (`Income`, `Spent`, `Left`, `Saved`), defaults Budget Charts to Burn Rate when available, adds a compact monthly signal strip, and moves secondary chart stats and long tables behind `Details` / `View all`.
+- Discord startup now logs each login attempt, respects retry-after hints on login rate limits, emits periodic backoff progress logs, and preserves retry metadata in JSON logs with real microsecond timestamps.
 
 ## Completed 2026-07-06
 
@@ -227,6 +228,8 @@ Use a test row or low-risk real row in Discord:
    - Expected: Average day equals shared spending divided by elapsed days for the selected month, while completed months use every calendar day in that month.
 44. Run `budgetSystemRollover` from Apps Script on a test copy or after making a safe template backup.
    - Expected: the previous personal budget month has static values in Burn Rate, Static Bills & Subscriptions (Needs), and Subscriptions (Wants) formula output cells; the current month tab exists even if the copied template did not contain an exact `Month` placeholder.
+45. If Discord login hits a global `429` rate limit during startup.
+   - Expected: Railway logs show the login attempt number, retry delay, retry-at timestamp, and periodic backoff progress until the next login attempt. Avoid repeated redeploys while Discord is still rate-limiting the bot.
 
 ## Verification Baseline
 

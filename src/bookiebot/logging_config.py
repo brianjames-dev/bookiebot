@@ -5,6 +5,7 @@ import re
 import sys
 import time
 from collections import deque
+from datetime import datetime, timezone
 from typing import Deque, Iterable, List, Optional
 
 # In-memory ring buffer for recent logs (process-local).
@@ -39,6 +40,12 @@ class RingBufferHandler(logging.Handler):
 
 
 class JsonFormatter(logging.Formatter):
+    def formatTime(self, record: logging.LogRecord, datefmt: str | None = None) -> str:
+        created = datetime.fromtimestamp(record.created, timezone.utc)
+        if datefmt:
+            return created.strftime(datefmt)
+        return created.isoformat()
+
     def format(self, record: logging.LogRecord) -> str:
         payload = {
             "ts": self.formatTime(record, datefmt="%Y-%m-%dT%H:%M:%S.%fZ"),
@@ -46,7 +53,21 @@ class JsonFormatter(logging.Formatter):
             "msg": record.getMessage(),
         }
         # Optional context injected via `extra=`
-        for key in ("user", "user_id", "channel", "intent", "entities", "exception", "text"):
+        for key in (
+            "user",
+            "user_id",
+            "channel",
+            "intent",
+            "entities",
+            "exception",
+            "text",
+            "login_attempt",
+            "retry_seconds",
+            "retry_after_seconds",
+            "retry_in_seconds",
+            "retry_at",
+            "max_retry_seconds",
+        ):
             if hasattr(record, key):
                 payload[key] = getattr(record, key)
         if record.exc_info:
