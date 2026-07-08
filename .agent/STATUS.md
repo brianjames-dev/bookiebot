@@ -1,6 +1,6 @@
 # Agent Status
 
-Last updated: 2026-07-07
+Last updated: 2026-07-08
 
 ## Active Focus
 
@@ -13,6 +13,18 @@ Recent transactions and reconciliation are in manual verification mode after the
 3. Harden recent-action pending state across restarts/deploys, since selections currently live only in process memory.
 4. Improve targeted recent-action search so commands can find older matches, not only the latest 10 recent actions.
 5. Explore clarifying questions before logging when BookieBot is uncertain instead of guessing or silently failing.
+
+## Completed 2026-07-08
+
+- Reconciliation `View Inbox` now includes recent persisted automatic matches when a forced inbox refresh no longer has those matches in the fresh preview.
+- Auto-match-only reconciliation inbox reports no longer show `Reconcile Now` / `Ignore All` actions, avoiding a misleading action view when there are no unresolved rows.
+- Expense breakdown Discord replies keep signed report tokens but render them behind a short `Open full report` markdown link.
+- Expense report top charts now use a carousel instead of the four-chart tab bar; mobile can swipe between charts and desktop has previous/next controls with active indicators.
+- The `Subs` chart now uses an inline All/Needs/Wants filter, highlights the current day, animates calendar switches, shows hit-so-far subscription totals with a projected monthly total, and keeps subscription detail tables collapsed behind `Details`.
+- Current/future-month subscription category totals now use scheduled hit-so-far subscription amounts from the Subscriptions sheet, while completed months keep using the Budget sheet totals.
+- The Income card now has a temporary `2x` paycheck forecast toggle that updates income-dependent top-card values client-side.
+- Expense Highlights now places its Largest/Most Frequent toggle in the card header, and table expanders append remaining rows with the collapse control at the bottom.
+- Rebuilt the embedded React expense report assets and added regression coverage for the short report link, reconciliation auto-match inbox behavior, and the new report UI hooks.
 
 ## Completed 2026-07-07
 
@@ -178,9 +190,9 @@ Use a test row or low-risk real row in Discord:
 18. Let the scheduled reconciliation digest post in the morning window.
    - Expected: the digest appears in the target user's DM with `Reconcile Now` and `View Inbox`.
 19. Click `View Inbox` on the reconciliation digest.
-   - Expected: the DM/private inbox list shows unresolved transactions with `Reconcile Now` and `Ignore All`.
+   - Expected: the DM/private inbox list shows unresolved transactions with `Reconcile Now` and `Ignore All`; if the digest only has automatic matches, the inbox shows the confirmed match report without unresolved action buttons.
 20. Run the expense breakdown command for the current month and for a completed prior month.
-   - Expected: the report link opens a page with `Category Mix`, `Burn Rate`, `Subs`, and `Bills & Utilities` tabs inside Budget Charts, with no `Needs vs Wants` tab; the Burn Rate tab shows a smoothed full-month daily variance line with red values above the zero baseline and green values below it; for the current month, the x-axis only includes elapsed days and the `$0` baseline remains visible even if all variance values are above or below zero; tapping several burn-rate nodes in succession shows one tooltip for the active day with variance, day spent, cumulative spent, and expected-by-day values; the active hover dot matches the red/green line color at that point and the tooltip appears at the cursor without flying in from the page corner; Category Mix pie labels show category plus amount, match their slice colors, fade in smoothly with their connector lines, and have visible spacing between text and stems on desktop widths; on phone widths, the Category Mix donut keeps the full-size chart while hiding pie labels and connector stems; Category Mix shows its total above the pie, Burn Rate shows under/over pace above the line graph with the daily-difference pill right-aligned, and Subs shows `{month} subs` above the amount with the scheduled-count pill right-aligned; the header subtitle is `{month} {year} budget report for {person}.`, the generated time appears in the header pill, and the Dark mode switch defaults to the system color preference while allowing a manual light/dark toggle without horizontal scroll; Budget Charts and Daily Spending have no extra subtitle copy; all tab controls size to their labels instead of stretching to the card width; the top cards are Income, Spent, Left, and Saved, with no Fixed Commitments, Burn Rate, Remaining Needs Budget, Remaining Wants Budget, Income After Expenses, or top signal-strip cards; Budget Charts defaults to Burn Rate when burn-rate data exists; secondary chart stats are behind Details and dense tables show View all for remaining rows without duplicating the visible rows; Amount Saved reads the two paycheck deposit values from column `E`, shows `$0.00` when those rows are present with zero deposits, and only uses green text when near the detected savings goal; Daily Spending appears before the `Expense Highlights` card and its bar hover has a subtle highlighted background; `Expense Highlights` toggles between `Largest` and `Most Frequent`, each view has a chart and itemized list, the largest chart truncates long axis labels, and the largest list uses only Item, Category, and Amount; Spending By Person / Card is absent; current-month pace counts elapsed days, completed months count every day in that month, loose NEED rows from the personal budget appear in `Need Expenses` and in daily activity/highlights as undated Need Expenses; Rent, Income Entries, lower subscription, and lower Bills & Utilities cards are absent; Bills & Utilities in Budget Charts shows a historical bill comparison chart with current-vs-average deltas; the `Subs` tab in Budget Charts toggles between All, Needs, and Wants calendars with a fade/slide tab transition; subscription tables omit `Kind`; All mode shows compact Needs and Wants tables with Name, Cadence, Pull Date, and Amount columns, side by side and top-aligned on desktop and stacked on mobile; calendar markers show visible hover/focus tooltips; monthly subscriptions appear in the selected month and yearly subscriptions appear on the calendar only for their pull month.
+   - Expected: the report link appears as a short `Open full report` link and opens a page whose top chart card title changes with the active carousel chart (`Category Mix`, `Burn Rate`, `Subs`, or `Bills & Utilities`); mobile can swipe between charts and desktop can use previous/next controls plus active indicators; the Burn Rate chart keeps the red/green variance behavior and cursor-stable tooltip; Category Mix labels show category plus amount on desktop and hide labels on phone widths; the Income card `2x` forecast toggle immediately updates income-dependent top-card values; the `Subs` chart has an inline All/Needs/Wants filter, shows the month-only label above the hit-so-far amount, shows projected monthly subs as secondary text, uses a `# total` pill, highlights the current day, animates view switches, keeps itemized sub tables collapsed behind `Details`, uses `Pull` as the pull-date column, and shortens monthly/yearly cadence to `M`/`Y` on mobile; Expense Highlights keeps its Largest/Most Frequent toggle in the card header; table expanders append remaining rows and place Collapse at the bottom; Daily Spending has no subtitle copy and its bar hover has a subtle highlighted background.
 21. If the expense breakdown command reports that a spreadsheet cannot be opened.
    - Expected: the error includes the active Google service account email so the spreadsheet share settings or deployment credential can be checked directly.
 22. Click `Reconcile Now` from either the digest or inbox view.
@@ -244,23 +256,17 @@ python -m pytest unit_tests/intents/test_handlers.py unit_tests/core/test_messag
 Latest verification:
 
 ```bash
-cd web/expense-report && npm run typecheck
-# passed
-
 cd web/expense-report && npm run build
 # passed
 
 python -m pytest unit_tests/reports/test_expense_breakdown.py
-# passed: 10 passed
-
-python -m py_compile src/bookiebot/reports/expense_breakdown.py
-# passed
+# passed: 11 passed
 
 python -m pyright
 # passed
 
 python -m pytest unit_tests
-# passed: 361 passed, 1 skipped
+# passed: 363 passed, 1 skipped
 
 git diff --check
 # passed

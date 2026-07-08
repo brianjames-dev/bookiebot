@@ -224,6 +224,14 @@ body {
   min-width: 0;
 }
 
+.bb-inline-toggle-row {
+  flex-wrap: wrap;
+}
+
+.bb-inline-toggle-row .bb-tabs-list {
+  margin-left: auto;
+}
+
 .bb-card-content {
   min-width: 0;
   padding: 18px;
@@ -269,6 +277,13 @@ body {
   padding: 16px;
 }
 
+.bb-metric-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
 .bb-metric-label {
   color: hsl(var(--muted-foreground));
   font-size: 13px;
@@ -285,6 +300,35 @@ body {
   margin-top: 4px;
   color: hsl(var(--muted-foreground));
   font-size: 12px;
+}
+
+.bb-metric-toggle {
+  appearance: none;
+  border: 1px solid hsl(var(--border));
+  border-radius: 999px;
+  background: hsl(var(--background));
+  color: hsl(var(--muted-foreground));
+  cursor: pointer;
+  flex: 0 0 auto;
+  font: inherit;
+  font-size: 11px;
+  font-weight: 750;
+  line-height: 1;
+  padding: 5px 7px;
+}
+
+.bb-metric-toggle[aria-pressed="true"] {
+  border-color: hsl(var(--primary) / 0.42);
+  background: hsl(var(--primary) / 0.12);
+  color: hsl(var(--primary));
+}
+
+.bb-metric-toggle:focus-visible,
+.bb-expand-toggle:focus-visible,
+.bb-chart-carousel-button:focus-visible,
+.bb-chart-carousel-dot:focus-visible {
+  outline: 2px solid hsl(var(--primary));
+  outline-offset: 2px;
 }
 
 .bb-positive {
@@ -369,6 +413,12 @@ body {
   font-weight: 780;
   line-height: 1;
   font-variant-numeric: tabular-nums;
+}
+
+.bb-subscription-projected {
+  margin-top: 7px;
+  color: hsl(var(--muted-foreground));
+  font-size: 13px;
 }
 
 .bb-subscription-tab-content[data-state="active"] {
@@ -492,6 +542,11 @@ body {
   box-shadow: inset 0 0 0 1px hsl(var(--muted) / 0.08);
 }
 
+.bb-calendar-day-today {
+  border-color: hsl(var(--primary));
+  box-shadow: inset 0 0 0 1px hsl(var(--primary) / 0.28), 0 0 0 3px hsl(var(--primary) / 0.08);
+}
+
 .bb-calendar-day-number {
   color: hsl(var(--muted-foreground));
   font-size: 12px;
@@ -557,6 +612,10 @@ body {
 
 .bb-subscription-marker-more {
   justify-content: center;
+}
+
+.bb-subscription-marker-pending {
+  opacity: 0.68;
 }
 
 .bb-subscription-tooltip {
@@ -628,6 +687,103 @@ body {
   padding-top: 14px;
 }
 
+.bb-analytics-card {
+  overflow: visible;
+}
+
+.bb-card-tabs {
+  display: contents;
+}
+
+.bb-analytics-title-row {
+  align-items: flex-start;
+  flex-wrap: wrap;
+}
+
+.bb-analytics-header-controls {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-left: auto;
+  min-width: 0;
+}
+
+.bb-chart-carousel {
+  min-width: 0;
+  touch-action: pan-y;
+}
+
+.bb-chart-carousel-panel {
+  min-width: 0;
+  animation: bb-chart-panel-in 300ms cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+.bb-chart-carousel-controls {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  flex: 0 0 auto;
+}
+
+.bb-chart-carousel-button {
+  appearance: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  border: 1px solid hsl(var(--border));
+  border-radius: 999px;
+  background: hsl(var(--background));
+  color: hsl(var(--foreground));
+  cursor: pointer;
+  font: inherit;
+  font-size: 14px;
+  font-weight: 800;
+  line-height: 1;
+}
+
+.bb-chart-carousel-button:hover {
+  border-color: hsl(var(--muted));
+  background: hsl(var(--muted) / 0.12);
+}
+
+.bb-chart-carousel-dots {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.bb-chart-carousel-dot {
+  appearance: none;
+  width: 7px;
+  height: 7px;
+  padding: 0;
+  border: 0;
+  border-radius: 999px;
+  background: hsl(var(--muted) / 0.35);
+  cursor: pointer;
+}
+
+.bb-chart-carousel-dot[data-state="active"] {
+  width: 18px;
+  background: hsl(var(--primary));
+}
+
+@keyframes bb-chart-panel-in {
+  from {
+    opacity: 0;
+    transform: translateX(10px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
 .bb-tabs-list {
   display: inline-flex;
   align-self: start;
@@ -662,6 +818,10 @@ body {
 
 .bb-tabs-content {
   margin-top: 18px;
+}
+
+.bb-subscription-tone-control {
+  flex: 0 1 auto;
 }
 
 .bb-chart-stack {
@@ -809,6 +969,29 @@ body {
 
 .bb-details-panel > div {
   margin-top: 10px;
+}
+
+.bb-expand-toggle {
+  appearance: none;
+  justify-self: start;
+  width: fit-content;
+  max-width: 100%;
+  margin-top: 10px;
+  border: 1px solid hsl(var(--border));
+  border-radius: 999px;
+  background: hsl(var(--background));
+  color: hsl(var(--muted-foreground));
+  cursor: pointer;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 700;
+  padding: 7px 10px;
+}
+
+.bb-expand-toggle:hover {
+  border-color: hsl(var(--muted));
+  background: hsl(var(--muted) / 0.12);
+  color: hsl(var(--foreground));
 }
 
 .bb-legend-row,
@@ -970,6 +1153,10 @@ tr:last-child td {
   font-variant-numeric: tabular-nums;
 }
 
+.bb-cadence-short {
+  display: none;
+}
+
 .bb-empty {
   color: hsl(var(--muted-foreground));
   font-size: 13px;
@@ -1006,6 +1193,15 @@ tr:last-child td {
   }
 
   .bb-header-actions {
+    justify-content: flex-start;
+  }
+
+  .bb-analytics-header-controls,
+  .bb-inline-toggle-row .bb-tabs-list {
+    margin-left: 0;
+  }
+
+  .bb-analytics-header-controls {
     justify-content: flex-start;
   }
 
@@ -1103,6 +1299,10 @@ tr:last-child td {
 }
 
 @media (max-width: 640px) {
+  .bb-chart-carousel-button {
+    display: none;
+  }
+
   .bb-subscription-all-grid {
     grid-template-columns: 1fr;
   }
@@ -1164,6 +1364,14 @@ tr:last-child td {
 
   .bb-subscription-marker-name {
     display: none;
+  }
+
+  .bb-cadence-full {
+    display: none;
+  }
+
+  .bb-cadence-short {
+    display: inline;
   }
 
   .bb-subscription-marker-more {

@@ -560,6 +560,17 @@ class BankingService:
             max_age_days = _reconciliation_max_age_days()
         return self.store.unresolved_reconciliation_items(owner_key, limit=limit, max_age_days=max_age_days)
 
+    def matched_reconciliation_items(
+        self,
+        owner_key: str,
+        limit: int = 25,
+        *,
+        max_age_days: int | None = None,
+    ) -> list:
+        if max_age_days is None:
+            max_age_days = _reconciliation_max_age_days()
+        return self.store.matched_reconciliation_items(owner_key, limit=limit, max_age_days=max_age_days)
+
     def resolved_reconciliation_items(self, owner_key: str, limit: int = 25) -> list:
         return self.store.resolved_reconciliation_items(owner_key, limit=limit)
 

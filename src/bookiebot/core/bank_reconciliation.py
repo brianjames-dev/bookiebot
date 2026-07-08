@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import asyncio
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from datetime import date, datetime, timedelta
 import logging
 import os
@@ -256,9 +256,10 @@ async def _send_bank_reconciliation_inbox(interaction: Any, actor_key: str) -> N
                 ephemeral=True,
             )
 
+    view = BankReconciliationInboxView(handle_inbox_action) if digest.item_ids else None
     await interaction.followup.send(
         content=digest.detail_message[:1900],
-        view=BankReconciliationInboxView(handle_inbox_action),
+        view=view,
         ephemeral=True,
     )
 
@@ -399,9 +400,15 @@ def prepare_bank_reconciliation_digest_messages(
             actor_key=actor_key,
         )
         unresolved = service.unresolved_reconciliation_items(owner.budget_owner_key, limit=25)
+        matched_items = [item for item in preview.items if item.status == "matched"]
+        if force:
+            matched_by_id = {item.id: item for item in matched_items}
+            for item in service.matched_reconciliation_items(owner.budget_owner_key, limit=25):
+                matched_by_id.setdefault(item.id, item)
+            matched_items = list(matched_by_id.values())
         report_matches = service.reconciliation_report_matches(
             owner.budget_owner_key,
-            preview.items,
+            matched_items,
             actor_key=actor_key,
             limit=12,
         )
@@ -410,9 +417,13 @@ def prepare_bank_reconciliation_digest_messages(
         return None
 
     unresolved_count = len(unresolved)
-    matched_count = len([item for item in preview.items if item.status == "matched"])
+    matched_count = len(matched_items)
     if not unresolved_count and not matched_count:
         return None
+    report_preview_items = {item.id: item for item in preview.items}
+    for item in matched_items:
+        report_preview_items.setdefault(item.id, item)
+    report_preview = replace(preview, items=list(report_preview_items.values()))
 
     if mark_sent:
         if not record_system_event(
@@ -436,7 +447,7 @@ def prepare_bank_reconciliation_digest_messages(
         ),
         detail_message=format_bank_reconciliation_digest(
             mention,
-            preview,
+            report_preview,
             unresolved,
             report_matches=report_matches,
             sync_error=sync_error,

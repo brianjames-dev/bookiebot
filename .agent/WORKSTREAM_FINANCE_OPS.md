@@ -1,6 +1,6 @@
 # Finance Operations Workstream
 
-Last updated: 2026-06-20
+Last updated: 2026-07-08
 
 ## Goal
 
@@ -116,6 +116,12 @@ Manual verification steps are tracked in `.agent/STATUS.md`.
 - Added regression coverage for user date rejection, recent-action reconciliation sync hooks, grouped matched-action reopening, and max-age filtering.
 
 Manual verification steps are tracked in `.agent/STATUS.md`.
+
+### 2026-07-08
+
+- Forced reconciliation inbox views now include recent persisted `matched` reconciliation items when the fresh preview no longer contains the automatic matches from the original digest.
+- Auto-match-only inbox reports send the confirmed-match detail without unresolved action buttons, while unresolved inboxes still include `Reconcile Now` and `Ignore All`.
+- Added regression coverage for the forced inbox auto-match report path.
 
 ### Slice D - Pending State Hardening
 

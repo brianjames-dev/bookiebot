@@ -193,7 +193,7 @@ def test_build_expense_breakdown_report_aggregates_shared_and_personal_data():
 
     html = render_expense_breakdown_html(report)
     assert "Expense Breakdown" in html
-    assert "Budget Charts" in html
+    assert "Budget Charts" not in html
     assert "Burn Rate" in html
     assert "bb-burn-rate-active-dot" in html
     assert "bb-pie-metric-label" in html
@@ -204,6 +204,9 @@ def test_build_expense_breakdown_report_aggregates_shared_and_personal_data():
     assert 'id="bookiebot-expense-report-root"' in html
     assert "window.process = window.process ||" in html
     assert "bb-chart-stack" in html
+    assert "bb-chart-carousel" in html
+    assert "bb-chart-carousel-dot" in html
+    assert "bb-metric-toggle" in html
     assert "bb-panel-head" in html
     assert "bb-burn-rate-summary" in html
     assert "bb-signal-strip" not in html
@@ -294,11 +297,14 @@ def test_build_expense_breakdown_report_aggregates_shared_and_personal_data():
     assert "bb-subscription-analytics" in html
     assert "Subs" in html
     assert "bb-subscription-summary" in html
+    assert "bb-subscription-projected" in html
+    assert "bb-calendar-day-today" in html
     assert "bb-subscription-all-grid" in html
     assert "bb-subscription-compact-table" in html
     assert "bb-subscription-tab-content" in html
     assert "bb-subscription-tooltip" in html
-    assert "Pull Date" in html
+    assert "Pull Date" not in html
+    assert "bb-cadence-short" in html
     assert "Kind" not in html
     assert "Subscription calendar and source-of-truth itemized lists" not in html
     assert "Interactive views powered by shadcn/ui patterns and Recharts" not in html
@@ -454,6 +460,44 @@ def test_current_month_burn_rate_series_only_includes_elapsed_days(monkeypatch):
     assert payload["elapsedDays"] == 5
     assert [point["day"] for point in burn_rate["series"]] == [1, 2, 3, 4, 5]
     assert all(point["variance"] is not None for point in burn_rate["series"])
+
+
+def test_current_month_subscription_breakdown_uses_hit_so_far_totals(monkeypatch):
+    monkeypatch.setattr(
+        expense_breakdown,
+        "now_pacific",
+        lambda: datetime(2026, 7, 5, 12, 0, tzinfo=routing.PACIFIC_TZ),
+    )
+    subscriptions_rows = [
+        [],
+        ["", "SUBSCRIPTIONS"],
+        [],
+        ["Needs", "", "(Monthly)", "", "Wants", "", "(Monthly)", "", "Needs", "", "(Yearly)", "", "Wants", "", "(Yearly)"],
+        ["", "", "", "", "", "", "", "", "", "", "", "", "", "", ""],
+        ["Recurring:", "Name:", "Amount:", "", "Recurring:", "Name:", "Amount:", "", "Date:", "Name:", "Amount:", "", "Date:", "Name:", "Amount:"],
+        ["1st", "Netflix", "$15.00", "", "4th", "Spotify", "$10.00", "", "7/4", "Amazon Prime", "$100.00", "", "7/6", "MacroFactor", "$72.00"],
+        ["10th", "Need Later", "$35.00", "", "10th", "Want Later", "$20.00", "", "", "", "", "", "", "", ""],
+    ]
+
+    report = build_expense_breakdown_report(
+        actor_key="hannah",
+        owner_name="Hannah",
+        persons=["Hannah"],
+        month=BudgetMonth(2026, 7),
+        worksheets=ReportWorksheets(
+            shared_expenses=InMemoryWorksheet([["hdr"] * 28, ["hdr"] * 28]),
+            personal_budget=InMemoryWorksheet(
+                [
+                    ["Static Bills & Subscriptions (Needs)", "$300.00"],
+                    ["Subscriptions (Wants)", "$200.00"],
+                ]
+            ),
+            subscriptions=InMemoryWorksheet(subscriptions_rows),
+        ),
+    )
+
+    assert report.breakdown["static_bills_subscriptions_needs"]["amount"] == 115.0
+    assert report.breakdown["subscriptions_wants"]["amount"] == 10.0
 
 
 def test_build_expense_breakdown_report_reports_zero_savings_deposits():

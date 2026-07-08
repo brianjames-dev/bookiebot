@@ -1734,7 +1734,7 @@ async def test_query_expense_breakdown_sends_chart(monkeypatch, message):
     content, kwargs = message.channel.sent[-1]
     assert "Expense breakdown for Hannah (May 2026)" in content
     assert "Food: $60.00 (60.00%)" in content
-    assert "Full report: https://example.test/report.html" in content
+    assert "Full report: [Open full report](https://example.test/report.html)" in content
     assert kwargs.get("file") is chart_file
     assert "shopping" not in build_fig.call_args.args[0]
     assert build_report.call_args.kwargs["month"].label == "May 2026"

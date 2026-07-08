@@ -1009,6 +1009,60 @@ class BankStore:
             ).fetchall()
         return [_reconciliation_item_from_row(row) for row in rows]
 
+    def matched_reconciliation_items(
+        self,
+        owner_key: str,
+        limit: int = 25,
+        *,
+        max_age_days: int | None = None,
+    ) -> list[ReconciliationItem]:
+        safe_limit = max(1, min(int(limit), 100))
+        cutoff_date = None
+        if max_age_days is not None:
+            cutoff_date = (date.today() - timedelta(days=max(1, int(max_age_days)))).isoformat()
+        date_filter = ""
+        params: tuple[Any, ...]
+        if cutoff_date:
+            date_filter = " AND COALESCE(t.date, t.authorized_date, '') >= ?"
+            params = (owner_key, cutoff_date, safe_limit)
+        else:
+            params = (owner_key, safe_limit)
+        self.initialize()
+        with self.connect() as conn:
+            rows = conn.execute(
+                f"""
+                SELECT
+                    r.*,
+                    t.provider_transaction_id,
+                    t.date,
+                    t.authorized_date,
+                    t.name,
+                    t.merchant_name,
+                    t.amount,
+                    t.pending,
+                    t.payment_channel,
+                    t.pending_transaction_id,
+                    t.updated_at,
+                    a.name AS account_name,
+                    a.mask AS account_mask,
+                    a.type AS account_type,
+                    a.subtype AS account_subtype
+                FROM bank_reconciliation_items r
+                JOIN bank_transactions t ON t.id = r.bank_transaction_id
+                LEFT JOIN bank_accounts a ON a.id = t.account_id
+                WHERE r.owner_key = ?
+                  AND t.removed_at IS NULL
+                  AND t.pending = 0
+                  AND (t.account_id IS NULL OR COALESCE(a.watched, 1) = 1)
+                  AND r.status = 'matched'
+                  {date_filter}
+                ORDER BY COALESCE(t.date, t.authorized_date, '') DESC, r.last_seen_at DESC, r.id DESC
+                LIMIT ?
+                """,
+                params,
+            ).fetchall()
+        return [_reconciliation_item_from_row(row) for row in rows]
+
     def resolved_reconciliation_items(self, owner_key: str, limit: int = 25) -> list[ReconciliationItem]:
         safe_limit = max(1, min(int(limit), 100))
         self.initialize()

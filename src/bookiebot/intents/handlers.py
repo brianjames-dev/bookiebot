@@ -1030,9 +1030,10 @@ async def query_expense_breakdown_handler(entities, message):
     except SheetRoutingError as exc:
         await message.channel.send(f"❌ Could not calculate expense breakdown.\n\n{exc}")
         return
+    full_report_link = f"[Open full report]({report_page.url})"
 
     if not report.breakdown:
-        await message.channel.send(f"❌ Could not calculate expense breakdown.\n\nFull report: {report_page.url}")
+        await message.channel.send(f"❌ Could not calculate expense breakdown.\n\nFull report: {full_report_link}")
         return
 
     lines = []
@@ -1056,7 +1057,7 @@ async def query_expense_breakdown_handler(entities, message):
     if not non_zero_categories:
         await message.channel.send(
             f"📊 No expenses found for {', '.join(persons)} in {report.month.label}.\n\n"
-            f"Full report: {report_page.url}"
+            f"Full report: {full_report_link}"
         )
         return
 
@@ -1066,7 +1067,7 @@ async def query_expense_breakdown_handler(entities, message):
         f"📊 Expense breakdown for {people_str} ({report.month.label}):\n"
         + "\n".join(lines)
         + f"\n\n💵 Total: ${grand_total:.2f}"
-        + f"\n🌐 Full report: {report_page.url}"
+        + f"\n🌐 Full report: {full_report_link}"
     )
 
     try:

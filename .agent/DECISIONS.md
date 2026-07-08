@@ -122,6 +122,24 @@ Decision: Signed expense report links should serve the saved HTML snapshot first
 
 Rationale: Reports generated from Discord should remain openable even if Google Sheets permissions or service-account access drift later. Live dashboard behavior belongs behind an explicit request until the report becomes a true app API surface with caching and refresh controls.
 
+## 2026-07-08 - Preserve Signed Report URLs Behind Short Link Text
+
+Decision: Expense breakdown Discord responses should keep signed report URLs but render them behind a short `Open full report` markdown label.
+
+Rationale: The token protects report access and snapshot selection. A short display label removes Discord message clutter without weakening the signed report route.
+
+## 2026-07-08 - Forced Inbox Shows Recent Automatic Matches
+
+Decision: The reconciliation `View Inbox` forced refresh may include recent persisted `matched` reconciliation items in addition to the fresh unresolved preview.
+
+Rationale: Automatic matches can be persisted by the original digest run and then disappear from later fresh previews. Reading recent persisted matches lets users inspect what the digest reported instead of seeing a misleading "all caught up" response.
+
+## 2026-07-08 - Use Hit-So-Far Subscription Totals For Open Months
+
+Decision: Expense breakdown reports use scheduled subscription pull dates from the Subscriptions sheet for current and future month subscription category totals, while completed months continue to use the Budget sheet totals.
+
+Rationale: Open-month reports should reflect which subscriptions should have hit so far and show the full-month subscription amount as projection context. Completed months should preserve Budget sheet snapshot totals for historical review.
+
 ## Pending Decisions
 
 - Where should durable system events live: banking database only, Google Sheets only, or dual-write during transition?

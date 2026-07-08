@@ -1,3 +1,4 @@
+from dataclasses import replace
 from datetime import date, datetime
 from types import SimpleNamespace
 import pytest
@@ -121,6 +122,16 @@ def _reconciliation_item(item_id: int, *, name: str) -> ReconciliationItem:
         ignored_at=None,
         notes="outflow transaction",
         transaction=transaction,
+    )
+
+
+def _matched_reconciliation_item(item_id: int, *, name: str) -> ReconciliationItem:
+    return replace(
+        _reconciliation_item(item_id, name=name),
+        classification="transfer_or_payment",
+        status="matched",
+        confidence=0.95,
+        notes="automatic rule",
     )
 
 
@@ -468,7 +479,6 @@ def test_prepare_bank_reconciliation_digest_uses_cached_items_when_sync_fails(mo
 
 
 @pytest.mark.asyncio
-@pytest.mark.asyncio
 async def test_bank_reconciliation_inbox_ignore_all_ignores_displayed_batch(monkeypatch):
     items = [
         _reconciliation_item(42, name="Unlogged Coffee"),
@@ -492,6 +502,9 @@ async def test_bank_reconciliation_inbox_ignore_all_ignores_displayed_batch(monk
 
         def unresolved_reconciliation_items(self, owner_key, *, limit):
             return [item for item in items if item.id not in ignored_ids]
+
+        def matched_reconciliation_items(self, _owner_key, *, limit):
+            return []
 
         def reconciliation_report_matches(self, _owner_key, _items, *, actor_key, limit):
             return []
@@ -522,6 +535,65 @@ async def test_bank_reconciliation_inbox_ignore_all_ignores_displayed_batch(monk
 
     assert ignored_ids == [42, 43]
     assert action_interaction.followup.messages[-1][0] == "Ignored `2` bank reconciliation item(s) from this inbox."
+
+
+@pytest.mark.asyncio
+async def test_bank_reconciliation_inbox_shows_recent_auto_matches_without_actions(monkeypatch):
+    item = _matched_reconciliation_item(51, name="CREDIT CARD 3333 PAYMENT")
+
+    class FakeService:
+        config = SimpleNamespace(configured=True)
+
+        async def sync_owner(self, _owner_key):
+            return None
+
+        def reconciliation_preview(self, owner_key, *, limit, actor_key):
+            return ReconciliationPreview(
+                owner_key=owner_key,
+                items=[],
+                cached_transaction_count=1,
+                candidate_transaction_count=0,
+                cache_buckets=ReconciliationCacheBuckets(stored=1, matched=1),
+            )
+
+        def unresolved_reconciliation_items(self, _owner_key, *, limit):
+            return []
+
+        def matched_reconciliation_items(self, _owner_key, *, limit):
+            return [item]
+
+        def reconciliation_report_matches(self, _owner_key, items, *, actor_key, limit):
+            assert items == [item]
+            return [
+                ReconciliationReportMatch(
+                    bank_date="2026-05-18",
+                    bank_name="CREDIT CARD 3333 PAYMENT",
+                    bank_amount=12.34,
+                    matched_date=None,
+                    matched_name=None,
+                    matched_amount=None,
+                    source_type="automatic rule",
+                    reason="automatic rule",
+                    confidence=0.95,
+                )
+            ]
+
+    monkeypatch.setattr(
+        bank_reconciliation,
+        "get_user_config",
+        lambda _actor_key: SimpleNamespace(budget_owner_key="brian", name="Brian"),
+    )
+    monkeypatch.setattr(bank_reconciliation, "build_banking_service", lambda: FakeService())
+    monkeypatch.setattr(bank_reconciliation, "has_system_event", lambda *_args: False)
+    interaction = FakeReviewInteraction()
+
+    await bank_reconciliation._send_bank_reconciliation_inbox(interaction, "123")
+
+    content, kwargs = interaction.followup.messages[-1]
+    assert "found no unresolved items and confirmed `1` automatic match" in content
+    assert "Confirmed matches this run:" in content
+    assert "CREDIT CARD 3333 PAYMENT" in content
+    assert kwargs["view"] is None
 
 
 @pytest.mark.asyncio

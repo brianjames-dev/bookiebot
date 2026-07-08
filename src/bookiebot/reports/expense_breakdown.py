@@ -327,7 +327,12 @@ def build_expense_breakdown_report(
     amount_saved = _amount_saved(personal_rows)
     savings_goal = _savings_goal(personal_rows)
     need_expenses = _need_expense_items(personal_rows)
-    static_needs_total, wants_total = _subscription_bucket_totals(personal_rows, current_month_subscriptions)
+    static_needs_total, wants_total = _subscription_breakdown_totals(
+        personal_rows,
+        subscriptions,
+        current_month_subscriptions,
+        month,
+    )
     payment_totals = _payment_totals_by_group(payments)
     utility_history = _utility_history_items(
         selected.budget_history or (BudgetHistoryRows(month, personal_rows),),
@@ -617,6 +622,54 @@ def _subscription_bucket_totals(
         )
 
     return round(static_needs_total, 2), round(wants_total, 2)
+
+
+def _subscription_breakdown_totals(
+    rows: list[list[str]],
+    all_subscriptions: list[SubscriptionItem],
+    current_month_subscriptions: list[SubscriptionItem],
+    month: BudgetMonth,
+) -> tuple[float, float]:
+    if all_subscriptions and not _is_completed_month(month):
+        return _subscription_item_totals(_subscriptions_hit_so_far(current_month_subscriptions, month))
+    return _subscription_bucket_totals(rows, current_month_subscriptions)
+
+
+def _subscription_item_totals(items: list[SubscriptionItem]) -> tuple[float, float]:
+    return (
+        round(sum(item.amount for item in items if _subscription_bucket(item) == "static_bills_subscriptions_needs"), 2),
+        round(sum(item.amount for item in items if _subscription_bucket(item) == "subscriptions_wants"), 2),
+    )
+
+
+def _subscriptions_hit_so_far(items: list[SubscriptionItem], month: BudgetMonth) -> list[SubscriptionItem]:
+    elapsed_days = _elapsed_days_for_month(month)
+    days_in_month = calendar.monthrange(month.year, month.month)[1]
+    hit_items: list[SubscriptionItem] = []
+    for item in items:
+        day = _subscription_day_in_month(item, month)
+        if day is None:
+            if elapsed_days >= days_in_month:
+                hit_items.append(item)
+            continue
+        if day <= elapsed_days:
+            hit_items.append(item)
+    return hit_items
+
+
+def _subscription_day_in_month(item: SubscriptionItem, month: BudgetMonth) -> int | None:
+    if item.cadence == "yearly" and item.pull_month != month.month:
+        return None
+    if item.pull_day is None:
+        return None
+    days_in_month = calendar.monthrange(month.year, month.month)[1]
+    return min(item.pull_day, days_in_month)
+
+
+def _is_completed_month(month: BudgetMonth) -> bool:
+    days_in_month = calendar.monthrange(month.year, month.month)[1]
+    last_day = datetime(month.year, month.month, days_in_month, tzinfo=PACIFIC_TZ).date()
+    return now_pacific().date() > last_day
 
 
 def _payment_totals_by_group(payments: list[PaymentItem]) -> dict[str, float]:
