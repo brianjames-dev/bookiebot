@@ -175,8 +175,15 @@ type ChartPanel = {
 }
 
 type CalendarFilter = "all" | "subscription"
+type DailySpendingFilter = "all" | "needs" | "wants"
 
 const CHART_CAROUSEL_GAP = 16
+const DAILY_SPENDING_FILTERS: Array<{ value: DailySpendingFilter; label: string }> = [
+  { value: "all", label: "All" },
+  { value: "needs", label: "Needs" },
+  { value: "wants", label: "Wants" },
+]
+const DAILY_WANTS_CATEGORIES = new Set(["Food", "Shopping"])
 
 type ChartTouchState = {
   startX: number
@@ -318,11 +325,14 @@ export function ExpenseReportApp({ report }: { report: ExpenseReportData }) {
   const { theme, toggleTheme } = useExpenseReportTheme()
   const [projectionActive, setProjectionActive] = useState(false)
   const [calendarFilter, setCalendarFilter] = useState<CalendarFilter>("all")
+  const [dailySpendingFilter, setDailySpendingFilter] = useState<DailySpendingFilter>("all")
   const [chartTouch, setChartTouch] = useState<ChartTouchState | null>(null)
   const chartGestureRef = useRef<ChartTouchState | null>(null)
   const [chartCollapseKey, setChartCollapseKey] = useState(0)
   const activeReport = buildReportView(report, projectionActive)
   const categoryColors: Record<string, string> = Object.fromEntries(activeReport.breakdown.map((item) => [item.label, item.color]))
+  const dailyEntries = filterDailyEntries(report.dailyEntries, dailySpendingFilter)
+  const dailyTotals = dailyTotalsForEntries(dailyEntries)
   const defaultChartTab = report.burnRate ? "burn-rate" : "category"
   const chartPanels: ChartPanel[] = [
     {
@@ -335,7 +345,7 @@ export function ExpenseReportApp({ report }: { report: ExpenseReportData }) {
           {
             id: "burn-rate",
             title: "Burn Rate",
-            content: <BurnRateChart burnRate={activeReport.burnRate} />,
+            content: <BurnRateChart burnRate={activeReport.burnRate} collapseKey={chartCollapseKey} />,
           },
         ]
       : []),
@@ -502,15 +512,7 @@ export function ExpenseReportApp({ report }: { report: ExpenseReportData }) {
                   <CardHeader className="bb-analytics-header">
                     <div className="bb-card-title-row bb-analytics-title-row">
                       <CardTitle>{panel.title}</CardTitle>
-                      <div className="bb-analytics-header-controls">
-                        {panel.headerControl}
-                        <ChartCarouselButtons
-                          onPrevious={() => moveChart(-1)}
-                          onNext={() => moveChart(1)}
-                          canPrevious={activeChartIndex > 0}
-                          canNext={activeChartIndex < chartPanels.length - 1}
-                        />
-                      </div>
+                      {panel.headerControl ? <div className="bb-analytics-header-controls">{panel.headerControl}</div> : null}
                     </div>
                   </CardHeader>
                   <CardContent>{panel.content}</CardContent>
@@ -519,15 +521,26 @@ export function ExpenseReportApp({ report }: { report: ExpenseReportData }) {
             ))}
           </div>
         </div>
-        <ChartCarouselIndicators panels={chartPanels} activeIndex={activeChartIndex} onSelect={switchChart} />
+        <ChartCarouselNavigation
+          panels={chartPanels}
+          activeIndex={activeChartIndex}
+          onSelect={switchChart}
+          onPrevious={() => moveChart(-1)}
+          onNext={() => moveChart(1)}
+          canPrevious={activeChartIndex > 0}
+          canNext={activeChartIndex < chartPanels.length - 1}
+        />
 
         <Card>
           <CardHeader>
-            <CardTitle>Daily Spending</CardTitle>
+            <div className="bb-card-title-row bb-inline-toggle-row">
+              <CardTitle>Daily Spending</CardTitle>
+              <DailySpendingFilterControl filter={dailySpendingFilter} onFilterChange={setDailySpendingFilter} />
+            </div>
           </CardHeader>
           <CardContent className="bb-daily-spending-content">
-            <DailySpendingChart data={report.dailyTotals} total={amountRowsTotal(report.dailyTotals)} elapsedDays={report.elapsedDays} />
-            <DailyEntriesTable entries={report.dailyEntries} categoryColors={categoryColors} />
+            <DailySpendingChart data={dailyTotals} total={amountRowsTotal(dailyTotals)} elapsedDays={report.elapsedDays} />
+            <DailyEntriesTable entries={dailyEntries} categoryColors={categoryColors} />
           </CardContent>
         </Card>
 
@@ -542,25 +555,58 @@ function isInteractiveTouchTarget(target: EventTarget | null) {
   return target instanceof Element && Boolean(target.closest("button, a, input, select, textarea, summary, [role='button'], [role='tab']"))
 }
 
-function ChartCarouselButtons({
+function ChartCarouselNavigation({
+  panels,
+  activeIndex,
+  onSelect,
   onPrevious,
   onNext,
   canPrevious,
   canNext,
 }: {
+  panels: ChartPanel[]
+  activeIndex: number
+  onSelect: (index: number) => void
   onPrevious: () => void
   onNext: () => void
   canPrevious: boolean
   canNext: boolean
 }) {
   return (
-    <div className="bb-chart-carousel-controls" aria-label="Budget chart navigation">
+    <div className="bb-chart-carousel-nav">
       <button type="button" className="bb-chart-carousel-button" aria-label="Previous chart" onClick={onPrevious} disabled={!canPrevious}>
         {"<"}
       </button>
+      <ChartCarouselIndicators panels={panels} activeIndex={activeIndex} onSelect={onSelect} />
       <button type="button" className="bb-chart-carousel-button" aria-label="Next chart" onClick={onNext} disabled={!canNext}>
         {">"}
       </button>
+    </div>
+  )
+}
+
+function DailySpendingFilterControl({
+  filter,
+  onFilterChange,
+}: {
+  filter: DailySpendingFilter
+  onFilterChange: (filter: DailySpendingFilter) => void
+}) {
+  return (
+    <div className="bb-tabs-list bb-daily-spending-filter" role="tablist" aria-label="Daily spending filter">
+      {DAILY_SPENDING_FILTERS.map((item) => (
+        <button
+          type="button"
+          key={item.value}
+          className="bb-tabs-trigger"
+          data-state={filter === item.value ? "active" : "inactive"}
+          role="tab"
+          aria-selected={filter === item.value}
+          onClick={() => onFilterChange(item.value)}
+        >
+          {item.label}
+        </button>
+      ))}
     </div>
   )
 }
@@ -617,7 +663,7 @@ function ThemeToggle({ theme, onToggle }: { theme: ThemeMode; onToggle: () => vo
   )
 }
 
-function BurnRateChart({ burnRate }: { burnRate: BurnRate }) {
+function BurnRateChart({ burnRate, collapseKey }: { burnRate: BurnRate; collapseKey: number }) {
   const isOver = burnRate.status === "over"
   const isNotStarted = burnRate.status === "not_started"
   const statusLabel = isNotStarted ? "Not started" : isOver ? "Over pace" : "Under pace"
@@ -646,7 +692,7 @@ function BurnRateChart({ burnRate }: { burnRate: BurnRate }) {
         config={{ variance: { label: "Variance", color: lineColor } }}
         className="bb-chart-box bb-chart-box-wide"
       >
-        <ResponsiveContainer width="100%" height={320}>
+        <ResponsiveContainer width="100%" height="100%">
           <LineChart data={chartSeries} margin={{ top: 20, right: 22, left: 0, bottom: 8 }}>
             <defs>
               <linearGradient id="burn-rate-variance-gradient" x1="0" y1="0" x2="0" y2="1">
@@ -679,7 +725,7 @@ function BurnRateChart({ burnRate }: { burnRate: BurnRate }) {
           </LineChart>
         </ResponsiveContainer>
       </ChartContainer>
-      <DetailsPanel summary="Details">
+      <DetailsPanel summary="Details" collapseKey={collapseKey}>
         <StatList
           rows={[
             ["Wants target", formatMoney(burnRate.budget)],
@@ -882,7 +928,7 @@ function CategoryMixChart({ data, total, collapseKey }: { data: BreakdownItem[];
       </div>
       <div className="bb-chart-layout">
         <ChartContainer config={chartConfig(data)} className="bb-chart-box">
-          <ResponsiveContainer width="100%" height={pieLayout.chartHeight}>
+          <ResponsiveContainer width="100%" height="100%">
             <PieChart>
               <ChartTooltip content={<ChartTooltipContent />} />
               <Pie
@@ -1085,7 +1131,7 @@ function DailySpendingChart({ data, total, elapsedDays }: { data: AmountRow[]; t
   return (
     <div className="bb-chart-layout">
       <ChartContainer config={{ amount: { label: "Amount", color: "hsl(var(--chart-1))" } }} className="bb-chart-box">
-        <ResponsiveContainer width="100%" height={320}>
+        <ResponsiveContainer width="100%" height="100%">
           <BarChart data={data} margin={{ top: 12, right: 16, left: 0, bottom: 0 }}>
             <CartesianGrid vertical={false} strokeDasharray="3 3" />
             <XAxis dataKey="label" tickLine={false} axisLine={false} />
@@ -1123,7 +1169,7 @@ function TopExpensesChart({ entries }: { entries: ExpenseEntry[] }) {
 
   return (
     <ChartContainer config={{ amount: { label: "Amount", color: "hsl(var(--chart-2))" } }} className="bb-insight-chart-box">
-      <ResponsiveContainer width="100%" height={360}>
+      <ResponsiveContainer width="100%" height="100%">
         <BarChart data={rows} layout="vertical" margin={{ top: 12, right: 22, left: 20, bottom: 12 }}>
           <CartesianGrid horizontal={false} strokeDasharray="3 3" />
           <XAxis type="number" tickFormatter={(value) => `$${value}`} tickLine={false} axisLine={false} />
@@ -1148,7 +1194,7 @@ function MerchantChart({ data }: { data: OccurrenceRow[] }) {
   const rows = data.slice(0, 10)
   return (
     <ChartContainer config={{ count: { label: "Occurrences", color: "hsl(var(--chart-4))" } }} className="bb-insight-chart-box">
-      <ResponsiveContainer width="100%" height={360}>
+      <ResponsiveContainer width="100%" height="100%">
         <BarChart data={rows} layout="vertical" margin={{ top: 12, right: 22, left: 20, bottom: 12 }}>
           <CartesianGrid horizontal={false} strokeDasharray="3 3" />
           <XAxis type="number" tickFormatter={(value) => String(value)} tickLine={false} axisLine={false} allowDecimals={false} />
@@ -1245,10 +1291,14 @@ function DetailsPanel({ summary, children, collapseKey = 0 }: { summary: string;
   }, [collapseKey])
 
   return (
-    <details className="bb-details-panel" open={open} onToggle={(event) => setOpen(event.currentTarget.open)}>
-      <summary>{summary}</summary>
-      <div>{children}</div>
-    </details>
+    <div className="bb-details-panel" data-state={open ? "open" : "closed"}>
+      <button type="button" className="bb-details-toggle" aria-expanded={open} onClick={() => setOpen((current) => !current)}>
+        {summary}
+      </button>
+      <div className="bb-details-content" aria-hidden={!open}>
+        <div className="bb-details-content-inner">{children}</div>
+      </div>
+    </div>
   )
 }
 
@@ -1272,7 +1322,9 @@ function HiddenListPanel({ children, total }: { children: ReactNode; total: numb
   const [expanded, setExpanded] = useState(false)
   return (
     <div className="bb-hidden-list-panel">
-      {expanded ? children : null}
+      <div className="bb-details-content" data-state={expanded ? "open" : "closed"} aria-hidden={!expanded}>
+        <div className="bb-details-content-inner">{children}</div>
+      </div>
       <ExpandRowsButton expanded={expanded} total={total} onToggle={() => setExpanded((current) => !current)} />
     </div>
   )
@@ -1439,6 +1491,43 @@ function DailyEntriesTable({ entries, categoryColors }: { entries: ExpenseEntry[
 }
 
 function compareDayGroups([left]: [string, ExpenseEntry[]], [right]: [string, ExpenseEntry[]]) {
+  const leftNumber = Number(left)
+  const rightNumber = Number(right)
+  if (Number.isFinite(leftNumber) && Number.isFinite(rightNumber)) {
+    return leftNumber - rightNumber
+  }
+  if (Number.isFinite(leftNumber)) {
+    return -1
+  }
+  if (Number.isFinite(rightNumber)) {
+    return 1
+  }
+  return left.localeCompare(right)
+}
+
+function filterDailyEntries(entries: ExpenseEntry[], filter: DailySpendingFilter) {
+  if (filter === "all") {
+    return entries
+  }
+  return entries.filter((entry) => dailyEntryFilter(entry) === filter)
+}
+
+function dailyEntryFilter(entry: ExpenseEntry): Exclude<DailySpendingFilter, "all"> {
+  return DAILY_WANTS_CATEGORIES.has(entry.category) ? "wants" : "needs"
+}
+
+function dailyTotalsForEntries(entries: ExpenseEntry[]) {
+  const totals = new Map<string, number>()
+  for (const entry of entries) {
+    const day = entry.date ? entry.date.split("/")[1] || entry.date : "No date"
+    totals.set(day, roundCurrency((totals.get(day) ?? 0) + entry.amount))
+  }
+  return Array.from(totals.entries())
+    .sort(([left], [right]) => compareDayLabels(left, right))
+    .map(([label, amount]) => ({ label, amount }))
+}
+
+function compareDayLabels(left: string, right: string) {
   const leftNumber = Number(left)
   const rightNumber = Number(right)
   if (Number.isFinite(leftNumber) && Number.isFinite(rightNumber)) {
@@ -1739,7 +1828,7 @@ function BillsUtilitiesChart({ items }: { items: UtilityHistoryItem[] }) {
 
   return (
     <ChartContainer config={utilityHistoryChartConfig(items)} className="bb-bills-chart-box">
-      <ResponsiveContainer width="100%" height={300}>
+      <ResponsiveContainer width="100%" height="100%">
         <LineChart data={rows} margin={{ top: 12, right: 20, left: 0, bottom: 6 }}>
           <CartesianGrid vertical={false} strokeDasharray="3 3" />
           <XAxis dataKey="label" tickLine={false} axisLine={false} />
