@@ -329,6 +329,7 @@ summary {
 }
 
 .bb-metric-toggle:focus-visible,
+.bb-details-toggle:focus-visible,
 .bb-expand-toggle:focus-visible,
 .bb-chart-carousel-button:focus-visible,
 .bb-chart-carousel-dot:focus-visible {
@@ -694,6 +695,30 @@ summary {
   transform: translateY(0);
 }
 
+@keyframes bb-touch-tooltip-auto-dismiss {
+  0%,
+  68% {
+    opacity: 1;
+  }
+
+  100% {
+    opacity: 0;
+  }
+}
+
+@media (hover: none), (pointer: coarse) {
+  .recharts-tooltip-wrapper {
+    animation: bb-touch-tooltip-auto-dismiss 1100ms ease-out forwards;
+    pointer-events: none !important;
+  }
+
+  .bb-subscription-marker:hover .bb-subscription-tooltip,
+  .bb-subscription-marker:focus .bb-subscription-tooltip {
+    animation: bb-touch-tooltip-auto-dismiss 1100ms ease-out forwards;
+    pointer-events: none;
+  }
+}
+
 .bb-card-tabs {
   display: contents;
 }
@@ -763,7 +788,9 @@ summary {
 }
 
 .bb-chart-carousel[data-dragging="true"] .recharts-tooltip-wrapper,
-.bb-chart-carousel[data-dragging="true"] .bb-subscription-tooltip {
+.bb-chart-carousel[data-dragging="true"] .bb-subscription-tooltip,
+.bb-chart-carousel[data-tooltip-cooldown="true"] .recharts-tooltip-wrapper,
+.bb-chart-carousel[data-tooltip-cooldown="true"] .bb-subscription-tooltip {
   opacity: 0 !important;
   pointer-events: none !important;
   visibility: hidden !important;
@@ -917,6 +944,12 @@ summary {
   height: 100%;
 }
 
+.bb-category-chart-layout {
+  grid-template-columns: 1fr;
+  grid-template-rows: minmax(0, 1fr) auto;
+  align-items: stretch;
+}
+
 .bb-chart-box {
   width: 100%;
   min-width: 0;
@@ -924,9 +957,18 @@ summary {
   min-height: 320px;
 }
 
+.bb-category-chart-box {
+  height: clamp(420px, 52vh, 620px);
+  min-height: 420px;
+}
+
 .bb-analytics-card .bb-chart-box {
   height: 100%;
   min-height: 280px;
+}
+
+.bb-analytics-card .bb-category-chart-box {
+  min-height: 420px;
 }
 
 .bb-chart-container {
@@ -1026,6 +1068,7 @@ summary {
 
 .bb-details-panel {
   display: grid;
+  align-content: start;
   gap: 8px;
   min-width: 0;
 }
@@ -1033,8 +1076,13 @@ summary {
 .bb-details-toggle {
   appearance: none;
   justify-self: start;
+  align-self: start;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   width: fit-content;
   max-width: 100%;
+  min-height: 32px;
   border: 1px solid hsl(var(--border));
   border-radius: 999px;
   background: hsl(var(--background));
@@ -1043,8 +1091,10 @@ summary {
   font: inherit;
   font-size: 13px;
   font-weight: 700;
+  line-height: 1;
   padding: 7px 10px;
   transition: background-color 160ms ease, border-color 160ms ease, color 160ms ease, box-shadow 160ms ease;
+  white-space: nowrap;
 }
 
 .bb-details-toggle:hover,
@@ -1083,8 +1133,13 @@ summary {
 .bb-expand-toggle {
   appearance: none;
   justify-self: start;
+  align-self: start;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   width: fit-content;
   max-width: 100%;
+  min-height: 32px;
   margin-top: 10px;
   border: 1px solid hsl(var(--border));
   border-radius: 999px;
@@ -1094,11 +1149,14 @@ summary {
   font: inherit;
   font-size: 13px;
   font-weight: 700;
+  line-height: 1;
   padding: 7px 10px;
   transition: background-color 160ms ease, border-color 160ms ease, color 160ms ease, box-shadow 160ms ease;
+  white-space: nowrap;
 }
 
-.bb-expand-toggle:hover {
+.bb-expand-toggle:hover,
+.bb-expand-toggle[aria-expanded="true"] {
   border-color: hsl(var(--muted));
   background: hsl(var(--muted) / 0.12);
   color: hsl(var(--foreground));

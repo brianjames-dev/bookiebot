@@ -328,6 +328,8 @@ export function ExpenseReportApp({ report }: { report: ExpenseReportData }) {
   const [dailySpendingFilter, setDailySpendingFilter] = useState<DailySpendingFilter>("all")
   const [chartTouch, setChartTouch] = useState<ChartTouchState | null>(null)
   const chartGestureRef = useRef<ChartTouchState | null>(null)
+  const tooltipCooldownTimeoutRef = useRef<number | null>(null)
+  const [chartTooltipCooldown, setChartTooltipCooldown] = useState(false)
   const [chartCollapseKey, setChartCollapseKey] = useState(0)
   const activeReport = buildReportView(report, projectionActive)
   const categoryColors: Record<string, string> = Object.fromEntries(activeReport.breakdown.map((item) => [item.label, item.color]))
@@ -382,12 +384,32 @@ export function ExpenseReportApp({ report }: { report: ExpenseReportData }) {
     setActiveChartIndex((current) => Math.min(current, chartPanels.length - 1))
   }, [chartPanels.length])
 
+  useEffect(() => {
+    return () => {
+      if (tooltipCooldownTimeoutRef.current !== null) {
+        window.clearTimeout(tooltipCooldownTimeoutRef.current)
+      }
+    }
+  }, [])
+
+  const startChartTooltipCooldown = () => {
+    if (tooltipCooldownTimeoutRef.current !== null) {
+      window.clearTimeout(tooltipCooldownTimeoutRef.current)
+    }
+    setChartTooltipCooldown(true)
+    tooltipCooldownTimeoutRef.current = window.setTimeout(() => {
+      setChartTooltipCooldown(false)
+      tooltipCooldownTimeoutRef.current = null
+    }, 1100)
+  }
+
   const switchChart = (nextIndex: number) => {
     const next = clamp(nextIndex, 0, chartPanels.length - 1)
     if (next === activeChartIndex) {
       return
     }
     setChartCollapseKey((current) => current + 1)
+    startChartTooltipCooldown()
     setActiveChartIndex(next)
   }
 
@@ -497,6 +519,7 @@ export function ExpenseReportApp({ report }: { report: ExpenseReportData }) {
         <div
           className="bb-chart-carousel"
           data-dragging={chartTouch?.dragging ? "true" : "false"}
+          data-tooltip-cooldown={chartTooltipCooldown ? "true" : "false"}
           onTouchStart={handleChartTouchStart}
           onTouchMove={handleChartTouchMove}
           onTouchEnd={handleChartTouchEnd}
@@ -926,8 +949,8 @@ function CategoryMixChart({ data, total, collapseKey }: { data: BreakdownItem[];
           <div className="bb-chart-total">{formatMoney(total)}</div>
         </div>
       </div>
-      <div className="bb-chart-layout">
-        <ChartContainer config={chartConfig(data)} className="bb-chart-box">
+      <div className="bb-chart-layout bb-category-chart-layout">
+        <ChartContainer config={chartConfig(data)} className="bb-chart-box bb-category-chart-box">
           <ResponsiveContainer width="100%" height="100%">
             <PieChart>
               <ChartTooltip content={<ChartTooltipContent />} />
@@ -948,21 +971,19 @@ function CategoryMixChart({ data, total, collapseKey }: { data: BreakdownItem[];
             </PieChart>
           </ResponsiveContainer>
         </ChartContainer>
-        <div className="bb-chart-side">
-          <DetailsPanel summary="Categories" collapseKey={collapseKey}>
-            <div className="bb-legend-list">
-              {data.map((item) => (
-                <div className="bb-legend-row" key={item.key}>
-                  <span className="bb-swatch" style={{ backgroundColor: item.color }} />
-                  <span>{item.label}</span>
-                  <strong>
-                    {formatMoney(item.amount)} <span>{formatPct(item.percentage)}</span>
-                  </strong>
-                </div>
-              ))}
-            </div>
-          </DetailsPanel>
-        </div>
+        <DetailsPanel summary="Categories" collapseKey={collapseKey}>
+          <div className="bb-legend-list">
+            {data.map((item) => (
+              <div className="bb-legend-row" key={item.key}>
+                <span className="bb-swatch" style={{ backgroundColor: item.color }} />
+                <span>{item.label}</span>
+                <strong>
+                  {formatMoney(item.amount)} <span>{formatPct(item.percentage)}</span>
+                </strong>
+              </div>
+            ))}
+          </div>
+        </DetailsPanel>
       </div>
     </div>
   )
@@ -970,15 +991,38 @@ function CategoryMixChart({ data, total, collapseKey }: { data: BreakdownItem[];
 
 function useExpensePieLayout() {
   const isPhone = useMediaQuery("(max-width: 520px)")
+  const isTablet = useMediaQuery("(max-width: 860px)")
 
+  if (isPhone) {
+    return {
+      chartHeight: 330,
+      innerRadius: 72,
+      outerRadius: 122,
+      labelOffset: 20,
+      labelGap: PIE_METRIC_LABEL_GAP,
+      compactLabel: false,
+      showLabels: false,
+    }
+  }
+  if (isTablet) {
+    return {
+      chartHeight: 390,
+      innerRadius: 86,
+      outerRadius: 150,
+      labelOffset: 26,
+      labelGap: PIE_METRIC_LABEL_GAP,
+      compactLabel: false,
+      showLabels: true,
+    }
+  }
   return {
-    chartHeight: 330,
-    innerRadius: 72,
-    outerRadius: 122,
-    labelOffset: 20,
+    chartHeight: 460,
+    innerRadius: 106,
+    outerRadius: 188,
+    labelOffset: 34,
     labelGap: PIE_METRIC_LABEL_GAP,
     compactLabel: false,
-    showLabels: !isPhone,
+    showLabels: true,
   }
 }
 
