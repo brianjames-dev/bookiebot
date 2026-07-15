@@ -658,6 +658,37 @@ def test_report_payload_total_expenses_uses_personal_outflow_subtotals():
     assert payload["metrics"]["incomeAfterExpenses"] == 1150.0
 
 
+def test_report_payload_total_expenses_keeps_zero_savings_subtotal():
+    personal_rows = [
+        ["Monthly Income", "$5,000.00"],
+        ["(Needs) Subtotal:", "$3,400.59 (180.18%)", "", "", "", "-$1,245.94"],
+        ["(Wants) Subtotal:", "", "$957.95 (84.60%)", "", "", "-$1,071.51"],
+        ["(Savings) Subtotal:", "", "", "", "$0.00", "-$316.59"],
+    ]
+    report = build_expense_breakdown_report(
+        actor_key="hannah",
+        owner_name="Hannah",
+        persons=["Hannah"],
+        month=BudgetMonth(2026, 5),
+        worksheets=ReportWorksheets(
+            shared_expenses=InMemoryWorksheet([["hdr"] * 28, ["hdr"] * 28]),
+            personal_budget=InMemoryWorksheet(personal_rows),
+            subscriptions=InMemoryWorksheet([]),
+        ),
+    )
+
+    html = render_expense_breakdown_html(report)
+    payload_match = re.search(
+        r'<script id="bookiebot-expense-report-data" type="application/json">(.*?)</script>',
+        html,
+    )
+    assert payload_match is not None
+    payload = json.loads(payload_match.group(1))
+
+    assert report.personal_total == 4358.54
+    assert payload["metrics"]["totalExpenses"] == 4358.54
+
+
 def test_current_month_income_projection_uses_logged_income_date_as_biweekly_anchor(monkeypatch):
     monkeypatch.setattr(
         expense_breakdown,

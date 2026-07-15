@@ -915,7 +915,9 @@ def _personal_outflow_subtotal_total(rows: list[list[str]]) -> float | None:
             bucket = _outflow_subtotal_bucket(normalized)
             if bucket is None:
                 continue
-            totals[bucket] = round(_next_money(row, index + 1, window=8), 2)
+            amount = _next_money_value(row, index + 1, window=8)
+            if amount is not None:
+                totals[bucket] = round(amount, 2)
 
     if not totals:
         return None
@@ -931,6 +933,17 @@ def _outflow_subtotal_bucket(label: str) -> str | None:
         return "wants"
     if "saving" in label:
         return "savings"
+    return None
+
+
+def _next_money_value(row: list[str], start_index: int, *, window: int = 4) -> float | None:
+    for value in row[start_index : start_index + window]:
+        text = str(value).strip()
+        if not text or not re.search(r"\d", text):
+            continue
+        match = re.search(r"-?\$?\s*\d[\d,]*(?:\.\d+)?", text)
+        if match is not None:
+            return clean_money(match.group(0).replace(" ", ""))
     return None
 
 

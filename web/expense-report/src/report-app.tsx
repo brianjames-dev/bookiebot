@@ -239,7 +239,7 @@ function projectedBreakdown(report: ExpenseReportData) {
 }
 
 function projectedOutflowTotal(report: ExpenseReportData, breakdown: BreakdownItem[]) {
-  return roundCurrency(amountRowsTotal(breakdown) + report.incomeProjection.savingsGoal)
+  return roundCurrency(amountRowsTotal(breakdown) + (report.metrics.amountSaved ?? 0))
 }
 
 function scheduledSubscriptionTotals(report: ExpenseReportData) {
@@ -473,7 +473,13 @@ export function ExpenseReportApp({ report }: { report: ExpenseReportData }) {
           />
         </section>
 
-        <div className="bb-chart-carousel" onTouchStart={handleChartTouchStart} onTouchMove={handleChartTouchMove} onTouchEnd={handleChartTouchEnd}>
+        <div
+          className="bb-chart-carousel"
+          data-dragging={chartTouch?.dragging ? "true" : "false"}
+          onTouchStart={handleChartTouchStart}
+          onTouchMove={handleChartTouchMove}
+          onTouchEnd={handleChartTouchEnd}
+        >
           <div
             className={chartTouch?.dragging ? "bb-chart-carousel-track bb-chart-carousel-track-dragging" : "bb-chart-carousel-track"}
             style={{ transform: carouselTransform }}

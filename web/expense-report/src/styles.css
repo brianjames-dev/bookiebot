@@ -746,6 +746,13 @@ summary {
   height: 100%;
 }
 
+.bb-chart-carousel[data-dragging="true"] .recharts-tooltip-wrapper,
+.bb-chart-carousel[data-dragging="true"] .bb-subscription-tooltip {
+  opacity: 0 !important;
+  pointer-events: none !important;
+  visibility: hidden !important;
+}
+
 .bb-chart-carousel-controls {
   display: inline-flex;
   align-items: center;
