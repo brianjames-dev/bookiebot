@@ -373,7 +373,16 @@ export function ExpenseReportApp({ report }: { report: ExpenseReportData }) {
     {
       id: "bills",
       title: "Bills & Utilities",
-      content: <BillsUtilitiesPanel items={activeReport.utilityHistory} projected={projectionActive} collapseKey={chartCollapseKey} />,
+      content: (
+        <BillsUtilitiesPanel
+          items={activeReport.utilityHistory}
+          events={activeReport.calendarEvents}
+          year={report.year}
+          month={report.month}
+          projected={projectionActive}
+          collapseKey={chartCollapseKey}
+        />
+      ),
     },
   ]
   const defaultChartIndex = Math.max(0, chartPanels.findIndex((panel) => panel.id === defaultChartTab))
@@ -562,7 +571,7 @@ export function ExpenseReportApp({ report }: { report: ExpenseReportData }) {
             </div>
           </CardHeader>
           <CardContent className="bb-daily-spending-content">
-            <DailySpendingChart data={dailyTotals} total={amountRowsTotal(dailyTotals)} elapsedDays={report.elapsedDays} />
+            <DailySpendingChart data={dailyTotals} total={amountRowsTotal(dailyTotals)} elapsedDays={report.elapsedDays} filter={dailySpendingFilter} />
             <DailyEntriesTable entries={dailyEntries} categoryColors={categoryColors} />
           </CardContent>
         </Card>
@@ -752,8 +761,8 @@ function BurnRateChart({ burnRate, collapseKey }: { burnRate: BurnRate; collapse
         <StatList
           rows={[
             ["Limit", formatMoney(burnRate.budget)],
-            ["Left", formatMoney(burnRate.remaining)],
             ["Spent", formatMoney(burnRate.spent)],
+            ["Left", formatMoney(burnRate.remaining)],
             ["Allowed/day", formatMoney(burnRate.allowedDailyAverage)],
             ["Actual/day", formatMoney(burnRate.actualDailyAverage)],
           ]}
@@ -1174,19 +1183,52 @@ function pieMetricPolarPoint(props: unknown, radius: number) {
   }
 }
 
-function DailySpendingChart({ data, total, elapsedDays }: { data: AmountRow[]; total: number; elapsedDays: number }) {
+type DailySpendingRow = AmountRow & {
+  needsAmount: number
+  wantsAmount: number
+}
+
+function DailySpendingChart({
+  data,
+  total,
+  elapsedDays,
+  filter,
+}: {
+  data: DailySpendingRow[]
+  total: number
+  elapsedDays: number
+  filter: DailySpendingFilter
+}) {
   const peak = data.reduce<AmountRow | null>((best, item) => (!best || item.amount > best.amount ? item : best), null)
   const averageDaySpend = elapsedDays ? total / elapsedDays : 0
+  const showGroupedBars = filter === "all"
   return (
     <div className="bb-chart-layout">
-      <ChartContainer config={{ amount: { label: "Amount", color: "hsl(var(--chart-1))" } }} className="bb-chart-box">
+      <ChartContainer
+        config={
+          showGroupedBars
+            ? {
+                needsAmount: { label: "Needs", color: "hsl(var(--chart-2))" },
+                wantsAmount: { label: "Wants", color: "hsl(var(--chart-4))" },
+              }
+            : { amount: { label: "Amount", color: "hsl(var(--chart-1))" } }
+        }
+        className="bb-chart-box"
+      >
         <ResponsiveContainer width="100%" height="100%">
           <BarChart data={data} margin={{ top: 12, right: 16, left: 0, bottom: 0 }}>
             <CartesianGrid vertical={false} strokeDasharray="3 3" />
             <XAxis dataKey="label" tickLine={false} axisLine={false} />
             <YAxis tickFormatter={(value) => `$${value}`} tickLine={false} axisLine={false} width={52} />
             <ChartTooltip content={<ChartTooltipContent />} cursor={{ fill: "hsl(var(--primary) / 0.1)" }} />
-            <Bar dataKey="amount" name="Daily spending" fill="hsl(var(--chart-1))" radius={[6, 6, 2, 2]} />
+            {showGroupedBars ? (
+              <>
+                <Bar dataKey="needsAmount" name="Needs" fill="hsl(var(--chart-2))" radius={[6, 6, 2, 2]} />
+                <Bar dataKey="wantsAmount" name="Wants" fill="hsl(var(--chart-4))" radius={[6, 6, 2, 2]} />
+              </>
+            ) : (
+              <Bar dataKey="amount" name="Daily spending" fill="hsl(var(--chart-1))" radius={[6, 6, 2, 2]} />
+            )}
           </BarChart>
         </ResponsiveContainer>
       </ChartContainer>
@@ -1567,14 +1609,22 @@ function dailyEntryFilter(entry: ExpenseEntry): Exclude<DailySpendingFilter, "al
 }
 
 function dailyTotalsForEntries(entries: ExpenseEntry[]) {
-  const totals = new Map<string, number>()
+  const totals = new Map<string, DailySpendingRow>()
   for (const entry of entries) {
     const day = entry.date ? entry.date.split("/")[1] || entry.date : "No date"
-    totals.set(day, roundCurrency((totals.get(day) ?? 0) + entry.amount))
+    const current = totals.get(day) ?? { label: day, amount: 0, needsAmount: 0, wantsAmount: 0 }
+    const bucket = dailyEntryFilter(entry)
+    const next = {
+      ...current,
+      amount: roundCurrency(current.amount + entry.amount),
+      needsAmount: roundCurrency(current.needsAmount + (bucket === "needs" ? entry.amount : 0)),
+      wantsAmount: roundCurrency(current.wantsAmount + (bucket === "wants" ? entry.amount : 0)),
+    }
+    totals.set(day, next)
   }
   return Array.from(totals.entries())
     .sort(([left], [right]) => compareDayLabels(left, right))
-    .map(([label, amount]) => ({ label, amount }))
+    .map(([, row]) => row)
 }
 
 function compareDayLabels(left: string, right: string) {
@@ -1848,8 +1898,23 @@ function calendarEventKindLabel(event: CalendarEvent) {
   return CALENDAR_EVENT_STYLES[event.kind].label
 }
 
-function BillsUtilitiesPanel({ items, projected, collapseKey }: { items: UtilityHistoryItem[]; projected: boolean; collapseKey: number }) {
-  const currentTotal = items.reduce((sum, item) => sum + item.currentAmount, 0)
+function BillsUtilitiesPanel({
+  items,
+  events,
+  year,
+  month,
+  projected,
+  collapseKey,
+}: {
+  items: UtilityHistoryItem[]
+  events: CalendarEvent[]
+  year: number
+  month: number
+  projected: boolean
+  collapseKey: number
+}) {
+  const billEvents = billsUtilitiesEvents(events)
+  const currentTotal = billsUtilitiesPanelTotal(items, billEvents, projected)
 
   return (
     <div className="bb-bills-analytics">
@@ -1865,7 +1930,7 @@ function BillsUtilitiesPanel({ items, projected, collapseKey }: { items: Utility
         <div className="bb-empty">No bill history found.</div>
       ) : (
         <>
-          <BillsUtilitiesChart items={items} />
+          <BillsUtilitiesChart items={items} billEvents={billEvents} year={year} month={month} />
           <DetailsPanel summary="Bill details" collapseKey={collapseKey}>
             <BillsUtilitiesSummary items={items} />
           </DetailsPanel>
@@ -1875,8 +1940,19 @@ function BillsUtilitiesPanel({ items, projected, collapseKey }: { items: Utility
   )
 }
 
-function BillsUtilitiesChart({ items }: { items: UtilityHistoryItem[] }) {
+function BillsUtilitiesChart({
+  items,
+  billEvents,
+  year,
+  month,
+}: {
+  items: UtilityHistoryItem[]
+  billEvents: CalendarEvent[]
+  year: number
+  month: number
+}) {
   const rows = utilityHistoryChartRows(items)
+  const eventByLabel = billEventByLabel(billEvents)
 
   return (
     <ChartContainer config={utilityHistoryChartConfig(items)} className="bb-bills-chart-box">
@@ -1885,7 +1961,7 @@ function BillsUtilitiesChart({ items }: { items: UtilityHistoryItem[] }) {
           <CartesianGrid vertical={false} strokeDasharray="3 3" />
           <XAxis dataKey="label" tickLine={false} axisLine={false} />
           <YAxis tickFormatter={(value) => `$${value}`} tickLine={false} axisLine={false} width={54} />
-          <ChartTooltip content={<ChartTooltipContent />} />
+          <ChartTooltip content={<BillsUtilitiesTooltipContent eventByLabel={eventByLabel} year={year} month={month} />} />
           {items.map((item, index) => (
             <Line
               key={item.key}
@@ -1902,6 +1978,98 @@ function BillsUtilitiesChart({ items }: { items: UtilityHistoryItem[] }) {
       </ResponsiveContainer>
     </ChartContainer>
   )
+}
+
+function billsUtilitiesEvents(events: CalendarEvent[]) {
+  return events.filter((item) => item.kind === "bill" && item.group === "bills_utilities")
+}
+
+function billsUtilitiesPanelTotal(items: UtilityHistoryItem[], events: CalendarEvent[], projected: boolean) {
+  if (events.length) {
+    return roundCurrency(
+      events
+        .filter((item) => projected || !item.projectedOnly)
+        .reduce((sum, item) => sum + item.amount, 0),
+    )
+  }
+  return roundCurrency(items.reduce((sum, item) => sum + item.currentAmount, 0))
+}
+
+function billEventByLabel(events: CalendarEvent[]) {
+  return new Map(events.map((event) => [normalizeChartLabel(event.label), event]))
+}
+
+type BillsUtilitiesTooltipPayload = {
+  name?: string | number
+  value?: string | number | null
+  color?: string
+  payload?: Record<string, string | number>
+}
+
+function BillsUtilitiesTooltipContent({
+  active,
+  payload,
+  eventByLabel,
+  year,
+  month,
+}: {
+  active?: boolean
+  payload?: BillsUtilitiesTooltipPayload[]
+  eventByLabel: Map<string, CalendarEvent>
+  year: number
+  month: number
+}) {
+  const rows = (payload ?? []).filter((item) => item.value !== null && item.value !== undefined)
+  if (!active || !rows.length) {
+    return null
+  }
+  const title = String(rows[0]?.payload?.label ?? "Bills")
+  const signature = rows.map((item) => `${item.name ?? ""}:${item.value ?? ""}`).join("|")
+
+  return (
+    <div className="bb-chart-tooltip bb-touch-tooltip-content" key={signature}>
+      <div className="bb-chart-tooltip-title">{title}</div>
+      {rows.map((item, index) => {
+        const name = String(item.name ?? "")
+        const event = eventByLabel.get(normalizeChartLabel(name))
+        return (
+          <div className="bb-chart-tooltip-row" key={`${name}-${item.value}-${index}`}>
+            <span className="bb-chart-tooltip-dot" style={{ background: item.color }} />
+            <span>
+              <span>{name}</span>
+              {event ? <small>{billHitTooltipLabel(event, year, month)}</small> : null}
+            </span>
+            <strong>{formatMoney(Number(item.value || 0))}</strong>
+          </div>
+        )
+      })}
+    </div>
+  )
+}
+
+function billHitTooltipLabel(event: CalendarEvent, year: number, month: number) {
+  const date = new Date(year, month - 1, event.day)
+  const weekday = new Intl.DateTimeFormat("en-US", { weekday: "long" }).format(date)
+  return `${event.projectedOnly ? "Upcoming" : "Hit"} ${weekday} ${ordinalDay(event.day)}`
+}
+
+function ordinalDay(day: number) {
+  const mod10 = day % 10
+  const mod100 = day % 100
+  if (mod10 === 1 && mod100 !== 11) {
+    return `${day}st`
+  }
+  if (mod10 === 2 && mod100 !== 12) {
+    return `${day}nd`
+  }
+  if (mod10 === 3 && mod100 !== 13) {
+    return `${day}rd`
+  }
+  return `${day}th`
+}
+
+function normalizeChartLabel(label: string) {
+  return label.toLowerCase().replace(/[^a-z0-9]+/g, "")
 }
 
 function utilityHistoryChartRows(items: UtilityHistoryItem[]) {
