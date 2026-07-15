@@ -608,13 +608,13 @@ def test_current_month_calendar_events_include_projected_income_subscriptions_an
         "kind": "income",
         "label": "Paycheck",
         "amount": 2000.0,
-        "day": 3,
+        "day": 2,
         "group": "income",
         "projectedOnly": False,
     }
     assert [(item["day"], item["amount"], item["projectedOnly"]) for item in projected_paychecks] == [
-        (17, 2000.0, True),
-        (31, 2000.0, True),
+        (16, 2000.0, True),
+        (30, 2000.0, True),
     ]
     assert events[("subscription", "Need Later")]["day"] == 10
     assert events[("subscription", "Need Later")]["projectedOnly"] is True
@@ -624,6 +624,38 @@ def test_current_month_calendar_events_include_projected_income_subscriptions_an
     assert events[("bill", "PG&E")]["day"] == 20
     assert events[("bill", "PG&E")]["projectedOnly"] is True
     assert "Calendar" in html
+
+
+def test_report_payload_total_expenses_uses_personal_outflow_subtotals():
+    personal_rows = [
+        ["Monthly Income", "$5,000.00"],
+        ["Needs Subtotal", "$2,100.00"],
+        ["Wants Subtotal", "$750.00"],
+        ["Savings Subtotal", "$1,000.00"],
+    ]
+    report = build_expense_breakdown_report(
+        actor_key="hannah",
+        owner_name="Hannah",
+        persons=["Hannah"],
+        month=BudgetMonth(2026, 5),
+        worksheets=ReportWorksheets(
+            shared_expenses=InMemoryWorksheet([["hdr"] * 28, ["hdr"] * 28]),
+            personal_budget=InMemoryWorksheet(personal_rows),
+            subscriptions=InMemoryWorksheet([]),
+        ),
+    )
+
+    html = render_expense_breakdown_html(report)
+    payload_match = re.search(
+        r'<script id="bookiebot-expense-report-data" type="application/json">(.*?)</script>',
+        html,
+    )
+    assert payload_match is not None
+    payload = json.loads(payload_match.group(1))
+
+    assert report.personal_total == 3850.0
+    assert payload["metrics"]["totalExpenses"] == 3850.0
+    assert payload["metrics"]["incomeAfterExpenses"] == 1150.0
 
 
 def test_current_month_income_projection_uses_logged_income_date_as_biweekly_anchor(monkeypatch):

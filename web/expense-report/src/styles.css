@@ -719,8 +719,8 @@ summary {
 .bb-chart-carousel {
   --bb-chart-carousel-gap: 16px;
   min-width: 0;
-  overflow-x: hidden;
-  overflow-y: visible;
+  overflow: hidden;
+  overscroll-behavior: contain;
   touch-action: pan-y;
 }
 

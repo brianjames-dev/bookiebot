@@ -174,7 +174,7 @@ type ChartPanel = {
   headerControl?: ReactNode
 }
 
-type CalendarFilter = "all" | "subscription" | "bill" | "income"
+type CalendarFilter = "all" | "subscription"
 
 const CHART_CAROUSEL_GAP = 16
 
@@ -200,8 +200,8 @@ type ReportView = {
 
 function buildReportView(report: ExpenseReportData, projected: boolean): ReportView {
   const breakdown = projected ? projectedBreakdown(report) : report.breakdown
-  const totalExpenses = roundCurrency(breakdown.reduce((sum, item) => sum + item.amount, 0))
   const monthlyIncome = projected ? report.incomeProjection.projectedAmount : report.incomeProjection.currentAmount
+  const totalExpenses = projected ? projectedOutflowTotal(report, breakdown) : report.metrics.totalExpenses
   return {
     metrics: {
       totalExpenses,
@@ -209,8 +209,8 @@ function buildReportView(report: ExpenseReportData, projected: boolean): ReportV
       incomeAfterExpenses: roundCurrency(monthlyIncome - totalExpenses),
     },
     breakdown,
-    burnRate: report.burnRate,
-    calendarEvents: calendarEventsForMode(report.calendarEvents, projected),
+    burnRate: projected ? projectedBurnRateFromIncome(report.burnRate, monthlyIncome) : report.burnRate,
+    calendarEvents: calendarEventsForMode(report.calendarEvents),
     utilityHistory: report.utilityHistory,
   }
 }
@@ -231,11 +231,15 @@ function projectedBreakdown(report: ExpenseReportData) {
     }
     return { ...item, amount: roundCurrency(amount) }
   })
-  const total = rows.reduce((sum, item) => sum + item.amount, 0)
+  const total = amountRowsTotal(rows)
   return rows.map((item) => ({
     ...item,
     percentage: total ? roundCurrency((item.amount / total) * 100) : 0,
   }))
+}
+
+function projectedOutflowTotal(report: ExpenseReportData, breakdown: BreakdownItem[]) {
+  return roundCurrency(amountRowsTotal(breakdown) + report.incomeProjection.savingsGoal)
 }
 
 function scheduledSubscriptionTotals(report: ExpenseReportData) {
@@ -260,8 +264,47 @@ function projectedBillTotals(report: ExpenseReportData) {
   }
 }
 
-function calendarEventsForMode(events: CalendarEvent[], projected: boolean) {
-  return projected ? events : events.filter((item) => item.kind !== "income" || !item.projectedOnly)
+function projectedBurnRateFromIncome(burnRate: BurnRate | null, monthlyIncome: number) {
+  if (!burnRate) {
+    return null
+  }
+  const budget = roundCurrency(monthlyIncome * 0.3)
+  const spent = roundCurrency(burnRate.spent)
+  const daysInMonth = burnRate.daysInMonth
+  const elapsedDays = burnRate.elapsedDays
+  const expectedSpend = roundCurrency(daysInMonth ? budget * (elapsedDays / daysInMonth) : 0)
+  const allowedDailyAverage = roundCurrency(daysInMonth ? budget / daysInMonth : 0)
+  const actualDailyAverage = roundCurrency(elapsedDays ? spent / elapsedDays : 0)
+  const dailyDifference = roundCurrency(actualDailyAverage - allowedDailyAverage)
+  const totalDifference = roundCurrency(spent - expectedSpend)
+  const status: BurnRate["status"] = elapsedDays === 0 ? "not_started" : totalDifference > 0 ? "over" : "under"
+  const series = burnRate.series.map((point) => {
+    const pointExpectedSpend = roundCurrency(daysInMonth ? budget * (point.day / daysInMonth) : 0)
+    const actualSpend = point.actualSpend
+    return {
+      ...point,
+      expectedSpend: pointExpectedSpend,
+      variance: actualSpend === null || actualSpend === undefined ? null : roundCurrency(actualSpend - pointExpectedSpend),
+    }
+  })
+
+  return {
+    ...burnRate,
+    budget,
+    spent,
+    remaining: roundCurrency(budget - spent),
+    expectedSpend,
+    allowedDailyAverage,
+    actualDailyAverage,
+    dailyDifference,
+    totalDifference,
+    status,
+    series,
+  }
+}
+
+function calendarEventsForMode(events: CalendarEvent[]) {
+  return events
 }
 
 function roundCurrency(value: number) {
@@ -285,7 +328,7 @@ export function ExpenseReportApp({ report }: { report: ExpenseReportData }) {
     {
       id: "category",
       title: "Category Mix",
-      content: <CategoryMixChart data={activeReport.breakdown} total={activeReport.metrics.totalExpenses} collapseKey={chartCollapseKey} />,
+      content: <CategoryMixChart data={activeReport.breakdown} total={amountRowsTotal(activeReport.breakdown)} collapseKey={chartCollapseKey} />,
     },
     ...(activeReport.burnRate
       ? [
@@ -308,6 +351,10 @@ export function ExpenseReportApp({ report }: { report: ExpenseReportData }) {
           elapsedDays={report.elapsedDays}
           events={activeReport.calendarEvents}
           filter={calendarFilter}
+          projected={projectionActive}
+          needs={report.subscriptionsNeeds}
+          wants={report.subscriptionsWants}
+          collapseKey={chartCollapseKey}
         />
       ),
     },
@@ -1391,8 +1438,6 @@ function compareDayGroups([left]: [string, ExpenseEntry[]], [right]: [string, Ex
 const CALENDAR_FILTERS: Array<{ value: CalendarFilter; label: string }> = [
   { value: "all", label: "All" },
   { value: "subscription", label: "Subs" },
-  { value: "bill", label: "Bills" },
-  { value: "income", label: "Income" },
 ]
 
 const CALENDAR_EVENT_STYLES: Record<CalendarEventKind, { label: string; color: string; background: string }> = {
@@ -1403,8 +1448,8 @@ const CALENDAR_EVENT_STYLES: Record<CalendarEventKind, { label: string; color: s
   },
   bill: {
     label: "Bill",
-    color: "#0d9488",
-    background: "rgb(13 148 136 / 0.1)",
+    color: "#ea580c",
+    background: "rgb(234 88 12 / 0.1)",
   },
   income: {
     label: "Income",
@@ -1446,6 +1491,10 @@ function CalendarAnalyticsPanel({
   elapsedDays,
   events,
   filter,
+  projected,
+  needs,
+  wants,
+  collapseKey,
 }: {
   year: number
   month: number
@@ -1453,11 +1502,17 @@ function CalendarAnalyticsPanel({
   elapsedDays: number
   events: CalendarEvent[]
   filter: CalendarFilter
+  projected: boolean
+  needs: SubscriptionItem[]
+  wants: SubscriptionItem[]
+  collapseKey: number
 }) {
   const visibleEvents = filter === "all" ? events : events.filter((item) => item.kind === filter)
-  const outflowTotal = visibleEvents
+  const totalEvents = projected ? visibleEvents : visibleEvents.filter((item) => !item.projectedOnly)
+  const outflowTotal = totalEvents
     .filter((item) => item.kind !== "income")
     .reduce((sum, item) => sum + item.amount, 0)
+  const subscriptionItems = [...needs, ...wants]
 
   return (
     <div className="bb-subscription-analytics">
@@ -1471,6 +1526,11 @@ function CalendarAnalyticsPanel({
             <Badge variant="secondary">{visibleEvents.length} total</Badge>
           </div>
           <FinancialCalendar year={year} month={month} elapsedDays={elapsedDays} events={visibleEvents} />
+          {subscriptionItems.length ? (
+            <DetailsPanel summary="Sub details" collapseKey={collapseKey}>
+              <SubscriptionAllItemsGrid items={subscriptionItems} />
+            </DetailsPanel>
+          ) : null}
         </div>
       </div>
     </div>
@@ -1587,6 +1647,9 @@ function calendarEventStyle(event: CalendarEvent) {
   if (event.group === "static_bills_subscriptions_needs") {
     return { ...CALENDAR_EVENT_STYLES.subscription, color: "#2563eb", background: "rgb(37 99 235 / 0.1)" }
   }
+  if (event.group === "subscriptions_wants") {
+    return { ...CALENDAR_EVENT_STYLES.subscription, color: "#7c3aed", background: "rgb(124 58 237 / 0.1)" }
+  }
   if (event.group === "rent") {
     return { ...CALENDAR_EVENT_STYLES.bill, color: "#dc2626", background: "rgb(220 38 38 / 0.1)" }
   }
@@ -1594,16 +1657,14 @@ function calendarEventStyle(event: CalendarEvent) {
 }
 
 function calendarEventLabel(event: CalendarEvent) {
-  const style = CALENDAR_EVENT_STYLES[event.kind]
-  return `${event.label} - ${style.label} - ${formatMoney(event.amount)}`
+  return `${event.label} - ${calendarEventKindLabel(event)} - ${formatMoney(event.amount)}`
 }
 
 function CalendarEventTooltip({ event }: { event: CalendarEvent }) {
-  const style = CALENDAR_EVENT_STYLES[event.kind]
   return (
     <span className="bb-subscription-tooltip" role="tooltip">
       <strong>{event.label}</strong>
-      <span>{style.label}</span>
+      <span>{calendarEventKindLabel(event)}</span>
       <span className="bb-subscription-tooltip-amount">{formatMoney(event.amount)}</span>
     </span>
   )
@@ -1615,11 +1676,18 @@ function CalendarOverflowTooltip({ events, day }: { events: CalendarEvent[]; day
       <strong>More on day {day}</strong>
       {events.map((event, index) => (
         <span key={`${event.kind}-${event.label}-${event.amount}-${index}`}>
-          {event.label} - {formatMoney(event.amount)}
+          {event.label} - {calendarEventKindLabel(event)} - {formatMoney(event.amount)}
         </span>
       ))}
     </span>
   )
+}
+
+function calendarEventKindLabel(event: CalendarEvent) {
+  if (event.kind === "subscription") {
+    return event.group === "subscriptions_wants" ? "Want sub" : "Need sub"
+  }
+  return CALENDAR_EVENT_STYLES[event.kind].label
 }
 
 function BillsUtilitiesPanel({ items, collapseKey }: { items: UtilityHistoryItem[]; collapseKey: number }) {

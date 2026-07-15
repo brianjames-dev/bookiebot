@@ -175,7 +175,7 @@ PAYMENT_GROUPS = {
     "student loan": ("bills_utilities", "Student Loan"),
 }
 
-BIWEEKLY_PAYDAY_ANCHOR = datetime(2026, 7, 3, tzinfo=PACIFIC_TZ).date()
+BIWEEKLY_PAYDAY_ANCHOR = datetime(2026, 7, 2, tzinfo=PACIFIC_TZ).date()
 
 BUDGET_SHARED_CATEGORY_LABELS = {
     "grocery": ("Groceries", "Grocery"),
@@ -388,7 +388,8 @@ def build_expense_breakdown_report(
     }
 
     shared_total = round(sum(entry.amount for entry in entries), 2)
-    personal_total = grand_total
+    personal_outflow_total = _personal_outflow_subtotal_total(personal_rows)
+    personal_total = personal_outflow_total if personal_outflow_total is not None else grand_total
 
     return ExpenseBreakdownReport(
         actor_key=actor_key,
@@ -452,7 +453,7 @@ def render_expense_breakdown_html(report: ExpenseBreakdownReport) -> str:
     merchant_occurrences = _merchant_occurrences(activity_entries)
     daily_totals = _daily_totals(activity_entries)
     budget_group_totals = _budget_group_totals(report.breakdown)
-    balance_after_expenses = report.income_total - report.grand_total if report.income_total else None
+    balance_after_expenses = report.income_total - report.personal_total if report.income_total else None
     payload = _report_client_payload(
         report=report,
         activity_entries=activity_entries,
@@ -902,6 +903,35 @@ def _payment_totals_by_group(payments: list[PaymentItem]) -> dict[str, float]:
             continue
         totals[payment.group] += payment.amount
     return {group: round(amount, 2) for group, amount in totals.items()}
+
+
+def _personal_outflow_subtotal_total(rows: list[list[str]]) -> float | None:
+    totals: dict[str, float] = {}
+    for row in rows:
+        for index, value in enumerate(row):
+            normalized = _normalize_label(value)
+            if "subtotal" not in normalized:
+                continue
+            bucket = _outflow_subtotal_bucket(normalized)
+            if bucket is None:
+                continue
+            totals[bucket] = round(_next_money(row, index + 1, window=8), 2)
+
+    if not totals:
+        return None
+    if any(amount > 0 for amount in totals.values()) or len(totals) >= 2:
+        return round(sum(totals.values()), 2)
+    return None
+
+
+def _outflow_subtotal_bucket(label: str) -> str | None:
+    if "need" in label:
+        return "needs"
+    if "want" in label:
+        return "wants"
+    if "saving" in label:
+        return "savings"
+    return None
 
 
 def _budget_shared_category_totals(rows: list[list[str]]) -> dict[str, float]:
@@ -1459,7 +1489,7 @@ def _report_client_payload(
         "elapsedDays": elapsed_days,
         "generatedAt": report.generated_at.strftime("%b %-d, %Y %-I:%M %p %Z"),
         "metrics": {
-            "totalExpenses": report.grand_total,
+            "totalExpenses": report.personal_total,
             "sharedExpenses": report.shared_total,
             "personalOutflows": report.personal_total,
             "fixedCommitments": _fixed_commitments_total(report.breakdown),
