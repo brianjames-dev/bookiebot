@@ -711,13 +711,22 @@ body {
 }
 
 .bb-chart-carousel {
+  display: grid;
+  gap: 10px;
   min-width: 0;
+  overflow: hidden;
   touch-action: pan-y;
 }
 
 .bb-chart-carousel-panel {
   min-width: 0;
+  transition: transform 180ms ease;
+  will-change: transform;
   animation: bb-chart-panel-in 300ms cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+.bb-chart-carousel-panel-dragging {
+  transition: none;
 }
 
 .bb-chart-carousel-controls {
@@ -754,6 +763,16 @@ body {
   display: inline-flex;
   align-items: center;
   gap: 5px;
+}
+
+.bb-chart-carousel-indicators {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  justify-self: center;
+  gap: 5px;
+  min-height: 18px;
+  width: 100%;
 }
 
 .bb-chart-carousel-dot {
@@ -969,6 +988,11 @@ body {
 
 .bb-details-panel > div {
   margin-top: 10px;
+}
+
+.bb-hidden-list-panel {
+  display: grid;
+  gap: 10px;
 }
 
 .bb-expand-toggle {
@@ -1196,13 +1220,12 @@ tr:last-child td {
     justify-content: flex-start;
   }
 
-  .bb-analytics-header-controls,
   .bb-inline-toggle-row .bb-tabs-list {
     margin-left: 0;
   }
 
   .bb-analytics-header-controls {
-    justify-content: flex-start;
+    justify-content: flex-end;
   }
 
   .bb-tabs-list {

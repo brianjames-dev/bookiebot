@@ -3,6 +3,10 @@ export interface AmountRow {
   amount: number
 }
 
+export interface OccurrenceRow extends AmountRow {
+  count: number
+}
+
 export interface BreakdownItem extends AmountRow {
   key: string
   percentage: number
@@ -42,6 +46,22 @@ export interface SubscriptionItem extends AmountRow {
   kind: string
   pullDay: number | null
   pullMonth: number | null
+}
+
+export type CalendarEventKind = "subscription" | "bill" | "income"
+
+export interface CalendarEvent {
+  kind: CalendarEventKind
+  label: string
+  amount: number
+  day: number
+  group: string
+  projectedOnly: boolean
+}
+
+export interface IncomeProjection {
+  currentAmount: number
+  projectedAmount: number
 }
 
 export interface Metrics {
@@ -91,15 +111,18 @@ export interface ExpenseReportData {
   elapsedDays: number
   generatedAt: string
   metrics: Metrics
+  incomeProjection: IncomeProjection
   burnRate: BurnRate | null
   breakdown: BreakdownItem[]
   dailyTotals: AmountRow[]
   budgetGroups: AmountRow[]
   personTotals: AmountRow[]
   merchantTotals: AmountRow[]
+  merchantOccurrences: OccurrenceRow[]
   topEntries: ExpenseEntry[]
   dailyEntries: ExpenseEntry[]
   needExpenses: PaymentItem[]
+  calendarEvents: CalendarEvent[]
   utilityHistory: UtilityHistoryItem[]
   subscriptionsNeeds: SubscriptionItem[]
   subscriptionsWants: SubscriptionItem[]

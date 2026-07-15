@@ -18,7 +18,19 @@ import { Badge } from "./components/ui/badge"
 import { Card, CardContent, CardHeader, CardTitle } from "./components/ui/card"
 import { ChartContainer, ChartTooltip, ChartTooltipContent } from "./components/ui/chart"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "./components/ui/tabs"
-import type { AmountRow, BreakdownItem, BurnRate, BurnRatePoint, ExpenseEntry, ExpenseReportData, PaymentItem, SubscriptionItem, UtilityHistoryItem } from "./types"
+import type {
+  AmountRow,
+  BreakdownItem,
+  BurnRate,
+  BurnRatePoint,
+  CalendarEvent,
+  CalendarEventKind,
+  ExpenseEntry,
+  ExpenseReportData,
+  OccurrenceRow,
+  SubscriptionItem,
+  UtilityHistoryItem,
+} from "./types"
 
 const money = new Intl.NumberFormat("en-US", {
   style: "currency",
@@ -162,50 +174,210 @@ type ChartPanel = {
   headerControl?: ReactNode
 }
 
+type CalendarFilter = "all" | "subscription" | "bill" | "income"
+
+type ChartTouchState = {
+  startX: number
+  startY: number
+  deltaX: number
+  deltaY: number
+  dragging: boolean
+}
+
+type ReportView = {
+  metrics: {
+    totalExpenses: number
+    monthlyIncome: number
+    incomeAfterExpenses: number
+  }
+  breakdown: BreakdownItem[]
+  burnRate: BurnRate | null
+  calendarEvents: CalendarEvent[]
+  utilityHistory: UtilityHistoryItem[]
+}
+
+function buildReportView(report: ExpenseReportData, projected: boolean): ReportView {
+  const breakdown = projected ? projectedBreakdown(report) : report.breakdown
+  const totalExpenses = roundCurrency(breakdown.reduce((sum, item) => sum + item.amount, 0))
+  const monthlyIncome = projected ? report.incomeProjection.projectedAmount : report.incomeProjection.currentAmount
+  return {
+    metrics: {
+      totalExpenses,
+      monthlyIncome,
+      incomeAfterExpenses: roundCurrency(monthlyIncome - totalExpenses),
+    },
+    breakdown,
+    burnRate: projected ? projectedBurnRate(report.burnRate) : report.burnRate,
+    calendarEvents: calendarEventsForMode(report.calendarEvents, projected),
+    utilityHistory: utilityHistoryForMode(report.utilityHistory, projected),
+  }
+}
+
+function projectedBreakdown(report: ExpenseReportData) {
+  const subscriptionTotals = scheduledSubscriptionTotals(report)
+  const billTotals = projectedBillTotals(report)
+  const scale = report.elapsedDays > 0 && report.elapsedDays < report.daysInMonth ? report.daysInMonth / report.elapsedDays : 1
+  const variableKeys = new Set(["grocery", "gas", "food", "shopping"])
+  const rows = report.breakdown.map((item) => {
+    let amount = item.amount
+    if (item.key === "static_bills_subscriptions_needs") {
+      amount = subscriptionTotals.needs || amount
+    } else if (item.key === "subscriptions_wants") {
+      amount = subscriptionTotals.wants || amount
+    } else if (item.key === "rent") {
+      amount = billTotals.rent || amount
+    } else if (item.key === "bills_utilities") {
+      amount = billTotals.billsUtilities || amount
+    } else if (variableKeys.has(item.key)) {
+      amount = roundCurrency(amount * scale)
+    }
+    return { ...item, amount: roundCurrency(amount) }
+  })
+  const total = rows.reduce((sum, item) => sum + item.amount, 0)
+  return rows.map((item) => ({
+    ...item,
+    percentage: total ? roundCurrency((item.amount / total) * 100) : 0,
+  }))
+}
+
+function scheduledSubscriptionTotals(report: ExpenseReportData) {
+  const totalFor = (items: SubscriptionItem[]) =>
+    items.reduce((sum, item) => (subscriptionDayInMonth(item, report.year, report.month) === null ? sum : sum + item.amount), 0)
+  return {
+    needs: roundCurrency(totalFor(report.subscriptionsNeeds)),
+    wants: roundCurrency(totalFor(report.subscriptionsWants)),
+  }
+}
+
+function projectedBillTotals(report: ExpenseReportData) {
+  const billsUtilities = roundCurrency(
+    report.utilityHistory.reduce((sum, item) => sum + Math.max(item.currentAmount, item.averageAmount), 0),
+  )
+  const rent = report.calendarEvents
+    .filter((item) => item.kind === "bill" && item.group === "rent")
+    .reduce((sum, item) => sum + item.amount, 0)
+  return {
+    rent: roundCurrency(rent),
+    billsUtilities,
+  }
+}
+
+function calendarEventsForMode(events: CalendarEvent[], projected: boolean) {
+  return projected ? events : events.filter((item) => !item.projectedOnly)
+}
+
+function utilityHistoryForMode(items: UtilityHistoryItem[], projected: boolean) {
+  if (!projected) {
+    return items
+  }
+  return items.map((item) => {
+    const currentAmount = roundCurrency(Math.max(item.currentAmount, item.averageAmount))
+    return {
+      ...item,
+      currentAmount,
+      deltaAmount: item.averageAmount > 0 ? roundCurrency(currentAmount - item.averageAmount) : item.deltaAmount,
+    }
+  })
+}
+
+function projectedBurnRate(burnRate: BurnRate | null): BurnRate | null {
+  if (!burnRate || burnRate.elapsedDays <= 0 || burnRate.daysInMonth <= 0) {
+    return burnRate
+  }
+  const dailyPace = burnRate.spent / burnRate.elapsedDays
+  const projectedSpend = roundCurrency(dailyPace * burnRate.daysInMonth)
+  const totalDifference = roundCurrency(projectedSpend - burnRate.budget)
+  const actualDailyAverage = roundCurrency(projectedSpend / burnRate.daysInMonth)
+  return {
+    ...burnRate,
+    spent: projectedSpend,
+    remaining: roundCurrency(burnRate.budget - projectedSpend),
+    elapsedDays: burnRate.daysInMonth,
+    expectedSpend: burnRate.budget,
+    actualDailyAverage,
+    dailyDifference: roundCurrency(actualDailyAverage - burnRate.allowedDailyAverage),
+    totalDifference,
+    status: totalDifference > 0 ? "over" : "under",
+    series: projectedBurnRateSeries(burnRate, dailyPace),
+  }
+}
+
+function projectedBurnRateSeries(burnRate: BurnRate, dailyPace: number): BurnRatePoint[] {
+  const existing = new Map(burnRate.series.map((point) => [point.day, point]))
+  let cumulative = 0
+  const series: BurnRatePoint[] = []
+  for (let day = 1; day <= burnRate.daysInMonth; day += 1) {
+    const existingPoint = existing.get(day)
+    if (existingPoint && existingPoint.actualSpend !== null) {
+      cumulative = existingPoint.actualSpend
+    } else {
+      cumulative = roundCurrency(cumulative + dailyPace)
+    }
+    const expectedSpend = roundCurrency(burnRate.budget * (day / burnRate.daysInMonth))
+    const dailySpend = existingPoint?.dailySpend ?? roundCurrency(dailyPace)
+    series.push({
+      day,
+      label: String(day),
+      dailySpend,
+      actualSpend: cumulative,
+      expectedSpend,
+      variance: roundCurrency(cumulative - expectedSpend),
+    })
+  }
+  return series
+}
+
+function roundCurrency(value: number) {
+  return Math.round((Number.isFinite(value) ? value : 0) * 100) / 100
+}
+
+function clamp(value: number, min: number, max: number) {
+  return Math.min(max, Math.max(min, value))
+}
+
 export function ExpenseReportApp({ report }: { report: ExpenseReportData }) {
   const { theme, toggleTheme } = useExpenseReportTheme()
-  const [includeSecondPaycheck, setIncludeSecondPaycheck] = useState(false)
-  const [subscriptionTone, setSubscriptionTone] = useState<SubscriptionTone>("all")
-  const [chartTouchStart, setChartTouchStart] = useState<number | null>(null)
-  const categoryColors: Record<string, string> = Object.fromEntries(report.breakdown.map((item) => [item.label, item.color]))
+  const [projectionActive, setProjectionActive] = useState(false)
+  const [calendarFilter, setCalendarFilter] = useState<CalendarFilter>("all")
+  const [chartTouch, setChartTouch] = useState<ChartTouchState | null>(null)
+  const activeReport = buildReportView(report, projectionActive)
+  const categoryColors: Record<string, string> = Object.fromEntries(activeReport.breakdown.map((item) => [item.label, item.color]))
   const defaultChartTab = report.burnRate ? "burn-rate" : "category"
-  const forecastIncome = includeSecondPaycheck ? report.metrics.monthlyIncome * 2 : report.metrics.monthlyIncome
-  const forecastIncomeAfterExpenses = forecastIncome - report.metrics.totalExpenses
   const chartPanels: ChartPanel[] = [
     {
       id: "category",
       title: "Category Mix",
-      content: <CategoryMixChart data={report.breakdown} total={report.metrics.totalExpenses} />,
+      content: <CategoryMixChart data={activeReport.breakdown} total={activeReport.metrics.totalExpenses} />,
     },
-    ...(report.burnRate
+    ...(activeReport.burnRate
       ? [
           {
             id: "burn-rate",
             title: "Burn Rate",
-            content: <BurnRateChart burnRate={report.burnRate} />,
+            content: <BurnRateChart burnRate={activeReport.burnRate} />,
           },
         ]
       : []),
     {
-      id: "subscriptions",
-      title: "Subs",
-      headerControl: <SubscriptionToneControl tone={subscriptionTone} onToneChange={setSubscriptionTone} />,
+      id: "calendar",
+      title: "Calendar",
+      headerControl: <CalendarFilterControl filter={calendarFilter} onFilterChange={setCalendarFilter} />,
       content: (
-        <SubscriptionAnalyticsPanel
+        <CalendarAnalyticsPanel
           year={report.year}
           month={report.month}
           monthLabel={report.monthLabel}
           elapsedDays={report.elapsedDays}
-          needs={report.subscriptionsNeeds}
-          wants={report.subscriptionsWants}
-          tone={subscriptionTone}
+          events={activeReport.calendarEvents}
+          projected={projectionActive}
+          filter={calendarFilter}
         />
       ),
     },
     {
       id: "bills",
       title: "Bills & Utilities",
-      content: <BillsUtilitiesPanel items={report.utilityHistory} />,
+      content: <BillsUtilitiesPanel items={activeReport.utilityHistory} />,
     },
   ]
   const defaultChartIndex = Math.max(0, chartPanels.findIndex((panel) => panel.id === defaultChartTab))
@@ -221,24 +393,44 @@ export function ExpenseReportApp({ report }: { report: ExpenseReportData }) {
   }
 
   const handleChartTouchStart = (event: TouchEvent<HTMLDivElement>) => {
-    setChartTouchStart(event.touches[0]?.clientX ?? null)
+    const touch = event.touches[0]
+    if (!touch) {
+      return
+    }
+    setChartTouch({ startX: touch.clientX, startY: touch.clientY, deltaX: 0, deltaY: 0, dragging: false })
+  }
+
+  const handleChartTouchMove = (event: TouchEvent<HTMLDivElement>) => {
+    const touch = event.touches[0]
+    if (!touch || chartTouch === null) {
+      return
+    }
+    const deltaX = touch.clientX - chartTouch.startX
+    const deltaY = touch.clientY - chartTouch.startY
+    const dragging = Math.abs(deltaX) > 10 && Math.abs(deltaX) > Math.abs(deltaY) * 1.2
+    setChartTouch({ ...chartTouch, deltaX, deltaY, dragging })
   }
 
   const handleChartTouchEnd = (event: TouchEvent<HTMLDivElement>) => {
-    if (chartTouchStart === null) {
+    if (chartTouch === null) {
       return
     }
     const endX = event.changedTouches[0]?.clientX
-    setChartTouchStart(null)
+    const endY = event.changedTouches[0]?.clientY
+    const touch = chartTouch
+    setChartTouch(null)
     if (endX === undefined) {
       return
     }
-    const delta = endX - chartTouchStart
-    if (Math.abs(delta) < 44) {
+    const deltaX = endX - touch.startX
+    const deltaY = endY === undefined ? touch.deltaY : endY - touch.startY
+    const threshold = Math.min(120, Math.max(68, window.innerWidth * 0.22))
+    if (Math.abs(deltaX) < threshold || Math.abs(deltaX) < Math.abs(deltaY) * 1.35) {
       return
     }
-    moveChart(delta < 0 ? 1 : -1)
+    moveChart(deltaX < 0 ? 1 : -1)
   }
+  const swipeOffset = chartTouch?.dragging ? clamp(chartTouch.deltaX, -110, 110) : 0
 
   return (
     <div className="bb-page">
@@ -257,17 +449,17 @@ export function ExpenseReportApp({ report }: { report: ExpenseReportData }) {
         <section className="bb-metrics-grid" aria-label="Budget metrics">
           <MetricCard
             label="Income"
-            value={forecastIncome}
-            description={includeSecondPaycheck ? "Forecast: 2 checks" : "Posted income"}
+            value={activeReport.metrics.monthlyIncome}
+            description={projectionActive ? "Projected month" : "Logged income"}
             control={
-              <IncomeForecastToggle
-                active={includeSecondPaycheck}
-                onToggle={() => setIncludeSecondPaycheck((current) => !current)}
+              <ProjectionToggle
+                active={projectionActive}
+                onToggle={() => setProjectionActive((current) => !current)}
               />
             }
           />
-          <MetricCard label="Spent" value={report.metrics.totalExpenses} />
-          <MetricCard label="Left" value={forecastIncomeAfterExpenses} description="After expenses" accent />
+          <MetricCard label="Spent" value={activeReport.metrics.totalExpenses} />
+          <MetricCard label="Left" value={activeReport.metrics.incomeAfterExpenses} description="After expenses" accent />
           <MetricCard
             label="Saved"
             value={report.metrics.amountSaved}
@@ -282,21 +474,23 @@ export function ExpenseReportApp({ report }: { report: ExpenseReportData }) {
               <CardTitle>{activeChart.title}</CardTitle>
               <div className="bb-analytics-header-controls">
                 {activeChart.headerControl}
-                <ChartCarouselControls
-                  panels={chartPanels}
-                  activeIndex={activeChartIndex}
+                <ChartCarouselButtons
                   onPrevious={() => moveChart(-1)}
                   onNext={() => moveChart(1)}
-                  onSelect={setActiveChartIndex}
                 />
               </div>
             </div>
           </CardHeader>
           <CardContent>
-            <div className="bb-chart-carousel" onTouchStart={handleChartTouchStart} onTouchEnd={handleChartTouchEnd}>
-              <div className="bb-chart-carousel-panel" key={activeChart.id}>
+            <div className="bb-chart-carousel" onTouchStart={handleChartTouchStart} onTouchMove={handleChartTouchMove} onTouchEnd={handleChartTouchEnd}>
+              <div
+                className={chartTouch?.dragging ? "bb-chart-carousel-panel bb-chart-carousel-panel-dragging" : "bb-chart-carousel-panel"}
+                key={activeChart.id}
+                style={{ transform: `translateX(${swipeOffset}px)` }}
+              >
                 {activeChart.content}
               </div>
+              <ChartCarouselIndicators panels={chartPanels} activeIndex={activeChartIndex} onSelect={setActiveChartIndex} />
             </div>
           </CardContent>
         </Card>
@@ -311,45 +505,25 @@ export function ExpenseReportApp({ report }: { report: ExpenseReportData }) {
           </CardContent>
         </Card>
 
-        <ExpenseInsightsCard topEntries={report.topEntries} merchantTotals={report.merchantTotals} />
-
-        <NeedExpensesCard items={report.needExpenses} />
+        <ExpenseInsightsCard topEntries={report.topEntries} merchantOccurrences={report.merchantOccurrences} />
 
       </main>
     </div>
   )
 }
 
-function ChartCarouselControls({
-  panels,
-  activeIndex,
+function ChartCarouselButtons({
   onPrevious,
   onNext,
-  onSelect,
 }: {
-  panels: ChartPanel[]
-  activeIndex: number
   onPrevious: () => void
   onNext: () => void
-  onSelect: (index: number) => void
 }) {
   return (
     <div className="bb-chart-carousel-controls" aria-label="Budget chart navigation">
       <button type="button" className="bb-chart-carousel-button" aria-label="Previous chart" onClick={onPrevious}>
         {"<"}
       </button>
-      <div className="bb-chart-carousel-dots">
-        {panels.map((panel, index) => (
-          <button
-            type="button"
-            key={panel.id}
-            className="bb-chart-carousel-dot"
-            data-state={index === activeIndex ? "active" : "inactive"}
-            aria-label={`Show ${panel.title}`}
-            onClick={() => onSelect(index)}
-          />
-        ))}
-      </div>
       <button type="button" className="bb-chart-carousel-button" aria-label="Next chart" onClick={onNext}>
         {">"}
       </button>
@@ -357,17 +531,42 @@ function ChartCarouselControls({
   )
 }
 
-function IncomeForecastToggle({ active, onToggle }: { active: boolean; onToggle: () => void }) {
+function ChartCarouselIndicators({
+  panels,
+  activeIndex,
+  onSelect,
+}: {
+  panels: ChartPanel[]
+  activeIndex: number
+  onSelect: (index: number) => void
+}) {
+  return (
+    <div className="bb-chart-carousel-indicators" aria-label="Budget chart position">
+      {panels.map((panel, index) => (
+        <button
+          type="button"
+          key={panel.id}
+          className="bb-chart-carousel-dot"
+          data-state={index === activeIndex ? "active" : "inactive"}
+          aria-label={`Show ${panel.title}`}
+          onClick={() => onSelect(index)}
+        />
+      ))}
+    </div>
+  )
+}
+
+function ProjectionToggle({ active, onToggle }: { active: boolean; onToggle: () => void }) {
   return (
     <button
       type="button"
       className="bb-metric-toggle"
       aria-pressed={active}
-      aria-label="Toggle second paycheck forecast"
-      title="Toggle second paycheck forecast"
+      aria-label="Toggle projected month view"
+      title="Toggle projected month view"
       onClick={onToggle}
     >
-      2x
+      Proj
     </button>
   )
 }
@@ -909,24 +1108,52 @@ function truncateChartLabel(value: unknown, maxLength: number) {
   return `${text.slice(0, Math.max(maxLength - 3, 0))}...`
 }
 
-function MerchantChart({ data }: { data: AmountRow[] }) {
+function MerchantChart({ data }: { data: OccurrenceRow[] }) {
   const rows = data.slice(0, 10)
   return (
-    <ChartContainer config={{ amount: { label: "Amount", color: "hsl(var(--chart-4))" } }} className="bb-insight-chart-box">
+    <ChartContainer config={{ count: { label: "Occurrences", color: "hsl(var(--chart-4))" } }} className="bb-insight-chart-box">
       <ResponsiveContainer width="100%" height={360}>
         <BarChart data={rows} layout="vertical" margin={{ top: 12, right: 22, left: 20, bottom: 12 }}>
           <CartesianGrid horizontal={false} strokeDasharray="3 3" />
-          <XAxis type="number" tickFormatter={(value) => `$${value}`} tickLine={false} axisLine={false} />
+          <XAxis type="number" tickFormatter={(value) => String(value)} tickLine={false} axisLine={false} allowDecimals={false} />
           <YAxis dataKey="label" type="category" width={148} tickLine={false} axisLine={false} />
-          <ChartTooltip content={<ChartTooltipContent />} />
-          <Bar dataKey="amount" name="Merchant total" fill="hsl(var(--chart-4))" radius={[0, 6, 6, 0]} />
+          <ChartTooltip content={<MerchantTooltipContent />} />
+          <Bar dataKey="count" name="Occurrences" fill="hsl(var(--chart-4))" radius={[0, 6, 6, 0]} />
         </BarChart>
       </ResponsiveContainer>
     </ChartContainer>
   )
 }
 
-function ExpenseInsightsCard({ topEntries, merchantTotals }: { topEntries: ExpenseEntry[]; merchantTotals: AmountRow[] }) {
+function MerchantTooltipContent({
+  active,
+  payload,
+}: {
+  active?: boolean
+  payload?: Array<{ payload?: OccurrenceRow }>
+}) {
+  const row = payload?.find((item) => item.payload)?.payload
+  if (!active || !row) {
+    return null
+  }
+  return (
+    <div className="bb-chart-tooltip">
+      <div className="bb-chart-tooltip-title">{row.label}</div>
+      <div className="bb-chart-tooltip-row">
+        <span className="bb-chart-tooltip-dot" style={{ background: "hsl(var(--chart-4))" }} />
+        <span>Occurrences</span>
+        <strong>{row.count}</strong>
+      </div>
+      <div className="bb-chart-tooltip-row">
+        <span />
+        <span>Total</span>
+        <strong>{formatMoney(row.amount)}</strong>
+      </div>
+    </div>
+  )
+}
+
+function ExpenseInsightsCard({ topEntries, merchantOccurrences }: { topEntries: ExpenseEntry[]; merchantOccurrences: OccurrenceRow[] }) {
   return (
     <Card>
       <Tabs defaultValue="largest" className="bb-card-tabs">
@@ -943,13 +1170,17 @@ function ExpenseInsightsCard({ topEntries, merchantTotals }: { topEntries: Expen
           <TabsContent value="largest">
             <div className="bb-insight-panel">
               <TopExpensesChart entries={topEntries} />
-              <TopExpensesTable entries={topEntries} />
+              <HiddenListPanel total={topEntries.length}>
+                <TopExpensesTable entries={topEntries} />
+              </HiddenListPanel>
             </div>
           </TabsContent>
           <TabsContent value="merchants">
             <div className="bb-insight-panel">
-              <MerchantChart data={merchantTotals} />
-              <AmountTable columns={["Merchant", "Amount"]} rows={merchantTotals} limit={5} />
+              <MerchantChart data={merchantOccurrences} />
+              <HiddenListPanel total={merchantOccurrences.length}>
+                <MerchantOccurrencesTable rows={merchantOccurrences} />
+              </HiddenListPanel>
             </div>
           </TabsContent>
         </CardContent>
@@ -993,6 +1224,16 @@ function ExpandRowsButton({
     <button type="button" className="bb-expand-toggle" aria-expanded={expanded} onClick={onToggle}>
       {expanded ? "Collapse" : `View all ${total}`}
     </button>
+  )
+}
+
+function HiddenListPanel({ children, total }: { children: ReactNode; total: number }) {
+  const [expanded, setExpanded] = useState(false)
+  return (
+    <div className="bb-hidden-list-panel">
+      {expanded ? children : null}
+      <ExpandRowsButton expanded={expanded} total={total} onToggle={() => setExpanded((current) => !current)} />
+    </div>
   )
 }
 
@@ -1043,20 +1284,11 @@ function expenseEntryItemLabel(entry: ExpenseEntry) {
 }
 
 function TopExpensesTable({ entries }: { entries: ExpenseEntry[] }) {
-  const [expanded, setExpanded] = useState(false)
   if (!entries.length) {
     return <div className="bb-empty">No shared expense entries found.</div>
   }
-  const visibleEntries = entries.slice(0, 5)
-  const rows = expanded ? entries : visibleEntries
-  const hasMore = entries.length > visibleEntries.length
 
-  return (
-    <>
-      <TopExpensesRowsTable entries={rows} />
-      {hasMore ? <ExpandRowsButton expanded={expanded} total={entries.length} onToggle={() => setExpanded((current) => !current)} /> : null}
-    </>
-  )
+  return <TopExpensesRowsTable entries={entries} />
 }
 
 function TopExpensesRowsTable({ entries, hideHeader = false }: { entries: ExpenseEntry[]; hideHeader?: boolean }) {
@@ -1078,6 +1310,35 @@ function TopExpensesRowsTable({ entries, hideHeader = false }: { entries: Expens
               <td>{expenseEntryItemLabel(entry)}</td>
               <td>{entry.category}</td>
               <td className="bb-amount">{formatMoney(entry.amount)}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  )
+}
+
+function MerchantOccurrencesTable({ rows }: { rows: OccurrenceRow[] }) {
+  if (!rows.length) {
+    return <div className="bb-empty">No merchant activity found.</div>
+  }
+
+  return (
+    <div className="bb-table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>Location</th>
+            <th>Count</th>
+            <th>Total</th>
+          </tr>
+        </thead>
+        <tbody>
+          {rows.map((row) => (
+            <tr key={row.label}>
+              <td>{row.label}</td>
+              <td>{row.count}</td>
+              <td className="bb-amount">{formatMoney(row.amount)}</td>
             </tr>
           ))}
         </tbody>
@@ -1151,25 +1412,245 @@ function compareDayGroups([left]: [string, ExpenseEntry[]], [right]: [string, Ex
   return left.localeCompare(right)
 }
 
-function NeedExpensesCard({ items }: { items: PaymentItem[] }) {
-  const total = items.reduce((sum, item) => sum + item.amount, 0)
+const CALENDAR_FILTERS: Array<{ value: CalendarFilter; label: string }> = [
+  { value: "all", label: "All" },
+  { value: "subscription", label: "Subs" },
+  { value: "bill", label: "Bills" },
+  { value: "income", label: "Income" },
+]
+
+const CALENDAR_EVENT_STYLES: Record<CalendarEventKind, { label: string; color: string; background: string }> = {
+  subscription: {
+    label: "Sub",
+    color: "#7c3aed",
+    background: "rgb(124 58 237 / 0.1)",
+  },
+  bill: {
+    label: "Bill",
+    color: "#0d9488",
+    background: "rgb(13 148 136 / 0.1)",
+  },
+  income: {
+    label: "Income",
+    color: "#16a34a",
+    background: "rgb(22 163 74 / 0.1)",
+  },
+}
+
+function CalendarFilterControl({
+  filter,
+  onFilterChange,
+}: {
+  filter: CalendarFilter
+  onFilterChange: (filter: CalendarFilter) => void
+}) {
+  return (
+    <div className="bb-tabs-list bb-subscription-tone-control" role="tablist" aria-label="Calendar view">
+      {CALENDAR_FILTERS.map((item) => (
+        <button
+          type="button"
+          key={item.value}
+          className="bb-tabs-trigger"
+          data-state={filter === item.value ? "active" : "inactive"}
+          role="tab"
+          aria-selected={filter === item.value}
+          onClick={() => onFilterChange(item.value)}
+        >
+          {item.label}
+        </button>
+      ))}
+    </div>
+  )
+}
+
+function CalendarAnalyticsPanel({
+  year,
+  month,
+  monthLabel,
+  elapsedDays,
+  events,
+  projected,
+  filter,
+}: {
+  year: number
+  month: number
+  monthLabel: string
+  elapsedDays: number
+  events: CalendarEvent[]
+  projected: boolean
+  filter: CalendarFilter
+}) {
+  const visibleEvents = filter === "all" ? events : events.filter((item) => item.kind === filter)
+  const outflowTotal = visibleEvents
+    .filter((item) => item.kind !== "income")
+    .reduce((sum, item) => sum + item.amount, 0)
+  const incomeTotal = visibleEvents
+    .filter((item) => item.kind === "income")
+    .reduce((sum, item) => sum + item.amount, 0)
 
   return (
-    <Card>
-      <CardHeader>
-        <div className="bb-card-title-row">
-          <CardTitle>Need Expenses</CardTitle>
-          <Badge variant="secondary">{formatMoney(total)}</Badge>
+    <div className="bb-subscription-analytics">
+      <div className="bb-subscription-tab-content" data-state="active" key={`${filter}-${projected ? "projected" : "current"}`}>
+        <div className="bb-subscription-panel">
+          <div className="bb-panel-head bb-subscription-summary">
+            <div>
+              <div className="bb-chart-kicker">{monthOnlyLabel(monthLabel)}</div>
+              <div className="bb-subscription-total">{formatMoney(outflowTotal)}</div>
+              <div className="bb-subscription-projected">
+                {projected ? "Projected" : "Current"} view • {formatMoney(incomeTotal)} income
+              </div>
+            </div>
+            <Badge variant="secondary">{visibleEvents.length} total</Badge>
+          </div>
+          <FinancialCalendar year={year} month={month} elapsedDays={elapsedDays} events={visibleEvents} />
         </div>
-      </CardHeader>
-      <CardContent>
-        {!items.length ? (
-          <div className="bb-empty">No need expenses found.</div>
-        ) : (
-          <AmountTable columns={["Item", "Amount"]} rows={items} limit={5} />
-        )}
-      </CardContent>
-    </Card>
+      </div>
+    </div>
+  )
+}
+
+function FinancialCalendar({
+  year,
+  month,
+  elapsedDays,
+  events,
+}: {
+  year: number
+  month: number
+  elapsedDays: number
+  events: CalendarEvent[]
+}) {
+  const daysInMonth = new Date(year, month, 0).getDate()
+  const leadingBlankDays = new Date(year, month - 1, 1).getDay()
+  const cellCount = Math.ceil((leadingBlankDays + daysInMonth) / 7) * 7
+  const days = Array.from({ length: cellCount }, (_, index) => {
+    const day = index - leadingBlankDays + 1
+    return day >= 1 && day <= daysInMonth ? day : null
+  })
+  const eventsByDay = calendarEventsByDay(events)
+
+  return (
+    <div className="bb-subscription-calendar" aria-label="Cashflow calendar">
+      <div className="bb-calendar-head" aria-hidden="true">
+        {WEEKDAY_LABELS.map((label) => (
+          <span key={label}>{label}</span>
+        ))}
+      </div>
+      <div className="bb-calendar-grid">
+        {days.map((day, index) => {
+          const dayEvents = day === null ? [] : eventsByDay.get(day) ?? []
+          const visibleEvents = dayEvents.slice(0, 3)
+          const hiddenCount = Math.max(dayEvents.length - visibleEvents.length, 0)
+          const isToday = day !== null && isCurrentCalendarDay(year, month, day)
+          const hasHit = day !== null && day <= elapsedDays
+          return (
+            <div
+              key={`${day ?? "blank"}-${index}`}
+              className={[
+                "bb-calendar-day",
+                day === null ? "bb-calendar-day-muted" : "",
+                dayEvents.length ? "bb-calendar-day-has-items" : "",
+                isToday ? "bb-calendar-day-today" : "",
+              ].filter(Boolean).join(" ")}
+              aria-hidden={day === null}
+            >
+              {day === null ? null : (
+                <>
+                  <div className="bb-calendar-day-number">{day}</div>
+                  <div className="bb-calendar-marker-stack">
+                    {visibleEvents.map((item, itemIndex) => {
+                      const style = calendarEventStyle(item)
+                      return (
+                        <button
+                          type="button"
+                          key={`${item.kind}-${item.label}-${item.amount}-${itemIndex}`}
+                          className={[
+                            "bb-subscription-marker",
+                            hasHit && !item.projectedOnly ? "" : "bb-subscription-marker-pending",
+                          ].filter(Boolean).join(" ")}
+                          style={{
+                            color: style.color,
+                            backgroundColor: style.background,
+                            borderColor: style.color,
+                          }}
+                          aria-label={calendarEventLabel(item)}
+                        >
+                          <span className="bb-subscription-marker-dot" />
+                          <span className="bb-subscription-marker-name">{item.label}</span>
+                          <span className="bb-subscription-marker-amount">{formatMoney(item.amount)}</span>
+                          <CalendarEventTooltip event={item} />
+                        </button>
+                      )
+                    })}
+                    {hiddenCount ? (
+                      <button
+                        type="button"
+                        className={[
+                          "bb-subscription-marker",
+                          "bb-subscription-marker-more",
+                          hasHit ? "" : "bb-subscription-marker-pending",
+                        ].filter(Boolean).join(" ")}
+                        aria-label={`${hiddenCount} more event${hiddenCount === 1 ? "" : "s"} on day ${day}`}
+                      >
+                        +{hiddenCount} more
+                        <CalendarOverflowTooltip events={dayEvents.slice(visibleEvents.length)} day={day} />
+                      </button>
+                    ) : null}
+                  </div>
+                </>
+              )}
+            </div>
+          )
+        })}
+      </div>
+    </div>
+  )
+}
+
+function calendarEventsByDay(events: CalendarEvent[]) {
+  const grouped = new Map<number, CalendarEvent[]>()
+  for (const event of events) {
+    grouped.set(event.day, [...(grouped.get(event.day) ?? []), event])
+  }
+  return grouped
+}
+
+function calendarEventStyle(event: CalendarEvent) {
+  if (event.group === "static_bills_subscriptions_needs") {
+    return { ...CALENDAR_EVENT_STYLES.subscription, color: "#2563eb", background: "rgb(37 99 235 / 0.1)" }
+  }
+  if (event.group === "rent") {
+    return { ...CALENDAR_EVENT_STYLES.bill, color: "#dc2626", background: "rgb(220 38 38 / 0.1)" }
+  }
+  return CALENDAR_EVENT_STYLES[event.kind]
+}
+
+function calendarEventLabel(event: CalendarEvent) {
+  const style = CALENDAR_EVENT_STYLES[event.kind]
+  return `${event.label} - ${style.label} - ${formatMoney(event.amount)}`
+}
+
+function CalendarEventTooltip({ event }: { event: CalendarEvent }) {
+  const style = CALENDAR_EVENT_STYLES[event.kind]
+  return (
+    <span className="bb-subscription-tooltip" role="tooltip">
+      <strong>{event.label}</strong>
+      <span>{style.label}</span>
+      <span className="bb-subscription-tooltip-amount">{formatMoney(event.amount)}</span>
+    </span>
+  )
+}
+
+function CalendarOverflowTooltip({ events, day }: { events: CalendarEvent[]; day: number }) {
+  return (
+    <span className="bb-subscription-tooltip bb-subscription-tooltip-wide" role="tooltip">
+      <strong>More on day {day}</strong>
+      {events.map((event, index) => (
+        <span key={`${event.kind}-${event.label}-${event.amount}-${index}`}>
+          {event.label} - {formatMoney(event.amount)}
+        </span>
+      ))}
+    </span>
   )
 }
 

@@ -90,6 +90,16 @@ class SubscriptionItem:
 
 
 @dataclass(frozen=True)
+class CalendarEvent:
+    kind: str
+    label: str
+    amount: float
+    day: int
+    group: str
+    projected_only: bool = False
+
+
+@dataclass(frozen=True)
 class RawSheet:
     title: str
     rows: list[list[str]]
@@ -116,6 +126,7 @@ class ExpenseBreakdownReport:
     payments: list[PaymentItem] = field(default_factory=list)
     utility_history: list[UtilityHistoryItem] = field(default_factory=list)
     subscriptions: list[SubscriptionItem] = field(default_factory=list)
+    calendar_events: list[CalendarEvent] = field(default_factory=list)
     income_entries: list[PaymentItem] = field(default_factory=list)
     raw_sheets: list[RawSheet] = field(default_factory=list)
 
@@ -339,6 +350,15 @@ def build_expense_breakdown_report(
         bill_schedule_rows,
         month,
     )
+    calendar_events = _calendar_events(
+        month=month,
+        subscriptions=current_month_subscriptions,
+        payments=payments,
+        income_entries=income_entries,
+        income_total=income_total,
+        utility_history=utility_history,
+        bill_schedule_rows=bill_schedule_rows,
+    )
     budget_shared_totals = _budget_shared_category_totals(personal_rows)
     itemized_shared_totals = _entry_totals_by_category(entries)
 
@@ -387,6 +407,7 @@ def build_expense_breakdown_report(
         payments=payments,
         utility_history=utility_history,
         subscriptions=subscriptions,
+        calendar_events=calendar_events,
         income_entries=income_entries,
         raw_sheets=[
             RawSheet("Shared Expenses", _compact_rows(shared_rows)),
@@ -425,6 +446,7 @@ def render_expense_breakdown_html(report: ExpenseBreakdownReport) -> str:
     top_entries = sorted(activity_entries, key=lambda entry: entry.amount, reverse=True)[:10]
     person_totals = _person_totals(activity_entries)
     merchant_totals = _merchant_totals(activity_entries)
+    merchant_occurrences = _merchant_occurrences(activity_entries)
     daily_totals = _daily_totals(activity_entries)
     budget_group_totals = _budget_group_totals(report.breakdown)
     balance_after_expenses = report.income_total - report.grand_total if report.income_total else None
@@ -436,6 +458,7 @@ def render_expense_breakdown_html(report: ExpenseBreakdownReport) -> str:
         budget_group_totals=budget_group_totals,
         person_totals=person_totals,
         merchant_totals=merchant_totals,
+        merchant_occurrences=merchant_occurrences,
         top_entries=top_entries,
         balance_after_expenses=balance_after_expenses,
     )
@@ -670,6 +693,125 @@ def _is_completed_month(month: BudgetMonth) -> bool:
     days_in_month = calendar.monthrange(month.year, month.month)[1]
     last_day = datetime(month.year, month.month, days_in_month, tzinfo=PACIFIC_TZ).date()
     return now_pacific().date() > last_day
+
+
+def _calendar_events(
+    *,
+    month: BudgetMonth,
+    subscriptions: list[SubscriptionItem],
+    payments: list[PaymentItem],
+    income_entries: list[PaymentItem],
+    income_total: float,
+    utility_history: list[UtilityHistoryItem],
+    bill_schedule_rows: list[list[str]],
+) -> list[CalendarEvent]:
+    elapsed_days = _elapsed_days_for_month(month)
+    events: list[CalendarEvent] = []
+    events.extend(_subscription_calendar_events(subscriptions, month, elapsed_days))
+    events.extend(_bill_calendar_events(payments, utility_history, bill_schedule_rows, month, elapsed_days))
+    events.extend(_income_calendar_events(income_entries, income_total, month))
+    return sorted(events, key=lambda item: (item.day, item.kind, item.label.lower()))
+
+
+def _subscription_calendar_events(
+    subscriptions: list[SubscriptionItem],
+    month: BudgetMonth,
+    elapsed_days: int,
+) -> list[CalendarEvent]:
+    events: list[CalendarEvent] = []
+    for item in subscriptions:
+        day = _subscription_day_in_month(item, month)
+        if day is None:
+            continue
+        events.append(
+            CalendarEvent(
+                kind="subscription",
+                label=item.name,
+                amount=item.amount,
+                day=day,
+                group=_subscription_bucket(item),
+                projected_only=day > elapsed_days,
+            )
+        )
+    return events
+
+
+def _bill_calendar_events(
+    payments: list[PaymentItem],
+    utility_history: list[UtilityHistoryItem],
+    bill_schedule_rows: list[list[str]],
+    month: BudgetMonth,
+    elapsed_days: int,
+) -> list[CalendarEvent]:
+    if not bill_schedule_rows:
+        return []
+    try:
+        from bookiebot.sheets.bills import list_bill_schedules
+    except Exception:
+        return []
+
+    payment_amounts = {_normalize_label(item.label): item.amount for item in payments}
+    utility_projection = {_normalize_label(item.label): max(item.current_amount, item.average_amount) for item in utility_history}
+    events: list[CalendarEvent] = []
+    for bill in list_bill_schedules(bill_schedule_rows):
+        day = _bill_day_in_month(bill, month)
+        if day is None:
+            continue
+        labels = [bill.source_label, bill.display_name, bill.bill_key]
+        amount = next((payment_amounts[_normalize_label(label)] for label in labels if _normalize_label(label) in payment_amounts), 0.0)
+        if amount <= 0:
+            amount = next((utility_projection[_normalize_label(label)] for label in labels if _normalize_label(label) in utility_projection), 0.0)
+        if amount <= 0:
+            continue
+        normalized_label = _normalize_label(bill.source_label or bill.display_name)
+        group = _payment_group_for_label(normalized_label) or "bills_utilities"
+        events.append(
+            CalendarEvent(
+                kind="bill",
+                label=bill.display_name or bill.source_label or bill.bill_key,
+                amount=round(amount, 2),
+                day=day,
+                group=group,
+                projected_only=day > elapsed_days,
+            )
+        )
+    return events
+
+
+def _bill_day_in_month(bill: Any, month: BudgetMonth) -> int | None:
+    if bill.recurrence == "quarterly" and month.month not in bill.pull_months:
+        return None
+    days_in_month = calendar.monthrange(month.year, month.month)[1]
+    return min(int(bill.pull_day), days_in_month)
+
+
+def _income_calendar_events(
+    income_entries: list[PaymentItem],
+    income_total: float,
+    month: BudgetMonth,
+) -> list[CalendarEvent]:
+    if income_total <= 0:
+        return []
+    days_in_month = calendar.monthrange(month.year, month.month)[1]
+    current_entries = income_entries or [PaymentItem("Income", income_total, "income")]
+    events: list[CalendarEvent] = []
+    for index, item in enumerate(current_entries[:2]):
+        day = 1 if index == 0 else min(15, days_in_month)
+        events.append(CalendarEvent("income", item.label, item.amount, day, "income", projected_only=False))
+
+    projected_total = _projected_income_total(income_entries, income_total, month)
+    projected_gap = round(projected_total - sum(item.amount for item in current_entries), 2)
+    if projected_gap > 0 and not _is_completed_month(month):
+        events.append(CalendarEvent("income", "Projected paycheck", projected_gap, min(15, days_in_month), "income", projected_only=True))
+    return events
+
+
+def _projected_income_total(income_entries: list[PaymentItem], income_total: float, month: BudgetMonth) -> float:
+    if _is_completed_month(month) or income_total <= 0:
+        return round(income_total, 2)
+    if len(income_entries) == 1:
+        return round(max(income_total, income_entries[0].amount * 2), 2)
+    return round(income_total, 2)
 
 
 def _payment_totals_by_group(payments: list[PaymentItem]) -> dict[str, float]:
@@ -1138,6 +1280,22 @@ def _merchant_totals(entries: list[ExpenseEntry]) -> list[tuple[str, float]]:
     ]
 
 
+def _merchant_occurrences(entries: list[ExpenseEntry]) -> list[dict[str, Any]]:
+    totals: dict[str, dict[str, float]] = defaultdict(lambda: {"count": 0.0, "amount": 0.0})
+    for entry in entries:
+        merchant = entry.location or entry.item or entry.category
+        totals[merchant]["count"] += 1
+        totals[merchant]["amount"] += entry.amount
+    return [
+        {"label": name, "count": int(values["count"]), "amount": round(values["amount"], 2)}
+        for name, values in sorted(
+            totals.items(),
+            key=lambda item: (item[1]["count"], item[1]["amount"]),
+            reverse=True,
+        )[:10]
+    ]
+
+
 def _report_activity_entries(report: ExpenseBreakdownReport) -> list[ExpenseEntry]:
     entries = [*report.entries, *_need_expense_entries(report)]
     return sorted(entries, key=lambda entry: (_entry_sort_date(entry.date), entry.amount), reverse=True)
@@ -1196,6 +1354,7 @@ def _report_client_payload(
     budget_group_totals: dict[str, float],
     person_totals: list[tuple[str, float]],
     merchant_totals: list[tuple[str, float]],
+    merchant_occurrences: list[dict[str, Any]],
     top_entries: list[ExpenseEntry],
     balance_after_expenses: float | None,
 ) -> dict[str, Any]:
@@ -1223,6 +1382,10 @@ def _report_client_payload(
             "savingsGoal": report.savings_goal,
             "incomeAfterExpenses": balance_after_expenses,
         },
+        "incomeProjection": {
+            "currentAmount": round(report.income_total, 2),
+            "projectedAmount": _projected_income_total(report.income_entries, report.income_total, report.month),
+        },
         "burnRate": _burn_rate_payload(report),
         "breakdown": [
             {
@@ -1238,9 +1401,11 @@ def _report_client_payload(
         "budgetGroups": [_amount_row(label, amount) for label, amount in budget_group_totals.items()],
         "personTotals": [_amount_row(label, amount) for label, amount in person_totals],
         "merchantTotals": [_amount_row(label, amount) for label, amount in merchant_totals],
+        "merchantOccurrences": merchant_occurrences,
         "topEntries": [_expense_entry_payload(entry) for entry in top_entries],
         "dailyEntries": [_expense_entry_payload(entry) for entry in activity_entries],
         "needExpenses": [_payment_payload(item) for item in report.need_expenses],
+        "calendarEvents": [_calendar_event_payload(item) for item in report.calendar_events],
         "utilityHistory": [_utility_history_payload(item) for item in report.utility_history],
         "subscriptionsNeeds": [
             _subscription_payload(item)
@@ -1274,6 +1439,17 @@ def _payment_payload(item: PaymentItem) -> dict[str, Any]:
         "amount": round(item.amount, 2),
         "group": CATEGORY_LABELS.get(item.group, item.group.title()),
         "status": item.status,
+    }
+
+
+def _calendar_event_payload(item: CalendarEvent) -> dict[str, Any]:
+    return {
+        "kind": item.kind,
+        "label": item.label,
+        "amount": round(item.amount, 2),
+        "day": item.day,
+        "group": item.group,
+        "projectedOnly": item.projected_only,
     }
 
 

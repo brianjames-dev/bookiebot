@@ -15,6 +15,7 @@ from bookiebot.reports.expense_breakdown import (
 )
 from bookiebot.reports.web import _static_report_path_for_payload, _static_report_path_for_request, _verify_expense_report_token
 from bookiebot.sheets import routing
+from bookiebot.sheets.bills import BILL_SCHEDULE_HEADERS
 from unit_tests.support.sheets_repo_stub import InMemoryWorksheet
 
 
@@ -498,6 +499,118 @@ def test_current_month_subscription_breakdown_uses_hit_so_far_totals(monkeypatch
 
     assert report.breakdown["static_bills_subscriptions_needs"]["amount"] == 115.0
     assert report.breakdown["subscriptions_wants"]["amount"] == 10.0
+
+
+def test_report_payload_tracks_merchant_occurrences_by_location_count():
+    shared_rows = [
+        ["hdr"] * 28,
+        ["hdr"] * 28,
+        _row({"A": "05/01/2026", "B": "5", "C": "Starbucks", "D": "Hannah"}),
+        _row({"A": "05/02/2026", "B": "6", "C": "Starbucks", "D": "Hannah"}),
+        _row({"A": "05/03/2026", "B": "100", "C": "Costco", "D": "Hannah"}),
+    ]
+    report = build_expense_breakdown_report(
+        actor_key="hannah",
+        owner_name="Hannah",
+        persons=["Hannah"],
+        month=BudgetMonth(2026, 5),
+        worksheets=ReportWorksheets(
+            shared_expenses=InMemoryWorksheet(shared_rows),
+            personal_budget=InMemoryWorksheet([]),
+            subscriptions=InMemoryWorksheet([]),
+        ),
+    )
+
+    html = render_expense_breakdown_html(report)
+    payload_match = re.search(
+        r'<script id="bookiebot-expense-report-data" type="application/json">(.*?)</script>',
+        html,
+    )
+    assert payload_match is not None
+    payload = json.loads(payload_match.group(1))
+
+    assert payload["merchantTotals"][0] == {"label": "Costco", "amount": 100.0}
+    assert payload["merchantOccurrences"][0] == {"label": "Starbucks", "count": 2, "amount": 11.0}
+    assert payload["merchantOccurrences"][1] == {"label": "Costco", "count": 1, "amount": 100.0}
+    assert "Occurrences" in html
+    assert "bb-hidden-list-panel" in html
+    assert "bb-chart-carousel-indicators" in html
+    assert "bb-chart-carousel-panel-dragging" in html
+    assert "No need expenses found" not in html
+
+
+def test_current_month_calendar_events_include_projected_income_subscriptions_and_bills(monkeypatch):
+    monkeypatch.setattr(
+        expense_breakdown,
+        "now_pacific",
+        lambda: datetime(2026, 7, 5, 12, 0, tzinfo=routing.PACIFIC_TZ),
+    )
+    subscriptions_rows = [
+        [],
+        ["", "SUBSCRIPTIONS"],
+        [],
+        ["Needs", "", "(Monthly)", "", "Wants", "", "(Monthly)", "", "Needs", "", "(Yearly)", "", "Wants", "", "(Yearly)"],
+        ["", "", "", "", "", "", "", "", "", "", "", "", "", "", ""],
+        ["Recurring:", "Name:", "Amount:", "", "Recurring:", "Name:", "Amount:", "", "Date:", "Name:", "Amount:", "", "Date:", "Name:", "Amount:"],
+        ["1st", "Netflix", "$15.00", "", "4th", "Spotify", "$10.00", "", "", "", "", "", "", "", ""],
+        ["10th", "Need Later", "$35.00", "", "20th", "Want Later", "$20.00", "", "", "", "", "", "", "", ""],
+    ]
+    personal_rows = [
+        ["Paycheck", "$2,000.00"],
+        ["Rent", "$1,750.00"],
+        ["PG&E", "$140.00"],
+        ["Static Bills & Subscriptions (Needs)", "$300.00"],
+        ["Subscriptions (Wants)", "$200.00"],
+    ]
+    bill_schedule_rows = [
+        BILL_SCHEDULE_HEADERS,
+        ["rent", "Rent", "monthly", "1", "", "Rent", "", "", ""],
+        ["pge", "PG&E", "monthly", "20", "", "PG&E", "", "", ""],
+    ]
+
+    report = build_expense_breakdown_report(
+        actor_key="hannah",
+        owner_name="Hannah",
+        persons=["Hannah"],
+        month=BudgetMonth(2026, 7),
+        worksheets=ReportWorksheets(
+            shared_expenses=InMemoryWorksheet([["hdr"] * 28, ["hdr"] * 28]),
+            personal_budget=InMemoryWorksheet(personal_rows),
+            subscriptions=InMemoryWorksheet(subscriptions_rows),
+            bill_schedule=InMemoryWorksheet(bill_schedule_rows),
+        ),
+    )
+
+    html = render_expense_breakdown_html(report)
+    payload_match = re.search(
+        r'<script id="bookiebot-expense-report-data" type="application/json">(.*?)</script>',
+        html,
+    )
+    assert payload_match is not None
+    payload = json.loads(payload_match.group(1))
+    events = {(item["kind"], item["label"]): item for item in payload["calendarEvents"]}
+
+    assert payload["incomeProjection"] == {"currentAmount": 2000.0, "projectedAmount": 4000.0}
+    assert payload["breakdown"][2]["label"] == "Subs (Needs)"
+    assert payload["breakdown"][2]["amount"] == 15.0
+    assert events[("income", "Paycheck")] == {
+        "kind": "income",
+        "label": "Paycheck",
+        "amount": 2000.0,
+        "day": 1,
+        "group": "income",
+        "projectedOnly": False,
+    }
+    assert events[("income", "Projected paycheck")]["amount"] == 2000.0
+    assert events[("income", "Projected paycheck")]["projectedOnly"] is True
+    assert events[("subscription", "Need Later")]["day"] == 10
+    assert events[("subscription", "Need Later")]["projectedOnly"] is True
+    assert events[("bill", "Rent")]["group"] == "rent"
+    assert events[("bill", "Rent")]["projectedOnly"] is False
+    assert events[("bill", "PG&E")]["group"] == "bills_utilities"
+    assert events[("bill", "PG&E")]["day"] == 20
+    assert events[("bill", "PG&E")]["projectedOnly"] is True
+    assert "Calendar" in html
 
 
 def test_build_expense_breakdown_report_reports_zero_savings_deposits():
