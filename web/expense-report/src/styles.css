@@ -409,6 +409,17 @@ summary {
 .bb-subscription-panel {
   display: grid;
   gap: 18px;
+  min-height: 0;
+}
+
+.bb-subscription-analytics,
+.bb-subscription-tab-content,
+.bb-subscription-panel {
+  height: 100%;
+}
+
+.bb-subscription-panel {
+  grid-template-rows: auto minmax(260px, 1fr) auto;
 }
 
 .bb-subscription-summary {
@@ -449,7 +460,9 @@ summary {
 
 .bb-subscription-calendar {
   display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
   gap: 8px;
+  height: 100%;
   min-width: 0;
 }
 
@@ -524,6 +537,11 @@ summary {
   gap: 6px;
 }
 
+.bb-calendar-grid {
+  grid-auto-rows: minmax(92px, 1fr);
+  min-height: 0;
+}
+
 .bb-calendar-head span {
   color: hsl(var(--muted-foreground));
   font-size: 12px;
@@ -536,7 +554,7 @@ summary {
   align-content: start;
   gap: 6px;
   min-width: 0;
-  min-height: 92px;
+  min-height: 0;
   padding: 7px;
   border: 1px solid hsl(var(--border));
   border-radius: var(--radius);
@@ -766,7 +784,7 @@ summary {
 
 .bb-chart-carousel-track {
   display: flex;
-  align-items: flex-start;
+  align-items: stretch;
   gap: var(--bb-chart-carousel-gap);
   min-width: 0;
   width: 100%;
@@ -779,11 +797,13 @@ summary {
 }
 
 .bb-chart-carousel-slide {
+  display: flex;
   flex: 0 0 100%;
   min-width: 0;
 }
 
 .bb-chart-carousel-slide > .bb-card {
+  flex: 1 1 auto;
   height: auto;
 }
 
@@ -910,8 +930,9 @@ summary {
 
 .bb-chart-stack {
   display: grid;
-  grid-template-rows: auto minmax(260px, auto) auto;
+  grid-template-rows: auto minmax(260px, 1fr) auto;
   gap: 16px;
+  height: 100%;
   align-content: stretch;
   min-width: 0;
   min-height: 0;
@@ -947,8 +968,9 @@ summary {
 
 .bb-category-chart-layout {
   grid-template-columns: 1fr;
-  grid-template-rows: minmax(420px, 1fr) auto;
+  grid-template-rows: minmax(0, 1fr);
   align-items: stretch;
+  min-height: 0;
   overflow: visible;
 }
 
@@ -960,8 +982,8 @@ summary {
 }
 
 .bb-category-chart-box {
-  height: clamp(500px, 58vh, 680px);
-  min-height: 500px;
+  height: 100%;
+  min-height: 360px;
   overflow: visible;
 }
 
@@ -971,7 +993,7 @@ summary {
 }
 
 .bb-analytics-card .bb-category-chart-box {
-  min-height: 500px;
+  min-height: 360px;
 }
 
 .bb-category-chart-box .recharts-responsive-container,
@@ -986,7 +1008,10 @@ summary {
 
 .bb-bills-analytics {
   display: grid;
+  grid-template-rows: auto minmax(260px, 1fr) auto;
   gap: 16px;
+  height: 100%;
+  min-height: 0;
 }
 
 .bb-bills-analytics-head {
@@ -1000,7 +1025,7 @@ summary {
 .bb-bills-chart-box {
   width: 100%;
   min-width: 0;
-  height: clamp(300px, 40vh, 480px);
+  height: 100%;
   min-height: 300px;
 }
 
@@ -1406,13 +1431,13 @@ tr:last-child td {
   }
 
   .bb-category-chart-layout {
-    grid-template-rows: auto auto;
+    grid-template-rows: minmax(0, 1fr);
   }
 
   .bb-category-chart-box,
   .bb-analytics-card .bb-category-chart-box {
-    height: clamp(340px, 54vh, 460px);
-    min-height: 340px;
+    height: 100%;
+    min-height: 280px;
   }
 }
 
@@ -1495,11 +1520,15 @@ tr:last-child td {
     min-height: 260px;
   }
 
-  .bb-bills-chart-box,
+  .bb-bills-chart-box {
+    height: 300px;
+    min-height: 260px;
+  }
+
   .bb-analytics-card .bb-chart-box,
   .bb-analytics-card .bb-category-chart-box,
   .bb-analytics-card .bb-bills-chart-box {
-    height: 300px;
+    height: 100%;
     min-height: 260px;
   }
 
@@ -1523,8 +1552,11 @@ tr:last-child td {
   }
 
   .bb-calendar-day {
-    min-height: 72px;
     padding: 6px;
+  }
+
+  .bb-calendar-grid {
+    grid-auto-rows: minmax(72px, 1fr);
   }
 
   .bb-subscription-marker {
@@ -1547,8 +1579,11 @@ tr:last-child td {
   }
 
   .bb-calendar-day {
-    min-height: 54px;
     padding: 5px;
+  }
+
+  .bb-calendar-grid {
+    grid-auto-rows: minmax(54px, 1fr);
   }
 
   .bb-calendar-day-number {

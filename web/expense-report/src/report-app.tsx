@@ -973,20 +973,20 @@ function CategoryMixChart({ data, total, projected, collapseKey }: { data: Break
             </PieChart>
           </ResponsiveContainer>
         </ChartContainer>
-        <DetailsPanel summary="Categories" collapseKey={collapseKey}>
-          <div className="bb-legend-list">
-            {data.map((item) => (
-              <div className="bb-legend-row" key={item.key}>
-                <span className="bb-swatch" style={{ backgroundColor: item.color }} />
-                <span>{item.label}</span>
-                <strong>
-                  {formatMoney(item.amount)} <span>{formatPct(item.percentage)}</span>
-                </strong>
-              </div>
-            ))}
-          </div>
-        </DetailsPanel>
       </div>
+      <DetailsPanel summary="Categories" collapseKey={collapseKey}>
+        <div className="bb-legend-list">
+          {data.map((item) => (
+            <div className="bb-legend-row" key={item.key}>
+              <span className="bb-swatch" style={{ backgroundColor: item.color }} />
+              <span>{item.label}</span>
+              <strong>
+                {formatMoney(item.amount)} <span>{formatPct(item.percentage)}</span>
+              </strong>
+            </div>
+          ))}
+        </div>
+      </DetailsPanel>
     </div>
   )
 }
