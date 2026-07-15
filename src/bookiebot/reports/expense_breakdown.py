@@ -67,6 +67,7 @@ class PaymentItem:
     amount: float
     group: str
     status: str = "entered"
+    date: str = ""
 
 
 @dataclass(frozen=True)
@@ -805,11 +806,17 @@ def _income_calendar_events(
     if not paycheck_entries and len(current_entries) == 1:
         paycheck_entries = current_entries
         other_entries = []
-    pay_days = _biweekly_pay_days(month)
+    pay_days = _biweekly_pay_days(month, _paycheck_anchor_date(paycheck_entries, month))
     events: list[CalendarEvent] = []
+    logged_paycheck_days: set[int] = set()
 
     for index, item in enumerate(paycheck_entries):
-        day = pay_days[index] if index < len(pay_days) else min(1 + index * 14, days_in_month)
+        parsed_date = _parse_date(item.date)
+        if parsed_date is not None and parsed_date.year == month.year and parsed_date.month == month.month:
+            day = parsed_date.day
+        else:
+            day = pay_days[index] if index < len(pay_days) else min(1 + index * 14, days_in_month)
+        logged_paycheck_days.add(day)
         events.append(CalendarEvent("income", item.label, item.amount, day, "income", projected_only=False))
 
     for item in other_entries:
@@ -824,7 +831,7 @@ def _income_calendar_events(
     paycheck_amount = _projected_paycheck_amount(current_entries)
     projected_gap = round(projected_total - income_total, 2)
     if projected_gap > 0 and paycheck_amount > 0 and not _is_completed_month(month):
-        for day in pay_days[len(paycheck_entries) :]:
+        for day in (day for day in pay_days if day not in logged_paycheck_days):
             if projected_gap <= 0:
                 break
             amount = min(paycheck_amount, projected_gap)
@@ -845,7 +852,7 @@ def _projected_income_total(income_entries: list[PaymentItem], income_total: flo
         paycheck_entries = current_entries
     logged_paycheck_total = round(sum(item.amount for item in paycheck_entries), 2)
     other_income_total = max(0.0, round(income_total - logged_paycheck_total, 2))
-    projected_total = round(other_income_total + paycheck_amount * len(_biweekly_pay_days(month)), 2)
+    projected_total = round(other_income_total + paycheck_amount * len(_biweekly_pay_days(month, _paycheck_anchor_date(paycheck_entries, month))), 2)
     return round(max(income_total, projected_total), 2)
 
 
@@ -866,12 +873,25 @@ def _projected_paycheck_amount(income_entries: list[PaymentItem]) -> float:
     return round(sum(item.amount for item in paycheck_entries) / len(paycheck_entries), 2)
 
 
-def _biweekly_pay_days(month: BudgetMonth) -> list[int]:
+def _paycheck_anchor_date(income_entries: list[PaymentItem], month: BudgetMonth) -> datetime | None:
+    parsed_dates = [
+        parsed
+        for item in income_entries
+        if (parsed := _parse_date(item.date)) is not None
+    ]
+    if not parsed_dates:
+        return None
+    in_month = [item for item in parsed_dates if item.year == month.year and item.month == month.month]
+    return max(in_month or parsed_dates)
+
+
+def _biweekly_pay_days(month: BudgetMonth, anchor_date: datetime | None = None) -> list[int]:
     days_in_month = calendar.monthrange(month.year, month.month)[1]
+    anchor = anchor_date.date() if anchor_date is not None else BIWEEKLY_PAYDAY_ANCHOR
     return [
         day
         for day in range(1, days_in_month + 1)
-        if (datetime(month.year, month.month, day, tzinfo=PACIFIC_TZ).date() - BIWEEKLY_PAYDAY_ANCHOR).days % 14 == 0
+        if (datetime(month.year, month.month, day, tzinfo=PACIFIC_TZ).date() - anchor).days % 14 == 0
     ]
 
 
@@ -1009,8 +1029,16 @@ def _income_entry_from_row(row: list[str], *, require_income_like_label: bool = 
             continue
         if require_income_like_label and not _looks_like_income_label(label):
             continue
-        return PaymentItem(label=label, amount=round(amount, 2), group="income")
+        return PaymentItem(label=label, amount=round(amount, 2), group="income", date=_row_date_text(row))
     return None
+
+
+def _row_date_text(row: list[str]) -> str:
+    for value in row:
+        text = str(value).strip()
+        if _parse_date(text) is not None:
+            return text
+    return ""
 
 
 def _nearest_left_label(row: list[str], index: int) -> str:

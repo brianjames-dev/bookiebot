@@ -299,7 +299,11 @@ def test_build_expense_breakdown_report_aggregates_shared_and_personal_data():
     assert "bb-subscription-analytics" in html
     assert "Subs" in html
     assert "bb-subscription-summary" in html
-    assert "bb-subscription-projected" in html
+    assert "Projected view" not in html
+    assert "Current view" not in html
+    assert "Categories" in html
+    assert "Bill details" in html
+    assert "bb-chart-carousel-slide" in html
     assert "bb-calendar-day-today" in html
     assert "bb-subscription-all-grid" in html
     assert "bb-subscription-compact-table" in html
@@ -620,6 +624,45 @@ def test_current_month_calendar_events_include_projected_income_subscriptions_an
     assert events[("bill", "PG&E")]["day"] == 20
     assert events[("bill", "PG&E")]["projectedOnly"] is True
     assert "Calendar" in html
+
+
+def test_current_month_income_projection_uses_logged_income_date_as_biweekly_anchor(monkeypatch):
+    monkeypatch.setattr(
+        expense_breakdown,
+        "now_pacific",
+        lambda: datetime(2026, 7, 5, 12, 0, tzinfo=routing.PACIFIC_TZ),
+    )
+    report = build_expense_breakdown_report(
+        actor_key="hannah",
+        owner_name="Hannah",
+        persons=["Hannah"],
+        month=BudgetMonth(2026, 7),
+        worksheets=ReportWorksheets(
+            shared_expenses=InMemoryWorksheet([["hdr"] * 28, ["hdr"] * 28]),
+            personal_budget=InMemoryWorksheet([["07/02/2026", "Paycheck", "$2,000.00"]]),
+            subscriptions=InMemoryWorksheet([]),
+        ),
+    )
+
+    html = render_expense_breakdown_html(report)
+    payload_match = re.search(
+        r'<script id="bookiebot-expense-report-data" type="application/json">(.*?)</script>',
+        html,
+    )
+    assert payload_match is not None
+    payload = json.loads(payload_match.group(1))
+    income_events = [
+        item
+        for item in payload["calendarEvents"]
+        if item["kind"] == "income"
+    ]
+
+    assert payload["incomeProjection"] == {"currentAmount": 2000.0, "projectedAmount": 6000.0, "savingsGoal": 1200.0}
+    assert [(item["label"], item["day"], item["projectedOnly"]) for item in income_events] == [
+        ("Paycheck", 2, False),
+        ("Projected paycheck", 16, True),
+        ("Projected paycheck", 30, True),
+    ]
 
 
 def test_current_month_calendar_does_not_project_unentered_utility_average(monkeypatch):

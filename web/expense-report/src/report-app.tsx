@@ -176,6 +176,8 @@ type ChartPanel = {
 
 type CalendarFilter = "all" | "subscription" | "bill" | "income"
 
+const CHART_CAROUSEL_GAP = 16
+
 type ChartTouchState = {
   startX: number
   startY: number
@@ -259,7 +261,7 @@ function projectedBillTotals(report: ExpenseReportData) {
 }
 
 function calendarEventsForMode(events: CalendarEvent[], projected: boolean) {
-  return projected ? events : events.filter((item) => !item.projectedOnly)
+  return projected ? events : events.filter((item) => item.kind !== "income" || !item.projectedOnly)
 }
 
 function roundCurrency(value: number) {
@@ -275,6 +277,7 @@ export function ExpenseReportApp({ report }: { report: ExpenseReportData }) {
   const [projectionActive, setProjectionActive] = useState(false)
   const [calendarFilter, setCalendarFilter] = useState<CalendarFilter>("all")
   const [chartTouch, setChartTouch] = useState<ChartTouchState | null>(null)
+  const [chartCollapseKey, setChartCollapseKey] = useState(0)
   const activeReport = buildReportView(report, projectionActive)
   const categoryColors: Record<string, string> = Object.fromEntries(activeReport.breakdown.map((item) => [item.label, item.color]))
   const defaultChartTab = report.burnRate ? "burn-rate" : "category"
@@ -282,7 +285,7 @@ export function ExpenseReportApp({ report }: { report: ExpenseReportData }) {
     {
       id: "category",
       title: "Category Mix",
-      content: <CategoryMixChart data={activeReport.breakdown} total={activeReport.metrics.totalExpenses} />,
+      content: <CategoryMixChart data={activeReport.breakdown} total={activeReport.metrics.totalExpenses} collapseKey={chartCollapseKey} />,
     },
     ...(activeReport.burnRate
       ? [
@@ -304,7 +307,6 @@ export function ExpenseReportApp({ report }: { report: ExpenseReportData }) {
           monthLabel={report.monthLabel}
           elapsedDays={report.elapsedDays}
           events={activeReport.calendarEvents}
-          projected={projectionActive}
           filter={calendarFilter}
         />
       ),
@@ -312,23 +314,34 @@ export function ExpenseReportApp({ report }: { report: ExpenseReportData }) {
     {
       id: "bills",
       title: "Bills & Utilities",
-      content: <BillsUtilitiesPanel items={activeReport.utilityHistory} />,
+      content: <BillsUtilitiesPanel items={activeReport.utilityHistory} collapseKey={chartCollapseKey} />,
     },
   ]
   const defaultChartIndex = Math.max(0, chartPanels.findIndex((panel) => panel.id === defaultChartTab))
   const [activeChartIndex, setActiveChartIndex] = useState(defaultChartIndex)
-  const activeChart = chartPanels[activeChartIndex] ?? chartPanels[0]
   const savingsGoal = report.incomeProjection.savingsGoal
 
   useEffect(() => {
     setActiveChartIndex((current) => Math.min(current, chartPanels.length - 1))
   }, [chartPanels.length])
 
+  const switchChart = (nextIndex: number) => {
+    const next = clamp(nextIndex, 0, chartPanels.length - 1)
+    if (next === activeChartIndex) {
+      return
+    }
+    setChartCollapseKey((current) => current + 1)
+    setActiveChartIndex(next)
+  }
+
   const moveChart = (direction: -1 | 1) => {
-    setActiveChartIndex((current) => clamp(current + direction, 0, chartPanels.length - 1))
+    switchChart(activeChartIndex + direction)
   }
 
   const handleChartTouchStart = (event: TouchEvent<HTMLDivElement>) => {
+    if (isInteractiveTouchTarget(event.target)) {
+      return
+    }
     const touch = event.touches[0]
     if (!touch) {
       return
@@ -374,7 +387,8 @@ export function ExpenseReportApp({ report }: { report: ExpenseReportData }) {
     (activeChartIndex === chartPanels.length - 1 && (chartTouch?.deltaX ?? 0) < 0)
       ? 0.25
       : 1
-  const swipeOffset = chartTouch?.dragging ? clamp(chartTouch.deltaX * edgeDragFactor, -180, 180) : 0
+  const swipeOffset = chartTouch?.dragging ? clamp(chartTouch.deltaX * edgeDragFactor, -220, 220) : 0
+  const carouselTransform = `translate3d(calc(${-activeChartIndex * 100}% - ${activeChartIndex * CHART_CAROUSEL_GAP}px + ${swipeOffset}px), 0, 0)`
 
   return (
     <div className="bb-page">
@@ -412,38 +426,35 @@ export function ExpenseReportApp({ report }: { report: ExpenseReportData }) {
           />
         </section>
 
-        <ChartCarouselIndicators panels={chartPanels} activeIndex={activeChartIndex} onSelect={setActiveChartIndex} />
-
-        <Card className="bb-analytics-card">
-          <CardHeader className="bb-analytics-header">
-            <div className="bb-card-title-row bb-analytics-title-row">
-              <CardTitle>{activeChart.title}</CardTitle>
-              <div className="bb-analytics-header-controls">
-                {activeChart.headerControl}
-                <ChartCarouselButtons
-                  onPrevious={() => moveChart(-1)}
-                  onNext={() => moveChart(1)}
-                  canPrevious={activeChartIndex > 0}
-                  canNext={activeChartIndex < chartPanels.length - 1}
-                />
+        <div className="bb-chart-carousel" onTouchStart={handleChartTouchStart} onTouchMove={handleChartTouchMove} onTouchEnd={handleChartTouchEnd}>
+          <div
+            className={chartTouch?.dragging ? "bb-chart-carousel-track bb-chart-carousel-track-dragging" : "bb-chart-carousel-track"}
+            style={{ transform: carouselTransform }}
+          >
+            {chartPanels.map((panel, index) => (
+              <div className="bb-chart-carousel-slide" key={panel.id} aria-hidden={index !== activeChartIndex}>
+                <Card className="bb-analytics-card">
+                  <CardHeader className="bb-analytics-header">
+                    <div className="bb-card-title-row bb-analytics-title-row">
+                      <CardTitle>{panel.title}</CardTitle>
+                      <div className="bb-analytics-header-controls">
+                        {panel.headerControl}
+                        <ChartCarouselButtons
+                          onPrevious={() => moveChart(-1)}
+                          onNext={() => moveChart(1)}
+                          canPrevious={activeChartIndex > 0}
+                          canNext={activeChartIndex < chartPanels.length - 1}
+                        />
+                      </div>
+                    </div>
+                  </CardHeader>
+                  <CardContent>{panel.content}</CardContent>
+                </Card>
               </div>
-            </div>
-          </CardHeader>
-          <CardContent>
-            <div className="bb-chart-carousel" onTouchStart={handleChartTouchStart} onTouchMove={handleChartTouchMove} onTouchEnd={handleChartTouchEnd}>
-              <div
-                className={chartTouch?.dragging ? "bb-chart-carousel-track bb-chart-carousel-track-dragging" : "bb-chart-carousel-track"}
-                style={{ transform: `translate3d(calc(${-activeChartIndex * 100}% + ${swipeOffset}px), 0, 0)` }}
-              >
-                {chartPanels.map((panel, index) => (
-                  <div className="bb-chart-carousel-slide" key={panel.id} aria-hidden={index !== activeChartIndex}>
-                    {panel.content}
-                  </div>
-                ))}
-              </div>
-            </div>
-          </CardContent>
-        </Card>
+            ))}
+          </div>
+        </div>
+        <ChartCarouselIndicators panels={chartPanels} activeIndex={activeChartIndex} onSelect={switchChart} />
 
         <Card>
           <CardHeader>
@@ -460,6 +471,10 @@ export function ExpenseReportApp({ report }: { report: ExpenseReportData }) {
       </main>
     </div>
   )
+}
+
+function isInteractiveTouchTarget(target: EventTarget | null) {
+  return target instanceof Element && Boolean(target.closest("button, a, input, select, textarea, summary, [role='button'], [role='tab']"))
 }
 
 function ChartCarouselButtons({
@@ -789,7 +804,7 @@ function isSavingsNearGoal(value: number | null | undefined, goal: number | null
   return value >= goal * 0.9
 }
 
-function CategoryMixChart({ data, total }: { data: BreakdownItem[]; total: number }) {
+function CategoryMixChart({ data, total, collapseKey }: { data: BreakdownItem[]; total: number; collapseKey: number }) {
   const pieLayout = useExpensePieLayout()
 
   return (
@@ -823,17 +838,19 @@ function CategoryMixChart({ data, total }: { data: BreakdownItem[]; total: numbe
           </ResponsiveContainer>
         </ChartContainer>
         <div className="bb-chart-side">
-          <div className="bb-legend-list">
-            {data.map((item) => (
-              <div className="bb-legend-row" key={item.key}>
-                <span className="bb-swatch" style={{ backgroundColor: item.color }} />
-                <span>{item.label}</span>
-                <strong>
-                  {formatMoney(item.amount)} <span>{formatPct(item.percentage)}</span>
-                </strong>
-              </div>
-            ))}
-          </div>
+          <DetailsPanel summary="Categories" collapseKey={collapseKey}>
+            <div className="bb-legend-list">
+              {data.map((item) => (
+                <div className="bb-legend-row" key={item.key}>
+                  <span className="bb-swatch" style={{ backgroundColor: item.color }} />
+                  <span>{item.label}</span>
+                  <strong>
+                    {formatMoney(item.amount)} <span>{formatPct(item.percentage)}</span>
+                  </strong>
+                </div>
+              ))}
+            </div>
+          </DetailsPanel>
         </div>
       </div>
     </div>
@@ -1156,9 +1173,14 @@ function StatList({ rows }: { rows: [string, string][] }) {
   )
 }
 
-function DetailsPanel({ summary, children }: { summary: string; children: ReactNode }) {
+function DetailsPanel({ summary, children, collapseKey = 0 }: { summary: string; children: ReactNode; collapseKey?: number }) {
+  const [open, setOpen] = useState(false)
+  useEffect(() => {
+    setOpen(false)
+  }, [collapseKey])
+
   return (
-    <details className="bb-details-panel">
+    <details className="bb-details-panel" open={open} onToggle={(event) => setOpen(event.currentTarget.open)}>
       <summary>{summary}</summary>
       <div>{children}</div>
     </details>
@@ -1423,7 +1445,6 @@ function CalendarAnalyticsPanel({
   monthLabel,
   elapsedDays,
   events,
-  projected,
   filter,
 }: {
   year: number
@@ -1431,28 +1452,21 @@ function CalendarAnalyticsPanel({
   monthLabel: string
   elapsedDays: number
   events: CalendarEvent[]
-  projected: boolean
   filter: CalendarFilter
 }) {
   const visibleEvents = filter === "all" ? events : events.filter((item) => item.kind === filter)
   const outflowTotal = visibleEvents
     .filter((item) => item.kind !== "income")
     .reduce((sum, item) => sum + item.amount, 0)
-  const incomeTotal = visibleEvents
-    .filter((item) => item.kind === "income")
-    .reduce((sum, item) => sum + item.amount, 0)
 
   return (
     <div className="bb-subscription-analytics">
-      <div className="bb-subscription-tab-content" data-state="active" key={`${filter}-${projected ? "projected" : "current"}`}>
+      <div className="bb-subscription-tab-content" data-state="active" key={filter}>
         <div className="bb-subscription-panel">
           <div className="bb-panel-head bb-subscription-summary">
             <div>
               <div className="bb-chart-kicker">{monthOnlyLabel(monthLabel)}</div>
               <div className="bb-subscription-total">{formatMoney(outflowTotal)}</div>
-              <div className="bb-subscription-projected">
-                {projected ? "Projected" : "Current"} view • {formatMoney(incomeTotal)} income
-              </div>
             </div>
             <Badge variant="secondary">{visibleEvents.length} total</Badge>
           </div>
@@ -1608,7 +1622,7 @@ function CalendarOverflowTooltip({ events, day }: { events: CalendarEvent[]; day
   )
 }
 
-function BillsUtilitiesPanel({ items }: { items: UtilityHistoryItem[] }) {
+function BillsUtilitiesPanel({ items, collapseKey }: { items: UtilityHistoryItem[]; collapseKey: number }) {
   const currentTotal = items.reduce((sum, item) => sum + item.currentAmount, 0)
 
   return (
@@ -1625,7 +1639,7 @@ function BillsUtilitiesPanel({ items }: { items: UtilityHistoryItem[] }) {
       ) : (
         <>
           <BillsUtilitiesChart items={items} />
-          <DetailsPanel summary="Bill details">
+          <DetailsPanel summary="Bill details" collapseKey={collapseKey}>
             <BillsUtilitiesSummary items={items} />
           </DetailsPanel>
         </>
