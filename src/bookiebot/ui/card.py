@@ -88,17 +88,28 @@ class CardSelectView(ViewBase):  # type: ignore[misc]
 
 
 class CardButton(ButtonBase):  # type: ignore[misc]
-    def __init__(self, label: str, callback_func):
+    def __init__(self, label: str, callback_func, *, owner_user_id: str | None = None):
         style_value = getattr(ButtonStyle, "primary", ButtonStyle.primary)
         super().__init__(label=label, style=style_value)
         self.callback_func = callback_func
+        self.owner_user_id = str(owner_user_id) if owner_user_id is not None else None
 
     async def callback(self, interaction: Interaction):
+        if self.owner_user_id is not None:
+            user = getattr(interaction, "user", None)
+            user_id = str(getattr(user, "id", "")) if user is not None else ""
+            if user_id != self.owner_user_id:
+                await interaction.response.send_message(
+                    "This card selection belongs to another user.",
+                    ephemeral=True,
+                )
+                return
         await self.callback_func(interaction, self.label)
 
 
 class CardButtonView(ViewBase):  # type: ignore[misc]
-    def __init__(self, callback_func):
+    def __init__(self, callback_func, *, owner_user_id: str | None = None):
         super().__init__(timeout=60)
+        self.owner_user_id = str(owner_user_id) if owner_user_id is not None else None
         for label in ["Brian (BofA)", "Brian (AL)"]:
-            self.add_item(CardButton(label, callback_func))
+            self.add_item(CardButton(label, callback_func, owner_user_id=self.owner_user_id))

@@ -163,6 +163,23 @@ def actor_key_aliases(actor_key: str | None) -> set[str]:
     }
 
 
+
+def interaction_actor_key(interaction: Any) -> str | None:
+    user = getattr(interaction, "user", None) or getattr(interaction, "author", None)
+    return resolve_actor_key(
+        getattr(user, "id", None),
+        getattr(user, "name", None) or getattr(user, "display_name", None),
+    )
+
+
+def interaction_belongs_to_actor(interaction: Any, actor_key: str | None) -> bool:
+    if not actor_key:
+        return True
+    current = interaction_actor_key(interaction)
+    if not current:
+        return True
+    return current in actor_key_aliases(str(actor_key))
+
 def get_user_config(discord_user_id: Any, discord_user: str | None = None) -> DiscordUserConfig:
     actor_key = resolve_actor_key(discord_user_id, discord_user)
     if not actor_key:
