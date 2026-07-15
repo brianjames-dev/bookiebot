@@ -1,4 +1,4 @@
-import { useEffect, useState, type ReactNode, type TouchEvent } from "react"
+import { useEffect, useRef, useState, type ReactNode, type TouchEvent } from "react"
 import {
   Bar,
   BarChart,
@@ -319,6 +319,7 @@ export function ExpenseReportApp({ report }: { report: ExpenseReportData }) {
   const [projectionActive, setProjectionActive] = useState(false)
   const [calendarFilter, setCalendarFilter] = useState<CalendarFilter>("all")
   const [chartTouch, setChartTouch] = useState<ChartTouchState | null>(null)
+  const chartGestureRef = useRef<ChartTouchState | null>(null)
   const [chartCollapseKey, setChartCollapseKey] = useState(0)
   const activeReport = buildReportView(report, projectionActive)
   const categoryColors: Record<string, string> = Object.fromEntries(activeReport.breakdown.map((item) => [item.label, item.color]))
@@ -392,27 +393,33 @@ export function ExpenseReportApp({ report }: { report: ExpenseReportData }) {
     if (!touch) {
       return
     }
-    setChartTouch({ startX: touch.clientX, startY: touch.clientY, deltaX: 0, deltaY: 0, dragging: false })
+    chartGestureRef.current = { startX: touch.clientX, startY: touch.clientY, deltaX: 0, deltaY: 0, dragging: false }
   }
 
   const handleChartTouchMove = (event: TouchEvent<HTMLDivElement>) => {
     const touch = event.touches[0]
-    if (!touch || chartTouch === null) {
+    const gesture = chartGestureRef.current
+    if (!touch || gesture === null) {
       return
     }
-    const deltaX = touch.clientX - chartTouch.startX
-    const deltaY = touch.clientY - chartTouch.startY
-    const dragging = Math.abs(deltaX) > 10 && Math.abs(deltaX) > Math.abs(deltaY) * 1.2
-    setChartTouch({ ...chartTouch, deltaX, deltaY, dragging })
+    const deltaX = touch.clientX - gesture.startX
+    const deltaY = touch.clientY - gesture.startY
+    const dragging = Math.abs(deltaX) > 18 && Math.abs(deltaX) > Math.abs(deltaY) * 1.35
+    const nextGesture = { ...gesture, deltaX, deltaY, dragging: gesture.dragging || dragging }
+    chartGestureRef.current = nextGesture
+    if (nextGesture.dragging) {
+      setChartTouch(nextGesture)
+    }
   }
 
   const handleChartTouchEnd = (event: TouchEvent<HTMLDivElement>) => {
-    if (chartTouch === null) {
+    const touch = chartGestureRef.current
+    chartGestureRef.current = null
+    if (touch === null) {
       return
     }
     const endX = event.changedTouches[0]?.clientX
     const endY = event.changedTouches[0]?.clientY
-    const touch = chartTouch
     setChartTouch(null)
     if (endX === undefined) {
       return
@@ -427,6 +434,11 @@ export function ExpenseReportApp({ report }: { report: ExpenseReportData }) {
       return
     }
     moveChart(deltaX < 0 ? 1 : -1)
+  }
+
+  const handleChartTouchCancel = () => {
+    chartGestureRef.current = null
+    setChartTouch(null)
   }
   const edgeDragFactor =
     (activeChartIndex === 0 && (chartTouch?.deltaX ?? 0) > 0) ||
@@ -478,6 +490,7 @@ export function ExpenseReportApp({ report }: { report: ExpenseReportData }) {
           onTouchStart={handleChartTouchStart}
           onTouchMove={handleChartTouchMove}
           onTouchEnd={handleChartTouchEnd}
+          onTouchCancel={handleChartTouchCancel}
         >
           <div
             className={chartTouch?.dragging ? "bb-chart-carousel-track bb-chart-carousel-track-dragging" : "bb-chart-carousel-track"}
