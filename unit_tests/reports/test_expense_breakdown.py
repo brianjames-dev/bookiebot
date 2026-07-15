@@ -238,6 +238,7 @@ def test_build_expense_breakdown_report_aggregates_shared_and_personal_data():
     assert payload["metrics"]["remainingWantsBudget"] == 750.0
     assert payload["metrics"]["amountSaved"] == 600.0
     assert payload["metrics"]["savingsGoal"] == 900.0
+    assert payload["incomeProjection"] == {"currentAmount": 3500.0, "projectedAmount": 3500.0, "savingsGoal": 700.0}
     burn_rate = payload["burnRate"]
     burn_rate_series = burn_rate.pop("series")
     assert burn_rate == {
@@ -535,7 +536,8 @@ def test_report_payload_tracks_merchant_occurrences_by_location_count():
     assert "Occurrences" in html
     assert "bb-hidden-list-panel" in html
     assert "bb-chart-carousel-indicators" in html
-    assert "bb-chart-carousel-panel-dragging" in html
+    assert "bb-chart-carousel-track" in html
+    assert "bb-chart-carousel-track-dragging" in html
     assert "No need expenses found" not in html
 
 
@@ -589,20 +591,27 @@ def test_current_month_calendar_events_include_projected_income_subscriptions_an
     assert payload_match is not None
     payload = json.loads(payload_match.group(1))
     events = {(item["kind"], item["label"]): item for item in payload["calendarEvents"]}
+    projected_paychecks = [
+        item
+        for item in payload["calendarEvents"]
+        if item["kind"] == "income" and item["label"] == "Projected paycheck"
+    ]
 
-    assert payload["incomeProjection"] == {"currentAmount": 2000.0, "projectedAmount": 4000.0}
+    assert payload["incomeProjection"] == {"currentAmount": 2000.0, "projectedAmount": 6000.0, "savingsGoal": 1200.0}
     assert payload["breakdown"][2]["label"] == "Subs (Needs)"
     assert payload["breakdown"][2]["amount"] == 15.0
     assert events[("income", "Paycheck")] == {
         "kind": "income",
         "label": "Paycheck",
         "amount": 2000.0,
-        "day": 1,
+        "day": 3,
         "group": "income",
         "projectedOnly": False,
     }
-    assert events[("income", "Projected paycheck")]["amount"] == 2000.0
-    assert events[("income", "Projected paycheck")]["projectedOnly"] is True
+    assert [(item["day"], item["amount"], item["projectedOnly"]) for item in projected_paychecks] == [
+        (17, 2000.0, True),
+        (31, 2000.0, True),
+    ]
     assert events[("subscription", "Need Later")]["day"] == 10
     assert events[("subscription", "Need Later")]["projectedOnly"] is True
     assert events[("bill", "Rent")]["group"] == "rent"
@@ -611,6 +620,50 @@ def test_current_month_calendar_events_include_projected_income_subscriptions_an
     assert events[("bill", "PG&E")]["day"] == 20
     assert events[("bill", "PG&E")]["projectedOnly"] is True
     assert "Calendar" in html
+
+
+def test_current_month_calendar_does_not_project_unentered_utility_average(monkeypatch):
+    monkeypatch.setattr(
+        expense_breakdown,
+        "now_pacific",
+        lambda: datetime(2026, 7, 5, 12, 0, tzinfo=routing.PACIFIC_TZ),
+    )
+    bill_schedule_rows = [
+        BILL_SCHEDULE_HEADERS,
+        ["pge", "PG&E", "monthly", "20", "", "PG&E", "", "", ""],
+    ]
+
+    report = build_expense_breakdown_report(
+        actor_key="hannah",
+        owner_name="Hannah",
+        persons=["Hannah"],
+        month=BudgetMonth(2026, 7),
+        worksheets=ReportWorksheets(
+            shared_expenses=InMemoryWorksheet([["hdr"] * 28, ["hdr"] * 28]),
+            personal_budget=InMemoryWorksheet([]),
+            subscriptions=InMemoryWorksheet([]),
+            bill_schedule=InMemoryWorksheet(bill_schedule_rows),
+            budget_history=(
+                BudgetHistoryRows(BudgetMonth(2026, 6), [["PG&E", "$100.00"]]),
+                BudgetHistoryRows(BudgetMonth(2026, 7), []),
+            ),
+        ),
+    )
+
+    html = render_expense_breakdown_html(report)
+    payload_match = re.search(
+        r'<script id="bookiebot-expense-report-data" type="application/json">(.*?)</script>',
+        html,
+    )
+    assert payload_match is not None
+    payload = json.loads(payload_match.group(1))
+
+    assert payload["utilityHistory"][0]["currentAmount"] == 0.0
+    assert payload["utilityHistory"][0]["averageAmount"] == 100.0
+    assert not any(
+        item["kind"] == "bill" and item["label"] == "PG&E"
+        for item in payload["calendarEvents"]
+    )
 
 
 def test_build_expense_breakdown_report_reports_zero_savings_deposits():

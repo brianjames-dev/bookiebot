@@ -174,6 +174,8 @@ PAYMENT_GROUPS = {
     "student loan": ("bills_utilities", "Student Loan"),
 }
 
+BIWEEKLY_PAYDAY_ANCHOR = datetime(2026, 7, 3, tzinfo=PACIFIC_TZ).date()
+
 BUDGET_SHARED_CATEGORY_LABELS = {
     "grocery": ("Groceries", "Grocery"),
     "gas": ("Auto/Gas", "Gas"),
@@ -751,7 +753,11 @@ def _bill_calendar_events(
         return []
 
     payment_amounts = {_normalize_label(item.label): item.amount for item in payments}
-    utility_projection = {_normalize_label(item.label): max(item.current_amount, item.average_amount) for item in utility_history}
+    known_utility_amounts = {
+        _normalize_label(item.label): item.current_amount
+        for item in utility_history
+        if item.current_amount > 0
+    }
     events: list[CalendarEvent] = []
     for bill in list_bill_schedules(bill_schedule_rows):
         day = _bill_day_in_month(bill, month)
@@ -760,7 +766,7 @@ def _bill_calendar_events(
         labels = [bill.source_label, bill.display_name, bill.bill_key]
         amount = next((payment_amounts[_normalize_label(label)] for label in labels if _normalize_label(label) in payment_amounts), 0.0)
         if amount <= 0:
-            amount = next((utility_projection[_normalize_label(label)] for label in labels if _normalize_label(label) in utility_projection), 0.0)
+            amount = next((known_utility_amounts[_normalize_label(label)] for label in labels if _normalize_label(label) in known_utility_amounts), 0.0)
         if amount <= 0:
             continue
         normalized_label = _normalize_label(bill.source_label or bill.display_name)
@@ -794,24 +800,79 @@ def _income_calendar_events(
         return []
     days_in_month = calendar.monthrange(month.year, month.month)[1]
     current_entries = income_entries or [PaymentItem("Income", income_total, "income")]
+    paycheck_entries = _paycheck_income_entries(current_entries)
+    other_entries = [item for item in current_entries if item not in paycheck_entries]
+    if not paycheck_entries and len(current_entries) == 1:
+        paycheck_entries = current_entries
+        other_entries = []
+    pay_days = _biweekly_pay_days(month)
     events: list[CalendarEvent] = []
-    for index, item in enumerate(current_entries[:2]):
-        day = 1 if index == 0 else min(15, days_in_month)
+
+    for index, item in enumerate(paycheck_entries):
+        day = pay_days[index] if index < len(pay_days) else min(1 + index * 14, days_in_month)
         events.append(CalendarEvent("income", item.label, item.amount, day, "income", projected_only=False))
 
+    for item in other_entries:
+        events.append(CalendarEvent("income", item.label, item.amount, 1, "income", projected_only=False))
+
+    parsed_total = round(sum(item.amount for item in current_entries), 2)
+    unparsed_total = round(income_total - parsed_total, 2)
+    if unparsed_total > 0:
+        events.append(CalendarEvent("income", "Other income", unparsed_total, 1, "income", projected_only=False))
+
     projected_total = _projected_income_total(income_entries, income_total, month)
-    projected_gap = round(projected_total - sum(item.amount for item in current_entries), 2)
-    if projected_gap > 0 and not _is_completed_month(month):
-        events.append(CalendarEvent("income", "Projected paycheck", projected_gap, min(15, days_in_month), "income", projected_only=True))
+    paycheck_amount = _projected_paycheck_amount(current_entries)
+    projected_gap = round(projected_total - income_total, 2)
+    if projected_gap > 0 and paycheck_amount > 0 and not _is_completed_month(month):
+        for day in pay_days[len(paycheck_entries) :]:
+            if projected_gap <= 0:
+                break
+            amount = min(paycheck_amount, projected_gap)
+            events.append(CalendarEvent("income", "Projected paycheck", round(amount, 2), day, "income", projected_only=True))
+            projected_gap = round(projected_gap - amount, 2)
     return events
 
 
 def _projected_income_total(income_entries: list[PaymentItem], income_total: float, month: BudgetMonth) -> float:
     if _is_completed_month(month) or income_total <= 0:
         return round(income_total, 2)
-    if len(income_entries) == 1:
-        return round(max(income_total, income_entries[0].amount * 2), 2)
-    return round(income_total, 2)
+    current_entries = income_entries or [PaymentItem("Income", income_total, "income")]
+    paycheck_amount = _projected_paycheck_amount(current_entries)
+    if paycheck_amount <= 0:
+        return round(income_total, 2)
+    paycheck_entries = _paycheck_income_entries(current_entries)
+    if not paycheck_entries and len(current_entries) == 1:
+        paycheck_entries = current_entries
+    logged_paycheck_total = round(sum(item.amount for item in paycheck_entries), 2)
+    other_income_total = max(0.0, round(income_total - logged_paycheck_total, 2))
+    projected_total = round(other_income_total + paycheck_amount * len(_biweekly_pay_days(month)), 2)
+    return round(max(income_total, projected_total), 2)
+
+
+def _paycheck_income_entries(income_entries: list[PaymentItem]) -> list[PaymentItem]:
+    return [
+        item
+        for item in income_entries
+        if any(term in _normalize_label(item.label) for term in ("paycheck", "payroll", "salary", "wage"))
+    ]
+
+
+def _projected_paycheck_amount(income_entries: list[PaymentItem]) -> float:
+    paycheck_entries = _paycheck_income_entries(income_entries)
+    if not paycheck_entries and len(income_entries) == 1:
+        paycheck_entries = income_entries
+    if not paycheck_entries:
+        return 0.0
+    return round(sum(item.amount for item in paycheck_entries) / len(paycheck_entries), 2)
+
+
+def _biweekly_pay_days(month: BudgetMonth) -> list[int]:
+    days_in_month = calendar.monthrange(month.year, month.month)[1]
+    return [
+        day
+        for day in range(1, days_in_month + 1)
+        if (datetime(month.year, month.month, day, tzinfo=PACIFIC_TZ).date() - BIWEEKLY_PAYDAY_ANCHOR).days % 14 == 0
+    ]
 
 
 def _payment_totals_by_group(payments: list[PaymentItem]) -> dict[str, float]:
@@ -1382,10 +1443,7 @@ def _report_client_payload(
             "savingsGoal": report.savings_goal,
             "incomeAfterExpenses": balance_after_expenses,
         },
-        "incomeProjection": {
-            "currentAmount": round(report.income_total, 2),
-            "projectedAmount": _projected_income_total(report.income_entries, report.income_total, report.month),
-        },
+        "incomeProjection": _income_projection_payload(report),
         "burnRate": _burn_rate_payload(report),
         "breakdown": [
             {
@@ -1420,6 +1478,15 @@ def _report_client_payload(
 
 def _amount_row(label: str, amount: float) -> dict[str, Any]:
     return {"label": str(label), "amount": round(float(amount or 0.0), 2)}
+
+
+def _income_projection_payload(report: ExpenseBreakdownReport) -> dict[str, Any]:
+    projected_amount = _projected_income_total(report.income_entries, report.income_total, report.month)
+    return {
+        "currentAmount": round(report.income_total, 2),
+        "projectedAmount": projected_amount,
+        "savingsGoal": round(projected_amount * 0.2, 2),
+    }
 
 
 def _expense_entry_payload(entry: ExpenseEntry) -> dict[str, Any]:

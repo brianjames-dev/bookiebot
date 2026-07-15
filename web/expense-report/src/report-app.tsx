@@ -207,17 +207,15 @@ function buildReportView(report: ExpenseReportData, projected: boolean): ReportV
       incomeAfterExpenses: roundCurrency(monthlyIncome - totalExpenses),
     },
     breakdown,
-    burnRate: projected ? projectedBurnRate(report.burnRate) : report.burnRate,
+    burnRate: report.burnRate,
     calendarEvents: calendarEventsForMode(report.calendarEvents, projected),
-    utilityHistory: utilityHistoryForMode(report.utilityHistory, projected),
+    utilityHistory: report.utilityHistory,
   }
 }
 
 function projectedBreakdown(report: ExpenseReportData) {
   const subscriptionTotals = scheduledSubscriptionTotals(report)
   const billTotals = projectedBillTotals(report)
-  const scale = report.elapsedDays > 0 && report.elapsedDays < report.daysInMonth ? report.daysInMonth / report.elapsedDays : 1
-  const variableKeys = new Set(["grocery", "gas", "food", "shopping"])
   const rows = report.breakdown.map((item) => {
     let amount = item.amount
     if (item.key === "static_bills_subscriptions_needs") {
@@ -228,8 +226,6 @@ function projectedBreakdown(report: ExpenseReportData) {
       amount = billTotals.rent || amount
     } else if (item.key === "bills_utilities") {
       amount = billTotals.billsUtilities || amount
-    } else if (variableKeys.has(item.key)) {
-      amount = roundCurrency(amount * scale)
     }
     return { ...item, amount: roundCurrency(amount) }
   })
@@ -251,7 +247,7 @@ function scheduledSubscriptionTotals(report: ExpenseReportData) {
 
 function projectedBillTotals(report: ExpenseReportData) {
   const billsUtilities = roundCurrency(
-    report.utilityHistory.reduce((sum, item) => sum + Math.max(item.currentAmount, item.averageAmount), 0),
+    report.utilityHistory.reduce((sum, item) => sum + item.currentAmount, 0),
   )
   const rent = report.calendarEvents
     .filter((item) => item.kind === "bill" && item.group === "rent")
@@ -264,67 +260,6 @@ function projectedBillTotals(report: ExpenseReportData) {
 
 function calendarEventsForMode(events: CalendarEvent[], projected: boolean) {
   return projected ? events : events.filter((item) => !item.projectedOnly)
-}
-
-function utilityHistoryForMode(items: UtilityHistoryItem[], projected: boolean) {
-  if (!projected) {
-    return items
-  }
-  return items.map((item) => {
-    const currentAmount = roundCurrency(Math.max(item.currentAmount, item.averageAmount))
-    return {
-      ...item,
-      currentAmount,
-      deltaAmount: item.averageAmount > 0 ? roundCurrency(currentAmount - item.averageAmount) : item.deltaAmount,
-    }
-  })
-}
-
-function projectedBurnRate(burnRate: BurnRate | null): BurnRate | null {
-  if (!burnRate || burnRate.elapsedDays <= 0 || burnRate.daysInMonth <= 0) {
-    return burnRate
-  }
-  const dailyPace = burnRate.spent / burnRate.elapsedDays
-  const projectedSpend = roundCurrency(dailyPace * burnRate.daysInMonth)
-  const totalDifference = roundCurrency(projectedSpend - burnRate.budget)
-  const actualDailyAverage = roundCurrency(projectedSpend / burnRate.daysInMonth)
-  return {
-    ...burnRate,
-    spent: projectedSpend,
-    remaining: roundCurrency(burnRate.budget - projectedSpend),
-    elapsedDays: burnRate.daysInMonth,
-    expectedSpend: burnRate.budget,
-    actualDailyAverage,
-    dailyDifference: roundCurrency(actualDailyAverage - burnRate.allowedDailyAverage),
-    totalDifference,
-    status: totalDifference > 0 ? "over" : "under",
-    series: projectedBurnRateSeries(burnRate, dailyPace),
-  }
-}
-
-function projectedBurnRateSeries(burnRate: BurnRate, dailyPace: number): BurnRatePoint[] {
-  const existing = new Map(burnRate.series.map((point) => [point.day, point]))
-  let cumulative = 0
-  const series: BurnRatePoint[] = []
-  for (let day = 1; day <= burnRate.daysInMonth; day += 1) {
-    const existingPoint = existing.get(day)
-    if (existingPoint && existingPoint.actualSpend !== null) {
-      cumulative = existingPoint.actualSpend
-    } else {
-      cumulative = roundCurrency(cumulative + dailyPace)
-    }
-    const expectedSpend = roundCurrency(burnRate.budget * (day / burnRate.daysInMonth))
-    const dailySpend = existingPoint?.dailySpend ?? roundCurrency(dailyPace)
-    series.push({
-      day,
-      label: String(day),
-      dailySpend,
-      actualSpend: cumulative,
-      expectedSpend,
-      variance: roundCurrency(cumulative - expectedSpend),
-    })
-  }
-  return series
 }
 
 function roundCurrency(value: number) {
@@ -383,13 +318,14 @@ export function ExpenseReportApp({ report }: { report: ExpenseReportData }) {
   const defaultChartIndex = Math.max(0, chartPanels.findIndex((panel) => panel.id === defaultChartTab))
   const [activeChartIndex, setActiveChartIndex] = useState(defaultChartIndex)
   const activeChart = chartPanels[activeChartIndex] ?? chartPanels[0]
+  const savingsGoal = report.incomeProjection.savingsGoal
 
   useEffect(() => {
     setActiveChartIndex((current) => Math.min(current, chartPanels.length - 1))
   }, [chartPanels.length])
 
   const moveChart = (direction: -1 | 1) => {
-    setActiveChartIndex((current) => (current + direction + chartPanels.length) % chartPanels.length)
+    setActiveChartIndex((current) => clamp(current + direction, 0, chartPanels.length - 1))
   }
 
   const handleChartTouchStart = (event: TouchEvent<HTMLDivElement>) => {
@@ -428,9 +364,17 @@ export function ExpenseReportApp({ report }: { report: ExpenseReportData }) {
     if (Math.abs(deltaX) < threshold || Math.abs(deltaX) < Math.abs(deltaY) * 1.35) {
       return
     }
+    if ((deltaX < 0 && activeChartIndex >= chartPanels.length - 1) || (deltaX > 0 && activeChartIndex <= 0)) {
+      return
+    }
     moveChart(deltaX < 0 ? 1 : -1)
   }
-  const swipeOffset = chartTouch?.dragging ? clamp(chartTouch.deltaX, -110, 110) : 0
+  const edgeDragFactor =
+    (activeChartIndex === 0 && (chartTouch?.deltaX ?? 0) > 0) ||
+    (activeChartIndex === chartPanels.length - 1 && (chartTouch?.deltaX ?? 0) < 0)
+      ? 0.25
+      : 1
+  const swipeOffset = chartTouch?.dragging ? clamp(chartTouch.deltaX * edgeDragFactor, -180, 180) : 0
 
   return (
     <div className="bb-page">
@@ -463,10 +407,12 @@ export function ExpenseReportApp({ report }: { report: ExpenseReportData }) {
           <MetricCard
             label="Saved"
             value={report.metrics.amountSaved}
-            description={report.metrics.savingsGoal ? `Goal ${formatMoney(report.metrics.savingsGoal)}` : undefined}
-            accent={isSavingsNearGoal(report.metrics.amountSaved, report.metrics.savingsGoal)}
+            description={savingsGoal > 0 ? `Goal ${formatMoney(savingsGoal)}` : undefined}
+            accent={isSavingsNearGoal(report.metrics.amountSaved, savingsGoal)}
           />
         </section>
+
+        <ChartCarouselIndicators panels={chartPanels} activeIndex={activeChartIndex} onSelect={setActiveChartIndex} />
 
         <Card className="bb-analytics-card">
           <CardHeader className="bb-analytics-header">
@@ -477,6 +423,8 @@ export function ExpenseReportApp({ report }: { report: ExpenseReportData }) {
                 <ChartCarouselButtons
                   onPrevious={() => moveChart(-1)}
                   onNext={() => moveChart(1)}
+                  canPrevious={activeChartIndex > 0}
+                  canNext={activeChartIndex < chartPanels.length - 1}
                 />
               </div>
             </div>
@@ -484,13 +432,15 @@ export function ExpenseReportApp({ report }: { report: ExpenseReportData }) {
           <CardContent>
             <div className="bb-chart-carousel" onTouchStart={handleChartTouchStart} onTouchMove={handleChartTouchMove} onTouchEnd={handleChartTouchEnd}>
               <div
-                className={chartTouch?.dragging ? "bb-chart-carousel-panel bb-chart-carousel-panel-dragging" : "bb-chart-carousel-panel"}
-                key={activeChart.id}
-                style={{ transform: `translateX(${swipeOffset}px)` }}
+                className={chartTouch?.dragging ? "bb-chart-carousel-track bb-chart-carousel-track-dragging" : "bb-chart-carousel-track"}
+                style={{ transform: `translate3d(calc(${-activeChartIndex * 100}% + ${swipeOffset}px), 0, 0)` }}
               >
-                {activeChart.content}
+                {chartPanels.map((panel, index) => (
+                  <div className="bb-chart-carousel-slide" key={panel.id} aria-hidden={index !== activeChartIndex}>
+                    {panel.content}
+                  </div>
+                ))}
               </div>
-              <ChartCarouselIndicators panels={chartPanels} activeIndex={activeChartIndex} onSelect={setActiveChartIndex} />
             </div>
           </CardContent>
         </Card>
@@ -515,16 +465,20 @@ export function ExpenseReportApp({ report }: { report: ExpenseReportData }) {
 function ChartCarouselButtons({
   onPrevious,
   onNext,
+  canPrevious,
+  canNext,
 }: {
   onPrevious: () => void
   onNext: () => void
+  canPrevious: boolean
+  canNext: boolean
 }) {
   return (
     <div className="bb-chart-carousel-controls" aria-label="Budget chart navigation">
-      <button type="button" className="bb-chart-carousel-button" aria-label="Previous chart" onClick={onPrevious}>
+      <button type="button" className="bb-chart-carousel-button" aria-label="Previous chart" onClick={onPrevious} disabled={!canPrevious}>
         {"<"}
       </button>
-      <button type="button" className="bb-chart-carousel-button" aria-label="Next chart" onClick={onNext}>
+      <button type="button" className="bb-chart-carousel-button" aria-label="Next chart" onClick={onNext} disabled={!canNext}>
         {">"}
       </button>
     </div>

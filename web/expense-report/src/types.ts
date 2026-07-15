@@ -62,6 +62,7 @@ export interface CalendarEvent {
 export interface IncomeProjection {
   currentAmount: number
   projectedAmount: number
+  savingsGoal: number
 }
 
 export interface Metrics {
