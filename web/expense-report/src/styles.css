@@ -697,7 +697,7 @@ summary {
 
 @keyframes bb-touch-tooltip-auto-dismiss {
   0%,
-  68% {
+  84% {
     opacity: 1;
   }
 
@@ -707,14 +707,13 @@ summary {
 }
 
 @media (hover: none), (pointer: coarse) {
-  .recharts-tooltip-wrapper {
-    animation: bb-touch-tooltip-auto-dismiss 1100ms ease-out forwards;
-    pointer-events: none !important;
+  .bb-touch-tooltip-content {
+    animation: bb-touch-tooltip-auto-dismiss 3000ms ease-out forwards;
   }
 
   .bb-subscription-marker:hover .bb-subscription-tooltip,
   .bb-subscription-marker:focus .bb-subscription-tooltip {
-    animation: bb-touch-tooltip-auto-dismiss 1100ms ease-out forwards;
+    animation: bb-touch-tooltip-auto-dismiss 3000ms ease-out forwards;
     pointer-events: none;
   }
 }
@@ -866,6 +865,7 @@ summary {
 
 .bb-tabs-list {
   display: inline-flex;
+  flex: 0 0 auto;
   align-self: start;
   justify-self: start;
   gap: 4px;
@@ -880,6 +880,7 @@ summary {
 
 .bb-tabs-trigger {
   appearance: none;
+  flex: 0 0 auto;
   border: 0;
   border-radius: 999px;
   background: transparent;
@@ -903,6 +904,10 @@ summary {
 
 .bb-subscription-tone-control {
   flex: 0 1 auto;
+  margin-left: auto;
+}
+
+.bb-burn-rate-filter {
   margin-left: auto;
 }
 
@@ -946,8 +951,9 @@ summary {
 
 .bb-category-chart-layout {
   grid-template-columns: 1fr;
-  grid-template-rows: minmax(0, 1fr) auto;
+  grid-template-rows: minmax(420px, 1fr) auto;
   align-items: stretch;
+  overflow: visible;
 }
 
 .bb-chart-box {
@@ -958,8 +964,9 @@ summary {
 }
 
 .bb-category-chart-box {
-  height: clamp(420px, 52vh, 620px);
-  min-height: 420px;
+  height: clamp(500px, 58vh, 680px);
+  min-height: 500px;
+  overflow: visible;
 }
 
 .bb-analytics-card .bb-chart-box {
@@ -968,7 +975,13 @@ summary {
 }
 
 .bb-analytics-card .bb-category-chart-box {
-  min-height: 420px;
+  min-height: 500px;
+}
+
+.bb-category-chart-box .recharts-responsive-container,
+.bb-category-chart-box .recharts-wrapper,
+.bb-category-chart-box svg {
+  overflow: visible;
 }
 
 .bb-chart-container {
@@ -1060,6 +1073,13 @@ summary {
   line-height: 1;
 }
 
+.bb-chart-mode-note {
+  margin-top: 5px;
+  color: hsl(var(--muted-foreground));
+  font-size: 12px;
+  font-weight: 700;
+}
+
 .bb-legend-list,
 .bb-stat-list {
   display: grid;
@@ -1069,12 +1089,14 @@ summary {
 .bb-details-panel {
   display: grid;
   align-content: start;
+  justify-items: start;
   gap: 8px;
   min-width: 0;
 }
 
 .bb-details-toggle {
   appearance: none;
+  flex: 0 0 auto;
   justify-self: start;
   align-self: start;
   display: inline-flex;
@@ -1127,11 +1149,13 @@ summary {
 
 .bb-hidden-list-panel {
   display: grid;
+  justify-items: start;
   gap: 10px;
 }
 
 .bb-expand-toggle {
   appearance: none;
+  flex: 0 0 auto;
   justify-self: start;
   align-self: start;
   display: inline-flex;
@@ -1244,7 +1268,7 @@ summary {
   pointer-events: none;
   transform-box: fill-box;
   transform-origin: center;
-  animation: bb-pie-label-in 420ms ease-out forwards;
+  animation: bb-pie-label-in 220ms ease-out forwards;
 }
 
 .bb-pie-metric-label-line {
@@ -1252,7 +1276,7 @@ summary {
   pointer-events: none;
   stroke-dasharray: 1;
   stroke-dashoffset: 1;
-  animation: bb-pie-label-line-in 420ms ease-out forwards;
+  animation: bb-pie-label-line-in 220ms ease-out forwards;
 }
 
 @keyframes bb-pie-label-in {

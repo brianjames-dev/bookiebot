@@ -58,6 +58,48 @@ type ChartTooltipPayload = {
   color?: string
 }
 
+const TOUCH_TOOLTIP_DISMISS_MS = 3000
+
+function useTouchTooltipVisibility(active?: boolean, signature?: string) {
+  const [isTouchPointer, setIsTouchPointer] = React.useState(false)
+  const [visible, setVisible] = React.useState(Boolean(active))
+
+  React.useEffect(() => {
+    if (typeof window === "undefined") {
+      return undefined
+    }
+
+    const media = window.matchMedia("(hover: none), (pointer: coarse)")
+    const handleChange = () => setIsTouchPointer(media.matches)
+    handleChange()
+    if (media.addEventListener) {
+      media.addEventListener("change", handleChange)
+      return () => media.removeEventListener("change", handleChange)
+    }
+    media.addListener(handleChange)
+    return () => media.removeListener(handleChange)
+  }, [])
+
+  React.useEffect(() => {
+    if (!active) {
+      setVisible(false)
+      return undefined
+    }
+
+    setVisible(true)
+    if (!isTouchPointer) {
+      return undefined
+    }
+
+    const timeout = window.setTimeout(() => {
+      setVisible(false)
+    }, TOUCH_TOOLTIP_DISMISS_MS)
+    return () => window.clearTimeout(timeout)
+  }, [active, isTouchPointer, signature])
+
+  return Boolean(active && visible)
+}
+
 function ChartTooltipContent({
   active,
   payload,
@@ -65,10 +107,7 @@ function ChartTooltipContent({
   active?: boolean
   payload?: ChartTooltipPayload[]
 }) {
-  if (!active || !payload?.length) {
-    return null
-  }
-  const rows = payload.reduce<ChartTooltipPayload[]>((dedupedRows, item) => {
+  const rows = (payload ?? []).reduce<ChartTooltipPayload[]>((dedupedRows, item) => {
     if (item.value === null || item.value === undefined) {
       return dedupedRows
     }
@@ -78,13 +117,15 @@ function ChartTooltipContent({
     }
     return dedupedRows
   }, [])
+  const signature = rows.map((item) => `${item.name ?? ""}:${item.value ?? ""}:${item.color ?? ""}`).join("|")
+  const visible = useTouchTooltipVisibility(active, signature)
 
-  if (!rows.length) {
+  if (!visible || !rows.length) {
     return null
   }
 
   return (
-    <div className="bb-chart-tooltip">
+    <div className="bb-chart-tooltip bb-touch-tooltip-content">
       {rows.map((item: ChartTooltipPayload, index) => (
         <div className="bb-chart-tooltip-row" key={`${item.name}-${item.value}-${index}`}>
           <span className="bb-chart-tooltip-dot" style={{ background: item.color }} />
@@ -124,3 +165,4 @@ function ChartTooltip({
 }
 
 export { ChartContainer, ChartTooltip, ChartTooltipContent }
+export { useTouchTooltipVisibility }
