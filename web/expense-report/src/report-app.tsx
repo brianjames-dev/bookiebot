@@ -216,7 +216,7 @@ function buildReportView(report: ExpenseReportData, projected: boolean): ReportV
 }
 
 function projectedBreakdown(report: ExpenseReportData) {
-  const subscriptionTotals = scheduledSubscriptionTotals(report)
+  const subscriptionTotals = projectedSubscriptionTotals(report)
   const billTotals = projectedBillTotals(report)
   const rows = report.breakdown.map((item) => {
     let amount = item.amount
@@ -242,9 +242,8 @@ function projectedOutflowTotal(report: ExpenseReportData, breakdown: BreakdownIt
   return roundCurrency(amountRowsTotal(breakdown) + (report.metrics.amountSaved ?? 0))
 }
 
-function scheduledSubscriptionTotals(report: ExpenseReportData) {
-  const totalFor = (items: SubscriptionItem[]) =>
-    items.reduce((sum, item) => (subscriptionDayInMonth(item, report.year, report.month) === null ? sum : sum + item.amount), 0)
+function projectedSubscriptionTotals(report: ExpenseReportData) {
+  const totalFor = (items: SubscriptionItem[]) => items.reduce((sum, item) => sum + item.amount, 0)
   return {
     needs: roundCurrency(totalFor(report.subscriptionsNeeds)),
     wants: roundCurrency(totalFor(report.subscriptionsWants)),
