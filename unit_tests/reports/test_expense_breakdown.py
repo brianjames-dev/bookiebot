@@ -728,6 +728,53 @@ def test_current_month_income_projection_uses_logged_income_date_as_biweekly_anc
     ]
 
 
+def test_current_month_income_projection_uses_configured_biweekly_source_and_start(monkeypatch):
+    monkeypatch.setattr(
+        expense_breakdown,
+        "now_pacific",
+        lambda: datetime(2026, 7, 5, 12, 0, tzinfo=routing.PACIFIC_TZ),
+    )
+    report = build_expense_breakdown_report(
+        actor_key="hannah",
+        owner_name="Hannah",
+        persons=["Hannah"],
+        month=BudgetMonth(2026, 7),
+        worksheets=ReportWorksheets(
+            shared_expenses=InMemoryWorksheet([["hdr"] * 28, ["hdr"] * 28]),
+            personal_budget=InMemoryWorksheet(
+                [
+                    ["Biweekly Income Source", "xAI"],
+                    ["Biweekly Income Start", "07/09/2026"],
+                    ["xAI", "$2,000.00"],
+                    ["Bonus", "$500.00"],
+                    ["Monthly Income:", "$2,500.00"],
+                ]
+            ),
+            subscriptions=InMemoryWorksheet([]),
+        ),
+    )
+
+    html = render_expense_breakdown_html(report)
+    payload_match = re.search(
+        r'<script id="bookiebot-expense-report-data" type="application/json">(.*?)</script>',
+        html,
+    )
+    assert payload_match is not None
+    payload = json.loads(payload_match.group(1))
+    income_events = [
+        item
+        for item in payload["calendarEvents"]
+        if item["kind"] == "income"
+    ]
+
+    assert payload["incomeProjection"] == {"currentAmount": 2500.0, "projectedAmount": 4500.0, "savingsGoal": 900.0}
+    assert [(item["label"], item["day"], item["amount"], item["projectedOnly"]) for item in income_events] == [
+        ("Bonus", 1, 500.0, False),
+        ("xAI", 9, 2000.0, False),
+        ("Projected paycheck", 23, 2000.0, True),
+    ]
+
+
 def test_current_month_calendar_does_not_project_unentered_utility_average(monkeypatch):
     monkeypatch.setattr(
         expense_breakdown,

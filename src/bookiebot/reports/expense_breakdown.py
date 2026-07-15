@@ -106,6 +106,12 @@ class RawSheet:
     rows: list[list[str]]
 
 
+@dataclass(frozen=True)
+class IncomeProjectionConfig:
+    source_label: str | None = None
+    anchor_date: datetime | None = None
+
+
 @dataclass
 class ExpenseBreakdownReport:
     actor_key: str
@@ -129,6 +135,7 @@ class ExpenseBreakdownReport:
     subscriptions: list[SubscriptionItem] = field(default_factory=list)
     calendar_events: list[CalendarEvent] = field(default_factory=list)
     income_entries: list[PaymentItem] = field(default_factory=list)
+    income_projection_config: IncomeProjectionConfig = field(default_factory=IncomeProjectionConfig)
     raw_sheets: list[RawSheet] = field(default_factory=list)
 
 
@@ -223,6 +230,25 @@ SAVINGS_DEPOSIT_LABEL_PHRASES = {
         "second savings deposit",
     ),
 }
+INCOME_PROJECTION_SOURCE_LABELS = (
+    "biweekly income event",
+    "biweekly income source",
+    "recurring income event",
+    "recurring income source",
+    "paycheck source",
+    "paycheck income source",
+)
+INCOME_PROJECTION_START_LABELS = (
+    "biweekly income start",
+    "biweekly income start date",
+    "biweekly start date",
+    "biweekly pay start",
+    "biweekly pay start date",
+    "pay schedule start",
+    "pay schedule start date",
+    "first pay date",
+    "income anchor date",
+)
 
 
 def parse_budget_month(value: Any = None, *, now: datetime | None = None) -> BudgetMonth:
@@ -337,6 +363,7 @@ def build_expense_breakdown_report(
     subscriptions = _subscription_items(subscription_rows)
     current_month_subscriptions = _current_month_subscription_items(subscriptions, month)
     income_entries, income_total = _income_entries(personal_rows)
+    income_projection_config = _income_projection_config(personal_rows)
     remaining_budget, remaining_wants_budget = _margin_amounts(personal_rows)
     amount_saved = _amount_saved(personal_rows)
     savings_goal = _savings_goal(personal_rows)
@@ -359,6 +386,7 @@ def build_expense_breakdown_report(
         payments=payments,
         income_entries=income_entries,
         income_total=income_total,
+        income_projection_config=income_projection_config,
         utility_history=utility_history,
         bill_schedule_rows=bill_schedule_rows,
     )
@@ -413,6 +441,7 @@ def build_expense_breakdown_report(
         subscriptions=subscriptions,
         calendar_events=calendar_events,
         income_entries=income_entries,
+        income_projection_config=income_projection_config,
         raw_sheets=[
             RawSheet("Shared Expenses", _compact_rows(shared_rows)),
             RawSheet("Personal Budget", _compact_rows(personal_rows)),
@@ -706,6 +735,7 @@ def _calendar_events(
     payments: list[PaymentItem],
     income_entries: list[PaymentItem],
     income_total: float,
+    income_projection_config: IncomeProjectionConfig,
     utility_history: list[UtilityHistoryItem],
     bill_schedule_rows: list[list[str]],
 ) -> list[CalendarEvent]:
@@ -713,7 +743,7 @@ def _calendar_events(
     events: list[CalendarEvent] = []
     events.extend(_subscription_calendar_events(subscriptions, month, elapsed_days))
     events.extend(_bill_calendar_events(payments, utility_history, bill_schedule_rows, month, elapsed_days))
-    events.extend(_income_calendar_events(income_entries, income_total, month))
+    events.extend(_income_calendar_events(income_entries, income_total, month, income_projection_config))
     return sorted(events, key=lambda item: (item.day, item.kind, item.label.lower()))
 
 
@@ -797,17 +827,18 @@ def _income_calendar_events(
     income_entries: list[PaymentItem],
     income_total: float,
     month: BudgetMonth,
+    projection_config: IncomeProjectionConfig | None = None,
 ) -> list[CalendarEvent]:
     if income_total <= 0:
         return []
     days_in_month = calendar.monthrange(month.year, month.month)[1]
     current_entries = income_entries or [PaymentItem("Income", income_total, "income")]
-    paycheck_entries = _paycheck_income_entries(current_entries)
+    paycheck_entries = _paycheck_income_entries(current_entries, projection_config)
     other_entries = [item for item in current_entries if item not in paycheck_entries]
     if not paycheck_entries and len(current_entries) == 1:
         paycheck_entries = current_entries
         other_entries = []
-    pay_days = _biweekly_pay_days(month, _paycheck_anchor_date(paycheck_entries, month))
+    pay_days = _biweekly_pay_days(month, _paycheck_anchor_date(paycheck_entries, month, projection_config))
     events: list[CalendarEvent] = []
     logged_paycheck_days: set[int] = set()
 
@@ -828,8 +859,8 @@ def _income_calendar_events(
     if unparsed_total > 0:
         events.append(CalendarEvent("income", "Other income", unparsed_total, 1, "income", projected_only=False))
 
-    projected_total = _projected_income_total(income_entries, income_total, month)
-    paycheck_amount = _projected_paycheck_amount(current_entries)
+    projected_total = _projected_income_total(income_entries, income_total, month, projection_config)
+    paycheck_amount = _projected_paycheck_amount(current_entries, projection_config)
     projected_gap = round(projected_total - income_total, 2)
     if projected_gap > 0 and paycheck_amount > 0 and not _is_completed_month(month):
         for day in (day for day in pay_days if day not in logged_paycheck_days):
@@ -841,23 +872,38 @@ def _income_calendar_events(
     return events
 
 
-def _projected_income_total(income_entries: list[PaymentItem], income_total: float, month: BudgetMonth) -> float:
+def _projected_income_total(
+    income_entries: list[PaymentItem],
+    income_total: float,
+    month: BudgetMonth,
+    projection_config: IncomeProjectionConfig | None = None,
+) -> float:
     if _is_completed_month(month) or income_total <= 0:
         return round(income_total, 2)
     current_entries = income_entries or [PaymentItem("Income", income_total, "income")]
-    paycheck_amount = _projected_paycheck_amount(current_entries)
+    paycheck_amount = _projected_paycheck_amount(current_entries, projection_config)
     if paycheck_amount <= 0:
         return round(income_total, 2)
-    paycheck_entries = _paycheck_income_entries(current_entries)
+    paycheck_entries = _paycheck_income_entries(current_entries, projection_config)
     if not paycheck_entries and len(current_entries) == 1:
         paycheck_entries = current_entries
     logged_paycheck_total = round(sum(item.amount for item in paycheck_entries), 2)
     other_income_total = max(0.0, round(income_total - logged_paycheck_total, 2))
-    projected_total = round(other_income_total + paycheck_amount * len(_biweekly_pay_days(month, _paycheck_anchor_date(paycheck_entries, month))), 2)
+    projected_total = round(
+        other_income_total
+        + paycheck_amount * len(_biweekly_pay_days(month, _paycheck_anchor_date(paycheck_entries, month, projection_config))),
+        2,
+    )
     return round(max(income_total, projected_total), 2)
 
 
-def _paycheck_income_entries(income_entries: list[PaymentItem]) -> list[PaymentItem]:
+def _paycheck_income_entries(
+    income_entries: list[PaymentItem],
+    projection_config: IncomeProjectionConfig | None = None,
+) -> list[PaymentItem]:
+    configured_entries = _configured_biweekly_income_entries(income_entries, projection_config)
+    if configured_entries:
+        return configured_entries
     return [
         item
         for item in income_entries
@@ -865,8 +911,26 @@ def _paycheck_income_entries(income_entries: list[PaymentItem]) -> list[PaymentI
     ]
 
 
-def _projected_paycheck_amount(income_entries: list[PaymentItem]) -> float:
-    paycheck_entries = _paycheck_income_entries(income_entries)
+def _configured_biweekly_income_entries(
+    income_entries: list[PaymentItem],
+    projection_config: IncomeProjectionConfig | None = None,
+) -> list[PaymentItem]:
+    source_label = (projection_config.source_label if projection_config else None) or ""
+    normalized_source = _normalize_label(source_label)
+    if not normalized_source:
+        return []
+    return [
+        item
+        for item in income_entries
+        if _labels_match(_normalize_label(item.label), normalized_source)
+    ]
+
+
+def _projected_paycheck_amount(
+    income_entries: list[PaymentItem],
+    projection_config: IncomeProjectionConfig | None = None,
+) -> float:
+    paycheck_entries = _paycheck_income_entries(income_entries, projection_config)
     if not paycheck_entries and len(income_entries) == 1:
         paycheck_entries = income_entries
     if not paycheck_entries:
@@ -874,7 +938,13 @@ def _projected_paycheck_amount(income_entries: list[PaymentItem]) -> float:
     return round(sum(item.amount for item in paycheck_entries) / len(paycheck_entries), 2)
 
 
-def _paycheck_anchor_date(income_entries: list[PaymentItem], month: BudgetMonth) -> datetime | None:
+def _paycheck_anchor_date(
+    income_entries: list[PaymentItem],
+    month: BudgetMonth,
+    projection_config: IncomeProjectionConfig | None = None,
+) -> datetime | None:
+    if projection_config and projection_config.anchor_date is not None:
+        return projection_config.anchor_date
     parsed_dates = [
         parsed
         for item in income_entries
@@ -1029,17 +1099,52 @@ def _income_entries(rows: list[list[str]]) -> tuple[list[PaymentItem], float]:
 
     if marker_index is not None:
         for row in rows[:marker_index]:
+            if _is_income_projection_config_row(row):
+                continue
             item = _income_entry_from_row(row)
             if item:
                 items.append(item)
     else:
         for row in rows:
+            if _is_income_projection_config_row(row):
+                continue
             item = _income_entry_from_row(row, require_income_like_label=True)
             if item:
                 items.append(item)
 
     total = summary_total or round(sum(item.amount for item in items), 2)
     return items, round(total, 2)
+
+
+def _income_projection_config(rows: list[list[str]]) -> IncomeProjectionConfig:
+    source_label: str | None = None
+    anchor_date: datetime | None = None
+
+    for row in rows:
+        normalized_cells = [_normalize_label(value) for value in row]
+        for index, normalized in enumerate(normalized_cells):
+            if not normalized:
+                continue
+            if source_label is None and any(_matches_income_projection_config_label(normalized, label) for label in INCOME_PROJECTION_SOURCE_LABELS):
+                source_label = _next_text_value(row, index + 1, window=6)
+            if anchor_date is None and any(_matches_income_projection_config_label(normalized, label) for label in INCOME_PROJECTION_START_LABELS):
+                anchor_date = _next_date_value(row, index + 1, window=6)
+
+    return IncomeProjectionConfig(source_label=source_label, anchor_date=anchor_date)
+
+
+def _is_income_projection_config_row(row: list[str]) -> bool:
+    normalized_cells = [_normalize_label(value) for value in row]
+    labels = INCOME_PROJECTION_SOURCE_LABELS + INCOME_PROJECTION_START_LABELS
+    return any(
+        any(_matches_income_projection_config_label(normalized, label) for label in labels)
+        for normalized in normalized_cells
+        if normalized
+    )
+
+
+def _matches_income_projection_config_label(normalized: str, label: str) -> bool:
+    return normalized == label or _contains_normalized_phrase(normalized, label)
 
 
 def _monthly_income_summary(rows: list[list[str]]) -> float:
@@ -1082,6 +1187,23 @@ def _row_date_text(row: list[str]) -> str:
         if _parse_date(text) is not None:
             return text
     return ""
+
+
+def _next_text_value(row: list[str], start_index: int, *, window: int = 4) -> str | None:
+    for value in row[start_index : start_index + window]:
+        text = str(value).strip()
+        if not text or _parse_date(text) is not None or _cell_money(text):
+            continue
+        return text
+    return None
+
+
+def _next_date_value(row: list[str], start_index: int, *, window: int = 4) -> datetime | None:
+    for value in row[start_index : start_index + window]:
+        parsed = _parse_date(str(value).strip())
+        if parsed is not None:
+            return parsed
+    return None
 
 
 def _nearest_left_label(row: list[str], index: int) -> str:
@@ -1552,7 +1674,12 @@ def _amount_row(label: str, amount: float) -> dict[str, Any]:
 
 
 def _income_projection_payload(report: ExpenseBreakdownReport) -> dict[str, Any]:
-    projected_amount = _projected_income_total(report.income_entries, report.income_total, report.month)
+    projected_amount = _projected_income_total(
+        report.income_entries,
+        report.income_total,
+        report.month,
+        report.income_projection_config,
+    )
     return {
         "currentAmount": round(report.income_total, 2),
         "projectedAmount": projected_amount,
