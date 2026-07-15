@@ -766,6 +766,7 @@ summary {
 
 .bb-chart-carousel-track {
   display: flex;
+  align-items: flex-start;
   gap: var(--bb-chart-carousel-gap);
   min-width: 0;
   width: 100%;
@@ -783,7 +784,7 @@ summary {
 }
 
 .bb-chart-carousel-slide > .bb-card {
-  height: 100%;
+  height: auto;
 }
 
 .bb-chart-carousel[data-dragging="true"] .recharts-tooltip-wrapper,
@@ -907,15 +908,10 @@ summary {
   margin-left: auto;
 }
 
-.bb-burn-rate-filter {
-  margin-left: auto;
-}
-
 .bb-chart-stack {
   display: grid;
-  grid-template-rows: auto minmax(260px, 1fr) auto;
+  grid-template-rows: auto minmax(260px, auto) auto;
   gap: 16px;
-  height: 100%;
   align-content: stretch;
   min-width: 0;
   min-height: 0;
@@ -1089,8 +1085,8 @@ summary {
 .bb-details-panel {
   display: grid;
   align-content: start;
-  justify-items: start;
   gap: 8px;
+  width: 100%;
   min-width: 0;
 }
 
@@ -1129,6 +1125,7 @@ summary {
 .bb-details-content {
   display: grid;
   grid-template-rows: 0fr;
+  width: 100%;
   min-height: 0;
   opacity: 0;
   overflow: hidden;
@@ -1142,6 +1139,7 @@ summary {
 }
 
 .bb-details-content-inner {
+  width: 100%;
   min-height: 0;
   overflow: hidden;
   padding-top: 2px;
@@ -1149,7 +1147,7 @@ summary {
 
 .bb-hidden-list-panel {
   display: grid;
-  justify-items: start;
+  width: 100%;
   gap: 10px;
 }
 
@@ -1406,6 +1404,16 @@ tr:last-child td {
   .bb-chart-layout {
     min-height: 0;
   }
+
+  .bb-category-chart-layout {
+    grid-template-rows: auto auto;
+  }
+
+  .bb-category-chart-box,
+  .bb-analytics-card .bb-category-chart-box {
+    height: clamp(340px, 54vh, 460px);
+    min-height: 340px;
+  }
 }
 
 @media (max-width: 420px) {
@@ -1489,6 +1497,7 @@ tr:last-child td {
 
   .bb-bills-chart-box,
   .bb-analytics-card .bb-chart-box,
+  .bb-analytics-card .bb-category-chart-box,
   .bb-analytics-card .bb-bills-chart-box {
     height: 300px;
     min-height: 260px;

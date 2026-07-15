@@ -16,7 +16,7 @@ import {
 
 import { Badge } from "./components/ui/badge"
 import { Card, CardContent, CardHeader, CardTitle } from "./components/ui/card"
-import { ChartContainer, ChartTooltip, ChartTooltipContent, useTouchTooltipVisibility } from "./components/ui/chart"
+import { ChartContainer, ChartTooltip, ChartTooltipContent } from "./components/ui/chart"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "./components/ui/tabs"
 import type {
   AmountRow,
@@ -176,7 +176,6 @@ type ChartPanel = {
 
 type CalendarFilter = "all" | "subscription"
 type DailySpendingFilter = "all" | "needs" | "wants"
-type BurnRateMode = "all" | "needs" | "wants"
 
 const CHART_CAROUSEL_GAP = 16
 const DAILY_SPENDING_FILTERS: Array<{ value: DailySpendingFilter; label: string }> = [
@@ -185,13 +184,6 @@ const DAILY_SPENDING_FILTERS: Array<{ value: DailySpendingFilter; label: string 
   { value: "wants", label: "Wants" },
 ]
 const DAILY_WANTS_CATEGORIES = new Set(["Food", "Shopping"])
-const BURN_RATE_FILTERS: Array<{ value: BurnRateMode; label: string }> = [
-  { value: "all", label: "All" },
-  { value: "needs", label: "Needs" },
-  { value: "wants", label: "Wants" },
-]
-const NEEDS_BURN_RATE_KEYS = new Set(["rent", "bills_utilities", "static_bills_subscriptions_needs", "need_expenses", "grocery", "gas"])
-const WANTS_BURN_RATE_KEYS = new Set(["food", "shopping"])
 
 type ChartTouchState = {
   startX: number
@@ -317,168 +309,6 @@ function projectedBurnRateFromIncome(burnRate: BurnRate | null, monthlyIncome: n
   }
 }
 
-function burnRateForMode(report: ExpenseReportData, view: ReportView, mode: BurnRateMode, projected: boolean) {
-  if (mode === "wants") {
-    return view.burnRate
-  }
-
-  const keys = burnRateKeysForMode(mode)
-  const spent = roundCurrency(sumBreakdownKeys(view.breakdown, keys))
-  const remaining = burnRateRemainingForMode(report, mode)
-  const fallbackBudget = mode === "all" ? view.metrics.monthlyIncome : spent
-  const budget = roundCurrency(remaining === null ? fallbackBudget : spent + remaining)
-  return buildDerivedBurnRate({
-    budget,
-    spent,
-    daysInMonth: report.daysInMonth,
-    elapsedDays: report.elapsedDays,
-    dailyAmounts: burnRateDailyAmounts(report, keys, spent, projected),
-  })
-}
-
-function burnRateKeysForMode(mode: BurnRateMode) {
-  if (mode === "needs") {
-    return NEEDS_BURN_RATE_KEYS
-  }
-  if (mode === "wants") {
-    return WANTS_BURN_RATE_KEYS
-  }
-  return new Set([...NEEDS_BURN_RATE_KEYS, ...WANTS_BURN_RATE_KEYS, "subscriptions_wants"])
-}
-
-function sumBreakdownKeys(breakdown: BreakdownItem[], keys: Set<string>) {
-  return breakdown.reduce((sum, item) => sum + (keys.has(item.key) ? item.amount : 0), 0)
-}
-
-function burnRateRemainingForMode(report: ExpenseReportData, mode: BurnRateMode) {
-  if (mode === "needs") {
-    return report.metrics.remainingNeedsBudget
-  }
-  if (mode === "all") {
-    const needs = report.metrics.remainingNeedsBudget
-    const wants = report.metrics.remainingWantsBudget
-    if (needs === null || needs === undefined || wants === null || wants === undefined) {
-      return null
-    }
-    return roundCurrency(needs + wants)
-  }
-  return report.metrics.remainingWantsBudget
-}
-
-function burnRateDailyAmounts(report: ExpenseReportData, keys: Set<string>, spent: number, projected: boolean) {
-  const rawAmounts = new Map<number, number>()
-  const labelsByKey = new Map(report.breakdown.map((item) => [item.key, item.label]))
-  const activeLabels = new Set(Array.from(keys).map((key) => labelsByKey.get(key)).filter((label): label is string => Boolean(label)))
-
-  for (const entry of report.dailyEntries) {
-    if (!activeLabels.has(entry.category)) {
-      continue
-    }
-    const day = expenseEntryDay(entry)
-    if (day === null) {
-      continue
-    }
-    rawAmounts.set(day, roundCurrency((rawAmounts.get(day) ?? 0) + entry.amount))
-  }
-
-  for (const event of report.calendarEvents) {
-    if (event.kind === "income" || !keys.has(event.group) || (!projected && event.projectedOnly)) {
-      continue
-    }
-    rawAmounts.set(event.day, roundCurrency((rawAmounts.get(event.day) ?? 0) + event.amount))
-  }
-
-  return scaledBurnRateDailyAmounts(rawAmounts, spent, report.elapsedDays)
-}
-
-function expenseEntryDay(entry: ExpenseEntry) {
-  const trimmed = entry.date.trim()
-  let day: number | null = null
-  const isoMatch = trimmed.match(/^\d{4}-(\d{1,2})-(\d{1,2})/)
-  const slashMatch = trimmed.match(/^(\d{1,2})\/(\d{1,2})(?:\/\d{2,4})?/)
-  const monthNameMatch = trimmed.match(/\b(?:jan|feb|mar|apr|may|jun|jul|aug|sep|sept|oct|nov|dec)[a-z]*\s+(\d{1,2})\b/i)
-  if (isoMatch) {
-    day = Number(isoMatch[2])
-  } else if (slashMatch) {
-    day = Number(slashMatch[2])
-  } else if (monthNameMatch) {
-    day = Number(monthNameMatch[1])
-  }
-  return day !== null && Number.isFinite(day) && day >= 1 && day <= 31 ? day : null
-}
-
-function scaledBurnRateDailyAmounts(rawAmounts: Map<number, number>, spent: number, elapsedDays: number) {
-  const rawTotal = roundCurrency(Array.from(rawAmounts.values()).reduce((sum, amount) => sum + amount, 0))
-  if (rawTotal > 0) {
-    const scale = spent / rawTotal
-    const scaled = new Map<number, number>()
-    for (const [day, amount] of rawAmounts) {
-      scaled.set(day, roundCurrency(amount * scale))
-    }
-    const roundingDelta = roundCurrency(spent - Array.from(scaled.values()).reduce((sum, amount) => sum + amount, 0))
-    if (roundingDelta) {
-      const lastDay = Math.max(...scaled.keys())
-      scaled.set(lastDay, roundCurrency((scaled.get(lastDay) ?? 0) + roundingDelta))
-    }
-    return scaled
-  }
-  if (spent > 0 && elapsedDays > 0) {
-    return new Map([[elapsedDays, spent]])
-  }
-  return new Map<number, number>()
-}
-
-function buildDerivedBurnRate({
-  budget,
-  spent,
-  daysInMonth,
-  elapsedDays,
-  dailyAmounts,
-}: {
-  budget: number
-  spent: number
-  daysInMonth: number
-  elapsedDays: number
-  dailyAmounts: Map<number, number>
-}): BurnRate {
-  const expectedSpend = roundCurrency(daysInMonth ? budget * (elapsedDays / daysInMonth) : 0)
-  const allowedDailyAverage = roundCurrency(daysInMonth ? budget / daysInMonth : 0)
-  const actualDailyAverage = roundCurrency(elapsedDays ? spent / elapsedDays : 0)
-  const dailyDifference = roundCurrency(actualDailyAverage - allowedDailyAverage)
-  const totalDifference = roundCurrency(spent - expectedSpend)
-  const status: BurnRate["status"] = elapsedDays === 0 ? "not_started" : totalDifference > 0 ? "over" : "under"
-  let cumulativeActual = 0
-  const series = Array.from({ length: elapsedDays }, (_, index) => {
-    const day = index + 1
-    const dailySpend = roundCurrency(dailyAmounts.get(day) ?? 0)
-    cumulativeActual = roundCurrency(cumulativeActual + dailySpend)
-    const expected = roundCurrency(daysInMonth ? budget * (day / daysInMonth) : 0)
-    return {
-      day,
-      label: String(day),
-      dailySpend,
-      actualSpend: cumulativeActual,
-      expectedSpend: expected,
-      variance: roundCurrency(cumulativeActual - expected),
-    }
-  })
-
-  return {
-    budget,
-    spent,
-    remaining: roundCurrency(budget - spent),
-    daysInMonth,
-    elapsedDays,
-    expectedSpend,
-    allowedDailyAverage,
-    actualDailyAverage,
-    dailyDifference,
-    totalDifference,
-    status,
-    series,
-  }
-}
-
 function calendarEventsForMode(events: CalendarEvent[]) {
   return events
 }
@@ -495,7 +325,6 @@ export function ExpenseReportApp({ report }: { report: ExpenseReportData }) {
   const { theme, toggleTheme } = useExpenseReportTheme()
   const [projectionActive, setProjectionActive] = useState(false)
   const [calendarFilter, setCalendarFilter] = useState<CalendarFilter>("all")
-  const [burnRateMode, setBurnRateMode] = useState<BurnRateMode>("wants")
   const [dailySpendingFilter, setDailySpendingFilter] = useState<DailySpendingFilter>("all")
   const [chartTouch, setChartTouch] = useState<ChartTouchState | null>(null)
   const chartGestureRef = useRef<ChartTouchState | null>(null)
@@ -506,7 +335,6 @@ export function ExpenseReportApp({ report }: { report: ExpenseReportData }) {
   const categoryColors: Record<string, string> = Object.fromEntries(activeReport.breakdown.map((item) => [item.label, item.color]))
   const dailyEntries = filterDailyEntries(report.dailyEntries, dailySpendingFilter)
   const dailyTotals = dailyTotalsForEntries(dailyEntries)
-  const activeBurnRate = burnRateForMode(report, activeReport, burnRateMode, projectionActive)
   const defaultChartTab = report.burnRate ? "burn-rate" : "category"
   const chartPanels: ChartPanel[] = [
     {
@@ -514,13 +342,12 @@ export function ExpenseReportApp({ report }: { report: ExpenseReportData }) {
       title: "Category Mix",
       content: <CategoryMixChart data={activeReport.breakdown} total={amountRowsTotal(activeReport.breakdown)} projected={projectionActive} collapseKey={chartCollapseKey} />,
     },
-    ...(activeBurnRate
+    ...(activeReport.burnRate
       ? [
           {
             id: "burn-rate",
             title: "Burn Rate",
-            headerControl: <BurnRateModeControl mode={burnRateMode} onModeChange={setBurnRateMode} />,
-            content: <BurnRateChart burnRate={activeBurnRate} collapseKey={chartCollapseKey} />,
+            content: <BurnRateChart burnRate={activeReport.burnRate} collapseKey={chartCollapseKey} />,
           },
         ]
       : []),
@@ -573,7 +400,7 @@ export function ExpenseReportApp({ report }: { report: ExpenseReportData }) {
     tooltipCooldownTimeoutRef.current = window.setTimeout(() => {
       setChartTooltipCooldown(false)
       tooltipCooldownTimeoutRef.current = null
-    }, 3000)
+    }, 320)
   }
 
   const switchChart = (nextIndex: number) => {
@@ -799,32 +626,6 @@ function DailySpendingFilterControl({
           role="tab"
           aria-selected={filter === item.value}
           onClick={() => onFilterChange(item.value)}
-        >
-          {item.label}
-        </button>
-      ))}
-    </div>
-  )
-}
-
-function BurnRateModeControl({
-  mode,
-  onModeChange,
-}: {
-  mode: BurnRateMode
-  onModeChange: (mode: BurnRateMode) => void
-}) {
-  return (
-    <div className="bb-tabs-list bb-burn-rate-filter" role="tablist" aria-label="Burn rate filter">
-      {BURN_RATE_FILTERS.map((item) => (
-        <button
-          type="button"
-          key={item.value}
-          className="bb-tabs-trigger"
-          data-state={mode === item.value ? "active" : "inactive"}
-          role="tab"
-          aria-selected={mode === item.value}
-          onClick={() => onModeChange(item.value)}
         >
           {item.label}
         </button>
@@ -1064,17 +865,17 @@ function BurnRateTooltipContent({
   payload?: BurnRateTooltipPayload[]
 }) {
   const point = payload?.find((item) => item.payload?.variance !== null && item.payload?.variance !== undefined)?.payload
-  const visible = useTouchTooltipVisibility(active, point ? `${point.day}:${point.variance}:${point.actualSpend}` : "")
-  if (!visible || !point || point.variance === null) {
+  if (!active || !point || point.variance === null) {
     return null
   }
 
   const isOver = point.variance > 0
   const label = isOver ? "Over pace" : "Under pace"
   const color = burnRatePointColor(point.variance)
+  const signature = `${point.day}:${point.variance}:${point.actualSpend}`
 
   return (
-    <div className="bb-chart-tooltip bb-touch-tooltip-content">
+    <div className="bb-chart-tooltip bb-touch-tooltip-content" key={signature}>
       <div className="bb-chart-tooltip-title">Day {point.label}</div>
       <div className="bb-chart-tooltip-row">
         <span className="bb-chart-tooltip-dot" style={{ background: color }} />
@@ -1463,12 +1264,12 @@ function MerchantTooltipContent({
   payload?: Array<{ payload?: OccurrenceRow }>
 }) {
   const row = payload?.find((item) => item.payload)?.payload
-  const visible = useTouchTooltipVisibility(active, row ? `${row.label}:${row.count}:${row.amount}` : "")
-  if (!visible || !row) {
+  if (!active || !row) {
     return null
   }
+  const signature = `${row.label}:${row.count}:${row.amount}`
   return (
-    <div className="bb-chart-tooltip bb-touch-tooltip-content">
+    <div className="bb-chart-tooltip bb-touch-tooltip-content" key={signature}>
       <div className="bb-chart-tooltip-title">{row.label}</div>
       <div className="bb-chart-tooltip-row">
         <span className="bb-chart-tooltip-dot" style={{ background: "hsl(var(--chart-4))" }} />
