@@ -733,12 +733,25 @@ class BankStore:
                 (error[:1000], int(event_id)),
             )
 
-    def recent_transactions(self, owner_key: str, limit: int = 10) -> list[BankTransaction]:
+    def recent_transactions(
+        self,
+        owner_key: str,
+        limit: int = 10,
+        *,
+        start_date: str | None = None,
+    ) -> list[BankTransaction]:
         safe_limit = max(1, min(int(limit), 25))
+        date_filter = ""
+        params: tuple[Any, ...]
+        if start_date:
+            date_filter = " AND COALESCE(t.date, t.authorized_date, '') >= ?"
+            params = (owner_key, start_date, safe_limit)
+        else:
+            params = (owner_key, safe_limit)
         self.initialize()
         with self.connect() as conn:
             rows = conn.execute(
-                """
+                f"""
                 SELECT
                     t.id,
                     t.provider_transaction_id,
@@ -760,11 +773,12 @@ class BankStore:
                 LEFT JOIN bank_accounts a ON a.id = t.account_id
                 WHERE t.owner_key = ?
                   AND t.removed_at IS NULL
+                  {date_filter}
                   AND (t.account_id IS NULL OR COALESCE(a.watched, 1) = 1)
                 ORDER BY COALESCE(t.date, t.authorized_date, '') DESC, t.updated_at DESC, t.id DESC
                 LIMIT ?
                 """,
-                (owner_key, safe_limit),
+                params,
             ).fetchall()
         return [_bank_transaction_from_row(row) for row in rows]
 
@@ -782,7 +796,7 @@ class BankStore:
             ).fetchone()
         return int(row["count"]) if row else 0
 
-    def reconciliation_cache_buckets(self, owner_key: str) -> ReconciliationCacheBuckets:
+    def reconciliation_cache_buckets(self, owner_key: str, *, start_date: str | None = None) -> ReconciliationCacheBuckets:
         self.initialize()
         buckets = {
             "stored": 0,
@@ -795,9 +809,16 @@ class BankStore:
             "unwatched": 0,
             "other": 0,
         }
+        date_filter = ""
+        params: tuple[Any, ...]
+        if start_date:
+            date_filter = " AND COALESCE(t.date, t.authorized_date, '') >= ?"
+            params = (owner_key, start_date)
+        else:
+            params = (owner_key,)
         with self.connect() as conn:
             rows = conn.execute(
-                """
+                f"""
                 SELECT
                     CASE
                         WHEN COALESCE(a.watched, 1) = 0 THEN 'unwatched'
@@ -815,9 +836,10 @@ class BankStore:
                 LEFT JOIN bank_reconciliation_items r ON r.bank_transaction_id = t.id
                 WHERE t.owner_key = ?
                   AND t.removed_at IS NULL
+                  {date_filter}
                 GROUP BY bucket
                 """,
-                (owner_key,),
+                params,
             ).fetchall()
         for row in rows:
             bucket = str(row["bucket"])
@@ -832,17 +854,31 @@ class BankStore:
         *,
         limit: int = 50,
         force: bool = False,
+        start_date: str | None = None,
     ) -> list[BankTransaction]:
         if force:
-            return self.recent_transactions(owner_key=owner_key, limit=min(max(1, int(limit)), 25))
-        return self.unreconciled_transactions(owner_key=owner_key, limit=limit)
+            return self.recent_transactions(owner_key=owner_key, limit=min(max(1, int(limit)), 25), start_date=start_date)
+        return self.unreconciled_transactions(owner_key=owner_key, limit=limit, start_date=start_date)
 
-    def unreconciled_transactions(self, owner_key: str, limit: int = 50) -> list[BankTransaction]:
+    def unreconciled_transactions(
+        self,
+        owner_key: str,
+        limit: int = 50,
+        *,
+        start_date: str | None = None,
+    ) -> list[BankTransaction]:
         safe_limit = max(1, min(int(limit), 100))
+        date_filter = ""
+        params: tuple[Any, ...]
+        if start_date:
+            date_filter = " AND COALESCE(t.date, t.authorized_date, '') >= ?"
+            params = (owner_key, start_date, safe_limit)
+        else:
+            params = (owner_key, safe_limit)
         self.initialize()
         with self.connect() as conn:
             rows = conn.execute(
-                """
+                f"""
                 SELECT
                     t.id,
                     t.provider_transaction_id,
@@ -866,6 +902,7 @@ class BankStore:
                 WHERE t.owner_key = ?
                   AND t.removed_at IS NULL
                   AND t.pending = 0
+                  {date_filter}
                   AND (t.account_id IS NULL OR COALESCE(a.watched, 1) = 1)
                   AND (
                     r.id IS NULL
@@ -874,7 +911,7 @@ class BankStore:
                 ORDER BY COALESCE(t.date, t.authorized_date, '') DESC, t.updated_at DESC, t.id DESC
                 LIMIT ?
                 """,
-                (owner_key, safe_limit),
+                params,
             ).fetchall()
         return [_bank_transaction_from_row(row) for row in rows]
 
@@ -961,10 +998,13 @@ class BankStore:
         limit: int = 25,
         *,
         max_age_days: int | None = None,
+        start_date: str | None = None,
     ) -> list[ReconciliationItem]:
         safe_limit = max(1, min(int(limit), 100))
         cutoff_date = None
-        if max_age_days is not None:
+        if start_date:
+            cutoff_date = start_date
+        elif max_age_days is not None:
             cutoff_date = (date.today() - timedelta(days=max(1, int(max_age_days)))).isoformat()
         date_filter = ""
         params: tuple[Any, ...]
@@ -1015,10 +1055,13 @@ class BankStore:
         limit: int = 25,
         *,
         max_age_days: int | None = None,
+        start_date: str | None = None,
     ) -> list[ReconciliationItem]:
         safe_limit = max(1, min(int(limit), 100))
         cutoff_date = None
-        if max_age_days is not None:
+        if start_date:
+            cutoff_date = start_date
+        elif max_age_days is not None:
             cutoff_date = (date.today() - timedelta(days=max(1, int(max_age_days)))).isoformat()
         date_filter = ""
         params: tuple[Any, ...]
@@ -1224,6 +1267,26 @@ class BankStore:
             raw_id = str(row["matched_action_log_id"])
             matched_ids.update(part.strip() for part in raw_id.split("+") if part.strip())
         return matched_ids
+
+    def matched_sheet_refs(self, owner_key: str) -> set[str]:
+        self.initialize()
+        with self.connect() as conn:
+            rows = conn.execute(
+                """
+                SELECT matched_sheet_ref
+                FROM bank_reconciliation_items
+                WHERE owner_key = ?
+                  AND matched_sheet_ref IS NOT NULL
+                  AND matched_sheet_ref != ''
+                  AND status IN ('matched', 'confirmed', 'import_requested')
+                """,
+                (owner_key,),
+            ).fetchall()
+        matched_refs: set[str] = set()
+        for row in rows:
+            raw_ref = str(row["matched_sheet_ref"])
+            matched_refs.update(part.strip() for part in raw_ref.split(" + ") if part.strip())
+        return matched_refs
 
     def confirm_reconciliation_item(
         self,

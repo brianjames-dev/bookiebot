@@ -668,6 +668,98 @@ def test_reconciliation_preview_force_rechecks_already_matched_items(tmp_path):
     assert forced_preview.items[0].classification == "transfer_or_payment"
 
 
+def test_reconciliation_preview_does_not_reuse_action_log_match(monkeypatch, tmp_path):
+    action = LoggedAction(
+        id="biscuits123",
+        created_at="2026-05-11T12:00:00",
+        user_key="676638528590970917",
+        action=UndoAction(
+            worksheet="expense",
+            kind="clear_cells",
+            row=12,
+            columns=[14, 15, 16, 17, 18],
+            previous_values=["", "", "", "", ""],
+            new_values=["5/11/2026", "breakfast", "17.00", "Biscuits and Gravy", "Brian (BofA)"],
+            metadata={"type": "expense", "category": "food", "person": "Brian (BofA)"},
+            description="food expense $17.00 for Brian (BofA)",
+        ),
+    )
+    monkeypatch.setattr(banking_service, "read_active_logged_actions", lambda _actor_key: [action])
+    monkeypatch.setattr(banking_service, "_scheduled_pulls_for_transactions", lambda *_args, **_kwargs: [])
+
+    store = BankStore(tmp_path / "banking.sqlite3", TokenCipher("test-secret-key"))
+    store.initialize()
+    item = store.upsert_item(
+        owner_key="brian",
+        provider="plaid",
+        item_id="item-1",
+        access_token="access-sandbox-123",
+        institution_name="Plaid Sandbox",
+    )
+    store.upsert_accounts(
+        [
+            BankAccount(
+                item_id=item.id,
+                provider_account_id="account-1",
+                owner_key="brian",
+                name="Checking",
+                mask="0000",
+                type="depository",
+                subtype="checking",
+                official_name=None,
+                current_balance=500.0,
+                available_balance=450.0,
+            )
+        ]
+    )
+    store.upsert_transactions(
+        [
+            {
+                "transaction_id": "txn-chads-soup",
+                "account_id": "account-1",
+                "date": "2026-05-13",
+                "name": "Chad's Soup Shack",
+                "amount": 17.0,
+                "pending": False,
+            },
+            {
+                "transaction_id": "txn-russian-river",
+                "account_id": "account-1",
+                "date": "2026-05-13",
+                "name": "Russian River Brewing",
+                "amount": 17.0,
+                "pending": False,
+            },
+        ],
+        owner_key="brian",
+    )
+    service = BankingService(
+        config=BankingConfig(
+            plaid_client_id="client",
+            plaid_secret="secret",
+            plaid_env="sandbox",
+            token_encryption_key="test-secret-key",
+            sqlite_path=Path("unused.sqlite3"),
+        ),
+        store=store,
+        plaid=PlaidClient(
+            BankingConfig(
+                plaid_client_id="client",
+                plaid_secret="secret",
+                plaid_env="sandbox",
+                token_encryption_key="test-secret-key",
+                sqlite_path=Path("unused.sqlite3"),
+            )
+        ),
+    )
+
+    preview = service.reconciliation_preview("brian", actor_key="676638528590970917")
+
+    matched = [item for item in preview.items if item.matched_action_log_id == "biscuits123"]
+    assert len(matched) == 1
+    assert len([item for item in preview.items if item.status == "needs_review"]) == 1
+
+
 def test_reconciliation_preview_excludes_ignored_accounts(tmp_path):
     store = BankStore(tmp_path / "banking.sqlite3", TokenCipher("test-secret-key"))
     store.initialize()

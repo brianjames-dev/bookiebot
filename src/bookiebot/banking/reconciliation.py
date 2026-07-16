@@ -133,9 +133,16 @@ def reconcile_transaction(
     transaction: BankTransaction,
     action_log: Iterable[LoggedAction] = (),
     scheduled_pulls: Iterable[ScheduledPullCandidate] = (),
+    excluded_action_ids: set[str] | None = None,
+    excluded_sheet_refs: set[str] | None = None,
 ) -> ReconciliationDecision:
     classification, status, confidence, notes = classify_transaction(transaction)
-    match = match_action_log(transaction, action_log, classification)
+    match = match_action_log(
+        transaction,
+        action_log,
+        classification,
+        excluded_action_ids=excluded_action_ids,
+    )
     if match:
         return ReconciliationDecision(
             classification=_matched_classification(classification, match.notes),
@@ -145,7 +152,11 @@ def reconcile_transaction(
             matched_action_log_id=match.action_id,
             matched_sheet_ref=match.sheet_ref,
         )
-    scheduled_match = match_scheduled_pull(transaction, scheduled_pulls)
+    scheduled_match = match_scheduled_pull(
+        transaction,
+        scheduled_pulls,
+        excluded_sheet_refs=excluded_sheet_refs,
+    )
     if scheduled_match:
         return ReconciliationDecision(
             classification="subscription_or_bill",
@@ -161,14 +172,19 @@ def match_action_log(
     transaction: BankTransaction,
     action_log: Iterable[LoggedAction],
     classification: ReconciliationClassification | None = None,
+    *,
+    excluded_action_ids: set[str] | None = None,
 ) -> ActionLogMatch | None:
     transaction_date = _transaction_date(transaction)
     if transaction_date is None:
         return None
 
     compatible = _compatible_action_types(transaction, classification)
+    excluded = excluded_action_ids or set()
     candidates = []
     for logged in action_log:
+        if logged.id in excluded:
+            continue
         candidate = _action_candidate(logged)
         if candidate is None or candidate["type"] not in compatible:
             continue
@@ -205,6 +221,7 @@ def match_scheduled_pull(
     scheduled_pulls: Iterable[ScheduledPullCandidate],
     *,
     window_days: int = 3,
+    excluded_sheet_refs: set[str] | None = None,
 ) -> ActionLogMatch | None:
     if transaction.pending or transaction.amount <= 0:
         return None
@@ -212,8 +229,11 @@ def match_scheduled_pull(
     if transaction_date is None:
         return None
 
+    excluded = excluded_sheet_refs or set()
     matches: list[tuple[float, int, ScheduledPullCandidate]] = []
     for pull in scheduled_pulls:
+        if pull.source_ref in excluded:
+            continue
         if abs(pull.amount - abs(transaction.amount)) > 0.01:
             continue
         day_delta = abs((pull.pull_date - transaction_date).days)

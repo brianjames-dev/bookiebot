@@ -65,6 +65,10 @@ def _reconciliation_max_age_days() -> int:
         return 60
 
 
+def _current_month_start() -> str:
+    return local_date.today().replace(day=1).isoformat()
+
+
 def _schedule_sources_for_actor(actor_key: str) -> tuple[list[Any], list[tuple[Any, bool, float]]]:
     cached = _SCHEDULE_SOURCE_CACHE.get(actor_key)
     now = time.monotonic()
@@ -555,10 +559,16 @@ class BankingService:
         limit: int = 25,
         *,
         max_age_days: int | None = None,
+        start_date: str | None = None,
     ) -> list:
-        if max_age_days is None:
+        if max_age_days is None and start_date is None:
             max_age_days = _reconciliation_max_age_days()
-        return self.store.unresolved_reconciliation_items(owner_key, limit=limit, max_age_days=max_age_days)
+        return self.store.unresolved_reconciliation_items(
+            owner_key,
+            limit=limit,
+            max_age_days=max_age_days,
+            start_date=start_date,
+        )
 
     def matched_reconciliation_items(
         self,
@@ -566,10 +576,16 @@ class BankingService:
         limit: int = 25,
         *,
         max_age_days: int | None = None,
+        start_date: str | None = None,
     ) -> list:
-        if max_age_days is None:
+        if max_age_days is None and start_date is None:
             max_age_days = _reconciliation_max_age_days()
-        return self.store.matched_reconciliation_items(owner_key, limit=limit, max_age_days=max_age_days)
+        return self.store.matched_reconciliation_items(
+            owner_key,
+            limit=limit,
+            max_age_days=max_age_days,
+            start_date=start_date,
+        )
 
     def resolved_reconciliation_items(self, owner_key: str, limit: int = 25) -> list:
         return self.store.resolved_reconciliation_items(owner_key, limit=limit)
@@ -734,7 +750,7 @@ class BankingService:
         items: list[ReconciliationItem],
         *,
         actor_key: str | None,
-        limit: int = 12,
+        limit: int = 100,
     ) -> list[ReconciliationReportMatch]:
         del owner_key
         matched_items = [
@@ -762,6 +778,7 @@ class BankingService:
             transaction = item.transaction
             report.append(
                 ReconciliationReportMatch(
+                    reconciliation_id=item.id,
                     bank_date=transaction.date or transaction.authorized_date or "unknown",
                     bank_name=transaction.merchant_name or transaction.name,
                     bank_amount=abs(transaction.amount),
@@ -1072,16 +1089,30 @@ class BankingService:
         *,
         force: bool = False,
         actor_key: str | None = None,
+        start_date: str | None = None,
     ) -> ReconciliationPreview:
         self.store.initialize()
-        cache_buckets = self.store.reconciliation_cache_buckets(owner_key)
+        cache_buckets = self.store.reconciliation_cache_buckets(owner_key, start_date=start_date)
         cached_transaction_count = cache_buckets.stored
-        transactions = self.store.bank_transactions_for_reconciliation(owner_key=owner_key, limit=limit, force=force)
+        transactions = self.store.bank_transactions_for_reconciliation(
+            owner_key=owner_key,
+            limit=limit,
+            force=force,
+            start_date=start_date,
+        )
         action_log = read_active_logged_actions(actor_key) if actor_key else []
         scheduled_pulls = _scheduled_pulls_for_transactions(transactions, actor_key=actor_key)
+        used_action_ids = set() if force else set(self.store.matched_action_log_ids(owner_key))
+        used_sheet_refs = set() if force else set(self.store.matched_sheet_refs(owner_key))
         items = []
         for transaction in transactions:
-            decision = reconcile_transaction(transaction, action_log, scheduled_pulls)
+            decision = reconcile_transaction(
+                transaction,
+                action_log,
+                scheduled_pulls,
+                excluded_action_ids=used_action_ids,
+                excluded_sheet_refs=used_sheet_refs,
+            )
             items.append(
                 self.store.upsert_reconciliation_item(
                     owner_key=owner_key,
@@ -1094,6 +1125,18 @@ class BankingService:
                     matched_sheet_ref=decision.matched_sheet_ref,
                 )
             )
+            if decision.matched_action_log_id:
+                used_action_ids.update(
+                    part.strip()
+                    for part in decision.matched_action_log_id.split("+")
+                    if part.strip()
+                )
+            if decision.matched_sheet_ref:
+                used_sheet_refs.update(
+                    part.strip()
+                    for part in decision.matched_sheet_ref.split(" + ")
+                    if part.strip()
+                )
         return ReconciliationPreview(
             owner_key=owner_key,
             items=items,

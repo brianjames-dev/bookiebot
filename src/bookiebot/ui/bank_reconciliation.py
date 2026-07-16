@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from collections.abc import Callable
 
+from bookiebot.banking.models import ReconciliationReportMatch
 from bookiebot.banking.reconciliation import ActionLogCandidate, ActionLogCandidateGroup
 from bookiebot.ui.card import ButtonBase, ButtonStyle, Interaction, SelectBase, SelectOption, ViewBase
 
@@ -41,6 +42,27 @@ class BankReconciliationMatchSelect(SelectBase):  # type: ignore[misc]
 
     async def callback(self, interaction: Interaction):
         await self.callback_func(interaction, self.actions_by_value[self.values[0]])
+
+
+class BankReconciliationUnmatchSelect(SelectBase):  # type: ignore[misc]
+    def __init__(
+        self,
+        matches: list[ReconciliationReportMatch],
+        callback_func: Callable,
+    ):
+        options = [
+            SelectOption(
+                label=f"${match.bank_amount:.2f} {match.bank_name}"[:100],
+                value=f"unmatch:{match.reconciliation_id}",
+                description=f"{match.bank_date[:10]} | conf {match.confidence:.0%}"[:100],
+            )
+            for match in matches[:25]
+        ]
+        super().__init__(placeholder="Unmatch a confirmed transaction", options=options)
+        self.callback_func = callback_func
+
+    async def callback(self, interaction: Interaction):
+        await self.callback_func(interaction, self.values[0])
 
 
 def _candidate_option(index: int, candidate: ActionLogCandidate) -> tuple[SelectOption, str]:
@@ -123,10 +145,19 @@ class BankReconciliationDigestView(ViewBase):  # type: ignore[misc]
 
 
 class BankReconciliationInboxView(ViewBase):  # type: ignore[misc]
-    def __init__(self, callback_func: Callable):
+    def __init__(
+        self,
+        callback_func: Callable,
+        *,
+        has_unresolved: bool = True,
+        matches: list[ReconciliationReportMatch] | None = None,
+    ):
         super().__init__(timeout=600)
-        self.add_item(BankReconciliationButton("Reconcile Now", "start", callback_func))
-        self.add_item(BankReconciliationButton("Ignore All", "ignore_all", callback_func))
+        if has_unresolved:
+            self.add_item(BankReconciliationButton("Reconcile Now", "start", callback_func))
+            self.add_item(BankReconciliationButton("Ignore All", "ignore_all", callback_func))
+        if matches:
+            self.add_item(BankReconciliationUnmatchSelect(matches, callback_func))
 
 
 class BankReconciliationLogChoiceView(ViewBase):  # type: ignore[misc]

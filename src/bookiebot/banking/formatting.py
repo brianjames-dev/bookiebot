@@ -125,20 +125,43 @@ def format_reconciliation_review(items: list[ReconciliationItem]) -> str:
 def format_reconciliation_match_report(
     matches: list[ReconciliationReportMatch],
     *,
-    max_items: int = 12,
+    max_items: int = 100,
+    max_chars: int = 1800,
 ) -> str:
+    return "\n\n".join(format_reconciliation_match_report_chunks(matches, max_items=max_items, max_chars=max_chars))
+
+
+def format_reconciliation_match_report_chunks(
+    matches: list[ReconciliationReportMatch],
+    *,
+    max_items: int = 100,
+    max_chars: int = 1800,
+) -> list[str]:
     if not matches:
-        return "Confirmed matches this run: `0`"
+        return ["Confirmed matches this run: `0`"]
     shown = matches[: max(1, max_items)]
-    lines = ["Confirmed matches this run:"]
+    chunks: list[str] = []
+    current = "Confirmed matches this run:"
     for index, match in enumerate(shown, start=1):
-        if index > 1:
-            lines.append("")
-        lines.extend(_format_reconciliation_match_report_entry(match))
+        block = _code_table(_format_reconciliation_match_report_entry(match))
+        candidate = current + "\n" + block if current else block
+        if current and len(candidate) > max_chars:
+            chunks.append(current)
+            current = "Confirmed matches this run (continued):\n" + block
+        else:
+            current = candidate
     omitted = len(matches) - len(shown)
     if omitted:
-        lines.append(f"...and `{omitted}` more confirmed match(es).")
-    return "\n".join(lines)
+        omitted_line = f"...and `{omitted}` more confirmed match(es)."
+        candidate = current + "\n" + omitted_line
+        if len(candidate) > max_chars:
+            chunks.append(current)
+            current = omitted_line
+        else:
+            current = candidate
+    if current:
+        chunks.append(current)
+    return chunks
 
 
 def format_reconciliation_review_chunks(

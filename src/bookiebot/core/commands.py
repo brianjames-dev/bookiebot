@@ -25,7 +25,7 @@ from bookiebot.banking.service import build_banking_service
 from bookiebot.core.bank_link import BankLinkTokenError, create_bank_link_setup_token
 from bookiebot.core.bank_reconciliation import (
     bank_reconciliation_digest_view,
-    prepare_bank_reconciliation_digest,
+    prepare_bank_reconciliation_digest_messages,
 )
 from bookiebot.core.bank_reconciliation_flow import send_bank_reconciliation_detail
 from bookiebot.logging_config import get_recent_logs, uptime_seconds
@@ -776,6 +776,7 @@ def register_commands(tree: app_commands.CommandTree):
                 limit=max(1, min(limit, 50)),
                 force=force,
                 actor_key=str(interaction.user.id),
+                start_date=now_pacific().date().replace(day=1).isoformat(),
             )
         except Exception as exc:
             await interaction.followup.send(
@@ -848,8 +849,8 @@ def register_commands(tree: app_commands.CommandTree):
         await interaction.response.defer(ephemeral=True)
         try:
             actor_key = str(interaction.user.id)
-            message = await asyncio.to_thread(
-                prepare_bank_reconciliation_digest,
+            digest = await asyncio.to_thread(
+                prepare_bank_reconciliation_digest_messages,
                 actor_key,
                 f"<@{actor_key}>",
                 datetime.now().date(),
@@ -863,18 +864,20 @@ def register_commands(tree: app_commands.CommandTree):
             )
             return
 
-        if not message:
+        if not digest:
             await interaction.followup.send(
                 content="No bank reconciliation digest is due right now. There may be no unresolved items.",
                 ephemeral=True,
             )
             return
 
-        await interaction.followup.send(
-            content=f"{message}\n\u200b",
-            view=bank_reconciliation_digest_view(str(interaction.user.id)),
-            ephemeral=True,
-        )
+        messages = digest.detail_messages or (digest.detail_message,)
+        for index, message in enumerate(messages):
+            await interaction.followup.send(
+                content=f"{message}\n\u200b",
+                view=bank_reconciliation_digest_view(str(interaction.user.id)) if index == len(messages) - 1 else None,
+                ephemeral=True,
+            )
 
     @tree.command(name="debug_bank_ignore", description="(Admin) Ignore an unresolved bank reconciliation item")
     @app_commands.describe(reconciliation_id="ID shown by /debug_bank_review")

@@ -138,6 +138,7 @@ class ReconciliationPreview:
 
 @dataclass(frozen=True)
 class ReconciliationReportMatch:
+    reconciliation_id: int
     bank_date: str
     bank_name: str
     bank_amount: float

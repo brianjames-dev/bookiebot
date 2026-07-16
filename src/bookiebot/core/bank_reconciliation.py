@@ -10,8 +10,8 @@ from typing import Any, Awaitable, cast
 
 import discord
 
-from bookiebot.banking.formatting import format_reconciliation_match_report, format_reconciliation_review
-from bookiebot.banking.models import ReconciliationPreview
+from bookiebot.banking.formatting import format_reconciliation_match_report_chunks, format_reconciliation_review_chunks
+from bookiebot.banking.models import ReconciliationPreview, ReconciliationReportMatch
 from bookiebot.banking.service import build_banking_service
 from bookiebot.core.bank_reconciliation_flow import send_next_bank_reconciliation_item
 from bookiebot.sheets.routing import (
@@ -36,6 +36,8 @@ _PERSISTENT_DIGEST_VIEW_REGISTERED = False
 class PreparedBankReconciliationDigest:
     public_message: str
     detail_message: str
+    detail_messages: tuple[str, ...] = ()
+    report_matches: tuple[ReconciliationReportMatch, ...] = ()
     item_ids: tuple[int, ...] = ()
     owner_key: str = ""
     owner_name: str = ""
@@ -255,13 +257,51 @@ async def _send_bank_reconciliation_inbox(interaction: Any, actor_key: str) -> N
                 f"Ignored `{ignored_count}` bank reconciliation item(s) from this inbox.",
                 ephemeral=True,
             )
+            return
+        if action.startswith("unmatch:"):
+            try:
+                reconciliation_id = int(action.split(":", 1)[1])
+            except ValueError:
+                await action_interaction.followup.send("That match selection was invalid.", ephemeral=True)
+                return
+            service = build_banking_service()
+            reopened = await asyncio.to_thread(
+                service.reopen_reconciliation_item,
+                digest.owner_key,
+                reconciliation_id,
+                notes="unmatched from reconciliation report",
+            )
+            if reopened is None:
+                await action_interaction.followup.send(
+                    f"No bank reconciliation item `{reconciliation_id}` was found.",
+                    ephemeral=True,
+                )
+                return
+            await action_interaction.followup.send(
+                (
+                    f"Unmatched `{reopened.transaction.name}` for "
+                    f"`${abs(reopened.transaction.amount):.2f}`. It is back in the review queue."
+                ),
+                ephemeral=True,
+            )
 
-    view = BankReconciliationInboxView(handle_inbox_action) if digest.item_ids else None
-    await interaction.followup.send(
-        content=digest.detail_message[:1900],
-        view=view,
-        ephemeral=True,
-    )
+    messages = digest.detail_messages or (digest.detail_message,)
+    for index, message in enumerate(messages):
+        is_last = index == len(messages) - 1
+        view = (
+            BankReconciliationInboxView(
+                handle_inbox_action,
+                has_unresolved=bool(digest.item_ids),
+                matches=list(digest.report_matches),
+            )
+            if is_last and (digest.item_ids or digest.report_matches)
+            else None
+        )
+        await interaction.followup.send(
+            content=message,
+            view=view,
+            ephemeral=True,
+        )
 
 
 def bank_reconciliation_digest_view(actor_key: str) -> BankReconciliationDigestView:
@@ -365,7 +405,7 @@ def prepare_bank_reconciliation_digest(
         mark_sent=mark_sent,
         force=force,
     )
-    return digest.detail_message if digest else None
+    return "\n\n".join(digest.detail_messages or (digest.detail_message,)) if digest else None
 
 
 def prepare_bank_reconciliation_digest_messages(
@@ -383,6 +423,7 @@ def prepare_bank_reconciliation_digest_messages(
     owner = get_user_config(actor_key)
     service = build_banking_service()
     sync_error: str | None = None
+    month_start = current.replace(day=1).isoformat()
     if service.config.configured:
         try:
             asyncio.run(service.sync_owner(owner.budget_owner_key))
@@ -398,19 +439,28 @@ def prepare_bank_reconciliation_digest_messages(
             owner.budget_owner_key,
             limit=50,
             actor_key=actor_key,
+            start_date=month_start,
         )
-        unresolved = service.unresolved_reconciliation_items(owner.budget_owner_key, limit=25)
+        unresolved = service.unresolved_reconciliation_items(
+            owner.budget_owner_key,
+            limit=25,
+            start_date=month_start,
+        )
         matched_items = [item for item in preview.items if item.status == "matched"]
         if force:
             matched_by_id = {item.id: item for item in matched_items}
-            for item in service.matched_reconciliation_items(owner.budget_owner_key, limit=25):
+            for item in service.matched_reconciliation_items(
+                owner.budget_owner_key,
+                limit=100,
+                start_date=month_start,
+            ):
                 matched_by_id.setdefault(item.id, item)
             matched_items = list(matched_by_id.values())
         report_matches = service.reconciliation_report_matches(
             owner.budget_owner_key,
             matched_items,
             actor_key=actor_key,
-            limit=12,
+            limit=100,
         )
     except Exception:
         logger.exception("Failed to prepare bank reconciliation digest", extra={"actor_key": actor_key})
@@ -445,6 +495,13 @@ def prepare_bank_reconciliation_digest_messages(
             matched_count=matched_count,
             sync_error=sync_error,
         ),
+        detail_messages=tuple(format_bank_reconciliation_digest_chunks(
+            mention,
+            report_preview,
+            unresolved,
+            report_matches=report_matches,
+            sync_error=sync_error,
+        )),
         detail_message=format_bank_reconciliation_digest(
             mention,
             report_preview,
@@ -452,6 +509,7 @@ def prepare_bank_reconciliation_digest_messages(
             report_matches=report_matches,
             sync_error=sync_error,
         ),
+        report_matches=tuple(report_matches),
         item_ids=tuple(int(item.id) for item in unresolved),
         owner_key=owner.budget_owner_key,
         owner_name=getattr(owner, "name", str(actor_key)),
@@ -491,6 +549,26 @@ def format_bank_reconciliation_digest(
     report_matches: list | None = None,
     sync_error: str | None = None,
 ) -> str:
+    return "\n\n".join(
+        format_bank_reconciliation_digest_chunks(
+            mention,
+            preview,
+            unresolved,
+            report_matches=report_matches,
+            sync_error=sync_error,
+        )
+    )
+
+
+def format_bank_reconciliation_digest_chunks(
+    mention: str,
+    preview: ReconciliationPreview,
+    unresolved: list,
+    *,
+    report_matches: list | None = None,
+    sync_error: str | None = None,
+    max_chars: int = 1850,
+) -> list[str]:
     matched_count = len([item for item in preview.items if item.status == "matched"])
     if unresolved:
         noun = "item" if len(unresolved) == 1 else "items"
@@ -516,18 +594,29 @@ def format_bank_reconciliation_digest(
             f"- Confirmed/logged: `{buckets.confirmed}`",
             f"- Ignored: `{buckets.ignored}`",
             f"- Pending: `{buckets.pending}`",
-            "  Pending Plaid transactions are cached but held out of reconciliation until Plaid posts or removes them.",
-            f"- Not reviewed yet: `{buckets.not_reviewed}`",
-            f"- Unwatched accounts: `{buckets.unwatched}`",
-            f"- Other: `{buckets.other}`",
-            f"- Checked this run: `{preview.candidate_transaction_count}`",
-            "",
-            format_reconciliation_match_report(report_matches or []),
-            "",
-            format_reconciliation_review(unresolved),
         ]
     )
-    return "\n".join(lines)[:1900]
+    chunks = [_fit_chunk("\n".join(lines), max_chars=max_chars)]
+    for section in format_reconciliation_match_report_chunks(report_matches or [], max_chars=max_chars):
+        chunks = _append_digest_chunk(chunks, section, max_chars=max_chars)
+    for section in format_reconciliation_review_chunks(unresolved, max_chars=max_chars):
+        chunks = _append_digest_chunk(chunks, section, max_chars=max_chars)
+    return chunks
+
+
+def _fit_chunk(value: str, *, max_chars: int) -> str:
+    return value if len(value) <= max_chars else value[:max_chars]
+
+
+def _append_digest_chunk(chunks: list[str], section: str, *, max_chars: int) -> list[str]:
+    if not chunks:
+        return [section]
+    candidate = chunks[-1] + "\n\n" + section
+    if len(candidate) <= max_chars:
+        chunks[-1] = candidate
+    else:
+        chunks.append(_fit_chunk(section, max_chars=max_chars))
+    return chunks
 
 
 async def run_bank_reconciliation_loop(client: Any) -> None:

@@ -14,6 +14,7 @@ import bookiebot.core.bank_reconciliation as bank_reconciliation
 from bookiebot.core.bank_reconciliation import (
     _is_eligible,
     format_bank_reconciliation_digest,
+    format_bank_reconciliation_digest_chunks,
     format_bank_reconciliation_public_prompt,
 )
 
@@ -197,9 +198,11 @@ def test_format_bank_reconciliation_digest_lists_unresolved_items():
     assert "- Confirmed/logged: `8`" in output
     assert "- Ignored: `2`" in output
     assert "- Pending: `3`" in output
-    assert "- Not reviewed yet: `1`" in output
-    assert "- Unwatched accounts: `1`" in output
-    assert "- Checked this run: `1`" in output
+    assert "Pending Plaid transactions are cached" not in output
+    assert "Not reviewed yet" not in output
+    assert "Unwatched accounts" not in output
+    assert "Other" not in output
+    assert "Checked this run" not in output
     assert "Unresolved bank reconciliation items:" in output
     assert "  42  05-18    $12.34  expense   Unlogged Coffee" in output
 
@@ -252,6 +255,7 @@ def test_format_bank_reconciliation_digest_lists_confirmed_run_matches():
         [],
         report_matches=[
             ReconciliationReportMatch(
+                reconciliation_id=43,
                 bank_date="2026-05-18",
                 bank_name="CREDIT CARD 3333 PAYMENT",
                 bank_amount=25.0,
@@ -266,8 +270,8 @@ def test_format_bank_reconciliation_digest_lists_confirmed_run_matches():
     )
 
     assert "confirmed `1` automatic match" in output
-    assert "Pending Plaid transactions are cached but held out of reconciliation until Plaid posts or removes them." in output
     assert "Confirmed matches this run:" in output
+    assert "```text\nBank:" in output
     assert "Bank:   05-18    $25.00  CREDIT CARD 3333 PAYMENT" in output
     assert "Sheet:  no spreadsheet row (automatic rule)" in output
     assert "Reason: transfer/payment pattern" in output
@@ -317,6 +321,7 @@ def test_format_bank_reconciliation_digest_compares_bank_and_sheet_match():
         [],
         report_matches=[
             ReconciliationReportMatch(
+                reconciliation_id=44,
                 bank_date="2026-05-18",
                 bank_name="Amazon",
                 bank_amount=76.90,
@@ -330,10 +335,46 @@ def test_format_bank_reconciliation_digest_compares_bank_and_sheet_match():
         ],
     )
 
+    assert "```text\nBank:" in output
     assert "Bank:   05-18    $76.90  Amazon" in output
     assert "Sheet:  05-17    $76.90  Baby registry stuff at Amazon" in output
     assert "Reason: matched expense action within 1d" in output
     assert "Conf:   92%" in output
+
+
+def test_format_bank_reconciliation_digest_chunks_long_match_report():
+    item = _matched_reconciliation_item(44, name="Amazon")
+    preview = ReconciliationPreview(owner_key="brian", items=[item] * 20, candidate_transaction_count=20)
+    matches = [
+        ReconciliationReportMatch(
+            reconciliation_id=index,
+            bank_date="2026-07-13",
+            bank_name=f"Bank Merchant {index}",
+            bank_amount=10.0 + index,
+            matched_date="2026-07-12",
+            matched_name=f"Sheet Item {index}",
+            matched_amount=10.0 + index,
+            source_type="spreadsheet row",
+            reason="matched expense action within 1d",
+            confidence=0.86,
+        )
+        for index in range(1, 21)
+    ]
+
+    chunks = format_bank_reconciliation_digest_chunks(
+        "<@123>",
+        preview,
+        [],
+        report_matches=matches,
+        max_chars=900,
+    )
+
+    assert len(chunks) > 1
+    assert all(len(chunk) <= 900 for chunk in chunks)
+    joined = "\n".join(chunks)
+    assert joined.count("```text") == 20
+    assert "Bank Merchant 1" in joined
+    assert "Bank Merchant 20" in joined
 
 
 def test_format_bank_reconciliation_public_prompt_hides_transaction_details():
@@ -442,7 +483,7 @@ def test_prepare_bank_reconciliation_digest_uses_cached_items_when_sync_fails(mo
         async def sync_owner(self, _owner_key):
             raise RuntimeError("Plaid unavailable")
 
-        def reconciliation_preview(self, owner_key, *, limit, actor_key):
+        def reconciliation_preview(self, owner_key, *, limit, actor_key, start_date):
             return ReconciliationPreview(
                 owner_key=owner_key,
                 items=[item],
@@ -450,7 +491,7 @@ def test_prepare_bank_reconciliation_digest_uses_cached_items_when_sync_fails(mo
                 candidate_transaction_count=1,
             )
 
-        def unresolved_reconciliation_items(self, _owner_key, *, limit):
+        def unresolved_reconciliation_items(self, _owner_key, *, limit, start_date):
             return [item]
 
         def reconciliation_report_matches(self, _owner_key, _items, *, actor_key, limit):
@@ -492,7 +533,7 @@ async def test_bank_reconciliation_inbox_ignore_all_ignores_displayed_batch(monk
         async def sync_owner(self, _owner_key):
             return None
 
-        def reconciliation_preview(self, owner_key, *, limit, actor_key):
+        def reconciliation_preview(self, owner_key, *, limit, actor_key, start_date):
             return ReconciliationPreview(
                 owner_key=owner_key,
                 items=items,
@@ -500,10 +541,10 @@ async def test_bank_reconciliation_inbox_ignore_all_ignores_displayed_batch(monk
                 candidate_transaction_count=2,
             )
 
-        def unresolved_reconciliation_items(self, owner_key, *, limit):
+        def unresolved_reconciliation_items(self, owner_key, *, limit, start_date):
             return [item for item in items if item.id not in ignored_ids]
 
-        def matched_reconciliation_items(self, _owner_key, *, limit):
+        def matched_reconciliation_items(self, _owner_key, *, limit, start_date):
             return []
 
         def reconciliation_report_matches(self, _owner_key, _items, *, actor_key, limit):
@@ -547,7 +588,7 @@ async def test_bank_reconciliation_inbox_shows_recent_auto_matches_without_actio
         async def sync_owner(self, _owner_key):
             return None
 
-        def reconciliation_preview(self, owner_key, *, limit, actor_key):
+        def reconciliation_preview(self, owner_key, *, limit, actor_key, start_date):
             return ReconciliationPreview(
                 owner_key=owner_key,
                 items=[],
@@ -556,16 +597,17 @@ async def test_bank_reconciliation_inbox_shows_recent_auto_matches_without_actio
                 cache_buckets=ReconciliationCacheBuckets(stored=1, matched=1),
             )
 
-        def unresolved_reconciliation_items(self, _owner_key, *, limit):
+        def unresolved_reconciliation_items(self, _owner_key, *, limit, start_date):
             return []
 
-        def matched_reconciliation_items(self, _owner_key, *, limit):
+        def matched_reconciliation_items(self, _owner_key, *, limit, start_date):
             return [item]
 
         def reconciliation_report_matches(self, _owner_key, items, *, actor_key, limit):
             assert items == [item]
             return [
                 ReconciliationReportMatch(
+                    reconciliation_id=43,
                     bank_date="2026-05-18",
                     bank_name="CREDIT CARD 3333 PAYMENT",
                     bank_amount=12.34,
@@ -593,7 +635,9 @@ async def test_bank_reconciliation_inbox_shows_recent_auto_matches_without_actio
     assert "found no unresolved items and confirmed `1` automatic match" in content
     assert "Confirmed matches this run:" in content
     assert "CREDIT CARD 3333 PAYMENT" in content
-    assert kwargs["view"] is None
+    children = getattr(kwargs["view"], "children", [])
+    assert len(children) == 1
+    assert getattr(children[0], "placeholder", "") == "Unmatch a confirmed transaction"
 
 
 @pytest.mark.asyncio
