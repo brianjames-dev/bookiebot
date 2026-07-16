@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type ReactNode, type TouchEvent } from "react"
+import { memo, useEffect, useRef, useState, type ReactNode, type TouchEvent } from "react"
 import {
   Bar,
   BarChart,
@@ -201,12 +201,13 @@ const TOP_EXPENSE_HEAT_COLORS = [
   "#f97316",
   "#f59e0b",
   "#eab308",
-  "#84cc16",
-  "#22c55e",
-  "#14b8a6",
   "#06b6d4",
   "#38bdf8",
+  "#60a5fa",
+  "#3b82f6",
+  "#2563eb",
 ]
+const MERCHANT_BAR_COLOR = "#0891b2"
 
 type ChartTouchState = {
   startX: number
@@ -1013,19 +1014,21 @@ function isSavingsNearGoal(value: number | null | undefined, goal: number | null
   return value >= goal * 0.9
 }
 
-function CategoryMixChart({
-  data,
-  leftAmount,
-  filter,
-  projected,
-  collapseKey,
-}: {
+type CategoryMixChartProps = {
   data: BreakdownItem[]
   leftAmount: number
   filter: CategoryMixFilter
   projected: boolean
   collapseKey: number
-}) {
+}
+
+const CategoryMixChart = memo(function CategoryMixChart({
+  data,
+  leftAmount,
+  filter,
+  projected,
+  collapseKey,
+}: CategoryMixChartProps) {
   const pieLayout = useExpensePieLayout()
   const chartData = categoryMixRows(data, leftAmount, filter)
   const spentTotal = amountRowsTotal(chartData.filter((item) => item.key !== "left"))
@@ -1051,6 +1054,8 @@ function CategoryMixChart({
                 innerRadius={pieLayout.innerRadius}
                 outerRadius={pieLayout.outerRadius}
                 paddingAngle={1}
+                animationDuration={520}
+                animationEasing="ease-out"
                 label={pieLayout.showLabels ? (props) => renderPieMetricLabel(props, pieLayout) : false}
                 labelLine={pieLayout.showLabels ? (props) => renderPieMetricLabelLine(props, pieLayout) : false}
               >
@@ -1077,6 +1082,32 @@ function CategoryMixChart({
       </DetailsPanel>
     </div>
   )
+}, areCategoryMixChartPropsEqual)
+
+function areCategoryMixChartPropsEqual(previous: CategoryMixChartProps, next: CategoryMixChartProps) {
+  return (
+    previous.leftAmount === next.leftAmount &&
+    previous.filter === next.filter &&
+    previous.projected === next.projected &&
+    previous.collapseKey === next.collapseKey &&
+    breakdownRowsEqual(previous.data, next.data)
+  )
+}
+
+function breakdownRowsEqual(previous: BreakdownItem[], next: BreakdownItem[]) {
+  if (previous.length !== next.length) {
+    return false
+  }
+  return previous.every((item, index) => {
+    const nextItem = next[index]
+    return (
+      item.key === nextItem.key &&
+      item.label === nextItem.label &&
+      item.amount === nextItem.amount &&
+      item.percentage === nextItem.percentage &&
+      item.color === nextItem.color
+    )
+  })
 }
 
 function categoryMixRows(data: BreakdownItem[], leftAmount: number, filter: CategoryMixFilter) {
@@ -1151,7 +1182,7 @@ function useExpensePieLayout() {
 }
 
 function pieMetricAnimationDelay(index: number | undefined) {
-  return `${Math.min(index ?? 0, 8) * 24 + 80}ms`
+  return `${Math.min(index ?? 0, 8) * 10 + 35}ms`
 }
 
 function pieMetricColor(payload: BreakdownItem | undefined, fallback: string | undefined) {
@@ -1335,7 +1366,7 @@ function DailySpendingChart({
           <BarChart data={data} margin={{ top: 12, right: 16, left: 0, bottom: 0 }}>
             <CartesianGrid vertical={false} strokeDasharray="3 3" />
             <XAxis dataKey="label" tickLine={false} axisLine={false} />
-            <YAxis domain={yAxisDomain} tickFormatter={(value) => `$${value}`} tickLine={false} axisLine={false} width={52} />
+            <YAxis domain={yAxisDomain} scale="sqrt" tickFormatter={(value) => `$${value}`} tickLine={false} axisLine={false} width={52} />
             <ChartTooltip content={showStackedBars ? <DailySpendingTooltipContent /> : <ChartTooltipContent />} cursor={{ fill: "hsl(var(--primary) / 0.1)" }} />
             {showStackedBars ? (
               <>
@@ -1461,14 +1492,14 @@ function truncateChartLabel(value: unknown, maxLength: number) {
 function MerchantChart({ data }: { data: OccurrenceRow[] }) {
   const rows = data.slice(0, 10)
   return (
-    <ChartContainer config={{ count: { label: "Occurrences", color: "hsl(var(--chart-4))" } }} className="bb-insight-chart-box">
+    <ChartContainer config={{ count: { label: "Occurrences", color: MERCHANT_BAR_COLOR } }} className="bb-insight-chart-box">
       <ResponsiveContainer width="100%" height="100%">
         <BarChart data={rows} layout="vertical" margin={{ top: 12, right: 22, left: 20, bottom: 12 }}>
           <CartesianGrid horizontal={false} strokeDasharray="3 3" />
           <XAxis type="number" tickFormatter={(value) => String(value)} tickLine={false} axisLine={false} allowDecimals={false} />
           <YAxis dataKey="label" type="category" width={148} tickLine={false} axisLine={false} />
           <ChartTooltip content={<MerchantTooltipContent />} />
-          <Bar dataKey="count" name="Occurrences" fill="hsl(var(--chart-4))" radius={[0, 6, 6, 0]} />
+          <Bar dataKey="count" name="Occurrences" fill={MERCHANT_BAR_COLOR} radius={[0, 6, 6, 0]} />
         </BarChart>
       </ResponsiveContainer>
     </ChartContainer>
@@ -1491,7 +1522,7 @@ function MerchantTooltipContent({
     <div className="bb-chart-tooltip bb-touch-tooltip-content" key={signature}>
       <div className="bb-chart-tooltip-title">{row.label}</div>
       <div className="bb-chart-tooltip-row">
-        <span className="bb-chart-tooltip-dot" style={{ background: "hsl(var(--chart-4))" }} />
+        <span className="bb-chart-tooltip-dot" style={{ background: MERCHANT_BAR_COLOR }} />
         <span>Occurrences</span>
         <strong>{row.count}</strong>
       </div>

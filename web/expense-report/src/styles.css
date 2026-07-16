@@ -1301,7 +1301,7 @@ summary {
   pointer-events: none;
   transform-box: fill-box;
   transform-origin: center;
-  animation: bb-pie-label-in 220ms ease-out forwards;
+  animation: bb-pie-label-in 150ms ease-out forwards;
 }
 
 .bb-pie-metric-label-line {
@@ -1309,7 +1309,7 @@ summary {
   pointer-events: none;
   stroke-dasharray: 1;
   stroke-dashoffset: 1;
-  animation: bb-pie-label-line-in 220ms ease-out forwards;
+  animation: bb-pie-label-line-in 150ms ease-out forwards;
 }
 
 @keyframes bb-pie-label-in {
