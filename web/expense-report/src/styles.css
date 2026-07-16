@@ -1067,6 +1067,21 @@ summary {
 
 .bb-chart-container {
   position: relative;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.bb-chart-container .recharts-wrapper,
+.bb-chart-container .recharts-surface,
+.bb-chart-container svg,
+.bb-chart-container svg * {
+  -webkit-tap-highlight-color: transparent;
+}
+
+.bb-chart-container .recharts-surface:focus,
+.bb-chart-container .recharts-surface *:focus,
+.bb-chart-container svg:focus,
+.bb-chart-container svg *:focus {
+  outline: none !important;
 }
 
 .bb-bills-analytics {

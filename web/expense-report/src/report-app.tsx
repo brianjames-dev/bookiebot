@@ -1515,6 +1515,7 @@ function DailySpendingTooltipContent({
 }
 
 function TopExpensesChart({ entries }: { entries: ExpenseEntry[] }) {
+  const showYAxisLabels = !useMediaQuery("(max-width: 640px)")
   const visibleEntries = entries.slice(0, 10)
   const rows = visibleEntries.map((entry, index) => ({
     label: expenseEntryItemLabel(entry),
@@ -1525,10 +1526,18 @@ function TopExpensesChart({ entries }: { entries: ExpenseEntry[] }) {
   return (
     <ChartContainer config={{ amount: { label: "Amount", color: "hsl(var(--chart-2))" } }} className="bb-insight-chart-box">
       <ResponsiveContainer width="100%" height="100%">
-        <BarChart data={rows} layout="vertical" margin={{ top: 12, right: 22, left: 20, bottom: 12 }}>
+        <BarChart data={rows} layout="vertical" margin={{ top: 12, right: 22, left: showYAxisLabels ? 20 : 0, bottom: 12 }}>
           <CartesianGrid horizontal={false} strokeDasharray="3 3" />
           <XAxis type="number" tickFormatter={(value) => `$${value}`} tickLine={false} axisLine={false} />
-          <YAxis dataKey="label" type="category" width={148} tickFormatter={(value) => truncateChartLabel(value, 22)} tickLine={false} axisLine={false} />
+          <YAxis
+            dataKey="label"
+            type="category"
+            width={showYAxisLabels ? 148 : 0}
+            tick={showYAxisLabels}
+            tickFormatter={(value) => truncateChartLabel(value, 22)}
+            tickLine={false}
+            axisLine={false}
+          />
           <ChartTooltip content={<TopExpensesTooltipContent />} cursor={{ fill: "hsl(var(--foreground) / 0.08)" }} />
           <Bar dataKey="amount" name="Expense amount" fill="hsl(var(--chart-2))" radius={[0, 6, 6, 0]}>
             {rows.map((row, index) => (
@@ -1588,14 +1597,15 @@ function truncateChartLabel(value: unknown, maxLength: number) {
 }
 
 function MerchantChart({ data }: { data: OccurrenceRow[] }) {
+  const showYAxisLabels = !useMediaQuery("(max-width: 640px)")
   const rows = data.slice(0, 10)
   return (
     <ChartContainer config={{ count: { label: "Occurrences", color: MERCHANT_BAR_COLOR } }} className="bb-insight-chart-box">
       <ResponsiveContainer width="100%" height="100%">
-        <BarChart data={rows} layout="vertical" margin={{ top: 12, right: 22, left: 20, bottom: 12 }}>
+        <BarChart data={rows} layout="vertical" margin={{ top: 12, right: 22, left: showYAxisLabels ? 20 : 0, bottom: 12 }}>
           <CartesianGrid horizontal={false} strokeDasharray="3 3" />
           <XAxis type="number" tickFormatter={(value) => String(value)} tickLine={false} axisLine={false} allowDecimals={false} />
-          <YAxis dataKey="label" type="category" width={148} tickLine={false} axisLine={false} />
+          <YAxis dataKey="label" type="category" width={showYAxisLabels ? 148 : 0} tick={showYAxisLabels} tickLine={false} axisLine={false} />
           <ChartTooltip content={<MerchantTooltipContent />} cursor={{ fill: "rgb(8 145 178 / 0.14)" }} />
           <Bar dataKey="count" name="Occurrences" fill={MERCHANT_BAR_COLOR} radius={[0, 6, 6, 0]} />
         </BarChart>
