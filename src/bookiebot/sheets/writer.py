@@ -62,6 +62,11 @@ async def write_income_to_sheet(data, message):
         )
     except Exception as e:
         logger.error("Could not log income", extra={"exception": str(e)})
+        if message:
+            await message.channel.send(
+                "❌ Could not finish logging income. If a row appeared in the sheet, "
+                "check recent actions / undo before retrying."
+            )
         return
 
     logger.info("Income logged", extra={"description": description, "amount": amount, "row": row})
@@ -231,7 +236,10 @@ async def write_expense_to_sheet(data, message):
                 f"✅ Logged {category} expense: ${stored['data']['amount']} for {selected_card}"
             )
 
-        view = CardButtonView(handle_selection)
+        view = CardButtonView(
+            handle_selection,
+            author_id=getattr(message.author, "id", None),
+        )
         await message.channel.send(
             f"{message.author.mention}, which card did you use?",
             view=view

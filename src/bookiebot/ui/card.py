@@ -69,36 +69,62 @@ else:  # pragma: no cover - test fallback
             return None
 
 
+def _interaction_user_id(interaction: Interaction) -> str | None:
+    user = getattr(interaction, "user", None)
+    user_id = getattr(user, "id", None)
+    return str(user_id) if user_id is not None else None
+
+
+async def _reject_if_not_author(interaction: Interaction, author_id: str | None) -> bool:
+    """Return True if the interaction was rejected (wrong user)."""
+    if author_id is None:
+        return False
+    user_id = _interaction_user_id(interaction)
+    if user_id is None or user_id == str(author_id):
+        return False
+    response = getattr(interaction, "response", None)
+    send = getattr(response, "send_message", None)
+    if send is not None:
+        await send("Only the person who started this can choose a card.", ephemeral=True)
+    return True
+
+
 class CardSelect(SelectBase):  # type: ignore[misc]
-    def __init__(self, callback_func):
+    def __init__(self, callback_func, *, author_id: int | str | None = None):
         options = [
             SelectOption(label="Brian (BofA)", value="Brian (BofA)"),
             SelectOption(label="Brian (AL)", value="Brian (AL)")
         ]
         super().__init__(placeholder="Select the card used", options=options)
         self.callback_func = callback_func
+        self.author_id = str(author_id) if author_id is not None else None
 
     async def callback(self, interaction: Interaction):
+        if await _reject_if_not_author(interaction, self.author_id):
+            return
         await self.callback_func(interaction, self.values[0])
 
 class CardSelectView(ViewBase):  # type: ignore[misc]
-    def __init__(self, callback_func):
+    def __init__(self, callback_func, *, author_id: int | str | None = None):
         super().__init__(timeout=60)
-        self.add_item(CardSelect(callback_func))
+        self.add_item(CardSelect(callback_func, author_id=author_id))
 
 
 class CardButton(ButtonBase):  # type: ignore[misc]
-    def __init__(self, label: str, callback_func):
+    def __init__(self, label: str, callback_func, *, author_id: int | str | None = None):
         style_value = getattr(ButtonStyle, "primary", ButtonStyle.primary)
         super().__init__(label=label, style=style_value)
         self.callback_func = callback_func
+        self.author_id = str(author_id) if author_id is not None else None
 
     async def callback(self, interaction: Interaction):
+        if await _reject_if_not_author(interaction, self.author_id):
+            return
         await self.callback_func(interaction, self.label)
 
 
 class CardButtonView(ViewBase):  # type: ignore[misc]
-    def __init__(self, callback_func):
+    def __init__(self, callback_func, *, author_id: int | str | None = None):
         super().__init__(timeout=60)
         for label in ["Brian (BofA)", "Brian (AL)"]:
-            self.add_item(CardButton(label, callback_func))
+            self.add_item(CardButton(label, callback_func, author_id=author_id))
