@@ -1347,6 +1347,7 @@ function DailySpendingChart({
   const peak = data.reduce<AmountRow | null>((best, item) => (!best || item.amount > best.amount ? item : best), null)
   const averageDaySpend = elapsedDays ? total / elapsedDays : 0
   const yAxisDomain = dailySpendingYAxisDomain(data)
+  const lowValueGridLines = dailySpendingLowValueGridLines(yAxisDomain)
   const showStackedBars = filter === "all"
   const singleBarColor = filter === "needs" ? NEEDS_BAR_COLOR : filter === "wants" ? WANTS_BAR_COLOR : "hsl(var(--chart-1))"
   return (
@@ -1365,6 +1366,16 @@ function DailySpendingChart({
         <ResponsiveContainer width="100%" height="100%">
           <BarChart data={data} margin={{ top: 12, right: 16, left: 0, bottom: 0 }}>
             <CartesianGrid vertical={false} strokeDasharray="3 3" />
+            {lowValueGridLines.map((value) => (
+              <ReferenceLine
+                key={`daily-low-grid-${value}`}
+                y={value}
+                stroke="hsl(var(--muted-foreground))"
+                strokeOpacity={0.34}
+                strokeDasharray="2 6"
+                strokeWidth={1}
+              />
+            ))}
             <XAxis dataKey="label" tickLine={false} axisLine={false} />
             <YAxis domain={yAxisDomain} scale="sqrt" tickFormatter={(value) => `$${value}`} tickLine={false} axisLine={false} width={52} />
             <ChartTooltip content={showStackedBars ? <DailySpendingTooltipContent /> : <ChartTooltipContent />} cursor={{ fill: "hsl(var(--primary) / 0.1)" }} />
@@ -1406,6 +1417,19 @@ function dailySpendingYAxisDomain(data: DailySpendingRow[]): [number, number] {
   }
   const paddedPeak = peak * 1.06
   return [0, Math.max(1, Math.ceil(paddedPeak / 10) * 10)]
+}
+
+function dailySpendingLowValueGridLines([, max]: [number, number]) {
+  const lowCeiling = Math.min(max, 100)
+  if (lowCeiling <= 0) {
+    return []
+  }
+  const step = lowCeiling <= 50 ? 10 : 25
+  const lines: number[] = []
+  for (let value = step; value < lowCeiling; value += step) {
+    lines.push(value)
+  }
+  return lines
 }
 
 type DailySpendingTooltipPayload = {
