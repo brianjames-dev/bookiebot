@@ -229,6 +229,13 @@ summary {
   min-width: 0;
 }
 
+.bb-title-with-accessory {
+  display: inline-flex;
+  align-items: center;
+  min-width: 0;
+  gap: 6px;
+}
+
 .bb-inline-toggle-row {
   flex-wrap: wrap;
 }
@@ -377,8 +384,8 @@ summary {
 .bb-burn-rate-info {
   position: relative;
   display: inline-grid;
-  width: 28px;
-  height: 28px;
+  width: 18px;
+  height: 18px;
   place-items: center;
   border: 1px solid hsl(var(--border));
   border-radius: 999px;
@@ -386,16 +393,17 @@ summary {
   color: hsl(var(--muted-foreground));
   cursor: pointer;
   font: inherit;
-  font-size: 13px;
+  font-size: 10px;
   font-weight: 800;
   line-height: 1;
+  padding: 0;
 }
 
 .bb-burn-rate-info-tooltip {
   position: absolute;
   z-index: 20;
   top: calc(100% + 8px);
-  right: 0;
+  left: 0;
   width: min(250px, calc(100vw - 32px));
   border: 1px solid hsl(var(--border));
   border-radius: var(--radius);

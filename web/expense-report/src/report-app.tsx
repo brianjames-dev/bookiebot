@@ -171,6 +171,7 @@ type ChartPanel = {
   id: string
   title: string
   content: ReactNode
+  titleAccessory?: ReactNode
   headerControl?: ReactNode
 }
 
@@ -387,6 +388,7 @@ export function ExpenseReportApp({ report }: { report: ExpenseReportData }) {
           {
             id: "burn-rate",
             title: "Burn Rate",
+            titleAccessory: <BurnRateInfoButton />,
             content: <BurnRateChart burnRate={activeReport.burnRate} collapseKey={chartCollapseKey} />,
           },
         ]
@@ -583,7 +585,10 @@ export function ExpenseReportApp({ report }: { report: ExpenseReportData }) {
                 <Card className="bb-analytics-card">
                   <CardHeader className="bb-analytics-header">
                     <div className="bb-card-title-row bb-analytics-title-row">
-                      <CardTitle>{panel.title}</CardTitle>
+                      <div className="bb-title-with-accessory">
+                        <CardTitle>{panel.title}</CardTitle>
+                        {panel.titleAccessory}
+                      </div>
                       {panel.headerControl ? <div className="bb-analytics-header-controls">{panel.headerControl}</div> : null}
                     </div>
                   </CardHeader>
@@ -783,7 +788,6 @@ function BurnRateChart({ burnRate, collapseKey }: { burnRate: BurnRate; collapse
           </div>
         </div>
         <div className="bb-burn-rate-actions">
-          <BurnRateInfoButton />
           <div className={isOver ? "bb-burn-rate-pill bb-burn-rate-pill-danger" : "bb-burn-rate-pill"}>
             {dailyDifference}
           </div>
@@ -991,12 +995,12 @@ function BurnRateTooltipContent({
       </div>
       <div className="bb-chart-tooltip-row">
         <span />
-        <span>Cumulative spent</span>
+        <span>Total Spent</span>
         <strong>{formatMoney(point.actualSpend)}</strong>
       </div>
       <div className="bb-chart-tooltip-row">
         <span />
-        <span>Expected by day</span>
+        <span>Limit</span>
         <strong>{formatMoney(point.expectedSpend)}</strong>
       </div>
     </div>
@@ -1374,7 +1378,7 @@ function DailySpendingChart({
   const peak = data.reduce<AmountRow | null>((best, item) => (!best || item.amount > best.amount ? item : best), null)
   const averageDaySpend = elapsedDays ? total / elapsedDays : 0
   const yAxisDomain = dailySpendingYAxisDomain(data)
-  const lowValueGridLines = dailySpendingLowValueGridLines(yAxisDomain)
+  const yAxisTicks = dailySpendingYAxisTicks(yAxisDomain)
   const showStackedBars = filter === "all"
   const singleBarColor = filter === "needs" ? NEEDS_BAR_COLOR : filter === "wants" ? WANTS_BAR_COLOR : "hsl(var(--chart-1))"
   return (
@@ -1393,19 +1397,9 @@ function DailySpendingChart({
         <ResponsiveContainer width="100%" height="100%">
           <BarChart data={data} margin={{ top: 12, right: 16, left: 0, bottom: 0 }}>
             <CartesianGrid vertical={false} strokeDasharray="3 3" />
-            {lowValueGridLines.map((value) => (
-              <ReferenceLine
-                key={`daily-low-grid-${value}`}
-                y={value}
-                stroke="hsl(var(--muted-foreground))"
-                strokeOpacity={0.34}
-                strokeDasharray="2 6"
-                strokeWidth={1}
-              />
-            ))}
             <XAxis dataKey="label" tickLine={false} axisLine={false} />
-            <YAxis domain={yAxisDomain} scale="sqrt" tickFormatter={(value) => `$${value}`} tickLine={false} axisLine={false} width={52} />
-            <ChartTooltip content={showStackedBars ? <DailySpendingTooltipContent /> : <ChartTooltipContent />} cursor={{ fill: "hsl(var(--primary) / 0.1)" }} />
+            <YAxis domain={yAxisDomain} ticks={yAxisTicks} scale="sqrt" tickFormatter={(value) => `$${value}`} tickLine={false} axisLine={false} width={52} />
+            <ChartTooltip content={showStackedBars ? <DailySpendingTooltipContent /> : <ChartTooltipContent />} cursor={{ fill: dailySpendingCursorFill(filter) }} />
             {showStackedBars ? (
               <>
                 <Bar dataKey="needsAmount" name="Needs" stackId="daily" fill={NEEDS_BAR_COLOR} radius={[2, 2, 2, 2]} />
@@ -1446,17 +1440,38 @@ function dailySpendingYAxisDomain(data: DailySpendingRow[]): [number, number] {
   return [0, Math.max(1, Math.ceil(paddedPeak / 10) * 10)]
 }
 
-function dailySpendingLowValueGridLines([, max]: [number, number]) {
-  const lowCeiling = Math.min(max, 100)
-  if (lowCeiling <= 0) {
-    return []
+function dailySpendingYAxisTicks([, max]: [number, number]) {
+  if (max <= 0) {
+    return [0]
   }
-  const step = lowCeiling <= 50 ? 10 : 25
-  const lines: number[] = []
-  for (let value = step; value < lowCeiling; value += step) {
-    lines.push(value)
+  if (max <= 160) {
+    const step = max <= 60 ? 10 : 20
+    return dailySpendingTickRange(step, max)
   }
-  return lines
+
+  const ticks = [0, 25, 50, 75, 100]
+  for (let value = 200; value < max; value += 100) {
+    ticks.push(value)
+  }
+  return ticks.filter((value) => value < max)
+}
+
+function dailySpendingTickRange(step: number, max: number) {
+  const ticks: number[] = []
+  for (let value = 0; value < max; value += step) {
+    ticks.push(value)
+  }
+  return ticks
+}
+
+function dailySpendingCursorFill(filter: DailySpendingFilter) {
+  if (filter === "needs") {
+    return "rgb(37 99 235 / 0.14)"
+  }
+  if (filter === "wants") {
+    return "rgb(124 58 237 / 0.14)"
+  }
+  return "hsl(var(--foreground) / 0.08)"
 }
 
 type DailySpendingTooltipPayload = {
@@ -1500,9 +1515,11 @@ function DailySpendingTooltipContent({
 }
 
 function TopExpensesChart({ entries }: { entries: ExpenseEntry[] }) {
-  const rows = entries.slice(0, 10).map((entry) => ({
+  const visibleEntries = entries.slice(0, 10)
+  const rows = visibleEntries.map((entry, index) => ({
     label: expenseEntryItemLabel(entry),
     amount: entry.amount,
+    color: topExpenseHeatColor(index, visibleEntries.length),
   }))
 
   return (
@@ -1512,15 +1529,45 @@ function TopExpensesChart({ entries }: { entries: ExpenseEntry[] }) {
           <CartesianGrid horizontal={false} strokeDasharray="3 3" />
           <XAxis type="number" tickFormatter={(value) => `$${value}`} tickLine={false} axisLine={false} />
           <YAxis dataKey="label" type="category" width={148} tickFormatter={(value) => truncateChartLabel(value, 22)} tickLine={false} axisLine={false} />
-          <ChartTooltip content={<ChartTooltipContent />} />
+          <ChartTooltip content={<TopExpensesTooltipContent />} cursor={{ fill: "hsl(var(--foreground) / 0.08)" }} />
           <Bar dataKey="amount" name="Expense amount" fill="hsl(var(--chart-2))" radius={[0, 6, 6, 0]}>
             {rows.map((row, index) => (
-              <Cell key={`${row.label}-${index}`} fill={topExpenseHeatColor(index, rows.length)} />
+              <Cell key={`${row.label}-${index}`} fill={row.color} />
             ))}
           </Bar>
         </BarChart>
       </ResponsiveContainer>
     </ChartContainer>
+  )
+}
+
+type TopExpensesChartRow = {
+  label: string
+  amount: number
+  color: string
+}
+
+function TopExpensesTooltipContent({
+  active,
+  payload,
+}: {
+  active?: boolean
+  payload?: Array<{ payload?: TopExpensesChartRow }>
+}) {
+  const row = payload?.find((item) => item.payload)?.payload
+  if (!active || !row) {
+    return null
+  }
+  const signature = `${row.label}:${row.amount}:${row.color}`
+  return (
+    <div className="bb-chart-tooltip bb-touch-tooltip-content" key={signature}>
+      <div className="bb-chart-tooltip-title">{row.label}</div>
+      <div className="bb-chart-tooltip-row">
+        <span className="bb-chart-tooltip-dot" style={{ background: row.color }} />
+        <span>Expense amount</span>
+        <strong>{formatMoney(row.amount)}</strong>
+      </div>
+    </div>
   )
 }
 
@@ -1549,7 +1596,7 @@ function MerchantChart({ data }: { data: OccurrenceRow[] }) {
           <CartesianGrid horizontal={false} strokeDasharray="3 3" />
           <XAxis type="number" tickFormatter={(value) => String(value)} tickLine={false} axisLine={false} allowDecimals={false} />
           <YAxis dataKey="label" type="category" width={148} tickLine={false} axisLine={false} />
-          <ChartTooltip content={<MerchantTooltipContent />} />
+          <ChartTooltip content={<MerchantTooltipContent />} cursor={{ fill: "rgb(8 145 178 / 0.14)" }} />
           <Bar dataKey="count" name="Occurrences" fill={MERCHANT_BAR_COLOR} radius={[0, 6, 6, 0]} />
         </BarChart>
       </ResponsiveContainer>
