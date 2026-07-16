@@ -1149,6 +1149,26 @@ summary {
   white-space: nowrap;
 }
 
+.bb-bill-history-name {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  min-width: 0;
+}
+
+.bb-bill-history-name > span:last-child {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.bb-bill-history-dot {
+  flex: 0 0 auto;
+  width: 9px;
+  height: 9px;
+  border-radius: 999px;
+}
+
 .bb-bill-history-row small {
   color: hsl(var(--muted-foreground));
   font-size: 12px;

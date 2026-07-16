@@ -873,11 +873,18 @@ def register_commands(tree: app_commands.CommandTree):
 
         messages = digest.detail_messages or (digest.detail_message,)
         for index, message in enumerate(messages):
-            await interaction.followup.send(
-                content=f"{message}\n\u200b",
-                view=bank_reconciliation_digest_view(str(interaction.user.id)) if index == len(messages) - 1 else None,
-                ephemeral=True,
-            )
+            content = f"{message}\n\u200b"
+            if index == len(messages) - 1:
+                await interaction.followup.send(
+                    content=content,
+                    view=bank_reconciliation_digest_view(str(interaction.user.id)),
+                    ephemeral=True,
+                )
+            else:
+                await interaction.followup.send(
+                    content=content,
+                    ephemeral=True,
+                )
 
     @tree.command(name="debug_bank_ignore", description="(Admin) Ignore an unresolved bank reconciliation item")
     @app_commands.describe(reconciliation_id="ID shown by /debug_bank_review")

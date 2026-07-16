@@ -302,7 +302,8 @@ def test_build_expense_breakdown_report_aggregates_shared_and_personal_data():
     assert "Projected view" not in html
     assert "Current view" not in html
     assert "Categories" in html
-    assert "Bill details" in html
+    assert "Bill details" not in html
+    assert "bb-bill-history-dot" in html
     assert "bb-chart-carousel-slide" in html
     assert "bb-calendar-day-today" in html
     assert "bb-subscription-all-grid" in html

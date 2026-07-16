@@ -2314,7 +2314,7 @@ function BillsUtilitiesPanel({
       ) : (
         <>
           <BillsUtilitiesChart items={items} billEvents={billEvents} year={year} month={month} />
-          <DetailsPanel summary="Bill details" collapseKey={collapseKey}>
+          <DetailsPanel summary="Details" collapseKey={collapseKey}>
             <BillsUtilitiesSummary items={items} />
           </DetailsPanel>
         </>
@@ -2482,13 +2482,17 @@ function chartColor(index: number) {
 function BillsUtilitiesSummary({ items }: { items: UtilityHistoryItem[] }) {
   return (
     <div className="bb-bill-history-list">
-      {items.map((item) => {
+      {items.map((item, index) => {
+        const color = chartColor(index)
         const hasAverage = item.averageAmount > 0
         const deltaClass = hasAverage && item.deltaAmount > 0 ? "bb-negative" : hasAverage && item.deltaAmount < 0 ? "bb-positive" : ""
         return (
           <div className="bb-bill-history-row" key={item.key}>
             <span>
-              <strong>{item.label}</strong>
+              <strong className="bb-bill-history-name">
+                <span className="bb-bill-history-dot" style={{ background: color }} />
+                <span>{item.label}</span>
+              </strong>
               <small>{hasAverage ? `Avg ${formatMoney(item.averageAmount)}` : "No prior average"}</small>
             </span>
             <span>
