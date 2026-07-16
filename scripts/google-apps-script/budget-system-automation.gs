@@ -110,6 +110,11 @@ const PERSONAL_BUDGET_IMPORT_RULES = {
       sharedExpenseCell: "L4",
     },
     {
+      label: "Various Need Transactions",
+      targetColumnOffsetFromLabel: 1,
+      sharedExpenseCell: "AJ4",
+    },
+    {
       label: "Eating out",
       targetColumnOffsetFromLabel: 2,
       sharedExpenseCell: "T4",
@@ -133,6 +138,11 @@ const PERSONAL_BUDGET_IMPORT_RULES = {
       sharedExpenseCell: "L5",
     },
     {
+      label: "Various Need Transactions",
+      targetColumnOffsetFromLabel: 1,
+      sharedExpenseCell: "AJ5",
+    },
+    {
       label: "Eating out",
       targetColumnOffsetFromLabel: 2,
       sharedExpenseCell: "T5",
@@ -151,16 +161,18 @@ const PERSONAL_BUDGET_IMPORT_RULES = {
  * When an amount is entered, the matching date column is stamped
  * if it is currently empty.
  *
- * B  -> A
- * I  -> H
- * P  -> N
- * X  -> V
+ * B  -> A   (Grocery)
+ * I  -> H   (Gas)
+ * P  -> N   (Food)
+ * X  -> V   (Shopping)
+ * AF -> AD  (Needs)
  */
 const SHARED_EXPENSES_DATE_COLUMN_MAP = {
   2: 1,
   9: 8,
   16: 14,
   24: 22,
+  32: 30,
 };
 
 /***********************
