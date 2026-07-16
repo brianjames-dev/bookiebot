@@ -764,9 +764,9 @@ function ThemeToggle({ theme, onToggle }: { theme: ThemeMode; onToggle: () => vo
 function BurnRateChart({ burnRate, collapseKey }: { burnRate: BurnRate; collapseKey: number }) {
   const isOver = burnRate.status === "over"
   const isNotStarted = burnRate.status === "not_started"
-  const statusLabel = isNotStarted ? "Not started" : isOver ? "Over pace" : "Under pace"
+  const statusLabel = isNotStarted ? "Not started" : isOver ? "Over pace" : "Available today"
   const differenceLabel = isNotStarted ? "No elapsed days" : formatMoney(Math.abs(burnRate.totalDifference))
-  const dailyDifference = isNotStarted ? "No daily pace yet" : `${burnRate.dailyDifference >= 0 ? "+" : ""}${formatMoney(burnRate.dailyDifference)}/day`
+  const dailyDifference = burnRateDailyPaceLabel(burnRate)
   const chartSeries = burnRate.series
   const gradientStops = burnRateGradientStops(chartSeries)
   const lineColor = isNotStarted ? "hsl(var(--chart-1))" : "url(#burn-rate-variance-gradient)"
@@ -782,8 +782,11 @@ function BurnRateChart({ burnRate, collapseKey }: { burnRate: BurnRate; collapse
             {burnRate.elapsedDays} of {burnRate.daysInMonth} days counted
           </div>
         </div>
-        <div className={isOver ? "bb-burn-rate-pill bb-burn-rate-pill-danger" : "bb-burn-rate-pill"}>
-          {dailyDifference}
+        <div className="bb-burn-rate-actions">
+          <BurnRateInfoButton />
+          <div className={isOver ? "bb-burn-rate-pill bb-burn-rate-pill-danger" : "bb-burn-rate-pill"}>
+            {dailyDifference}
+          </div>
         </div>
       </div>
       <ChartContainer
@@ -835,6 +838,30 @@ function BurnRateChart({ burnRate, collapseKey }: { burnRate: BurnRate; collapse
         />
       </DetailsPanel>
     </div>
+  )
+}
+
+function burnRateDailyPaceLabel(burnRate: BurnRate) {
+  if (burnRate.status === "not_started") {
+    return "No daily pace yet"
+  }
+  if (burnRate.dailyDifference > 0) {
+    return `Overspending ${formatMoney(Math.abs(burnRate.dailyDifference))}/day`
+  }
+  if (burnRate.dailyDifference < 0) {
+    return `Saving ${formatMoney(Math.abs(burnRate.dailyDifference))}/day`
+  }
+  return "On pace"
+}
+
+function BurnRateInfoButton() {
+  return (
+    <button type="button" className="bb-burn-rate-info" aria-label="What burn rate means">
+      <span aria-hidden="true">i</span>
+      <span className="bb-burn-rate-info-tooltip" role="tooltip">
+        Tracks Food + Shopping pace against your wants limit. Available today is what you can spend now and stay on pace.
+      </span>
+    </button>
   )
 }
 

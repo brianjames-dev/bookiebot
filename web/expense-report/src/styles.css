@@ -331,6 +331,7 @@ summary {
 .bb-metric-toggle:focus-visible,
 .bb-details-toggle:focus-visible,
 .bb-expand-toggle:focus-visible,
+.bb-burn-rate-info:focus-visible,
 .bb-chart-carousel-button:focus-visible,
 .bb-chart-carousel-dot:focus-visible {
   outline: 2px solid hsl(var(--primary));
@@ -363,6 +364,59 @@ summary {
   margin-top: 7px;
   color: hsl(var(--muted-foreground));
   font-size: 13px;
+}
+
+.bb-burn-rate-actions {
+  display: flex;
+  align-items: center;
+  flex: 0 0 auto;
+  gap: 8px;
+  margin-left: auto;
+}
+
+.bb-burn-rate-info {
+  position: relative;
+  display: inline-grid;
+  width: 28px;
+  height: 28px;
+  place-items: center;
+  border: 1px solid hsl(var(--border));
+  border-radius: 999px;
+  background: hsl(var(--background));
+  color: hsl(var(--muted-foreground));
+  cursor: pointer;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 800;
+  line-height: 1;
+}
+
+.bb-burn-rate-info-tooltip {
+  position: absolute;
+  z-index: 20;
+  top: calc(100% + 8px);
+  right: 0;
+  width: min(250px, calc(100vw - 32px));
+  border: 1px solid hsl(var(--border));
+  border-radius: var(--radius);
+  background: hsl(var(--card));
+  color: hsl(var(--foreground));
+  padding: 9px 10px;
+  box-shadow: 0 8px 22px rgb(15 23 42 / 0.12);
+  font-size: 12px;
+  font-weight: 650;
+  line-height: 1.35;
+  opacity: 0;
+  pointer-events: none;
+  text-align: left;
+  transform: translateY(-4px);
+  transition: opacity 150ms ease, transform 150ms ease;
+}
+
+.bb-burn-rate-info:hover .bb-burn-rate-info-tooltip,
+.bb-burn-rate-info:focus .bb-burn-rate-info-tooltip {
+  opacity: 1;
+  transform: translateY(0);
 }
 
 .bb-burn-rate-pill {
@@ -952,7 +1006,8 @@ summary {
 }
 
 .bb-panel-head > .bb-badge,
-.bb-panel-head > .bb-burn-rate-pill {
+.bb-panel-head > .bb-burn-rate-pill,
+.bb-panel-head > .bb-burn-rate-actions {
   margin-left: auto;
 }
 
