@@ -387,6 +387,99 @@ def test_build_expense_breakdown_report_aggregates_shared_and_personal_data():
     )
 
 
+def test_shared_need_expense_section_feeds_need_category_and_daily_activity():
+    shared_rows = [
+        ["hdr"] * 36,
+        ["hdr"] * 36,
+        _row(
+            {
+                "AD": "05/06/2026",
+                "AE": "DMV Registration",
+                "AF": "184",
+                "AG": "DMV",
+                "AH": "Hannah",
+            },
+            width=36,
+        ),
+        _row(
+            {
+                "AD": "05/07/2026",
+                "AE": "Car repair",
+                "AF": "250",
+                "AG": "Auto Shop",
+                "AH": "Brian (BofA)",
+            },
+            width=36,
+        ),
+        _row(
+            {
+                "AD": "06/01/2026",
+                "AE": "Doctor copay",
+                "AF": "40",
+                "AG": "Kaiser",
+                "AH": "Hannah",
+            },
+            width=36,
+        ),
+    ]
+    personal_rows = [
+        ["Name:", "Needs (50%):", "Wants (30%):", "Savings (20%):"],
+        ["Legacy Personal Need", "$999.00"],
+        ["(Needs) Subtotal:", "$0.00"],
+    ]
+
+    report = build_expense_breakdown_report(
+        actor_key="hannah",
+        owner_name="Hannah",
+        persons=["Hannah"],
+        month=BudgetMonth(2026, 5),
+        worksheets=ReportWorksheets(
+            shared_expenses=InMemoryWorksheet(shared_rows),
+            personal_budget=InMemoryWorksheet(personal_rows),
+            subscriptions=InMemoryWorksheet([]),
+        ),
+    )
+
+    assert report.breakdown["need_expenses"]["amount"] == 184.0
+    assert report.shared_total == 184.0
+    assert [(item.label, item.amount, item.status, item.date) for item in report.need_expenses] == [
+        ("DMV Registration", 184.0, "entered", "05/06/2026")
+    ]
+    assert len(report.entries) == 1
+    assert report.entries[0] == expense_breakdown.ExpenseEntry(
+        date="05/06/2026",
+        category="need_expenses",
+        amount=184.0,
+        person="Hannah",
+        item="DMV Registration",
+        location="DMV",
+    )
+
+    html = render_expense_breakdown_html(report)
+    payload_match = re.search(
+        r'<script id="bookiebot-expense-report-data" type="application/json">(.*?)</script>',
+        html,
+    )
+    assert payload_match is not None
+    payload = json.loads(payload_match.group(1))
+
+    assert payload["dailyTotals"] == [{"label": "6", "amount": 184.0}]
+    assert payload["needExpenses"] == [
+        {"label": "DMV Registration", "amount": 184.0, "group": "Need Expenses", "status": "entered"}
+    ]
+    assert payload["topEntries"][0] == {
+        "date": "05/06/2026",
+        "category": "Need Expenses",
+        "amount": 184.0,
+        "person": "Hannah",
+        "item": "DMV Registration",
+        "location": "DMV",
+    }
+    assert payload["merchantTotals"][0] == {"label": "DMV", "amount": 184.0}
+    assert payload["merchantOccurrences"][0] == {"label": "DMV", "count": 1, "amount": 184.0}
+    assert all(entry["item"] != "Legacy Personal Need" for entry in payload["dailyEntries"])
+
+
 def test_subscription_tables_include_yearly_items_outside_selected_month_without_changing_fallback_totals():
     subscriptions_rows = [
         [],

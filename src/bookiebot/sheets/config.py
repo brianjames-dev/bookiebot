@@ -37,5 +37,15 @@ get_category_columns = {
             "location": "Y",
             "person": "Z"
         }
+    },
+    "need_expenses": {
+        "start_row": 3,
+        "columns": {
+            "date": "AD",
+            "item": "AE",
+            "amount": "AF",
+            "location": "AG",
+            "person": "AH"
+        }
     }
 }

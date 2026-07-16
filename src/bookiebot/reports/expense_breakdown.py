@@ -367,7 +367,13 @@ def build_expense_breakdown_report(
     remaining_budget, remaining_wants_budget = _margin_amounts(personal_rows)
     amount_saved = _amount_saved(personal_rows)
     savings_goal = _savings_goal(personal_rows)
-    need_expenses = _need_expense_items(personal_rows)
+    shared_need_entries = _entries_for_category(entries, "need_expenses")
+    legacy_need_expenses = _need_expense_items(personal_rows)
+    need_expenses = (
+        _need_expense_items_from_entries(shared_need_entries)
+        if shared_need_entries
+        else legacy_need_expenses
+    )
     static_needs_total, wants_total = _subscription_breakdown_totals(
         personal_rows,
         subscriptions,
@@ -612,6 +618,10 @@ def _shared_expense_entries(rows: list[list[str]], persons: list[str], month: Bu
                 )
             )
     return sorted(entries, key=lambda entry: (_entry_sort_date(entry.date), entry.amount), reverse=True)
+
+
+def _entries_for_category(entries: list[ExpenseEntry], category: str) -> list[ExpenseEntry]:
+    return [entry for entry in entries if entry.category == category]
 
 
 def _payment_items(rows: list[list[str]], bill_schedule_rows: list[list[str]], month: BudgetMonth) -> list[PaymentItem]:
@@ -1309,6 +1319,18 @@ def _need_expense_items(rows: list[list[str]]) -> list[PaymentItem]:
     return items
 
 
+def _need_expense_items_from_entries(entries: list[ExpenseEntry]) -> list[PaymentItem]:
+    return [
+        PaymentItem(
+            label=entry.item or entry.location or "Need expense",
+            amount=round(entry.amount, 2),
+            group="need_expenses",
+            date=entry.date,
+        )
+        for entry in sorted(entries, key=lambda entry: (_entry_sort_date(entry.date), entry.amount), reverse=True)
+    ]
+
+
 def _need_expense_item_from_row(row: list[str]) -> PaymentItem | None:
     for amount_index, value in enumerate(row):
         amount = _cell_money(value)
@@ -1551,7 +1573,9 @@ def _merchant_occurrences(entries: list[ExpenseEntry]) -> list[dict[str, Any]]:
 
 
 def _report_activity_entries(report: ExpenseBreakdownReport) -> list[ExpenseEntry]:
-    entries = [*report.entries, *_need_expense_entries(report)]
+    entries = list(report.entries)
+    if not _entries_for_category(report.entries, "need_expenses"):
+        entries.extend(_need_expense_entries(report))
     return sorted(entries, key=lambda entry: (_entry_sort_date(entry.date), entry.amount), reverse=True)
 
 
