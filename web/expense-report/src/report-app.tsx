@@ -176,14 +176,25 @@ type ChartPanel = {
 
 type CalendarFilter = "all" | "subscription"
 type DailySpendingFilter = "all" | "needs" | "wants"
+type CategoryMixFilter = "all" | "needs" | "wants"
 
 const CHART_CAROUSEL_GAP = 16
+const CATEGORY_MIX_FILTERS: Array<{ value: CategoryMixFilter; label: string }> = [
+  { value: "all", label: "All" },
+  { value: "needs", label: "Needs" },
+  { value: "wants", label: "Wants" },
+]
 const DAILY_SPENDING_FILTERS: Array<{ value: DailySpendingFilter; label: string }> = [
   { value: "all", label: "All" },
   { value: "needs", label: "Needs" },
   { value: "wants", label: "Wants" },
 ]
+const CATEGORY_NEEDS_KEYS = new Set(["rent", "bills_utilities", "static_bills_subscriptions_needs", "need_expenses", "grocery", "gas"])
+const CATEGORY_WANTS_KEYS = new Set(["subscriptions_wants", "food", "shopping"])
 const DAILY_WANTS_CATEGORIES = new Set(["Food", "Shopping"])
+const INCOME_CATEGORY_COLOR = "#16a34a"
+const NEEDS_BAR_COLOR = "#2563eb"
+const WANTS_BAR_COLOR = "#7c3aed"
 
 type ChartTouchState = {
   startX: number
@@ -324,6 +335,7 @@ function clamp(value: number, min: number, max: number) {
 export function ExpenseReportApp({ report }: { report: ExpenseReportData }) {
   const { theme, toggleTheme } = useExpenseReportTheme()
   const [projectionActive, setProjectionActive] = useState(false)
+  const [categoryMixFilter, setCategoryMixFilter] = useState<CategoryMixFilter>("all")
   const [calendarFilter, setCalendarFilter] = useState<CalendarFilter>("all")
   const [dailySpendingFilter, setDailySpendingFilter] = useState<DailySpendingFilter>("all")
   const [chartTouch, setChartTouch] = useState<ChartTouchState | null>(null)
@@ -335,12 +347,22 @@ export function ExpenseReportApp({ report }: { report: ExpenseReportData }) {
   const categoryColors: Record<string, string> = Object.fromEntries(activeReport.breakdown.map((item) => [item.label, item.color]))
   const dailyEntries = filterDailyEntries(report.dailyEntries, dailySpendingFilter)
   const dailyTotals = dailyTotalsForEntries(dailyEntries)
+  const spentTotal = amountRowsTotal(activeReport.breakdown)
   const defaultChartTab = report.burnRate ? "burn-rate" : "category"
   const chartPanels: ChartPanel[] = [
     {
       id: "category",
       title: "Category Mix",
-      content: <CategoryMixChart data={activeReport.breakdown} total={amountRowsTotal(activeReport.breakdown)} projected={projectionActive} collapseKey={chartCollapseKey} />,
+      headerControl: <CategoryMixFilterControl filter={categoryMixFilter} onFilterChange={setCategoryMixFilter} />,
+      content: (
+        <CategoryMixChart
+          data={activeReport.breakdown}
+          income={activeReport.metrics.monthlyIncome}
+          filter={categoryMixFilter}
+          projected={projectionActive}
+          collapseKey={chartCollapseKey}
+        />
+      ),
     },
     ...(activeReport.burnRate
       ? [
@@ -515,7 +537,7 @@ export function ExpenseReportApp({ report }: { report: ExpenseReportData }) {
               />
             }
           />
-          <MetricCard label="Spent" value={activeReport.metrics.totalExpenses} />
+          <MetricCard label="Spent" value={spentTotal} />
           <MetricCard label="Left" value={activeReport.metrics.incomeAfterExpenses} description="After expenses" accent />
           <MetricCard
             label="Saved"
@@ -613,6 +635,32 @@ function ChartCarouselNavigation({
       <button type="button" className="bb-chart-carousel-button" aria-label="Next chart" onClick={onNext} disabled={!canNext}>
         {">"}
       </button>
+    </div>
+  )
+}
+
+function CategoryMixFilterControl({
+  filter,
+  onFilterChange,
+}: {
+  filter: CategoryMixFilter
+  onFilterChange: (filter: CategoryMixFilter) => void
+}) {
+  return (
+    <div className="bb-tabs-list bb-category-mix-filter" role="tablist" aria-label="Category mix filter">
+      {CATEGORY_MIX_FILTERS.map((item) => (
+        <button
+          type="button"
+          key={item.value}
+          className="bb-tabs-trigger"
+          data-state={filter === item.value ? "active" : "inactive"}
+          role="tab"
+          aria-selected={filter === item.value}
+          onClick={() => onFilterChange(item.value)}
+        >
+          {item.label}
+        </button>
+      ))}
     </div>
   )
 }
@@ -948,25 +996,39 @@ function isSavingsNearGoal(value: number | null | undefined, goal: number | null
   return value >= goal * 0.9
 }
 
-function CategoryMixChart({ data, total, projected, collapseKey }: { data: BreakdownItem[]; total: number; projected: boolean; collapseKey: number }) {
+function CategoryMixChart({
+  data,
+  income,
+  filter,
+  projected,
+  collapseKey,
+}: {
+  data: BreakdownItem[]
+  income: number
+  filter: CategoryMixFilter
+  projected: boolean
+  collapseKey: number
+}) {
   const pieLayout = useExpensePieLayout()
+  const chartData = categoryMixRows(data, income, filter)
+  const spentTotal = amountRowsTotal(chartData.filter((item) => item.key !== "income"))
 
   return (
     <div className="bb-chart-stack">
       <div className="bb-panel-head">
         <div>
-          <div className="bb-chart-kicker">Category Mix</div>
-          <div className="bb-chart-total">{formatMoney(total)}</div>
+          <div className="bb-chart-kicker">Spent</div>
+          <div className="bb-chart-total">{formatMoney(spentTotal)}</div>
           <div className="bb-chart-mode-note">{projected ? "Projected" : "Current"}</div>
         </div>
       </div>
       <div className="bb-chart-layout bb-category-chart-layout">
-        <ChartContainer config={chartConfig(data)} className="bb-chart-box bb-category-chart-box">
+        <ChartContainer config={chartConfig(chartData)} className="bb-chart-box bb-category-chart-box">
           <ResponsiveContainer width="100%" height="100%">
             <PieChart margin={pieLayout.margin}>
               <ChartTooltip content={<ChartTooltipContent />} />
               <Pie
-                data={data}
+                data={chartData}
                 dataKey="amount"
                 nameKey="label"
                 innerRadius={pieLayout.innerRadius}
@@ -975,7 +1037,7 @@ function CategoryMixChart({ data, total, projected, collapseKey }: { data: Break
                 label={pieLayout.showLabels ? (props) => renderPieMetricLabel(props, pieLayout) : false}
                 labelLine={pieLayout.showLabels ? (props) => renderPieMetricLabelLine(props, pieLayout) : false}
               >
-                {data.map((item) => (
+                {chartData.map((item) => (
                   <Cell key={item.key} fill={item.color} />
                 ))}
               </Pie>
@@ -985,7 +1047,7 @@ function CategoryMixChart({ data, total, projected, collapseKey }: { data: Break
       </div>
       <DetailsPanel summary="Categories" collapseKey={collapseKey}>
         <div className="bb-legend-list">
-          {data.map((item) => (
+          {chartData.map((item) => (
             <div className="bb-legend-row" key={item.key}>
               <span className="bb-swatch" style={{ backgroundColor: item.color }} />
               <span>{item.label}</span>
@@ -998,6 +1060,36 @@ function CategoryMixChart({ data, total, projected, collapseKey }: { data: Break
       </DetailsPanel>
     </div>
   )
+}
+
+function categoryMixRows(data: BreakdownItem[], income: number, filter: CategoryMixFilter) {
+  const filtered = data.filter((item) => {
+    if (filter === "needs") {
+      return CATEGORY_NEEDS_KEYS.has(item.key)
+    }
+    if (filter === "wants") {
+      return CATEGORY_WANTS_KEYS.has(item.key)
+    }
+    return true
+  })
+  const rows =
+    filter === "all"
+      ? [
+          {
+            key: "income",
+            label: "Income",
+            amount: roundCurrency(income),
+            percentage: 0,
+            color: INCOME_CATEGORY_COLOR,
+          },
+          ...filtered,
+        ]
+      : filtered
+  const total = amountRowsTotal(rows)
+  return rows.map((item) => ({
+    ...item,
+    percentage: total ? roundCurrency((item.amount / total) * 100) : 0,
+  }))
 }
 
 function useExpensePieLayout() {
@@ -1201,15 +1293,15 @@ function DailySpendingChart({
 }) {
   const peak = data.reduce<AmountRow | null>((best, item) => (!best || item.amount > best.amount ? item : best), null)
   const averageDaySpend = elapsedDays ? total / elapsedDays : 0
-  const showGroupedBars = filter === "all"
+  const showStackedBars = filter === "all"
   return (
     <div className="bb-chart-layout">
       <ChartContainer
         config={
-          showGroupedBars
+          showStackedBars
             ? {
-                needsAmount: { label: "Needs", color: "hsl(var(--chart-2))" },
-                wantsAmount: { label: "Wants", color: "hsl(var(--chart-4))" },
+                needsAmount: { label: "Needs", color: NEEDS_BAR_COLOR },
+                wantsAmount: { label: "Wants", color: WANTS_BAR_COLOR },
               }
             : { amount: { label: "Amount", color: "hsl(var(--chart-1))" } }
         }
@@ -1220,11 +1312,11 @@ function DailySpendingChart({
             <CartesianGrid vertical={false} strokeDasharray="3 3" />
             <XAxis dataKey="label" tickLine={false} axisLine={false} />
             <YAxis tickFormatter={(value) => `$${value}`} tickLine={false} axisLine={false} width={52} />
-            <ChartTooltip content={<ChartTooltipContent />} cursor={{ fill: "hsl(var(--primary) / 0.1)" }} />
-            {showGroupedBars ? (
+            <ChartTooltip content={showStackedBars ? <DailySpendingTooltipContent /> : <ChartTooltipContent />} cursor={{ fill: "hsl(var(--primary) / 0.1)" }} />
+            {showStackedBars ? (
               <>
-                <Bar dataKey="needsAmount" name="Needs" fill="hsl(var(--chart-2))" radius={[6, 6, 2, 2]} />
-                <Bar dataKey="wantsAmount" name="Wants" fill="hsl(var(--chart-4))" radius={[6, 6, 2, 2]} />
+                <Bar dataKey="needsAmount" name="Needs" stackId="daily" fill={NEEDS_BAR_COLOR} radius={[2, 2, 2, 2]} />
+                <Bar dataKey="wantsAmount" name="Wants" stackId="daily" fill={WANTS_BAR_COLOR} radius={[6, 6, 2, 2]} />
               </>
             ) : (
               <Bar dataKey="amount" name="Daily spending" fill="hsl(var(--chart-1))" radius={[6, 6, 2, 2]} />
@@ -1247,6 +1339,46 @@ function DailySpendingChart({
             ]}
           />
         </DetailsPanel>
+      </div>
+    </div>
+  )
+}
+
+type DailySpendingTooltipPayload = {
+  name?: string | number
+  value?: string | number | null
+  color?: string
+  payload?: DailySpendingRow
+}
+
+function DailySpendingTooltipContent({
+  active,
+  payload,
+}: {
+  active?: boolean
+  payload?: DailySpendingTooltipPayload[]
+}) {
+  const rows = (payload ?? []).filter((item) => item.value !== null && item.value !== undefined && Number(item.value) > 0)
+  const point = rows[0]?.payload
+  if (!active || !rows.length || !point) {
+    return null
+  }
+  const signature = rows.map((item) => `${item.name ?? ""}:${item.value ?? ""}`).join("|")
+
+  return (
+    <div className="bb-chart-tooltip bb-touch-tooltip-content" key={signature}>
+      <div className="bb-chart-tooltip-title">Day {point.label}</div>
+      {rows.map((item, index) => (
+        <div className="bb-chart-tooltip-row" key={`${item.name}-${item.value}-${index}`}>
+          <span className="bb-chart-tooltip-dot" style={{ background: item.color }} />
+          <span>{item.name}</span>
+          <strong>{formatMoney(Number(item.value || 0))}</strong>
+        </div>
+      ))}
+      <div className="bb-chart-tooltip-row">
+        <span />
+        <span>Total</span>
+        <strong>{formatMoney(point.amount)}</strong>
       </div>
     </div>
   )
@@ -1735,7 +1867,7 @@ function CalendarAnalyticsPanel({
           </div>
           <FinancialCalendar year={year} month={month} elapsedDays={elapsedDays} events={visibleEvents} />
           {subscriptionItems.length ? (
-            <DetailsPanel summary="Sub details" collapseKey={collapseKey}>
+            <DetailsPanel summary="Details" collapseKey={collapseKey}>
               <SubscriptionAllItemsGrid items={subscriptionItems} />
             </DetailsPanel>
           ) : null}
