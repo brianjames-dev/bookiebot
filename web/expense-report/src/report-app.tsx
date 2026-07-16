@@ -192,7 +192,7 @@ const DAILY_SPENDING_FILTERS: Array<{ value: DailySpendingFilter; label: string 
 const CATEGORY_NEEDS_KEYS = new Set(["rent", "bills_utilities", "static_bills_subscriptions_needs", "need_expenses", "grocery", "gas"])
 const CATEGORY_WANTS_KEYS = new Set(["subscriptions_wants", "food", "shopping"])
 const DAILY_WANTS_CATEGORIES = new Set(["Food", "Shopping"])
-const INCOME_CATEGORY_COLOR = "#16a34a"
+const LEFT_CATEGORY_COLOR = "#16a34a"
 const NEEDS_BAR_COLOR = "#2563eb"
 const WANTS_BAR_COLOR = "#7c3aed"
 
@@ -262,9 +262,11 @@ function projectedOutflowTotal(report: ExpenseReportData, breakdown: BreakdownIt
 
 function projectedSubscriptionTotals(report: ExpenseReportData) {
   const totalFor = (items: SubscriptionItem[]) => items.reduce((sum, item) => sum + item.amount, 0)
+  const scheduledNeeds = report.subscriptionsNeeds.filter((item) => subscriptionDayInMonth(item, report.year, report.month) !== null)
+  const scheduledWants = report.subscriptionsWants.filter((item) => subscriptionDayInMonth(item, report.year, report.month) !== null)
   return {
-    needs: roundCurrency(totalFor(report.subscriptionsNeeds)),
-    wants: roundCurrency(totalFor(report.subscriptionsWants)),
+    needs: roundCurrency(totalFor(scheduledNeeds)),
+    wants: roundCurrency(totalFor(scheduledWants)),
   }
 }
 
@@ -346,7 +348,9 @@ export function ExpenseReportApp({ report }: { report: ExpenseReportData }) {
   const activeReport = buildReportView(report, projectionActive)
   const categoryColors: Record<string, string> = Object.fromEntries(activeReport.breakdown.map((item) => [item.label, item.color]))
   const dailyEntries = filterDailyEntries(report.dailyEntries, dailySpendingFilter)
-  const dailyTotals = dailyTotalsForEntries(dailyEntries)
+  const dailySubscriptionEvents = dailySpendingSubscriptionEvents(activeReport.calendarEvents, dailySpendingFilter, projectionActive)
+  const dailyTotals = dailyTotalsForEntries(dailyEntries, dailySubscriptionEvents)
+  const dailyTotal = dailySpendingTotal(dailyEntries, dailySubscriptionEvents)
   const spentTotal = amountRowsTotal(activeReport.breakdown)
   const defaultChartTab = report.burnRate ? "burn-rate" : "category"
   const chartPanels: ChartPanel[] = [
@@ -357,7 +361,7 @@ export function ExpenseReportApp({ report }: { report: ExpenseReportData }) {
       content: (
         <CategoryMixChart
           data={activeReport.breakdown}
-          income={activeReport.metrics.monthlyIncome}
+          leftAmount={activeReport.metrics.incomeAfterExpenses}
           filter={categoryMixFilter}
           projected={projectionActive}
           collapseKey={chartCollapseKey}
@@ -593,7 +597,7 @@ export function ExpenseReportApp({ report }: { report: ExpenseReportData }) {
             </div>
           </CardHeader>
           <CardContent className="bb-daily-spending-content">
-            <DailySpendingChart data={dailyTotals} total={amountRowsTotal(dailyTotals)} elapsedDays={report.elapsedDays} filter={dailySpendingFilter} />
+            <DailySpendingChart data={dailyTotals} total={dailyTotal} elapsedDays={report.elapsedDays} filter={dailySpendingFilter} />
             <DailyEntriesTable entries={dailyEntries} categoryColors={categoryColors} />
           </CardContent>
         </Card>
@@ -998,20 +1002,20 @@ function isSavingsNearGoal(value: number | null | undefined, goal: number | null
 
 function CategoryMixChart({
   data,
-  income,
+  leftAmount,
   filter,
   projected,
   collapseKey,
 }: {
   data: BreakdownItem[]
-  income: number
+  leftAmount: number
   filter: CategoryMixFilter
   projected: boolean
   collapseKey: number
 }) {
   const pieLayout = useExpensePieLayout()
-  const chartData = categoryMixRows(data, income, filter)
-  const spentTotal = amountRowsTotal(chartData.filter((item) => item.key !== "income"))
+  const chartData = categoryMixRows(data, leftAmount, filter)
+  const spentTotal = amountRowsTotal(chartData.filter((item) => item.key !== "left"))
 
   return (
     <div className="bb-chart-stack">
@@ -1062,7 +1066,7 @@ function CategoryMixChart({
   )
 }
 
-function categoryMixRows(data: BreakdownItem[], income: number, filter: CategoryMixFilter) {
+function categoryMixRows(data: BreakdownItem[], leftAmount: number, filter: CategoryMixFilter) {
   const filtered = data.filter((item) => {
     if (filter === "needs") {
       return CATEGORY_NEEDS_KEYS.has(item.key)
@@ -1072,15 +1076,16 @@ function categoryMixRows(data: BreakdownItem[], income: number, filter: Category
     }
     return true
   })
+  const positiveLeftAmount = Math.max(roundCurrency(leftAmount), 0)
   const rows =
-    filter === "all"
+    filter === "all" && positiveLeftAmount > 0
       ? [
           {
-            key: "income",
-            label: "Income",
-            amount: roundCurrency(income),
+            key: "left",
+            label: "Left",
+            amount: positiveLeftAmount,
             percentage: 0,
-            color: INCOME_CATEGORY_COLOR,
+            color: LEFT_CATEGORY_COLOR,
           },
           ...filtered,
         ]
@@ -1294,6 +1299,7 @@ function DailySpendingChart({
   const peak = data.reduce<AmountRow | null>((best, item) => (!best || item.amount > best.amount ? item : best), null)
   const averageDaySpend = elapsedDays ? total / elapsedDays : 0
   const showStackedBars = filter === "all"
+  const singleBarColor = filter === "needs" ? NEEDS_BAR_COLOR : filter === "wants" ? WANTS_BAR_COLOR : "hsl(var(--chart-1))"
   return (
     <div className="bb-chart-layout">
       <ChartContainer
@@ -1303,7 +1309,7 @@ function DailySpendingChart({
                 needsAmount: { label: "Needs", color: NEEDS_BAR_COLOR },
                 wantsAmount: { label: "Wants", color: WANTS_BAR_COLOR },
               }
-            : { amount: { label: "Amount", color: "hsl(var(--chart-1))" } }
+            : { amount: { label: "Amount", color: singleBarColor } }
         }
         className="bb-chart-box"
       >
@@ -1319,7 +1325,7 @@ function DailySpendingChart({
                 <Bar dataKey="wantsAmount" name="Wants" stackId="daily" fill={WANTS_BAR_COLOR} radius={[6, 6, 2, 2]} />
               </>
             ) : (
-              <Bar dataKey="amount" name="Daily spending" fill="hsl(var(--chart-1))" radius={[6, 6, 2, 2]} />
+              <Bar dataKey="amount" name="Daily spending" fill={singleBarColor} radius={[6, 6, 2, 2]} />
             )}
           </BarChart>
         </ResponsiveContainer>
@@ -1740,23 +1746,68 @@ function dailyEntryFilter(entry: ExpenseEntry): Exclude<DailySpendingFilter, "al
   return DAILY_WANTS_CATEGORIES.has(entry.category) ? "wants" : "needs"
 }
 
-function dailyTotalsForEntries(entries: ExpenseEntry[]) {
+function dailyTotalsForEntries(entries: ExpenseEntry[], subscriptionEvents: CalendarEvent[]) {
   const totals = new Map<string, DailySpendingRow>()
   for (const entry of entries) {
-    const day = entry.date ? entry.date.split("/")[1] || entry.date : "No date"
-    const current = totals.get(day) ?? { label: day, amount: 0, needsAmount: 0, wantsAmount: 0 }
-    const bucket = dailyEntryFilter(entry)
-    const next = {
-      ...current,
-      amount: roundCurrency(current.amount + entry.amount),
-      needsAmount: roundCurrency(current.needsAmount + (bucket === "needs" ? entry.amount : 0)),
-      wantsAmount: roundCurrency(current.wantsAmount + (bucket === "wants" ? entry.amount : 0)),
+    const day = dailyEntryDayLabel(entry)
+    if (day === null) {
+      continue
     }
-    totals.set(day, next)
+    const bucket = dailyEntryFilter(entry)
+    addDailySpendingAmount(totals, day, bucket, entry.amount)
+  }
+  for (const event of subscriptionEvents) {
+    addDailySpendingAmount(totals, String(event.day), dailySubscriptionBucket(event), event.amount)
   }
   return Array.from(totals.entries())
     .sort(([left], [right]) => compareDayLabels(left, right))
     .map(([, row]) => row)
+}
+
+function dailySpendingTotal(entries: ExpenseEntry[], subscriptionEvents: CalendarEvent[]) {
+  return roundCurrency(
+    entries.reduce((sum, entry) => sum + entry.amount, 0) +
+      subscriptionEvents.reduce((sum, event) => sum + event.amount, 0),
+  )
+}
+
+function addDailySpendingAmount(
+  totals: Map<string, DailySpendingRow>,
+  day: string,
+  bucket: Exclude<DailySpendingFilter, "all">,
+  amount: number,
+) {
+  const current = totals.get(day) ?? { label: day, amount: 0, needsAmount: 0, wantsAmount: 0 }
+  totals.set(day, {
+    ...current,
+    amount: roundCurrency(current.amount + amount),
+    needsAmount: roundCurrency(current.needsAmount + (bucket === "needs" ? amount : 0)),
+    wantsAmount: roundCurrency(current.wantsAmount + (bucket === "wants" ? amount : 0)),
+  })
+}
+
+function dailyEntryDayLabel(entry: ExpenseEntry) {
+  if (!entry.date || entry.date.trim().toLowerCase() === "no date") {
+    return null
+  }
+  const label = entry.date.split("/")[1] || entry.date
+  return label.trim().toLowerCase() === "no date" ? null : label
+}
+
+function dailySpendingSubscriptionEvents(events: CalendarEvent[], filter: DailySpendingFilter, projected: boolean) {
+  return events.filter((event) => {
+    if (event.kind !== "subscription" || (!projected && event.projectedOnly)) {
+      return false
+    }
+    if (filter === "all") {
+      return true
+    }
+    return dailySubscriptionBucket(event) === filter
+  })
+}
+
+function dailySubscriptionBucket(event: CalendarEvent): Exclude<DailySpendingFilter, "all"> {
+  return event.group === "subscriptions_wants" ? "wants" : "needs"
 }
 
 function compareDayLabels(left: string, right: string) {
