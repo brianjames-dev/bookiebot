@@ -195,6 +195,18 @@ const DAILY_WANTS_CATEGORIES = new Set(["Food", "Shopping"])
 const LEFT_CATEGORY_COLOR = "#16a34a"
 const NEEDS_BAR_COLOR = "#2563eb"
 const WANTS_BAR_COLOR = "#7c3aed"
+const TOP_EXPENSE_HEAT_COLORS = [
+  "#dc2626",
+  "#ef4444",
+  "#f97316",
+  "#f59e0b",
+  "#eab308",
+  "#84cc16",
+  "#22c55e",
+  "#14b8a6",
+  "#06b6d4",
+  "#38bdf8",
+]
 
 type ChartTouchState = {
   startX: number
@@ -349,6 +361,7 @@ export function ExpenseReportApp({ report }: { report: ExpenseReportData }) {
   const categoryColors: Record<string, string> = Object.fromEntries(activeReport.breakdown.map((item) => [item.label, item.color]))
   const dailyEntries = filterDailyEntries(report.dailyEntries, dailySpendingFilter)
   const dailySubscriptionEvents = dailySpendingSubscriptionEvents(activeReport.calendarEvents, dailySpendingFilter, projectionActive)
+  const dailyTableEntries = dailyEntriesWithSubscriptions(dailyEntries, dailySubscriptionEvents, report.month)
   const dailyTotals = dailyTotalsForEntries(dailyEntries, dailySubscriptionEvents)
   const dailyTotal = dailySpendingTotal(dailyEntries, dailySubscriptionEvents)
   const spentTotal = amountRowsTotal(activeReport.breakdown)
@@ -598,7 +611,7 @@ export function ExpenseReportApp({ report }: { report: ExpenseReportData }) {
           </CardHeader>
           <CardContent className="bb-daily-spending-content">
             <DailySpendingChart data={dailyTotals} total={dailyTotal} elapsedDays={report.elapsedDays} filter={dailySpendingFilter} />
-            <DailyEntriesTable entries={dailyEntries} categoryColors={categoryColors} />
+            <DailyEntriesTable entries={dailyTableEntries} categoryColors={categoryColors} />
           </CardContent>
         </Card>
 
@@ -1285,6 +1298,10 @@ type DailySpendingRow = AmountRow & {
   wantsAmount: number
 }
 
+type DailyEntryDisplayRow = ExpenseEntry & {
+  categoryColor?: string
+}
+
 function DailySpendingChart({
   data,
   total,
@@ -1298,6 +1315,7 @@ function DailySpendingChart({
 }) {
   const peak = data.reduce<AmountRow | null>((best, item) => (!best || item.amount > best.amount ? item : best), null)
   const averageDaySpend = elapsedDays ? total / elapsedDays : 0
+  const yAxisDomain = dailySpendingYAxisDomain(data)
   const showStackedBars = filter === "all"
   const singleBarColor = filter === "needs" ? NEEDS_BAR_COLOR : filter === "wants" ? WANTS_BAR_COLOR : "hsl(var(--chart-1))"
   return (
@@ -1317,7 +1335,7 @@ function DailySpendingChart({
           <BarChart data={data} margin={{ top: 12, right: 16, left: 0, bottom: 0 }}>
             <CartesianGrid vertical={false} strokeDasharray="3 3" />
             <XAxis dataKey="label" tickLine={false} axisLine={false} />
-            <YAxis tickFormatter={(value) => `$${value}`} tickLine={false} axisLine={false} width={52} />
+            <YAxis domain={yAxisDomain} tickFormatter={(value) => `$${value}`} tickLine={false} axisLine={false} width={52} />
             <ChartTooltip content={showStackedBars ? <DailySpendingTooltipContent /> : <ChartTooltipContent />} cursor={{ fill: "hsl(var(--primary) / 0.1)" }} />
             {showStackedBars ? (
               <>
@@ -1348,6 +1366,15 @@ function DailySpendingChart({
       </div>
     </div>
   )
+}
+
+function dailySpendingYAxisDomain(data: DailySpendingRow[]): [number, number] {
+  const peak = Math.max(0, ...data.map((item) => item.amount))
+  if (peak <= 0) {
+    return [0, 1]
+  }
+  const paddedPeak = peak * 1.06
+  return [0, Math.max(1, Math.ceil(paddedPeak / 10) * 10)]
 }
 
 type DailySpendingTooltipPayload = {
@@ -1404,11 +1431,23 @@ function TopExpensesChart({ entries }: { entries: ExpenseEntry[] }) {
           <XAxis type="number" tickFormatter={(value) => `$${value}`} tickLine={false} axisLine={false} />
           <YAxis dataKey="label" type="category" width={148} tickFormatter={(value) => truncateChartLabel(value, 22)} tickLine={false} axisLine={false} />
           <ChartTooltip content={<ChartTooltipContent />} />
-          <Bar dataKey="amount" name="Expense amount" fill="hsl(var(--chart-2))" radius={[0, 6, 6, 0]} />
+          <Bar dataKey="amount" name="Expense amount" fill="hsl(var(--chart-2))" radius={[0, 6, 6, 0]}>
+            {rows.map((row, index) => (
+              <Cell key={`${row.label}-${index}`} fill={topExpenseHeatColor(index, rows.length)} />
+            ))}
+          </Bar>
         </BarChart>
       </ResponsiveContainer>
     </ChartContainer>
   )
+}
+
+function topExpenseHeatColor(index: number, total: number) {
+  if (total <= 1) {
+    return TOP_EXPENSE_HEAT_COLORS[0]
+  }
+  const paletteIndex = Math.round((index / (total - 1)) * (TOP_EXPENSE_HEAT_COLORS.length - 1))
+  return TOP_EXPENSE_HEAT_COLORS[Math.min(Math.max(paletteIndex, 0), TOP_EXPENSE_HEAT_COLORS.length - 1)]
 }
 
 function truncateChartLabel(value: unknown, maxLength: number) {
@@ -1670,12 +1709,12 @@ function MerchantOccurrencesTable({ rows }: { rows: OccurrenceRow[] }) {
   )
 }
 
-function DailyEntriesTable({ entries, categoryColors }: { entries: ExpenseEntry[]; categoryColors: Record<string, string> }) {
+function DailyEntriesTable({ entries, categoryColors }: { entries: DailyEntryDisplayRow[]; categoryColors: Record<string, string> }) {
   if (!entries.length) {
     return <div className="bb-empty">No shared expense entries found.</div>
   }
 
-  const grouped = new Map<string, ExpenseEntry[]>()
+  const grouped = new Map<string, DailyEntryDisplayRow[]>()
   for (const entry of entries) {
     const day = entry.date ? entry.date.split("/")[1] || entry.date : "No date"
     grouped.set(day, [...(grouped.get(day) || []), entry])
@@ -1702,7 +1741,7 @@ function DailyEntriesTable({ entries, categoryColors }: { entries: ExpenseEntry[
                   <div className="bb-transaction-list">
                     {dayEntries.map((entry, index) => (
                       <div key={`${entry.category}-${entry.amount}-${index}`}>
-                        <strong className="bb-transaction-category" style={{ color: categoryColors[entry.category] }}>
+                        <strong className="bb-transaction-category" style={{ color: entry.categoryColor ?? categoryColors[entry.category] }}>
                           {entry.category}
                         </strong>{" "}
                         {entry.item || entry.location || "Transaction"} - {formatMoney(entry.amount)}
@@ -1720,7 +1759,7 @@ function DailyEntriesTable({ entries, categoryColors }: { entries: ExpenseEntry[
   )
 }
 
-function compareDayGroups([left]: [string, ExpenseEntry[]], [right]: [string, ExpenseEntry[]]) {
+function compareDayGroups([left]: [string, DailyEntryDisplayRow[]], [right]: [string, DailyEntryDisplayRow[]]) {
   const leftNumber = Number(left)
   const rightNumber = Number(right)
   if (Number.isFinite(leftNumber) && Number.isFinite(rightNumber)) {
@@ -1744,6 +1783,28 @@ function filterDailyEntries(entries: ExpenseEntry[], filter: DailySpendingFilter
 
 function dailyEntryFilter(entry: ExpenseEntry): Exclude<DailySpendingFilter, "all"> {
   return DAILY_WANTS_CATEGORIES.has(entry.category) ? "wants" : "needs"
+}
+
+function dailyEntriesWithSubscriptions(
+  entries: ExpenseEntry[],
+  subscriptionEvents: CalendarEvent[],
+  month: number,
+): DailyEntryDisplayRow[] {
+  return [
+    ...entries,
+    ...subscriptionEvents.map((event) => {
+      const bucket = dailySubscriptionBucket(event)
+      return {
+        date: `${month}/${event.day}`,
+        category: "Subscription",
+        amount: event.amount,
+        person: bucket === "wants" ? "Want sub" : "Need sub",
+        item: event.label,
+        location: "",
+        categoryColor: bucket === "wants" ? WANTS_BAR_COLOR : NEEDS_BAR_COLOR,
+      }
+    }),
+  ]
 }
 
 function dailyTotalsForEntries(entries: ExpenseEntry[], subscriptionEvents: CalendarEvent[]) {
