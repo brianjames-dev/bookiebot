@@ -324,8 +324,10 @@ def test_build_expense_breakdown_report_aggregates_shared_and_personal_data():
     assert "bookiebot-expense-report-theme" in html
     assert "prefers-color-scheme: dark" in html
     assert "data-theme" in html
-    assert "data-graph-surface" in html
-    assert "bookiebot-dismiss-chart-tooltips" in html
+    assert "data-graph-surface" not in html
+    assert "bookiebot-dismiss-chart-tooltips" not in html
+    assert "bb-touch-tooltip-auto-dismiss" in html
+    assert "bb-theme-toggle-moon" in html
     assert "bb-table-row-divider" in html
     assert "Highest day" in html
     assert "Days counted" in html

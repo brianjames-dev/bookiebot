@@ -16,7 +16,7 @@ import {
 
 import { Badge } from "./components/ui/badge"
 import { Card, CardContent, CardHeader, CardTitle } from "./components/ui/card"
-import { ChartContainer, ChartTooltip, ChartTooltipContent, dismissChartTooltips } from "./components/ui/chart"
+import { ChartContainer, ChartTooltip, ChartTooltipContent } from "./components/ui/chart"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "./components/ui/tabs"
 import type {
   AmountRow,
@@ -446,34 +446,6 @@ export function ExpenseReportApp({ report }: { report: ExpenseReportData }) {
     }
   }, [])
 
-  useEffect(() => {
-    const dismissOpenGraphTooltips = () => {
-      dismissChartTooltips()
-      const activeElement = document.activeElement
-      if (activeElement instanceof HTMLElement && activeElement.closest("[data-graph-surface='true']")) {
-        activeElement.blur()
-      }
-    }
-
-    const handlePointerDown = (event: PointerEvent) => {
-      if (isGraphSurfaceTarget(event.target)) {
-        return
-      }
-      dismissOpenGraphTooltips()
-    }
-
-    const handleScroll = () => {
-      dismissOpenGraphTooltips()
-    }
-
-    document.addEventListener("pointerdown", handlePointerDown, true)
-    window.addEventListener("scroll", handleScroll, true)
-    return () => {
-      document.removeEventListener("pointerdown", handlePointerDown, true)
-      window.removeEventListener("scroll", handleScroll, true)
-    }
-  }, [])
-
   const startChartTooltipCooldown = () => {
     if (tooltipCooldownTimeoutRef.current !== null) {
       window.clearTimeout(tooltipCooldownTimeoutRef.current)
@@ -500,7 +472,7 @@ export function ExpenseReportApp({ report }: { report: ExpenseReportData }) {
   }
 
   const handleChartTouchStart = (event: TouchEvent<HTMLDivElement>) => {
-    if (isInteractiveTouchTarget(event.target) || isGraphSurfaceTarget(event.target)) {
+    if (isInteractiveTouchTarget(event.target)) {
       return
     }
     const touch = event.touches[0]
@@ -661,10 +633,6 @@ function isInteractiveTouchTarget(target: EventTarget | null) {
   return target instanceof Element && Boolean(target.closest("button, a, input, select, textarea, summary, [role='button'], [role='tab']"))
 }
 
-function isGraphSurfaceTarget(target: EventTarget | null) {
-  return target instanceof Element && Boolean(target.closest("[data-graph-surface='true']"))
-}
-
 function ChartCarouselNavigation({
   panels,
   activeIndex,
@@ -794,7 +762,10 @@ function ThemeToggle({ theme, onToggle }: { theme: ThemeMode; onToggle: () => vo
       <span className="bb-theme-toggle-icon" aria-hidden="true">
         {isDark ? (
           <svg viewBox="0 0 24 24" focusable="false">
-            <path d="M21 14.8A8.2 8.2 0 0 1 9.2 3 7 7 0 1 0 21 14.8Z" />
+            <path
+              className="bb-theme-toggle-moon"
+              d="M20.6 14.1A8.3 8.3 0 0 1 9.9 3.4a8.7 8.7 0 1 0 10.7 10.7Z"
+            />
           </svg>
         ) : (
           <svg viewBox="0 0 24 24" focusable="false">
@@ -2190,7 +2161,7 @@ function FinancialCalendar({
   const eventsByDay = calendarEventsByDay(events)
 
   return (
-    <div className="bb-subscription-calendar" aria-label="Cashflow calendar" data-graph-surface="true">
+    <div className="bb-subscription-calendar" aria-label="Cashflow calendar">
       <div className="bb-calendar-head" aria-hidden="true">
         {WEEKDAY_LABELS.map((label) => (
           <span key={label}>{label}</span>
@@ -2692,7 +2663,7 @@ function SubscriptionCalendar({
   const itemsByDay = subscriptionsByDay(items, year, month)
 
   return (
-    <div className="bb-subscription-calendar" aria-label={`${toneConfig.label} subs calendar`} data-graph-surface="true">
+    <div className="bb-subscription-calendar" aria-label={`${toneConfig.label} subs calendar`}>
       <div className="bb-calendar-head" aria-hidden="true">
         {WEEKDAY_LABELS.map((label) => (
           <span key={label}>{label}</span>

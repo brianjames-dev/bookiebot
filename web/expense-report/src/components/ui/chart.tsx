@@ -12,7 +12,6 @@ export type ChartConfig = Record<
 >
 
 const ChartContext = React.createContext<ChartConfig | null>(null)
-const DISMISS_CHART_TOOLTIPS_EVENT = "bookiebot-dismiss-chart-tooltips"
 
 function ChartContainer({
   id,
@@ -28,7 +27,7 @@ function ChartContainer({
 
   return (
     <ChartContext.Provider value={config}>
-      <div id={resolvedId} className={cn("bb-chart-container", className)} data-chart={resolvedId} data-graph-surface="true">
+      <div id={resolvedId} className={cn("bb-chart-container", className)} data-chart={resolvedId}>
         <ChartStyle id={resolvedId} config={config} />
         {children}
       </div>
@@ -105,40 +104,21 @@ function formatMoney(value: number) {
 type ChartTooltipProps = React.ComponentProps<typeof RechartsPrimitive.Tooltip>
 
 function ChartTooltip({
-  trigger = "click",
   isAnimationActive = false,
   wrapperStyle,
   ...props
 }: ChartTooltipProps) {
-  const [resetKey, setResetKey] = React.useState(0)
-
-  React.useEffect(() => {
-    const handleDismiss = () => setResetKey((current) => current + 1)
-    window.addEventListener(DISMISS_CHART_TOOLTIPS_EVENT, handleDismiss)
-    return () => window.removeEventListener(DISMISS_CHART_TOOLTIPS_EVENT, handleDismiss)
-  }, [])
-
   return (
     <RechartsPrimitive.Tooltip
-      key={resetKey}
       {...props}
-      trigger={trigger}
       isAnimationActive={isAnimationActive}
-      allowEscapeViewBox={{ x: true, y: true }}
       wrapperStyle={{
         outline: "none",
-        transition: "opacity 160ms ease, transform 160ms ease, visibility 160ms ease",
+        transition: "none",
         ...wrapperStyle,
       }}
     />
   )
 }
 
-function dismissChartTooltips() {
-  if (typeof window === "undefined") {
-    return
-  }
-  window.dispatchEvent(new Event(DISMISS_CHART_TOOLTIPS_EVENT))
-}
-
-export { ChartContainer, ChartTooltip, ChartTooltipContent, dismissChartTooltips }
+export { ChartContainer, ChartTooltip, ChartTooltipContent }

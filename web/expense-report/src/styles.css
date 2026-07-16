@@ -178,6 +178,11 @@ summary {
   vector-effect: non-scaling-stroke;
 }
 
+.bb-theme-toggle-moon {
+  fill: currentColor;
+  stroke: none;
+}
+
 .bb-theme-toggle[aria-pressed="true"] {
   border-color: hsl(var(--primary) / 0.42);
   background: hsl(var(--primary) / 0.12);
@@ -532,9 +537,7 @@ summary {
   border-radius: var(--radius);
   background: hsl(var(--muted) / 0.075);
   overflow: visible;
-  overscroll-behavior: contain;
   padding: 8px;
-  touch-action: none;
 }
 
 .bb-subscription-all-grid {
@@ -782,6 +785,29 @@ summary {
 .bb-calendar-day:nth-child(7n) .bb-subscription-marker:hover .bb-subscription-tooltip,
 .bb-calendar-day:nth-child(7n) .bb-subscription-marker:focus .bb-subscription-tooltip {
   transform: translateY(0);
+}
+
+@keyframes bb-touch-tooltip-auto-dismiss {
+  0%,
+  84% {
+    opacity: 1;
+  }
+
+  100% {
+    opacity: 0;
+  }
+}
+
+@media (hover: none), (pointer: coarse) {
+  .bb-touch-tooltip-content {
+    animation: bb-touch-tooltip-auto-dismiss 3000ms ease-out forwards;
+  }
+
+  .bb-subscription-marker:hover .bb-subscription-tooltip,
+  .bb-subscription-marker:focus .bb-subscription-tooltip {
+    animation: bb-touch-tooltip-auto-dismiss 3000ms ease-out forwards;
+    pointer-events: none;
+  }
 }
 
 .bb-card-tabs {
@@ -1057,9 +1083,7 @@ summary {
   border-radius: var(--radius);
   background: hsl(var(--muted) / 0.075);
   overflow: visible;
-  overscroll-behavior: contain;
   padding: 8px;
-  touch-action: none;
   -webkit-tap-highlight-color: transparent;
 }
 
@@ -1075,10 +1099,6 @@ summary {
 .bb-chart-container svg:focus,
 .bb-chart-container svg *:focus {
   outline: none !important;
-}
-
-.bb-chart-container .recharts-tooltip-wrapper {
-  will-change: opacity, transform;
 }
 
 .bb-category-chart-box {
