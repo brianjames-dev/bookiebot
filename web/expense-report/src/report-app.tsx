@@ -16,7 +16,7 @@ import {
 
 import { Badge } from "./components/ui/badge"
 import { Card, CardContent, CardHeader, CardTitle } from "./components/ui/card"
-import { ChartContainer, ChartTooltip, ChartTooltipContent } from "./components/ui/chart"
+import { ChartContainer, ChartTooltip, ChartTooltipContent, dismissChartTooltips } from "./components/ui/chart"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "./components/ui/tabs"
 import type {
   AmountRow,
@@ -49,8 +49,11 @@ function formatPct(value: number) {
 }
 
 function generatedTimeLabel(value: string) {
-  const match = value.match(/(\d{1,2}:\d{2}\s+[AP]M(?:\s+[A-Z]+)?)$/)
-  return match?.[1] ?? value
+  const match = value.match(/^([A-Z][a-z]{2,})\s+(\d{1,2}),?\s+(?:\d{4}\s+)?(\d{1,2}:\d{2}\s+[AP]M)(?:\s+[A-Z]+)?$/)
+  if (match) {
+    return `${match[1]} ${match[2]} ${match[3]}`
+  }
+  return value.replace(/\s+[A-Z]{2,5}$/, "")
 }
 
 type ThemeMode = "light" | "dark"
@@ -443,6 +446,34 @@ export function ExpenseReportApp({ report }: { report: ExpenseReportData }) {
     }
   }, [])
 
+  useEffect(() => {
+    const dismissOpenGraphTooltips = () => {
+      dismissChartTooltips()
+      const activeElement = document.activeElement
+      if (activeElement instanceof HTMLElement && activeElement.closest("[data-graph-surface='true']")) {
+        activeElement.blur()
+      }
+    }
+
+    const handlePointerDown = (event: PointerEvent) => {
+      if (isGraphSurfaceTarget(event.target)) {
+        return
+      }
+      dismissOpenGraphTooltips()
+    }
+
+    const handleScroll = () => {
+      dismissOpenGraphTooltips()
+    }
+
+    document.addEventListener("pointerdown", handlePointerDown, true)
+    window.addEventListener("scroll", handleScroll, true)
+    return () => {
+      document.removeEventListener("pointerdown", handlePointerDown, true)
+      window.removeEventListener("scroll", handleScroll, true)
+    }
+  }, [])
+
   const startChartTooltipCooldown = () => {
     if (tooltipCooldownTimeoutRef.current !== null) {
       window.clearTimeout(tooltipCooldownTimeoutRef.current)
@@ -469,7 +500,7 @@ export function ExpenseReportApp({ report }: { report: ExpenseReportData }) {
   }
 
   const handleChartTouchStart = (event: TouchEvent<HTMLDivElement>) => {
-    if (isInteractiveTouchTarget(event.target)) {
+    if (isInteractiveTouchTarget(event.target) || isGraphSurfaceTarget(event.target)) {
       return
     }
     const touch = event.touches[0]
@@ -539,8 +570,12 @@ export function ExpenseReportApp({ report }: { report: ExpenseReportData }) {
           <p>{report.monthLabel} budget report for {report.ownerName}.</p>
         </div>
         <div className="bb-header-actions">
+          <ProjectionToggle
+            active={projectionActive}
+            onToggle={() => setProjectionActive((current) => !current)}
+          />
           <ThemeToggle theme={theme} onToggle={toggleTheme} />
-          <Badge variant="outline">Generated {generatedTimeLabel(report.generatedAt)}</Badge>
+          <Badge variant="outline">{generatedTimeLabel(report.generatedAt)}</Badge>
         </div>
       </header>
 
@@ -550,12 +585,6 @@ export function ExpenseReportApp({ report }: { report: ExpenseReportData }) {
             label="Income"
             value={activeReport.metrics.monthlyIncome}
             description={projectionActive ? "Projected month" : "Logged income"}
-            control={
-              <ProjectionToggle
-                active={projectionActive}
-                onToggle={() => setProjectionActive((current) => !current)}
-              />
-            }
           />
           <MetricCard label="Spent" value={spentTotal} />
           <MetricCard label="Left" value={activeReport.metrics.incomeAfterExpenses} description="After expenses" accent />
@@ -630,6 +659,10 @@ export function ExpenseReportApp({ report }: { report: ExpenseReportData }) {
 
 function isInteractiveTouchTarget(target: EventTarget | null) {
   return target instanceof Element && Boolean(target.closest("button, a, input, select, textarea, summary, [role='button'], [role='tab']"))
+}
+
+function isGraphSurfaceTarget(target: EventTarget | null) {
+  return target instanceof Element && Boolean(target.closest("[data-graph-surface='true']"))
 }
 
 function ChartCarouselNavigation({
@@ -758,10 +791,18 @@ function ThemeToggle({ theme, onToggle }: { theme: ThemeMode; onToggle: () => vo
   const isDark = theme === "dark"
   return (
     <button type="button" className="bb-theme-toggle" aria-pressed={isDark} aria-label={`Turn dark mode ${isDark ? "off" : "on"}`} onClick={onToggle}>
-      <span className="bb-theme-toggle-track" aria-hidden="true">
-        <span className="bb-theme-toggle-thumb" />
+      <span className="bb-theme-toggle-icon" aria-hidden="true">
+        {isDark ? (
+          <svg viewBox="0 0 24 24" focusable="false">
+            <path d="M21 14.8A8.2 8.2 0 0 1 9.2 3 7 7 0 1 0 21 14.8Z" />
+          </svg>
+        ) : (
+          <svg viewBox="0 0 24 24" focusable="false">
+            <circle cx="12" cy="12" r="4" />
+            <path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4" />
+          </svg>
+        )}
       </span>
-      <span className="bb-theme-toggle-label">Dark mode</span>
     </button>
   )
 }
@@ -2149,7 +2190,7 @@ function FinancialCalendar({
   const eventsByDay = calendarEventsByDay(events)
 
   return (
-    <div className="bb-subscription-calendar" aria-label="Cashflow calendar">
+    <div className="bb-subscription-calendar" aria-label="Cashflow calendar" data-graph-surface="true">
       <div className="bb-calendar-head" aria-hidden="true">
         {WEEKDAY_LABELS.map((label) => (
           <span key={label}>{label}</span>
@@ -2651,7 +2692,7 @@ function SubscriptionCalendar({
   const itemsByDay = subscriptionsByDay(items, year, month)
 
   return (
-    <div className="bb-subscription-calendar" aria-label={`${toneConfig.label} subs calendar`}>
+    <div className="bb-subscription-calendar" aria-label={`${toneConfig.label} subs calendar`} data-graph-surface="true">
       <div className="bb-calendar-head" aria-hidden="true">
         {WEEKDAY_LABELS.map((label) => (
           <span key={label}>{label}</span>
@@ -2795,7 +2836,7 @@ function SubscriptionCompactTable({
         <div className="bb-empty">No matching subs found.</div>
       ) : (
         <>
-          <SubscriptionRowsTable items={rows} compact />
+          <SubscriptionRowsTable items={rows} compact dividerBeforeIndex={expanded && hasMore ? visibleItems.length : undefined} />
           {hasMore ? <ExpandRowsButton expanded={expanded} total={items.length} onToggle={() => setExpanded((current) => !current)} /> : null}
         </>
       )}
@@ -2814,13 +2855,21 @@ function SubscriptionItemsTable({ items }: { items: SubscriptionItem[] }) {
 
   return (
     <>
-      <SubscriptionRowsTable items={rows} />
+      <SubscriptionRowsTable items={rows} dividerBeforeIndex={expanded && hasMore ? visibleItems.length : undefined} />
       {hasMore ? <ExpandRowsButton expanded={expanded} total={items.length} onToggle={() => setExpanded((current) => !current)} /> : null}
     </>
   )
 }
 
-function SubscriptionRowsTable({ items, compact = false }: { items: SubscriptionItem[]; compact?: boolean }) {
+function SubscriptionRowsTable({
+  items,
+  compact = false,
+  dividerBeforeIndex,
+}: {
+  items: SubscriptionItem[]
+  compact?: boolean
+  dividerBeforeIndex?: number
+}) {
   return (
     <div className="bb-table-wrap">
       <table className={compact ? "bb-subscription-compact-table" : undefined}>
@@ -2834,7 +2883,10 @@ function SubscriptionRowsTable({ items, compact = false }: { items: Subscription
         </thead>
         <tbody>
           {items.map((item, index) => (
-            <tr key={`${item.name}-${item.amount}-${index}`}>
+            <tr
+              key={`${item.name}-${item.amount}-${index}`}
+              className={dividerBeforeIndex !== undefined && index === dividerBeforeIndex ? "bb-table-row-divider" : undefined}
+            >
               <td>{item.name}</td>
               <td>
                 <span className="bb-cadence-full">{subscriptionCadenceLabel(item.cadence)}</span>

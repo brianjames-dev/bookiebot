@@ -130,19 +130,17 @@ summary {
   appearance: none;
   display: inline-flex;
   align-items: center;
-  gap: 8px;
-  min-height: 30px;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
   border: 1px solid hsl(var(--border));
   border-radius: 999px;
   background: hsl(var(--background));
   color: hsl(var(--foreground));
   cursor: pointer;
   font: inherit;
-  font-size: 12px;
-  font-weight: 700;
-  padding: 4px 9px 4px 5px;
-  white-space: nowrap;
-  transition: background-color 160ms ease, border-color 160ms ease, color 160ms ease;
+  padding: 0;
+  transition: background-color 160ms ease, border-color 160ms ease, color 160ms ease, transform 160ms ease;
 }
 
 .bb-theme-toggle:hover {
@@ -155,34 +153,38 @@ summary {
   outline-offset: 2px;
 }
 
-.bb-theme-toggle-track {
+.bb-theme-toggle-icon {
   display: inline-flex;
   align-items: center;
-  width: 31px;
+  justify-content: center;
+  width: 18px;
   height: 18px;
-  padding: 2px;
-  border-radius: 999px;
-  background: hsl(var(--muted) / 0.28);
-  transition: background-color 160ms ease;
+  color: hsl(var(--muted-foreground));
+  transition: color 160ms ease, transform 160ms ease;
 }
 
-.bb-theme-toggle-thumb {
-  width: 14px;
-  height: 14px;
-  border-radius: 999px;
-  background: hsl(var(--card));
-  box-shadow: 0 1px 3px rgb(15 23 42 / 0.24);
-  transform: translateX(0);
-  transition: transform 160ms ease, background-color 160ms ease;
+.bb-theme-toggle-icon svg {
+  width: 18px;
+  height: 18px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
 }
 
-.bb-theme-toggle[aria-pressed="true"] .bb-theme-toggle-track {
-  background: hsl(var(--primary) / 0.35);
+.bb-theme-toggle-icon circle,
+.bb-theme-toggle-icon path {
+  vector-effect: non-scaling-stroke;
 }
 
-.bb-theme-toggle[aria-pressed="true"] .bb-theme-toggle-thumb {
-  background: hsl(var(--primary));
-  transform: translateX(13px);
+.bb-theme-toggle[aria-pressed="true"] {
+  border-color: hsl(var(--primary) / 0.42);
+  background: hsl(var(--primary) / 0.12);
+}
+
+.bb-theme-toggle[aria-pressed="true"] .bb-theme-toggle-icon {
+  color: hsl(var(--primary));
 }
 
 .bb-main {
@@ -526,6 +528,13 @@ summary {
   gap: 8px;
   height: 100%;
   min-width: 0;
+  border: 1px solid hsl(var(--border) / 0.72);
+  border-radius: var(--radius);
+  background: hsl(var(--muted) / 0.075);
+  overflow: visible;
+  overscroll-behavior: contain;
+  padding: 8px;
+  touch-action: none;
 }
 
 .bb-subscription-all-grid {
@@ -773,29 +782,6 @@ summary {
 .bb-calendar-day:nth-child(7n) .bb-subscription-marker:hover .bb-subscription-tooltip,
 .bb-calendar-day:nth-child(7n) .bb-subscription-marker:focus .bb-subscription-tooltip {
   transform: translateY(0);
-}
-
-@keyframes bb-touch-tooltip-auto-dismiss {
-  0%,
-  84% {
-    opacity: 1;
-  }
-
-  100% {
-    opacity: 0;
-  }
-}
-
-@media (hover: none), (pointer: coarse) {
-  .bb-touch-tooltip-content {
-    animation: bb-touch-tooltip-auto-dismiss 3000ms ease-out forwards;
-  }
-
-  .bb-subscription-marker:hover .bb-subscription-tooltip,
-  .bb-subscription-marker:focus .bb-subscription-tooltip {
-    animation: bb-touch-tooltip-auto-dismiss 3000ms ease-out forwards;
-    pointer-events: none;
-  }
 }
 
 .bb-card-tabs {
@@ -1067,6 +1053,13 @@ summary {
 
 .bb-chart-container {
   position: relative;
+  border: 1px solid hsl(var(--border) / 0.72);
+  border-radius: var(--radius);
+  background: hsl(var(--muted) / 0.075);
+  overflow: visible;
+  overscroll-behavior: contain;
+  padding: 8px;
+  touch-action: none;
   -webkit-tap-highlight-color: transparent;
 }
 
@@ -1082,6 +1075,14 @@ summary {
 .bb-chart-container svg:focus,
 .bb-chart-container svg *:focus {
   outline: none !important;
+}
+
+.bb-chart-container .recharts-tooltip-wrapper {
+  will-change: opacity, transform;
+}
+
+.bb-category-chart-box {
+  overflow: visible;
 }
 
 .bb-bills-analytics {
@@ -1472,6 +1473,10 @@ th {
 
 tr:last-child td {
   border-bottom: 0;
+}
+
+.bb-table-row-divider td {
+  border-top: 1px solid hsl(var(--border));
 }
 
 .bb-amount {
