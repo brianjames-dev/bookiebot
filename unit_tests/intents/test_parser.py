@@ -2,6 +2,7 @@ import asyncio
 import json
 
 from bookiebot.intents.parser import parse_message_llm
+from bookiebot.intents.explorer import INTENTS
 from bookiebot.llm.client import FixtureLLMClient, LLMClient
 
 
@@ -47,3 +48,17 @@ def test_need_expense_prompt_uses_shared_expense_fields():
     assert "same separated expense fields as other shared expenses" in prompt
     assert "handler routes it to the shared Needs category and timestamps it" in prompt
     assert "only include the description of the expense and the amount" not in prompt
+
+
+def test_student_loan_payment_intents_are_retired_from_parser_prompt():
+    client = _CapturingLLMClient()
+
+    asyncio.run(parse_message_llm("Did the student loan autopay?", llm_client=client))
+
+    prompt = client.messages[0]["content"]
+    assert "log_student_loan_paid" not in INTENTS
+    assert "query_student_loans_paid" not in INTENTS
+    assert "log_student_loan_paid" not in prompt
+    assert "query_student_loans_paid" not in prompt
+    assert "tracked as subscription autopay" in prompt
+    assert "return the fallback intent" in prompt

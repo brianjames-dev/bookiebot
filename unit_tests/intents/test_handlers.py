@@ -132,7 +132,6 @@ async def test_sheet_routing_errors_are_sent_to_user(monkeypatch, message):
         ("log_pge_paid", "log_pge_paid", 85.0, "PG&E"),
         ("log_recology_paid", "log_recology_paid", 85.0, "Recology"),
         ("log_water_paid", "log_water_paid", 85.0, "water"),
-        ("log_student_loan_paid", "log_student_loan_paid", 250.0, "student loan"),
         ("log_1st_savings", "log_1st_savings", 100.0, "1st savings"),
         ("log_2nd_savings", "log_2nd_savings", 200.0, "2nd savings"),
     ],
@@ -1852,7 +1851,6 @@ async def test_query_rent_paid(monkeypatch, message):
         ("query_pge_paid", "check_pge_paid", (True, 80.0), "PG&E"),
         ("query_recology_paid", "check_recology_paid", (True, 80.0), "Recology"),
         ("query_water_paid", "check_water_paid", (True, 80.0), "water"),
-        ("query_student_loans_paid", "check_student_loan_paid", (False, 0.0), "NOT"),
         ("query_total_income", "total_income", 1500.0, "1500.00"),
         ("query_remaining_budget", "remaining_budget", 200.0, "Remaining spending budget"),
         ("query_average_daily_spend", "average_daily_spend", 5.5, "5.50"),
@@ -2157,3 +2155,16 @@ async def test_fallback(monkeypatch, message):
     await ih.handle_intent("unknown_intent", {}, message)
 
     assert any("fallback" in (msg or "").lower() or "sorry" in (msg or "").lower() for msg, _ in message.channel.sent)
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("intent", ["log_student_loan_paid", "query_student_loans_paid"])
+async def test_retired_student_loan_intents_use_fallback_without_sheet_helpers(monkeypatch, message, intent):
+    fallback = AsyncMock()
+    monkeypatch.setattr(ih, "fallback_handler", fallback)
+
+    await ih.handle_intent(intent, {"amount": 242.29}, message)
+
+    fallback.assert_awaited_once_with(message.content, message, context=None)
+    assert not hasattr(ih.su, "log_student_loan_paid")
+    assert not hasattr(ih.su, "check_student_loan_paid")

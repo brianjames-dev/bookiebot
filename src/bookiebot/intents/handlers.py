@@ -90,7 +90,6 @@ INTENT_HANDLERS: dict[str, IntentHandler] = {
     "log_pge_paid":                         lambda e, m: log_pge_paid_handler(e, m),
     "log_recology_paid":                    lambda e, m: log_recology_paid_handler(e, m),
     "log_water_paid":                       lambda e, m: log_water_paid_handler(e, m),
-    "log_student_loan_paid":                lambda e, m: log_student_loan_paid_handler(e, m),
     "log_1st_savings":                      lambda e, m: log_1st_savings_handler(e, m),
     "log_2nd_savings":                      lambda e, m: log_2nd_savings_handler(e, m),
     "log_need_expense":                     lambda e, m: log_need_expense_handler(e, m),
@@ -106,7 +105,6 @@ INTENT_HANDLERS: dict[str, IntentHandler] = {
     "query_pge_paid":                       lambda e, m: query_pge_paid_handler(m),
     "query_recology_paid":                  lambda e, m: query_recology_paid_handler(m),
     "query_water_paid":                     lambda e, m: query_water_paid_handler(m),
-    "query_student_loans_paid":             lambda e, m: query_student_loan_paid_handler(m),
     "query_total_for_store":                lambda e, m: query_total_for_store_handler(e, m),
     "query_highest_expense_category":       lambda e, m: query_highest_expense_category_handler(e, m),
     "query_total_income":                   lambda e, m: query_total_income_handler(m),
@@ -919,14 +917,6 @@ async def query_water_paid_handler(message):
         await message.channel.send("❌ You have NOT paid water yet this month.")
 
 
-async def query_student_loan_paid_handler(message):
-    paid, amount = await su.check_student_loan_paid()
-    if paid:
-        await message.channel.send(f"✅ You paid ${amount:.2f} for student loans this month.")
-    else:
-        await message.channel.send("❌ You have NOT made a student loan payment yet this month.")
-
-
 async def query_total_for_store_handler(entities, message):
     store = entities.get("store")
     persons_to_query = entities.get("persons")  # <-- already resolved in handle_intent
@@ -1452,19 +1442,6 @@ async def log_water_paid_handler(entities, message):
         await message.channel.send(f"✅ Logged water as paid for {_budget_profile_name(message)}: ${amount:.2f}")
     else:
         await message.channel.send("❌ Could not confirm the water payment was written.")
-
-
-async def log_student_loan_paid_handler(entities, message):
-    amount = entities.get("amount")
-    if amount is None:
-        await message.channel.send("❌ Please specify the amount you paid for your student loan.")
-        return
-
-    success = su.log_student_loan_paid(amount)
-    if success:
-        await message.channel.send(f"✅ Logged student loan as paid for {_budget_profile_name(message)}: ${amount:.2f}")
-    else:
-        await message.channel.send("❌ Could not confirm the Student Loan payment was written.")
 
 
 async def query_1st_savings_handler(entities, message):

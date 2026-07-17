@@ -161,21 +161,6 @@ async def test_check_new_utility_paid(mock_get_income_worksheet, func_name, labe
 
 
 @pytest.mark.asyncio
-@patch("bookiebot.sheets.utils.get_income_worksheet")
-async def test_check_student_loan_paid(mock_get_income_worksheet):
-    mock_ws = MagicMock()
-    mock_get_income_worksheet.return_value = mock_ws
-    mock_ws.find.return_value.row = 3
-    mock_ws.find.return_value.col = 3
-    mock_ws.cell.return_value.value = "250.00"
-
-    paid, amount = await su.check_student_loan_paid()
-
-    assert paid is True
-    assert amount == 250.0
-
-
-@pytest.mark.asyncio
 @pytest.mark.parametrize(
     ("store", "expected_total"),
     [

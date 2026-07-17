@@ -96,17 +96,18 @@ async def parse_message_llm(user_message: str, *, llm_client: Optional[LLMClient
     - intent: "query_recent_actions"
     - entities: {{ "n": <integer if provided, otherwise 5>, "explicit_n": <true only if the user asked for a specific number> }}
 
-    If the message is about logging a payment for **rent**, **PG&E**, **Recology/trash**, **water**, or **student loan**, use the specific intents:
+    If the message is about logging a payment for **rent**, **PG&E**, **Recology/trash**, or **water**, use the specific intents:
     - "log_rent_paid" → when paying rent
     - "log_pge_paid" → when paying PG&E / PGE / gas and electric utilities
     - "log_recology_paid" → when paying Recology, trash, garbage, or waste bills
     - "log_water_paid" → when paying water, water bill, or Santa Rosa Water
-    - "log_student_loan_paid" → when paying a student loan
 
     For these intents, extract the amount paid as:
     - entities: {{ "amount": <float> }}
 
     Do NOT treat these payments as generic expenses. Do NOT assign them a category. Do NOT include item, location, or store — only use the amount and the correct intent.
+
+    Student loan payments are tracked as subscription autopay and do not have log-payment or paid-status intents. If a message asks to log or check a student loan payment, return the fallback intent instead of treating it as a generic expense or another payment type.
 
     If the message is about logging a Need expense, use the same separated expense fields as other shared expenses:
     - amount: float (do not include $)

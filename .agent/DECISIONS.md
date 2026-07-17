@@ -182,6 +182,12 @@ Decision: `_BookieBot Subscription Schedule` stores structurally complete visibl
 
 Rationale: Persisting drafts gives users a stable normalized scaffold while they research dates and prevents background sync from erasing known cadence/name/amount/source metadata. Excluding undated drafts from reminder reads prevents BookieBot from inventing or sending notifications for unknown dates.
 
+## 2026-07-17 - Track Student Loan Only As Subscription Autopay
+
+Decision: Remove BookieBot's dedicated student-loan payment logging and paid-status query intents, stop seeding Student Loan into the manual bill schedule, and ignore pre-existing legacy student-loan bill-schedule rows. Keep the subscription schedule as the active source and retain historical report labels for old budget data.
+
+Rationale: The student loan is an automatic subscription pull and no longer has a standalone personal-budget payment row. Removing the manual payment workflow prevents failed writes, misleading paid-status checks, and duplicate bill/subscription reminders without erasing historical reporting.
+
 ## Pending Decisions
 
 - Where should durable system events live: banking database only, Google Sheets only, or dual-write during transition?

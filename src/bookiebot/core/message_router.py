@@ -122,7 +122,6 @@ def _intent_action_label(intent: str | None) -> str:
         "log_pge_paid": "logging PG&E paid",
         "log_recology_paid": "logging Recology paid",
         "log_water_paid": "logging water paid",
-        "log_student_loan_paid": "logging a student loan payment",
         "query_recent_actions": "showing recent actions",
         "update_recent_action": "updating a logged action",
         "delete_recent_action": "deleting a logged action",

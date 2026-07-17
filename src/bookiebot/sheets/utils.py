@@ -232,22 +232,6 @@ async def check_water_paid():
     return await check_payment_paid("Water")
 
 
-async def check_student_loan_paid():
-    ws = _income_ws()
-    if ws is None:
-        return False, 0.0
-    try:
-        cell = ws.find("Student Loan Payment")
-        amount_cell = ws.cell(cell.row, cell.col + 1).value
-        if amount_cell:
-            cleaned = clean_money(amount_cell)
-            if cleaned > 0:
-                return True, cleaned
-    except Exception as e:
-        print(f"[ERROR] Failed to check student loan paid: {e}")
-    return False, 0.0
-
-
 async def total_spent_at_store(store, persons=None, top_n=5):
     ws = _expense_ws()
     if ws is None:
@@ -1557,10 +1541,6 @@ def log_recology_paid(amount):
 
 def log_water_paid(amount):
     return log_payment("water", amount)
-
-
-def log_student_loan_paid(amount):
-    return log_payment("student loan payment", amount)
 
 
 async def check_1st_savings_deposited():

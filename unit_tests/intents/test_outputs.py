@@ -106,13 +106,6 @@ SCENARIOS = [
         assert_fn=lambda result, repo: bool(result.replies),
     ),
     ScenarioCase(
-        name="log_student_loan_paid__natural",
-        prompt="Student loan payment 325",
-        llm_fixture="unit_tests/fixtures/llm/logging_actions/log_student_loan_paid/log_student_loan_paid__natural.json",
-        sheet_fixture="base_month",
-        assert_fn=lambda result, repo: bool(result.replies),
-    ),
-    ScenarioCase(
         name="log_income__natural",
         prompt="Log income 1000 from Acme",
         llm_fixture="unit_tests/fixtures/llm/logging_actions/log_income/log_income__natural.json",
@@ -212,27 +205,6 @@ SCENARIOS = [
         llm_fixture="unit_tests/fixtures/llm/checking_payments/query_water_paid/query_water_paid__natural.json",
         sheet_fixture="base_month",
         assert_fn=lambda result, repo: "water" in result.replies[0].lower(),
-    ),
-    ScenarioCase(
-        name="query_student_loans_paid__natural",
-        prompt="Have we paid the student loan?",
-        llm_fixture="unit_tests/fixtures/llm/checking_payments/query_student_loans_paid/query_student_loans_paid__natural.json",
-        sheet_fixture="base_month",
-        assert_fn=lambda result, repo: "student loan" in result.replies[0].lower(),
-    ),
-    ScenarioCase(
-        name="query_student_loans_paid__short",
-        prompt="student loan paid?",
-        llm_fixture="unit_tests/fixtures/llm/checking_payments/query_student_loans_paid/query_student_loans_paid__short.json",
-        sheet_fixture="base_month",
-        assert_fn=lambda result, repo: "student loan" in result.replies[0].lower(),
-    ),
-    ScenarioCase(
-        name="query_student_loans_paid__typo",
-        prompt="did we pay the studnt loan?",
-        llm_fixture="unit_tests/fixtures/llm/checking_payments/query_student_loans_paid/query_student_loans_paid__typo.json",
-        sheet_fixture="base_month",
-        assert_fn=lambda result, repo: "student loan" in result.replies[0].lower(),
     ),
     ScenarioCase(
         name="query_subscriptions__natural",

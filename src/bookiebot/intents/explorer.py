@@ -9,7 +9,6 @@ FRIENDLY_NAMES = {
     "log_pge_paid": "Log PG&E Paid",
     "log_recology_paid": "Log Recology Paid",
     "log_water_paid": "Log Water Paid",
-    "log_student_loan_paid": "Log Student Loan Paid",
     "log_1st_savings": "Log 1st Savings Deposit",
     "log_2nd_savings": "Log 2nd Savings Deposit",
     "log_need_expense": "Log NEED Expense",
@@ -23,7 +22,6 @@ FRIENDLY_NAMES = {
     "query_pge_paid": "Check PG&E Paid",
     "query_recology_paid": "Check Recology Paid",
     "query_water_paid": "Check Water Paid",
-    "query_student_loans_paid": "Check Student Loans Paid",
     "query_total_for_store": "Total Spent at Specific Store",
     "query_highest_expense_category": "Highest Expense Category",
     "query_total_income": "Current Total Monthly Income",
@@ -81,10 +79,6 @@ INTENT_DETAILS = {
         "Log your water bill payment.",
         ["paid water bill $90", "Santa Rosa Water 100"]
     ),
-    "log_student_loan_paid": (
-        "Log your student loan payment.",
-        ["paid student loan $200", "logged student loan $150"]
-    ),
     "log_1st_savings": (
         "Log a contribution to your first savings account.",
         ["moved $100 to savings 1", "saved 50 in first savings"]
@@ -138,10 +132,6 @@ INTENT_DETAILS = {
     "query_water_paid": (
         "Check if/when your water bill was paid.",
         ["when did I last pay water?", "Santa Rosa Water paid?"]
-    ),
-    "query_student_loans_paid": (
-        "Check if/when you paid your student loans.",
-        ["when did I pay student loans?", "show student loan payments"]
     ),
     "query_total_for_store": (
         "Get the total amount spent at a specific store.",
@@ -241,11 +231,11 @@ INTENT_DETAILS = {
 INTENT_GROUPS = [
     ("Logging Actions", [
         "log_expense", "log_need_expense", "log_income", "log_rent_paid",
-        "log_pge_paid", "log_recology_paid", "log_water_paid", "log_student_loan_paid",
+        "log_pge_paid", "log_recology_paid", "log_water_paid",
         "log_1st_savings", "log_2nd_savings", "undo_last_transaction", "delete_recent_action", "query_recent_actions", "update_recent_action", "move_recent_action"
     ]),
     ("Checking Payments", [
-        "query_rent_paid", "query_pge_paid", "query_recology_paid", "query_water_paid", "query_student_loans_paid",
+        "query_rent_paid", "query_pge_paid", "query_recology_paid", "query_water_paid",
         "query_1st_savings", "query_2nd_savings", "query_subscriptions"
     ]),
     ("Spending & Budget Overview", [

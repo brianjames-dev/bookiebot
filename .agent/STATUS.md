@@ -49,6 +49,7 @@ Shared Needs-category logging, the shifted dated Income layout, and the four-blo
 - Synced all fourteen dated entries into `_BookieBot Subscription Schedule` with cadence, amount, pull day/month, source range, and timestamp metadata; every row is reminder-eligible and a repeat sync produced no warnings.
 - Restored Internet as a `$0.00` Needs Monthly placeholder with a blank pull day; the normalized schedule retains it as an undated draft while the fourteen dated subscriptions remain reminder-eligible.
 - Removed the standalone `Student Loan Payment` budget row from Hannah's Template, May, June, and July tabs; each tab compacted cleanly, retained its subscription-backed Needs row, and automatically shifted subtotal, rollover, margins, savings, and net formulas to the new locations.
+- Retired the dedicated student-loan log/check intents, handlers, sheet helpers, intent-explorer entries, fixtures, and legacy default bill-schedule row; pre-existing student-loan bill rows are ignored so the payment is represented only by subscription autopay, while historical report categorization remains available.
 - Manual verification: deploy the updated Apps Script, run `setupBudgetSystemAutomation()` once, enter an amount in a new dated Income table, then confirm manual and BookieBot income dates plus update/delete/undo behavior.
 
 ## Completed 2026-07-08
@@ -302,6 +303,8 @@ Use a test row or low-risk real row in Discord:
     - Expected: fourteen dated entries are reminder-eligible; Internet is retained as a `$0.00` monthly draft with one expected missing-pull-date warning; the four visible subtotals remain `$521.07`, `$32.99`, `$47.95`, and `$59.99`.
 56. Open Hannah Budget 2026 Template, May, June, and July and inspect the Needs section.
     - Expected: no standalone `Student Loan Payment` row remains; `Subscriptions (Needs)` and `Various Need Transactions` remain intact; May's net is `-$606.05`, July's Needs subtotal is `$688.12 (84.98%)`, and July's net is `$618.53`.
+57. After deployment, send `student loan paid?` and `log student loan payment 242.29`, then run `/debug_subscriptions`.
+    - Expected: neither message invokes a dedicated student-loan payment command or mutates a budget row; the Student Loan subscription/autopay remains present and reminder-eligible in Hannah's normalized subscription schedule.
 
 ## Verification Baseline
 
@@ -315,6 +318,15 @@ python -m pytest unit_tests/intents/test_handlers.py unit_tests/core/test_messag
 Latest verification:
 
 ```bash
+PYTHONPATH=src venv/bin/python -m pytest unit_tests
+# passed: 393 passed, 1 warning
+
+python -m pyright --pythonpath venv/bin/python --pythonversion 3.12
+# passed: 0 errors, 0 warnings, 0 informations
+
+PYTHONPATH=src venv/bin/python -m pytest unit_tests/intents/test_parser.py unit_tests/intents/test_handlers.py unit_tests/intents/test_outputs.py unit_tests/sheets/test_bills.py unit_tests/sheets/test_utils.py unit_tests/core/test_subscription_reminder_schedule.py unit_tests/reports/test_expense_breakdown.py
+# passed: 190 passed, 1 warning
+
 Live Hannah Student Loan Payment row removal and formula/visual audit
 # passed: no matching row in Template/May/June/July; formula ranges shifted cleanly; no QA tabs remain; final PDF renders clean
 

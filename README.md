@@ -64,7 +64,7 @@ Upcoming:
 
 The current block layout is supported. The hidden sheet uses one normalized row per subscription with columns for owner, kind, cadence, amount, pull day/month, reminder offsets, source range, and sync timestamp. BookieBot refreshes this hidden sheet in the background even before the daily notification window, so sheet changes can be normalized automatically before reminders are due. If BookieBot finds malformed visible subscription rows it cannot safely normalize, it sends a concise parse-warning digest and skips those rows until fixed.
 
-For scheduled rows that look like manually tracked bills, such as Rent, PG&E, Recology, Water, or Student Loan, BookieBot checks the existing payment fields and annotates the reminder if no payment has been logged yet:
+For scheduled rows that look like manually tracked bills, such as Rent, PG&E, Recology, or Water, BookieBot checks the existing payment fields and annotates the reminder if no payment has been logged yet. Student Loan is tracked only as subscription autopay, without dedicated log-payment or paid-status commands:
 
 ```text
 Tomorrow:

@@ -24,6 +24,7 @@ def test_hidden_bill_schedule_templates_are_seeded_without_reminders_or_warnings
     assert warnings == []
     assert rows[0] == BILL_SCHEDULE_HEADERS
     assert rows[1][0:6] == ["rent", "Rent", "monthly", "", "", "Rent"]
+    assert all(row[0] != "student_loan" for row in rows[1:])
 
 
 def test_parse_bill_schedules_supports_monthly_and_quarterly_rows():
@@ -39,6 +40,19 @@ def test_parse_bill_schedules_supports_monthly_and_quarterly_rows():
         ("pge", "monthly", 16, ()),
         ("recology", "quarterly", 20, (2, 5, 8, 11)),
     ]
+
+
+def test_legacy_student_loan_bill_rows_are_ignored():
+    rows = [
+        BILL_SCHEDULE_HEADERS,
+        ["student_loan", "Student Loan Payment", "monthly", "5", "", "Student Loan Payment", "", "", ""],
+        ["pge", "PG&E", "monthly", "16", "", "PG&E", "", "", ""],
+    ]
+
+    bills, warnings = parse_bill_schedules_with_warnings(rows)
+
+    assert [bill.bill_key for bill in bills] == ["pge"]
+    assert warnings == []
 
 
 def test_parse_bill_schedules_reports_invalid_rows():

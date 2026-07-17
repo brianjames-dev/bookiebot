@@ -36,8 +36,9 @@ DEFAULT_BILL_TEMPLATE_ROWS = [
     ("pge", "PG&E", "monthly", "", "", "PG&E", "", ""),
     ("recology", "Recology", "quarterly", "", "", "Recology", "", ""),
     ("water", "Water", "quarterly", "", "", "Water", "", ""),
-    ("student_loan", "Student Loan Payment", "monthly", "", "", "Student Loan Payment", "", ""),
 ]
+
+RETIRED_BILL_KEYS = {"student_loan", "student_loan_payment"}
 
 
 @dataclass(frozen=True)
@@ -223,6 +224,13 @@ def parse_bill_schedules_with_warnings(rows: list[list[str]] | None = None) -> t
             for index, column in enumerate(header)
             if column
         }
+        legacy_keys = {
+            _slug(fields.get("bill_key", "")),
+            _slug(fields.get("display_name", "")),
+            _slug(fields.get("source_label", "")),
+        }
+        if legacy_keys & RETIRED_BILL_KEYS:
+            continue
         bill, warning = _bill_from_fields(fields, _source_range(row_index))
         if bill:
             bills.append(bill)
