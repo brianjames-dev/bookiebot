@@ -39,6 +39,11 @@ Shared Needs-category logging, the shifted dated Income layout, and the four-blo
 - Added an exact-response regression test that also confirms the full non-zero category dataset still reaches the pie-chart renderer.
 - Manual verification: request an expense breakdown in Discord and confirm the reply contains only the concise summary text plus the pie-chart attachment, while the linked web report retains the complete breakdown.
 - Concise-reply verification: `400 passed`, Pyright reported zero errors, and `git diff --check` passed.
+- Replaced Category Mix's fixed desktop radius/margins with a measured layout that fits the donut, connector stems, label gap, rendered label widths, and per-category x/y deltas inside the chart host.
+- Matched Recharts' real sector start/end/padding-angle math and re-centers the full visual envelope after chart or details-panel resizing, retaining at least 16px requested padding in collapsed and expanded states.
+- Local browser verification used the reported ten-slice Brian category mix and found zero label/stem boundary violations with 17px minimum measured clearance in both the 460px collapsed host and 342px expanded host.
+- Manual verification: after deployment, open and expand/collapse Categories in Brian's July report and confirm every stem and label stays inside the chart border with visible edge padding.
+- Category-envelope verification: `400 passed`, Pyright reported zero errors, frontend typecheck/build passed, and browser geometry checks found zero boundary violations.
 
 ## Completed 2026-07-16
 

@@ -201,6 +201,8 @@ def test_build_expense_breakdown_report_aggregates_shared_and_personal_data():
     assert "bb-burn-rate-active-dot" in html
     assert "bb-pie-metric-label" in html
     assert "bb-pie-metric-label-line" in html
+    assert "bb-category-pie-host" in html
+    assert "data-bb-pie-fit-padding" in html
     assert "Food and shopping pace" not in html
     assert "Merchant Concentration" not in html
     assert "Spending By Person / Card" not in html

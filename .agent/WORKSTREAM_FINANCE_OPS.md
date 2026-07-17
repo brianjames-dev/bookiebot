@@ -305,6 +305,17 @@ Status: Complete. Discord now sends a compact expense-breakdown summary while th
 - Continued passing every non-zero category to the pie-chart renderer, so only the duplicated text payload changed.
 - Manual test: request an expense breakdown and confirm the Discord reply has only the compact summary and chart; open the signed link and confirm the full category detail remains available.
 
+### 2026-07-17 Category Mix Envelope Follow-Up
+
+Status: Complete. The donut, connector stems, and metric labels now remain inside the chart border as its available height changes.
+
+- Category Mix observes its actual chart-host size and solves for the largest radius whose complete visual envelope fits with responsive edge padding.
+- Envelope bounds include the donut radius, stem endpoints, text gap, measured label width/height, and the same per-category x/y deltas applied during rendering.
+- Sector midpoint calculations mirror Recharts' `0°` to `360°` distribution and one-degree slice padding so later categories do not accumulate angular drift.
+- The full envelope is re-centered after ResizeObserver updates, including when expanding Categories reduces the chart host height.
+- Regression coverage confirms the fitted-host hooks are embedded in generated reports; frontend type-check/build and browser geometry checks cover the ten-slice Brian example.
+- Manual test: open Brian's July report at desktop width, expand and collapse Categories, and confirm all labels and stems keep a small gap from every chart border.
+
 ## Open Questions
 
 - What should the canonical recent-action lineage model look like?

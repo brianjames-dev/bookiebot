@@ -1071,8 +1071,9 @@ const CategoryMixChart = memo(function CategoryMixChart({
   projected,
   collapseKey,
 }: CategoryMixChartProps) {
-  const pieLayout = useExpensePieLayout()
   const chartData = categoryMixRows(data, leftAmount, filter)
+  const [pieHostRef, pieHostSize] = useElementSize<HTMLDivElement>()
+  const pieLayout = useExpensePieLayout(chartData, pieHostSize)
   const spentTotal = amountRowsTotal(chartData.filter((item) => item.key !== "left"))
 
   return (
@@ -1086,27 +1087,37 @@ const CategoryMixChart = memo(function CategoryMixChart({
       </div>
       <div className="bb-chart-layout bb-category-chart-layout">
         <ChartContainer config={chartConfig(chartData)} className="bb-chart-box bb-category-chart-box">
-          <ResponsiveContainer width="100%" height="100%">
-            <PieChart margin={pieLayout.margin}>
-              <ChartTooltip content={<ChartTooltipContent />} />
-              <Pie
-                data={chartData}
-                dataKey="amount"
-                nameKey="label"
-                innerRadius={pieLayout.innerRadius}
-                outerRadius={pieLayout.outerRadius}
-                paddingAngle={1}
-                animationDuration={520}
-                animationEasing="ease-out"
-                label={pieLayout.showLabels ? (props) => renderPieMetricLabel(props, pieLayout) : false}
-                labelLine={pieLayout.showLabels ? (props) => renderPieMetricLabelLine(props, pieLayout) : false}
-              >
-                {chartData.map((item) => (
-                  <Cell key={item.key} fill={item.color} />
-                ))}
-              </Pie>
-            </PieChart>
-          </ResponsiveContainer>
+          <div
+            ref={pieHostRef}
+            className="bb-category-pie-host"
+            data-bb-pie-fit-padding={pieLayout.containerPadding}
+          >
+            <ResponsiveContainer width="100%" height="100%">
+              <PieChart margin={pieLayout.margin}>
+                <ChartTooltip content={<ChartTooltipContent />} />
+                <Pie
+                  data={chartData}
+                  dataKey="amount"
+                  nameKey="label"
+                  cx={pieLayout.cx}
+                  cy={pieLayout.cy}
+                  innerRadius={pieLayout.innerRadius}
+                  outerRadius={pieLayout.outerRadius}
+                  startAngle={PIE_METRIC_START_ANGLE}
+                  endAngle={PIE_METRIC_END_ANGLE}
+                  paddingAngle={PIE_METRIC_PADDING_ANGLE}
+                  animationDuration={520}
+                  animationEasing="ease-out"
+                  label={pieLayout.showLabels ? (props) => renderPieMetricLabel(props, pieLayout) : false}
+                  labelLine={pieLayout.showLabels ? (props) => renderPieMetricLabelLine(props, pieLayout) : false}
+                >
+                  {chartData.map((item) => (
+                    <Cell key={item.key} fill={item.color} />
+                  ))}
+                </Pie>
+              </PieChart>
+            </ResponsiveContainer>
+          </div>
         </ChartContainer>
       </div>
       <DetailsPanel summary="Categories" collapseKey={collapseKey}>
@@ -1183,44 +1194,101 @@ function categoryMixRows(data: BreakdownItem[], leftAmount: number, filter: Cate
   }))
 }
 
-function useExpensePieLayout() {
+type ElementSize = {
+  width: number
+  height: number
+}
+
+function useElementSize<T extends HTMLElement>() {
+  const ref = useRef<T | null>(null)
+  const [size, setSize] = useState<ElementSize>({ width: 0, height: 0 })
+
+  useEffect(() => {
+    const element = ref.current
+    if (!element) {
+      return undefined
+    }
+
+    const updateSize = () => {
+      const rect = element.getBoundingClientRect()
+      setSize((current) => {
+        const next = {
+          width: Math.max(0, Math.round(rect.width * 10) / 10),
+          height: Math.max(0, Math.round(rect.height * 10) / 10),
+        }
+        return current.width === next.width && current.height === next.height ? current : next
+      })
+    }
+
+    updateSize()
+    const observer = new ResizeObserver(updateSize)
+    observer.observe(element)
+    return () => observer.disconnect()
+  }, [])
+
+  return [ref, size] as const
+}
+
+type ExpensePieBaseLayout = {
+  fallbackWidth: number
+  fallbackHeight: number
+  minOuterRadius: number
+  maxOuterRadius: number
+  innerRadiusRatio: number
+  labelOffset: number
+  labelGap: number
+  containerPadding: number
+  compactLabel: boolean
+  showLabels: boolean
+}
+
+function useExpensePieLayout(data: BreakdownItem[], hostSize: ElementSize) {
   const isPhone = useMediaQuery("(max-width: 520px)")
   const isTablet = useMediaQuery("(max-width: 860px)")
 
+  let base: ExpensePieBaseLayout
   if (isPhone) {
-    return {
-      chartHeight: 330,
-      innerRadius: 72,
-      outerRadius: 122,
+    base = {
+      fallbackWidth: 360,
+      fallbackHeight: 330,
+      minOuterRadius: 72,
+      maxOuterRadius: 122,
+      innerRadiusRatio: 72 / 122,
       labelOffset: 20,
       labelGap: PIE_METRIC_LABEL_GAP,
-      margin: { top: 6, right: 8, bottom: 6, left: 8 },
+      containerPadding: 12,
       compactLabel: false,
       showLabels: false,
     }
-  }
-  if (isTablet) {
-    return {
-      chartHeight: 390,
-      innerRadius: 86,
-      outerRadius: 150,
+  } else if (isTablet) {
+    base = {
+      fallbackWidth: 760,
+      fallbackHeight: 390,
+      minOuterRadius: 96,
+      maxOuterRadius: 150,
+      innerRadiusRatio: 86 / 150,
       labelOffset: 26,
       labelGap: PIE_METRIC_LABEL_GAP,
-      margin: { top: 28, right: 74, bottom: 28, left: 74 },
+      containerPadding: 14,
+      compactLabel: false,
+      showLabels: true,
+    }
+  } else {
+    base = {
+      fallbackWidth: 1100,
+      fallbackHeight: 460,
+      minOuterRadius: 120,
+      maxOuterRadius: 220,
+      innerRadiusRatio: 122 / 220,
+      labelOffset: 42,
+      labelGap: PIE_METRIC_LABEL_GAP,
+      containerPadding: 16,
       compactLabel: false,
       showLabels: true,
     }
   }
-  return {
-    chartHeight: 460,
-    innerRadius: 122,
-    outerRadius: 220,
-    labelOffset: 42,
-    labelGap: PIE_METRIC_LABEL_GAP,
-    margin: { top: 34, right: 140, bottom: 34, left: 140 },
-    compactLabel: false,
-    showLabels: true,
-  }
+
+  return fitExpensePieLayout(data, hostSize, base)
 }
 
 function pieMetricAnimationDelay(index: number | undefined) {
@@ -1234,6 +1302,176 @@ function pieMetricColor(payload: BreakdownItem | undefined, fallback: string | u
 type PieMetricTextAnchor = "start" | "middle" | "end" | "inherit"
 
 const PIE_METRIC_LABEL_GAP = 10
+const PIE_METRIC_LABEL_HALF_HEIGHT = 8
+const PIE_METRIC_LABEL_MIN_VERTICAL_GAP = 18
+const PIE_METRIC_LABEL_WIDTH_SAFETY = 4
+const PIE_METRIC_MINIMUM_RADIUS = 54
+const PIE_METRIC_START_ANGLE = 0
+const PIE_METRIC_END_ANGLE = 360
+const PIE_METRIC_PADDING_ANGLE = 1
+
+type PieMetricDelta = {
+  x: number
+  y: number
+}
+
+type PieMetricEnvelope = {
+  minX: number
+  maxX: number
+  minY: number
+  maxY: number
+}
+
+type PieMetricPlacement = {
+  key: string
+  cos: number
+  sin: number
+  labelWidth: number
+  delta: PieMetricDelta
+}
+
+const pieMetricLabelWidthCache = new Map<string, number>()
+let pieMetricMeasureContext: CanvasRenderingContext2D | null | undefined
+
+function fitExpensePieLayout(data: BreakdownItem[], hostSize: ElementSize, base: ExpensePieBaseLayout) {
+  const width = hostSize.width || base.fallbackWidth
+  const height = hostSize.height || base.fallbackHeight
+  const safeWidth = Math.max(1, width - base.containerPadding * 2)
+  const safeHeight = Math.max(1, height - base.containerPadding * 2)
+  const minimumRadius = Math.min(base.minOuterRadius, base.maxOuterRadius, safeWidth / 2, safeHeight / 2)
+  let low = Math.min(PIE_METRIC_MINIMUM_RADIUS, minimumRadius)
+  let high = base.maxOuterRadius
+
+  for (let iteration = 0; iteration < 24; iteration += 1) {
+    const candidate = (low + high) / 2
+    const candidateEnvelope = expensePieEnvelope(data, candidate, base)
+    if (
+      candidateEnvelope.maxX - candidateEnvelope.minX <= safeWidth &&
+      candidateEnvelope.maxY - candidateEnvelope.minY <= safeHeight
+    ) {
+      low = candidate
+    } else {
+      high = candidate
+    }
+  }
+
+  const outerRadius = Math.max(PIE_METRIC_MINIMUM_RADIUS, Math.min(base.maxOuterRadius, low))
+  const envelope = expensePieEnvelope(data, outerRadius, base)
+  const envelopeWidth = envelope.maxX - envelope.minX
+  const envelopeHeight = envelope.maxY - envelope.minY
+  const cx = base.containerPadding + (safeWidth - envelopeWidth) / 2 - envelope.minX
+  const cy = base.containerPadding + (safeHeight - envelopeHeight) / 2 - envelope.minY
+
+  return {
+    ...base,
+    cx,
+    cy,
+    innerRadius: outerRadius * base.innerRadiusRatio,
+    outerRadius,
+    labelDeltas: pieMetricLabelDeltas(data, outerRadius, base),
+    margin: { top: 0, right: 0, bottom: 0, left: 0 },
+  }
+}
+
+function expensePieEnvelope(data: BreakdownItem[], outerRadius: number, layout: ExpensePieBaseLayout): PieMetricEnvelope {
+  const envelope: PieMetricEnvelope = {
+    minX: -outerRadius,
+    maxX: outerRadius,
+    minY: -outerRadius,
+    maxY: outerRadius,
+  }
+  if (!layout.showLabels) {
+    return envelope
+  }
+
+  for (const placement of pieMetricPlacements(data, outerRadius, layout)) {
+    const lineEndX = placement.cos * (outerRadius + layout.labelOffset) + placement.delta.x
+    const lineEndY = placement.sin * (outerRadius + layout.labelOffset) + placement.delta.y
+    const isRight = placement.cos >= 0
+    const labelNearX = lineEndX + (isRight ? layout.labelGap : -layout.labelGap)
+    const labelMinX = isRight ? labelNearX : labelNearX - placement.labelWidth
+    const labelMaxX = isRight ? labelNearX + placement.labelWidth : labelNearX
+
+    envelope.minX = Math.min(envelope.minX, lineEndX, labelMinX)
+    envelope.maxX = Math.max(envelope.maxX, lineEndX, labelMaxX)
+    envelope.minY = Math.min(envelope.minY, lineEndY - PIE_METRIC_LABEL_HALF_HEIGHT)
+    envelope.maxY = Math.max(envelope.maxY, lineEndY + PIE_METRIC_LABEL_HALF_HEIGHT)
+  }
+  return envelope
+}
+
+function pieMetricPlacements(data: BreakdownItem[], outerRadius: number, layout: ExpensePieBaseLayout) {
+  const total = amountRowsTotal(data)
+  const nonZeroCount = data.filter((item) => item.amount !== 0).length
+  const angleDirection = Math.sign(PIE_METRIC_END_ANGLE - PIE_METRIC_START_ANGLE) || 1
+  const realTotalAngle =
+    Math.abs(PIE_METRIC_END_ANGLE - PIE_METRIC_START_ANGLE) - nonZeroCount * PIE_METRIC_PADDING_ANGLE
+  let currentAngle = PIE_METRIC_START_ANGLE
+  const placements: PieMetricPlacement[] = data.map((item, index) => {
+    if (index > 0 && item.amount !== 0) {
+      currentAngle += angleDirection * PIE_METRIC_PADDING_ANGLE
+    }
+    const sweep = total ? (realTotalAngle * item.amount) / total : 0
+    const midAngle = currentAngle + (angleDirection * sweep) / 2
+    currentAngle += angleDirection * sweep
+    const radians = (-midAngle * Math.PI) / 180
+    return {
+      key: item.key,
+      cos: Math.cos(radians),
+      sin: Math.sin(radians),
+      labelWidth: pieMetricLabelWidth(item, layout.compactLabel),
+      delta: { x: 0, y: 0 },
+    }
+  })
+
+  for (const side of [-1, 1]) {
+    const sidePlacements = placements
+      .filter((placement) => (placement.cos >= 0 ? 1 : -1) === side)
+      .sort((left, right) => left.sin - right.sin)
+    let priorY = Number.NEGATIVE_INFINITY
+    for (const placement of sidePlacements) {
+      const baseY = placement.sin * (outerRadius + layout.labelOffset)
+      const adjustedY = Math.max(baseY, priorY + PIE_METRIC_LABEL_MIN_VERTICAL_GAP)
+      placement.delta.y = adjustedY - baseY
+      priorY = adjustedY
+    }
+    if (sidePlacements.length) {
+      const averageDelta = sidePlacements.reduce((sum, placement) => sum + placement.delta.y, 0) / sidePlacements.length
+      for (const placement of sidePlacements) {
+        placement.delta.y -= averageDelta
+      }
+    }
+  }
+
+  return placements
+}
+
+function pieMetricLabelDeltas(data: BreakdownItem[], outerRadius: number, layout: ExpensePieBaseLayout) {
+  return Object.fromEntries(
+    pieMetricPlacements(data, outerRadius, layout).map((placement) => [placement.key, placement.delta]),
+  ) as Record<string, PieMetricDelta>
+}
+
+function pieMetricLabelWidth(item: BreakdownItem, compactLabel: boolean) {
+  const text = compactLabel ? `${item.label}\n${formatMoney(item.amount)}` : `${item.label} ${formatMoney(item.amount)}`
+  const cached = pieMetricLabelWidthCache.get(text)
+  if (cached !== undefined) {
+    return cached
+  }
+
+  if (pieMetricMeasureContext === undefined) {
+    pieMetricMeasureContext = typeof document === "undefined" ? null : document.createElement("canvas").getContext("2d")
+    if (pieMetricMeasureContext) {
+      pieMetricMeasureContext.font = "650 12px Inter, ui-sans-serif, system-ui, sans-serif"
+    }
+  }
+  const width = pieMetricMeasureContext
+    ? pieMetricMeasureContext.measureText(text.replace("\n", " ")).width
+    : text.replace("\n", " ").length * 7
+  const measured = Math.ceil(width + PIE_METRIC_LABEL_WIDTH_SAFETY)
+  pieMetricLabelWidthCache.set(text, measured)
+  return measured
+}
 
 type ExpensePieLayout = ReturnType<typeof useExpensePieLayout>
 
@@ -1321,11 +1559,12 @@ function pieMetricLabelPosition(props: unknown, layout: ExpensePieLayout) {
     y?: number | string
     textAnchor?: PieMetricTextAnchor
   }
+  const delta = pieMetricPositionDelta(props, layout)
   const computed = pieMetricPolarPoint(props, layout.outerRadius + layout.labelOffset)
   if (computed) {
     return {
-      x: computed.x,
-      y: computed.y,
+      x: computed.x + delta.x,
+      y: computed.y + delta.y,
       textAnchor: computed.x > computed.cx ? "start" as const : "end" as const,
     }
   }
@@ -1333,10 +1572,14 @@ function pieMetricLabelPosition(props: unknown, layout: ExpensePieLayout) {
 }
 
 function pieMetricLinePosition(props: unknown, layout: ExpensePieLayout) {
+  const delta = pieMetricPositionDelta(props, layout)
   const start = pieMetricPolarPoint(props, layout.outerRadius)
   const end = pieMetricPolarPoint(props, layout.outerRadius + layout.labelOffset)
   if (start && end) {
-    return { start, end }
+    return {
+      start,
+      end: { ...end, x: end.x + delta.x, y: end.y + delta.y },
+    }
   }
 
   const { points } = props as {
@@ -1347,6 +1590,11 @@ function pieMetricLinePosition(props: unknown, layout: ExpensePieLayout) {
     return null
   }
   return { start: fallbackStart, end: fallbackEnd }
+}
+
+function pieMetricPositionDelta(props: unknown, layout: ExpensePieLayout): PieMetricDelta {
+  const { payload } = props as { payload?: BreakdownItem }
+  return payload ? layout.labelDeltas[payload.key] ?? { x: 0, y: 0 } : { x: 0, y: 0 }
 }
 
 function pieMetricPolarPoint(props: unknown, radius: number) {
