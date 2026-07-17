@@ -62,6 +62,8 @@ Shared Needs-category logging, the shifted dated Income layout, and the four-blo
 - Extended the shared tooltip-dismissal provider across the full report and connected every data-view selector: Projected mode, Category Mix, Calendar, Daily Spending, and Expense Highlights.
 - Local browser verification confirmed Daily Spending All-to-Needs hides the open tooltip and reactivates with only the filtered Needs value; Category Mix All-to-Needs increments the same dismissal lifecycle and leaves no stale tooltip behind.
 - Toggle-tooltip verification: `404 passed, 1 skipped`, Pyright reported zero errors, frontend typecheck/build passed, all five dismissal triggers are embedded in generated reports, and the browser console remained clean.
+- Calendar All/Subs switching now preserves the mounted month shell and day cells, animates only event markers whose visibility changes, and crossfades the outflow total/count without reanimating the month or Current/Projected labels.
+- Calendar transition verification: `404 passed, 1 skipped`, Pyright reported zero errors, frontend typecheck/build passed, and a local browser fixture confirmed one stable calendar node, collapsed non-subscription markers, updated `$2,451.32` to `$126.32`, unchanged July/Current labels, and a clean console.
 
 ## Completed 2026-07-16
 

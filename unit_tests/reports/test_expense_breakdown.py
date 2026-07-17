@@ -314,6 +314,10 @@ def test_build_expense_breakdown_report_aggregates_shared_and_personal_data():
     assert "bb-bill-history-dot" in html
     assert "bb-chart-carousel-slide" in html
     assert "bb-calendar-day-today" in html
+    assert "data-bb-calendar-filter" in html
+    assert "data-bb-calendar-static-label" in html
+    assert "data-bb-calendar-changing-value" in html
+    assert "bb-calendar-marker-transition" in html
     assert "bb-subscription-all-grid" in html
     assert "bb-subscription-compact-table" in html
     assert "bb-subscription-tab-content" in html

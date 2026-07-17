@@ -2651,17 +2651,35 @@ function CalendarAnalyticsPanel({
 
   return (
     <div className="bb-subscription-analytics">
-      <div className="bb-subscription-tab-content" data-state="active" key={filter}>
+      <div
+        className="bb-subscription-tab-content bb-cashflow-calendar-content"
+        data-state="active"
+        data-bb-calendar-filter={filter}
+      >
         <div className="bb-subscription-panel">
           <div className="bb-panel-head bb-subscription-summary">
             <div>
-              <div className="bb-chart-kicker">{monthOnlyLabel(monthLabel)}</div>
-              <div className="bb-subscription-total">{formatMoney(outflowTotal)}</div>
-              <div className="bb-chart-mode-note">{projected ? "Projected" : "Current"}</div>
+              <div className="bb-chart-kicker" data-bb-calendar-static-label="month">
+                {monthOnlyLabel(monthLabel)}
+              </div>
+              <div className="bb-subscription-total">
+                <CalendarChangingValue value={formatMoney(outflowTotal)} />
+              </div>
+              <div className="bb-chart-mode-note" data-bb-calendar-static-label="mode">
+                {projected ? "Projected" : "Current"}
+              </div>
             </div>
-            <Badge variant="secondary">{visibleEvents.length} total</Badge>
+            <Badge variant="secondary">
+              <CalendarChangingValue value={String(visibleEvents.length)} /> total
+            </Badge>
           </div>
-          <FinancialCalendar year={year} month={month} elapsedDays={elapsedDays} events={visibleEvents} />
+          <FinancialCalendar
+            year={year}
+            month={month}
+            elapsedDays={elapsedDays}
+            events={events}
+            filter={filter}
+          />
           {subscriptionItems.length ? (
             <DetailsPanel summary="Details" collapseKey={collapseKey}>
               <SubscriptionAllItemsGrid items={subscriptionItems} />
@@ -2673,16 +2691,61 @@ function CalendarAnalyticsPanel({
   )
 }
 
+function CalendarChangingValue({ value }: { value: string }) {
+  const [currentValue, setCurrentValue] = useState(value)
+  const [previousValue, setPreviousValue] = useState<string | null>(null)
+  const transitionTimerRef = useRef<number | null>(null)
+
+  useEffect(() => {
+    if (value === currentValue) {
+      return
+    }
+    if (transitionTimerRef.current !== null) {
+      window.clearTimeout(transitionTimerRef.current)
+    }
+    setPreviousValue(currentValue)
+    setCurrentValue(value)
+    transitionTimerRef.current = window.setTimeout(() => {
+      setPreviousValue(null)
+      transitionTimerRef.current = null
+    }, 220)
+  }, [currentValue, value])
+
+  useEffect(() => () => {
+    if (transitionTimerRef.current !== null) {
+      window.clearTimeout(transitionTimerRef.current)
+    }
+  }, [])
+
+  return (
+    <span className="bb-calendar-changing-value" aria-live="polite" data-bb-calendar-changing-value>
+      {previousValue !== null ? (
+        <span className="bb-calendar-changing-value-out" aria-hidden="true">
+          {previousValue}
+        </span>
+      ) : null}
+      <span
+        className={previousValue !== null ? "bb-calendar-changing-value-in" : undefined}
+        aria-label={currentValue}
+      >
+        {currentValue}
+      </span>
+    </span>
+  )
+}
+
 function FinancialCalendar({
   year,
   month,
   elapsedDays,
   events,
+  filter,
 }: {
   year: number
   month: number
   elapsedDays: number
   events: CalendarEvent[]
+  filter: CalendarFilter
 }) {
   const daysInMonth = new Date(year, month, 0).getDate()
   const leadingBlankDays = new Date(year, month - 1, 1).getDay()
@@ -2703,8 +2766,23 @@ function FinancialCalendar({
       <div className="bb-calendar-grid">
         {days.map((day, index) => {
           const dayEvents = day === null ? [] : eventsByDay.get(day) ?? []
-          const visibleEvents = dayEvents.slice(0, 3)
-          const hiddenCount = Math.max(dayEvents.length - visibleEvents.length, 0)
+          const indexedEvents = dayEvents.map((event, eventIndex) => ({ event, eventIndex }))
+          const subscriptionEvents = indexedEvents.filter(({ event }) => event.kind === "subscription")
+          const filteredEvents = filter === "all"
+            ? indexedEvents
+            : subscriptionEvents
+          const visibleEventIndexes = new Set(filteredEvents.slice(0, 3).map(({ eventIndex }) => eventIndex))
+          const renderableEventIndexes = new Set([
+            ...indexedEvents.slice(0, 3).map(({ eventIndex }) => eventIndex),
+            ...subscriptionEvents.slice(0, 3).map(({ eventIndex }) => eventIndex),
+          ])
+          const overflowGroups: Array<{ filter: CalendarFilter; events: CalendarEvent[] }> = [
+            { filter: "all", events: indexedEvents.slice(3).map(({ event }) => event) },
+            {
+              filter: "subscription",
+              events: subscriptionEvents.slice(3).map(({ event }) => event),
+            },
+          ]
           const isToday = day !== null && isCurrentCalendarDay(year, month, day)
           const hasHit = day !== null && day <= elapsedDays
           return (
@@ -2713,7 +2791,7 @@ function FinancialCalendar({
               className={[
                 "bb-calendar-day",
                 day === null ? "bb-calendar-day-muted" : "",
-                dayEvents.length ? "bb-calendar-day-has-items" : "",
+                filteredEvents.length ? "bb-calendar-day-has-items" : "",
                 isToday ? "bb-calendar-day-today" : "",
               ].filter(Boolean).join(" ")}
               aria-hidden={day === null}
@@ -2722,44 +2800,64 @@ function FinancialCalendar({
                 <>
                   <div className="bb-calendar-day-number">{day}</div>
                   <div className="bb-calendar-marker-stack">
-                    {visibleEvents.map((item, itemIndex) => {
-                      const style = calendarEventStyle(item)
-                      return (
-                        <button
-                          type="button"
-                          key={`${item.kind}-${item.label}-${item.amount}-${itemIndex}`}
-                          className={[
-                            "bb-subscription-marker",
-                            hasHit && !item.projectedOnly ? "" : "bb-subscription-marker-pending",
-                          ].filter(Boolean).join(" ")}
-                          style={{
-                            color: style.color,
-                            backgroundColor: style.background,
-                            borderColor: style.color,
-                          }}
-                          aria-label={calendarEventLabel(item)}
-                        >
-                          <span className="bb-subscription-marker-dot" />
-                          <span className="bb-subscription-marker-name">{item.label}</span>
-                          <span className="bb-subscription-marker-amount">{formatMoney(item.amount)}</span>
-                          <CalendarEventTooltip event={item} />
-                        </button>
-                      )
-                    })}
-                    {hiddenCount ? (
-                      <button
-                        type="button"
-                        className={[
-                          "bb-subscription-marker",
-                          "bb-subscription-marker-more",
-                          hasHit ? "" : "bb-subscription-marker-pending",
-                        ].filter(Boolean).join(" ")}
-                        aria-label={`${hiddenCount} more event${hiddenCount === 1 ? "" : "s"} on day ${day}`}
-                      >
-                        +{hiddenCount} more
-                        <CalendarOverflowTooltip events={dayEvents.slice(visibleEvents.length)} day={day} />
-                      </button>
-                    ) : null}
+                    {indexedEvents
+                      .filter(({ eventIndex }) => renderableEventIndexes.has(eventIndex))
+                      .map(({ event: item, eventIndex }) => {
+                        const style = calendarEventStyle(item)
+                        const isVisible = visibleEventIndexes.has(eventIndex)
+                        return (
+                          <button
+                            type="button"
+                            key={calendarEventKey(item, eventIndex)}
+                            className={[
+                              "bb-subscription-marker",
+                              "bb-calendar-marker-transition",
+                              hasHit && !item.projectedOnly ? "" : "bb-subscription-marker-pending",
+                            ].filter(Boolean).join(" ")}
+                            data-visible={isVisible ? "true" : "false"}
+                            data-calendar-event-kind={item.kind}
+                            style={{
+                              color: style.color,
+                              backgroundColor: style.background,
+                              borderColor: style.color,
+                            }}
+                            aria-label={calendarEventLabel(item)}
+                            aria-hidden={!isVisible}
+                            tabIndex={isVisible ? 0 : -1}
+                          >
+                            <span className="bb-subscription-marker-dot" />
+                            <span className="bb-subscription-marker-name">{item.label}</span>
+                            <span className="bb-subscription-marker-amount">{formatMoney(item.amount)}</span>
+                            <CalendarEventTooltip event={item} />
+                          </button>
+                        )
+                      })}
+                    {overflowGroups
+                      .filter((overflowGroup) => overflowGroup.events.length > 0)
+                      .map((overflowGroup) => {
+                        const hiddenCount = overflowGroup.events.length
+                        const isVisible = overflowGroup.filter === filter
+                        return (
+                          <button
+                            type="button"
+                            key={`overflow-${overflowGroup.filter}`}
+                            className={[
+                              "bb-subscription-marker",
+                              "bb-subscription-marker-more",
+                              "bb-calendar-marker-transition",
+                              hasHit ? "" : "bb-subscription-marker-pending",
+                            ].filter(Boolean).join(" ")}
+                            data-visible={isVisible ? "true" : "false"}
+                            data-calendar-overflow-filter={overflowGroup.filter}
+                            aria-label={`${hiddenCount} more event${hiddenCount === 1 ? "" : "s"} on day ${day}`}
+                            aria-hidden={!isVisible}
+                            tabIndex={isVisible ? 0 : -1}
+                          >
+                            +{hiddenCount} more
+                            <CalendarOverflowTooltip events={overflowGroup.events} day={day} />
+                          </button>
+                        )
+                      })}
                   </div>
                 </>
               )}
@@ -2769,6 +2867,18 @@ function FinancialCalendar({
       </div>
     </div>
   )
+}
+
+function calendarEventKey(event: CalendarEvent, index: number) {
+  return [
+    event.kind,
+    event.group,
+    event.day,
+    event.label,
+    event.amount,
+    event.projectedOnly ? "projected" : "actual",
+    index,
+  ].join("-")
 }
 
 function calendarEventsByDay(events: CalendarEvent[]) {

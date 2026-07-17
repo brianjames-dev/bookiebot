@@ -308,6 +308,17 @@ Status: Complete. Changing the top-chart carousel or any chart data-view toggle 
 - Regression markers cover every toggle trigger plus the switch/fade hooks in generated report HTML; focused and full report tests, Pyright, frontend typecheck/build, and local browser switching checks pass.
 - Manual test: show a tooltip, change the current chart with either a carousel control or an in-card data toggle, confirm the old tooltip fades away with no replacement, then hover or tap the new view and confirm its correct tooltip appears.
 
+### 2026-07-17 Selective Calendar Filter Transition Follow-Up
+
+Status: Complete. Switching the report Calendar between All and Subs no longer remounts or reanimates the full calendar panel.
+
+- Removed the filter-keyed panel boundary so the month heading, Current/Projected label, weekday header, day cells, and calendar container retain stable DOM identity across filter changes.
+- Each potentially visible event marker now remains stably keyed and changes an explicit visibility state; markers leaving or entering the selected view fade and collapse individually on desktop and mobile.
+- Per-day rendering retains only markers that can occupy the three visible slots in at least one filter, while separate stable overflow controls represent each filter's remaining events.
+- The outflow amount and event count crossfade independently when their values change; the month and mode labels do not receive change animations.
+- Regression markers cover the stable calendar shell, static labels, changing values, and marker transitions. Full unit tests, Pyright, frontend typecheck/build, and a local All-to-Subs browser fixture pass with no console warnings or errors.
+- Manual test: open Calendar on All, switch to Subs, and confirm only non-subscription event pills fade/collapse, the amount/count crossfade to subscription values, and the calendar/month/mode labels remain visually stationary; switch back and confirm the removed events return smoothly.
+
 ### 2026-07-17 Concise Expense Breakdown Reply Follow-Up
 
 Status: Complete. Discord now sends a compact expense-breakdown summary while the web report remains the detailed view.
