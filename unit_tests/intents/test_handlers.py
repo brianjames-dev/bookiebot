@@ -571,7 +571,7 @@ async def test_shifted_income_layout_stamps_date_and_keeps_recent_actions_workin
         income_rows=[
             ["", "Date:", "Source:", "Amount:"],
             ["", "", "<Enter Source>", "0"],
-            ["", "", "Monthly Income:", ""],
+            ["", "Monthly Income:", "", ""],
         ]
     )
 
@@ -612,9 +612,9 @@ async def test_shifted_income_layout_stamps_date_and_keeps_recent_actions_workin
 async def test_shifted_income_can_be_updated_deleted_and_delete_undone(message):
     repo = SheetsRepoStub(
         income_rows=[
-            ["", "Date:", "Source:", "Amount:"],
-            ["", "", "<Enter Source>", "0"],
-            ["", "", "Monthly Income:", ""],
+            ["", "Date:", "Source:", "Amount:", "Biweekly Income Source:", "xAI"],
+            ["", "", "<Enter Source>", "0", "Biweekly Income Start:", "7/2/2026"],
+            ["", "Monthly Income:", "", ""],
         ]
     )
 
@@ -649,6 +649,9 @@ async def test_shifted_income_can_be_updated_deleted_and_delete_undone(message):
         assert repo.income.cell(2, 2).value == "7/17/2026"
         assert repo.income.cell(2, 3).value == "xAI"
         assert repo.income.cell(2, 4).value == "2977.16"
+        assert repo.income.cell(2, 5).value == "Biweekly Income Start:"
+        assert repo.income.cell(2, 6).value == "7/2/2026"
+        assert repo.income.cell(4, 4).value == "=SUM(D2:D3)"
 
         await ih.handle_intent("undo_last_transaction", {}, message)
 
@@ -658,6 +661,11 @@ async def test_shifted_income_can_be_updated_deleted_and_delete_undone(message):
         assert repo.income.cell(3, 2).value == "7/17/2026"
         assert repo.income.cell(3, 3).value == "xAI"
         assert repo.income.cell(3, 4).value == "2977.16"
+        assert repo.income.cell(2, 5).value == "Biweekly Income Start:"
+        assert repo.income.cell(2, 6).value == "7/2/2026"
+        assert repo.income.cell(3, 5).value == ""
+        assert repo.income.cell(3, 6).value == ""
+        assert repo.income.cell(5, 4).value == "=SUM(D2:D4)"
 
         await ih.handle_intent(
             "update_recent_action",
@@ -666,6 +674,75 @@ async def test_shifted_income_can_be_updated_deleted_and_delete_undone(message):
         )
 
         assert repo.income.cell(3, 3).value == "xAI Corp"
+
+
+@pytest.mark.asyncio
+async def test_undo_new_first_income_preserves_biweekly_config_and_repairs_formula(message):
+    repo = SheetsRepoStub(
+        income_rows=[
+            ["", "Date:", "Source:", "Amount:", "Biweekly Income Source:", "xAI"],
+            ["", "", "<Enter Source>", "0", "Biweekly Income Start:", "7/2/2026"],
+            ["", "Monthly Income:", "", ""],
+        ]
+    )
+
+    with repo.patched():
+        await ih.handle_intent(
+            "log_income",
+            {
+                "type": "income",
+                "date": "2026-07-16",
+                "amount": 1639.9,
+                "source": "Sonic",
+            },
+            message,
+        )
+        await ih.handle_intent("undo_last_transaction", {}, message)
+
+    assert repo.income.cell(2, 2).value == ""
+    assert repo.income.cell(2, 3).value == "<Enter Source>"
+    assert repo.income.cell(2, 4).value == "0"
+    assert repo.income.cell(2, 5).value == "Biweekly Income Start:"
+    assert repo.income.cell(2, 6).value == "7/2/2026"
+    assert repo.income.cell(3, 2).value == "Monthly Income:"
+    assert repo.income.cell(3, 4).value == "=SUM(D2:D2)"
+
+
+@pytest.mark.asyncio
+async def test_delete_and_undo_later_income_repairs_summary_formula(message):
+    repo = SheetsRepoStub(
+        income_rows=[
+            ["", "Date:", "Source:", "Amount:", "Biweekly Income Source:", "xAI"],
+            ["", "", "<Enter Source>", "0", "Biweekly Income Start:", "7/2/2026"],
+            ["", "Monthly Income:", "", ""],
+        ]
+    )
+
+    with repo.patched():
+        await ih.handle_intent(
+            "log_income",
+            {"type": "income", "date": "2026-07-16", "amount": 1000, "source": "First"},
+            message,
+        )
+        await ih.handle_intent(
+            "log_income",
+            {"type": "income", "date": "2026-07-17", "amount": 250, "source": "Second"},
+            message,
+        )
+        await ih.handle_intent("delete_recent_action", {"index": 1}, message)
+
+        assert repo.income.cell(4, 4).value == "=SUM(D2:D3)"
+        assert repo.income.cell(2, 5).value == "Biweekly Income Start:"
+        assert repo.income.cell(2, 6).value == "7/2/2026"
+
+        await ih.handle_intent("undo_last_transaction", {}, message)
+
+    assert repo.income.cell(3, 2).value == "7/17/2026"
+    assert repo.income.cell(3, 3).value == "Second"
+    assert repo.income.cell(3, 4).value == "250"
+    assert repo.income.cell(5, 4).value == "=SUM(D2:D4)"
+    assert repo.income.cell(2, 5).value == "Biweekly Income Start:"
+    assert repo.income.cell(2, 6).value == "7/2/2026"
 
 
 @pytest.mark.asyncio

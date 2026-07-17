@@ -164,6 +164,12 @@ Decision: Personal budget Income tables keep exactly one trailing placeholder ro
 
 Rationale: A single reusable seed keeps Templates compact, preserves sequential entry order, gives manual users an obvious next input row, and removes the need for multiple preformatted blanks while keeping Bot and Apps Script behavior identical.
 
+## 2026-07-16 - Preserve Anchored Income Configuration During Row Compaction
+
+Decision: Income deletion may compact a whole sheet row, but it must snapshot and restore the biweekly configuration anchored beside the first Income row, preserve the deleted row's explicit cell properties, and rebuild the Monthly Income formula from stored header and summary coordinates. Undo clears the temporary anchor copy before reinserting the original row.
+
+Rationale: Dynamic Income entries in `B:D` share physical rows with fixed configuration in `E:F`, and Google Sheets row insertion/deletion does not reliably preserve formula ranges, borders, notes, validation, or row height. Treating the transaction cells and anchored configuration as separate logical regions keeps edit/delete/undo behavior safe without abandoning compact sequential rows.
+
 ## Pending Decisions
 
 - Where should durable system events live: banking database only, Google Sheets only, or dual-write during transition?

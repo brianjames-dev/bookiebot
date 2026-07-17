@@ -4,7 +4,7 @@ Last updated: 2026-07-16
 
 ## Active Focus
 
-Shared Needs-category logging and the shifted dated Income layout are implemented. Brian and Hannah May-July are migrated, both Templates use one Income seed row, and Discord mutation flows remain ready for final manual verification.
+Shared Needs-category logging and the shifted dated Income layout are implemented. Brian and Hannah May-July are migrated, both Templates use one Income seed row, and Income delete/undo now preserves the adjacent biweekly configuration and summary formulas.
 
 ## On Deck
 
@@ -38,6 +38,8 @@ Shared Needs-category logging and the shifted dated Income layout are implemente
 - Reduced the live Hannah Budget 2026 Template Income section to one `<Enter Source>` row while preserving its style, validation, notes, Monthly Income formula, budget-banner reference, and adjacent biweekly configuration.
 - BookieBot now reapplies the seed row's explicit formatting, validation, notes, borders, and row height after Google Sheets inserts a new Income row, covering properties that `inheritFromBefore` omits.
 - Live Hannah integration verification logged two sequential dated Income entries on a temporary Template copy, retained exactly one trailing placeholder, calculated `$191.34`, and removed the temporary QA tab afterward.
+- Income delete and immediate undo now snapshot and restore anchored biweekly configuration cells, explicit row properties, and the Monthly Income summary formula while compacting whole rows.
+- Live Brian July verification on a temporary copy covered first-row delete/undo, later-row delete/undo, and immediate undo; every path preserved the `E:F` configuration, repaired the `D` summary formula, and restored the original sheet values/formulas exactly before the QA tab was removed.
 - Manual verification: deploy the updated Apps Script, run `setupBudgetSystemAutomation()` once, enter an amount in a new dated Income table, then confirm manual and BookieBot income dates plus update/delete/undo behavior.
 
 ## Completed 2026-07-08
@@ -285,6 +287,8 @@ Use a test row or low-risk real row in Discord:
    - Expected: the first entry replaces the seed row, each completed entry receives a date, exactly one new placeholder appears directly below with matching format/validation, later entries remain sequential, and Monthly Income includes every completed row.
 53. Copy Hannah's Template to a safe test month and log two Income entries through Hannah's BookieBot account.
    - Expected: the entries occupy consecutive `B:D` rows with dates, every generated row retains the seed's formatting/validation/notes/height, exactly one `<Enter Source>` placeholder remains, and the Monthly Income formula includes both entries.
+54. In Brian July, delete and undo the first Income entry, then repeat with the later entry and with an immediate undo after logging test Income.
+    - Expected: the `Biweekly Income Start` configuration remains anchored in `E:F`, Monthly Income always sums the current `D` rows, the Budget section retains its total reference, and undo restores the deleted row's values and formatting.
 
 ## Verification Baseline
 
@@ -298,6 +302,18 @@ python -m pytest unit_tests/intents/test_handlers.py unit_tests/core/test_messag
 Latest verification:
 
 ```bash
+venv/bin/python -m pytest unit_tests
+# passed: 391 passed, 1 warning
+
+python -m pyright --pythonpath venv/bin/python --pythonversion 3.12
+# passed: 0 errors, 0 warnings, 0 informations
+
+node --check < scripts/google-apps-script/budget-system-automation.gs
+# passed
+
+git diff --check
+# passed
+
 venv/bin/python -m pytest unit_tests
 # passed: 389 passed, 1 warning
 

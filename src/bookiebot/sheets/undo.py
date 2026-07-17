@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import copy
 from dataclasses import asdict, dataclass, field
 from datetime import datetime
 import json
@@ -12,6 +13,12 @@ from uuid import uuid4
 from openpyxl.utils import get_column_letter
 
 from bookiebot.sheets.config import expense_category_label, normalize_expense_category
+from bookiebot.sheets.income import (
+    apply_income_row_properties,
+    capture_income_row_properties,
+    income_sheet_layout,
+    repair_income_summary_formula,
+)
 from bookiebot.sheets.repo import get_sheets_repo
 from bookiebot.sheets.routing import actor_key_aliases, get_user_config
 
@@ -47,6 +54,8 @@ _PENDING_SELECTION_EXPIRED_MESSAGE = "That recent transaction selection expired.
 _RECENT_ACTION_OFFSET_BY_USER: dict[str, int] = {}
 _LOG_HEADERS = ["id", "created_at", "user_key", "status", "undone_at", "action_json"]
 _LOG_HEADER_READY: weakref.WeakSet[Any] = weakref.WeakSet()
+_BIWEEKLY_INCOME_LABELS = {"biweekly income source", "biweekly income start"}
+_BIWEEKLY_INCOME_START_LABEL = "biweekly income start"
 
 
 @dataclass
@@ -153,6 +162,261 @@ def _update_contiguous_row(ws: Any, row: int, columns: list[int], values: list[A
         previous_col = col
     if group_columns:
         _update_range(ws, row, group_columns[0], [group_values])
+
+
+def _normalized_sheet_label(value: Any) -> str:
+    return str(value or "").strip().rstrip(":").strip().lower()
+
+
+def _income_rows_values(ws: Any, start_row: int, end_row: int, end_column: int) -> list[list[str]]:
+    range_name = f"A{start_row}:{get_column_letter(end_column)}{end_row}"
+    if hasattr(ws, "get"):
+        try:
+            result = ws.get(range_name, value_render_option="FORMULA")
+        except TypeError:
+            result = ws.get(range_name)
+        if result:
+            normalized = [
+                ([_sheet_value(value) for value in values] + [""] * end_column)[:end_column]
+                for values in result
+            ]
+            return normalized + [[""] * end_column for _ in range(end_row - start_row + 1 - len(normalized))]
+
+    rows = ws.get_all_values()
+    return [
+        (
+            [_sheet_value(value) for value in (rows[row - 1] if 0 < row <= len(rows) else [])]
+            + [""] * end_column
+        )[:end_column]
+        for row in range(start_row, end_row + 1)
+    ]
+
+
+def _income_row_property_bounds(
+    rows: list[list[Any]],
+    layout: dict[str, Any],
+    summary_row: int,
+) -> tuple[int, int]:
+    columns = [layout["source"], layout["amount"]]
+    if layout.get("date"):
+        columns.append(layout["date"])
+    start_column = min(columns)
+    end_column = max(columns)
+
+    for row in rows[:summary_row]:
+        for column, value in enumerate(row, start=1):
+            if _normalized_sheet_label(value) in _BIWEEKLY_INCOME_LABELS:
+                end_column = max(end_column, column + 1)
+    return start_column, end_column
+
+
+def _income_anchor_columns(rows: list[list[Any]], row: int) -> tuple[int, int] | None:
+    values = rows[row - 1] if 0 < row <= len(rows) else []
+    for column, value in enumerate(values, start=1):
+        if _normalized_sheet_label(value) == _BIWEEKLY_INCOME_START_LABEL:
+            return column, column + 1
+    return None
+
+
+def _json_metadata_value(metadata: dict[str, str], key: str) -> Any:
+    raw = metadata.get(key)
+    if raw is None or raw == "":
+        return None
+    if isinstance(raw, str):
+        return json.loads(raw)
+    return raw
+
+
+def _positive_metadata_value(metadata: dict[str, str], key: str) -> int | None:
+    try:
+        value = int(metadata.get(key, ""))
+    except (TypeError, ValueError):
+        return None
+    return value if value > 0 else None
+
+
+def _slice_income_row_properties(
+    snapshot: dict[str, Any] | None,
+    *,
+    source_start_column: int,
+    slice_start_column: int,
+    slice_end_column: int,
+) -> dict[str, Any] | None:
+    if snapshot is None:
+        return None
+    start_offset = slice_start_column - source_start_column
+    end_offset = slice_end_column - source_start_column + 1
+    sliced: dict[str, Any] = {
+        "cells": copy.deepcopy(snapshot.get("cells", [])[start_offset:end_offset])
+    }
+    if "pixelSize" in snapshot:
+        sliced["pixelSize"] = snapshot["pixelSize"]
+    return sliced
+
+
+def _income_row_delete_snapshot(ws: Any, row: int) -> tuple[list[str], dict[str, str]]:
+    rows = ws.get_all_values()
+    summary_row = next(
+        row_number
+        for row_number, values in enumerate(rows, start=1)
+        if any(str(value).strip() == "Monthly Income:" for value in values)
+    )
+    layout = income_sheet_layout(ws, summary_row, rows=rows)
+    start_column, end_column = _income_row_property_bounds(rows, layout, summary_row)
+    row_values = _income_rows_values(ws, row, row + 1, end_column)
+    deleted_row = row_values[0]
+    following_row = row_values[1]
+    row_properties = capture_income_row_properties(
+        ws,
+        row=row,
+        start_column=start_column,
+        end_column=end_column,
+    )
+    metadata = {
+        "income_row_property_start_column": str(start_column),
+        "income_row_property_end_column": str(end_column),
+        "income_header_row": str(layout["header_row"]),
+        "income_summary_row": str(summary_row),
+        "income_source_column": str(layout["source"]),
+        "income_amount_column": str(layout["amount"]),
+    }
+    if layout.get("date"):
+        metadata["income_date_column"] = str(layout["date"])
+    if row_properties is not None:
+        metadata["income_row_properties"] = json.dumps(row_properties, separators=(",", ":"))
+
+    anchor_columns = _income_anchor_columns(rows, row)
+    if anchor_columns is None:
+        return deleted_row, metadata
+
+    anchor_start, anchor_end = anchor_columns
+    following_values = following_row[anchor_start - 1 : anchor_end]
+    if any(str(value).strip() for value in following_values):
+        raise RuntimeError("Cannot preserve biweekly income configuration because the following row is occupied.")
+
+    anchor_values = deleted_row[anchor_start - 1 : anchor_end]
+    anchor_properties = _slice_income_row_properties(
+        row_properties,
+        source_start_column=start_column,
+        slice_start_column=anchor_start,
+        slice_end_column=anchor_end,
+    )
+    following_row_properties = capture_income_row_properties(
+        ws,
+        row=row + 1,
+        start_column=start_column,
+        end_column=end_column,
+    )
+    following_properties = _slice_income_row_properties(
+        following_row_properties,
+        source_start_column=start_column,
+        slice_start_column=anchor_start,
+        slice_end_column=anchor_end,
+    )
+    metadata.update(
+        {
+            "income_anchor_start_column": str(anchor_start),
+            "income_anchor_end_column": str(anchor_end),
+            "income_anchor_values": json.dumps(anchor_values, separators=(",", ":")),
+            "income_anchor_following_values": json.dumps(following_values, separators=(",", ":")),
+        }
+    )
+    if anchor_properties is not None:
+        metadata["income_anchor_properties"] = json.dumps(anchor_properties, separators=(",", ":"))
+    if following_properties is not None:
+        metadata["income_anchor_following_properties"] = json.dumps(
+            following_properties,
+            separators=(",", ":"),
+        )
+    return deleted_row, metadata
+
+
+def _restore_preserved_income_anchor(ws: Any, row: int, metadata: dict[str, str]) -> None:
+    start_column = _positive_metadata_value(metadata, "income_anchor_start_column")
+    end_column = _positive_metadata_value(metadata, "income_anchor_end_column")
+    values = _json_metadata_value(metadata, "income_anchor_values")
+    if start_column is None or end_column is None or not isinstance(values, list):
+        return
+    _update_contiguous_row(ws, row, list(range(start_column, end_column + 1)), values)
+    properties = _json_metadata_value(metadata, "income_anchor_properties")
+    apply_income_row_properties(
+        ws,
+        row=row,
+        start_column=start_column,
+        end_column=end_column,
+        snapshot=properties if isinstance(properties, dict) else None,
+    )
+
+
+def _prepare_preserved_income_anchor_for_undo(ws: Any, row: int, metadata: dict[str, str]) -> None:
+    start_column = _positive_metadata_value(metadata, "income_anchor_start_column")
+    end_column = _positive_metadata_value(metadata, "income_anchor_end_column")
+    values = _json_metadata_value(metadata, "income_anchor_following_values")
+    if start_column is None or end_column is None or not isinstance(values, list):
+        return
+    _update_contiguous_row(ws, row, list(range(start_column, end_column + 1)), values)
+    properties = _json_metadata_value(metadata, "income_anchor_following_properties")
+    apply_income_row_properties(
+        ws,
+        row=row,
+        start_column=start_column,
+        end_column=end_column,
+        snapshot=properties if isinstance(properties, dict) else None,
+    )
+
+
+def _restore_deleted_income_row_properties(ws: Any, row: int, metadata: dict[str, str]) -> None:
+    start_column = _positive_metadata_value(metadata, "income_row_property_start_column")
+    end_column = _positive_metadata_value(metadata, "income_row_property_end_column")
+    properties = _json_metadata_value(metadata, "income_row_properties")
+    if start_column is None or end_column is None or not isinstance(properties, dict):
+        return
+    apply_income_row_properties(
+        ws,
+        row=row,
+        start_column=start_column,
+        end_column=end_column,
+        snapshot=properties,
+    )
+
+
+def _repair_income_summary_from_metadata(
+    ws: Any,
+    metadata: dict[str, str],
+    *,
+    summary_row_offset: int = 0,
+) -> None:
+    header_row = _positive_metadata_value(metadata, "income_header_row")
+    source_column = _positive_metadata_value(metadata, "income_source_column")
+    amount_column = _positive_metadata_value(metadata, "income_amount_column")
+    summary_row = _positive_metadata_value(metadata, "income_summary_row")
+    if header_row is None or source_column is None or amount_column is None or summary_row is None:
+        repair_income_summary_formula(ws)
+        return
+    layout: dict[str, Any] = {
+        "header_row": header_row,
+        "source": source_column,
+        "amount": amount_column,
+    }
+    date_column = _positive_metadata_value(metadata, "income_date_column")
+    if date_column:
+        layout["date"] = date_column
+    repair_income_summary_formula(
+        ws,
+        layout,
+        summary_row=summary_row + summary_row_offset,
+    )
+
+
+def _delete_income_row_preserving_layout(ws: Any, row: int, metadata: dict[str, str]) -> None:
+    if hasattr(ws, "delete_rows"):
+        ws.delete_rows(row)
+    elif hasattr(ws, "delete_row"):
+        ws.delete_row(row)
+    else:
+        raise RuntimeError("This sheet client cannot delete rows.")
+    _restore_preserved_income_anchor(ws, row, metadata)
+    _repair_income_summary_from_metadata(ws, metadata, summary_row_offset=-1)
 
 
 @dataclass
@@ -1670,7 +1934,10 @@ def _apply_undo_action(action: UndoAction, log_data: _ActionLogData | None = Non
         )
         _restore_category_snapshot(ws, start_row, action.columns, snapshot)
     elif action.kind == "delete_row":
-        if hasattr(ws, "delete_rows"):
+        if action.worksheet == "income" and _is_income_display_action(action):
+            _deleted_row, delete_metadata = _income_row_delete_snapshot(ws, action.row)
+            _delete_income_row_preserving_layout(ws, action.row, delete_metadata)
+        elif hasattr(ws, "delete_rows"):
             ws.delete_rows(action.row)
         elif hasattr(ws, "delete_row"):
             ws.delete_row(action.row)
@@ -1683,12 +1950,18 @@ def _apply_undo_action(action: UndoAction, log_data: _ActionLogData | None = Non
             exclude_ids=_deleted_action_ids(action),
             log_data=log_data,
         )
+        is_income_restore = action.worksheet == "income" and action.metadata.get("source_type") == "income"
+        if is_income_restore:
+            _prepare_preserved_income_anchor_for_undo(ws, action.row, action.metadata)
         ws.insert_row(
             action.previous_values,
             index=action.row,
             value_input_option="USER_ENTERED",
             inherit_from_before=action.row > 1,
         )
+        if is_income_restore:
+            _restore_deleted_income_row_properties(ws, action.row, action.metadata)
+            _repair_income_summary_from_metadata(ws, action.metadata)
     elif action.kind == "clear_cells":
         _update_contiguous_row(ws, action.row, action.columns, [""] * len(action.columns))
     elif action.kind == "restore_cells":
@@ -1761,20 +2034,14 @@ def _delete_income_action_with_compaction(user_key: str | None, logged: LoggedAc
         return False, ""
 
     ws = _worksheet("income")
-    rows = ws.get_all_values()
-    deleted_row = list(rows[action.row - 1]) if 0 < action.row <= len(rows) else []
 
     try:
         log_data = _read_log_data()
         if log_data is None:
             return False, "Something went wrong while reading the action log."
         lineage_ids = _active_lineage_ids(logged, log_data)
-        if hasattr(ws, "delete_rows"):
-            ws.delete_rows(action.row)
-        elif hasattr(ws, "delete_row"):
-            ws.delete_row(action.row)
-        else:
-            return False, "This sheet client cannot delete rows."
+        deleted_row, delete_metadata = _income_row_delete_snapshot(ws, action.row)
+        _delete_income_row_preserving_layout(ws, action.row, delete_metadata)
         _mark_logged_ids_undone(lineage_ids, log_data)
         _shift_income_logged_action_rows(
             lower_row=action.row + 1,
@@ -1806,6 +2073,7 @@ def _delete_income_action_with_compaction(user_key: str | None, logged: LoggedAc
                 "deleted_action_id": logged.id,
                 "deleted_action_ids": json.dumps(sorted(lineage_ids)),
                 **layout_metadata,
+                **delete_metadata,
             },
             description=f"deleted {action.description}",
         ),

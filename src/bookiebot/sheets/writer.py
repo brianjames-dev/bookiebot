@@ -1,15 +1,19 @@
 # expense & income logging
 
-import copy
 from datetime import datetime
 import logging
 from typing import Any, Literal, cast, overload
-from openpyxl.utils import column_index_from_string, get_column_letter
+from openpyxl.utils import column_index_from_string
 from bookiebot.ui.card import CardButtonView
 import asyncio
 import os
 from zoneinfo import ZoneInfo
 from bookiebot.sheets.config import expense_category_label, get_category_columns, normalize_expense_category
+from bookiebot.sheets.income import (
+    copy_income_row_properties as _copy_income_row_properties,
+    income_sheet_layout as _income_sheet_layout,
+    repair_income_summary_formula as _repair_income_summary_formula,
+)
 from bookiebot.sheets.utils import resolve_query_persons
 from bookiebot.sheets.repo import get_sheets_repo
 from bookiebot.sheets.routing import get_current_discord_user_id
@@ -202,33 +206,6 @@ def log_income_row(data: dict[str, Any], worksheet: Any, *, return_action_id: bo
     return income_row, description, amount
 
 
-def _income_sheet_layout(worksheet: Any, summary_row: int) -> dict[str, Any]:
-    rows = worksheet.get_all_values()
-    for row_number, row in enumerate(rows[: max(0, summary_row - 1)], start=1):
-        columns_by_header: dict[str, int] = {}
-        source_placeholder = "<Enter Source>"
-        for column, value in enumerate(row, start=1):
-            normalized = str(value).strip().rstrip(":").strip().lower()
-            if normalized in {"date", "amount"}:
-                columns_by_header[normalized] = column
-            elif normalized in {"source", "employer"}:
-                columns_by_header["source"] = column
-                source_placeholder = "<Enter Employer>" if normalized == "employer" else "<Enter Source>"
-        if "source" in columns_by_header and "amount" in columns_by_header:
-            return {
-                **columns_by_header,
-                "header_row": row_number,
-                "source_placeholder": source_placeholder,
-            }
-
-    return {
-        "source": 2,
-        "amount": 3,
-        "header_row": 1,
-        "source_placeholder": "<Enter Employer>",
-    }
-
-
 def _trailing_income_placeholder_rows(
     rows: list[list[str]],
     *,
@@ -268,109 +245,6 @@ def _income_placeholder_values(layout: dict[str, Any]) -> list[Any]:
     values[layout["source"] - 1] = layout["source_placeholder"]
     values[layout["amount"] - 1] = 0
     return values
-
-
-def _copy_income_row_properties(
-    worksheet: Any,
-    *,
-    source_row: int,
-    target_row: int,
-    start_column: int,
-    end_column: int,
-) -> None:
-    """Copy the income seed row's cell properties after a Sheets row insertion.
-
-    Google Sheets' ``inheritFromBefore`` copies most formatting, but live Sheets
-    testing showed that it omits notes and some border details. Reapplying the
-    source row's explicit cell properties keeps every generated income row
-    consistent with the template without copying its values.
-    """
-    spreadsheet = getattr(worksheet, "spreadsheet", None)
-    if spreadsheet is None or not hasattr(spreadsheet, "fetch_sheet_metadata"):
-        return
-    if not hasattr(spreadsheet, "batch_update"):
-        return
-
-    try:
-        title = str(getattr(worksheet, "title", "")).replace("'", "''")
-        start_letter = get_column_letter(start_column)
-        end_letter = get_column_letter(end_column)
-        metadata = spreadsheet.fetch_sheet_metadata(
-            {
-                "includeGridData": True,
-                "ranges": [f"'{title}'!{start_letter}{source_row}:{end_letter}{source_row}"],
-            }
-        )
-        worksheet_id = int(getattr(worksheet, "id"))
-        sheet = next(
-            item
-            for item in metadata.get("sheets", [])
-            if int(item.get("properties", {}).get("sheetId", -1)) == worksheet_id
-        )
-        grid = sheet.get("data", [{}])[0]
-        source_cells = grid.get("rowData", [{}])[0].get("values", [])
-        width = end_column - start_column + 1
-        copied_cells: list[dict[str, Any]] = []
-        for offset in range(width):
-            source_cell = source_cells[offset] if offset < len(source_cells) else {}
-            copied_cells.append(
-                {
-                    key: copy.deepcopy(source_cell[key])
-                    for key in ("userEnteredFormat", "dataValidation", "note")
-                    if key in source_cell
-                }
-            )
-
-        requests: list[dict[str, Any]] = [
-            {
-                "updateCells": {
-                    "range": {
-                        "sheetId": worksheet_id,
-                        "startRowIndex": target_row - 1,
-                        "endRowIndex": target_row,
-                        "startColumnIndex": start_column - 1,
-                        "endColumnIndex": end_column,
-                    },
-                    "rows": [{"values": copied_cells}],
-                    "fields": "userEnteredFormat,dataValidation,note",
-                }
-            }
-        ]
-        row_metadata = grid.get("rowMetadata", [])
-        if row_metadata and "pixelSize" in row_metadata[0]:
-            requests.append(
-                {
-                    "updateDimensionProperties": {
-                        "range": {
-                            "sheetId": worksheet_id,
-                            "dimension": "ROWS",
-                            "startIndex": target_row - 1,
-                            "endIndex": target_row,
-                        },
-                        "properties": {"pixelSize": row_metadata[0]["pixelSize"]},
-                        "fields": "pixelSize",
-                    }
-                }
-            )
-        spreadsheet.batch_update({"requests": requests})
-    except Exception as exc:
-        logger.warning(
-            "Could not copy income row properties",
-            extra={
-                "exception": str(exc),
-                "source_row": source_row,
-                "target_row": target_row,
-            },
-        )
-
-
-def _repair_income_summary_formula(worksheet: Any, layout: dict[str, Any]) -> None:
-    summary_row = worksheet.find("Monthly Income:").row
-    first_income_row = layout["header_row"] + 1
-    amount_column = layout["amount"]
-    amount_letter = get_column_letter(amount_column)
-    formula = f"=SUM({amount_letter}{first_income_row}:{amount_letter}{summary_row - 1})"
-    _update_contiguous_row(worksheet, summary_row, [amount_column], [formula])
 
 
 def _income_date_text(value: Any = None) -> str:

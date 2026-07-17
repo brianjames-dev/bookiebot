@@ -241,7 +241,7 @@ Status: Complete first pass as of 2026-06-20. Existing-row match confirmation up
 
 ### 2026-07-16 Shifted Dated Income Layout Follow-Up
 
-Status: Complete. Live May-July migration and report verification finished; Discord/Google Sheets mutation flows are ready for final manual verification.
+Status: Complete. Live May-July migration and report verification finished; Income mutation lifecycle coverage now includes anchored configuration and formula preservation.
 
 - Shifted the Brian Budget 2026 Template Income table to `B:D` with Date, Source, and Amount while preserving the biweekly-income configuration in `E:F`.
 - Repaired the Template monthly-income total and budget-banner formula lineage for the shifted Amount column.
@@ -257,8 +257,11 @@ Status: Complete. Live May-July migration and report verification finished; Disc
 - Reduced the live Hannah Template to the same one-seed layout, standardized the seed label to `<Enter Source>`, and preserved the biweekly configuration plus shifted formula lineage.
 - BookieBot now replaces the trailing seed row instead of inserting ahead of it, then creates exactly one inherited-format placeholder for the next sequential entry and repairs the summary range.
 - BookieBot explicitly reapplies the seed row's cell format, validation, notes, borders, and row height because the Sheets API's inherited-row insertion omits some of those properties.
+- Whole-row Income deletion now snapshots the affected `B:F` properties and preserves the first Income row's anchored biweekly configuration instead of shifting or deleting it with the transaction.
+- Income delete undo clears the temporarily preserved anchor before reinsertion, restores the deleted row's explicit formatting/validation/notes/height, and rebuilds Monthly Income from the discovered header and summary coordinates.
 - Manual Source/Amount edits use the same one-placeholder lifecycle through Apps Script, regardless of whether Source or Amount is entered first.
 - Live Hannah verification: a temporary Template copy accepted two sequential dated BookieBot Income entries, retained one trailing placeholder with matching row properties, totaled `$191.34`, and was deleted after the check.
+- Live Brian July verification: temporary-copy first-row delete/undo, later-row delete/undo, and immediate undo all preserved the `E:F` biweekly configuration, kept summary totals/formulas correct, restored baseline values/formulas, and left no QA tabs behind.
 - Manual test: deploy the script and run `setupBudgetSystemAutomation()`, enter a manual Income amount, then log, update, delete, and undo a BookieBot income entry on month tabs copied from both Templates.
 
 ## Open Questions
