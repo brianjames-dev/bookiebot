@@ -48,6 +48,7 @@ Shared Needs-category logging, the shifted dated Income layout, and the four-blo
 - Replaced Hannah's visible subscription roster from the final dated list: seven monthly Needs, one yearly Need, five monthly Wants, and one yearly Want; visible subtotals are `$521.07`, `$32.99`, `$47.95`, and `$59.99` respectively.
 - Synced all fourteen dated entries into `_BookieBot Subscription Schedule` with cadence, amount, pull day/month, source range, and timestamp metadata; every row is reminder-eligible and a repeat sync produced no warnings.
 - Restored Internet as a `$0.00` Needs Monthly placeholder with a blank pull day; the normalized schedule retains it as an undated draft while the fourteen dated subscriptions remain reminder-eligible.
+- Removed the standalone `Student Loan Payment` budget row from Hannah's Template, May, June, and July tabs; each tab compacted cleanly, retained its subscription-backed Needs row, and automatically shifted subtotal, rollover, margins, savings, and net formulas to the new locations.
 - Manual verification: deploy the updated Apps Script, run `setupBudgetSystemAutomation()` once, enter an amount in a new dated Income table, then confirm manual and BookieBot income dates plus update/delete/undo behavior.
 
 ## Completed 2026-07-08
@@ -299,6 +300,8 @@ Use a test row or low-risk real row in Discord:
     - Expected: the `Biweekly Income Start` configuration remains anchored in `E:F`, Monthly Income always sums the current `D` rows, the Budget section retains its total reference, and undo restores the deleted row's values and formatting.
 55. Run `/debug_subscriptions` after deployment and inspect Hannah's visible and normalized subscription sheets.
     - Expected: fourteen dated entries are reminder-eligible; Internet is retained as a `$0.00` monthly draft with one expected missing-pull-date warning; the four visible subtotals remain `$521.07`, `$32.99`, `$47.95`, and `$59.99`.
+56. Open Hannah Budget 2026 Template, May, June, and July and inspect the Needs section.
+    - Expected: no standalone `Student Loan Payment` row remains; `Subscriptions (Needs)` and `Various Need Transactions` remain intact; May's net is `-$606.05`, July's Needs subtotal is `$688.12 (84.98%)`, and July's net is `$618.53`.
 
 ## Verification Baseline
 
@@ -312,6 +315,12 @@ python -m pytest unit_tests/intents/test_handlers.py unit_tests/core/test_messag
 Latest verification:
 
 ```bash
+Live Hannah Student Loan Payment row removal and formula/visual audit
+# passed: no matching row in Template/May/June/July; formula ranges shifted cleanly; no QA tabs remain; final PDF renders clean
+
+PYTHONPATH=src venv/bin/python -m pytest unit_tests/reports/test_expense_breakdown.py unit_tests/sheets/test_utils.py
+# passed: 57 passed
+
 Live Hannah Internet subscription placeholder sync
 # passed: Internet persisted at Subscriptions!B14:D14 and in the normalized schedule; 14 eligible rows plus 1 expected missing-date warning
 
