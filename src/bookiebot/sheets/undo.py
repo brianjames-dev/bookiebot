@@ -1,5 +1,8 @@
 from __future__ import annotations
 
+import logging
+import os
+
 from dataclasses import asdict, dataclass, field
 from datetime import datetime
 import json
@@ -32,7 +35,30 @@ class UndoAction:
     metadata: dict[str, str] = field(default_factory=dict)
 
 
+
+_PENDING_STATE_LOGGER = logging.getLogger(__name__)
+_REPLICAS_WARNED = False
+
+
+def _warn_if_multi_replica() -> None:
+    global _REPLICAS_WARNED
+    if _REPLICAS_WARNED:
+        return
+    raw = os.getenv("BOOKIEBOT_REPLICA_COUNT", "1").strip() or "1"
+    try:
+        replicas = int(raw)
+    except ValueError:
+        replicas = 1
+    if replicas > 1:
+        _PENDING_STATE_LOGGER.warning(
+            "Pending recent-action state is in-memory; running with BOOKIEBOT_REPLICA_COUNT=%s can drop or split selections. Use a single replica until pending state is persisted.",
+            replicas,
+        )
+    _REPLICAS_WARNED = True
+
 _LAST_ACTION_BY_USER: dict[str, UndoAction] = {}
+_warn_if_multi_replica()
+
 _GLOBAL_LAST_ACTION: UndoAction | None = None
 _PENDING_ACTION_TTL_SECONDS = 300
 _PENDING_SELECTION_EXPIRED_MESSAGE = "That recent transaction selection expired. Please choose the transaction again."

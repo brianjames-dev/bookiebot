@@ -302,3 +302,4 @@ git diff --check
 python -m pyright
 # Failed: pyright is not installed in the current Python environment.
 ```
+- Pending recent-action/card state remains in-memory; production must run a single replica until durable pending state ships.
