@@ -878,8 +878,16 @@ summary {
 }
 
 .bb-chart-carousel[data-dragging="true"] .recharts-tooltip-wrapper,
-.bb-chart-carousel[data-dragging="true"] .bb-subscription-tooltip,
-.bb-chart-carousel[data-tooltip-cooldown="true"] .recharts-tooltip-wrapper,
+.bb-chart-carousel[data-dragging="true"] .bb-subscription-tooltip {
+  opacity: 0 !important;
+  pointer-events: none !important;
+  visibility: hidden !important;
+}
+
+.bb-chart-carousel[data-tooltip-cooldown="true"] .recharts-tooltip-wrapper {
+  pointer-events: none !important;
+}
+
 .bb-chart-carousel[data-tooltip-cooldown="true"] .bb-subscription-tooltip {
   opacity: 0 !important;
   pointer-events: none !important;

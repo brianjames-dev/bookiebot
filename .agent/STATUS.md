@@ -56,6 +56,9 @@ Shared Needs-category logging, the shifted dated Income layout, and the four-blo
 - Local browser verification confirmed live July balances of `$35.56` Needs, `$1,624.48` Wants, and `$1,539.64` Savings; simulated Wants overspend reduced Savings to `$1,064.12` without touching Needs, and over-saving consumed Wants before Needs.
 - Manual verification: switch Category Mix through Needs, Wants, and Savings, test each source category over its allocation, and confirm the donor-impact amounts follow the category-specific priority before All reports total overspending.
 - Three-bucket cascade verification: `404 passed, 1 skipped`, Pyright reported zero errors, frontend typecheck/build passed, and browser checks covered every donor order, projected mode, total overspend, and chart containment.
+- Chart carousel switches now put any open Recharts tooltip into its existing 180 ms fade, cancel its five-second hold timer, and suppress cached payloads from the newly selected graph until the user deliberately moves or presses inside that graph.
+- Local browser verification opened a Burn Rate tooltip, switched to Category Mix, confirmed no stale or arbitrary tooltip remained after the transition, then switched back and confirmed a fresh Burn Rate hover rendered the correct data.
+- Carousel-tooltip verification: `404 passed, 1 skipped`, Pyright reported zero errors, focused report tests passed, and frontend typecheck/build passed.
 
 ## Completed 2026-07-16
 
@@ -360,6 +363,18 @@ python -m pytest unit_tests/intents/test_handlers.py unit_tests/core/test_messag
 Latest verification:
 
 ```bash
+python -m pytest unit_tests
+# passed: 404 passed, 1 skipped
+
+python -m pyright
+# passed: 0 errors, 0 warnings, 0 informations
+
+cd web/expense-report && npm run typecheck && npm run build
+# passed
+
+python -m pytest unit_tests/reports/test_expense_breakdown.py
+# passed: 27 passed
+
 PYTHONPATH=src venv/bin/python -m pytest unit_tests
 # passed: 393 passed, 1 warning
 

@@ -337,6 +337,9 @@ def test_build_expense_breakdown_report_aggregates_shared_and_personal_data():
     assert "bb-touch-tooltip-auto-dismiss" in html
     assert "data-bb-last-transform" in html
     assert "data-bb-tooltip-motion-ready" in html
+    assert "data-bb-tooltip-dismiss-revision" in html
+    assert "data-bb-chart-interaction-revision" in html
+    assert "bb-chart-tooltip-frame-dismissing" in html
     assert "bb-theme-toggle-moon" in html
     assert "bb-table-row-divider" in html
     assert "Highest day" in html

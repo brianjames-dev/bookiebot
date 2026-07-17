@@ -16,7 +16,7 @@ import {
 
 import { Badge } from "./components/ui/badge"
 import { Card, CardContent, CardHeader, CardTitle } from "./components/ui/card"
-import { ChartContainer, ChartTooltip, ChartTooltipContent } from "./components/ui/chart"
+import { ChartContainer, ChartTooltip, ChartTooltipContent, ChartTooltipDismissProvider } from "./components/ui/chart"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "./components/ui/tabs"
 import type {
   AmountRow,
@@ -438,6 +438,7 @@ export function ExpenseReportApp({ report }: { report: ExpenseReportData }) {
   const chartGestureRef = useRef<ChartTouchState | null>(null)
   const tooltipCooldownTimeoutRef = useRef<number | null>(null)
   const [chartTooltipCooldown, setChartTooltipCooldown] = useState(false)
+  const [chartTooltipDismissRevision, setChartTooltipDismissRevision] = useState(0)
   const [chartCollapseKey, setChartCollapseKey] = useState(0)
   const activeReport = buildReportView(report, projectionActive)
   const categoryColors: Record<string, string> = Object.fromEntries(activeReport.breakdown.map((item) => [item.label, item.color]))
@@ -541,6 +542,7 @@ export function ExpenseReportApp({ report }: { report: ExpenseReportData }) {
       return
     }
     setChartCollapseKey((current) => current + 1)
+    setChartTooltipDismissRevision((current) => current + 1)
     startChartTooltipCooldown()
     setActiveChartIndex(next)
   }
@@ -646,37 +648,40 @@ export function ExpenseReportApp({ report }: { report: ExpenseReportData }) {
           />
         </section>
 
-        <div
-          className="bb-chart-carousel"
-          data-dragging={chartTouch?.dragging ? "true" : "false"}
-          data-tooltip-cooldown={chartTooltipCooldown ? "true" : "false"}
-          onTouchStart={handleChartTouchStart}
-          onTouchMove={handleChartTouchMove}
-          onTouchEnd={handleChartTouchEnd}
-          onTouchCancel={handleChartTouchCancel}
-        >
+        <ChartTooltipDismissProvider revision={chartTooltipDismissRevision}>
           <div
-            className={chartTouch?.dragging ? "bb-chart-carousel-track bb-chart-carousel-track-dragging" : "bb-chart-carousel-track"}
-            style={{ transform: carouselTransform }}
+            className="bb-chart-carousel"
+            data-bb-tooltip-dismiss-revision={chartTooltipDismissRevision}
+            data-dragging={chartTouch?.dragging ? "true" : "false"}
+            data-tooltip-cooldown={chartTooltipCooldown ? "true" : "false"}
+            onTouchStart={handleChartTouchStart}
+            onTouchMove={handleChartTouchMove}
+            onTouchEnd={handleChartTouchEnd}
+            onTouchCancel={handleChartTouchCancel}
           >
-            {chartPanels.map((panel, index) => (
-              <div className="bb-chart-carousel-slide" key={panel.id} aria-hidden={index !== activeChartIndex}>
-                <Card className="bb-analytics-card">
-                  <CardHeader className="bb-analytics-header">
-                    <div className="bb-card-title-row bb-analytics-title-row">
-                      <div className="bb-title-with-accessory">
-                        <CardTitle>{panel.title}</CardTitle>
-                        {panel.titleAccessory}
+            <div
+              className={chartTouch?.dragging ? "bb-chart-carousel-track bb-chart-carousel-track-dragging" : "bb-chart-carousel-track"}
+              style={{ transform: carouselTransform }}
+            >
+              {chartPanels.map((panel, index) => (
+                <div className="bb-chart-carousel-slide" key={panel.id} aria-hidden={index !== activeChartIndex}>
+                  <Card className="bb-analytics-card">
+                    <CardHeader className="bb-analytics-header">
+                      <div className="bb-card-title-row bb-analytics-title-row">
+                        <div className="bb-title-with-accessory">
+                          <CardTitle>{panel.title}</CardTitle>
+                          {panel.titleAccessory}
+                        </div>
+                        {panel.headerControl ? <div className="bb-analytics-header-controls">{panel.headerControl}</div> : null}
                       </div>
-                      {panel.headerControl ? <div className="bb-analytics-header-controls">{panel.headerControl}</div> : null}
-                    </div>
-                  </CardHeader>
-                  <CardContent>{panel.content}</CardContent>
-                </Card>
-              </div>
-            ))}
+                    </CardHeader>
+                    <CardContent>{panel.content}</CardContent>
+                  </Card>
+                </div>
+              ))}
+            </div>
           </div>
-        </div>
+        </ChartTooltipDismissProvider>
         <ChartCarouselNavigation
           panels={chartPanels}
           activeIndex={activeChartIndex}

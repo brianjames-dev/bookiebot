@@ -13,9 +13,24 @@ export type ChartConfig = Record<
 
 const ChartContext = React.createContext<ChartConfig | null>(null)
 const ChartInteractionContext = React.createContext(0)
+const ChartTooltipDismissContext = React.createContext(0)
 const TOOLTIP_LAST_TRANSFORM_ATTRIBUTE = "data-bb-last-transform"
 const TOOLTIP_MOTION_READY_ATTRIBUTE = "data-bb-tooltip-motion-ready"
 const TOOLTIP_FADE_DURATION = 180
+
+function ChartTooltipDismissProvider({
+  revision,
+  children,
+}: {
+  revision: number
+  children: React.ReactNode
+}) {
+  return (
+    <ChartTooltipDismissContext.Provider value={revision}>
+      {children}
+    </ChartTooltipDismissContext.Provider>
+  )
+}
 
 function ChartContainer({
   id,
@@ -29,17 +44,31 @@ function ChartContainer({
   const chartId = React.useId()
   const resolvedId = `chart-${id || chartId.replace(/:/g, "")}`
   const [interactionRevision, setInteractionRevision] = React.useState(0)
+  const dismissRevision = React.useContext(ChartTooltipDismissContext)
+  const releasedDismissRevisionRef = React.useRef(dismissRevision)
 
-  const handlePointerEnter = React.useCallback(() => {
+  const handleMouseEnter = React.useCallback(() => {
+    if (releasedDismissRevisionRef.current !== dismissRevision) {
+      return
+    }
     setInteractionRevision((revision) => revision + 1)
-  }, [])
+  }, [dismissRevision])
+
+  const handleMouseMove = React.useCallback(() => {
+    if (releasedDismissRevisionRef.current === dismissRevision) {
+      return
+    }
+    releasedDismissRevisionRef.current = dismissRevision
+    setInteractionRevision((revision) => revision + 1)
+  }, [dismissRevision])
 
   const handlePointerDownCapture = React.useCallback((event: React.PointerEvent<HTMLDivElement>) => {
     if (event.pointerType === "mouse" && event.button !== 0) {
       return
     }
+    releasedDismissRevisionRef.current = dismissRevision
     setInteractionRevision((revision) => revision + 1)
-  }, [])
+  }, [dismissRevision])
 
   return (
     <ChartContext.Provider value={config}>
@@ -48,7 +77,9 @@ function ChartContainer({
           id={resolvedId}
           className={cn("bb-chart-container", className)}
           data-chart={resolvedId}
-          onPointerEnter={handlePointerEnter}
+          data-bb-chart-interaction-revision={interactionRevision}
+          onMouseEnter={handleMouseEnter}
+          onMouseMove={handleMouseMove}
           onPointerDownCapture={handlePointerDownCapture}
         >
           <ChartStyle id={resolvedId} config={config} />
@@ -149,6 +180,7 @@ function ChartTooltipAutoDismissContent({
   animatePosition: boolean
 } & ChartTooltipRenderProps) {
   const interactionRevision = React.useContext(ChartInteractionContext)
+  const dismissRevision = React.useContext(ChartTooltipDismissContext)
   const [phase, setPhase] = React.useState<"hidden" | "visible" | "dismissing">("visible")
   const signature = React.useMemo(() => chartTooltipSignature(label, payload), [label, payload])
   const frameRef = React.useRef<HTMLDivElement | null>(null)
@@ -157,9 +189,14 @@ function ChartTooltipAutoDismissContent({
   const dismissTimerRef = React.useRef<number | null>(null)
   const hideTimerRef = React.useRef<number | null>(null)
   const motionFrameRef = React.useRef<number | null>(null)
-  const hasActivePayload = Boolean(active && Array.isArray(payload) && payload.length)
+  const handledDismissRevisionRef = React.useRef(dismissRevision)
+  const dismissedAtInteractionRevisionRef = React.useRef<number | null>(null)
+  const activationAllowed = dismissedAtInteractionRevisionRef.current === null
+    || interactionRevision > dismissedAtInteractionRevisionRef.current
+  const hasActivePayload = Boolean(active && Array.isArray(payload) && payload.length && activationAllowed)
 
   if (hasActivePayload) {
+    dismissedAtInteractionRevisionRef.current = null
     lastActivePropsRef.current = {
       ...props,
       active: true,
@@ -190,6 +227,34 @@ function ChartTooltipAutoDismissContent({
       setPhase("hidden")
     }, dismissDelay + TOOLTIP_FADE_DURATION)
   }, [dismissDelay, hasActivePayload, interactionRevision, signature])
+
+  React.useLayoutEffect(() => {
+    if (handledDismissRevisionRef.current === dismissRevision) {
+      return
+    }
+    handledDismissRevisionRef.current = dismissRevision
+    dismissedAtInteractionRevisionRef.current = interactionRevision
+
+    if (dismissTimerRef.current !== null) {
+      window.clearTimeout(dismissTimerRef.current)
+      dismissTimerRef.current = null
+    }
+    if (hideTimerRef.current !== null) {
+      window.clearTimeout(hideTimerRef.current)
+      hideTimerRef.current = null
+    }
+
+    if (!lastActivePropsRef.current) {
+      setPhase("hidden")
+      return
+    }
+
+    setPhase("dismissing")
+    hideTimerRef.current = window.setTimeout(() => {
+      setPhase("hidden")
+      hideTimerRef.current = null
+    }, TOOLTIP_FADE_DURATION)
+  }, [dismissRevision, interactionRevision])
 
   React.useLayoutEffect(() => {
     const renderedWrapper = frameRef.current?.parentElement
@@ -328,4 +393,4 @@ function ChartTooltip({
   )
 }
 
-export { ChartContainer, ChartTooltip, ChartTooltipContent }
+export { ChartContainer, ChartTooltip, ChartTooltipContent, ChartTooltipDismissProvider }
