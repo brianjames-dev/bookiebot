@@ -45,6 +45,8 @@ Shared Needs-category logging, the shifted dated Income layout, and the four-blo
 - Live Google Sheets and PDF-render verification confirmed matching reference styles, correct formulas/totals, parser-ready block structure, hidden infrastructure tabs, no broken cell formulas, and no remaining staging sheet.
 - Subscription schedule sync now retains rows with valid cadence/name/amount but unknown pull dates as normalized drafts; reminder readers continue to exclude those drafts until `pull_day` is populated.
 - After Hannah removed Amazon Prime, repopulated her live `_BookieBot Subscription Schedule` with all ten current monthly rows, blank date fields, source ranges, and timestamps; current visible subtotals are `$163.94` Needs and `$23.97` Wants.
+- Replaced Hannah's visible subscription roster from the final dated list: seven monthly Needs, one yearly Need, five monthly Wants, and one yearly Want; visible subtotals are `$521.07`, `$32.99`, `$47.95`, and `$59.99` respectively.
+- Synced all fourteen dated entries into `_BookieBot Subscription Schedule` with cadence, amount, pull day/month, source range, and timestamp metadata; every row is reminder-eligible and a repeat sync produced no warnings.
 - Manual verification: deploy the updated Apps Script, run `setupBudgetSystemAutomation()` once, enter an amount in a new dated Income table, then confirm manual and BookieBot income dates plus update/delete/undo behavior.
 
 ## Completed 2026-07-08
@@ -294,8 +296,8 @@ Use a test row or low-risk real row in Discord:
    - Expected: the entries occupy consecutive `B:D` rows with dates, every generated row retains the seed's formatting/validation/notes/height, exactly one `<Enter Source>` placeholder remains, and the Monthly Income formula includes both entries.
 54. In Brian July, delete and undo the first Income entry, then repeat with the later entry and with an immediate undo after logging test Income.
     - Expected: the `Biweekly Income Start` configuration remains anchored in `E:F`, Monthly Income always sums the current `D` rows, the Budget section retains its total reference, and undo restores the deleted row's values and formatting.
-55. Open Hannah's visible Subscriptions tab and enter the real monthly pull day for each row in the blank Recurring/Date cells.
-    - Expected: Needs and Wants remain in their Monthly blocks, Yearly stays empty, subtotals remain `$163.94` and `$23.97`, and `/debug_subscriptions` makes all ten normalized rows reminder-eligible without missing-pull-date warnings.
+55. Run `/debug_subscriptions` after deployment and inspect Hannah's visible and normalized subscription sheets.
+    - Expected: all fourteen entries parse without warnings; monthly rows have the supplied pull day, yearly rows have the supplied month/day, and the four visible subtotals remain `$521.07`, `$32.99`, `$47.95`, and `$59.99`.
 
 ## Verification Baseline
 
@@ -309,6 +311,15 @@ python -m pytest unit_tests/intents/test_handlers.py unit_tests/core/test_messag
 Latest verification:
 
 ```bash
+Live Hannah subscription roster and normalized schedule sync
+# passed: 14 dated rows, 0 parse warnings; repeat sync stable
+
+Live Hannah subscription formula and visual audit
+# passed: visible subtotals $521.07/$32.99/$47.95/$59.99; Template/May/July Needs $554.06 and Wants $107.94; final PDF render clean
+
+PYTHONPATH=src venv/bin/python -m pytest unit_tests/sheets/test_subscription_reminders.py
+# passed: 10 passed
+
 venv/bin/python -m pytest unit_tests
 # passed: 392 passed, 1 warning
 
