@@ -365,6 +365,16 @@ Status: Complete. Needs and Wants Category Mix views now show their category-spe
 - Regression coverage preserves negative rollover values and the cross-category payload; browser checks cover current positive rollovers, Needs overspend, Wants impact, projected mode, and chart containment.
 - Manual test: open Category Mix for a month with positive rollovers, verify both `Income left` slices, then temporarily overspend Needs and confirm Needs shows the overspend bar while Wants drops by the same amount and explains the deduction.
 
+### 2026-07-17 Daily Spending Grid Follow-Up
+
+Status: Complete. Every Daily Spending filter now distinguishes the chart boundaries from the interior scale grid while keeping the line and label colors synchronized.
+
+- The All, Needs, and Wants views share one theme-aware muted color for Y-axis dollar labels and horizontal gridlines.
+- Recharts' first generated horizontal line (`$0`) and final unlabeled top boundary are solid; only the labeled interior lines retain the `3 3` dotted pattern.
+- A stable grid class is embedded in generated report assets for regression coverage.
+- Browser SVG checks verified the dash pattern and exact computed color equality for All, Needs, and Wants with no console warnings or errors.
+- Manual test: switch Daily Spending through All, Needs, and Wants in light and dark mode, confirm the top/bottom lines are solid, and confirm each dotted interior line uses the same hue as its adjacent Y-axis label.
+
 ### 2026-07-17 Three-Bucket Category Cascade Follow-Up
 
 Status: Complete. Category Mix now preserves separate Needs, Wants, and Savings balances and exhausts donor buckets in the requested source-specific order.

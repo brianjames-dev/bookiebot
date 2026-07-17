@@ -461,6 +461,11 @@ summary {
   margin-left: auto;
 }
 
+.bb-daily-spending-content .recharts-cartesian-grid-horizontal .bb-daily-spending-grid:first-child,
+.bb-daily-spending-content .recharts-cartesian-grid-horizontal .bb-daily-spending-grid:last-child {
+  stroke-dasharray: none;
+}
+
 .bb-expense-insights-content,
 .bb-insight-panel {
   display: grid;

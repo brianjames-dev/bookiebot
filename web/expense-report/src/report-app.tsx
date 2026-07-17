@@ -214,6 +214,7 @@ const LEFT_CATEGORY_COLOR = "#166534"
 const SAVINGS_CATEGORY_COLOR = "#0f766e"
 const NEEDS_BAR_COLOR = "#2563eb"
 const WANTS_BAR_COLOR = "#7c3aed"
+const DAILY_SPENDING_AXIS_COLOR = "hsl(var(--muted-foreground))"
 const TOP_EXPENSE_HEAT_COLORS = [
   "#dc2626",
   "#ef4444",
@@ -2085,9 +2086,23 @@ function DailySpendingChart({
       >
         <ResponsiveContainer width="100%" height="100%">
           <BarChart data={data} margin={{ top: 12, right: 16, left: 0, bottom: 0 }}>
-            <CartesianGrid vertical={false} strokeDasharray="3 3" />
+            <CartesianGrid
+              className="bb-daily-spending-grid"
+              vertical={false}
+              stroke={DAILY_SPENDING_AXIS_COLOR}
+              strokeDasharray="3 3"
+            />
             <XAxis dataKey="label" tickLine={false} axisLine={false} />
-            <YAxis domain={yAxisDomain} ticks={yAxisTicks} scale="sqrt" tickFormatter={(value) => `$${value}`} tickLine={false} axisLine={false} width={52} />
+            <YAxis
+              domain={yAxisDomain}
+              ticks={yAxisTicks}
+              scale="sqrt"
+              tick={{ fill: DAILY_SPENDING_AXIS_COLOR }}
+              tickFormatter={(value) => `$${value}`}
+              tickLine={false}
+              axisLine={false}
+              width={52}
+            />
             <ChartTooltip content={showStackedBars ? <DailySpendingTooltipContent /> : <ChartTooltipContent />} cursor={{ fill: dailySpendingCursorFill(filter) }} />
             {showStackedBars ? (
               <>

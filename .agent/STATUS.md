@@ -69,6 +69,9 @@ Shared Needs-category logging, the shifted dated Income layout, and the four-blo
 - Removed the Category Mix transition hiccup by isolating wrapper motion state from the memoized Recharts pie surface and setting the sector animation delay to zero, so center travel and slice interpolation begin together without mid-morph reconciliation.
 - Added an 80 ms post-animation settle window before releasing the wrapper phase; browser frame sampling showed 17 consecutive changed sector frames followed by one stable tail with no freeze-and-resume, and the full `404 passed, 1 skipped` suite plus Pyright and frontend checks pass.
 - Manual verification: switch Category Mix between All, Needs, Wants, and Savings and confirm the pie glides and reshapes as one continuous motion, with no delayed start, pause, or second burst of slice resizing.
+- Daily Spending All, Needs, and Wants now render solid top/bottom horizontal boundaries while retaining dotted interior gridlines; the Y-axis labels and gridlines share one theme-aware muted hue instead of using mismatched Recharts defaults.
+- Daily-grid verification: browser SVG checks confirmed solid boundaries and exact label/stroke color matches in all three filters with a clean console; `404 passed, 1 skipped`, Pyright, frontend typecheck/build, focused report tests, and `git diff --check` pass.
+- Manual verification: switch Daily Spending through All, Needs, and Wants in both themes and confirm the first/last horizontal lines are solid while every labeled interior line remains dotted and matches its dollar-label hue.
 
 ## Completed 2026-07-16
 
