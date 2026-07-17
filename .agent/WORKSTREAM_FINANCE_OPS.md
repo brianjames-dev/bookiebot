@@ -284,6 +284,15 @@ Status: Complete. Current-month report projections now account for paychecks tha
 - Live Brian July verification produced actual xAI events on July 2 and July 17 plus a projected `$3,774.11` paycheck on July 31; the projected monthly total is `$11,472.33`.
 - Manual test: log a configured paycheck one to two days early or late, open the current expense breakdown, and confirm the next projected paycheck is exactly fourteen days after the actual event with no stale projection left behind.
 
+### 2026-07-17 Chart Tooltip Anchor Follow-Up
+
+Status: Complete. Report tooltips no longer animate from the chart origin after briefly losing hover.
+
+- The shared chart tooltip content records the wrapper's last non-empty Recharts transform and restores it whenever the inactive render clears that transform.
+- Point-to-point transform transitions remain enabled, so sequential hover movement stays smooth while non-sequential re-entry starts from the prior anchored position rather than `(0, 0)`.
+- Rebuilt the embedded JavaScript asset and added a report regression assertion for the transform-retention hook.
+- Manual test: move between non-adjacent bars, slices, and line points while briefly crossing empty chart space; confirm no top-left fly-in and no regression to normal adjacent-point animation.
+
 ## Open Questions
 
 - What should the canonical recent-action lineage model look like?

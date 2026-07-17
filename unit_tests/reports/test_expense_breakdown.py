@@ -329,6 +329,7 @@ def test_build_expense_breakdown_report_aggregates_shared_and_personal_data():
     assert "data-graph-surface" not in html
     assert "bookiebot-dismiss-chart-tooltips" not in html
     assert "bb-touch-tooltip-auto-dismiss" in html
+    assert "data-bb-last-transform" in html
     assert "bb-theme-toggle-moon" in html
     assert "bb-table-row-divider" in html
     assert "Highest day" in html

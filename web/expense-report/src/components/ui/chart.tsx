@@ -13,6 +13,7 @@ export type ChartConfig = Record<
 
 const ChartContext = React.createContext<ChartConfig | null>(null)
 const ChartInteractionContext = React.createContext(0)
+const TOOLTIP_LAST_TRANSFORM_ATTRIBUTE = "data-bb-last-transform"
 
 function ChartContainer({
   id,
@@ -141,6 +142,32 @@ function ChartTooltipAutoDismissContent({
   const interactionRevision = React.useContext(ChartInteractionContext)
   const [phase, setPhase] = React.useState<"hidden" | "visible" | "dismissing">("hidden")
   const signature = React.useMemo(() => chartTooltipSignature(label, payload), [label, payload])
+  const frameRef = React.useRef<HTMLDivElement | null>(null)
+  const wrapperRef = React.useRef<HTMLDivElement | null>(null)
+
+  React.useLayoutEffect(() => {
+    const renderedWrapper = frameRef.current?.parentElement
+    const wrapper = renderedWrapper instanceof HTMLDivElement ? renderedWrapper : wrapperRef.current
+    if (!wrapper) {
+      return
+    }
+    wrapperRef.current = wrapper
+
+    const currentTransform = wrapper.style.transform.trim()
+    if (active) {
+      if (currentTransform && currentTransform !== "none") {
+        wrapper.setAttribute(TOOLTIP_LAST_TRANSFORM_ATTRIBUTE, currentTransform)
+      }
+      return
+    }
+
+    const lastTransform = wrapper.getAttribute(TOOLTIP_LAST_TRANSFORM_ATTRIBUTE)
+    if (lastTransform && (!currentTransform || currentTransform === "none")) {
+      // Recharts drops transform when the pointer briefly leaves a data point.
+      // Retaining the last anchor prevents the next tooltip from animating out of (0, 0).
+      wrapper.style.transform = lastTransform
+    }
+  })
 
   React.useEffect(() => {
     if (!active) {
@@ -167,7 +194,10 @@ function ChartTooltipAutoDismissContent({
   }
 
   return (
-    <div className={cn("bb-chart-tooltip-frame", phase === "dismissing" && "bb-chart-tooltip-frame-dismissing")}>
+    <div
+      ref={frameRef}
+      className={cn("bb-chart-tooltip-frame", phase === "dismissing" && "bb-chart-tooltip-frame-dismissing")}
+    >
       {React.cloneElement(content, {
         ...props,
         active,

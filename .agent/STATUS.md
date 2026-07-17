@@ -27,6 +27,10 @@ Shared Needs-category logging, the shifted dated Income layout, and the four-blo
 - Live Brian July report verification now shows actual xAI paychecks on July 2 and July 17 plus the remaining projected paycheck on July 31; regression coverage also confirms an early July 15 paycheck moves the next projection to July 29.
 - Calendar-fix verification: `400 passed`, `git diff --check` passed, and Pyright reported zero errors.
 - Manual verification: after deployment, open Brian's current expense breakdown and confirm the calendar shows July 2 and July 17 as actual xAI Income plus July 31 as the only remaining projected paycheck.
+- Fixed report chart tooltips so their Recharts wrapper retains its last valid transform while briefly inactive; the next hover now animates from the prior data point instead of flying in from the chart's top-left corner.
+- Rebuilt the embedded report assets and added a regression marker assertion; focused report tests, frontend type-checking, and the production build pass.
+- Manual verification: after deployment, hover non-adjacent bars/slices with a brief gap between points and confirm the tooltip resumes from its last position while adjacent point-to-point movement remains smooth.
+- Tooltip-fix verification: `400 passed`, frontend and Python type checks passed, the Vite production build passed, and `git diff --check` passed.
 
 ## Completed 2026-07-16
 
