@@ -44,6 +44,12 @@ Shared Needs-category logging, the shifted dated Income layout, and the four-blo
 - Local browser verification used the reported ten-slice Brian category mix and found zero label/stem boundary violations with 17px minimum measured clearance in both the 460px collapsed host and 342px expanded host.
 - Manual verification: after deployment, open and expand/collapse Categories in Brian's July report and confirm every stem and label stays inside the chart border with visible edge padding.
 - Category-envelope verification: `400 passed`, Pyright reported zero errors, frontend typecheck/build passed, and browser geometry checks found zero boundary violations.
+- Category Mix Needs and Wants views now add an `Income left` slice from their Budget-sheet Rollover values, including the sequential Needs-to-Wants carryover already encoded by the sheet formulas.
+- Negative category rollover renders as a compact overspend bar instead of an invalid pie slice; Wants explicitly shows when Needs overspend has already reduced its available rollover.
+- Projected mode recomputes the same 50% Needs then 30% Wants rollover cascade from projected income and category totals.
+- Local browser verification confirmed July's `$35.56` Needs and `$1,660.04` Wants slices, plus a simulated `$500.00` Needs overspend reducing Wants to `$1,160.04` with zero chart-bound violations.
+- Manual verification: after deployment, switch Category Mix between Needs and Wants, then test a category overspend and confirm the selected rollover slice/bar and cross-category impact match the Budget sheet.
+- Category-rollover verification: `401 passed`, Pyright reported zero errors, frontend typecheck/build passed, and browser checks covered positive, overspent, impacted, and projected states.
 
 ## Completed 2026-07-16
 

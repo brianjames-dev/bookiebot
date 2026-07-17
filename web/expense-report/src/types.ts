@@ -74,6 +74,8 @@ export interface Metrics {
   remainingBudget: number | null
   remainingNeedsBudget: number | null
   remainingWantsBudget: number | null
+  needsRollover: number | null
+  wantsRollover: number | null
   amountSaved: number | null
   savingsGoal: number | null
   incomeAfterExpenses: number | null

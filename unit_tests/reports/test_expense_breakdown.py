@@ -203,6 +203,8 @@ def test_build_expense_breakdown_report_aggregates_shared_and_personal_data():
     assert "bb-pie-metric-label-line" in html
     assert "bb-category-pie-host" in html
     assert "data-bb-pie-fit-padding" in html
+    assert "bb-category-pressure" in html
+    assert "data-bb-category-balance-alert" in html
     assert "Food and shopping pace" not in html
     assert "Merchant Concentration" not in html
     assert "Spending By Person / Card" not in html
@@ -240,6 +242,8 @@ def test_build_expense_breakdown_report_aggregates_shared_and_personal_data():
     assert payload["metrics"]["fixedCommitments"] == 3370.0
     assert payload["metrics"]["remainingNeedsBudget"] == 2000.0
     assert payload["metrics"]["remainingWantsBudget"] == 750.0
+    assert payload["metrics"]["needsRollover"] == 2000.0
+    assert payload["metrics"]["wantsRollover"] == 750.0
     assert payload["metrics"]["amountSaved"] == 600.0
     assert payload["metrics"]["savingsGoal"] == 900.0
     assert payload["incomeProjection"] == {"currentAmount": 3500.0, "projectedAmount": 3500.0, "savingsGoal": 700.0}
@@ -817,6 +821,43 @@ def test_report_payload_total_expenses_keeps_zero_savings_subtotal():
 
     assert report.personal_total == 4358.54
     assert payload["metrics"]["totalExpenses"] == 4358.54
+
+
+def test_report_payload_prefers_category_rollovers_and_preserves_cross_category_impact():
+    personal_rows = [
+        ["", "BUDGET: $7,698.22", "$3,849.11", "$2,309.47", "$1,539.64", "Rollover:"],
+        ["", "(Needs) Subtotal:", "$4,349.11 (113.00%)", "", "", "-$500.00"],
+        ["", "(Wants) Subtotal:", "", "$649.43 (28.12%)", "", "$1,160.04"],
+        ["", "Margins:", "-$500.00", "", "$1,660.04"],
+    ]
+    report = build_expense_breakdown_report(
+        actor_key="brian",
+        owner_name="Brian",
+        persons=["Brian (BofA)"],
+        month=BudgetMonth(2026, 7),
+        worksheets=ReportWorksheets(
+            shared_expenses=InMemoryWorksheet([["hdr"] * 28, ["hdr"] * 28]),
+            personal_budget=InMemoryWorksheet(personal_rows),
+            subscriptions=InMemoryWorksheet([]),
+        ),
+    )
+
+    assert report.remaining_budget == -500.0
+    assert report.remaining_wants_budget == 1660.04
+    assert report.needs_rollover == -500.0
+    assert report.wants_rollover == 1160.04
+
+    html = render_expense_breakdown_html(report)
+    payload_match = re.search(
+        r'<script id="bookiebot-expense-report-data" type="application/json">(.*?)</script>',
+        html,
+    )
+    assert payload_match is not None
+    payload = json.loads(payload_match.group(1))
+    assert payload["metrics"]["remainingNeedsBudget"] == -500.0
+    assert payload["metrics"]["remainingWantsBudget"] == 1660.04
+    assert payload["metrics"]["needsRollover"] == -500.0
+    assert payload["metrics"]["wantsRollover"] == 1160.04
 
 
 def test_current_month_income_projection_uses_logged_income_date_as_biweekly_anchor(monkeypatch):

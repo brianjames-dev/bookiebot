@@ -206,6 +206,12 @@ Decision: Expense-breakdown replies in Discord include only the person/month hea
 
 Rationale: The Discord response should be quick to scan and avoid sending a large duplicate payload when the full interactive breakdown is already available behind the signed report link.
 
+## 2026-07-17 - Use Cascaded Category Rollover For Category Mix Balances
+
+Decision: Needs and Wants Category Mix views use dedicated payload fields sourced from the Budget sheet's category Rollover cells as their `Income left` values, leaving existing margin fields and Burn Rate semantics unchanged. Positive rollover is a pie slice; negative rollover is displayed separately as overspend. Wants uses the sheet's cascaded rollover, which includes any positive or negative Needs remainder, and the report calls out a negative Needs impact explicitly. Projected mode applies the same 50% Needs, 30% Wants, then Needs-to-Wants cascade.
+
+Rationale: Rollover is the sheet's authoritative available-money value for each category. Keeping negative values out of a pie preserves valid chart geometry, while a separate bar makes overspending visible and explains why Needs overspend reduces the later Wants bucket.
+
 ## Pending Decisions
 
 - Where should durable system events live: banking database only, Google Sheets only, or dual-write during transition?

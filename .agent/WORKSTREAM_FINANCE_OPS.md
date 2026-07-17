@@ -316,6 +316,18 @@ Status: Complete. The donut, connector stems, and metric labels now remain insid
 - Regression coverage confirms the fitted-host hooks are embedded in generated reports; frontend type-check/build and browser geometry checks cover the ten-slice Brian example.
 - Manual test: open Brian's July report at desktop width, expand and collapse Categories, and confirm all labels and stems keep a small gap from every chart border.
 
+### 2026-07-17 Category Rollover And Overspend Follow-Up
+
+Status: Complete. Needs and Wants Category Mix views now show their category-specific available income and overspend pressure.
+
+- Report parsing prefers the Budget sheet's Rollover column aligned with the Needs and Wants subtotal rows, while retaining the older Margins-row fallback for legacy sheets.
+- Dedicated Needs/Wants rollover payload fields preserve the existing margin metrics and Burn Rate target instead of silently changing those established calculations.
+- Positive rollover is added to the selected pie as `Income left`; negative rollover is excluded from the pie and shown in a compact single-bar overspend indicator.
+- Wants uses its cascaded rollover value, so Needs overspend is already deducted; the Wants view explicitly identifies that carried impact.
+- Projected mode mirrors the sheet sequence by calculating Needs at 50% of projected income and Wants at 30%, then carrying Needs rollover into Wants.
+- Regression coverage preserves negative rollover values and the cross-category payload; browser checks cover current positive rollovers, Needs overspend, Wants impact, projected mode, and chart containment.
+- Manual test: open Category Mix for a month with positive rollovers, verify both `Income left` slices, then temporarily overspend Needs and confirm Needs shows the overspend bar while Wants drops by the same amount and explains the deduction.
+
 ## Open Questions
 
 - What should the canonical recent-action lineage model look like?
