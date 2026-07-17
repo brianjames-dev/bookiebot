@@ -37,6 +37,7 @@ def test_log_income_row_replaces_single_placeholder_and_adds_formatted_next_row(
     )
     recorded_actions = []
     insert_calls = []
+    property_copy_calls = []
     original_insert_row = worksheet.insert_row
 
     def record_insert(values, index, **kwargs):
@@ -48,6 +49,11 @@ def test_log_income_row_replaces_single_placeholder_and_adds_formatted_next_row(
         return "income-action-1"
 
     monkeypatch.setattr(worksheet, "insert_row", record_insert)
+    monkeypatch.setattr(
+        writer,
+        "_copy_income_row_properties",
+        lambda _worksheet, **kwargs: property_copy_calls.append(kwargs),
+    )
     monkeypatch.setattr(writer, "record_undo_action", fake_record)
 
     row, description, amount, action_id = writer.log_income_row(
@@ -70,6 +76,9 @@ def test_log_income_row_replaces_single_placeholder_and_adds_formatted_next_row(
     assert worksheet.get_all_values()[2] == ["", "", "<Enter Source>", "0"]
     assert worksheet.get_all_values()[3] == ["", "", "Monthly Income:", "=SUM(D2:D3)"]
     assert insert_calls == [(3, {"value_input_option": "USER_ENTERED", "inherit_from_before": True})]
+    assert property_copy_calls == [
+        {"source_row": 2, "target_row": 3, "start_column": 2, "end_column": 4}
+    ]
 
     action = recorded_actions[0]
     assert action.new_values == ["", "7/16/2026", "xAI paycheck", "2500.0"]
@@ -92,6 +101,108 @@ def test_log_income_row_replaces_single_placeholder_and_adds_formatted_next_row(
     assert worksheet.get_all_values()[3] == ["", "", "<Enter Source>", "0"]
     assert worksheet.get_all_values()[4] == ["", "", "Monthly Income:", "=SUM(D2:D4)"]
     assert insert_calls[-1] == (4, {"value_input_option": "USER_ENTERED", "inherit_from_before": True})
+    assert property_copy_calls[-1] == {
+        "source_row": 3,
+        "target_row": 4,
+        "start_column": 2,
+        "end_column": 4,
+    }
+
+
+def test_copy_income_row_properties_reapplies_format_validation_notes_and_height():
+    class Spreadsheet:
+        def __init__(self):
+            self.requests = None
+
+        def fetch_sheet_metadata(self, params):
+            assert params == {
+                "includeGridData": True,
+                "ranges": ["'Template'!B5:D5"],
+            }
+            return {
+                "sheets": [
+                    {
+                        "properties": {"sheetId": 321},
+                        "data": [
+                            {
+                                "rowData": [
+                                    {
+                                        "values": [
+                                            {
+                                                "userEnteredFormat": {"numberFormat": {"type": "DATE"}},
+                                                "dataValidation": {"condition": {"type": "DATE_IS_VALID"}},
+                                                "note": "Enter the income date.",
+                                            },
+                                            {"userEnteredFormat": {"backgroundColor": {"green": 1}}},
+                                            {"userEnteredFormat": {"numberFormat": {"type": "CURRENCY"}}},
+                                        ]
+                                    }
+                                ],
+                                "rowMetadata": [{"pixelSize": 24}],
+                            }
+                        ],
+                    }
+                ]
+            }
+
+        def batch_update(self, body):
+            self.requests = body
+
+    class Worksheet:
+        title = "Template"
+        id = 321
+        spreadsheet = Spreadsheet()
+
+    worksheet = Worksheet()
+    writer._copy_income_row_properties(
+        worksheet,
+        source_row=5,
+        target_row=6,
+        start_column=2,
+        end_column=4,
+    )
+
+    assert worksheet.spreadsheet.requests == {
+        "requests": [
+            {
+                "updateCells": {
+                    "range": {
+                        "sheetId": 321,
+                        "startRowIndex": 5,
+                        "endRowIndex": 6,
+                        "startColumnIndex": 1,
+                        "endColumnIndex": 4,
+                    },
+                    "rows": [
+                        {
+                            "values": [
+                                {
+                                    "userEnteredFormat": {"numberFormat": {"type": "DATE"}},
+                                    "dataValidation": {"condition": {"type": "DATE_IS_VALID"}},
+                                    "note": "Enter the income date.",
+                                },
+                                {"userEnteredFormat": {"backgroundColor": {"green": 1}}},
+                                {"userEnteredFormat": {"numberFormat": {"type": "CURRENCY"}}},
+                            ]
+                        }
+                    ],
+                    "fields": "userEnteredFormat,dataValidation,note",
+                }
+            },
+            {
+                "updateDimensionProperties": {
+                    "range": {
+                        "sheetId": 321,
+                        "dimension": "ROWS",
+                        "startIndex": 5,
+                        "endIndex": 6,
+                    },
+                    "properties": {"pixelSize": 24},
+                    "fields": "pixelSize",
+                }
+            },
+        ]
+    }
 
 
 def test_log_income_row_preserves_legacy_undated_layout(monkeypatch):

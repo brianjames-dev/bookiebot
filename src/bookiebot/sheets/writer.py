@@ -1,5 +1,6 @@
 # expense & income logging
 
+import copy
 from datetime import datetime
 import logging
 from typing import Any, Literal, cast, overload
@@ -146,6 +147,14 @@ def log_income_row(data: dict[str, Any], worksheet: Any, *, return_action_id: bo
             value_input_option="USER_ENTERED",
             inherit_from_before=income_row > 1,
         )
+        if income_row - 1 > layout["header_row"]:
+            _copy_income_row_properties(
+                worksheet,
+                source_row=income_row - 1,
+                target_row=income_row,
+                start_column=min(source_column, amount_column, date_column or source_column),
+                end_column=len(row_values),
+            )
         needs_placeholder = True
 
     if needs_placeholder:
@@ -154,6 +163,13 @@ def log_income_row(data: dict[str, Any], worksheet: Any, *, return_action_id: bo
             index=income_row + 1,
             value_input_option="USER_ENTERED",
             inherit_from_before=True,
+        )
+        _copy_income_row_properties(
+            worksheet,
+            source_row=income_row,
+            target_row=income_row + 1,
+            start_column=min(source_column, amount_column, date_column or source_column),
+            end_column=max(source_column, amount_column, date_column or source_column),
         )
 
     _repair_income_summary_formula(worksheet, layout)
@@ -252,6 +268,100 @@ def _income_placeholder_values(layout: dict[str, Any]) -> list[Any]:
     values[layout["source"] - 1] = layout["source_placeholder"]
     values[layout["amount"] - 1] = 0
     return values
+
+
+def _copy_income_row_properties(
+    worksheet: Any,
+    *,
+    source_row: int,
+    target_row: int,
+    start_column: int,
+    end_column: int,
+) -> None:
+    """Copy the income seed row's cell properties after a Sheets row insertion.
+
+    Google Sheets' ``inheritFromBefore`` copies most formatting, but live Sheets
+    testing showed that it omits notes and some border details. Reapplying the
+    source row's explicit cell properties keeps every generated income row
+    consistent with the template without copying its values.
+    """
+    spreadsheet = getattr(worksheet, "spreadsheet", None)
+    if spreadsheet is None or not hasattr(spreadsheet, "fetch_sheet_metadata"):
+        return
+    if not hasattr(spreadsheet, "batch_update"):
+        return
+
+    try:
+        title = str(getattr(worksheet, "title", "")).replace("'", "''")
+        start_letter = get_column_letter(start_column)
+        end_letter = get_column_letter(end_column)
+        metadata = spreadsheet.fetch_sheet_metadata(
+            {
+                "includeGridData": True,
+                "ranges": [f"'{title}'!{start_letter}{source_row}:{end_letter}{source_row}"],
+            }
+        )
+        worksheet_id = int(getattr(worksheet, "id"))
+        sheet = next(
+            item
+            for item in metadata.get("sheets", [])
+            if int(item.get("properties", {}).get("sheetId", -1)) == worksheet_id
+        )
+        grid = sheet.get("data", [{}])[0]
+        source_cells = grid.get("rowData", [{}])[0].get("values", [])
+        width = end_column - start_column + 1
+        copied_cells: list[dict[str, Any]] = []
+        for offset in range(width):
+            source_cell = source_cells[offset] if offset < len(source_cells) else {}
+            copied_cells.append(
+                {
+                    key: copy.deepcopy(source_cell[key])
+                    for key in ("userEnteredFormat", "dataValidation", "note")
+                    if key in source_cell
+                }
+            )
+
+        requests: list[dict[str, Any]] = [
+            {
+                "updateCells": {
+                    "range": {
+                        "sheetId": worksheet_id,
+                        "startRowIndex": target_row - 1,
+                        "endRowIndex": target_row,
+                        "startColumnIndex": start_column - 1,
+                        "endColumnIndex": end_column,
+                    },
+                    "rows": [{"values": copied_cells}],
+                    "fields": "userEnteredFormat,dataValidation,note",
+                }
+            }
+        ]
+        row_metadata = grid.get("rowMetadata", [])
+        if row_metadata and "pixelSize" in row_metadata[0]:
+            requests.append(
+                {
+                    "updateDimensionProperties": {
+                        "range": {
+                            "sheetId": worksheet_id,
+                            "dimension": "ROWS",
+                            "startIndex": target_row - 1,
+                            "endIndex": target_row,
+                        },
+                        "properties": {"pixelSize": row_metadata[0]["pixelSize"]},
+                        "fields": "pixelSize",
+                    }
+                }
+            )
+        spreadsheet.batch_update({"requests": requests})
+    except Exception as exc:
+        logger.warning(
+            "Could not copy income row properties",
+            extra={
+                "exception": str(exc),
+                "source_row": source_row,
+                "target_row": target_row,
+            },
+        )
 
 
 def _repair_income_summary_formula(worksheet: Any, layout: dict[str, Any]) -> None:

@@ -254,9 +254,12 @@ Status: Complete. Live May-July migration and report verification finished; Disc
 - Updated Income actions remain deletable; deletion compacts the sheet and related action-row references, while undo reinserts the row and restores the affected lineage.
 - Live report check: Brian July returned xAI `$3,774.59` on `7/2/2026` and internet stipend `$150.00` on `7/15/2026`; Hannah July returned Sonic paycheck `$1,619.47` on `7/10/2026`.
 - Reduced the live Brian Template to one Income seed row and preserved its visible style, validation, notes, Monthly Income formula, and budget formula lineage.
+- Reduced the live Hannah Template to the same one-seed layout, standardized the seed label to `<Enter Source>`, and preserved the biweekly configuration plus shifted formula lineage.
 - BookieBot now replaces the trailing seed row instead of inserting ahead of it, then creates exactly one inherited-format placeholder for the next sequential entry and repairs the summary range.
+- BookieBot explicitly reapplies the seed row's cell format, validation, notes, borders, and row height because the Sheets API's inherited-row insertion omits some of those properties.
 - Manual Source/Amount edits use the same one-placeholder lifecycle through Apps Script, regardless of whether Source or Amount is entered first.
-- Manual test: deploy the script and run `setupBudgetSystemAutomation()`, enter a manual Income amount, then log, update, delete, and undo a BookieBot income entry on a month tab copied from Template.
+- Live Hannah verification: a temporary Template copy accepted two sequential dated BookieBot Income entries, retained one trailing placeholder with matching row properties, totaled `$191.34`, and was deleted after the check.
+- Manual test: deploy the script and run `setupBudgetSystemAutomation()`, enter a manual Income amount, then log, update, delete, and undo a BookieBot income entry on month tabs copied from both Templates.
 
 ## Open Questions
 
