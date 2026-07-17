@@ -31,6 +31,10 @@ Shared Needs-category logging, the shifted dated Income layout, and the four-blo
 - Rebuilt the embedded report assets and added a regression marker assertion; focused report tests, frontend type-checking, and the production build pass.
 - Manual verification: after deployment, hover non-adjacent bars/slices with a brief gap between points and confirm the tooltip resumes from its last position while adjacent point-to-point movement remains smooth.
 - Tooltip-fix verification: `400 passed`, frontend and Python type checks passed, the Vite production build passed, and `git diff --check` passed.
+- Reduced the Discord expense-breakdown response to its heading, Total Spent, signed full-report link, and attached pie chart; category amounts and percentages remain available in the web report instead of being duplicated in message text.
+- Added an exact-response regression test that also confirms the full non-zero category dataset still reaches the pie-chart renderer.
+- Manual verification: request an expense breakdown in Discord and confirm the reply contains only the concise summary text plus the pie-chart attachment, while the linked web report retains the complete breakdown.
+- Concise-reply verification: `400 passed`, Pyright reported zero errors, and `git diff --check` passed.
 
 ## Completed 2026-07-16
 

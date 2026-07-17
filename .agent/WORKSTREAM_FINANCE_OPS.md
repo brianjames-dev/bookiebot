@@ -293,6 +293,15 @@ Status: Complete. Report tooltips no longer animate from the chart origin after 
 - Rebuilt the embedded JavaScript asset and added a report regression assertion for the transform-retention hook.
 - Manual test: move between non-adjacent bars, slices, and line points while briefly crossing empty chart space; confirm no top-left fly-in and no regression to normal adjacent-point animation.
 
+### 2026-07-17 Concise Expense Breakdown Reply Follow-Up
+
+Status: Complete. Discord now sends a compact expense-breakdown summary while the web report remains the detailed view.
+
+- Removed the category-by-category amounts and percentages from the Discord message body.
+- Retained the report heading, Total Spent, signed `Open full report` link, and attached pie chart.
+- Continued passing every non-zero category to the pie-chart renderer, so only the duplicated text payload changed.
+- Manual test: request an expense breakdown and confirm the Discord reply has only the compact summary and chart; open the signed link and confirm the full category detail remains available.
+
 ## Open Questions
 
 - What should the canonical recent-action lineage model look like?

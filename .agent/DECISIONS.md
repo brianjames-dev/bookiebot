@@ -200,6 +200,12 @@ Decision: Expense breakdown Income projections use Biweekly Income Start only to
 
 Rationale: Payroll deposits can arrive slightly early or late. Keeping the original static cadence after an actual shift can leave a projected paycheck in the past and consume the remaining projection before the real month-end payday. Actual dates provide the most accurate forward schedule while retaining explicit configuration for months with no observed paycheck yet.
 
+## 2026-07-17 - Keep Discord Expense Breakdown Replies Concise
+
+Decision: Expense-breakdown replies in Discord include only the person/month heading, Total Spent, signed full-report link, and pie-chart attachment. Category-by-category values remain in the linked web report and the chart rather than being repeated as message text.
+
+Rationale: The Discord response should be quick to scan and avoid sending a large duplicate payload when the full interactive breakdown is already available behind the signed report link.
+
 ## Pending Decisions
 
 - Where should durable system events live: banking database only, Google Sheets only, or dual-write during transition?

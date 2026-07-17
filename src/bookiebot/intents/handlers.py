@@ -1031,23 +1031,11 @@ async def query_expense_breakdown_handler(entities, message):
         await message.channel.send(f"❌ Could not calculate expense breakdown.\n\nFull report: {full_report_link}")
         return
 
-    lines = []
-    non_zero_categories = {}
-
-    for category, info in report.breakdown.items():
-        amt = info["amount"]
-        pct = info["percentage"]
-
-        if amt == 0:
-            continue
-
-        non_zero_categories[category] = info
-        label = (
-            str(info["label"]).strip()
-            if info.get("label")
-            else str(category).replace("_", " ").title()
-        )
-        lines.append(f"{label}: ${amt:.2f} ({pct:.2f}%)")
+    non_zero_categories = {
+        category: info
+        for category, info in report.breakdown.items()
+        if info["amount"] != 0
+    }
 
     if not non_zero_categories:
         await message.channel.send(
@@ -1059,10 +1047,9 @@ async def query_expense_breakdown_handler(entities, message):
     people_str = ", ".join(persons)
     grand_total = report.grand_total
     text = (
-        f"📊 Expense breakdown for {people_str} ({report.month.label}):\n"
-        + "\n".join(lines)
-        + f"\n\n💵 Total: ${grand_total:.2f}"
-        + f"\n🌐 Full report: {full_report_link}"
+        f"📊 Expense breakdown for {people_str} ({report.month.label}):\n\n"
+        f"💵 Total Spent: ${grand_total:.2f}\n"
+        f"🌐 Full report: {full_report_link}"
     )
 
     try:
