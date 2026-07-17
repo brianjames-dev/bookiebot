@@ -253,6 +253,9 @@ Status: Complete. Live May-July migration and report verification finished; Disc
 - Expense report parsing now anchors to the visible Date/Source/Amount headers rather than row contents, so adjacent biweekly configuration labels cannot hide valid income rows.
 - Updated Income actions remain deletable; deletion compacts the sheet and related action-row references, while undo reinserts the row and restores the affected lineage.
 - Live report check: Brian July returned xAI `$3,774.59` on `7/2/2026` and internet stipend `$150.00` on `7/15/2026`; Hannah July returned Sonic paycheck `$1,619.47` on `7/10/2026`.
+- Reduced the live Brian Template to one Income seed row and preserved its visible style, validation, notes, Monthly Income formula, and budget formula lineage.
+- BookieBot now replaces the trailing seed row instead of inserting ahead of it, then creates exactly one inherited-format placeholder for the next sequential entry and repairs the summary range.
+- Manual Source/Amount edits use the same one-placeholder lifecycle through Apps Script, regardless of whether Source or Amount is entered first.
 - Manual test: deploy the script and run `setupBudgetSystemAutomation()`, enter a manual Income amount, then log, update, delete, and undo a BookieBot income entry on a month tab copied from Template.
 
 ## Open Questions

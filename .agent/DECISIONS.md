@@ -158,6 +158,12 @@ Decision: Migrate existing Income rows to the canonical `B:D` Date/Source/Amount
 
 Rationale: Invented dates would corrupt financial history. Keeping values intact and moving action metadata with the rows preserves report accuracy and update/delete/undo targeting while allowing unmatched manually entered income to remain honestly undated.
 
+## 2026-07-16 - Maintain One Trailing Income Placeholder Row
+
+Decision: Personal budget Income tables keep exactly one trailing placeholder row. A completed manual or BookieBot entry replaces that row in place, then creates one new placeholder immediately beneath it by inheriting the completed row's format and validation. The Monthly Income formula is reset to cover the full header-to-placeholder range after each append.
+
+Rationale: A single reusable seed keeps Templates compact, preserves sequential entry order, gives manual users an obvious next input row, and removes the need for multiple preformatted blanks while keeping Bot and Apps Script behavior identical.
+
 ## Pending Decisions
 
 - Where should durable system events live: banking database only, Google Sheets only, or dual-write during transition?

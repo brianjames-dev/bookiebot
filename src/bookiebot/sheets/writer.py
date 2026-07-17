@@ -3,7 +3,7 @@
 from datetime import datetime
 import logging
 from typing import Any, Literal, cast, overload
-from openpyxl.utils import column_index_from_string
+from openpyxl.utils import column_index_from_string, get_column_letter
 from bookiebot.ui.card import CardButtonView
 import asyncio
 import os
@@ -15,6 +15,8 @@ from bookiebot.sheets.routing import get_current_discord_user_id
 from bookiebot.sheets.undo import UndoAction, _sheet_user_entered_value, _update_contiguous_row, record_undo_action
 
 logger = logging.getLogger(__name__)
+
+_INCOME_SOURCE_PLACEHOLDERS = {"<enter employer>", "<enter source>"}
 
 
 # Temporary memory for user interactions (used for dropdown callbacks)
@@ -112,19 +114,6 @@ def log_income_row(data: dict[str, Any], worksheet: Any, *, return_action_id: bo
     amount_column = layout["amount"]
     date_column = layout.get("date")
 
-    source_values = worksheet.col_values(source_column)
-    last_entry_row = None
-    for i in range(summary_row - 1, 0, -1):
-        if i <= len(source_values) and source_values[i - 1].strip():
-            last_entry_row = i
-            break
-
-    if last_entry_row is None:
-        logger.error("Could not find any existing income entries.")
-        raise RuntimeError("Could not find any existing income entries.")
-
-    insert_row_index = last_entry_row
-
     description = f"{data.get('source', '')} {data.get('label', '')}".strip()
     amount = data.get("amount", "")
     row_values: list[Any] = [""] * max(source_column, amount_column, date_column or 0)
@@ -133,11 +122,41 @@ def log_income_row(data: dict[str, Any], worksheet: Any, *, return_action_id: bo
     if date_column:
         row_values[date_column - 1] = _income_date_text(data.get("date"))
 
-    worksheet.insert_row(
-        row_values,
-        index=insert_row_index,
-        value_input_option="USER_ENTERED",
+    rows = worksheet.get_all_values()
+    placeholder_rows = _trailing_income_placeholder_rows(
+        rows,
+        layout=layout,
+        summary_row=summary_row,
     )
+    if placeholder_rows:
+        income_row = placeholder_rows[0]
+        first_income_column = min(source_column, amount_column, date_column or source_column)
+        _update_contiguous_row(
+            worksheet,
+            income_row,
+            list(range(first_income_column, len(row_values) + 1)),
+            row_values[first_income_column - 1 :],
+        )
+        needs_placeholder = len(placeholder_rows) == 1
+    else:
+        income_row = summary_row
+        worksheet.insert_row(
+            row_values,
+            index=income_row,
+            value_input_option="USER_ENTERED",
+            inherit_from_before=income_row > 1,
+        )
+        needs_placeholder = True
+
+    if needs_placeholder:
+        worksheet.insert_row(
+            _income_placeholder_values(layout),
+            index=income_row + 1,
+            value_input_option="USER_ENTERED",
+            inherit_from_before=True,
+        )
+
+    _repair_income_summary_formula(worksheet, layout)
     layout_metadata = {
         "income_source_column": str(source_column),
         "income_amount_column": str(amount_column),
@@ -149,7 +168,7 @@ def log_income_row(data: dict[str, Any], worksheet: Any, *, return_action_id: bo
         UndoAction(
             worksheet="income",
             kind="delete_row",
-            row=insert_row_index,
+            row=income_row,
             columns=[],
             previous_values=[],
             new_values=[str(value) for value in row_values],
@@ -163,24 +182,85 @@ def log_income_row(data: dict[str, Any], worksheet: Any, *, return_action_id: bo
         ),
     )
     if return_action_id:
-        return insert_row_index, description, amount, action_id
-    return insert_row_index, description, amount
+        return income_row, description, amount, action_id
+    return income_row, description, amount
 
 
-def _income_sheet_layout(worksheet: Any, summary_row: int) -> dict[str, int]:
+def _income_sheet_layout(worksheet: Any, summary_row: int) -> dict[str, Any]:
     rows = worksheet.get_all_values()
-    for row in rows[: max(0, summary_row - 1)]:
+    for row_number, row in enumerate(rows[: max(0, summary_row - 1)], start=1):
         columns_by_header: dict[str, int] = {}
+        source_placeholder = "<Enter Source>"
         for column, value in enumerate(row, start=1):
             normalized = str(value).strip().rstrip(":").strip().lower()
             if normalized in {"date", "amount"}:
                 columns_by_header[normalized] = column
             elif normalized in {"source", "employer"}:
                 columns_by_header["source"] = column
+                source_placeholder = "<Enter Employer>" if normalized == "employer" else "<Enter Source>"
         if "source" in columns_by_header and "amount" in columns_by_header:
-            return columns_by_header
+            return {
+                **columns_by_header,
+                "header_row": row_number,
+                "source_placeholder": source_placeholder,
+            }
 
-    return {"source": 2, "amount": 3}
+    return {
+        "source": 2,
+        "amount": 3,
+        "header_row": 1,
+        "source_placeholder": "<Enter Employer>",
+    }
+
+
+def _trailing_income_placeholder_rows(
+    rows: list[list[str]],
+    *,
+    layout: dict[str, Any],
+    summary_row: int,
+) -> list[int]:
+    source_column = layout["source"]
+    amount_column = layout["amount"]
+    first_income_row = layout["header_row"] + 1
+    trailing: list[int] = []
+    for row_number in range(summary_row - 1, first_income_row - 1, -1):
+        row = rows[row_number - 1] if row_number <= len(rows) else []
+        source = row[source_column - 1] if source_column <= len(row) else ""
+        amount = row[amount_column - 1] if amount_column <= len(row) else ""
+        if not _is_income_placeholder_row(source, amount):
+            break
+        trailing.append(row_number)
+    return sorted(trailing)
+
+
+def _is_income_placeholder_row(source: Any, amount: Any) -> bool:
+    normalized_source = str(source or "").strip().lower()
+    if normalized_source not in _INCOME_SOURCE_PLACEHOLDERS:
+        return False
+    normalized_amount = str(amount or "").strip().replace("$", "").replace(",", "")
+    if normalized_amount == "":
+        return True
+    try:
+        return float(normalized_amount) == 0
+    except ValueError:
+        return False
+
+
+def _income_placeholder_values(layout: dict[str, Any]) -> list[Any]:
+    width = max(layout["source"], layout["amount"], layout.get("date") or 0)
+    values: list[Any] = [""] * width
+    values[layout["source"] - 1] = layout["source_placeholder"]
+    values[layout["amount"] - 1] = 0
+    return values
+
+
+def _repair_income_summary_formula(worksheet: Any, layout: dict[str, Any]) -> None:
+    summary_row = worksheet.find("Monthly Income:").row
+    first_income_row = layout["header_row"] + 1
+    amount_column = layout["amount"]
+    amount_letter = get_column_letter(amount_column)
+    formula = f"=SUM({amount_letter}{first_income_row}:{amount_letter}{summary_row - 1})"
+    _update_contiguous_row(worksheet, summary_row, [amount_column], [formula])
 
 
 def _income_date_text(value: Any = None) -> str:

@@ -32,6 +32,9 @@ Shared Needs-category logging and the shifted dated Income layout are implemente
 - Income actions remain editable after an update and can now be deleted with row compaction; undo reinserts the row and restores the full active lineage and affected action-row references.
 - Discord typing-indicator API failures are now non-fatal, so a transient Discord `5xx` cannot abort intent parsing or prevent an otherwise valid transaction from being logged.
 - Added regression coverage for failed typing-context entry and for preserving real parser/handler exceptions through the typing wrapper.
+- Reduced the live Brian Budget 2026 Template Income section to one `Date / Source / Amount` placeholder row while preserving its formatting, validation, notes, total formula, and budget-banner reference.
+- Income logging now fills the trailing placeholder in place and creates exactly one new placeholder beneath it with inherited formatting; the summary formula is repaired after each append.
+- The Apps Script applies the same behavior to manual edits, including source-first or amount-first entry order, automatic date stamping, row-height/style copying, and legacy Employer placeholders.
 - Manual verification: deploy the updated Apps Script, run `setupBudgetSystemAutomation()` once, enter an amount in a new dated Income table, then confirm manual and BookieBot income dates plus update/delete/undo behavior.
 
 ## Completed 2026-07-08
@@ -275,6 +278,8 @@ Use a test row or low-risk real row in Discord:
    - Expected: Date/Source/Amount populate in `B:D`, the report includes the dated entry, delete compacts the Income rows, and undo restores the row and its editable lineage without changing the monthly total beyond the expected transaction amount.
 51. Retry `Brian (BofA) purchased celebration dinner at Jackson's bar and grill for $140` after deployment.
    - Expected: the expense reaches intent parsing and logs normally; if Discord's typing endpoint returns another transient error, logs show a warning that processing continued instead of `Failed to parse intent` from `send_typing`.
+52. After deploying the Apps Script, enter a real Source and Amount in the sole Income placeholder on a safe month tab, then log a second Income entry through BookieBot.
+   - Expected: the first entry replaces the seed row, each completed entry receives a date, exactly one new placeholder appears directly below with matching format/validation, later entries remain sequential, and Monthly Income includes every completed row.
 
 ## Verification Baseline
 
@@ -288,6 +293,18 @@ python -m pytest unit_tests/intents/test_handlers.py unit_tests/core/test_messag
 Latest verification:
 
 ```bash
+venv/bin/python -m pytest unit_tests
+# passed: 388 passed, 1 warning
+
+python -m pyright --pythonpath venv/bin/python --pythonversion 3.12
+# passed: 0 errors, 0 warnings, 0 informations
+
+node --check --input-type=commonjs < scripts/google-apps-script/budget-system-automation.gs
+# passed
+
+git diff --check
+# passed
+
 venv/bin/python -m pytest unit_tests
 # passed: 387 passed, 1 warning
 

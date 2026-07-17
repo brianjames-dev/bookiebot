@@ -556,13 +556,13 @@ async def test_update_recent_income_changes_source_and_amount(message):
             message,
         )
 
-        assert repo.income.cell(1, 2).value == "xAI"
-        assert repo.income.cell(1, 3).value == "$2977.16"
+        assert repo.income.cell(2, 2).value == "xAI"
+        assert repo.income.cell(2, 3).value == "$2977.16"
 
         await ih.handle_intent("undo_last_transaction", {}, message)
 
-        assert repo.income.cell(1, 2).value == "Sonic"
-        assert repo.income.cell(1, 3).value == "1639.9"
+        assert repo.income.cell(2, 2).value == "Sonic"
+        assert repo.income.cell(2, 3).value == "1639.9"
 
 
 @pytest.mark.asyncio
@@ -570,7 +570,6 @@ async def test_shifted_income_layout_stamps_date_and_keeps_recent_actions_workin
     repo = SheetsRepoStub(
         income_rows=[
             ["", "Date:", "Source:", "Amount:"],
-            ["", "", "<Enter Source>", "0"],
             ["", "", "<Enter Source>", "0"],
             ["", "", "Monthly Income:", ""],
         ]
@@ -588,9 +587,9 @@ async def test_shifted_income_layout_stamps_date_and_keeps_recent_actions_workin
             message,
         )
 
-        assert repo.income.cell(3, 2).value == "7/16/2026"
-        assert repo.income.cell(3, 3).value == "Sonic"
-        assert repo.income.cell(3, 4).value == "1639.9"
+        assert repo.income.cell(2, 2).value == "7/16/2026"
+        assert repo.income.cell(2, 3).value == "Sonic"
+        assert repo.income.cell(2, 4).value == "1639.9"
 
         await ih.handle_intent(
             "update_recent_action",
@@ -598,15 +597,15 @@ async def test_shifted_income_layout_stamps_date_and_keeps_recent_actions_workin
             message,
         )
 
-        assert repo.income.cell(3, 2).value == "7/16/2026"
-        assert repo.income.cell(3, 3).value == "xAI"
-        assert repo.income.cell(3, 4).value == "$2977.16"
+        assert repo.income.cell(2, 2).value == "7/16/2026"
+        assert repo.income.cell(2, 3).value == "xAI"
+        assert repo.income.cell(2, 4).value == "$2977.16"
 
         await ih.handle_intent("undo_last_transaction", {}, message)
 
-        assert repo.income.cell(3, 2).value == "7/16/2026"
-        assert repo.income.cell(3, 3).value == "Sonic"
-        assert repo.income.cell(3, 4).value == "1639.9"
+        assert repo.income.cell(2, 2).value == "7/16/2026"
+        assert repo.income.cell(2, 3).value == "Sonic"
+        assert repo.income.cell(2, 4).value == "1639.9"
 
 
 @pytest.mark.asyncio
@@ -614,7 +613,6 @@ async def test_shifted_income_can_be_updated_deleted_and_delete_undone(message):
     repo = SheetsRepoStub(
         income_rows=[
             ["", "Date:", "Source:", "Amount:"],
-            ["", "", "<Enter Source>", "0"],
             ["", "", "<Enter Source>", "0"],
             ["", "", "Monthly Income:", ""],
         ]
@@ -648,18 +646,18 @@ async def test_shifted_income_can_be_updated_deleted_and_delete_undone(message):
         )
         await ih.handle_intent("delete_recent_action", {"index": 1}, message)
 
-        assert repo.income.cell(3, 2).value == "7/17/2026"
-        assert repo.income.cell(3, 3).value == "xAI"
-        assert repo.income.cell(3, 4).value == "2977.16"
+        assert repo.income.cell(2, 2).value == "7/17/2026"
+        assert repo.income.cell(2, 3).value == "xAI"
+        assert repo.income.cell(2, 4).value == "2977.16"
 
         await ih.handle_intent("undo_last_transaction", {}, message)
 
-        assert repo.income.cell(3, 2).value == "7/16/2026"
-        assert repo.income.cell(3, 3).value == "Sonic Drive-In"
-        assert repo.income.cell(3, 4).value == "$1700.00"
-        assert repo.income.cell(4, 2).value == "7/17/2026"
-        assert repo.income.cell(4, 3).value == "xAI"
-        assert repo.income.cell(4, 4).value == "2977.16"
+        assert repo.income.cell(2, 2).value == "7/16/2026"
+        assert repo.income.cell(2, 3).value == "Sonic Drive-In"
+        assert repo.income.cell(2, 4).value == "$1700.00"
+        assert repo.income.cell(3, 2).value == "7/17/2026"
+        assert repo.income.cell(3, 3).value == "xAI"
+        assert repo.income.cell(3, 4).value == "2977.16"
 
         await ih.handle_intent(
             "update_recent_action",
@@ -667,7 +665,7 @@ async def test_shifted_income_can_be_updated_deleted_and_delete_undone(message):
             message,
         )
 
-        assert repo.income.cell(4, 3).value == "xAI Corp"
+        assert repo.income.cell(3, 3).value == "xAI Corp"
 
 
 @pytest.mark.asyncio

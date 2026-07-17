@@ -26,22 +26,28 @@ async def test_expense_sheet_with_retry_recovers_from_transient_access_error(mon
     assert calls == ["expense_sheet", "expense_sheet"]
 
 
-def test_log_income_row_uses_shifted_dated_layout(monkeypatch):
+def test_log_income_row_replaces_single_placeholder_and_adds_formatted_next_row(monkeypatch):
     worksheet = InMemoryWorksheet(
         [
             ["", "Date:", "Source:", "Amount:"],
             ["", "", "<Enter Source>", "0"],
-            ["", "", "<Enter Source>", "0"],
-            ["", "", "Monthly Income:", "=SUM(D2:D3)"],
+            ["", "", "Monthly Income:", "=SUM(D2:D2)"],
         ],
         title="Template",
     )
     recorded_actions = []
+    insert_calls = []
+    original_insert_row = worksheet.insert_row
+
+    def record_insert(values, index, **kwargs):
+        insert_calls.append((index, kwargs))
+        original_insert_row(values, index, **kwargs)
 
     def fake_record(_user_key, action):
         recorded_actions.append(action)
         return "income-action-1"
 
+    monkeypatch.setattr(worksheet, "insert_row", record_insert)
     monkeypatch.setattr(writer, "record_undo_action", fake_record)
 
     row, description, amount, action_id = writer.log_income_row(
@@ -56,11 +62,14 @@ def test_log_income_row_uses_shifted_dated_layout(monkeypatch):
         return_action_id=True,
     )
 
-    assert row == 3
+    assert row == 2
     assert description == "xAI paycheck"
     assert amount == 2500.0
     assert action_id == "income-action-1"
-    assert worksheet.get_all_values()[2] == ["", "7/16/2026", "xAI paycheck", "2500.0"]
+    assert worksheet.get_all_values()[1] == ["", "7/16/2026", "xAI paycheck", "2500.0"]
+    assert worksheet.get_all_values()[2] == ["", "", "<Enter Source>", "0"]
+    assert worksheet.get_all_values()[3] == ["", "", "Monthly Income:", "=SUM(D2:D3)"]
+    assert insert_calls == [(3, {"value_input_option": "USER_ENTERED", "inherit_from_before": True})]
 
     action = recorded_actions[0]
     assert action.new_values == ["", "7/16/2026", "xAI paycheck", "2500.0"]
@@ -68,14 +77,29 @@ def test_log_income_row_uses_shifted_dated_layout(monkeypatch):
     assert action.metadata["income_source_column"] == "3"
     assert action.metadata["income_amount_column"] == "4"
 
+    second_row, _description, _amount = writer.log_income_row(
+        {
+            "type": "income",
+            "date": "2026-07-30",
+            "source": "Internet stipend",
+            "amount": 150.0,
+        },
+        worksheet,
+    )
+
+    assert second_row == 3
+    assert worksheet.get_all_values()[2] == ["", "7/30/2026", "Internet stipend", "150.0"]
+    assert worksheet.get_all_values()[3] == ["", "", "<Enter Source>", "0"]
+    assert worksheet.get_all_values()[4] == ["", "", "Monthly Income:", "=SUM(D2:D4)"]
+    assert insert_calls[-1] == (4, {"value_input_option": "USER_ENTERED", "inherit_from_before": True})
+
 
 def test_log_income_row_preserves_legacy_undated_layout(monkeypatch):
     worksheet = InMemoryWorksheet(
         [
             ["", "Employer:", "Amount:"],
             ["", "<Enter Employer>", "0"],
-            ["", "<Enter Employer>", "0"],
-            ["", "Monthly Income:", "=SUM(C2:C3)"],
+            ["", "Monthly Income:", "=SUM(C2:C2)"],
         ],
         title="July",
     )
@@ -92,8 +116,10 @@ def test_log_income_row_preserves_legacy_undated_layout(monkeypatch):
         worksheet,
     )
 
-    assert row == 3
-    assert worksheet.get_all_values()[2] == ["", "Gift", "100.0"]
+    assert row == 2
+    assert worksheet.get_all_values()[1] == ["", "Gift", "100.0"]
+    assert worksheet.get_all_values()[2] == ["", "<Enter Employer>", "0"]
+    assert worksheet.get_all_values()[3] == ["", "Monthly Income:", "=SUM(C2:C3)"]
     action = recorded_actions[0]
     assert "income_date_column" not in action.metadata
     assert action.metadata["income_source_column"] == "2"
