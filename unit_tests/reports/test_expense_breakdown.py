@@ -332,15 +332,17 @@ def test_build_expense_breakdown_report_aggregates_shared_and_personal_data():
     assert "Highest day" in html
     assert "Days counted" in html
     assert "Daily Spending" in html
-    assert "Need Expenses" in html
+    assert "Income left" in html
+    assert "Need Expenses" not in html
+    assert "Need" in html
     assert "Rent" in html
     assert any(item["label"] == "Bills & Utilities" for item in payload["breakdown"])
     assert payload["needExpenses"] == [
-        {"label": "DMV Registration", "amount": 184.0, "group": "Need Expenses", "status": "entered"}
+        {"label": "DMV Registration", "amount": 184.0, "group": "Need", "status": "entered"}
     ]
     assert payload["topEntries"][0] == {
         "date": "",
-        "category": "Need Expenses",
+        "category": "Need",
         "amount": 184.0,
         "person": "Hannah",
         "item": "DMV Registration",
@@ -387,7 +389,7 @@ def test_build_expense_breakdown_report_aggregates_shared_and_personal_data():
     assert [item["name"] for item in payload["subscriptionsWants"]] == ["MacroFactor", "Spotify"]
     assert any(entry["location"] == "Trader Joe's" for entry in payload["dailyEntries"])
     assert any(
-        entry["category"] == "Need Expenses"
+        entry["category"] == "Need"
         and entry["item"] == "DMV Registration"
         and entry["date"] == ""
         for entry in payload["dailyEntries"]
@@ -493,11 +495,11 @@ def test_shared_need_expense_section_feeds_need_category_and_daily_activity():
 
     assert payload["dailyTotals"] == [{"label": "6", "amount": 184.0}]
     assert payload["needExpenses"] == [
-        {"label": "DMV Registration", "amount": 184.0, "group": "Need Expenses", "status": "entered"}
+        {"label": "DMV Registration", "amount": 184.0, "group": "Need", "status": "entered"}
     ]
     assert payload["topEntries"][0] == {
         "date": "05/06/2026",
-        "category": "Need Expenses",
+        "category": "Need",
         "amount": 184.0,
         "person": "Hannah",
         "item": "DMV Registration",

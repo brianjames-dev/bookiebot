@@ -157,7 +157,7 @@ CATEGORY_LABELS = {
     "rent": "Rent",
     "bills_utilities": "Bills & Utilities",
     "static_bills_subscriptions_needs": "Subs (Needs)",
-    "need_expenses": "Need Expenses",
+    "need_expenses": "Need",
     "subscriptions_wants": "Subs (Wants)",
     "grocery": "Grocery",
     "gas": "Gas",

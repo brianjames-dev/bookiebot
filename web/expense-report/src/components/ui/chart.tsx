@@ -12,6 +12,7 @@ export type ChartConfig = Record<
 >
 
 const ChartContext = React.createContext<ChartConfig | null>(null)
+const ChartInteractionContext = React.createContext(0)
 
 function ChartContainer({
   id,
@@ -24,13 +25,28 @@ function ChartContainer({
 }) {
   const chartId = React.useId()
   const resolvedId = `chart-${id || chartId.replace(/:/g, "")}`
+  const [interactionRevision, setInteractionRevision] = React.useState(0)
+
+  const handlePointerDownCapture = React.useCallback((event: React.PointerEvent<HTMLDivElement>) => {
+    if (event.pointerType === "mouse" && event.button !== 0) {
+      return
+    }
+    setInteractionRevision((revision) => revision + 1)
+  }, [])
 
   return (
     <ChartContext.Provider value={config}>
-      <div id={resolvedId} className={cn("bb-chart-container", className)} data-chart={resolvedId}>
-        <ChartStyle id={resolvedId} config={config} />
-        {children}
-      </div>
+      <ChartInteractionContext.Provider value={interactionRevision}>
+        <div
+          id={resolvedId}
+          className={cn("bb-chart-container", className)}
+          data-chart={resolvedId}
+          onPointerDownCapture={handlePointerDownCapture}
+        >
+          <ChartStyle id={resolvedId} config={config} />
+          {children}
+        </div>
+      </ChartInteractionContext.Provider>
     </ChartContext.Provider>
   )
 }
@@ -75,14 +91,13 @@ function ChartTooltipContent({
     }
     return dedupedRows
   }, [])
-  const signature = rows.map((item) => `${item.name ?? ""}:${item.value ?? ""}:${item.color ?? ""}`).join("|")
 
   if (!active || !rows.length) {
     return null
   }
 
   return (
-    <div className="bb-chart-tooltip bb-touch-tooltip-content" key={signature}>
+    <div className="bb-chart-tooltip bb-touch-tooltip-content">
       {rows.map((item: ChartTooltipPayload, index) => (
         <div className="bb-chart-tooltip-row" key={`${item.name}-${item.value}-${index}`}>
           <span className="bb-chart-tooltip-dot" style={{ background: item.color }} />
@@ -101,20 +116,119 @@ function formatMoney(value: number) {
   }).format(value)
 }
 
-type ChartTooltipProps = React.ComponentProps<typeof RechartsPrimitive.Tooltip>
+type ChartTooltipProps = React.ComponentProps<typeof RechartsPrimitive.Tooltip> & {
+  dismissDelay?: number
+}
+
+type ChartTooltipRenderProps = {
+  active?: boolean
+  payload?: unknown[]
+  label?: unknown
+  [key: string]: unknown
+}
+
+function ChartTooltipAutoDismissContent({
+  content,
+  dismissDelay,
+  active,
+  payload,
+  label,
+  ...props
+}: {
+  content: React.ReactElement<ChartTooltipRenderProps>
+  dismissDelay: number
+} & ChartTooltipRenderProps) {
+  const interactionRevision = React.useContext(ChartInteractionContext)
+  const [phase, setPhase] = React.useState<"hidden" | "visible" | "dismissing">("hidden")
+  const signature = React.useMemo(() => chartTooltipSignature(label, payload), [label, payload])
+
+  React.useEffect(() => {
+    if (!active) {
+      setPhase("hidden")
+      return undefined
+    }
+
+    setPhase("visible")
+    const dismissTimer = window.setTimeout(() => {
+      setPhase("dismissing")
+    }, dismissDelay)
+    const hideTimer = window.setTimeout(() => {
+      setPhase("hidden")
+    }, dismissDelay + 180)
+
+    return () => {
+      window.clearTimeout(dismissTimer)
+      window.clearTimeout(hideTimer)
+    }
+  }, [active, dismissDelay, interactionRevision, signature])
+
+  if (!active || phase === "hidden") {
+    return null
+  }
+
+  return (
+    <div className={cn("bb-chart-tooltip-frame", phase === "dismissing" && "bb-chart-tooltip-frame-dismissing")}>
+      {React.cloneElement(content, {
+        ...props,
+        active,
+        payload,
+        label,
+      })}
+    </div>
+  )
+}
+
+function chartTooltipSignature(label: unknown, payload: unknown[] | undefined) {
+  const payloadSignature = Array.isArray(payload)
+    ? payload
+        .map((item) => {
+          if (!item || typeof item !== "object") {
+            return String(item ?? "")
+          }
+          const row = item as Record<string, unknown>
+          const rowPayload = row.payload && typeof row.payload === "object" ? (row.payload as Record<string, unknown>) : {}
+          return [
+            row.dataKey,
+            row.name,
+            row.value,
+            row.color,
+            rowPayload.label,
+            rowPayload.day,
+            rowPayload.amount,
+          ]
+            .map((value) => String(value ?? ""))
+            .join(":")
+        })
+        .join("|")
+    : ""
+  return `${String(label ?? "")}:${payloadSignature}`
+}
 
 function ChartTooltip({
-  isAnimationActive = false,
+  isAnimationActive = true,
+  animationDuration = 180,
+  animationEasing = "ease-out",
+  content,
+  dismissDelay = 5000,
   wrapperStyle,
   ...props
 }: ChartTooltipProps) {
+  const tooltipContent = React.isValidElement<ChartTooltipRenderProps>(content) ? (
+    <ChartTooltipAutoDismissContent content={content} dismissDelay={dismissDelay} />
+  ) : (
+    content
+  )
+
   return (
     <RechartsPrimitive.Tooltip
       {...props}
+      content={tooltipContent}
       isAnimationActive={isAnimationActive}
+      animationDuration={animationDuration}
+      animationEasing={animationEasing}
       wrapperStyle={{
         outline: "none",
-        transition: "none",
+        transition: "transform 180ms cubic-bezier(0.22, 1, 0.36, 1), opacity 140ms ease-out, visibility 140ms ease-out",
         ...wrapperStyle,
       }}
     />

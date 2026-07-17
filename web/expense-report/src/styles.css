@@ -799,13 +799,9 @@ summary {
 }
 
 @media (hover: none), (pointer: coarse) {
-  .bb-touch-tooltip-content {
-    animation: bb-touch-tooltip-auto-dismiss 3000ms ease-out forwards;
-  }
-
   .bb-subscription-marker:hover .bb-subscription-tooltip,
   .bb-subscription-marker:focus .bb-subscription-tooltip {
-    animation: bb-touch-tooltip-auto-dismiss 3000ms ease-out forwards;
+    animation: bb-touch-tooltip-auto-dismiss 5000ms ease-out forwards;
     pointer-events: none;
   }
 }
@@ -1380,6 +1376,17 @@ summary {
   padding: 9px;
   box-shadow: 0 8px 22px rgb(15 23 42 / 0.12);
   overflow-wrap: anywhere;
+}
+
+.bb-chart-tooltip-frame {
+  opacity: 1;
+  transform: translateY(0);
+  transition: opacity 180ms ease-out, transform 180ms ease-out;
+}
+
+.bb-chart-tooltip-frame-dismissing {
+  opacity: 0;
+  transform: translateY(3px);
 }
 
 .bb-chart-tooltip-title {

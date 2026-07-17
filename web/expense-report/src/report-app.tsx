@@ -196,7 +196,7 @@ const DAILY_SPENDING_FILTERS: Array<{ value: DailySpendingFilter; label: string 
 const CATEGORY_NEEDS_KEYS = new Set(["rent", "bills_utilities", "static_bills_subscriptions_needs", "need_expenses", "grocery", "gas"])
 const CATEGORY_WANTS_KEYS = new Set(["subscriptions_wants", "food", "shopping"])
 const DAILY_WANTS_CATEGORIES = new Set(["Food", "Shopping"])
-const LEFT_CATEGORY_COLOR = "#16a34a"
+const LEFT_CATEGORY_COLOR = "#166534"
 const NEEDS_BAR_COLOR = "#2563eb"
 const WANTS_BAR_COLOR = "#7c3aed"
 const TOP_EXPENSE_HEAT_COLORS = [
@@ -990,10 +990,9 @@ function BurnRateTooltipContent({
   const isOver = point.variance > 0
   const label = isOver ? "Over pace" : "Under pace"
   const color = burnRatePointColor(point.variance)
-  const signature = `${point.day}:${point.variance}:${point.actualSpend}`
 
   return (
-    <div className="bb-chart-tooltip bb-touch-tooltip-content" key={signature}>
+    <div className="bb-chart-tooltip bb-touch-tooltip-content">
       <div className="bb-chart-tooltip-title">Day {point.label}</div>
       <div className="bb-chart-tooltip-row">
         <span className="bb-chart-tooltip-dot" style={{ background: color }} />
@@ -1169,7 +1168,7 @@ function categoryMixRows(data: BreakdownItem[], leftAmount: number, filter: Cate
       ? [
           {
             key: "left",
-            label: "Left",
+            label: "Income left",
             amount: positiveLeftAmount,
             percentage: 0,
             color: LEFT_CATEGORY_COLOR,
@@ -1505,10 +1504,9 @@ function DailySpendingTooltipContent({
   if (!active || !rows.length || !point) {
     return null
   }
-  const signature = rows.map((item) => `${item.name ?? ""}:${item.value ?? ""}`).join("|")
 
   return (
-    <div className="bb-chart-tooltip bb-touch-tooltip-content" key={signature}>
+    <div className="bb-chart-tooltip bb-touch-tooltip-content">
       <div className="bb-chart-tooltip-title">Day {point.label}</div>
       {rows.map((item, index) => (
         <div className="bb-chart-tooltip-row" key={`${item.name}-${item.value}-${index}`}>
@@ -1579,9 +1577,8 @@ function TopExpensesTooltipContent({
   if (!active || !row) {
     return null
   }
-  const signature = `${row.label}:${row.amount}:${row.color}`
   return (
-    <div className="bb-chart-tooltip bb-touch-tooltip-content" key={signature}>
+    <div className="bb-chart-tooltip bb-touch-tooltip-content">
       <div className="bb-chart-tooltip-title">{row.label}</div>
       <div className="bb-chart-tooltip-row">
         <span className="bb-chart-tooltip-dot" style={{ background: row.color }} />
@@ -1637,9 +1634,8 @@ function MerchantTooltipContent({
   if (!active || !row) {
     return null
   }
-  const signature = `${row.label}:${row.count}:${row.amount}`
   return (
-    <div className="bb-chart-tooltip bb-touch-tooltip-content" key={signature}>
+    <div className="bb-chart-tooltip bb-touch-tooltip-content">
       <div className="bb-chart-tooltip-title">{row.label}</div>
       <div className="bb-chart-tooltip-row">
         <span className="bb-chart-tooltip-dot" style={{ background: MERCHANT_BAR_COLOR }} />
@@ -2419,10 +2415,9 @@ function BillsUtilitiesTooltipContent({
     return null
   }
   const title = String(rows[0]?.payload?.label ?? "Bills")
-  const signature = rows.map((item) => `${item.name ?? ""}:${item.value ?? ""}`).join("|")
 
   return (
-    <div className="bb-chart-tooltip bb-touch-tooltip-content" key={signature}>
+    <div className="bb-chart-tooltip bb-touch-tooltip-content">
       <div className="bb-chart-tooltip-title">{title}</div>
       {rows.map((item, index) => {
         const name = String(item.name ?? "")
