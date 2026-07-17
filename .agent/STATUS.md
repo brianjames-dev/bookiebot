@@ -66,6 +66,9 @@ Shared Needs-category logging, the shifted dated Income layout, and the four-blo
 - Calendar transition verification: `404 passed, 1 skipped`, Pyright reported zero errors, frontend typecheck/build passed, and a local browser fixture confirmed one stable calendar node, collapsed non-subscription markers, updated `$2,451.32` to `$126.32`, unchanged July/Current labels, and a clean console.
 - Category Mix now carries the prior fitted pie center into each All/Needs/Wants/Savings view and glides the stable Recharts pie group to the new fitted center over the same 520 ms window as the slice morph, instead of snapping positions.
 - Category Mix motion verification: `404 passed, 1 skipped`, Pyright reported zero errors, frontend typecheck/build passed, and a full browser fixture confirmed bounded 7 px, 25 px, and 124 px layout travel plus clean rapid-toggle settlement and console output.
+- Removed the Category Mix transition hiccup by isolating wrapper motion state from the memoized Recharts pie surface and setting the sector animation delay to zero, so center travel and slice interpolation begin together without mid-morph reconciliation.
+- Added an 80 ms post-animation settle window before releasing the wrapper phase; browser frame sampling showed 17 consecutive changed sector frames followed by one stable tail with no freeze-and-resume, and the full `404 passed, 1 skipped` suite plus Pyright and frontend checks pass.
+- Manual verification: switch Category Mix between All, Needs, Wants, and Savings and confirm the pie glides and reshapes as one continuous motion, with no delayed start, pause, or second burst of slice resizing.
 
 ## Completed 2026-07-16
 

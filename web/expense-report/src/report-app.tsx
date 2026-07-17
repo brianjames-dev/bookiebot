@@ -1,4 +1,14 @@
-import { memo, useEffect, useLayoutEffect, useRef, useState, type CSSProperties, type ReactNode, type TouchEvent } from "react"
+import {
+  memo,
+  useEffect,
+  useLayoutEffect,
+  useRef,
+  useState,
+  type CSSProperties,
+  type ReactNode,
+  type RefObject,
+  type TouchEvent,
+} from "react"
 import {
   Bar,
   BarChart,
@@ -1202,7 +1212,6 @@ const CategoryMixChart = memo(function CategoryMixChart({
   const chartData = categoryMixRows(data, selectedRollover, filter, amountSaved)
   const [pieHostRef, pieHostSize] = useElementSize<HTMLDivElement>()
   const pieLayout = useExpensePieLayout(chartData, pieHostSize)
-  const pieLayoutMotion = useExpensePieLayoutMotion(pieLayout, filter)
   const spentTotal = amountRowsTotal(chartData.filter((item) => item.key !== "left"))
   const pressure = categoryMixPressure(filter, categoryBalances, spentTotal)
 
@@ -1218,45 +1227,13 @@ const CategoryMixChart = memo(function CategoryMixChart({
       </div>
       <div className="bb-chart-layout bb-category-chart-layout">
         <ChartContainer config={chartConfig(chartData)} className="bb-chart-box bb-category-chart-box">
-          <div
-            ref={pieHostRef}
-            className="bb-category-pie-host"
-            data-bb-pie-fit-padding={pieLayout.containerPadding}
-            data-bb-pie-layout-motion={pieLayoutMotion.phase}
-            data-bb-pie-layout-motion-revision={pieLayoutMotion.revision}
-            data-bb-pie-layout-travel-x={pieLayoutMotion.travelX}
-            data-bb-pie-layout-travel-y={pieLayoutMotion.travelY}
-            style={{
-              "--bb-pie-layout-offset-x": `${pieLayoutMotion.offsetX}px`,
-              "--bb-pie-layout-offset-y": `${pieLayoutMotion.offsetY}px`,
-            } as CSSProperties}
+          <CategoryMixPieMotionHost
+            hostRef={pieHostRef}
+            layout={pieLayout}
+            filter={filter}
           >
-            <ResponsiveContainer width="100%" height="100%">
-              <PieChart margin={pieLayout.margin}>
-                <ChartTooltip content={<ChartTooltipContent />} />
-                <Pie
-                  data={chartData}
-                  dataKey="amount"
-                  nameKey="label"
-                  cx={pieLayout.cx}
-                  cy={pieLayout.cy}
-                  innerRadius={pieLayout.innerRadius}
-                  outerRadius={pieLayout.outerRadius}
-                  startAngle={PIE_METRIC_START_ANGLE}
-                  endAngle={PIE_METRIC_END_ANGLE}
-                  paddingAngle={PIE_METRIC_PADDING_ANGLE}
-                  animationDuration={520}
-                  animationEasing="ease-out"
-                  label={pieLayout.showLabels ? (props) => renderPieMetricLabel(props, pieLayout) : false}
-                  labelLine={pieLayout.showLabels ? (props) => renderPieMetricLabelLine(props, pieLayout) : false}
-                >
-                  {chartData.map((item) => (
-                    <Cell key={item.key} fill={item.color} />
-                  ))}
-                </Pie>
-              </PieChart>
-            </ResponsiveContainer>
-          </div>
+            <CategoryMixPieSurface data={chartData} layout={pieLayout} />
+          </CategoryMixPieMotionHost>
         </ChartContainer>
       </div>
       <DetailsPanel summary="Categories" collapseKey={collapseKey}>
@@ -1275,6 +1252,80 @@ const CategoryMixChart = memo(function CategoryMixChart({
     </div>
   )
 }, areCategoryMixChartPropsEqual)
+
+type CategoryMixPieMotionHostProps = {
+  hostRef: RefObject<HTMLDivElement>
+  layout: ExpensePieLayout
+  filter: CategoryMixFilter
+  children: ReactNode
+}
+
+function CategoryMixPieMotionHost({ hostRef, layout, filter, children }: CategoryMixPieMotionHostProps) {
+  const motion = useExpensePieLayoutMotion(layout, filter)
+
+  return (
+    <div
+      ref={hostRef}
+      className="bb-category-pie-host"
+      data-bb-pie-fit-padding={layout.containerPadding}
+      data-bb-pie-layout-motion={motion.phase}
+      data-bb-pie-layout-motion-revision={motion.revision}
+      data-bb-pie-layout-travel-x={motion.travelX}
+      data-bb-pie-layout-travel-y={motion.travelY}
+      data-bb-pie-motion-isolated="true"
+      data-bb-pie-animation-synchronized="true"
+      style={{
+        "--bb-pie-layout-offset-x": `${motion.offsetX}px`,
+        "--bb-pie-layout-offset-y": `${motion.offsetY}px`,
+      } as CSSProperties}
+    >
+      {children}
+    </div>
+  )
+}
+
+type CategoryMixPieSurfaceProps = {
+  data: BreakdownItem[]
+  layout: ExpensePieLayout
+}
+
+const CategoryMixPieSurface = memo(function CategoryMixPieSurface({ data, layout }: CategoryMixPieSurfaceProps) {
+  return (
+    <ResponsiveContainer width="100%" height="100%">
+      <PieChart margin={layout.margin}>
+        <ChartTooltip content={<ChartTooltipContent />} />
+        <Pie
+          data={data}
+          dataKey="amount"
+          nameKey="label"
+          cx={layout.cx}
+          cy={layout.cy}
+          innerRadius={layout.innerRadius}
+          outerRadius={layout.outerRadius}
+          startAngle={PIE_METRIC_START_ANGLE}
+          endAngle={PIE_METRIC_END_ANGLE}
+          paddingAngle={PIE_METRIC_PADDING_ANGLE}
+          animationBegin={0}
+          animationDuration={520}
+          animationEasing="ease-out"
+          label={layout.showLabels ? (props) => renderPieMetricLabel(props, layout) : false}
+          labelLine={layout.showLabels ? (props) => renderPieMetricLabelLine(props, layout) : false}
+        >
+          {data.map((item) => (
+            <Cell key={item.key} fill={item.color} />
+          ))}
+        </Pie>
+      </PieChart>
+    </ResponsiveContainer>
+  )
+}, areCategoryMixPieSurfacePropsEqual)
+
+function areCategoryMixPieSurfacePropsEqual(
+  previous: CategoryMixPieSurfaceProps,
+  next: CategoryMixPieSurfaceProps,
+) {
+  return breakdownRowsEqual(previous.data, next.data) && expensePieLayoutsEqual(previous.layout, next.layout)
+}
 
 function areCategoryMixChartPropsEqual(previous: CategoryMixChartProps, next: CategoryMixChartProps) {
   return (
@@ -1749,6 +1800,7 @@ function pieMetricLabelWidth(item: BreakdownItem, compactLabel: boolean) {
 type ExpensePieLayout = ReturnType<typeof useExpensePieLayout>
 
 const PIE_LAYOUT_MOTION_DURATION_MS = 520
+const PIE_LAYOUT_MOTION_SETTLE_MS = 80
 
 type PieLayoutMotionPhase = "idle" | "primed" | "active"
 
@@ -1803,7 +1855,7 @@ function useExpensePieLayoutMotion(layout: ExpensePieLayout, filter: CategoryMix
           setMotion((current) => current.revision === revision
             ? { phase: "idle", offsetX: 0, offsetY: 0, travelX: offsetX, travelY: offsetY, revision }
             : current)
-        }, PIE_LAYOUT_MOTION_DURATION_MS)
+        }, PIE_LAYOUT_MOTION_DURATION_MS + PIE_LAYOUT_MOTION_SETTLE_MS)
       })
     })
 
@@ -1821,6 +1873,36 @@ function useExpensePieLayoutMotion(layout: ExpensePieLayout, filter: CategoryMix
   }, [filter, layout.cx, layout.cy])
 
   return motion
+}
+
+function expensePieLayoutsEqual(previous: ExpensePieLayout, next: ExpensePieLayout) {
+  const previousDeltaKeys = Object.keys(previous.labelDeltas)
+  const nextDeltaKeys = Object.keys(next.labelDeltas)
+  return (
+    previous.fallbackWidth === next.fallbackWidth &&
+    previous.fallbackHeight === next.fallbackHeight &&
+    previous.minOuterRadius === next.minOuterRadius &&
+    previous.maxOuterRadius === next.maxOuterRadius &&
+    previous.innerRadiusRatio === next.innerRadiusRatio &&
+    previous.labelOffset === next.labelOffset &&
+    previous.labelGap === next.labelGap &&
+    previous.containerPadding === next.containerPadding &&
+    previous.compactLabel === next.compactLabel &&
+    previous.showLabels === next.showLabels &&
+    previous.cx === next.cx &&
+    previous.cy === next.cy &&
+    previous.innerRadius === next.innerRadius &&
+    previous.outerRadius === next.outerRadius &&
+    previous.margin.top === next.margin.top &&
+    previous.margin.right === next.margin.right &&
+    previous.margin.bottom === next.margin.bottom &&
+    previous.margin.left === next.margin.left &&
+    previousDeltaKeys.length === nextDeltaKeys.length &&
+    previousDeltaKeys.every((key) => (
+      previous.labelDeltas[key]?.x === next.labelDeltas[key]?.x &&
+      previous.labelDeltas[key]?.y === next.labelDeltas[key]?.y
+    ))
+  )
 }
 
 function pieMetricLabelX(x: number | string | undefined, textAnchor: PieMetricTextAnchor | undefined, gap: number) {

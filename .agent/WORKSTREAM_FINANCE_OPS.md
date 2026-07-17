@@ -341,15 +341,17 @@ Status: Complete. The donut, connector stems, and metric labels now remain insid
 
 ### 2026-07-17 Category Mix Layout Motion Follow-Up
 
-Status: Complete. Category Mix retains the envelope solver's per-view fit while smoothly moving the pie between the All, Needs, Wants, and Savings centers.
+Status: Complete after animation-pipeline correction. Category Mix retains the envelope solver's per-view fit while smoothly moving and reshaping the pie between the All, Needs, Wants, and Savings centers without a delayed or interrupted sector morph.
 
 - Each filter change records the previous fitted center and initially offsets the newly rendered stable Recharts pie group back to that visual origin.
 - The offset returns to zero over 520 ms while Recharts performs its existing slice morph, so the donut, stems, and labels float together into the new fitted position instead of snapping.
+- Wrapper phase state now lives outside a memoized Recharts pie surface, preventing the primed, active, and idle updates from reconciling the sector-animation subtree mid-morph.
+- The Recharts pie animation starts at zero delay so sector interpolation and center travel share the same 520 ms window; the wrapper keeps its compositor state for an additional 80 ms before settling idle.
 - The fit solver remains authoritative for every destination; no fixed center or radius is introduced, and endpoint label/stem padding remains unchanged.
 - Tooltip interaction is temporarily suppressed during the layout transition and restored after completion; interrupted or near-zero transitions settle explicitly to idle so rapid toggles cannot leave the chart inert.
 - Reduced-motion users receive the final fitted position without the translation animation.
-- Regression hooks expose motion phase, revision, travel, and offsets in generated reports. Full unit tests, Pyright, frontend typecheck/build, and browser checks across all four tabs pass with bounded endpoints and a clean console.
-- Manual test: switch Category Mix through All, Needs, Wants, and Savings, confirm the complete pie/label group glides into each fitted location, then toggle two tabs quickly and confirm the chart settles and tooltips remain interactive.
+- Regression hooks expose motion phase, revision, travel, offsets, render isolation, and synchronized animation in generated reports. Full unit tests, Pyright, frontend typecheck/build, and browser frame sampling pass; the sampled sector changed continuously until its stable tail and never resumed after becoming stable.
+- Manual test: switch Category Mix through All, Needs, Wants, and Savings, confirm the complete pie/label group glides and reshapes continuously into each fitted location without a pause, then toggle two tabs quickly and confirm the chart settles and tooltips remain interactive.
 
 ### 2026-07-17 Category Rollover And Overspend Follow-Up
 
