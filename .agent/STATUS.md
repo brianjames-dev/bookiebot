@@ -59,6 +59,9 @@ Shared Needs-category logging, the shifted dated Income layout, and the four-blo
 - Chart carousel switches now put any open Recharts tooltip into its existing 180 ms fade, cancel its five-second hold timer, and suppress cached payloads from the newly selected graph until the user deliberately moves or presses inside that graph.
 - Local browser verification opened a Burn Rate tooltip, switched to Category Mix, confirmed no stale or arbitrary tooltip remained after the transition, then switched back and confirmed a fresh Burn Rate hover rendered the correct data.
 - Carousel-tooltip verification: `404 passed, 1 skipped`, Pyright reported zero errors, focused report tests passed, and frontend typecheck/build passed.
+- Extended the shared tooltip-dismissal provider across the full report and connected every data-view selector: Projected mode, Category Mix, Calendar, Daily Spending, and Expense Highlights.
+- Local browser verification confirmed Daily Spending All-to-Needs hides the open tooltip and reactivates with only the filtered Needs value; Category Mix All-to-Needs increments the same dismissal lifecycle and leaves no stale tooltip behind.
+- Toggle-tooltip verification: `404 passed, 1 skipped`, Pyright reported zero errors, frontend typecheck/build passed, all five dismissal triggers are embedded in generated reports, and the browser console remained clean.
 
 ## Completed 2026-07-16
 

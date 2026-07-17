@@ -298,14 +298,15 @@ Status: Complete after lifecycle correction. Report tooltips no longer animate f
 
 ### 2026-07-17 Carousel Tooltip Dismissal Follow-Up
 
-Status: Complete. Changing the top-chart carousel now dismisses the tooltip from the previous graph without leaking cached data into the next graph.
+Status: Complete. Changing the top-chart carousel or any chart data-view toggle now dismisses the previous tooltip without leaking cached data into the next view.
 
-- Every chart switch publishes a shared dismissal revision before moving the carousel and cancels the active tooltip's normal five-second hold timer.
+- Every chart or data-view switch publishes a shared dismissal revision before changing its visible dataset and cancels the active tooltip's normal five-second hold timer.
 - A visible tooltip uses the existing 180 ms fade-out instead of being hidden abruptly by the carousel cooldown.
 - Cached payloads stay suppressed after the transition until a deliberate mouse move or pointer press occurs inside the selected chart, preventing arbitrary new-graph data from occupying the old tooltip position.
 - The regular five-second tooltip lifecycle and fresh-hover behavior remain unchanged after that interaction gate is released.
-- Regression markers cover the switch and fade hooks in generated report HTML; focused and full report tests, Pyright, frontend typecheck/build, and local browser switching checks pass.
-- Manual test: show a tooltip, switch graphs using any chart-position control, confirm the old tooltip fades away with no replacement, then hover or tap the new graph and confirm its correct tooltip appears.
+- The dismissal provider now spans the full report, covering Projected mode, Category Mix, Calendar, Daily Spending, and Expense Highlights selectors in addition to carousel navigation.
+- Regression markers cover every toggle trigger plus the switch/fade hooks in generated report HTML; focused and full report tests, Pyright, frontend typecheck/build, and local browser switching checks pass.
+- Manual test: show a tooltip, change the current chart with either a carousel control or an in-card data toggle, confirm the old tooltip fades away with no replacement, then hover or tap the new view and confirm its correct tooltip appears.
 
 ### 2026-07-17 Concise Expense Breakdown Reply Follow-Up
 

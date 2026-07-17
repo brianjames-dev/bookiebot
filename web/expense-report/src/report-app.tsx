@@ -440,6 +440,34 @@ export function ExpenseReportApp({ report }: { report: ExpenseReportData }) {
   const [chartTooltipCooldown, setChartTooltipCooldown] = useState(false)
   const [chartTooltipDismissRevision, setChartTooltipDismissRevision] = useState(0)
   const [chartCollapseKey, setChartCollapseKey] = useState(0)
+  const dismissChartTooltips = () => {
+    setChartTooltipDismissRevision((current) => current + 1)
+  }
+  const switchCategoryMixFilter = (nextFilter: CategoryMixFilter) => {
+    if (nextFilter === categoryMixFilter) {
+      return
+    }
+    dismissChartTooltips()
+    setCategoryMixFilter(nextFilter)
+  }
+  const switchCalendarFilter = (nextFilter: CalendarFilter) => {
+    if (nextFilter === calendarFilter) {
+      return
+    }
+    dismissChartTooltips()
+    setCalendarFilter(nextFilter)
+  }
+  const switchDailySpendingFilter = (nextFilter: DailySpendingFilter) => {
+    if (nextFilter === dailySpendingFilter) {
+      return
+    }
+    dismissChartTooltips()
+    setDailySpendingFilter(nextFilter)
+  }
+  const toggleProjection = () => {
+    dismissChartTooltips()
+    setProjectionActive((current) => !current)
+  }
   const activeReport = buildReportView(report, projectionActive)
   const categoryColors: Record<string, string> = Object.fromEntries(activeReport.breakdown.map((item) => [item.label, item.color]))
   const dailyEntries = filterDailyEntries(report.dailyEntries, dailySpendingFilter)
@@ -453,7 +481,7 @@ export function ExpenseReportApp({ report }: { report: ExpenseReportData }) {
     {
       id: "category",
       title: "Category Mix",
-      headerControl: <CategoryMixFilterControl filter={categoryMixFilter} onFilterChange={setCategoryMixFilter} />,
+      headerControl: <CategoryMixFilterControl filter={categoryMixFilter} onFilterChange={switchCategoryMixFilter} />,
       content: (
         <CategoryMixChart
           data={activeReport.breakdown}
@@ -478,7 +506,7 @@ export function ExpenseReportApp({ report }: { report: ExpenseReportData }) {
     {
       id: "calendar",
       title: "Calendar",
-      headerControl: <CalendarFilterControl filter={calendarFilter} onFilterChange={setCalendarFilter} />,
+      headerControl: <CalendarFilterControl filter={calendarFilter} onFilterChange={switchCalendarFilter} />,
       content: (
         <CalendarAnalyticsPanel
           year={report.year}
@@ -624,14 +652,15 @@ export function ExpenseReportApp({ report }: { report: ExpenseReportData }) {
         <div className="bb-header-actions">
           <ProjectionToggle
             active={projectionActive}
-            onToggle={() => setProjectionActive((current) => !current)}
+            onToggle={toggleProjection}
           />
           <ThemeToggle theme={theme} onToggle={toggleTheme} />
           <Badge variant="outline">{generatedTimeLabel(report.generatedAt)}</Badge>
         </div>
       </header>
 
-      <main className="bb-main">
+      <ChartTooltipDismissProvider revision={chartTooltipDismissRevision}>
+        <main className="bb-main" data-bb-tooltip-dismiss-revision={chartTooltipDismissRevision}>
         <section className="bb-metrics-grid" aria-label="Budget metrics">
           <MetricCard
             label="Income"
@@ -648,40 +677,37 @@ export function ExpenseReportApp({ report }: { report: ExpenseReportData }) {
           />
         </section>
 
-        <ChartTooltipDismissProvider revision={chartTooltipDismissRevision}>
+        <div
+          className="bb-chart-carousel"
+          data-dragging={chartTouch?.dragging ? "true" : "false"}
+          data-tooltip-cooldown={chartTooltipCooldown ? "true" : "false"}
+          onTouchStart={handleChartTouchStart}
+          onTouchMove={handleChartTouchMove}
+          onTouchEnd={handleChartTouchEnd}
+          onTouchCancel={handleChartTouchCancel}
+        >
           <div
-            className="bb-chart-carousel"
-            data-bb-tooltip-dismiss-revision={chartTooltipDismissRevision}
-            data-dragging={chartTouch?.dragging ? "true" : "false"}
-            data-tooltip-cooldown={chartTooltipCooldown ? "true" : "false"}
-            onTouchStart={handleChartTouchStart}
-            onTouchMove={handleChartTouchMove}
-            onTouchEnd={handleChartTouchEnd}
-            onTouchCancel={handleChartTouchCancel}
+            className={chartTouch?.dragging ? "bb-chart-carousel-track bb-chart-carousel-track-dragging" : "bb-chart-carousel-track"}
+            style={{ transform: carouselTransform }}
           >
-            <div
-              className={chartTouch?.dragging ? "bb-chart-carousel-track bb-chart-carousel-track-dragging" : "bb-chart-carousel-track"}
-              style={{ transform: carouselTransform }}
-            >
-              {chartPanels.map((panel, index) => (
-                <div className="bb-chart-carousel-slide" key={panel.id} aria-hidden={index !== activeChartIndex}>
-                  <Card className="bb-analytics-card">
-                    <CardHeader className="bb-analytics-header">
-                      <div className="bb-card-title-row bb-analytics-title-row">
-                        <div className="bb-title-with-accessory">
-                          <CardTitle>{panel.title}</CardTitle>
-                          {panel.titleAccessory}
-                        </div>
-                        {panel.headerControl ? <div className="bb-analytics-header-controls">{panel.headerControl}</div> : null}
+            {chartPanels.map((panel, index) => (
+              <div className="bb-chart-carousel-slide" key={panel.id} aria-hidden={index !== activeChartIndex}>
+                <Card className="bb-analytics-card">
+                  <CardHeader className="bb-analytics-header">
+                    <div className="bb-card-title-row bb-analytics-title-row">
+                      <div className="bb-title-with-accessory">
+                        <CardTitle>{panel.title}</CardTitle>
+                        {panel.titleAccessory}
                       </div>
-                    </CardHeader>
-                    <CardContent>{panel.content}</CardContent>
-                  </Card>
-                </div>
-              ))}
-            </div>
+                      {panel.headerControl ? <div className="bb-analytics-header-controls">{panel.headerControl}</div> : null}
+                    </div>
+                  </CardHeader>
+                  <CardContent>{panel.content}</CardContent>
+                </Card>
+              </div>
+            ))}
           </div>
-        </ChartTooltipDismissProvider>
+        </div>
         <ChartCarouselNavigation
           panels={chartPanels}
           activeIndex={activeChartIndex}
@@ -696,7 +722,7 @@ export function ExpenseReportApp({ report }: { report: ExpenseReportData }) {
           <CardHeader>
             <div className="bb-card-title-row bb-inline-toggle-row">
               <CardTitle>Daily Spending</CardTitle>
-              <DailySpendingFilterControl filter={dailySpendingFilter} onFilterChange={setDailySpendingFilter} />
+              <DailySpendingFilterControl filter={dailySpendingFilter} onFilterChange={switchDailySpendingFilter} />
             </div>
           </CardHeader>
           <CardContent className="bb-daily-spending-content">
@@ -705,9 +731,14 @@ export function ExpenseReportApp({ report }: { report: ExpenseReportData }) {
           </CardContent>
         </Card>
 
-        <ExpenseInsightsCard topEntries={report.topEntries} merchantOccurrences={report.merchantOccurrences} />
+        <ExpenseInsightsCard
+          topEntries={report.topEntries}
+          merchantOccurrences={report.merchantOccurrences}
+          onViewChange={dismissChartTooltips}
+        />
 
-      </main>
+        </main>
+      </ChartTooltipDismissProvider>
     </div>
   )
 }
@@ -754,7 +785,12 @@ function CategoryMixFilterControl({
   onFilterChange: (filter: CategoryMixFilter) => void
 }) {
   return (
-    <div className="bb-tabs-list bb-category-mix-filter" role="tablist" aria-label="Category mix filter">
+    <div
+      className="bb-tabs-list bb-category-mix-filter"
+      role="tablist"
+      aria-label="Category mix filter"
+      data-bb-tooltip-dismiss-trigger="category-mix"
+    >
       {CATEGORY_MIX_FILTERS.map((item) => (
         <button
           type="button"
@@ -780,7 +816,12 @@ function DailySpendingFilterControl({
   onFilterChange: (filter: DailySpendingFilter) => void
 }) {
   return (
-    <div className="bb-tabs-list bb-daily-spending-filter" role="tablist" aria-label="Daily spending filter">
+    <div
+      className="bb-tabs-list bb-daily-spending-filter"
+      role="tablist"
+      aria-label="Daily spending filter"
+      data-bb-tooltip-dismiss-trigger="daily-spending"
+    >
       {DAILY_SPENDING_FILTERS.map((item) => (
         <button
           type="button"
@@ -831,6 +872,7 @@ function ProjectionToggle({ active, onToggle }: { active: boolean; onToggle: () 
       aria-pressed={active}
       aria-label="Toggle projected month view"
       title="Toggle projected month view"
+      data-bb-tooltip-dismiss-trigger="projection"
       onClick={onToggle}
     >
       Projected
@@ -2121,14 +2163,34 @@ function MerchantTooltipContent({
   )
 }
 
-function ExpenseInsightsCard({ topEntries, merchantOccurrences }: { topEntries: ExpenseEntry[]; merchantOccurrences: OccurrenceRow[] }) {
+type ExpenseInsightsView = "largest" | "merchants"
+
+function ExpenseInsightsCard({
+  topEntries,
+  merchantOccurrences,
+  onViewChange,
+}: {
+  topEntries: ExpenseEntry[]
+  merchantOccurrences: OccurrenceRow[]
+  onViewChange: () => void
+}) {
+  const [view, setView] = useState<ExpenseInsightsView>("largest")
+  const switchView = (nextView: string) => {
+    const resolvedView = nextView as ExpenseInsightsView
+    if (resolvedView === view) {
+      return
+    }
+    onViewChange()
+    setView(resolvedView)
+  }
+
   return (
     <Card>
-      <Tabs defaultValue="largest" className="bb-card-tabs">
+      <Tabs value={view} onValueChange={switchView} className="bb-card-tabs">
         <CardHeader>
           <div className="bb-card-title-row bb-inline-toggle-row">
             <CardTitle>Expense Highlights</CardTitle>
-            <TabsList>
+            <TabsList data-bb-tooltip-dismiss-trigger="expense-highlights">
               <TabsTrigger value="largest">Largest</TabsTrigger>
               <TabsTrigger value="merchants">Most Frequent</TabsTrigger>
             </TabsList>
@@ -2534,7 +2596,12 @@ function CalendarFilterControl({
   onFilterChange: (filter: CalendarFilter) => void
 }) {
   return (
-    <div className="bb-tabs-list bb-subscription-tone-control" role="tablist" aria-label="Calendar view">
+    <div
+      className="bb-tabs-list bb-subscription-tone-control"
+      role="tablist"
+      aria-label="Calendar view"
+      data-bb-tooltip-dismiss-trigger="calendar"
+    >
       {CALENDAR_FILTERS.map((item) => (
         <button
           type="button"

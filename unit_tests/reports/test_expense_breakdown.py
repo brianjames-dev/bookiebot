@@ -339,6 +339,8 @@ def test_build_expense_breakdown_report_aggregates_shared_and_personal_data():
     assert "data-bb-tooltip-motion-ready" in html
     assert "data-bb-tooltip-dismiss-revision" in html
     assert "data-bb-chart-interaction-revision" in html
+    for trigger in ("projection", "category-mix", "calendar", "daily-spending", "expense-highlights"):
+        assert f'data-bb-tooltip-dismiss-trigger":"{trigger}"' in html
     assert "bb-chart-tooltip-frame-dismissing" in html
     assert "bb-theme-toggle-moon" in html
     assert "bb-table-row-divider" in html
