@@ -82,10 +82,16 @@ class MoveCategoryView(ViewBase):  # type: ignore[misc]
     def __init__(self, callback_func: Callable, *, exclude_category: str | None = None):
         super().__init__(timeout=300)
         excluded = (exclude_category or "").strip().lower()
-        for category in ["Grocery", "Gas", "Food", "Shopping"]:
-            if category.lower() == excluded:
+        for label, category in [
+            ("Grocery", "grocery"),
+            ("Gas", "gas"),
+            ("Food", "food"),
+            ("Shopping", "shopping"),
+            ("Needs", "need_expenses"),
+        ]:
+            if category == excluded:
                 continue
-            self.add_item(RecentActionButton(category, category.lower(), callback_func))
+            self.add_item(RecentActionButton(label, category, callback_func))
 
 
 class UpdateFieldView(ViewBase):  # type: ignore[misc]

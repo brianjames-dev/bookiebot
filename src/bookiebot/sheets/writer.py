@@ -8,7 +8,7 @@ from bookiebot.ui.card import CardButtonView
 import asyncio
 import os
 from zoneinfo import ZoneInfo
-from bookiebot.sheets.config import get_category_columns
+from bookiebot.sheets.config import expense_category_label, get_category_columns, normalize_expense_category
 from bookiebot.sheets.utils import resolve_query_persons
 from bookiebot.sheets.repo import get_sheets_repo
 from bookiebot.sheets.routing import get_current_discord_user_id
@@ -19,6 +19,12 @@ logger = logging.getLogger(__name__)
 
 # Temporary memory for user interactions (used for dropdown callbacks)
 pending_data_by_user = {}
+
+
+def _logged_expense_label(category: str) -> str:
+    if category == "need_expenses":
+        return "Need expense"
+    return f"{expense_category_label(category)} expense"
 
 
 async def _expense_sheet_with_retry(attempts: int = 2):
@@ -137,7 +143,7 @@ def log_income_row(data: dict[str, Any], worksheet: Any, *, return_action_id: bo
 
 
 async def write_expense_to_sheet(data, message):
-    category = (data.get("category") or "").strip().lower()
+    category = normalize_expense_category(data.get("category"))
     if not category:
         if message:
             await message.channel.send("❌ Could not log entry — missing category.")
@@ -228,7 +234,7 @@ async def write_expense_to_sheet(data, message):
             )
 
             await interaction.followup.send(
-                f"✅ Logged {category} expense: ${stored['data']['amount']} for {selected_card}"
+                f"✅ {_logged_expense_label(category)} logged: ${stored['data']['amount']} for {selected_card}"
             )
 
         view = CardButtonView(handle_selection)
@@ -258,7 +264,7 @@ async def write_expense_to_sheet(data, message):
 
     if message:
         await message.channel.send(
-            f"✅ {category.capitalize()} expense logged: ${data.get('amount')} for {selected_person}"
+            f"✅ {_logged_expense_label(category)} logged: ${data.get('amount')} for {selected_person}"
         )
 
 

@@ -1,18 +1,28 @@
 # Agent Status
 
-Last updated: 2026-07-08
+Last updated: 2026-07-16
 
 ## Active Focus
 
-Recent transactions and reconciliation are in manual verification mode after the latest reliability fixes.
+Shared Needs-category logging and recent-action parity are implemented and ready for manual Discord/Google Sheets verification.
 
 ## On Deck
 
-1. Manually verify recent transactions and reconciliation after the latest reliability fixes.
-2. Consider a richer Discord button flow for grouped amount adjustments if the current UX feels too manual.
-3. Harden recent-action pending state across restarts/deploys, since selections currently live only in process memory.
-4. Improve targeted recent-action search so commands can find older matches, not only the latest 10 recent actions.
-5. Explore clarifying questions before logging when BookieBot is uncertain instead of guessing or silently failing.
+1. Manually verify shared Needs logging plus update/move/delete/undo behavior in Discord and Google Sheets.
+2. Manually verify recent transactions and reconciliation after the latest reliability fixes.
+3. Consider a richer Discord button flow for grouped amount adjustments if the current UX feels too manual.
+4. Harden recent-action pending state across restarts/deploys, since selections currently live only in process memory.
+5. Improve targeted recent-action search so commands can find older matches, not only the latest 10 recent actions.
+6. Explore clarifying questions before logging when BookieBot is uncertain instead of guessing or silently failing.
+
+## Completed 2026-07-16
+
+- Replaced personal-budget Need row insertion with normal shared-expense logging in the monthly Needs section (`AD:AH`).
+- Need logging now separates item, location, person, and amount while applying the automatic shared-expense date.
+- New Need rows now use standard expense lineages and support item/amount/location/person updates, moves into or out of Needs, delete compaction, undo, and reconciliation-link reopening.
+- Added Needs to move buttons, direct text routing, and bank reconciliation expense categories.
+- Included Needs in category totals, highest-category, largest-expense, and top-expense queries.
+- Added regression coverage for storage location, legacy description compatibility, editable fields/capabilities, move/delete/undo behavior, category routing/selectors, parser instructions, and Needs query inclusion.
 
 ## Completed 2026-07-08
 
@@ -243,6 +253,14 @@ Use a test row or low-risk real row in Discord:
    - Expected: the previous personal budget month has static values in Burn Rate, Static Bills & Subscriptions (Needs), and Subscriptions (Wants) formula output cells; the current month tab exists even if the copied template did not contain an exact `Month` placeholder.
 45. If Discord login hits a global `429` rate limit during startup.
    - Expected: Railway logs show the login attempt number, retry delay, retry-at timestamp, and periodic backoff progress until the next login attempt. Avoid repeated redeploys while Discord is still rate-limiting the bot.
+46. Log `Need expense $40 for a doctor copay at Kaiser` from Hannah's Discord account, then inspect the current month in Shared Expenses and both personal budget sheets.
+   - Expected: one Needs row appears in Shared Expenses with an automatic date, item `doctor copay`, location `Kaiser`, person `Hannah`, and `$40.00`; no individual transaction row is inserted into Hannah's personal budget sheet, whose Needs bucket receives only the aggregate.
+47. From `recent`, update that Need transaction's item, location, amount, and person/card one field at a time.
+   - Expected: all four fields update in the Shared Expenses Needs row, the date remains unchanged, and the recent action remains editable/movable/deletable.
+48. Move the Need transaction to Shopping, then move it back to Needs using both the Discord buttons and a text command such as `move it to Needs`.
+   - Expected: the source category cells clear/compact, the destination receives the complete transaction exactly once, and Needs is offered as a move destination unless it is already the current category.
+49. Place two test transactions in Needs, delete the older one from recent actions, then immediately undo.
+   - Expected: the newer Needs row compacts upward after delete; undo restores both rows in order with all date/item/amount/location/person values intact.
 
 ## Verification Baseline
 
@@ -256,6 +274,15 @@ python -m pytest unit_tests/intents/test_handlers.py unit_tests/core/test_messag
 Latest verification:
 
 ```bash
+venv/bin/python -m pytest unit_tests
+# passed: 378 passed, 1 warning
+
+python -m pyright --pythonpath venv/bin/python --pythonversion 3.12
+# passed: 0 errors, 0 warnings, 0 informations
+
+git diff --check
+# passed
+
 cd web/expense-report && npm run build
 # passed
 

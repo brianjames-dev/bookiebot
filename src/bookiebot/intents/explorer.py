@@ -94,8 +94,8 @@ INTENT_DETAILS = {
         ["moved $200 to savings 2", "saved 75 in second savings"]
     ),
     "log_need_expense": (
-        "Log a necessary or non-discretionary expense.",
-        ["logged $80 for medication (need)", "spent 60 on gas (need)"]
+        "Log a necessary or non-discretionary expense to the shared Needs category.",
+        ["logged $80 for medication at CVS (need)", "Need expense $60 for a copay at Kaiser"]
     ),
     "undo_last_transaction": (
         "Undo the most recent transaction logged through BookieBot.",

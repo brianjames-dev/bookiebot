@@ -33,6 +33,7 @@ from bookiebot.sheets.routing import (
     resolve_actor_key,
     sheet_user_context,
 )
+from bookiebot.sheets.config import expense_category_label
 from bookiebot.sheets.undo import (
     clear_pending_action_selection,
     delete_recent_action,
@@ -620,7 +621,8 @@ def _move_category_prompt(actor_key: str | None, action_id: str) -> str:
     logged = select_recent_action(actor_key, action_id=action_id)
     source_category = logged.action.metadata.get("category") if logged else None
     if source_category:
-        return f"Move this {source_category} expense to which category?"
+        source_label = "Needs" if source_category == "need_expenses" else source_category
+        return f"Move this {source_label} expense to which category?"
     return "Which category would you like to move this transaction to?"
 
 
@@ -967,7 +969,10 @@ async def query_highest_expense_category_handler(entities, message):
         return
 
     category, amount = await su.highest_expense_category(persons_to_query)
-    await message.channel.send(f"📊 Highest expense category: {category} (${amount:.2f}).")
+    category_label = "Needs" if category == "need_expenses" else category
+    await message.channel.send(
+        f"📊 Highest expense category: {category_label} (${amount:.2f})."
+    )
 
 
 async def query_total_income_handler(message):
@@ -1106,7 +1111,7 @@ async def query_total_for_category_handler(entities, message):
 
     total = await su.total_for_category(category, persons)
     await message.channel.send(
-        f"💰 Total spent on **{category.capitalize()}** this month: ${total:.2f}."
+        f"💰 Total spent on **{expense_category_label(category)}** this month: ${total:.2f}."
     )
 
 
@@ -1118,10 +1123,11 @@ async def query_largest_single_expense_handler(entities, message):
 
     result = await su.largest_single_expense(persons)
     if isinstance(result, dict):
+        category_label = "Needs" if result["category"] == "need_expenses" else result["category"]
         await message.channel.send(
             f"💸 Largest single expense: ${result['amount']:.2f} — "
             f"{result['item']} at {result['location']} on {result['date']} "
-            f"({result['category']})"
+            f"({category_label})"
         )
     else:
         await message.channel.send("❌ Could not find any expenses.")
@@ -1143,10 +1149,11 @@ async def query_top_n_expenses_handler(entities, message):
     # Build message
     lines = []
     for i, expense in enumerate(top_expenses, 1):
+        category_label = "Needs" if expense["category"] == "need_expenses" else expense["category"]
         lines.append(
             f"{i}. ${expense['amount']:.2f} — {expense['item']} "
             f"at {expense['location']} on {expense['date']} "
-            f"({expense['category']})"
+            f"({category_label})"
         )
 
     text = "\n".join(lines)
@@ -1515,13 +1522,13 @@ async def log_2nd_savings_handler(entities, message):
 
 
 async def log_need_expense_handler(entities, message):
-    description = entities.get("description")
+    item = entities.get("item") or entities.get("description")
     amount = entities.get("amount")
-    if not description or amount is None:
-        await message.channel.send("❌ Please specify both a description and an amount for the Need expense.")
+    if not item or amount is None:
+        await message.channel.send("❌ Please specify both an item and an amount for the Need expense.")
         return
-    success = su.log_need_expense(description, amount)
-    if success:
-        await message.channel.send(f"✅ Logged Need expense: '{description}' - ${amount:.2f}")
-    else:
-        await message.channel.send("❌ Failed to log Need expense.")
+    expense = dict(entities)
+    expense["item"] = item
+    expense["category"] = "need_expenses"
+    expense.pop("description", None)
+    await write_transaction_to_sheet("expense", expense, message)

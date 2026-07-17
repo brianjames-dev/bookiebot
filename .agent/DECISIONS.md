@@ -140,6 +140,12 @@ Decision: Expense breakdown reports use scheduled subscription pull dates from t
 
 Rationale: Open-month reports should reflect which subscriptions should have hit so far and show the full-month subscription amount as projection context. Completed months should preserve Budget sheet snapshot totals for historical review.
 
+## 2026-07-16 - Treat Needs As A Shared Expense Category
+
+Decision: New Need transactions are normal shared-expense rows in the monthly `Shared Expenses` Needs section (`AD:AH`) with date, item, amount, location, and person fields. Personal Brian/Hannah budget sheets receive only their aggregated Needs total through the existing sheet formula/import flow; BookieBot no longer inserts individual Need rows there.
+
+Rationale: Using the normal expense writer and action lineage gives Needs the same update, move, delete, undo, reconciliation-reopen, and query behavior as other shared categories while keeping personal budget sheets as aggregate views.
+
 ## Pending Decisions
 
 - Where should durable system events live: banking database only, Google Sheets only, or dual-write during transition?

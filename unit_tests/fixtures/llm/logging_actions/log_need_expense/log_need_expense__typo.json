@@ -1,4 +1,4 @@
 {
   "intent": "log_need_expense",
-  "entities": {"description": "bss ticket", "amount": 30}
+  "entities": {"item": "bus ticket", "location": "", "amount": 30}
 }

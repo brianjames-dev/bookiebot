@@ -1301,7 +1301,7 @@ def register_commands(tree: app_commands.CommandTree):
     @tree.command(name="debug_bank_log_expense", description="(Admin) Log an unresolved bank item as an expense")
     @app_commands.describe(
         reconciliation_id="ID shown by /debug_bank_review",
-        category="Expense category, such as food, grocery, gas, or shopping",
+        category="Expense category, such as food, grocery, gas, shopping, or needs",
         person="Budget person/card label, such as Brian (BofA)",
         item="Optional item/description override",
         location="Optional location/merchant override",

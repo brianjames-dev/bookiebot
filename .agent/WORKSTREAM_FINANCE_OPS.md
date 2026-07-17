@@ -1,6 +1,6 @@
 # Finance Operations Workstream
 
-Last updated: 2026-07-08
+Last updated: 2026-07-16
 
 ## Goal
 
@@ -21,7 +21,7 @@ Task execution and documentation update rules live in `.Agents`.
 5. The UI does not expose date updates, and user-entered date updates are now rejected. Fixed 2026-06-20; reconciliation-origin automation may still set dates from bank transaction dates.
 6. Pending selections live only in process memory, so deploys, restarts, or long pauses lose context.
 7. Component views time out after 120 seconds while pending text state may still exist. Fixed 2026-06-18.
-8. Income, Need expenses, payments, and savings appear in recent actions but have inconsistent edit/move/delete capabilities.
+8. Income, Need expenses, payments, and savings appear in recent actions but have inconsistent edit/move/delete capabilities. Fixed for new shared-sheet Need expenses as of 2026-07-16; historical personal-budget Need action records remain legacy-only.
 9. Match-text search only checks the latest 10 recent actions, so targeted commands can miss older actions.
 10. Reconciled actions can be updated, moved, deleted, or undone without updating/reopening reconciliation state. Fixed first pass 2026-06-20 by reopening linked reconciliation items.
 
@@ -122,6 +122,17 @@ Manual verification steps are tracked in `.agent/STATUS.md`.
 - Forced reconciliation inbox views now include recent persisted `matched` reconciliation items when the fresh preview no longer contains the automatic matches from the original digest.
 - Auto-match-only inbox reports send the confirmed-match detail without unresolved action buttons, while unresolved inboxes still include `Reconcile Now` and `Ignore All`.
 - Added regression coverage for the forced inbox auto-match report path.
+
+### 2026-07-16
+
+- Routed `log_need_expense` through the normal shared-expense writer into the monthly Needs section instead of inserting individual rows into a personal budget sheet.
+- Need rows now record date, item, amount, location, and person and use normal expense action metadata/lineage.
+- Added Needs to text and button move destinations plus the bank reconciliation expense-category selector.
+- Verified shared Needs rows can be updated, moved out, moved back, deleted with category compaction, and restored with undo.
+- Extended category totals, highest-category, largest-expense, and top-expense queries so Needs participates like the other shared categories.
+- Preserved support for legacy `description` entities by translating them to the new item field at the intent boundary.
+
+Manual verification steps are tracked in `.agent/STATUS.md`.
 
 ### Slice D - Pending State Hardening
 

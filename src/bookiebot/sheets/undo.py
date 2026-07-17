@@ -11,6 +11,7 @@ from uuid import uuid4
 
 from openpyxl.utils import get_column_letter
 
+from bookiebot.sheets.config import expense_category_label, normalize_expense_category
 from bookiebot.sheets.repo import get_sheets_repo
 from bookiebot.sheets.routing import actor_key_aliases, get_user_config
 
@@ -509,15 +510,15 @@ def action_title(action: UndoAction) -> str:
     action_type = action.metadata.get("type")
     category = action.metadata.get("category")
     if action_type == "expense":
-        return f"{category or 'expense'} expense".title()
+        return f"{expense_category_label(category) if category else 'Expense'} Expense"
     if action_type == "update":
         if _is_income_display_action(action):
             return "Updated: Income"
-        return f"Updated: {(category or 'transaction').capitalize()} Expense"
+        return f"Updated: {expense_category_label(category) if category else 'Transaction'} Expense"
     if action_type == "move":
         source = action.metadata.get("source_category", "unknown")
         destination = action.metadata.get("destination_category") or category or "unknown"
-        return f"Moved Expense: {source.capitalize()} -> {destination.capitalize()}"
+        return f"Moved Expense: {expense_category_label(source)} -> {expense_category_label(destination)}"
     if action_type == "need_expense":
         return "Need Expense"
     if action_type == "payment":
@@ -1224,15 +1225,17 @@ def _values_for_category(source_values: dict[str, str], destination_category: st
 
 def _missing_required_move_fields(values: dict[str, str], destination_category: str) -> list[str]:
     required = ["date", "amount", "person"]
-    if destination_category in {"food", "shopping"}:
+    if destination_category in {"food", "shopping", "need_expenses"}:
         required.append("item")
     return [field for field in required if field in values and not str(values[field]).strip()]
 
 
 def _move_item_prompt(source_category: str, destination_category: str) -> str:
+    source_label = "Needs" if source_category == "need_expenses" else source_category
+    destination_label = "Needs" if destination_category == "need_expenses" else destination_category
     return (
-        f"To move this {source_category} expense to {destination_category}, "
-        f"reply with the item name to use in {destination_category}."
+        f"To move this {source_label} expense to {destination_label}, "
+        f"reply with the item name to use in {destination_label}."
     )
 
 
@@ -1266,7 +1269,7 @@ def move_recent_action(
     from bookiebot.sheets.config import get_category_columns
 
     updates = updates or {}
-    destination_category = (destination_category or "").strip().lower()
+    destination_category = normalize_expense_category(destination_category)
     if match_text and not index and not action_id:
         return False, format_move_candidates(user_key, match_text, 10)
 

@@ -92,6 +92,13 @@ def test_selected_transaction_move_followup_routes_to_move_action():
     )
 
 
+def test_move_specific_expense_to_needs_routes_to_shared_need_category():
+    assert _action_management_intent("move the Midas expense to Needs") == (
+        "move_recent_action",
+        {"category": "need_expenses", "match_text": "midas"},
+    )
+
+
 def test_change_item_name_routes_to_recent_actions():
     assert _action_management_intent("change item name") == (
         "query_recent_actions",

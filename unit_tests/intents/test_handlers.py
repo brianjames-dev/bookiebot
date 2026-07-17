@@ -147,11 +147,104 @@ async def test_logging_helpers_success(monkeypatch, message, intent, func_name, 
 
 @pytest.mark.asyncio
 async def test_log_need_expense(monkeypatch, message):
-    monkeypatch.setattr(ih.su, "log_need_expense", lambda desc, amt: True)
+    import bookiebot.sheets.writer as writer
+    from bookiebot.sheets.undo import action_capabilities, recent_actions
 
-    await ih.handle_intent("log_need_expense", {"description": "Groceries", "amount": 42.0}, message)
+    monkeypatch.setattr(writer, "resolve_query_persons", lambda user, person=None, user_id=None: ["Hannah"])
+    income_rows = [["", "Legacy Need", "12"], ["", "<Enter Transaction>", ""]]
+    repo = SheetsRepoStub(expense_rows=[[], []], income_rows=income_rows)
 
-    assert any("Need expense" in (msg or "") for msg, _ in message.channel.sent)
+    with repo.patched():
+        await ih.handle_intent(
+            "log_need_expense",
+            {"item": "Doctor copay", "location": "Kaiser", "amount": 42.0},
+            message,
+        )
+
+        assert repo.expense.cell(3, 30).value
+        assert repo.expense.cell(3, 31).value == "Doctor copay"
+        assert repo.expense.cell(3, 32).value == "$42.00"
+        assert repo.expense.cell(3, 33).value == "Kaiser"
+        assert repo.expense.cell(3, 34).value == "Hannah"
+        assert repo.income.get_all_values() == income_rows
+
+        action = recent_actions(str(message.author.id), 1)[0].action
+        capabilities = action_capabilities(action)
+        assert action.metadata["type"] == "expense"
+        assert action.metadata["category"] == "need_expenses"
+        assert capabilities.can_update is True
+        assert capabilities.can_move is True
+        assert capabilities.can_delete is True
+        assert capabilities.editable_fields == ["item", "amount", "location", "person"]
+
+    assert any("Need expense logged" in (msg or "") for msg, _ in message.channel.sent)
+
+
+@pytest.mark.asyncio
+async def test_need_expense_supports_update_move_delete_and_undo(monkeypatch, message):
+    import bookiebot.sheets.writer as writer
+
+    monkeypatch.setattr(writer, "resolve_query_persons", lambda user, person=None, user_id=None: ["Hannah"])
+    repo = SheetsRepoStub(expense_rows=[[], []])
+
+    with repo.patched():
+        await ih.handle_intent(
+            "log_need_expense",
+            {"description": "Car repair", "location": "Midas", "amount": 250.0},
+            message,
+        )
+        await ih.handle_intent(
+            "update_recent_action",
+            {
+                "index": 1,
+                "updates": {
+                    "item": "Brake repair",
+                    "location": "Local Midas",
+                    "amount": 275.0,
+                    "person": "Brian (BofA)",
+                },
+            },
+            message,
+        )
+
+        assert repo.expense.cell(3, 31).value == "Brake repair"
+        assert repo.expense.cell(3, 32).value == "$275.00"
+        assert repo.expense.cell(3, 33).value == "Local Midas"
+        assert repo.expense.cell(3, 34).value == "Brian (BofA)"
+
+        await ih.handle_intent("move_recent_action", {"index": 1, "category": "shopping"}, message)
+        assert repo.expense.cell(3, 31).value == ""
+        assert repo.expense.cell(3, 32).value == ""
+        assert repo.expense.cell(3, 23).value == "Brake repair"
+        assert repo.expense.cell(3, 24).value == "$275.00"
+        assert repo.expense.cell(3, 25).value == "Local Midas"
+
+        await ih.handle_intent("move_recent_action", {"index": 1, "category": "needs"}, message)
+        assert repo.expense.cell(3, 23).value == ""
+        assert repo.expense.cell(3, 31).value == "Brake repair"
+        assert repo.expense.cell(3, 32).value == "$275.00"
+        assert repo.expense.cell(3, 33).value == "Local Midas"
+        assert repo.expense.cell(3, 34).value == "Brian (BofA)"
+
+        await ih.handle_intent(
+            "log_need_expense",
+            {"item": "Doctor copay", "location": "Kaiser", "amount": 40.0},
+            message,
+        )
+        await ih.handle_intent("delete_recent_action", {"index": 2}, message)
+        assert repo.expense.cell(3, 31).value == "Doctor copay"
+        assert repo.expense.cell(3, 32).value == "$40.00"
+        assert repo.expense.cell(4, 31).value == ""
+
+        await ih.handle_intent("undo_last_transaction", {}, message)
+        assert repo.expense.cell(3, 31).value == "Brake repair"
+        assert repo.expense.cell(3, 32).value == "$275.00"
+        assert repo.expense.cell(4, 31).value == "Doctor copay"
+        assert repo.expense.cell(4, 32).value == "$40.00"
+
+    assert any("Updated logged action" in (msg or "") for msg, _ in message.channel.sent)
+    assert sum("Moved logged expense" in (msg or "") for msg, _ in message.channel.sent) == 2
+    assert any("Deleted:" in (msg or "") for msg, _ in message.channel.sent)
 
 
 @pytest.mark.asyncio
@@ -1117,6 +1210,15 @@ async def test_recent_action_component_views_use_five_minute_timeout():
     assert ih.MoveCategoryView(noop).timeout == 300
     assert ih.PersonSelectView(noop).timeout == 300
 
+    move_view = ih.MoveCategoryView(noop)
+    assert [getattr(child, "label", "") for child in move_view.children] == [
+        "Grocery",
+        "Gas",
+        "Food",
+        "Shopping",
+        "Needs",
+    ]
+
 
 def test_pending_move_item_expires_and_clears_notice(monkeypatch):
     import bookiebot.sheets.undo as undo
@@ -1444,7 +1546,7 @@ async def test_move_category_view_excludes_current_category(monkeypatch, message
 
     labels = [child.label for child in view.children]
     assert "Grocery" not in labels
-    assert labels == ["Gas", "Food", "Shopping"]
+    assert labels == ["Gas", "Food", "Shopping", "Needs"]
 
 
 @pytest.mark.asyncio

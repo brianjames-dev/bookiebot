@@ -82,7 +82,7 @@ async def parse_message_llm(user_message: str, *, llm_client: Optional[LLMClient
         "index": <number if the user identifies a numbered action>,
         "action_id": "<id if provided>",
         "match_text": "<store/item/description text such as Chipotle if provided>",
-        "category": "<destination category: grocery, gas, food, or shopping>",
+        "category": "<destination category: grocery, gas, food, shopping, or need_expenses>",
         "updates": {{
             "item": "<item if needed for the destination category>",
             "amount": <float if correcting amount too>,
@@ -108,11 +108,16 @@ async def parse_message_llm(user_message: str, *, llm_client: Optional[LLMClient
 
     Do NOT treat these payments as generic expenses. Do NOT assign them a category. Do NOT include item, location, or store — only use the amount and the correct intent.
 
-    If the message is about logging a Need expense, only include the description of the expense and the amount.
-    Do NOT include item, category, location, or other fields. Use the following format:User: "Need expense 45 for bus ticket"
-    → {{ "intent": "log_need_expense", "entities": {{ "description": "bus ticket", "amount": 45 }} }}
-    User: "Add a Need expense of 75 for car repair"
-    → {{ "intent": "log_need_expense", "entities": {{ "description": "car repair", "amount": 75 }} }}
+    If the message is about logging a Need expense, use the same separated expense fields as other shared expenses:
+    - amount: float (do not include $)
+    - item: short label for what was purchased or paid for
+    - location: merchant, vendor, or place when provided or reasonably inferable
+    - person: only when explicitly provided; otherwise omit it so the Discord user is used
+    Do NOT include a category or date; the handler routes it to the shared Needs category and timestamps it.
+    User: "Need expense 45 for bus ticket at Golden Gate Transit"
+    → {{ "intent": "log_need_expense", "entities": {{ "item": "bus ticket", "location": "Golden Gate Transit", "amount": 45 }} }}
+    User: "Add a Need expense of 75 for car repair at Midas"
+    → {{ "intent": "log_need_expense", "entities": {{ "item": "car repair", "location": "Midas", "amount": 75 }} }}
 
     If the message is about logging an expense or income:
     - intent: "log_expense" or "log_income"

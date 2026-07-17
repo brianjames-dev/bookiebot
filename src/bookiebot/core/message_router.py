@@ -56,7 +56,7 @@ _ACTION_NOUNS = {
 _DELETE_VERBS = {"clear", "delete", "remove", "erase"}
 _UPDATE_VERBS = {"change", "correct", "edit", "fix", "redo", "update"}
 _MOVE_VERBS = {"categorize", "move", "reclassify", "recategorize"}
-_CATEGORIES = {"grocery", "groceries", "gas", "food", "shopping"}
+_CATEGORIES = {"grocery", "groceries", "gas", "food", "shopping", "need", "needs"}
 _CANCEL_WORDS = {"cancel", "nevermind", "never mind", "stop"}
 
 
@@ -186,6 +186,8 @@ def _extract_destination_category(content: str) -> str | None:
     words = set(re.findall(r"[a-z&']+", content.lower()))
     if "groceries" in words:
         return "grocery"
+    if re.search(r"\bto\s+(?:the\s+)?needs?\b", content.lower()):
+        return "need_expenses"
     for category in ("grocery", "gas", "food", "shopping"):
         if category in words:
             return category

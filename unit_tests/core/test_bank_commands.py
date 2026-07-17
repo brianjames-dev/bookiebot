@@ -403,7 +403,13 @@ async def test_bank_expense_fixed_fields_view_uses_dropdowns_for_fixed_fields():
 
     assert getattr(category_select, "placeholder", "") == "Select category"
     assert getattr(person_select, "placeholder", "") == "Select person/card"
-    assert [option.value for option in category_select.options] == ["food", "grocery", "gas", "shopping"]
+    assert [option.value for option in category_select.options] == [
+        "food",
+        "grocery",
+        "gas",
+        "shopping",
+        "need_expenses",
+    ]
     assert [option.value for option in person_select.options] == ["Hannah", "Brian (BofA)", "Brian (AL)"]
     assert any(option.value == "shopping" and option.default for option in category_select.options)
     assert any(option.value == "Brian (AL)" and option.default for option in person_select.options)

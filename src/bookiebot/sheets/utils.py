@@ -5,7 +5,7 @@ import os
 import re
 from typing import Any, Optional
 from zoneinfo import ZoneInfo
-from bookiebot.sheets.config import get_category_columns
+from bookiebot.sheets.config import get_category_columns, normalize_expense_category
 from dateutil import parser as dateparser
 from collections import defaultdict, Counter
 from bookiebot.sheets.routing import get_user_config, resolve_actor_key, UnknownDiscordUserError
@@ -332,15 +332,17 @@ async def highest_expense_category(persons=None):
     category_totals = {}
 
     categories = {
-        'grocery': {'amount': 'B', 'person': 'D'},
-        'gas': {'amount': 'I', 'person': 'J'},
-        'food': {'amount': 'P', 'person': 'R'},
-        'shopping': {'amount': 'X', 'person': 'Z'}
+        category: {
+            "amount": config["columns"]["amount"],
+            "person": config["columns"].get("person"),
+            "start_row": int(config["start_row"]),
+        }
+        for category, config in get_category_columns.items()
     }
 
     for category, cols in categories.items():
         amount_col_idx = column_index_from_string(cols['amount'])
-        person_col_idx = column_index_from_string(cols['person']) if persons_filter else None
+        person_col_idx = column_index_from_string(cols['person']) if persons_filter and cols['person'] else None
 
         try:
             amounts = ws.col_values(amount_col_idx)
@@ -353,8 +355,8 @@ async def highest_expense_category(persons=None):
             persons_col = []
 
         total = 0.0
-        # skip headers (first two rows)
-        for idx, amount_str in enumerate(amounts[2:], start=2):
+        start_index = cols["start_row"] - 1
+        for idx, amount_str in enumerate(amounts[start_index:], start=start_index):
             if not amount_str:
                 continue
 
@@ -611,23 +613,20 @@ async def total_for_category(category, persons=None):
     today = get_local_today()
     persons_filter = set(persons) if persons else None
 
-    category = category.lower()
-    config = {
-        'grocery': {'amount': 'B', 'person': 'D', 'start_row': 3},
-        'gas': {'amount': 'I', 'person': 'J', 'start_row': 3},
-        'food': {'amount': 'P', 'person': 'R', 'start_row': 3},
-        'shopping': {'amount': 'X', 'person': 'Z', 'start_row': 3}
-    }
-
-    if category not in config:
+    category = normalize_expense_category(category)
+    if category not in get_category_columns:
         print(f"[ERROR] Unknown category: {category}")
         return 0.0
 
-    cols = config[category]
-    amount_idx = column_index_from_string(cols['amount']) - 1
-    person_idx = column_index_from_string(cols['person']) - 1
+    category_config = get_category_columns[category]
+    columns = category_config["columns"]
+    person_column = columns.get("person")
+    if not person_column:
+        return 0.0
+    amount_idx = column_index_from_string(columns['amount']) - 1
+    person_idx = column_index_from_string(person_column) - 1
 
-    rows = ws.get_all_values()[cols['start_row'] - 1:]
+    rows = ws.get_all_values()[int(category_config['start_row']) - 1:]
     total = 0.0
 
     for row in rows:
@@ -663,20 +662,9 @@ async def largest_single_expense(persons=None):
     rows = ws.get_all_values()[2:]  # skip header rows
 
     configs = {
-        "food": {
-            "date": "N",
-            "item": "O",
-            "amount": "P",
-            "location": "Q",
-            "person": "R"
-        },
-        "shopping": {
-            "date": "V",
-            "item": "W",
-            "amount": "X",
-            "location": "Y",
-            "person": "Z"
-        }
+        category: config["columns"]
+        for category, config in get_category_columns.items()
+        if config["columns"].get("person")
     }
 
     max_amount = 0.0
@@ -686,12 +674,13 @@ async def largest_single_expense(persons=None):
         for category, cols in configs.items():
             try:
                 date_idx = column_index_from_string(cols["date"]) - 1
-                item_idx = column_index_from_string(cols["item"]) - 1
+                item_idx = column_index_from_string(cols["item"]) - 1 if cols.get("item") else None
                 amount_idx = column_index_from_string(cols["amount"]) - 1
-                location_idx = column_index_from_string(cols["location"]) - 1
+                location_idx = column_index_from_string(cols["location"]) - 1 if cols.get("location") else None
                 person_idx = column_index_from_string(cols["person"]) - 1
 
-                if max(date_idx, item_idx, amount_idx, location_idx, person_idx) >= len(row):
+                required_indices = [date_idx, amount_idx, person_idx]
+                if max(required_indices) >= len(row):
                     continue
 
                 person_str = row[person_idx].strip()
@@ -710,8 +699,8 @@ async def largest_single_expense(persons=None):
                         "category": category,
                         "amount": round(amt, 2),
                         "date": row[date_idx],
-                        "item": row[item_idx],
-                        "location": row[location_idx]
+                        "item": row[item_idx] if item_idx is not None and item_idx < len(row) else "",
+                        "location": row[location_idx] if location_idx is not None and location_idx < len(row) else ""
                     }
 
             except Exception as e:
@@ -732,18 +721,9 @@ async def top_n_expenses_all_categories(persons, n=5):
     rows = ws.get_all_values()[2:]  # skip header
 
     configs = {
-        "grocery": {
-            "date": "A", "item": None, "amount": "B", "location": "C", "person": "D"
-        },
-        "gas": {
-            "date": "H", "item": None, "amount": "I", "location": None, "person": "J"
-        },
-        "food": {
-            "date": "N", "item": "O", "amount": "P", "location": "Q", "person": "R"
-        },
-        "shopping": {
-            "date": "V", "item": "W", "amount": "X", "location": "Y", "person": "Z"
-        }
+        category: config["columns"]
+        for category, config in get_category_columns.items()
+        if config["columns"].get("person")
     }
 
     expenses = []
@@ -755,8 +735,8 @@ async def top_n_expenses_all_categories(persons, n=5):
                 amount_idx = column_index_from_string(cols["amount"]) - 1
                 person_idx = column_index_from_string(cols["person"]) - 1
 
-                item_idx = column_index_from_string(cols["item"]) - 1 if cols["item"] else None
-                location_idx = column_index_from_string(cols["location"]) - 1 if cols["location"] else None
+                item_idx = column_index_from_string(cols["item"]) - 1 if cols.get("item") else None
+                location_idx = column_index_from_string(cols["location"]) - 1 if cols.get("location") else None
 
                 if max(date_idx, amount_idx, person_idx, *(i for i in [item_idx, location_idx] if i is not None)) >= len(row):
                     continue
@@ -1735,44 +1715,4 @@ def log_2nd_savings(amount):
 
     except Exception as e:
         print(f"[ERROR] Failed to log 2nd savings deposit: {e}")
-        return False
-
-
-def log_need_expense(description, amount):
-    """
-    Logs a Need expense by inserting a row above the <Enter Transaction> marker
-    in the Needs section of the income sheet.
-    Writes description in column B and amount in column C.
-    """
-    ws = _income_ws()
-    try:
-        # find the <Enter Transaction> marker
-        cell = ws.find("<Enter Transaction>")
-        insert_row_idx = cell.row
-
-        # insert a blank row above
-        ws.insert_row([], index=insert_row_idx)
-
-        # write description and amount
-        ws.update_acell(f"B{insert_row_idx}", description)
-        ws.update_acell(f"C{insert_row_idx}", str(amount))
-        record_undo_action(
-            get_current_discord_user_id(),
-            UndoAction(
-                worksheet="income",
-                kind="delete_row",
-                row=insert_row_idx,
-                columns=[],
-                previous_values=[],
-                new_values=[str(description), str(amount)],
-                metadata={"type": "need_expense"},
-                description=f"Need expense '{description}' ${amount}",
-            ),
-        )
-
-        print(f"[INFO] Logged Need expense: '{description}' - ${amount} at row {insert_row_idx}")
-        return True
-
-    except Exception as e:
-        print(f"[ERROR] Failed to log Need expense: {e}")
         return False

@@ -36,6 +36,16 @@ def _shopping_row(date_str, amount, person):
     return row
 
 
+def _needs_row(date_str, item, amount, location, person):
+    row = [""] * 34  # enough columns through AH
+    row[su.column_index_from_string("AD") - 1] = date_str
+    row[su.column_index_from_string("AE") - 1] = item
+    row[su.column_index_from_string("AF") - 1] = str(amount)
+    row[su.column_index_from_string("AG") - 1] = location
+    row[su.column_index_from_string("AH") - 1] = person
+    return row
+
+
 def test_resolve_query_persons_uses_discord_user_id():
     result = su.resolve_query_persons("hannerish#0000", None, "1395120954589315303")
     assert result == ["Hannah"]
@@ -226,7 +236,8 @@ async def test_highest_expense_category(mock_get_expense_worksheet, mock_col_idx
         'B': 2,
         'I': 9,
         'P': 16,
-        'X': 24
+        'X': 24,
+        'AF': 32,
     }[col]
 
     # mock the col_values per column index
@@ -234,13 +245,14 @@ async def test_highest_expense_category(mock_get_expense_worksheet, mock_col_idx
         2: ['header', 'header', '10', '20'],      # grocery → 30
         9: ['header', 'header', '5'],            # gas → 5
         16: ['header', 'header', '15', '25'],   # food → 40
-        24: ['header', 'header', '50']          # shopping → 50
+        24: ['header', 'header', '50'],         # shopping → 50
+        32: ['header', 'header', '75'],         # needs → 75
     }[col]
 
     category, amount = await su.highest_expense_category()
 
-    assert category == 'shopping'
-    assert amount == 50.0
+    assert category == 'need_expenses'
+    assert amount == 75.0
 
 
 @pytest.mark.asyncio
@@ -395,6 +407,21 @@ async def test_total_for_category(mock_ws_func, mock_ws, persons):
 
 @pytest.mark.asyncio
 @patch("bookiebot.sheets.utils.get_expense_worksheet")
+async def test_total_for_needs_category_alias(mock_ws_func, mock_ws, persons):
+    mock_ws_func.return_value = mock_ws
+    mock_ws.get_all_values.return_value = [
+        ["hdr"] * 34,
+        ["hdr"] * 34,
+        _needs_row("05/01/2025", "Copay", 40, "Kaiser", "Hannah"),
+        _needs_row("05/02/2025", "Repair", 75, "Midas", "SomeoneElse"),
+        _needs_row("05/03/2025", "Registration", 184, "DMV", "Brian (BofA)"),
+    ]
+
+    assert await su.total_for_category("needs", persons) == 224.0
+
+
+@pytest.mark.asyncio
+@patch("bookiebot.sheets.utils.get_expense_worksheet")
 async def test_average_daily_spend(mock_ws_func, mock_ws, persons):
     mock_ws_func.return_value = mock_ws
     mock_ws.get_all_values.return_value = [
@@ -413,14 +440,17 @@ async def test_average_daily_spend(mock_ws_func, mock_ws, persons):
 async def test_largest_single_expense(mock_ws_func, mock_ws, persons):
     mock_ws_func.return_value = mock_ws
     mock_ws.get_all_values.return_value = [
-        ["hdr"] * 26,
-        ["hdr"] * 26,
+        ["hdr"] * 34,
+        ["hdr"] * 34,
         _food_row("05/12/2025", 30, "Hannah"),
         _shopping_row("05/14/2025", 50, "Brian (BofA)"),
+        _needs_row("05/15/2025", "DMV Registration", 184, "DMV", "Hannah"),
     ]
     result = await su.largest_single_expense(persons)
     assert isinstance(result, dict)
-    assert result["amount"] == 50.0
+    assert result["amount"] == 184.0
+    assert result["category"] == "need_expenses"
+    assert result["item"] == "DMV Registration"
 
 
 @pytest.mark.asyncio
@@ -428,17 +458,21 @@ async def test_largest_single_expense(mock_ws_func, mock_ws, persons):
 async def test_top_n_expenses_all_categories(mock_ws_func, mock_ws, persons):
     mock_ws_func.return_value = mock_ws
     mock_ws.get_all_values.return_value = [
-        ["hdr"] * 26,
-        ["hdr"] * 26,
+        ["hdr"] * 34,
+        ["hdr"] * 34,
         _food_row("05/12/2025", 30, "Hannah"),            # food amount
         _shopping_row("05/14/2025", 50, "Brian (BofA)"),  # shopping amount
+        _needs_row("05/15/2025", "DMV Registration", 184, "DMV", "Hannah"),
     ]
 
-    results = await su.top_n_expenses_all_categories(persons, n=2)
-    assert len(results) == 2
-    assert results[0]["amount"] == 50.0
-    assert results[0]["category"] == "shopping"
-    assert results[1]["amount"] == 30.0
+    results = await su.top_n_expenses_all_categories(persons, n=3)
+    assert len(results) == 3
+    assert results[0]["amount"] == 184.0
+    assert results[0]["category"] == "need_expenses"
+    assert results[0]["item"] == "DMV Registration"
+    assert results[1]["amount"] == 50.0
+    assert results[1]["category"] == "shopping"
+    assert results[2]["amount"] == 30.0
 
 
 @pytest.mark.asyncio

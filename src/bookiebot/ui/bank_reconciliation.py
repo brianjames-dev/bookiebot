@@ -197,8 +197,14 @@ class BankReconciliationGroupAdjustView(ViewBase):  # type: ignore[misc]
 class BankExpenseCategorySelect(SelectBase):  # type: ignore[misc]
     def __init__(self, callback_func: Callable, *, default_category: str):
         options = [
-            SelectOption(label=category.title(), value=category, default=category == default_category)
-            for category in ["food", "grocery", "gas", "shopping"]
+            SelectOption(label=label, value=category, default=category == default_category)
+            for label, category in [
+                ("Food", "food"),
+                ("Grocery", "grocery"),
+                ("Gas", "gas"),
+                ("Shopping", "shopping"),
+                ("Needs", "need_expenses"),
+            ]
         ]
         super().__init__(placeholder="Select category", options=options)
         self.callback_func = callback_func
