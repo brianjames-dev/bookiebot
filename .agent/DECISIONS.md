@@ -176,6 +176,12 @@ Decision: Personal budget `Subscriptions` tabs use the Brian four-block layout: 
 
 Rationale: One visible structure keeps subscription parsing, reminders, reports, and future annual subscriptions consistent across both budget owners. Leaving unsourced dates blank preserves financial accuracy while making the missing schedule inputs explicit.
 
+## 2026-07-16 - Persist Undated Subscription Drafts Without Scheduling Them
+
+Decision: `_BookieBot Subscription Schedule` stores structurally complete visible subscription rows even when their pull date is missing, leaving `pull_day` and `pull_month` blank. Reminder and normalized schedule readers continue to return only entries with a valid pull day.
+
+Rationale: Persisting drafts gives users a stable normalized scaffold while they research dates and prevents background sync from erasing known cadence/name/amount/source metadata. Excluding undated drafts from reminder reads prevents BookieBot from inventing or sending notifications for unknown dates.
+
 ## Pending Decisions
 
 - Where should durable system events live: banking database only, Google Sheets only, or dual-write during transition?

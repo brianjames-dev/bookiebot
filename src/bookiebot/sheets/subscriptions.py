@@ -153,6 +153,7 @@ def _subscription_from_fields(
     owner_key: str = "",
     owner_name: str = "",
     updated_at: str = "",
+    allow_missing_pull_day: bool = False,
 ) -> Subscription | None:
     name = fields.get("name") or fields.get("service") or fields.get("merchant") or ""
     amount_text = fields.get("amount") or fields.get("estimate") or fields.get("expected_amount") or ""
@@ -172,7 +173,7 @@ def _subscription_from_fields(
 
     pull_day = _parse_optional_int(fields.get("pull_day", "")) or pull_day
     pull_month = _parse_optional_int(fields.get("pull_month", "")) or pull_month
-    if pull_day is None:
+    if pull_day is None and not allow_missing_pull_day:
         return None
 
     budget_owner_key = fields.get("budget_owner_key", "") or owner_key
@@ -223,7 +224,11 @@ def _parse_warning_for_fields(
     return None
 
 
-def _parse_normalized_table(rows: list[list[str]]) -> list[Subscription]:
+def _parse_normalized_table(
+    rows: list[list[str]],
+    *,
+    allow_missing_pull_day: bool = False,
+) -> list[Subscription]:
     if not rows:
         return []
     required_headers = {"cadence", "name", "amount", "pull_day"}
@@ -240,7 +245,10 @@ def _parse_normalized_table(rows: list[list[str]]) -> list[Subscription]:
                 for index, header in enumerate(normalized)
                 if header
             }
-            subscription = _subscription_from_fields(fields)
+            subscription = _subscription_from_fields(
+                fields,
+                allow_missing_pull_day=allow_missing_pull_day,
+            )
             if subscription:
                 subscriptions.append(subscription)
         return subscriptions
@@ -271,6 +279,7 @@ def _parse_block_layout(
     owner_name: str = "",
     updated_at: str = "",
     warnings: list[SubscriptionParseWarning] | None = None,
+    allow_missing_pull_day: bool = False,
 ) -> list[Subscription]:
     subscriptions: list[Subscription] = []
     for row_index, row in enumerate(rows):
@@ -310,6 +319,7 @@ def _parse_block_layout(
                     owner_key=owner_key,
                     owner_name=owner_name,
                     updated_at=updated_at,
+                    allow_missing_pull_day=allow_missing_pull_day,
                 )
                 if subscription:
                     subscriptions.append(subscription)
@@ -378,6 +388,53 @@ def parse_visible_subscription_schedules_with_warnings(
     return normalized, warnings
 
 
+def _parse_visible_subscription_schedule_drafts(
+    rows: list[list[str]],
+) -> list[Subscription]:
+    """Normalize complete rows for schedule storage, even before their dates are known."""
+    updated_at = now_pacific().isoformat(timespec="seconds")
+    try:
+        owner_key, owner_name = _current_owner_metadata()
+    except Exception:
+        owner_key, owner_name = "", ""
+
+    subscriptions = _parse_normalized_table(rows, allow_missing_pull_day=True)
+    if not subscriptions:
+        subscriptions = _parse_block_layout(
+            rows,
+            owner_key=owner_key,
+            owner_name=owner_name,
+            updated_at=updated_at,
+            allow_missing_pull_day=True,
+        )
+
+    return [
+        Subscription(
+            id=subscription.id
+            or _subscription_id(
+                owner_key,
+                subscription.name,
+                subscription.cadence,
+                subscription.source_range,
+            ),
+            active=subscription.active,
+            budget_owner_key=subscription.budget_owner_key or owner_key,
+            owner_name=subscription.owner_name or owner_name,
+            kind=subscription.kind,
+            cadence=subscription.cadence,
+            name=subscription.name,
+            amount=subscription.amount,
+            pull_day=subscription.pull_day,
+            pull_month=subscription.pull_month,
+            account=subscription.account,
+            source_range=subscription.source_range,
+            updated_at=subscription.updated_at or updated_at,
+            category=subscription.category,
+        )
+        for subscription in subscriptions
+    ]
+
+
 def _subscription_to_row(subscription: Subscription) -> list[str]:
     return [
         subscription.cadence,
@@ -418,14 +475,18 @@ def _write_subscription_schedule_rows(subscriptions: list[Subscription]) -> None
 
 
 def sync_subscription_schedule_sheet() -> list[Subscription]:
-    subscriptions = parse_visible_subscription_schedules()
-    _write_subscription_schedule_rows(subscriptions)
+    rows = cast(list[list[str]], get_sheets_repo().subscriptions_sheet().get_all_values())
+    subscriptions = parse_visible_subscription_schedules(rows)
+    drafts = _parse_visible_subscription_schedule_drafts(rows)
+    _write_subscription_schedule_rows(drafts)
     return subscriptions
 
 
 def debug_subscription_sync() -> tuple[list[Subscription], list[SubscriptionParseWarning]]:
-    subscriptions, warnings = parse_visible_subscription_schedules_with_warnings()
-    _write_subscription_schedule_rows(subscriptions)
+    rows = cast(list[list[str]], get_sheets_repo().subscriptions_sheet().get_all_values())
+    subscriptions, warnings = parse_visible_subscription_schedules_with_warnings(rows)
+    drafts = _parse_visible_subscription_schedule_drafts(rows)
+    _write_subscription_schedule_rows(drafts)
     return subscriptions, warnings
 
 

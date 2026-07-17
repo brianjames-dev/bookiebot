@@ -4,6 +4,7 @@ from bookiebot.sheets.subscriptions import (
     NORMALIZED_SCHEDULE_HEADERS,
     Subscription,
     SubscriptionReminder,
+    debug_subscription_sync,
     format_subscription_reminder,
     list_normalized_subscription_schedules,
     list_subscription_schedules,
@@ -174,6 +175,76 @@ def test_sync_subscription_schedule_sheet_writes_hidden_normalized_rows():
     assert len(rows[0]) == 14
     assert all(value == "" for value in rows[0][7:])
     assert all(value == "" for value in rows[1][7:])
+
+
+def test_sync_subscription_schedule_sheet_keeps_rows_without_dates_as_drafts():
+    repo = SheetsRepoStub(
+        subscriptions_rows=[
+            [],
+            ["", "SUBSCRIPTIONS"],
+            [],
+            [
+                "",
+                "Needs",
+                "",
+                "(Monthly)",
+                "",
+                "Needs",
+                "",
+                "(Yearly)",
+                "",
+                "Wants",
+                "",
+                "(Monthly)",
+            ],
+            [],
+            [
+                "",
+                "Recurring:",
+                "Name:",
+                "Amount:",
+                "",
+                "Recurring:",
+                "Name:",
+                "Amount:",
+                "",
+                "Date:",
+                "Name:",
+                "Amount:",
+            ],
+            ["", "", "Verizon", "$97.33", "", "", "", "", "", "", "Apple TV+", "$12.99"],
+        ],
+        subscription_schedule_rows=[NORMALIZED_SCHEDULE_HEADERS],
+    )
+
+    with repo.patched(), sheet_user_context("830984827904851969"):
+        subscriptions = sync_subscription_schedule_sheet()
+        debug_subscriptions, warnings = debug_subscription_sync()
+        reminder_subscriptions = list_normalized_subscription_schedules()
+
+    rows = repo.subscription_schedule.get_all_values()
+    assert subscriptions == []
+    assert debug_subscriptions == []
+    assert [warning.reason for warning in warnings] == ["missing pull date", "missing pull date"]
+    assert reminder_subscriptions == []
+    assert rows[1][:6] == [
+        "monthly",
+        "Verizon",
+        "97.33",
+        "",
+        "",
+        "Subscriptions!B7:D7",
+    ]
+    assert rows[2][:6] == [
+        "monthly",
+        "Apple TV+",
+        "12.99",
+        "",
+        "",
+        "Subscriptions!J7:L7",
+    ]
+    assert rows[1][6]
+    assert rows[2][6]
 
 
 def test_list_normalized_subscription_schedules_accepts_extra_hidden_columns():

@@ -43,6 +43,8 @@ Shared Needs-category logging, the shifted dated Income layout, and the four-blo
 - Replaced Hannah's live two-block Subscriptions tab with Brian's native four-block Needs/Wants Monthly/Yearly layout, preserving all eight Needs and three Wants entries as monthly data plus the `$180.20` and `$23.97` subtotals.
 - Extended Brian's Needs Monthly body styling through Hannah's eighth row, repaired Template/May/July references to the new Monthly+Yearly subtotal cells, retained the old tab as a hidden backup, and kept unknown pull dates blank instead of inventing them.
 - Live Google Sheets and PDF-render verification confirmed matching reference styles, correct formulas/totals, parser-ready block structure, hidden infrastructure tabs, no broken cell formulas, and no remaining staging sheet.
+- Subscription schedule sync now retains rows with valid cadence/name/amount but unknown pull dates as normalized drafts; reminder readers continue to exclude those drafts until `pull_day` is populated.
+- After Hannah removed Amazon Prime, repopulated her live `_BookieBot Subscription Schedule` with all ten current monthly rows, blank date fields, source ranges, and timestamps; current visible subtotals are `$163.94` Needs and `$23.97` Wants.
 - Manual verification: deploy the updated Apps Script, run `setupBudgetSystemAutomation()` once, enter an amount in a new dated Income table, then confirm manual and BookieBot income dates plus update/delete/undo behavior.
 
 ## Completed 2026-07-08
@@ -292,8 +294,8 @@ Use a test row or low-risk real row in Discord:
    - Expected: the entries occupy consecutive `B:D` rows with dates, every generated row retains the seed's formatting/validation/notes/height, exactly one `<Enter Source>` placeholder remains, and the Monthly Income formula includes both entries.
 54. In Brian July, delete and undo the first Income entry, then repeat with the later entry and with an immediate undo after logging test Income.
     - Expected: the `Biweekly Income Start` configuration remains anchored in `E:F`, Monthly Income always sums the current `D` rows, the Budget section retains its total reference, and undo restores the deleted row's values and formatting.
-55. Open Hannah's Subscriptions tab and enter the real monthly pull day for each row in the blank Recurring/Date cells.
-    - Expected: Needs and Wants remain in their Monthly blocks, Yearly stays empty, subtotals remain `$180.20` and `$23.97`, and `/debug_subscriptions` parses all 11 rows without missing-pull-date warnings.
+55. Open Hannah's visible Subscriptions tab and enter the real monthly pull day for each row in the blank Recurring/Date cells.
+    - Expected: Needs and Wants remain in their Monthly blocks, Yearly stays empty, subtotals remain `$163.94` and `$23.97`, and `/debug_subscriptions` makes all ten normalized rows reminder-eligible without missing-pull-date warnings.
 
 ## Verification Baseline
 
@@ -307,6 +309,21 @@ python -m pytest unit_tests/intents/test_handlers.py unit_tests/core/test_messag
 Latest verification:
 
 ```bash
+venv/bin/python -m pytest unit_tests
+# passed: 392 passed, 1 warning
+
+python -m pyright --pythonpath venv/bin/python --pythonversion 3.12
+# passed: 0 errors, 0 warnings, 0 informations
+
+node --check < scripts/google-apps-script/budget-system-automation.gs
+# passed
+
+git diff --check
+# passed
+
+Live Hannah subscription draft sync
+# passed: 10 monthly rows persisted with blank dates; 0 reminder-eligible until dates are supplied
+
 Live Google Sheets API style/formula audit plus PDF render of Hannah Budget 2026 / Subscriptions
 # passed: Brian reference style match, $180.20 Needs, $23.97 Wants, formula links repaired, parser-ready layout, hidden backup
 
