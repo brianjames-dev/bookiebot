@@ -65,6 +65,24 @@ export interface IncomeProjection {
   savingsGoal: number
 }
 
+export type BudgetCategoryKey = "needs" | "wants" | "savings"
+
+export type CategoryBalanceAmounts = Record<BudgetCategoryKey, number>
+
+export interface CategoryBalanceTransfer {
+  from: BudgetCategoryKey
+  to: BudgetCategoryKey
+  amount: number
+}
+
+export interface CategoryBalances {
+  raw: CategoryBalanceAmounts
+  remaining: CategoryBalanceAmounts
+  deficits: CategoryBalanceAmounts
+  transfers: CategoryBalanceTransfer[]
+  totalOverspend: number
+}
+
 export interface Metrics {
   totalExpenses: number
   sharedExpenses: number
@@ -74,6 +92,7 @@ export interface Metrics {
   remainingBudget: number | null
   remainingNeedsBudget: number | null
   remainingWantsBudget: number | null
+  remainingSavingsBudget: number | null
   needsRollover: number | null
   wantsRollover: number | null
   amountSaved: number | null
@@ -114,6 +133,7 @@ export interface ExpenseReportData {
   elapsedDays: number
   generatedAt: string
   metrics: Metrics
+  categoryBalances?: CategoryBalances
   incomeProjection: IncomeProjection
   burnRate: BurnRate | null
   breakdown: BreakdownItem[]

@@ -23,8 +23,11 @@ import type {
   BreakdownItem,
   BurnRate,
   BurnRatePoint,
+  BudgetCategoryKey,
   CalendarEvent,
   CalendarEventKind,
+  CategoryBalanceAmounts,
+  CategoryBalances,
   ExpenseEntry,
   ExpenseReportData,
   OccurrenceRow,
@@ -180,13 +183,14 @@ type ChartPanel = {
 
 type CalendarFilter = "all" | "subscription"
 type DailySpendingFilter = "all" | "needs" | "wants"
-type CategoryMixFilter = "all" | "needs" | "wants"
+type CategoryMixFilter = "all" | BudgetCategoryKey
 
 const CHART_CAROUSEL_GAP = 16
 const CATEGORY_MIX_FILTERS: Array<{ value: CategoryMixFilter; label: string }> = [
   { value: "all", label: "All" },
   { value: "needs", label: "Needs" },
   { value: "wants", label: "Wants" },
+  { value: "savings", label: "Savings" },
 ]
 const DAILY_SPENDING_FILTERS: Array<{ value: DailySpendingFilter; label: string }> = [
   { value: "all", label: "All" },
@@ -197,6 +201,7 @@ const CATEGORY_NEEDS_KEYS = new Set(["rent", "bills_utilities", "static_bills_su
 const CATEGORY_WANTS_KEYS = new Set(["subscriptions_wants", "food", "shopping"])
 const DAILY_WANTS_CATEGORIES = new Set(["Food", "Shopping"])
 const LEFT_CATEGORY_COLOR = "#166534"
+const SAVINGS_CATEGORY_COLOR = "#0f766e"
 const NEEDS_BAR_COLOR = "#2563eb"
 const WANTS_BAR_COLOR = "#7c3aed"
 const TOP_EXPENSE_HEAT_COLORS = [
@@ -226,9 +231,8 @@ type ReportView = {
     totalExpenses: number
     monthlyIncome: number
     incomeAfterExpenses: number
-    needsRollover: number | null
-    wantsRollover: number | null
   }
+  categoryBalances: CategoryBalances
   breakdown: BreakdownItem[]
   burnRate: BurnRate | null
   calendarEvents: CalendarEvent[]
@@ -239,20 +243,16 @@ function buildReportView(report: ExpenseReportData, projected: boolean): ReportV
   const breakdown = projected ? projectedBreakdown(report) : report.breakdown
   const monthlyIncome = projected ? report.incomeProjection.projectedAmount : report.incomeProjection.currentAmount
   const totalExpenses = projected ? projectedOutflowTotal(report, breakdown) : report.metrics.totalExpenses
-  const categoryRollovers = projected
-    ? projectedCategoryRollovers(monthlyIncome, breakdown)
-    : {
-        needs: report.metrics.needsRollover ?? report.metrics.remainingNeedsBudget,
-        wants: report.metrics.wantsRollover ?? report.metrics.remainingWantsBudget,
-      }
+  const categoryBalances = projected
+    ? projectedCategoryBalances(monthlyIncome, breakdown, report.metrics.amountSaved ?? 0)
+    : report.categoryBalances ?? currentCategoryBalances(report)
   return {
     metrics: {
       totalExpenses,
       monthlyIncome,
       incomeAfterExpenses: roundCurrency(monthlyIncome - totalExpenses),
-      needsRollover: categoryRollovers.needs,
-      wantsRollover: categoryRollovers.wants,
     },
+    categoryBalances,
     breakdown,
     burnRate: projected ? projectedBurnRateFromIncome(report.burnRate, monthlyIncome) : report.burnRate,
     calendarEvents: calendarEventsForMode(report.calendarEvents),
@@ -287,14 +287,70 @@ function projectedOutflowTotal(report: ExpenseReportData, breakdown: BreakdownIt
   return roundCurrency(amountRowsTotal(breakdown) + (report.metrics.amountSaved ?? 0))
 }
 
-function projectedCategoryRollovers(monthlyIncome: number, breakdown: BreakdownItem[]) {
+function projectedCategoryBalances(monthlyIncome: number, breakdown: BreakdownItem[], amountSaved: number) {
   const needsSpent = amountRowsTotal(breakdown.filter((item) => CATEGORY_NEEDS_KEYS.has(item.key)))
   const wantsSpent = amountRowsTotal(breakdown.filter((item) => CATEGORY_WANTS_KEYS.has(item.key)))
-  const needs = roundCurrency(monthlyIncome * 0.5 - needsSpent)
-  const wantsMargin = roundCurrency(monthlyIncome * 0.3 - wantsSpent)
+  return cascadeCategoryBalances({
+    needs: roundCurrency(monthlyIncome * 0.5 - needsSpent),
+    wants: roundCurrency(monthlyIncome * 0.3 - wantsSpent),
+    savings: roundCurrency(monthlyIncome * 0.2 - amountSaved),
+  })
+}
+
+function currentCategoryBalances(report: ExpenseReportData) {
+  const needs = report.metrics.remainingNeedsBudget ?? report.metrics.needsRollover ?? 0
+  const wants = report.metrics.remainingWantsBudget
+    ?? roundCurrency((report.metrics.wantsRollover ?? 0) - (report.metrics.needsRollover ?? 0))
+  const savings = report.metrics.remainingSavingsBudget
+    ?? roundCurrency((report.metrics.savingsGoal ?? 0) - (report.metrics.amountSaved ?? 0))
+  return cascadeCategoryBalances({ needs, wants, savings })
+}
+
+const CATEGORY_BALANCE_PRIORITIES: Array<[BudgetCategoryKey, BudgetCategoryKey[]]> = [
+  ["needs", ["wants", "savings"]],
+  ["wants", ["savings", "needs"]],
+  ["savings", ["wants", "needs"]],
+]
+
+function cascadeCategoryBalances(rawAmounts: CategoryBalanceAmounts): CategoryBalances {
+  const raw: CategoryBalanceAmounts = {
+    needs: roundCurrency(rawAmounts.needs),
+    wants: roundCurrency(rawAmounts.wants),
+    savings: roundCurrency(rawAmounts.savings),
+  }
+  const remaining = { ...raw }
+  const transfers: CategoryBalances["transfers"] = []
+
+  CATEGORY_BALANCE_PRIORITIES.forEach(([recipient, donors]) => {
+    let deficit = Math.max(-remaining[recipient], 0)
+    donors.forEach((donor) => {
+      if (deficit <= 0) {
+        return
+      }
+      const transferred = roundCurrency(Math.min(deficit, Math.max(remaining[donor], 0)))
+      if (transferred <= 0) {
+        return
+      }
+      remaining[donor] = roundCurrency(remaining[donor] - transferred)
+      remaining[recipient] = roundCurrency(remaining[recipient] + transferred)
+      deficit = roundCurrency(deficit - transferred)
+      transfers.push({ from: donor, to: recipient, amount: transferred })
+    })
+  })
+
+  const deficits: CategoryBalanceAmounts = {
+    needs: roundCurrency(Math.max(-raw.needs, 0)),
+    wants: roundCurrency(Math.max(-raw.wants, 0)),
+    savings: roundCurrency(Math.max(-raw.savings, 0)),
+  }
   return {
-    needs,
-    wants: roundCurrency(wantsMargin + needs),
+    raw,
+    remaining,
+    deficits,
+    transfers,
+    totalOverspend: roundCurrency(
+      Object.values(remaining).reduce((total, amount) => total + Math.max(-amount, 0), 0),
+    ),
   }
 }
 
@@ -400,9 +456,8 @@ export function ExpenseReportApp({ report }: { report: ExpenseReportData }) {
       content: (
         <CategoryMixChart
           data={activeReport.breakdown}
-          leftAmount={activeReport.metrics.incomeAfterExpenses}
-          needsRollover={activeReport.metrics.needsRollover}
-          wantsRollover={activeReport.metrics.wantsRollover}
+          categoryBalances={activeReport.categoryBalances}
+          amountSaved={report.metrics.amountSaved ?? 0}
           filter={categoryMixFilter}
           projected={projectionActive}
           collapseKey={chartCollapseKey}
@@ -1081,9 +1136,8 @@ function isSavingsNearGoal(value: number | null | undefined, goal: number | null
 
 type CategoryMixChartProps = {
   data: BreakdownItem[]
-  leftAmount: number
-  needsRollover: number | null
-  wantsRollover: number | null
+  categoryBalances: CategoryBalances
+  amountSaved: number
   filter: CategoryMixFilter
   projected: boolean
   collapseKey: number
@@ -1091,25 +1145,24 @@ type CategoryMixChartProps = {
 
 const CategoryMixChart = memo(function CategoryMixChart({
   data,
-  leftAmount,
-  needsRollover,
-  wantsRollover,
+  categoryBalances,
+  amountSaved,
   filter,
   projected,
   collapseKey,
 }: CategoryMixChartProps) {
-  const selectedRollover = categoryMixRollover(leftAmount, needsRollover, wantsRollover, filter)
-  const chartData = categoryMixRows(data, selectedRollover, filter)
+  const selectedRollover = categoryMixRollover(categoryBalances, filter)
+  const chartData = categoryMixRows(data, selectedRollover, filter, amountSaved)
   const [pieHostRef, pieHostSize] = useElementSize<HTMLDivElement>()
   const pieLayout = useExpensePieLayout(chartData, pieHostSize)
   const spentTotal = amountRowsTotal(chartData.filter((item) => item.key !== "left"))
-  const pressure = categoryMixPressure(filter, needsRollover, wantsRollover, spentTotal)
+  const pressure = categoryMixPressure(filter, categoryBalances, spentTotal)
 
   return (
     <div className="bb-chart-stack">
       <div className="bb-panel-head">
         <div>
-          <div className="bb-chart-kicker">Spent</div>
+          <div className="bb-chart-kicker">{filter === "savings" ? "Saved" : "Spent"}</div>
           <div className="bb-chart-total">{formatMoney(spentTotal)}</div>
           <div className="bb-chart-mode-note">{projected ? "Projected" : "Current"}</div>
         </div>
@@ -1169,13 +1222,29 @@ const CategoryMixChart = memo(function CategoryMixChart({
 
 function areCategoryMixChartPropsEqual(previous: CategoryMixChartProps, next: CategoryMixChartProps) {
   return (
-    previous.leftAmount === next.leftAmount &&
-    previous.needsRollover === next.needsRollover &&
-    previous.wantsRollover === next.wantsRollover &&
+    previous.amountSaved === next.amountSaved &&
+    categoryBalancesEqual(previous.categoryBalances, next.categoryBalances) &&
     previous.filter === next.filter &&
     previous.projected === next.projected &&
     previous.collapseKey === next.collapseKey &&
     breakdownRowsEqual(previous.data, next.data)
+  )
+}
+
+function categoryBalancesEqual(previous: CategoryBalances, next: CategoryBalances) {
+  return (
+    previous.raw.needs === next.raw.needs &&
+    previous.raw.wants === next.raw.wants &&
+    previous.raw.savings === next.raw.savings &&
+    previous.remaining.needs === next.remaining.needs &&
+    previous.remaining.wants === next.remaining.wants &&
+    previous.remaining.savings === next.remaining.savings &&
+    previous.totalOverspend === next.totalOverspend &&
+    previous.transfers.length === next.transfers.length &&
+    previous.transfers.every((transfer, index) => {
+      const nextTransfer = next.transfers[index]
+      return transfer.from === nextTransfer.from && transfer.to === nextTransfer.to && transfer.amount === nextTransfer.amount
+    })
   )
 }
 
@@ -1196,18 +1265,19 @@ function breakdownRowsEqual(previous: BreakdownItem[], next: BreakdownItem[]) {
 }
 
 function categoryMixRollover(
-  leftAmount: number,
-  needsRollover: number | null,
-  wantsRollover: number | null,
+  balances: CategoryBalances,
   filter: CategoryMixFilter,
 ) {
-  if (filter === "needs") {
-    return needsRollover
+  if (filter !== "all") {
+    return balances.remaining[filter]
   }
-  if (filter === "wants") {
-    return wantsRollover
-  }
-  return leftAmount
+  return roundCurrency(Object.values(balances.remaining).reduce((total, amount) => total + amount, 0))
+}
+
+const CATEGORY_BALANCE_LABELS: Record<BudgetCategoryKey, string> = {
+  needs: "Needs",
+  wants: "Wants",
+  savings: "Savings",
 }
 
 type CategoryMixPressure = {
@@ -1220,40 +1290,50 @@ type CategoryMixPressure = {
 
 function categoryMixPressure(
   filter: CategoryMixFilter,
-  needsRollover: number | null,
-  wantsRollover: number | null,
+  balances: CategoryBalances,
   spentTotal: number,
 ): CategoryMixPressure | null {
-  if (filter === "all") {
-    return null
+  let pressure: Omit<CategoryMixPressure, "fillPercent"> | null = null
+  if (filter === "all" && balances.totalOverspend > 0) {
+    pressure = {
+      label: "Budget overspend",
+      amount: balances.totalOverspend,
+      note: "Needs, Wants, and Savings funds are fully depleted",
+      tone: "danger",
+    }
   }
 
-  const needsOverspend = needsRollover === null ? 0 : Math.max(-roundCurrency(needsRollover), 0)
-  const wantsOverspend = wantsRollover === null ? 0 : Math.max(-roundCurrency(wantsRollover), 0)
-  let pressure: Omit<CategoryMixPressure, "fillPercent"> | null = null
-
-  if (filter === "needs" && needsOverspend > 0) {
-    pressure = {
-      label: "Needs overspend",
-      amount: needsOverspend,
-      note: "Carried forward and deducted from Wants",
-      tone: "danger",
-    }
-  } else if (filter === "wants" && wantsOverspend > 0) {
-    pressure = {
-      label: "Wants overspend",
-      amount: wantsOverspend,
-      note: needsOverspend > 0
-        ? `Includes ${formatMoney(needsOverspend)} carried from Needs`
-        : "Beyond the available Wants rollover",
-      tone: "danger",
-    }
-  } else if (filter === "wants" && needsOverspend > 0) {
-    pressure = {
-      label: "Needs overspend impact",
-      amount: needsOverspend,
-      note: "Already deducted from Wants income left",
-      tone: "impact",
+  if (filter !== "all") {
+    const deficit = balances.deficits[filter]
+    const receivedTransfers = balances.transfers.filter((transfer) => transfer.to === filter)
+    const remainingDeficit = Math.max(-balances.remaining[filter], 0)
+    if (deficit > 0) {
+      const coverage = receivedTransfers
+        .map((transfer) => `${formatMoney(transfer.amount)} from ${CATEGORY_BALANCE_LABELS[transfer.from]}`)
+        .join(" + ")
+      const uncovered = remainingDeficit > 0
+        ? `${formatMoney(remainingDeficit)} remains beyond the total budget`
+        : ""
+      pressure = {
+        label: filter === "savings" ? "Over saving" : `${CATEGORY_BALANCE_LABELS[filter]} overspend`,
+        amount: deficit,
+        note: coverage
+          ? `Covered by ${coverage}${uncovered ? `; ${uncovered}` : ""}`
+          : uncovered || "No other category funds were needed",
+        tone: "danger",
+      }
+    } else {
+      const donatedTransfers = balances.transfers.filter((transfer) => transfer.from === filter)
+      const impact = roundCurrency(donatedTransfers.reduce((total, transfer) => total + transfer.amount, 0))
+      if (impact > 0) {
+        const recipients = [...new Set(donatedTransfers.map((transfer) => CATEGORY_BALANCE_LABELS[transfer.to]))]
+        pressure = {
+          label: recipients.length === 1 ? `${recipients[0]} overspend impact` : "Category overspend impact",
+          amount: impact,
+          note: `${formatMoney(impact)} deducted from ${CATEGORY_BALANCE_LABELS[filter]} income left`,
+          tone: "impact",
+        }
+      }
     }
   }
 
@@ -1288,17 +1368,29 @@ function CategoryMixPressureBar({ pressure }: { pressure: CategoryMixPressure })
   )
 }
 
-function categoryMixRows(data: BreakdownItem[], rolloverAmount: number | null, filter: CategoryMixFilter) {
-  const filtered = data.filter((item) => {
-    if (filter === "needs") {
-      return CATEGORY_NEEDS_KEYS.has(item.key)
-    }
-    if (filter === "wants") {
-      return CATEGORY_WANTS_KEYS.has(item.key)
-    }
-    return true
+function categoryMixRows(
+  data: BreakdownItem[],
+  rolloverAmount: number,
+  filter: CategoryMixFilter,
+  amountSaved: number,
+) {
+  let filtered = data.filter((item) => {
+    if (filter === "needs") return CATEGORY_NEEDS_KEYS.has(item.key)
+    if (filter === "wants") return CATEGORY_WANTS_KEYS.has(item.key)
+    return filter === "all"
   })
-  const positiveLeftAmount = rolloverAmount === null ? 0 : Math.max(roundCurrency(rolloverAmount), 0)
+  if (filter === "savings") {
+    filtered = amountSaved > 0
+      ? [{
+          key: "savings",
+          label: "Saved",
+          amount: roundCurrency(amountSaved),
+          percentage: 0,
+          color: SAVINGS_CATEGORY_COLOR,
+        }]
+      : []
+  }
+  const positiveLeftAmount = Math.max(roundCurrency(rolloverAmount), 0)
   const rows =
     positiveLeftAmount > 0
       ? [

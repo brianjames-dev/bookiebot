@@ -828,7 +828,7 @@ def test_report_payload_prefers_category_rollovers_and_preserves_cross_category_
         ["", "BUDGET: $7,698.22", "$3,849.11", "$2,309.47", "$1,539.64", "Rollover:"],
         ["", "(Needs) Subtotal:", "$4,349.11 (113.00%)", "", "", "-$500.00"],
         ["", "(Wants) Subtotal:", "", "$649.43 (28.12%)", "", "$1,160.04"],
-        ["", "Margins:", "-$500.00", "", "$1,660.04"],
+        ["", "Margins:", "-$500.00", "$1,660.04", "$1,539.64"],
     ]
     report = build_expense_breakdown_report(
         actor_key="brian",
@@ -844,6 +844,7 @@ def test_report_payload_prefers_category_rollovers_and_preserves_cross_category_
 
     assert report.remaining_budget == -500.0
     assert report.remaining_wants_budget == 1660.04
+    assert report.remaining_savings_budget == 1539.64
     assert report.needs_rollover == -500.0
     assert report.wants_rollover == 1160.04
 
@@ -856,8 +857,70 @@ def test_report_payload_prefers_category_rollovers_and_preserves_cross_category_
     payload = json.loads(payload_match.group(1))
     assert payload["metrics"]["remainingNeedsBudget"] == -500.0
     assert payload["metrics"]["remainingWantsBudget"] == 1660.04
+    assert payload["metrics"]["remainingSavingsBudget"] == 1539.64
     assert payload["metrics"]["needsRollover"] == -500.0
     assert payload["metrics"]["wantsRollover"] == 1160.04
+    assert payload["categoryBalances"] == {
+        "raw": {"needs": -500.0, "wants": 1660.04, "savings": 1539.64},
+        "remaining": {"needs": 0.0, "wants": 1160.04, "savings": 1539.64},
+        "deficits": {"needs": 500.0, "wants": 0.0, "savings": 0.0},
+        "transfers": [{"from": "wants", "to": "needs", "amount": 500.0}],
+        "totalOverspend": 0.0,
+    }
+
+
+@pytest.mark.parametrize(
+    ("raw", "remaining", "transfers", "total_overspend"),
+    [
+        (
+            (-500.0, 200.0, 1000.0),
+            {"needs": 0.0, "wants": 0.0, "savings": 700.0},
+            [
+                {"from": "wants", "to": "needs", "amount": 200.0},
+                {"from": "savings", "to": "needs", "amount": 300.0},
+            ],
+            0.0,
+        ),
+        (
+            (200.0, -500.0, 300.0),
+            {"needs": 0.0, "wants": 0.0, "savings": 0.0},
+            [
+                {"from": "savings", "to": "wants", "amount": 300.0},
+                {"from": "needs", "to": "wants", "amount": 200.0},
+            ],
+            0.0,
+        ),
+        (
+            (200.0, 400.0, -500.0),
+            {"needs": 100.0, "wants": 0.0, "savings": 0.0},
+            [
+                {"from": "wants", "to": "savings", "amount": 400.0},
+                {"from": "needs", "to": "savings", "amount": 100.0},
+            ],
+            0.0,
+        ),
+        (
+            (100.0, -500.0, 300.0),
+            {"needs": 0.0, "wants": -100.0, "savings": 0.0},
+            [
+                {"from": "savings", "to": "wants", "amount": 300.0},
+                {"from": "needs", "to": "wants", "amount": 100.0},
+            ],
+            100.0,
+        ),
+    ],
+)
+def test_category_balance_cascade_uses_category_specific_donor_priorities(
+    raw,
+    remaining,
+    transfers,
+    total_overspend,
+):
+    payload = expense_breakdown._cascade_category_balances(*raw)
+
+    assert payload["remaining"] == remaining
+    assert payload["transfers"] == transfers
+    assert payload["totalOverspend"] == total_overspend
 
 
 def test_current_month_income_projection_uses_logged_income_date_as_biweekly_anchor(monkeypatch):

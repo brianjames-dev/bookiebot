@@ -328,6 +328,19 @@ Status: Complete. Needs and Wants Category Mix views now show their category-spe
 - Regression coverage preserves negative rollover values and the cross-category payload; browser checks cover current positive rollovers, Needs overspend, Wants impact, projected mode, and chart containment.
 - Manual test: open Category Mix for a month with positive rollovers, verify both `Income left` slices, then temporarily overspend Needs and confirm Needs shows the overspend bar while Wants drops by the same amount and explains the deduction.
 
+### 2026-07-17 Three-Bucket Category Cascade Follow-Up
+
+Status: Complete. Category Mix now preserves separate Needs, Wants, and Savings balances and exhausts donor buckets in the requested source-specific order.
+
+- Current reports parse all three raw values from the Budget sheet Margins row, including zero balances, while retaining the older Rollover payload fields for compatibility and unchanged Burn Rate behavior.
+- Needs overspend borrows from Wants then Savings; Wants overspend borrows from Savings then Needs; over-saving borrows from Wants then Needs.
+- The backend emits the raw balances, adjusted balances, transfer ledger, source deficits, and final total overspend so current-mode behavior is regression tested and auditable.
+- Category Mix adds a Savings tab, uses Amount Saved as its activity slice, and shows its adjusted positive balance as `Income left`.
+- Red alerts describe the overspent source and how donors covered it; amber alerts identify deductions from a selected donor; All shows a budget-overspend alert only after all category funds are depleted.
+- Projected mode recomputes the same three-bucket cascade from projected 50/30/20 allocations and projected category totals.
+- Manual test: create a temporary overage in each source category, confirm donor impacts follow its priority, then exceed all three available balances and confirm the All-tab budget-overspend amount equals the uncovered remainder.
+- Verification: `404 passed, 1 skipped`, Pyright reported zero errors, frontend typecheck/build passed, and local browser checks covered live balances, all donor orders, projected mode, total overspend, and chart containment.
+
 ## Open Questions
 
 - What should the canonical recent-action lineage model look like?

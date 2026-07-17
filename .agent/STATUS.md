@@ -50,6 +50,12 @@ Shared Needs-category logging, the shifted dated Income layout, and the four-blo
 - Local browser verification confirmed July's `$35.56` Needs and `$1,660.04` Wants slices, plus a simulated `$500.00` Needs overspend reducing Wants to `$1,160.04` with zero chart-bound violations.
 - Manual verification: after deployment, switch Category Mix between Needs and Wants, then test a category overspend and confirm the selected rollover slice/bar and cross-category impact match the Budget sheet.
 - Category-rollover verification: `401 passed`, Pyright reported zero errors, frontend typecheck/build passed, and browser checks covered positive, overspent, impacted, and projected states.
+- Category Mix now applies a source-aware three-bucket cascade from the Budget sheet's raw Needs, Wants, and Savings margins instead of relying on the sheet's fixed cumulative rollover order.
+- Needs overspend draws from Wants then Savings; Wants overspend draws from Savings then Needs; over-saving draws from Wants then Needs. A remaining deficit after all donors reach zero becomes whole-budget overspend.
+- Added a Savings Category Mix tab with Saved and Income left slices, plus red source-overspend alerts, amber donor-impact alerts, and an All-tab budget-overspend alert.
+- Local browser verification confirmed live July balances of `$35.56` Needs, `$1,624.48` Wants, and `$1,539.64` Savings; simulated Wants overspend reduced Savings to `$1,064.12` without touching Needs, and over-saving consumed Wants before Needs.
+- Manual verification: switch Category Mix through Needs, Wants, and Savings, test each source category over its allocation, and confirm the donor-impact amounts follow the category-specific priority before All reports total overspending.
+- Three-bucket cascade verification: `404 passed, 1 skipped`, Pyright reported zero errors, frontend typecheck/build passed, and browser checks covered every donor order, projected mode, total overspend, and chart containment.
 
 ## Completed 2026-07-16
 

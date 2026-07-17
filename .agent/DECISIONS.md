@@ -212,6 +212,12 @@ Decision: Needs and Wants Category Mix views use dedicated payload fields source
 
 Rationale: Rollover is the sheet's authoritative available-money value for each category. Keeping negative values out of a pie preserves valid chart geometry, while a separate bar makes overspending visible and explains why Needs overspend reduces the later Wants bucket.
 
+## 2026-07-17 - Use A Source-Aware Three-Bucket Category Cascade
+
+Decision: Supersede the fixed Needs-to-Wants Category Mix cascade with three separate raw Budget-sheet margin balances. Needs deficits draw from Wants then Savings; Wants deficits draw from Savings then Needs; Savings deficits (`Over saving`) draw from Wants then Needs. Each donor retains its positive balance until a source-specific rule uses it, and any uncovered remainder becomes total budget overspend.
+
+Rationale: The sheet's cumulative Rollover formulas encode one fixed sequence and can consume Needs before Savings when Wants is overspent. An explicit transfer ledger preserves the same total money while honoring the requested priorities, supporting a Savings view, and explaining both source overspending and downstream donor impacts in current and projected reports.
+
 ## Pending Decisions
 
 - Where should durable system events live: banking database only, Google Sheets only, or dual-write during transition?

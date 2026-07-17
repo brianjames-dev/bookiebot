@@ -134,6 +134,7 @@ class ExpenseBreakdownReport:
     income_total: float
     remaining_budget: float | None
     remaining_wants_budget: float | None
+    remaining_savings_budget: float | None
     needs_rollover: float | None
     wants_rollover: float | None
     amount_saved: float | None
@@ -374,10 +375,12 @@ def build_expense_breakdown_report(
     current_month_subscriptions = _current_month_subscription_items(subscriptions, month)
     income_entries, income_total = _income_entries(personal_rows)
     income_projection_config = _income_projection_config(personal_rows)
-    remaining_budget, remaining_wants_budget = _margin_amounts(personal_rows)
+    remaining_budget, remaining_wants_budget, remaining_savings_budget = _category_margin_amounts(personal_rows)
     needs_rollover, wants_rollover = _category_rollover_amounts(personal_rows)
     amount_saved = _amount_saved(personal_rows)
     savings_goal = _savings_goal(personal_rows)
+    if remaining_savings_budget is None and amount_saved is not None and savings_goal is not None:
+        remaining_savings_budget = round(savings_goal - amount_saved, 2)
     shared_need_entries = _entries_for_category(entries, "need_expenses")
     legacy_need_expenses = _need_expense_items(personal_rows)
     need_expenses = (
@@ -449,6 +452,7 @@ def build_expense_breakdown_report(
         income_total=income_total,
         remaining_budget=remaining_budget,
         remaining_wants_budget=remaining_wants_budget,
+        remaining_savings_budget=remaining_savings_budget,
         needs_rollover=needs_rollover,
         wants_rollover=wants_rollover,
         amount_saved=amount_saved,
@@ -1364,15 +1368,96 @@ def _category_rollover_amounts(rows: list[list[str]]) -> tuple[float | None, flo
 
 
 def _margin_amounts(rows: list[list[str]]) -> tuple[float | None, float | None]:
+    needs_budget, wants_budget, _savings_budget = _category_margin_amounts(rows)
+    return needs_budget, wants_budget
+
+
+def _category_margin_amounts(
+    rows: list[list[str]],
+) -> tuple[float | None, float | None, float | None]:
     for row in rows:
         for index, value in enumerate(row):
             if "margins" not in str(value).strip().lower():
                 continue
-            amounts = _money_values(row, index + 1)
+            amounts = [
+                round(_cell_money(cell), 2)
+                for cell in row[index + 1 :]
+                if re.search(r"\d", str(cell))
+            ]
             needs_budget = amounts[0] if amounts else None
             wants_budget = amounts[1] if len(amounts) > 1 else None
-            return needs_budget, wants_budget
-    return None, None
+            savings_budget = amounts[2] if len(amounts) > 2 else None
+            return needs_budget, wants_budget, savings_budget
+    return None, None, None
+
+
+CATEGORY_BALANCE_PRIORITIES = (
+    ("needs", ("wants", "savings")),
+    ("wants", ("savings", "needs")),
+    ("savings", ("wants", "needs")),
+)
+
+
+def _cascade_category_balances(
+    needs: float,
+    wants: float,
+    savings: float,
+) -> dict[str, Any]:
+    raw = {
+        "needs": round(needs, 2),
+        "wants": round(wants, 2),
+        "savings": round(savings, 2),
+    }
+    remaining = dict(raw)
+    transfers: list[dict[str, Any]] = []
+
+    for recipient, donors in CATEGORY_BALANCE_PRIORITIES:
+        deficit = max(-remaining[recipient], 0.0)
+        for donor in donors:
+            available = max(remaining[donor], 0.0)
+            transferred = round(min(deficit, available), 2)
+            if transferred <= 0:
+                continue
+            remaining[donor] = round(remaining[donor] - transferred, 2)
+            remaining[recipient] = round(remaining[recipient] + transferred, 2)
+            deficit = round(deficit - transferred, 2)
+            transfers.append(
+                {
+                    "from": donor,
+                    "to": recipient,
+                    "amount": transferred,
+                }
+            )
+            if deficit <= 0:
+                break
+
+    deficits = {key: round(max(-amount, 0.0), 2) for key, amount in raw.items()}
+    total_overspend = round(sum(max(-amount, 0.0) for amount in remaining.values()), 2)
+    return {
+        "raw": raw,
+        "remaining": remaining,
+        "deficits": deficits,
+        "transfers": transfers,
+        "totalOverspend": total_overspend,
+    }
+
+
+def _category_balance_payload(report: ExpenseBreakdownReport) -> dict[str, Any]:
+    needs = report.remaining_budget
+    if needs is None:
+        needs = report.needs_rollover or 0.0
+
+    wants = report.remaining_wants_budget
+    if wants is None:
+        wants = report.wants_rollover or 0.0
+        if report.needs_rollover is not None:
+            wants = round(wants - report.needs_rollover, 2)
+
+    savings = report.remaining_savings_budget
+    if savings is None and report.savings_goal is not None and report.amount_saved is not None:
+        savings = round(report.savings_goal - report.amount_saved, 2)
+
+    return _cascade_category_balances(needs, wants, savings or 0.0)
 
 
 def _amount_saved(rows: list[list[str]]) -> float | None:
@@ -1779,12 +1864,14 @@ def _report_client_payload(
             "remainingBudget": report.remaining_budget,
             "remainingNeedsBudget": report.remaining_budget,
             "remainingWantsBudget": report.remaining_wants_budget,
+            "remainingSavingsBudget": report.remaining_savings_budget,
             "needsRollover": report.needs_rollover,
             "wantsRollover": report.wants_rollover,
             "amountSaved": report.amount_saved,
             "savingsGoal": report.savings_goal,
             "incomeAfterExpenses": balance_after_expenses,
         },
+        "categoryBalances": _category_balance_payload(report),
         "incomeProjection": _income_projection_payload(report),
         "burnRate": _burn_rate_payload(report),
         "breakdown": [
