@@ -214,7 +214,8 @@ const LEFT_CATEGORY_COLOR = "#166534"
 const SAVINGS_CATEGORY_COLOR = "#0f766e"
 const NEEDS_BAR_COLOR = "#2563eb"
 const WANTS_BAR_COLOR = "#7c3aed"
-const DAILY_SPENDING_AXIS_COLOR = "hsl(var(--muted-foreground))"
+const DAILY_SPENDING_GRID_COLOR = "hsl(var(--muted-foreground))"
+const DAILY_SPENDING_BOUNDARY_COLOR = "hsl(var(--foreground))"
 const TOP_EXPENSE_HEAT_COLORS = [
   "#dc2626",
   "#ef4444",
@@ -2089,15 +2090,20 @@ function DailySpendingChart({
             <CartesianGrid
               className="bb-daily-spending-grid"
               vertical={false}
-              stroke={DAILY_SPENDING_AXIS_COLOR}
+              stroke={DAILY_SPENDING_GRID_COLOR}
               strokeDasharray="3 3"
             />
-            <XAxis dataKey="label" tickLine={false} axisLine={false} />
+            <XAxis
+              dataKey="label"
+              tick={{ className: "bb-daily-spending-x-axis-label", fill: DAILY_SPENDING_BOUNDARY_COLOR }}
+              tickLine={false}
+              axisLine={false}
+            />
             <YAxis
               domain={yAxisDomain}
               ticks={yAxisTicks}
               scale="sqrt"
-              tick={{ fill: DAILY_SPENDING_AXIS_COLOR }}
+              tick={{ fill: DAILY_SPENDING_GRID_COLOR }}
               tickFormatter={(value) => `$${value}`}
               tickLine={false}
               axisLine={false}

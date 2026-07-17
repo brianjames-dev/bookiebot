@@ -357,6 +357,7 @@ def test_build_expense_breakdown_report_aggregates_shared_and_personal_data():
     assert "Days counted" in html
     assert "Daily Spending" in html
     assert "bb-daily-spending-grid" in html
+    assert "bb-daily-spending-x-axis-label" in html
     assert "Income left" in html
     assert "Need Expenses" not in html
     assert "Need" in html

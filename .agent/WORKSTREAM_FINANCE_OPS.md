@@ -367,13 +367,14 @@ Status: Complete. Needs and Wants Category Mix views now show their category-spe
 
 ### 2026-07-17 Daily Spending Grid Follow-Up
 
-Status: Complete. Every Daily Spending filter now distinguishes the chart boundaries from the interior scale grid while keeping the line and label colors synchronized.
+Status: Complete after contrast follow-up. Every Daily Spending filter now separates foreground boundaries/X labels from the muted-grey interior scale/Y labels.
 
-- The All, Needs, and Wants views share one theme-aware muted color for Y-axis dollar labels and horizontal gridlines.
-- Recharts' first generated horizontal line (`$0`) and final unlabeled top boundary are solid; only the labeled interior lines retain the `3 3` dotted pattern.
-- A stable grid class is embedded in generated report assets for regression coverage.
-- Browser SVG checks verified the dash pattern and exact computed color equality for All, Needs, and Wants with no console warnings or errors.
-- Manual test: switch Daily Spending through All, Needs, and Wants in light and dark mode, confirm the top/bottom lines are solid, and confirm each dotted interior line uses the same hue as its adjacent Y-axis label.
+- Recharts' first generated horizontal line (`$0`) and final unlabeled top boundary are solid and use the report's theme-aware foreground color.
+- X-axis labels use that same foreground tone; Y-axis dollar labels retain the muted-grey color.
+- Interior lines explicitly use the muted-grey color, `1px` width, `3 3` dash spacing, and butt caps so no segment differs in hue or dot size.
+- Stable grid and X-label classes are embedded in generated report assets for regression coverage.
+- Browser SVG checks verified computed colors, widths, caps, and dash patterns for All, Needs, and Wants with no console warnings or errors.
+- Manual test: switch Daily Spending through All, Needs, and Wants in light and dark mode, confirm the top/bottom boundaries and X labels use the foreground tone, and confirm the Y labels plus uniformly dotted interior lines remain grey.
 
 ### 2026-07-17 Three-Bucket Category Cascade Follow-Up
 

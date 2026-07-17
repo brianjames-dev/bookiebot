@@ -461,8 +461,16 @@ summary {
   margin-left: auto;
 }
 
+.bb-daily-spending-content .recharts-cartesian-grid-horizontal .bb-daily-spending-grid {
+  stroke: hsl(var(--muted-foreground));
+  stroke-width: 1;
+  stroke-dasharray: 3 3;
+  stroke-linecap: butt;
+}
+
 .bb-daily-spending-content .recharts-cartesian-grid-horizontal .bb-daily-spending-grid:first-child,
 .bb-daily-spending-content .recharts-cartesian-grid-horizontal .bb-daily-spending-grid:last-child {
+  stroke: hsl(var(--foreground));
   stroke-dasharray: none;
 }
 
