@@ -18,7 +18,14 @@ from bookiebot.sheets.routing import actor_key_aliases, get_user_config
 logger = logging.getLogger(__name__)
 
 WorksheetName = Literal["expense", "income"]
-ActionKind = Literal["clear_cells", "delete_row", "restore_cells", "move_expense", "compact_category_cells"]
+ActionKind = Literal[
+    "clear_cells",
+    "delete_row",
+    "restore_cells",
+    "restore_row",
+    "move_expense",
+    "compact_category_cells",
+]
 
 
 @dataclass
@@ -826,10 +833,13 @@ def _field_columns_for_action(action: UndoAction) -> dict[str, int]:
     ):
         columns: dict[str, int] = {}
         date_column = _positive_metadata_int(action, "income_date_column")
+        if date_column is None and action.kind == "delete_row" and len(action.new_values) >= 4:
+            date_column = 2
         if date_column:
             columns["date"] = date_column
-        columns["source"] = _positive_metadata_int(action, "income_source_column") or 2
-        columns["amount"] = _positive_metadata_int(action, "income_amount_column") or 3
+        dated_row = action.kind == "delete_row" and len(action.new_values) >= 4
+        columns["source"] = _positive_metadata_int(action, "income_source_column") or (3 if dated_row else 2)
+        columns["amount"] = _positive_metadata_int(action, "income_amount_column") or (4 if dated_row else 3)
         return columns
 
     if action.metadata.get("type") in {"payment", "savings"}:
@@ -872,7 +882,7 @@ def action_capabilities(action: UndoAction) -> ActionCapabilities:
         action.worksheet == "expense"
         and action_type in {"expense", "update", "move"}
         and bool(action.metadata.get("category"))
-    ) or (action.worksheet == "income" and action_type == "income" and action.kind == "delete_row")
+    ) or (action.worksheet == "income" and _is_income_display_action(action))
     if not can_delete:
         if action_type == "income":
             delete_reason = "I cannot delete that income row from recent transactions yet. Use undo if this was the last logged action."
@@ -1227,6 +1237,31 @@ def _shift_logged_action_rows(
 
         if changed:
             _write_logged_action(data.ws, record.row_index, logged)
+
+
+def _shift_income_logged_action_rows(
+    *,
+    lower_row: int,
+    delta: int,
+    exclude_ids: set[str] | None = None,
+    log_data: _ActionLogData | None = None,
+) -> None:
+    exclude_ids = exclude_ids or set()
+    data = log_data or _read_log_data()
+    if data is None:
+        raise RuntimeError("Could not read action log for income row-reference updates.")
+    for record in data.records:
+        logged = record.logged
+        if (
+            logged.id in exclude_ids
+            or logged.status != "active"
+            or logged.action.worksheet != "income"
+            or not _is_income_display_action(logged.action)
+            or logged.action.row < lower_row
+        ):
+            continue
+        logged.action.row += delta
+        _write_logged_action(data.ws, record.row_index, logged)
 
 
 def _values_for_category(source_values: dict[str, str], destination_category: str, overrides: dict[str, Any]) -> dict[str, str]:
@@ -1641,6 +1676,19 @@ def _apply_undo_action(action: UndoAction, log_data: _ActionLogData | None = Non
             ws.delete_row(action.row)
         else:
             return False, "This sheet client cannot delete rows."
+    elif action.kind == "restore_row":
+        _shift_income_logged_action_rows(
+            lower_row=action.row,
+            delta=1,
+            exclude_ids=_deleted_action_ids(action),
+            log_data=log_data,
+        )
+        ws.insert_row(
+            action.previous_values,
+            index=action.row,
+            value_input_option="USER_ENTERED",
+            inherit_from_before=action.row > 1,
+        )
     elif action.kind == "clear_cells":
         _update_contiguous_row(ws, action.row, action.columns, [""] * len(action.columns))
     elif action.kind == "restore_cells":
@@ -1707,6 +1755,65 @@ def _delete_expense_action_with_compaction(user_key: str | None, logged: LoggedA
     return True, f"Deleted: {action.description}"
 
 
+def _delete_income_action_with_compaction(user_key: str | None, logged: LoggedAction) -> tuple[bool, str]:
+    action = logged.action
+    if action.worksheet != "income" or not _is_income_display_action(action):
+        return False, ""
+
+    ws = _worksheet("income")
+    rows = ws.get_all_values()
+    deleted_row = list(rows[action.row - 1]) if 0 < action.row <= len(rows) else []
+
+    try:
+        log_data = _read_log_data()
+        if log_data is None:
+            return False, "Something went wrong while reading the action log."
+        lineage_ids = _active_lineage_ids(logged, log_data)
+        if hasattr(ws, "delete_rows"):
+            ws.delete_rows(action.row)
+        elif hasattr(ws, "delete_row"):
+            ws.delete_row(action.row)
+        else:
+            return False, "This sheet client cannot delete rows."
+        _mark_logged_ids_undone(lineage_ids, log_data)
+        _shift_income_logged_action_rows(
+            lower_row=action.row + 1,
+            delta=-1,
+            exclude_ids=lineage_ids,
+            log_data=log_data,
+        )
+    except Exception as e:
+        logger.exception("Failed to compact deleted income", extra={"exception": str(e)})
+        return False, "Something went wrong while deleting that income."
+
+    layout_metadata = {
+        key: value
+        for key, value in action.metadata.items()
+        if key.startswith("income_")
+    }
+    record_undo_action(
+        user_key,
+        UndoAction(
+            worksheet="income",
+            kind="restore_row",
+            row=action.row,
+            columns=[],
+            previous_values=deleted_row,
+            new_values=[],
+            metadata={
+                "type": "delete",
+                "source_type": "income",
+                "deleted_action_id": logged.id,
+                "deleted_action_ids": json.dumps(sorted(lineage_ids)),
+                **layout_metadata,
+            },
+            description=f"deleted {action.description}",
+        ),
+    )
+    _sync_reconciliation_after_action_mutation(user_key, set(lineage_ids), reason="deleted")
+    return True, f"Deleted: {action.description}"
+
+
 def delete_recent_action(
     user_key: str | None,
     *,
@@ -1744,6 +1851,13 @@ def delete_recent_action(
 
     if logged.action.worksheet == "expense":
         success, detail = _delete_expense_action_with_compaction(user_key, logged)
+        if detail:
+            if success and key:
+                _PENDING_DELETE_IDS_BY_USER.pop(key, None)
+            return success, detail
+
+    if logged.action.worksheet == "income":
+        success, detail = _delete_income_action_with_compaction(user_key, logged)
         if detail:
             if success and key:
                 _PENDING_DELETE_IDS_BY_USER.pop(key, None)
@@ -1789,7 +1903,7 @@ def undo_logged_action(user_key: str | None, action_id: str) -> tuple[bool, str]
             log_data,
         )
     deleted_action_ids = _deleted_action_ids(logged.action)
-    if deleted_action_ids and logged.action.kind == "compact_category_cells":
+    if deleted_action_ids and logged.action.kind in {"compact_category_cells", "restore_row"}:
         _mark_logged_ids_active(deleted_action_ids, log_data)
     source_action_id = logged.action.metadata.get("source_action_id")
     if source_action_id and logged.action.kind == "move_expense":
@@ -1840,7 +1954,7 @@ def undo_last_action(user_key: str | None) -> tuple[bool, str]:
                 log_data,
             )
         deleted_action_ids = _deleted_action_ids(action)
-        if deleted_action_ids and action.kind == "compact_category_cells":
+        if deleted_action_ids and action.kind in {"compact_category_cells", "restore_row"}:
             _mark_logged_ids_active(deleted_action_ids, log_data)
         source_action_id = action.metadata.get("source_action_id")
         if source_action_id and action.kind == "move_expense":

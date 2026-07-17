@@ -4,7 +4,7 @@ Last updated: 2026-07-16
 
 ## Active Focus
 
-Shared Needs-category logging and the shifted dated Income layout are implemented and ready for manual Discord/Google Sheets verification.
+Shared Needs-category logging and the shifted dated Income layout are implemented. Brian and Hannah May-July plus the Hannah Template are migrated; Discord mutation flows remain ready for final manual verification.
 
 ## On Deck
 
@@ -26,6 +26,10 @@ Shared Needs-category logging and the shifted dated Income layout are implemente
 - Shifted the Brian Budget 2026 Template Income table from `A:C` to `B:D`, repaired the monthly-income total and budget-banner formula lineage, and preserved the adjacent biweekly-income configuration.
 - Made income logging discover Date, Source/Employer, and Amount from visible headers so existing legacy month tabs and newly copied dated Template tabs both work during rollout.
 - Added bot-side Pacific-date stamping, reconciliation transaction-date propagation, recent-action/update compatibility, and header-driven Apps Script date stamping for manual Income entries.
+- Migrated the May, June, and July tabs in both Brian and Hannah Budget 2026, plus Hannah's Template, to the `B:D` Date/Source/Amount layout without changing the existing source/amount data or monthly totals.
+- Backfilled Income dates only where a matching BookieBot action timestamp provided reliable history, preserved Brian July's xAI biweekly configuration, and migrated action-log column metadata/row references for the new locations.
+- Updated the expense breakdown parser to read the Income table from its visible headers, including income rows that share a sheet row with biweekly configuration labels.
+- Income actions remain editable after an update and can now be deleted with row compaction; undo reinserts the row and restores the full active lineage and affected action-row references.
 - Manual verification: deploy the updated Apps Script, run `setupBudgetSystemAutomation()` once, enter an amount in a new dated Income table, then confirm manual and BookieBot income dates plus update/delete/undo behavior.
 
 ## Completed 2026-07-08
@@ -265,6 +269,8 @@ Use a test row or low-risk real row in Discord:
    - Expected: the source category cells clear/compact, the destination receives the complete transaction exactly once, and Needs is offered as a move destination unless it is already the current category.
 49. Place two test transactions in Needs, delete the older one from recent actions, then immediately undo.
    - Expected: the newer Needs row compacts upward after delete; undo restores both rows in order with all date/item/amount/location/person values intact.
+50. On a migrated May, June, or July personal budget tab, log an Income entry, update its source or amount, delete it from recent actions, and immediately undo.
+   - Expected: Date/Source/Amount populate in `B:D`, the report includes the dated entry, delete compacts the Income rows, and undo restores the row and its editable lineage without changing the monthly total beyond the expected transaction amount.
 
 ## Verification Baseline
 
@@ -278,6 +284,18 @@ python -m pytest unit_tests/intents/test_handlers.py unit_tests/core/test_messag
 Latest verification:
 
 ```bash
+venv/bin/python -m pytest unit_tests
+# passed: 385 passed, 1 warning
+
+python -m pyright --pythonpath venv/bin/python --pythonversion 3.12
+# passed: 0 errors, 0 warnings, 0 informations
+
+node --check --input-type=commonjs < scripts/google-apps-script/budget-system-automation.gs
+# passed
+
+git diff --check
+# passed
+
 venv/bin/python -m pytest unit_tests
 # passed: 378 passed, 1 warning
 

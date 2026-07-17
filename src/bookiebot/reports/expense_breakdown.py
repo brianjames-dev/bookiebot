@@ -112,6 +112,14 @@ class IncomeProjectionConfig:
     anchor_date: datetime | None = None
 
 
+@dataclass(frozen=True)
+class _IncomeTableLayout:
+    header_row_index: int
+    source_column: int
+    amount_column: int
+    date_column: int | None = None
+
+
 @dataclass
 class ExpenseBreakdownReport:
     actor_key: str
@@ -1106,8 +1114,14 @@ def _income_entries(rows: list[list[str]]) -> tuple[list[PaymentItem], float]:
     summary_total = _monthly_income_summary(rows)
     marker_index = _monthly_income_marker_index(rows)
     items: list[PaymentItem] = []
+    layout = _income_table_layout(rows, marker_index)
 
-    if marker_index is not None:
+    if marker_index is not None and layout is not None:
+        for row in rows[layout.header_row_index + 1 : marker_index]:
+            item = _income_entry_from_layout(row, layout)
+            if item:
+                items.append(item)
+    elif marker_index is not None:
         for row in rows[:marker_index]:
             if _is_income_projection_config_row(row):
                 continue
@@ -1124,6 +1138,48 @@ def _income_entries(rows: list[list[str]]) -> tuple[list[PaymentItem], float]:
 
     total = summary_total or round(sum(item.amount for item in items), 2)
     return items, round(total, 2)
+
+
+def _income_table_layout(
+    rows: list[list[str]],
+    marker_index: int | None,
+) -> _IncomeTableLayout | None:
+    scan_rows = rows[:marker_index] if marker_index is not None else rows
+    for row_index, row in enumerate(scan_rows):
+        source_column: int | None = None
+        amount_column: int | None = None
+        date_column: int | None = None
+        for column, value in enumerate(row):
+            normalized = _normalize_label(value)
+            if normalized == "date":
+                date_column = column
+            elif normalized in {"source", "employer"}:
+                source_column = column
+            elif normalized == "amount":
+                amount_column = column
+        if source_column is not None and amount_column is not None:
+            return _IncomeTableLayout(
+                header_row_index=row_index,
+                source_column=source_column,
+                amount_column=amount_column,
+                date_column=date_column,
+            )
+    return None
+
+
+def _income_entry_from_layout(row: list[str], layout: _IncomeTableLayout) -> PaymentItem | None:
+    if layout.source_column >= len(row) or layout.amount_column >= len(row):
+        return None
+    label = str(row[layout.source_column]).strip()
+    amount = _cell_money(row[layout.amount_column])
+    if amount <= 0 or not label or label.startswith("<") or _is_non_income_label(label):
+        return None
+    date = ""
+    if layout.date_column is not None and layout.date_column < len(row):
+        candidate = str(row[layout.date_column]).strip()
+        if _parse_date(candidate) is not None:
+            date = candidate
+    return PaymentItem(label=label, amount=round(amount, 2), group="income", date=date)
 
 
 def _income_projection_config(rows: list[list[str]]) -> IncomeProjectionConfig:

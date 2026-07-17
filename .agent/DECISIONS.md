@@ -152,6 +152,12 @@ Decision: Personal-budget income mutations discover Date, Source (or legacy Empl
 
 Rationale: Header discovery permits a safe mixed-layout rollout without breaking current month tabs, fixed-column assumptions, recent-action updates, undo metadata, or reconciliation matching. Explicit API-side dates are required because Google Sheets API writes do not trigger spreadsheet `onEdit` handlers.
 
+## 2026-07-16 - Do Not Guess Historical Income Dates During Layout Migration
+
+Decision: Migrate existing Income rows to the canonical `B:D` Date/Source/Amount layout without changing their source or amount. Backfill a historical date only when the BookieBot action log provides a reliable matching timestamp; otherwise leave the new Date cell blank. Migrate action-log Income column metadata and reliable row references with the sheet layout.
+
+Rationale: Invented dates would corrupt financial history. Keeping values intact and moving action metadata with the rows preserves report accuracy and update/delete/undo targeting while allowing unmatched manually entered income to remain honestly undated.
+
 ## Pending Decisions
 
 - Where should durable system events live: banking database only, Google Sheets only, or dual-write during transition?

@@ -239,13 +239,18 @@ Status: Complete first pass as of 2026-06-20. Existing-row match confirmation up
 
 ### 2026-07-16 Shifted Dated Income Layout Follow-Up
 
-Status: Complete and ready for manual Discord/Google Sheets verification.
+Status: Complete. Live May-July migration and report verification finished; Discord/Google Sheets mutation flows are ready for final manual verification.
 
 - Shifted the Brian Budget 2026 Template Income table to `B:D` with Date, Source, and Amount while preserving the biweekly-income configuration in `E:F`.
 - Repaired the Template monthly-income total and budget-banner formula lineage for the shifted Amount column.
 - Income writes now discover visible headers and support both the legacy Employer/Amount layout and the new Date/Source/Amount layout.
 - BookieBot/API writes stamp a Pacific date directly because Google Sheets API writes do not fire `onEdit`; bank-origin income uses the bank transaction date when available.
 - The global Apps Script now installs personal-budget edit triggers and stamps an empty Income date when a user manually enters an amount.
+- Migrated Brian and Hannah May, June, and July plus Hannah's Template to the canonical `B:D` layout while preserving existing Income source/amount rows and month totals.
+- Backfilled dates only from reliable BookieBot action-log timestamps, preserved Brian July's xAI configuration, and migrated Income action-log column metadata and matching row references.
+- Expense report parsing now anchors to the visible Date/Source/Amount headers rather than row contents, so adjacent biweekly configuration labels cannot hide valid income rows.
+- Updated Income actions remain deletable; deletion compacts the sheet and related action-row references, while undo reinserts the row and restores the affected lineage.
+- Live report check: Brian July returned xAI `$3,774.59` on `7/2/2026` and internet stipend `$150.00` on `7/15/2026`; Hannah July returned Sonic paycheck `$1,619.47` on `7/10/2026`.
 - Manual test: deploy the script and run `setupBudgetSystemAutomation()`, enter a manual Income amount, then log, update, delete, and undo a BookieBot income entry on a month tab copied from Template.
 
 ## Open Questions

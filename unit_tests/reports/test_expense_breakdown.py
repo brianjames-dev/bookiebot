@@ -394,6 +394,27 @@ def test_build_expense_breakdown_report_aggregates_shared_and_personal_data():
     )
 
 
+def test_income_entries_parse_shifted_dated_header_layout():
+    rows = [
+        ["", "Date:", "Source:", "Amount:", "Biweekly Income Source:", "xAI"],
+        ["", "07/02/2026", "xAI", "$3,774.59", "Biweekly Income Start:", "07/02/2026"],
+        ["", "07/15/2026", "Internet stipend", "$150.00"],
+        ["", "", "<Enter Source>", "$0.00"],
+        ["", "", "Monthly Income:", "$3,924.59"],
+    ]
+
+    entries, total = expense_breakdown._income_entries(rows)
+    config = expense_breakdown._income_projection_config(rows)
+
+    assert total == 3924.59
+    assert [(entry.label, entry.amount, entry.date) for entry in entries] == [
+        ("xAI", 3774.59, "07/02/2026"),
+        ("Internet stipend", 150.0, "07/15/2026"),
+    ]
+    assert config.source_label == "xAI"
+    assert config.anchor_date == datetime(2026, 7, 2)
+
+
 def test_shared_need_expense_section_feeds_need_category_and_daily_activity():
     shared_rows = [
         ["hdr"] * 36,

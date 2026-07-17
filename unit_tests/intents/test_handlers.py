@@ -610,6 +610,67 @@ async def test_shifted_income_layout_stamps_date_and_keeps_recent_actions_workin
 
 
 @pytest.mark.asyncio
+async def test_shifted_income_can_be_updated_deleted_and_delete_undone(message):
+    repo = SheetsRepoStub(
+        income_rows=[
+            ["", "Date:", "Source:", "Amount:"],
+            ["", "", "<Enter Source>", "0"],
+            ["", "", "<Enter Source>", "0"],
+            ["", "", "Monthly Income:", ""],
+        ]
+    )
+
+    with repo.patched():
+        await ih.handle_intent(
+            "log_income",
+            {
+                "type": "income",
+                "date": "2026-07-16",
+                "amount": 1639.9,
+                "source": "Sonic",
+            },
+            message,
+        )
+        await ih.handle_intent(
+            "log_income",
+            {
+                "type": "income",
+                "date": "2026-07-17",
+                "amount": 2977.16,
+                "source": "xAI",
+            },
+            message,
+        )
+        await ih.handle_intent(
+            "update_recent_action",
+            {"index": 2, "updates": {"source": "Sonic Drive-In", "amount": 1700}},
+            message,
+        )
+        await ih.handle_intent("delete_recent_action", {"index": 1}, message)
+
+        assert repo.income.cell(3, 2).value == "7/17/2026"
+        assert repo.income.cell(3, 3).value == "xAI"
+        assert repo.income.cell(3, 4).value == "2977.16"
+
+        await ih.handle_intent("undo_last_transaction", {}, message)
+
+        assert repo.income.cell(3, 2).value == "7/16/2026"
+        assert repo.income.cell(3, 3).value == "Sonic Drive-In"
+        assert repo.income.cell(3, 4).value == "$1700.00"
+        assert repo.income.cell(4, 2).value == "7/17/2026"
+        assert repo.income.cell(4, 3).value == "xAI"
+        assert repo.income.cell(4, 4).value == "2977.16"
+
+        await ih.handle_intent(
+            "update_recent_action",
+            {"index": 2, "updates": {"source": "xAI Corp"}},
+            message,
+        )
+
+        assert repo.income.cell(4, 3).value == "xAI Corp"
+
+
+@pytest.mark.asyncio
 async def test_updated_income_recent_display_keeps_amount_when_only_source_changes(message):
     repo = SheetsRepoStub(income_rows=[["", "Existing Income", "100"], ["", "Monthly Income:", ""]])
 
