@@ -286,12 +286,15 @@ Status: Complete. Current-month report projections now account for paychecks tha
 
 ### 2026-07-17 Chart Tooltip Anchor Follow-Up
 
-Status: Complete. Report tooltips no longer animate from the chart origin after briefly losing hover.
+Status: Complete after lifecycle correction. Report tooltips no longer animate from the chart origin after briefly losing hover, and their five-second hold/fade behavior remains intact.
 
-- The shared chart tooltip content records the wrapper's last non-empty Recharts transform and restores it whenever the inactive render clears that transform.
-- Point-to-point transform transitions remain enabled, so sequential hover movement stays smooth while non-sequential re-entry starts from the prior anchored position rather than `(0, 0)`.
+- The shared chart tooltip content caches the last active payload and overrides Recharts' immediate inactive visibility only until the five-second hold plus 180 ms fade completes.
+- The wrapper records its last non-empty Recharts transform and restores it whenever the inactive render clears that transform.
+- Transform transitions are disabled for the unpositioned wrapper and enabled only after the first real anchor is painted, eliminating the initial `(0, 0)` flight.
+- Point-to-point transitions remain enabled after that first anchor, so sequential hover and non-sequential re-entry both move smoothly from the prior position.
 - Rebuilt the embedded JavaScript asset and added a report regression assertion for the transform-retention hook.
-- Manual test: move between non-adjacent bars, slices, and line points while briefly crossing empty chart space; confirm no top-left fly-in and no regression to normal adjacent-point animation.
+- Local browser verification covered initial hover, adjacent movement, empty-space re-entry, the five-second visible hold, fade phase, and final hide.
+- Manual test: move between non-adjacent bars, slices, and line points while briefly crossing empty chart space; confirm no top-left fly-in, no janky re-entry, and a smooth fade after about five seconds.
 
 ### 2026-07-17 Concise Expense Breakdown Reply Follow-Up
 

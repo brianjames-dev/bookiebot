@@ -31,6 +31,10 @@ Shared Needs-category logging, the shifted dated Income layout, and the four-blo
 - Rebuilt the embedded report assets and added a regression marker assertion; focused report tests, frontend type-checking, and the production build pass.
 - Manual verification: after deployment, hover non-adjacent bars/slices with a brief gap between points and confirm the tooltip resumes from its last position while adjacent point-to-point movement remains smooth.
 - Tooltip-fix verification: `400 passed`, frontend and Python type checks passed, the Vite production build passed, and `git diff --check` passed.
+- Corrected the tooltip anchor follow-up so Recharts cannot immediately hide cached tooltip content: the last active payload now stays visible through the five-second hold, fades for 180 ms, and then hides.
+- Delayed transform animation until after the first real tooltip anchor is painted, removing the initial top-left fly-in while retaining smooth point-to-point and post-gap motion.
+- Local browser verification covered first hover, sequential movement, re-entry from empty chart space, full-opacity hold through five seconds, the fade phase, and final removal.
+- Tooltip-lifecycle verification: `400 passed`, Pyright reported zero errors, frontend typecheck/build passed, and `git diff --check` passed.
 - Reduced the Discord expense-breakdown response to its heading, Total Spent, signed full-report link, and attached pie chart; category amounts and percentages remain available in the web report instead of being duplicated in message text.
 - Added an exact-response regression test that also confirms the full non-zero category dataset still reaches the pie-chart renderer.
 - Manual verification: request an expense breakdown in Discord and confirm the reply contains only the concise summary text plus the pie-chart attachment, while the linked web report retains the complete breakdown.

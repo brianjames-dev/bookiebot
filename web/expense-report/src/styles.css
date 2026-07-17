@@ -1389,6 +1389,10 @@ summary {
   transform: translateY(3px);
 }
 
+.bb-chart-container .recharts-tooltip-wrapper[data-bb-tooltip-motion-ready="true"] {
+  transition: transform 180ms cubic-bezier(0.22, 1, 0.36, 1), opacity 140ms ease-out, visibility 140ms ease-out !important;
+}
+
 .bb-chart-tooltip-title {
   font-size: 12px;
   font-weight: 700;

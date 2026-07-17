@@ -14,6 +14,8 @@ export type ChartConfig = Record<
 const ChartContext = React.createContext<ChartConfig | null>(null)
 const ChartInteractionContext = React.createContext(0)
 const TOOLTIP_LAST_TRANSFORM_ATTRIBUTE = "data-bb-last-transform"
+const TOOLTIP_MOTION_READY_ATTRIBUTE = "data-bb-tooltip-motion-ready"
+const TOOLTIP_FADE_DURATION = 180
 
 function ChartContainer({
   id,
@@ -27,6 +29,10 @@ function ChartContainer({
   const chartId = React.useId()
   const resolvedId = `chart-${id || chartId.replace(/:/g, "")}`
   const [interactionRevision, setInteractionRevision] = React.useState(0)
+
+  const handlePointerEnter = React.useCallback(() => {
+    setInteractionRevision((revision) => revision + 1)
+  }, [])
 
   const handlePointerDownCapture = React.useCallback((event: React.PointerEvent<HTMLDivElement>) => {
     if (event.pointerType === "mouse" && event.button !== 0) {
@@ -42,6 +48,7 @@ function ChartContainer({
           id={resolvedId}
           className={cn("bb-chart-container", className)}
           data-chart={resolvedId}
+          onPointerEnter={handlePointerEnter}
           onPointerDownCapture={handlePointerDownCapture}
         >
           <ChartStyle id={resolvedId} config={config} />
@@ -131,6 +138,7 @@ type ChartTooltipRenderProps = {
 function ChartTooltipAutoDismissContent({
   content,
   dismissDelay,
+  animatePosition,
   active,
   payload,
   label,
@@ -138,12 +146,50 @@ function ChartTooltipAutoDismissContent({
 }: {
   content: React.ReactElement<ChartTooltipRenderProps>
   dismissDelay: number
+  animatePosition: boolean
 } & ChartTooltipRenderProps) {
   const interactionRevision = React.useContext(ChartInteractionContext)
-  const [phase, setPhase] = React.useState<"hidden" | "visible" | "dismissing">("hidden")
+  const [phase, setPhase] = React.useState<"hidden" | "visible" | "dismissing">("visible")
   const signature = React.useMemo(() => chartTooltipSignature(label, payload), [label, payload])
   const frameRef = React.useRef<HTMLDivElement | null>(null)
   const wrapperRef = React.useRef<HTMLDivElement | null>(null)
+  const lastActivePropsRef = React.useRef<ChartTooltipRenderProps | null>(null)
+  const dismissTimerRef = React.useRef<number | null>(null)
+  const hideTimerRef = React.useRef<number | null>(null)
+  const motionFrameRef = React.useRef<number | null>(null)
+  const hasActivePayload = Boolean(active && Array.isArray(payload) && payload.length)
+
+  if (hasActivePayload) {
+    lastActivePropsRef.current = {
+      ...props,
+      active: true,
+      payload,
+      label,
+    }
+  }
+
+  const renderProps = lastActivePropsRef.current
+
+  React.useLayoutEffect(() => {
+    if (!hasActivePayload) {
+      return
+    }
+
+    if (dismissTimerRef.current !== null) {
+      window.clearTimeout(dismissTimerRef.current)
+    }
+    if (hideTimerRef.current !== null) {
+      window.clearTimeout(hideTimerRef.current)
+    }
+
+    setPhase("visible")
+    dismissTimerRef.current = window.setTimeout(() => {
+      setPhase("dismissing")
+    }, dismissDelay)
+    hideTimerRef.current = window.setTimeout(() => {
+      setPhase("hidden")
+    }, dismissDelay + TOOLTIP_FADE_DURATION)
+  }, [dismissDelay, hasActivePayload, interactionRevision, signature])
 
   React.useLayoutEffect(() => {
     const renderedWrapper = frameRef.current?.parentElement
@@ -151,45 +197,63 @@ function ChartTooltipAutoDismissContent({
     if (!wrapper) {
       return
     }
-    wrapperRef.current = wrapper
+    if (wrapperRef.current !== wrapper) {
+      if (motionFrameRef.current !== null) {
+        window.cancelAnimationFrame(motionFrameRef.current)
+        motionFrameRef.current = null
+      }
+      wrapperRef.current = wrapper
+    }
 
     const currentTransform = wrapper.style.transform.trim()
-    if (active) {
-      if (currentTransform && currentTransform !== "none") {
-        wrapper.setAttribute(TOOLTIP_LAST_TRANSFORM_ATTRIBUTE, currentTransform)
+    const hasCurrentTransform = Boolean(currentTransform && currentTransform !== "none")
+    if (hasCurrentTransform) {
+      wrapper.setAttribute(TOOLTIP_LAST_TRANSFORM_ATTRIBUTE, currentTransform)
+      if (
+        animatePosition &&
+        !wrapper.hasAttribute(TOOLTIP_MOTION_READY_ATTRIBUTE) &&
+        motionFrameRef.current === null
+      ) {
+        motionFrameRef.current = window.requestAnimationFrame(() => {
+          motionFrameRef.current = null
+          if (wrapperRef.current === wrapper) {
+            wrapper.setAttribute(TOOLTIP_MOTION_READY_ATTRIBUTE, "true")
+          }
+        })
       }
-      return
+    } else {
+      const lastTransform = wrapper.getAttribute(TOOLTIP_LAST_TRANSFORM_ATTRIBUTE)
+      if (lastTransform) {
+        // Recharts drops transform when the pointer briefly leaves a data point.
+        // Retaining the last anchor prevents the next tooltip from animating out of (0, 0).
+        wrapper.style.transform = lastTransform
+      }
     }
 
-    const lastTransform = wrapper.getAttribute(TOOLTIP_LAST_TRANSFORM_ATTRIBUTE)
-    if (lastTransform && (!currentTransform || currentTransform === "none")) {
-      // Recharts drops transform when the pointer briefly leaves a data point.
-      // Retaining the last anchor prevents the next tooltip from animating out of (0, 0).
-      wrapper.style.transform = lastTransform
+    if (!animatePosition) {
+      wrapper.removeAttribute(TOOLTIP_MOTION_READY_ATTRIBUTE)
     }
+
+    // Recharts hides the wrapper immediately when its pointer state becomes inactive.
+    // Keep the cached tooltip visible until our own hold-and-fade lifecycle completes.
+    wrapper.style.visibility = phase === "hidden" || !renderProps ? "hidden" : "visible"
   })
 
   React.useEffect(() => {
-    if (!active) {
-      setPhase("hidden")
-      return undefined
-    }
-
-    setPhase("visible")
-    const dismissTimer = window.setTimeout(() => {
-      setPhase("dismissing")
-    }, dismissDelay)
-    const hideTimer = window.setTimeout(() => {
-      setPhase("hidden")
-    }, dismissDelay + 180)
-
     return () => {
-      window.clearTimeout(dismissTimer)
-      window.clearTimeout(hideTimer)
+      if (dismissTimerRef.current !== null) {
+        window.clearTimeout(dismissTimerRef.current)
+      }
+      if (hideTimerRef.current !== null) {
+        window.clearTimeout(hideTimerRef.current)
+      }
+      if (motionFrameRef.current !== null) {
+        window.cancelAnimationFrame(motionFrameRef.current)
+      }
     }
-  }, [active, dismissDelay, interactionRevision, signature])
+  }, [])
 
-  if (!active || phase === "hidden") {
+  if (!renderProps || phase === "hidden") {
     return null
   }
 
@@ -198,12 +262,7 @@ function ChartTooltipAutoDismissContent({
       ref={frameRef}
       className={cn("bb-chart-tooltip-frame", phase === "dismissing" && "bb-chart-tooltip-frame-dismissing")}
     >
-      {React.cloneElement(content, {
-        ...props,
-        active,
-        payload,
-        label,
-      })}
+      {React.cloneElement(content, renderProps)}
     </div>
   )
 }
@@ -244,7 +303,11 @@ function ChartTooltip({
   ...props
 }: ChartTooltipProps) {
   const tooltipContent = React.isValidElement<ChartTooltipRenderProps>(content) ? (
-    <ChartTooltipAutoDismissContent content={content} dismissDelay={dismissDelay} />
+    <ChartTooltipAutoDismissContent
+      content={content}
+      dismissDelay={dismissDelay}
+      animatePosition={isAnimationActive !== false}
+    />
   ) : (
     content
   )
@@ -253,12 +316,12 @@ function ChartTooltip({
     <RechartsPrimitive.Tooltip
       {...props}
       content={tooltipContent}
-      isAnimationActive={isAnimationActive}
+      isAnimationActive={false}
       animationDuration={animationDuration}
       animationEasing={animationEasing}
       wrapperStyle={{
         outline: "none",
-        transition: "transform 180ms cubic-bezier(0.22, 1, 0.36, 1), opacity 140ms ease-out, visibility 140ms ease-out",
+        transition: "opacity 140ms ease-out, visibility 140ms ease-out",
         ...wrapperStyle,
       }}
     />
