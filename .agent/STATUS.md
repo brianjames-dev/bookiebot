@@ -1,6 +1,6 @@
 # Agent Status
 
-Last updated: 2026-07-16
+Last updated: 2026-07-17
 
 ## Active Focus
 
@@ -47,6 +47,7 @@ Shared Needs-category logging, the shifted dated Income layout, and the four-blo
 - After Hannah removed Amazon Prime, repopulated her live `_BookieBot Subscription Schedule` with all ten current monthly rows, blank date fields, source ranges, and timestamps; current visible subtotals are `$163.94` Needs and `$23.97` Wants.
 - Replaced Hannah's visible subscription roster from the final dated list: seven monthly Needs, one yearly Need, five monthly Wants, and one yearly Want; visible subtotals are `$521.07`, `$32.99`, `$47.95`, and `$59.99` respectively.
 - Synced all fourteen dated entries into `_BookieBot Subscription Schedule` with cadence, amount, pull day/month, source range, and timestamp metadata; every row is reminder-eligible and a repeat sync produced no warnings.
+- Restored Internet as a `$0.00` Needs Monthly placeholder with a blank pull day; the normalized schedule retains it as an undated draft while the fourteen dated subscriptions remain reminder-eligible.
 - Manual verification: deploy the updated Apps Script, run `setupBudgetSystemAutomation()` once, enter an amount in a new dated Income table, then confirm manual and BookieBot income dates plus update/delete/undo behavior.
 
 ## Completed 2026-07-08
@@ -297,7 +298,7 @@ Use a test row or low-risk real row in Discord:
 54. In Brian July, delete and undo the first Income entry, then repeat with the later entry and with an immediate undo after logging test Income.
     - Expected: the `Biweekly Income Start` configuration remains anchored in `E:F`, Monthly Income always sums the current `D` rows, the Budget section retains its total reference, and undo restores the deleted row's values and formatting.
 55. Run `/debug_subscriptions` after deployment and inspect Hannah's visible and normalized subscription sheets.
-    - Expected: all fourteen entries parse without warnings; monthly rows have the supplied pull day, yearly rows have the supplied month/day, and the four visible subtotals remain `$521.07`, `$32.99`, `$47.95`, and `$59.99`.
+    - Expected: fourteen dated entries are reminder-eligible; Internet is retained as a `$0.00` monthly draft with one expected missing-pull-date warning; the four visible subtotals remain `$521.07`, `$32.99`, `$47.95`, and `$59.99`.
 
 ## Verification Baseline
 
@@ -311,6 +312,12 @@ python -m pytest unit_tests/intents/test_handlers.py unit_tests/core/test_messag
 Latest verification:
 
 ```bash
+Live Hannah Internet subscription placeholder sync
+# passed: Internet persisted at Subscriptions!B14:D14 and in the normalized schedule; 14 eligible rows plus 1 expected missing-date warning
+
+PYTHONPATH=src venv/bin/python -m pytest unit_tests/sheets/test_subscription_reminders.py unit_tests/core/test_subscription_reminder_schedule.py
+# passed: 28 passed
+
 Live Hannah subscription roster and normalized schedule sync
 # passed: 14 dated rows, 0 parse warnings; repeat sync stable
 
