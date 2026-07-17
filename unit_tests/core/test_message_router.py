@@ -43,6 +43,36 @@ async def test_message_router_maybe_typing_wraps_pre_intent_work():
     assert message.channel.typing_exits == 1
 
 
+@pytest.mark.asyncio
+async def test_message_router_continues_when_discord_typing_indicator_fails():
+    class FailingTyping:
+        async def __aenter__(self):
+            raise RuntimeError("Discord returned 500")
+
+        async def __aexit__(self, exc_type, exc, tb):
+            raise AssertionError("Typing context should not exit after a failed enter")
+
+    message = SimpleNamespace(channel=SimpleNamespace(typing=lambda: FailingTyping()))
+    request_processed = False
+
+    async with _maybe_typing(message):
+        request_processed = True
+
+    assert request_processed is True
+
+
+@pytest.mark.asyncio
+async def test_message_router_typing_context_does_not_swallow_request_errors():
+    message = TypingMessage()
+
+    with pytest.raises(RuntimeError, match="intent parser failed"):
+        async with _maybe_typing(message):
+            raise RuntimeError("intent parser failed")
+
+    assert message.channel.typing_enters == 1
+    assert message.channel.typing_exits == 1
+
+
 def test_delete_unspecified_expense_routes_to_recent_actions():
     assert _action_management_intent("I need to delete an expense") == (
         "query_recent_actions",

@@ -67,9 +67,43 @@ async def _maybe_typing(message: Any) -> AsyncIterator[None]:
     if not callable(typing):
         yield
         return
-    typing_context = cast(AsyncContextManager[Any], typing())
-    async with typing_context:
+
+    try:
+        typing_context = cast(AsyncContextManager[Any], typing())
+        await typing_context.__aenter__()
+    except Exception as exc:
+        logger.warning(
+            "Discord typing indicator unavailable; continuing without it",
+            extra={"exception": str(exc)},
+        )
         yield
+        return
+
+    try:
+        yield
+    except BaseException as body_error:
+        try:
+            suppress = await typing_context.__aexit__(
+                type(body_error),
+                body_error,
+                body_error.__traceback__,
+            )
+        except Exception as exc:
+            logger.warning(
+                "Discord typing indicator cleanup failed",
+                extra={"exception": str(exc)},
+            )
+            suppress = False
+        if not suppress:
+            raise
+    else:
+        try:
+            await typing_context.__aexit__(None, None, None)
+        except Exception as exc:
+            logger.warning(
+                "Discord typing indicator cleanup failed; request completed normally",
+                extra={"exception": str(exc)},
+            )
 
 
 def _short_value(value: object, *, limit: int = 80) -> str:

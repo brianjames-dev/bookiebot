@@ -131,6 +131,8 @@ Manual verification steps are tracked in `.agent/STATUS.md`.
 - Verified shared Needs rows can be updated, moved out, moved back, deleted with category compaction, and restored with undo.
 - Extended category totals, highest-category, largest-expense, and top-expense queries so Needs participates like the other shared categories.
 - Preserved support for legacy `description` entities by translating them to the new item field at the intent boundary.
+- Made the optional Discord typing indicator fail open: transient `send_typing` entry or cleanup failures are logged as warnings and no longer abort intent parsing or a completed request.
+- Added message-router regression tests proving typing-entry failures do not block processing and genuine request exceptions still propagate through the wrapper.
 
 Manual verification steps are tracked in `.agent/STATUS.md`.
 

@@ -30,6 +30,8 @@ Shared Needs-category logging and the shifted dated Income layout are implemente
 - Backfilled Income dates only where a matching BookieBot action timestamp provided reliable history, preserved Brian July's xAI biweekly configuration, and migrated action-log column metadata/row references for the new locations.
 - Updated the expense breakdown parser to read the Income table from its visible headers, including income rows that share a sheet row with biweekly configuration labels.
 - Income actions remain editable after an update and can now be deleted with row compaction; undo reinserts the row and restores the full active lineage and affected action-row references.
+- Discord typing-indicator API failures are now non-fatal, so a transient Discord `5xx` cannot abort intent parsing or prevent an otherwise valid transaction from being logged.
+- Added regression coverage for failed typing-context entry and for preserving real parser/handler exceptions through the typing wrapper.
 - Manual verification: deploy the updated Apps Script, run `setupBudgetSystemAutomation()` once, enter an amount in a new dated Income table, then confirm manual and BookieBot income dates plus update/delete/undo behavior.
 
 ## Completed 2026-07-08
@@ -271,6 +273,8 @@ Use a test row or low-risk real row in Discord:
    - Expected: the newer Needs row compacts upward after delete; undo restores both rows in order with all date/item/amount/location/person values intact.
 50. On a migrated May, June, or July personal budget tab, log an Income entry, update its source or amount, delete it from recent actions, and immediately undo.
    - Expected: Date/Source/Amount populate in `B:D`, the report includes the dated entry, delete compacts the Income rows, and undo restores the row and its editable lineage without changing the monthly total beyond the expected transaction amount.
+51. Retry `Brian (BofA) purchased celebration dinner at Jackson's bar and grill for $140` after deployment.
+   - Expected: the expense reaches intent parsing and logs normally; if Discord's typing endpoint returns another transient error, logs show a warning that processing continued instead of `Failed to parse intent` from `send_typing`.
 
 ## Verification Baseline
 
@@ -284,6 +288,15 @@ python -m pytest unit_tests/intents/test_handlers.py unit_tests/core/test_messag
 Latest verification:
 
 ```bash
+venv/bin/python -m pytest unit_tests
+# passed: 387 passed, 1 warning
+
+python -m pyright --pythonpath venv/bin/python --pythonversion 3.12
+# passed: 0 errors, 0 warnings, 0 informations
+
+git diff --check
+# passed
+
 venv/bin/python -m pytest unit_tests
 # passed: 385 passed, 1 warning
 
