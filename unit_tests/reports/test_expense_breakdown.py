@@ -1,6 +1,7 @@
 from datetime import datetime
 import json
 import os
+from pathlib import Path
 import re
 
 import pytest
@@ -68,6 +69,15 @@ def test_parse_budget_month_accepts_names_and_relative_months():
     assert parse_budget_month("June 2025", now=now) == BudgetMonth(2025, 6)
     assert parse_budget_month("2026-05", now=now) == BudgetMonth(2026, 5)
     assert parse_budget_month("last month", now=now) == BudgetMonth(2026, 6)
+
+
+def test_daily_spending_bars_share_the_blue_corner_radius():
+    source = (Path(__file__).resolve().parents[2] / "web/expense-report/src/report-app.tsx").read_text()
+    chart_source = source.split("function DailySpendingChart", 1)[1].split("function dailySpendingYAxisDomain", 1)[0]
+
+    assert "const DAILY_SPENDING_BAR_RADIUS: [number, number, number, number] = [2, 2, 2, 2]" in source
+    assert chart_source.count("radius={DAILY_SPENDING_BAR_RADIUS}") == 3
+    assert "radius={[6, 6, 2, 2]}" not in chart_source
 
 
 def test_load_report_worksheets_uses_resolved_month_tabs_when_optional_workbook_open_fails(monkeypatch):

@@ -214,6 +214,7 @@ const LEFT_CATEGORY_COLOR = "#166534"
 const SAVINGS_CATEGORY_COLOR = "#0f766e"
 const NEEDS_BAR_COLOR = "#2563eb"
 const WANTS_BAR_COLOR = "#7c3aed"
+const DAILY_SPENDING_BAR_RADIUS: [number, number, number, number] = [2, 2, 2, 2]
 const DAILY_SPENDING_GRID_COLOR = "hsl(var(--muted-foreground))"
 const DAILY_SPENDING_BOUNDARY_COLOR = "hsl(var(--foreground))"
 const TOP_EXPENSE_HEAT_COLORS = [
@@ -2112,11 +2113,11 @@ function DailySpendingChart({
             <ChartTooltip content={showStackedBars ? <DailySpendingTooltipContent /> : <ChartTooltipContent />} cursor={{ fill: dailySpendingCursorFill(filter) }} />
             {showStackedBars ? (
               <>
-                <Bar dataKey="needsAmount" name="Needs" stackId="daily" fill={NEEDS_BAR_COLOR} radius={[2, 2, 2, 2]} />
-                <Bar dataKey="wantsAmount" name="Wants" stackId="daily" fill={WANTS_BAR_COLOR} radius={[6, 6, 2, 2]} />
+                <Bar dataKey="needsAmount" name="Needs" stackId="daily" fill={NEEDS_BAR_COLOR} radius={DAILY_SPENDING_BAR_RADIUS} />
+                <Bar dataKey="wantsAmount" name="Wants" stackId="daily" fill={WANTS_BAR_COLOR} radius={DAILY_SPENDING_BAR_RADIUS} />
               </>
             ) : (
-              <Bar dataKey="amount" name="Daily spending" fill={singleBarColor} radius={[6, 6, 2, 2]} />
+              <Bar dataKey="amount" name="Daily spending" fill={singleBarColor} radius={DAILY_SPENDING_BAR_RADIUS} />
             )}
           </BarChart>
         </ResponsiveContainer>

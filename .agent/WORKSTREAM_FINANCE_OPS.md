@@ -376,6 +376,16 @@ Status: Complete after contrast follow-up. Every Daily Spending filter now separ
 - Browser SVG checks verified computed colors, widths, caps, and dash patterns for All, Needs, and Wants with no console warnings or errors.
 - Manual test: switch Daily Spending through All, Needs, and Wants in light and dark mode, confirm the top/bottom boundaries and X labels use the foreground tone, and confirm the Y labels plus uniformly dotted interior lines remain grey.
 
+### 2026-07-17 Daily Spending Bar Radius Follow-Up
+
+Status: Complete. Needs and Wants bars now share the blue bar's subtle four-corner radius in every Daily Spending filter.
+
+- One typed `[2, 2, 2, 2]` radius constant drives both stacked bars and the single filtered bar, preventing color-specific radius drift.
+- Focused regression coverage asserts all three Daily Spending bar definitions consume the shared constant and rejects the former purple `6px` top corners.
+- Browser SVG checks confirmed identical `A 2,2` corner arcs for blue and purple bars across All, Needs, and Wants with no console warnings or errors.
+- Manual test: compare blue and purple bars in All, then switch to Needs and Wants and confirm every bar retains the same subtle rounding.
+- Verification: `405 passed, 1 skipped`, Pyright reported zero errors, frontend typecheck/build passed, focused report tests passed, and `git diff --check` passed.
+
 ### 2026-07-17 Three-Bucket Category Cascade Follow-Up
 
 Status: Complete. Category Mix now preserves separate Needs, Wants, and Savings balances and exhausts donor buckets in the requested source-specific order.

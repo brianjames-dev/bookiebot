@@ -72,6 +72,9 @@ Shared Needs-category logging, the shifted dated Income layout, and the four-blo
 - Daily Spending All, Needs, and Wants now render solid foreground-colored top/bottom boundaries and matching X-axis labels, while Y-axis labels and every interior gridline retain the theme's muted grey.
 - Interior lines now explicitly share identical `1px` width, `3 3` dash spacing, and butt caps; browser-computed SVG checks confirmed the color and pattern split in all three filters with a clean console, while `404 passed, 1 skipped`, Pyright, frontend typecheck/build, focused report tests, and `git diff --check` pass.
 - Manual verification: switch Daily Spending through All, Needs, and Wants in both themes and confirm the top/bottom boundaries plus X labels use the foreground tone, while Y labels and consistently sized dotted interior lines remain grey.
+- Unified blue Needs and purple Wants bars on the blue bar's `2px` four-corner radius in stacked and filtered Daily Spending views; a focused source regression prevents any of the three bar definitions from drifting to a separate radius again.
+- Radius verification: browser SVG paths confirmed identical `A 2,2` corner arcs for both colors across All, Needs, and Wants with a clean console; `405 passed, 1 skipped`, Pyright, frontend typecheck/build, focused report tests, and `git diff --check` pass.
+- Manual verification: compare blue and purple Daily Spending bars in All, then switch through Needs and Wants and confirm every visible bar has the same subtle corner rounding.
 
 ## Completed 2026-07-16
 
