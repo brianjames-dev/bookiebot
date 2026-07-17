@@ -303,9 +303,9 @@ Use a test row or low-risk real row in Discord:
 51. Retry `Brian (BofA) purchased celebration dinner at Jackson's bar and grill for $140` after deployment.
    - Expected: the expense reaches intent parsing and logs normally; if Discord's typing endpoint returns another transient error, logs show a warning that processing continued instead of `Failed to parse intent` from `send_typing`.
 52. After deploying the Apps Script, enter a real Source and Amount in the sole Income placeholder on a safe month tab, then log a second Income entry through BookieBot.
-   - Expected: the first entry replaces the seed row, each completed entry receives a date, exactly one new placeholder appears directly below with matching format/validation, later entries remain sequential, and Monthly Income includes every completed row.
+   - Expected: the first entry replaces the seed row and receives a date without creating another blank; the BookieBot entry inserts a matching formatted row immediately above Monthly Income, and the total includes both completed rows.
 53. Copy Hannah's Template to a safe test month and log two Income entries through Hannah's BookieBot account.
-   - Expected: the entries occupy consecutive `B:D` rows with dates, every generated row retains the seed's formatting/validation/notes/height, exactly one `<Enter Source>` placeholder remains, and the Monthly Income formula includes both entries.
+   - Expected: the entries occupy consecutive `B:D` rows with dates, every generated row retains the seed's formatting/validation/notes/height, no `<Enter Source>` row remains after completion, and the Monthly Income formula includes both entries.
 54. In Brian July, delete and undo the first Income entry, then repeat with the later entry and with an immediate undo after logging test Income.
     - Expected: the `Biweekly Income Start` configuration remains anchored in `E:F`, Monthly Income always sums the current `D` rows, the Budget section retains its total reference, and undo restores the deleted row's values and formatting.
 55. Run `/debug_subscriptions` after deployment and inspect Hannah's visible and normalized subscription sheets.
