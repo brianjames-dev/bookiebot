@@ -1225,6 +1225,31 @@ summary {
   min-height: 0;
 }
 
+.bb-category-pie-host .recharts-pie {
+  transform: translate(
+    var(--bb-pie-layout-offset-x, 0px),
+    var(--bb-pie-layout-offset-y, 0px)
+  );
+  transform-box: view-box;
+  transform-origin: 0 0;
+}
+
+.bb-category-pie-host[data-bb-pie-layout-motion="primed"] .recharts-pie {
+  transition: none;
+}
+
+.bb-category-pie-host[data-bb-pie-layout-motion="active"] .recharts-pie {
+  pointer-events: none;
+  transition: transform 520ms cubic-bezier(0.22, 1, 0.36, 1);
+  will-change: transform;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .bb-category-pie-host[data-bb-pie-layout-motion="active"] .recharts-pie {
+    transition: none;
+  }
+}
+
 .bb-analytics-card .bb-chart-box {
   height: 100%;
   min-height: 280px;

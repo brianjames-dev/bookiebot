@@ -1,4 +1,4 @@
-import { memo, useEffect, useRef, useState, type ReactNode, type TouchEvent } from "react"
+import { memo, useEffect, useLayoutEffect, useRef, useState, type CSSProperties, type ReactNode, type TouchEvent } from "react"
 import {
   Bar,
   BarChart,
@@ -1202,6 +1202,7 @@ const CategoryMixChart = memo(function CategoryMixChart({
   const chartData = categoryMixRows(data, selectedRollover, filter, amountSaved)
   const [pieHostRef, pieHostSize] = useElementSize<HTMLDivElement>()
   const pieLayout = useExpensePieLayout(chartData, pieHostSize)
+  const pieLayoutMotion = useExpensePieLayoutMotion(pieLayout, filter)
   const spentTotal = amountRowsTotal(chartData.filter((item) => item.key !== "left"))
   const pressure = categoryMixPressure(filter, categoryBalances, spentTotal)
 
@@ -1221,6 +1222,14 @@ const CategoryMixChart = memo(function CategoryMixChart({
             ref={pieHostRef}
             className="bb-category-pie-host"
             data-bb-pie-fit-padding={pieLayout.containerPadding}
+            data-bb-pie-layout-motion={pieLayoutMotion.phase}
+            data-bb-pie-layout-motion-revision={pieLayoutMotion.revision}
+            data-bb-pie-layout-travel-x={pieLayoutMotion.travelX}
+            data-bb-pie-layout-travel-y={pieLayoutMotion.travelY}
+            style={{
+              "--bb-pie-layout-offset-x": `${pieLayoutMotion.offsetX}px`,
+              "--bb-pie-layout-offset-y": `${pieLayoutMotion.offsetY}px`,
+            } as CSSProperties}
           >
             <ResponsiveContainer width="100%" height="100%">
               <PieChart margin={pieLayout.margin}>
@@ -1738,6 +1747,81 @@ function pieMetricLabelWidth(item: BreakdownItem, compactLabel: boolean) {
 }
 
 type ExpensePieLayout = ReturnType<typeof useExpensePieLayout>
+
+const PIE_LAYOUT_MOTION_DURATION_MS = 520
+
+type PieLayoutMotionPhase = "idle" | "primed" | "active"
+
+type PieLayoutMotion = {
+  phase: PieLayoutMotionPhase
+  offsetX: number
+  offsetY: number
+  travelX: number
+  travelY: number
+  revision: number
+}
+
+function useExpensePieLayoutMotion(layout: ExpensePieLayout, filter: CategoryMixFilter) {
+  const previousLayoutRef = useRef<{ filter: CategoryMixFilter; cx: number; cy: number } | null>(null)
+  const revisionRef = useRef(0)
+  const [motion, setMotion] = useState<PieLayoutMotion>({
+    phase: "idle",
+    offsetX: 0,
+    offsetY: 0,
+    travelX: 0,
+    travelY: 0,
+    revision: 0,
+  })
+
+  useLayoutEffect(() => {
+    const previous = previousLayoutRef.current
+    previousLayoutRef.current = { filter, cx: layout.cx, cy: layout.cy }
+    if (!previous) {
+      return
+    }
+
+    const offsetX = previous.cx - layout.cx
+    const offsetY = previous.cy - layout.cy
+    if (Math.abs(offsetX) < 0.1 && Math.abs(offsetY) < 0.1) {
+      setMotion((current) => current.phase === "idle"
+        ? current
+        : { ...current, phase: "idle", offsetX: 0, offsetY: 0 })
+      return
+    }
+
+    revisionRef.current += 1
+    const revision = revisionRef.current
+    setMotion({ phase: "primed", offsetX, offsetY, travelX: offsetX, travelY: offsetY, revision })
+
+    let startFrame = 0
+    let activeFrame = 0
+    let completionTimer = 0
+    startFrame = window.requestAnimationFrame(() => {
+      activeFrame = window.requestAnimationFrame(() => {
+        setMotion({ phase: "active", offsetX: 0, offsetY: 0, travelX: offsetX, travelY: offsetY, revision })
+        completionTimer = window.setTimeout(() => {
+          setMotion((current) => current.revision === revision
+            ? { phase: "idle", offsetX: 0, offsetY: 0, travelX: offsetX, travelY: offsetY, revision }
+            : current)
+        }, PIE_LAYOUT_MOTION_DURATION_MS)
+      })
+    })
+
+    return () => {
+      window.cancelAnimationFrame(startFrame)
+      window.cancelAnimationFrame(activeFrame)
+      window.clearTimeout(completionTimer)
+    }
+  }, [filter])
+
+  useLayoutEffect(() => {
+    if (previousLayoutRef.current?.filter === filter) {
+      previousLayoutRef.current = { filter, cx: layout.cx, cy: layout.cy }
+    }
+  }, [filter, layout.cx, layout.cy])
+
+  return motion
+}
 
 function pieMetricLabelX(x: number | string | undefined, textAnchor: PieMetricTextAnchor | undefined, gap: number) {
   const numericX = typeof x === "number" ? x : typeof x === "string" && x.trim() ? Number(x) : Number.NaN

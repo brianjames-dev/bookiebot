@@ -339,6 +339,18 @@ Status: Complete. The donut, connector stems, and metric labels now remain insid
 - Regression coverage confirms the fitted-host hooks are embedded in generated reports; frontend type-check/build and browser geometry checks cover the ten-slice Brian example.
 - Manual test: open Brian's July report at desktop width, expand and collapse Categories, and confirm all labels and stems keep a small gap from every chart border.
 
+### 2026-07-17 Category Mix Layout Motion Follow-Up
+
+Status: Complete. Category Mix retains the envelope solver's per-view fit while smoothly moving the pie between the All, Needs, Wants, and Savings centers.
+
+- Each filter change records the previous fitted center and initially offsets the newly rendered stable Recharts pie group back to that visual origin.
+- The offset returns to zero over 520 ms while Recharts performs its existing slice morph, so the donut, stems, and labels float together into the new fitted position instead of snapping.
+- The fit solver remains authoritative for every destination; no fixed center or radius is introduced, and endpoint label/stem padding remains unchanged.
+- Tooltip interaction is temporarily suppressed during the layout transition and restored after completion; interrupted or near-zero transitions settle explicitly to idle so rapid toggles cannot leave the chart inert.
+- Reduced-motion users receive the final fitted position without the translation animation.
+- Regression hooks expose motion phase, revision, travel, and offsets in generated reports. Full unit tests, Pyright, frontend typecheck/build, and browser checks across all four tabs pass with bounded endpoints and a clean console.
+- Manual test: switch Category Mix through All, Needs, Wants, and Savings, confirm the complete pie/label group glides into each fitted location, then toggle two tabs quickly and confirm the chart settles and tooltips remain interactive.
+
 ### 2026-07-17 Category Rollover And Overspend Follow-Up
 
 Status: Complete. Needs and Wants Category Mix views now show their category-specific available income and overspend pressure.

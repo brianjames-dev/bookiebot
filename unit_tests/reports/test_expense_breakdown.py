@@ -318,6 +318,9 @@ def test_build_expense_breakdown_report_aggregates_shared_and_personal_data():
     assert "data-bb-calendar-static-label" in html
     assert "data-bb-calendar-changing-value" in html
     assert "bb-calendar-marker-transition" in html
+    assert "data-bb-pie-layout-motion" in html
+    assert "data-bb-pie-layout-travel-x" in html
+    assert "--bb-pie-layout-offset-x" in html
     assert "bb-subscription-all-grid" in html
     assert "bb-subscription-compact-table" in html
     assert "bb-subscription-tab-content" in html

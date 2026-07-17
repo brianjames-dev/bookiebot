@@ -64,6 +64,8 @@ Shared Needs-category logging, the shifted dated Income layout, and the four-blo
 - Toggle-tooltip verification: `404 passed, 1 skipped`, Pyright reported zero errors, frontend typecheck/build passed, all five dismissal triggers are embedded in generated reports, and the browser console remained clean.
 - Calendar All/Subs switching now preserves the mounted month shell and day cells, animates only event markers whose visibility changes, and crossfades the outflow total/count without reanimating the month or Current/Projected labels.
 - Calendar transition verification: `404 passed, 1 skipped`, Pyright reported zero errors, frontend typecheck/build passed, and a local browser fixture confirmed one stable calendar node, collapsed non-subscription markers, updated `$2,451.32` to `$126.32`, unchanged July/Current labels, and a clean console.
+- Category Mix now carries the prior fitted pie center into each All/Needs/Wants/Savings view and glides the stable Recharts pie group to the new fitted center over the same 520 ms window as the slice morph, instead of snapping positions.
+- Category Mix motion verification: `404 passed, 1 skipped`, Pyright reported zero errors, frontend typecheck/build passed, and a full browser fixture confirmed bounded 7 px, 25 px, and 124 px layout travel plus clean rapid-toggle settlement and console output.
 
 ## Completed 2026-07-16
 
