@@ -848,9 +848,9 @@ function buildSheetRangeReference(sheetName, cellRef) {
  * Personal budget Income date stamping.
  *
  * The handler discovers Date / Source (or Employer) / Amount from the
- * visible Income header row. When a completed income entry is placed in
- * the trailing placeholder row, the Date is stamped and one new
- * placeholder row is created by copying the completed row's formatting.
+ * visible Income header row. When an income entry is completed, its Date
+ * is stamped and the Monthly Income formula is repaired. The template's
+ * seed row is consumed once; this handler does not append blank rows.
  */
 function handlePersonalBudgetEdit(e) {
   if (!e || !e.range || !e.source) {
@@ -921,11 +921,7 @@ function handlePersonalBudgetEdit(e) {
       continue;
     }
 
-    ensureNextPersonalBudgetIncomePlaceholder(
-      editedSheet,
-      incomeLayout,
-      row,
-    );
+    repairPersonalBudgetIncomeSummaryFormula(editedSheet, incomeLayout);
   }
 }
 
@@ -952,63 +948,6 @@ function isCompletedPersonalBudgetIncomeSource(value) {
     normalized !== "<enter source>" &&
     normalized !== "<enter employer>"
   );
-}
-
-function ensureNextPersonalBudgetIncomePlaceholder(
-  sheet,
-  incomeLayout,
-  completedRow,
-) {
-  const monthlyIncomeCell = findCellByExactText(sheet, "Monthly Income:");
-
-  if (!monthlyIncomeCell || completedRow !== monthlyIncomeCell.getRow() - 1) {
-    return false;
-  }
-
-  const firstIncomeColumn = Math.min(
-    incomeLayout.dateColumn || incomeLayout.sourceColumn,
-    incomeLayout.sourceColumn,
-    incomeLayout.amountColumn,
-  );
-  const lastIncomeColumn = Math.max(
-    incomeLayout.dateColumn || incomeLayout.sourceColumn,
-    incomeLayout.sourceColumn,
-    incomeLayout.amountColumn,
-  );
-  const incomeColumnCount = lastIncomeColumn - firstIncomeColumn + 1;
-  const sourceRange = sheet.getRange(
-    completedRow,
-    firstIncomeColumn,
-    1,
-    incomeColumnCount,
-  );
-  const sourceRowHeight = sheet.getRowHeight(completedRow);
-
-  sheet.insertRowAfter(completedRow);
-
-  const placeholderRow = completedRow + 1;
-  const placeholderRange = sheet.getRange(
-    placeholderRow,
-    firstIncomeColumn,
-    1,
-    incomeColumnCount,
-  );
-
-  sourceRange.copyTo(
-    placeholderRange,
-    SpreadsheetApp.CopyPasteType.PASTE_NORMAL,
-    false,
-  );
-  placeholderRange.clearContent();
-  sheet.setRowHeight(placeholderRow, sourceRowHeight);
-  sheet
-    .getRange(placeholderRow, incomeLayout.sourceColumn)
-    .setValue(incomeLayout.sourcePlaceholder);
-  sheet.getRange(placeholderRow, incomeLayout.amountColumn).setValue(0);
-
-  repairPersonalBudgetIncomeSummaryFormula(sheet, incomeLayout);
-
-  return true;
 }
 
 function repairPersonalBudgetIncomeSummaryFormula(sheet, incomeLayout) {
@@ -1051,8 +990,6 @@ function findPersonalBudgetIncomeLayout(sheet) {
     let dateColumn = null;
     let sourceColumn = null;
     let amountColumn = null;
-    let sourcePlaceholder = "<Enter Source>";
-
     for (let columnIndex = 0; columnIndex < values[rowIndex].length; columnIndex++) {
       const normalized = String(values[rowIndex][columnIndex] || "")
         .trim()
@@ -1064,8 +1001,6 @@ function findPersonalBudgetIncomeLayout(sheet) {
         dateColumn = columnIndex + 1;
       } else if (normalized === "source" || normalized === "employer") {
         sourceColumn = columnIndex + 1;
-        sourcePlaceholder =
-          normalized === "employer" ? "<Enter Employer>" : "<Enter Source>";
       } else if (normalized === "amount") {
         amountColumn = columnIndex + 1;
       }
@@ -1077,7 +1012,6 @@ function findPersonalBudgetIncomeLayout(sheet) {
         dateColumn: dateColumn,
         sourceColumn: sourceColumn,
         amountColumn: amountColumn,
-        sourcePlaceholder: sourcePlaceholder,
       };
     }
   }

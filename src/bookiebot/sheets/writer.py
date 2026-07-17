@@ -119,7 +119,7 @@ def log_income_row(data: dict[str, Any], worksheet: Any, *, return_action_id: bo
     amount_column = layout["amount"]
     date_column = layout.get("date")
 
-    description = f"{data.get('source', '')} {data.get('label', '')}".strip()
+    description = _income_description(data.get("source"), data.get("label"))
     amount = data.get("amount", "")
     row_values: list[Any] = [""] * max(source_column, amount_column, date_column or 0)
     row_values[source_column - 1] = description
@@ -136,13 +136,22 @@ def log_income_row(data: dict[str, Any], worksheet: Any, *, return_action_id: bo
     if placeholder_rows:
         income_row = placeholder_rows[0]
         first_income_column = min(source_column, amount_column, date_column or source_column)
+        action_columns = list(range(first_income_column, len(row_values) + 1))
+        existing_row = rows[income_row - 1] if income_row <= len(rows) else []
+        action_previous_values = [
+            existing_row[column - 1] if column <= len(existing_row) else ""
+            for column in action_columns
+        ]
         _update_contiguous_row(
             worksheet,
             income_row,
-            list(range(first_income_column, len(row_values) + 1)),
+            action_columns,
             row_values[first_income_column - 1 :],
         )
-        needs_placeholder = len(placeholder_rows) == 1
+        for extra_placeholder_row in reversed(placeholder_rows[1:]):
+            worksheet.delete_rows(extra_placeholder_row)
+        action_kind = "restore_cells"
+        action_new_values = row_values[first_income_column - 1 :]
     else:
         income_row = summary_row
         worksheet.insert_row(
@@ -159,22 +168,10 @@ def log_income_row(data: dict[str, Any], worksheet: Any, *, return_action_id: bo
                 start_column=min(source_column, amount_column, date_column or source_column),
                 end_column=len(row_values),
             )
-        needs_placeholder = True
-
-    if needs_placeholder:
-        worksheet.insert_row(
-            _income_placeholder_values(layout),
-            index=income_row + 1,
-            value_input_option="USER_ENTERED",
-            inherit_from_before=True,
-        )
-        _copy_income_row_properties(
-            worksheet,
-            source_row=income_row,
-            target_row=income_row + 1,
-            start_column=min(source_column, amount_column, date_column or source_column),
-            end_column=max(source_column, amount_column, date_column or source_column),
-        )
+        action_kind = "delete_row"
+        action_columns = []
+        action_previous_values = []
+        action_new_values = row_values
 
     _repair_income_summary_formula(worksheet, layout)
     layout_metadata = {
@@ -187,11 +184,11 @@ def log_income_row(data: dict[str, Any], worksheet: Any, *, return_action_id: bo
         get_current_discord_user_id(),
         UndoAction(
             worksheet="income",
-            kind="delete_row",
+            kind=action_kind,
             row=income_row,
-            columns=[],
-            previous_values=[],
-            new_values=[str(value) for value in row_values],
+            columns=action_columns,
+            previous_values=[str(value) for value in action_previous_values],
+            new_values=[str(value) for value in action_new_values],
             metadata={
                 "type": "income",
                 "source": str(data.get("source") or ""),
@@ -204,6 +201,25 @@ def log_income_row(data: dict[str, Any], worksheet: Any, *, return_action_id: bo
     if return_action_id:
         return income_row, description, amount, action_id
     return income_row, description, amount
+
+
+def _income_description(source: Any, label: Any) -> str:
+    source_text = " ".join(str(source or "").split())
+    label_text = " ".join(str(label or "").split())
+    if not source_text:
+        return label_text
+    if not label_text:
+        return source_text
+
+    normalized_source = source_text.casefold()
+    normalized_label = label_text.casefold()
+    if normalized_source == normalized_label:
+        return source_text
+    if normalized_label.startswith(f"{normalized_source} "):
+        return label_text
+    if normalized_source.startswith(f"{normalized_label} "):
+        return source_text
+    return f"{source_text} {label_text}"
 
 
 def _trailing_income_placeholder_rows(
@@ -237,14 +253,6 @@ def _is_income_placeholder_row(source: Any, amount: Any) -> bool:
         return float(normalized_amount) == 0
     except ValueError:
         return False
-
-
-def _income_placeholder_values(layout: dict[str, Any]) -> list[Any]:
-    width = max(layout["source"], layout["amount"], layout.get("date") or 0)
-    values: list[Any] = [""] * width
-    values[layout["source"] - 1] = layout["source_placeholder"]
-    values[layout["amount"] - 1] = 0
-    return values
 
 
 def _income_date_text(value: Any = None) -> str:

@@ -23,13 +23,12 @@ def test_personal_budget_income_date_stamping_uses_header_layout_not_fixed_cells
     assert 'normalized === "amount"' in source
 
 
-def test_personal_budget_income_edit_maintains_one_formatted_placeholder_row():
+def test_personal_budget_income_edit_does_not_append_placeholder_row():
     source = SCRIPT_PATH.read_text(encoding="utf-8")
 
-    assert "function ensureNextPersonalBudgetIncomePlaceholder(" in source
-    assert "sheet.insertRowAfter(completedRow);" in source
-    assert "SpreadsheetApp.CopyPasteType.PASTE_NORMAL" in source
-    assert "placeholderRange.clearContent();" in source
-    assert ".setValue(incomeLayout.sourcePlaceholder);" in source
+    assert "function ensureNextPersonalBudgetIncomePlaceholder(" not in source
+    assert "sheet.insertRowAfter(completedRow);" not in source
+    assert "placeholderRange.clearContent();" not in source
+    assert "repairPersonalBudgetIncomeSummaryFormula(editedSheet, incomeLayout);" in source
     assert "function repairPersonalBudgetIncomeSummaryFormula(" in source
     assert "if (!editTouchesAmount && !editTouchesSource)" in source

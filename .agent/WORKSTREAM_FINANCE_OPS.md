@@ -255,14 +255,24 @@ Status: Complete. Live May-July migration and report verification finished; Inco
 - Live report check: Brian July returned xAI `$3,774.59` on `7/2/2026` and internet stipend `$150.00` on `7/15/2026`; Hannah July returned Sonic paycheck `$1,619.47` on `7/10/2026`.
 - Reduced the live Brian Template to one Income seed row and preserved its visible style, validation, notes, Monthly Income formula, and budget formula lineage.
 - Reduced the live Hannah Template to the same one-seed layout, standardized the seed label to `<Enter Source>`, and preserved the biweekly configuration plus shifted formula lineage.
-- BookieBot now replaces the trailing seed row instead of inserting ahead of it, then creates exactly one inherited-format placeholder for the next sequential entry and repairs the summary range.
+- BookieBot now replaces the Template seed row instead of inserting ahead of it, then inserts later rows only when another Income event is logged and repairs the summary range without retaining a trailing placeholder.
 - BookieBot explicitly reapplies the seed row's cell format, validation, notes, borders, and row height because the Sheets API's inherited-row insertion omits some of those properties.
 - Whole-row Income deletion now snapshots the affected `B:F` properties and preserves the first Income row's anchored biweekly configuration instead of shifting or deleting it with the transaction.
 - Income delete undo clears the temporarily preserved anchor before reinsertion, restores the deleted row's explicit formatting/validation/notes/height, and rebuilds Monthly Income from the discovered header and summary coordinates.
-- Manual Source/Amount edits use the same one-placeholder lifecycle through Apps Script, regardless of whether Source or Amount is entered first.
-- Live Hannah verification: a temporary Template copy accepted two sequential dated BookieBot Income entries, retained one trailing placeholder with matching row properties, totaled `$191.34`, and was deleted after the check.
+- Manual Source/Amount edits use Apps Script for date stamping and summary-formula repair without appending a placeholder, regardless of whether Source or Amount is entered first.
+- Live Hannah verification: a temporary Template copy accepted two sequential dated BookieBot Income entries with matching row properties, totaled `$191.34`, and was deleted after the check.
 - Live Brian July verification: temporary-copy first-row delete/undo, later-row delete/undo, and immediate undo all preserved the `E:F` biweekly configuration, kept summary totals/formulas correct, restored baseline values/formulas, and left no QA tabs behind.
 - Manual test: deploy the script and run `setupBudgetSystemAutomation()`, enter a manual Income amount, then log, update, delete, and undo a BookieBot income entry on month tabs copied from both Templates.
+
+### 2026-07-17 Income Source And Just-In-Time Row Follow-Up
+
+Status: Complete. The duplicate Source and extra trailing placeholder reported from Brian July are fixed in code and on the live sheet.
+
+- Income Source and label values are whitespace-normalized and overlapping values are collapsed, so `source=xAI` plus `label=xAI` writes `xAI` once while distinct details remain available.
+- A Template retains one initial seed row; the first Income event restores that row's undo state, and subsequent events insert copied/formatted rows immediately above Monthly Income only when needed.
+- Apps Script keeps automatic date stamping and summary repair but no longer appends a blank placeholder after a completed manual entry.
+- Brian July's live Source was corrected from `xAI xAI` to `xAI`, the extra placeholder was removed, and PDF/API verification confirmed `$7,698.22` Monthly Income plus intact Budget and biweekly configuration formulas.
+- Manual test: after deploying the Apps Script and bot revision, log another Income event whose parser repeats Source and label; confirm a single Source value, one newly inserted formatted transaction row, no trailing placeholder, and a correct Monthly Income total.
 
 ## Open Questions
 

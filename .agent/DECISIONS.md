@@ -158,7 +158,7 @@ Decision: Migrate existing Income rows to the canonical `B:D` Date/Source/Amount
 
 Rationale: Invented dates would corrupt financial history. Keeping values intact and moving action metadata with the rows preserves report accuracy and update/delete/undo targeting while allowing unmatched manually entered income to remain honestly undated.
 
-## 2026-07-16 - Maintain One Trailing Income Placeholder Row
+## 2026-07-16 - Maintain One Trailing Income Placeholder Row (Superseded 2026-07-17)
 
 Decision: Personal budget Income tables keep exactly one trailing placeholder row. A completed manual or BookieBot entry replaces that row in place, then creates one new placeholder immediately beneath it by inheriting the completed row's format and validation. The Monthly Income formula is reset to cover the full header-to-placeholder range after each append.
 
@@ -187,6 +187,12 @@ Rationale: Persisting drafts gives users a stable normalized scaffold while they
 Decision: Remove BookieBot's dedicated student-loan payment logging and paid-status query intents, stop seeding Student Loan into the manual bill schedule, and ignore pre-existing legacy student-loan bill-schedule rows. Keep the subscription schedule as the active source and retain historical report labels for old budget data.
 
 Rationale: The student loan is an automatic subscription pull and no longer has a standalone personal-budget payment row. Removing the manual payment workflow prevents failed writes, misleading paid-status checks, and duplicate bill/subscription reminders without erasing historical reporting.
+
+## 2026-07-17 - Insert Income Rows Only When Transactions Are Logged
+
+Decision: Personal budget Templates keep one initial Income seed row. The first Income event consumes that seed, while each later BookieBot event inserts a copied/formatted row immediately above Monthly Income. Completed tables retain no trailing placeholder. Apps Script stamps dates and repairs the summary formula but does not create blank rows. Source and label values are collapsed when they repeat or overlap.
+
+Rationale: Just-in-time insertion preserves sequential formatting without displaying a false `$0.00` Income entry. Treating the seed replacement as a cell restoration for undo keeps a new month reusable, while later inserted transactions retain normal row-delete undo semantics. Source normalization prevents parser aliases from appearing twice in the single visible Source field.
 
 ## Pending Decisions
 

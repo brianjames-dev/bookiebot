@@ -26,7 +26,7 @@ async def test_expense_sheet_with_retry_recovers_from_transient_access_error(mon
     assert calls == ["expense_sheet", "expense_sheet"]
 
 
-def test_log_income_row_replaces_single_placeholder_and_adds_formatted_next_row(monkeypatch):
+def test_log_income_row_consumes_seed_and_inserts_later_rows_just_in_time(monkeypatch):
     worksheet = InMemoryWorksheet(
         [
             ["", "Date:", "Source:", "Amount:"],
@@ -61,7 +61,7 @@ def test_log_income_row_replaces_single_placeholder_and_adds_formatted_next_row(
             "type": "income",
             "date": "2026-07-16",
             "source": "xAI",
-            "label": "paycheck",
+            "label": "xAI",
             "amount": 2500.0,
         },
         worksheet,
@@ -69,19 +69,19 @@ def test_log_income_row_replaces_single_placeholder_and_adds_formatted_next_row(
     )
 
     assert row == 2
-    assert description == "xAI paycheck"
+    assert description == "xAI"
     assert amount == 2500.0
     assert action_id == "income-action-1"
-    assert worksheet.get_all_values()[1] == ["", "7/16/2026", "xAI paycheck", "2500.0"]
-    assert worksheet.get_all_values()[2] == ["", "", "<Enter Source>", "0"]
-    assert worksheet.get_all_values()[3] == ["", "", "Monthly Income:", "=SUM(D2:D3)"]
-    assert insert_calls == [(3, {"value_input_option": "USER_ENTERED", "inherit_from_before": True})]
-    assert property_copy_calls == [
-        {"source_row": 2, "target_row": 3, "start_column": 2, "end_column": 4}
-    ]
+    assert worksheet.get_all_values()[1] == ["", "7/16/2026", "xAI", "2500.0"]
+    assert worksheet.get_all_values()[2] == ["", "", "Monthly Income:", "=SUM(D2:D2)"]
+    assert insert_calls == []
+    assert property_copy_calls == []
 
     action = recorded_actions[0]
-    assert action.new_values == ["", "7/16/2026", "xAI paycheck", "2500.0"]
+    assert action.kind == "restore_cells"
+    assert action.columns == [2, 3, 4]
+    assert action.previous_values == ["", "<Enter Source>", "0"]
+    assert action.new_values == ["7/16/2026", "xAI", "2500.0"]
     assert action.metadata["income_date_column"] == "2"
     assert action.metadata["income_source_column"] == "3"
     assert action.metadata["income_amount_column"] == "4"
@@ -98,15 +98,28 @@ def test_log_income_row_replaces_single_placeholder_and_adds_formatted_next_row(
 
     assert second_row == 3
     assert worksheet.get_all_values()[2] == ["", "7/30/2026", "Internet stipend", "150.0"]
-    assert worksheet.get_all_values()[3] == ["", "", "<Enter Source>", "0"]
-    assert worksheet.get_all_values()[4] == ["", "", "Monthly Income:", "=SUM(D2:D4)"]
-    assert insert_calls[-1] == (4, {"value_input_option": "USER_ENTERED", "inherit_from_before": True})
+    assert worksheet.get_all_values()[3] == ["", "", "Monthly Income:", "=SUM(D2:D3)"]
+    assert insert_calls[-1] == (3, {"value_input_option": "USER_ENTERED", "inherit_from_before": True})
     assert property_copy_calls[-1] == {
-        "source_row": 3,
-        "target_row": 4,
+        "source_row": 2,
+        "target_row": 3,
         "start_column": 2,
         "end_column": 4,
     }
+
+
+@pytest.mark.parametrize(
+    ("source", "label", "expected"),
+    [
+        ("xAI", "xAI", "xAI"),
+        ("xAI", "xAI paycheck", "xAI paycheck"),
+        ("xAI paycheck", "xAI", "xAI paycheck"),
+        ("xAI", "paycheck", "xAI paycheck"),
+        ("", "bonus", "bonus"),
+    ],
+)
+def test_income_description_deduplicates_overlapping_source_and_label(source, label, expected):
+    assert writer._income_description(source, label) == expected
 
 
 def test_copy_income_row_properties_reapplies_format_validation_notes_and_height():
@@ -229,9 +242,9 @@ def test_log_income_row_preserves_legacy_undated_layout(monkeypatch):
 
     assert row == 2
     assert worksheet.get_all_values()[1] == ["", "Gift", "100.0"]
-    assert worksheet.get_all_values()[2] == ["", "<Enter Employer>", "0"]
-    assert worksheet.get_all_values()[3] == ["", "Monthly Income:", "=SUM(C2:C3)"]
+    assert worksheet.get_all_values()[2] == ["", "Monthly Income:", "=SUM(C2:C2)"]
     action = recorded_actions[0]
+    assert action.kind == "restore_cells"
     assert "income_date_column" not in action.metadata
     assert action.metadata["income_source_column"] == "2"
     assert action.metadata["income_amount_column"] == "3"

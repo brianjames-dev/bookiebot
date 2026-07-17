@@ -650,7 +650,7 @@ async def test_shifted_income_can_be_updated_deleted_and_delete_undone(message):
         assert repo.income.cell(2, 4).value == "2977.16"
         assert repo.income.cell(2, 5).value == "Biweekly Income Start:"
         assert repo.income.cell(2, 6).value == "7/2/2026"
-        assert repo.income.cell(4, 4).value == "=SUM(D2:D3)"
+        assert repo.income.cell(3, 4).value == "=SUM(D2:D2)"
 
         await ih.handle_intent("undo_last_transaction", {}, message)
 
@@ -664,7 +664,7 @@ async def test_shifted_income_can_be_updated_deleted_and_delete_undone(message):
         assert repo.income.cell(2, 6).value == "7/2/2026"
         assert repo.income.cell(3, 5).value == ""
         assert repo.income.cell(3, 6).value == ""
-        assert repo.income.cell(5, 4).value == "=SUM(D2:D4)"
+        assert repo.income.cell(4, 4).value == "=SUM(D2:D3)"
 
         await ih.handle_intent(
             "update_recent_action",
@@ -730,7 +730,7 @@ async def test_delete_and_undo_later_income_repairs_summary_formula(message):
         )
         await ih.handle_intent("delete_recent_action", {"index": 1}, message)
 
-        assert repo.income.cell(4, 4).value == "=SUM(D2:D3)"
+        assert repo.income.cell(3, 4).value == "=SUM(D2:D2)"
         assert repo.income.cell(2, 5).value == "Biweekly Income Start:"
         assert repo.income.cell(2, 6).value == "7/2/2026"
 
@@ -739,7 +739,7 @@ async def test_delete_and_undo_later_income_repairs_summary_formula(message):
     assert repo.income.cell(3, 2).value == "7/17/2026"
     assert repo.income.cell(3, 3).value == "Second"
     assert repo.income.cell(3, 4).value == "250"
-    assert repo.income.cell(5, 4).value == "=SUM(D2:D4)"
+    assert repo.income.cell(4, 4).value == "=SUM(D2:D3)"
     assert repo.income.cell(2, 5).value == "Biweekly Income Start:"
     assert repo.income.cell(2, 6).value == "7/2/2026"
 

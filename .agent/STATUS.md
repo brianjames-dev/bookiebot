@@ -15,6 +15,15 @@ Shared Needs-category logging, the shifted dated Income layout, and the four-blo
 5. Improve targeted recent-action search so commands can find older matches, not only the latest 10 recent actions.
 6. Explore clarifying questions before logging when BookieBot is uncertain instead of guessing or silently failing.
 
+## Completed 2026-07-17
+
+- Fixed Income descriptions so parser payloads that repeat the same Source and label, such as `xAI` / `xAI`, write one clean Source value instead of `xAI xAI`.
+- Changed the Income-row lifecycle so a Template starts with one seed row, the first entry consumes it, and later BookieBot entries insert a formatted row only when the transaction is logged; completed Income tables no longer retain a blank placeholder.
+- Updated the Apps Script to stamp manual Income dates and repair the Monthly Income formula without appending a placeholder row.
+- Corrected Brian July's live `7/17/2026` Income row to Source `xAI`, removed the extra `<Enter Source>` row, and verified that Monthly Income remains `$7,698.22`, the Budget formula now follows `D8`, and the biweekly configuration remains intact.
+- Added regression coverage for repeated/overlapping Source-label values, seed consumption, just-in-time row insertion and property copying, no-placeholder Apps Script behavior, and Income delete/undo summary formulas.
+- Verification: `398 passed`, Apps Script syntax check passed, `git diff --check` passed, and Pyright reported zero errors.
+
 ## Completed 2026-07-16
 
 - Replaced personal-budget Need row insertion with normal shared-expense logging in the monthly Needs section (`AD:AH`).
@@ -33,11 +42,11 @@ Shared Needs-category logging, the shifted dated Income layout, and the four-blo
 - Discord typing-indicator API failures are now non-fatal, so a transient Discord `5xx` cannot abort intent parsing or prevent an otherwise valid transaction from being logged.
 - Added regression coverage for failed typing-context entry and for preserving real parser/handler exceptions through the typing wrapper.
 - Reduced the live Brian Budget 2026 Template Income section to one `Date / Source / Amount` placeholder row while preserving its formatting, validation, notes, total formula, and budget-banner reference.
-- Income logging now fills the trailing placeholder in place and creates exactly one new placeholder beneath it with inherited formatting; the summary formula is repaired after each append.
-- The Apps Script applies the same behavior to manual edits, including source-first or amount-first entry order, automatic date stamping, row-height/style copying, and legacy Employer placeholders.
+- Income logging now fills the Template seed in place and inserts later rows with inherited formatting only when a new event is logged; the summary formula is repaired after each append and no permanent trailing placeholder remains.
+- The Apps Script stamps manual Income dates and repairs the summary formula for source-first or amount-first entry order without creating an extra blank row.
 - Reduced the live Hannah Budget 2026 Template Income section to one `<Enter Source>` row while preserving its style, validation, notes, Monthly Income formula, budget-banner reference, and adjacent biweekly configuration.
 - BookieBot now reapplies the seed row's explicit formatting, validation, notes, borders, and row height after Google Sheets inserts a new Income row, covering properties that `inheritFromBefore` omits.
-- Live Hannah integration verification logged two sequential dated Income entries on a temporary Template copy, retained exactly one trailing placeholder, calculated `$191.34`, and removed the temporary QA tab afterward.
+- Live Hannah integration verification logged two sequential dated Income entries on a temporary Template copy, verified inherited row properties and the `$191.34` total, and removed the temporary QA tab afterward.
 - Income delete and immediate undo now snapshot and restore anchored biweekly configuration cells, explicit row properties, and the Monthly Income summary formula while compacting whole rows.
 - Live Brian July verification on a temporary copy covered first-row delete/undo, later-row delete/undo, and immediate undo; every path preserved the `E:F` configuration, repaired the `D` summary formula, and restored the original sheet values/formulas exactly before the QA tab was removed.
 - Replaced Hannah's live two-block Subscriptions tab with Brian's native four-block Needs/Wants Monthly/Yearly layout, preserving all eight Needs and three Wants entries as monthly data plus the `$180.20` and `$23.97` subtotals.
