@@ -107,10 +107,15 @@ def log_income_row(data: dict[str, Any], worksheet: Any, *, return_action_id: bo
         logger.error("Could not find 'Monthly Income:' in the sheet.", extra={"exception": str(e)})
         raise
 
-    col_b_values = worksheet.col_values(2)  # Column B
+    layout = _income_sheet_layout(worksheet, summary_row)
+    source_column = layout["source"]
+    amount_column = layout["amount"]
+    date_column = layout.get("date")
+
+    source_values = worksheet.col_values(source_column)
     last_entry_row = None
     for i in range(summary_row - 1, 0, -1):
-        if i <= len(col_b_values) and col_b_values[i - 1].strip():
+        if i <= len(source_values) and source_values[i - 1].strip():
             last_entry_row = i
             break
 
@@ -122,8 +127,23 @@ def log_income_row(data: dict[str, Any], worksheet: Any, *, return_action_id: bo
 
     description = f"{data.get('source', '')} {data.get('label', '')}".strip()
     amount = data.get("amount", "")
+    row_values: list[Any] = [""] * max(source_column, amount_column, date_column or 0)
+    row_values[source_column - 1] = description
+    row_values[amount_column - 1] = amount
+    if date_column:
+        row_values[date_column - 1] = _income_date_text(data.get("date"))
 
-    worksheet.insert_row(["", description, amount], index=insert_row_index)
+    worksheet.insert_row(
+        row_values,
+        index=insert_row_index,
+        value_input_option="USER_ENTERED",
+    )
+    layout_metadata = {
+        "income_source_column": str(source_column),
+        "income_amount_column": str(amount_column),
+    }
+    if date_column:
+        layout_metadata["income_date_column"] = str(date_column)
     action_id = record_undo_action(
         get_current_discord_user_id(),
         UndoAction(
@@ -132,14 +152,56 @@ def log_income_row(data: dict[str, Any], worksheet: Any, *, return_action_id: bo
             row=insert_row_index,
             columns=[],
             previous_values=[],
-            new_values=["", str(description), str(amount)],
-            metadata={"type": "income", "source": str(data.get("source") or ""), **(metadata_extra or {})},
+            new_values=[str(value) for value in row_values],
+            metadata={
+                "type": "income",
+                "source": str(data.get("source") or ""),
+                **(metadata_extra or {}),
+                **layout_metadata,
+            },
             description=f"income ${amount} from {data.get('source')}",
         ),
     )
     if return_action_id:
         return insert_row_index, description, amount, action_id
     return insert_row_index, description, amount
+
+
+def _income_sheet_layout(worksheet: Any, summary_row: int) -> dict[str, int]:
+    rows = worksheet.get_all_values()
+    for row in rows[: max(0, summary_row - 1)]:
+        columns_by_header: dict[str, int] = {}
+        for column, value in enumerate(row, start=1):
+            normalized = str(value).strip().rstrip(":").strip().lower()
+            if normalized in {"date", "amount"}:
+                columns_by_header[normalized] = column
+            elif normalized in {"source", "employer"}:
+                columns_by_header["source"] = column
+        if "source" in columns_by_header and "amount" in columns_by_header:
+            return columns_by_header
+
+    return {"source": 2, "amount": 3}
+
+
+def _income_date_text(value: Any = None) -> str:
+    if isinstance(value, datetime):
+        parsed = value
+    else:
+        raw = str(value or "").strip()
+        parsed = None
+        if raw:
+            for pattern in ("%Y-%m-%d", "%m/%d/%Y", "%m/%d/%y"):
+                try:
+                    parsed = datetime.strptime(raw, pattern)
+                    break
+                except ValueError:
+                    continue
+            if parsed is None:
+                return raw
+        else:
+            tz = ZoneInfo(os.getenv("TZ", "America/Los_Angeles"))
+            parsed = datetime.now(tz)
+    return f"{parsed.month}/{parsed.day}/{parsed.year}"
 
 
 async def write_expense_to_sheet(data, message):

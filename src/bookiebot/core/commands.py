@@ -147,6 +147,7 @@ def _log_bank_reconciliation_income(
         "amount": abs(transaction.amount),
         "source": source_name,
         "label": _clean_command_text(label),
+        "date": transaction.date or transaction.authorized_date,
     }
     with sheet_user_context(actor_key):
         worksheet = get_sheets_repo().income_sheet()

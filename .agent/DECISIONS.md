@@ -146,6 +146,12 @@ Decision: New Need transactions are normal shared-expense rows in the monthly `S
 
 Rationale: Using the normal expense writer and action lineage gives Needs the same update, move, delete, undo, reconciliation-reopen, and query behavior as other shared categories while keeping personal budget sheets as aggregate views.
 
+## 2026-07-16 - Discover Personal Income Columns From Headers
+
+Decision: Personal-budget income mutations discover Date, Source (or legacy Employer), and Amount from the visible Income header row. Existing undated month tabs remain supported, while new tabs copied from the Brian Budget 2026 Template use the shifted `B:D` Date/Source/Amount layout. BookieBot and bank reconciliation stamp dates on API writes, and the global Apps Script stamps dates for manual amount edits.
+
+Rationale: Header discovery permits a safe mixed-layout rollout without breaking current month tabs, fixed-column assumptions, recent-action updates, undo metadata, or reconciliation matching. Explicit API-side dates are required because Google Sheets API writes do not trigger spreadsheet `onEdit` handlers.
+
 ## Pending Decisions
 
 - Where should durable system events live: banking database only, Google Sheets only, or dual-write during transition?

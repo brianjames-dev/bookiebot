@@ -59,7 +59,7 @@ class InMemoryWorksheet:
                     return Cell(row=r, col=c, value=value)
         raise ValueError(f"Value '{needle}' not found in sheet '{self.title}'.")
 
-    def insert_row(self, values: Iterable[str], index: int) -> None:
+    def insert_row(self, values: Iterable[str], index: int, **_kwargs) -> None:
         idx = max(index - 1, 0)
         row = [str(v) for v in values]
         self._rows.insert(idx, row)

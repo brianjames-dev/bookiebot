@@ -4,7 +4,7 @@ Last updated: 2026-07-16
 
 ## Active Focus
 
-Shared Needs-category logging and recent-action parity are implemented and ready for manual Discord/Google Sheets verification.
+Shared Needs-category logging and the shifted dated Income layout are implemented and ready for manual Discord/Google Sheets verification.
 
 ## On Deck
 
@@ -23,6 +23,10 @@ Shared Needs-category logging and recent-action parity are implemented and ready
 - Added Needs to move buttons, direct text routing, and bank reconciliation expense categories.
 - Included Needs in category totals, highest-category, largest-expense, and top-expense queries.
 - Added regression coverage for storage location, legacy description compatibility, editable fields/capabilities, move/delete/undo behavior, category routing/selectors, parser instructions, and Needs query inclusion.
+- Shifted the Brian Budget 2026 Template Income table from `A:C` to `B:D`, repaired the monthly-income total and budget-banner formula lineage, and preserved the adjacent biweekly-income configuration.
+- Made income logging discover Date, Source/Employer, and Amount from visible headers so existing legacy month tabs and newly copied dated Template tabs both work during rollout.
+- Added bot-side Pacific-date stamping, reconciliation transaction-date propagation, recent-action/update compatibility, and header-driven Apps Script date stamping for manual Income entries.
+- Manual verification: deploy the updated Apps Script, run `setupBudgetSystemAutomation()` once, enter an amount in a new dated Income table, then confirm manual and BookieBot income dates plus update/delete/undo behavior.
 
 ## Completed 2026-07-08
 

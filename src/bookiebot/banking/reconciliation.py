@@ -605,8 +605,11 @@ def _action_transaction_name(logged: LoggedAction) -> str:
 
 
 def _action_amount(action_type: str, values: list[str], description: str) -> float | None:
-    if action_type == "income" and len(values) >= 3:
-        return _money_value(values[2])
+    if action_type == "income":
+        for value in reversed(values):
+            amount = _money_value(value)
+            if amount is not None:
+                return amount
     if action_type == "payment" and values:
         return _money_value(values[-1])
     for value in values:

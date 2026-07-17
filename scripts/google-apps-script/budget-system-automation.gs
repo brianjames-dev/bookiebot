@@ -21,8 +21,9 @@
  *    Brian  -> row 4
  *    Hannah -> row 5
  *
- * - Shared Expenses date-stamping is handled by a global installable
- *   edit trigger instead of a sheet-bound onEdit(e).
+ * - Shared Expenses and personal-budget Income date-stamping are
+ *   handled by global installable edit triggers instead of sheet-bound
+ *   onEdit(e) functions.
  ************************************************************/
 
 /***********************
@@ -175,6 +176,9 @@ const SHARED_EXPENSES_DATE_COLUMN_MAP = {
   32: 30,
 };
 
+const PERSONAL_BUDGET_INCOME_HEADER_SCAN_ROWS = 20;
+const PERSONAL_BUDGET_INCOME_HEADER_SCAN_COLUMNS = 10;
+
 /***********************
  * MAIN ENTRY POINT
  ***********************/
@@ -223,13 +227,14 @@ function budgetSystemRollover() {
  * - Stores the known 2026 files
  * - Runs the rollover once
  * - Relinks current-year formulas
- * - Installs the Shared Expenses edit trigger for the current year
+ * - Installs Shared Expenses and personal-budget edit triggers for the
+ *   current year
  */
 function setupBudgetSystemAutomation() {
   seedKnown2026ConfigIfMissing();
   budgetSystemRollover();
   relinkCurrentYearPersonalBudgetFormulas();
-  installCurrentYearSharedExpensesEditTrigger();
+  installCurrentYearBudgetEditTriggers();
 
   Logger.log("Budget System automation setup complete.");
 }
@@ -498,11 +503,7 @@ function createYearFilesFromTemplates(year) {
 
   initializeNewYearFiles(config);
 
-  /**
-   * Install the Shared Expenses edit trigger for the new yearly
-   * Shared Expenses file.
-   */
-  installSharedExpensesEditTriggerForSpreadsheet(config.sharedExpensesId, year);
+  installBudgetEditTriggersForYearConfig(config, year);
 
   return config;
 }
@@ -840,6 +841,144 @@ function buildSheetRangeReference(sheetName, cellRef) {
 }
 
 /***********************
+ * EDIT DATE STAMPING
+ ***********************/
+
+/**
+ * Personal budget Income date stamping.
+ *
+ * The handler discovers Date / Source (or Employer) / Amount from the
+ * visible Income header row. When an amount is entered beneath that
+ * header, the corresponding Date cell is stamped if it is empty.
+ */
+function handlePersonalBudgetEdit(e) {
+  if (!e || !e.range || !e.source) {
+    return;
+  }
+
+  const editedSpreadsheetId = e.source.getId();
+  const editedSheet = e.range.getSheet();
+
+  if (!MONTH_NAMES.includes(editedSheet.getName())) {
+    return;
+  }
+
+  if (!isKnownPersonalBudgetSpreadsheet(editedSpreadsheetId)) {
+    return;
+  }
+
+  const incomeLayout = findPersonalBudgetIncomeLayout(editedSheet);
+
+  if (!incomeLayout || !incomeLayout.dateColumn) {
+    return;
+  }
+
+  const editedStartColumn = e.range.getColumn();
+  const editedEndColumn = editedStartColumn + e.range.getNumColumns() - 1;
+
+  if (
+    incomeLayout.amountColumn < editedStartColumn ||
+    incomeLayout.amountColumn > editedEndColumn
+  ) {
+    return;
+  }
+
+  const monthlyIncomeCell = findCellByExactText(editedSheet, "Monthly Income:");
+  const firstIncomeRow = incomeLayout.headerRow + 1;
+  const lastIncomeRow = monthlyIncomeCell
+    ? monthlyIncomeCell.getRow() - 1
+    : editedSheet.getMaxRows();
+  const editedStartRow = Math.max(e.range.getRow(), firstIncomeRow);
+  const editedEndRow = Math.min(
+    e.range.getRow() + e.range.getNumRows() - 1,
+    lastIncomeRow,
+  );
+
+  for (let row = editedStartRow; row <= editedEndRow; row++) {
+    const amountCell = editedSheet.getRange(row, incomeLayout.amountColumn);
+
+    if (amountCell.getValue() === "") {
+      continue;
+    }
+
+    const dateCell = editedSheet.getRange(row, incomeLayout.dateColumn);
+
+    if (dateCell.getValue() === "") {
+      dateCell.setValue(new Date()).setNumberFormat("M/d/yyyy");
+    }
+  }
+}
+
+function findPersonalBudgetIncomeLayout(sheet) {
+  const rowCount = Math.min(
+    PERSONAL_BUDGET_INCOME_HEADER_SCAN_ROWS,
+    sheet.getMaxRows(),
+  );
+  const columnCount = Math.min(
+    PERSONAL_BUDGET_INCOME_HEADER_SCAN_COLUMNS,
+    sheet.getMaxColumns(),
+  );
+  const values = sheet.getRange(1, 1, rowCount, columnCount).getValues();
+
+  for (let rowIndex = 0; rowIndex < values.length; rowIndex++) {
+    let dateColumn = null;
+    let sourceColumn = null;
+    let amountColumn = null;
+
+    for (let columnIndex = 0; columnIndex < values[rowIndex].length; columnIndex++) {
+      const normalized = String(values[rowIndex][columnIndex] || "")
+        .trim()
+        .replace(/:\s*$/, "")
+        .trim()
+        .toLowerCase();
+
+      if (normalized === "date") {
+        dateColumn = columnIndex + 1;
+      } else if (normalized === "source" || normalized === "employer") {
+        sourceColumn = columnIndex + 1;
+      } else if (normalized === "amount") {
+        amountColumn = columnIndex + 1;
+      }
+    }
+
+    if (sourceColumn && amountColumn) {
+      return {
+        headerRow: rowIndex + 1,
+        dateColumn: dateColumn,
+        sourceColumn: sourceColumn,
+        amountColumn: amountColumn,
+      };
+    }
+  }
+
+  return null;
+}
+
+function isKnownPersonalBudgetSpreadsheet(spreadsheetId) {
+  const props = PropertiesService.getScriptProperties().getProperties();
+
+  for (const key in props) {
+    if (!key.startsWith("YEAR_CONFIG_")) {
+      continue;
+    }
+
+    const config = JSON.parse(props[key]);
+
+    if (
+      config.brianBudgetId === spreadsheetId ||
+      config.hannahBudgetId === spreadsheetId
+    ) {
+      return true;
+    }
+  }
+
+  return (
+    spreadsheetId === KNOWN_2026_FILES.brianBudgetId ||
+    spreadsheetId === KNOWN_2026_FILES.hannahBudgetId
+  );
+}
+
+/***********************
  * SHARED EXPENSES EDIT DATE STAMPING
  ***********************/
 
@@ -935,6 +1074,36 @@ function installCurrentYearSharedExpensesEditTrigger() {
 }
 
 /**
+ * Installs all edit triggers needed by the current year's budget files.
+ */
+function installCurrentYearBudgetEditTriggers() {
+  seedKnown2026ConfigIfMissing();
+
+  const today = new Date();
+  const currentYear = getYear(today);
+  const yearConfig = getOrCreateYearFiles(currentYear);
+
+  installBudgetEditTriggersForYearConfig(yearConfig, currentYear);
+}
+
+function installBudgetEditTriggersForYearConfig(yearConfig, year) {
+  installSharedExpensesEditTriggerForSpreadsheet(
+    yearConfig.sharedExpensesId,
+    year,
+  );
+  installPersonalBudgetEditTriggerForSpreadsheet(
+    yearConfig.brianBudgetId,
+    year,
+    "Brian",
+  );
+  installPersonalBudgetEditTriggerForSpreadsheet(
+    yearConfig.hannahBudgetId,
+    year,
+    "Hannah",
+  );
+}
+
+/**
  * Installs an edit trigger for a specific year's Shared Expenses spreadsheet.
  *
  * Example:
@@ -968,18 +1137,54 @@ function installSharedExpensesEditTriggerForSpreadsheet(
   );
 }
 
+function installPersonalBudgetEditTriggerForSpreadsheet(
+  personalBudgetSpreadsheetId,
+  year,
+  ownerName,
+) {
+  removePersonalBudgetEditTriggersForSpreadsheet(personalBudgetSpreadsheetId);
+
+  ScriptApp.newTrigger("handlePersonalBudgetEdit")
+    .forSpreadsheet(personalBudgetSpreadsheetId)
+    .onEdit()
+    .create();
+
+  Logger.log(
+    `Installed ${ownerName} personal-budget on-edit trigger for ${year}: ${personalBudgetSpreadsheetId}`,
+  );
+}
+
 /**
  * Removes duplicate handleSharedExpensesEdit triggers for the same spreadsheet.
  */
 function removeSharedExpensesEditTriggersForSpreadsheet(
   sharedExpensesSpreadsheetId,
 ) {
+  removeEditTriggersForSpreadsheet(
+    "handleSharedExpensesEdit",
+    sharedExpensesSpreadsheetId,
+  );
+}
+
+function removePersonalBudgetEditTriggersForSpreadsheet(
+  personalBudgetSpreadsheetId,
+) {
+  removeEditTriggersForSpreadsheet(
+    "handlePersonalBudgetEdit",
+    personalBudgetSpreadsheetId,
+  );
+}
+
+function removeEditTriggersForSpreadsheet(
+  handlerFunctionName,
+  spreadsheetId,
+) {
   const triggers = ScriptApp.getProjectTriggers();
 
   triggers.forEach(function (trigger) {
     const handlerFunction = trigger.getHandlerFunction();
 
-    if (handlerFunction !== "handleSharedExpensesEdit") {
+    if (handlerFunction !== handlerFunctionName) {
       return;
     }
 
@@ -996,7 +1201,7 @@ function removeSharedExpensesEditTriggersForSpreadsheet(
      * If Apps Script cannot provide the source ID, remove the trigger
      * defensively to avoid duplicate date-stamping triggers.
      */
-    if (!triggerSourceId || triggerSourceId === sharedExpensesSpreadsheetId) {
+    if (!triggerSourceId || triggerSourceId === spreadsheetId) {
       ScriptApp.deleteTrigger(trigger);
     }
   });

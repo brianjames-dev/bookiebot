@@ -567,6 +567,7 @@ class _BankIncomeLogModal(discord.ui.Modal, title="Log bank item as income/refun
             "source": str(self.source.value).strip(),
             "label": str(self.label.value).strip(),
             "amount": abs(transaction.amount),
+            "date": transaction.date or transaction.authorized_date,
         }
         try:
             with sheet_user_context(self.actor_key):

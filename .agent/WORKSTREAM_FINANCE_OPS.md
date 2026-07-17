@@ -237,6 +237,17 @@ Status: Complete first pass as of 2026-06-20. Existing-row match confirmation up
 - Keep Discord UI/session flow in core workflow modules.
 - Avoid sheet mutation logic inside reconciliation matching code.
 
+### 2026-07-16 Shifted Dated Income Layout Follow-Up
+
+Status: Complete and ready for manual Discord/Google Sheets verification.
+
+- Shifted the Brian Budget 2026 Template Income table to `B:D` with Date, Source, and Amount while preserving the biweekly-income configuration in `E:F`.
+- Repaired the Template monthly-income total and budget-banner formula lineage for the shifted Amount column.
+- Income writes now discover visible headers and support both the legacy Employer/Amount layout and the new Date/Source/Amount layout.
+- BookieBot/API writes stamp a Pacific date directly because Google Sheets API writes do not fire `onEdit`; bank-origin income uses the bank transaction date when available.
+- The global Apps Script now installs personal-budget edit triggers and stamps an empty Income date when a user manually enters an amount.
+- Manual test: deploy the script and run `setupBudgetSystemAutomation()`, enter a manual Income amount, then log, update, delete, and undo a BookieBot income entry on a month tab copied from Template.
+
 ## Open Questions
 
 - What should the canonical recent-action lineage model look like?

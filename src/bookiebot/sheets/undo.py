@@ -820,13 +820,30 @@ def _field_columns_for_action(action: UndoAction) -> dict[str, int]:
                 for field, col_letter in get_category_columns[category]["columns"].items()
             }
 
-    if action.metadata.get("type") == "income":
-        return {"source": 2, "amount": 3}
+    if action.worksheet == "income" and (
+        action.metadata.get("type") == "income"
+        or action.metadata.get("source_type") == "income"
+    ):
+        columns: dict[str, int] = {}
+        date_column = _positive_metadata_int(action, "income_date_column")
+        if date_column:
+            columns["date"] = date_column
+        columns["source"] = _positive_metadata_int(action, "income_source_column") or 2
+        columns["amount"] = _positive_metadata_int(action, "income_amount_column") or 3
+        return columns
 
     if action.metadata.get("type") in {"payment", "savings"}:
         return {"amount": action.columns[0]} if action.columns else {}
 
     return {}
+
+
+def _positive_metadata_int(action: UndoAction, key: str) -> int | None:
+    try:
+        value = int(action.metadata.get(key, ""))
+    except (TypeError, ValueError):
+        return None
+    return value if value > 0 else None
 
 
 def editable_fields_for_action(action: UndoAction) -> list[str]:
@@ -936,6 +953,12 @@ def _field_values_for_action(action: UndoAction, values: list[str] | None = None
         }
 
     field_columns = _field_columns_for_action(action)
+    if _is_income_display_action(action) and action.kind == "delete_row":
+        source_values = list(values if values is not None else action.new_values)
+        return {
+            field: _sheet_value(source_values[column - 1]) if column <= len(source_values) else ""
+            for field, column in field_columns.items()
+        }
     fields = list(field_columns.keys())
     source_values = list(values if values is not None else action.new_values)
     while len(source_values) < len(fields):
@@ -1004,10 +1027,9 @@ def _income_data_lines(action: UndoAction, values: list[str] | None = None) -> l
         description = (field_values.get("source") or "").strip()
         amount = _money_display_value(field_values.get("amount"))
     else:
-        while len(source_values) < 3:
-            source_values.append("")
-        description = _sheet_value(source_values[1]).strip()
-        amount = _money_display_value(source_values[2])
+        field_values = _field_values_for_action(action, values)
+        description = (field_values.get("source") or "").strip()
+        amount = _money_display_value(field_values.get("amount"))
     source = description or action.metadata.get("source")
     if amount and source:
         return [f"   Income: {amount} from {source}"]

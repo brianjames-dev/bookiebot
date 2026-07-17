@@ -303,8 +303,14 @@ def test_reconcile_income_matches_when_source_overlaps():
             row=12,
             columns=[],
             previous_values=[],
-            new_values=["", "Sonic paycheck", "100.0"],
-            metadata={"type": "income", "source": "Sonic"},
+            new_values=["", "5/17/2026", "Sonic paycheck", "100.0"],
+            metadata={
+                "type": "income",
+                "source": "Sonic",
+                "income_date_column": "2",
+                "income_source_column": "3",
+                "income_amount_column": "4",
+            },
             description="income $100.0 from Sonic",
         ),
     )

@@ -566,6 +566,50 @@ async def test_update_recent_income_changes_source_and_amount(message):
 
 
 @pytest.mark.asyncio
+async def test_shifted_income_layout_stamps_date_and_keeps_recent_actions_working(message):
+    repo = SheetsRepoStub(
+        income_rows=[
+            ["", "Date:", "Source:", "Amount:"],
+            ["", "", "<Enter Source>", "0"],
+            ["", "", "<Enter Source>", "0"],
+            ["", "", "Monthly Income:", ""],
+        ]
+    )
+
+    with repo.patched():
+        await ih.handle_intent(
+            "log_income",
+            {
+                "type": "income",
+                "date": "2026-07-16",
+                "amount": 1639.9,
+                "source": "Sonic",
+            },
+            message,
+        )
+
+        assert repo.income.cell(3, 2).value == "7/16/2026"
+        assert repo.income.cell(3, 3).value == "Sonic"
+        assert repo.income.cell(3, 4).value == "1639.9"
+
+        await ih.handle_intent(
+            "update_recent_action",
+            {"index": 1, "updates": {"source": "xAI", "amount": 2977.16}},
+            message,
+        )
+
+        assert repo.income.cell(3, 2).value == "7/16/2026"
+        assert repo.income.cell(3, 3).value == "xAI"
+        assert repo.income.cell(3, 4).value == "$2977.16"
+
+        await ih.handle_intent("undo_last_transaction", {}, message)
+
+        assert repo.income.cell(3, 2).value == "7/16/2026"
+        assert repo.income.cell(3, 3).value == "Sonic"
+        assert repo.income.cell(3, 4).value == "1639.9"
+
+
+@pytest.mark.asyncio
 async def test_updated_income_recent_display_keeps_amount_when_only_source_changes(message):
     repo = SheetsRepoStub(income_rows=[["", "Existing Income", "100"], ["", "Monthly Income:", ""]])
 
