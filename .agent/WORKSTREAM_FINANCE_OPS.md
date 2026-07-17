@@ -274,6 +274,16 @@ Status: Complete. The duplicate Source and extra trailing placeholder reported f
 - Brian July's live Source was corrected from `xAI xAI` to `xAI`, the extra placeholder was removed, and PDF/API verification confirmed `$7,698.22` Monthly Income plus intact Budget and biweekly configuration formulas.
 - Manual test: after deploying the Apps Script and bot revision, log another Income event whose parser repeats Source and label; confirm a single Source value, one newly inserted formatted transaction row, no trailing placeholder, and a correct Monthly Income total.
 
+### 2026-07-17 Actual-Date Biweekly Projection Follow-Up
+
+Status: Complete. Current-month report projections now account for paychecks that arrive slightly early or late.
+
+- The configured Biweekly Income Start remains the bootstrap schedule before a dated paycheck is available.
+- Once the configured Income source has a dated paycheck, future calendar projections advance in 14-day increments from the latest actual date instead of leaving an obsolete configured occurrence in the past.
+- Projected Income now adds only the remaining future occurrences to the current logged total, avoiding both stale projection days and dropped month-end paychecks.
+- Live Brian July verification produced actual xAI events on July 2 and July 17 plus a projected `$3,774.11` paycheck on July 31; the projected monthly total is `$11,472.33`.
+- Manual test: log a configured paycheck one to two days early or late, open the current expense breakdown, and confirm the next projected paycheck is exactly fourteen days after the actual event with no stale projection left behind.
+
 ## Open Questions
 
 - What should the canonical recent-action lineage model look like?

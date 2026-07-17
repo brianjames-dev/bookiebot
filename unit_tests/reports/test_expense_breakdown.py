@@ -3,6 +3,8 @@ import json
 import os
 import re
 
+import pytest
+
 import bookiebot.reports.expense_breakdown as expense_breakdown
 from bookiebot.reports.expense_breakdown import (
     BudgetHistoryRows,
@@ -896,6 +898,61 @@ def test_current_month_income_projection_uses_configured_biweekly_source_and_sta
         ("Bonus", 1, 500.0, False),
         ("xAI", 9, 2000.0, False),
         ("Projected paycheck", 23, 2000.0, True),
+    ]
+
+
+@pytest.mark.parametrize(("actual_day", "projected_day"), [(15, 29), (17, 31)])
+def test_current_month_income_projection_reanchors_after_early_or_late_paycheck(
+    monkeypatch,
+    actual_day,
+    projected_day,
+):
+    monkeypatch.setattr(
+        expense_breakdown,
+        "now_pacific",
+        lambda: datetime(2026, 7, actual_day, 12, 0, tzinfo=routing.PACIFIC_TZ),
+    )
+    report = build_expense_breakdown_report(
+        actor_key="brian",
+        owner_name="Brian",
+        persons=["Brian"],
+        month=BudgetMonth(2026, 7),
+        worksheets=ReportWorksheets(
+            shared_expenses=InMemoryWorksheet([["hdr"] * 28, ["hdr"] * 28]),
+            personal_budget=InMemoryWorksheet(
+                [
+                    ["", "Date:", "Source:", "Amount:", "Biweekly Income Source:", "xAI"],
+                    ["", "7/2/2026", "xAI", "$3,774.59", "Biweekly Income Start:", "7/2/2026"],
+                    ["", "7/15/2026", "internet stipend", "$150.00"],
+                    ["", f"7/{actual_day}/2026", "xAI", "$3,773.63"],
+                    ["", "Monthly Income:", "", "$7,698.22"],
+                ]
+            ),
+            subscriptions=InMemoryWorksheet([]),
+        ),
+    )
+
+    payload_match = re.search(
+        r'<script id="bookiebot-expense-report-data" type="application/json">(.*?)</script>',
+        render_expense_breakdown_html(report),
+    )
+    assert payload_match is not None
+    payload = json.loads(payload_match.group(1))
+    paycheck_events = [
+        item
+        for item in payload["calendarEvents"]
+        if item["kind"] == "income" and item["label"] in {"xAI", "Projected paycheck"}
+    ]
+
+    assert payload["incomeProjection"] == {
+        "currentAmount": 7698.22,
+        "projectedAmount": 11472.33,
+        "savingsGoal": 2294.47,
+    }
+    assert [(item["label"], item["day"], item["projectedOnly"]) for item in paycheck_events] == [
+        ("xAI", 2, False),
+        ("xAI", actual_day, False),
+        ("Projected paycheck", projected_day, True),
     ]
 
 

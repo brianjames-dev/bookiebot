@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from collections import defaultdict
 from dataclasses import dataclass, field
-from datetime import datetime
+from datetime import datetime, timedelta
 import calendar
 import html
 import json
@@ -857,8 +857,8 @@ def _income_calendar_events(
         paycheck_entries = current_entries
         other_entries = []
     pay_days = _biweekly_pay_days(month, _paycheck_anchor_date(paycheck_entries, month, projection_config))
+    projected_pay_days = _projected_biweekly_pay_days(paycheck_entries, month, projection_config)
     events: list[CalendarEvent] = []
-    logged_paycheck_days: set[int] = set()
 
     for index, item in enumerate(paycheck_entries):
         parsed_date = _parse_date(item.date)
@@ -866,7 +866,6 @@ def _income_calendar_events(
             day = parsed_date.day
         else:
             day = pay_days[index] if index < len(pay_days) else min(1 + index * 14, days_in_month)
-        logged_paycheck_days.add(day)
         events.append(CalendarEvent("income", item.label, item.amount, day, "income", projected_only=False))
 
     for item in other_entries:
@@ -881,7 +880,7 @@ def _income_calendar_events(
     paycheck_amount = _projected_paycheck_amount(current_entries, projection_config)
     projected_gap = round(projected_total - income_total, 2)
     if projected_gap > 0 and paycheck_amount > 0 and not _is_completed_month(month):
-        for day in (day for day in pay_days if day not in logged_paycheck_days):
+        for day in projected_pay_days:
             if projected_gap <= 0:
                 break
             amount = min(paycheck_amount, projected_gap)
@@ -905,11 +904,9 @@ def _projected_income_total(
     paycheck_entries = _paycheck_income_entries(current_entries, projection_config)
     if not paycheck_entries and len(current_entries) == 1:
         paycheck_entries = current_entries
-    logged_paycheck_total = round(sum(item.amount for item in paycheck_entries), 2)
-    other_income_total = max(0.0, round(income_total - logged_paycheck_total, 2))
+    projected_pay_days = _projected_biweekly_pay_days(paycheck_entries, month, projection_config)
     projected_total = round(
-        other_income_total
-        + paycheck_amount * len(_biweekly_pay_days(month, _paycheck_anchor_date(paycheck_entries, month, projection_config))),
+        income_total + paycheck_amount * len(projected_pay_days),
         2,
     )
     return round(max(income_total, projected_total), 2)
@@ -982,6 +979,36 @@ def _biweekly_pay_days(month: BudgetMonth, anchor_date: datetime | None = None) 
         for day in range(1, days_in_month + 1)
         if (datetime(month.year, month.month, day, tzinfo=PACIFIC_TZ).date() - anchor).days % 14 == 0
     ]
+
+
+def _projected_biweekly_pay_days(
+    income_entries: list[PaymentItem],
+    month: BudgetMonth,
+    projection_config: IncomeProjectionConfig | None = None,
+) -> list[int]:
+    anchor_date = _paycheck_anchor_date(income_entries, month, projection_config)
+    scheduled_days = _biweekly_pay_days(month, anchor_date)
+    parsed_dates = [
+        parsed
+        for item in income_entries
+        if (parsed := _parse_date(item.date)) is not None
+        and parsed.year == month.year
+        and parsed.month == month.month
+    ]
+    if parsed_dates:
+        next_pay_date = max(parsed_dates) + timedelta(days=14)
+        projected_days: list[int] = []
+        while next_pay_date.year == month.year and next_pay_date.month == month.month:
+            projected_days.append(next_pay_date.day)
+            next_pay_date += timedelta(days=14)
+        return projected_days
+
+    logged_days = {
+        scheduled_days[index]
+        for index, _item in enumerate(income_entries)
+        if index < len(scheduled_days)
+    }
+    return [day for day in scheduled_days if day not in logged_days]
 
 
 def _payment_totals_by_group(payments: list[PaymentItem]) -> dict[str, float]:

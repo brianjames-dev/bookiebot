@@ -23,6 +23,10 @@ Shared Needs-category logging, the shifted dated Income layout, and the four-blo
 - Corrected Brian July's live `7/17/2026` Income row to Source `xAI`, removed the extra `<Enter Source>` row, and verified that Monthly Income remains `$7,698.22`, the Budget formula now follows `D8`, and the biweekly configuration remains intact.
 - Added regression coverage for repeated/overlapping Source-label values, seed consumption, just-in-time row insertion and property copying, no-placeholder Apps Script behavior, and Income delete/undo summary formulas.
 - Verification: `398 passed`, Apps Script syntax check passed, `git diff --check` passed, and Pyright reported zero errors.
+- Reworked current-month biweekly Income projections so the configured start date bootstraps the cadence, then the latest dated paycheck from the configured source becomes the anchor for future 14-day occurrences.
+- Live Brian July report verification now shows actual xAI paychecks on July 2 and July 17 plus the remaining projected paycheck on July 31; regression coverage also confirms an early July 15 paycheck moves the next projection to July 29.
+- Calendar-fix verification: `400 passed`, `git diff --check` passed, and Pyright reported zero errors.
+- Manual verification: after deployment, open Brian's current expense breakdown and confirm the calendar shows July 2 and July 17 as actual xAI Income plus July 31 as the only remaining projected paycheck.
 
 ## Completed 2026-07-16
 

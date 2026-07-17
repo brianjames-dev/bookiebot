@@ -194,6 +194,12 @@ Decision: Personal budget Templates keep one initial Income seed row. The first 
 
 Rationale: Just-in-time insertion preserves sequential formatting without displaying a false `$0.00` Income entry. Treating the seed replacement as a cell restoration for undo keeps a new month reusable, while later inserted transactions retain normal row-delete undo semantics. Source normalization prevents parser aliases from appearing twice in the single visible Source field.
 
+## 2026-07-17 - Re-Anchor Biweekly Projections From Actual Paychecks
+
+Decision: Expense breakdown Income projections use Biweekly Income Start only to bootstrap the schedule. After a dated Income entry matches the configured biweekly source, the latest actual paycheck becomes the anchor and remaining current-month projections advance every fourteen days from that date. Projected totals add those future occurrences to the amount already logged.
+
+Rationale: Payroll deposits can arrive slightly early or late. Keeping the original static cadence after an actual shift can leave a projected paycheck in the past and consume the remaining projection before the real month-end payday. Actual dates provide the most accurate forward schedule while retaining explicit configuration for months with no observed paycheck yet.
+
 ## Pending Decisions
 
 - Where should durable system events live: banking database only, Google Sheets only, or dual-write during transition?
