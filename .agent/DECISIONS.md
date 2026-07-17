@@ -170,6 +170,12 @@ Decision: Income deletion may compact a whole sheet row, but it must snapshot an
 
 Rationale: Dynamic Income entries in `B:D` share physical rows with fixed configuration in `E:F`, and Google Sheets row insertion/deletion does not reliably preserve formula ranges, borders, notes, validation, or row height. Treating the transaction cells and anchored configuration as separate logical regions keeps edit/delete/undo behavior safe without abandoning compact sequential rows.
 
+## 2026-07-16 - Standardize Personal Subscription Sheets On Four Blocks
+
+Decision: Personal budget `Subscriptions` tabs use the Brian four-block layout: Needs Monthly, Needs Yearly, Wants Monthly, and Wants Yearly, with schedule, name, amount, and subtotal fields. Budget tabs sum both cadence subtotals for each category. Migrations preserve unknown pull dates as blanks rather than assigning guessed dates.
+
+Rationale: One visible structure keeps subscription parsing, reminders, reports, and future annual subscriptions consistent across both budget owners. Leaving unsourced dates blank preserves financial accuracy while making the missing schedule inputs explicit.
+
 ## Pending Decisions
 
 - Where should durable system events live: banking database only, Google Sheets only, or dual-write during transition?

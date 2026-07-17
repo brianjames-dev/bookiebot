@@ -4,7 +4,7 @@ Last updated: 2026-07-16
 
 ## Active Focus
 
-Shared Needs-category logging and the shifted dated Income layout are implemented. Brian and Hannah May-July are migrated, both Templates use one Income seed row, and Income delete/undo now preserves the adjacent biweekly configuration and summary formulas.
+Shared Needs-category logging, the shifted dated Income layout, and the four-block personal subscription layout are implemented. Hannah's live subscription sheet now matches Brian's Monthly/Yearly structure while retaining her data and totals.
 
 ## On Deck
 
@@ -40,6 +40,9 @@ Shared Needs-category logging and the shifted dated Income layout are implemente
 - Live Hannah integration verification logged two sequential dated Income entries on a temporary Template copy, retained exactly one trailing placeholder, calculated `$191.34`, and removed the temporary QA tab afterward.
 - Income delete and immediate undo now snapshot and restore anchored biweekly configuration cells, explicit row properties, and the Monthly Income summary formula while compacting whole rows.
 - Live Brian July verification on a temporary copy covered first-row delete/undo, later-row delete/undo, and immediate undo; every path preserved the `E:F` configuration, repaired the `D` summary formula, and restored the original sheet values/formulas exactly before the QA tab was removed.
+- Replaced Hannah's live two-block Subscriptions tab with Brian's native four-block Needs/Wants Monthly/Yearly layout, preserving all eight Needs and three Wants entries as monthly data plus the `$180.20` and `$23.97` subtotals.
+- Extended Brian's Needs Monthly body styling through Hannah's eighth row, repaired Template/May/July references to the new Monthly+Yearly subtotal cells, retained the old tab as a hidden backup, and kept unknown pull dates blank instead of inventing them.
+- Live Google Sheets and PDF-render verification confirmed matching reference styles, correct formulas/totals, parser-ready block structure, hidden infrastructure tabs, no broken cell formulas, and no remaining staging sheet.
 - Manual verification: deploy the updated Apps Script, run `setupBudgetSystemAutomation()` once, enter an amount in a new dated Income table, then confirm manual and BookieBot income dates plus update/delete/undo behavior.
 
 ## Completed 2026-07-08
@@ -289,6 +292,8 @@ Use a test row or low-risk real row in Discord:
    - Expected: the entries occupy consecutive `B:D` rows with dates, every generated row retains the seed's formatting/validation/notes/height, exactly one `<Enter Source>` placeholder remains, and the Monthly Income formula includes both entries.
 54. In Brian July, delete and undo the first Income entry, then repeat with the later entry and with an immediate undo after logging test Income.
     - Expected: the `Biweekly Income Start` configuration remains anchored in `E:F`, Monthly Income always sums the current `D` rows, the Budget section retains its total reference, and undo restores the deleted row's values and formatting.
+55. Open Hannah's Subscriptions tab and enter the real monthly pull day for each row in the blank Recurring/Date cells.
+    - Expected: Needs and Wants remain in their Monthly blocks, Yearly stays empty, subtotals remain `$180.20` and `$23.97`, and `/debug_subscriptions` parses all 11 rows without missing-pull-date warnings.
 
 ## Verification Baseline
 
@@ -302,6 +307,9 @@ python -m pytest unit_tests/intents/test_handlers.py unit_tests/core/test_messag
 Latest verification:
 
 ```bash
+Live Google Sheets API style/formula audit plus PDF render of Hannah Budget 2026 / Subscriptions
+# passed: Brian reference style match, $180.20 Needs, $23.97 Wants, formula links repaired, parser-ready layout, hidden backup
+
 venv/bin/python -m pytest unit_tests
 # passed: 391 passed, 1 warning
 
