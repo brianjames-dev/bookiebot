@@ -30,7 +30,7 @@ from bookiebot.core.web_server import ensure_web_server
 from bookiebot.intents.parser import parse_message_llm
 from bookiebot.intents.handlers import handle_intent
 from bookiebot.intents import explorer as intent_explorer
-from bookiebot.sheets.routing import resolve_actor_key
+from bookiebot.sheets.routing import UnknownDiscordUserError, get_user_config, resolve_actor_key, resolve_message_actor_key
 from bookiebot.sheets.undo import (
     clear_pending_action_selection,
     pending_action_selection_count,
@@ -335,6 +335,19 @@ def register_events(client, tree):
             if not is_dm and getattr(message.channel, "name", None) != config.CHANNEL_NAME:
                 return
 
+        actor_key = resolve_message_actor_key(message)
+        try:
+            get_user_config(actor_key)
+        except UnknownDiscordUserError as exc:
+            if is_dm:
+                logger.info(
+                    "Ignoring DM from unmapped Discord user",
+                    extra={"user_id": str(getattr(message.author, "id", None))},
+                )
+                return
+            await message.channel.send(str(exc))
+            return
+
         content = message.content.strip()
         logger.info(
             "📩 New message",
@@ -351,10 +364,6 @@ def register_events(client, tree):
             await message.channel.send(output)
             return
 
-        actor_key = resolve_actor_key(
-            getattr(message.author, "id", None),
-            getattr(message.author, "name", None) or getattr(message.author, "display_name", None),
-        )
         pending_item_move = pending_move_item(actor_key)
         if pending_item_move:
             if content.lower() in _CANCEL_WORDS:
@@ -445,10 +454,6 @@ def register_events(client, tree):
         action_management = _action_management_intent(content)
         if action_management:
             intent, entities = action_management
-            actor_key = resolve_actor_key(
-                getattr(message.author, "id", None),
-                getattr(message.author, "name", None) or getattr(message.author, "display_name", None),
-            )
             pending_kind = pending_action_selection_kind(actor_key)
             expired_notice = pop_pending_action_expiration_notice(actor_key)
             if expired_notice:
