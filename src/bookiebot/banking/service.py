@@ -371,7 +371,7 @@ class BankingService:
         return results
 
     async def sync_item(self, item: LinkedBankItem) -> SyncResult:
-        access_token = self.store.get_access_token(item.id)
+        access_token = self.store.get_access_token(item.id, owner_key=item.owner_key)
         cursor = self.store.get_cursor(item.id)
         total_added = 0
         total_modified = 0
@@ -490,7 +490,7 @@ class BankingService:
         if item is None:
             return None
         if item.status == "active":
-            access_token = self.store.get_access_token(item.id)
+            access_token = self.store.get_access_token(item.id, owner_key=item.owner_key)
             await self.plaid.remove_item(access_token)
         return self.store.disconnect_item(owner_key, item_db_id)
 
@@ -1152,7 +1152,7 @@ class BankingService:
         *,
         access_token: str | None = None,
     ) -> list[BankAccount]:
-        token = access_token or self.store.get_access_token(item.id)
+        token = access_token or self.store.get_access_token(item.id, owner_key=item.owner_key)
         raw_accounts = await self.plaid.get_accounts(token)
         return [_account_from_plaid(item, raw) for raw in raw_accounts]
 
