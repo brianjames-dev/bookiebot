@@ -26,6 +26,7 @@ from collections.abc import Awaitable, Callable
 from typing import Any, AsyncContextManager, cast
 from bookiebot.sheets.utils import resolve_query_persons, get_local_today
 from bookiebot.sheets.routing import (
+    APPLE_SHORTCUT_RELAY_USER_ID,
     SheetRoutingError,
     UnknownDiscordUserError,
     actor_key_aliases,
@@ -137,16 +138,24 @@ async def write_transaction_to_sheet(transaction_type: str, entities: IntentEnti
 
 
 def _message_actor_key(message) -> str | None:
-    for mentioned in getattr(message, "mentions", []) or []:
-        if getattr(mentioned, "bot", False):
-            continue
-        mentioned_id = getattr(mentioned, "id", None)
-        mentioned_name = getattr(mentioned, "name", None) or getattr(mentioned, "display_name", None)
-        return resolve_actor_key(mentioned_id, mentioned_name)
+    """Resolve the budget actor for a message.
 
+    Mention-based actor override is restricted to the Apple Shortcut relay bot
+    so arbitrary channel members cannot impersonate another mapped user by @mention.
+    """
     author = getattr(message, "author", None)
     author_id = getattr(author, "id", None)
+    author_id_str = str(author_id) if author_id is not None else None
     author_name = getattr(author, "name", None) or getattr(author, "display_name", None)
+
+    if author_id_str == APPLE_SHORTCUT_RELAY_USER_ID:
+        for mentioned in getattr(message, "mentions", []) or []:
+            if getattr(mentioned, "bot", False):
+                continue
+            mentioned_id = getattr(mentioned, "id", None)
+            mentioned_name = getattr(mentioned, "name", None) or getattr(mentioned, "display_name", None)
+            return resolve_actor_key(mentioned_id, mentioned_name)
+
     return resolve_actor_key(author_id, author_name)
 
 
