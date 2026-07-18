@@ -431,8 +431,7 @@ class BankingService:
         processed = 0
         failed = 0
         skipped = 0
-        for event, payload in self.store.pending_plaid_webhook_events(limit=limit):
-            self.store.mark_plaid_webhook_processing(event.id)
+        for event, payload in self.store.claim_pending_plaid_webhook_events(limit=limit):
             item_id = event.item_id or str(payload.get("item_id") or "").strip() or None
             try:
                 webhook_type = (event.webhook_type or "").upper()

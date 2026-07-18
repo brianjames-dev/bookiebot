@@ -671,17 +671,42 @@ class BankStore:
         return events
 
     def mark_plaid_webhook_processing(self, event_id: int) -> None:
+        claimed = self.claim_plaid_webhook_event(int(event_id))
+        if claimed is None:
+            raise RuntimeError(f"Plaid webhook event {event_id} could not be claimed")
+
+    def claim_plaid_webhook_event(self, event_id: int):
+        """Atomically claim a pending/failed webhook event for processing."""
         self.initialize()
         with self.connect() as conn:
-            conn.execute(
+            row = conn.execute(
                 """
                 UPDATE bank_webhook_events
                 SET status = 'processing',
                     error = NULL
                 WHERE id = ?
+                  AND provider = 'plaid'
+                  AND status IN ('pending', 'failed')
+                RETURNING *
                 """,
                 (int(event_id),),
-            )
+            ).fetchone()
+        if row is None:
+            return None
+        payload = json.loads(str(row["payload"]))
+        return (
+            _plaid_webhook_event_from_row(row),
+            payload if isinstance(payload, dict) else {},
+        )
+
+    def claim_pending_plaid_webhook_events(self, limit: int = 25):
+        safe_limit = max(1, min(int(limit), 100))
+        claimed = []
+        for event, _payload in self.pending_plaid_webhook_events(limit=safe_limit):
+            claimed_event = self.claim_plaid_webhook_event(event.id)
+            if claimed_event is not None:
+                claimed.append(claimed_event)
+        return claimed
 
     def mark_plaid_webhook_processed(self, event_id: int, item_id: str | None = None) -> None:
         now = utc_now_iso()
