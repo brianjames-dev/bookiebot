@@ -1090,7 +1090,7 @@ def test_current_month_income_projection_reanchors_after_early_or_late_paycheck(
     ]
 
 
-def test_savings_projection_uses_three_deposit_targets_and_future_paychecks(monkeypatch):
+def test_savings_projection_uses_one_monthly_target_across_three_paychecks(monkeypatch):
     monkeypatch.setattr(
         expense_breakdown,
         "now_pacific",
@@ -1150,11 +1150,11 @@ def test_savings_projection_uses_three_deposit_targets_and_future_paychecks(monk
     assert report.amount_saved == 2294.47
     assert payload["savingsProjection"] == {
         "currentAmount": 2294.47,
-        "projectedAmount": 3441.70,
+        "projectedAmount": 3059.29,
         "currentIdeal": 1539.64,
         "currentMinimum": 769.82,
-        "projectedIdeal": 3441.69,
-        "projectedMinimum": 1720.85,
+        "projectedIdeal": 2294.47,
+        "projectedMinimum": 1147.23,
         "currentPaycheckCount": 2,
         "projectedPaycheckCount": 3,
     }

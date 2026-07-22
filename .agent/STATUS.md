@@ -22,10 +22,11 @@ The reconciliation digest inbox control, three-paycheck savings workflow, and cu
 - Added a callback-level regression test that invokes the real digest button, verifies the private thinking defer, and confirms inbox dispatch.
 - Added third-paycheck savings intents, parser guidance, intent-explorer entries, handlers, sheet checks, sheet logging, and undo metadata.
 - Generalized savings-row discovery across first, second, and third paycheck rows, reading each row's Actual, Ideal, and Minimum values while retaining compatibility with the older two-row shared-target layout.
-- Added a report savings-projection payload that tracks current/projected saved amounts, Ideal/Minimum totals, and applicable paycheck counts. Current mode uses entered deposits and targets for reached paychecks; projected mode preserves entered deposits and fills remaining detected paycheck slots at their income-scaled Ideal target.
+- Added a report savings-projection payload that tracks current/projected saved amounts, Ideal/Minimum totals, and applicable paycheck counts. Current mode uses entered deposits and sheet targets for reached paychecks; projected mode applies the observed monthly target rate once to projected income, then distributes that monthly target across the projected paycheck slots.
 - Wired the report's Projected toggle into the Saved card, Left amount, Savings Category Mix slices/pressure, and projected outflow totals. The Saved card now displays its active paycheck count plus Ideal and Minimum targets.
 - Read-only live-sheet inspection confirmed both Brian and Hannah July tabs and Templates contain three savings rows; legacy May/June two-row tabs remain supported.
-- Local browser verification of Brian July showed Current Saved `$2,294.47` with 2 paychecks, Ideal `$1,539.64`, and Minimum `$769.82`; Projected changed to Saved `$3,441.70` with 3 paychecks, Ideal `$3,441.69`, and Minimum `$1,720.85`. The Savings graph and pressure copy changed with the toggle, and the console remained clean.
+- Corrected the first three-paycheck projection, which multiplied an already income-scaled target once per savings row and incorrectly turned the monthly 20% Ideal into 30%. Brian July now projects Ideal `$2,294.47` and Minimum `$1,147.23` from `$11,472.33` income.
+- Local browser verification of Brian July showed Current Saved `$2,294.47` with 2 paychecks, Ideal `$1,539.64`, and Minimum `$769.82`; Projected changed to Saved `$3,059.29` with 3 paychecks, Ideal `$2,294.47`, and Minimum `$1,147.23`. The Saved card and dependent projected totals changed with the toggle, and the console remained clean.
 - Verification: `410 passed, 1 skipped`; Pyright reported zero errors; frontend typecheck/build passed; `git diff --check` passed.
 - Manual verification steps are checklist items 59-61 below.
 
@@ -394,7 +395,7 @@ Use a test row or low-risk real row in Discord:
 60. From both Brian's and Hannah's Discord accounts, use a safe test month to log and query the third paycheck savings amount, then undo the test write if needed.
     - Expected: only the third labeled savings row's Actual cell changes; the query reports that row's Actual, Ideal, and Minimum values; undo restores its previous value.
 61. Open current-month reports for Brian and Hannah and switch Projected off and on while viewing the Saved card and Savings Category Mix tab.
-    - Expected: the Saved amount, paycheck count, Ideal/Minimum copy, Left amount, Savings slices, and over/under-saving pressure all use the active current/projected mode. Brian July's verified snapshot changes from `$2,294.47` across 2 paychecks to `$3,441.70` across 3 projected paychecks.
+    - Expected: the Saved amount, paycheck count, Ideal/Minimum copy, Left amount, Savings slices, and over/under-saving pressure all use the active current/projected mode. Brian July's verified snapshot changes from `$2,294.47` across 2 paychecks to `$3,059.29` across 3 projected paychecks, while the monthly projected Ideal remains 20% of income at `$2,294.47`.
 
 ## Verification Baseline
 

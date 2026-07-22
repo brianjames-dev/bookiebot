@@ -2011,17 +2011,23 @@ def _savings_projection_payload(report: ExpenseBreakdownReport) -> dict[str, Any
     current_targets = [item for item in deposits if item.number <= current_slots]
     projected_targets = [item for item in deposits if item.number <= projected_slots]
 
-    income_scale = (
-        projected_income / report.income_total
-        if report.income_total > 0 and not _is_completed_month(report.month)
-        else 1.0
-    )
     current_ideal = round(sum(item.ideal for item in current_targets), 2)
     current_minimum = round(sum(item.minimum for item in current_targets), 2)
-    projected_ideal = round(sum(item.ideal * income_scale for item in projected_targets), 2)
-    projected_minimum = round(sum(item.minimum * income_scale for item in projected_targets), 2)
+    ideal_rate = (
+        round(current_ideal / report.income_total, 4)
+        if current_ideal > 0 and report.income_total > 0
+        else 0.2
+    )
+    minimum_rate = (
+        round(current_minimum / report.income_total, 4)
+        if current_minimum > 0 and report.income_total > 0
+        else 0.1
+    )
+    projected_ideal = round(projected_income * ideal_rate, 2)
+    projected_minimum = round(projected_income * minimum_rate, 2)
+    projected_ideal_per_slot = projected_ideal / projected_slots if projected_slots else 0.0
     projected_amount = round(
-        sum(item.actual if item.actual > 0 else item.ideal * income_scale for item in projected_targets),
+        sum(item.actual if item.actual > 0 else projected_ideal_per_slot for item in projected_targets),
         2,
     )
     if _is_completed_month(report.month):

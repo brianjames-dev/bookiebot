@@ -407,9 +407,10 @@ Status: Complete in code and automated/local browser verification; deployment ch
 - Callback regression coverage invokes the real `View Inbox` button and confirms it defers privately before dispatching the inbox workflow.
 - Savings commands now support numbered first, second, and third paycheck rows through shared row-discovery, check, and logging helpers with standard undo metadata.
 - Modern savings rows expose their own Ideal and Minimum values; the reader retains the legacy two-row fallback where Ideal and Minimum were split across the first and second rows.
-- Expense reports emit current/projected savings amounts, Ideal/Minimum totals, and paycheck counts. Projected mode preserves entered deposits and fills applicable unentered paycheck slots at the projected Ideal target.
+- Expense reports emit current/projected savings amounts, Ideal/Minimum totals, and paycheck counts. Projected mode derives one monthly Ideal/Minimum rate from the reached sheet targets, applies it once to projected income, and divides the resulting monthly Ideal evenly across projected paycheck slots before filling empty contributions.
 - The report's Saved card, Left amount, outflow total, and Savings Category Mix all consume the active current/projected savings value instead of a fixed current amount.
-- Read-only inspection confirmed three savings rows on both live July sheets and Templates. Local browser verification confirmed Brian July's Saved card and Savings graph update together with the Projected toggle and produce no console warnings or errors.
+- Read-only inspection confirmed three savings rows on both live July sheets and Templates. A follow-up corrected the initial per-row scaling error: Brian July's `$11,472.33` projected income now produces a `$2,294.47` monthly Ideal and `$1,147.23` Minimum, not a three-row `$3,441.69` Ideal.
+- Local browser verification confirmed the Brian July Saved card changes from the current `$2,294.47` / `$1,539.64` Ideal to a `$3,059.29` projected contribution / `$2,294.47` Ideal and produces no console warnings or errors.
 - Verification: `410 passed, 1 skipped`; Pyright clean; frontend typecheck/build passed; `git diff --check` passed.
 
 ## Open Questions

@@ -230,11 +230,17 @@ Decision: Supersede the fixed Needs-to-Wants Category Mix cascade with three sep
 
 Rationale: The sheet's cumulative Rollover formulas encode one fixed sequence and can consume Needs before Savings when Wants is overspent. An explicit transfer ledger preserves the same total money while honoring the requested priorities, supporting a Savings view, and explaining both source overspending and downstream donor impacts in current and projected reports.
 
-## 2026-07-22 - Project Savings From Numbered Paycheck Targets
+## 2026-07-22 - Project Savings From Numbered Paycheck Targets (Superseded 2026-07-22)
 
 Decision: Treat each discovered numbered paycheck savings row as a separate contribution slot with its own Actual, Ideal, and Minimum values. Current report mode includes slots reached by observed paychecks or entered deposits. Projected mode preserves entered deposits, adds remaining detected paycheck slots, scales their sheet targets with the existing income projection, and uses each empty slot's projected Ideal as its projected saved amount. Completed months remain actual-only. The report's Saved card, Left amount, outflow, and Savings Category Mix must all consume the same active-mode savings amount.
 
 Rationale: The personal budget sheets now support three paycheck savings entries, and a fixed current savings value made the Projected toggle internally inconsistent. Basing both targets and projected contributions on the sheet's numbered rows keeps the budget sheet authoritative, supports two- and three-paycheck months, and makes every savings visualization describe the same current or projected scenario.
+
+## 2026-07-22 - Apply The Savings Target Once Per Month
+
+Decision: Use reached savings rows to determine the current month's aggregate Ideal and Minimum rates, rounded to the nearest basis point so sheet-cent rounding does not distort the percentage. Apply each rate once to projected monthly income, regardless of whether the month has two or three paycheck rows. Preserve entered contributions and estimate each unentered projected contribution from the monthly projected Ideal divided by the projected paycheck count.
+
+Rationale: A savings row is a contribution slot, not an additional monthly allocation. Scaling every row by projected income made three rows produce a 30% Ideal even though the Budget model's aggregate target is 20%. Separating the one monthly target from its per-paycheck contribution schedule preserves the sheet's current values while keeping projected Ideal and Minimum mathematically consistent.
 
 ## Pending Decisions
 
