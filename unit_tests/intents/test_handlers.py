@@ -134,6 +134,7 @@ async def test_sheet_routing_errors_are_sent_to_user(monkeypatch, message):
         ("log_water_paid", "log_water_paid", 85.0, "water"),
         ("log_1st_savings", "log_1st_savings", 100.0, "1st savings"),
         ("log_2nd_savings", "log_2nd_savings", 200.0, "2nd savings"),
+        ("log_3rd_savings", "log_3rd_savings", 300.0, "3rd savings"),
     ],
 )
 async def test_logging_helpers_success(monkeypatch, message, intent, func_name, amount, expected):
@@ -2142,6 +2143,15 @@ async def test_query_savings_checks(monkeypatch, message):
     )
     await ih.handle_intent("query_2nd_savings", {}, message)
     assert any("2nd savings" in (msg or "") for msg, _ in message.channel.sent)
+
+    message.channel.sent.clear()
+    monkeypatch.setattr(
+        ih.su,
+        "check_3rd_savings_deposited",
+        AsyncMock(return_value={"deposited": True, "actual": 25.0, "ideal": 20.0, "minimum": 5.0}),
+    )
+    await ih.handle_intent("query_3rd_savings", {}, message)
+    assert any("3rd savings" in (msg or "") for msg, _ in message.channel.sent)
 
 
 @pytest.mark.asyncio

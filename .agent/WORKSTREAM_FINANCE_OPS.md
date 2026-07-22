@@ -1,6 +1,6 @@
 # Finance Operations Workstream
 
-Last updated: 2026-07-16
+Last updated: 2026-07-22
 
 ## Goal
 
@@ -398,6 +398,19 @@ Status: Complete. Category Mix now preserves separate Needs, Wants, and Savings 
 - Projected mode recomputes the same three-bucket cascade from projected 50/30/20 allocations and projected category totals.
 - Manual test: create a temporary overage in each source category, confirm donor impacts follow its priority, then exceed all three available balances and confirm the All-tab budget-overspend amount equals the uncovered remainder.
 - Verification: `404 passed, 1 skipped`, Pyright reported zero errors, frontend typecheck/build passed, and local browser checks covered live balances, all donor orders, projected mode, total overspend, and chart containment.
+
+### 2026-07-22 Digest Inbox And Three-Paycheck Savings Follow-Up
+
+Status: Complete in code and automated/local browser verification; deployment checks remain in `.agent/STATUS.md`.
+
+- Reconciliation digest and inbox component actions now use an explicit private thinking defer before sending follow-ups, fixing the silent `View Inbox` interaction and keeping the response actor-scoped.
+- Callback regression coverage invokes the real `View Inbox` button and confirms it defers privately before dispatching the inbox workflow.
+- Savings commands now support numbered first, second, and third paycheck rows through shared row-discovery, check, and logging helpers with standard undo metadata.
+- Modern savings rows expose their own Ideal and Minimum values; the reader retains the legacy two-row fallback where Ideal and Minimum were split across the first and second rows.
+- Expense reports emit current/projected savings amounts, Ideal/Minimum totals, and paycheck counts. Projected mode preserves entered deposits and fills applicable unentered paycheck slots at the projected Ideal target.
+- The report's Saved card, Left amount, outflow total, and Savings Category Mix all consume the active current/projected savings value instead of a fixed current amount.
+- Read-only inspection confirmed three savings rows on both live July sheets and Templates. Local browser verification confirmed Brian July's Saved card and Savings graph update together with the Projected toggle and produce no console warnings or errors.
+- Verification: `410 passed, 1 skipped`; Pyright clean; frontend typecheck/build passed; `git diff --check` passed.
 
 ## Open Questions
 

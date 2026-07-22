@@ -65,6 +65,17 @@ export interface IncomeProjection {
   savingsGoal: number
 }
 
+export interface SavingsProjection {
+  currentAmount: number
+  projectedAmount: number
+  currentIdeal: number
+  currentMinimum: number
+  projectedIdeal: number
+  projectedMinimum: number
+  currentPaycheckCount: number
+  projectedPaycheckCount: number
+}
+
 export type BudgetCategoryKey = "needs" | "wants" | "savings"
 
 export type CategoryBalanceAmounts = Record<BudgetCategoryKey, number>
@@ -135,6 +146,7 @@ export interface ExpenseReportData {
   metrics: Metrics
   categoryBalances?: CategoryBalances
   incomeProjection: IncomeProjection
+  savingsProjection: SavingsProjection
   burnRate: BurnRate | null
   breakdown: BreakdownItem[]
   dailyTotals: AmountRow[]

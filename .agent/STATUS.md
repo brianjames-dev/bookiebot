@@ -1,19 +1,33 @@
 # Agent Status
 
-Last updated: 2026-07-17
+Last updated: 2026-07-22
 
 ## Active Focus
 
-Shared Needs-category logging, the shifted dated Income layout, and the four-block personal subscription layout are implemented. Hannah's live subscription sheet now matches Brian's Monthly/Yearly structure while retaining her data and totals.
+The reconciliation digest inbox control, three-paycheck savings workflow, and current/projected savings reporting are implemented and verified. The next step is deployment and low-risk Discord/report confirmation for both budget owners.
 
 ## On Deck
 
-1. Manually verify shared Needs logging plus update/move/delete/undo behavior in Discord and Google Sheets.
-2. Manually verify recent transactions and reconciliation after the latest reliability fixes.
-3. Consider a richer Discord button flow for grouped amount adjustments if the current UX feels too manual.
-4. Harden recent-action pending state across restarts/deploys, since selections currently live only in process memory.
-5. Improve targeted recent-action search so commands can find older matches, not only the latest 10 recent actions.
-6. Explore clarifying questions before logging when BookieBot is uncertain instead of guessing or silently failing.
+1. Deploy and manually verify the digest `View Inbox` control, third-paycheck savings log/check commands, and current/projected savings report behavior.
+2. Manually verify shared Needs logging plus update/move/delete/undo behavior in Discord and Google Sheets.
+3. Manually verify recent transactions and reconciliation after the latest reliability fixes.
+4. Consider a richer Discord button flow for grouped amount adjustments if the current UX feels too manual.
+5. Harden recent-action pending state across restarts/deploys, since selections currently live only in process memory.
+6. Improve targeted recent-action search so commands can find older matches, not only the latest 10 recent actions.
+7. Explore clarifying questions before logging when BookieBot is uncertain instead of guessing or silently failing.
+
+## Completed 2026-07-22
+
+- Fixed the reconciliation digest `View Inbox` callback to create an explicit private deferred response before loading the inbox, so Discord acknowledges the component and the follow-up renders reliably.
+- Added a callback-level regression test that invokes the real digest button, verifies the private thinking defer, and confirms inbox dispatch.
+- Added third-paycheck savings intents, parser guidance, intent-explorer entries, handlers, sheet checks, sheet logging, and undo metadata.
+- Generalized savings-row discovery across first, second, and third paycheck rows, reading each row's Actual, Ideal, and Minimum values while retaining compatibility with the older two-row shared-target layout.
+- Added a report savings-projection payload that tracks current/projected saved amounts, Ideal/Minimum totals, and applicable paycheck counts. Current mode uses entered deposits and targets for reached paychecks; projected mode preserves entered deposits and fills remaining detected paycheck slots at their income-scaled Ideal target.
+- Wired the report's Projected toggle into the Saved card, Left amount, Savings Category Mix slices/pressure, and projected outflow totals. The Saved card now displays its active paycheck count plus Ideal and Minimum targets.
+- Read-only live-sheet inspection confirmed both Brian and Hannah July tabs and Templates contain three savings rows; legacy May/June two-row tabs remain supported.
+- Local browser verification of Brian July showed Current Saved `$2,294.47` with 2 paychecks, Ideal `$1,539.64`, and Minimum `$769.82`; Projected changed to Saved `$3,441.70` with 3 paychecks, Ideal `$3,441.69`, and Minimum `$1,720.85`. The Savings graph and pressure copy changed with the toggle, and the console remained clean.
+- Verification: `410 passed, 1 skipped`; Pyright reported zero errors; frontend typecheck/build passed; `git diff --check` passed.
+- Manual verification steps are checklist items 59-61 below.
 
 ## Completed 2026-07-17
 
@@ -112,6 +126,13 @@ Shared Needs-category logging, the shifted dated Income layout, and the four-blo
 - Removed the standalone `Student Loan Payment` budget row from Hannah's Template, May, June, and July tabs; each tab compacted cleanly, retained its subscription-backed Needs row, and automatically shifted subtotal, rollover, margins, savings, and net formulas to the new locations.
 - Retired the dedicated student-loan log/check intents, handlers, sheet helpers, intent-explorer entries, fixtures, and legacy default bill-schedule row; pre-existing student-loan bill rows are ignored so the payment is represented only by subscription autopay, while historical report categorization remains available.
 - Manual verification: deploy the updated Apps Script, run `setupBudgetSystemAutomation()` once, enter an amount in a new dated Income table, then confirm manual and BookieBot income dates plus update/delete/undo behavior.
+
+## Completed 2026-07-09
+
+- Added `app_conversion_blueprint/` as a standalone iOS app conversion handoff package that can be copied into a new repository without touching the current Discord bot runtime.
+- Captured the local-first app architecture, assistant tool framework, database-first data model, Plaid bridge boundary, Google Sheets export direction, BookieBot porting map, roadmap/backlog, risks, and source references.
+- Added a copy-ready `repo-template/` with starter agent instructions, backlog, ADR template, and placeholders for `ios/`, `server/`, and `shared/contracts/`.
+- Updated the app-conversion AI strategy so the primary assistant target is a downloadable Qwen 4B-class local model pack offered during onboarding, with Apple Foundation Models retained as fallback/lightweight mode.
 
 ## Completed 2026-07-08
 
@@ -342,30 +363,38 @@ Use a test row or low-risk real row in Discord:
    - Expected: the previous personal budget month has static values in Burn Rate, Static Bills & Subscriptions (Needs), and Subscriptions (Wants) formula output cells; the current month tab exists even if the copied template did not contain an exact `Month` placeholder.
 45. If Discord login hits a global `429` rate limit during startup.
    - Expected: Railway logs show the login attempt number, retry delay, retry-at timestamp, and periodic backoff progress until the next login attempt. Avoid repeated redeploys while Discord is still rate-limiting the bot.
-46. Log `Need expense $40 for a doctor copay at Kaiser` from Hannah's Discord account, then inspect the current month in Shared Expenses and both personal budget sheets.
+46. Copy `app_conversion_blueprint/` to a scratch directory or new repo and open `README.md`.
+   - Expected: the read order, repo template, architecture docs, backlog, and source references are present without requiring any current BookieBot runtime files.
+47. Log `Need expense $40 for a doctor copay at Kaiser` from Hannah's Discord account, then inspect the current month in Shared Expenses and both personal budget sheets.
    - Expected: one Needs row appears in Shared Expenses with an automatic date, item `doctor copay`, location `Kaiser`, person `Hannah`, and `$40.00`; no individual transaction row is inserted into Hannah's personal budget sheet, whose Needs bucket receives only the aggregate.
-47. From `recent`, update that Need transaction's item, location, amount, and person/card one field at a time.
+48. From `recent`, update that Need transaction's item, location, amount, and person/card one field at a time.
    - Expected: all four fields update in the Shared Expenses Needs row, the date remains unchanged, and the recent action remains editable/movable/deletable.
-48. Move the Need transaction to Shopping, then move it back to Needs using both the Discord buttons and a text command such as `move it to Needs`.
+49. Move the Need transaction to Shopping, then move it back to Needs using both the Discord buttons and a text command such as `move it to Needs`.
    - Expected: the source category cells clear/compact, the destination receives the complete transaction exactly once, and Needs is offered as a move destination unless it is already the current category.
-49. Place two test transactions in Needs, delete the older one from recent actions, then immediately undo.
-   - Expected: the newer Needs row compacts upward after delete; undo restores both rows in order with all date/item/amount/location/person values intact.
-50. On a migrated May, June, or July personal budget tab, log an Income entry, update its source or amount, delete it from recent actions, and immediately undo.
-   - Expected: Date/Source/Amount populate in `B:D`, the report includes the dated entry, delete compacts the Income rows, and undo restores the row and its editable lineage without changing the monthly total beyond the expected transaction amount.
-51. Retry `Brian (BofA) purchased celebration dinner at Jackson's bar and grill for $140` after deployment.
-   - Expected: the expense reaches intent parsing and logs normally; if Discord's typing endpoint returns another transient error, logs show a warning that processing continued instead of `Failed to parse intent` from `send_typing`.
-52. After deploying the Apps Script, enter a real Source and Amount in the sole Income placeholder on a safe month tab, then log a second Income entry through BookieBot.
-   - Expected: the first entry replaces the seed row and receives a date without creating another blank; the BookieBot entry inserts a matching formatted row immediately above Monthly Income, and the total includes both completed rows.
-53. Copy Hannah's Template to a safe test month and log two Income entries through Hannah's BookieBot account.
-   - Expected: the entries occupy consecutive `B:D` rows with dates, every generated row retains the seed's formatting/validation/notes/height, no `<Enter Source>` row remains after completion, and the Monthly Income formula includes both entries.
-54. In Brian July, delete and undo the first Income entry, then repeat with the later entry and with an immediate undo after logging test Income.
+50. Place two test transactions in Needs, delete the older one from recent actions, then immediately undo.
+    - Expected: the newer Needs row compacts upward after delete; undo restores both rows in order with all date/item/amount/location/person values intact.
+51. On a migrated May, June, or July personal budget tab, log an Income entry, update its source or amount, delete it from recent actions, and immediately undo.
+    - Expected: Date/Source/Amount populate in `B:D`, the report includes the dated entry, delete compacts the Income rows, and undo restores the row and its editable lineage without changing the monthly total beyond the expected transaction amount.
+52. Retry `Brian (BofA) purchased celebration dinner at Jackson's bar and grill for $140` after deployment.
+    - Expected: the expense reaches intent parsing and logs normally; if Discord's typing endpoint returns another transient error, logs show a warning that processing continued instead of `Failed to parse intent` from `send_typing`.
+53. After deploying the Apps Script, enter a real Source and Amount in the sole Income placeholder on a safe month tab, then log a second Income entry through BookieBot.
+    - Expected: the first entry replaces the seed row and receives a date without creating another blank; the BookieBot entry inserts a matching formatted row immediately above Monthly Income, and the total includes both completed rows.
+54. Copy Hannah's Template to a safe test month and log two Income entries through Hannah's BookieBot account.
+    - Expected: the entries occupy consecutive `B:D` rows with dates, every generated row retains the seed's formatting/validation/notes/height, no `<Enter Source>` row remains after completion, and the Monthly Income formula includes both entries.
+55. In Brian July, delete and undo the first Income entry, then repeat with the later entry and with an immediate undo after logging test Income.
     - Expected: the `Biweekly Income Start` configuration remains anchored in `E:F`, Monthly Income always sums the current `D` rows, the Budget section retains its total reference, and undo restores the deleted row's values and formatting.
-55. Run `/debug_subscriptions` after deployment and inspect Hannah's visible and normalized subscription sheets.
+56. Run `/debug_subscriptions` after deployment and inspect Hannah's visible and normalized subscription sheets.
     - Expected: fourteen dated entries are reminder-eligible; Internet is retained as a `$0.00` monthly draft with one expected missing-pull-date warning; the four visible subtotals remain `$521.07`, `$32.99`, `$47.95`, and `$59.99`.
-56. Open Hannah Budget 2026 Template, May, June, and July and inspect the Needs section.
+57. Open Hannah Budget 2026 Template, May, June, and July and inspect the Needs section.
     - Expected: no standalone `Student Loan Payment` row remains; `Subscriptions (Needs)` and `Various Need Transactions` remain intact; May's net is `-$606.05`, July's Needs subtotal is `$688.12 (84.98%)`, and July's net is `$618.53`.
-57. After deployment, send `student loan paid?` and `log student loan payment 242.29`, then run `/debug_subscriptions`.
+58. After deployment, send `student loan paid?` and `log student loan payment 242.29`, then run `/debug_subscriptions`.
     - Expected: neither message invokes a dedicated student-loan payment command or mutates a budget row; the Student Loan subscription/autopay remains present and reminder-eligible in Hannah's normalized subscription schedule.
+59. Let a scheduled reconciliation digest arrive, then click `View Inbox`.
+    - Expected: Discord immediately shows the private thinking state, then replaces it with the actor's unresolved inbox or confirmed automatic-match report; the button does not fail silently.
+60. From both Brian's and Hannah's Discord accounts, use a safe test month to log and query the third paycheck savings amount, then undo the test write if needed.
+    - Expected: only the third labeled savings row's Actual cell changes; the query reports that row's Actual, Ideal, and Minimum values; undo restores its previous value.
+61. Open current-month reports for Brian and Hannah and switch Projected off and on while viewing the Saved card and Savings Category Mix tab.
+    - Expected: the Saved amount, paycheck count, Ideal/Minimum copy, Left amount, Savings slices, and over/under-saving pressure all use the active current/projected mode. Brian July's verified snapshot changes from `$2,294.47` across 2 paychecks to `$3,441.70` across 3 projected paychecks.
 
 ## Verification Baseline
 
@@ -379,6 +408,18 @@ python -m pytest unit_tests/intents/test_handlers.py unit_tests/core/test_messag
 Latest verification:
 
 ```bash
+python -m pytest unit_tests
+# passed: 410 passed, 1 skipped
+
+python -m pyright
+# passed: 0 errors, 0 warnings, 0 informations
+
+cd web/expense-report && npm run typecheck && npm run build
+# passed
+
+git diff --check
+# passed
+
 python -m pytest unit_tests
 # passed: 404 passed, 1 skipped
 
@@ -492,6 +533,15 @@ python -m pyright --pythonpath venv/bin/python --pythonversion 3.12
 
 git diff --check
 # passed
+
+find app_conversion_blueprint -maxdepth 4 -type f | sort
+# passed
+
+rg -n "app_conversion_blueprint|Plaid|Foundation Models|Google Sheets" app_conversion_blueprint
+# passed
+
+rg -n "Preferred first path|Apple's Foundation Models framework on supported devices for local|bundled Core ML or other local model" app_conversion_blueprint
+# passed: no matches
 
 cd web/expense-report && npm run build
 # passed

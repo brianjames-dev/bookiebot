@@ -18,7 +18,10 @@
       {"A": "PG&E", "B": "$140.00"},
       {"A": "Recology", "B": "$95.00"},
       {"A": "Water", "B": "$110.00"},
-      {"A": "Monthly Income", "B": "$7,500.00"}
+      {"A": "Monthly Income", "B": "$7,500.00"},
+      {"B": "Enter 1st Paycheck Deposit", "C": "IDEAL = $750.00", "D": "MINIMUM = $375.00", "E": "$0.00"},
+      {"B": "Enter 2nd Paycheck Deposit", "C": "IDEAL = $750.00", "D": "MINIMUM = $375.00", "E": "$0.00"},
+      {"B": "Enter 3rd Paycheck Deposit", "C": "IDEAL = $750.00", "D": "MINIMUM = $375.00", "E": "$0.00"}
     ]
   },
   "subscriptions": {

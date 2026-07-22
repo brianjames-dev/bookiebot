@@ -242,7 +242,7 @@ async def _send_bank_reconciliation_inbox(interaction: Any, actor_key: str) -> N
                 ephemeral=True,
             )
             return
-        await action_interaction.response.defer(ephemeral=True)
+        await action_interaction.response.defer(ephemeral=True, thinking=True)
         if action == "start":
             await _start_bank_reconciliation_from_prompt(action_interaction, actor_key, clear_prompt=False)
             return
@@ -313,7 +313,7 @@ def bank_reconciliation_digest_view(actor_key: str) -> BankReconciliationDigestV
                 ephemeral=True,
             )
             return
-        await interaction.response.defer(ephemeral=True)
+        await interaction.response.defer(ephemeral=True, thinking=True)
         if action == "start":
             await _start_bank_reconciliation_from_prompt(interaction, actor_key, clear_prompt=True)
             return
@@ -332,7 +332,7 @@ def persistent_bank_reconciliation_digest_view(actor_key: str) -> BankReconcilia
                 ephemeral=True,
             )
             return
-        await interaction.response.defer(ephemeral=True)
+        await interaction.response.defer(ephemeral=True, thinking=True)
         if action == "start":
             await _start_bank_reconciliation_from_prompt(interaction, actor_key, clear_prompt=True)
             return

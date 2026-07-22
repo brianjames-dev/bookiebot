@@ -134,6 +134,16 @@ SCENARIOS = [
         assert_fn=lambda result, repo: "savings" in result.replies[0].lower(),
     ),
     ScenarioCase(
+        name="log_3rd_savings__natural",
+        prompt="log third paycheck savings 300",
+        llm_fixture="unit_tests/fixtures/llm/logging_actions/log_3rd_savings/log_3rd_savings__natural.json",
+        sheet_fixture="base_month",
+        assert_fn=lambda result, repo: (
+            "logged 3rd savings" in result.replies[0].lower()
+            and repo.income.acell("E9").value == "300"
+        ),
+    ),
+    ScenarioCase(
         name="harness_echo_log_expense",
         prompt="Paid $18.50 for coffee",
         llm_fixture="unit_tests/fixtures/llm/logging_actions/log_expense/log_expense__natural.json",
@@ -238,6 +248,13 @@ SCENARIOS = [
         name="query_2nd_savings__natural",
         prompt="Did we deposit 2nd savings?",
         llm_fixture="unit_tests/fixtures/llm/checking_payments/query_2nd_savings/query_2nd_savings__natural.json",
+        sheet_fixture="base_month",
+        assert_fn=lambda result, repo: bool(result.replies),
+    ),
+    ScenarioCase(
+        name="query_3rd_savings__natural",
+        prompt="Did we deposit 3rd paycheck savings?",
+        llm_fixture="unit_tests/fixtures/llm/checking_payments/query_3rd_savings/query_3rd_savings__natural.json",
         sheet_fixture="base_month",
         assert_fn=lambda result, repo: bool(result.replies),
     ),

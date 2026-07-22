@@ -1,0 +1,6 @@
+{
+  "intent": "log_3rd_savings",
+  "entities": {
+    "amount": 300
+  }
+}

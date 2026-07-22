@@ -109,6 +109,11 @@ async def parse_message_llm(user_message: str, *, llm_client: Optional[LLMClient
 
     Student loan payments are tracked as subscription autopay and do not have log-payment or paid-status intents. If a message asks to log or check a student loan payment, return the fallback intent instead of treating it as a generic expense or another payment type.
 
+    If the message is about a savings contribution tied to a numbered paycheck, use the matching numbered savings intent:
+    - "log_1st_savings", "log_2nd_savings", or "log_3rd_savings" when recording an amount
+    - "query_1st_savings", "query_2nd_savings", or "query_3rd_savings" when checking whether it was deposited
+    For logging, extract entities as: {{ "amount": <float> }}.
+
     If the message is about logging a Need expense, use the same separated expense fields as other shared expenses:
     - amount: float (do not include $)
     - item: short label for what was purchased or paid for

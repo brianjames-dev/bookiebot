@@ -1090,6 +1090,85 @@ def test_current_month_income_projection_reanchors_after_early_or_late_paycheck(
     ]
 
 
+def test_savings_projection_uses_three_deposit_targets_and_future_paychecks(monkeypatch):
+    monkeypatch.setattr(
+        expense_breakdown,
+        "now_pacific",
+        lambda: datetime(2026, 7, 17, 12, 0, tzinfo=routing.PACIFIC_TZ),
+    )
+    personal_rows = [
+        ["", "Date:", "Source:", "Amount:", "Biweekly Income Source:", "xAI"],
+        ["", "7/2/2026", "xAI", "$3,774.59", "Biweekly Income Start:", "7/2/2026"],
+        ["", "7/15/2026", "internet stipend", "$150.00"],
+        ["", "7/17/2026", "xAI", "$3,773.63"],
+        ["", "Monthly Income:", "", "$7,698.22"],
+        _row(
+            {
+                "B": "Enter 1st Paycheck Deposit",
+                "C": "IDEAL = $769.82",
+                "D": "MINIMUM = $384.91",
+                "E": "$1,147.23",
+            }
+        ),
+        _row(
+            {
+                "B": "Enter 2nd Paycheck Deposit",
+                "C": "IDEAL = $769.82",
+                "D": "MINIMUM = $384.91",
+                "E": "$1,147.24",
+            }
+        ),
+        _row(
+            {
+                "B": "Enter 3rd Paycheck Deposit",
+                "C": "IDEAL = $769.82",
+                "D": "MINIMUM = $384.91",
+                "E": "$0.00",
+            }
+        ),
+        _row({"B": "Total Savings Deposited", "E": "$2,294.47"}),
+    ]
+    report = build_expense_breakdown_report(
+        actor_key="brian",
+        owner_name="Brian",
+        persons=["Brian"],
+        month=BudgetMonth(2026, 7),
+        worksheets=ReportWorksheets(
+            shared_expenses=InMemoryWorksheet([["hdr"] * 28, ["hdr"] * 28]),
+            personal_budget=InMemoryWorksheet(personal_rows),
+            subscriptions=InMemoryWorksheet([]),
+        ),
+    )
+
+    payload_match = re.search(
+        r'<script id="bookiebot-expense-report-data" type="application/json">(.*?)</script>',
+        render_expense_breakdown_html(report),
+    )
+    assert payload_match is not None
+    payload = json.loads(payload_match.group(1))
+
+    assert report.amount_saved == 2294.47
+    assert payload["savingsProjection"] == {
+        "currentAmount": 2294.47,
+        "projectedAmount": 3441.70,
+        "currentIdeal": 1539.64,
+        "currentMinimum": 769.82,
+        "projectedIdeal": 3441.69,
+        "projectedMinimum": 1720.85,
+        "currentPaycheckCount": 2,
+        "projectedPaycheckCount": 3,
+    }
+
+
+def test_report_frontend_uses_active_savings_for_cards_and_category_mix():
+    source = (Path(__file__).resolve().parents[2] / "web/expense-report/src/report-app.tsx").read_text()
+
+    assert "const savings = savingsForMode(report, projected)" in source
+    assert "amountSaved={activeReport.metrics.amountSaved}" in source
+    assert "value={activeReport.metrics.amountSaved}" in source
+    assert "savingsMetricDescription(activeReport.metrics, projectionActive)" in source
+
+
 def test_current_month_calendar_does_not_project_unentered_utility_average(monkeypatch):
     monkeypatch.setattr(
         expense_breakdown,
@@ -1146,6 +1225,7 @@ def test_build_expense_breakdown_report_reports_zero_savings_deposits():
                 [
                     _row({"B": "Enter 1st Paycheck Deposit", "E": "$0.00"}),
                     _row({"B": "Enter 2nd Paycheck Deposit", "E": "$0.00"}),
+                    _row({"B": "Enter 3rd Paycheck Deposit", "E": "$0.00"}),
                     _row({"B": "Total Savings Deposited", "E": "$0.00"}),
                 ]
             ),

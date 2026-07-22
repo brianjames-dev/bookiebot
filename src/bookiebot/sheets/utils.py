@@ -1543,156 +1543,118 @@ def log_water_paid(amount):
     return log_payment("water", amount)
 
 
-async def check_1st_savings_deposited():
+_SAVINGS_DEPOSIT_ORDINALS = {1: "1st", 2: "2nd", 3: "3rd"}
+
+
+def _savings_deposit_label(check_number: int) -> str:
+    ordinal = _SAVINGS_DEPOSIT_ORDINALS[check_number]
+    return f"Enter {ordinal} Paycheck Deposit"
+
+
+def _labeled_savings_target(ws, row: int, col: int, target: str) -> float:
+    for offset in range(1, 4):
+        value = ws.cell(row, col + offset).value
+        if str(value or "").strip().lower().startswith(target):
+            return extract_amount_from_text(value)
+    return 0.0
+
+
+async def _check_savings_deposited(check_number: int):
     ws = _income_ws()
+    ordinal = _SAVINGS_DEPOSIT_ORDINALS[check_number]
+    label = _savings_deposit_label(check_number)
     try:
-        # robust text match
-        cell = find_cell_by_partial_text(ws, "Enter 1st Paycheck Deposit")
+        cell = find_cell_by_partial_text(ws, label)
         if not cell:
-            raise ValueError("Could not find 'Enter 1st Paycheck Deposit'")
+            raise ValueError(f"Could not find '{label}'")
 
         row, col = cell.row, cell.col
+        actual_amount = clean_money(ws.cell(row, col + 3).value)
+        ideal_amount = _labeled_savings_target(ws, row, col, "ideal")
+        minimum_amount = _labeled_savings_target(ws, row, col, "minimum")
 
-        # actual = 3 right
-        actual_val = ws.cell(row, col + 3).value
-        actual_amount = clean_money(actual_val)
-
-        # ideal = 1 right
-        ideal_val = ws.cell(row, col + 1).value
-        ideal_amount = extract_amount_from_text(ideal_val)
-
-        # minimum = 1 right & 1 down
-        min_val = ws.cell(row + 1, col + 1).value
-        minimum_amount = extract_amount_from_text(min_val)
-
-        deposited = actual_amount > 0
+        # Older two-row sheets shared the Ideal/Minimum labels across the
+        # first and second deposit rows. Retain that layout as a fallback.
+        if ideal_amount <= 0 and check_number == 2:
+            ideal_amount = _labeled_savings_target(ws, row - 1, col, "ideal")
+        if minimum_amount <= 0 and check_number == 1:
+            minimum_amount = _labeled_savings_target(ws, row + 1, col, "minimum")
 
         return {
-            "deposited": deposited,
+            "deposited": actual_amount > 0,
             "actual": actual_amount,
             "ideal": ideal_amount,
-            "minimum": minimum_amount
+            "minimum": minimum_amount,
         }
 
     except Exception as e:
-        print(f"[ERROR] Failed to check 1st savings deposited: {e}")
+        print(f"[ERROR] Failed to check {ordinal} savings deposited: {e}")
         return {
             "deposited": False,
             "actual": 0.0,
             "ideal": 0.0,
-            "minimum": 0.0
+            "minimum": 0.0,
         }
+
+
+async def check_1st_savings_deposited():
+    return await _check_savings_deposited(1)
 
 
 async def check_2nd_savings_deposited():
+    return await _check_savings_deposited(2)
+
+
+async def check_3rd_savings_deposited():
+    return await _check_savings_deposited(3)
+
+
+def _log_savings(amount, check_number: int):
+    """
+    Logs a paycheck savings deposit by writing it 3 columns to the right of
+    its labeled row.
+    """
     ws = _income_ws()
+    ordinal = _SAVINGS_DEPOSIT_ORDINALS[check_number]
+    label = _savings_deposit_label(check_number)
     try:
-        cell = find_cell_by_partial_text(ws, "Enter 2nd Paycheck Deposit")
+        cell = find_cell_by_partial_text(ws, label)
         if not cell:
-            raise ValueError("Could not find 'Enter 2nd Paycheck Deposit'")
+            raise ValueError(f"Could not find '{label}'")
 
         row, col = cell.row, cell.col
+        target_cell = rowcol_to_a1(row, col + 3)
+        previous_value = ws.acell(target_cell).value
 
-        # actual = 3 right
-        actual_val = ws.cell(row, col + 3).value
-        actual_amount = clean_money(actual_val)
-
-        # ideal = 1 right & 1 up
-        ideal_val = ws.cell(row - 1, col + 1).value
-        ideal_amount = extract_amount_from_text(ideal_val)
-
-        # minimum = 1 right
-        min_val = ws.cell(row, col + 1).value
-        minimum_amount = extract_amount_from_text(min_val)
-
-        deposited = actual_amount > 0
-
-        return {
-            "deposited": deposited,
-            "actual": actual_amount,
-            "ideal": ideal_amount,
-            "minimum": minimum_amount
-        }
+        ws.update_acell(target_cell, str(amount))
+        record_undo_action(
+            get_current_discord_user_id(),
+            UndoAction(
+                worksheet="income",
+                kind="restore_cells",
+                row=row,
+                columns=[col + 3],
+                previous_values=[previous_value],
+                new_values=[str(amount)],
+                metadata={"type": "savings", "category": f"{ordinal} savings"},
+                description=f"{ordinal} savings deposit ${amount}",
+            ),
+        )
+        print(f"[INFO] Logged {ordinal} savings deposit: ${amount} at {target_cell}")
+        return True
 
     except Exception as e:
-        print(f"[ERROR] Failed to check 2nd savings deposited: {e}")
-        return {
-            "deposited": False,
-            "actual": 0.0,
-            "ideal": 0.0,
-            "minimum": 0.0
-        }
+        print(f"[ERROR] Failed to log {ordinal} savings deposit: {e}")
+        return False
 
 
 def log_1st_savings(amount):
-    """
-    Logs the 1st savings deposit amount by writing it 3 columns to the right
-    of the cell containing 'Enter 1st Paycheck Deposit'.
-    """
-    ws = _income_ws()
-    try:
-        cell = find_cell_by_partial_text(ws, "Enter 1st Paycheck Deposit")
-        if not cell:
-            raise ValueError("Could not find 'Enter 1st Paycheck Deposit'")
-
-        row, col = cell.row, cell.col
-        target_cell = rowcol_to_a1(row, col + 3)
-        previous_value = ws.acell(target_cell).value
-
-        ws.update_acell(target_cell, str(amount))
-        record_undo_action(
-            get_current_discord_user_id(),
-            UndoAction(
-                worksheet="income",
-                kind="restore_cells",
-                row=row,
-                columns=[col + 3],
-                previous_values=[previous_value],
-                new_values=[str(amount)],
-                metadata={"type": "savings", "category": "1st savings"},
-                description=f"1st savings deposit ${amount}",
-            ),
-        )
-        print(f"[INFO] Logged 1st savings deposit: ${amount} at {target_cell}")
-        return True
-
-    except Exception as e:
-        print(f"[ERROR] Failed to log 1st savings deposit: {e}")
-        return False
+    return _log_savings(amount, 1)
 
 
 def log_2nd_savings(amount):
-    """
-    Logs the 2nd savings deposit amount by writing it 3 columns to the right
-    of the cell containing 'Enter 2nd Paycheck Deposit'.
-    """
-    ws = _income_ws()
-    try:
-        cell = find_cell_by_partial_text(ws, "Enter 2nd Paycheck Deposit")
-        if not cell:
-            raise ValueError("Could not find 'Enter 2nd Paycheck Deposit'")
+    return _log_savings(amount, 2)
 
-        row, col = cell.row, cell.col
-        target_cell = rowcol_to_a1(row, col + 3)
-        previous_value = ws.acell(target_cell).value
 
-        ws.update_acell(target_cell, str(amount))
-        record_undo_action(
-            get_current_discord_user_id(),
-            UndoAction(
-                worksheet="income",
-                kind="restore_cells",
-                row=row,
-                columns=[col + 3],
-                previous_values=[previous_value],
-                new_values=[str(amount)],
-                metadata={"type": "savings", "category": "2nd savings"},
-                description=f"2nd savings deposit ${amount}",
-            ),
-        )
-        print(f"[INFO] Logged 2nd savings deposit: ${amount} at {target_cell}")
-        return True
-
-    except Exception as e:
-        print(f"[ERROR] Failed to log 2nd savings deposit: {e}")
-        return False
+def log_3rd_savings(amount):
+    return _log_savings(amount, 3)

@@ -92,6 +92,7 @@ INTENT_HANDLERS: dict[str, IntentHandler] = {
     "log_water_paid":                       lambda e, m: log_water_paid_handler(e, m),
     "log_1st_savings":                      lambda e, m: log_1st_savings_handler(e, m),
     "log_2nd_savings":                      lambda e, m: log_2nd_savings_handler(e, m),
+    "log_3rd_savings":                      lambda e, m: log_3rd_savings_handler(e, m),
     "log_need_expense":                     lambda e, m: log_need_expense_handler(e, m),
     "undo_last_transaction":                lambda e, m: undo_last_transaction_handler(m),
     "delete_recent_action":                 lambda e, m: delete_recent_action_handler(e, m),
@@ -128,6 +129,7 @@ INTENT_HANDLERS: dict[str, IntentHandler] = {
     "query_expenses_on_day":                lambda e, m: query_expenses_on_day_handler(e, m),
     "query_1st_savings":                    lambda e, m: query_1st_savings_handler(e, m),
     "query_2nd_savings":                    lambda e, m: query_2nd_savings_handler(e, m),
+    "query_3rd_savings":                    lambda e, m: query_3rd_savings_handler(e, m),
 }
 
 
@@ -1431,58 +1433,55 @@ async def log_water_paid_handler(entities, message):
         await message.channel.send("❌ Could not confirm the water payment was written.")
 
 
-async def query_1st_savings_handler(entities, message):
-    result = await su.check_1st_savings_deposited()
+async def _query_savings_handler(message, ordinal: str, check_func):
+    result = await check_func()
     if result["deposited"]:
         response = (
-            f"✅ 1st savings deposited: ${result['actual']:.2f}\n"
+            f"✅ {ordinal} savings deposited: ${result['actual']:.2f}\n"
             f"💡 Ideal: ${result['ideal']:.2f} | Minimum: ${result['minimum']:.2f}"
         )
     else:
         response = (
-            f"❌ 1st savings not deposited.\n"
+            f"❌ {ordinal} savings not deposited.\n"
             f"💡 Ideal: ${result['ideal']:.2f} | Minimum: ${result['minimum']:.2f}"
         )
     await message.channel.send(response)
+
+
+async def query_1st_savings_handler(entities, message):
+    await _query_savings_handler(message, "1st", su.check_1st_savings_deposited)
 
 
 async def query_2nd_savings_handler(entities, message):
-    result = await su.check_2nd_savings_deposited()
-    if result["deposited"]:
-        response = (
-            f"✅ 2nd savings deposited: ${result['actual']:.2f}\n"
-            f"💡 Ideal: ${result['ideal']:.2f} | Minimum: ${result['minimum']:.2f}"
-        )
+    await _query_savings_handler(message, "2nd", su.check_2nd_savings_deposited)
+
+
+async def query_3rd_savings_handler(entities, message):
+    await _query_savings_handler(message, "3rd", su.check_3rd_savings_deposited)
+
+
+async def _log_savings_handler(entities, message, ordinal: str, log_func):
+    amount = entities.get("amount")
+    if amount is None:
+        await message.channel.send(f"❌ Please specify the amount for {ordinal} savings.")
+        return
+    success = log_func(amount)
+    if success:
+        await message.channel.send(f"✅ Logged {ordinal} savings: ${amount:.2f}")
     else:
-        response = (
-            f"❌ 2nd savings not deposited.\n"
-            f"💡 Ideal: ${result['ideal']:.2f} | Minimum: ${result['minimum']:.2f}"
-        )
-    await message.channel.send(response)
+        await message.channel.send(f"❌ Failed to log {ordinal} savings.")
 
 
 async def log_1st_savings_handler(entities, message):
-    amount = entities.get("amount")
-    if amount is None:
-        await message.channel.send("❌ Please specify the amount for 1st savings.")
-        return
-    success = su.log_1st_savings(amount)
-    if success:
-        await message.channel.send(f"✅ Logged 1st savings: ${amount:.2f}")
-    else:
-        await message.channel.send("❌ Failed to log 1st savings.")
+    await _log_savings_handler(entities, message, "1st", su.log_1st_savings)
 
 
 async def log_2nd_savings_handler(entities, message):
-    amount = entities.get("amount")
-    if amount is None:
-        await message.channel.send("❌ Please specify the amount for 2nd savings.")
-        return
-    success = su.log_2nd_savings(amount)
-    if success:
-        await message.channel.send(f"✅ Logged 2nd savings: ${amount:.2f}")
-    else:
-        await message.channel.send("❌ Failed to log 2nd savings.")
+    await _log_savings_handler(entities, message, "2nd", su.log_2nd_savings)
+
+
+async def log_3rd_savings_handler(entities, message):
+    await _log_savings_handler(entities, message, "3rd", su.log_3rd_savings)
 
 
 async def log_need_expense_handler(entities, message):

@@ -140,6 +140,18 @@ Decision: Expense breakdown reports use scheduled subscription pull dates from t
 
 Rationale: Open-month reports should reflect which subscriptions should have hit so far and show the full-month subscription amount as projection context. Completed months should preserve Budget sheet snapshot totals for historical review.
 
+## 2026-07-09 - Keep iOS App Conversion Planning Separate
+
+Decision: Add `app_conversion_blueprint/` as a standalone planning and new-repo handoff package. The blueprint recommends a future local-database-first iOS app with Google Sheets as export/sync output and a minimal Plaid bridge, but it does not change the current Discord bot runtime.
+
+Rationale: The app conversion is a product and architecture direction that should be easy to copy into a fresh project without coupling early iOS planning to the existing Google Sheets and Discord implementation.
+
+## 2026-07-09 - Use Downloadable Local AI Pack As Primary App Assistant
+
+Decision: The iOS app blueprint should target a downloadable Qwen 4B-class local AI model pack as the primary assistant provider, with Apple Foundation Models kept as fallback/lightweight mode. The stronger model should be offered during onboarding rather than prebundled in the app.
+
+Rationale: The desired app experience needs a smarter and larger-context chat agent than Apple's lightweight on-device model. A post-install model pack keeps the base app small, makes the privacy/storage tradeoff explicit to the user, and preserves local-only finance chat by default.
+
 ## 2026-07-16 - Treat Needs As A Shared Expense Category
 
 Decision: New Need transactions are normal shared-expense rows in the monthly `Shared Expenses` Needs section (`AD:AH`) with date, item, amount, location, and person fields. Personal Brian/Hannah budget sheets receive only their aggregated Needs total through the existing sheet formula/import flow; BookieBot no longer inserts individual Need rows there.
@@ -217,6 +229,12 @@ Rationale: Rollover is the sheet's authoritative available-money value for each 
 Decision: Supersede the fixed Needs-to-Wants Category Mix cascade with three separate raw Budget-sheet margin balances. Needs deficits draw from Wants then Savings; Wants deficits draw from Savings then Needs; Savings deficits (`Over saving`) draw from Wants then Needs. Each donor retains its positive balance until a source-specific rule uses it, and any uncovered remainder becomes total budget overspend.
 
 Rationale: The sheet's cumulative Rollover formulas encode one fixed sequence and can consume Needs before Savings when Wants is overspent. An explicit transfer ledger preserves the same total money while honoring the requested priorities, supporting a Savings view, and explaining both source overspending and downstream donor impacts in current and projected reports.
+
+## 2026-07-22 - Project Savings From Numbered Paycheck Targets
+
+Decision: Treat each discovered numbered paycheck savings row as a separate contribution slot with its own Actual, Ideal, and Minimum values. Current report mode includes slots reached by observed paychecks or entered deposits. Projected mode preserves entered deposits, adds remaining detected paycheck slots, scales their sheet targets with the existing income projection, and uses each empty slot's projected Ideal as its projected saved amount. Completed months remain actual-only. The report's Saved card, Left amount, outflow, and Savings Category Mix must all consume the same active-mode savings amount.
+
+Rationale: The personal budget sheets now support three paycheck savings entries, and a fixed current savings value made the Projected toggle internally inconsistent. Basing both targets and projected contributions on the sheet's numbered rows keeps the budget sheet authoritative, supports two- and three-paycheck months, and makes every savings visualization describe the same current or projected scenario.
 
 ## Pending Decisions
 

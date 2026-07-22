@@ -72,6 +72,36 @@ def test_log_payment_returns_false_when_label_missing():
         assert su.log_payment("rent", 1625) is False
 
 
+@pytest.mark.asyncio
+async def test_third_savings_check_and_log_use_the_third_paycheck_row():
+    repo = SheetsRepoStub(
+        income_rows=[
+            ["", "Enter 1st Paycheck Deposit", "IDEAL = $100.00", "MINIMUM = $50.00", "$90.00"],
+            ["", "Enter 2nd Paycheck Deposit", "IDEAL = $100.00", "MINIMUM = $50.00", "$80.00"],
+            ["", "Enter 3rd Paycheck Deposit", "IDEAL = $100.00", "MINIMUM = $50.00", "$0.00"],
+        ]
+    )
+
+    with repo.patched():
+        before = await su.check_3rd_savings_deposited()
+        assert su.log_3rd_savings(75.25) is True
+        after = await su.check_3rd_savings_deposited()
+
+    assert before == {
+        "deposited": False,
+        "actual": 0.0,
+        "ideal": 100.0,
+        "minimum": 50.0,
+    }
+    assert after == {
+        "deposited": True,
+        "actual": 75.25,
+        "ideal": 100.0,
+        "minimum": 50.0,
+    }
+    assert repo.income.acell("E3").value == "75.25"
+
+
 @pytest.fixture
 def mock_ws():
     ws = MagicMock()

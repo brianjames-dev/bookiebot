@@ -1,6 +1,7 @@
 from dataclasses import replace
 from datetime import date, datetime
 from types import SimpleNamespace
+from unittest.mock import AsyncMock
 import pytest
 
 from bookiebot.banking.models import (
@@ -70,9 +71,11 @@ class FakeInteraction:
 class FakeResponse:
     def __init__(self):
         self.deferred = False
+        self.defer_kwargs = {}
 
-    async def defer(self, **_kwargs):
+    async def defer(self, **kwargs):
         self.deferred = True
+        self.defer_kwargs = kwargs
 
 
 class FakeFollowup:
@@ -406,6 +409,22 @@ async def test_bank_reconciliation_digest_view_is_persistent():
         "bank_reconcile:start:123",
         "bank_reconcile:inbox:123",
     ]
+
+
+@pytest.mark.asyncio
+async def test_bank_reconciliation_digest_view_inbox_button_runs_private_inbox(monkeypatch):
+    send_inbox = AsyncMock()
+    monkeypatch.setattr(bank_reconciliation, "_send_bank_reconciliation_inbox", send_inbox)
+    view = bank_reconciliation.bank_reconciliation_digest_view("123")
+    inbox_button = next(child for child in view.children if getattr(child, "label", None) == "View Inbox")
+    interaction = FakeReviewInteraction()
+    interaction.user = SimpleNamespace(id="123")
+
+    await inbox_button.callback(interaction)
+
+    assert interaction.response.deferred is True
+    assert interaction.response.defer_kwargs == {"ephemeral": True, "thinking": True}
+    send_inbox.assert_awaited_once_with(interaction, "123")
 
 
 @pytest.mark.asyncio

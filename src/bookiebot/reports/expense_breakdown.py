@@ -113,6 +113,14 @@ class IncomeProjectionConfig:
 
 
 @dataclass(frozen=True)
+class SavingsDeposit:
+    number: int
+    actual: float
+    ideal: float
+    minimum: float
+
+
+@dataclass(frozen=True)
 class _IncomeTableLayout:
     header_row_index: int
     source_column: int
@@ -139,6 +147,7 @@ class ExpenseBreakdownReport:
     wants_rollover: float | None
     amount_saved: float | None
     savings_goal: float | None
+    savings_deposits: list[SavingsDeposit] = field(default_factory=list)
     entries: list[ExpenseEntry] = field(default_factory=list)
     need_expenses: list[PaymentItem] = field(default_factory=list)
     payments: list[PaymentItem] = field(default_factory=list)
@@ -239,6 +248,14 @@ SAVINGS_DEPOSIT_LABEL_PHRASES = {
         "check 2 deposit",
         "2nd savings deposit",
         "second savings deposit",
+    ),
+    3: (
+        "enter 3rd paycheck deposit",
+        "3rd paycheck deposit",
+        "third paycheck deposit",
+        "check 3 deposit",
+        "3rd savings deposit",
+        "third savings deposit",
     ),
 }
 INCOME_PROJECTION_SOURCE_LABELS = (
@@ -377,7 +394,8 @@ def build_expense_breakdown_report(
     income_projection_config = _income_projection_config(personal_rows)
     remaining_budget, remaining_wants_budget, remaining_savings_budget = _category_margin_amounts(personal_rows)
     needs_rollover, wants_rollover = _category_rollover_amounts(personal_rows)
-    amount_saved = _amount_saved(personal_rows)
+    savings_deposits = _savings_deposits(personal_rows)
+    amount_saved = _amount_saved(personal_rows, deposits=savings_deposits)
     savings_goal = _savings_goal(personal_rows)
     if remaining_savings_budget is None and amount_saved is not None and savings_goal is not None:
         remaining_savings_budget = round(savings_goal - amount_saved, 2)
@@ -457,6 +475,7 @@ def build_expense_breakdown_report(
         wants_rollover=wants_rollover,
         amount_saved=amount_saved,
         savings_goal=savings_goal,
+        savings_deposits=savings_deposits,
         entries=entries,
         need_expenses=need_expenses,
         payments=payments,
@@ -1460,25 +1479,61 @@ def _category_balance_payload(report: ExpenseBreakdownReport) -> dict[str, Any]:
     return _cascade_category_balances(needs, wants, savings or 0.0)
 
 
-def _amount_saved(rows: list[list[str]]) -> float | None:
-    total = 0.0
+def _savings_deposits(rows: list[list[str]]) -> list[SavingsDeposit]:
+    deposits: list[SavingsDeposit] = []
     found_checks: set[int] = set()
-    for row in rows:
+    for row_index, row in enumerate(rows):
         normalized_cells = [_normalize_label(value) for value in row]
         row_text = " ".join(cell for cell in normalized_cells if cell)
         if "deposit" not in row_text:
             continue
-        for check_number in (1, 2):
+        for check_number in sorted(SAVINGS_DEPOSIT_LABEL_PHRASES):
             if check_number in found_checks:
                 continue
             for index in range(len(normalized_cells)):
                 if not _is_check_deposit_label(normalized_cells, index, check_number):
                     continue
-                amount = _savings_deposit_amount(row, index)
-                total += amount
+                _ideal_found, ideal = _savings_target_amount(row, "ideal")
+                _minimum_found, minimum = _savings_target_amount(row, "minimum")
+
+                # Legacy two-paycheck sheets put the shared Ideal label on the
+                # first row and Minimum label on the second row. New sheets put
+                # both targets on every numbered deposit row.
+                if not _ideal_found and check_number == 2 and row_index > 0:
+                    _ideal_found, ideal = _savings_target_amount(rows[row_index - 1], "ideal")
+                if not _minimum_found and check_number == 1 and row_index + 1 < len(rows):
+                    _minimum_found, minimum = _savings_target_amount(rows[row_index + 1], "minimum")
+
+                deposits.append(
+                    SavingsDeposit(
+                        number=check_number,
+                        actual=round(_savings_deposit_amount(row, index), 2),
+                        ideal=round(ideal, 2),
+                        minimum=round(minimum, 2),
+                    )
+                )
                 found_checks.add(check_number)
                 break
-    return round(total, 2) if found_checks else None
+    return sorted(deposits, key=lambda item: item.number)
+
+
+def _savings_target_amount(row: list[str], target: str) -> tuple[bool, float]:
+    for value in row:
+        normalized = _normalize_label(value)
+        if normalized.startswith(target):
+            return True, _cell_money(value)
+    return False, 0.0
+
+
+def _amount_saved(
+    rows: list[list[str]],
+    *,
+    deposits: list[SavingsDeposit] | None = None,
+) -> float | None:
+    parsed = deposits if deposits is not None else _savings_deposits(rows)
+    if not parsed:
+        return None
+    return round(sum(item.actual for item in parsed), 2)
 
 
 def _savings_goal(rows: list[list[str]]) -> float | None:
@@ -1873,6 +1928,7 @@ def _report_client_payload(
         },
         "categoryBalances": _category_balance_payload(report),
         "incomeProjection": _income_projection_payload(report),
+        "savingsProjection": _savings_projection_payload(report),
         "burnRate": _burn_rate_payload(report),
         "breakdown": [
             {
@@ -1921,6 +1977,88 @@ def _income_projection_payload(report: ExpenseBreakdownReport) -> dict[str, Any]
         "projectedAmount": projected_amount,
         "savingsGoal": round(projected_amount * 0.2, 2),
     }
+
+
+def _savings_projection_payload(report: ExpenseBreakdownReport) -> dict[str, Any]:
+    current_amount = round(report.amount_saved or 0.0, 2)
+    projected_income = _projected_income_total(
+        report.income_entries,
+        report.income_total,
+        report.month,
+        report.income_projection_config,
+    )
+    current_paychecks, projected_paychecks = _income_paycheck_counts(report)
+    deposits = report.savings_deposits
+
+    if not deposits:
+        current_ideal = round(report.savings_goal or report.income_total * 0.2, 2)
+        projected_ideal = round(projected_income * 0.2, 2)
+        return {
+            "currentAmount": current_amount,
+            "projectedAmount": current_amount,
+            "currentIdeal": current_ideal,
+            "currentMinimum": 0.0,
+            "projectedIdeal": projected_ideal,
+            "projectedMinimum": 0.0,
+            "currentPaycheckCount": current_paychecks,
+            "projectedPaycheckCount": projected_paychecks,
+        }
+
+    highest_entered_deposit = max((item.number for item in deposits if item.actual > 0), default=0)
+    max_deposit_number = max(item.number for item in deposits)
+    current_slots = min(max_deposit_number, max(current_paychecks, highest_entered_deposit))
+    projected_slots = min(max_deposit_number, max(projected_paychecks, current_slots))
+    current_targets = [item for item in deposits if item.number <= current_slots]
+    projected_targets = [item for item in deposits if item.number <= projected_slots]
+
+    income_scale = (
+        projected_income / report.income_total
+        if report.income_total > 0 and not _is_completed_month(report.month)
+        else 1.0
+    )
+    current_ideal = round(sum(item.ideal for item in current_targets), 2)
+    current_minimum = round(sum(item.minimum for item in current_targets), 2)
+    projected_ideal = round(sum(item.ideal * income_scale for item in projected_targets), 2)
+    projected_minimum = round(sum(item.minimum * income_scale for item in projected_targets), 2)
+    projected_amount = round(
+        sum(item.actual if item.actual > 0 else item.ideal * income_scale for item in projected_targets),
+        2,
+    )
+    if _is_completed_month(report.month):
+        projected_amount = current_amount
+
+    return {
+        "currentAmount": current_amount,
+        "projectedAmount": projected_amount,
+        "currentIdeal": current_ideal,
+        "currentMinimum": current_minimum,
+        "projectedIdeal": projected_ideal,
+        "projectedMinimum": projected_minimum,
+        "currentPaycheckCount": current_slots,
+        "projectedPaycheckCount": projected_slots,
+    }
+
+
+def _income_paycheck_counts(report: ExpenseBreakdownReport) -> tuple[int, int]:
+    current_entries = report.income_entries or (
+        [PaymentItem("Income", report.income_total, "income")]
+        if report.income_total > 0
+        else []
+    )
+    paycheck_entries = _paycheck_income_entries(current_entries, report.income_projection_config)
+    if not paycheck_entries and len(current_entries) == 1:
+        paycheck_entries = current_entries
+    current_count = len(paycheck_entries)
+    if _is_completed_month(report.month):
+        return current_count, current_count
+    projected_count = current_count + len(
+        _projected_biweekly_pay_days(
+            paycheck_entries,
+            report.month,
+            report.income_projection_config,
+        )
+    )
+    return current_count, projected_count
 
 
 def _expense_entry_payload(entry: ExpenseEntry) -> dict[str, Any]:

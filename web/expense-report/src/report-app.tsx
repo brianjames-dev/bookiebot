@@ -244,6 +244,10 @@ type ReportView = {
     totalExpenses: number
     monthlyIncome: number
     incomeAfterExpenses: number
+    amountSaved: number
+    savingsIdeal: number
+    savingsMinimum: number
+    savingsPaycheckCount: number
   }
   categoryBalances: CategoryBalances
   breakdown: BreakdownItem[]
@@ -255,15 +259,20 @@ type ReportView = {
 function buildReportView(report: ExpenseReportData, projected: boolean): ReportView {
   const breakdown = projected ? projectedBreakdown(report) : report.breakdown
   const monthlyIncome = projected ? report.incomeProjection.projectedAmount : report.incomeProjection.currentAmount
-  const totalExpenses = projected ? projectedOutflowTotal(report, breakdown) : report.metrics.totalExpenses
+  const savings = savingsForMode(report, projected)
+  const totalExpenses = projected ? projectedOutflowTotal(breakdown, savings.amount) : report.metrics.totalExpenses
   const categoryBalances = projected
-    ? projectedCategoryBalances(monthlyIncome, breakdown, report.metrics.amountSaved ?? 0)
+    ? projectedCategoryBalances(monthlyIncome, breakdown, savings.amount)
     : report.categoryBalances ?? currentCategoryBalances(report)
   return {
     metrics: {
       totalExpenses,
       monthlyIncome,
       incomeAfterExpenses: roundCurrency(monthlyIncome - totalExpenses),
+      amountSaved: savings.amount,
+      savingsIdeal: savings.ideal,
+      savingsMinimum: savings.minimum,
+      savingsPaycheckCount: savings.paycheckCount,
     },
     categoryBalances,
     breakdown,
@@ -296,8 +305,25 @@ function projectedBreakdown(report: ExpenseReportData) {
   }))
 }
 
-function projectedOutflowTotal(report: ExpenseReportData, breakdown: BreakdownItem[]) {
-  return roundCurrency(amountRowsTotal(breakdown) + (report.metrics.amountSaved ?? 0))
+function projectedOutflowTotal(breakdown: BreakdownItem[], amountSaved: number) {
+  return roundCurrency(amountRowsTotal(breakdown) + amountSaved)
+}
+
+function savingsForMode(report: ExpenseReportData, projected: boolean) {
+  const savings = report.savingsProjection
+  return projected
+    ? {
+        amount: savings.projectedAmount,
+        ideal: savings.projectedIdeal,
+        minimum: savings.projectedMinimum,
+        paycheckCount: savings.projectedPaycheckCount,
+      }
+    : {
+        amount: savings.currentAmount,
+        ideal: savings.currentIdeal,
+        minimum: savings.currentMinimum,
+        paycheckCount: savings.currentPaycheckCount,
+      }
 }
 
 function projectedCategoryBalances(monthlyIncome: number, breakdown: BreakdownItem[], amountSaved: number) {
@@ -499,7 +525,7 @@ export function ExpenseReportApp({ report }: { report: ExpenseReportData }) {
         <CategoryMixChart
           data={activeReport.breakdown}
           categoryBalances={activeReport.categoryBalances}
-          amountSaved={report.metrics.amountSaved ?? 0}
+          amountSaved={activeReport.metrics.amountSaved}
           filter={categoryMixFilter}
           projected={projectionActive}
           collapseKey={chartCollapseKey}
@@ -552,8 +578,6 @@ export function ExpenseReportApp({ report }: { report: ExpenseReportData }) {
   ]
   const defaultChartIndex = Math.max(0, chartPanels.findIndex((panel) => panel.id === defaultChartTab))
   const [activeChartIndex, setActiveChartIndex] = useState(defaultChartIndex)
-  const savingsGoal = report.incomeProjection.savingsGoal
-
   useEffect(() => {
     setActiveChartIndex((current) => Math.min(current, chartPanels.length - 1))
   }, [chartPanels.length])
@@ -684,9 +708,9 @@ export function ExpenseReportApp({ report }: { report: ExpenseReportData }) {
           <MetricCard label="Left" value={activeReport.metrics.incomeAfterExpenses} description="After expenses" accent />
           <MetricCard
             label="Saved"
-            value={report.metrics.amountSaved}
-            description={savingsGoal > 0 ? `Goal ${formatMoney(savingsGoal)}` : undefined}
-            accent={isSavingsNearGoal(report.metrics.amountSaved, savingsGoal)}
+            value={activeReport.metrics.amountSaved}
+            description={savingsMetricDescription(activeReport.metrics, projectionActive)}
+            accent={isSavingsNearGoal(activeReport.metrics.amountSaved, activeReport.metrics.savingsIdeal)}
           />
         </section>
 
@@ -1185,6 +1209,21 @@ function MetricCard({
       </CardContent>
     </Card>
   )
+}
+
+function savingsMetricDescription(metrics: ReportView["metrics"], projected: boolean) {
+  const parts = [projected ? "Projected" : "Current"]
+  if (metrics.savingsPaycheckCount > 0) {
+    const noun = metrics.savingsPaycheckCount === 1 ? "paycheck" : "paychecks"
+    parts.push(`${metrics.savingsPaycheckCount} ${noun}`)
+  }
+  if (metrics.savingsIdeal > 0) {
+    parts.push(`Ideal ${formatMoney(metrics.savingsIdeal)}`)
+  }
+  if (metrics.savingsMinimum > 0) {
+    parts.push(`Minimum ${formatMoney(metrics.savingsMinimum)}`)
+  }
+  return parts.join(" • ")
 }
 
 function isSavingsNearGoal(value: number | null | undefined, goal: number | null | undefined) {
