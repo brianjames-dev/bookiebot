@@ -39,7 +39,7 @@ from bookiebot.sheets.routing import (
 )
 from bookiebot.sheets.config import get_category_columns
 from bookiebot.sheets.repo import get_sheets_repo
-from bookiebot.sheets.undo import update_recent_action
+from bookiebot.sheets.undo import undo_last_action, update_recent_action
 from bookiebot.sheets.writer import log_category_row, log_income_row, record_expense_undo
 from bookiebot.sheets.bills import bill_amount_for_source_label, next_bill_pull_date, parse_bill_schedules_with_warnings
 from bookiebot.sheets.subscriptions import debug_subscription_sync
@@ -114,12 +114,22 @@ def _log_bank_reconciliation_expense(
                 "bank_reconciliation_id": str(reconciliation_id),
             },
         )
-    confirmed = service.confirm_reconciliation_item(
-        owner_key,
-        reconciliation_id,
-        matched_action_log_id=action_id,
-        matched_sheet_ref=f"expense!row {row}",
-    )
+    try:
+        confirmed = service.confirm_reconciliation_item(
+            owner_key,
+            reconciliation_id,
+            matched_action_log_id=action_id,
+            matched_sheet_ref=f"expense!row {row}",
+        )
+    except Exception:
+        with sheet_user_context(actor_key):
+            undo_last_action(actor_key)
+        raise
+    if confirmed is None:
+        # Sheet write succeeded but recon item vanished — compensate to avoid double-log on retry.
+        with sheet_user_context(actor_key):
+            undo_last_action(actor_key)
+        return None, "confirm_failed"
     return confirmed, "logged"
 
 
@@ -163,12 +173,21 @@ def _log_bank_reconciliation_income(
                 },
             ),
         )
-    confirmed = service.confirm_reconciliation_item(
-        owner_key,
-        reconciliation_id,
-        matched_action_log_id=action_id,
-        matched_sheet_ref=f"income!row {row}",
-    )
+    try:
+        confirmed = service.confirm_reconciliation_item(
+            owner_key,
+            reconciliation_id,
+            matched_action_log_id=action_id,
+            matched_sheet_ref=f"income!row {row}",
+        )
+    except Exception:
+        with sheet_user_context(actor_key):
+            undo_last_action(actor_key)
+        raise
+    if confirmed is None:
+        with sheet_user_context(actor_key):
+            undo_last_action(actor_key)
+        return None, "confirm_failed"
     return confirmed, "logged"
 
 
@@ -1352,6 +1371,15 @@ def register_commands(tree: app_commands.CommandTree):
             )
             return
 
+        if status == "confirm_failed":
+            await interaction.followup.send(
+                content=(
+                    f"Sheet write for bank reconciliation item `{reconciliation_id}` could not be confirmed. "
+                    "Any sheet row just written was undone to avoid a double log. Please try again."
+                ),
+                ephemeral=True,
+            )
+            return
         if status == "not_found" or confirmed is None:
             await interaction.followup.send(
                 content=f"No bank reconciliation item `{reconciliation_id}` was found for {owner.name}.",
@@ -1414,6 +1442,15 @@ def register_commands(tree: app_commands.CommandTree):
             )
             return
 
+        if status == "confirm_failed":
+            await interaction.followup.send(
+                content=(
+                    f"Sheet write for bank reconciliation item `{reconciliation_id}` could not be confirmed. "
+                    "Any sheet row just written was undone to avoid a double log. Please try again."
+                ),
+                ephemeral=True,
+            )
+            return
         if status == "not_found" or confirmed is None:
             await interaction.followup.send(
                 content=f"No bank reconciliation item `{reconciliation_id}` was found for {owner.name}.",
