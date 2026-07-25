@@ -254,6 +254,12 @@ Decision: When a Discord component is deferred with `thinking=True`, its first s
 
 Rationale: A follow-up webhook message does not replace Discord's original private thinking placeholder. Editing the original response gives every deferred interaction one explicit terminal state and prevents a successful or failed reconciliation inbox load from appearing to run forever.
 
+## 2026-07-25 - Prioritize Actionable Reconciliation Inbox State
+
+Decision: A persisted reconciliation inbox reads its cache summary from the same banking store and date window as its unresolved and matched items. When unresolved items exist, their rows and controls appear before automatic-match history and are attached to the first Discord response; match history may continue in later chunks.
+
+Rationale: Synthetic zero-valued cache metadata contradicts the persisted item count, while placing a long audit report before unresolved transactions can hide the work the user opened the inbox to perform. One consistent store snapshot and action-first ordering keep the summary truthful and the inbox immediately usable.
+
 ## Pending Decisions
 
 - Where should durable system events live: banking database only, Google Sheets only, or dual-write during transition?

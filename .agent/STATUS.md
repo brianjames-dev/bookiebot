@@ -4,7 +4,7 @@ Last updated: 2026-07-25
 
 ## Active Focus
 
-The remaining production `View Inbox` response-lifecycle bug is fixed in code: the button now replaces Discord's original private thinking response with the persisted inbox, empty state, timeout, or error result. The next step is deployment and production confirmation.
+The production `View Inbox` data bug is fixed in code: the inbox now uses persisted cache totals and places actionable unresolved rows and controls before automatic-match history. The next step is deployment and production confirmation.
 
 ## On Deck
 
@@ -24,6 +24,11 @@ The remaining production `View Inbox` response-lifecycle bug is fixed in code: t
 - Added regression coverage for successful persisted reports, empty inboxes, timeout/failure paths, and inbox actions replacing their deferred response.
 - Verification: focused reconciliation suite `68 passed`; full suite `414 passed, 1 skipped`; Pyright reported zero errors; `git diff --check` passed.
 - Manual verification is checklist item 63 below.
+- Corrected the persisted inbox preview to load its Bank cache buckets from the banking store instead of displaying the synthetic preview model's all-zero defaults.
+- Reordered inbox content so unresolved review rows appear before potentially long automatic-match history, and attached unresolved inbox controls to the first response instead of the final history chunk.
+- Added screenshot-shaped regression coverage proving real cache totals, unresolved transaction rows, and `Reconcile Now` / `Ignore All` controls are returned together even when the match report spans later messages.
+- Verification for the data-accuracy follow-up: focused finance-ops suite `92 passed`; full suite `414 passed, 1 skipped`; Pyright reported zero errors; `git diff --check` passed.
+- Manual verification is checklist item 64 below.
 
 ## Completed 2026-07-24
 
@@ -419,6 +424,8 @@ Use a test row or low-risk real row in Discord:
     - Expected: the private thinking indicator is replaced by the persisted match/inbox report; automatic matches include the `Unmatch` selector, unresolved reports include `Reconcile Now` and `Ignore All`, and a backend failure produces a private retry message within 15 seconds instead of thinking forever.
 63. After deploying the July 25 Discord response-lifecycle fix, dismiss any old stuck thinking message and tap `View Inbox` again.
     - Expected: the same temporary private thinking response transforms into the first inbox report chunk, the caught-up message, or a bounded retry message; later report chunks appear as follow-ups, and no thinking response remains indefinitely.
+64. Tap `View Inbox` on a digest with unresolved items and existing automatic-match history.
+    - Expected: Bank cache totals match persisted current-month transactions; the first response includes the unresolved transaction rows plus `Reconcile Now` and `Ignore All`; confirmed-match history may continue in later messages without delaying or hiding the review inbox.
 
 ## Verification Baseline
 

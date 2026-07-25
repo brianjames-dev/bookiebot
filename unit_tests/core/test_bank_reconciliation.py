@@ -352,7 +352,12 @@ def test_format_bank_reconciliation_digest_compares_bank_and_sheet_match():
 
 def test_format_bank_reconciliation_digest_chunks_long_match_report():
     item = _matched_reconciliation_item(44, name="Amazon")
-    preview = ReconciliationPreview(owner_key="brian", items=[item] * 20, candidate_transaction_count=20)
+    unresolved = _reconciliation_item(45, name="Unlogged Coffee")
+    preview = ReconciliationPreview(
+        owner_key="brian",
+        items=[unresolved, *([item] * 20)],
+        candidate_transaction_count=21,
+    )
     matches = [
         ReconciliationReportMatch(
             reconciliation_id=index,
@@ -372,15 +377,17 @@ def test_format_bank_reconciliation_digest_chunks_long_match_report():
     chunks = format_bank_reconciliation_digest_chunks(
         "<@123>",
         preview,
-        [],
+        [unresolved],
         report_matches=matches,
         max_chars=900,
     )
 
     assert len(chunks) > 1
     assert all(len(chunk) <= 900 for chunk in chunks)
+    assert "Unresolved bank reconciliation items:" in chunks[0]
+    assert "Unlogged Coffee" in chunks[0]
     joined = "\n".join(chunks)
-    assert joined.count("```text") == 20
+    assert joined.count("```text") == 21
     assert "Bank Merchant 1" in joined
     assert "Bank Merchant 20" in joined
 
@@ -563,6 +570,15 @@ async def test_bank_reconciliation_inbox_ignore_all_ignores_displayed_batch(monk
         def unresolved_reconciliation_items(self, owner_key, *, limit, start_date):
             return [item for item in items if item.id not in ignored_ids]
 
+        def reconciliation_cache_buckets(self, _owner_key, *, start_date):
+            assert start_date == "2026-07-01"
+            return ReconciliationCacheBuckets(
+                stored=4,
+                needs_review=2,
+                matched=1,
+                confirmed=1,
+            )
+
         def matched_reconciliation_items(self, _owner_key, *, limit, start_date):
             return []
 
@@ -581,6 +597,7 @@ async def test_bank_reconciliation_inbox_ignore_all_ignores_displayed_batch(monk
         "get_user_config",
         lambda _actor_key: SimpleNamespace(budget_owner_key="brian", name="Brian"),
     )
+    monkeypatch.setattr(bank_reconciliation, "now_pacific", lambda: datetime(2026, 7, 25))
     monkeypatch.setattr(bank_reconciliation, "build_banking_service", lambda: FakeService())
     monkeypatch.setattr(bank_reconciliation, "has_system_event", lambda *_args: False)
     interaction = FakeReviewInteraction()
@@ -588,6 +605,12 @@ async def test_bank_reconciliation_inbox_ignore_all_ignores_displayed_batch(monk
     await bank_reconciliation._send_bank_reconciliation_inbox(interaction, "123")
 
     assert interaction.followup.messages == []
+    content = interaction.original_response_edits[0]["content"]
+    assert "- Stored bank transactions: `4`" in content
+    assert "- Needs review: `2`" in content
+    assert "Unresolved bank reconciliation items:" in content
+    assert "Unlogged Coffee" in content
+    assert content.index("Unresolved bank reconciliation items:") < content.index("Confirmed matches this run:")
     view = interaction.original_response_edits[0]["view"]
     ignore_all = next(child for child in view.children if getattr(child, "label", None) == "Ignore All")
     action_interaction = FakeReviewInteraction()
@@ -617,6 +640,15 @@ async def test_bank_reconciliation_inbox_shows_recent_auto_matches_without_actio
         def unresolved_reconciliation_items(self, _owner_key, *, limit, start_date):
             return []
 
+        def reconciliation_cache_buckets(self, _owner_key, *, start_date):
+            assert start_date == "2026-07-01"
+            return ReconciliationCacheBuckets(
+                stored=3,
+                needs_review=0,
+                matched=1,
+                confirmed=2,
+            )
+
         def matched_reconciliation_items(self, _owner_key, *, limit, start_date):
             return [item]
 
@@ -643,6 +675,7 @@ async def test_bank_reconciliation_inbox_shows_recent_auto_matches_without_actio
         "get_user_config",
         lambda _actor_key: SimpleNamespace(budget_owner_key="brian", name="Brian"),
     )
+    monkeypatch.setattr(bank_reconciliation, "now_pacific", lambda: datetime(2026, 7, 25))
     monkeypatch.setattr(bank_reconciliation, "build_banking_service", lambda: FakeService())
     monkeypatch.setattr(bank_reconciliation, "has_system_event", lambda *_args: False)
     interaction = FakeReviewInteraction()
@@ -653,6 +686,8 @@ async def test_bank_reconciliation_inbox_shows_recent_auto_matches_without_actio
     kwargs = interaction.original_response_edits[-1]
     content = kwargs["content"]
     assert "found no unresolved items and confirmed `1` automatic match" in content
+    assert "- Stored bank transactions: `3`" in content
+    assert "- Matched automatically: `1`" in content
     assert "Confirmed matches this run:" in content
     assert "CREDIT CARD 3333 PAYMENT" in content
     children = getattr(kwargs["view"], "children", [])
@@ -727,13 +762,18 @@ async def test_bank_reconciliation_inbox_uses_followups_only_after_replacing_def
             public_message="public",
             detail_message="first chunk",
             detail_messages=("first chunk", "second chunk"),
+            item_ids=(42,),
         ),
     )
     interaction = FakeReviewInteraction()
 
     await bank_reconciliation._send_bank_reconciliation_inbox(interaction, "123")
 
-    assert interaction.original_response_edits == [{"content": "first chunk", "view": None}]
+    assert interaction.original_response_edits[0]["content"] == "first chunk"
+    assert [
+        getattr(child, "label", None)
+        for child in interaction.original_response_edits[0]["view"].children
+    ] == ["Reconcile Now", "Ignore All"]
     assert interaction.followup.messages == [
         ("second chunk", {"view": None, "ephemeral": True})
     ]

@@ -304,15 +304,15 @@ async def _send_bank_reconciliation_inbox(interaction: Any, actor_key: str) -> N
             )
 
     messages = digest.detail_messages or (digest.detail_message,)
+    view_message_index = 0 if digest.item_ids else len(messages) - 1
     for index, message in enumerate(messages):
-        is_last = index == len(messages) - 1
         view = (
             BankReconciliationInboxView(
                 handle_inbox_action,
                 has_unresolved=bool(digest.item_ids),
                 matches=list(digest.report_matches),
             )
-            if is_last and (digest.item_ids or digest.report_matches)
+            if index == view_message_index and (digest.item_ids or digest.report_matches)
             else None
         )
         if index == 0:
@@ -556,6 +556,10 @@ def prepare_bank_reconciliation_inbox_messages(
         limit=100,
         start_date=month_start,
     )
+    cache_buckets = service.reconciliation_cache_buckets(
+        owner.budget_owner_key,
+        start_date=month_start,
+    )
     if not unresolved and not matched_items:
         return None
 
@@ -565,8 +569,9 @@ def prepare_bank_reconciliation_inbox_messages(
     preview = ReconciliationPreview(
         owner_key=owner.budget_owner_key,
         items=list(items_by_id.values()),
-        cached_transaction_count=len(items_by_id),
+        cached_transaction_count=cache_buckets.stored,
         candidate_transaction_count=len(items_by_id),
+        cache_buckets=cache_buckets,
     )
     # actor_key=None intentionally avoids rereading action logs and schedule
     # sheets. The persisted match lineage is enough for the inbox report.
@@ -687,9 +692,10 @@ def format_bank_reconciliation_digest_chunks(
         ]
     )
     chunks = [_fit_chunk("\n".join(lines), max_chars=max_chars)]
+    if unresolved:
+        for section in format_reconciliation_review_chunks(unresolved, max_chars=max_chars):
+            chunks = _append_digest_chunk(chunks, section, max_chars=max_chars)
     for section in format_reconciliation_match_report_chunks(report_matches or [], max_chars=max_chars):
-        chunks = _append_digest_chunk(chunks, section, max_chars=max_chars)
-    for section in format_reconciliation_review_chunks(unresolved, max_chars=max_chars):
         chunks = _append_digest_chunk(chunks, section, max_chars=max_chars)
     return chunks
 

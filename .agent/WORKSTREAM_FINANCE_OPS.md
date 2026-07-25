@@ -434,6 +434,15 @@ Status: Complete in code and focused verification; production deployment confirm
 - Regression coverage verifies successful reports, empty state, timeout/failure, and batch-ignore response completion.
 - Verification: focused core/reconciliation suite `68 passed`; full suite `414 passed, 1 skipped`; Pyright clean; `git diff --check` passed.
 
+### 2026-07-25 Persisted Inbox Data Accuracy Follow-Up
+
+Status: Complete in code and focused verification; production deployment confirmation remains in `.agent/STATUS.md`.
+
+- Persisted inbox previews now load current-month cache buckets from the banking store, so Stored, Needs review, Matched, Confirmed, Ignored, and Pending counts no longer fall back to zeros.
+- Unresolved review rows are formatted before automatic-match history and their action controls are attached to the first Discord response. Long match reports continue in later messages without hiding the actionable inbox.
+- Regression coverage reproduces unresolved items alongside multi-message match history and verifies accurate cache totals, visible review rows, and immediate controls.
+- Verification: focused finance-ops suite `92 passed`; full suite `414 passed, 1 skipped`; Pyright clean; `git diff --check` passed.
+
 ## Open Questions
 
 - What should the canonical recent-action lineage model look like?

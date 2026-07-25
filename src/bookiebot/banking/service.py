@@ -14,6 +14,7 @@ from bookiebot.banking.models import (
     BankStatus,
     BankTransaction,
     LinkedBankItem,
+    ReconciliationCacheBuckets,
     ReconciliationItem,
     ReconciliationPreview,
     ReconciliationReportMatch,
@@ -573,6 +574,14 @@ class BankingService:
             max_age_days=max_age_days,
             start_date=start_date,
         )
+
+    def reconciliation_cache_buckets(
+        self,
+        owner_key: str,
+        *,
+        start_date: str | None = None,
+    ) -> ReconciliationCacheBuckets:
+        return self.store.reconciliation_cache_buckets(owner_key, start_date=start_date)
 
     def matched_reconciliation_items(
         self,
