@@ -1,3 +1,4 @@
+import asyncio
 from dataclasses import replace
 from datetime import date, datetime
 from types import SimpleNamespace
@@ -550,15 +551,10 @@ async def test_bank_reconciliation_inbox_ignore_all_ignores_displayed_batch(monk
         config = SimpleNamespace(configured=True)
 
         async def sync_owner(self, _owner_key):
-            return None
+            raise AssertionError("View Inbox must not start a fresh bank sync")
 
         def reconciliation_preview(self, owner_key, *, limit, actor_key, start_date):
-            return ReconciliationPreview(
-                owner_key=owner_key,
-                items=items,
-                cached_transaction_count=2,
-                candidate_transaction_count=2,
-            )
+            raise AssertionError("View Inbox must not rescore persisted transactions")
 
         def unresolved_reconciliation_items(self, owner_key, *, limit, start_date):
             return [item for item in items if item.id not in ignored_ids]
@@ -605,16 +601,10 @@ async def test_bank_reconciliation_inbox_shows_recent_auto_matches_without_actio
         config = SimpleNamespace(configured=True)
 
         async def sync_owner(self, _owner_key):
-            return None
+            raise AssertionError("View Inbox must not start a fresh bank sync")
 
         def reconciliation_preview(self, owner_key, *, limit, actor_key, start_date):
-            return ReconciliationPreview(
-                owner_key=owner_key,
-                items=[],
-                cached_transaction_count=1,
-                candidate_transaction_count=0,
-                cache_buckets=ReconciliationCacheBuckets(stored=1, matched=1),
-            )
+            raise AssertionError("View Inbox must not rescore persisted transactions")
 
         def unresolved_reconciliation_items(self, _owner_key, *, limit, start_date):
             return []
@@ -624,6 +614,7 @@ async def test_bank_reconciliation_inbox_shows_recent_auto_matches_without_actio
 
         def reconciliation_report_matches(self, _owner_key, items, *, actor_key, limit):
             assert items == [item]
+            assert actor_key is None
             return [
                 ReconciliationReportMatch(
                     reconciliation_id=43,
@@ -657,6 +648,47 @@ async def test_bank_reconciliation_inbox_shows_recent_auto_matches_without_actio
     children = getattr(kwargs["view"], "children", [])
     assert len(children) == 1
     assert getattr(children[0], "placeholder", "") == "Unmatch a confirmed transaction"
+
+
+@pytest.mark.asyncio
+async def test_bank_reconciliation_inbox_failure_finishes_deferred_response(monkeypatch):
+    def fail_to_prepare(*_args, **_kwargs):
+        raise RuntimeError("database unavailable")
+
+    monkeypatch.setattr(
+        bank_reconciliation,
+        "prepare_bank_reconciliation_inbox_messages",
+        fail_to_prepare,
+    )
+    interaction = FakeReviewInteraction()
+
+    await bank_reconciliation._send_bank_reconciliation_inbox(interaction, "123")
+
+    assert interaction.followup.messages == [
+        (
+            "I couldn't load the reconciliation inbox right now. Nothing was changed; please try again.",
+            {"ephemeral": True},
+        )
+    ]
+
+
+@pytest.mark.asyncio
+async def test_bank_reconciliation_inbox_timeout_finishes_deferred_response(monkeypatch):
+    async def stall_inbox_load(*_args, **_kwargs):
+        await asyncio.sleep(1)
+
+    monkeypatch.setattr(bank_reconciliation.asyncio, "to_thread", stall_inbox_load)
+    monkeypatch.setattr(bank_reconciliation, "_inbox_load_timeout_seconds", lambda: 0.01)
+    interaction = FakeReviewInteraction()
+
+    await bank_reconciliation._send_bank_reconciliation_inbox(interaction, "123")
+
+    assert interaction.followup.messages == [
+        (
+            "I couldn't load the reconciliation inbox in time. Nothing was changed; please try again.",
+            {"ephemeral": True},
+        )
+    ]
 
 
 @pytest.mark.asyncio

@@ -76,6 +76,14 @@ def _send_window_minutes() -> int:
         return 60
 
 
+def _inbox_load_timeout_seconds() -> float:
+    raw = os.getenv("BOOKIEBOT_RECONCILIATION_INBOX_TIMEOUT_SECONDS", "15").strip()
+    try:
+        return min(max(float(raw), 1.0), 120.0)
+    except ValueError:
+        return 15.0
+
+
 def _is_eligible(now: datetime | None = None) -> bool:
     current = now or now_pacific()
     window_start = current.replace(hour=_send_hour(), minute=0, second=0, microsecond=0)
@@ -219,14 +227,30 @@ async def _start_bank_reconciliation_from_prompt(interaction: Any, actor_key: st
 
 
 async def _send_bank_reconciliation_inbox(interaction: Any, actor_key: str) -> None:
-    digest = await asyncio.to_thread(
-        prepare_bank_reconciliation_digest_messages,
-        actor_key,
-        f"<@{actor_key}>",
-        now_pacific().date(),
-        mark_sent=False,
-        force=True,
-    )
+    try:
+        digest = await asyncio.wait_for(
+            asyncio.to_thread(
+                prepare_bank_reconciliation_inbox_messages,
+                actor_key,
+                f"<@{actor_key}>",
+                now_pacific().date(),
+            ),
+            timeout=_inbox_load_timeout_seconds(),
+        )
+    except TimeoutError:
+        logger.warning("Bank reconciliation inbox load timed out", extra={"actor_key": actor_key})
+        await interaction.followup.send(
+            content="I couldn't load the reconciliation inbox in time. Nothing was changed; please try again.",
+            ephemeral=True,
+        )
+        return
+    except Exception:
+        logger.exception("Failed to load bank reconciliation inbox", extra={"actor_key": actor_key})
+        await interaction.followup.send(
+            content="I couldn't load the reconciliation inbox right now. Nothing was changed; please try again.",
+            ephemeral=True,
+        )
+        return
     if not digest:
         await interaction.followup.send(
             content="Bank reconciliation is all caught up. No unresolved items remain.",
@@ -508,6 +532,75 @@ def prepare_bank_reconciliation_digest_messages(
             unresolved,
             report_matches=report_matches,
             sync_error=sync_error,
+        ),
+        report_matches=tuple(report_matches),
+        item_ids=tuple(int(item.id) for item in unresolved),
+        owner_key=owner.budget_owner_key,
+        owner_name=getattr(owner, "name", str(actor_key)),
+    )
+
+
+def prepare_bank_reconciliation_inbox_messages(
+    actor_key: str,
+    mention: str,
+    current: date,
+) -> PreparedBankReconciliationDigest | None:
+    """Build the button-driven inbox from persisted reconciliation state only."""
+    owner = get_user_config(actor_key)
+    service = build_banking_service()
+    month_start = current.replace(day=1).isoformat()
+    unresolved = service.unresolved_reconciliation_items(
+        owner.budget_owner_key,
+        limit=25,
+        start_date=month_start,
+    )
+    matched_items = service.matched_reconciliation_items(
+        owner.budget_owner_key,
+        limit=100,
+        start_date=month_start,
+    )
+    if not unresolved and not matched_items:
+        return None
+
+    items_by_id = {item.id: item for item in unresolved}
+    for item in matched_items:
+        items_by_id.setdefault(item.id, item)
+    preview = ReconciliationPreview(
+        owner_key=owner.budget_owner_key,
+        items=list(items_by_id.values()),
+        cached_transaction_count=len(items_by_id),
+        candidate_transaction_count=len(items_by_id),
+    )
+    # actor_key=None intentionally avoids rereading action logs and schedule
+    # sheets. The persisted match lineage is enough for the inbox report.
+    report_matches = service.reconciliation_report_matches(
+        owner.budget_owner_key,
+        matched_items,
+        actor_key=None,
+        limit=100,
+    )
+    unresolved_count = len(unresolved)
+    matched_count = len(matched_items)
+    detail_messages = tuple(
+        format_bank_reconciliation_digest_chunks(
+            mention,
+            preview,
+            unresolved,
+            report_matches=report_matches,
+        )
+    )
+    return PreparedBankReconciliationDigest(
+        public_message=format_bank_reconciliation_public_prompt(
+            mention,
+            unresolved_count,
+            matched_count=matched_count,
+        ),
+        detail_messages=detail_messages,
+        detail_message=format_bank_reconciliation_digest(
+            mention,
+            preview,
+            unresolved,
+            report_matches=report_matches,
         ),
         report_matches=tuple(report_matches),
         item_ids=tuple(int(item.id) for item in unresolved),

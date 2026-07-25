@@ -242,6 +242,12 @@ Decision: Use reached savings rows to determine the current month's aggregate Id
 
 Rationale: A savings row is a contribution slot, not an additional monthly allocation. Scaling every row by projected income made three rows produce a 30% Ideal even though the Budget model's aggregate target is 20%. Separating the one monthly target from its per-paycheck contribution schedule preserves the sheet's current values while keeping projected Ideal and Minimum mathematically consistent.
 
+## 2026-07-24 - Render View Inbox From Persisted Reconciliation State
+
+Decision: The reconciliation digest's `View Inbox` action reads current-month unresolved and matched items already persisted in the banking store. It does not run Plaid sync, reconciliation rescoring, action-log reads, or schedule-sheet hydration. Inbox preparation must have a bounded timeout and return a private failure message without mutating reconciliation state when it cannot complete.
+
+Rationale: The scheduled digest has already synchronized and persisted the state the user is asking to inspect. Repeating external network and sheet work after Discord defers the component made a read-only button slow and capable of leaving an indefinite thinking response. Persisted reads make the interaction deterministic while `Reconcile Now` remains the explicit path for active review work.
+
 ## Pending Decisions
 
 - Where should durable system events live: banking database only, Google Sheets only, or dual-write during transition?

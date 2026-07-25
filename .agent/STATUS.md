@@ -1,20 +1,30 @@
 # Agent Status
 
-Last updated: 2026-07-22
+Last updated: 2026-07-24
 
 ## Active Focus
 
-The reconciliation digest inbox control, three-paycheck savings workflow, and current/projected savings reporting are implemented and verified. The next step is deployment and low-risk Discord/report confirmation for both budget owners.
+The production `View Inbox` hang is fixed in code: the button now renders persisted reconciliation state without repeating Plaid/Sheets reconciliation work, and a bounded failure path always finishes Discord's deferred response. The next step is deployment and production confirmation.
 
 ## On Deck
 
-1. Deploy and manually verify the digest `View Inbox` control, third-paycheck savings log/check commands, and current/projected savings report behavior.
+1. Deploy and manually verify that digest `View Inbox` returns the persisted automatic-match/unresolved report without remaining in Discord's thinking state.
 2. Manually verify shared Needs logging plus update/move/delete/undo behavior in Discord and Google Sheets.
 3. Manually verify recent transactions and reconciliation after the latest reliability fixes.
 4. Consider a richer Discord button flow for grouped amount adjustments if the current UX feels too manual.
 5. Harden recent-action pending state across restarts/deploys, since selections currently live only in process memory.
 6. Improve targeted recent-action search so commands can find older matches, not only the latest 10 recent actions.
 7. Explore clarifying questions before logging when BookieBot is uncertain instead of guessing or silently failing.
+
+## Completed 2026-07-24
+
+- Diagnosed the production `View Inbox` hang from the post-defer path: the button was starting a fresh Plaid sync, reconciliation preview, action-log read, schedule-sheet read, and match hydration instead of displaying the state already persisted by the 7:00 AM digest.
+- Added a persisted-only inbox builder that reads unresolved and matched reconciliation items from the banking store and formats the report without Plaid sync or Google Sheets access.
+- Preserved match source classification from stored action/sheet lineage even when the fast inbox path intentionally skips source hydration.
+- Added a configurable `BOOKIEBOT_RECONCILIATION_INBOX_TIMEOUT_SECONDS` ceiling (15 seconds by default) and guaranteed private timeout/error responses so Discord cannot remain indefinitely in `BookieBot is thinking` after a failed load.
+- Added regression coverage proving `View Inbox` does not invoke sync/rescoring, still returns recent automatic matches, preserves inbox actions, and finishes the deferred response when preparation fails.
+- Verification: focused reconciliation suite `66 passed`; full suite `412 passed, 1 skipped`; Pyright reported zero errors; `git diff --check` passed.
+- Manual verification is checklist item 62 below.
 
 ## Completed 2026-07-22
 
@@ -396,6 +406,8 @@ Use a test row or low-risk real row in Discord:
     - Expected: only the third labeled savings row's Actual cell changes; the query reports that row's Actual, Ideal, and Minimum values; undo restores its previous value.
 61. Open current-month reports for Brian and Hannah and switch Projected off and on while viewing the Saved card and Savings Category Mix tab.
     - Expected: the Saved amount, paycheck count, Ideal/Minimum copy, Left amount, Savings slices, and over/under-saving pressure all use the active current/projected mode. Brian July's verified snapshot changes from `$2,294.47` across 2 paychecks to `$3,059.29` across 3 projected paychecks, while the monthly projected Ideal remains 20% of income at `$2,294.47`.
+62. After deploying the July 24 reconciliation fix, tap `View Inbox` on a digest containing an automatic match and on one containing unresolved items.
+    - Expected: the private thinking indicator is replaced by the persisted match/inbox report; automatic matches include the `Unmatch` selector, unresolved reports include `Reconcile Now` and `Ignore All`, and a backend failure produces a private retry message within 15 seconds instead of thinking forever.
 
 ## Verification Baseline
 
@@ -409,6 +421,18 @@ python -m pytest unit_tests/intents/test_handlers.py unit_tests/core/test_messag
 Latest verification:
 
 ```bash
+python -m pytest unit_tests/core/test_bank_reconciliation.py unit_tests/banking/test_reconciliation.py
+# passed: 66 passed
+
+python -m pytest unit_tests
+# passed: 412 passed, 1 skipped
+
+python -m pyright
+# passed: 0 errors, 0 warnings, 0 informations
+
+git diff --check
+# passed
+
 python -m pytest unit_tests
 # passed: 410 passed, 1 skipped
 

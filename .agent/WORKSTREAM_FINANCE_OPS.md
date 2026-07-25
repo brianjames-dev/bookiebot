@@ -1,6 +1,6 @@
 # Finance Operations Workstream
 
-Last updated: 2026-07-22
+Last updated: 2026-07-24
 
 ## Goal
 
@@ -412,6 +412,17 @@ Status: Complete in code and automated/local browser verification; deployment ch
 - Read-only inspection confirmed three savings rows on both live July sheets and Templates. A follow-up corrected the initial per-row scaling error: Brian July's `$11,472.33` projected income now produces a `$2,294.47` monthly Ideal and `$1,147.23` Minimum, not a three-row `$3,441.69` Ideal.
 - Local browser verification confirmed the Brian July Saved card changes from the current `$2,294.47` / `$1,539.64` Ideal to a `$3,059.29` projected contribution / `$2,294.47` Ideal and produces no console warnings or errors.
 - Verification: `410 passed, 1 skipped`; Pyright clean; frontend typecheck/build passed; `git diff --check` passed.
+
+### 2026-07-24 Persisted Reconciliation Inbox Follow-Up
+
+Status: Complete in code and focused verification; production deployment confirmation remains in `.agent/STATUS.md`.
+
+- Replaced the digest button's forced reconciliation rebuild with a persisted-state inbox read. `View Inbox` no longer starts a Plaid sync, rescoring preview, action-log read, or schedule-sheet hydration after deferring the Discord interaction.
+- The persisted report includes current-month unresolved and automatic-match items and retains `Reconcile Now`, `Ignore All`, and `Unmatch` controls where applicable.
+- Match reports infer schedule, spreadsheet-row, and spreadsheet-group source types from persisted lineage when source hydration is intentionally skipped.
+- Inbox loading is bounded by `BOOKIEBOT_RECONCILIATION_INBOX_TIMEOUT_SECONDS` (15 seconds by default); timeouts and exceptions return a private no-mutation retry message instead of leaving Discord's thinking state unresolved.
+- Regression coverage proves the fast path never calls sync/rescoring, returns persisted automatic matches, retains batch-ignore behavior, and closes the deferred interaction on preparation failure.
+- Verification: focused core/reconciliation suite `66 passed`; full suite `412 passed, 1 skipped`; Pyright clean; `git diff --check` passed.
 
 ## Open Questions
 

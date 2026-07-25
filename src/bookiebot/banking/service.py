@@ -296,13 +296,17 @@ def _transaction_local_date(transaction: BankTransaction) -> local_date | None:
 
 
 def _report_source_type(item: ReconciliationItem, matched: ActionLogCandidate | None) -> str:
-    if matched is None:
-        return "automatic rule"
-    if matched.action_type == "schedule" or matched.action_id.startswith("schedule:"):
+    if matched is not None:
+        if matched.action_type == "schedule" or matched.action_id.startswith("schedule:"):
+            return "schedule"
+        if matched.action_type == "group":
+            return "spreadsheet group"
+        return "spreadsheet row"
+    if item.matched_action_log_id:
+        return "spreadsheet group" if "+" in item.matched_action_log_id else "spreadsheet row"
+    if item.matched_sheet_ref:
         return "schedule"
-    if matched.action_type == "group":
-        return "spreadsheet group"
-    return "spreadsheet row"
+    return "automatic rule"
 
 
 class BankingService:
