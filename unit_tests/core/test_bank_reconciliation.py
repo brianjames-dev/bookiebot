@@ -87,11 +87,32 @@ class FakeFollowup:
         self.messages.append((content, kwargs))
 
 
+class FakeTyping:
+    def __init__(self, channel):
+        self.channel = channel
+
+    async def __aenter__(self):
+        self.channel.enters += 1
+
+    async def __aexit__(self, exc_type, exc, tb):
+        self.channel.exits += 1
+
+
+class FakeTypingChannel:
+    def __init__(self):
+        self.enters = 0
+        self.exits = 0
+
+    def typing(self):
+        return FakeTyping(self)
+
+
 class FakeReviewInteraction:
     def __init__(self):
         self.response = FakeResponse()
         self.followup = FakeFollowup()
         self.original_response_edits = []
+        self.channel = FakeTypingChannel()
 
     async def edit_original_response(self, **kwargs):
         self.original_response_edits.append(kwargs)
@@ -435,8 +456,31 @@ async def test_bank_reconciliation_digest_view_inbox_button_runs_private_inbox(m
     await inbox_button.callback(interaction)
 
     assert interaction.response.deferred is True
-    assert interaction.response.defer_kwargs == {"ephemeral": True, "thinking": True}
+    assert interaction.response.defer_kwargs == {"ephemeral": True, "thinking": False}
+    assert interaction.channel.enters == 1
+    assert interaction.channel.exits == 1
     send_inbox.assert_awaited_once_with(interaction, "123")
+
+
+@pytest.mark.asyncio
+async def test_bank_reconciliation_digest_view_reconcile_button_shows_typing(monkeypatch):
+    start_reconciliation = AsyncMock()
+    monkeypatch.setattr(
+        bank_reconciliation,
+        "_start_bank_reconciliation_from_prompt",
+        start_reconciliation,
+    )
+    view = bank_reconciliation.bank_reconciliation_digest_view("123")
+    reconcile_button = next(child for child in view.children if getattr(child, "label", None) == "Reconcile Now")
+    interaction = FakeReviewInteraction()
+    interaction.user = SimpleNamespace(id="123")
+
+    await reconcile_button.callback(interaction)
+
+    assert interaction.response.defer_kwargs == {"ephemeral": True, "thinking": False}
+    assert interaction.channel.enters == 1
+    assert interaction.channel.exits == 1
+    start_reconciliation.assert_awaited_once_with(interaction, "123", clear_prompt=True)
 
 
 @pytest.mark.asyncio
@@ -604,24 +648,31 @@ async def test_bank_reconciliation_inbox_ignore_all_ignores_displayed_batch(monk
 
     await bank_reconciliation._send_bank_reconciliation_inbox(interaction, "123")
 
-    assert interaction.followup.messages == []
-    content = interaction.original_response_edits[0]["content"]
+    assert interaction.original_response_edits == []
+    content, inbox_kwargs = interaction.followup.messages[0]
     assert "- Stored bank transactions: `4`" in content
     assert "- Needs review: `2`" in content
     assert "Unresolved bank reconciliation items:" in content
     assert "Unlogged Coffee" in content
     assert content.index("Unresolved bank reconciliation items:") < content.index("Confirmed matches this run:")
-    view = interaction.original_response_edits[0]["view"]
+    assert inbox_kwargs["ephemeral"] is True
+    view = inbox_kwargs["view"]
     ignore_all = next(child for child in view.children if getattr(child, "label", None) == "Ignore All")
     action_interaction = FakeReviewInteraction()
     action_interaction.user = SimpleNamespace(id="123")
     await ignore_all.callback(action_interaction)
 
     assert ignored_ids == [42, 43]
-    assert action_interaction.original_response_edits == [
-        {"content": "Ignored `2` bank reconciliation item(s) from this inbox."}
+    assert action_interaction.response.defer_kwargs == {"ephemeral": True, "thinking": False}
+    assert action_interaction.original_response_edits == []
+    assert action_interaction.followup.messages == [
+        (
+            "Ignored `2` bank reconciliation item(s) from this inbox.",
+            {"ephemeral": True},
+        )
     ]
-    assert action_interaction.followup.messages == []
+    assert action_interaction.channel.enters == 1
+    assert action_interaction.channel.exits == 1
 
 
 @pytest.mark.asyncio
@@ -682,12 +733,12 @@ async def test_bank_reconciliation_inbox_shows_recent_auto_matches_without_actio
 
     await bank_reconciliation._send_bank_reconciliation_inbox(interaction, "123")
 
-    assert interaction.followup.messages == []
-    kwargs = interaction.original_response_edits[-1]
-    content = kwargs["content"]
+    assert interaction.original_response_edits == []
+    content, kwargs = interaction.followup.messages[-1]
     assert "found no unresolved items and confirmed `1` automatic match" in content
     assert "- Stored bank transactions: `3`" in content
     assert "- Matched automatically: `1`" in content
+    assert kwargs["ephemeral"] is True
     assert "Confirmed matches this run:" in content
     assert "CREDIT CARD 3333 PAYMENT" in content
     children = getattr(kwargs["view"], "children", [])
@@ -696,7 +747,7 @@ async def test_bank_reconciliation_inbox_shows_recent_auto_matches_without_actio
 
 
 @pytest.mark.asyncio
-async def test_bank_reconciliation_inbox_failure_finishes_deferred_response(monkeypatch):
+async def test_bank_reconciliation_inbox_failure_returns_private_followup(monkeypatch):
     def fail_to_prepare(*_args, **_kwargs):
         raise RuntimeError("database unavailable")
 
@@ -709,16 +760,17 @@ async def test_bank_reconciliation_inbox_failure_finishes_deferred_response(monk
 
     await bank_reconciliation._send_bank_reconciliation_inbox(interaction, "123")
 
-    assert interaction.original_response_edits == [
-        {
-            "content": "I couldn't load the reconciliation inbox right now. Nothing was changed; please try again.",
-        }
+    assert interaction.original_response_edits == []
+    assert interaction.followup.messages == [
+        (
+            "I couldn't load the reconciliation inbox right now. Nothing was changed; please try again.",
+            {"ephemeral": True},
+        )
     ]
-    assert interaction.followup.messages == []
 
 
 @pytest.mark.asyncio
-async def test_bank_reconciliation_inbox_timeout_finishes_deferred_response(monkeypatch):
+async def test_bank_reconciliation_inbox_timeout_returns_private_followup(monkeypatch):
     async def stall_inbox_load(*_args, **_kwargs):
         await asyncio.sleep(1)
 
@@ -728,16 +780,17 @@ async def test_bank_reconciliation_inbox_timeout_finishes_deferred_response(monk
 
     await bank_reconciliation._send_bank_reconciliation_inbox(interaction, "123")
 
-    assert interaction.original_response_edits == [
-        {
-            "content": "I couldn't load the reconciliation inbox in time. Nothing was changed; please try again.",
-        }
+    assert interaction.original_response_edits == []
+    assert interaction.followup.messages == [
+        (
+            "I couldn't load the reconciliation inbox in time. Nothing was changed; please try again.",
+            {"ephemeral": True},
+        )
     ]
-    assert interaction.followup.messages == []
 
 
 @pytest.mark.asyncio
-async def test_bank_reconciliation_empty_inbox_replaces_deferred_response(monkeypatch):
+async def test_bank_reconciliation_empty_inbox_returns_private_followup(monkeypatch):
     monkeypatch.setattr(
         bank_reconciliation,
         "prepare_bank_reconciliation_inbox_messages",
@@ -747,14 +800,17 @@ async def test_bank_reconciliation_empty_inbox_replaces_deferred_response(monkey
 
     await bank_reconciliation._send_bank_reconciliation_inbox(interaction, "123")
 
-    assert interaction.original_response_edits == [
-        {"content": "Bank reconciliation is all caught up. No unresolved items remain."}
+    assert interaction.original_response_edits == []
+    assert interaction.followup.messages == [
+        (
+            "Bank reconciliation is all caught up. No unresolved items remain.",
+            {"ephemeral": True},
+        )
     ]
-    assert interaction.followup.messages == []
 
 
 @pytest.mark.asyncio
-async def test_bank_reconciliation_inbox_uses_followups_only_after_replacing_deferred_response(monkeypatch):
+async def test_bank_reconciliation_inbox_sends_all_chunks_as_private_followups(monkeypatch):
     monkeypatch.setattr(
         bank_reconciliation,
         "prepare_bank_reconciliation_inbox_messages",
@@ -769,14 +825,14 @@ async def test_bank_reconciliation_inbox_uses_followups_only_after_replacing_def
 
     await bank_reconciliation._send_bank_reconciliation_inbox(interaction, "123")
 
-    assert interaction.original_response_edits[0]["content"] == "first chunk"
+    assert interaction.original_response_edits == []
+    assert interaction.followup.messages[0][0] == "first chunk"
     assert [
         getattr(child, "label", None)
-        for child in interaction.original_response_edits[0]["view"].children
+        for child in interaction.followup.messages[0][1]["view"].children
     ] == ["Reconcile Now", "Ignore All"]
-    assert interaction.followup.messages == [
-        ("second chunk", {"view": None, "ephemeral": True})
-    ]
+    assert interaction.followup.messages[0][1]["ephemeral"] is True
+    assert interaction.followup.messages[1] == ("second chunk", {"view": None, "ephemeral": True})
 
 
 @pytest.mark.asyncio

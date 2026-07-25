@@ -443,6 +443,16 @@ Status: Complete in code and focused verification; production deployment confirm
 - Regression coverage reproduces unresolved items alongside multi-message match history and verifies accurate cache totals, visible review rows, and immediate controls.
 - Verification: focused finance-ops suite `92 passed`; full suite `414 passed, 1 skipped`; Pyright clean; `git diff --check` passed.
 
+### 2026-07-25 Interaction Typing And Recent Privacy Follow-Up
+
+Status: Reconciliation complete in code; recent-action component privacy verified; fully ephemeral typed-message entry is pending a UX choice.
+
+- `View Inbox`, digest `Reconcile Now`, and inbox `Reconcile Now` now use silent component defers while a resilient channel typing context displays Discord's normal `BookieBot is typing...` UI.
+- Inbox success, empty, timeout, failure, Ignore All, and Unmatch results are private follow-ups rather than edits to a temporary thinking response.
+- Recent-action button/select prompts, ownership errors, and action outcomes remain ephemeral, with new callback-level regression coverage.
+- Discord does not support `ephemeral=True` on ordinary `User.send` or DM channel messages. A typed `recent` request needs either a `/recent` interaction or a one-click launcher before its initial list and later typed-reply results can carry the `Only you can see this · Dismiss message` footer.
+- Verification: focused reconciliation/recent suite `203 passed`; full suite `417 passed, 1 skipped`; Pyright clean; `git diff --check` passed.
+
 ## Open Questions
 
 - What should the canonical recent-action lineage model look like?
@@ -454,6 +464,7 @@ Status: Complete in code and focused verification; production deployment confirm
 - Should amount mismatches default to asking every time? Decided 2026-06-20: selecting the matching row is the confirmation; after that, use the bank amount as source of truth for single-row matches.
 - Should a moved reconciled expense stay confirmed automatically if amount/date/person are unchanged?
 - How much event state should live in Google Sheets versus the banking database?
+- Should fully ephemeral recent actions start from `/recent`, or should typed `recent` return a short-lived launcher button whose interaction opens the private list?
 
 ## Candidate Commands To Add Or Improve
 

@@ -4,17 +4,18 @@ Last updated: 2026-07-25
 
 ## Active Focus
 
-The production `View Inbox` data bug is fixed in code: the inbox now uses persisted cache totals and places actionable unresolved rows and controls before automatic-match history. The next step is deployment and production confirmation.
+Reconciliation component work now uses Discord's channel typing indicator without a temporary thinking response. Recent-action component responses are verified ephemeral; making the initial or typed-message DM replies carry Discord's ephemeral footer requires choosing an interaction-based entry UX.
 
 ## On Deck
 
-1. Deploy and manually verify that digest `View Inbox` returns the persisted automatic-match/unresolved report without remaining in Discord's thinking state.
-2. Manually verify shared Needs logging plus update/move/delete/undo behavior in Discord and Google Sheets.
-3. Manually verify recent transactions and reconciliation after the latest reliability fixes.
-4. Consider a richer Discord button flow for grouped amount adjustments if the current UX feels too manual.
-5. Harden recent-action pending state across restarts/deploys, since selections currently live only in process memory.
-6. Improve targeted recent-action search so commands can find older matches, not only the latest 10 recent actions.
-7. Explore clarifying questions before logging when BookieBot is uncertain instead of guessing or silently failing.
+1. Choose an interaction-based entry for fully ephemeral recent actions: a `/recent` command or a one-click launcher sent in response to typed `recent`.
+2. Deploy and manually verify `View Inbox` and `Reconcile Now` show `BookieBot is typing...` without a temporary thinking message.
+3. Manually verify shared Needs logging plus update/move/delete/undo behavior in Discord and Google Sheets.
+4. Manually verify recent transactions and reconciliation after the latest reliability fixes.
+5. Consider a richer Discord button flow for grouped amount adjustments if the current UX feels too manual.
+6. Harden recent-action pending state across restarts/deploys, since selections currently live only in process memory.
+7. Improve targeted recent-action search so commands can find older matches, not only the latest 10 recent actions.
+8. Explore clarifying questions before logging when BookieBot is uncertain instead of guessing or silently failing.
 
 ## Completed 2026-07-25
 
@@ -29,6 +30,11 @@ The production `View Inbox` data bug is fixed in code: the inbox now uses persis
 - Added screenshot-shaped regression coverage proving real cache totals, unresolved transaction rows, and `Reconcile Now` / `Ignore All` controls are returned together even when the match report spans later messages.
 - Verification for the data-accuracy follow-up: focused finance-ops suite `92 passed`; full suite `414 passed, 1 skipped`; Pyright reported zero errors; `git diff --check` passed.
 - Manual verification is checklist item 64 below.
+- Replaced reconciliation component `thinking=True` defers with silent component acknowledgements plus the normal channel-level `BookieBot is typing...` indicator for both `View Inbox` and `Reconcile Now`.
+- Inbox results, caught-up notices, failures, timeouts, and inbox actions now arrive as private interaction follow-ups, so no temporary thinking placeholder is created.
+- Audited recent-action buttons/selects and added regression coverage proving prompts, ownership rejections, and action results are ephemeral. Ordinary messages initiated from typed DM text cannot carry Discord's interaction-only ephemeral footer; the entry UX choice remains on deck.
+- Verification: focused reconciliation/recent suite `203 passed`; full suite `417 passed, 1 skipped`; Pyright reported zero errors; `git diff --check` passed.
+- Manual verification is checklist item 65 below.
 
 ## Completed 2026-07-24
 
@@ -415,17 +421,19 @@ Use a test row or low-risk real row in Discord:
 58. After deployment, send `student loan paid?` and `log student loan payment 242.29`, then run `/debug_subscriptions`.
     - Expected: neither message invokes a dedicated student-loan payment command or mutates a budget row; the Student Loan subscription/autopay remains present and reminder-eligible in Hannah's normalized subscription schedule.
 59. Let a scheduled reconciliation digest arrive, then click `View Inbox`.
-    - Expected: Discord immediately shows the private thinking state, then replaces it with the actor's unresolved inbox or confirmed automatic-match report; the button does not fail silently.
+    - Expected: Discord shows `BookieBot is typing...` at the channel level without creating a temporary thinking message, then returns the actor's private unresolved inbox or confirmed automatic-match report.
 60. From both Brian's and Hannah's Discord accounts, use a safe test month to log and query the third paycheck savings amount, then undo the test write if needed.
     - Expected: only the third labeled savings row's Actual cell changes; the query reports that row's Actual, Ideal, and Minimum values; undo restores its previous value.
 61. Open current-month reports for Brian and Hannah and switch Projected off and on while viewing the Saved card and Savings Category Mix tab.
     - Expected: the Saved amount, paycheck count, Ideal/Minimum copy, Left amount, Savings slices, and over/under-saving pressure all use the active current/projected mode. Brian July's verified snapshot changes from `$2,294.47` across 2 paychecks to `$3,059.29` across 3 projected paychecks, while the monthly projected Ideal remains 20% of income at `$2,294.47`.
 62. After deploying the July 24 reconciliation fix, tap `View Inbox` on a digest containing an automatic match and on one containing unresolved items.
-    - Expected: the private thinking indicator is replaced by the persisted match/inbox report; automatic matches include the `Unmatch` selector, unresolved reports include `Reconcile Now` and `Ignore All`, and a backend failure produces a private retry message within 15 seconds instead of thinking forever.
+    - Expected: channel typing is followed by the persisted private match/inbox report; automatic matches include the `Unmatch` selector, unresolved reports include `Reconcile Now` and `Ignore All`, and a backend failure produces a private retry message within 15 seconds.
 63. After deploying the July 25 Discord response-lifecycle fix, dismiss any old stuck thinking message and tap `View Inbox` again.
-    - Expected: the same temporary private thinking response transforms into the first inbox report chunk, the caught-up message, or a bounded retry message; later report chunks appear as follow-ups, and no thinking response remains indefinitely.
+    - Expected: no new temporary thinking message is created; `BookieBot is typing...` appears until the first private inbox, caught-up, or bounded retry response is sent.
 64. Tap `View Inbox` on a digest with unresolved items and existing automatic-match history.
     - Expected: Bank cache totals match persisted current-month transactions; the first response includes the unresolved transaction rows plus `Reconcile Now` and `Ignore All`; confirmed-match history may continue in later messages without delaying or hiding the review inbox.
+65. Tap `View Inbox`, then separately tap `Reconcile Now` from both the digest and inbox.
+    - Expected: each tap shows the channel-level `BookieBot is typing...` UI, creates no `BookieBot is thinking` temporary message, and ends with a private Discord response. Recent-action button/select prompts and outcomes continue to show `Only you can see this · Dismiss message`.
 
 ## Verification Baseline
 

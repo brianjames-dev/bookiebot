@@ -1,12 +1,13 @@
 from __future__ import annotations
 
 import asyncio
+from contextlib import asynccontextmanager
 from dataclasses import dataclass, replace
 from datetime import date, datetime, timedelta
 import logging
 import os
-from collections.abc import Callable
-from typing import Any, Awaitable, cast
+from collections.abc import AsyncIterator, Callable
+from typing import Any, AsyncContextManager, Awaitable, cast
 
 import discord
 
@@ -82,6 +83,52 @@ def _inbox_load_timeout_seconds() -> float:
         return min(max(float(raw), 1.0), 120.0)
     except ValueError:
         return 15.0
+
+
+@asynccontextmanager
+async def _interaction_typing(interaction: Any) -> AsyncIterator[None]:
+    channel = getattr(interaction, "channel", None)
+    typing = getattr(channel, "typing", None)
+    if not callable(typing):
+        yield
+        return
+
+    typing_context = cast(AsyncContextManager[Any], typing())
+    try:
+        await typing_context.__aenter__()
+    except Exception as exc:
+        logger.warning(
+            "Discord interaction typing indicator unavailable; continuing without it",
+            extra={"exception": str(exc)},
+        )
+        yield
+        return
+
+    try:
+        yield
+    except BaseException as body_error:
+        try:
+            suppress = await typing_context.__aexit__(
+                type(body_error),
+                body_error,
+                body_error.__traceback__,
+            )
+        except Exception as exc:
+            logger.warning(
+                "Discord interaction typing indicator cleanup failed",
+                extra={"exception": str(exc)},
+            )
+            suppress = False
+        if not suppress:
+            raise
+    else:
+        try:
+            await typing_context.__aexit__(None, None, None)
+        except Exception as exc:
+            logger.warning(
+                "Discord interaction typing indicator cleanup failed; request completed normally",
+                extra={"exception": str(exc)},
+            )
 
 
 def _is_eligible(now: datetime | None = None) -> bool:
@@ -239,19 +286,22 @@ async def _send_bank_reconciliation_inbox(interaction: Any, actor_key: str) -> N
         )
     except TimeoutError:
         logger.warning("Bank reconciliation inbox load timed out", extra={"actor_key": actor_key})
-        await interaction.edit_original_response(
+        await interaction.followup.send(
             content="I couldn't load the reconciliation inbox in time. Nothing was changed; please try again.",
+            ephemeral=True,
         )
         return
     except Exception:
         logger.exception("Failed to load bank reconciliation inbox", extra={"actor_key": actor_key})
-        await interaction.edit_original_response(
+        await interaction.followup.send(
             content="I couldn't load the reconciliation inbox right now. Nothing was changed; please try again.",
+            ephemeral=True,
         )
         return
     if not digest:
-        await interaction.edit_original_response(
+        await interaction.followup.send(
             content="Bank reconciliation is all caught up. No unresolved items remain.",
+            ephemeral=True,
         )
         return
 
@@ -263,45 +313,52 @@ async def _send_bank_reconciliation_inbox(interaction: Any, actor_key: str) -> N
                 ephemeral=True,
             )
             return
-        await action_interaction.response.defer(ephemeral=True, thinking=action != "start")
-        if action == "start":
-            await _start_bank_reconciliation_from_prompt(action_interaction, actor_key, clear_prompt=False)
-            return
-        if action == "ignore_all":
-            service = build_banking_service()
-            ignored_count = 0
-            for item_id in digest.item_ids:
-                ignored = await asyncio.to_thread(service.ignore_reconciliation_item, digest.owner_key, item_id)
-                if ignored is not None:
-                    ignored_count += 1
-            await action_interaction.edit_original_response(
-                content=f"Ignored `{ignored_count}` bank reconciliation item(s) from this inbox.",
-            )
-            return
-        if action.startswith("unmatch:"):
-            try:
-                reconciliation_id = int(action.split(":", 1)[1])
-            except ValueError:
-                await action_interaction.edit_original_response(content="That match selection was invalid.")
+        await action_interaction.response.defer(ephemeral=True, thinking=False)
+        async with _interaction_typing(action_interaction):
+            if action == "start":
+                await _start_bank_reconciliation_from_prompt(action_interaction, actor_key, clear_prompt=False)
                 return
-            service = build_banking_service()
-            reopened = await asyncio.to_thread(
-                service.reopen_reconciliation_item,
-                digest.owner_key,
-                reconciliation_id,
-                notes="unmatched from reconciliation report",
-            )
-            if reopened is None:
-                await action_interaction.edit_original_response(
-                    content=f"No bank reconciliation item `{reconciliation_id}` was found.",
+            if action == "ignore_all":
+                service = build_banking_service()
+                ignored_count = 0
+                for item_id in digest.item_ids:
+                    ignored = await asyncio.to_thread(service.ignore_reconciliation_item, digest.owner_key, item_id)
+                    if ignored is not None:
+                        ignored_count += 1
+                await action_interaction.followup.send(
+                    content=f"Ignored `{ignored_count}` bank reconciliation item(s) from this inbox.",
+                    ephemeral=True,
                 )
                 return
-            await action_interaction.edit_original_response(
-                content=(
-                    f"Unmatched `{reopened.transaction.name}` for "
-                    f"`${abs(reopened.transaction.amount):.2f}`. It is back in the review queue."
-                ),
-            )
+            if action.startswith("unmatch:"):
+                try:
+                    reconciliation_id = int(action.split(":", 1)[1])
+                except ValueError:
+                    await action_interaction.followup.send(
+                        content="That match selection was invalid.",
+                        ephemeral=True,
+                    )
+                    return
+                service = build_banking_service()
+                reopened = await asyncio.to_thread(
+                    service.reopen_reconciliation_item,
+                    digest.owner_key,
+                    reconciliation_id,
+                    notes="unmatched from reconciliation report",
+                )
+                if reopened is None:
+                    await action_interaction.followup.send(
+                        content=f"No bank reconciliation item `{reconciliation_id}` was found.",
+                        ephemeral=True,
+                    )
+                    return
+                await action_interaction.followup.send(
+                    content=(
+                        f"Unmatched `{reopened.transaction.name}` for "
+                        f"`${abs(reopened.transaction.amount):.2f}`. It is back in the review queue."
+                    ),
+                    ephemeral=True,
+                )
 
     messages = digest.detail_messages or (digest.detail_message,)
     view_message_index = 0 if digest.item_ids else len(messages) - 1
@@ -315,14 +372,11 @@ async def _send_bank_reconciliation_inbox(interaction: Any, actor_key: str) -> N
             if index == view_message_index and (digest.item_ids or digest.report_matches)
             else None
         )
-        if index == 0:
-            await interaction.edit_original_response(content=message, view=view)
-        else:
-            await interaction.followup.send(
-                content=message,
-                view=view,
-                ephemeral=True,
-            )
+        await interaction.followup.send(
+            content=message,
+            view=view,
+            ephemeral=True,
+        )
 
 
 def bank_reconciliation_digest_view(actor_key: str) -> BankReconciliationDigestView:
@@ -334,12 +388,13 @@ def bank_reconciliation_digest_view(actor_key: str) -> BankReconciliationDigestV
                 ephemeral=True,
             )
             return
-        await interaction.response.defer(ephemeral=True, thinking=action == "inbox")
-        if action == "start":
-            await _start_bank_reconciliation_from_prompt(interaction, actor_key, clear_prompt=True)
-            return
-        if action == "inbox":
-            await _send_bank_reconciliation_inbox(interaction, actor_key)
+        await interaction.response.defer(ephemeral=True, thinking=False)
+        async with _interaction_typing(interaction):
+            if action == "start":
+                await _start_bank_reconciliation_from_prompt(interaction, actor_key, clear_prompt=True)
+                return
+            if action == "inbox":
+                await _send_bank_reconciliation_inbox(interaction, actor_key)
 
     return BankReconciliationDigestView(handle_action, actor_key=str(actor_key))
 
@@ -353,12 +408,13 @@ def persistent_bank_reconciliation_digest_view(actor_key: str) -> BankReconcilia
                 ephemeral=True,
             )
             return
-        await interaction.response.defer(ephemeral=True, thinking=action == "inbox")
-        if action == "start":
-            await _start_bank_reconciliation_from_prompt(interaction, actor_key, clear_prompt=True)
-            return
-        if action == "inbox":
-            await _send_bank_reconciliation_inbox(interaction, actor_key)
+        await interaction.response.defer(ephemeral=True, thinking=False)
+        async with _interaction_typing(interaction):
+            if action == "start":
+                await _start_bank_reconciliation_from_prompt(interaction, actor_key, clear_prompt=True)
+                return
+            if action == "inbox":
+                await _send_bank_reconciliation_inbox(interaction, actor_key)
 
     return BankReconciliationDigestView(handle_action, actor_key=str(actor_key))
 

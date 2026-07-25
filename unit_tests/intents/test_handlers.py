@@ -418,6 +418,72 @@ async def test_recent_interaction_allows_owner_alias():
 
 
 @pytest.mark.asyncio
+async def test_recent_component_prompts_are_ephemeral(monkeypatch, message):
+    import bookiebot.sheets.writer as writer
+    from bookiebot.sheets.undo import recent_actions
+
+    class Response:
+        def __init__(self):
+            self.sent = []
+
+        async def send_message(self, content=None, **kwargs):
+            self.sent.append((content, kwargs))
+
+    monkeypatch.setattr(writer, "resolve_query_persons", lambda user, person=None, user_id=None: ["Hannah"])
+    repo = SheetsRepoStub(expense_rows=[[], []])
+
+    with repo.patched():
+        await ih.handle_intent(
+            "log_expense",
+            {
+                "type": "expense",
+                "category": "food",
+                "amount": 12.5,
+                "item": "Burrito",
+                "location": "Chipotle",
+            },
+            message,
+        )
+        actor_key = str(message.author.id)
+        logged = recent_actions(actor_key, 1)[0]
+        select_view = ih._recent_action_select_view(actor_key, [logged])
+        select = select_view.children[0]
+        select._values = [logged.id]
+        select_response = Response()
+        select_interaction = SimpleNamespace(user=message.author, response=select_response)
+
+        await select.callback(select_interaction)
+
+        assert select_response.sent[0][1]["ephemeral"] is True
+        decision_view = select_response.sent[0][1]["view"]
+        update_button = next(child for child in decision_view.children if getattr(child, "label", None) == "Update")
+        update_response = Response()
+        update_interaction = SimpleNamespace(user=message.author, response=update_response)
+
+        await update_button.callback(update_interaction)
+
+    assert update_response.sent[0][1]["ephemeral"] is True
+
+
+@pytest.mark.asyncio
+async def test_recent_component_action_results_are_ephemeral():
+    class Followup:
+        def __init__(self):
+            self.sent = []
+
+        async def send(self, content=None, **kwargs):
+            self.sent.append((content, kwargs))
+
+    interaction = SimpleNamespace(followup=Followup())
+
+    await ih._send_interaction_action_result(interaction, True, "Updated transaction.")
+
+    assert interaction.followup.sent == [
+        ("✅ Updated transaction.", {"ephemeral": True}),
+    ]
+
+
+@pytest.mark.asyncio
 async def test_query_recent_actions_formats_income_cleanly(message):
     repo = SheetsRepoStub(income_rows=[["", "Existing Income", "100"], ["", "Monthly Income:", ""]])
 

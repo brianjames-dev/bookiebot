@@ -260,6 +260,12 @@ Decision: A persisted reconciliation inbox reads its cache summary from the same
 
 Rationale: Synthetic zero-valued cache metadata contradicts the persisted item count, while placing a long audit report before unresolved transactions can hide the work the user opened the inbox to perform. One consistent store snapshot and action-first ordering keep the summary truthful and the inbox immediately usable.
 
+## 2026-07-25 - Use Channel Typing For Reconciliation Components
+
+Decision: Reconciliation component callbacks acknowledge with `thinking=False`, run their work inside a resilient Discord channel typing context, and return results through private follow-ups. This applies to `View Inbox`, `Reconcile Now`, and inbox mutation controls.
+
+Rationale: Discord's `thinking=True` defer creates a temporary response instead of the familiar channel-level `BookieBot is typing...` UI. A silent acknowledgement preserves the three-second component deadline, typing communicates progress consistently with message-driven workflows, and ephemeral follow-ups keep financial results private.
+
 ## Pending Decisions
 
 - Where should durable system events live: banking database only, Google Sheets only, or dual-write during transition?
