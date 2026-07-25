@@ -266,6 +266,12 @@ Decision: Reconciliation component callbacks acknowledge with `thinking=False`, 
 
 Rationale: Discord's `thinking=True` defer creates a temporary response instead of the familiar channel-level `BookieBot is typing...` UI. A silent acknowledgement preserves the three-second component deadline, typing communicates progress consistently with message-driven workflows, and ephemeral follow-ups keep financial results private.
 
+## 2026-07-25 - Bridge Typed Recent Requests Into Ephemeral Interactions
+
+Decision: A message-triggered recent-action request sends a five-minute launcher DM containing no financial data. Opening the launcher silently acknowledges the component, deletes the launcher, and sends the prepared list ephemerally. BookieBot retains the latest authorized interaction follow-up for ten minutes so later typed replies and pagination remain ephemeral. DM-originated requests do not receive a sent-to-DMs acknowledgement.
+
+Rationale: Discord cannot mark an ordinary bot-authored DM as ephemeral. A disposable launcher is the smallest bridge that preserves the natural-language `recent` entry while giving the transaction list and full workflow Discord's native `Only you can see this · Dismiss message` treatment.
+
 ## Pending Decisions
 
 - Where should durable system events live: banking database only, Google Sheets only, or dual-write during transition?

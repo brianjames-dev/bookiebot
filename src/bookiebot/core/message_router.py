@@ -28,7 +28,7 @@ from bookiebot.core.bank_reconciliation import ensure_bank_reconciliation_loop, 
 from bookiebot.core.subscription_reminders import ensure_subscription_reminder_loop
 from bookiebot.core.web_server import ensure_web_server
 from bookiebot.intents.parser import parse_message_llm
-from bookiebot.intents.handlers import handle_intent
+from bookiebot.intents.handlers import handle_intent, send_recent_workflow_message
 from bookiebot.intents import explorer as intent_explorer
 from bookiebot.sheets.routing import resolve_actor_key
 from bookiebot.sheets.undo import (
@@ -359,7 +359,7 @@ def register_events(client, tree):
         if pending_item_move:
             if content.lower() in _CANCEL_WORDS:
                 clear_pending_action_selection(actor_key)
-                await message.channel.send("Canceled.")
+                await send_recent_workflow_message(message, "Canceled.")
                 return
             action_id, category = pending_item_move
             await handle_intent(
@@ -370,7 +370,7 @@ def register_events(client, tree):
             return
         expired_notice = pop_pending_action_expiration_notice(actor_key)
         if expired_notice:
-            await message.channel.send(f"❌ {expired_notice}")
+            await send_recent_workflow_message(message, f"❌ {expired_notice}")
             return
 
         pending_field = pending_update_field(actor_key)
@@ -385,7 +385,7 @@ def register_events(client, tree):
             return
         expired_notice = pop_pending_action_expiration_notice(actor_key)
         if expired_notice:
-            await message.channel.send(f"❌ {expired_notice}")
+            await send_recent_workflow_message(message, f"❌ {expired_notice}")
             return
 
         if content.isdigit():
@@ -393,7 +393,7 @@ def register_events(client, tree):
             pending_kind = pending_action_selection_kind(actor_key)
             expired_notice = pop_pending_action_expiration_notice(actor_key)
             if expired_notice:
-                await message.channel.send(f"❌ {expired_notice}")
+                await send_recent_workflow_message(message, f"❌ {expired_notice}")
                 return
             if pending_kind == "update":
                 await handle_intent("update_recent_action", {"index": idx}, message)
@@ -427,7 +427,7 @@ def register_events(client, tree):
             return
         expired_notice = pop_pending_action_expiration_notice(actor_key)
         if expired_notice:
-            await message.channel.send(f"❌ {expired_notice}")
+            await send_recent_workflow_message(message, f"❌ {expired_notice}")
             return
 
         recent_query = _recent_query_intent(content)
@@ -452,7 +452,7 @@ def register_events(client, tree):
             pending_kind = pending_action_selection_kind(actor_key)
             expired_notice = pop_pending_action_expiration_notice(actor_key)
             if expired_notice:
-                await message.channel.send(f"❌ {expired_notice}")
+                await send_recent_workflow_message(message, f"❌ {expired_notice}")
                 return
             if pending_kind == "move" and intent == "move_recent_action":
                 entities.setdefault("index", 1)

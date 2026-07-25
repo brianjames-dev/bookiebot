@@ -2,6 +2,7 @@
 from contextlib import asynccontextmanager
 import os
 import re
+import time
 from collections.abc import AsyncIterator
 
 # Disable discord voice/audio stack to avoid loading audioop (deprecated in Python 3.13)
@@ -62,12 +63,15 @@ from bookiebot.ui.recent_actions import (
     PersonSelectView,
     RecentActionDecisionView,
     RecentActionSelectView,
+    RecentActionsLauncherView,
     UpdateConfirmView,
     UpdateFieldView,
 )
 
 IntentEntities = dict[str, Any]
 IntentHandler = Callable[[IntentEntities, Any], Awaitable[None]]
+_RECENT_FOLLOWUP_TTL_SECONDS = 600.0
+_RECENT_PRIVATE_FOLLOWUPS: dict[str, tuple[float, Callable[..., Awaitable[Any]]]] = {}
 
 
 @asynccontextmanager
@@ -255,22 +259,113 @@ async def query_recent_actions_handler(entities: IntentEntities, message: Any) -
 
 async def _send_recent_private_message(message: Any, content: str, public_ack: str | None = None, **kwargs: Any) -> None:
     chunks = _discord_message_chunks(content)
+    actor_key = _message_actor_key(message)
+    followup_send = _recent_private_followup(actor_key)
+    if followup_send is not None:
+        try:
+            await _send_recent_followup_chunks(followup_send, chunks, kwargs)
+            if public_ack and not _message_is_dm(message):
+                await message.channel.send(public_ack)
+            return
+        except Exception:
+            _forget_recent_private_followup(actor_key)
+
     author_send = getattr(getattr(message, "author", None), "send", None)
     if callable(author_send):
         async_author_send = cast(Callable[..., Awaitable[Any]], author_send)
         try:
-            for index, chunk in enumerate(chunks):
-                chunk_kwargs = kwargs if index == len(chunks) - 1 else {}
-                await async_author_send(chunk, **chunk_kwargs)
+            await async_author_send(
+                "Open your temporary recent transactions workflow.",
+                view=_recent_actions_launcher_view(actor_key, chunks, kwargs),
+                delete_after=300,
+            )
         except Exception:
             await message.channel.send("❌ I could not send that recent transaction workflow privately. Please check your DM settings.")
             return
-        if public_ack:
+        if public_ack and not _message_is_dm(message):
             await message.channel.send(public_ack)
         return
     for index, chunk in enumerate(chunks):
         chunk_kwargs = kwargs if index == len(chunks) - 1 else {}
         await message.channel.send(chunk, **chunk_kwargs)
+
+
+async def send_recent_workflow_message(message: Any, content: str) -> None:
+    await _send_recent_private_message(message, content)
+
+
+def _message_is_dm(message: Any) -> bool:
+    return getattr(getattr(message, "channel", None), "guild", None) is None
+
+
+def _remember_recent_private_followup(actor_key: str | None, interaction: Any) -> None:
+    if not actor_key:
+        return
+    send = getattr(getattr(interaction, "followup", None), "send", None)
+    if not callable(send):
+        return
+    _RECENT_PRIVATE_FOLLOWUPS[str(actor_key)] = (
+        time.monotonic() + _RECENT_FOLLOWUP_TTL_SECONDS,
+        cast(Callable[..., Awaitable[Any]], send),
+    )
+
+
+def _recent_private_followup(actor_key: str | None) -> Callable[..., Awaitable[Any]] | None:
+    if not actor_key:
+        return None
+    stored = _RECENT_PRIVATE_FOLLOWUPS.get(str(actor_key))
+    if stored is None:
+        return None
+    expires_at, send = stored
+    if time.monotonic() >= expires_at:
+        _RECENT_PRIVATE_FOLLOWUPS.pop(str(actor_key), None)
+        return None
+    return send
+
+
+def _forget_recent_private_followup(actor_key: str | None) -> None:
+    if actor_key:
+        _RECENT_PRIVATE_FOLLOWUPS.pop(str(actor_key), None)
+
+
+async def _send_recent_followup_chunks(
+    followup_send: Callable[..., Awaitable[Any]],
+    chunks: list[str],
+    kwargs: dict[str, Any],
+) -> None:
+    for index, chunk in enumerate(chunks):
+        chunk_kwargs = dict(kwargs) if index == len(chunks) - 1 else {}
+        chunk_kwargs["ephemeral"] = True
+        await followup_send(chunk, **chunk_kwargs)
+
+
+def _recent_actions_launcher_view(
+    actor_key: str | None,
+    chunks: list[str],
+    kwargs: dict[str, Any],
+) -> RecentActionsLauncherView:
+    async def handle_open(interaction: Any, _action: str) -> None:
+        if await _reject_unowned_recent_interaction(interaction, actor_key):
+            return
+        await interaction.response.defer(ephemeral=True, thinking=False)
+        _remember_recent_private_followup(actor_key, interaction)
+        followup_send = _recent_private_followup(actor_key)
+        if followup_send is None:
+            await interaction.followup.send(
+                "❌ I could not open that recent transaction workflow. Please type `recent` again.",
+                ephemeral=True,
+            )
+            return
+        await _send_recent_followup_chunks(followup_send, chunks, kwargs)
+        delete = getattr(getattr(interaction, "message", None), "delete", None)
+        if callable(delete):
+            try:
+                async_delete = cast(Callable[[], Awaitable[Any]], delete)
+                await async_delete()
+            except Exception:
+                pass
+
+    return RecentActionsLauncherView(handle_open)
 
 
 def _discord_message_chunks(content: str, *, max_chars: int = 1900) -> list[str]:
@@ -387,6 +482,7 @@ def _interaction_belongs_to_actor(interaction: Any, actor_key: str | None) -> bo
 
 async def _reject_unowned_recent_interaction(interaction: Any, actor_key: str | None) -> bool:
     if _interaction_belongs_to_actor(interaction, actor_key):
+        _remember_recent_private_followup(actor_key, interaction)
         return False
     await interaction.response.send_message("This recent transaction workflow belongs to another user.", ephemeral=True)
     return True

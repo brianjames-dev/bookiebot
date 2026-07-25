@@ -445,13 +445,15 @@ Status: Complete in code and focused verification; production deployment confirm
 
 ### 2026-07-25 Interaction Typing And Recent Privacy Follow-Up
 
-Status: Reconciliation complete in code; recent-action component privacy verified; fully ephemeral typed-message entry is pending a UX choice.
+Status: Complete in code and automated verification; production confirmation remains in `.agent/STATUS.md`.
 
 - `View Inbox`, digest `Reconcile Now`, and inbox `Reconcile Now` now use silent component defers while a resilient channel typing context displays Discord's normal `BookieBot is typing...` UI.
 - Inbox success, empty, timeout, failure, Ignore All, and Unmatch results are private follow-ups rather than edits to a temporary thinking response.
 - Recent-action button/select prompts, ownership errors, and action outcomes remain ephemeral, with new callback-level regression coverage.
-- Discord does not support `ephemeral=True` on ordinary `User.send` or DM channel messages. A typed `recent` request needs either a `/recent` interaction or a one-click launcher before its initial list and later typed-reply results can carry the `Only you can see this · Dismiss message` footer.
-- Verification: focused reconciliation/recent suite `203 passed`; full suite `417 passed, 1 skipped`; Pyright clean; `git diff --check` passed.
+- Discord does not support `ephemeral=True` on ordinary `User.send` or DM channel messages. Typed recent-action requests now receive a short-lived launcher with no financial data; opening it deletes the launcher and sends the list through an ephemeral interaction.
+- The active follow-up webhook is retained for the ten-minute workflow window, keeping typed pagination, update/move replies, cancellations, expiry notices, and results in the same ephemeral session.
+- DM-originated requests no longer receive the redundant `I sent your recent transactions list to your DMs.` acknowledgement; requests from a shared channel still do.
+- Verification: focused recent/message-router suite `135 passed`; full suite `418 passed, 1 skipped`; Pyright clean; `git diff --check` passed.
 
 ## Open Questions
 
@@ -464,7 +466,6 @@ Status: Reconciliation complete in code; recent-action component privacy verifie
 - Should amount mismatches default to asking every time? Decided 2026-06-20: selecting the matching row is the confirmation; after that, use the bank amount as source of truth for single-row matches.
 - Should a moved reconciled expense stay confirmed automatically if amount/date/person are unchanged?
 - How much event state should live in Google Sheets versus the banking database?
-- Should fully ephemeral recent actions start from `/recent`, or should typed `recent` return a short-lived launcher button whose interaction opens the private list?
 
 ## Candidate Commands To Add Or Improve
 

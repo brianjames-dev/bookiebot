@@ -27,6 +27,49 @@ class PrivateAuthor:
         self.dm_sent.append((content, kwargs))
 
 
+class LauncherResponse:
+    def __init__(self):
+        self.defer_kwargs = None
+
+    async def defer(self, **kwargs):
+        self.defer_kwargs = kwargs
+
+
+class LauncherFollowup:
+    def __init__(self):
+        self.sent = []
+
+    async def send(self, content=None, **kwargs):
+        self.sent.append((content, kwargs))
+
+
+class LauncherMessage:
+    def __init__(self):
+        self.deleted = False
+
+    async def delete(self):
+        self.deleted = True
+
+
+async def _open_recent_launcher(author: PrivateAuthor):
+    launcher_content, launcher_kwargs = author.dm_sent[-1]
+    launcher_view = launcher_kwargs["view"]
+    button = launcher_view.children[0]
+    response = LauncherResponse()
+    followup = LauncherFollowup()
+    launcher_message = LauncherMessage()
+    interaction = SimpleNamespace(
+        user=author,
+        response=response,
+        followup=followup,
+        message=launcher_message,
+    )
+
+    await button.callback(interaction)
+
+    return launcher_content, launcher_kwargs, response, followup, launcher_message
+
+
 class DummyTyping:
     def __init__(self, channel):
         self.channel = channel
@@ -50,8 +93,10 @@ class TypingChannel(DummyChannel):
 
 @pytest.fixture(autouse=True)
 def _patch_resolver(monkeypatch):
+    ih._RECENT_PRIVATE_FOLLOWUPS.clear()
     monkeypatch.setattr(ih, "resolve_query_persons", lambda user, person=None, user_id=None: ["Hannah"])
     yield
+    ih._RECENT_PRIVATE_FOLLOWUPS.clear()
 
 
 @pytest.fixture
@@ -314,10 +359,22 @@ async def test_query_recent_actions_sends_transaction_list_privately(monkeypatch
 
     assert not any("recent transaction workflow privately" in (msg or "") for msg, _ in message.channel.sent)
     assert not any("Burrito" in (msg or "") for msg, _ in message.channel.sent)
-    recent_dm, kwargs = author.dm_sent[-1]
+    assert not any("sent your recent transactions list" in (msg or "") for msg, _ in message.channel.sent)
+    launcher_content, launcher_kwargs, response, followup, launcher_message = await _open_recent_launcher(author)
+    assert launcher_content == "Open your temporary recent transactions workflow."
+    assert launcher_kwargs["delete_after"] == 300
+    assert response.defer_kwargs == {"ephemeral": True, "thinking": False}
+    recent_dm, kwargs = followup.sent[-1]
     assert "Burrito" in (recent_dm or "")
     assert "Chipotle" in (recent_dm or "")
     assert kwargs.get("view") is not None
+    assert kwargs["ephemeral"] is True
+    assert launcher_message.deleted is True
+
+    await ih.send_recent_workflow_message(message, "✅ Updated transaction.")
+
+    assert len(author.dm_sent) == 1
+    assert followup.sent[-1] == ("✅ Updated transaction.", {"ephemeral": True})
 
 
 @pytest.mark.asyncio
@@ -344,13 +401,39 @@ async def test_query_recent_actions_chunks_large_private_list(monkeypatch):
             )
         await ih.handle_intent("query_recent_actions", {"n": 25, "explicit_n": True}, message)
 
-    assert len(author.dm_sent) > 1
-    assert all(len(content or "") <= 1900 for content, _kwargs in author.dm_sent)
+    assert len(author.dm_sent) == 1
     assert not any("recent transaction workflow privately" in (msg or "") for msg, _ in message.channel.sent)
-    assert ("I sent your recent transactions list to your DMs.", {}) in message.channel.sent
-    assert author.dm_sent[-1][1].get("view") is not None
-    assert all(not kwargs.get("view") for _content, kwargs in author.dm_sent[:-1])
-    assert all((content or "").count("```") % 2 == 0 for content, _kwargs in author.dm_sent)
+    assert not any("sent your recent transactions list" in (msg or "") for msg, _ in message.channel.sent)
+    _content, _kwargs, _response, followup, _message = await _open_recent_launcher(author)
+    assert len(followup.sent) > 1
+    assert all(len(content or "") <= 1900 for content, _kwargs in followup.sent)
+    assert all(kwargs["ephemeral"] is True for _content, kwargs in followup.sent)
+    assert followup.sent[-1][1].get("view") is not None
+    assert all(not kwargs.get("view") for _content, kwargs in followup.sent[:-1])
+    assert all((content or "").count("```") % 2 == 0 for content, _kwargs in followup.sent)
+
+
+@pytest.mark.asyncio
+async def test_query_recent_actions_acknowledges_launcher_only_outside_dms(monkeypatch):
+    import bookiebot.sheets.writer as writer
+
+    monkeypatch.setattr(writer, "resolve_query_persons", lambda user, person=None, user_id=None: ["Hannah"])
+    author = PrivateAuthor()
+    channel = DummyChannel()
+    channel.guild = object()
+    message = SimpleNamespace(content="recent", author=author, channel=channel)
+    repo = SheetsRepoStub(expense_rows=[[], []])
+
+    with repo.patched():
+        await ih.handle_intent(
+            "log_expense",
+            {"type": "expense", "category": "food", "amount": 12.5, "item": "Burrito", "location": "Chipotle"},
+            message,
+        )
+        await ih.handle_intent("query_recent_actions", {"n": 5}, message)
+
+    assert ("I sent your recent transactions list to your DMs.", {}) in channel.sent
+    assert len(author.dm_sent) == 1
 
 
 def test_discord_message_chunks_keep_code_fences_balanced():

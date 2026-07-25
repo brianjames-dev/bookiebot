@@ -4,11 +4,11 @@ Last updated: 2026-07-25
 
 ## Active Focus
 
-Reconciliation component work now uses Discord's channel typing indicator without a temporary thinking response. Recent-action component responses are verified ephemeral; making the initial or typed-message DM replies carry Discord's ephemeral footer requires choosing an interaction-based entry UX.
+Typed `recent` now bridges into a fully ephemeral DM workflow through a short-lived launcher, and redundant DM-to-DM acknowledgement copy is removed. The next step is deployment and production confirmation.
 
 ## On Deck
 
-1. Choose an interaction-based entry for fully ephemeral recent actions: a `/recent` command or a one-click launcher sent in response to typed `recent`.
+1. Deploy and manually verify typed `recent` opens the short-lived launcher and keeps the resulting DM session ephemeral.
 2. Deploy and manually verify `View Inbox` and `Reconcile Now` show `BookieBot is typing...` without a temporary thinking message.
 3. Manually verify shared Needs logging plus update/move/delete/undo behavior in Discord and Google Sheets.
 4. Manually verify recent transactions and reconciliation after the latest reliability fixes.
@@ -32,9 +32,14 @@ Reconciliation component work now uses Discord's channel typing indicator withou
 - Manual verification is checklist item 64 below.
 - Replaced reconciliation component `thinking=True` defers with silent component acknowledgements plus the normal channel-level `BookieBot is typing...` indicator for both `View Inbox` and `Reconcile Now`.
 - Inbox results, caught-up notices, failures, timeouts, and inbox actions now arrive as private interaction follow-ups, so no temporary thinking placeholder is created.
-- Audited recent-action buttons/selects and added regression coverage proving prompts, ownership rejections, and action results are ephemeral. Ordinary messages initiated from typed DM text cannot carry Discord's interaction-only ephemeral footer; the entry UX choice remains on deck.
+- Audited recent-action buttons/selects and added regression coverage proving prompts, ownership rejections, and action results are ephemeral. Ordinary messages initiated from typed DM text require an interaction bridge to carry Discord's ephemeral footer.
 - Verification: focused reconciliation/recent suite `203 passed`; full suite `417 passed, 1 skipped`; Pyright reported zero errors; `git diff --check` passed.
 - Manual verification is checklist item 65 below.
+- Added a five-minute `Open Recent Transactions` launcher for typed recent-action requests. The launcher carries no transaction data, is scheduled for deletion, and deletes immediately after opening the ephemeral list.
+- Retained the active interaction follow-up for ten minutes so typed `show more`, update values, missing move items, cancellations, expiration notices, and subsequent recent-action results stay ephemeral throughout the workflow.
+- Suppressed `I sent your recent transactions list to your DMs.` when the request already originated in a DM; channel-originated requests still receive that acknowledgement.
+- Verification: focused recent/message-router suite `135 passed`; full suite `418 passed, 1 skipped`; Pyright reported zero errors; `git diff --check` passed.
+- Manual verification is checklist item 66 below.
 
 ## Completed 2026-07-24
 
@@ -434,6 +439,8 @@ Use a test row or low-risk real row in Discord:
     - Expected: Bank cache totals match persisted current-month transactions; the first response includes the unresolved transaction rows plus `Reconcile Now` and `Ignore All`; confirmed-match history may continue in later messages without delaying or hiding the review inbox.
 65. Tap `View Inbox`, then separately tap `Reconcile Now` from both the digest and inbox.
     - Expected: each tap shows the channel-level `BookieBot is typing...` UI, creates no `BookieBot is thinking` temporary message, and ends with a private Discord response. Recent-action button/select prompts and outcomes continue to show `Only you can see this · Dismiss message`.
+66. Send `recent` directly in BookieBot's DM, then open the launcher and complete a selection plus an update that requires a typed reply.
+    - Expected: no `I sent your recent transactions list to your DMs.` tail appears; the short-lived launcher deletes when tapped; the list, prompts, typed-reply result, pagination, and action outcomes all show Discord's `Only you can see this · Dismiss message` footer.
 
 ## Verification Baseline
 
