@@ -1,10 +1,10 @@
 # Agent Status
 
-Last updated: 2026-07-24
+Last updated: 2026-07-25
 
 ## Active Focus
 
-The production `View Inbox` hang is fixed in code: the button now renders persisted reconciliation state without repeating Plaid/Sheets reconciliation work, and a bounded failure path always finishes Discord's deferred response. The next step is deployment and production confirmation.
+The remaining production `View Inbox` response-lifecycle bug is fixed in code: the button now replaces Discord's original private thinking response with the persisted inbox, empty state, timeout, or error result. The next step is deployment and production confirmation.
 
 ## On Deck
 
@@ -15,6 +15,15 @@ The production `View Inbox` hang is fixed in code: the button now renders persis
 5. Harden recent-action pending state across restarts/deploys, since selections currently live only in process memory.
 6. Improve targeted recent-action search so commands can find older matches, not only the latest 10 recent actions.
 7. Explore clarifying questions before logging when BookieBot is uncertain instead of guessing or silently failing.
+
+## Completed 2026-07-25
+
+- Diagnosed the follow-up production hang after the persisted-only inbox fix: BookieBot was sending the first result through Discord's follow-up webhook, which left the original deferred `BookieBot is thinking` response unresolved.
+- Changed the first inbox chunk, empty state, timeout, and failure paths to edit the original deferred response in place. Only additional report chunks use follow-up messages.
+- Applied the same lifecycle rule to inbox `Ignore All` and `Unmatch` actions, while `Reconcile Now` uses a non-thinking defer because its existing workflow sends follow-up review cards.
+- Added regression coverage for successful persisted reports, empty inboxes, timeout/failure paths, and inbox actions replacing their deferred response.
+- Verification: focused reconciliation suite `68 passed`; full suite `414 passed, 1 skipped`; Pyright reported zero errors; `git diff --check` passed.
+- Manual verification is checklist item 63 below.
 
 ## Completed 2026-07-24
 
@@ -408,6 +417,8 @@ Use a test row or low-risk real row in Discord:
     - Expected: the Saved amount, paycheck count, Ideal/Minimum copy, Left amount, Savings slices, and over/under-saving pressure all use the active current/projected mode. Brian July's verified snapshot changes from `$2,294.47` across 2 paychecks to `$3,059.29` across 3 projected paychecks, while the monthly projected Ideal remains 20% of income at `$2,294.47`.
 62. After deploying the July 24 reconciliation fix, tap `View Inbox` on a digest containing an automatic match and on one containing unresolved items.
     - Expected: the private thinking indicator is replaced by the persisted match/inbox report; automatic matches include the `Unmatch` selector, unresolved reports include `Reconcile Now` and `Ignore All`, and a backend failure produces a private retry message within 15 seconds instead of thinking forever.
+63. After deploying the July 25 Discord response-lifecycle fix, dismiss any old stuck thinking message and tap `View Inbox` again.
+    - Expected: the same temporary private thinking response transforms into the first inbox report chunk, the caught-up message, or a bounded retry message; later report chunks appear as follow-ups, and no thinking response remains indefinitely.
 
 ## Verification Baseline
 

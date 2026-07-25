@@ -239,22 +239,19 @@ async def _send_bank_reconciliation_inbox(interaction: Any, actor_key: str) -> N
         )
     except TimeoutError:
         logger.warning("Bank reconciliation inbox load timed out", extra={"actor_key": actor_key})
-        await interaction.followup.send(
+        await interaction.edit_original_response(
             content="I couldn't load the reconciliation inbox in time. Nothing was changed; please try again.",
-            ephemeral=True,
         )
         return
     except Exception:
         logger.exception("Failed to load bank reconciliation inbox", extra={"actor_key": actor_key})
-        await interaction.followup.send(
+        await interaction.edit_original_response(
             content="I couldn't load the reconciliation inbox right now. Nothing was changed; please try again.",
-            ephemeral=True,
         )
         return
     if not digest:
-        await interaction.followup.send(
+        await interaction.edit_original_response(
             content="Bank reconciliation is all caught up. No unresolved items remain.",
-            ephemeral=True,
         )
         return
 
@@ -266,7 +263,7 @@ async def _send_bank_reconciliation_inbox(interaction: Any, actor_key: str) -> N
                 ephemeral=True,
             )
             return
-        await action_interaction.response.defer(ephemeral=True, thinking=True)
+        await action_interaction.response.defer(ephemeral=True, thinking=action != "start")
         if action == "start":
             await _start_bank_reconciliation_from_prompt(action_interaction, actor_key, clear_prompt=False)
             return
@@ -277,16 +274,15 @@ async def _send_bank_reconciliation_inbox(interaction: Any, actor_key: str) -> N
                 ignored = await asyncio.to_thread(service.ignore_reconciliation_item, digest.owner_key, item_id)
                 if ignored is not None:
                     ignored_count += 1
-            await action_interaction.followup.send(
-                f"Ignored `{ignored_count}` bank reconciliation item(s) from this inbox.",
-                ephemeral=True,
+            await action_interaction.edit_original_response(
+                content=f"Ignored `{ignored_count}` bank reconciliation item(s) from this inbox.",
             )
             return
         if action.startswith("unmatch:"):
             try:
                 reconciliation_id = int(action.split(":", 1)[1])
             except ValueError:
-                await action_interaction.followup.send("That match selection was invalid.", ephemeral=True)
+                await action_interaction.edit_original_response(content="That match selection was invalid.")
                 return
             service = build_banking_service()
             reopened = await asyncio.to_thread(
@@ -296,17 +292,15 @@ async def _send_bank_reconciliation_inbox(interaction: Any, actor_key: str) -> N
                 notes="unmatched from reconciliation report",
             )
             if reopened is None:
-                await action_interaction.followup.send(
-                    f"No bank reconciliation item `{reconciliation_id}` was found.",
-                    ephemeral=True,
+                await action_interaction.edit_original_response(
+                    content=f"No bank reconciliation item `{reconciliation_id}` was found.",
                 )
                 return
-            await action_interaction.followup.send(
-                (
+            await action_interaction.edit_original_response(
+                content=(
                     f"Unmatched `{reopened.transaction.name}` for "
                     f"`${abs(reopened.transaction.amount):.2f}`. It is back in the review queue."
                 ),
-                ephemeral=True,
             )
 
     messages = digest.detail_messages or (digest.detail_message,)
@@ -321,11 +315,14 @@ async def _send_bank_reconciliation_inbox(interaction: Any, actor_key: str) -> N
             if is_last and (digest.item_ids or digest.report_matches)
             else None
         )
-        await interaction.followup.send(
-            content=message,
-            view=view,
-            ephemeral=True,
-        )
+        if index == 0:
+            await interaction.edit_original_response(content=message, view=view)
+        else:
+            await interaction.followup.send(
+                content=message,
+                view=view,
+                ephemeral=True,
+            )
 
 
 def bank_reconciliation_digest_view(actor_key: str) -> BankReconciliationDigestView:
@@ -337,7 +334,7 @@ def bank_reconciliation_digest_view(actor_key: str) -> BankReconciliationDigestV
                 ephemeral=True,
             )
             return
-        await interaction.response.defer(ephemeral=True, thinking=True)
+        await interaction.response.defer(ephemeral=True, thinking=action == "inbox")
         if action == "start":
             await _start_bank_reconciliation_from_prompt(interaction, actor_key, clear_prompt=True)
             return
@@ -356,7 +353,7 @@ def persistent_bank_reconciliation_digest_view(actor_key: str) -> BankReconcilia
                 ephemeral=True,
             )
             return
-        await interaction.response.defer(ephemeral=True, thinking=True)
+        await interaction.response.defer(ephemeral=True, thinking=action == "inbox")
         if action == "start":
             await _start_bank_reconciliation_from_prompt(interaction, actor_key, clear_prompt=True)
             return

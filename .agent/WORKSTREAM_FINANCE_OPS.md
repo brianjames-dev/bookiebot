@@ -1,6 +1,6 @@
 # Finance Operations Workstream
 
-Last updated: 2026-07-24
+Last updated: 2026-07-25
 
 ## Goal
 
@@ -423,6 +423,16 @@ Status: Complete in code and focused verification; production deployment confirm
 - Inbox loading is bounded by `BOOKIEBOT_RECONCILIATION_INBOX_TIMEOUT_SECONDS` (15 seconds by default); timeouts and exceptions return a private no-mutation retry message instead of leaving Discord's thinking state unresolved.
 - Regression coverage proves the fast path never calls sync/rescoring, returns persisted automatic matches, retains batch-ignore behavior, and closes the deferred interaction on preparation failure.
 - Verification: focused core/reconciliation suite `66 passed`; full suite `412 passed, 1 skipped`; Pyright clean; `git diff --check` passed.
+
+### 2026-07-25 Deferred Discord Response Lifecycle Follow-Up
+
+Status: Complete in code and focused verification; production deployment confirmation remains in `.agent/STATUS.md`.
+
+- Corrected the remaining Discord lifecycle issue: after `thinking=True`, the first inbox result now edits the original deferred interaction response instead of creating a separate follow-up that leaves the thinking placeholder unresolved.
+- Empty, timeout, exception, Ignore All, and Unmatch outcomes also complete their original deferred responses in place.
+- Multi-chunk reports edit the original response with the first chunk and reserve follow-ups for later chunks. `Reconcile Now` uses a non-thinking defer because its established review flow sends follow-up cards.
+- Regression coverage verifies successful reports, empty state, timeout/failure, and batch-ignore response completion.
+- Verification: focused core/reconciliation suite `68 passed`; full suite `414 passed, 1 skipped`; Pyright clean; `git diff --check` passed.
 
 ## Open Questions
 

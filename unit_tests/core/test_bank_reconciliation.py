@@ -91,6 +91,10 @@ class FakeReviewInteraction:
     def __init__(self):
         self.response = FakeResponse()
         self.followup = FakeFollowup()
+        self.original_response_edits = []
+
+    async def edit_original_response(self, **kwargs):
+        self.original_response_edits.append(kwargs)
 
 
 def _reconciliation_item(item_id: int, *, name: str) -> ReconciliationItem:
@@ -583,14 +587,18 @@ async def test_bank_reconciliation_inbox_ignore_all_ignores_displayed_batch(monk
 
     await bank_reconciliation._send_bank_reconciliation_inbox(interaction, "123")
 
-    view = interaction.followup.messages[0][1]["view"]
+    assert interaction.followup.messages == []
+    view = interaction.original_response_edits[0]["view"]
     ignore_all = next(child for child in view.children if getattr(child, "label", None) == "Ignore All")
     action_interaction = FakeReviewInteraction()
     action_interaction.user = SimpleNamespace(id="123")
     await ignore_all.callback(action_interaction)
 
     assert ignored_ids == [42, 43]
-    assert action_interaction.followup.messages[-1][0] == "Ignored `2` bank reconciliation item(s) from this inbox."
+    assert action_interaction.original_response_edits == [
+        {"content": "Ignored `2` bank reconciliation item(s) from this inbox."}
+    ]
+    assert action_interaction.followup.messages == []
 
 
 @pytest.mark.asyncio
@@ -641,7 +649,9 @@ async def test_bank_reconciliation_inbox_shows_recent_auto_matches_without_actio
 
     await bank_reconciliation._send_bank_reconciliation_inbox(interaction, "123")
 
-    content, kwargs = interaction.followup.messages[-1]
+    assert interaction.followup.messages == []
+    kwargs = interaction.original_response_edits[-1]
+    content = kwargs["content"]
     assert "found no unresolved items and confirmed `1` automatic match" in content
     assert "Confirmed matches this run:" in content
     assert "CREDIT CARD 3333 PAYMENT" in content
@@ -664,12 +674,12 @@ async def test_bank_reconciliation_inbox_failure_finishes_deferred_response(monk
 
     await bank_reconciliation._send_bank_reconciliation_inbox(interaction, "123")
 
-    assert interaction.followup.messages == [
-        (
-            "I couldn't load the reconciliation inbox right now. Nothing was changed; please try again.",
-            {"ephemeral": True},
-        )
+    assert interaction.original_response_edits == [
+        {
+            "content": "I couldn't load the reconciliation inbox right now. Nothing was changed; please try again.",
+        }
     ]
+    assert interaction.followup.messages == []
 
 
 @pytest.mark.asyncio
@@ -683,11 +693,49 @@ async def test_bank_reconciliation_inbox_timeout_finishes_deferred_response(monk
 
     await bank_reconciliation._send_bank_reconciliation_inbox(interaction, "123")
 
+    assert interaction.original_response_edits == [
+        {
+            "content": "I couldn't load the reconciliation inbox in time. Nothing was changed; please try again.",
+        }
+    ]
+    assert interaction.followup.messages == []
+
+
+@pytest.mark.asyncio
+async def test_bank_reconciliation_empty_inbox_replaces_deferred_response(monkeypatch):
+    monkeypatch.setattr(
+        bank_reconciliation,
+        "prepare_bank_reconciliation_inbox_messages",
+        lambda *_args, **_kwargs: None,
+    )
+    interaction = FakeReviewInteraction()
+
+    await bank_reconciliation._send_bank_reconciliation_inbox(interaction, "123")
+
+    assert interaction.original_response_edits == [
+        {"content": "Bank reconciliation is all caught up. No unresolved items remain."}
+    ]
+    assert interaction.followup.messages == []
+
+
+@pytest.mark.asyncio
+async def test_bank_reconciliation_inbox_uses_followups_only_after_replacing_deferred_response(monkeypatch):
+    monkeypatch.setattr(
+        bank_reconciliation,
+        "prepare_bank_reconciliation_inbox_messages",
+        lambda *_args, **_kwargs: bank_reconciliation.PreparedBankReconciliationDigest(
+            public_message="public",
+            detail_message="first chunk",
+            detail_messages=("first chunk", "second chunk"),
+        ),
+    )
+    interaction = FakeReviewInteraction()
+
+    await bank_reconciliation._send_bank_reconciliation_inbox(interaction, "123")
+
+    assert interaction.original_response_edits == [{"content": "first chunk", "view": None}]
     assert interaction.followup.messages == [
-        (
-            "I couldn't load the reconciliation inbox in time. Nothing was changed; please try again.",
-            {"ephemeral": True},
-        )
+        ("second chunk", {"view": None, "ephemeral": True})
     ]
 
 
