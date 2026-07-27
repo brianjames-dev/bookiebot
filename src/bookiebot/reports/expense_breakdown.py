@@ -454,8 +454,8 @@ def build_expense_breakdown_report(
     }
 
     shared_total = round(sum(entry.amount for entry in entries), 2)
-    personal_outflow_total = _personal_outflow_subtotal_total(personal_rows)
-    personal_total = personal_outflow_total if personal_outflow_total is not None else grand_total
+    personal_expense_total = _personal_expense_subtotal_total(personal_rows)
+    personal_total = grand_total if grand_total > 0 else (personal_expense_total or 0.0)
 
     return ExpenseBreakdownReport(
         actor_key=actor_key,
@@ -518,7 +518,7 @@ def render_expense_breakdown_html(report: ExpenseBreakdownReport) -> str:
         if float(info.get("amount") or 0.0) > 0
     ]
     activity_entries = _report_activity_entries(report)
-    top_entries = sorted(activity_entries, key=lambda entry: entry.amount, reverse=True)[:10]
+    top_entries = _report_highlight_entries(report, activity_entries)
     person_totals = _person_totals(activity_entries)
     merchant_totals = _merchant_totals(activity_entries)
     merchant_occurrences = _merchant_occurrences(activity_entries)
@@ -1048,7 +1048,7 @@ def _payment_totals_by_group(payments: list[PaymentItem]) -> dict[str, float]:
     return {group: round(amount, 2) for group, amount in totals.items()}
 
 
-def _personal_outflow_subtotal_total(rows: list[list[str]]) -> float | None:
+def _personal_expense_subtotal_total(rows: list[list[str]]) -> float | None:
     totals: dict[str, float] = {}
     for row in rows:
         for index, value in enumerate(row):
@@ -1056,7 +1056,7 @@ def _personal_outflow_subtotal_total(rows: list[list[str]]) -> float | None:
             if "subtotal" not in normalized:
                 continue
             bucket = _outflow_subtotal_bucket(normalized)
-            if bucket is None:
+            if bucket not in {"needs", "wants"}:
                 continue
             amount = _next_money_value(row, index + 1, window=8)
             if amount is not None:
@@ -1612,7 +1612,7 @@ def _is_excluded_need_expense_label(label: str) -> bool:
         return True
     if any(term in normalized for term in {"enter transaction", "subtotal", "budget", "name"}):
         return True
-    if ("static bills" in normalized and "subscriptions" in normalized) or normalized == "subscriptions wants":
+    if "subscriptions" in normalized and any(bucket in normalized for bucket in {"needs", "wants"}):
         return True
     if any(_labels_match(normalized, _normalize_label(candidate)) for candidates in BUDGET_SHARED_CATEGORY_LABELS.values() for candidate in candidates):
         return True
@@ -1842,6 +1842,44 @@ def _report_activity_entries(report: ExpenseBreakdownReport) -> list[ExpenseEntr
     return sorted(entries, key=lambda entry: (_entry_sort_date(entry.date), entry.amount), reverse=True)
 
 
+def _report_highlight_entries(
+    report: ExpenseBreakdownReport,
+    activity_entries: list[ExpenseEntry],
+) -> list[ExpenseEntry]:
+    entries = list(activity_entries)
+    entries.extend(
+        ExpenseEntry(
+            date=payment.date,
+            category=payment.group,
+            amount=payment.amount,
+            person=report.owner_name,
+            item=payment.label,
+            location="",
+        )
+        for payment in report.payments
+        if payment.amount > 0
+    )
+    entries.extend(
+        ExpenseEntry(
+            date=f"{report.month.month}/{event.day}/{report.month.year}",
+            category=event.group,
+            amount=event.amount,
+            person=report.owner_name,
+            item=event.label,
+            location="",
+        )
+        for event in report.calendar_events
+        if event.kind == "subscription"
+        and not event.projected_only
+        and event.amount > 0
+    )
+    return sorted(
+        entries,
+        key=lambda entry: (entry.amount, _entry_sort_date(entry.date), entry.item, entry.location),
+        reverse=True,
+    )
+
+
 def _need_expense_entries(report: ExpenseBreakdownReport) -> list[ExpenseEntry]:
     return [
         ExpenseEntry(
@@ -2009,7 +2047,6 @@ def _savings_projection_payload(report: ExpenseBreakdownReport) -> dict[str, Any
     current_slots = min(max_deposit_number, max(current_paychecks, highest_entered_deposit))
     projected_slots = min(max_deposit_number, max(projected_paychecks, current_slots))
     current_targets = [item for item in deposits if item.number <= current_slots]
-    projected_targets = [item for item in deposits if item.number <= projected_slots]
 
     current_ideal = round(sum(item.ideal for item in current_targets), 2)
     current_minimum = round(sum(item.minimum for item in current_targets), 2)
@@ -2025,17 +2062,9 @@ def _savings_projection_payload(report: ExpenseBreakdownReport) -> dict[str, Any
     )
     projected_ideal = round(projected_income * ideal_rate, 2)
     projected_minimum = round(projected_income * minimum_rate, 2)
-    projected_ideal_per_slot = projected_ideal / projected_slots if projected_slots else 0.0
-    projected_amount = round(
-        sum(item.actual if item.actual > 0 else projected_ideal_per_slot for item in projected_targets),
-        2,
-    )
-    if _is_completed_month(report.month):
-        projected_amount = current_amount
-
     return {
         "currentAmount": current_amount,
-        "projectedAmount": projected_amount,
+        "projectedAmount": current_amount,
         "currentIdeal": current_ideal,
         "currentMinimum": current_minimum,
         "projectedIdeal": projected_ideal,
@@ -2343,7 +2372,8 @@ def _burn_rate_payload(report: ExpenseBreakdownReport) -> dict[str, Any] | None:
         sum(float(report.breakdown.get(key, {}).get("amount") or 0.0) for key in WANTS_BURN_RATE_KEYS),
         2,
     )
-    remaining_wants_budget = round(report.remaining_wants_budget, 2)
+    category_balances = _category_balance_payload(report)
+    remaining_wants_budget = round(category_balances["remaining"]["wants"], 2)
     wants_budget = round(wants_spent + remaining_wants_budget, 2)
     expected_spend = round(wants_budget * (elapsed_days / days_in_month), 2) if days_in_month else 0.0
     allowed_daily_average = round(wants_budget / days_in_month, 2) if days_in_month else 0.0

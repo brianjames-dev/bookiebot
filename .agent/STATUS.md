@@ -1,21 +1,34 @@
 # Agent Status
 
-Last updated: 2026-07-25
+Last updated: 2026-07-26
 
 ## Active Focus
 
-Typed `recent` now bridges into a fully ephemeral DM workflow through a short-lived launcher, and redundant DM-to-DM acknowledgement copy is removed. The next step is deployment and production confirmation.
+Expense-report spending, savings, Calendar, Largest, and Burn Rate semantics are corrected and verified against live Brian and Hannah July data. The next step is deployment and production confirmation.
 
 ## On Deck
 
-1. Deploy and manually verify typed `recent` opens the short-lived launcher and keeps the resulting DM session ephemeral.
-2. Deploy and manually verify `View Inbox` and `Reconcile Now` show `BookieBot is typing...` without a temporary thinking message.
-3. Manually verify shared Needs logging plus update/move/delete/undo behavior in Discord and Google Sheets.
-4. Manually verify recent transactions and reconciliation after the latest reliability fixes.
-5. Consider a richer Discord button flow for grouped amount adjustments if the current UX feels too manual.
-6. Harden recent-action pending state across restarts/deploys, since selections currently live only in process memory.
-7. Improve targeted recent-action search so commands can find older matches, not only the latest 10 recent actions.
-8. Explore clarifying questions before logging when BookieBot is uncertain instead of guessing or silently failing.
+1. Deploy and manually verify the expense-report corrections in checklist item 67.
+2. Deploy and manually verify typed `recent` opens the short-lived launcher and keeps the resulting DM session ephemeral.
+3. Deploy and manually verify `View Inbox` and `Reconcile Now` show `BookieBot is typing...` without a temporary thinking message.
+4. Manually verify shared Needs logging plus update/move/delete/undo behavior in Discord and Google Sheets.
+5. Manually verify recent transactions and reconciliation after the latest reliability fixes.
+6. Consider a richer Discord button flow for grouped amount adjustments if the current UX feels too manual.
+7. Harden recent-action pending state across restarts/deploys, since selections currently live only in process memory.
+8. Improve targeted recent-action search so commands can find older matches, not only the latest 10 recent actions.
+9. Explore clarifying questions before logging when BookieBot is uncertain instead of guessing or silently failing.
+
+## Completed 2026-07-26
+
+- Separated savings from spending throughout the expense-report payload and UI. Needs/Wants itemization is the primary expense total, savings subtotals are excluded, and Needs/Wants subtotal totals remain a fallback when itemized rows are unavailable.
+- Kept Saved actual in both Current and Projected modes while retaining projected monthly Ideal/Minimum targets. Brian July now remains `$1,539.64` Saved in both modes while Projected shows `$2,294.47` Ideal from `$11,472.33` projected income.
+- Confirmed Category Mix already excluded Saved from its All/Needs/Wants spending slices and added an explicit guard so a savings row cannot enter the spending mix. Fixed `Subscriptions (Needs)` summary rows being duplicated as individual Need expenses.
+- Replaced Calendar's outflow total with the month name and made the count a single spaced value such as `17 total`.
+- Expanded Largest to include all shared expenses, entered bills/utilities, and elapsed subscriptions; retained every row for the expandable table and sorted both payload and frontend descending by amount.
+- Applied the three-bucket category cascade to Burn Rate's effective Wants availability and added a visible transfer-impact callout. Live Brian July showed `$249.36` of Needs overspend deducted from Wants.
+- Verification: focused report suite `33 passed`; full suite `421 passed, 1 skipped`; Pyright reported zero errors; frontend typecheck/build passed; `git diff --check` passed.
+- Live browser verification covered Brian and Hannah July Current/Projected metrics, Calendar labels/counts, descending Largest data, Burn Rate category coverage, and clean browser logs.
+- Manual verification is checklist item 67 below.
 
 ## Completed 2026-07-25
 
@@ -57,11 +70,11 @@ Typed `recent` now bridges into a fully ephemeral DM workflow through a short-li
 - Added a callback-level regression test that invokes the real digest button, verifies the private thinking defer, and confirms inbox dispatch.
 - Added third-paycheck savings intents, parser guidance, intent-explorer entries, handlers, sheet checks, sheet logging, and undo metadata.
 - Generalized savings-row discovery across first, second, and third paycheck rows, reading each row's Actual, Ideal, and Minimum values while retaining compatibility with the older two-row shared-target layout.
-- Added a report savings-projection payload that tracks current/projected saved amounts, Ideal/Minimum totals, and applicable paycheck counts. Current mode uses entered deposits and sheet targets for reached paychecks; projected mode applies the observed monthly target rate once to projected income, then distributes that monthly target across the projected paycheck slots.
-- Wired the report's Projected toggle into the Saved card, Left amount, Savings Category Mix slices/pressure, and projected outflow totals. The Saved card now displays its active paycheck count plus Ideal and Minimum targets.
+- Added a report savings-projection payload that tracks saved amounts, Ideal/Minimum totals, and applicable paycheck counts. The original contribution-estimation behavior was superseded on 2026-07-26; Projected now changes targets without estimating future saved dollars.
+- Added the Savings Category Mix view and Saved-card paycheck/Ideal/Minimum context. The 2026-07-26 follow-up keeps Saved actual and excludes it from Left/outflow totals in both modes.
 - Read-only live-sheet inspection confirmed both Brian and Hannah July tabs and Templates contain three savings rows; legacy May/June two-row tabs remain supported.
 - Corrected the first three-paycheck projection, which multiplied an already income-scaled target once per savings row and incorrectly turned the monthly 20% Ideal into 30%. Brian July now projects Ideal `$2,294.47` and Minimum `$1,147.23` from `$11,472.33` income.
-- Local browser verification of Brian July showed Current Saved `$2,294.47` with 2 paychecks, Ideal `$1,539.64`, and Minimum `$769.82`; Projected changed to Saved `$3,059.29` with 3 paychecks, Ideal `$2,294.47`, and Minimum `$1,147.23`. The Saved card and dependent projected totals changed with the toggle, and the console remained clean.
+- Historical browser verification covered the original projected-contribution behavior; current expected values and live verification are recorded in the 2026-07-26 section.
 - Verification: `410 passed, 1 skipped`; Pyright reported zero errors; frontend typecheck/build passed; `git diff --check` passed.
 - Manual verification steps are checklist items 59-61 below.
 
@@ -348,7 +361,7 @@ Use a test row or low-risk real row in Discord:
 19. Click `View Inbox` on the reconciliation digest.
    - Expected: the DM/private inbox list shows unresolved transactions with `Reconcile Now` and `Ignore All`; if the digest only has automatic matches, the inbox shows the confirmed match report without unresolved action buttons.
 20. Run the expense breakdown command for the current month and for a completed prior month.
-   - Expected: the report link appears as a short `Open full report` link and opens a page whose top chart card title changes with the active carousel chart (`Category Mix`, `Burn Rate`, `Subs`, or `Bills & Utilities`); mobile can swipe between charts and desktop can use previous/next controls plus active indicators; the Burn Rate chart keeps the red/green variance behavior and cursor-stable tooltip; Category Mix labels show category plus amount on desktop and hide labels on phone widths; the Income card `2x` forecast toggle immediately updates income-dependent top-card values; the `Subs` chart has an inline All/Needs/Wants filter, shows the month-only label above the hit-so-far amount, shows projected monthly subs as secondary text, uses a `# total` pill, highlights the current day, animates view switches, keeps itemized sub tables collapsed behind `Details`, uses `Pull` as the pull-date column, and shortens monthly/yearly cadence to `M`/`Y` on mobile; Expense Highlights keeps its Largest/Most Frequent toggle in the card header; table expanders append remaining rows and place Collapse at the bottom; Daily Spending has no subtitle copy and its bar hover has a subtle highlighted background.
+   - Expected: the report link appears as a short `Open full report` link and opens a page whose top chart card title changes with the active carousel chart (`Category Mix`, `Burn Rate`, `Calendar`, or `Bills & Utilities`); mobile can swipe between charts and desktop can use previous/next controls plus active indicators; the Burn Rate chart keeps the red/green variance behavior and cursor-stable tooltip; Category Mix labels show category plus amount on desktop and hide labels on phone widths; the Projected toggle immediately updates income-dependent top-card values; Calendar has an inline All/Subs filter, shows the month name instead of an outflow total, uses a spaced `# total` pill, highlights the current day, and keeps itemized subscription tables collapsed behind `Details`; Expense Highlights keeps its Largest/Most Frequent toggle in the card header; table expanders append remaining rows and place Collapse at the bottom; Daily Spending has no subtitle copy and its bar hover has a subtle highlighted background.
 21. If the expense breakdown command reports that a spreadsheet cannot be opened.
    - Expected: the error includes the active Google service account email so the spreadsheet share settings or deployment credential can be checked directly.
 22. Click `Reconcile Now` from either the digest or inbox view.
@@ -430,7 +443,7 @@ Use a test row or low-risk real row in Discord:
 60. From both Brian's and Hannah's Discord accounts, use a safe test month to log and query the third paycheck savings amount, then undo the test write if needed.
     - Expected: only the third labeled savings row's Actual cell changes; the query reports that row's Actual, Ideal, and Minimum values; undo restores its previous value.
 61. Open current-month reports for Brian and Hannah and switch Projected off and on while viewing the Saved card and Savings Category Mix tab.
-    - Expected: the Saved amount, paycheck count, Ideal/Minimum copy, Left amount, Savings slices, and over/under-saving pressure all use the active current/projected mode. Brian July's verified snapshot changes from `$2,294.47` across 2 paychecks to `$3,059.29` across 3 projected paychecks, while the monthly projected Ideal remains 20% of income at `$2,294.47`.
+    - Expected: the Saved amount and actual paycheck count do not change with Projected; only the target copy and savings gap respond to projected monthly income. Brian July remains `$1,539.64` Saved across 2 actual paychecks while its target changes from `$1,539.64` Ideal / `$769.82` Minimum to `$2,294.47` projected Ideal / `$1,147.23` projected Minimum.
 62. After deploying the July 24 reconciliation fix, tap `View Inbox` on a digest containing an automatic match and on one containing unresolved items.
     - Expected: channel typing is followed by the persisted private match/inbox report; automatic matches include the `Unmatch` selector, unresolved reports include `Reconcile Now` and `Ignore All`, and a backend failure produces a private retry message within 15 seconds.
 63. After deploying the July 25 Discord response-lifecycle fix, dismiss any old stuck thinking message and tap `View Inbox` again.
@@ -441,6 +454,8 @@ Use a test row or low-risk real row in Discord:
     - Expected: each tap shows the channel-level `BookieBot is typing...` UI, creates no `BookieBot is thinking` temporary message, and ends with a private Discord response. Recent-action button/select prompts and outcomes continue to show `Only you can see this · Dismiss message`.
 66. Send `recent` directly in BookieBot's DM, then open the launcher and complete a selection plus an update that requires a typed reply.
     - Expected: no `I sent your recent transactions list to your DMs.` tail appears; the short-lived launcher deletes when tapped; the list, prompts, typed-reply result, pagination, and action outcomes all show Discord's `Only you can see this · Dismiss message` footer.
+67. Open current-month expense reports for Brian and Hannah, inspect Current and Projected, then view Calendar, Burn Rate, Category Mix, and Largest.
+    - Expected: Spent and Left exclude Saved; Saved stays actual when Projected is toggled while monthly Ideal/Minimum targets may change; Category Mix spending excludes Saved; Calendar shows the month name and a spaced count such as `17 total`; Largest is descending and its expanded table includes all actual shared expenses, entered bills/utilities, and elapsed subscriptions; Burn Rate's Wants limit and visible impact note reflect any Needs/Wants/Savings cascade transfers.
 
 ## Verification Baseline
 
@@ -454,6 +469,24 @@ python -m pytest unit_tests/intents/test_handlers.py unit_tests/core/test_messag
 Latest verification:
 
 ```bash
+python -m pytest unit_tests/reports/test_expense_breakdown.py
+# passed: 33 passed
+
+python -m pytest unit_tests
+# passed: 421 passed, 1 skipped
+
+python -m pyright
+# passed: 0 errors, 0 warnings, 0 informations
+
+cd web/expense-report && npm run typecheck && npm run build
+# passed
+
+git diff --check
+# passed
+
+Live Brian/Hannah July expense-report browser verification
+# passed: actual-only savings, savings-free spending, Calendar labels/counts, descending Largest, cascade-aware Burn Rate, clean browser logs
+
 python -m pytest unit_tests/core/test_bank_reconciliation.py unit_tests/banking/test_reconciliation.py
 # passed: 66 passed
 

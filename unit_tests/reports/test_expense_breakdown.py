@@ -378,11 +378,18 @@ def test_build_expense_breakdown_report_aggregates_shared_and_personal_data():
     ]
     assert payload["topEntries"][0] == {
         "date": "",
-        "category": "Need",
-        "amount": 184.0,
+        "category": "Rent",
+        "amount": 1750.0,
         "person": "Hannah",
-        "item": "DMV Registration",
+        "item": "Rent",
         "location": "",
+    }
+    assert [entry["amount"] for entry in payload["topEntries"]] == sorted(
+        (entry["amount"] for entry in payload["topEntries"]),
+        reverse=True,
+    )
+    assert {"Rent", "PG&E", "Water", "Netflix", "Spotify"} <= {
+        entry["item"] for entry in payload["topEntries"]
     }
     assert payload["merchantTotals"][0] == {"label": "DMV Registration", "amount": 184.0}
     assert {item["label"]: item for item in payload["utilityHistory"]} == {
@@ -786,7 +793,7 @@ def test_current_month_calendar_events_include_projected_income_subscriptions_an
     assert "Calendar" in html
 
 
-def test_report_payload_total_expenses_uses_personal_outflow_subtotals():
+def test_report_payload_total_expenses_excludes_savings_subtotal():
     personal_rows = [
         ["Monthly Income", "$5,000.00"],
         ["Needs Subtotal", "$2,100.00"],
@@ -813,9 +820,9 @@ def test_report_payload_total_expenses_uses_personal_outflow_subtotals():
     assert payload_match is not None
     payload = json.loads(payload_match.group(1))
 
-    assert report.personal_total == 3850.0
-    assert payload["metrics"]["totalExpenses"] == 3850.0
-    assert payload["metrics"]["incomeAfterExpenses"] == 1150.0
+    assert report.personal_total == 2850.0
+    assert payload["metrics"]["totalExpenses"] == 2850.0
+    assert payload["metrics"]["incomeAfterExpenses"] == 2150.0
 
 
 def test_report_payload_total_expenses_keeps_zero_savings_subtotal():
@@ -847,6 +854,29 @@ def test_report_payload_total_expenses_keeps_zero_savings_subtotal():
 
     assert report.personal_total == 4358.54
     assert payload["metrics"]["totalExpenses"] == 4358.54
+
+
+def test_needs_subscription_summary_is_not_duplicated_as_an_individual_expense():
+    personal_rows = [
+        ["Name:", "Needs (50%):", "Wants (30%):", "Savings (20%):"],
+        ["Subscriptions (Needs)", "$554.06"],
+        ["(Needs) Subtotal:", "$554.06"],
+    ]
+    report = build_expense_breakdown_report(
+        actor_key="hannah",
+        owner_name="Hannah",
+        persons=["Hannah"],
+        month=BudgetMonth(2026, 7),
+        worksheets=ReportWorksheets(
+            shared_expenses=InMemoryWorksheet([["hdr"] * 28, ["hdr"] * 28]),
+            personal_budget=InMemoryWorksheet(personal_rows),
+            subscriptions=InMemoryWorksheet([]),
+        ),
+    )
+
+    assert report.need_expenses == []
+    assert report.breakdown["need_expenses"]["amount"] == 0.0
+    assert report.personal_total == 554.06
 
 
 def test_report_payload_prefers_category_rollovers_and_preserves_cross_category_impact():
@@ -893,6 +923,8 @@ def test_report_payload_prefers_category_rollovers_and_preserves_cross_category_
         "transfers": [{"from": "wants", "to": "needs", "amount": 500.0}],
         "totalOverspend": 0.0,
     }
+    assert payload["burnRate"]["remaining"] == 1160.04
+    assert payload["burnRate"]["budget"] == 1160.04
 
 
 @pytest.mark.parametrize(
@@ -1150,7 +1182,7 @@ def test_savings_projection_uses_one_monthly_target_across_three_paychecks(monke
     assert report.amount_saved == 2294.47
     assert payload["savingsProjection"] == {
         "currentAmount": 2294.47,
-        "projectedAmount": 3059.29,
+        "projectedAmount": 2294.47,
         "currentIdeal": 1539.64,
         "currentMinimum": 769.82,
         "projectedIdeal": 2294.47,
@@ -1160,13 +1192,67 @@ def test_savings_projection_uses_one_monthly_target_across_three_paychecks(monke
     }
 
 
-def test_report_frontend_uses_active_savings_for_cards_and_category_mix():
+def test_report_frontend_keeps_saved_amount_actual_and_out_of_spending():
     source = (Path(__file__).resolve().parents[2] / "web/expense-report/src/report-app.tsx").read_text()
 
     assert "const savings = savingsForMode(report, projected)" in source
+    assert "amount: savings.currentAmount" in source
+    assert "amount: savings.projectedAmount" not in source
+    assert "amountRowsTotal(breakdown) + amountSaved" not in source
+    assert 'return filter === "all" && item.key !== "savings"' in source
     assert "amountSaved={activeReport.metrics.amountSaved}" in source
     assert "value={activeReport.metrics.amountSaved}" in source
     assert "savingsMetricDescription(activeReport.metrics, projectionActive)" in source
+
+
+def test_report_frontend_calendar_largest_and_burn_rate_presentation_regressions():
+    source = (Path(__file__).resolve().parents[2] / "web/expense-report/src/report-app.tsx").read_text()
+
+    assert 'value={`${totalEvents.length} total`}' in source
+    assert "formatMoney(outflowTotal)" not in source
+    assert '<div className="bb-subscription-total" data-bb-calendar-static-label="month">' in source
+    assert "const largestEntries = [...topEntries].sort" in source
+    assert 'categoryMixPressure("wants", categoryBalances, burnRate.spent)' in source
+    assert "after cross-category coverage" in source
+
+
+def test_largest_expenses_payload_keeps_all_transactions_in_descending_order():
+    shared_rows = [
+        ["hdr"] * 28,
+        ["hdr"] * 28,
+        *[
+            _row(
+                {
+                    "A": f"05/{day:02d}/2026",
+                    "B": str(day * 10),
+                    "C": f"Merchant {day}",
+                    "D": "Hannah",
+                }
+            )
+            for day in range(1, 13)
+        ],
+    ]
+    report = build_expense_breakdown_report(
+        actor_key="hannah",
+        owner_name="Hannah",
+        persons=["Hannah"],
+        month=BudgetMonth(2026, 5),
+        worksheets=ReportWorksheets(
+            shared_expenses=InMemoryWorksheet(shared_rows),
+            personal_budget=InMemoryWorksheet([]),
+            subscriptions=InMemoryWorksheet([]),
+        ),
+    )
+
+    payload_match = re.search(
+        r'<script id="bookiebot-expense-report-data" type="application/json">(.*?)</script>',
+        render_expense_breakdown_html(report),
+    )
+    assert payload_match is not None
+    top_entries = json.loads(payload_match.group(1))["topEntries"]
+
+    assert len(top_entries) == 12
+    assert [entry["amount"] for entry in top_entries] == list(range(120, 0, -10))
 
 
 def test_current_month_calendar_does_not_project_unentered_utility_average(monkeypatch):

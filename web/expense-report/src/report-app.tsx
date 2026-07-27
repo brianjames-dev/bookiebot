@@ -260,7 +260,7 @@ function buildReportView(report: ExpenseReportData, projected: boolean): ReportV
   const breakdown = projected ? projectedBreakdown(report) : report.breakdown
   const monthlyIncome = projected ? report.incomeProjection.projectedAmount : report.incomeProjection.currentAmount
   const savings = savingsForMode(report, projected)
-  const totalExpenses = projected ? projectedOutflowTotal(breakdown, savings.amount) : report.metrics.totalExpenses
+  const totalExpenses = projected ? amountRowsTotal(breakdown) : report.metrics.totalExpenses
   const categoryBalances = projected
     ? projectedCategoryBalances(monthlyIncome, breakdown, savings.amount)
     : report.categoryBalances ?? currentCategoryBalances(report)
@@ -276,7 +276,9 @@ function buildReportView(report: ExpenseReportData, projected: boolean): ReportV
     },
     categoryBalances,
     breakdown,
-    burnRate: projected ? projectedBurnRateFromIncome(report.burnRate, monthlyIncome) : report.burnRate,
+    burnRate: projected
+      ? projectedBurnRateFromIncome(report.burnRate, categoryBalances)
+      : report.burnRate,
     calendarEvents: calendarEventsForMode(report.calendarEvents),
     utilityHistory: report.utilityHistory,
   }
@@ -305,25 +307,14 @@ function projectedBreakdown(report: ExpenseReportData) {
   }))
 }
 
-function projectedOutflowTotal(breakdown: BreakdownItem[], amountSaved: number) {
-  return roundCurrency(amountRowsTotal(breakdown) + amountSaved)
-}
-
 function savingsForMode(report: ExpenseReportData, projected: boolean) {
   const savings = report.savingsProjection
-  return projected
-    ? {
-        amount: savings.projectedAmount,
-        ideal: savings.projectedIdeal,
-        minimum: savings.projectedMinimum,
-        paycheckCount: savings.projectedPaycheckCount,
-      }
-    : {
-        amount: savings.currentAmount,
-        ideal: savings.currentIdeal,
-        minimum: savings.currentMinimum,
-        paycheckCount: savings.currentPaycheckCount,
-      }
+  return {
+    amount: savings.currentAmount,
+    ideal: projected ? savings.projectedIdeal : savings.currentIdeal,
+    minimum: projected ? savings.projectedMinimum : savings.currentMinimum,
+    paycheckCount: savings.currentPaycheckCount,
+  }
 }
 
 function projectedCategoryBalances(monthlyIncome: number, breakdown: BreakdownItem[], amountSaved: number) {
@@ -416,12 +407,15 @@ function projectedBillTotals(report: ExpenseReportData) {
   }
 }
 
-function projectedBurnRateFromIncome(burnRate: BurnRate | null, monthlyIncome: number) {
+function projectedBurnRateFromIncome(
+  burnRate: BurnRate | null,
+  categoryBalances: CategoryBalances,
+) {
   if (!burnRate) {
     return null
   }
-  const budget = roundCurrency(monthlyIncome * 0.3)
   const spent = roundCurrency(burnRate.spent)
+  const budget = roundCurrency(spent + categoryBalances.remaining.wants)
   const daysInMonth = burnRate.daysInMonth
   const elapsedDays = burnRate.elapsedDays
   const expectedSpend = roundCurrency(daysInMonth ? budget * (elapsedDays / daysInMonth) : 0)
@@ -538,7 +532,13 @@ export function ExpenseReportApp({ report }: { report: ExpenseReportData }) {
             id: "burn-rate",
             title: "Burn Rate",
             titleAccessory: <BurnRateInfoButton />,
-            content: <BurnRateChart burnRate={activeReport.burnRate} collapseKey={chartCollapseKey} />,
+            content: (
+              <BurnRateChart
+                burnRate={activeReport.burnRate}
+                categoryBalances={activeReport.categoryBalances}
+                collapseKey={chartCollapseKey}
+              />
+            ),
           },
         ]
       : []),
@@ -940,7 +940,15 @@ function ThemeToggle({ theme, onToggle }: { theme: ThemeMode; onToggle: () => vo
   )
 }
 
-function BurnRateChart({ burnRate, collapseKey }: { burnRate: BurnRate; collapseKey: number }) {
+function BurnRateChart({
+  burnRate,
+  categoryBalances,
+  collapseKey,
+}: {
+  burnRate: BurnRate
+  categoryBalances: CategoryBalances
+  collapseKey: number
+}) {
   const isOver = burnRate.status === "over"
   const isNotStarted = burnRate.status === "not_started"
   const statusLabel = isNotStarted ? "Not started" : isOver ? "Over pace" : "Available today"
@@ -950,6 +958,7 @@ function BurnRateChart({ burnRate, collapseKey }: { burnRate: BurnRate; collapse
   const gradientStops = burnRateGradientStops(chartSeries)
   const lineColor = isNotStarted ? "hsl(var(--chart-1))" : "url(#burn-rate-variance-gradient)"
   const yAxisDomain = burnRateYAxisDomain(chartSeries)
+  const categoryPressure = categoryMixPressure("wants", categoryBalances, burnRate.spent)
 
   return (
     <div className="bb-chart-stack">
@@ -966,6 +975,7 @@ function BurnRateChart({ burnRate, collapseKey }: { burnRate: BurnRate; collapse
             {dailyDifference}
           </div>
         </div>
+        {categoryPressure ? <CategoryMixPressureBar pressure={categoryPressure} /> : null}
       </div>
       <ChartContainer
         config={{ variance: { label: "Variance", color: lineColor } }}
@@ -1037,7 +1047,7 @@ function BurnRateInfoButton() {
     <button type="button" className="bb-burn-rate-info" aria-label="What burn rate means">
       <span aria-hidden="true">i</span>
       <span className="bb-burn-rate-info-tooltip" role="tooltip">
-        Tracks Food + Shopping pace against your wants limit. Available today is what you can spend now and stay on pace.
+        Tracks Food + Shopping pace against your Wants limit after cross-category coverage. Available today is what you can spend now and stay on pace.
       </span>
     </button>
   )
@@ -1212,16 +1222,16 @@ function MetricCard({
 }
 
 function savingsMetricDescription(metrics: ReportView["metrics"], projected: boolean) {
-  const parts = [projected ? "Projected" : "Current"]
+  const parts = ["Actual"]
   if (metrics.savingsPaycheckCount > 0) {
     const noun = metrics.savingsPaycheckCount === 1 ? "paycheck" : "paychecks"
     parts.push(`${metrics.savingsPaycheckCount} ${noun}`)
   }
   if (metrics.savingsIdeal > 0) {
-    parts.push(`Ideal ${formatMoney(metrics.savingsIdeal)}`)
+    parts.push(`${projected ? "Projected ideal" : "Ideal"} ${formatMoney(metrics.savingsIdeal)}`)
   }
   if (metrics.savingsMinimum > 0) {
-    parts.push(`Minimum ${formatMoney(metrics.savingsMinimum)}`)
+    parts.push(`${projected ? "Projected minimum" : "Minimum"} ${formatMoney(metrics.savingsMinimum)}`)
   }
   return parts.join(" • ")
 }
@@ -1526,7 +1536,7 @@ function categoryMixRows(
   let filtered = data.filter((item) => {
     if (filter === "needs") return CATEGORY_NEEDS_KEYS.has(item.key)
     if (filter === "wants") return CATEGORY_WANTS_KEYS.has(item.key)
-    return filter === "all"
+    return filter === "all" && item.key !== "savings"
   })
   if (filter === "savings") {
     filtered = amountSaved > 0
@@ -2402,6 +2412,11 @@ function ExpenseInsightsCard({
   onViewChange: () => void
 }) {
   const [view, setView] = useState<ExpenseInsightsView>("largest")
+  const largestEntries = [...topEntries].sort((left, right) => (
+    right.amount - left.amount
+    || right.date.localeCompare(left.date)
+    || expenseEntryItemLabel(left).localeCompare(expenseEntryItemLabel(right))
+  ))
   const switchView = (nextView: string) => {
     const resolvedView = nextView as ExpenseInsightsView
     if (resolvedView === view) {
@@ -2426,9 +2441,9 @@ function ExpenseInsightsCard({
         <CardContent className="bb-expense-insights-content">
           <TabsContent value="largest">
             <div className="bb-insight-panel">
-              <TopExpensesChart entries={topEntries} />
-              <HiddenListPanel total={topEntries.length}>
-                <TopExpensesTable entries={topEntries} />
+              <TopExpensesChart entries={largestEntries} />
+              <HiddenListPanel total={largestEntries.length}>
+                <TopExpensesTable entries={largestEntries} />
               </HiddenListPanel>
             </div>
           </TabsContent>
@@ -2871,9 +2886,6 @@ function CalendarAnalyticsPanel({
 }) {
   const visibleEvents = filter === "all" ? events : events.filter((item) => item.kind === filter)
   const totalEvents = projected ? visibleEvents : visibleEvents.filter((item) => !item.projectedOnly)
-  const outflowTotal = totalEvents
-    .filter((item) => item.kind !== "income")
-    .reduce((sum, item) => sum + item.amount, 0)
   const subscriptionItems = [...needs, ...wants]
 
   return (
@@ -2886,18 +2898,15 @@ function CalendarAnalyticsPanel({
         <div className="bb-subscription-panel">
           <div className="bb-panel-head bb-subscription-summary">
             <div>
-              <div className="bb-chart-kicker" data-bb-calendar-static-label="month">
+              <div className="bb-subscription-total" data-bb-calendar-static-label="month">
                 {monthOnlyLabel(monthLabel)}
-              </div>
-              <div className="bb-subscription-total">
-                <CalendarChangingValue value={formatMoney(outflowTotal)} />
               </div>
               <div className="bb-chart-mode-note" data-bb-calendar-static-label="mode">
                 {projected ? "Projected" : "Current"}
               </div>
             </div>
             <Badge variant="secondary">
-              <CalendarChangingValue value={String(visibleEvents.length)} /> total
+              <CalendarChangingValue value={`${totalEvents.length} total`} />
             </Badge>
           </div>
           <FinancialCalendar

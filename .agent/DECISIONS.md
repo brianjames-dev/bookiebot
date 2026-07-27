@@ -272,6 +272,12 @@ Decision: A message-triggered recent-action request sends a five-minute launcher
 
 Rationale: Discord cannot mark an ordinary bot-authored DM as ephemeral. A disposable launcher is the smallest bridge that preserves the natural-language `recent` entry while giving the transaction list and full workflow Discord's native `Only you can see this · Dismiss message` treatment.
 
+## 2026-07-26 - Keep Savings Actual And Spending Savings-Free
+
+Decision: Expense-report Saved values always come from actual numbered savings deposits read at report build time, even when Projected is active. Projected income may change monthly Ideal/Minimum targets and the remaining savings gap, but it does not estimate future deposits. Spent, Left, and Category Mix spending exclude savings; detailed Needs/Wants itemization is the primary expense total and category subtotals are fallback data. Burn Rate uses Wants availability after the same three-bucket category cascade shown in Category Mix.
+
+Rationale: Moving money to savings is not spending, and an unmade contribution is not actual savings. Keeping actual deposits separate from projected targets makes Current and Projected internally consistent, while applying the shared category cascade to Burn Rate prevents Needs overspending from leaving the Wants pace artificially unchanged.
+
 ## Pending Decisions
 
 - Where should durable system events live: banking database only, Google Sheets only, or dual-write during transition?

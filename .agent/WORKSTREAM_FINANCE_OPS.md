@@ -401,17 +401,30 @@ Status: Complete. Category Mix now preserves separate Needs, Wants, and Savings 
 
 ### 2026-07-22 Digest Inbox And Three-Paycheck Savings Follow-Up
 
-Status: Complete in code and automated/local browser verification; deployment checks remain in `.agent/STATUS.md`.
+Status: Complete. The three-paycheck workflow remains active; its projected-savings-amount behavior was superseded by the 2026-07-26 actual-only savings decision below.
 
 - Reconciliation digest and inbox component actions now use an explicit private thinking defer before sending follow-ups, fixing the silent `View Inbox` interaction and keeping the response actor-scoped.
 - Callback regression coverage invokes the real `View Inbox` button and confirms it defers privately before dispatching the inbox workflow.
 - Savings commands now support numbered first, second, and third paycheck rows through shared row-discovery, check, and logging helpers with standard undo metadata.
 - Modern savings rows expose their own Ideal and Minimum values; the reader retains the legacy two-row fallback where Ideal and Minimum were split across the first and second rows.
-- Expense reports emit current/projected savings amounts, Ideal/Minimum totals, and paycheck counts. Projected mode derives one monthly Ideal/Minimum rate from the reached sheet targets, applies it once to projected income, and divides the resulting monthly Ideal evenly across projected paycheck slots before filling empty contributions.
-- The report's Saved card, Left amount, outflow total, and Savings Category Mix all consume the active current/projected savings value instead of a fixed current amount.
+- Expense reports emit current/projected savings target metadata and paycheck counts. Projected mode derives one monthly Ideal/Minimum rate from the reached sheet targets and applies it once to projected income.
+- Historical behavior estimated unentered future contributions and fed that amount into Saved, Left, and Savings Category Mix. The 2026-07-26 follow-up keeps Saved actual in both modes instead.
 - Read-only inspection confirmed three savings rows on both live July sheets and Templates. A follow-up corrected the initial per-row scaling error: Brian July's `$11,472.33` projected income now produces a `$2,294.47` monthly Ideal and `$1,147.23` Minimum, not a three-row `$3,441.69` Ideal.
-- Local browser verification confirmed the Brian July Saved card changes from the current `$2,294.47` / `$1,539.64` Ideal to a `$3,059.29` projected contribution / `$2,294.47` Ideal and produces no console warnings or errors.
+- Historical browser verification covered the prior contribution projection; current expected behavior is recorded in the 2026-07-26 follow-up.
 - Verification: `410 passed, 1 skipped`; Pyright clean; frontend typecheck/build passed; `git diff --check` passed.
+
+### 2026-07-26 Expense Report Financial Semantics Follow-Up
+
+Status: Complete in code, automated verification, and live browser verification; deployment confirmation remains in `.agent/STATUS.md`.
+
+- Spent and Left use detailed Needs/Wants expense itemization without savings. Needs/Wants subtotals are a fallback only when no detailed breakdown exists, and `Subscriptions (Needs)` summary rows cannot be duplicated as individual Need expenses.
+- Category Mix spending already excluded savings; an explicit key guard preserves that invariant. The Savings tab remains separate and uses only the actual saved amount read from the sheet.
+- Projected mode keeps Saved and the actual paycheck count unchanged. It may update the projected monthly Ideal/Minimum targets and remaining savings gap from projected income.
+- Calendar shows the month name instead of an outflow total and renders its current/projected event count as one spaced value.
+- Largest includes every actual shared expense, entered bill/utility, and elapsed subscription in descending order. The graph shows the top ten while the expandable table retains all rows.
+- Burn Rate derives effective Wants availability after the category cascade and reuses the category-impact callout to explain funds donated to or received from other buckets.
+- Live Brian July verification showed Current Saved `$1,539.64`, Projected Saved `$1,539.64`, projected Ideal `$2,294.47`, a `$249.36` Needs deduction from Wants in current Burn Rate, and a descending Largest list headed by Rent.
+- Verification: focused report suite `33 passed`; full suite `421 passed, 1 skipped`; Pyright clean; frontend typecheck/build passed; `git diff --check` passed; Brian/Hannah live browser logs were clean.
 
 ### 2026-07-24 Persisted Reconciliation Inbox Follow-Up
 
