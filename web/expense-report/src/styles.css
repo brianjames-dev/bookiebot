@@ -1519,6 +1519,13 @@ summary {
   font-weight: 700;
 }
 
+.bb-chart-budget-note {
+  margin-top: 4px;
+  color: hsl(var(--muted-foreground));
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+}
+
 .bb-legend-list,
 .bb-stat-list {
   display: grid;

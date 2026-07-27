@@ -4,7 +4,7 @@ Last updated: 2026-07-26
 
 ## Active Focus
 
-Expense-report available-cash, savings progress, responsive details, Largest, header, and Burn Rate presentation are corrected and verified against live Brian July data. The next step is deployment and production confirmation.
+Expense-report financial totals now follow the Budget sheets' category budgets, subtotals, margins, and Net Total while keeping elapsed outflow separate for Spent. The next step is deployment and production confirmation.
 
 ## On Deck
 
@@ -29,11 +29,13 @@ Expense-report available-cash, savings progress, responsive details, Largest, he
 - Verification: focused report suite `33 passed`; full suite `421 passed, 1 skipped`; Pyright reported zero errors; frontend typecheck/build passed; `git diff --check` passed.
 - Live browser verification covered Brian and Hannah July Current/Projected metrics, Calendar labels/counts, descending Largest data, Burn Rate category coverage, and clean browser logs.
 - Manual verification is checklist item 67 below.
-- Corrected `Left` to reserve actual savings while keeping savings out of `Spent`: Brian July now shows `$7,698.22 - $5,133.70 - $1,539.64 = $1,024.88`, and projected mode applies the same actual-savings deduction.
+- Corrected `Left` to use the Budget sheet's cascaded Net Total instead of subtracting elapsed outflow from income. Brian July now shows `$794.00`, matching the sheet after the `$249.36` Needs overage is covered by Wants, while Spent remains the separate `$5,133.70` elapsed-outflow metric.
+- Split elapsed report itemization from Budget-sheet category usage. Brian's Needs and Wants views now show `$4,098.47 / $3,849.11 (106.48%)` and `$1,266.11 / $2,309.47 (54.82%)`; Savings remains `$1,539.64 / $1,539.64`.
+- Projected category budgets use a penny-safe 50/30/20 split of projected income and subtract the current sheet subtotals without projecting savings deposits. Brian Projected now shows `$4,568.11` Left and a `$2,294.47` Savings Ideal.
 - Replaced the Saved card's mode/paycheck copy with a color-coded progress bar from zero through Minimum to Ideal. The projected toggle changes only its target scale, not the saved amount.
 - Moved the generated timestamp beside the title, kept Projected immediately left of the rightmost theme control, opened Daily Spending details by default only above the desktop breakpoint, and anchored the daily pace badge beside the Burn Rate summary.
 - Reworded the Burn Rate transfer callout to name the donor and covered category, and excluded Rent from Largest in both generated payloads and the frontend compatibility filter.
-- Follow-up verification: focused report suite `33 passed`; full suite `421 passed, 1 skipped`; Pyright reported zero errors; frontend typecheck/build passed; live Brian Current/Projected desktop/mobile checks passed.
+- Follow-up verification: focused report suite `34 passed`; full suite `422 passed, 1 skipped`; Pyright reported zero errors; frontend typecheck/build passed; live Brian Current/Projected desktop/mobile checks passed.
 - Manual verification remains checklist item 67 below.
 
 ## Completed 2026-07-25
@@ -461,7 +463,7 @@ Use a test row or low-risk real row in Discord:
 66. Send `recent` directly in BookieBot's DM, then open the launcher and complete a selection plus an update that requires a typed reply.
     - Expected: no `I sent your recent transactions list to your DMs.` tail appears; the short-lived launcher deletes when tapped; the list, prompts, typed-reply result, pagination, and action outcomes all show Discord's `Only you can see this · Dismiss message` footer.
 67. Open current-month expense reports for Brian and Hannah, inspect Current and Projected, then view Calendar, Burn Rate, Category Mix, and Largest.
-    - Expected: Spent and Category Mix spending exclude Saved, while Left equals Income minus Spent minus actual Saved; Saved stays actual when Projected is toggled while the progress bar's monthly Ideal/Minimum targets may change; Calendar shows the month name and a spaced count such as `17 total`; Largest is descending, excludes Rent, and retains all other actual shared expenses, entered bills/utilities, and elapsed subscriptions; Burn Rate's Wants limit and donor/recipient impact note reflect category-cascade transfers, with the pace badge anchored beside its summary. Daily Spending details start open on desktop and closed on mobile, and the timestamp/Projected/theme controls follow the updated header order.
+    - Expected: Current Left equals the sheet's Net Total after category coverage, while Spent remains elapsed outflow without Saved. Brian shows `$794.00` Left, Needs `$4,098.47 / $3,849.11 (106.48%)`, Wants `$1,266.11 / $2,309.47 (54.82%)`, and Saved `$1,539.64 / $1,539.64`; Hannah shows `$618.53` Left from Needs `$688.12`, Wants `$312.82`, and Saved `$0.00`. Saved stays actual when Projected is toggled while projected category budgets and the progress bar's monthly Ideal/Minimum targets change; Calendar shows the month name and a spaced count such as `17 total`; Largest is descending, excludes Rent, and retains all other actual shared expenses, entered bills/utilities, and elapsed subscriptions; Burn Rate's Wants limit and donor/recipient impact note reflect category-cascade transfers, with the pace badge anchored beside its summary. Daily Spending details start open on desktop and closed on mobile, and the timestamp/Projected/theme controls follow the updated header order.
 
 ## Verification Baseline
 
@@ -476,10 +478,10 @@ Latest verification:
 
 ```bash
 python -m pytest unit_tests/reports/test_expense_breakdown.py
-# passed: 33 passed
+# passed: 34 passed
 
 python -m pytest unit_tests
-# passed: 421 passed, 1 skipped
+# passed: 422 passed, 1 skipped
 
 python -m pyright
 # passed: 0 errors, 0 warnings, 0 informations
@@ -491,7 +493,7 @@ git diff --check
 # passed
 
 Live Brian July expense-report desktop/mobile browser verification
-# passed: Left reserves actual savings, Spent remains savings-free, progress targets react to Projected, Rent is absent from Largest, desktop/mobile details defaults and updated header/Burn Rate layouts
+# passed: Current Left $794.00; exact Needs/Wants/Savings budgets, usage, and percentages; Projected Left $4,568.11 and Ideal $2,294.47; responsive layouts remain valid
 
 python -m pytest unit_tests/core/test_bank_reconciliation.py unit_tests/banking/test_reconciliation.py
 # passed: 66 passed

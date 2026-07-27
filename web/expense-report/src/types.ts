@@ -149,6 +149,9 @@ export interface ExpenseReportData {
   savingsProjection: SavingsProjection
   burnRate: BurnRate | null
   breakdown: BreakdownItem[]
+  budgetBreakdown?: BreakdownItem[]
+  categoryBudgets?: CategoryBalanceAmounts
+  categorySpending?: CategoryBalanceAmounts
   dailyTotals: AmountRow[]
   budgetGroups: AmountRow[]
   personTotals: AmountRow[]

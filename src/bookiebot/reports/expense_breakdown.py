@@ -147,6 +147,10 @@ class ExpenseBreakdownReport:
     wants_rollover: float | None
     amount_saved: float | None
     savings_goal: float | None
+    category_budgets: dict[str, float] = field(default_factory=dict)
+    category_spending: dict[str, float] = field(default_factory=dict)
+    budget_breakdown: dict[str, dict[str, Any]] = field(default_factory=dict)
+    net_total: float | None = None
     savings_deposits: list[SavingsDeposit] = field(default_factory=list)
     entries: list[ExpenseEntry] = field(default_factory=list)
     need_expenses: list[PaymentItem] = field(default_factory=list)
@@ -412,6 +416,10 @@ def build_expense_breakdown_report(
         current_month_subscriptions,
         month,
     )
+    budget_static_needs_total, budget_wants_total = _subscription_bucket_totals(
+        personal_rows,
+        current_month_subscriptions,
+    )
     payment_totals = _payment_totals_by_group(payments)
     utility_history = _utility_history_items(
         selected.budget_history or (BudgetHistoryRows(month, personal_rows),),
@@ -443,19 +451,34 @@ def build_expense_breakdown_report(
         else:
             breakdown_amounts[category] = itemized_shared_totals[category]
 
+    budget_breakdown_amounts = dict(breakdown_amounts)
+    budget_breakdown_amounts["static_bills_subscriptions_needs"] = budget_static_needs_total
+    budget_breakdown_amounts["subscriptions_wants"] = budget_wants_total
+
     grand_total = round(sum(breakdown_amounts.values()), 2)
-    breakdown = {
-        key: {
-            "amount": round(amount, 2),
-            "percentage": round((amount / grand_total * 100), 2) if grand_total else 0.0,
-            "label": CATEGORY_LABELS[key],
-        }
-        for key, amount in breakdown_amounts.items()
-    }
+    breakdown = _breakdown_from_amounts(breakdown_amounts)
+    budget_breakdown = _breakdown_from_amounts(budget_breakdown_amounts)
 
     shared_total = round(sum(entry.amount for entry in entries), 2)
     personal_expense_total = _personal_expense_subtotal_total(personal_rows)
     personal_total = grand_total if grand_total > 0 else (personal_expense_total or 0.0)
+    category_budgets = _category_budget_amounts(personal_rows, income_total)
+    category_spending = _category_spending_amounts(
+        personal_rows,
+        budget_breakdown,
+        amount_saved=amount_saved,
+    )
+    net_total = _net_total_amount(personal_rows)
+    if net_total is None:
+        if any(value is not None for value in (remaining_budget, remaining_wants_budget, remaining_savings_budget)):
+            fallback_balances = _cascade_category_balances(
+                remaining_budget or 0.0,
+                remaining_wants_budget or 0.0,
+                remaining_savings_budget or 0.0,
+            )
+            net_total = round(sum(fallback_balances["remaining"].values()), 2)
+        elif income_total:
+            net_total = round(income_total - personal_total - float(amount_saved or 0.0), 2)
 
     return ExpenseBreakdownReport(
         actor_key=actor_key,
@@ -475,6 +498,10 @@ def build_expense_breakdown_report(
         wants_rollover=wants_rollover,
         amount_saved=amount_saved,
         savings_goal=savings_goal,
+        category_budgets=category_budgets,
+        category_spending=category_spending,
+        budget_breakdown=budget_breakdown,
+        net_total=net_total,
         savings_deposits=savings_deposits,
         entries=entries,
         need_expenses=need_expenses,
@@ -490,6 +517,18 @@ def build_expense_breakdown_report(
             RawSheet("Subscriptions", _compact_rows(subscription_rows)),
         ],
     )
+
+
+def _breakdown_from_amounts(amounts: dict[str, float]) -> dict[str, dict[str, Any]]:
+    total = round(sum(amounts.values()), 2)
+    return {
+        key: {
+            "amount": round(amount, 2),
+            "percentage": round((amount / total * 100), 2) if total else 0.0,
+            "label": CATEGORY_LABELS[key],
+        }
+        for key, amount in amounts.items()
+    }
 
 
 def write_expense_breakdown_report(report: ExpenseBreakdownReport, *, report_dir: Path | None = None) -> ExpenseReportPage:
@@ -523,12 +562,11 @@ def render_expense_breakdown_html(report: ExpenseBreakdownReport) -> str:
     merchant_totals = _merchant_totals(activity_entries)
     merchant_occurrences = _merchant_occurrences(activity_entries)
     daily_totals = _daily_totals(activity_entries)
-    budget_group_totals = _budget_group_totals(report.breakdown)
-    balance_after_expenses = (
-        round(report.income_total - report.personal_total - float(report.amount_saved or 0.0), 2)
-        if report.income_total
-        else None
-    )
+    budget_group_totals = {
+        "Needs": round(report.category_spending.get("needs", 0.0), 2),
+        "Wants": round(report.category_spending.get("wants", 0.0), 2),
+    }
+    balance_after_expenses = report.net_total
     payload = _report_client_payload(
         report=report,
         activity_entries=activity_entries,
@@ -1053,6 +1091,20 @@ def _payment_totals_by_group(payments: list[PaymentItem]) -> dict[str, float]:
 
 
 def _personal_expense_subtotal_total(rows: list[list[str]]) -> float | None:
+    totals = _personal_expense_subtotals(rows)
+    expense_totals = {
+        bucket: amount
+        for bucket, amount in totals.items()
+        if bucket in {"needs", "wants"}
+    }
+    if not expense_totals:
+        return None
+    if any(amount > 0 for amount in expense_totals.values()) or len(expense_totals) >= 2:
+        return round(sum(expense_totals.values()), 2)
+    return None
+
+
+def _personal_expense_subtotals(rows: list[list[str]]) -> dict[str, float]:
     totals: dict[str, float] = {}
     for row in rows:
         for index, value in enumerate(row):
@@ -1060,16 +1112,73 @@ def _personal_expense_subtotal_total(rows: list[list[str]]) -> float | None:
             if "subtotal" not in normalized:
                 continue
             bucket = _outflow_subtotal_bucket(normalized)
-            if bucket not in {"needs", "wants"}:
+            if bucket not in {"needs", "wants", "savings"}:
                 continue
             amount = _next_money_value(row, index + 1, window=8)
             if amount is not None:
                 totals[bucket] = round(amount, 2)
+    return totals
 
-    if not totals:
-        return None
-    if any(amount > 0 for amount in totals.values()) or len(totals) >= 2:
-        return round(sum(totals.values()), 2)
+
+def _category_budget_amounts(rows: list[list[str]], income_total: float) -> dict[str, float]:
+    for row in rows:
+        for index, value in enumerate(row):
+            normalized = _normalize_label(value)
+            if normalized != "budget" and not normalized.startswith("budget "):
+                continue
+            amounts = [
+                round(_cell_money(cell), 2)
+                for cell in row[index + 1 :]
+                if re.search(r"\d", str(cell))
+            ]
+            if len(amounts) >= 3:
+                return {
+                    "needs": amounts[0],
+                    "wants": amounts[1],
+                    "savings": amounts[2],
+                }
+
+    needs = round(income_total * 0.5, 2)
+    savings = round(income_total * 0.2, 2)
+    wants = round(income_total - needs - savings, 2)
+    return {"needs": needs, "wants": wants, "savings": savings}
+
+
+def _category_spending_amounts(
+    rows: list[list[str]],
+    budget_breakdown: dict[str, dict[str, Any]],
+    *,
+    amount_saved: float | None,
+) -> dict[str, float]:
+    subtotals = _personal_expense_subtotals(rows)
+    reliable_expense_subtotals = (
+        any(subtotals.get(bucket, 0.0) > 0 for bucket in ("needs", "wants"))
+        or all(bucket in subtotals for bucket in ("needs", "wants"))
+    )
+    budget_groups = _budget_group_totals(budget_breakdown)
+    return {
+        "needs": round(
+            subtotals.get("needs", budget_groups["Needs"])
+            if reliable_expense_subtotals
+            else budget_groups["Needs"],
+            2,
+        ),
+        "wants": round(
+            subtotals.get("wants", budget_groups["Wants"])
+            if reliable_expense_subtotals
+            else budget_groups["Wants"],
+            2,
+        ),
+        "savings": round(subtotals.get("savings", float(amount_saved or 0.0)), 2),
+    }
+
+
+def _net_total_amount(rows: list[list[str]]) -> float | None:
+    for row in rows:
+        for index, value in enumerate(row):
+            if _normalize_label(value) != "net total":
+                continue
+            return round(_next_money(row, index + 1), 2)
     return None
 
 
@@ -1468,17 +1577,27 @@ def _cascade_category_balances(
 def _category_balance_payload(report: ExpenseBreakdownReport) -> dict[str, Any]:
     needs = report.remaining_budget
     if needs is None:
-        needs = report.needs_rollover or 0.0
+        needs = round(
+            report.category_budgets.get("needs", 0.0)
+            - report.category_spending.get("needs", 0.0),
+            2,
+        )
 
     wants = report.remaining_wants_budget
     if wants is None:
-        wants = report.wants_rollover or 0.0
-        if report.needs_rollover is not None:
-            wants = round(wants - report.needs_rollover, 2)
+        wants = round(
+            report.category_budgets.get("wants", 0.0)
+            - report.category_spending.get("wants", 0.0),
+            2,
+        )
 
     savings = report.remaining_savings_budget
-    if savings is None and report.savings_goal is not None and report.amount_saved is not None:
-        savings = round(report.savings_goal - report.amount_saved, 2)
+    if savings is None:
+        savings = round(
+            report.category_budgets.get("savings", 0.0)
+            - report.category_spending.get("savings", 0.0),
+            2,
+        )
 
     return _cascade_category_balances(needs, wants, savings or 0.0)
 
@@ -1978,6 +2097,8 @@ def _report_client_payload(
             "incomeAfterExpenses": balance_after_expenses,
         },
         "categoryBalances": _category_balance_payload(report),
+        "categoryBudgets": report.category_budgets,
+        "categorySpending": report.category_spending,
         "incomeProjection": _income_projection_payload(report),
         "savingsProjection": _savings_projection_payload(report),
         "burnRate": _burn_rate_payload(report),
@@ -1990,6 +2111,17 @@ def _report_client_payload(
                 "color": CATEGORY_COLORS.get(key, "#64748b"),
             }
             for key, info in breakdown_items
+        ],
+        "budgetBreakdown": [
+            {
+                "key": key,
+                "label": str(info.get("label") or key),
+                "amount": round(float(info.get("amount") or 0.0), 2),
+                "percentage": round(float(info.get("percentage") or 0.0), 2),
+                "color": CATEGORY_COLORS.get(key, "#64748b"),
+            }
+            for key, info in report.budget_breakdown.items()
+            if float(info.get("amount") or 0.0) > 0
         ],
         "dailyTotals": [_amount_row(label, amount) for label, amount in daily_totals],
         "budgetGroups": [_amount_row(label, amount) for label, amount in budget_group_totals.items()],

@@ -417,15 +417,16 @@ Status: Complete. The three-paycheck workflow remains active; its projected-savi
 
 Status: Complete in code, automated verification, and live browser verification; deployment confirmation remains in `.agent/STATUS.md`.
 
-- Spent uses detailed Needs/Wants expense itemization without savings. Left represents available cash after both those expenses and the actual savings deposits read from the sheet. Needs/Wants subtotals are a fallback only when no detailed breakdown exists, and `Subscriptions (Needs)` summary rows cannot be duplicated as individual Need expenses.
-- Category Mix spending already excluded savings; an explicit key guard preserves that invariant. The Savings tab remains separate and uses only the actual saved amount read from the sheet.
-- Projected mode keeps Saved unchanged. It may update the monthly Ideal/Minimum targets and the Saved progress scale from projected income, but Left still subtracts only actual savings.
+- Spent uses detailed elapsed Needs/Wants expense itemization without savings. Left uses the Budget sheet's Net Total after its category margins and cross-category coverage; it is not derived by subtracting elapsed outflow and savings from income.
+- Category Mix All remains the elapsed-outflow view. Needs and Wants use their source Budget-sheet subtotals and allocations so percentages match the workbook even when full subscription budgets differ from subscriptions elapsed so far. The Savings tab remains separate and uses only the actual saved amount read from the sheet.
+- Projected mode keeps Saved and current category usage unchanged. It applies a penny-safe 50/30/20 split to projected income, cascades the resulting category balances, and updates the monthly Ideal/Minimum targets without inventing future savings deposits.
 - Calendar shows the month name instead of an outflow total and renders its current/projected event count as one spaced value.
 - Largest includes every non-Rent actual shared expense, entered bill/utility, and elapsed subscription in descending order. The graph shows the top ten while the expandable table retains all non-Rent rows.
 - Burn Rate derives effective Wants availability after the category cascade, places the daily pace beside its summary, and names both donor and covered category in the impact callout.
 - The Saved metric is a color-coded zero-to-Ideal progress bar with a Minimum marker; mode/paycheck prose was removed. Daily Spending details start open only on desktop, and the header places the timestamp beside the title with Projected immediately left of the rightmost theme control.
-- Live Brian July verification showed Current Left `$1,024.88` from Income `$7,698.22` minus Spent `$5,133.70` minus Saved `$1,539.64`; Projected Left `$4,793.00`; unchanged Saved `$1,539.64`; projected Ideal `$2,294.47`; a `$249.36` Needs transfer from Wants; and a descending Rent-free Largest list headed by `Hannah's T`.
-- Verification: focused report suite `33 passed`; full suite `421 passed, 1 skipped`; Pyright clean; frontend typecheck/build passed; `git diff --check` passed; Brian/Hannah live browser logs were clean.
+- Live Brian July verification showed Current Income `$7,698.22`, Spent `$5,133.70`, Left `$794.00`, Needs `$4,098.47 / $3,849.11 (106.48%)`, Wants `$1,266.11 / $2,309.47 (54.82%)`, and Saved `$1,539.64 / $1,539.64`. Projected showed `$11,472.33` Income, `$4,568.11` Left, unchanged Saved `$1,539.64`, and `$2,294.47` Ideal.
+- Live Hannah July source verification showed `$618.53` Left with `$688.12 / $809.74` Needs, `$312.82 / $485.84` Wants, and `$0.00 / $323.89` Savings.
+- Verification: focused report suite, full suite, Pyright, frontend typecheck/build, `git diff --check`, and live desktop/mobile browser checks are recorded in `.agent/STATUS.md`.
 
 ### 2026-07-24 Persisted Reconciliation Inbox Follow-Up
 

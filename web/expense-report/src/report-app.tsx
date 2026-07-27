@@ -249,7 +249,10 @@ type ReportView = {
     savingsMinimum: number
   }
   categoryBalances: CategoryBalances
+  categoryBudgets: CategoryBalanceAmounts
+  categorySpending: CategoryBalanceAmounts
   breakdown: BreakdownItem[]
+  budgetBreakdown: BreakdownItem[]
   burnRate: BurnRate | null
   calendarEvents: CalendarEvent[]
   utilityHistory: UtilityHistoryItem[]
@@ -260,20 +263,30 @@ function buildReportView(report: ExpenseReportData, projected: boolean): ReportV
   const monthlyIncome = projected ? report.incomeProjection.projectedAmount : report.incomeProjection.currentAmount
   const savings = savingsForMode(report, projected)
   const totalExpenses = projected ? amountRowsTotal(breakdown) : report.metrics.totalExpenses
+  const currentBalances = report.categoryBalances ?? currentCategoryBalances(report)
+  const currentBudgets = currentCategoryBudgets(report)
+  const categorySpending = currentCategorySpending(report, currentBudgets, currentBalances)
+  const categoryBudgets = projected ? projectedCategoryBudgets(monthlyIncome) : currentBudgets
   const categoryBalances = projected
-    ? projectedCategoryBalances(monthlyIncome, breakdown, savings.amount)
-    : report.categoryBalances ?? currentCategoryBalances(report)
+    ? projectedCategoryBalances(categoryBudgets, categorySpending)
+    : currentBalances
+  const budgetRemaining = projected
+    ? categoryBalanceTotal(categoryBalances)
+    : report.metrics.incomeAfterExpenses ?? categoryBalanceTotal(categoryBalances)
   return {
     metrics: {
       totalExpenses,
       monthlyIncome,
-      incomeAfterExpenses: roundCurrency(monthlyIncome - totalExpenses - savings.amount),
+      incomeAfterExpenses: roundCurrency(budgetRemaining),
       amountSaved: savings.amount,
       savingsIdeal: savings.ideal,
       savingsMinimum: savings.minimum,
     },
     categoryBalances,
+    categoryBudgets,
+    categorySpending,
     breakdown,
+    budgetBreakdown: report.budgetBreakdown?.length ? report.budgetBreakdown : report.breakdown,
     burnRate: projected
       ? projectedBurnRateFromIncome(report.burnRate, categoryBalances)
       : report.burnRate,
@@ -314,14 +327,48 @@ function savingsForMode(report: ExpenseReportData, projected: boolean) {
   }
 }
 
-function projectedCategoryBalances(monthlyIncome: number, breakdown: BreakdownItem[], amountSaved: number) {
-  const needsSpent = amountRowsTotal(breakdown.filter((item) => CATEGORY_NEEDS_KEYS.has(item.key)))
-  const wantsSpent = amountRowsTotal(breakdown.filter((item) => CATEGORY_WANTS_KEYS.has(item.key)))
+function currentCategoryBudgets(report: ExpenseReportData): CategoryBalanceAmounts {
+  if (report.categoryBudgets) {
+    return report.categoryBudgets
+  }
+  return projectedCategoryBudgets(report.incomeProjection.currentAmount)
+}
+
+function projectedCategoryBudgets(monthlyIncome: number): CategoryBalanceAmounts {
+  const needs = roundCurrency(monthlyIncome * 0.5)
+  const savings = roundCurrency(monthlyIncome * 0.2)
+  const wants = roundCurrency(monthlyIncome - needs - savings)
+  return { needs, wants, savings }
+}
+
+function currentCategorySpending(
+  report: ExpenseReportData,
+  budgets: CategoryBalanceAmounts,
+  balances: CategoryBalances,
+): CategoryBalanceAmounts {
+  if (report.categorySpending) {
+    return report.categorySpending
+  }
+  return {
+    needs: roundCurrency(budgets.needs - balances.raw.needs),
+    wants: roundCurrency(budgets.wants - balances.raw.wants),
+    savings: roundCurrency(budgets.savings - balances.raw.savings),
+  }
+}
+
+function projectedCategoryBalances(
+  budgets: CategoryBalanceAmounts,
+  spending: CategoryBalanceAmounts,
+) {
   return cascadeCategoryBalances({
-    needs: roundCurrency(monthlyIncome * 0.5 - needsSpent),
-    wants: roundCurrency(monthlyIncome * 0.3 - wantsSpent),
-    savings: roundCurrency(monthlyIncome * 0.2 - amountSaved),
+    needs: roundCurrency(budgets.needs - spending.needs),
+    wants: roundCurrency(budgets.wants - spending.wants),
+    savings: roundCurrency(budgets.savings - spending.savings),
   })
+}
+
+function categoryBalanceTotal(balances: CategoryBalances) {
+  return roundCurrency(Object.values(balances.remaining).reduce((total, amount) => total + amount, 0))
 }
 
 function currentCategoryBalances(report: ExpenseReportData) {
@@ -516,7 +563,9 @@ export function ExpenseReportApp({ report }: { report: ExpenseReportData }) {
       content: (
         <CategoryMixChart
           data={activeReport.breakdown}
+          budgetData={activeReport.budgetBreakdown}
           categoryBalances={activeReport.categoryBalances}
+          categoryBudgets={activeReport.categoryBudgets}
           amountSaved={activeReport.metrics.amountSaved}
           filter={categoryMixFilter}
           projected={projectionActive}
@@ -708,7 +757,7 @@ export function ExpenseReportApp({ report }: { report: ExpenseReportData }) {
           <MetricCard
             label="Left"
             value={activeReport.metrics.incomeAfterExpenses}
-            description="After expenses & savings"
+            description="Budget remaining"
             accent
           />
           <SavingsMetricCard
@@ -1280,7 +1329,9 @@ function SavingsMetricCard({
 
 type CategoryMixChartProps = {
   data: BreakdownItem[]
+  budgetData: BreakdownItem[]
   categoryBalances: CategoryBalances
+  categoryBudgets: CategoryBalanceAmounts
   amountSaved: number
   filter: CategoryMixFilter
   projected: boolean
@@ -1289,18 +1340,23 @@ type CategoryMixChartProps = {
 
 const CategoryMixChart = memo(function CategoryMixChart({
   data,
+  budgetData,
   categoryBalances,
+  categoryBudgets,
   amountSaved,
   filter,
   projected,
   collapseKey,
 }: CategoryMixChartProps) {
   const selectedRollover = categoryMixRollover(categoryBalances, filter)
-  const chartData = categoryMixRows(data, selectedRollover, filter, amountSaved)
+  const categoryData = filter === "needs" || filter === "wants" ? budgetData : data
+  const chartData = categoryMixRows(categoryData, selectedRollover, filter, amountSaved)
   const [pieHostRef, pieHostSize] = useElementSize<HTMLDivElement>()
   const pieLayout = useExpensePieLayout(chartData, pieHostSize)
   const spentTotal = amountRowsTotal(chartData.filter((item) => item.key !== "left"))
   const pressure = categoryMixPressure(filter, categoryBalances, spentTotal)
+  const selectedBudget = filter === "all" ? 0 : categoryBudgets[filter]
+  const usedPercent = selectedBudget > 0 ? (spentTotal / selectedBudget) * 100 : 0
 
   return (
     <div className="bb-chart-stack">
@@ -1309,6 +1365,11 @@ const CategoryMixChart = memo(function CategoryMixChart({
           <div className="bb-chart-kicker">{filter === "savings" ? "Saved" : "Spent"}</div>
           <div className="bb-chart-total">{formatMoney(spentTotal)}</div>
           <div className="bb-chart-mode-note">{projected ? "Projected" : "Current"}</div>
+          {filter !== "all" && selectedBudget > 0 ? (
+            <div className="bb-chart-budget-note">
+              {formatMoney(selectedBudget)} budget • {usedPercent.toFixed(2)}% used
+            </div>
+          ) : null}
         </div>
         {pressure ? <CategoryMixPressureBar pressure={pressure} /> : null}
       </div>

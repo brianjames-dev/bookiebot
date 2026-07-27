@@ -278,6 +278,12 @@ Decision: Expense-report Saved values always come from actual numbered savings d
 
 Rationale: Moving money to savings is not spending, but it is also no longer available cash. Keeping actual deposits separate from both expenses and projected targets makes Spent, Saved, and Left describe distinct concepts, while applying the shared category cascade to Burn Rate prevents Needs overspending from leaving the Wants pace artificially unchanged.
 
+## 2026-07-26 - Use Budget-Sheet Category Totals For Available Money
+
+Decision: Supersede the arithmetic definition of Left above. Current Left is the Budget sheet's Net Total after its Needs, Wants, and Savings margins and cross-category coverage. Spent remains the separately computed elapsed outflow without savings. Category Mix All uses that elapsed itemization, while Needs, Wants, and Savings use the sheet's category subtotals and allocations. Projected mode keeps current category usage and Saved actual, creates penny-safe 50/30/20 budgets from projected income, and cascades those projected balances.
+
+Rationale: Open-month subscription rows contain both full budget commitments and only the charges elapsed so far. Subtracting elapsed Spent and Saved from Income overstated available budget by the unelapsed subscription commitments. Using the sheet's category totals preserves its `$794.00` source-of-truth Net Total while keeping `$5,133.70` Spent an honest actual-outflow metric.
+
 ## Pending Decisions
 
 - Where should durable system events live: banking database only, Google Sheets only, or dual-write during transition?
