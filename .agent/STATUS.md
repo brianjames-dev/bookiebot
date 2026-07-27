@@ -4,7 +4,7 @@ Last updated: 2026-07-26
 
 ## Active Focus
 
-Expense-report spending, savings, Calendar, Largest, and Burn Rate semantics are corrected and verified against live Brian and Hannah July data. The next step is deployment and production confirmation.
+Expense-report available-cash, savings progress, responsive details, Largest, header, and Burn Rate presentation are corrected and verified against live Brian July data. The next step is deployment and production confirmation.
 
 ## On Deck
 
@@ -29,6 +29,12 @@ Expense-report spending, savings, Calendar, Largest, and Burn Rate semantics are
 - Verification: focused report suite `33 passed`; full suite `421 passed, 1 skipped`; Pyright reported zero errors; frontend typecheck/build passed; `git diff --check` passed.
 - Live browser verification covered Brian and Hannah July Current/Projected metrics, Calendar labels/counts, descending Largest data, Burn Rate category coverage, and clean browser logs.
 - Manual verification is checklist item 67 below.
+- Corrected `Left` to reserve actual savings while keeping savings out of `Spent`: Brian July now shows `$7,698.22 - $5,133.70 - $1,539.64 = $1,024.88`, and projected mode applies the same actual-savings deduction.
+- Replaced the Saved card's mode/paycheck copy with a color-coded progress bar from zero through Minimum to Ideal. The projected toggle changes only its target scale, not the saved amount.
+- Moved the generated timestamp beside the title, kept Projected immediately left of the rightmost theme control, opened Daily Spending details by default only above the desktop breakpoint, and anchored the daily pace badge beside the Burn Rate summary.
+- Reworded the Burn Rate transfer callout to name the donor and covered category, and excluded Rent from Largest in both generated payloads and the frontend compatibility filter.
+- Follow-up verification: focused report suite `33 passed`; full suite `421 passed, 1 skipped`; Pyright reported zero errors; frontend typecheck/build passed; live Brian Current/Projected desktop/mobile checks passed.
+- Manual verification remains checklist item 67 below.
 
 ## Completed 2026-07-25
 
@@ -71,7 +77,7 @@ Expense-report spending, savings, Calendar, Largest, and Burn Rate semantics are
 - Added third-paycheck savings intents, parser guidance, intent-explorer entries, handlers, sheet checks, sheet logging, and undo metadata.
 - Generalized savings-row discovery across first, second, and third paycheck rows, reading each row's Actual, Ideal, and Minimum values while retaining compatibility with the older two-row shared-target layout.
 - Added a report savings-projection payload that tracks saved amounts, Ideal/Minimum totals, and applicable paycheck counts. The original contribution-estimation behavior was superseded on 2026-07-26; Projected now changes targets without estimating future saved dollars.
-- Added the Savings Category Mix view and Saved-card paycheck/Ideal/Minimum context. The 2026-07-26 follow-up keeps Saved actual and excludes it from Left/outflow totals in both modes.
+- Added the Savings Category Mix view and Saved-card paycheck/Ideal/Minimum context. The 2026-07-26 follow-up keeps Saved actual and out of Spent/outflow totals while reserving the actual saved amount from Left in both modes.
 - Read-only live-sheet inspection confirmed both Brian and Hannah July tabs and Templates contain three savings rows; legacy May/June two-row tabs remain supported.
 - Corrected the first three-paycheck projection, which multiplied an already income-scaled target once per savings row and incorrectly turned the monthly 20% Ideal into 30%. Brian July now projects Ideal `$2,294.47` and Minimum `$1,147.23` from `$11,472.33` income.
 - Historical browser verification covered the original projected-contribution behavior; current expected values and live verification are recorded in the 2026-07-26 section.
@@ -443,7 +449,7 @@ Use a test row or low-risk real row in Discord:
 60. From both Brian's and Hannah's Discord accounts, use a safe test month to log and query the third paycheck savings amount, then undo the test write if needed.
     - Expected: only the third labeled savings row's Actual cell changes; the query reports that row's Actual, Ideal, and Minimum values; undo restores its previous value.
 61. Open current-month reports for Brian and Hannah and switch Projected off and on while viewing the Saved card and Savings Category Mix tab.
-    - Expected: the Saved amount and actual paycheck count do not change with Projected; only the target copy and savings gap respond to projected monthly income. Brian July remains `$1,539.64` Saved across 2 actual paychecks while its target changes from `$1,539.64` Ideal / `$769.82` Minimum to `$2,294.47` projected Ideal / `$1,147.23` projected Minimum.
+    - Expected: the Saved amount does not change with Projected; only the progress bar's Minimum/Ideal scale and savings gap respond to projected monthly income. Brian July remains `$1,539.64` Saved while its target changes from `$1,539.64` Ideal / `$769.82` Minimum to `$2,294.47` projected Ideal / `$1,147.23` projected Minimum.
 62. After deploying the July 24 reconciliation fix, tap `View Inbox` on a digest containing an automatic match and on one containing unresolved items.
     - Expected: channel typing is followed by the persisted private match/inbox report; automatic matches include the `Unmatch` selector, unresolved reports include `Reconcile Now` and `Ignore All`, and a backend failure produces a private retry message within 15 seconds.
 63. After deploying the July 25 Discord response-lifecycle fix, dismiss any old stuck thinking message and tap `View Inbox` again.
@@ -455,7 +461,7 @@ Use a test row or low-risk real row in Discord:
 66. Send `recent` directly in BookieBot's DM, then open the launcher and complete a selection plus an update that requires a typed reply.
     - Expected: no `I sent your recent transactions list to your DMs.` tail appears; the short-lived launcher deletes when tapped; the list, prompts, typed-reply result, pagination, and action outcomes all show Discord's `Only you can see this · Dismiss message` footer.
 67. Open current-month expense reports for Brian and Hannah, inspect Current and Projected, then view Calendar, Burn Rate, Category Mix, and Largest.
-    - Expected: Spent and Left exclude Saved; Saved stays actual when Projected is toggled while monthly Ideal/Minimum targets may change; Category Mix spending excludes Saved; Calendar shows the month name and a spaced count such as `17 total`; Largest is descending and its expanded table includes all actual shared expenses, entered bills/utilities, and elapsed subscriptions; Burn Rate's Wants limit and visible impact note reflect any Needs/Wants/Savings cascade transfers.
+    - Expected: Spent and Category Mix spending exclude Saved, while Left equals Income minus Spent minus actual Saved; Saved stays actual when Projected is toggled while the progress bar's monthly Ideal/Minimum targets may change; Calendar shows the month name and a spaced count such as `17 total`; Largest is descending, excludes Rent, and retains all other actual shared expenses, entered bills/utilities, and elapsed subscriptions; Burn Rate's Wants limit and donor/recipient impact note reflect category-cascade transfers, with the pace badge anchored beside its summary. Daily Spending details start open on desktop and closed on mobile, and the timestamp/Projected/theme controls follow the updated header order.
 
 ## Verification Baseline
 
@@ -484,8 +490,8 @@ cd web/expense-report && npm run typecheck && npm run build
 git diff --check
 # passed
 
-Live Brian/Hannah July expense-report browser verification
-# passed: actual-only savings, savings-free spending, Calendar labels/counts, descending Largest, cascade-aware Burn Rate, clean browser logs
+Live Brian July expense-report desktop/mobile browser verification
+# passed: Left reserves actual savings, Spent remains savings-free, progress targets react to Projected, Rent is absent from Largest, desktop/mobile details defaults and updated header/Burn Rate layouts
 
 python -m pytest unit_tests/core/test_bank_reconciliation.py unit_tests/banking/test_reconciliation.py
 # passed: 66 passed

@@ -247,7 +247,6 @@ type ReportView = {
     amountSaved: number
     savingsIdeal: number
     savingsMinimum: number
-    savingsPaycheckCount: number
   }
   categoryBalances: CategoryBalances
   breakdown: BreakdownItem[]
@@ -268,11 +267,10 @@ function buildReportView(report: ExpenseReportData, projected: boolean): ReportV
     metrics: {
       totalExpenses,
       monthlyIncome,
-      incomeAfterExpenses: roundCurrency(monthlyIncome - totalExpenses),
+      incomeAfterExpenses: roundCurrency(monthlyIncome - totalExpenses - savings.amount),
       amountSaved: savings.amount,
       savingsIdeal: savings.ideal,
       savingsMinimum: savings.minimum,
-      savingsPaycheckCount: savings.paycheckCount,
     },
     categoryBalances,
     breakdown,
@@ -313,7 +311,6 @@ function savingsForMode(report: ExpenseReportData, projected: boolean) {
     amount: savings.currentAmount,
     ideal: projected ? savings.projectedIdeal : savings.currentIdeal,
     minimum: projected ? savings.projectedMinimum : savings.currentMinimum,
-    paycheckCount: savings.currentPaycheckCount,
   }
 }
 
@@ -463,6 +460,7 @@ function clamp(value: number, min: number, max: number) {
 
 export function ExpenseReportApp({ report }: { report: ExpenseReportData }) {
   const { theme, toggleTheme } = useExpenseReportTheme()
+  const dailySpendingDetailsOpen = useMediaQuery("(min-width: 861px)")
   const [projectionActive, setProjectionActive] = useState(false)
   const [categoryMixFilter, setCategoryMixFilter] = useState<CategoryMixFilter>("all")
   const [calendarFilter, setCalendarFilter] = useState<CalendarFilter>("all")
@@ -682,8 +680,11 @@ export function ExpenseReportApp({ report }: { report: ExpenseReportData }) {
   return (
     <div className="bb-page">
       <header className="bb-page-header">
-        <div>
-          <h1>Expense Breakdown</h1>
+        <div className="bb-header-copy">
+          <div className="bb-header-title-row">
+            <h1>Expense Breakdown</h1>
+            <Badge variant="outline">{generatedTimeLabel(report.generatedAt)}</Badge>
+          </div>
           <p>{report.monthLabel} budget report for {report.ownerName}.</p>
         </div>
         <div className="bb-header-actions">
@@ -692,7 +693,6 @@ export function ExpenseReportApp({ report }: { report: ExpenseReportData }) {
             onToggle={toggleProjection}
           />
           <ThemeToggle theme={theme} onToggle={toggleTheme} />
-          <Badge variant="outline">{generatedTimeLabel(report.generatedAt)}</Badge>
         </div>
       </header>
 
@@ -705,12 +705,16 @@ export function ExpenseReportApp({ report }: { report: ExpenseReportData }) {
             description={projectionActive ? "Projected month" : "Logged income"}
           />
           <MetricCard label="Spent" value={spentTotal} />
-          <MetricCard label="Left" value={activeReport.metrics.incomeAfterExpenses} description="After expenses" accent />
           <MetricCard
-            label="Saved"
+            label="Left"
+            value={activeReport.metrics.incomeAfterExpenses}
+            description="After expenses & savings"
+            accent
+          />
+          <SavingsMetricCard
             value={activeReport.metrics.amountSaved}
-            description={savingsMetricDescription(activeReport.metrics, projectionActive)}
-            accent={isSavingsNearGoal(activeReport.metrics.amountSaved, activeReport.metrics.savingsIdeal)}
+            minimum={activeReport.metrics.savingsMinimum}
+            ideal={activeReport.metrics.savingsIdeal}
           />
         </section>
 
@@ -763,7 +767,13 @@ export function ExpenseReportApp({ report }: { report: ExpenseReportData }) {
             </div>
           </CardHeader>
           <CardContent className="bb-daily-spending-content">
-            <DailySpendingChart data={dailyTotals} total={dailyTotal} elapsedDays={report.elapsedDays} filter={dailySpendingFilter} />
+            <DailySpendingChart
+              data={dailyTotals}
+              total={dailyTotal}
+              elapsedDays={report.elapsedDays}
+              filter={dailySpendingFilter}
+              defaultDetailsOpen={dailySpendingDetailsOpen}
+            />
             <DailyEntriesTable entries={dailyTableEntries} categoryColors={categoryColors} />
           </CardContent>
         </Card>
@@ -963,16 +973,18 @@ function BurnRateChart({
   return (
     <div className="bb-chart-stack">
       <div className="bb-panel-head bb-burn-rate-summary">
-        <div>
-          <div className="bb-chart-kicker">{statusLabel}</div>
-          <div className={isOver ? "bb-burn-rate-value bb-negative" : "bb-burn-rate-value bb-positive"}>{differenceLabel}</div>
-          <div className="bb-burn-rate-note">
-            {burnRate.elapsedDays} of {burnRate.daysInMonth} days counted
+        <div className="bb-burn-rate-primary">
+          <div>
+            <div className="bb-chart-kicker">{statusLabel}</div>
+            <div className={isOver ? "bb-burn-rate-value bb-negative" : "bb-burn-rate-value bb-positive"}>{differenceLabel}</div>
+            <div className="bb-burn-rate-note">
+              {burnRate.elapsedDays} of {burnRate.daysInMonth} days counted
+            </div>
           </div>
-        </div>
-        <div className="bb-burn-rate-actions">
-          <div className={isOver ? "bb-burn-rate-pill bb-burn-rate-pill-danger" : "bb-burn-rate-pill"}>
-            {dailyDifference}
+          <div className="bb-burn-rate-actions">
+            <div className={isOver ? "bb-burn-rate-pill bb-burn-rate-pill-danger" : "bb-burn-rate-pill"}>
+              {dailyDifference}
+            </div>
           </div>
         </div>
         {categoryPressure ? <CategoryMixPressureBar pressure={categoryPressure} /> : null}
@@ -1221,26 +1233,49 @@ function MetricCard({
   )
 }
 
-function savingsMetricDescription(metrics: ReportView["metrics"], projected: boolean) {
-  const parts = ["Actual"]
-  if (metrics.savingsPaycheckCount > 0) {
-    const noun = metrics.savingsPaycheckCount === 1 ? "paycheck" : "paychecks"
-    parts.push(`${metrics.savingsPaycheckCount} ${noun}`)
-  }
-  if (metrics.savingsIdeal > 0) {
-    parts.push(`${projected ? "Projected ideal" : "Ideal"} ${formatMoney(metrics.savingsIdeal)}`)
-  }
-  if (metrics.savingsMinimum > 0) {
-    parts.push(`${projected ? "Projected minimum" : "Minimum"} ${formatMoney(metrics.savingsMinimum)}`)
-  }
-  return parts.join(" • ")
-}
-
 function isSavingsNearGoal(value: number | null | undefined, goal: number | null | undefined) {
   if (value === null || value === undefined || goal === null || goal === undefined || goal <= 0) {
     return false
   }
   return value >= goal * 0.9
+}
+
+function SavingsMetricCard({
+  value,
+  minimum,
+  ideal,
+}: {
+  value: number
+  minimum: number
+  ideal: number
+}) {
+  const progressPercent = ideal > 0 ? clamp((value / ideal) * 100, 0, 100) : 0
+  const minimumPercent = ideal > 0 ? clamp((minimum / ideal) * 100, 0, 100) : 0
+  const tone = value <= 0 ? "empty" : value < minimum ? "low" : isSavingsNearGoal(value, ideal) ? "ideal" : "minimum"
+  return (
+    <Card className="bb-savings-metric-card">
+      <CardContent className="bb-metric-card">
+        <div className="bb-metric-label">Saved</div>
+        <div className={`bb-metric-value bb-savings-value bb-savings-value-${tone}`}>{formatMoney(value)}</div>
+        <div
+          className={`bb-savings-progress bb-savings-progress-${tone}`}
+          role="img"
+          aria-label={`${formatMoney(value)} saved; minimum ${formatMoney(minimum)}; ideal ${formatMoney(ideal)}`}
+        >
+          <div className="bb-savings-progress-track">
+            <span className="bb-savings-progress-fill" style={{ width: `${progressPercent}%` }} />
+            {minimumPercent > 0 && minimumPercent < 100 ? (
+              <span className="bb-savings-progress-minimum-marker" style={{ left: `${minimumPercent}%` }} />
+            ) : null}
+          </div>
+          <div className="bb-savings-progress-labels">
+            <span>Minimum {formatMoney(minimum)}</span>
+            <span>Ideal {formatMoney(ideal)}</span>
+          </div>
+        </div>
+      </CardContent>
+    </Card>
+  )
 }
 
 type CategoryMixChartProps = {
@@ -1489,7 +1524,7 @@ function categoryMixPressure(
         pressure = {
           label: recipients.length === 1 ? `${recipients[0]} overspend impact` : "Category overspend impact",
           amount: impact,
-          note: `${formatMoney(impact)} deducted from ${CATEGORY_BALANCE_LABELS[filter]} income left`,
+          note: `${formatMoney(impact)} moved from ${CATEGORY_BALANCE_LABELS[filter]} to cover ${recipients.join(" + ")} overspend`,
           tone: "impact",
         }
       }
@@ -2110,11 +2145,13 @@ function DailySpendingChart({
   total,
   elapsedDays,
   filter,
+  defaultDetailsOpen,
 }: {
   data: DailySpendingRow[]
   total: number
   elapsedDays: number
   filter: DailySpendingFilter
+  defaultDetailsOpen: boolean
 }) {
   const peak = data.reduce<AmountRow | null>((best, item) => (!best || item.amount > best.amount ? item : best), null)
   const averageDaySpend = elapsedDays ? total / elapsedDays : 0
@@ -2176,7 +2213,7 @@ function DailySpendingChart({
           <div className="bb-chart-kicker">Total Spent</div>
           <div className="bb-chart-total">{formatMoney(total)}</div>
         </div>
-        <DetailsPanel summary="Details">
+        <DetailsPanel summary="Details" defaultOpen={defaultDetailsOpen}>
           <StatList
             rows={[
               ["Tracked days", String(data.length)],
@@ -2412,11 +2449,13 @@ function ExpenseInsightsCard({
   onViewChange: () => void
 }) {
   const [view, setView] = useState<ExpenseInsightsView>("largest")
-  const largestEntries = [...topEntries].sort((left, right) => (
-    right.amount - left.amount
-    || right.date.localeCompare(left.date)
-    || expenseEntryItemLabel(left).localeCompare(expenseEntryItemLabel(right))
-  ))
+  const largestEntries = topEntries
+    .filter((entry) => entry.category.trim().toLowerCase() !== "rent" && expenseEntryItemLabel(entry).trim().toLowerCase() !== "rent")
+    .sort((left, right) => (
+      right.amount - left.amount
+      || right.date.localeCompare(left.date)
+      || expenseEntryItemLabel(left).localeCompare(expenseEntryItemLabel(right))
+    ))
   const switchView = (nextView: string) => {
     const resolvedView = nextView as ExpenseInsightsView
     if (resolvedView === view) {
@@ -2474,11 +2513,21 @@ function StatList({ rows }: { rows: [string, string][] }) {
   )
 }
 
-function DetailsPanel({ summary, children, collapseKey = 0 }: { summary: string; children: ReactNode; collapseKey?: number }) {
-  const [open, setOpen] = useState(false)
+function DetailsPanel({
+  summary,
+  children,
+  collapseKey = 0,
+  defaultOpen = false,
+}: {
+  summary: string
+  children: ReactNode
+  collapseKey?: number
+  defaultOpen?: boolean
+}) {
+  const [open, setOpen] = useState(defaultOpen)
   useEffect(() => {
-    setOpen(false)
-  }, [collapseKey])
+    setOpen(defaultOpen)
+  }, [collapseKey, defaultOpen])
 
   return (
     <div className="bb-details-panel" data-state={open ? "open" : "closed"}>

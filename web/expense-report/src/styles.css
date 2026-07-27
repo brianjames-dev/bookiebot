@@ -116,6 +116,19 @@ summary {
   color: hsl(var(--muted-foreground));
 }
 
+.bb-header-copy {
+  display: grid;
+  gap: 0;
+}
+
+.bb-header-title-row {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px;
+  min-width: 0;
+}
+
 .bb-header-actions {
   display: flex;
   flex: 0 0 auto;
@@ -321,6 +334,75 @@ summary {
   font-size: 12px;
 }
 
+.bb-savings-progress {
+  --bb-savings-progress-color: hsl(var(--muted-foreground));
+  margin-top: 10px;
+}
+
+.bb-savings-progress-low {
+  --bb-savings-progress-color: hsl(var(--destructive));
+}
+
+.bb-savings-progress-minimum {
+  --bb-savings-progress-color: hsl(var(--chart-3));
+}
+
+.bb-savings-progress-ideal {
+  --bb-savings-progress-color: hsl(var(--success));
+}
+
+.bb-savings-value-low {
+  color: hsl(var(--destructive));
+}
+
+.bb-savings-value-minimum {
+  color: hsl(var(--chart-3));
+}
+
+.bb-savings-value-ideal {
+  color: hsl(var(--success));
+}
+
+.bb-savings-progress-track {
+  position: relative;
+  height: 8px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: hsl(var(--muted) / 0.22);
+}
+
+.bb-savings-progress-fill {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: var(--bb-savings-progress-color);
+  transition: width 240ms ease, background-color 180ms ease;
+}
+
+.bb-savings-progress-minimum-marker {
+  position: absolute;
+  top: -2px;
+  bottom: -2px;
+  width: 2px;
+  border-radius: 999px;
+  background: hsl(var(--foreground) / 0.7);
+  transform: translateX(-1px);
+}
+
+.bb-savings-progress-labels {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  margin-top: 5px;
+  color: hsl(var(--muted-foreground));
+  font-size: 10px;
+  line-height: 1.2;
+}
+
+.bb-savings-progress-labels span:last-child {
+  text-align: right;
+}
+
 .bb-metric-toggle {
   appearance: none;
   border: 1px solid hsl(var(--border));
@@ -361,10 +443,18 @@ summary {
 }
 
 .bb-burn-rate-summary {
-  display: flex;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(280px, 360px);
   align-items: flex-start;
-  justify-content: space-between;
   gap: 16px;
+}
+
+.bb-burn-rate-primary {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 14px 20px;
+  min-width: 0;
 }
 
 .bb-burn-rate-value {
@@ -385,7 +475,7 @@ summary {
   align-items: center;
   flex: 0 0 auto;
   gap: 8px;
-  margin-left: auto;
+  margin-left: 0;
 }
 
 .bb-burn-rate-info {
@@ -1188,6 +1278,12 @@ summary {
   line-height: 1.3;
 }
 
+.bb-burn-rate-summary > .bb-category-pressure {
+  justify-self: end;
+  width: 100%;
+  margin-left: 0;
+}
+
 @keyframes bb-category-pressure-in {
   from {
     opacity: 0;
@@ -1758,8 +1854,16 @@ tr:last-child td {
     justify-self: start;
   }
 
+  .bb-burn-rate-summary {
+    grid-template-columns: 1fr;
+  }
+
+  .bb-burn-rate-summary > .bb-category-pressure {
+    justify-self: stretch;
+  }
+
   .bb-header-actions {
-    justify-content: flex-start;
+    justify-content: flex-end;
   }
 
   .bb-inline-toggle-row .bb-tabs-list {
@@ -1834,7 +1938,7 @@ tr:last-child td {
   }
 
   .bb-metric-card {
-    min-height: 102px;
+    min-height: 112px;
     padding: 12px 10px;
   }
 
@@ -1854,6 +1958,11 @@ tr:last-child td {
 
   .bb-metric-note {
     font-size: 11px;
+  }
+
+  .bb-savings-progress-labels {
+    gap: 4px;
+    font-size: 9px;
   }
 
   .bb-chart-total {

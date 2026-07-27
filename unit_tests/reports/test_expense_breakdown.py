@@ -256,6 +256,7 @@ def test_build_expense_breakdown_report_aggregates_shared_and_personal_data():
     assert payload["metrics"]["wantsRollover"] == 750.0
     assert payload["metrics"]["amountSaved"] == 600.0
     assert payload["metrics"]["savingsGoal"] == 900.0
+    assert payload["metrics"]["incomeAfterExpenses"] == -766.0
     assert payload["incomeProjection"] == {"currentAmount": 3500.0, "projectedAmount": 3500.0, "savingsGoal": 700.0}
     burn_rate = payload["burnRate"]
     burn_rate_series = burn_rate.pop("series")
@@ -378,19 +379,20 @@ def test_build_expense_breakdown_report_aggregates_shared_and_personal_data():
     ]
     assert payload["topEntries"][0] == {
         "date": "",
-        "category": "Rent",
-        "amount": 1750.0,
+        "category": "Need",
+        "amount": 184.0,
         "person": "Hannah",
-        "item": "Rent",
+        "item": "DMV Registration",
         "location": "",
     }
     assert [entry["amount"] for entry in payload["topEntries"]] == sorted(
         (entry["amount"] for entry in payload["topEntries"]),
         reverse=True,
     )
-    assert {"Rent", "PG&E", "Water", "Netflix", "Spotify"} <= {
+    assert {"PG&E", "Water", "Netflix", "Spotify"} <= {
         entry["item"] for entry in payload["topEntries"]
     }
+    assert all(entry["item"] != "Rent" for entry in payload["topEntries"])
     assert payload["merchantTotals"][0] == {"label": "DMV Registration", "amount": 184.0}
     assert {item["label"]: item for item in payload["utilityHistory"]} == {
         "PG&E": {
@@ -1202,7 +1204,11 @@ def test_report_frontend_keeps_saved_amount_actual_and_out_of_spending():
     assert 'return filter === "all" && item.key !== "savings"' in source
     assert "amountSaved={activeReport.metrics.amountSaved}" in source
     assert "value={activeReport.metrics.amountSaved}" in source
-    assert "savingsMetricDescription(activeReport.metrics, projectionActive)" in source
+    assert "incomeAfterExpenses: roundCurrency(monthlyIncome - totalExpenses - savings.amount)" in source
+    assert "<SavingsMetricCard" in source
+    assert "savingsMetricDescription" not in source
+    assert "savingsPaycheckCount" not in source
+    assert "bb-savings-progress-minimum-marker" in source
 
 
 def test_report_frontend_calendar_largest_and_burn_rate_presentation_regressions():
@@ -1211,9 +1217,14 @@ def test_report_frontend_calendar_largest_and_burn_rate_presentation_regressions
     assert 'value={`${totalEvents.length} total`}' in source
     assert "formatMoney(outflowTotal)" not in source
     assert '<div className="bb-subscription-total" data-bb-calendar-static-label="month">' in source
-    assert "const largestEntries = [...topEntries].sort" in source
+    assert "const largestEntries = topEntries" in source
+    assert 'entry.category.trim().toLowerCase() !== "rent"' in source
     assert 'categoryMixPressure("wants", categoryBalances, burnRate.spent)' in source
     assert "after cross-category coverage" in source
+    assert 'const dailySpendingDetailsOpen = useMediaQuery("(min-width: 861px)")' in source
+    assert "defaultDetailsOpen={dailySpendingDetailsOpen}" in source
+    assert '<div className="bb-header-title-row">' in source
+    assert "bb-burn-rate-primary" in source
 
 
 def test_largest_expenses_payload_keeps_all_transactions_in_descending_order():

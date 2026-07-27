@@ -417,13 +417,14 @@ Status: Complete. The three-paycheck workflow remains active; its projected-savi
 
 Status: Complete in code, automated verification, and live browser verification; deployment confirmation remains in `.agent/STATUS.md`.
 
-- Spent and Left use detailed Needs/Wants expense itemization without savings. Needs/Wants subtotals are a fallback only when no detailed breakdown exists, and `Subscriptions (Needs)` summary rows cannot be duplicated as individual Need expenses.
+- Spent uses detailed Needs/Wants expense itemization without savings. Left represents available cash after both those expenses and the actual savings deposits read from the sheet. Needs/Wants subtotals are a fallback only when no detailed breakdown exists, and `Subscriptions (Needs)` summary rows cannot be duplicated as individual Need expenses.
 - Category Mix spending already excluded savings; an explicit key guard preserves that invariant. The Savings tab remains separate and uses only the actual saved amount read from the sheet.
-- Projected mode keeps Saved and the actual paycheck count unchanged. It may update the projected monthly Ideal/Minimum targets and remaining savings gap from projected income.
+- Projected mode keeps Saved unchanged. It may update the monthly Ideal/Minimum targets and the Saved progress scale from projected income, but Left still subtracts only actual savings.
 - Calendar shows the month name instead of an outflow total and renders its current/projected event count as one spaced value.
-- Largest includes every actual shared expense, entered bill/utility, and elapsed subscription in descending order. The graph shows the top ten while the expandable table retains all rows.
-- Burn Rate derives effective Wants availability after the category cascade and reuses the category-impact callout to explain funds donated to or received from other buckets.
-- Live Brian July verification showed Current Saved `$1,539.64`, Projected Saved `$1,539.64`, projected Ideal `$2,294.47`, a `$249.36` Needs deduction from Wants in current Burn Rate, and a descending Largest list headed by Rent.
+- Largest includes every non-Rent actual shared expense, entered bill/utility, and elapsed subscription in descending order. The graph shows the top ten while the expandable table retains all non-Rent rows.
+- Burn Rate derives effective Wants availability after the category cascade, places the daily pace beside its summary, and names both donor and covered category in the impact callout.
+- The Saved metric is a color-coded zero-to-Ideal progress bar with a Minimum marker; mode/paycheck prose was removed. Daily Spending details start open only on desktop, and the header places the timestamp beside the title with Projected immediately left of the rightmost theme control.
+- Live Brian July verification showed Current Left `$1,024.88` from Income `$7,698.22` minus Spent `$5,133.70` minus Saved `$1,539.64`; Projected Left `$4,793.00`; unchanged Saved `$1,539.64`; projected Ideal `$2,294.47`; a `$249.36` Needs transfer from Wants; and a descending Rent-free Largest list headed by `Hannah's T`.
 - Verification: focused report suite `33 passed`; full suite `421 passed, 1 skipped`; Pyright clean; frontend typecheck/build passed; `git diff --check` passed; Brian/Hannah live browser logs were clean.
 
 ### 2026-07-24 Persisted Reconciliation Inbox Follow-Up

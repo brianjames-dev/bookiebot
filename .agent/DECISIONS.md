@@ -272,11 +272,11 @@ Decision: A message-triggered recent-action request sends a five-minute launcher
 
 Rationale: Discord cannot mark an ordinary bot-authored DM as ephemeral. A disposable launcher is the smallest bridge that preserves the natural-language `recent` entry while giving the transaction list and full workflow Discord's native `Only you can see this · Dismiss message` treatment.
 
-## 2026-07-26 - Keep Savings Actual And Spending Savings-Free
+## 2026-07-26 - Keep Savings Actual, Spending Savings-Free, And Reserve Savings From Left
 
-Decision: Expense-report Saved values always come from actual numbered savings deposits read at report build time, even when Projected is active. Projected income may change monthly Ideal/Minimum targets and the remaining savings gap, but it does not estimate future deposits. Spent, Left, and Category Mix spending exclude savings; detailed Needs/Wants itemization is the primary expense total and category subtotals are fallback data. Burn Rate uses Wants availability after the same three-bucket category cascade shown in Category Mix.
+Decision: Expense-report Saved values always come from actual numbered savings deposits read at report build time, even when Projected is active. Projected income may change monthly Ideal/Minimum targets and the remaining savings gap, but it does not estimate future deposits. Spent and Category Mix spending exclude savings; Left is Income minus Spent minus actual Saved. Detailed Needs/Wants itemization is the primary expense total and category subtotals are fallback data. Burn Rate uses Wants availability after the same three-bucket category cascade shown in Category Mix.
 
-Rationale: Moving money to savings is not spending, and an unmade contribution is not actual savings. Keeping actual deposits separate from projected targets makes Current and Projected internally consistent, while applying the shared category cascade to Burn Rate prevents Needs overspending from leaving the Wants pace artificially unchanged.
+Rationale: Moving money to savings is not spending, but it is also no longer available cash. Keeping actual deposits separate from both expenses and projected targets makes Spent, Saved, and Left describe distinct concepts, while applying the shared category cascade to Burn Rate prevents Needs overspending from leaving the Wants pace artificially unchanged.
 
 ## Pending Decisions
 

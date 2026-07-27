@@ -524,7 +524,11 @@ def render_expense_breakdown_html(report: ExpenseBreakdownReport) -> str:
     merchant_occurrences = _merchant_occurrences(activity_entries)
     daily_totals = _daily_totals(activity_entries)
     budget_group_totals = _budget_group_totals(report.breakdown)
-    balance_after_expenses = report.income_total - report.personal_total if report.income_total else None
+    balance_after_expenses = (
+        round(report.income_total - report.personal_total - float(report.amount_saved or 0.0), 2)
+        if report.income_total
+        else None
+    )
     payload = _report_client_payload(
         report=report,
         activity_entries=activity_entries,
@@ -1846,7 +1850,7 @@ def _report_highlight_entries(
     report: ExpenseBreakdownReport,
     activity_entries: list[ExpenseEntry],
 ) -> list[ExpenseEntry]:
-    entries = list(activity_entries)
+    entries = [entry for entry in activity_entries if not _is_rent_highlight_entry(entry)]
     entries.extend(
         ExpenseEntry(
             date=payment.date,
@@ -1858,6 +1862,8 @@ def _report_highlight_entries(
         )
         for payment in report.payments
         if payment.amount > 0
+        and payment.group.strip().casefold() != "rent"
+        and payment.label.strip().casefold() != "rent"
     )
     entries.extend(
         ExpenseEntry(
@@ -1877,6 +1883,13 @@ def _report_highlight_entries(
         entries,
         key=lambda entry: (entry.amount, _entry_sort_date(entry.date), entry.item, entry.location),
         reverse=True,
+    )
+
+
+def _is_rent_highlight_entry(entry: ExpenseEntry) -> bool:
+    return (
+        entry.category.strip().casefold() == "rent"
+        or entry.item.strip().casefold() == "rent"
     )
 
 
