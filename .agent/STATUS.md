@@ -32,6 +32,7 @@ Expense-report financial totals now follow the Budget sheets' category budgets, 
 - Corrected `Left` to use the Budget sheet's cascaded Net Total instead of subtracting elapsed outflow from income. Brian July now shows `$794.00`, matching the sheet after the `$249.36` Needs overage is covered by Wants, while Spent remains the separate `$5,133.70` elapsed-outflow metric.
 - Split elapsed report itemization from Budget-sheet category usage. Brian's Needs and Wants views now show `$4,098.47 / $3,849.11 (106.48%)` and `$1,266.11 / $2,309.47 (54.82%)`; Savings remains `$1,539.64 / $1,539.64`.
 - Projected category budgets use a penny-safe 50/30/20 split of projected income and subtract the current sheet subtotals without projecting savings deposits. Brian Projected now shows `$4,568.11` Left and a `$2,294.47` Savings Ideal.
+- Restored Calendar's original visible non-income outflow total and moved it into the subtitle beneath the month name, replacing the redundant Current/Projected label. The animated value continues to follow All/Subs and Current/Projected state; live Brian July checks showed `$2,669.89` Current All, `$263.33` Current Subs, and `$269.32` Projected Subs.
 - Replaced the Saved card's mode/paycheck copy with a color-coded progress bar from zero through Minimum to Ideal. The projected toggle changes only its target scale, not the saved amount.
 - Moved the generated timestamp beside the title, kept Projected immediately left of the rightmost theme control, opened Daily Spending details by default only above the desktop breakpoint, and anchored the daily pace badge beside the Burn Rate summary.
 - Reworded the Burn Rate transfer callout to name the donor and covered category, and excluded Rent from Largest in both generated payloads and the frontend compatibility filter.
@@ -464,6 +465,8 @@ Use a test row or low-risk real row in Discord:
     - Expected: no `I sent your recent transactions list to your DMs.` tail appears; the short-lived launcher deletes when tapped; the list, prompts, typed-reply result, pagination, and action outcomes all show Discord's `Only you can see this · Dismiss message` footer.
 67. Open current-month expense reports for Brian and Hannah, inspect Current and Projected, then view Calendar, Burn Rate, Category Mix, and Largest.
     - Expected: Current Left equals the sheet's Net Total after category coverage, while Spent remains elapsed outflow without Saved. Brian shows `$794.00` Left, Needs `$4,098.47 / $3,849.11 (106.48%)`, Wants `$1,266.11 / $2,309.47 (54.82%)`, and Saved `$1,539.64 / $1,539.64`; Hannah shows `$618.53` Left from Needs `$688.12`, Wants `$312.82`, and Saved `$0.00`. Saved stays actual when Projected is toggled while projected category budgets and the progress bar's monthly Ideal/Minimum targets change; Calendar shows the month name and a spaced count such as `17 total`; Largest is descending, excludes Rent, and retains all other actual shared expenses, entered bills/utilities, and elapsed subscriptions; Burn Rate's Wants limit and donor/recipient impact note reflect category-cascade transfers, with the pace badge anchored beside its summary. Daily Spending details start open on desktop and closed on mobile, and the timestamp/Projected/theme controls follow the updated header order.
+68. Open Brian July's Calendar and switch All/Subs, then toggle Projected.
+    - Expected: `July` remains the heading; the animated dollar subtitle shows `$2,669.89` for Current All, `$263.33` for Current Subs, and `$269.32` for Projected Subs; the event-count pill changes independently and no Current/Projected subtitle appears beneath the month.
 
 ## Verification Baseline
 
@@ -494,6 +497,9 @@ git diff --check
 
 Live Brian July expense-report desktop/mobile browser verification
 # passed: Current Left $794.00; exact Needs/Wants/Savings budgets, usage, and percentages; Projected Left $4,568.11 and Ideal $2,294.47; responsive layouts remain valid
+
+Live Brian July Calendar desktop/mobile browser verification
+# passed: outflow subtitle beneath July; Current All $2,669.89; Current Subs $263.33; Projected Subs $269.32; filter/count transitions settled cleanly
 
 python -m pytest unit_tests/core/test_bank_reconciliation.py unit_tests/banking/test_reconciliation.py
 # passed: 66 passed

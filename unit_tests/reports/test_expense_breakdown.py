@@ -1309,7 +1309,10 @@ def test_report_frontend_calendar_largest_and_burn_rate_presentation_regressions
     source = (Path(__file__).resolve().parents[2] / "web/expense-report/src/report-app.tsx").read_text()
 
     assert 'value={`${totalEvents.length} total`}' in source
-    assert "formatMoney(outflowTotal)" not in source
+    assert "const outflowTotal = totalEvents" in source
+    assert '.filter((item) => item.kind !== "income")' in source
+    assert '<CalendarChangingValue value={formatMoney(outflowTotal)} />' in source
+    assert 'data-bb-calendar-summary="outflow"' in source
     assert '<div className="bb-subscription-total" data-bb-calendar-static-label="month">' in source
     assert "const largestEntries = topEntries" in source
     assert 'entry.category.trim().toLowerCase() !== "rent"' in source

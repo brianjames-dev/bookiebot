@@ -2996,6 +2996,9 @@ function CalendarAnalyticsPanel({
 }) {
   const visibleEvents = filter === "all" ? events : events.filter((item) => item.kind === filter)
   const totalEvents = projected ? visibleEvents : visibleEvents.filter((item) => !item.projectedOnly)
+  const outflowTotal = totalEvents
+    .filter((item) => item.kind !== "income")
+    .reduce((sum, item) => sum + item.amount, 0)
   const subscriptionItems = [...needs, ...wants]
 
   return (
@@ -3011,8 +3014,8 @@ function CalendarAnalyticsPanel({
               <div className="bb-subscription-total" data-bb-calendar-static-label="month">
                 {monthOnlyLabel(monthLabel)}
               </div>
-              <div className="bb-chart-mode-note" data-bb-calendar-static-label="mode">
-                {projected ? "Projected" : "Current"}
+              <div className="bb-chart-mode-note" data-bb-calendar-summary="outflow">
+                <CalendarChangingValue value={formatMoney(outflowTotal)} />
               </div>
             </div>
             <Badge variant="secondary">
