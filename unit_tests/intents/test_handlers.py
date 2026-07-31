@@ -5,6 +5,7 @@ from types import SimpleNamespace
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import bookiebot.intents.handlers as ih
+from bookiebot.intents.explorer import INTENTS
 from bookiebot.sheets.routing import SpreadsheetAccessError
 from unit_tests.support.sheets_repo_stub import SheetsRepoStub
 
@@ -15,6 +16,12 @@ class DummyChannel:
 
     async def send(self, content=None, **kwargs):
         self.sent.append((content, kwargs))
+
+
+def test_savings_exposes_one_monthly_log_and_query_intent():
+    savings_intents = [intent for intent in INTENTS if "savings" in intent]
+
+    assert savings_intents == ["log_savings", "query_savings"]
 
 
 class PrivateAuthor:
@@ -177,9 +184,7 @@ async def test_sheet_routing_errors_are_sent_to_user(monkeypatch, message):
         ("log_pge_paid", "log_pge_paid", 85.0, "PG&E"),
         ("log_recology_paid", "log_recology_paid", 85.0, "Recology"),
         ("log_water_paid", "log_water_paid", 85.0, "water"),
-        ("log_1st_savings", "log_1st_savings", 100.0, "1st savings"),
-        ("log_2nd_savings", "log_2nd_savings", 200.0, "2nd savings"),
-        ("log_3rd_savings", "log_3rd_savings", 300.0, "3rd savings"),
+        ("log_savings", "log_savings", 300.0, "monthly savings"),
     ],
 )
 async def test_logging_helpers_success(monkeypatch, message, intent, func_name, amount, expected):
@@ -655,8 +660,8 @@ async def test_recent_action_capabilities_make_unsupported_operations_explicit()
         columns=[7],
         previous_values=[""],
         new_values=["200"],
-        metadata={"type": "savings", "category": "1st savings"},
-        description="1st savings deposit $200",
+        metadata={"type": "savings", "category": "monthly savings"},
+        description="monthly savings contribution $200",
     )
 
     income_capabilities = action_capabilities(income)
@@ -2278,29 +2283,11 @@ async def test_query_subscriptions(monkeypatch, message):
 async def test_query_savings_checks(monkeypatch, message):
     monkeypatch.setattr(
         ih.su,
-        "check_1st_savings_deposited",
+        "check_savings_deposited",
         AsyncMock(return_value={"deposited": True, "actual": 10.0, "ideal": 20.0, "minimum": 5.0}),
     )
-    await ih.handle_intent("query_1st_savings", {}, message)
-    assert any("1st savings" in (msg or "") for msg, _ in message.channel.sent)
-
-    message.channel.sent.clear()
-    monkeypatch.setattr(
-        ih.su,
-        "check_2nd_savings_deposited",
-        AsyncMock(return_value={"deposited": False, "actual": 0.0, "ideal": 15.0, "minimum": 5.0}),
-    )
-    await ih.handle_intent("query_2nd_savings", {}, message)
-    assert any("2nd savings" in (msg or "") for msg, _ in message.channel.sent)
-
-    message.channel.sent.clear()
-    monkeypatch.setattr(
-        ih.su,
-        "check_3rd_savings_deposited",
-        AsyncMock(return_value={"deposited": True, "actual": 25.0, "ideal": 20.0, "minimum": 5.0}),
-    )
-    await ih.handle_intent("query_3rd_savings", {}, message)
-    assert any("3rd savings" in (msg or "") for msg, _ in message.channel.sent)
+    await ih.handle_intent("query_savings", {}, message)
+    assert any("monthly savings" in (msg or "").lower() for msg, _ in message.channel.sent)
 
 
 @pytest.mark.asyncio

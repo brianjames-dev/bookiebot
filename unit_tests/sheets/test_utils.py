@@ -73,33 +73,51 @@ def test_log_payment_returns_false_when_label_missing():
 
 
 @pytest.mark.asyncio
-async def test_third_savings_check_and_log_use_the_third_paycheck_row():
+async def test_monthly_savings_check_and_log_overwrite_the_single_bucket():
     repo = SheetsRepoStub(
         income_rows=[
-            ["", "Enter 1st Paycheck Deposit", "IDEAL = $100.00", "MINIMUM = $50.00", "$90.00"],
-            ["", "Enter 2nd Paycheck Deposit", "IDEAL = $100.00", "MINIMUM = $50.00", "$80.00"],
-            ["", "Enter 3rd Paycheck Deposit", "IDEAL = $100.00", "MINIMUM = $50.00", "$0.00"],
+            ["", "Enter Monthly Savings Contribution", "IDEAL = $1,500.00", "MINIMUM = $750.00", "$900.00"],
         ]
     )
 
     with repo.patched():
-        before = await su.check_3rd_savings_deposited()
-        assert su.log_3rd_savings(75.25) is True
-        after = await su.check_3rd_savings_deposited()
+        before = await su.check_savings_deposited()
+        assert su.log_savings(975.25) is True
+        after = await su.check_savings_deposited()
 
     assert before == {
-        "deposited": False,
-        "actual": 0.0,
-        "ideal": 100.0,
-        "minimum": 50.0,
+        "deposited": True,
+        "actual": 900.0,
+        "ideal": 1500.0,
+        "minimum": 750.0,
     }
     assert after == {
         "deposited": True,
-        "actual": 75.25,
-        "ideal": 100.0,
-        "minimum": 50.0,
+        "actual": 975.25,
+        "ideal": 1500.0,
+        "minimum": 750.0,
     }
-    assert repo.income.acell("E3").value == "75.25"
+    assert repo.income.acell("E1").value == "975.25"
+
+
+@pytest.mark.asyncio
+async def test_monthly_savings_check_reads_legacy_first_row_targets():
+    repo = SheetsRepoStub(
+        income_rows=[
+            ["", "Enter 1st Paycheck Deposit", "IDEAL = $1,500.00", "", "$900.00"],
+            ["", "Enter 2nd Paycheck Deposit", "", "MINIMUM = $750.00", "$0.00"],
+        ]
+    )
+
+    with repo.patched():
+        result = await su.check_savings_deposited()
+
+    assert result == {
+        "deposited": True,
+        "actual": 900.0,
+        "ideal": 1500.0,
+        "minimum": 750.0,
+    }
 
 
 @pytest.fixture

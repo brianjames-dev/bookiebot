@@ -120,27 +120,13 @@ SCENARIOS = [
         assert_fn=lambda result, repo: "Need expense" in result.replies[0],
     ),
     ScenarioCase(
-        name="log_1st_savings__natural",
-        prompt="log first savings 300",
-        llm_fixture="unit_tests/fixtures/llm/logging_actions/log_1st_savings/log_1st_savings__natural.json",
-        sheet_fixture="base_month",
-        assert_fn=lambda result, repo: "savings" in result.replies[0].lower(),
-    ),
-    ScenarioCase(
-        name="log_2nd_savings__natural",
-        prompt="log second savings 250",
-        llm_fixture="unit_tests/fixtures/llm/logging_actions/log_2nd_savings/log_2nd_savings__natural.json",
-        sheet_fixture="base_month",
-        assert_fn=lambda result, repo: "savings" in result.replies[0].lower(),
-    ),
-    ScenarioCase(
-        name="log_3rd_savings__natural",
-        prompt="log third paycheck savings 300",
-        llm_fixture="unit_tests/fixtures/llm/logging_actions/log_3rd_savings/log_3rd_savings__natural.json",
+        name="log_savings__natural",
+        prompt="set monthly savings to 300",
+        llm_fixture="unit_tests/fixtures/llm/logging_actions/log_savings/log_savings__natural.json",
         sheet_fixture="base_month",
         assert_fn=lambda result, repo: (
-            "logged 3rd savings" in result.replies[0].lower()
-            and repo.income.acell("E9").value == "300"
+            "monthly savings" in result.replies[0].lower()
+            and repo.income.acell("E7").value == "300"
         ),
     ),
     ScenarioCase(
@@ -238,23 +224,9 @@ SCENARIOS = [
         assert_fn=lambda result, repo: "subscriptions" in result.replies[0].lower(),
     ),
     ScenarioCase(
-        name="query_1st_savings__natural",
-        prompt="Did we deposit 1st savings?",
-        llm_fixture="unit_tests/fixtures/llm/checking_payments/query_1st_savings/query_1st_savings__natural.json",
-        sheet_fixture="base_month",
-        assert_fn=lambda result, repo: bool(result.replies),
-    ),
-    ScenarioCase(
-        name="query_2nd_savings__natural",
-        prompt="Did we deposit 2nd savings?",
-        llm_fixture="unit_tests/fixtures/llm/checking_payments/query_2nd_savings/query_2nd_savings__natural.json",
-        sheet_fixture="base_month",
-        assert_fn=lambda result, repo: bool(result.replies),
-    ),
-    ScenarioCase(
-        name="query_3rd_savings__natural",
-        prompt="Did we deposit 3rd paycheck savings?",
-        llm_fixture="unit_tests/fixtures/llm/checking_payments/query_3rd_savings/query_3rd_savings__natural.json",
+        name="query_savings__natural",
+        prompt="How much have we saved this month?",
+        llm_fixture="unit_tests/fixtures/llm/checking_payments/query_savings/query_savings__natural.json",
         sheet_fixture="base_month",
         assert_fn=lambda result, repo: bool(result.replies),
     ),

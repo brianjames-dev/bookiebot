@@ -1543,12 +1543,15 @@ def log_water_paid(amount):
     return log_payment("water", amount)
 
 
-_SAVINGS_DEPOSIT_ORDINALS = {1: "1st", 2: "2nd", 3: "3rd"}
+SAVINGS_CONTRIBUTION_LABEL = "Enter Monthly Savings Contribution"
+_LEGACY_SAVINGS_CONTRIBUTION_LABEL = "Enter 1st Paycheck Deposit"
 
 
-def _savings_deposit_label(check_number: int) -> str:
-    ordinal = _SAVINGS_DEPOSIT_ORDINALS[check_number]
-    return f"Enter {ordinal} Paycheck Deposit"
+def _savings_contribution_cell(ws):
+    return (
+        find_cell_by_partial_text(ws, SAVINGS_CONTRIBUTION_LABEL)
+        or find_cell_by_partial_text(ws, _LEGACY_SAVINGS_CONTRIBUTION_LABEL)
+    )
 
 
 def _labeled_savings_target(ws, row: int, col: int, target: str) -> float:
@@ -1559,25 +1562,20 @@ def _labeled_savings_target(ws, row: int, col: int, target: str) -> float:
     return 0.0
 
 
-async def _check_savings_deposited(check_number: int):
+async def check_savings_deposited():
     ws = _income_ws()
-    ordinal = _SAVINGS_DEPOSIT_ORDINALS[check_number]
-    label = _savings_deposit_label(check_number)
     try:
-        cell = find_cell_by_partial_text(ws, label)
+        cell = _savings_contribution_cell(ws)
         if not cell:
-            raise ValueError(f"Could not find '{label}'")
+            raise ValueError(f"Could not find '{SAVINGS_CONTRIBUTION_LABEL}'")
 
         row, col = cell.row, cell.col
         actual_amount = clean_money(ws.cell(row, col + 3).value)
         ideal_amount = _labeled_savings_target(ws, row, col, "ideal")
         minimum_amount = _labeled_savings_target(ws, row, col, "minimum")
 
-        # Older two-row sheets shared the Ideal/Minimum labels across the
-        # first and second deposit rows. Retain that layout as a fallback.
-        if ideal_amount <= 0 and check_number == 2:
-            ideal_amount = _labeled_savings_target(ws, row - 1, col, "ideal")
-        if minimum_amount <= 0 and check_number == 1:
+        # Historical sheets split the minimum onto the second paycheck row.
+        if minimum_amount <= 0:
             minimum_amount = _labeled_savings_target(ws, row + 1, col, "minimum")
 
         return {
@@ -1588,7 +1586,7 @@ async def _check_savings_deposited(check_number: int):
         }
 
     except Exception as e:
-        print(f"[ERROR] Failed to check {ordinal} savings deposited: {e}")
+        print(f"[ERROR] Failed to check monthly savings contribution: {e}")
         return {
             "deposited": False,
             "actual": 0.0,
@@ -1597,30 +1595,13 @@ async def _check_savings_deposited(check_number: int):
         }
 
 
-async def check_1st_savings_deposited():
-    return await _check_savings_deposited(1)
-
-
-async def check_2nd_savings_deposited():
-    return await _check_savings_deposited(2)
-
-
-async def check_3rd_savings_deposited():
-    return await _check_savings_deposited(3)
-
-
-def _log_savings(amount, check_number: int):
-    """
-    Logs a paycheck savings deposit by writing it 3 columns to the right of
-    its labeled row.
-    """
+def log_savings(amount):
+    """Overwrite the current month's total savings contribution."""
     ws = _income_ws()
-    ordinal = _SAVINGS_DEPOSIT_ORDINALS[check_number]
-    label = _savings_deposit_label(check_number)
     try:
-        cell = find_cell_by_partial_text(ws, label)
+        cell = _savings_contribution_cell(ws)
         if not cell:
-            raise ValueError(f"Could not find '{label}'")
+            raise ValueError(f"Could not find '{SAVINGS_CONTRIBUTION_LABEL}'")
 
         row, col = cell.row, cell.col
         target_cell = rowcol_to_a1(row, col + 3)
@@ -1636,25 +1617,13 @@ def _log_savings(amount, check_number: int):
                 columns=[col + 3],
                 previous_values=[previous_value],
                 new_values=[str(amount)],
-                metadata={"type": "savings", "category": f"{ordinal} savings"},
-                description=f"{ordinal} savings deposit ${amount}",
+                metadata={"type": "savings", "category": "monthly savings"},
+                description=f"monthly savings contribution ${amount}",
             ),
         )
-        print(f"[INFO] Logged {ordinal} savings deposit: ${amount} at {target_cell}")
+        print(f"[INFO] Set monthly savings contribution: ${amount} at {target_cell}")
         return True
 
     except Exception as e:
-        print(f"[ERROR] Failed to log {ordinal} savings deposit: {e}")
+        print(f"[ERROR] Failed to set monthly savings contribution: {e}")
         return False
-
-
-def log_1st_savings(amount):
-    return _log_savings(amount, 1)
-
-
-def log_2nd_savings(amount):
-    return _log_savings(amount, 2)
-
-
-def log_3rd_savings(amount):
-    return _log_savings(amount, 3)

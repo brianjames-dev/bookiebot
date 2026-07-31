@@ -9,9 +9,7 @@ FRIENDLY_NAMES = {
     "log_pge_paid": "Log PG&E Paid",
     "log_recology_paid": "Log Recology Paid",
     "log_water_paid": "Log Water Paid",
-    "log_1st_savings": "Log 1st Savings Deposit",
-    "log_2nd_savings": "Log 2nd Savings Deposit",
-    "log_3rd_savings": "Log 3rd Savings Deposit",
+    "log_savings": "Log Monthly Savings",
     "log_need_expense": "Log NEED Expense",
     "undo_last_transaction": "Undo Last Transaction",
     "delete_recent_action": "Delete Recent Action",
@@ -44,9 +42,7 @@ FRIENDLY_NAMES = {
     "query_days_budget_lasts": "Days Budget Will Last",
     "query_most_frequent_purchases": "Most Frequent N Purchases",
     "query_expenses_on_day": "Expenses on Specific Day",
-    "query_1st_savings": "Check 1st Savings Deposit",
-    "query_2nd_savings": "Check 2nd Savings Deposit",
-    "query_3rd_savings": "Check 3rd Savings Deposit",
+    "query_savings": "Check Monthly Savings",
 }
 
 
@@ -81,17 +77,9 @@ INTENT_DETAILS = {
         "Log your water bill payment.",
         ["paid water bill $90", "Santa Rosa Water 100"]
     ),
-    "log_1st_savings": (
-        "Log a contribution to your first savings account.",
-        ["moved $100 to savings 1", "saved 50 in first savings"]
-    ),
-    "log_2nd_savings": (
-        "Log a contribution to your second savings account.",
-        ["moved $200 to savings 2", "saved 75 in second savings"]
-    ),
-    "log_3rd_savings": (
-        "Log the savings contribution associated with your third paycheck.",
-        ["log third paycheck savings 300", "saved 250 from paycheck 3"]
+    "log_savings": (
+        "Set the total amount contributed to savings this month.",
+        ["log monthly savings 1500", "set this month's savings to 750"]
     ),
     "log_need_expense": (
         "Log a necessary or non-discretionary expense to the shared Needs category.",
@@ -223,17 +211,9 @@ INTENT_DETAILS = {
         "Show expenses on a specific day.",
         ["expenses on March 5th", "what did I spend on July 1?"]
     ),
-    "query_1st_savings": (
-        "Check the balance or activity in your first savings account.",
-        ["how much in first savings?", "show savings 1 activity"]
-    ),
-    "query_2nd_savings": (
-        "Check the balance or activity in your second savings account.",
-        ["how much in second savings?", "show savings 2 activity"]
-    ),
-    "query_3rd_savings": (
-        "Check the savings contribution associated with your third paycheck.",
-        ["did I deposit third paycheck savings?", "check savings 3"]
+    "query_savings": (
+        "Check the total amount contributed to savings this month.",
+        ["how much have I saved this month?", "check monthly savings"]
     )
 }
 
@@ -242,11 +222,11 @@ INTENT_GROUPS = [
     ("Logging Actions", [
         "log_expense", "log_need_expense", "log_income", "log_rent_paid",
         "log_pge_paid", "log_recology_paid", "log_water_paid",
-        "log_1st_savings", "log_2nd_savings", "log_3rd_savings", "undo_last_transaction", "delete_recent_action", "query_recent_actions", "update_recent_action", "move_recent_action"
+        "log_savings", "undo_last_transaction", "delete_recent_action", "query_recent_actions", "update_recent_action", "move_recent_action"
     ]),
     ("Checking Payments", [
         "query_rent_paid", "query_pge_paid", "query_recology_paid", "query_water_paid",
-        "query_1st_savings", "query_2nd_savings", "query_3rd_savings", "query_subscriptions"
+        "query_savings", "query_subscriptions"
     ]),
     ("Spending & Budget Overview", [
         "query_burn_rate", "query_remaining_budget", "query_projected_spending",

@@ -236,6 +236,10 @@ FIXED_COMMITMENT_KEYS = (
     "subscriptions_wants",
 )
 SAVINGS_AMOUNT_COLUMN_INDEX = 4
+MONTHLY_SAVINGS_LABEL_PHRASES = (
+    "enter monthly savings contribution",
+    "monthly savings contribution",
+)
 SAVINGS_DEPOSIT_LABEL_PHRASES = {
     1: (
         "enter 1st paycheck deposit",
@@ -1603,6 +1607,24 @@ def _category_balance_payload(report: ExpenseBreakdownReport) -> dict[str, Any]:
 
 
 def _savings_deposits(rows: list[list[str]]) -> list[SavingsDeposit]:
+    for row in rows:
+        normalized_cells = [_normalize_label(value) for value in row]
+        for index in range(len(normalized_cells)):
+            if not _is_monthly_savings_label(normalized_cells, index):
+                continue
+            _ideal_found, ideal = _savings_target_amount(row, "ideal")
+            _minimum_found, minimum = _savings_target_amount(row, "minimum")
+            return [
+                SavingsDeposit(
+                    number=1,
+                    actual=round(_savings_deposit_amount(row, index), 2),
+                    ideal=round(ideal, 2),
+                    minimum=round(minimum, 2),
+                )
+            ]
+
+    # Historical sheets used one row per paycheck. Keep them readable while
+    # all new/current sheets use the single monthly contribution row above.
     deposits: list[SavingsDeposit] = []
     found_checks: set[int] = set()
     for row_index, row in enumerate(rows):
@@ -1674,7 +1696,10 @@ def _savings_goal(rows: list[list[str]]) -> float | None:
     for row in rows:
         normalized_cells = [_normalize_label(value) for value in row]
         row_text = " ".join(cell for cell in normalized_cells if cell)
-        if "paycheck deposit" not in row_text or "ideal" not in row_text:
+        if not any(
+            phrase in row_text
+            for phrase in ("monthly savings contribution", "paycheck deposit")
+        ) or "ideal" not in row_text:
             continue
         for index, cell in enumerate(normalized_cells):
             if cell.startswith("ideal"):
@@ -1815,6 +1840,14 @@ def _is_check_deposit_label(normalized_cells: list[str], index: int, check_numbe
     return any(
         _contains_normalized_phrase(nearby_label, phrase)
         for phrase in SAVINGS_DEPOSIT_LABEL_PHRASES[check_number]
+    )
+
+
+def _is_monthly_savings_label(normalized_cells: list[str], index: int) -> bool:
+    nearby_label = " ".join(cell for cell in normalized_cells[max(index - 1, 0) : index + 3] if cell)
+    return any(
+        _contains_normalized_phrase(nearby_label, phrase)
+        for phrase in MONTHLY_SAVINGS_LABEL_PHRASES
     )
 
 
@@ -2170,43 +2203,15 @@ def _savings_projection_payload(report: ExpenseBreakdownReport) -> dict[str, Any
         report.month,
         report.income_projection_config,
     )
-    current_paychecks, projected_paychecks = _income_paycheck_counts(report)
-    deposits = report.savings_deposits
-
-    if not deposits:
-        current_ideal = round(report.savings_goal or report.income_total * 0.2, 2)
-        projected_ideal = round(projected_income * 0.2, 2)
-        return {
-            "currentAmount": current_amount,
-            "projectedAmount": current_amount,
-            "currentIdeal": current_ideal,
-            "currentMinimum": 0.0,
-            "projectedIdeal": projected_ideal,
-            "projectedMinimum": 0.0,
-            "currentPaycheckCount": current_paychecks,
-            "projectedPaycheckCount": projected_paychecks,
-        }
-
-    highest_entered_deposit = max((item.number for item in deposits if item.actual > 0), default=0)
-    max_deposit_number = max(item.number for item in deposits)
-    current_slots = min(max_deposit_number, max(current_paychecks, highest_entered_deposit))
-    projected_slots = min(max_deposit_number, max(projected_paychecks, current_slots))
-    current_targets = [item for item in deposits if item.number <= current_slots]
-
-    current_ideal = round(sum(item.ideal for item in current_targets), 2)
-    current_minimum = round(sum(item.minimum for item in current_targets), 2)
-    ideal_rate = (
-        round(current_ideal / report.income_total, 4)
-        if current_ideal > 0 and report.income_total > 0
-        else 0.2
+    current_ideal = round(
+        report.income_total * 0.2
+        if report.income_total > 0
+        else report.savings_goal or 0.0,
+        2,
     )
-    minimum_rate = (
-        round(current_minimum / report.income_total, 4)
-        if current_minimum > 0 and report.income_total > 0
-        else 0.1
-    )
-    projected_ideal = round(projected_income * ideal_rate, 2)
-    projected_minimum = round(projected_income * minimum_rate, 2)
+    current_minimum = round(current_ideal * 0.5, 2)
+    projected_ideal = round(projected_income * 0.2, 2)
+    projected_minimum = round(projected_ideal * 0.5, 2)
     return {
         "currentAmount": current_amount,
         "projectedAmount": current_amount,
@@ -2214,31 +2219,7 @@ def _savings_projection_payload(report: ExpenseBreakdownReport) -> dict[str, Any
         "currentMinimum": current_minimum,
         "projectedIdeal": projected_ideal,
         "projectedMinimum": projected_minimum,
-        "currentPaycheckCount": current_slots,
-        "projectedPaycheckCount": projected_slots,
     }
-
-
-def _income_paycheck_counts(report: ExpenseBreakdownReport) -> tuple[int, int]:
-    current_entries = report.income_entries or (
-        [PaymentItem("Income", report.income_total, "income")]
-        if report.income_total > 0
-        else []
-    )
-    paycheck_entries = _paycheck_income_entries(current_entries, report.income_projection_config)
-    if not paycheck_entries and len(current_entries) == 1:
-        paycheck_entries = current_entries
-    current_count = len(paycheck_entries)
-    if _is_completed_month(report.month):
-        return current_count, current_count
-    projected_count = current_count + len(
-        _projected_biweekly_pay_days(
-            paycheck_entries,
-            report.month,
-            report.income_projection_config,
-        )
-    )
-    return current_count, projected_count
 
 
 def _expense_entry_payload(entry: ExpenseEntry) -> dict[str, Any]:

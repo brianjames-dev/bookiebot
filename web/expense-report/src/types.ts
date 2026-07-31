@@ -72,8 +72,6 @@ export interface SavingsProjection {
   currentMinimum: number
   projectedIdeal: number
   projectedMinimum: number
-  currentPaycheckCount: number
-  projectedPaycheckCount: number
 }
 
 export type BudgetCategoryKey = "needs" | "wants" | "savings"

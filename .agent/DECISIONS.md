@@ -284,6 +284,12 @@ Decision: Supersede the arithmetic definition of Left above. Current Left is the
 
 Rationale: Open-month subscription rows contain both full budget commitments and only the charges elapsed so far. Subtracting elapsed Spent and Saved from Income overstated available budget by the unelapsed subscription commitments. Using the sheet's category totals preserves its `$794.00` source-of-truth Net Total while keeping `$5,133.70` Spent an honest actual-outflow metric.
 
+## 2026-07-31 - Treat Savings As One Monthly Overwriteable Bucket
+
+Decision: Supersede the numbered paycheck savings workflow. Current Budget tabs and Templates contain one `Enter Monthly Savings Contribution` row whose Actual value is overwritten by `log_savings`; `query_savings` reads the same value. The row's Ideal is the full Savings allocation (20% of monthly income) and Minimum is half that allocation (10% of monthly income). Expense reports calculate current and projected targets directly from those fixed income rates and never multiply targets by paycheck count or project the actual saved value. Historical numbered rows remain readable only for backward-compatible reporting and checks.
+
+Rationale: Savings is a monthly allocation, not one independent target per paycheck. Repeating a 10% per-row target across a three-paycheck month incorrectly produced a 30% Ideal and made command semantics depend on payroll cadence. One overwriteable total matches the Budget sheet's 50/30/20 model, prevents double-counting, and keeps the sheet, Discord workflow, and report card aligned.
+
 ## Pending Decisions
 
 - Where should durable system events live: banking database only, Google Sheets only, or dual-write during transition?

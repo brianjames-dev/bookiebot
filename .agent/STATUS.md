@@ -1,22 +1,34 @@
 # Agent Status
 
-Last updated: 2026-07-26
+Last updated: 2026-07-31
 
 ## Active Focus
 
-Expense-report financial totals now follow the Budget sheets' category budgets, subtotals, margins, and Net Total while keeping elapsed outflow separate for Spent. The next step is deployment and production confirmation.
+Monthly savings is now one overwriteable Budget-sheet value, with report targets fixed at 20% Ideal and 10% Minimum regardless of paycheck count. The next step is deployment and production confirmation.
 
 ## On Deck
 
-1. Deploy and manually verify the expense-report corrections in checklist item 67.
-2. Deploy and manually verify typed `recent` opens the short-lived launcher and keeps the resulting DM session ephemeral.
-3. Deploy and manually verify `View Inbox` and `Reconcile Now` show `BookieBot is typing...` without a temporary thinking message.
-4. Manually verify shared Needs logging plus update/move/delete/undo behavior in Discord and Google Sheets.
-5. Manually verify recent transactions and reconciliation after the latest reliability fixes.
-6. Consider a richer Discord button flow for grouped amount adjustments if the current UX feels too manual.
-7. Harden recent-action pending state across restarts/deploys, since selections currently live only in process memory.
-8. Improve targeted recent-action search so commands can find older matches, not only the latest 10 recent actions.
-9. Explore clarifying questions before logging when BookieBot is uncertain instead of guessing or silently failing.
+1. Deploy and manually verify the monthly savings workflow and corrected Saved-card targets in checklist items 60-61.
+2. Deploy and manually verify the expense-report corrections in checklist item 67.
+3. Deploy and manually verify typed `recent` opens the short-lived launcher and keeps the resulting DM session ephemeral.
+4. Deploy and manually verify `View Inbox` and `Reconcile Now` show `BookieBot is typing...` without a temporary thinking message.
+5. Manually verify shared Needs logging plus update/move/delete/undo behavior in Discord and Google Sheets.
+6. Manually verify recent transactions and reconciliation after the latest reliability fixes.
+7. Consider a richer Discord button flow for grouped amount adjustments if the current UX feels too manual.
+8. Harden recent-action pending state across restarts/deploys, since selections currently live only in process memory.
+9. Improve targeted recent-action search so commands can find older matches, not only the latest 10 recent actions.
+10. Explore clarifying questions before logging when BookieBot is uncertain instead of guessing or silently failing.
+
+## Completed 2026-07-31
+
+- Replaced the three numbered paycheck savings commands with one `log_savings` overwrite and one `query_savings` check for the monthly contribution bucket.
+- Migrated the live Brian Budget 2026 July and Template tabs from three savings input rows to one `Enter Monthly Savings Contribution` row. July preserved the prior rows' `$1,539.64` combined actual; Template remains `$0.00`.
+- Changed the single row's Ideal formula to the full Savings (20%) budget and Minimum to half of that budget (10% of income). Live July now shows `$2,167.14` Ideal and `$1,083.57` Minimum from `$10,835.71` income.
+- Removed paycheck-count fields and target multiplication from the expense-report savings payload. Current and projected Ideal are always 20% of their respective income values, Minimum is 10%, and Saved remains actual in both modes.
+- Retained read compatibility for historical numbered savings rows without exposing the retired numbered intents.
+- Verification: focused suite `178 passed`; full suite `422 passed, 1 skipped`; Pyright reported zero errors with the project Python 3.12 environment; frontend typecheck/build passed; `git diff --check` passed.
+- Live Google Sheets and browser verification confirmed the July formulas/values and the Saved card in both Current and Projected modes.
+- Manual verification is checklist items 60-61 below.
 
 ## Completed 2026-07-26
 
@@ -449,10 +461,10 @@ Use a test row or low-risk real row in Discord:
     - Expected: neither message invokes a dedicated student-loan payment command or mutates a budget row; the Student Loan subscription/autopay remains present and reminder-eligible in Hannah's normalized subscription schedule.
 59. Let a scheduled reconciliation digest arrive, then click `View Inbox`.
     - Expected: Discord shows `BookieBot is typing...` at the channel level without creating a temporary thinking message, then returns the actor's private unresolved inbox or confirmed automatic-match report.
-60. From both Brian's and Hannah's Discord accounts, use a safe test month to log and query the third paycheck savings amount, then undo the test write if needed.
-    - Expected: only the third labeled savings row's Actual cell changes; the query reports that row's Actual, Ideal, and Minimum values; undo restores its previous value.
+60. After deployment, send `set monthly savings to 1539.64`, then `how much have I saved this month?`; undo the test write if it replaced a different real amount.
+    - Expected: only the single `Enter Monthly Savings Contribution` Actual cell is overwritten; the query reports Actual `$1,539.64`, Ideal `$2,167.14`, and Minimum `$1,083.57` for Brian July; undo restores the prior monthly value.
 61. Open current-month reports for Brian and Hannah and switch Projected off and on while viewing the Saved card and Savings Category Mix tab.
-    - Expected: the Saved amount does not change with Projected; only the progress bar's Minimum/Ideal scale and savings gap respond to projected monthly income. Brian July remains `$1,539.64` Saved while its target changes from `$1,539.64` Ideal / `$769.82` Minimum to `$2,294.47` projected Ideal / `$1,147.23` projected Minimum.
+    - Expected: Saved does not change with Projected; Ideal always equals 20% and Minimum 10% of the selected mode's income, independent of paycheck count. At July month-end, Brian remains `$1,539.64` Saved with `$2,167.14` Ideal and `$1,083.57` Minimum in both modes.
 62. After deploying the July 24 reconciliation fix, tap `View Inbox` on a digest containing an automatic match and on one containing unresolved items.
     - Expected: channel typing is followed by the persisted private match/inbox report; automatic matches include the `Unmatch` selector, unresolved reports include `Reconcile Now` and `Ignore All`, and a backend failure produces a private retry message within 15 seconds.
 63. After deploying the July 25 Discord response-lifecycle fix, dismiss any old stuck thinking message and tap `View Inbox` again.
@@ -480,13 +492,13 @@ python -m pytest unit_tests/intents/test_handlers.py unit_tests/core/test_messag
 Latest verification:
 
 ```bash
-python -m pytest unit_tests/reports/test_expense_breakdown.py
-# passed: 34 passed
+python -m pytest unit_tests/sheets/test_utils.py unit_tests/intents/test_handlers.py unit_tests/intents/test_outputs.py unit_tests/reports/test_expense_breakdown.py
+# passed: 178 passed
 
 python -m pytest unit_tests
 # passed: 422 passed, 1 skipped
 
-python -m pyright
+python -m pyright --pythonpath venv/bin/python --pythonversion 3.12
 # passed: 0 errors, 0 warnings, 0 informations
 
 cd web/expense-report && npm run typecheck && npm run build
@@ -494,6 +506,9 @@ cd web/expense-report && npm run typecheck && npm run build
 
 git diff --check
 # passed
+
+Live Brian July Google Sheets and expense-report browser verification
+# passed: one monthly savings row; Saved $1,539.64; Ideal $2,167.14; Minimum $1,083.57 in Current and Projected
 
 Live Brian July expense-report desktop/mobile browser verification
 # passed: Current Left $794.00; exact Needs/Wants/Savings budgets, usage, and percentages; Projected Left $4,568.11 and Ideal $2,294.47; responsive layouts remain valid

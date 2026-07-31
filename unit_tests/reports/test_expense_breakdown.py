@@ -850,9 +850,7 @@ def test_report_uses_sheet_budget_subtotals_and_net_separately_from_elapsed_outf
         ["Shopping", "$214.94"],
         ["Subscriptions (Wants)", "$111.95"],
         ["(Wants) Subtotal:", "$1,266.11 (54.82%)", "$794.00"],
-        ["Enter 1st Paycheck Deposit", "IDEAL = $769.82", "MINIMUM = $384.91", "$769.82"],
-        ["Enter 2nd Paycheck Deposit", "IDEAL = $769.82", "MINIMUM = $384.91", "$769.82"],
-        ["Enter 3rd Paycheck Deposit", "IDEAL = $769.82", "MINIMUM = $384.91", "$0.00"],
+        ["Enter Monthly Savings Contribution", "IDEAL = $1,539.64", "MINIMUM = $769.82", "$1,539.64"],
         ["(Savings) Subtotal:", "$1,539.64", "$794.00"],
         ["Margins:", "-$249.36", "$1,043.36", "$0.00"],
         ["Net Total:", "$794.00"],
@@ -1212,7 +1210,7 @@ def test_current_month_income_projection_reanchors_after_early_or_late_paycheck(
     ]
 
 
-def test_savings_projection_uses_one_monthly_target_across_three_paychecks(monkeypatch):
+def test_savings_projection_uses_twenty_percent_of_income_not_paycheck_count(monkeypatch):
     monkeypatch.setattr(
         expense_breakdown,
         "now_pacific",
@@ -1226,26 +1224,10 @@ def test_savings_projection_uses_one_monthly_target_across_three_paychecks(monke
         ["", "Monthly Income:", "", "$7,698.22"],
         _row(
             {
-                "B": "Enter 1st Paycheck Deposit",
-                "C": "IDEAL = $769.82",
-                "D": "MINIMUM = $384.91",
-                "E": "$1,147.23",
-            }
-        ),
-        _row(
-            {
-                "B": "Enter 2nd Paycheck Deposit",
-                "C": "IDEAL = $769.82",
-                "D": "MINIMUM = $384.91",
-                "E": "$1,147.24",
-            }
-        ),
-        _row(
-            {
-                "B": "Enter 3rd Paycheck Deposit",
-                "C": "IDEAL = $769.82",
-                "D": "MINIMUM = $384.91",
-                "E": "$0.00",
+                "B": "Enter Monthly Savings Contribution",
+                "C": "IDEAL = $1,539.64",
+                "D": "MINIMUM = $769.82",
+                "E": "$2,294.47",
             }
         ),
         _row({"B": "Total Savings Deposited", "E": "$2,294.47"}),
@@ -1277,8 +1259,6 @@ def test_savings_projection_uses_one_monthly_target_across_three_paychecks(monke
         "currentMinimum": 769.82,
         "projectedIdeal": 2294.47,
         "projectedMinimum": 1147.23,
-        "currentPaycheckCount": 2,
-        "projectedPaycheckCount": 3,
     }
 
 
@@ -1417,9 +1397,7 @@ def test_build_expense_breakdown_report_reports_zero_savings_deposits():
             shared_expenses=InMemoryWorksheet([["hdr"] * 28, ["hdr"] * 28]),
             personal_budget=InMemoryWorksheet(
                 [
-                    _row({"B": "Enter 1st Paycheck Deposit", "E": "$0.00"}),
-                    _row({"B": "Enter 2nd Paycheck Deposit", "E": "$0.00"}),
-                    _row({"B": "Enter 3rd Paycheck Deposit", "E": "$0.00"}),
+                    _row({"B": "Enter Monthly Savings Contribution", "E": "$0.00"}),
                     _row({"B": "Total Savings Deposited", "E": "$0.00"}),
                 ]
             ),
