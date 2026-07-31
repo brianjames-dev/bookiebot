@@ -400,13 +400,10 @@ def build_expense_breakdown_report(
     current_month_subscriptions = _current_month_subscription_items(subscriptions, month)
     income_entries, income_total = _income_entries(personal_rows)
     income_projection_config = _income_projection_config(personal_rows)
-    remaining_budget, remaining_wants_budget, remaining_savings_budget = _category_margin_amounts(personal_rows)
     needs_rollover, wants_rollover = _category_rollover_amounts(personal_rows)
     savings_deposits = _savings_deposits(personal_rows)
     amount_saved = _amount_saved(personal_rows, deposits=savings_deposits)
     savings_goal = _savings_goal(personal_rows)
-    if remaining_savings_budget is None and amount_saved is not None and savings_goal is not None:
-        remaining_savings_budget = round(savings_goal - amount_saved, 2)
     shared_need_entries = _entries_for_category(entries, "need_expenses")
     legacy_need_expenses = _need_expense_items(personal_rows)
     need_expenses = (
@@ -420,10 +417,15 @@ def build_expense_breakdown_report(
         current_month_subscriptions,
         month,
     )
-    budget_static_needs_total, budget_wants_total = _subscription_bucket_totals(
-        personal_rows,
-        current_month_subscriptions,
-    )
+    if subscriptions:
+        budget_static_needs_total, budget_wants_total = _subscription_item_totals(
+            current_month_subscriptions
+        )
+    else:
+        budget_static_needs_total, budget_wants_total = _subscription_bucket_totals(
+            personal_rows,
+            current_month_subscriptions,
+        )
     payment_totals = _payment_totals_by_group(payments)
     utility_history = _utility_history_items(
         selected.budget_history or (BudgetHistoryRows(month, personal_rows),),
@@ -469,20 +471,19 @@ def build_expense_breakdown_report(
     category_budgets = _category_budget_amounts(personal_rows, income_total)
     category_spending = _category_spending_amounts(
         personal_rows,
-        budget_breakdown,
+        breakdown,
         amount_saved=amount_saved,
+        use_sheet_subtotals=not subscriptions,
     )
-    net_total = _net_total_amount(personal_rows)
-    if net_total is None:
-        if any(value is not None for value in (remaining_budget, remaining_wants_budget, remaining_savings_budget)):
-            fallback_balances = _cascade_category_balances(
-                remaining_budget or 0.0,
-                remaining_wants_budget or 0.0,
-                remaining_savings_budget or 0.0,
-            )
-            net_total = round(sum(fallback_balances["remaining"].values()), 2)
-        elif income_total:
-            net_total = round(income_total - personal_total - float(amount_saved or 0.0), 2)
+    remaining_budget = round(category_budgets["needs"] - category_spending["needs"], 2)
+    remaining_wants_budget = round(category_budgets["wants"] - category_spending["wants"], 2)
+    remaining_savings_budget = round(category_budgets["savings"] - category_spending["savings"], 2)
+    category_balances = _cascade_category_balances(
+        remaining_budget,
+        remaining_wants_budget,
+        remaining_savings_budget,
+    )
+    net_total = round(sum(category_balances["remaining"].values()), 2)
 
     return ExpenseBreakdownReport(
         actor_key=actor_key,
@@ -778,8 +779,11 @@ def _subscription_breakdown_totals(
     current_month_subscriptions: list[SubscriptionItem],
     month: BudgetMonth,
 ) -> tuple[float, float]:
-    if all_subscriptions and not _is_completed_month(month):
-        return _subscription_item_totals(_subscriptions_hit_so_far(current_month_subscriptions, month))
+    if all_subscriptions:
+        selected_items = current_month_subscriptions
+        if not _is_completed_month(month):
+            selected_items = _subscriptions_hit_so_far(selected_items, month)
+        return _subscription_item_totals(selected_items)
     return _subscription_bucket_totals(rows, current_month_subscriptions)
 
 
@@ -1150,40 +1154,28 @@ def _category_budget_amounts(rows: list[list[str]], income_total: float) -> dict
 
 def _category_spending_amounts(
     rows: list[list[str]],
-    budget_breakdown: dict[str, dict[str, Any]],
+    breakdown: dict[str, dict[str, Any]],
     *,
     amount_saved: float | None,
+    use_sheet_subtotals: bool,
 ) -> dict[str, float]:
-    subtotals = _personal_expense_subtotals(rows)
-    reliable_expense_subtotals = (
-        any(subtotals.get(bucket, 0.0) > 0 for bucket in ("needs", "wants"))
-        or all(bucket in subtotals for bucket in ("needs", "wants"))
-    )
-    budget_groups = _budget_group_totals(budget_breakdown)
+    budget_groups = _budget_group_totals(breakdown)
+    subtotals = _personal_expense_subtotals(rows) if use_sheet_subtotals else {}
     return {
         "needs": round(
-            subtotals.get("needs", budget_groups["Needs"])
-            if reliable_expense_subtotals
-            else budget_groups["Needs"],
+            budget_groups["Needs"]
+            if budget_groups["Needs"] > 0
+            else subtotals.get("needs", 0.0),
             2,
         ),
         "wants": round(
-            subtotals.get("wants", budget_groups["Wants"])
-            if reliable_expense_subtotals
-            else budget_groups["Wants"],
+            budget_groups["Wants"]
+            if budget_groups["Wants"] > 0
+            else subtotals.get("wants", 0.0),
             2,
         ),
-        "savings": round(subtotals.get("savings", float(amount_saved or 0.0)), 2),
+        "savings": round(float(amount_saved or 0.0), 2),
     }
-
-
-def _net_total_amount(rows: list[list[str]]) -> float | None:
-    for row in rows:
-        for index, value in enumerate(row):
-            if _normalize_label(value) != "net total":
-                continue
-            return round(_next_money(row, index + 1), 2)
-    return None
 
 
 def _outflow_subtotal_bucket(label: str) -> str | None:
@@ -1275,11 +1267,7 @@ def _subscription_items(rows: list[list[str]]) -> list[SubscriptionItem]:
 
 
 def _current_month_subscription_items(items: list[SubscriptionItem], month: BudgetMonth) -> list[SubscriptionItem]:
-    return [
-        item
-        for item in items
-        if item.cadence != "yearly" or item.pull_month == month.month
-    ]
+    return [item for item in items if _subscription_day_in_month(item, month) is not None]
 
 
 def _income_entries(rows: list[list[str]]) -> tuple[list[PaymentItem], float]:
@@ -1579,31 +1567,23 @@ def _cascade_category_balances(
 
 
 def _category_balance_payload(report: ExpenseBreakdownReport) -> dict[str, Any]:
-    needs = report.remaining_budget
-    if needs is None:
-        needs = round(
+    return _cascade_category_balances(
+        round(
             report.category_budgets.get("needs", 0.0)
             - report.category_spending.get("needs", 0.0),
             2,
-        )
-
-    wants = report.remaining_wants_budget
-    if wants is None:
-        wants = round(
+        ),
+        round(
             report.category_budgets.get("wants", 0.0)
             - report.category_spending.get("wants", 0.0),
             2,
-        )
-
-    savings = report.remaining_savings_budget
-    if savings is None:
-        savings = round(
+        ),
+        round(
             report.category_budgets.get("savings", 0.0)
             - report.category_spending.get("savings", 0.0),
             2,
-        )
-
-    return _cascade_category_balances(needs, wants, savings or 0.0)
+        ),
+    )
 
 
 def _savings_deposits(rows: list[list[str]]) -> list[SavingsDeposit]:
@@ -2104,6 +2084,10 @@ def _report_client_payload(
 ) -> dict[str, Any]:
     days_in_month = calendar.monthrange(report.month.year, report.month.month)[1]
     elapsed_days = _elapsed_days_for_month(report.month)
+    selected_month_subscriptions = _current_month_subscription_items(
+        report.subscriptions,
+        report.month,
+    )
 
     return {
         "ownerName": report.owner_name,
@@ -2168,11 +2152,17 @@ def _report_client_payload(
         "utilityHistory": [_utility_history_payload(item) for item in report.utility_history],
         "subscriptionsNeeds": [
             _subscription_payload(item)
-            for item in _subscriptions_for_bucket(report.subscriptions, "static_bills_subscriptions_needs")
+            for item in _subscriptions_for_bucket(
+                selected_month_subscriptions,
+                "static_bills_subscriptions_needs",
+            )
         ],
         "subscriptionsWants": [
             _subscription_payload(item)
-            for item in _subscriptions_for_bucket(report.subscriptions, "subscriptions_wants")
+            for item in _subscriptions_for_bucket(
+                selected_month_subscriptions,
+                "subscriptions_wants",
+            )
         ],
     }
 

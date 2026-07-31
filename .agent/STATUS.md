@@ -4,24 +4,30 @@ Last updated: 2026-07-31
 
 ## Active Focus
 
-Daily Spending now includes scheduled Rent and Bills & Utilities events, with an explicit outlier-compressed axis that keeps normal spending readable without changing exact dollar values. The next step is deployment and production confirmation alongside the monthly savings, recent-action, and expense-report updates.
+Expense-report subscription data is now scoped to the selected month across totals, balances, charts, Calendar details, and Current/Projected views. The next step is deployment and production confirmation alongside the Daily Spending, monthly savings, recent-action, and reconciliation updates.
 
 ## On Deck
 
-1. Deploy and manually verify Daily Spending bill coverage and outlier scaling in checklist item 70.
-2. Deploy and manually verify the monthly savings workflow and corrected Saved-card targets in checklist items 60-61 and 69.
-3. Deploy and manually verify the expense-report corrections in checklist item 67.
-4. Deploy and manually verify typed `recent` opens the short-lived launcher and keeps the resulting DM session ephemeral.
-5. Deploy and manually verify `View Inbox` and `Reconcile Now` show `BookieBot is typing...` without a temporary thinking message.
-6. Manually verify shared Needs logging plus update/move/delete/undo behavior in Discord and Google Sheets.
-7. Manually verify recent transactions and reconciliation after the latest reliability fixes.
-8. Consider a richer Discord button flow for grouped amount adjustments if the current UX feels too manual.
-9. Harden recent-action pending state across restarts/deploys, since selections currently live only in process memory.
-10. Improve targeted recent-action search so commands can find older matches, not only the latest 10 recent actions.
-11. Explore clarifying questions before logging when BookieBot is uncertain instead of guessing or silently failing.
+1. Deploy and manually verify selected-month subscription scoping in checklist item 71.
+2. Deploy and manually verify Daily Spending bill coverage and outlier scaling in checklist item 70.
+3. Deploy and manually verify the monthly savings workflow and corrected Saved-card targets in checklist items 60-61 and 69.
+4. Deploy and manually verify the expense-report corrections in checklist item 67.
+5. Deploy and manually verify typed `recent` opens the short-lived launcher and keeps the resulting DM session ephemeral.
+6. Deploy and manually verify `View Inbox` and `Reconcile Now` show `BookieBot is typing...` without a temporary thinking message.
+7. Manually verify shared Needs logging plus update/move/delete/undo behavior in Discord and Google Sheets.
+8. Manually verify recent transactions and reconciliation after the latest reliability fixes.
+9. Consider a richer Discord button flow for grouped amount adjustments if the current UX feels too manual.
+10. Harden recent-action pending state across restarts/deploys, since selections currently live only in process memory.
+11. Improve targeted recent-action search so commands can find older matches, not only the latest 10 recent actions.
+12. Explore clarifying questions before logging when BookieBot is uncertain instead of guessing or silently failing.
 
 ## Completed 2026-07-31
 
+- Scoped structured subscriptions to the selected report month everywhere. Monthly items require a dated pull in that month; yearly items appear only in their configured pull month; undated drafts and yearly items from other months no longer enter cards, Category Mix, Calendar details, balances, or totals.
+- Preserved the report toggle semantics inside that boundary: Current uses subscriptions that have hit through the selected month's elapsed day, while Projected uses the full dated subscription schedule for that same month.
+- Rebased Needs/Wants usage, category-cascade balances, Burn Rate availability, and Left on the active month-scoped breakdown plus actual savings instead of the Budget sheet's full subscription subtotals, margins, and Net Total. Sheets without a structured subscription schedule retain subtotal fallback compatibility.
+- Live Brian July verification now reconciles Spent `$5,620.89`, Needs `$4,064.56`, Wants `$1,556.33`, Saved `$2,167.14`, and Left `$3,047.68`. July subscription totals are `$229.36` Needs and `$39.96` Wants; `brianjames.dev` remains included, while October's Amazon Prime and February's MacroFactor are absent from Current and Projected.
+- Verification: focused report suite `36 passed`; full suite `425 passed`; Pyright reported zero errors; frontend typecheck/build passed; `git diff --check` passed; live desktop browser checks confirmed the Current/Projected and Needs/Wants totals with the out-of-month yearly subscriptions absent. Manual verification is checklist item 71 below.
 - Added entered Rent and Bills & Utilities calendar events to Daily Spending and its itemized table. They follow the existing Needs bucket, appear in All/Needs, stay out of Wants, and respect Current/Projected event timing without changing their exact dollar values.
 - Replaced rent-flattened Daily Spending geometry with a conditional, explicitly labeled axis compression. It activates only when a `$500+` peak is at least `2.5x` the next-highest day, keeps values through the next-highest day linear, and reserves a short upper band for the outlier; tooltips, totals, Highest day, and table rows continue to use raw amounts.
 - Live Brian July verification found Rent `$2,100.00` on day 1, Water `$141.43` on day 18, and PG&E `$165.13` on day 22. All totals `$5,620.89`, Needs totals `$4,064.56`, Wants totals `$1,556.33`, and the second-highest bar is `87.4%` of the rent bar height. Desktop and `390x844` checks found the compression note inside the chart, no document overflow, mobile Details closed by default, and no browser warnings/errors.
@@ -480,7 +486,7 @@ Use a test row or low-risk real row in Discord:
 60. After deployment, send `set monthly savings to 1539.64`, then `how much have I saved this month?`; undo the test write if it replaced a different real amount.
     - Expected: only the single `Enter Monthly Savings Contribution` Actual cell is overwritten; the query reports Actual `$1,539.64`, Ideal `$2,167.14`, and Minimum `$1,083.57` for Brian July; undo restores the prior monthly value.
 61. Open current-month reports for Brian and Hannah and switch Projected off and on while viewing the Saved card and Savings Category Mix tab.
-    - Expected: Saved does not change with Projected; Ideal always equals 20% and Minimum 10% of the selected mode's income, independent of paycheck count. At July month-end, Brian remains `$1,539.64` Saved with `$2,167.14` Ideal and `$1,083.57` Minimum in both modes.
+    - Expected: Saved does not change with Projected; Ideal always equals 20% and Minimum 10% of the selected mode's income, independent of paycheck count. At July month-end, Brian remains `$2,167.14` Saved with `$2,167.14` Ideal and `$1,083.57` Minimum in both modes.
 62. After deploying the July 24 reconciliation fix, tap `View Inbox` on a digest containing an automatic match and on one containing unresolved items.
     - Expected: channel typing is followed by the persisted private match/inbox report; automatic matches include the `Unmatch` selector, unresolved reports include `Reconcile Now` and `Ignore All`, and a backend failure produces a private retry message within 15 seconds.
 63. After deploying the July 25 Discord response-lifecycle fix, dismiss any old stuck thinking message and tap `View Inbox` again.
@@ -492,13 +498,15 @@ Use a test row or low-risk real row in Discord:
 66. Send `recent` directly in BookieBot's DM, then open the launcher and complete a selection plus an update that requires a typed reply.
     - Expected: no `I sent your recent transactions list to your DMs.` tail appears; the short-lived launcher deletes when tapped; the list, prompts, typed-reply result, pagination, and action outcomes all show Discord's `Only you can see this · Dismiss message` footer.
 67. Open current-month expense reports for Brian and Hannah, inspect Current and Projected, then view Calendar, Burn Rate, Category Mix, and Largest.
-    - Expected: Current Left equals the sheet's Net Total after category coverage, while Spent remains elapsed outflow without Saved. Brian shows `$794.00` Left, Needs `$4,098.47 / $3,849.11 (106.48%)`, Wants `$1,266.11 / $2,309.47 (54.82%)`, and Saved `$1,539.64 / $1,539.64`; Hannah shows `$618.53` Left from Needs `$688.12`, Wants `$312.82`, and Saved `$0.00`. Saved stays actual when Projected is toggled while projected category budgets and the progress bar's monthly Ideal/Minimum targets change; Calendar shows the month name and a spaced count such as `17 total`; Largest is descending, excludes Rent, and retains all other actual shared expenses, entered bills/utilities, and elapsed subscriptions; Burn Rate's Wants limit and donor/recipient impact note reflect category-cascade transfers, with the pace badge anchored beside its summary. Daily Spending details start open on desktop and closed on mobile, and the timestamp/Projected/theme controls follow the updated header order.
+    - Expected: Spent excludes Saved, Left equals the three active category balances after coverage, and Category Mix uses the same Current or Projected breakdown shown elsewhere. Saved stays actual when Projected is toggled while projected category budgets and the progress bar's monthly Ideal/Minimum targets change; Calendar shows the month name and a spaced count such as `17 total`; Largest is descending, excludes Rent, and retains all other actual shared expenses, entered bills/utilities, and elapsed subscriptions; Burn Rate's Wants limit and donor/recipient impact note reflect category-cascade transfers, with the pace badge anchored beside its summary. Daily Spending details start open on desktop and closed on mobile, and the timestamp/Projected/theme controls follow the updated header order.
 68. Open Brian July's Calendar and switch All/Subs, then toggle Projected.
-    - Expected: `July` remains the heading; the animated dollar subtitle shows `$2,669.89` for Current All, `$263.33` for Current Subs, and `$269.32` for Projected Subs; the event-count pill changes independently and no Current/Projected subtitle appears beneath the month.
+    - Expected: `July` remains the heading; at month-end the animated dollar subtitle shows `$2,675.88` for All and `$269.32` for Subs in both modes; the event-count pill changes independently and no Current/Projected subtitle appears beneath the month.
 69. Open Hannah Budget 2026 July and Template, then generate Hannah's July expense report.
     - Expected: each tab has one `Enter Monthly Savings Contribution` row; July shows Actual `$0.00`, Ideal `$323.89`, Minimum `$161.95`, Savings subtotal `$0.00`, and Net Total `$618.53`. The Saved card uses the same `$161.95` current Minimum while Projected remains based on projected income.
 70. Open Brian July's Daily Spending card in All, Needs, and Wants at desktop and phone widths.
     - Expected: All/Needs include Rent `$2,100.00` on day 1, Water `$141.43` on day 18, and PG&E `$165.13` on day 22; Wants excludes those Needs bills. All and Needs show an `Axis compressed above $450.00` note, keep the next-highest day close to the top of the graph, and still show exact amounts in tooltips, Highest day, totals, and table rows. Wants returns to the normal axis, mobile has no horizontal overflow, and Details remains closed by default on mobile.
+71. Open Brian July's report, compare Current and Projected, and inspect Needs, Wants, Calendar subscription details, Daily Spending, Burn Rate, and Left.
+    - Expected: every view is limited to transactions scheduled for July. At month-end, Spent is `$5,620.89`, Needs is `$4,064.56`, Wants is `$1,556.33`, Saved is `$2,167.14`, and Left is `$3,047.68`; subscription totals are `$229.36` Needs and `$39.96` Wants. The July yearly `brianjames.dev` item is included, while October's Amazon Prime and February's MacroFactor appear nowhere in either mode.
 
 ## Verification Baseline
 
@@ -512,6 +520,21 @@ python -m pytest unit_tests/intents/test_handlers.py unit_tests/core/test_messag
 Latest verification:
 
 ```bash
+PYTHONPATH=src venv/bin/python -m pytest unit_tests
+# passed: 425 passed, 1 warning
+
+python -m pyright --pythonpath venv/bin/python --pythonversion 3.12
+# passed: 0 errors, 0 warnings, 0 informations
+
+cd web/expense-report && npm run typecheck && npm run build
+# passed
+
+git diff --check
+# passed
+
+Live Brian July selected-month subscription browser verification
+# passed: Current/Projected exclude Amazon Prime and MacroFactor; Needs $4,064.56; Wants $1,556.33; Left $3,047.68; month subscription totals $229.36/$39.96
+
 python -m pytest unit_tests/reports/test_expense_breakdown.py
 # passed: 36 passed
 

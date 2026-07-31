@@ -195,17 +195,17 @@ def test_build_expense_breakdown_report_aggregates_shared_and_personal_data():
         ),
     )
 
-    assert report.grand_total == 3666.0
+    assert report.grand_total == 2271.0
     assert report.shared_total == 75.0
-    assert report.personal_total == 3666.0
+    assert report.personal_total == 2271.0
     assert report.income_total == 3500.0
-    assert report.remaining_budget == 2000.0
-    assert report.remaining_wants_budget == 750.0
+    assert report.remaining_budget == -466.0
+    assert report.remaining_wants_budget == 995.0
     assert report.amount_saved == 600.0
     assert report.savings_goal == 900.0
     assert report.breakdown["rent"]["amount"] == 1750.0
     assert report.breakdown["bills_utilities"]["amount"] == 200.0
-    assert report.breakdown["static_bills_subscriptions_needs"]["amount"] == 1410.0
+    assert report.breakdown["static_bills_subscriptions_needs"]["amount"] == 15.0
     assert report.breakdown["need_expenses"]["amount"] == 184.0
     assert report.breakdown["subscriptions_wants"]["amount"] == 10.0
     assert report.breakdown["grocery"]["amount"] == 55.0
@@ -265,28 +265,28 @@ def test_build_expense_breakdown_report_aggregates_shared_and_personal_data():
         {"label": "No date", "amount": 184.0},
     ]
     assert payload["budgetGroups"][0]["label"] == "Needs"
-    assert payload["metrics"]["fixedCommitments"] == 3370.0
-    assert payload["metrics"]["remainingNeedsBudget"] == 2000.0
-    assert payload["metrics"]["remainingWantsBudget"] == 750.0
+    assert payload["metrics"]["fixedCommitments"] == 1975.0
+    assert payload["metrics"]["remainingNeedsBudget"] == -466.0
+    assert payload["metrics"]["remainingWantsBudget"] == 995.0
     assert payload["metrics"]["needsRollover"] == 2000.0
     assert payload["metrics"]["wantsRollover"] == 750.0
     assert payload["metrics"]["amountSaved"] == 600.0
     assert payload["metrics"]["savingsGoal"] == 900.0
-    assert payload["metrics"]["incomeAfterExpenses"] == 3050.0
+    assert payload["metrics"]["incomeAfterExpenses"] == 629.0
     assert payload["incomeProjection"] == {"currentAmount": 3500.0, "projectedAmount": 3500.0, "savingsGoal": 700.0}
     burn_rate = payload["burnRate"]
     burn_rate_series = burn_rate.pop("series")
     assert burn_rate == {
-        "budget": 795.0,
+        "budget": 574.0,
         "spent": 45.0,
-        "remaining": 750.0,
+        "remaining": 529.0,
         "daysInMonth": 31,
         "elapsedDays": 31,
-        "expectedSpend": 795.0,
-        "allowedDailyAverage": 25.65,
+        "expectedSpend": 574.0,
+        "allowedDailyAverage": 18.52,
         "actualDailyAverage": 1.45,
-        "dailyDifference": -24.2,
-        "totalDifference": -750.0,
+        "dailyDifference": -17.07,
+        "totalDifference": -529.0,
         "status": "under",
     }
     assert len(burn_rate_series) == 31
@@ -295,24 +295,24 @@ def test_build_expense_breakdown_report_aggregates_shared_and_personal_data():
         "label": "1",
         "dailySpend": 0.0,
         "actualSpend": 0.0,
-        "expectedSpend": 25.65,
-        "variance": -25.65,
+        "expectedSpend": 18.52,
+        "variance": -18.52,
     }
     assert burn_rate_series[1] == {
         "day": 2,
         "label": "2",
         "dailySpend": 45.0,
         "actualSpend": 45.0,
-        "expectedSpend": 51.29,
-        "variance": -6.29,
+        "expectedSpend": 37.03,
+        "variance": 7.97,
     }
     assert burn_rate_series[-1] == {
         "day": 31,
         "label": "31",
         "dailySpend": 0.0,
         "actualSpend": 45.0,
-        "expectedSpend": 795.0,
-        "variance": -750.0,
+        "expectedSpend": 574.0,
+        "variance": -529.0,
     }
     assert "Needs vs Wants" not in html
     assert "Fixed Commitments" not in html
@@ -446,8 +446,8 @@ def test_build_expense_breakdown_report_aggregates_shared_and_personal_data():
     assert "All Shared Expense Transactions" not in html
     assert "Source Sheet Data" not in html
     assert "Personal Budget" not in html
-    assert [item["name"] for item in payload["subscriptionsNeeds"]] == ["Amazon Prime", "Netflix"]
-    assert [item["name"] for item in payload["subscriptionsWants"]] == ["MacroFactor", "Spotify"]
+    assert [item["name"] for item in payload["subscriptionsNeeds"]] == ["Netflix"]
+    assert [item["name"] for item in payload["subscriptionsWants"]] == ["Spotify"]
     assert any(entry["location"] == "Trader Joe's" for entry in payload["dailyEntries"])
     assert any(
         entry["category"] == "Need"
@@ -571,7 +571,7 @@ def test_shared_need_expense_section_feeds_need_category_and_daily_activity():
     assert all(entry["item"] != "Legacy Personal Need" for entry in payload["dailyEntries"])
 
 
-def test_subscription_tables_include_yearly_items_outside_selected_month_without_changing_fallback_totals():
+def test_subscription_tables_and_totals_exclude_yearly_items_outside_selected_month():
     subscriptions_rows = [
         [],
         ["", "SUBSCRIPTIONS"],
@@ -603,8 +603,13 @@ def test_subscription_tables_include_yearly_items_outside_selected_month_without
     )
     assert payload_match is not None
     payload = json.loads(payload_match.group(1))
-    assert [item["name"] for item in payload["subscriptionsNeeds"]] == ["Amazon Prime", "Netflix"]
-    assert [item["name"] for item in payload["subscriptionsWants"]] == ["MacroFactor", "Spotify"]
+    assert [item["name"] for item in payload["subscriptionsNeeds"]] == ["Netflix"]
+    assert [item["name"] for item in payload["subscriptionsWants"]] == ["Spotify"]
+    assert payload["categorySpending"] == {
+        "needs": 15.0,
+        "wants": 10.0,
+        "savings": 0.0,
+    }
 
 
 def test_current_month_burn_rate_series_only_includes_elapsed_days(monkeypatch):
@@ -689,6 +694,30 @@ def test_current_month_subscription_breakdown_uses_hit_so_far_totals(monkeypatch
 
     assert report.breakdown["static_bills_subscriptions_needs"]["amount"] == 115.0
     assert report.breakdown["subscriptions_wants"]["amount"] == 10.0
+    assert report.budget_breakdown["static_bills_subscriptions_needs"]["amount"] == 150.0
+    assert report.budget_breakdown["subscriptions_wants"]["amount"] == 102.0
+    assert report.category_spending == {
+        "needs": 115.0,
+        "wants": 10.0,
+        "savings": 0.0,
+    }
+
+    payload_match = re.search(
+        r'<script id="bookiebot-expense-report-data" type="application/json">(.*?)</script>',
+        render_expense_breakdown_html(report),
+    )
+    assert payload_match is not None
+    payload = json.loads(payload_match.group(1))
+    assert [item["name"] for item in payload["subscriptionsNeeds"]] == [
+        "Amazon Prime",
+        "Need Later",
+        "Netflix",
+    ]
+    assert [item["name"] for item in payload["subscriptionsWants"]] == [
+        "MacroFactor",
+        "Spotify",
+        "Want Later",
+    ]
 
 
 def test_report_payload_tracks_merchant_occurrences_by_location_count():
@@ -843,7 +872,7 @@ def test_report_payload_total_expenses_excludes_savings_subtotal():
     assert payload["metrics"]["incomeAfterExpenses"] == 2150.0
 
 
-def test_report_uses_sheet_budget_subtotals_and_net_separately_from_elapsed_outflow(monkeypatch):
+def test_report_recalculates_totals_from_selected_month_subscription_activity(monkeypatch):
     monkeypatch.setattr(
         expense_breakdown,
         "now_pacific",
@@ -901,32 +930,37 @@ def test_report_uses_sheet_budget_subtotals_and_net_separately_from_elapsed_outf
     payload = json.loads(payload_match.group(1))
 
     assert payload["metrics"]["totalExpenses"] == 5133.70
-    assert payload["metrics"]["incomeAfterExpenses"] == 794.0
+    assert payload["metrics"]["incomeAfterExpenses"] == 1024.88
     assert payload["categoryBudgets"] == {
         "needs": 3849.11,
         "wants": 2309.47,
         "savings": 1539.64,
     }
     assert payload["categorySpending"] == {
-        "needs": 4098.47,
-        "wants": 1266.11,
+        "needs": 3945.57,
+        "wants": 1188.13,
         "savings": 1539.64,
     }
     assert payload["budgetGroups"] == [
-        {"label": "Needs", "amount": 4098.47},
-        {"label": "Wants", "amount": 1266.11},
+        {"label": "Needs", "amount": 3945.57},
+        {"label": "Wants", "amount": 1188.13},
     ]
     assert payload["categoryBalances"]["remaining"] == {
         "needs": 0.0,
-        "wants": 794.0,
+        "wants": 1024.88,
         "savings": 0.0,
     }
     actual_breakdown = {item["key"]: item["amount"] for item in payload["breakdown"]}
     budget_breakdown = {item["key"]: item["amount"] for item in payload["budgetBreakdown"]}
     assert actual_breakdown["static_bills_subscriptions_needs"] == 229.36
     assert actual_breakdown["subscriptions_wants"] == 33.97
-    assert budget_breakdown["static_bills_subscriptions_needs"] == 382.26
-    assert budget_breakdown["subscriptions_wants"] == 111.95
+    assert budget_breakdown["static_bills_subscriptions_needs"] == 229.36
+    assert budget_breakdown["subscriptions_wants"] == 39.96
+    assert [item["name"] for item in payload["subscriptionsNeeds"]] == ["Needs elapsed"]
+    assert [item["name"] for item in payload["subscriptionsWants"]] == [
+        "Discovery+",
+        "Wants elapsed",
+    ]
 
 
 def test_report_payload_total_expenses_keeps_zero_savings_subtotal():
@@ -1330,9 +1364,11 @@ def test_report_frontend_keeps_saved_amount_actual_and_out_of_spending():
     assert "amountSaved={activeReport.metrics.amountSaved}" in source
     assert "value={activeReport.metrics.amountSaved}" in source
     assert "incomeAfterExpenses: roundCurrency(budgetRemaining)" in source
-    assert "report.metrics.incomeAfterExpenses ?? categoryBalanceTotal(categoryBalances)" in source
+    assert "const budgetRemaining = categoryBalanceTotal(categoryBalances)" in source
+    assert "categorySpendingForBreakdown(" in source
     assert "projectedCategoryBalances(categoryBudgets, categorySpending)" in source
-    assert "budgetData={activeReport.budgetBreakdown}" in source
+    assert "budgetData={activeReport.budgetBreakdown}" not in source
+    assert "categoryMixRows(data, selectedRollover, filter, amountSaved)" in source
     assert "categoryBudgets={activeReport.categoryBudgets}" in source
     assert "Budget remaining" in source
     assert "usedPercent.toFixed(2)" in source

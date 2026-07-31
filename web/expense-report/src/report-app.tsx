@@ -252,7 +252,6 @@ type ReportView = {
   categoryBudgets: CategoryBalanceAmounts
   categorySpending: CategoryBalanceAmounts
   breakdown: BreakdownItem[]
-  budgetBreakdown: BreakdownItem[]
   burnRate: BurnRate | null
   calendarEvents: CalendarEvent[]
   utilityHistory: UtilityHistoryItem[]
@@ -263,16 +262,15 @@ function buildReportView(report: ExpenseReportData, projected: boolean): ReportV
   const monthlyIncome = projected ? report.incomeProjection.projectedAmount : report.incomeProjection.currentAmount
   const savings = savingsForMode(report, projected)
   const totalExpenses = projected ? amountRowsTotal(breakdown) : report.metrics.totalExpenses
-  const currentBalances = report.categoryBalances ?? currentCategoryBalances(report)
   const currentBudgets = currentCategoryBudgets(report)
-  const categorySpending = currentCategorySpending(report, currentBudgets, currentBalances)
   const categoryBudgets = projected ? projectedCategoryBudgets(monthlyIncome) : currentBudgets
-  const categoryBalances = projected
-    ? projectedCategoryBalances(categoryBudgets, categorySpending)
-    : currentBalances
-  const budgetRemaining = projected
-    ? categoryBalanceTotal(categoryBalances)
-    : report.metrics.incomeAfterExpenses ?? categoryBalanceTotal(categoryBalances)
+  const categorySpending = categorySpendingForBreakdown(
+    breakdown,
+    savings.amount,
+    report.categorySpending,
+  )
+  const categoryBalances = projectedCategoryBalances(categoryBudgets, categorySpending)
+  const budgetRemaining = categoryBalanceTotal(categoryBalances)
   return {
     metrics: {
       totalExpenses,
@@ -286,7 +284,6 @@ function buildReportView(report: ExpenseReportData, projected: boolean): ReportV
     categoryBudgets,
     categorySpending,
     breakdown,
-    budgetBreakdown: report.budgetBreakdown?.length ? report.budgetBreakdown : report.breakdown,
     burnRate: projected
       ? projectedBurnRateFromIncome(report.burnRate, categoryBalances)
       : report.burnRate,
@@ -298,7 +295,8 @@ function buildReportView(report: ExpenseReportData, projected: boolean): ReportV
 function projectedBreakdown(report: ExpenseReportData) {
   const subscriptionTotals = projectedSubscriptionTotals(report)
   const billTotals = projectedBillTotals(report)
-  const rows = report.breakdown.map((item) => {
+  const sourceRows = report.budgetBreakdown?.length ? report.budgetBreakdown : report.breakdown
+  const rows = sourceRows.map((item) => {
     let amount = item.amount
     if (item.key === "static_bills_subscriptions_needs") {
       amount = subscriptionTotals.needs || amount
@@ -341,18 +339,21 @@ function projectedCategoryBudgets(monthlyIncome: number): CategoryBalanceAmounts
   return { needs, wants, savings }
 }
 
-function currentCategorySpending(
-  report: ExpenseReportData,
-  budgets: CategoryBalanceAmounts,
-  balances: CategoryBalances,
+function categorySpendingForBreakdown(
+  breakdown: BreakdownItem[],
+  amountSaved: number,
+  fallback?: CategoryBalanceAmounts,
 ): CategoryBalanceAmounts {
-  if (report.categorySpending) {
-    return report.categorySpending
-  }
+  const needs = breakdown
+    .filter((item) => CATEGORY_NEEDS_KEYS.has(item.key))
+    .reduce((total, item) => total + item.amount, 0)
+  const wants = breakdown
+    .filter((item) => CATEGORY_WANTS_KEYS.has(item.key))
+    .reduce((total, item) => total + item.amount, 0)
   return {
-    needs: roundCurrency(budgets.needs - balances.raw.needs),
-    wants: roundCurrency(budgets.wants - balances.raw.wants),
-    savings: roundCurrency(budgets.savings - balances.raw.savings),
+    needs: roundCurrency(needs > 0 ? needs : fallback?.needs ?? 0),
+    wants: roundCurrency(wants > 0 ? wants : fallback?.wants ?? 0),
+    savings: roundCurrency(amountSaved),
   }
 }
 
@@ -369,15 +370,6 @@ function projectedCategoryBalances(
 
 function categoryBalanceTotal(balances: CategoryBalances) {
   return roundCurrency(Object.values(balances.remaining).reduce((total, amount) => total + amount, 0))
-}
-
-function currentCategoryBalances(report: ExpenseReportData) {
-  const needs = report.metrics.remainingNeedsBudget ?? report.metrics.needsRollover ?? 0
-  const wants = report.metrics.remainingWantsBudget
-    ?? roundCurrency((report.metrics.wantsRollover ?? 0) - (report.metrics.needsRollover ?? 0))
-  const savings = report.metrics.remainingSavingsBudget
-    ?? roundCurrency((report.metrics.savingsGoal ?? 0) - (report.metrics.amountSaved ?? 0))
-  return cascadeCategoryBalances({ needs, wants, savings })
 }
 
 const CATEGORY_BALANCE_PRIORITIES: Array<[BudgetCategoryKey, BudgetCategoryKey[]]> = [
@@ -563,7 +555,6 @@ export function ExpenseReportApp({ report }: { report: ExpenseReportData }) {
       content: (
         <CategoryMixChart
           data={activeReport.breakdown}
-          budgetData={activeReport.budgetBreakdown}
           categoryBalances={activeReport.categoryBalances}
           categoryBudgets={activeReport.categoryBudgets}
           amountSaved={activeReport.metrics.amountSaved}
@@ -1329,7 +1320,6 @@ function SavingsMetricCard({
 
 type CategoryMixChartProps = {
   data: BreakdownItem[]
-  budgetData: BreakdownItem[]
   categoryBalances: CategoryBalances
   categoryBudgets: CategoryBalanceAmounts
   amountSaved: number
@@ -1340,7 +1330,6 @@ type CategoryMixChartProps = {
 
 const CategoryMixChart = memo(function CategoryMixChart({
   data,
-  budgetData,
   categoryBalances,
   categoryBudgets,
   amountSaved,
@@ -1349,8 +1338,7 @@ const CategoryMixChart = memo(function CategoryMixChart({
   collapseKey,
 }: CategoryMixChartProps) {
   const selectedRollover = categoryMixRollover(categoryBalances, filter)
-  const categoryData = filter === "needs" || filter === "wants" ? budgetData : data
-  const chartData = categoryMixRows(categoryData, selectedRollover, filter, amountSaved)
+  const chartData = categoryMixRows(data, selectedRollover, filter, amountSaved)
   const [pieHostRef, pieHostSize] = useElementSize<HTMLDivElement>()
   const pieLayout = useExpensePieLayout(chartData, pieHostSize)
   const spentTotal = amountRowsTotal(chartData.filter((item) => item.key !== "left"))

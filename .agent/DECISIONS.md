@@ -302,6 +302,12 @@ Decision: Daily Spending includes entered Rent and Bills & Utilities events as N
 
 Rationale: Rent is a real monthly outflow and belongs in daily cash-flow history, but a normal linear or square-root range makes every other day too small to compare. A disclosed broken-axis treatment keeps rent visible, preserves the relative shape of ordinary spending, and avoids presenting transformed bar heights as unqualified dollar values.
 
+## 2026-07-31 - Scope Subscription Reporting To The Selected Month
+
+Decision: Supersede the 2026-07-26 use of full Budget-sheet category subtotals, margins, and Net Total in expense reports. When a structured subscription schedule is available, monthly subscriptions count only when they have a valid pull day, yearly subscriptions count only in their configured pull month, and undated drafts do not count. Current mode includes scheduled items that have hit through the selected month's elapsed day; Projected includes every dated item scheduled within that same month. Needs/Wants spending, category-cascade balances, Burn Rate availability, Calendar details, and Left all derive from the same active month-scoped breakdown plus actual savings. Sheet subtotals remain a compatibility fallback only when no structured subscription schedule exists.
+
+Rationale: Budget-sheet subscription subtotals aggregate monthly and yearly items without regard to the selected report month. Reusing those totals made annual Amazon Prime and MacroFactor charges appear in July category usage and available-money calculations even though neither charge occurs in July, while Calendar and Daily Spending correctly omitted them. One month-scoped schedule keeps every card and graph reconcilable without inventing dates for incomplete subscription drafts.
+
 ## Pending Decisions
 
 - Where should durable system events live: banking database only, Google Sheets only, or dual-write during transition?
