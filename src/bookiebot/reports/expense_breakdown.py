@@ -2209,9 +2209,14 @@ def _savings_projection_payload(report: ExpenseBreakdownReport) -> dict[str, Any
         else report.savings_goal or 0.0,
         2,
     )
-    current_minimum = round(current_ideal * 0.5, 2)
+    current_minimum = round(
+        report.income_total * 0.1
+        if report.income_total > 0
+        else (report.savings_goal or 0.0) * 0.5,
+        2,
+    )
     projected_ideal = round(projected_income * 0.2, 2)
-    projected_minimum = round(projected_ideal * 0.5, 2)
+    projected_minimum = round(projected_income * 0.1, 2)
     return {
         "currentAmount": current_amount,
         "projectedAmount": current_amount,

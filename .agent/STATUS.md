@@ -4,11 +4,11 @@ Last updated: 2026-07-31
 
 ## Active Focus
 
-Typed recent-action requests again use the short-lived interaction launcher so the financial list and its workflow carry Discord's native ephemeral footer. The next step is deployment and production confirmation alongside the monthly-savings and expense-report updates.
+Brian and Hannah July/Templates now share the one-row monthly savings structure, and report Minimum targets round directly from 10% of income. The next step is deployment and production confirmation alongside the recent-action and expense-report updates.
 
 ## On Deck
 
-1. Deploy and manually verify the monthly savings workflow and corrected Saved-card targets in checklist items 60-61.
+1. Deploy and manually verify the monthly savings workflow and corrected Saved-card targets in checklist items 60-61 and 69.
 2. Deploy and manually verify the expense-report corrections in checklist item 67.
 3. Deploy and manually verify typed `recent` opens the short-lived launcher and keeps the resulting DM session ephemeral.
 4. Deploy and manually verify `View Inbox` and `Reconcile Now` show `BookieBot is typing...` without a temporary thinking message.
@@ -21,6 +21,12 @@ Typed recent-action requests again use the short-lived interaction launcher so t
 
 ## Completed 2026-07-31
 
+- Migrated the live Hannah Budget 2026 July and Template tabs from three numbered paycheck savings rows to the same one-row `Enter Monthly Savings Contribution` structure already used by Brian.
+- Preserved Hannah's existing `$0.00` monthly contribution, changed Ideal to the full 20% Savings allocation, changed Minimum to 10% of income, and repaired the shifted Savings subtotal, Margins, and Net Total formulas. July remains `$618.53` Net Total with `$323.89` Ideal and `$161.95` Minimum.
+- Corrected the expense-report Minimum calculation to round 10% of current/projected income directly instead of halving an already rounded 20% Ideal. This removes Hannah's `$161.94` versus `$161.95` sheet/card mismatch.
+- Added a penny-boundary regression for Hannah's `$1,619.47` income. Verification: focused report suite `35 passed`; full suite `423 passed, 1 skipped`; Pyright reported zero errors; targeted live formula checks and before/after PDF renders passed; `git diff --check` passed.
+- The Template tabs' existing placeholder-driven `#REF!` outputs remain unchanged and visually match Brian's Template baseline; the migrated savings formulas themselves contain no formula errors.
+- Manual verification is checklist item 69 below.
 - Restored the five-minute `Open Recent Transactions` launcher after confirming that an immediately returned ordinary DM remains persistent and cannot carry Discord's native ephemeral footer.
 - Tapping the launcher returns the recent list and selector ephemerally, deletes the launcher immediately, and retains the interaction follow-up for the remaining recent-action workflow window.
 - Regression coverage verifies the ephemeral launcher/list lifecycle, multi-chunk private lists, selector placement, and DM-only acknowledgement behavior.
@@ -484,6 +490,8 @@ Use a test row or low-risk real row in Discord:
     - Expected: Current Left equals the sheet's Net Total after category coverage, while Spent remains elapsed outflow without Saved. Brian shows `$794.00` Left, Needs `$4,098.47 / $3,849.11 (106.48%)`, Wants `$1,266.11 / $2,309.47 (54.82%)`, and Saved `$1,539.64 / $1,539.64`; Hannah shows `$618.53` Left from Needs `$688.12`, Wants `$312.82`, and Saved `$0.00`. Saved stays actual when Projected is toggled while projected category budgets and the progress bar's monthly Ideal/Minimum targets change; Calendar shows the month name and a spaced count such as `17 total`; Largest is descending, excludes Rent, and retains all other actual shared expenses, entered bills/utilities, and elapsed subscriptions; Burn Rate's Wants limit and donor/recipient impact note reflect category-cascade transfers, with the pace badge anchored beside its summary. Daily Spending details start open on desktop and closed on mobile, and the timestamp/Projected/theme controls follow the updated header order.
 68. Open Brian July's Calendar and switch All/Subs, then toggle Projected.
     - Expected: `July` remains the heading; the animated dollar subtitle shows `$2,669.89` for Current All, `$263.33` for Current Subs, and `$269.32` for Projected Subs; the event-count pill changes independently and no Current/Projected subtitle appears beneath the month.
+69. Open Hannah Budget 2026 July and Template, then generate Hannah's July expense report.
+    - Expected: each tab has one `Enter Monthly Savings Contribution` row; July shows Actual `$0.00`, Ideal `$323.89`, Minimum `$161.95`, Savings subtotal `$0.00`, and Net Total `$618.53`. The Saved card uses the same `$161.95` current Minimum while Projected remains based on projected income.
 
 ## Verification Baseline
 
@@ -497,6 +505,15 @@ python -m pytest unit_tests/intents/test_handlers.py unit_tests/core/test_messag
 Latest verification:
 
 ```bash
+python -m pytest unit_tests/reports/test_expense_breakdown.py
+# passed: 35 passed
+
+python -m pytest unit_tests
+# passed: 423 passed, 1 skipped
+
+python -m pyright --pythonpath venv/bin/python --pythonversion 3.12
+# passed: 0 errors, 0 warnings, 0 informations
+
 python -m pytest unit_tests/intents/test_handlers.py unit_tests/core/test_message_router.py
 # passed: 134 passed
 

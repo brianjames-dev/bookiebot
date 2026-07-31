@@ -1262,6 +1262,47 @@ def test_savings_projection_uses_twenty_percent_of_income_not_paycheck_count(mon
     }
 
 
+def test_savings_minimum_rounds_ten_percent_of_income_directly():
+    personal_rows = [
+        ["", "7/10/2026", "Sonic", "$1,619.47"],
+        ["", "Monthly Income:", "", "$1,619.47"],
+        _row(
+            {
+                "B": "Enter Monthly Savings Contribution",
+                "C": "IDEAL = $323.89",
+                "D": "MINIMUM = $161.95",
+                "E": "$0.00",
+            }
+        ),
+    ]
+    report = build_expense_breakdown_report(
+        actor_key="hannah",
+        owner_name="Hannah",
+        persons=["Hannah"],
+        month=BudgetMonth(2026, 7),
+        worksheets=ReportWorksheets(
+            shared_expenses=InMemoryWorksheet([["hdr"] * 28, ["hdr"] * 28]),
+            personal_budget=InMemoryWorksheet(personal_rows),
+            subscriptions=InMemoryWorksheet([]),
+        ),
+    )
+
+    payload_match = re.search(
+        r'<script id="bookiebot-expense-report-data" type="application/json">(.*?)</script>',
+        render_expense_breakdown_html(report),
+    )
+    assert payload_match is not None
+    payload = json.loads(payload_match.group(1))
+
+    savings = payload["savingsProjection"]
+    assert savings["currentAmount"] == 0.0
+    assert savings["projectedAmount"] == 0.0
+    assert savings["currentIdeal"] == 323.89
+    assert savings["currentMinimum"] == 161.95
+    assert savings["projectedIdeal"] == 647.79
+    assert savings["projectedMinimum"] == 323.89
+
+
 def test_report_frontend_keeps_saved_amount_actual_and_out_of_spending():
     source = (Path(__file__).resolve().parents[2] / "web/expense-report/src/report-app.tsx").read_text()
 
