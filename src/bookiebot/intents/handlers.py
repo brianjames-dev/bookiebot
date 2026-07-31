@@ -63,7 +63,6 @@ from bookiebot.ui.recent_actions import (
     PersonSelectView,
     RecentActionDecisionView,
     RecentActionSelectView,
-    RecentActionsLauncherView,
     UpdateConfirmView,
     UpdateFieldView,
 )
@@ -270,11 +269,9 @@ async def _send_recent_private_message(message: Any, content: str, public_ack: s
     if callable(author_send):
         async_author_send = cast(Callable[..., Awaitable[Any]], author_send)
         try:
-            await async_author_send(
-                "Open your temporary recent transactions workflow.",
-                view=_recent_actions_launcher_view(actor_key, chunks, kwargs),
-                delete_after=300,
-            )
+            for index, chunk in enumerate(chunks):
+                chunk_kwargs = kwargs if index == len(chunks) - 1 else {}
+                await async_author_send(chunk, **chunk_kwargs)
         except Exception:
             await message.channel.send("❌ I could not send that recent transaction workflow privately. Please check your DM settings.")
             return
@@ -333,35 +330,6 @@ async def _send_recent_followup_chunks(
         chunk_kwargs = dict(kwargs) if index == len(chunks) - 1 else {}
         chunk_kwargs["ephemeral"] = True
         await followup_send(chunk, **chunk_kwargs)
-
-
-def _recent_actions_launcher_view(
-    actor_key: str | None,
-    chunks: list[str],
-    kwargs: dict[str, Any],
-) -> RecentActionsLauncherView:
-    async def handle_open(interaction: Any, _action: str) -> None:
-        if await _reject_unowned_recent_interaction(interaction, actor_key):
-            return
-        await interaction.response.defer(ephemeral=True, thinking=False)
-        _remember_recent_private_followup(actor_key, interaction)
-        followup_send = _recent_private_followup(actor_key)
-        if followup_send is None:
-            await interaction.followup.send(
-                "❌ I could not open that recent transaction workflow. Please type `recent` again.",
-                ephemeral=True,
-            )
-            return
-        await _send_recent_followup_chunks(followup_send, chunks, kwargs)
-        delete = getattr(getattr(interaction, "message", None), "delete", None)
-        if callable(delete):
-            try:
-                async_delete = cast(Callable[[], Awaitable[Any]], delete)
-                await async_delete()
-            except Exception:
-                pass
-
-    return RecentActionsLauncherView(handle_open)
 
 
 def _discord_message_chunks(content: str, *, max_chars: int = 1900) -> list[str]:

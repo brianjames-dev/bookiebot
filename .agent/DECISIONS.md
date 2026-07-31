@@ -290,6 +290,12 @@ Decision: Supersede the numbered paycheck savings workflow. Current Budget tabs 
 
 Rationale: Savings is a monthly allocation, not one independent target per paycheck. Repeating a 10% per-row target across a three-paycheck month incorrectly produced a 30% Ideal and made command semantics depend on payroll cadence. One overwriteable total matches the Budget sheet's 50/30/20 model, prevents double-counting, and keeps the sheet, Discord workflow, and report card aligned.
 
+## 2026-07-31 - Display Typed Recent Lists Immediately In DM
+
+Decision: Supersede the 2026-07-25 typed-recent launcher bridge. A message-triggered recent-action request sends the prepared list and selector directly to the actor's DM without requiring another confirmation tap. DM-originated requests use the same private conversation without a sent-to-DMs acknowledgement; shared-channel requests still send financial details by DM and receive only a generic channel acknowledgement. Component-derived prompts and outcomes remain ephemeral after a real interaction exists, while text-only replies remain ordinary private DM messages.
+
+Rationale: The actor already requested the list and a DM is private to that actor, so a second confirmation adds friction without changing who can read the financial data. Discord cannot create a native ephemeral response from an ordinary typed message, and the bot should not simulate an interaction merely to obtain that footer.
+
 ## Pending Decisions
 
 - Where should durable system events live: banking database only, Google Sheets only, or dual-write during transition?

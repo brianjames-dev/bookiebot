@@ -1,6 +1,6 @@
 # Finance Operations Workstream
 
-Last updated: 2026-07-25
+Last updated: 2026-07-31
 
 ## Goal
 
@@ -469,6 +469,16 @@ Status: Complete in code and automated verification; production confirmation rem
 - The active follow-up webhook is retained for the ten-minute workflow window, keeping typed pagination, update/move replies, cancellations, expiry notices, and results in the same ephemeral session.
 - DM-originated requests no longer receive the redundant `I sent your recent transactions list to your DMs.` acknowledgement; requests from a shared channel still do.
 - Verification: focused recent/message-router suite `135 passed`; full suite `418 passed, 1 skipped`; Pyright clean; `git diff --check` passed.
+
+### 2026-07-31 Immediate Typed Recent Follow-Up
+
+Status: Complete in code and automated verification; production confirmation remains in `.agent/STATUS.md`.
+
+- Typed recent-action requests now send the transaction list and selector immediately to the actor's DM instead of asking the actor to open a temporary launcher first.
+- Requests made inside the BookieBot DM do not receive a redundant sent-to-DMs acknowledgement. Requests from shared channels still keep transaction details in DM and receive only the generic acknowledgement in-channel.
+- Discord cannot make an ordinary bot-authored DM ephemeral. Once the user clicks a list control, the resulting component prompts and outcomes remain ephemeral and the active interaction follow-up remains available to subsequent typed workflow replies.
+- Removed the obsolete launcher view and added regression coverage for immediate single- and multi-chunk DM delivery and correct selector placement.
+- Verification: focused recent/message-router suite `134 passed`; full suite `422 passed, 1 skipped`; Pyright clean; `git diff --check` passed.
 
 ## Open Questions
 

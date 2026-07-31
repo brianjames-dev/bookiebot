@@ -45,12 +45,6 @@ class RecentActionSelectView(ViewBase):  # type: ignore[misc]
         self.add_item(RecentActionSelect(actions, callback_func))
 
 
-class RecentActionsLauncherView(ViewBase):  # type: ignore[misc]
-    def __init__(self, callback_func: Callable):
-        super().__init__(timeout=300)
-        self.add_item(RecentActionButton("Open Recent Transactions", "open_recent", callback_func))
-
-
 class RecentActionDecisionView(ViewBase):  # type: ignore[misc]
     def __init__(self, callback_func: Callable, capabilities: ActionCapabilities | None = None):
         super().__init__(timeout=300)
