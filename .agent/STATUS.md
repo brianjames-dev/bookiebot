@@ -4,13 +4,13 @@ Last updated: 2026-07-31
 
 ## Active Focus
 
-Typed recent-action requests now return their transaction list immediately in the actor's DM without an extra launcher tap. The next step is deployment and production confirmation alongside the monthly-savings and expense-report updates.
+Typed recent-action requests again use the short-lived interaction launcher so the financial list and its workflow carry Discord's native ephemeral footer. The next step is deployment and production confirmation alongside the monthly-savings and expense-report updates.
 
 ## On Deck
 
 1. Deploy and manually verify the monthly savings workflow and corrected Saved-card targets in checklist items 60-61.
 2. Deploy and manually verify the expense-report corrections in checklist item 67.
-3. Deploy and manually verify typed `recent` immediately returns the transaction list in the existing DM with no launcher or redundant acknowledgement.
+3. Deploy and manually verify typed `recent` opens the short-lived launcher and keeps the resulting DM session ephemeral.
 4. Deploy and manually verify `View Inbox` and `Reconcile Now` show `BookieBot is typing...` without a temporary thinking message.
 5. Manually verify shared Needs logging plus update/move/delete/undo behavior in Discord and Google Sheets.
 6. Manually verify recent transactions and reconciliation after the latest reliability fixes.
@@ -21,10 +21,9 @@ Typed recent-action requests now return their transaction list immediately in th
 
 ## Completed 2026-07-31
 
-- Removed the `Open Recent Transactions` confirmation launcher from typed recent-action requests. BookieBot now sends the formatted transaction list and selector immediately to the actor's DM.
-- Preserved private interaction responses for selections and mutations after the user interacts with the list; text-only messages remain direct DM responses because Discord cannot mark an ordinary bot DM as ephemeral.
-- Kept the shared-channel behavior private by sending financial details to the actor's DM and acknowledging only outside DMs. DM-originated requests still omit the redundant sent-to-DMs tail.
-- Added regression coverage for immediate single- and multi-message DM delivery, selector placement, and channel-only acknowledgements; removed the obsolete launcher implementation and fixtures.
+- Restored the five-minute `Open Recent Transactions` launcher after confirming that an immediately returned ordinary DM remains persistent and cannot carry Discord's native ephemeral footer.
+- Tapping the launcher returns the recent list and selector ephemerally, deletes the launcher immediately, and retains the interaction follow-up for the remaining recent-action workflow window.
+- Regression coverage verifies the ephemeral launcher/list lifecycle, multi-chunk private lists, selector placement, and DM-only acknowledgement behavior.
 - Verification: focused recent/message-router suite `134 passed`; full suite `422 passed, 1 skipped`; Pyright reported zero errors; `git diff --check` passed.
 - Manual verification is checklist item 66 below.
 - Replaced the three numbered paycheck savings commands with one `log_savings` overwrite and one `query_savings` check for the monthly contribution bucket.
@@ -479,8 +478,8 @@ Use a test row or low-risk real row in Discord:
     - Expected: Bank cache totals match persisted current-month transactions; the first response includes the unresolved transaction rows plus `Reconcile Now` and `Ignore All`; confirmed-match history may continue in later messages without delaying or hiding the review inbox.
 65. Tap `View Inbox`, then separately tap `Reconcile Now` from both the digest and inbox.
     - Expected: each tap shows the channel-level `BookieBot is typing...` UI, creates no `BookieBot is thinking` temporary message, and ends with a private Discord response. Recent-action button/select prompts and outcomes continue to show `Only you can see this · Dismiss message`.
-66. Send `recent` directly in BookieBot's DM, then complete a selection plus an update that requires a typed reply.
-    - Expected: the recent transaction list and selector appear immediately with no launcher and no `I sent your recent transactions list to your DMs.` tail. Component prompts and action outcomes show Discord's `Only you can see this · Dismiss message` footer; text-only replies stay in the private DM.
+66. Send `recent` directly in BookieBot's DM, then open the launcher and complete a selection plus an update that requires a typed reply.
+    - Expected: no `I sent your recent transactions list to your DMs.` tail appears; the short-lived launcher deletes when tapped; the list, prompts, typed-reply result, pagination, and action outcomes all show Discord's `Only you can see this · Dismiss message` footer.
 67. Open current-month expense reports for Brian and Hannah, inspect Current and Projected, then view Calendar, Burn Rate, Category Mix, and Largest.
     - Expected: Current Left equals the sheet's Net Total after category coverage, while Spent remains elapsed outflow without Saved. Brian shows `$794.00` Left, Needs `$4,098.47 / $3,849.11 (106.48%)`, Wants `$1,266.11 / $2,309.47 (54.82%)`, and Saved `$1,539.64 / $1,539.64`; Hannah shows `$618.53` Left from Needs `$688.12`, Wants `$312.82`, and Saved `$0.00`. Saved stays actual when Projected is toggled while projected category budgets and the progress bar's monthly Ideal/Minimum targets change; Calendar shows the month name and a spaced count such as `17 total`; Largest is descending, excludes Rent, and retains all other actual shared expenses, entered bills/utilities, and elapsed subscriptions; Burn Rate's Wants limit and donor/recipient impact note reflect category-cascade transfers, with the pace badge anchored beside its summary. Daily Spending details start open on desktop and closed on mobile, and the timestamp/Projected/theme controls follow the updated header order.
 68. Open Brian July's Calendar and switch All/Subs, then toggle Projected.

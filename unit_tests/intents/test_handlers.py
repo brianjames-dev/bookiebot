@@ -34,6 +34,49 @@ class PrivateAuthor:
         self.dm_sent.append((content, kwargs))
 
 
+class LauncherResponse:
+    def __init__(self):
+        self.defer_kwargs = None
+
+    async def defer(self, **kwargs):
+        self.defer_kwargs = kwargs
+
+
+class LauncherFollowup:
+    def __init__(self):
+        self.sent = []
+
+    async def send(self, content=None, **kwargs):
+        self.sent.append((content, kwargs))
+
+
+class LauncherMessage:
+    def __init__(self):
+        self.deleted = False
+
+    async def delete(self):
+        self.deleted = True
+
+
+async def _open_recent_launcher(author: PrivateAuthor):
+    launcher_content, launcher_kwargs = author.dm_sent[-1]
+    launcher_view = launcher_kwargs["view"]
+    button = launcher_view.children[0]
+    response = LauncherResponse()
+    followup = LauncherFollowup()
+    launcher_message = LauncherMessage()
+    interaction = SimpleNamespace(
+        user=author,
+        response=response,
+        followup=followup,
+        message=launcher_message,
+    )
+
+    await button.callback(interaction)
+
+    return launcher_content, launcher_kwargs, response, followup, launcher_message
+
+
 class DummyTyping:
     def __init__(self, channel):
         self.channel = channel
@@ -322,16 +365,21 @@ async def test_query_recent_actions_sends_transaction_list_privately(monkeypatch
     assert not any("recent transaction workflow privately" in (msg or "") for msg, _ in message.channel.sent)
     assert not any("Burrito" in (msg or "") for msg, _ in message.channel.sent)
     assert not any("sent your recent transactions list" in (msg or "") for msg, _ in message.channel.sent)
-    assert len(author.dm_sent) == 1
-    recent_dm, kwargs = author.dm_sent[-1]
+    launcher_content, launcher_kwargs, response, followup, launcher_message = await _open_recent_launcher(author)
+    assert launcher_content == "Open your temporary recent transactions workflow."
+    assert launcher_kwargs["delete_after"] == 300
+    assert response.defer_kwargs == {"ephemeral": True, "thinking": False}
+    recent_dm, kwargs = followup.sent[-1]
     assert "Burrito" in (recent_dm or "")
     assert "Chipotle" in (recent_dm or "")
     assert kwargs.get("view") is not None
-    assert "delete_after" not in kwargs
+    assert kwargs["ephemeral"] is True
+    assert launcher_message.deleted is True
 
     await ih.send_recent_workflow_message(message, "✅ Updated transaction.")
 
-    assert author.dm_sent[-1] == ("✅ Updated transaction.", {})
+    assert len(author.dm_sent) == 1
+    assert followup.sent[-1] == ("✅ Updated transaction.", {"ephemeral": True})
 
 
 @pytest.mark.asyncio
@@ -358,17 +406,20 @@ async def test_query_recent_actions_chunks_large_private_list(monkeypatch):
             )
         await ih.handle_intent("query_recent_actions", {"n": 25, "explicit_n": True}, message)
 
-    assert len(author.dm_sent) > 1
+    assert len(author.dm_sent) == 1
     assert not any("recent transaction workflow privately" in (msg or "") for msg, _ in message.channel.sent)
     assert not any("sent your recent transactions list" in (msg or "") for msg, _ in message.channel.sent)
-    assert all(len(content or "") <= 1900 for content, _kwargs in author.dm_sent)
-    assert author.dm_sent[-1][1].get("view") is not None
-    assert all(not kwargs.get("view") for _content, kwargs in author.dm_sent[:-1])
-    assert all((content or "").count("```") % 2 == 0 for content, _kwargs in author.dm_sent)
+    _content, _kwargs, _response, followup, _message = await _open_recent_launcher(author)
+    assert len(followup.sent) > 1
+    assert all(len(content or "") <= 1900 for content, _kwargs in followup.sent)
+    assert all(kwargs["ephemeral"] is True for _content, kwargs in followup.sent)
+    assert followup.sent[-1][1].get("view") is not None
+    assert all(not kwargs.get("view") for _content, kwargs in followup.sent[:-1])
+    assert all((content or "").count("```") % 2 == 0 for content, _kwargs in followup.sent)
 
 
 @pytest.mark.asyncio
-async def test_query_recent_actions_acknowledges_private_list_only_outside_dms(monkeypatch):
+async def test_query_recent_actions_acknowledges_launcher_only_outside_dms(monkeypatch):
     import bookiebot.sheets.writer as writer
 
     monkeypatch.setattr(writer, "resolve_query_persons", lambda user, person=None, user_id=None: ["Hannah"])
