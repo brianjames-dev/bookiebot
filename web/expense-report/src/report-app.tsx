@@ -549,10 +549,10 @@ export function ExpenseReportApp({ report }: { report: ExpenseReportData }) {
   const activeReport = buildReportView(report, projectionActive)
   const categoryColors: Record<string, string> = Object.fromEntries(activeReport.breakdown.map((item) => [item.label, item.color]))
   const dailyEntries = filterDailyEntries(report.dailyEntries, dailySpendingFilter)
-  const dailySubscriptionEvents = dailySpendingSubscriptionEvents(activeReport.calendarEvents, dailySpendingFilter, projectionActive)
-  const dailyTableEntries = dailyEntriesWithSubscriptions(dailyEntries, dailySubscriptionEvents, report.month)
-  const dailyTotals = dailyTotalsForEntries(dailyEntries, dailySubscriptionEvents)
-  const dailyTotal = dailySpendingTotal(dailyEntries, dailySubscriptionEvents)
+  const dailyCalendarEvents = dailySpendingCalendarEvents(activeReport.calendarEvents, dailySpendingFilter, projectionActive)
+  const dailyTableEntries = dailyEntriesWithCalendarEvents(dailyEntries, dailyCalendarEvents, report.month)
+  const dailyTotals = dailyTotalsForEntries(dailyEntries, dailyCalendarEvents)
+  const dailyTotal = dailySpendingTotal(dailyEntries, dailyCalendarEvents)
   const spentTotal = amountRowsTotal(activeReport.breakdown)
   const defaultChartTab = report.burnRate ? "burn-rate" : "category"
   const chartPanels: ChartPanel[] = [
@@ -2197,6 +2197,21 @@ type DailySpendingRow = AmountRow & {
   wantsAmount: number
 }
 
+type DailySpendingChartRow = DailySpendingRow & {
+  chartAmount: number
+  chartNeedsAmount: number
+  chartWantsAmount: number
+}
+
+type DailySpendingAxis = {
+  compressed: boolean
+  breakAt: number
+  peak: number
+  visualMax: number
+  domain: [number, number]
+  ticks: number[]
+}
+
 type DailyEntryDisplayRow = ExpenseEntry & {
   categoryColor?: string
 }
@@ -2216,8 +2231,8 @@ function DailySpendingChart({
 }) {
   const peak = data.reduce<AmountRow | null>((best, item) => (!best || item.amount > best.amount ? item : best), null)
   const averageDaySpend = elapsedDays ? total / elapsedDays : 0
-  const yAxisDomain = dailySpendingYAxisDomain(data)
-  const yAxisTicks = dailySpendingYAxisTicks(yAxisDomain)
+  const axis = dailySpendingAxis(data)
+  const chartData = dailySpendingChartRows(data, axis)
   const showStackedBars = filter === "all"
   const singleBarColor = filter === "needs" ? NEEDS_BAR_COLOR : filter === "wants" ? WANTS_BAR_COLOR : "hsl(var(--chart-1))"
   return (
@@ -2226,15 +2241,21 @@ function DailySpendingChart({
         config={
           showStackedBars
             ? {
-                needsAmount: { label: "Needs", color: NEEDS_BAR_COLOR },
-                wantsAmount: { label: "Wants", color: WANTS_BAR_COLOR },
+                chartNeedsAmount: { label: "Needs", color: NEEDS_BAR_COLOR },
+                chartWantsAmount: { label: "Wants", color: WANTS_BAR_COLOR },
               }
-            : { amount: { label: "Amount", color: singleBarColor } }
+            : { chartAmount: { label: "Amount", color: singleBarColor } }
         }
         className="bb-chart-box"
       >
+        {axis.compressed ? (
+          <div className="bb-daily-spending-axis-note" data-bb-daily-spending-axis-mode="compressed" role="note">
+            <span aria-hidden="true">//</span>
+            Axis compressed above {formatMoney(axis.breakAt)}
+          </div>
+        ) : null}
         <ResponsiveContainer width="100%" height="100%">
-          <BarChart data={data} margin={{ top: 12, right: 16, left: 0, bottom: 0 }}>
+          <BarChart data={chartData} margin={{ top: 12, right: 16, left: 0, bottom: 0 }}>
             <CartesianGrid
               className="bb-daily-spending-grid"
               vertical={false}
@@ -2248,23 +2269,23 @@ function DailySpendingChart({
               axisLine={false}
             />
             <YAxis
-              domain={yAxisDomain}
-              ticks={yAxisTicks}
-              scale="sqrt"
+              domain={axis.domain}
+              ticks={axis.ticks}
+              scale={axis.compressed ? "linear" : "sqrt"}
               tick={{ fill: DAILY_SPENDING_GRID_COLOR }}
-              tickFormatter={(value) => `$${value}`}
+              tickFormatter={(value) => dailySpendingAxisTickLabel(Number(value), axis)}
               tickLine={false}
               axisLine={false}
-              width={52}
+              width={58}
             />
-            <ChartTooltip content={showStackedBars ? <DailySpendingTooltipContent /> : <ChartTooltipContent />} cursor={{ fill: dailySpendingCursorFill(filter) }} />
+            <ChartTooltip content={<DailySpendingTooltipContent filter={filter} />} cursor={{ fill: dailySpendingCursorFill(filter) }} />
             {showStackedBars ? (
               <>
-                <Bar dataKey="needsAmount" name="Needs" stackId="daily" fill={NEEDS_BAR_COLOR} radius={DAILY_SPENDING_BAR_RADIUS} />
-                <Bar dataKey="wantsAmount" name="Wants" stackId="daily" fill={WANTS_BAR_COLOR} radius={DAILY_SPENDING_BAR_RADIUS} />
+                <Bar dataKey="chartNeedsAmount" name="Needs" stackId="daily" fill={NEEDS_BAR_COLOR} radius={DAILY_SPENDING_BAR_RADIUS} />
+                <Bar dataKey="chartWantsAmount" name="Wants" stackId="daily" fill={WANTS_BAR_COLOR} radius={DAILY_SPENDING_BAR_RADIUS} />
               </>
             ) : (
-              <Bar dataKey="amount" name="Daily spending" fill={singleBarColor} radius={DAILY_SPENDING_BAR_RADIUS} />
+              <Bar dataKey="chartAmount" name="Daily spending" fill={singleBarColor} radius={DAILY_SPENDING_BAR_RADIUS} />
             )}
           </BarChart>
         </ResponsiveContainer>
@@ -2287,6 +2308,79 @@ function DailySpendingChart({
       </div>
     </div>
   )
+}
+
+function dailySpendingAxis(data: DailySpendingRow[]): DailySpendingAxis {
+  const values = data.map((item) => item.amount).filter((amount) => amount > 0).sort((left, right) => right - left)
+  const peak = values[0] ?? 0
+  const referencePeak = values[1] ?? 0
+  const linearDomain = dailySpendingYAxisDomain(data)
+  const compressed = peak >= 500 && referencePeak > 0 && peak >= referencePeak * 2.5
+
+  if (!compressed) {
+    return {
+      compressed: false,
+      breakAt: 0,
+      peak,
+      visualMax: linearDomain[1],
+      domain: linearDomain,
+      ticks: dailySpendingYAxisTicks(linearDomain),
+    }
+  }
+
+  const breakAt = dailySpendingBreakAmount(referencePeak)
+  const visualMax = breakAt * 1.1
+  return {
+    compressed: true,
+    breakAt,
+    peak,
+    visualMax,
+    domain: [0, visualMax * 1.04],
+    ticks: [0, breakAt * 0.25, breakAt * 0.5, breakAt * 0.75, breakAt, visualMax],
+  }
+}
+
+function dailySpendingBreakAmount(referencePeak: number) {
+  const step = referencePeak >= 1000 ? 100 : referencePeak >= 250 ? 50 : referencePeak >= 100 ? 25 : referencePeak >= 50 ? 10 : 5
+  return Math.max(step, Math.ceil(referencePeak / step) * step)
+}
+
+function dailySpendingChartRows(data: DailySpendingRow[], axis: DailySpendingAxis): DailySpendingChartRow[] {
+  return data.map((item) => {
+    const chartAmount = dailySpendingVisualAmount(item.amount, axis)
+    const ratio = item.amount > 0 ? chartAmount / item.amount : 0
+    return {
+      ...item,
+      chartAmount,
+      chartNeedsAmount: item.needsAmount * ratio,
+      chartWantsAmount: item.wantsAmount * ratio,
+    }
+  })
+}
+
+function dailySpendingVisualAmount(amount: number, axis: DailySpendingAxis) {
+  if (!axis.compressed || amount <= axis.breakAt || axis.peak <= axis.breakAt) {
+    return amount
+  }
+  const progress = (amount - axis.breakAt) / (axis.peak - axis.breakAt)
+  return axis.breakAt + progress * (axis.visualMax - axis.breakAt)
+}
+
+function dailySpendingActualAmount(value: number, axis: DailySpendingAxis) {
+  if (!axis.compressed || value <= axis.breakAt || axis.visualMax <= axis.breakAt) {
+    return value
+  }
+  const progress = (value - axis.breakAt) / (axis.visualMax - axis.breakAt)
+  return axis.breakAt + progress * (axis.peak - axis.breakAt)
+}
+
+function dailySpendingAxisTickLabel(value: number, axis: DailySpendingAxis) {
+  const amount = dailySpendingActualAmount(value, axis)
+  if (amount >= 1000) {
+    const digits = amount % 1000 === 0 ? 0 : 1
+    return `$${(amount / 1000).toFixed(digits)}k`
+  }
+  return `$${Math.round(amount)}`
 }
 
 function dailySpendingYAxisDomain(data: DailySpendingRow[]): [number, number] {
@@ -2342,24 +2436,38 @@ type DailySpendingTooltipPayload = {
 function DailySpendingTooltipContent({
   active,
   payload,
+  filter,
 }: {
   active?: boolean
   payload?: DailySpendingTooltipPayload[]
+  filter: DailySpendingFilter
 }) {
-  const rows = (payload ?? []).filter((item) => item.value !== null && item.value !== undefined && Number(item.value) > 0)
-  const point = rows[0]?.payload
-  if (!active || !rows.length || !point) {
+  const point = (payload ?? []).find((item) => item.payload)?.payload
+  if (!active || !point) {
     return null
   }
+
+  const rows = filter === "all"
+    ? [
+        { label: "Needs", amount: point.needsAmount, color: NEEDS_BAR_COLOR },
+        { label: "Wants", amount: point.wantsAmount, color: WANTS_BAR_COLOR },
+      ].filter((item) => item.amount > 0)
+    : [
+        {
+          label: filter === "needs" ? "Needs" : "Wants",
+          amount: point.amount,
+          color: filter === "needs" ? NEEDS_BAR_COLOR : WANTS_BAR_COLOR,
+        },
+      ]
 
   return (
     <div className="bb-chart-tooltip bb-touch-tooltip-content">
       <div className="bb-chart-tooltip-title">Day {point.label}</div>
       {rows.map((item, index) => (
-        <div className="bb-chart-tooltip-row" key={`${item.name}-${item.value}-${index}`}>
+        <div className="bb-chart-tooltip-row" key={`${item.label}-${item.amount}-${index}`}>
           <span className="bb-chart-tooltip-dot" style={{ background: item.color }} />
-          <span>{item.name}</span>
-          <strong>{formatMoney(Number(item.value || 0))}</strong>
+          <span>{item.label}</span>
+          <strong>{formatMoney(item.amount)}</strong>
         </div>
       ))}
       <div className="bb-chart-tooltip-row">
@@ -2816,20 +2924,23 @@ function dailyEntryFilter(entry: ExpenseEntry): Exclude<DailySpendingFilter, "al
   return DAILY_WANTS_CATEGORIES.has(entry.category) ? "wants" : "needs"
 }
 
-function dailyEntriesWithSubscriptions(
+function dailyEntriesWithCalendarEvents(
   entries: ExpenseEntry[],
-  subscriptionEvents: CalendarEvent[],
+  calendarEvents: CalendarEvent[],
   month: number,
 ): DailyEntryDisplayRow[] {
   return [
     ...entries,
-    ...subscriptionEvents.map((event) => {
-      const bucket = dailySubscriptionBucket(event)
+    ...calendarEvents.map((event) => {
+      const bucket = dailyCalendarEventBucket(event)
+      const category = event.kind === "bill"
+        ? event.group === "rent" ? "Rent" : "Bills & Utilities"
+        : "Subscription"
       return {
         date: `${month}/${event.day}`,
-        category: "Subscription",
+        category,
         amount: event.amount,
-        person: bucket === "wants" ? "Want sub" : "Need sub",
+        person: event.kind === "bill" ? "Need bill" : bucket === "wants" ? "Want sub" : "Need sub",
         item: event.label,
         location: "",
         categoryColor: bucket === "wants" ? WANTS_BAR_COLOR : NEEDS_BAR_COLOR,
@@ -2838,7 +2949,7 @@ function dailyEntriesWithSubscriptions(
   ]
 }
 
-function dailyTotalsForEntries(entries: ExpenseEntry[], subscriptionEvents: CalendarEvent[]) {
+function dailyTotalsForEntries(entries: ExpenseEntry[], calendarEvents: CalendarEvent[]) {
   const totals = new Map<string, DailySpendingRow>()
   for (const entry of entries) {
     const day = dailyEntryDayLabel(entry)
@@ -2848,18 +2959,18 @@ function dailyTotalsForEntries(entries: ExpenseEntry[], subscriptionEvents: Cale
     const bucket = dailyEntryFilter(entry)
     addDailySpendingAmount(totals, day, bucket, entry.amount)
   }
-  for (const event of subscriptionEvents) {
-    addDailySpendingAmount(totals, String(event.day), dailySubscriptionBucket(event), event.amount)
+  for (const event of calendarEvents) {
+    addDailySpendingAmount(totals, String(event.day), dailyCalendarEventBucket(event), event.amount)
   }
   return Array.from(totals.entries())
     .sort(([left], [right]) => compareDayLabels(left, right))
     .map(([, row]) => row)
 }
 
-function dailySpendingTotal(entries: ExpenseEntry[], subscriptionEvents: CalendarEvent[]) {
+function dailySpendingTotal(entries: ExpenseEntry[], calendarEvents: CalendarEvent[]) {
   return roundCurrency(
     entries.reduce((sum, entry) => sum + entry.amount, 0) +
-      subscriptionEvents.reduce((sum, event) => sum + event.amount, 0),
+      calendarEvents.reduce((sum, event) => sum + event.amount, 0),
   )
 }
 
@@ -2886,20 +2997,20 @@ function dailyEntryDayLabel(entry: ExpenseEntry) {
   return label.trim().toLowerCase() === "no date" ? null : label
 }
 
-function dailySpendingSubscriptionEvents(events: CalendarEvent[], filter: DailySpendingFilter, projected: boolean) {
+function dailySpendingCalendarEvents(events: CalendarEvent[], filter: DailySpendingFilter, projected: boolean) {
   return events.filter((event) => {
-    if (event.kind !== "subscription" || (!projected && event.projectedOnly)) {
+    if ((event.kind !== "subscription" && event.kind !== "bill") || (!projected && event.projectedOnly)) {
       return false
     }
     if (filter === "all") {
       return true
     }
-    return dailySubscriptionBucket(event) === filter
+    return dailyCalendarEventBucket(event) === filter
   })
 }
 
-function dailySubscriptionBucket(event: CalendarEvent): Exclude<DailySpendingFilter, "all"> {
-  return event.group === "subscriptions_wants" ? "wants" : "needs"
+function dailyCalendarEventBucket(event: CalendarEvent): Exclude<DailySpendingFilter, "all"> {
+  return event.kind === "subscription" && event.group === "subscriptions_wants" ? "wants" : "needs"
 }
 
 function compareDayLabels(left: string, right: string) {

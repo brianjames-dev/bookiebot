@@ -80,6 +80,22 @@ def test_daily_spending_bars_share_the_blue_corner_radius():
     assert "radius={[6, 6, 2, 2]}" not in chart_source
 
 
+def test_daily_spending_includes_bills_and_compresses_strong_outliers():
+    source = (Path(__file__).resolve().parents[2] / "web/expense-report/src/report-app.tsx").read_text()
+
+    assert '(event.kind !== "subscription" && event.kind !== "bill")' in source
+    assert 'event.group === "rent" ? "Rent" : "Bills & Utilities"' in source
+    assert 'event.kind === "subscription" && event.group === "subscriptions_wants" ? "wants" : "needs"' in source
+    assert "peak >= 500 && referencePeak > 0 && peak >= referencePeak * 2.5" in source
+    assert 'data-bb-daily-spending-axis-mode="compressed"' in source
+    assert "Axis compressed above {formatMoney(axis.breakAt)}" in source
+    assert 'dataKey="chartNeedsAmount"' in source
+    assert 'dataKey="chartWantsAmount"' in source
+    assert 'dataKey="chartAmount"' in source
+    assert "point.needsAmount" in source
+    assert "point.wantsAmount" in source
+
+
 def test_load_report_worksheets_uses_resolved_month_tabs_when_optional_workbook_open_fails(monkeypatch):
     month = BudgetMonth(2026, 5)
     personal_id = routing.get_budget_spreadsheet_id_for_user(routing.DEFAULT_BRIAN_DISCORD_USER_IDS[0], month.year)

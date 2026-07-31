@@ -296,6 +296,12 @@ Decision: Reaffirm the 2026-07-25 launcher bridge after testing direct delivery.
 
 Rationale: Direct delivery removes one tap but produces a persistent bot-authored DM without the `Only you can see this · Dismiss message` treatment. The launcher is the required interaction boundary for preserving the preferred temporary, dismissible recent-action workflow while retaining natural-language entry.
 
+## 2026-07-31 - Compress Only Strong Daily-Spending Outliers
+
+Decision: Daily Spending includes entered Rent and Bills & Utilities events as Needs. When the highest day is at least `$500` and `2.5x` the second-highest day, the chart keeps values through a rounded second-highest threshold linear, compresses only the range above that threshold into a short upper band, and labels the axis adjustment in the chart. Totals, tooltips, details, and transaction rows always retain the true dollar amounts; months and filters without a strong outlier keep the existing scale.
+
+Rationale: Rent is a real monthly outflow and belongs in daily cash-flow history, but a normal linear or square-root range makes every other day too small to compare. A disclosed broken-axis treatment keeps rent visible, preserves the relative shape of ordinary spending, and avoids presenting transformed bar heights as unqualified dollar values.
+
 ## Pending Decisions
 
 - Where should durable system events live: banking database only, Google Sheets only, or dual-write during transition?
