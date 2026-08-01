@@ -228,7 +228,8 @@ WANTS_BREAKDOWN_KEYS = (
     "food",
     "shopping",
 )
-WANTS_BURN_RATE_KEYS = ("food", "shopping")
+WANTS_BURN_RATE_KEYS = ("subscriptions_wants", "food", "shopping")
+WANTS_BURN_RATE_TRANSACTION_KEYS = ("food", "shopping")
 FIXED_COMMITMENT_KEYS = (
     "rent",
     "bills_utilities",
@@ -2568,25 +2569,54 @@ def _burn_rate_series(
 def _burn_rate_daily_amounts(report: ExpenseBreakdownReport, wants_spent: float, elapsed_days: int) -> dict[int, float]:
     raw_amounts: dict[int, float] = defaultdict(float)
     for entry in report.entries:
-        if entry.category not in WANTS_BURN_RATE_KEYS:
+        if entry.category not in WANTS_BURN_RATE_TRANSACTION_KEYS:
             continue
         parsed = _parse_date(entry.date)
         if parsed is None:
             continue
         raw_amounts[parsed.day] += entry.amount
 
+    subscription_spent = round(
+        float(report.breakdown.get("subscriptions_wants", {}).get("amount") or 0.0),
+        2,
+    )
+    discretionary_spent = round(max(wants_spent - subscription_spent, 0.0), 2)
     raw_total = round(sum(raw_amounts.values()), 2)
+    daily_amounts: dict[int, float] = {}
     if raw_total > 0:
-        scale = wants_spent / raw_total
-        scaled = {day: round(amount * scale, 2) for day, amount in raw_amounts.items()}
-        rounding_delta = round(wants_spent - sum(scaled.values()), 2)
+        scale = discretionary_spent / raw_total
+        daily_amounts = {day: round(amount * scale, 2) for day, amount in raw_amounts.items()}
+        rounding_delta = round(discretionary_spent - sum(daily_amounts.values()), 2)
         if rounding_delta:
-            scaled[max(scaled)] = round(scaled[max(scaled)] + rounding_delta, 2)
-        return scaled
+            latest_day = max(daily_amounts)
+            daily_amounts[latest_day] = round(daily_amounts[latest_day] + rounding_delta, 2)
+    elif discretionary_spent > 0 and elapsed_days > 0:
+        daily_amounts[elapsed_days] = discretionary_spent
 
-    if wants_spent > 0 and elapsed_days > 0:
-        return {elapsed_days: wants_spent}
-    return {}
+    scheduled_subscription_total = 0.0
+    for event in report.calendar_events:
+        if (
+            event.kind != "subscription"
+            or event.group != "subscriptions_wants"
+            or event.projected_only
+            or event.day > elapsed_days
+        ):
+            continue
+        daily_amounts[event.day] = round(daily_amounts.get(event.day, 0.0) + event.amount, 2)
+        scheduled_subscription_total += event.amount
+
+    unattributed_subscriptions = round(subscription_spent - scheduled_subscription_total, 2)
+    if unattributed_subscriptions > 0 and elapsed_days > 0:
+        daily_amounts[elapsed_days] = round(
+            daily_amounts.get(elapsed_days, 0.0) + unattributed_subscriptions,
+            2,
+        )
+
+    rounding_delta = round(wants_spent - sum(daily_amounts.values()), 2)
+    if rounding_delta and daily_amounts:
+        latest_day = max(daily_amounts)
+        daily_amounts[latest_day] = round(daily_amounts[latest_day] + rounding_delta, 2)
+    return daily_amounts
 
 
 def _elapsed_days_for_month(month: BudgetMonth) -> int:

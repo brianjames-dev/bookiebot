@@ -277,14 +277,14 @@ def test_build_expense_breakdown_report_aggregates_shared_and_personal_data():
     burn_rate = payload["burnRate"]
     burn_rate_series = burn_rate.pop("series")
     assert burn_rate == {
-        "budget": 574.0,
-        "spent": 45.0,
+        "budget": 584.0,
+        "spent": 55.0,
         "remaining": 529.0,
         "daysInMonth": 31,
         "elapsedDays": 31,
-        "expectedSpend": 574.0,
-        "allowedDailyAverage": 18.52,
-        "actualDailyAverage": 1.45,
+        "expectedSpend": 584.0,
+        "allowedDailyAverage": 18.84,
+        "actualDailyAverage": 1.77,
         "dailyDifference": -17.07,
         "totalDifference": -529.0,
         "status": "under",
@@ -295,23 +295,23 @@ def test_build_expense_breakdown_report_aggregates_shared_and_personal_data():
         "label": "1",
         "dailySpend": 0.0,
         "actualSpend": 0.0,
-        "expectedSpend": 18.52,
-        "variance": -18.52,
+        "expectedSpend": 18.84,
+        "variance": -18.84,
     }
     assert burn_rate_series[1] == {
         "day": 2,
         "label": "2",
         "dailySpend": 45.0,
         "actualSpend": 45.0,
-        "expectedSpend": 37.03,
-        "variance": 7.97,
+        "expectedSpend": 37.68,
+        "variance": 7.32,
     }
     assert burn_rate_series[-1] == {
         "day": 31,
         "label": "31",
         "dailySpend": 0.0,
-        "actualSpend": 45.0,
-        "expectedSpend": 574.0,
+        "actualSpend": 55.0,
+        "expectedSpend": 584.0,
         "variance": -529.0,
     }
     assert "Needs vs Wants" not in html
@@ -625,9 +625,20 @@ def test_current_month_burn_rate_series_only_includes_elapsed_days(monkeypatch):
         _row({"V": "07/05/2026", "W": "Book", "X": "20", "Y": "Bookstore", "Z": "Hannah"}),
     ]
     personal_rows = [
+        ["Monthly Income", "$300.00"],
         ["Eating out", "$30.00"],
         ["Shopping", "$20.00"],
-        ["Margins:", "", "$10.00", "", "$100.00"],
+        ["Subscriptions (Wants)", "$30.00"],
+    ]
+    subscriptions_rows = [
+        [],
+        ["", "SUBSCRIPTIONS"],
+        [],
+        ["Needs", "", "(Monthly)", "", "Wants", "", "(Monthly)"],
+        ["", "", "", "", "", "", ""],
+        ["Recurring:", "Name:", "Amount:", "", "Recurring:", "Name:", "Amount:"],
+        ["", "", "", "", "4th", "Spotify", "$10.00"],
+        ["", "", "", "", "10th", "Future Want", "$20.00"],
     ]
 
     report = build_expense_breakdown_report(
@@ -638,7 +649,7 @@ def test_current_month_burn_rate_series_only_includes_elapsed_days(monkeypatch):
         worksheets=ReportWorksheets(
             shared_expenses=InMemoryWorksheet(shared_rows),
             personal_budget=InMemoryWorksheet(personal_rows),
-            subscriptions=InMemoryWorksheet([]),
+            subscriptions=InMemoryWorksheet(subscriptions_rows),
         ),
     )
 
@@ -653,8 +664,12 @@ def test_current_month_burn_rate_series_only_includes_elapsed_days(monkeypatch):
 
     assert burn_rate["daysInMonth"] == 31
     assert burn_rate["elapsedDays"] == 5
+    assert burn_rate["spent"] == 60.0
+    assert burn_rate["budget"] == 90.0
     assert payload["elapsedDays"] == 5
     assert [point["day"] for point in burn_rate["series"]] == [1, 2, 3, 4, 5]
+    assert burn_rate["series"][3]["dailySpend"] == 10.0
+    assert burn_rate["series"][-1]["actualSpend"] == 60.0
     assert all(point["variance"] is not None for point in burn_rate["series"])
 
 
@@ -1390,6 +1405,7 @@ def test_report_frontend_calendar_largest_and_burn_rate_presentation_regressions
     assert "const largestEntries = topEntries" in source
     assert 'entry.category.trim().toLowerCase() !== "rent"' in source
     assert 'categoryMixPressure("wants", categoryBalances, burnRate.spent)' in source
+    assert "Food + Shopping + Wants subscriptions" in source
     assert "after cross-category coverage" in source
     assert 'const dailySpendingDetailsOpen = useMediaQuery("(min-width: 861px)")' in source
     assert "defaultDetailsOpen={dailySpendingDetailsOpen}" in source

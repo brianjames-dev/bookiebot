@@ -308,6 +308,12 @@ Decision: Supersede the 2026-07-26 use of full Budget-sheet category subtotals, 
 
 Rationale: Budget-sheet subscription subtotals aggregate monthly and yearly items without regard to the selected report month. Reusing those totals made annual Amazon Prime and MacroFactor charges appear in July category usage and available-money calculations even though neither charge occurs in July, while Calendar and Daily Spending correctly omitted them. One month-scoped schedule keeps every card and graph reconcilable without inventing dates for incomplete subscription drafts.
 
+## 2026-07-31 - Include Wants Subscriptions In Burn Rate Activity
+
+Decision: Burn Rate Spent includes Food, Shopping, and elapsed Wants subscriptions. Dated Wants subscriptions enter the daily series on their configured pull day; future pulls remain excluded from Current, and any legacy subscription amount without a usable schedule is attributed as a fallback without scaling or redistributing the dated Food/Shopping series. Burn Rate's effective limit remains the active Wants spending plus the post-cascade Wants balance.
+
+Rationale: Category Mix and Daily Spending already classify Wants subscriptions as Wants spending. Excluding them from Burn Rate produced a `$39.96` discrepancy in Brian July and made the generic `Spent` label describe only discretionary activity. Including the same month-scoped subscription events makes all three Wants views reconcile while preserving the category-cascade effect on available money.
+
 ## Pending Decisions
 
 - Where should durable system events live: banking database only, Google Sheets only, or dual-write during transition?

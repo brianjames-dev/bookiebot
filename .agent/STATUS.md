@@ -4,25 +4,29 @@ Last updated: 2026-07-31
 
 ## Active Focus
 
-Expense-report subscription data is now scoped to the selected month across totals, balances, charts, Calendar details, and Current/Projected views. The next step is deployment and production confirmation alongside the Daily Spending, monthly savings, recent-action, and reconciliation updates.
+Expense-report subscription data is now scoped to the selected month and Wants subscriptions are included in Burn Rate totals and dated activity. The next step is deployment and production confirmation alongside the Daily Spending, monthly savings, recent-action, and reconciliation updates.
 
 ## On Deck
 
-1. Deploy and manually verify selected-month subscription scoping in checklist item 71.
-2. Deploy and manually verify Daily Spending bill coverage and outlier scaling in checklist item 70.
-3. Deploy and manually verify the monthly savings workflow and corrected Saved-card targets in checklist items 60-61 and 69.
-4. Deploy and manually verify the expense-report corrections in checklist item 67.
-5. Deploy and manually verify typed `recent` opens the short-lived launcher and keeps the resulting DM session ephemeral.
-6. Deploy and manually verify `View Inbox` and `Reconcile Now` show `BookieBot is typing...` without a temporary thinking message.
-7. Manually verify shared Needs logging plus update/move/delete/undo behavior in Discord and Google Sheets.
-8. Manually verify recent transactions and reconciliation after the latest reliability fixes.
-9. Consider a richer Discord button flow for grouped amount adjustments if the current UX feels too manual.
-10. Harden recent-action pending state across restarts/deploys, since selections currently live only in process memory.
-11. Improve targeted recent-action search so commands can find older matches, not only the latest 10 recent actions.
-12. Explore clarifying questions before logging when BookieBot is uncertain instead of guessing or silently failing.
+1. Deploy and manually verify Wants subscriptions in Burn Rate in checklist item 72.
+2. Deploy and manually verify selected-month subscription scoping in checklist item 71.
+3. Deploy and manually verify Daily Spending bill coverage and outlier scaling in checklist item 70.
+4. Deploy and manually verify the monthly savings workflow and corrected Saved-card targets in checklist items 60-61 and 69.
+5. Deploy and manually verify the expense-report corrections in checklist item 67.
+6. Deploy and manually verify typed `recent` opens the short-lived launcher and keeps the resulting DM session ephemeral.
+7. Deploy and manually verify `View Inbox` and `Reconcile Now` show `BookieBot is typing...` without a temporary thinking message.
+8. Manually verify shared Needs logging plus update/move/delete/undo behavior in Discord and Google Sheets.
+9. Manually verify recent transactions and reconciliation after the latest reliability fixes.
+10. Consider a richer Discord button flow for grouped amount adjustments if the current UX feels too manual.
+11. Harden recent-action pending state across restarts/deploys, since selections currently live only in process memory.
+12. Improve targeted recent-action search so commands can find older matches, not only the latest 10 recent actions.
+13. Explore clarifying questions before logging when BookieBot is uncertain instead of guessing or silently failing.
 
 ## Completed 2026-07-31
 
+- Added elapsed Wants subscriptions to Burn Rate's Spent total and daily series. Each subscription is attributed to its actual pull day; future pulls stay out of Current, and schedule-less fallback amounts remain accounted for without distorting dated Food/Shopping activity.
+- Updated the Burn Rate explanation to name Food, Shopping, and Wants subscriptions. Live Brian July now reconciles Burn Rate Spent, Wants Category Mix, and Wants Daily Spending at `$1,556.33`; the effective Limit is `$3,250.71`, Left is `$1,694.38`, Allowed/day is `$104.86`, and Actual/day is `$50.20`.
+- Verification: focused report suite `36 passed`; full suite `425 passed`; Pyright reported zero errors; frontend typecheck/build passed; `git diff --check` passed; live browser checks confirmed all three Wants totals match. Manual verification is checklist item 72 below.
 - Scoped structured subscriptions to the selected report month everywhere. Monthly items require a dated pull in that month; yearly items appear only in their configured pull month; undated drafts and yearly items from other months no longer enter cards, Category Mix, Calendar details, balances, or totals.
 - Preserved the report toggle semantics inside that boundary: Current uses subscriptions that have hit through the selected month's elapsed day, while Projected uses the full dated subscription schedule for that same month.
 - Rebased Needs/Wants usage, category-cascade balances, Burn Rate availability, and Left on the active month-scoped breakdown plus actual savings instead of the Budget sheet's full subscription subtotals, margins, and Net Total. Sheets without a structured subscription schedule retain subtotal fallback compatibility.
@@ -507,6 +511,8 @@ Use a test row or low-risk real row in Discord:
     - Expected: All/Needs include Rent `$2,100.00` on day 1, Water `$141.43` on day 18, and PG&E `$165.13` on day 22; Wants excludes those Needs bills. All and Needs show an `Axis compressed above $450.00` note, keep the next-highest day close to the top of the graph, and still show exact amounts in tooltips, Highest day, totals, and table rows. Wants returns to the normal axis, mobile has no horizontal overflow, and Details remains closed by default on mobile.
 71. Open Brian July's report, compare Current and Projected, and inspect Needs, Wants, Calendar subscription details, Daily Spending, Burn Rate, and Left.
     - Expected: every view is limited to transactions scheduled for July. At month-end, Spent is `$5,620.89`, Needs is `$4,064.56`, Wants is `$1,556.33`, Saved is `$2,167.14`, and Left is `$3,047.68`; subscription totals are `$229.36` Needs and `$39.96` Wants. The July yearly `brianjames.dev` item is included, while October's Amazon Prime and February's MacroFactor appear nowhere in either mode.
+72. Open Brian July's Burn Rate details and compare it with Wants Category Mix and Wants Daily Spending.
+    - Expected: all three Spent totals are `$1,556.33`. Burn Rate shows Limit `$3,250.71`, Left `$1,694.38`, Allowed/day `$104.86`, and Actual/day `$50.20`; its explanation names Wants subscriptions, and the line includes Slate Digital, YouTube Premium, iCloud Storage, and Discovery+ on their actual pull days.
 
 ## Verification Baseline
 
@@ -520,6 +526,9 @@ python -m pytest unit_tests/intents/test_handlers.py unit_tests/core/test_messag
 Latest verification:
 
 ```bash
+Live Brian July Burn Rate browser verification
+# passed: Burn Rate, Wants Category Mix, and Wants Daily Spending all $1,556.33; Limit $3,250.71; Wants subscriptions included on pull days
+
 PYTHONPATH=src venv/bin/python -m pytest unit_tests
 # passed: 425 passed, 1 warning
 

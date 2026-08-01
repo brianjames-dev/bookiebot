@@ -1099,7 +1099,7 @@ function BurnRateInfoButton() {
     <button type="button" className="bb-burn-rate-info" aria-label="What burn rate means">
       <span aria-hidden="true">i</span>
       <span className="bb-burn-rate-info-tooltip" role="tooltip">
-        Tracks Food + Shopping pace against your Wants limit after cross-category coverage. Available today is what you can spend now and stay on pace.
+        Tracks Food + Shopping + Wants subscriptions against your Wants limit after cross-category coverage. Available today is what you can spend now and stay on pace.
       </span>
     </button>
   )
