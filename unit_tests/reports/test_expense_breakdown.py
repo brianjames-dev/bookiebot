@@ -118,6 +118,31 @@ def test_load_report_worksheets_uses_resolved_month_tabs_when_optional_workbook_
     assert worksheets.budget_history == ()
 
 
+def test_previous_year_budget_history_loads_prior_december_for_january(monkeypatch):
+    december = InMemoryWorksheet([["12/31/2026", "xAI", "$3,774.11"]], title="December")
+    spreadsheet = FakeSpreadsheet({"December": december})
+
+    class PreviousYearGC:
+        def open_by_key(self, key: str):
+            assert key == "budget-2026"
+            return spreadsheet
+
+    monkeypatch.setattr("bookiebot.sheets.auth.get_gspread_client", lambda: PreviousYearGC())
+    monkeypatch.setattr(
+        "bookiebot.sheets.routing.get_budget_spreadsheet_id_for_user",
+        lambda actor_key, year: f"budget-{year}",
+    )
+
+    history = expense_breakdown._optional_previous_year_budget_history(
+        "brian",
+        BudgetMonth(2027, 1),
+    )
+
+    assert history == (
+        BudgetHistoryRows(BudgetMonth(2026, 12), [["12/31/2026", "xAI", "$3,774.11"]]),
+    )
+
+
 def test_build_expense_breakdown_report_aggregates_shared_and_personal_data():
     shared_rows = [
         ["hdr"] * 28,
@@ -1275,6 +1300,179 @@ def test_current_month_income_projection_reanchors_after_early_or_late_paycheck(
     ]
 
 
+@pytest.mark.parametrize(
+    ("previous_month", "selected_month", "previous_date", "expected_days"),
+    [
+        (BudgetMonth(2026, 7), BudgetMonth(2026, 8), "7/31/2026", [14, 28]),
+        (BudgetMonth(2026, 12), BudgetMonth(2027, 1), "12/31/2026", [14, 28]),
+    ],
+)
+def test_new_month_income_projection_uses_last_prior_month_paycheck(
+    monkeypatch,
+    previous_month,
+    selected_month,
+    previous_date,
+    expected_days,
+):
+    monkeypatch.setattr(
+        expense_breakdown,
+        "now_pacific",
+        lambda: datetime(selected_month.year, selected_month.month, 2, 12, 0, tzinfo=routing.PACIFIC_TZ),
+    )
+    previous_rows = [
+        ["", "Date:", "Source:", "Amount:", "Biweekly Income Source:", "xAI"],
+        ["", previous_date, "xAI", "$3,774.11", "Biweekly Income Start:", "7/2/2026"],
+        ["", "Monthly Income:", "", "$3,774.11"],
+    ]
+    selected_rows = [
+        ["", "Date:", "Source:", "Amount:"],
+        ["", "", "<Enter Source>", ""],
+        ["", "Monthly Income:", "", "$0.00"],
+    ]
+    report = build_expense_breakdown_report(
+        actor_key="brian",
+        owner_name="Brian",
+        persons=["Brian (BofA)"],
+        month=selected_month,
+        worksheets=ReportWorksheets(
+            shared_expenses=InMemoryWorksheet([["hdr"] * 28, ["hdr"] * 28]),
+            personal_budget=InMemoryWorksheet(selected_rows),
+            subscriptions=InMemoryWorksheet([]),
+            budget_history=(
+                BudgetHistoryRows(previous_month, previous_rows),
+                BudgetHistoryRows(selected_month, selected_rows),
+            ),
+        ),
+    )
+
+    payload_match = re.search(
+        r'<script id="bookiebot-expense-report-data" type="application/json">(.*?)</script>',
+        render_expense_breakdown_html(report),
+    )
+    assert payload_match is not None
+    payload = json.loads(payload_match.group(1))
+    income_events = [item for item in payload["calendarEvents"] if item["kind"] == "income"]
+
+    assert payload["incomeProjection"] == {
+        "currentAmount": 0.0,
+        "projectedAmount": 7548.22,
+        "savingsGoal": 1509.64,
+    }
+    assert [(item["label"], item["day"], item["amount"], item["projectedOnly"]) for item in income_events] == [
+        ("Projected paycheck", expected_days[0], 3774.11, True),
+        ("Projected paycheck", expected_days[1], 3774.11, True),
+    ]
+
+
+def test_new_month_income_projection_keeps_other_income_actual(monkeypatch):
+    monkeypatch.setattr(
+        expense_breakdown,
+        "now_pacific",
+        lambda: datetime(2026, 8, 2, 12, 0, tzinfo=routing.PACIFIC_TZ),
+    )
+    previous_rows = [
+        ["", "Date:", "Source:", "Amount:", "Biweekly Income Source:", "xAI"],
+        ["", "7/31/2026", "xAI", "$3,774.11", "Biweekly Income Start:", "7/2/2026"],
+        ["", "Monthly Income:", "", "$3,774.11"],
+    ]
+    selected_rows = [
+        ["", "Date:", "Source:", "Amount:", "Biweekly Income Source:", "xAI"],
+        ["", "8/1/2026", "Internet stipend", "$150.00", "Biweekly Income Start:", "7/2/2026"],
+        ["", "Monthly Income:", "", "$150.00"],
+    ]
+    report = build_expense_breakdown_report(
+        actor_key="brian",
+        owner_name="Brian",
+        persons=["Brian (BofA)"],
+        month=BudgetMonth(2026, 8),
+        worksheets=ReportWorksheets(
+            shared_expenses=InMemoryWorksheet([["hdr"] * 28, ["hdr"] * 28]),
+            personal_budget=InMemoryWorksheet(selected_rows),
+            subscriptions=InMemoryWorksheet([]),
+            budget_history=(
+                BudgetHistoryRows(BudgetMonth(2026, 7), previous_rows),
+                BudgetHistoryRows(BudgetMonth(2026, 8), selected_rows),
+            ),
+        ),
+    )
+
+    payload_match = re.search(
+        r'<script id="bookiebot-expense-report-data" type="application/json">(.*?)</script>',
+        render_expense_breakdown_html(report),
+    )
+    assert payload_match is not None
+    payload = json.loads(payload_match.group(1))
+    income_events = [item for item in payload["calendarEvents"] if item["kind"] == "income"]
+
+    assert payload["incomeProjection"] == {
+        "currentAmount": 150.0,
+        "projectedAmount": 7698.22,
+        "savingsGoal": 1539.64,
+    }
+    assert [(item["label"], item["day"], item["amount"], item["projectedOnly"]) for item in income_events] == [
+        ("Internet stipend", 1, 150.0, False),
+        ("Projected paycheck", 14, 3774.11, True),
+        ("Projected paycheck", 28, 3774.11, True),
+    ]
+
+
+def test_current_month_paycheck_supersedes_prior_month_projection_reference():
+    config = expense_breakdown.IncomeProjectionConfig(
+        source_label="xAI",
+        anchor_date=datetime(2026, 7, 2, tzinfo=routing.PACIFIC_TZ),
+    )
+    current_paycheck = expense_breakdown.PaymentItem(
+        "xAI",
+        3900.0,
+        "income",
+        date="8/15/2026",
+    )
+    prior_paycheck = expense_breakdown.PaymentItem(
+        "xAI",
+        3774.11,
+        "income",
+        date="7/31/2026",
+    )
+
+    assert expense_breakdown._projected_paycheck_amount(
+        [current_paycheck],
+        config,
+        prior_paycheck,
+    ) == 3900.0
+    assert expense_breakdown._projected_biweekly_pay_days(
+        [current_paycheck],
+        BudgetMonth(2026, 8),
+        config,
+        prior_paycheck,
+    ) == [29]
+
+
+@pytest.mark.parametrize(
+    "prior_row",
+    [
+        ["", "", "xAI", "$3,774.11"],
+        ["", "7/31/2026", "Internet stipend", "$150.00"],
+    ],
+)
+def test_prior_month_projection_reference_requires_dated_configured_paycheck(prior_row):
+    history = (
+        BudgetHistoryRows(
+            BudgetMonth(2026, 7),
+            [
+                ["", "Date:", "Source:", "Amount:"],
+                prior_row,
+                ["", "Monthly Income:", "", "$3,774.11"],
+            ],
+        ),
+    )
+
+    assert expense_breakdown._prior_month_paycheck_reference(
+        history,
+        BudgetMonth(2026, 8),
+        expense_breakdown.IncomeProjectionConfig(source_label="xAI"),
+    ) is None
+
+
 def test_savings_projection_uses_twenty_percent_of_income_not_paycheck_count(monkeypatch):
     monkeypatch.setattr(
         expense_breakdown,
@@ -1327,7 +1525,12 @@ def test_savings_projection_uses_twenty_percent_of_income_not_paycheck_count(mon
     }
 
 
-def test_savings_minimum_rounds_ten_percent_of_income_directly():
+def test_savings_minimum_rounds_ten_percent_of_income_directly(monkeypatch):
+    monkeypatch.setattr(
+        expense_breakdown,
+        "now_pacific",
+        lambda: datetime(2026, 7, 10, 12, 0, tzinfo=routing.PACIFIC_TZ),
+    )
     personal_rows = [
         ["", "7/10/2026", "Sonic", "$1,619.47"],
         ["", "Monthly Income:", "", "$1,619.47"],
@@ -1574,8 +1777,12 @@ def test_expense_report_payload_resolves_exact_snapshot(tmp_path, monkeypatch):
     assert _static_report_path_for_payload(payload) == snapshot
 
 
-def test_expense_report_request_prefers_snapshot_unless_live_requested(tmp_path, monkeypatch):
+def test_completed_expense_report_request_prefers_snapshot_unless_live_requested(tmp_path, monkeypatch):
     monkeypatch.setenv("BOOKIEBOT_REPORT_DIR", str(tmp_path))
+    monkeypatch.setattr(
+        "bookiebot.reports.web._is_current_expense_report_payload",
+        lambda payload: False,
+    )
     filename = "expense-breakdown-brian-2026-06-snapshot.html"
     snapshot = tmp_path / filename
     snapshot.write_text("<html>snapshot</html>", encoding="utf-8")
@@ -1589,6 +1796,29 @@ def test_expense_report_request_prefers_snapshot_unless_live_requested(tmp_path,
     }
 
     assert _static_report_path_for_request(payload, {"token": "abc"}) == snapshot
+    assert _static_report_path_for_request(payload, {"token": "abc", "live": "1"}) is None
+
+
+def test_current_expense_report_request_renders_live_unless_snapshot_requested(tmp_path, monkeypatch):
+    monkeypatch.setenv("BOOKIEBOT_REPORT_DIR", str(tmp_path))
+    monkeypatch.setattr(
+        "bookiebot.reports.web._is_current_expense_report_payload",
+        lambda payload: True,
+    )
+    filename = "expense-breakdown-brian-2026-08-stale.html"
+    snapshot = tmp_path / filename
+    snapshot.write_text("<html>stale</html>", encoding="utf-8")
+    payload = {
+        "actor_key": "brian",
+        "owner_name": "Brian",
+        "persons": ["Brian (BofA)"],
+        "year": 2026,
+        "month": 8,
+        "filename": filename,
+    }
+
+    assert _static_report_path_for_request(payload, {"token": "abc"}) is None
+    assert _static_report_path_for_request(payload, {"token": "abc", "snapshot": "1"}) == snapshot
     assert _static_report_path_for_request(payload, {"token": "abc", "live": "1"}) is None
 
 

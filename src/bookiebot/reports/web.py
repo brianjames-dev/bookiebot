@@ -175,12 +175,34 @@ def _static_report_path_for_payload(payload: dict) -> Path | None:
 def _static_report_path_for_request(payload: dict, query: Any) -> Path | None:
     if _live_expense_report_requested(query):
         return None
+    if _is_current_expense_report_payload(payload) and not _snapshot_expense_report_requested(query):
+        return None
     return _static_report_path_for_payload(payload)
 
 
 def _live_expense_report_requested(query: Any) -> bool:
     value = str(query.get("live", "") if hasattr(query, "get") else "").strip().lower()
     return value in {"1", "true", "yes", "y"}
+
+
+def _snapshot_expense_report_requested(query: Any) -> bool:
+    value = str(query.get("snapshot", "") if hasattr(query, "get") else "").strip().lower()
+    return value in {"1", "true", "yes", "y"}
+
+
+def _is_current_expense_report_payload(payload: dict) -> bool:
+    try:
+        year = int(payload["year"])
+        month = int(payload["month"])
+    except (KeyError, TypeError, ValueError):
+        return False
+    try:
+        from bookiebot.sheets.routing import now_pacific
+
+        current = now_pacific()
+    except Exception:
+        return False
+    return year == current.year and month == current.month
 
 
 def _safe_report_path(filename: str) -> Path | None:

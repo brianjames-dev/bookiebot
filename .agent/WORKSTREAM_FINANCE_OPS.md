@@ -479,6 +479,19 @@ Status: Complete in code and automated verification; production confirmation rem
 - The active interaction follow-up remains available for the ten-minute workflow window so pagination, typed update/move replies, cancellations, expiry notices, and outcomes stay ephemeral where Discord permits.
 - Verification: focused recent/message-router suite `134 passed`; full suite `422 passed, 1 skipped`; Pyright clean; `git diff --check` passed.
 
+### 2026-08-02 Prior-Month Paycheck Projection Follow-Up
+
+Status: Complete in code and automated/read-only verification; production browser confirmation remains in `.agent/STATUS.md` checklist item 73.
+
+- New-month expense reports use the immediately prior month's latest dated paycheck matching the configured biweekly source as projection-only amount and cadence context.
+- A missing current-month source/start configuration inherits from the immediately prior month, covering Brian's live August tab without changing either sheet.
+- The prior paycheck never enters Current income or the selected month's actual calendar. A matching current-month paycheck supersedes it; unrelated, mismatched, undated, or older income does not become the projection basis.
+- January optionally loads the previous annual workbook's December tab, while access/configuration failures retain the existing safe fallback behavior.
+- Current-month signed report links rebuild from Sheets by default so a pre-fix saved HTML snapshot cannot keep returning a `$0.00` projection. The saved file remains the route's failure fallback; completed months remain snapshot-first, and `snapshot=1` explicitly requests the current-month file.
+- Read-only Brian August verification found the July 31 `xAI` paycheck at `$3,137.49` and produced `$6,274.98` Projected income with August 14 and 28 projected events while Current remained `$0.00`.
+- Browser verification opened a normal signed current-month URL backed by a deliberately stale snapshot and confirmed the live Projected cards show Income `$6,274.98`, Left `$2,339.42`, Minimum `$627.50`, and Ideal `$1,255.00` with no console errors.
+- Verification: report suite `44 passed`; full suite `432 passed, 1 skipped`; Pyright clean; frontend typecheck/build passed; `git diff --check` passed.
+
 ## Open Questions
 
 - What should the canonical recent-action lineage model look like?

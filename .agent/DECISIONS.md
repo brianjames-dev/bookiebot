@@ -314,6 +314,18 @@ Decision: Burn Rate Spent includes Food, Shopping, and elapsed Wants subscriptio
 
 Rationale: Category Mix and Daily Spending already classify Wants subscriptions as Wants spending. Excluding them from Burn Rate produced a `$39.96` discrepancy in Brian July and made the generic `Spent` label describe only discretionary activity. Including the same month-scoped subscription events makes all three Wants views reconcile while preserving the category-cascade effect on available money.
 
+## 2026-08-02 - Carry One Prior Paycheck Into New-Month Projections
+
+Decision: When an open selected month has no matching paycheck yet, Expense Breakdown may use the immediately prior calendar month's latest dated paycheck matching the configured biweekly source as projection-only amount and cadence context. Missing current-month source/start configuration inherits from that prior month. The prior paycheck is never counted as selected-month actual income or rendered as an actual selected-month event; a matching selected-month paycheck supersedes it. Older, undated, or mismatched income is not eligible. January may read the previous annual workbook's December tab through the same optional history path.
+
+Rationale: A paycheck near month-end is the most accurate anchor for the next biweekly occurrences, but new month tabs begin with zero income and may omit copied projection configuration. Carrying exactly one prior-month actual preserves Current accounting boundaries while allowing Projected income, savings targets, category budgets, Calendar, Daily Spending, and Burn Rate to work before the first new-month paycheck is logged. Limiting the reference to the immediately prior month avoids silently projecting from stale employment income.
+
+## 2026-08-02 - Live-Render Current-Month Signed Reports
+
+Decision: Supersede the 2026-07-07 snapshot-first rule for the selected current month only. A normal signed current-month Expense Breakdown URL rebuilds from current Sheets data; its saved HTML remains the automatic fallback when the live rebuild fails. Completed-month URLs remain snapshot-first for audit stability. `live=1` continues to force a rebuild for any month, while `snapshot=1` explicitly requests the saved current-month file.
+
+Rationale: Current-month reports are interactive operational views whose Projected values depend on newly logged income and corrected projection logic. Serving the embedded snapshot indefinitely can make a correct backend fix invisible and leave the Projected toggle at `$0.00`. Live-rendering only the open month keeps the page current while preserving resilient fallback behavior and stable historical snapshots.
+
 ## Pending Decisions
 
 - Where should durable system events live: banking database only, Google Sheets only, or dual-write during transition?

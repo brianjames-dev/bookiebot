@@ -1,26 +1,37 @@
 # Agent Status
 
-Last updated: 2026-07-31
+Last updated: 2026-08-02
 
 ## Active Focus
 
-Expense-report subscription data is now scoped to the selected month and Wants subscriptions are included in Burn Rate totals and dated activity. The next step is deployment and production confirmation alongside the Daily Spending, monthly savings, recent-action, and reconciliation updates.
+New-month expense reports now carry the immediately prior month's last dated paycheck into Projected mode without counting it as current income, and current-month signed links rebuild live instead of reopening stale snapshots. The next step is deployment confirmation alongside the subscription, Daily Spending, monthly savings, recent-action, and reconciliation updates.
 
 ## On Deck
 
-1. Deploy and manually verify Wants subscriptions in Burn Rate in checklist item 72.
-2. Deploy and manually verify selected-month subscription scoping in checklist item 71.
-3. Deploy and manually verify Daily Spending bill coverage and outlier scaling in checklist item 70.
-4. Deploy and manually verify the monthly savings workflow and corrected Saved-card targets in checklist items 60-61 and 69.
-5. Deploy and manually verify the expense-report corrections in checklist item 67.
-6. Deploy and manually verify typed `recent` opens the short-lived launcher and keeps the resulting DM session ephemeral.
-7. Deploy and manually verify `View Inbox` and `Reconcile Now` show `BookieBot is typing...` without a temporary thinking message.
-8. Manually verify shared Needs logging plus update/move/delete/undo behavior in Discord and Google Sheets.
-9. Manually verify recent transactions and reconciliation after the latest reliability fixes.
-10. Consider a richer Discord button flow for grouped amount adjustments if the current UX feels too manual.
-11. Harden recent-action pending state across restarts/deploys, since selections currently live only in process memory.
-12. Improve targeted recent-action search so commands can find older matches, not only the latest 10 recent actions.
-13. Explore clarifying questions before logging when BookieBot is uncertain instead of guessing or silently failing.
+1. Deploy and manually verify prior-month paycheck carry-forward in Projected mode in checklist item 73.
+2. Deploy and manually verify Wants subscriptions in Burn Rate in checklist item 72.
+3. Deploy and manually verify selected-month subscription scoping in checklist item 71.
+4. Deploy and manually verify Daily Spending bill coverage and outlier scaling in checklist item 70.
+5. Deploy and manually verify the monthly savings workflow and corrected Saved-card targets in checklist items 60-61 and 69.
+6. Deploy and manually verify the expense-report corrections in checklist item 67.
+7. Deploy and manually verify typed `recent` opens the short-lived launcher and keeps the resulting DM session ephemeral.
+8. Deploy and manually verify `View Inbox` and `Reconcile Now` show `BookieBot is typing...` without a temporary thinking message.
+9. Manually verify shared Needs logging plus update/move/delete/undo behavior in Discord and Google Sheets.
+10. Manually verify recent transactions and reconciliation after the latest reliability fixes.
+11. Consider a richer Discord button flow for grouped amount adjustments if the current UX feels too manual.
+12. Harden recent-action pending state across restarts/deploys, since selections currently live only in process memory.
+13. Improve targeted recent-action search so commands can find older matches, not only the latest 10 recent actions.
+14. Explore clarifying questions before logging when BookieBot is uncertain instead of guessing or silently failing.
+
+## Completed 2026-08-02
+
+- Added a projection-only reference to the expense-report model. When the selected month has no matching paycheck yet, it uses the immediately prior month's latest dated paycheck for amount and biweekly cadence without adding that prior transaction to Current income or the selected month's calendar.
+- Inherited missing biweekly source/start configuration from the immediately prior month. This covers the live August tab, whose copied Income section has no projection configuration even though July retains the `xAI` configuration and dated paycheck history.
+- Current-month matching paychecks continue to supersede the carry-forward reference, unrelated income remains actual-only, stale/mismatched/undated prior entries are ignored, completed months remain actual-only, and January can load the prior December tab from the previous annual workbook when available.
+- Corrected the web serving path that could preserve a pre-fix `$0.00` projection inside the signed link's saved HTML. Current-month links now rebuild from Sheets by default and retain the saved snapshot as an error fallback; completed-month links remain snapshot-first, and `snapshot=1` can explicitly request a current-month snapshot.
+- Read-only live Brian August verification resolved the July 31 `xAI` paycheck at `$3,137.49`, kept Current income at `$0.00`, and produced Projected income `$6,274.98` with projected paychecks on August 14 and 28.
+- Browser verification opened a normal current-month signed URL pointing at a deliberately stale `$0.00` snapshot; the route rebuilt live and the Projected toggle showed Income `$6,274.98`, Left `$2,339.42`, Minimum `$627.50`, and Ideal `$1,255.00` with no browser errors.
+- Verification: focused report suite `44 passed`; full suite `432 passed, 1 skipped`; Pyright reported zero errors; frontend typecheck/build passed; `git diff --check` passed. Manual verification is checklist item 73 below.
 
 ## Completed 2026-07-31
 
@@ -513,6 +524,8 @@ Use a test row or low-risk real row in Discord:
     - Expected: every view is limited to transactions scheduled for July. At month-end, Spent is `$5,620.89`, Needs is `$4,064.56`, Wants is `$1,556.33`, Saved is `$2,167.14`, and Left is `$3,047.68`; subscription totals are `$229.36` Needs and `$39.96` Wants. The July yearly `brianjames.dev` item is included, while October's Amazon Prime and February's MacroFactor appear nowhere in either mode.
 72. Open Brian July's Burn Rate details and compare it with Wants Category Mix and Wants Daily Spending.
     - Expected: all three Spent totals are `$1,556.33`. Burn Rate shows Limit `$3,250.71`, Left `$1,694.38`, Allowed/day `$104.86`, and Actual/day `$50.20`; its explanation names Wants subscriptions, and the line includes Slate Digital, YouTube Premium, iCloud Storage, and Discovery+ on their actual pull days.
+73. After deployment, open Brian's August expense report before logging an August paycheck and toggle Projected; repeat after the first real August paycheck is logged.
+    - Expected: Current keeps August Income at `$0.00` before the first paycheck and does not show July 31 as an August event. Projected shows `$6,274.98` from two `$3,137.49` paychecks on August 14 and 28, and all income-dependent cards/charts follow that projected total. After an August `xAI` paycheck is logged, its actual amount/date supersede the July reference and the next projection lands exactly fourteen days later.
 
 ## Verification Baseline
 
@@ -526,6 +539,27 @@ python -m pytest unit_tests/intents/test_handlers.py unit_tests/core/test_messag
 Latest verification:
 
 ```bash
+Live Brian August report-model verification
+# passed: July 31 xAI $3,137.49 used only as projection reference; Current $0.00; Projected $6,274.98; August 14 and 28 projected events
+
+Current-month signed-link browser verification against a deliberately stale snapshot
+# passed: normal URL rebuilt live; Projected Income $6,274.98; Left $2,339.42; Minimum $627.50; Ideal $1,255.00; no browser errors
+
+python -m pytest unit_tests/reports/test_expense_breakdown.py
+# passed: 44 passed
+
+python -m pytest unit_tests
+# passed: 432 passed, 1 skipped
+
+python -m pyright --pythonpath venv/bin/python --pythonversion 3.12
+# passed: 0 errors, 0 warnings, 0 informations
+
+cd web/expense-report && npm run typecheck && npm run build
+# passed
+
+git diff --check
+# passed
+
 Live Brian July Burn Rate browser verification
 # passed: Burn Rate, Wants Category Mix, and Wants Daily Spending all $1,556.33; Limit $3,250.71; Wants subscriptions included on pull days
 

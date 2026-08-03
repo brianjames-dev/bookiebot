@@ -160,6 +160,7 @@ class ExpenseBreakdownReport:
     calendar_events: list[CalendarEvent] = field(default_factory=list)
     income_entries: list[PaymentItem] = field(default_factory=list)
     income_projection_config: IncomeProjectionConfig = field(default_factory=IncomeProjectionConfig)
+    income_projection_reference: PaymentItem | None = None
     raw_sheets: list[RawSheet] = field(default_factory=list)
 
 
@@ -372,12 +373,17 @@ def load_report_worksheets(actor_key: str, month: BudgetMonth) -> ReportWorkshee
     gc = get_gspread_client()
     context = resolve_sheet_context(actor_key, gc, month.as_datetime())
     personal_spreadsheet = _optional_spreadsheet_by_key(gc, context.personal_budget_spreadsheet_id)
+    budget_history = (
+        _budget_history_from_spreadsheet(personal_spreadsheet, month)
+        if personal_spreadsheet is not None
+        else ()
+    )
     return ReportWorksheets(
         shared_expenses=context.shared_expenses_worksheet,
         personal_budget=context.personal_budget_worksheet,
         subscriptions=_worksheet_by_name(personal_spreadsheet, "Subscriptions") if personal_spreadsheet is not None else None,
         bill_schedule=_worksheet_by_name(personal_spreadsheet, "_BookieBot Bill Schedule") if personal_spreadsheet is not None else None,
-        budget_history=_budget_history_from_spreadsheet(personal_spreadsheet, month) if personal_spreadsheet is not None else (),
+        budget_history=_optional_previous_year_budget_history(actor_key, month) + budget_history,
     )
 
 
@@ -400,7 +406,17 @@ def build_expense_breakdown_report(
     subscriptions = _subscription_items(subscription_rows)
     current_month_subscriptions = _current_month_subscription_items(subscriptions, month)
     income_entries, income_total = _income_entries(personal_rows)
-    income_projection_config = _income_projection_config(personal_rows)
+    budget_history = selected.budget_history or (BudgetHistoryRows(month, personal_rows),)
+    income_projection_config = _income_projection_config_with_prior_month(
+        _income_projection_config(personal_rows),
+        budget_history,
+        month,
+    )
+    income_projection_reference = _prior_month_paycheck_reference(
+        budget_history,
+        month,
+        income_projection_config,
+    )
     needs_rollover, wants_rollover = _category_rollover_amounts(personal_rows)
     savings_deposits = _savings_deposits(personal_rows)
     amount_saved = _amount_saved(personal_rows, deposits=savings_deposits)
@@ -429,7 +445,7 @@ def build_expense_breakdown_report(
         )
     payment_totals = _payment_totals_by_group(payments)
     utility_history = _utility_history_items(
-        selected.budget_history or (BudgetHistoryRows(month, personal_rows),),
+        budget_history,
         bill_schedule_rows,
         month,
     )
@@ -440,6 +456,7 @@ def build_expense_breakdown_report(
         income_entries=income_entries,
         income_total=income_total,
         income_projection_config=income_projection_config,
+        income_projection_reference=income_projection_reference,
         utility_history=utility_history,
         bill_schedule_rows=bill_schedule_rows,
     )
@@ -517,6 +534,7 @@ def build_expense_breakdown_report(
         calendar_events=calendar_events,
         income_entries=income_entries,
         income_projection_config=income_projection_config,
+        income_projection_reference=income_projection_reference,
         raw_sheets=[
             RawSheet("Shared Expenses", _compact_rows(shared_rows)),
             RawSheet("Personal Budget", _compact_rows(personal_rows)),
@@ -633,13 +651,36 @@ def _optional_spreadsheet_by_key(gc: Any, spreadsheet_id: str) -> Any | None:
 
 
 def _optional_budget_history(actor_key: str, month: BudgetMonth) -> tuple[BudgetHistoryRows, ...]:
+    history: tuple[BudgetHistoryRows, ...] = ()
     try:
         from bookiebot.sheets.auth import get_gspread_client
         from bookiebot.sheets.routing import get_budget_spreadsheet_id_for_user
 
         spreadsheet_id = get_budget_spreadsheet_id_for_user(actor_key, month.year)
         spreadsheet = get_gspread_client().open_by_key(spreadsheet_id)
-        return _budget_history_from_spreadsheet(spreadsheet, month)
+        history = _budget_history_from_spreadsheet(spreadsheet, month)
+    except Exception:
+        pass
+    return _optional_previous_year_budget_history(actor_key, month) + history
+
+
+def _optional_previous_year_budget_history(
+    actor_key: str,
+    month: BudgetMonth,
+) -> tuple[BudgetHistoryRows, ...]:
+    previous_month = _previous_budget_month(month)
+    if previous_month.year == month.year:
+        return ()
+    try:
+        from bookiebot.sheets.auth import get_gspread_client
+        from bookiebot.sheets.routing import get_budget_spreadsheet_id_for_user
+
+        spreadsheet_id = get_budget_spreadsheet_id_for_user(actor_key, previous_month.year)
+        spreadsheet = get_gspread_client().open_by_key(spreadsheet_id)
+        worksheet = _worksheet_by_name(spreadsheet, previous_month.name)
+        if worksheet is None:
+            return ()
+        return (BudgetHistoryRows(previous_month, _rows(worksheet)),)
     except Exception:
         return ()
 
@@ -652,6 +693,12 @@ def _budget_history_from_spreadsheet(spreadsheet: Any, month: BudgetMonth) -> tu
             continue
         history.append(BudgetHistoryRows(BudgetMonth(month.year, month_number), _rows(worksheet)))
     return tuple(history)
+
+
+def _previous_budget_month(month: BudgetMonth) -> BudgetMonth:
+    if month.month == 1:
+        return BudgetMonth(month.year - 1, 12)
+    return BudgetMonth(month.year, month.month - 1)
 
 
 def _rows(ws: Any) -> list[list[str]]:
@@ -833,6 +880,7 @@ def _calendar_events(
     income_entries: list[PaymentItem],
     income_total: float,
     income_projection_config: IncomeProjectionConfig,
+    income_projection_reference: PaymentItem | None,
     utility_history: list[UtilityHistoryItem],
     bill_schedule_rows: list[list[str]],
 ) -> list[CalendarEvent]:
@@ -840,7 +888,15 @@ def _calendar_events(
     events: list[CalendarEvent] = []
     events.extend(_subscription_calendar_events(subscriptions, month, elapsed_days))
     events.extend(_bill_calendar_events(payments, utility_history, bill_schedule_rows, month, elapsed_days))
-    events.extend(_income_calendar_events(income_entries, income_total, month, income_projection_config))
+    events.extend(
+        _income_calendar_events(
+            income_entries,
+            income_total,
+            month,
+            income_projection_config,
+            income_projection_reference,
+        )
+    )
     return sorted(events, key=lambda item: (item.day, item.kind, item.label.lower()))
 
 
@@ -925,18 +981,31 @@ def _income_calendar_events(
     income_total: float,
     month: BudgetMonth,
     projection_config: IncomeProjectionConfig | None = None,
+    projection_reference: PaymentItem | None = None,
 ) -> list[CalendarEvent]:
-    if income_total <= 0:
+    if income_total <= 0 and projection_reference is None:
         return []
     days_in_month = calendar.monthrange(month.year, month.month)[1]
-    current_entries = income_entries or [PaymentItem("Income", income_total, "income")]
+    current_entries = income_entries or (
+        [PaymentItem("Income", income_total, "income")]
+        if income_total > 0
+        else []
+    )
     paycheck_entries = _paycheck_income_entries(current_entries, projection_config)
     other_entries = [item for item in current_entries if item not in paycheck_entries]
-    if not paycheck_entries and len(current_entries) == 1:
+    if not paycheck_entries and len(current_entries) == 1 and not _configured_income_source(projection_config):
         paycheck_entries = current_entries
         other_entries = []
-    pay_days = _biweekly_pay_days(month, _paycheck_anchor_date(paycheck_entries, month, projection_config))
-    projected_pay_days = _projected_biweekly_pay_days(paycheck_entries, month, projection_config)
+    pay_days = _biweekly_pay_days(
+        month,
+        _paycheck_anchor_date(paycheck_entries, month, projection_config, projection_reference),
+    )
+    projected_pay_days = _projected_biweekly_pay_days(
+        paycheck_entries,
+        month,
+        projection_config,
+        projection_reference,
+    )
     events: list[CalendarEvent] = []
 
     for index, item in enumerate(paycheck_entries):
@@ -955,8 +1024,18 @@ def _income_calendar_events(
     if unparsed_total > 0:
         events.append(CalendarEvent("income", "Other income", unparsed_total, 1, "income", projected_only=False))
 
-    projected_total = _projected_income_total(income_entries, income_total, month, projection_config)
-    paycheck_amount = _projected_paycheck_amount(current_entries, projection_config)
+    projected_total = _projected_income_total(
+        income_entries,
+        income_total,
+        month,
+        projection_config,
+        projection_reference,
+    )
+    paycheck_amount = _projected_paycheck_amount(
+        current_entries,
+        projection_config,
+        projection_reference,
+    )
     projected_gap = round(projected_total - income_total, 2)
     if projected_gap > 0 and paycheck_amount > 0 and not _is_completed_month(month):
         for day in projected_pay_days:
@@ -973,17 +1052,31 @@ def _projected_income_total(
     income_total: float,
     month: BudgetMonth,
     projection_config: IncomeProjectionConfig | None = None,
+    projection_reference: PaymentItem | None = None,
 ) -> float:
-    if _is_completed_month(month) or income_total <= 0:
+    if _is_completed_month(month) or (income_total <= 0 and projection_reference is None):
         return round(income_total, 2)
-    current_entries = income_entries or [PaymentItem("Income", income_total, "income")]
-    paycheck_amount = _projected_paycheck_amount(current_entries, projection_config)
+    current_entries = income_entries or (
+        [PaymentItem("Income", income_total, "income")]
+        if income_total > 0
+        else []
+    )
+    paycheck_amount = _projected_paycheck_amount(
+        current_entries,
+        projection_config,
+        projection_reference,
+    )
     if paycheck_amount <= 0:
         return round(income_total, 2)
     paycheck_entries = _paycheck_income_entries(current_entries, projection_config)
-    if not paycheck_entries and len(current_entries) == 1:
+    if not paycheck_entries and len(current_entries) == 1 and not _configured_income_source(projection_config):
         paycheck_entries = current_entries
-    projected_pay_days = _projected_biweekly_pay_days(paycheck_entries, month, projection_config)
+    projected_pay_days = _projected_biweekly_pay_days(
+        paycheck_entries,
+        month,
+        projection_config,
+        projection_reference,
+    )
     projected_total = round(
         income_total + paycheck_amount * len(projected_pay_days),
         2,
@@ -1020,34 +1113,93 @@ def _configured_biweekly_income_entries(
     ]
 
 
+def _configured_income_source(
+    projection_config: IncomeProjectionConfig | None = None,
+) -> str:
+    return _normalize_label((projection_config.source_label if projection_config else None) or "")
+
+
+def _prior_month_paycheck_reference(
+    budget_history: tuple[BudgetHistoryRows, ...],
+    month: BudgetMonth,
+    projection_config: IncomeProjectionConfig | None = None,
+) -> PaymentItem | None:
+    previous_month = _previous_budget_month(month)
+    candidates: list[tuple[datetime, PaymentItem]] = []
+    for history_item in budget_history:
+        if history_item.month != previous_month:
+            continue
+        income_entries, _income_total = _income_entries(history_item.rows)
+        for item in _paycheck_income_entries(income_entries, projection_config):
+            parsed_date = _parse_date(item.date)
+            if (
+                parsed_date is None
+                or parsed_date.year != previous_month.year
+                or parsed_date.month != previous_month.month
+            ):
+                continue
+            candidates.append((parsed_date, item))
+    if not candidates:
+        return None
+    return max(candidates, key=lambda candidate: candidate[0])[1]
+
+
+def _income_projection_config_with_prior_month(
+    current_config: IncomeProjectionConfig,
+    budget_history: tuple[BudgetHistoryRows, ...],
+    month: BudgetMonth,
+) -> IncomeProjectionConfig:
+    if current_config.source_label is not None and current_config.anchor_date is not None:
+        return current_config
+    previous_month = _previous_budget_month(month)
+    previous_config = next(
+        (
+            _income_projection_config(history_item.rows)
+            for history_item in budget_history
+            if history_item.month == previous_month
+        ),
+        IncomeProjectionConfig(),
+    )
+    return IncomeProjectionConfig(
+        source_label=current_config.source_label or previous_config.source_label,
+        anchor_date=current_config.anchor_date or previous_config.anchor_date,
+    )
+
+
 def _projected_paycheck_amount(
     income_entries: list[PaymentItem],
     projection_config: IncomeProjectionConfig | None = None,
+    projection_reference: PaymentItem | None = None,
 ) -> float:
     paycheck_entries = _paycheck_income_entries(income_entries, projection_config)
-    if not paycheck_entries and len(income_entries) == 1:
+    if not paycheck_entries and len(income_entries) == 1 and not _configured_income_source(projection_config):
         paycheck_entries = income_entries
-    if not paycheck_entries:
-        return 0.0
-    return round(sum(item.amount for item in paycheck_entries) / len(paycheck_entries), 2)
+    if paycheck_entries:
+        return round(sum(item.amount for item in paycheck_entries) / len(paycheck_entries), 2)
+    return round(projection_reference.amount, 2) if projection_reference is not None else 0.0
 
 
 def _paycheck_anchor_date(
     income_entries: list[PaymentItem],
     month: BudgetMonth,
     projection_config: IncomeProjectionConfig | None = None,
+    projection_reference: PaymentItem | None = None,
 ) -> datetime | None:
-    if projection_config and projection_config.anchor_date is not None:
-        return projection_config.anchor_date
     parsed_dates = [
         parsed
         for item in income_entries
         if (parsed := _parse_date(item.date)) is not None
     ]
-    if not parsed_dates:
-        return None
-    in_month = [item for item in parsed_dates if item.year == month.year and item.month == month.month]
-    return max(in_month or parsed_dates)
+    if parsed_dates:
+        in_month = [item for item in parsed_dates if item.year == month.year and item.month == month.month]
+        return max(in_month or parsed_dates)
+    if projection_reference is not None:
+        reference_date = _parse_date(projection_reference.date)
+        if reference_date is not None:
+            return reference_date
+    if projection_config and projection_config.anchor_date is not None:
+        return projection_config.anchor_date
+    return None
 
 
 def _biweekly_pay_days(month: BudgetMonth, anchor_date: datetime | None = None) -> list[int]:
@@ -1064,8 +1216,14 @@ def _projected_biweekly_pay_days(
     income_entries: list[PaymentItem],
     month: BudgetMonth,
     projection_config: IncomeProjectionConfig | None = None,
+    projection_reference: PaymentItem | None = None,
 ) -> list[int]:
-    anchor_date = _paycheck_anchor_date(income_entries, month, projection_config)
+    anchor_date = _paycheck_anchor_date(
+        income_entries,
+        month,
+        projection_config,
+        projection_reference,
+    )
     scheduled_days = _biweekly_pay_days(month, anchor_date)
     parsed_dates = [
         parsed
@@ -2178,6 +2336,7 @@ def _income_projection_payload(report: ExpenseBreakdownReport) -> dict[str, Any]
         report.income_total,
         report.month,
         report.income_projection_config,
+        report.income_projection_reference,
     )
     return {
         "currentAmount": round(report.income_total, 2),
@@ -2193,6 +2352,7 @@ def _savings_projection_payload(report: ExpenseBreakdownReport) -> dict[str, Any
         report.income_total,
         report.month,
         report.income_projection_config,
+        report.income_projection_reference,
     )
     current_ideal = round(
         report.income_total * 0.2
