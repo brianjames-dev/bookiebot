@@ -22,6 +22,22 @@ export interface ExpenseEntry {
   location: string
 }
 
+export interface SharedReimbursementItem {
+  id: string
+  date: string
+  item: string
+  location: string
+  payer: string
+  partner: string
+  grossAmount: number
+  personalShare: number
+  partnerShare: number
+  receivedAmount: number
+  outstandingAmount: number
+  splitMethod: string
+  status: "outstanding" | "reimbursed" | "void"
+}
+
 export interface PaymentItem extends AmountRow {
   group: string
   status?: string
@@ -160,6 +176,7 @@ export interface ExpenseReportData {
   needExpenses: PaymentItem[]
   calendarEvents: CalendarEvent[]
   utilityHistory: UtilityHistoryItem[]
+  sharedReimbursements: SharedReimbursementItem[]
   subscriptionsNeeds: SubscriptionItem[]
   subscriptionsWants: SubscriptionItem[]
 }

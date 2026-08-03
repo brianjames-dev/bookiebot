@@ -152,6 +152,36 @@ def test_indexed_move_routes_to_move_action():
     )
 
 
+def test_split_last_expense_by_income_routes_without_llm():
+    assert _action_management_intent("split the last PG&E expense by income") == (
+        "split_recent_action",
+        {"split_method": "income", "index": 1, "match_text": "pg&e"},
+    )
+
+
+def test_new_logged_expense_with_split_instruction_is_not_mistaken_for_recent_action():
+    assert _action_management_intent("log a $100 grocery expense and split by income") is None
+
+
+def test_indexed_equal_split_routes_without_llm():
+    from bookiebot.core.message_router import _indexed_action_intent
+
+    assert _indexed_action_intent("2 split 50/50") == (
+        "split_recent_action",
+        {"index": 2, "split_method": "equal"},
+    )
+
+
+def test_reimbursement_commands_route_without_llm():
+    from bookiebot.core.message_router import _reimbursement_intent
+
+    assert _reimbursement_intent("What does Hannah owe me?") == ("query_shared_reimbursements", {})
+    assert _reimbursement_intent("Hannah reimbursed me for PG&E") == (
+        "mark_shared_reimbursement_received",
+        {"match_text": "pg&e"},
+    )
+
+
 def test_recent_query_show_more():
     from bookiebot.core.message_router import _recent_query_intent
 

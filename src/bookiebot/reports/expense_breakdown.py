@@ -14,6 +14,7 @@ from typing import Any
 from openpyxl.utils import column_index_from_string
 
 from bookiebot.sheets.config import get_category_columns
+from bookiebot.sheets.collaboration import SharedAllocation, allocations_from_rows, split_method_label
 from bookiebot.sheets.repo import get_sheets_repo
 from bookiebot.sheets.routing import PACIFIC_TZ, now_pacific, resolve_sheet_context
 from bookiebot.sheets.utils import clean_money
@@ -40,6 +41,7 @@ class BudgetMonth:
 class ReportWorksheets:
     shared_expenses: Any
     personal_budget: Any
+    shared_reimbursements: Any | None = None
     subscriptions: Any | None = None
     bill_schedule: Any | None = None
     budget_history: tuple[BudgetHistoryRows, ...] = ()
@@ -161,6 +163,7 @@ class ExpenseBreakdownReport:
     income_entries: list[PaymentItem] = field(default_factory=list)
     income_projection_config: IncomeProjectionConfig = field(default_factory=IncomeProjectionConfig)
     income_projection_reference: PaymentItem | None = None
+    shared_reimbursements: list[SharedAllocation] = field(default_factory=list)
     raw_sheets: list[RawSheet] = field(default_factory=list)
 
 
@@ -365,6 +368,7 @@ def load_report_worksheets(actor_key: str, month: BudgetMonth) -> ReportWorkshee
             personal_budget=repo.income_sheet(),
             subscriptions=_optional_sheet(repo.subscriptions_sheet),
             bill_schedule=_optional_sheet(repo.bill_schedule_sheet),
+            shared_reimbursements=_optional_sheet(repo.shared_reimbursements_sheet),
             budget_history=_optional_budget_history(actor_key, month),
         )
 
@@ -383,6 +387,7 @@ def load_report_worksheets(actor_key: str, month: BudgetMonth) -> ReportWorkshee
         personal_budget=context.personal_budget_worksheet,
         subscriptions=_worksheet_by_name(personal_spreadsheet, "Subscriptions") if personal_spreadsheet is not None else None,
         bill_schedule=_worksheet_by_name(personal_spreadsheet, "_BookieBot Bill Schedule") if personal_spreadsheet is not None else None,
+        shared_reimbursements=_worksheet_by_name(personal_spreadsheet, "Shared Reimbursements") if personal_spreadsheet is not None else None,
         budget_history=_optional_previous_year_budget_history(actor_key, month) + budget_history,
     )
 
@@ -400,6 +405,12 @@ def build_expense_breakdown_report(
     personal_rows = _rows(selected.personal_budget)
     subscription_rows = _rows(selected.subscriptions) if selected.subscriptions is not None else []
     bill_schedule_rows = _rows(selected.bill_schedule) if selected.bill_schedule is not None else []
+    shared_reimbursement_rows = _rows(selected.shared_reimbursements) if selected.shared_reimbursements is not None else []
+    shared_reimbursements = [
+        allocation
+        for allocation in allocations_from_rows(shared_reimbursement_rows)
+        if allocation.expense_date and _date_belongs_to_month(allocation.expense_date, month)
+    ]
 
     entries = _shared_expense_entries(shared_rows, persons, month)
     payments = _payment_items(personal_rows, bill_schedule_rows, month)
@@ -535,10 +546,12 @@ def build_expense_breakdown_report(
         income_entries=income_entries,
         income_projection_config=income_projection_config,
         income_projection_reference=income_projection_reference,
+        shared_reimbursements=shared_reimbursements,
         raw_sheets=[
             RawSheet("Shared Expenses", _compact_rows(shared_rows)),
             RawSheet("Personal Budget", _compact_rows(personal_rows)),
             RawSheet("Subscriptions", _compact_rows(subscription_rows)),
+            RawSheet("Shared Reimbursements", _compact_rows(shared_reimbursement_rows)),
         ],
     )
 
@@ -2309,6 +2322,7 @@ def _report_client_payload(
         "needExpenses": [_payment_payload(item) for item in report.need_expenses],
         "calendarEvents": [_calendar_event_payload(item) for item in report.calendar_events],
         "utilityHistory": [_utility_history_payload(item) for item in report.utility_history],
+        "sharedReimbursements": [_shared_reimbursement_payload(item) for item in report.shared_reimbursements],
         "subscriptionsNeeds": [
             _subscription_payload(item)
             for item in _subscriptions_for_bucket(
@@ -2386,6 +2400,24 @@ def _expense_entry_payload(entry: ExpenseEntry) -> dict[str, Any]:
         "person": entry.person,
         "item": entry.item,
         "location": entry.location,
+    }
+
+
+def _shared_reimbursement_payload(item: SharedAllocation) -> dict[str, Any]:
+    return {
+        "id": item.allocation_id,
+        "date": item.expense_date,
+        "item": item.item or item.source_category.title(),
+        "location": item.location,
+        "payer": item.payer,
+        "partner": item.partner,
+        "grossAmount": round(item.gross_amount, 2),
+        "personalShare": round(item.payer_share, 2),
+        "partnerShare": round(item.partner_share, 2),
+        "receivedAmount": round(item.received_amount, 2),
+        "outstandingAmount": round(item.outstanding_amount, 2),
+        "splitMethod": split_method_label(item.split_method),
+        "status": item.status,
     }
 
 

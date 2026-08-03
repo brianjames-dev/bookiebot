@@ -1,6 +1,6 @@
 # Finance Operations Workstream
 
-Last updated: 2026-08-02
+Last updated: 2026-08-03
 
 ## Goal
 
@@ -161,6 +161,46 @@ Status: Date decision complete as of 2026-06-20. User-entered date updates are n
 - Add tests for reconciled row update, move, delete, and undo.
 
 Status: Complete first pass as of 2026-06-20. Recent-action update, move, delete, and undo reopen linked reconciliation items by matched action-log ID, including grouped IDs. Future refinement can decide whether some unchanged moves should stay confirmed instead of reopening.
+
+## Shared Expense Responsibility And Reimbursements
+
+### Target Invariants
+
+- The original bank-clearing amount remains immutable in the source action lineage and available for reconciliation.
+- The visible expense amount and expense-report spending totals represent the payer's personal responsibility after a split.
+- Partner responsibility is a reimbursement receivable, not income and not negative spending.
+- Settlement changes the reimbursement state only; it does not change the personal expense after the split is applied.
+- Every split links the source action, current sheet row, gross amount, method, both shares, and settlement state in the visible `Shared Reimbursements` worksheet.
+- `No split` cancels only the split workflow and leaves the already logged full expense intact.
+
+### Slice G - Initial Split And Settlement Workflow
+
+Status: Complete in code and automated/browser verification as of 2026-08-03; production confirmation remains in `.agent/STATUS.md` checklist item 74.
+
+- Added income-weighted splitting from Brian `$156,000` and Hannah `$85,000` annual incomes, plus 50/50 splitting with penny-safe allocation.
+- Added the post-log split prompt and explicit command directives. Grocery, Rent, PG&E, Water, Recology, and Gameday prompt automatically; internet is deliberately excluded.
+- Added `Split` to applicable expense/payment recent-action workflows and kept already-split actions from being split again.
+- Net the visible expense row to the payer's share while retaining the original gross in source action metadata for bank matching.
+- Store reimbursement receivables in `Shared Reimbursements`, support outstanding-balance queries and received-state updates, and audit settlement without logging income.
+- Added a responsive Shared Reimbursements web-report card and itemization. Primary expense charts continue to consume only the visible personal share.
+
+### Slice H - Split Lifecycle Completion
+
+Status: Pending; this is the next collaboration implementation slice.
+
+1. Change the split method and recalculate both shares without losing the original gross or settlement history.
+2. Remove an outstanding split by restoring the gross visible expense and voiding the receivable.
+3. Correct the actual gross amount after splitting and recalculate the active responsibility and reimbursement amounts.
+4. Record partial reimbursements and maintain accurate received/outstanding balances.
+5. Add an explicit confirmation/refund workflow before undoing or removing a split that has already been paid.
+6. Make update, move, delete, and undo fully split-aware, including ledger row references and reconciliation lineage synchronization.
+7. Harden pending split selections across restarts/deploys and add any lifecycle audit events required by production use.
+
+### 2026-08-03 Work Log
+
+- Implemented Slice G with focused calculation, ledger, recent-action, router, handler, report, and undo regression coverage.
+- Confirmed source action amounts remain gross while split leaf actions and the reimbursement ledger carry the personal allocation state.
+- Verified the report at desktop and mobile widths and recorded the remaining lifecycle work in Slice H.
 
 ## Bank Reconciliation - Known Problems
 

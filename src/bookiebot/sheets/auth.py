@@ -34,8 +34,10 @@ _GC: Any = None
 _ACTION_LOG_WORKSHEET_BY_TITLE = {}
 _SUBSCRIPTION_SCHEDULE_WORKSHEET_BY_KEY = {}
 _BILL_SCHEDULE_WORKSHEET_BY_KEY = {}
+_SHARED_REIMBURSEMENTS_WORKSHEET_BY_KEY = {}
 SUBSCRIPTION_SCHEDULE_WORKSHEET_TITLE = "_BookieBot Subscription Schedule"
 BILL_SCHEDULE_WORKSHEET_TITLE = "_BookieBot Bill Schedule"
+SHARED_REIMBURSEMENTS_WORKSHEET_TITLE = "Shared Reimbursements"
 
 
 def _get_gc():
@@ -153,6 +155,27 @@ def get_bill_schedule_worksheet():
             pass
         _BILL_SCHEDULE_WORKSHEET_BY_KEY[cache_key] = worksheet
         return worksheet
+
+
+def get_shared_reimbursements_worksheet():
+    """Return the actor's visible shared-reimbursement ledger."""
+    year = get_current_year()
+    sheet_key = get_budget_spreadsheet_id_for_user(get_current_discord_user_id(), year)
+    cache_key = (sheet_key, SHARED_REIMBURSEMENTS_WORKSHEET_TITLE)
+    if cache_key in _SHARED_REIMBURSEMENTS_WORKSHEET_BY_KEY:
+        return _SHARED_REIMBURSEMENTS_WORKSHEET_BY_KEY[cache_key]
+
+    spreadsheet = _get_gc().open_by_key(sheet_key)
+    try:
+        worksheet = spreadsheet.worksheet(SHARED_REIMBURSEMENTS_WORKSHEET_TITLE)
+    except Exception:
+        worksheet = spreadsheet.add_worksheet(
+            title=SHARED_REIMBURSEMENTS_WORKSHEET_TITLE,
+            rows=1000,
+            cols=22,
+        )
+    _SHARED_REIMBURSEMENTS_WORKSHEET_BY_KEY[cache_key] = worksheet
+    return worksheet
 
 
 def get_action_log_worksheet():

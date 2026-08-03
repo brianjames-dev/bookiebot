@@ -41,6 +41,7 @@ import type {
   ExpenseEntry,
   ExpenseReportData,
   OccurrenceRow,
+  SharedReimbursementItem,
   SubscriptionItem,
   UtilityHistoryItem,
 } from "./types"
@@ -818,6 +819,8 @@ export function ExpenseReportApp({ report }: { report: ExpenseReportData }) {
           </CardContent>
         </Card>
 
+        <SharedReimbursementsCard items={report.sharedReimbursements ?? []} />
+
         <ExpenseInsightsCard
           topEntries={report.topEntries}
           merchantOccurrences={report.merchantOccurrences}
@@ -827,6 +830,59 @@ export function ExpenseReportApp({ report }: { report: ExpenseReportData }) {
         </main>
       </ChartTooltipDismissProvider>
     </div>
+  )
+}
+
+function SharedReimbursementsCard({ items }: { items: SharedReimbursementItem[] }) {
+  if (!items.length) {
+    return null
+  }
+  const grossPaid = items.reduce((total, item) => total + item.grossAmount, 0)
+  const personalShare = items.reduce((total, item) => total + item.personalShare, 0)
+  const outstanding = items.reduce((total, item) => total + item.outstandingAmount, 0)
+  const received = items.reduce((total, item) => total + item.receivedAmount, 0)
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle>Shared Reimbursements</CardTitle>
+      </CardHeader>
+      <CardContent className="bb-reimbursement-content">
+        <div className="bb-reimbursement-summary" aria-label="Shared reimbursement summary">
+          <div><span>Gross paid</span><strong>{formatMoney(grossPaid)}</strong></div>
+          <div><span>Your share</span><strong>{formatMoney(personalShare)}</strong></div>
+          <div><span>Outstanding</span><strong>{formatMoney(outstanding)}</strong></div>
+          <div><span>Received</span><strong>{formatMoney(received)}</strong></div>
+        </div>
+        <div className="bb-table-wrap">
+          <table className="bb-reimbursement-table">
+            <thead>
+              <tr>
+                <th>Expense</th>
+                <th>Gross</th>
+                <th>Your share</th>
+                <th>Partner share</th>
+                <th>Status</th>
+              </tr>
+            </thead>
+            <tbody>
+              {items.map((item) => (
+                <tr key={item.id}>
+                  <td>
+                    <strong>{item.item}</strong>
+                    <span>{[item.location, item.date, item.splitMethod].filter(Boolean).join(" · ")}</span>
+                  </td>
+                  <td>{formatMoney(item.grossAmount)}</td>
+                  <td>{formatMoney(item.personalShare)}</td>
+                  <td>{formatMoney(item.partnerShare)}</td>
+                  <td>{item.status === "reimbursed" ? "Received" : `${formatMoney(item.outstandingAmount)} due`}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </CardContent>
+    </Card>
   )
 }
 

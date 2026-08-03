@@ -16,6 +16,9 @@ FRIENDLY_NAMES = {
     "query_recent_actions": "Recent Logged Actions",
     "update_recent_action": "Update Recent Action",
     "move_recent_action": "Move Recent Action",
+    "split_recent_action": "Split Recent Action",
+    "query_shared_reimbursements": "Shared Reimbursements",
+    "mark_shared_reimbursement_received": "Mark Reimbursement Received",
     "query_burn_rate": "Burn Rate",
     "query_rent_paid": "Check Rent Paid",
     "query_pge_paid": "Check PG&E Paid",
@@ -104,6 +107,18 @@ INTENT_DETAILS = {
     "move_recent_action": (
         "Move a recent expense to a different category.",
         ["move the Chipotle expense to food", "that grocery expense should be shopping"]
+    ),
+    "split_recent_action": (
+        "Split a recent expense by household income or evenly.",
+        ["split the last expense by income", "split transaction 2 evenly"]
+    ),
+    "query_shared_reimbursements": (
+        "Show outstanding shared-expense reimbursements.",
+        ["what does Hannah owe me?", "show shared reimbursements"]
+    ),
+    "mark_shared_reimbursement_received": (
+        "Mark a shared-expense reimbursement as received without logging income.",
+        ["Hannah reimbursed me for PG&E", "mark the grocery reimbursement received"]
     ),
 
     # Query Intents
@@ -222,7 +237,8 @@ INTENT_GROUPS = [
     ("Logging Actions", [
         "log_expense", "log_need_expense", "log_income", "log_rent_paid",
         "log_pge_paid", "log_recology_paid", "log_water_paid",
-        "log_savings", "undo_last_transaction", "delete_recent_action", "query_recent_actions", "update_recent_action", "move_recent_action"
+        "log_savings", "undo_last_transaction", "delete_recent_action", "query_recent_actions", "update_recent_action", "move_recent_action",
+        "split_recent_action", "query_shared_reimbursements", "mark_shared_reimbursement_received"
     ]),
     ("Checking Payments", [
         "query_rent_paid", "query_pge_paid", "query_recology_paid", "query_water_paid",

@@ -7,6 +7,7 @@ from bookiebot.sheets.auth import (
     get_bill_schedule_worksheet,
     get_expense_worksheet,
     get_income_worksheet,
+    get_shared_reimbursements_worksheet,
     get_subscription_schedule_worksheet,
     get_subscriptions_worksheet,
 )
@@ -31,6 +32,9 @@ class SheetsRepository(Protocol):
     def action_log_sheet(self) -> Any:
         ...
 
+    def shared_reimbursements_sheet(self) -> Any:
+        ...
+
 
 class GSpreadSheetsRepository:
     """Production repository that simply delegates to sheets_auth helpers."""
@@ -52,6 +56,9 @@ class GSpreadSheetsRepository:
 
     def action_log_sheet(self):
         return get_action_log_worksheet()
+
+    def shared_reimbursements_sheet(self):
+        return get_shared_reimbursements_worksheet()
 
 
 _REPO: SheetsRepository = GSpreadSheetsRepository()

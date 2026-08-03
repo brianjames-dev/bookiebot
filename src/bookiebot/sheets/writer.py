@@ -18,6 +18,7 @@ from bookiebot.sheets.utils import resolve_query_persons
 from bookiebot.sheets.repo import get_sheets_repo
 from bookiebot.sheets.routing import get_current_discord_user_id
 from bookiebot.sheets.undo import UndoAction, _sheet_user_entered_value, _update_contiguous_row, record_undo_action
+from bookiebot.splits import continue_split_after_log
 
 logger = logging.getLogger(__name__)
 
@@ -359,7 +360,7 @@ async def write_expense_to_sheet(data, message):
             stored["data"]["person"] = selected_card
             values = normalize_expense_data(stored["data"], selected_card)
             row = log_category_row(values, ws, category)
-            record_expense_undo(
+            action_id = record_expense_undo(
                 category,
                 row,
                 values,
@@ -369,6 +370,13 @@ async def write_expense_to_sheet(data, message):
 
             await interaction.followup.send(
                 f"✅ {_logged_expense_label(category)} logged: ${stored['data']['amount']} for {selected_card}"
+            )
+            await continue_split_after_log(
+                data=stored["data"],
+                message=message,
+                actor_key=stored.get("undo_user_key"),
+                action_id=action_id,
+                category=category,
             )
 
         view = CardButtonView(handle_selection)
@@ -394,11 +402,19 @@ async def write_expense_to_sheet(data, message):
         return
 
     row = log_category_row(values_to_write, ws, category)
-    record_expense_undo(category, row, values_to_write, selected_person)
+    actor_key = get_current_discord_user_id() or discord_user_id
+    action_id = record_expense_undo(category, row, values_to_write, selected_person, actor_key)
 
     if message:
         await message.channel.send(
             f"✅ {_logged_expense_label(category)} logged: ${data.get('amount')} for {selected_person}"
+        )
+        await continue_split_after_log(
+            data=data,
+            message=message,
+            actor_key=actor_key,
+            action_id=action_id,
+            category=category,
         )
 
 

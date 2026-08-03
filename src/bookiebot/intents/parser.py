@@ -92,6 +92,24 @@ async def parse_message_llm(user_message: str, *, llm_client: Optional[LLMClient
         }}
       }}
 
+    If the message asks to split a previously logged expense or payment, use:
+    - intent: "split_recent_action"
+    - entities: {{
+        "index": <1 for "last one", or explicit number if provided>,
+        "action_id": "<id if provided>",
+        "match_text": "<store/item/description/category text if provided>",
+        "split_method": <"income" for by-income, "equal" for 50/50/evenly, otherwise omit>
+      }}
+
+    If the message asks what Hannah/Brian owes for shared expenses or asks to list outstanding reimbursements, use:
+    - intent: "query_shared_reimbursements"
+    - entities: {{}}
+
+    If the message says a shared-expense reimbursement was received, use:
+    - intent: "mark_shared_reimbursement_received"
+    - entities: {{ "match_text": "<expense, merchant, or category identifying the reimbursement>" }}
+    Do not classify a reimbursement as income.
+
     If the message asks to show or list recent logged actions, undo history, edit candidates, or the last N actions, use:
     - intent: "query_recent_actions"
     - entities: {{ "n": <integer if provided, otherwise 5>, "explicit_n": <true only if the user asked for a specific number> }}
@@ -103,9 +121,12 @@ async def parse_message_llm(user_message: str, *, llm_client: Optional[LLMClient
     - "log_water_paid" → when paying water, water bill, or Santa Rosa Water
 
     For these intents, extract the amount paid as:
-    - entities: {{ "amount": <float> }}
+    - entities: {{ "amount": <float>, "split_method": <optional "income", "equal", or "prompt"> }}
 
-    Do NOT treat these payments as generic expenses. Do NOT assign them a category. Do NOT include item, location, or store — only use the amount and the correct intent.
+    Do NOT treat these payments as generic expenses. Do NOT assign them a category. Do NOT include item, location, or store. A split instruction may add only `split_method`:
+    - "split by income" → "income"
+    - "split evenly" or "50/50" → "equal"
+    - "split" with no method → "prompt"
 
     Student loan payments are tracked as subscription autopay and do not have log-payment or paid-status intents. If a message asks to log or check a student loan payment, return the fallback intent instead of treating it as a generic expense or another payment type.
 
@@ -137,6 +158,7 @@ async def parse_message_llm(user_message: str, *, llm_client: Optional[LLMClient
         - item: short label for what was bought (e.g., "coffee", "gas", "groceries", or "Starbucks reload")
         - location: where it was bought (e.g., Trader Joe's, Shell, Ulta)
         - category: one of ["grocery", "gas", "food", "shopping"]
+        - split_method: only when explicitly requested: "income", "equal", or "prompt" using the same rules above
 
     ❗ Do NOT leave "item" blank — if unsure, infer based on the location or context (e.g., "coffee" for Starbucks).
 

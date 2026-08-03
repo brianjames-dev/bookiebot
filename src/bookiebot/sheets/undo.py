@@ -20,7 +20,7 @@ from bookiebot.sheets.income import (
     repair_income_summary_formula,
 )
 from bookiebot.sheets.repo import get_sheets_repo
-from bookiebot.sheets.routing import actor_key_aliases, get_user_config
+from bookiebot.sheets.routing import actor_key_aliases, get_user_config, now_pacific
 
 logger = logging.getLogger(__name__)
 
@@ -433,11 +433,13 @@ class LoggedAction:
 class ActionCapabilities:
     can_update: bool
     can_move: bool
+    can_split: bool
     can_delete: bool
     can_undo: bool
     editable_fields: list[str]
     update_reason: str = ""
     move_reason: str = ""
+    split_reason: str = ""
     delete_reason: str = ""
 
 
@@ -790,6 +792,9 @@ def action_title(action: UndoAction) -> str:
         source = action.metadata.get("source_category", "unknown")
         destination = action.metadata.get("destination_category") or category or "unknown"
         return f"Moved Expense: {expense_category_label(source)} -> {expense_category_label(destination)}"
+    if action_type == "split":
+        category_label = expense_category_label(category) if category else "Transaction"
+        return f"Split: {category_label}"
     if action_type == "need_expense":
         return "Need Expense"
     if action_type == "payment":
@@ -1106,7 +1111,7 @@ def _field_columns_for_action(action: UndoAction) -> dict[str, int]:
         columns["amount"] = _positive_metadata_int(action, "income_amount_column") or (4 if dated_row else 3)
         return columns
 
-    if action.metadata.get("type") in {"payment", "savings"}:
+    if action.metadata.get("type") in {"payment", "savings"} or action.metadata.get("source_type") in {"payment", "savings"}:
         return {"amount": action.columns[0]} if action.columns else {}
 
     return {}
@@ -1136,11 +1141,17 @@ def action_capabilities(action: UndoAction) -> ActionCapabilities:
     action_type = action.metadata.get("type")
     editable_fields = editable_fields_for_action(action)
 
-    can_update = bool(editable_fields)
+    is_split = action_type == "split"
+    can_update = bool(editable_fields) and not is_split
     update_reason = "" if can_update else "I do not know how to update fields for that transaction yet."
+    if is_split:
+        update_reason = "Changing a split or correcting its gross amount is planned as a follow-up workflow."
 
     can_move = action.worksheet == "expense" and action_type in {"expense", "update", "move"} and bool(action.metadata.get("category"))
     move_reason = "" if can_move else "I can only move normal expense rows between categories right now."
+
+    can_split = action_type in {"expense", "update", "move", "payment"}
+    split_reason = "" if can_split else "That transaction cannot be split, or already has an active split."
 
     can_delete = (
         action.worksheet == "expense"
@@ -1162,11 +1173,13 @@ def action_capabilities(action: UndoAction) -> ActionCapabilities:
     return ActionCapabilities(
         can_update=can_update,
         can_move=can_move,
+        can_split=can_split,
         can_delete=can_delete,
         can_undo=True,
         editable_fields=editable_fields,
         update_reason=update_reason,
         move_reason=move_reason,
+        split_reason=split_reason,
         delete_reason=delete_reason,
     )
 
@@ -1256,7 +1269,7 @@ def _format_action_data_lines(action: UndoAction, values: list[str] | None = Non
     if _is_income_display_action(action):
         return _income_data_lines(action, values)
 
-    if action.metadata.get("type") in {"expense", "update", "move"}:
+    if action.metadata.get("type") in {"expense", "update", "move", "split"}:
         return _field_data_lines(field_values, action)
 
     if action.metadata.get("type") in {"payment", "savings"}:
@@ -1747,6 +1760,157 @@ def move_recent_action(
     )
 
 
+def split_recent_action(
+    user_key: str | None,
+    *,
+    split_method: str,
+    index: int | None = None,
+    action_id: str | None = None,
+    match_text: str | None = None,
+) -> tuple[bool, str]:
+    """Allocate a gross logged expense and replace its visible amount with the payer's share."""
+    from bookiebot.sheets.collaboration import (
+        allocation_for_source_action,
+        append_allocation,
+        new_allocation,
+        normalize_split_method,
+        payer_owner_from_person,
+        remove_allocation,
+        split_amounts,
+        split_method_label,
+        update_allocation,
+    )
+
+    method = normalize_split_method(split_method)
+    if method is None:
+        return False, "Choose either By income or 50/50 for this split."
+
+    logged = select_recent_action(
+        user_key,
+        index=index,
+        action_id=action_id,
+        match_text=match_text,
+    )
+    if logged is None:
+        return False, format_recent_actions(user_key, 5)
+
+    capabilities = action_capabilities(logged.action)
+    if not capabilities.can_split:
+        return False, capabilities.split_reason
+    if allocation_for_source_action(logged.id, user_key) is not None:
+        return False, "That transaction already has an active split."
+
+    action = logged.action
+    field_columns = _field_columns_for_action(action)
+    amount_column = field_columns.get("amount")
+    if amount_column is None:
+        return False, "I could not find the amount cell for that transaction."
+
+    ws = _worksheet(action.worksheet)
+    gross_value = _sheet_value(ws.cell(action.row, amount_column).value)
+    try:
+        gross_amount = float(gross_value.replace("$", "").replace(",", "").strip())
+    except (TypeError, ValueError):
+        return False, "I could not read a valid amount from that transaction."
+    if gross_amount <= 0:
+        return False, "Only expenses greater than $0 can be split."
+
+    fields = list(field_columns)
+    current_values = [_sheet_value(ws.cell(action.row, field_columns[field]).value) for field in fields]
+    field_values = dict(zip(fields, current_values, strict=False))
+    payer = field_values.get("person") or action.metadata.get("person") or get_user_config(user_key).name
+    payer_owner = payer_owner_from_person(payer, user_key)
+    try:
+        payer_share, partner_share = split_amounts(gross_amount, method, payer_owner)
+    except ValueError as exc:
+        return False, str(exc)
+
+    after_values = list(current_values)
+    if "amount" in fields:
+        after_values[fields.index("amount")] = f"{payer_share:.2f}"
+
+    allocation = new_allocation(
+        actor_key=user_key,
+        payer=payer,
+        source_action_id=logged.id,
+        source_worksheet=action.worksheet,
+        source_category=action.metadata.get("category", ""),
+        source_row=action.row,
+        expense_date=field_values.get("date", now_pacific().strftime("%-m/%-d/%Y")),
+        item=field_values.get("item", action.metadata.get("category", "")),
+        location=field_values.get("location", ""),
+        gross_amount=gross_amount,
+        split_method=method,
+        payer_share=payer_share,
+        partner_share=partner_share,
+    )
+
+    try:
+        _update_contiguous_row(
+            ws,
+            action.row,
+            [amount_column],
+            [_sheet_user_entered_value("amount", payer_share)],
+        )
+        append_allocation(allocation)
+    except Exception as exc:
+        logger.exception("Failed to persist shared expense allocation", extra={"exception": str(exc)})
+        try:
+            _update_contiguous_row(ws, action.row, [amount_column], [gross_value])
+        except Exception:
+            logger.exception("Failed to roll back expense amount after split persistence failure")
+        return False, "Something went wrong while saving that split. The original amount was left in place."
+
+    split_action_id = record_undo_action(
+        user_key,
+        UndoAction(
+            worksheet=action.worksheet,
+            kind="restore_cells",
+            row=action.row,
+            columns=[amount_column],
+            previous_values=[gross_value],
+            new_values=after_values,
+            metadata={
+                **action.metadata,
+                "type": "split",
+                "source_type": action.metadata.get("type", ""),
+                "source_action_id": logged.id,
+                "allocation_id": allocation.allocation_id,
+                "gross_amount": f"{gross_amount:.2f}",
+                "payer_share": f"{payer_share:.2f}",
+                "partner_share": f"{partner_share:.2f}",
+                "split_method": method,
+                "display_fields": json.dumps(fields),
+            },
+            description=f"split {action.description}",
+        ),
+    )
+    if split_action_id is None:
+        try:
+            remove_allocation(allocation.allocation_id)
+            _update_contiguous_row(ws, action.row, [amount_column], [gross_value])
+        except Exception:
+            logger.exception("Failed to roll back split after action-log failure")
+        return False, "Something went wrong while recording the split. The original amount was restored."
+
+    try:
+        update_allocation(allocation.allocation_id, split_action_id=split_action_id)
+    except Exception:
+        logger.exception("Failed to attach split action id to shared reimbursement")
+
+    payer_name = "Hannah" if payer_owner == "hannah" else "Brian"
+    partner_name = "Brian" if payer_owner == "hannah" else "Hannah"
+    ratio_detail = "64.73% / 35.27%" if method == "income" else "50% / 50%"
+    if payer_owner == "hannah" and method == "income":
+        ratio_detail = "35.27% / 64.73%"
+    return (
+        True,
+        f"Split applied ({split_method_label(method)}, {ratio_detail}). "
+        f"Original: ${gross_amount:.2f}. {payer_name}'s expense: ${payer_share:.2f}. "
+        f"{partner_name} owes: ${partner_share:.2f}.",
+    )
+
+
 def update_recent_action(
     user_key: str | None,
     *,
@@ -1965,7 +2129,22 @@ def _apply_undo_action(action: UndoAction, log_data: _ActionLogData | None = Non
     elif action.kind == "clear_cells":
         _update_contiguous_row(ws, action.row, action.columns, [""] * len(action.columns))
     elif action.kind == "restore_cells":
+        current_values = [_sheet_value(ws.cell(action.row, col).value) for col in action.columns]
         _update_contiguous_row(ws, action.row, action.columns, action.previous_values)
+        if action.metadata.get("type") == "split":
+            from bookiebot.sheets.collaboration import allocation_by_id, void_allocation
+
+            allocation_id = action.metadata.get("allocation_id", "")
+            allocation = allocation_by_id(allocation_id) if allocation_id else None
+            if allocation is not None and allocation.status == "reimbursed":
+                _update_contiguous_row(ws, action.row, action.columns, current_values)
+                return (
+                    False,
+                    "That split has already been reimbursed. Undo-after-payment needs the planned settlement confirmation workflow.",
+                )
+            if allocation_id and void_allocation(allocation_id) is None:
+                _update_contiguous_row(ws, action.row, action.columns, current_values)
+                return False, "I could not safely cancel that split, so its expense amount was left unchanged."
     else:
         return False, "Unknown undo action."
     return True, f"Undid: {action.description}"
@@ -2177,11 +2356,12 @@ def undo_logged_action(user_key: str | None, action_id: str) -> tuple[bool, str]
     if source_action_id and logged.action.kind == "move_expense":
         _mark_active(source_action_id, log_data)
     _mark_undone(logged.id, log_data)
-    _sync_reconciliation_after_action_mutation(
-        key,
-        _sync_action_ids_for_undo_action(logged.action, logged.id),
-        reason="undone",
-    )
+    if logged.action.metadata.get("type") != "split":
+        _sync_reconciliation_after_action_mutation(
+            key,
+            _sync_action_ids_for_undo_action(logged.action, logged.id),
+            reason="undone",
+        )
     return True, detail
 
 
@@ -2228,11 +2408,12 @@ def undo_last_action(user_key: str | None) -> tuple[bool, str]:
         if source_action_id and action.kind == "move_expense":
             _mark_active(source_action_id, log_data)
         _mark_undone(logged.id, log_data)
-        _sync_reconciliation_after_action_mutation(
-            key,
-            _sync_action_ids_for_undo_action(action, logged.id),
-            reason="undone",
-        )
+        if action.metadata.get("type") != "split":
+            _sync_reconciliation_after_action_mutation(
+                key,
+                _sync_action_ids_for_undo_action(action, logged.id),
+                reason="undone",
+            )
     if _GLOBAL_LAST_ACTION is action:
         _GLOBAL_LAST_ACTION = None
     return True, detail

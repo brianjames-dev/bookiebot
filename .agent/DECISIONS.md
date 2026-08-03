@@ -326,6 +326,12 @@ Decision: Supersede the 2026-07-07 snapshot-first rule for the selected current 
 
 Rationale: Current-month reports are interactive operational views whose Projected values depend on newly logged income and corrected projection logic. Serving the embedded snapshot indefinitely can make a correct backend fix invisible and leave the Projected toggle at `$0.00`. Live-rendering only the open month keeps the page current while preserving resilient fallback behavior and stable historical snapshots.
 
+## 2026-08-03 - Separate Gross Clearing Amount From Personal Split Responsibility
+
+Decision: A shared split keeps the original gross amount in the immutable source action lineage for bank reconciliation and writes the payer's calculated share to the visible expense row used by Budget and Expense Breakdown. A separate visible `Shared Reimbursements` ledger links the source action and records gross, split method, payer share, partner share, and settlement state. Reimbursement receipts settle that ledger without creating income or changing the already-netted expense. Undo may restore gross and void an outstanding allocation; undoing a paid allocation requires a future explicit settlement-handling workflow.
+
+Rationale: One number cannot simultaneously represent the amount that cleared the bank and the amount ultimately borne by the payer. Separating clearing, responsibility, and settlement preserves reconciliation/audit history while making the sheet and report accurately reflect personal spending. Blocking implicit paid-split reversal prevents a completed reimbursement from being erased without an explicit refund or correction decision.
+
 ## Pending Decisions
 
 - Where should durable system events live: banking database only, Google Sheets only, or dual-write during transition?

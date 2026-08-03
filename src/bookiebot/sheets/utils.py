@@ -1456,7 +1456,7 @@ async def list_subscriptions():
     return needs, round(needs_total, 2), wants, round(wants_total, 2)
 
 
-def log_payment(category_label, amount):
+def log_payment(category_label, amount, *, return_action_id: bool = False):
     """
     Finds the row where column B matches category_label (case-insensitive),
     and writes the amount to column C of that row.
@@ -1489,7 +1489,7 @@ def log_payment(category_label, amount):
                         "user_id": discord_user_id,
                     },
                 )
-                return False
+                return (False, None) if return_action_id else False
 
             logger.info(
                 "Payment logged",
@@ -1501,7 +1501,7 @@ def log_payment(category_label, amount):
                     "user_id": discord_user_id,
                 },
             )
-            record_undo_action(
+            action_id = record_undo_action(
                 discord_user_id,
                 UndoAction(
                     worksheet="income",
@@ -1514,7 +1514,7 @@ def log_payment(category_label, amount):
                     description=f"{category_label} payment ${amount}",
                 ),
             )
-            return True
+            return (True, action_id) if return_action_id else True
 
     logger.error(
         "Could not find payment category in income sheet",
@@ -1524,23 +1524,23 @@ def log_payment(category_label, amount):
             "user_id": discord_user_id,
         },
     )
-    return False
+    return (False, None) if return_action_id else False
 
 
-def log_rent_paid(amount):
-    return log_payment("rent", amount)
+def log_rent_paid(amount, *, return_action_id: bool = False):
+    return log_payment("rent", amount, return_action_id=return_action_id)
 
 
-def log_pge_paid(amount):
-    return log_payment("pg&e", amount)
+def log_pge_paid(amount, *, return_action_id: bool = False):
+    return log_payment("pg&e", amount, return_action_id=return_action_id)
 
 
-def log_recology_paid(amount):
-    return log_payment("recology", amount)
+def log_recology_paid(amount, *, return_action_id: bool = False):
+    return log_payment("recology", amount, return_action_id=return_action_id)
 
 
-def log_water_paid(amount):
-    return log_payment("water", amount)
+def log_water_paid(amount, *, return_action_id: bool = False):
+    return log_payment("water", amount, return_action_id=return_action_id)
 
 
 SAVINGS_CONTRIBUTION_LABEL = "Enter Monthly Savings Contribution"

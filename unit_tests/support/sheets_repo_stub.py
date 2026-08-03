@@ -123,6 +123,7 @@ class SheetsRepoStub:
         subscription_schedule_rows: Sequence[Sequence[str]] | None = None,
         bill_schedule_rows: Sequence[Sequence[str]] | None = None,
         action_log_rows: Sequence[Sequence[str]] | None = None,
+        shared_reimbursements_rows: Sequence[Sequence[str]] | None = None,
     ):
         self.expense = InMemoryWorksheet(expense_rows, title="Expense")
         self.income = InMemoryWorksheet(income_rows, title="Income")
@@ -136,6 +137,10 @@ class SheetsRepoStub:
             title="_BookieBot Bill Schedule",
         )
         self.action_log = InMemoryWorksheet(action_log_rows, title="_BookieBot Action Log")
+        self.shared_reimbursements = InMemoryWorksheet(
+            shared_reimbursements_rows,
+            title="Shared Reimbursements",
+        )
 
     @contextlib.contextmanager
     def patched(self):
@@ -166,3 +171,6 @@ class SheetsRepoStub:
 
     def action_log_sheet(self):
         return self.action_log
+
+    def shared_reimbursements_sheet(self):
+        return self.shared_reimbursements

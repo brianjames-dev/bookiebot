@@ -139,6 +139,65 @@ async def test_log_expense_calls_writer(monkeypatch, message):
 
 
 @pytest.mark.asyncio
+async def test_grocery_log_automatically_offers_approved_split_buttons(monkeypatch):
+    import bookiebot.sheets.writer as writer
+
+    brian_message = SimpleNamespace(
+        content="spent $200 on groceries at Safeway",
+        author=SimpleNamespace(name="deebers", id=676638528590970917, mention="<@676638528590970917>"),
+        channel=DummyChannel(),
+        mentions=[],
+    )
+    monkeypatch.setattr(writer, "resolve_query_persons", lambda *_args, **_kwargs: ["Brian (BofA)"])
+    repo = SheetsRepoStub(expense_rows=[[], []])
+
+    with repo.patched():
+        await ih.handle_intent(
+            "log_expense",
+            {"type": "expense", "category": "grocery", "amount": 200, "item": "groceries", "location": "Safeway"},
+            brian_message,
+        )
+
+        prompt, kwargs = brian_message.channel.sent[-1]
+        assert prompt == "How do you want to split this expense?"
+        assert [child.label for child in kwargs["view"].children] == ["By income", "50/50", "No split"]
+        assert repo.expense.cell(3, 2).value == "$200.00"
+        assert repo.shared_reimbursements.get_all_values() == []
+
+
+@pytest.mark.asyncio
+async def test_explicit_income_split_nets_grocery_immediately(monkeypatch):
+    import bookiebot.sheets.writer as writer
+
+    brian_message = SimpleNamespace(
+        content="spent $200 on groceries at Safeway split by income",
+        author=SimpleNamespace(name="deebers", id=676638528590970917, mention="<@676638528590970917>"),
+        channel=DummyChannel(),
+        mentions=[],
+    )
+    monkeypatch.setattr(writer, "resolve_query_persons", lambda *_args, **_kwargs: ["Brian (BofA)"])
+    repo = SheetsRepoStub(expense_rows=[[], []])
+
+    with repo.patched():
+        await ih.handle_intent(
+            "log_expense",
+            {
+                "type": "expense",
+                "category": "grocery",
+                "amount": 200,
+                "item": "groceries",
+                "location": "Safeway",
+                "split_method": "income",
+            },
+            brian_message,
+        )
+
+        assert repo.expense.cell(3, 2).value == "$129.46"
+        assert "Hannah owes: $70.54" in (brian_message.channel.sent[-1][0] or "")
+        assert repo.shared_reimbursements.get_all_values()[1][15] == "200.00"
+
+
+@pytest.mark.asyncio
 async def test_log_income_calls_writer(monkeypatch, message):
     writer = AsyncMock()
     monkeypatch.setattr(ih, "write_to_sheet", writer)
@@ -188,7 +247,10 @@ async def test_sheet_routing_errors_are_sent_to_user(monkeypatch, message):
     ],
 )
 async def test_logging_helpers_success(monkeypatch, message, intent, func_name, amount, expected):
-    monkeypatch.setattr(ih.su, func_name, lambda amt: True)
+    if intent == "log_savings":
+        monkeypatch.setattr(ih.su, func_name, lambda amt: True)
+    else:
+        monkeypatch.setattr(ih.su, func_name, lambda amt, **_kwargs: (True, "payment-action"))
 
     await ih.handle_intent(intent, {"amount": amount}, message)
 
@@ -615,7 +677,7 @@ async def test_recent_action_capabilities_control_available_decision_buttons(mon
 
     view = RecentActionDecisionView(lambda *_args: None, capabilities)
     labels = [getattr(child, "label", "") for child in getattr(view, "children", [])]
-    assert labels == ["Update", "Move", "Delete", "Cancel"]
+    assert labels == ["Update", "Move", "Split", "Delete", "Cancel"]
 
 
 @pytest.mark.asyncio
@@ -690,7 +752,12 @@ async def test_recent_action_capabilities_make_unsupported_operations_explicit()
         assert capabilities.can_move is False
         assert capabilities.can_delete is False
         labels = [getattr(child, "label", "") for child in getattr(RecentActionDecisionView(lambda *_args: None, capabilities), "children", [])]
-        assert labels == ["Update", "Cancel"]
+        if action is payment:
+            assert capabilities.can_split is True
+            assert labels == ["Update", "Split", "Cancel"]
+        else:
+            assert capabilities.can_split is False
+            assert labels == ["Update", "Cancel"]
         assert "Use undo" in capabilities.delete_reason
 
 
@@ -1901,10 +1968,12 @@ async def test_move_recent_action_lists_candidates_before_category(monkeypatch, 
 
     assert not any("Use the controls below, or type the number of the transaction you want to move" in (msg or "") for msg, _ in message.channel.sent)
     assert any(kwargs.get("view") is not None for _msg, kwargs in message.channel.sent)
-    view = next(kwargs.get("view") for _msg, kwargs in message.channel.sent if kwargs.get("view") is not None)
-    labels = [getattr(child, "label", "") for child in getattr(view, "children", [])]
-    assert "Confirm Move" in labels
-    assert "Cancel" in labels
+    view_labels = [
+        [getattr(child, "label", "") for child in getattr(kwargs.get("view"), "children", [])]
+        for _msg, kwargs in message.channel.sent
+        if kwargs.get("view") is not None
+    ]
+    assert any("Confirm Move" in labels and "Cancel" in labels for labels in view_labels)
 
 
 def test_expense_undo_can_be_recorded_after_context_exits():

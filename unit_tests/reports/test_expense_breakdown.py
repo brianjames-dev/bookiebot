@@ -19,6 +19,7 @@ from bookiebot.reports.expense_breakdown import (
 from bookiebot.reports.web import _static_report_path_for_payload, _static_report_path_for_request, _verify_expense_report_token
 from bookiebot.sheets import routing
 from bookiebot.sheets.bills import BILL_SCHEDULE_HEADERS
+from bookiebot.sheets.collaboration import SHARED_REIMBURSEMENT_HEADERS
 from unit_tests.support.sheets_repo_stub import InMemoryWorksheet
 
 
@@ -246,7 +247,6 @@ def test_build_expense_breakdown_report_aggregates_shared_and_personal_data():
         ("Paycheck", 3000.0),
         ("Side Gig", 500.0),
     ]
-
     html = render_expense_breakdown_html(report)
     assert "Expense Breakdown" in html
     assert "Budget Charts" not in html
@@ -482,6 +482,77 @@ def test_build_expense_breakdown_report_aggregates_shared_and_personal_data():
         and entry["date"] == ""
         for entry in payload["dailyEntries"]
     )
+
+
+def test_report_uses_personal_share_for_totals_and_exposes_gross_reimbursement_audit_data():
+    shared_rows = [
+        ["hdr"] * 28,
+        ["hdr"] * 28,
+        _row({"A": "08/03/2026", "B": "129.46", "C": "Safeway", "D": "Brian (BofA)"}),
+    ]
+    reimbursement_row = [
+        "alloc-1",
+        "2026-08-03T10:00:00-07:00",
+        "2026-08-03T10:00:00-07:00",
+        routing.DEFAULT_BRIAN_DISCORD_USER_IDS[0],
+        "brian",
+        "Brian (BofA)",
+        "Hannah",
+        "expense-1",
+        "split-1",
+        "expense",
+        "grocery",
+        "3",
+        "8/3/2026",
+        "Groceries",
+        "Safeway",
+        "200.00",
+        "income",
+        "129.46",
+        "70.54",
+        "outstanding",
+        "0.00",
+        "",
+    ]
+    report = build_expense_breakdown_report(
+        actor_key=routing.DEFAULT_BRIAN_DISCORD_USER_IDS[0],
+        owner_name="Brian",
+        persons=["Brian (BofA)", "Brian (AL)"],
+        month=BudgetMonth(2026, 8),
+        worksheets=ReportWorksheets(
+            shared_expenses=InMemoryWorksheet(shared_rows),
+            personal_budget=InMemoryWorksheet([]),
+            shared_reimbursements=InMemoryWorksheet([SHARED_REIMBURSEMENT_HEADERS, reimbursement_row]),
+        ),
+    )
+
+    assert report.shared_total == 129.46
+    assert report.breakdown["grocery"]["amount"] == 129.46
+    assert report.shared_reimbursements[0].gross_amount == 200
+
+    payload_match = re.search(
+        r'<script id="bookiebot-expense-report-data" type="application/json">(.*?)</script>',
+        render_expense_breakdown_html(report),
+    )
+    assert payload_match is not None
+    payload = json.loads(payload_match.group(1))
+    assert payload["sharedReimbursements"] == [
+        {
+            "id": "alloc-1",
+            "date": "8/3/2026",
+            "item": "Groceries",
+            "location": "Safeway",
+            "payer": "Brian (BofA)",
+            "partner": "Hannah",
+            "grossAmount": 200.0,
+            "personalShare": 129.46,
+            "partnerShare": 70.54,
+            "receivedAmount": 0.0,
+            "outstandingAmount": 70.54,
+            "splitMethod": "By income",
+            "status": "outstanding",
+        }
+    ]
 
 
 def test_income_entries_parse_shifted_dated_header_layout():

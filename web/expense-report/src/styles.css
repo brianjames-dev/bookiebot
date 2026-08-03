@@ -1790,6 +1790,48 @@ summary {
   -webkit-overflow-scrolling: touch;
 }
 
+.bb-reimbursement-content {
+  display: grid;
+  gap: 16px;
+}
+
+.bb-reimbursement-summary {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.bb-reimbursement-summary > div {
+  display: grid;
+  gap: 4px;
+  padding: 12px;
+  border: 1px solid hsl(var(--border));
+  border-radius: var(--radius);
+  background: hsl(var(--background));
+}
+
+.bb-reimbursement-summary span,
+.bb-reimbursement-table td:first-child span {
+  color: hsl(var(--muted-foreground));
+  font-size: 12px;
+}
+
+.bb-reimbursement-summary strong {
+  font-size: 18px;
+  font-variant-numeric: tabular-nums;
+}
+
+.bb-reimbursement-table td:first-child {
+  display: grid;
+  min-width: 190px;
+  gap: 3px;
+}
+
+.bb-reimbursement-table td:not(:first-child) {
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+
 table {
   width: 100%;
   border-collapse: collapse;
@@ -2004,6 +2046,9 @@ tr:last-child td {
 }
 
 @media (max-width: 640px) {
+  .bb-reimbursement-summary {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
   .bb-chart-carousel-button {
     display: none;
   }

@@ -35,6 +35,14 @@ from bookiebot.sheets.routing import (
     sheet_user_context,
 )
 from bookiebot.sheets.config import expense_category_label
+from bookiebot.sheets.collaboration import (
+    allocation_label,
+    mark_reimbursed,
+    matching_outstanding_allocations,
+    normalize_split_method,
+)
+from bookiebot.splits import split_method_view
+from bookiebot.splits import continue_split_after_log
 from bookiebot.sheets.undo import (
     clear_pending_action_selection,
     delete_recent_action,
@@ -53,6 +61,8 @@ from bookiebot.sheets.undo import (
     set_pending_move_selection,
     set_pending_update_field,
     set_pending_update_selection,
+    split_recent_action,
+    record_system_event,
     undo_last_action,
     update_recent_action,
 )
@@ -101,6 +111,9 @@ INTENT_HANDLERS: dict[str, IntentHandler] = {
     "query_recent_actions":                 lambda e, m: query_recent_actions_handler(e, m),
     "update_recent_action":                 lambda e, m: update_recent_action_handler(e, m),
     "move_recent_action":                   lambda e, m: move_recent_action_handler(e, m),
+    "split_recent_action":                  lambda e, m: split_recent_action_handler(e, m),
+    "query_shared_reimbursements":          lambda e, m: query_shared_reimbursements_handler(e, m),
+    "mark_shared_reimbursement_received":   lambda e, m: mark_shared_reimbursement_received_handler(e, m),
 
     # Query handlers
     "query_burn_rate":                      lambda e, m: query_burn_rate_handler(m),
@@ -250,6 +263,112 @@ async def query_recent_actions_handler(entities: IntentEntities, message: Any) -
         _with_component_spacer(output, view),
         view=view,
         public_ack="I sent your recent transactions list to your DMs.",
+    )
+
+
+async def split_recent_action_handler(entities: IntentEntities, message: Any) -> None:
+    actor_key = _message_actor_key(message)
+    raw_index = entities.get("index")
+    try:
+        index = int(str(raw_index)) if raw_index is not None else None
+    except (TypeError, ValueError):
+        index = None
+    action_id = entities.get("action_id")
+    match_text = entities.get("match_text") or entities.get("description") or entities.get("location") or entities.get("item")
+    method = normalize_split_method(entities.get("split_method"))
+    logged = select_recent_action(
+        actor_key,
+        index=index,
+        action_id=action_id,
+        match_text=str(match_text) if match_text else None,
+    )
+    if logged is None and match_text:
+        matches = matching_recent_actions(actor_key, str(match_text), 10)
+        if len(matches) == 1:
+            logged = matches[0]
+        elif matches:
+            detail = format_recent_action_list(matches)
+            await _send_recent_private_message(
+                message,
+                _with_component_spacer(detail, True),
+                view=_recent_action_select_view(actor_key, matches),
+            )
+            return
+    if logged is None:
+        await query_recent_actions_handler({"n": 5}, message)
+        return
+    capabilities = action_capabilities(logged.action)
+    if not capabilities.can_split:
+        await _send_action_result(message, False, capabilities.split_reason)
+        return
+    if method is None:
+        await _send_recent_private_message(
+            message,
+            _with_component_spacer("How do you want to split this expense?", True),
+            view=split_method_view(actor_key, logged.id),
+        )
+        return
+    success, detail = split_recent_action(
+        actor_key,
+        split_method=method,
+        action_id=logged.id,
+    )
+    await _send_action_result(message, success, detail)
+
+
+async def query_shared_reimbursements_handler(_entities: IntentEntities, message: Any) -> None:
+    actor_key = _message_actor_key(message)
+    allocations = matching_outstanding_allocations(actor_key)
+    if not allocations:
+        await message.channel.send("No shared-expense reimbursements are currently outstanding.")
+        return
+    total = round(sum(allocation.outstanding_amount for allocation in allocations), 2)
+    lines = [f"{allocations[0].partner} owes ${total:.2f} across {len(allocations)} shared expense(s):"]
+    lines.extend(f"- {allocation_label(allocation)}" for allocation in allocations)
+    await message.channel.send("\n".join(lines))
+
+
+async def mark_shared_reimbursement_received_handler(entities: IntentEntities, message: Any) -> None:
+    actor_key = _message_actor_key(message)
+    match_text = str(
+        entities.get("match_text")
+        or entities.get("description")
+        or entities.get("location")
+        or entities.get("item")
+        or ""
+    ).strip()
+    allocations = matching_outstanding_allocations(actor_key, match_text)
+    if not allocations:
+        await message.channel.send(
+            f"I could not find an outstanding reimbursement matching '{match_text}'."
+            if match_text
+            else "There are no outstanding reimbursements to mark received."
+        )
+        return
+    if len(allocations) > 1:
+        lines = ["I found multiple outstanding reimbursements. Name the expense more specifically:"]
+        lines.extend(f"- {allocation_label(allocation)}" for allocation in allocations)
+        await message.channel.send("\n".join(lines))
+        return
+    allocation = allocations[0]
+    updated = mark_reimbursed(allocation.allocation_id)
+    if updated is None:
+        await message.channel.send("❌ I could not mark that reimbursement received.")
+        return
+    record_system_event(
+        actor_key,
+        "shared_reimbursement_received",
+        {
+            "allocation_id": updated.allocation_id,
+            "source_action_id": updated.source_action_id,
+            "gross_amount": f"{updated.gross_amount:.2f}",
+            "received_amount": f"{updated.received_amount:.2f}",
+        },
+        f"received shared reimbursement for {updated.item or updated.source_category}",
+    )
+    await message.channel.send(
+        f"✅ Marked ${updated.received_amount:.2f} received from {updated.partner}. "
+        f"The expense remains ${updated.payer_share:.2f}; no income was logged."
     )
 
 
@@ -546,6 +665,16 @@ def _recent_action_select_view(actor_key: str | None, actions: list[Any], *, des
                     ephemeral=True,
                 )
                 return
+            if decision == "split":
+                if capabilities and not capabilities.can_split:
+                    await decision_interaction.response.send_message(capabilities.split_reason, ephemeral=True)
+                    return
+                await decision_interaction.response.send_message(
+                    _with_component_spacer("How do you want to split this expense?", True),
+                    view=split_method_view(actor_key, action_id),
+                    ephemeral=True,
+                )
+                return
             clear_pending_action_selection(actor_key)
             await decision_interaction.response.send_message("Canceled.", ephemeral=True)
 
@@ -559,8 +688,6 @@ def _recent_action_select_view(actor_key: str | None, actions: list[Any], *, des
         )
 
     return RecentActionSelectView(actions, handle_select)
-
-
 def _delete_candidates_view(actor_key: str | None, actions: list[Any]):
     if len(actions) == 1:
         return _delete_confirm_view(actor_key, actions[0].id)
@@ -1479,9 +1606,16 @@ async def log_rent_paid_handler(entities, message):
         await message.channel.send("❌ Please specify the amount you paid for rent.")
         return
 
-    success = su.log_rent_paid(amount)
+    success, action_id = cast(tuple[bool, str | None], su.log_rent_paid(amount, return_action_id=True))
     if success:
         await message.channel.send(f"✅ Logged rent as paid for {_budget_profile_name(message)}: ${amount:.2f}")
+        await continue_split_after_log(
+            data=entities,
+            message=message,
+            actor_key=_message_actor_key(message),
+            action_id=action_id,
+            payment_label="rent",
+        )
     else:
         await message.channel.send("❌ Could not confirm the Rent payment was written.")
 
@@ -1492,9 +1626,16 @@ async def log_pge_paid_handler(entities, message):
         await message.channel.send("❌ Please specify the amount you paid for PG&E.")
         return
 
-    success = su.log_pge_paid(amount)
+    success, action_id = cast(tuple[bool, str | None], su.log_pge_paid(amount, return_action_id=True))
     if success:
         await message.channel.send(f"✅ Logged PG&E as paid for {_budget_profile_name(message)}: ${amount:.2f}")
+        await continue_split_after_log(
+            data=entities,
+            message=message,
+            actor_key=_message_actor_key(message),
+            action_id=action_id,
+            payment_label="pg&e",
+        )
     else:
         await message.channel.send("❌ Could not confirm the PG&E payment was written.")
 
@@ -1505,9 +1646,16 @@ async def log_recology_paid_handler(entities, message):
         await message.channel.send("❌ Please specify the amount you paid for Recology.")
         return
 
-    success = su.log_recology_paid(amount)
+    success, action_id = cast(tuple[bool, str | None], su.log_recology_paid(amount, return_action_id=True))
     if success:
         await message.channel.send(f"✅ Logged Recology as paid for {_budget_profile_name(message)}: ${amount:.2f}")
+        await continue_split_after_log(
+            data=entities,
+            message=message,
+            actor_key=_message_actor_key(message),
+            action_id=action_id,
+            payment_label="recology",
+        )
     else:
         await message.channel.send("❌ Could not confirm the Recology payment was written.")
 
@@ -1518,9 +1666,16 @@ async def log_water_paid_handler(entities, message):
         await message.channel.send("❌ Please specify the amount you paid for water.")
         return
 
-    success = su.log_water_paid(amount)
+    success, action_id = cast(tuple[bool, str | None], su.log_water_paid(amount, return_action_id=True))
     if success:
         await message.channel.send(f"✅ Logged water as paid for {_budget_profile_name(message)}: ${amount:.2f}")
+        await continue_split_after_log(
+            data=entities,
+            message=message,
+            actor_key=_message_actor_key(message),
+            action_id=action_id,
+            payment_label="water",
+        )
     else:
         await message.channel.send("❌ Could not confirm the water payment was written.")
 

@@ -1,27 +1,39 @@
 # Agent Status
 
-Last updated: 2026-08-02
+Last updated: 2026-08-03
 
 ## Active Focus
 
-New-month expense reports now carry the immediately prior month's last dated paycheck into Projected mode without counting it as current income, current-month signed links rebuild live instead of reopening stale snapshots, and Daily Spending keeps its outlier compression without showing a compression-threshold pill. The next step is deployment confirmation alongside the subscription, monthly savings, recent-action, and reconciliation updates.
+Shared-expense splitting now separates the bank-clearing gross amount from the payer's personal budget responsibility, tracks the partner reimbursement independently, and exposes Split throughout the recent-transaction workflow. The next step is production verification, followed by the planned split-lifecycle refinements recorded in the finance-operations workstream.
 
 ## On Deck
 
-1. Deploy and manually verify prior-month paycheck carry-forward in Projected mode in checklist item 73.
-2. Deploy and manually verify Wants subscriptions in Burn Rate in checklist item 72.
-3. Deploy and manually verify selected-month subscription scoping in checklist item 71.
-4. Deploy and manually verify Daily Spending bill coverage and outlier scaling in checklist item 70.
-5. Deploy and manually verify the monthly savings workflow and corrected Saved-card targets in checklist items 60-61 and 69.
-6. Deploy and manually verify the expense-report corrections in checklist item 67.
-7. Deploy and manually verify typed `recent` opens the short-lived launcher and keeps the resulting DM session ephemeral.
-8. Deploy and manually verify `View Inbox` and `Reconcile Now` show `BookieBot is typing...` without a temporary thinking message.
-9. Manually verify shared Needs logging plus update/move/delete/undo behavior in Discord and Google Sheets.
-10. Manually verify recent transactions and reconciliation after the latest reliability fixes.
-11. Consider a richer Discord button flow for grouped amount adjustments if the current UX feels too manual.
-12. Harden recent-action pending state across restarts/deploys, since selections currently live only in process memory.
-13. Improve targeted recent-action search so commands can find older matches, not only the latest 10 recent actions.
-14. Explore clarifying questions before logging when BookieBot is uncertain instead of guessing or silently failing.
+1. Deploy and manually verify the shared-expense split and reimbursement workflow in checklist item 74.
+2. Implement the deferred split lifecycle: change/remove a split, correct gross after splitting, partial reimbursement, explicit paid-split undo, and split-aware update/move/delete/undo.
+3. Deploy and manually verify prior-month paycheck carry-forward in Projected mode in checklist item 73.
+4. Deploy and manually verify Wants subscriptions in Burn Rate in checklist item 72.
+5. Deploy and manually verify selected-month subscription scoping in checklist item 71.
+6. Deploy and manually verify Daily Spending bill coverage and outlier scaling in checklist item 70.
+7. Deploy and manually verify the monthly savings workflow and corrected Saved-card targets in checklist items 60-61 and 69.
+8. Deploy and manually verify the expense-report corrections in checklist item 67.
+9. Deploy and manually verify typed `recent` opens the short-lived launcher and keeps the resulting DM session ephemeral.
+10. Deploy and manually verify `View Inbox` and `Reconcile Now` show `BookieBot is typing...` without a temporary thinking message.
+11. Manually verify shared Needs logging plus update/move/delete/undo behavior in Discord and Google Sheets.
+12. Manually verify recent transactions and reconciliation after the latest reliability fixes.
+13. Consider a richer Discord button flow for grouped amount adjustments if the current UX feels too manual.
+14. Harden recent-action pending state across restarts/deploys, since selections currently live only in process memory.
+15. Improve targeted recent-action search so commands can find older matches, not only the latest 10 recent actions.
+16. Explore clarifying questions before logging when BookieBot is uncertain instead of guessing or silently failing.
+
+## Completed 2026-08-03
+
+- Added income-weighted and 50/50 shared-expense splits. Brian's `$156,000` and Hannah's `$85,000` incomes produce exact `64.73%` / `35.27%` responsibility with penny-safe rounding.
+- Preserved the immutable gross amount in action lineage for bank reconciliation while changing the visible Budget/expense amount to the payer's personal share. A visible `Shared Reimbursements` worksheet records gross, personal share, partner share, source action, method, and settlement state.
+- Added the exact `How do you want to split this expense?` prompt with `By income`, `50/50`, and grey `No split` controls. Grocery, Rent, PG&E, Water, Recology, and Gameday expenses prompt automatically; internet does not. Explicit `split`, `split by income`, and `split evenly` language is supported.
+- Added Split to applicable recent-transaction expense and payment workflows, plus reimbursement balance queries and received-state handling. Marking reimbursement received does not change the personal expense or create income.
+- Added a responsive Shared Reimbursements report card with gross, personal, outstanding, and received totals plus itemized reimbursement state. Desktop and `390x844` browser checks passed without browser warnings or errors.
+- Recorded the deferred change/remove/correct/partial/paid-undo and split-aware mutation work as the next collaboration slice rather than silently extending the initial lifecycle.
+- Verification: focused split/handler/router/report suite `206 passed`; focused reconciliation suite `94 passed`; full suite `462 passed`; Pyright reported zero errors; frontend typecheck/build passed; responsive browser verification passed; `git diff --check` passed. Manual verification is checklist item 74 below.
 
 ## Completed 2026-08-02
 
@@ -529,6 +541,12 @@ Use a test row or low-risk real row in Discord:
     - Expected: all three Spent totals are `$1,556.33`. Burn Rate shows Limit `$3,250.71`, Left `$1,694.38`, Allowed/day `$104.86`, and Actual/day `$50.20`; its explanation names Wants subscriptions, and the line includes Slate Digital, YouTube Premium, iCloud Storage, and Discovery+ on their actual pull days.
 73. After deployment, open Brian's August expense report before logging an August paycheck and toggle Projected; repeat after the first real August paycheck is logged.
     - Expected: Current keeps August Income at `$0.00` before the first paycheck and does not show July 31 as an August event. Projected shows `$6,274.98` from two `$3,137.49` paychecks on August 14 and 28, and all income-dependent cards/charts follow that projected total. After an August `xAI` paycheck is logged, its actual amount/date supersede the July reference and the next projection lands exactly fourteen days later.
+74. After deployment, exercise shared splitting with low-risk test transactions and undo or remove the rows afterward if needed.
+    - Log a `$200.00` Grocery expense and choose `No split`. Expected: the full `$200.00` remains logged and no reimbursement row is created.
+    - Log another `$200.00` Grocery expense and choose `By income`. Expected: the visible expense and report spending use Brian's `$129.46` personal share; `Shared Reimbursements` preserves `$200.00` gross and `$70.54` owed by Hannah; bank reconciliation still matches the `$200.00` clearing amount.
+    - Log or select Rent, PG&E, Water, Recology, Grocery, and a Gameday expense. Expected: new logs auto-prompt and applicable recent transactions include `Split`; internet does not auto-prompt. A `50/50` choice uses penny-safe halves.
+    - Ask what Hannah owes, then mark the test reimbursement received. Expected: outstanding becomes received, the `$129.46` expense stays unchanged in Sheets and the report, and no income entry is created.
+    - Open the report at desktop and phone widths. Expected: Shared Reimbursements shows gross, personal, outstanding, received, and itemized status without horizontal page overflow.
 
 ## Verification Baseline
 
@@ -542,6 +560,27 @@ python -m pytest unit_tests/intents/test_handlers.py unit_tests/core/test_messag
 Latest verification:
 
 ```bash
+venv/bin/python -m pytest unit_tests/sheets/test_collaboration.py unit_tests/test_splits.py unit_tests/intents/test_handlers.py unit_tests/core/test_message_router.py unit_tests/reports/test_expense_breakdown.py -q
+# passed: 206 passed
+
+venv/bin/python -m pytest unit_tests/banking/test_reconciliation.py unit_tests/banking/test_store.py unit_tests/core/test_bank_reconciliation.py -q
+# passed: 94 passed
+
+venv/bin/python -m pytest unit_tests -q
+# passed: 462 passed, 1 warning
+
+pyright --pythonpath venv/bin/python
+# passed: 0 errors, 0 warnings, 0 informations
+
+cd web/expense-report && npm run typecheck && npm run build
+# passed
+
+Responsive shared-reimbursement browser verification
+# passed: desktop and 390x844; personal-share totals and ledger detail correct; no browser warnings or errors
+
+git diff --check
+# passed
+
 Live Brian August report-model verification
 # passed: July 31 xAI $3,137.49 used only as projection reference; Current $0.00; Projected $6,274.98; August 14 and 28 projected events
 

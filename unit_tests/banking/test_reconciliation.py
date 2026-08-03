@@ -132,6 +132,55 @@ def test_reconcile_matches_logged_expense_by_amount_and_date():
     assert decision.notes == "matched expense action"
 
 
+def test_reconcile_split_expense_uses_original_gross_action_amount():
+    source = LoggedAction(
+        id="gross123",
+        created_at="2026-05-17T12:00:00",
+        user_key="676638528590970917",
+        action=UndoAction(
+            worksheet="expense",
+            kind="clear_cells",
+            row=12,
+            columns=[14, 15, 16, 17, 18],
+            previous_values=["", "", "", "", ""],
+            new_values=["5/17/2026", "groceries", "200.00", "Safeway", "Brian (BofA)"],
+            metadata={"type": "expense", "category": "grocery", "person": "Brian (BofA)"},
+            description="grocery expense $200.00 for Brian (BofA)",
+        ),
+    )
+    split = LoggedAction(
+        id="split123",
+        created_at="2026-05-17T12:01:00",
+        user_key="676638528590970917",
+        action=UndoAction(
+            worksheet="expense",
+            kind="restore_cells",
+            row=12,
+            columns=[16],
+            previous_values=["200.00"],
+            new_values=["5/17/2026", "groceries", "129.46", "Safeway", "Brian (BofA)"],
+            metadata={
+                "type": "split",
+                "source_type": "expense",
+                "source_action_id": "gross123",
+                "category": "grocery",
+                "gross_amount": "200.00",
+                "payer_share": "129.46",
+            },
+            description="split grocery expense $200.00 for Brian (BofA)",
+        ),
+    )
+
+    candidates = find_action_log_candidates(
+        _transaction("Safeway", 200.00),
+        [source, split],
+        classification="expense",
+    )
+
+    assert [candidate.action_id for candidate in candidates] == ["gross123"]
+    assert candidates[0].amount == 200.00
+
+
 def test_find_action_log_candidates_allows_fuzzy_amount_and_seven_day_window():
     action = LoggedAction(
         id="abc123",

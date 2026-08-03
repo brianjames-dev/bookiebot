@@ -39,6 +39,7 @@ from bookiebot.sheets.undo import (
     pop_pending_action_expiration_notice,
     pending_update_field,
 )
+from bookiebot.splits import requested_split_directive
 
 logger = logging.getLogger(__name__)
 _AVATAR_ROTATION_TASK: asyncio.Task | None = None
@@ -56,6 +57,7 @@ _ACTION_NOUNS = {
 _DELETE_VERBS = {"clear", "delete", "remove", "erase"}
 _UPDATE_VERBS = {"change", "correct", "edit", "fix", "redo", "update"}
 _MOVE_VERBS = {"categorize", "move", "reclassify", "recategorize"}
+_SPLIT_VERBS = {"split"}
 _CATEGORIES = {"grocery", "groceries", "gas", "food", "shopping", "need", "needs"}
 _CANCEL_WORDS = {"cancel", "nevermind", "never mind", "stop"}
 
@@ -208,7 +210,12 @@ def _extract_action_match_text(content: str) -> str | None:
         "name",
         "of",
         "should",
-    } | _ACTION_NOUNS | _DELETE_VERBS | _UPDATE_VERBS | _MOVE_VERBS
+        "by",
+        "income",
+        "evenly",
+        "equally",
+        "split",
+    } | _ACTION_NOUNS | _DELETE_VERBS | _UPDATE_VERBS | _MOVE_VERBS | _SPLIT_VERBS
     field_words = {"amount", "card", "date", "item", "location", "name", "person"}
     candidates = [word for word in words if word not in stop_words and word not in field_words]
     candidates = [word for word in candidates if word not in _CATEGORIES]
@@ -232,6 +239,23 @@ def _action_management_intent(content: str) -> tuple[str, dict] | None:
     words = set(re.findall(r"[a-z&']+", text))
     has_action_noun = bool(words & _ACTION_NOUNS)
     has_update_field = bool(words & {"amount", "card", "date", "item", "location", "name", "person"})
+    looks_like_new_log = bool(re.search(r"\$?\d+(?:\.\d{1,2})?", text)) and bool(
+        words & {"add", "bought", "log", "logged", "paid", "purchase", "purchased", "spent"}
+    )
+
+    if "split" in words and not looks_like_new_log and (
+        has_action_noun or bool(words & {"it", "that", "last", "one"})
+    ):
+        directive = requested_split_directive({}, text)
+        entities: dict[str, Any] = {}
+        if directive in {"income", "equal"}:
+            entities["split_method"] = directive
+        if words & {"it", "that", "last", "one"}:
+            entities["index"] = 1
+        match_text = _extract_action_match_text(text)
+        if match_text:
+            entities["match_text"] = match_text
+        return "split_recent_action", entities
 
     destination_category = _extract_destination_category(text)
     if destination_category and (has_action_noun or "it" in words or "that" in words) and "to" in words and not (words & _DELETE_VERBS):
@@ -282,7 +306,27 @@ def _indexed_action_intent(content: str) -> tuple[str, dict] | None:
         return "delete_recent_action", {"index": index}
     if words & _UPDATE_VERBS:
         return "update_recent_action", {"index": index, "updates": {}}
+    if words & _SPLIT_VERBS:
+        directive = requested_split_directive({}, rest)
+        entities: dict[str, Any] = {"index": index}
+        if directive in {"income", "equal"}:
+            entities["split_method"] = directive
+        return "split_recent_action", entities
     return None
+
+
+def _reimbursement_intent(content: str) -> tuple[str, dict] | None:
+    text = " ".join(content.lower().split())
+    if re.search(r"\b(?:what|how much)\s+does\s+(?:hannah|brian)\s+owe\b", text) or (
+        "reimbursement" in text and bool(re.search(r"\b(?:show|list|outstanding|owe|owed)\b", text))
+    ):
+        return "query_shared_reimbursements", {}
+    if not re.search(r"\b(?:reimbursed|reimbursement received|paid me back|got paid back)\b", text):
+        return None
+    match = re.search(r"\bfor\s+(.+)$", text)
+    match_text = match.group(1).strip(" .") if match else ""
+    entities = {"match_text": match_text} if match_text else {}
+    return "mark_shared_reimbursement_received", entities
 
 
 def _recent_query_intent(content: str) -> tuple[str, dict] | None:
@@ -433,6 +477,12 @@ def register_events(client, tree):
         recent_query = _recent_query_intent(content)
         if recent_query:
             intent, entities = recent_query
+            await handle_intent(intent, entities, message)
+            return
+
+        reimbursement = _reimbursement_intent(content)
+        if reimbursement:
+            intent, entities = reimbursement
             await handle_intent(intent, entities, message)
             return
 
