@@ -2236,12 +2236,6 @@ function DailySpendingChart({
         }
         className="bb-chart-box"
       >
-        {axis.compressed ? (
-          <div className="bb-daily-spending-axis-note" data-bb-daily-spending-axis-mode="compressed" role="note">
-            <span aria-hidden="true">//</span>
-            Axis compressed above {formatMoney(axis.breakAt)}
-          </div>
-        ) : null}
         <ResponsiveContainer width="100%" height="100%">
           <BarChart data={chartData} margin={{ top: 12, right: 16, left: 0, bottom: 0 }}>
             <CartesianGrid

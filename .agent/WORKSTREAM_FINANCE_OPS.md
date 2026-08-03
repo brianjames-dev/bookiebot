@@ -1,6 +1,6 @@
 # Finance Operations Workstream
 
-Last updated: 2026-07-31
+Last updated: 2026-08-02
 
 ## Goal
 
@@ -491,6 +491,16 @@ Status: Complete in code and automated/read-only verification; production browse
 - Read-only Brian August verification found the July 31 `xAI` paycheck at `$3,137.49` and produced `$6,274.98` Projected income with August 14 and 28 projected events while Current remained `$0.00`.
 - Browser verification opened a normal signed current-month URL backed by a deliberately stale snapshot and confirmed the live Projected cards show Income `$6,274.98`, Left `$2,339.42`, Minimum `$627.50`, and Ideal `$1,255.00` with no console errors.
 - Verification: report suite `44 passed`; full suite `432 passed, 1 skipped`; Pyright clean; frontend typecheck/build passed; `git diff --check` passed.
+
+### 2026-08-02 Daily Spending Compression-Pill Follow-Up
+
+Status: Complete in code and focused/browser verification; production confirmation remains in `.agent/STATUS.md` checklist item 70.
+
+- Removed the visible `Axis compressed above ...` pill and its dedicated CSS from Daily Spending.
+- Preserved the conditional outlier-compression calculation, transformed chart values, raw-value axis labels/tooltips, totals, and itemized details.
+- Regression coverage rejects the removed markup and styling while continuing to assert the compression trigger and chart data paths.
+- Live Brian August browser verification confirmed the chart still compresses the rent outlier, the pill and copy are absent, the page has no horizontal overflow, and browser logs are clean.
+- Verification: focused report suite `44 passed`; full suite `432 passed, 1 skipped`; Pyright clean; frontend typecheck/build passed; `git diff --check` passed.
 
 ## Open Questions
 

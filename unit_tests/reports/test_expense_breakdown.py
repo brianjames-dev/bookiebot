@@ -82,13 +82,15 @@ def test_daily_spending_bars_share_the_blue_corner_radius():
 
 def test_daily_spending_includes_bills_and_compresses_strong_outliers():
     source = (Path(__file__).resolve().parents[2] / "web/expense-report/src/report-app.tsx").read_text()
+    styles = (Path(__file__).resolve().parents[2] / "web/expense-report/src/styles.css").read_text()
 
     assert '(event.kind !== "subscription" && event.kind !== "bill")' in source
     assert 'event.group === "rent" ? "Rent" : "Bills & Utilities"' in source
     assert 'event.kind === "subscription" && event.group === "subscriptions_wants" ? "wants" : "needs"' in source
     assert "peak >= 500 && referencePeak > 0 && peak >= referencePeak * 2.5" in source
-    assert 'data-bb-daily-spending-axis-mode="compressed"' in source
-    assert "Axis compressed above {formatMoney(axis.breakAt)}" in source
+    assert 'data-bb-daily-spending-axis-mode="compressed"' not in source
+    assert "Axis compressed above" not in source
+    assert ".bb-daily-spending-axis-note" not in styles
     assert 'dataKey="chartNeedsAmount"' in source
     assert 'dataKey="chartWantsAmount"' in source
     assert 'dataKey="chartAmount"' in source

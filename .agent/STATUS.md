@@ -4,7 +4,7 @@ Last updated: 2026-08-02
 
 ## Active Focus
 
-New-month expense reports now carry the immediately prior month's last dated paycheck into Projected mode without counting it as current income, and current-month signed links rebuild live instead of reopening stale snapshots. The next step is deployment confirmation alongside the subscription, Daily Spending, monthly savings, recent-action, and reconciliation updates.
+New-month expense reports now carry the immediately prior month's last dated paycheck into Projected mode without counting it as current income, current-month signed links rebuild live instead of reopening stale snapshots, and Daily Spending keeps its outlier compression without showing a compression-threshold pill. The next step is deployment confirmation alongside the subscription, monthly savings, recent-action, and reconciliation updates.
 
 ## On Deck
 
@@ -25,6 +25,9 @@ New-month expense reports now carry the immediately prior month's last dated pay
 
 ## Completed 2026-08-02
 
+- Removed the `Axis compressed above ...` pill from Daily Spending while preserving the conditional outlier-compression geometry, raw-value tooltips, axis labels, totals, and details.
+- Removed the pill's unused CSS and added a focused regression that rejects both its markup and styling while retaining assertions for the compression threshold and chart data paths.
+- Live Brian August browser verification confirmed the compressed scale remains visible with no pill/copy, no horizontal overflow, and no browser warnings or errors. Verification: focused report suite `44 passed`; full suite `432 passed, 1 skipped`; Pyright reported zero errors; frontend typecheck/build passed; `git diff --check` passed. Production confirmation remains in checklist item 70.
 - Added a projection-only reference to the expense-report model. When the selected month has no matching paycheck yet, it uses the immediately prior month's latest dated paycheck for amount and biweekly cadence without adding that prior transaction to Current income or the selected month's calendar.
 - Inherited missing biweekly source/start configuration from the immediately prior month. This covers the live August tab, whose copied Income section has no projection configuration even though July retains the `xAI` configuration and dated paycheck history.
 - Current-month matching paychecks continue to supersede the carry-forward reference, unrelated income remains actual-only, stale/mismatched/undated prior entries are ignored, completed months remain actual-only, and January can load the prior December tab from the previous annual workbook when available.
@@ -519,7 +522,7 @@ Use a test row or low-risk real row in Discord:
 69. Open Hannah Budget 2026 July and Template, then generate Hannah's July expense report.
     - Expected: each tab has one `Enter Monthly Savings Contribution` row; July shows Actual `$0.00`, Ideal `$323.89`, Minimum `$161.95`, Savings subtotal `$0.00`, and Net Total `$618.53`. The Saved card uses the same `$161.95` current Minimum while Projected remains based on projected income.
 70. Open Brian July's Daily Spending card in All, Needs, and Wants at desktop and phone widths.
-    - Expected: All/Needs include Rent `$2,100.00` on day 1, Water `$141.43` on day 18, and PG&E `$165.13` on day 22; Wants excludes those Needs bills. All and Needs show an `Axis compressed above $450.00` note, keep the next-highest day close to the top of the graph, and still show exact amounts in tooltips, Highest day, totals, and table rows. Wants returns to the normal axis, mobile has no horizontal overflow, and Details remains closed by default on mobile.
+    - Expected: All/Needs include Rent `$2,100.00` on day 1, Water `$141.43` on day 18, and PG&E `$165.13` on day 22; Wants excludes those Needs bills. All and Needs keep the next-highest day close to the top of the graph without showing an axis-compression pill, and still show exact amounts in axis labels, tooltips, Highest day, totals, and table rows. Wants returns to the normal axis, mobile has no horizontal overflow, and Details remains closed by default on mobile.
 71. Open Brian July's report, compare Current and Projected, and inspect Needs, Wants, Calendar subscription details, Daily Spending, Burn Rate, and Left.
     - Expected: every view is limited to transactions scheduled for July. At month-end, Spent is `$5,620.89`, Needs is `$4,064.56`, Wants is `$1,556.33`, Saved is `$2,167.14`, and Left is `$3,047.68`; subscription totals are `$229.36` Needs and `$39.96` Wants. The July yearly `brianjames.dev` item is included, while October's Amazon Prime and February's MacroFactor appear nowhere in either mode.
 72. Open Brian July's Burn Rate details and compare it with Wants Category Mix and Wants Daily Spending.
@@ -544,6 +547,9 @@ Live Brian August report-model verification
 
 Current-month signed-link browser verification against a deliberately stale snapshot
 # passed: normal URL rebuilt live; Projected Income $6,274.98; Left $2,339.42; Minimum $627.50; Ideal $1,255.00; no browser errors
+
+Live Brian August Daily Spending pill-removal browser verification
+# passed: compressed outlier scale retained; compression pill/copy absent; no horizontal overflow; no browser warnings or errors
 
 python -m pytest unit_tests/reports/test_expense_breakdown.py
 # passed: 44 passed
