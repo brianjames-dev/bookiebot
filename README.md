@@ -97,9 +97,14 @@ PLAID_CLIENT_ID=
 PLAID_SECRET=
 PLAID_ENV=sandbox
 BANK_TOKEN_ENCRYPTION_KEY=
+BANK_LINK_SIGNING_SECRET=
 BANK_DATABASE_URL=
 BANK_SQLITE_PATH=data/banking.sqlite3
+PLAID_WEBHOOK_SECRET=
+PLAID_WEBHOOK_URL=https://your-public-bot-url.example/bank/plaid-webhook
 ```
+
+Send `PLAID_WEBHOOK_SECRET` with the `X-BookieBot-Webhook-Secret` request header. The webhook endpoint returns HTTP 503 when the secret is unset and HTTP 401 when the header is missing or invalid. Do not put the secret in the webhook URL query string.
 
 On Railway, `data/banking.sqlite3` is not durable across redeploys unless a persistent volume is mounted. For Sandbox testing, use `/debug_bank_seed_sandbox` after each redeploy. Before linking real bank accounts, use Railway Postgres and set `BANK_DATABASE_URL`; SQLite should remain local/Sandbox-only unless it is backed by a mounted volume.
 
