@@ -41,9 +41,9 @@ from bookiebot.sheets.collaboration import (
     matching_outstanding_allocations,
     normalize_split_method,
 )
-from bookiebot.splits import split_method_view
-from bookiebot.splits import continue_split_after_log
+from bookiebot.splits import change_split_method_view, continue_split_after_log, split_method_view
 from bookiebot.sheets.undo import (
+    cancel_split_recent_action,
     clear_pending_action_selection,
     delete_recent_action,
     editable_fields_for_action,
@@ -67,6 +67,7 @@ from bookiebot.sheets.undo import (
     update_recent_action,
 )
 from bookiebot.ui.recent_actions import (
+    CancelSplitConfirmView,
     DeleteConfirmView,
     MoveCategoryView,
     MoveConfirmView,
@@ -672,6 +673,47 @@ def _recent_action_select_view(actor_key: str | None, actions: list[Any], *, des
                 await decision_interaction.response.send_message(
                     _with_component_spacer("How do you want to split this expense?", True),
                     view=split_method_view(actor_key, action_id),
+                    ephemeral=True,
+                )
+                return
+            if decision == "change_split":
+                if capabilities and not capabilities.can_change_split:
+                    await decision_interaction.response.send_message(capabilities.change_split_reason, ephemeral=True)
+                    return
+                await decision_interaction.response.send_message(
+                    _with_component_spacer("How do you want to update this split?", True),
+                    view=change_split_method_view(actor_key, action_id),
+                    ephemeral=True,
+                )
+                return
+            if decision == "cancel_split":
+                if capabilities and not capabilities.can_cancel_split:
+                    await decision_interaction.response.send_message(capabilities.cancel_split_reason, ephemeral=True)
+                    return
+
+                async def handle_cancel_split(confirm_interaction: Any, confirmation: str) -> None:
+                    if await _reject_unowned_recent_interaction(confirm_interaction, actor_key):
+                        return
+                    if confirmation == "keep_split":
+                        await confirm_interaction.response.send_message(
+                            "Canceled. The existing split remains unchanged.",
+                            ephemeral=True,
+                        )
+                        return
+                    try:
+                        await confirm_interaction.response.defer(ephemeral=True)
+                    except Exception:
+                        pass
+                    with sheet_user_context(actor_key):
+                        success, detail = cancel_split_recent_action(actor_key, action_id=action_id)
+                    await _send_interaction_action_result(confirm_interaction, success, detail)
+
+                await decision_interaction.response.send_message(
+                    _with_component_spacer(
+                        "Cancel this split? The original gross amount will be restored and the reimbursement will be voided.",
+                        True,
+                    ),
+                    view=CancelSplitConfirmView(handle_cancel_split),
                     ephemeral=True,
                 )
                 return

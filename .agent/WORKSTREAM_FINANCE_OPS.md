@@ -186,10 +186,10 @@ Status: Complete in code and automated/browser verification as of 2026-08-03; pr
 
 ### Slice H - Split Lifecycle Completion
 
-Status: Pending; this is the next collaboration implementation slice.
+Status: Partial as of 2026-08-03. Method changes and outstanding split cancellation are complete; the remaining settlement and mutation lifecycle work stays pending.
 
-1. Change the split method and recalculate both shares without losing the original gross or settlement history.
-2. Remove an outstanding split by restoring the gross visible expense and voiding the receivable.
+1. Complete 2026-08-03: change the split method and recalculate both shares without losing the original gross or settlement history.
+2. Complete 2026-08-03: remove an outstanding split by restoring the gross visible expense and voiding the receivable.
 3. Correct the actual gross amount after splitting and recalculate the active responsibility and reimbursement amounts.
 4. Record partial reimbursements and maintain accurate received/outstanding balances.
 5. Add an explicit confirmation/refund workflow before undoing or removing a split that has already been paid.
@@ -198,6 +198,9 @@ Status: Pending; this is the next collaboration implementation slice.
 
 ### 2026-08-03 Work Log
 
+- Added split-specific Recent Transactions controls for method changes and cancellation across normal expenses and bill/payment cells.
+- Recorded method changes as reversible split-lineage children, retained gross source actions for bank matching, and kept ledger/current-sheet changes synchronized with rollback on persistence failures.
+- Added confirmed outstanding-split cancellation with gross restoration, reimbursement voiding, a system audit event, and safe re-splitting. Received reimbursements remain protected pending the explicit paid-settlement workflow.
 - Implemented Slice G with focused calculation, ledger, recent-action, router, handler, report, and undo regression coverage.
 - Confirmed source action amounts remain gross while split leaf actions and the reimbursement ledger carry the personal allocation state.
 - Verified the report at desktop and mobile widths and recorded the remaining lifecycle work in Slice H.

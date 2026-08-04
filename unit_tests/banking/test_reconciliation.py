@@ -170,10 +170,33 @@ def test_reconcile_split_expense_uses_original_gross_action_amount():
             description="split grocery expense $200.00 for Brian (BofA)",
         ),
     )
+    changed_split = LoggedAction(
+        id="split456",
+        created_at="2026-05-17T12:02:00",
+        user_key="676638528590970917",
+        action=UndoAction(
+            worksheet="expense",
+            kind="restore_cells",
+            row=12,
+            columns=[16],
+            previous_values=["129.46"],
+            new_values=["5/17/2026", "groceries", "100.00", "Safeway", "Brian (BofA)"],
+            metadata={
+                "type": "split",
+                "source_type": "expense",
+                "source_action_id": "split123",
+                "split_operation": "change",
+                "category": "grocery",
+                "gross_amount": "200.00",
+                "payer_share": "100.00",
+            },
+            description="changed split for groceries",
+        ),
+    )
 
     candidates = find_action_log_candidates(
         _transaction("Safeway", 200.00),
-        [source, split],
+        [source, split, changed_split],
         classification="expense",
     )
 

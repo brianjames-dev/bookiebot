@@ -332,6 +332,12 @@ Decision: A shared split keeps the original gross amount in the immutable source
 
 Rationale: One number cannot simultaneously represent the amount that cleared the bank and the amount ultimately borne by the payer. Separating clearing, responsibility, and settlement preserves reconciliation/audit history while making the sheet and report accurately reflect personal spending. Blocking implicit paid-split reversal prevents a completed reimbursement from being erased without an explicit refund or correction decision.
 
+## 2026-08-03 - Treat Split Method Changes As Reversible Lineage
+
+Decision: Changing an outstanding split creates a child split action that recalculates both shares from the preserved gross amount and updates the reimbursement ledger's active split-action reference. Undo restores the immediately prior method and shares. Canceling an outstanding split requires confirmation, restores gross, voids the receivable, marks active split actions undone, and records a cancellation system event so the original transaction can become the active recent-action leaf again. Any received reimbursement blocks these operations until an explicit settlement-correction workflow exists.
+
+Rationale: Editing the original split in place would erase how responsibility changed, while treating cancellation as transaction deletion would corrupt the bank-clearing history. Reversible lineage preserves each allocation decision, keeps reconciliation anchored to gross, and gives outstanding and paid receivables intentionally different safety boundaries.
+
 ## Pending Decisions
 
 - Where should durable system events live: banking database only, Google Sheets only, or dual-write during transition?

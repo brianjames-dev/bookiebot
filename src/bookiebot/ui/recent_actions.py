@@ -8,9 +8,9 @@ from bookiebot.ui.card import ButtonBase, ButtonStyle, Interaction, SelectBase, 
 
 class RecentActionButton(ButtonBase):  # type: ignore[misc]
     def __init__(self, label: str, custom_id: str, callback_func: Callable):
-        if custom_id in {"delete", "confirm_delete"}:
+        if custom_id in {"delete", "confirm_delete", "cancel_split", "confirm_cancel_split"}:
             style_name = "danger"
-        elif custom_id in {"cancel", "no_split"}:
+        elif custom_id in {"cancel", "no_split", "keep_split"}:
             style_name = "secondary"
         else:
             style_name = "primary"
@@ -60,6 +60,10 @@ class RecentActionDecisionView(ViewBase):  # type: ignore[misc]
             self.add_item(RecentActionButton("Move", "move", callback_func))
         if capabilities is None or capabilities.can_split:
             self.add_item(RecentActionButton("Split", "split", callback_func))
+        if capabilities is not None and capabilities.can_change_split:
+            self.add_item(RecentActionButton("Change split", "change_split", callback_func))
+        if capabilities is not None and capabilities.can_cancel_split:
+            self.add_item(RecentActionButton("Cancel split", "cancel_split", callback_func))
         if capabilities is None or capabilities.can_delete:
             self.add_item(RecentActionButton("Delete", "delete", callback_func))
         self.add_item(RecentActionButton("Cancel", "cancel", callback_func))
@@ -71,6 +75,21 @@ class SplitMethodView(ViewBase):  # type: ignore[misc]
         self.add_item(RecentActionButton("By income", "income", callback_func))
         self.add_item(RecentActionButton("50/50", "equal", callback_func))
         self.add_item(RecentActionButton("No split", "no_split", callback_func))
+
+
+class ChangeSplitMethodView(ViewBase):  # type: ignore[misc]
+    def __init__(self, callback_func: Callable):
+        super().__init__(timeout=300)
+        self.add_item(RecentActionButton("By income", "income", callback_func))
+        self.add_item(RecentActionButton("50/50", "equal", callback_func))
+        self.add_item(RecentActionButton("Cancel", "cancel", callback_func))
+
+
+class CancelSplitConfirmView(ViewBase):  # type: ignore[misc]
+    def __init__(self, callback_func: Callable):
+        super().__init__(timeout=300)
+        self.add_item(RecentActionButton("Confirm cancel split", "confirm_cancel_split", callback_func))
+        self.add_item(RecentActionButton("Keep split", "keep_split", callback_func))
 
 
 class DeleteConfirmView(ViewBase):  # type: ignore[misc]

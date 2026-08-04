@@ -7,7 +7,15 @@ from bookiebot.sheets.collaboration import (
     new_allocation,
     split_amounts,
 )
-from bookiebot.sheets.undo import read_active_logged_actions, recent_actions, split_recent_action, undo_last_action
+from bookiebot.sheets.undo import (
+    cancel_split_recent_action,
+    change_split_recent_action,
+    has_system_event,
+    read_active_logged_actions,
+    recent_actions,
+    split_recent_action,
+    undo_last_action,
+)
 from bookiebot.sheets.writer import log_category_row, record_expense_undo
 from bookiebot.sheets.routing import sheet_user_context
 import bookiebot.sheets.utils as sheet_utils
@@ -16,10 +24,13 @@ from unit_tests.support.sheets_repo_stub import SheetsRepoStub
 
 def test_income_split_uses_exact_household_income_ratio_and_penny_safe_remainder():
     brian_share, hannah_share = split_amounts(200, "income", "brian")
+    hannah_payer_share, brian_partner_share = split_amounts(200, "income", "hannah")
 
     assert brian_share == 129.46
     assert hannah_share == 70.54
     assert brian_share + hannah_share == 200
+    assert hannah_payer_share == 70.54
+    assert brian_partner_share == 129.46
 
 
 def test_equal_split_assigns_rounding_remainder_to_payer():
@@ -118,3 +129,119 @@ def test_budget_payment_cells_can_be_split_without_changing_the_gross_action_amo
         assert allocation.payer_share == 64.73
         source = next(logged for logged in read_active_logged_actions(actor_key) if logged.id == action_id)
         assert source.action.new_values == ["100"]
+
+
+def test_change_grocery_split_method_recalculates_from_gross_and_can_be_undone():
+    actor_key = "676638528590970917"
+    repo = SheetsRepoStub(expense_rows=[[], []])
+
+    with repo.patched(), sheet_user_context(actor_key):
+        values = {
+            "date": "8/3/2026",
+            "amount": 200,
+            "item": "Groceries",
+            "location": "Safeway",
+            "person": "Brian (BofA)",
+        }
+        row = log_category_row(values, repo.expense, "grocery")
+        source_action_id = record_expense_undo("grocery", row, values, values["person"], actor_key)
+        split_recent_action(actor_key, split_method="income", action_id=source_action_id)
+        split_action_id = recent_actions(actor_key, 1)[0].id
+
+        changed, detail = change_split_recent_action(
+            actor_key,
+            split_method="equal",
+            action_id=split_action_id,
+        )
+
+        assert changed is True
+        assert "Split changed to 50/50" in detail
+        assert repo.expense.cell(row, 2).value == "$100.00"
+        allocation = list_allocations(actor_key)[0]
+        assert allocation.gross_amount == 200
+        assert allocation.split_method == "equal"
+        assert allocation.payer_share == 100
+        assert allocation.partner_share == 100
+        changed_action = recent_actions(actor_key, 1)[0]
+        assert changed_action.action.metadata["split_operation"] == "change"
+        source = next(logged for logged in read_active_logged_actions(actor_key) if logged.id == source_action_id)
+        assert source.action.new_values[1] == "200"
+
+        undone, _undo_detail = undo_last_action(actor_key)
+
+        assert undone is True
+        assert repo.expense.cell(row, 2).value == "$129.46"
+        restored = list_allocations(actor_key)[0]
+        assert restored.split_method == "income"
+        assert restored.payer_share == 129.46
+        assert restored.partner_share == 70.54
+
+
+def test_cancel_changed_bill_split_restores_gross_and_voids_reimbursement():
+    actor_key = "676638528590970917"
+    repo = SheetsRepoStub(income_rows=[["", "PG&E", ""]])
+
+    with repo.patched(), sheet_user_context(actor_key):
+        logged, source_action_id = sheet_utils.log_pge_paid(200, return_action_id=True)
+        split_recent_action(actor_key, split_method="income", action_id=source_action_id)
+        first_split_id = recent_actions(actor_key, 1)[0].id
+        change_split_recent_action(actor_key, split_method="equal", action_id=first_split_id)
+        changed_split_id = recent_actions(actor_key, 1)[0].id
+
+        canceled, detail = cancel_split_recent_action(actor_key, action_id=changed_split_id)
+
+        assert logged is True
+        assert canceled is True
+        assert "Restored the original $200.00 expense" in detail
+        assert repo.income.cell(1, 3).value == "$200.00"
+        assert list_allocations(actor_key) == []
+        voided = list_allocations(actor_key, include_void=True)[0]
+        assert voided.status == "void"
+        assert voided.gross_amount == 200
+        assert recent_actions(actor_key, 1)[0].id == source_action_id
+        assert recent_actions(actor_key, 1)[0].action.metadata["type"] == "payment"
+        assert has_system_event(
+            actor_key,
+            "shared_split_cancelled",
+            {"allocation_id": voided.allocation_id},
+        )
+
+        resplit, _resplit_detail = split_recent_action(
+            actor_key,
+            split_method="equal",
+            action_id=source_action_id,
+        )
+        assert resplit is True
+        assert repo.income.cell(1, 3).value == "$100.00"
+        outstanding = list_allocations(actor_key)
+        assert len(outstanding) == 1
+        assert outstanding[0].allocation_id != voided.allocation_id
+        assert outstanding[0].status == "outstanding"
+
+
+def test_reimbursed_split_cannot_be_changed_or_canceled():
+    actor_key = "676638528590970917"
+    repo = SheetsRepoStub(income_rows=[["", "Water", ""]])
+
+    with repo.patched(), sheet_user_context(actor_key):
+        _logged, source_action_id = sheet_utils.log_water_paid(200, return_action_id=True)
+        split_recent_action(actor_key, split_method="income", action_id=source_action_id)
+        split_action_id = recent_actions(actor_key, 1)[0].id
+        allocation = list_allocations(actor_key)[0]
+        mark_reimbursed(allocation.allocation_id)
+
+        changed, change_detail = change_split_recent_action(
+            actor_key,
+            split_method="equal",
+            action_id=split_action_id,
+        )
+        canceled, cancel_detail = cancel_split_recent_action(actor_key, action_id=split_action_id)
+
+        assert changed is False
+        assert canceled is False
+        assert "already been reimbursed" in change_detail
+        assert "already been reimbursed" in cancel_detail
+        assert repo.income.cell(1, 3).value == "$129.46"
+        reimbursed = list_allocations(actor_key)[0]
+        assert reimbursed.status == "reimbursed"
+        assert reimbursed.received_amount == 70.54

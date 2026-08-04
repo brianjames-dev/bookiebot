@@ -5,8 +5,8 @@ from typing import Any, Literal
 
 from bookiebot.sheets.collaboration import normalize_split_method
 from bookiebot.sheets.routing import actor_key_aliases, resolve_actor_key, sheet_user_context
-from bookiebot.sheets.undo import split_recent_action
-from bookiebot.ui.recent_actions import SplitMethodView
+from bookiebot.sheets.undo import change_split_recent_action, split_recent_action
+from bookiebot.ui.recent_actions import ChangeSplitMethodView, SplitMethodView
 
 
 SplitDirective = Literal["income", "equal", "prompt", "none"]
@@ -77,6 +77,38 @@ def split_method_view(actor_key: str | None, action_id: str) -> SplitMethodView:
         await interaction.followup.send(f"{prefix} {detail}", ephemeral=True)
 
     return SplitMethodView(handle_split)
+
+
+def change_split_method_view(actor_key: str | None, action_id: str) -> ChangeSplitMethodView:
+    async def handle_change(interaction: Any, method: str) -> None:
+        interaction_user = getattr(interaction, "user", None)
+        interaction_actor = resolve_actor_key(
+            getattr(interaction_user, "id", None),
+            getattr(interaction_user, "name", None),
+        )
+        if actor_key and interaction_actor and interaction_actor not in actor_key_aliases(str(actor_key)):
+            await interaction.response.send_message("This split workflow belongs to another user.", ephemeral=True)
+            return
+        if method == "cancel":
+            await interaction.response.send_message(
+                "Canceled. The existing split remains unchanged.",
+                ephemeral=True,
+            )
+            return
+        try:
+            await interaction.response.defer(ephemeral=True)
+        except Exception:
+            pass
+        with sheet_user_context(actor_key):
+            success, detail = change_split_recent_action(
+                actor_key,
+                split_method=method,
+                action_id=action_id,
+            )
+        prefix = "✅" if success else "❌"
+        await interaction.followup.send(f"{prefix} {detail}", ephemeral=True)
+
+    return ChangeSplitMethodView(handle_change)
 
 
 async def continue_split_after_log(

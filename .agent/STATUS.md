@@ -4,12 +4,12 @@ Last updated: 2026-08-03
 
 ## Active Focus
 
-Shared-expense splitting now separates the bank-clearing gross amount from the payer's personal budget responsibility, tracks the partner reimbursement independently, and exposes Split throughout the recent-transaction workflow. The next step is production verification, followed by the planned split-lifecycle refinements recorded in the finance-operations workstream.
+Recent split transactions now expose dedicated method-change and cancellation workflows for both normal expenses and bills while preserving gross reconciliation history. The next step is production verification, followed by gross correction, partial reimbursement, paid-split correction, and split-aware transaction mutation work.
 
 ## On Deck
 
-1. Deploy and manually verify the shared-expense split and reimbursement workflow in checklist item 74.
-2. Implement the deferred split lifecycle: change/remove a split, correct gross after splitting, partial reimbursement, explicit paid-split undo, and split-aware update/move/delete/undo.
+1. Deploy and manually verify split creation/settlement in checklist item 74 and recent split changes/cancellation in checklist item 75.
+2. Continue the deferred split lifecycle: correct gross after splitting, partial reimbursement, explicit paid-split undo, and split-aware update/move/delete/undo.
 3. Deploy and manually verify prior-month paycheck carry-forward in Projected mode in checklist item 73.
 4. Deploy and manually verify Wants subscriptions in Burn Rate in checklist item 72.
 5. Deploy and manually verify selected-month subscription scoping in checklist item 71.
@@ -27,6 +27,11 @@ Shared-expense splitting now separates the bank-clearing gross amount from the p
 
 ## Completed 2026-08-03
 
+- Replaced the split transaction's Cancel-only recent-action menu with `Change split`, `Cancel split`, and the ordinary menu `Cancel` for both shared expense rows and bill/payment cells.
+- `Change split` switches between By income and 50/50 using the preserved gross amount, updates the visible personal share and reimbursement ledger together, and records a reversible child action without altering the original bank candidate.
+- `Cancel split` uses an explicit confirmation, restores the original gross amount, voids the outstanding reimbursement, records a cancellation audit event, and returns the original transaction to the recent list so it can be split again later.
+- Method changes can be undone back to the prior method. Any received reimbursement blocks method changes, cancellation, and undo until the planned paid-settlement correction workflow exists.
+- Verification for the lifecycle follow-up: combined split/UI/reconciliation suite `226 passed`; full suite `466 passed`; Pyright reported zero errors; `git diff --check` passed. Manual verification is checklist item 75 below.
 - Added income-weighted and 50/50 shared-expense splits. Brian's `$156,000` and Hannah's `$85,000` incomes produce exact `64.73%` / `35.27%` responsibility with penny-safe rounding.
 - Preserved the immutable gross amount in action lineage for bank reconciliation while changing the visible Budget/expense amount to the payer's personal share. A visible `Shared Reimbursements` worksheet records gross, personal share, partner share, source action, method, and settlement state.
 - Added the exact `How do you want to split this expense?` prompt with `By income`, `50/50`, and grey `No split` controls. Grocery, Rent, PG&E, Water, Recology, and Gameday expenses prompt automatically; internet does not. Explicit `split`, `split by income`, and `split evenly` language is supported.
@@ -547,6 +552,11 @@ Use a test row or low-risk real row in Discord:
     - Log or select Rent, PG&E, Water, Recology, Grocery, and a Gameday expense. Expected: new logs auto-prompt and applicable recent transactions include `Split`; internet does not auto-prompt. A `50/50` choice uses penny-safe halves.
     - Ask what Hannah owes, then mark the test reimbursement received. Expected: outstanding becomes received, the `$129.46` expense stays unchanged in Sheets and the report, and no income entry is created.
     - Open the report at desktop and phone widths. Expected: Shared Reimbursements shows gross, personal, outstanding, received, and itemized status without horizontal page overflow.
+75. Open Recent Transactions and select an outstanding split Grocery and an outstanding split bill such as PG&E.
+    - Expected: both transaction types show `Change split`, `Cancel split`, and `Cancel`; the former Cancel-only menu is gone.
+    - Change a `$200.00` Brian split from By income to 50/50. Expected: the visible personal share changes from `$129.46` to `$100.00`, partner responsibility changes from `$70.54` to `$100.00`, and the preserved gross/bank candidate remains `$200.00`. Undo should return the split to By income.
+    - Choose `Cancel split`, then `Keep split`. Expected: nothing changes. Repeat and choose `Confirm cancel split`. Expected: the visible amount returns to `$200.00`, the reimbursement is voided/removed from outstanding totals, and the original expense/payment returns to Recent Transactions with `Split` available again.
+    - Mark a separate reimbursement received, then attempt Change split and Cancel split. Expected: both are refused with settlement-correction guidance; the personal amount, received ledger state, and bank lineage remain unchanged.
 
 ## Verification Baseline
 
@@ -560,6 +570,18 @@ python -m pytest unit_tests/intents/test_handlers.py unit_tests/core/test_messag
 Latest verification:
 
 ```bash
+PYTHONPATH=src venv/bin/python -m pytest unit_tests/sheets/test_collaboration.py unit_tests/test_splits.py unit_tests/intents/test_handlers.py unit_tests/banking/test_reconciliation.py unit_tests/banking/test_store.py unit_tests/core/test_bank_reconciliation.py -q
+# passed: 226 passed
+
+PYTHONPATH=src venv/bin/python -m pytest unit_tests -q
+# passed: 466 passed, 1 warning
+
+pyright --pythonpath venv/bin/python
+# passed: 0 errors, 0 warnings, 0 informations
+
+git diff --check
+# passed
+
 venv/bin/python -m pytest unit_tests/sheets/test_collaboration.py unit_tests/test_splits.py unit_tests/intents/test_handlers.py unit_tests/core/test_message_router.py unit_tests/reports/test_expense_breakdown.py -q
 # passed: 206 passed
 

@@ -725,6 +725,22 @@ async def test_recent_action_capabilities_make_unsupported_operations_explicit()
         metadata={"type": "savings", "category": "monthly savings"},
         description="monthly savings contribution $200",
     )
+    split = UndoAction(
+        worksheet="income",
+        kind="restore_cells",
+        row=12,
+        columns=[3],
+        previous_values=["200"],
+        new_values=["129.46"],
+        metadata={
+            "type": "split",
+            "source_type": "payment",
+            "category": "pg&e",
+            "allocation_id": "allocation-1",
+            "gross_amount": "200.00",
+        },
+        description="split pg&e payment $200",
+    )
 
     income_capabilities = action_capabilities(income)
     assert income_capabilities.can_update is True
@@ -759,6 +775,18 @@ async def test_recent_action_capabilities_make_unsupported_operations_explicit()
             assert capabilities.can_split is False
             assert labels == ["Update", "Cancel"]
         assert "Use undo" in capabilities.delete_reason
+
+    split_capabilities = action_capabilities(split)
+    assert split_capabilities.can_update is False
+    assert split_capabilities.can_move is False
+    assert split_capabilities.can_split is False
+    assert split_capabilities.can_change_split is True
+    assert split_capabilities.can_cancel_split is True
+    split_labels = [
+        getattr(child, "label", "")
+        for child in getattr(RecentActionDecisionView(lambda *_args: None, split_capabilities), "children", [])
+    ]
+    assert split_labels == ["Change split", "Cancel split", "Cancel"]
 
 
 @pytest.mark.asyncio

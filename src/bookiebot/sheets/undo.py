@@ -434,12 +434,16 @@ class ActionCapabilities:
     can_update: bool
     can_move: bool
     can_split: bool
+    can_change_split: bool
+    can_cancel_split: bool
     can_delete: bool
     can_undo: bool
     editable_fields: list[str]
     update_reason: str = ""
     move_reason: str = ""
     split_reason: str = ""
+    change_split_reason: str = ""
+    cancel_split_reason: str = ""
     delete_reason: str = ""
 
 
@@ -1153,6 +1157,11 @@ def action_capabilities(action: UndoAction) -> ActionCapabilities:
     can_split = action_type in {"expense", "update", "move", "payment"}
     split_reason = "" if can_split else "That transaction cannot be split, or already has an active split."
 
+    can_change_split = is_split
+    change_split_reason = "" if can_change_split else "That transaction does not have an active split to change."
+    can_cancel_split = is_split
+    cancel_split_reason = "" if can_cancel_split else "That transaction does not have an active split to cancel."
+
     can_delete = (
         action.worksheet == "expense"
         and action_type in {"expense", "update", "move"}
@@ -1174,12 +1183,16 @@ def action_capabilities(action: UndoAction) -> ActionCapabilities:
         can_update=can_update,
         can_move=can_move,
         can_split=can_split,
+        can_change_split=can_change_split,
+        can_cancel_split=can_cancel_split,
         can_delete=can_delete,
         can_undo=True,
         editable_fields=editable_fields,
         update_reason=update_reason,
         move_reason=move_reason,
         split_reason=split_reason,
+        change_split_reason=change_split_reason,
+        cancel_split_reason=cancel_split_reason,
         delete_reason=delete_reason,
     )
 
@@ -1880,6 +1893,7 @@ def split_recent_action(
                 "payer_share": f"{payer_share:.2f}",
                 "partner_share": f"{partner_share:.2f}",
                 "split_method": method,
+                "split_operation": "apply",
                 "display_fields": json.dumps(fields),
             },
             description=f"split {action.description}",
@@ -1908,6 +1922,230 @@ def split_recent_action(
         f"Split applied ({split_method_label(method)}, {ratio_detail}). "
         f"Original: ${gross_amount:.2f}. {payer_name}'s expense: ${payer_share:.2f}. "
         f"{partner_name} owes: ${partner_share:.2f}.",
+    )
+
+
+def change_split_recent_action(
+    user_key: str | None,
+    *,
+    split_method: str,
+    action_id: str,
+) -> tuple[bool, str]:
+    """Change an outstanding split method while retaining its immutable gross amount."""
+    from bookiebot.sheets.collaboration import (
+        allocation_by_id,
+        normalize_split_method,
+        split_amounts,
+        split_method_label,
+        update_allocation,
+    )
+
+    method = normalize_split_method(split_method)
+    if method is None:
+        return False, "Choose either By income or 50/50 for this split."
+    logged = select_recent_action(user_key, action_id=action_id)
+    if logged is None or logged.action.metadata.get("type") != "split":
+        return False, "I could not find that active split."
+
+    action = logged.action
+    allocation_id = action.metadata.get("allocation_id", "")
+    allocation = allocation_by_id(allocation_id, user_key) if allocation_id else None
+    if allocation is None or allocation.status == "void":
+        return False, "I could not find an active reimbursement record for that split."
+    if allocation.status == "reimbursed" or allocation.received_amount > 0:
+        return (
+            False,
+            "That split has already been reimbursed. Changing it needs the planned settlement correction workflow.",
+        )
+    if allocation.split_method == method:
+        return True, f"That expense is already split {split_method_label(method).lower()}."
+
+    amount_column = _field_columns_for_action(action).get("amount")
+    if amount_column is None:
+        return False, "I could not find the amount cell for that split."
+    ws = _worksheet(action.worksheet)
+    current_value = _sheet_value(ws.cell(action.row, amount_column).value)
+    try:
+        current_amount = float(current_value.replace("$", "").replace(",", "").strip())
+    except ValueError:
+        return False, "I could not read the current personal-share amount for that split."
+    if round(current_amount, 2) != round(allocation.payer_share, 2):
+        return (
+            False,
+            "The visible amount no longer matches this split's recorded personal share, so I did not overwrite it.",
+        )
+
+    payer_share, partner_share = split_amounts(allocation.gross_amount, method, allocation.owner_key)
+    field_columns = _field_columns_for_action(action)
+    fields = list(field_columns)
+    current_values = [_sheet_value(ws.cell(action.row, field_columns[field]).value) for field in fields]
+    after_values = list(current_values)
+    after_values[fields.index("amount")] = f"{payer_share:.2f}"
+
+    try:
+        _update_contiguous_row(
+            ws,
+            action.row,
+            [amount_column],
+            [_sheet_user_entered_value("amount", payer_share)],
+        )
+    except Exception:
+        logger.exception("Failed to update the visible amount while changing a split")
+        return False, "Something went wrong while changing that split. The existing split was left unchanged."
+
+    changed_action_id = record_undo_action(
+        user_key,
+        UndoAction(
+            worksheet=action.worksheet,
+            kind="restore_cells",
+            row=action.row,
+            columns=[amount_column],
+            previous_values=[current_value],
+            new_values=after_values,
+            metadata={
+                **action.metadata,
+                "type": "split",
+                "source_action_id": logged.id,
+                "split_action_id": logged.id,
+                "split_operation": "change",
+                "previous_split_method": allocation.split_method,
+                "previous_payer_share": f"{allocation.payer_share:.2f}",
+                "previous_partner_share": f"{allocation.partner_share:.2f}",
+                "split_method": method,
+                "payer_share": f"{payer_share:.2f}",
+                "partner_share": f"{partner_share:.2f}",
+                "display_fields": json.dumps(fields),
+            },
+            description=f"changed split for {allocation.item or allocation.source_category or 'shared expense'}",
+        ),
+    )
+    if changed_action_id is None:
+        try:
+            _update_contiguous_row(ws, action.row, [amount_column], [current_value])
+        except Exception:
+            logger.exception("Failed to restore the visible amount after split action-log failure")
+        return False, "Something went wrong while recording that split change. The existing split was restored."
+
+    try:
+        updated = update_allocation(
+            allocation_id,
+            split_action_id=changed_action_id,
+            split_method=method,
+            payer_share=payer_share,
+            partner_share=partner_share,
+        )
+        if updated is None:
+            raise RuntimeError("Shared reimbursement row disappeared during split change.")
+    except Exception:
+        logger.exception("Failed to update reimbursement ledger while changing a split")
+        try:
+            _update_contiguous_row(ws, action.row, [amount_column], [current_value])
+            update_allocation(
+                allocation_id,
+                split_action_id=logged.id,
+                split_method=allocation.split_method,
+                payer_share=allocation.payer_share,
+                partner_share=allocation.partner_share,
+            )
+            _mark_undone(changed_action_id)
+        except Exception:
+            logger.exception("Failed to roll back an incomplete split change")
+        return False, "Something went wrong while saving that split change. The existing split was restored."
+
+    return (
+        True,
+        f"Split changed to {split_method_label(method)}. Original: ${allocation.gross_amount:.2f}. "
+        f"{allocation.payer}'s expense: ${payer_share:.2f}. {allocation.partner} owes: ${partner_share:.2f}.",
+    )
+
+
+def cancel_split_recent_action(user_key: str | None, *, action_id: str) -> tuple[bool, str]:
+    """Cancel an outstanding split, restore gross, and retain voided audit history."""
+    from bookiebot.sheets.collaboration import allocation_by_id, update_allocation
+
+    logged = select_recent_action(user_key, action_id=action_id)
+    if logged is None or logged.action.metadata.get("type") != "split":
+        return False, "I could not find that active split."
+    action = logged.action
+    allocation_id = action.metadata.get("allocation_id", "")
+    allocation = allocation_by_id(allocation_id, user_key) if allocation_id else None
+    if allocation is None or allocation.status == "void":
+        return False, "That split is no longer active."
+    if allocation.status == "reimbursed" or allocation.received_amount > 0:
+        return (
+            False,
+            "That split has already been reimbursed. Canceling it needs the planned settlement correction workflow.",
+        )
+
+    amount_column = _field_columns_for_action(action).get("amount")
+    if amount_column is None:
+        return False, "I could not find the amount cell for that split."
+    ws = _worksheet(action.worksheet)
+    current_value = _sheet_value(ws.cell(action.row, amount_column).value)
+    try:
+        current_amount = float(current_value.replace("$", "").replace(",", "").strip())
+    except ValueError:
+        return False, "I could not read the current personal-share amount for that split."
+    if round(current_amount, 2) != round(allocation.payer_share, 2):
+        return (
+            False,
+            "The visible amount no longer matches this split's recorded personal share, so I did not cancel it.",
+        )
+
+    log_data = _read_log_data()
+    if log_data is None:
+        return False, "I could not read the action history, so I did not cancel that split."
+    actions_by_id = {record.logged.id: record.logged for record in log_data.records}
+    lineage_id = _lineage_id(logged, actions_by_id)
+    split_action_ids = {
+        record.logged.id
+        for record in log_data.records
+        if record.logged.status == "active"
+        and record.logged.action.metadata.get("type") == "split"
+        and _lineage_id(record.logged, actions_by_id) == lineage_id
+    }
+
+    try:
+        _update_contiguous_row(
+            ws,
+            action.row,
+            [amount_column],
+            [_sheet_user_entered_value("amount", allocation.gross_amount)],
+        )
+        voided = update_allocation(allocation_id, status="void")
+        if voided is None:
+            raise RuntimeError("Shared reimbursement row disappeared during split cancellation.")
+        _mark_logged_ids_undone(split_action_ids, log_data)
+        if not record_system_event(
+            user_key,
+            "shared_split_cancelled",
+            {
+                "allocation_id": allocation_id,
+                "source_action_id": allocation.source_action_id,
+                "gross_amount": f"{allocation.gross_amount:.2f}",
+            },
+            f"cancelled split for {allocation.item or allocation.source_category or 'shared expense'}",
+        ):
+            raise RuntimeError("Could not persist split cancellation audit event.")
+    except Exception:
+        logger.exception("Failed to cancel an outstanding split")
+        try:
+            _update_contiguous_row(ws, action.row, [amount_column], [current_value])
+            update_allocation(
+                allocation_id,
+                status=allocation.status,
+                received_amount=allocation.received_amount,
+                received_at=allocation.received_at,
+            )
+            _mark_logged_ids_active(split_action_ids, log_data)
+        except Exception:
+            logger.exception("Failed to roll back an incomplete split cancellation")
+        return False, "Something went wrong while canceling that split. The existing split was restored."
+
+    return (
+        True,
+        f"Split canceled. Restored the original ${allocation.gross_amount:.2f} expense; "
+        "no reimbursement is outstanding.",
     )
 
 
@@ -2130,21 +2368,52 @@ def _apply_undo_action(action: UndoAction, log_data: _ActionLogData | None = Non
         _update_contiguous_row(ws, action.row, action.columns, [""] * len(action.columns))
     elif action.kind == "restore_cells":
         current_values = [_sheet_value(ws.cell(action.row, col).value) for col in action.columns]
-        _update_contiguous_row(ws, action.row, action.columns, action.previous_values)
         if action.metadata.get("type") == "split":
-            from bookiebot.sheets.collaboration import allocation_by_id, void_allocation
+            from bookiebot.sheets.collaboration import allocation_by_id, normalize_split_method, update_allocation
 
             allocation_id = action.metadata.get("allocation_id", "")
             allocation = allocation_by_id(allocation_id) if allocation_id else None
-            if allocation is not None and allocation.status == "reimbursed":
-                _update_contiguous_row(ws, action.row, action.columns, current_values)
+            if allocation is not None and (allocation.status == "reimbursed" or allocation.received_amount > 0):
                 return (
                     False,
                     "That split has already been reimbursed. Undo-after-payment needs the planned settlement confirmation workflow.",
                 )
-            if allocation_id and void_allocation(allocation_id) is None:
-                _update_contiguous_row(ws, action.row, action.columns, current_values)
-                return False, "I could not safely cancel that split, so its expense amount was left unchanged."
+            if action.metadata.get("split_operation") == "change":
+                previous_method = normalize_split_method(action.metadata.get("previous_split_method"))
+                if previous_method is None:
+                    return False, "I could not safely restore the prior split method."
+                try:
+                    previous_payer_share = float(action.metadata.get("previous_payer_share", "0") or 0)
+                    previous_partner_share = float(action.metadata.get("previous_partner_share", "0") or 0)
+                except ValueError:
+                    return False, "I could not safely restore the prior split amounts."
+                _update_contiguous_row(ws, action.row, action.columns, action.previous_values)
+                try:
+                    restored = update_allocation(
+                        allocation_id,
+                        split_action_id=action.metadata.get("source_action_id", ""),
+                        split_method=previous_method,
+                        payer_share=previous_payer_share,
+                        partner_share=previous_partner_share,
+                    )
+                except Exception:
+                    logger.exception("Failed to restore reimbursement ledger while undoing a split change")
+                    restored = None
+                if restored is None:
+                    _update_contiguous_row(ws, action.row, action.columns, current_values)
+                    return False, "I could not safely restore the prior split method."
+            else:
+                _update_contiguous_row(ws, action.row, action.columns, action.previous_values)
+                try:
+                    voided = update_allocation(allocation_id, status="void") if allocation_id else None
+                except Exception:
+                    logger.exception("Failed to void reimbursement ledger while undoing a split")
+                    voided = None
+                if allocation_id and voided is None:
+                    _update_contiguous_row(ws, action.row, action.columns, current_values)
+                    return False, "I could not safely cancel that split, so its expense amount was left unchanged."
+        else:
+            _update_contiguous_row(ws, action.row, action.columns, action.previous_values)
     else:
         return False, "Unknown undo action."
     return True, f"Undid: {action.description}"

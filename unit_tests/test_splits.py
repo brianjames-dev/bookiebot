@@ -3,7 +3,7 @@ from __future__ import annotations
 import pytest
 
 from bookiebot.splits import requested_split_directive, should_auto_prompt_for_split
-from bookiebot.ui.recent_actions import SplitMethodView
+from bookiebot.ui.recent_actions import CancelSplitConfirmView, ChangeSplitMethodView, SplitMethodView
 
 
 @pytest.mark.parametrize(
@@ -45,3 +45,15 @@ async def test_split_method_buttons_use_approved_labels_and_no_split_is_secondar
 
     assert [child.label for child in view.children] == ["By income", "50/50", "No split"]
     assert view.children[-1].style.name == "secondary"
+
+
+@pytest.mark.asyncio
+async def test_split_change_and_cancel_confirmation_buttons_are_explicit():
+    change_view = ChangeSplitMethodView(lambda *_args: None)
+    cancel_view = CancelSplitConfirmView(lambda *_args: None)
+
+    assert [child.label for child in change_view.children] == ["By income", "50/50", "Cancel"]
+    assert change_view.children[-1].style.name == "secondary"
+    assert [child.label for child in cancel_view.children] == ["Confirm cancel split", "Keep split"]
+    assert cancel_view.children[0].style.name == "danger"
+    assert cancel_view.children[1].style.name == "secondary"
