@@ -562,9 +562,9 @@ Status: Complete in code and automated/browser verification; production confirma
 
 - Utility history now resolves quarterly cadence and configured pull months from the normalized bill schedule before producing chart points.
 - Off-cycle months are absent from a quarterly series instead of being represented as `$0`. Monthly bills remain month-by-month, and a configured quarterly pull month can still show `$0` when an expected bill has not been entered.
-- Regression coverage uses May/August Recology hits and rejects June/July points. Local browser verification confirmed two isolated quarterly dots alongside continuous monthly series with no browser warnings or errors.
-- Verification: report suite `46 passed`; full suite `489 passed`; Pyright clean; frontend typecheck/build passed; `git diff --check` passed.
-- Manual test: open a report spanning quarterly billing and off-cycle months and confirm only configured pull months receive nodes for that quarterly bill.
+- Regression coverage uses May/August Recology hits, rejects June/July points, and requires Recharts to connect valid hits across the off-cycle gaps. Local browser verification confirmed one quarterly line with nodes only at May/August alongside continuous monthly series, with no browser warnings or errors.
+- Verification: report suite `47 passed`; full suite `490 passed`; Pyright clean; frontend typecheck/build passed; `git diff --check` passed.
+- Manual test: open a report spanning quarterly billing and off-cycle months and confirm configured pull months remain connected while only those months receive nodes for that quarterly bill.
 
 ## Open Questions
 

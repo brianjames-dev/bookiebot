@@ -99,6 +99,13 @@ def test_daily_spending_includes_bills_and_compresses_strong_outliers():
     assert "point.wantsAmount" in source
 
 
+def test_bills_chart_connects_quarterly_hits_across_off_cycle_gaps():
+    source = (Path(__file__).resolve().parents[2] / "web/expense-report/src/report-app.tsx").read_text()
+    chart_source = source.split("function BillsUtilitiesChart", 1)[1].split("function billsUtilitiesEvents", 1)[0]
+
+    assert "connectNulls" in chart_source
+
+
 def test_load_report_worksheets_uses_resolved_month_tabs_when_optional_workbook_open_fails(monkeypatch):
     month = BudgetMonth(2026, 5)
     personal_id = routing.get_budget_spreadsheet_id_for_user(routing.DEFAULT_BRIAN_DISCORD_USER_IDS[0], month.year)

@@ -3506,6 +3506,7 @@ function BillsUtilitiesChart({
               name={item.label}
               stroke={chartColor(index)}
               strokeWidth={2.5}
+              connectNulls
               dot={{ r: 3 }}
               activeDot={{ r: 5 }}
             />
