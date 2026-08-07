@@ -1772,6 +1772,40 @@ def test_current_month_calendar_does_not_project_unentered_utility_average(monke
     )
 
 
+def test_quarterly_utility_history_omits_off_cycle_zero_points():
+    bill_schedule_rows = [
+        BILL_SCHEDULE_HEADERS,
+        ["recology", "Recology", "quarterly", "20", "2,5,8,11", "Recology", "", "", ""],
+    ]
+    report = build_expense_breakdown_report(
+        actor_key="brian",
+        owner_name="Brian",
+        persons=["Brian"],
+        month=BudgetMonth(2026, 8),
+        worksheets=ReportWorksheets(
+            shared_expenses=InMemoryWorksheet([["hdr"] * 28, ["hdr"] * 28]),
+            personal_budget=InMemoryWorksheet([]),
+            subscriptions=InMemoryWorksheet([]),
+            bill_schedule=InMemoryWorksheet(bill_schedule_rows),
+            budget_history=(
+                BudgetHistoryRows(BudgetMonth(2026, 5), [["Recology", "$145.00"]]),
+                BudgetHistoryRows(BudgetMonth(2026, 6), [["Recology", "$0.00"]]),
+                BudgetHistoryRows(BudgetMonth(2026, 7), []),
+                BudgetHistoryRows(BudgetMonth(2026, 8), [["Recology", "$123.00"]]),
+            ),
+        ),
+    )
+
+    assert len(report.utility_history) == 1
+    item = report.utility_history[0]
+    assert item.key == "recology"
+    assert item.label == "Recology"
+    assert item.current_amount == 123.0
+    assert item.average_amount == 145.0
+    assert item.delta_amount == -22.0
+    assert item.history == [("May", 5, 145.0), ("Aug", 8, 123.0)]
+
+
 def test_build_expense_breakdown_report_reports_zero_savings_deposits():
     report = build_expense_breakdown_report(
         actor_key="hannah",

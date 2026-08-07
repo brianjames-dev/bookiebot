@@ -813,6 +813,26 @@ def _bill_schedule_labels(rows: list[list[str]], month: BudgetMonth) -> dict[str
         return {}
 
 
+def _quarterly_bill_months_by_label(rows: list[list[str]]) -> dict[str, frozenset[int]]:
+    if not rows:
+        return {}
+    try:
+        from bookiebot.sheets.bills import list_bill_schedules
+
+        months_by_label: dict[str, frozenset[int]] = {}
+        for bill in list_bill_schedules(rows):
+            if bill.recurrence != "quarterly":
+                continue
+            pull_months = frozenset(bill.pull_months)
+            for label in {bill.bill_key, bill.display_name, bill.source_label}:
+                normalized = _normalize_label(label)
+                if normalized:
+                    months_by_label[normalized] = pull_months
+        return months_by_label
+    except Exception:
+        return {}
+
+
 def _subscription_bucket_totals(
     rows: list[list[str]],
     subscriptions: list[SubscriptionItem],
@@ -1933,6 +1953,7 @@ def _utility_history_items(
     if not history:
         return []
 
+    quarterly_months_by_label = _quarterly_bill_months_by_label(bill_schedule_rows)
     by_label: dict[str, dict[str, Any]] = {}
     for history_item in history:
         monthly_items = _payment_items(history_item.rows, bill_schedule_rows, history_item.month)
@@ -1954,9 +1975,11 @@ def _utility_history_items(
     }
     for index, (key, bucket) in enumerate(sorted(by_label.items(), key=lambda item: item[1]["label"].lower())):
         amounts_by_month = bucket["amounts"]
+        quarterly_pull_months = quarterly_months_by_label.get(key)
         points = [
             (month_labels[history_item.month.month], history_item.month.month, round(float(amounts_by_month.get(history_item.month.month, 0.0)), 2))
             for history_item in history
+            if quarterly_pull_months is None or history_item.month.month in quarterly_pull_months
         ]
         current_amount = round(float(amounts_by_month.get(selected_month.month, 0.0)), 2)
         prior_amounts = [amount for _label, month_number, amount in points if month_number < selected_month.month and amount > 0]

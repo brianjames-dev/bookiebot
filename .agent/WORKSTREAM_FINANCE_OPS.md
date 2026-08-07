@@ -556,6 +556,16 @@ Status: Complete in code and automated verification; production confirmation rem
 - Verification: focused reliability suite `221 passed`; full suite `488 passed`; Pyright clean; `git diff --check` passed.
 - Manual test: deploy, send `Water bill 148.82` and a bill-status query, then confirm local routing, the normal success/split flow, and the bounded no-generic-response behavior under simulated OpenAI `500` and Sheets read-quota `429` failures.
 
+### 2026-08-07 Quarterly Utility History Follow-Up
+
+Status: Complete in code and automated/browser verification; production confirmation remains in `.agent/STATUS.md` checklist item 77.
+
+- Utility history now resolves quarterly cadence and configured pull months from the normalized bill schedule before producing chart points.
+- Off-cycle months are absent from a quarterly series instead of being represented as `$0`. Monthly bills remain month-by-month, and a configured quarterly pull month can still show `$0` when an expected bill has not been entered.
+- Regression coverage uses May/August Recology hits and rejects June/July points. Local browser verification confirmed two isolated quarterly dots alongside continuous monthly series with no browser warnings or errors.
+- Verification: report suite `46 passed`; full suite `489 passed`; Pyright clean; frontend typecheck/build passed; `git diff --check` passed.
+- Manual test: open a report spanning quarterly billing and off-cycle months and confirm only configured pull months receive nodes for that quarterly bill.
+
 ## Open Questions
 
 - What should the canonical recent-action lineage model look like?

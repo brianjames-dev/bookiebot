@@ -4,30 +4,34 @@ Last updated: 2026-08-07
 
 ## Active Focus
 
-Bill logging and intent parsing now fail conservatively through transient OpenAI and Google Sheets errors, and terse bill commands no longer depend on the LLM. The immediate next step is production verification of this reliability slice, followed by the existing split lifecycle work.
+Quarterly utility history now omits off-cycle chart points instead of drawing false `$0` bills. The immediate next steps are production verification of this chart correction and the parser/bill reliability slice, followed by the existing split lifecycle work.
 
 ## On Deck
 
-1. Deploy and manually verify parser and bill-payment reliability in checklist item 76.
-2. Deploy and manually verify split creation/settlement in checklist item 74 and recent split changes/cancellation in checklist item 75.
-3. Continue the deferred split lifecycle: correct gross after splitting, partial reimbursement, explicit paid-split undo, and split-aware update/move/delete/undo.
-4. Deploy and manually verify prior-month paycheck carry-forward in Projected mode in checklist item 73.
-5. Deploy and manually verify Wants subscriptions in Burn Rate in checklist item 72.
-6. Deploy and manually verify selected-month subscription scoping in checklist item 71.
-7. Deploy and manually verify Daily Spending bill coverage and outlier scaling in checklist item 70.
-8. Deploy and manually verify the monthly savings workflow and corrected Saved-card targets in checklist items 60-61 and 69.
-9. Deploy and manually verify the expense-report corrections in checklist item 67.
-10. Deploy and manually verify typed `recent` opens the short-lived launcher and keeps the resulting DM session ephemeral.
-11. Deploy and manually verify `View Inbox` and `Reconcile Now` show `BookieBot is typing...` without a temporary thinking message.
-12. Manually verify shared Needs logging plus update/move/delete/undo behavior in Discord and Google Sheets.
-13. Manually verify recent transactions and reconciliation after the latest reliability fixes.
-14. Consider a richer Discord button flow for grouped amount adjustments if the current UX feels too manual.
-15. Harden recent-action pending state across restarts/deploys, since selections currently live only in process memory.
-16. Improve targeted recent-action search so commands can find older matches, not only the latest 10 recent actions.
-17. Explore clarifying questions before logging when BookieBot is uncertain instead of guessing or silently failing.
+1. Deploy and manually verify quarterly utility history in checklist item 77.
+2. Deploy and manually verify parser and bill-payment reliability in checklist item 76.
+3. Deploy and manually verify split creation/settlement in checklist item 74 and recent split changes/cancellation in checklist item 75.
+4. Continue the deferred split lifecycle: correct gross after splitting, partial reimbursement, explicit paid-split undo, and split-aware update/move/delete/undo.
+5. Deploy and manually verify prior-month paycheck carry-forward in Projected mode in checklist item 73.
+6. Deploy and manually verify Wants subscriptions in Burn Rate in checklist item 72.
+7. Deploy and manually verify selected-month subscription scoping in checklist item 71.
+8. Deploy and manually verify Daily Spending bill coverage and outlier scaling in checklist item 70.
+9. Deploy and manually verify the monthly savings workflow and corrected Saved-card targets in checklist items 60-61 and 69.
+10. Deploy and manually verify the expense-report corrections in checklist item 67.
+11. Deploy and manually verify typed `recent` opens the short-lived launcher and keeps the resulting DM session ephemeral.
+12. Deploy and manually verify `View Inbox` and `Reconcile Now` show `BookieBot is typing...` without a temporary thinking message.
+13. Manually verify shared Needs logging plus update/move/delete/undo behavior in Discord and Google Sheets.
+14. Manually verify recent transactions and reconciliation after the latest reliability fixes.
+15. Consider a richer Discord button flow for grouped amount adjustments if the current UX feels too manual.
+16. Harden recent-action pending state across restarts/deploys, since selections currently live only in process memory.
+17. Improve targeted recent-action search so commands can find older matches, not only the latest 10 recent actions.
+18. Explore clarifying questions before logging when BookieBot is uncertain instead of guessing or silently failing.
 
 ## Completed 2026-08-07
 
+- Made utility-history points cadence-aware. Quarterly bills now emit chart points only in configured pull months, so off-cycle months no longer create `$0` nodes or a false dip to zero; monthly bills and scheduled quarterly months retain their existing values.
+- Added a Recology regression covering May/August quarterly hits with omitted June/July points. A local browser fixture confirmed only the May and August Recology dots render while monthly utility series remain continuous, with no browser warnings or errors.
+- Verification: report suite `46 passed`; full suite `489 passed`; Pyright reported zero errors; frontend typecheck/build passed; `git diff --check` passed. Production verification is checklist item 77 below.
 - Added deterministic routing for Rent, PG&E, Recology/trash, and Water log/check messages. Terse commands such as `Water bill 148.82` now reach `log_water_paid` without an OpenAI request while ambiguous purchases such as bottled water still use normal intent parsing.
 - Added bounded OpenAI retry/backoff for transient `429`, `5xx`, timeout, and connection failures while leaving billing/spend quota failures non-retryable.
 - Parser transport errors, malformed JSON, and unknown intents now remain explicit parser failures instead of being converted to the conversational fallback and a second generic GPT call. Discord reports that no change was made and asks the user to retry.
@@ -572,6 +576,8 @@ Use a test row or low-risk real row in Discord:
     - Temporarily simulate or observe an OpenAI `500` on a non-deterministic request. Expected: BookieBot retries the intent request; if all attempts fail, Discord says the parser is temporarily unavailable and explicitly says no changes were made. It does not send generic budgeting advice.
     - If Google Sheets returns a read-quota `429`, expected: BookieBot retries with bounded backoff. If quota remains exhausted, it says Sheets is temporarily rate-limiting reads and no sheet changes were made; it does not mislabel the failure as a spreadsheet-sharing problem or dump `APIError` details.
     - If a genuine spreadsheet permission error occurs, expected: the existing access message still names the active service account so the sheet can be shared with that account.
+77. After deployment, open an expense report whose utility history includes a quarterly bill such as Recology across both billing and off-cycle months.
+    - Expected: the quarterly series shows dots only in its configured pull months, such as May and August, with no `$0` nodes or curve through June and July. Monthly utility series continue to show their normal month-by-month points, and scheduled quarterly months remain eligible to show a real `$0` when the expected bill has not been entered.
 
 ## Verification Baseline
 
@@ -585,6 +591,24 @@ python -m pytest unit_tests/intents/test_handlers.py unit_tests/core/test_messag
 Latest verification:
 
 ```bash
+PYTHONPATH=src venv/bin/python -m pytest unit_tests/reports/test_expense_breakdown.py -q
+# passed: 46 passed
+
+PYTHONPATH=src venv/bin/python -m pytest unit_tests -q
+# passed: 489 passed, 1 warning
+
+pyright --pythonpath venv/bin/python --pythonversion 3.12
+# passed: 0 errors, 0 warnings, 0 informations
+
+cd web/expense-report && npm run typecheck && npm run build
+# passed
+
+Local browser verification of a May-August report fixture
+# passed: quarterly Recology rendered May/August dots only; monthly series remained continuous; no browser warnings/errors
+
+git diff --check
+# passed
+
 PYTHONPATH=src venv/bin/python -m pytest unit_tests/llm/test_client.py unit_tests/intents/test_parser.py unit_tests/core/test_message_router.py unit_tests/sheets/test_routing.py unit_tests/sheets/test_auth.py unit_tests/sheets/test_utils.py unit_tests/intents/test_handlers.py -q
 # passed: 221 passed
 
