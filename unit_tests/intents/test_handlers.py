@@ -6,7 +6,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import bookiebot.intents.handlers as ih
 from bookiebot.intents.explorer import INTENTS
-from bookiebot.sheets.routing import SpreadsheetAccessError
+from bookiebot.sheets.routing import SpreadsheetAccessError, spreadsheet_read_quota_error
 from unit_tests.support.sheets_repo_stub import SheetsRepoStub
 
 
@@ -255,6 +255,46 @@ async def test_logging_helpers_success(monkeypatch, message, intent, func_name, 
     await ih.handle_intent(intent, {"amount": amount}, message)
 
     assert any(expected in (msg or "") for msg, _ in message.channel.sent)
+
+
+@pytest.mark.asyncio
+async def test_payment_logging_retries_transient_sheets_read_quota(monkeypatch, message):
+    attempts = 0
+
+    def log_water(amount, **_kwargs):
+        nonlocal attempts
+        attempts += 1
+        if attempts == 1:
+            raise spreadsheet_read_quota_error()
+        return True, "payment-action"
+
+    sleep = AsyncMock()
+    monkeypatch.setenv("BOOKIEBOT_SHEETS_READ_MAX_ATTEMPTS", "3")
+    monkeypatch.setattr(ih.su, "log_water_paid", log_water)
+    monkeypatch.setattr(ih.asyncio, "sleep", sleep)
+    monkeypatch.setattr(ih.random, "uniform", lambda _start, _end: 0.0)
+
+    await ih.handle_intent("log_water_paid", {"amount": 148.82}, message)
+
+    assert attempts == 2
+    sleep.assert_awaited_once_with(1.0)
+    assert any("Logged water as paid" in (content or "") for content, _kwargs in message.channel.sent)
+
+
+@pytest.mark.asyncio
+async def test_payment_logging_reports_exhausted_sheets_quota_without_generic_error(monkeypatch, message):
+    def log_water(amount, **_kwargs):
+        raise spreadsheet_read_quota_error()
+
+    monkeypatch.setenv("BOOKIEBOT_SHEETS_READ_MAX_ATTEMPTS", "1")
+    monkeypatch.setattr(ih.su, "log_water_paid", log_water)
+
+    await ih.handle_intent("log_water_paid", {"amount": 148.82}, message)
+
+    reply = message.channel.sent[-1][0] or ""
+    assert "temporarily rate-limiting" in reply
+    assert "No sheet changes were made" in reply
+    assert "APIError" not in reply
 
 
 @pytest.mark.asyncio

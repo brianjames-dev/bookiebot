@@ -167,3 +167,23 @@ def test_get_month_worksheet_access_error_includes_service_account_email():
 
     with pytest.raises(routing.SpreadsheetAccessError, match="bookiebot-writer@example.test"):
         routing.get_month_worksheet(gc, "sheet-id", "May")
+
+
+def test_get_month_worksheet_reports_quota_errors_without_claiming_permission_failure():
+    class QuotaResponse:
+        status_code = 429
+
+    class QuotaError(RuntimeError):
+        response = QuotaResponse()
+
+    class QuotaGC:
+        bookiebot_service_account_email = "bookiebot-writer@example.test"
+
+        def open_by_key(self, key):
+            raise QuotaError("Quota exceeded for quota metric 'Read requests'")
+
+    with pytest.raises(routing.SpreadsheetQuotaError, match="temporarily rate-limiting") as exc_info:
+        routing.get_month_worksheet(QuotaGC(), "sheet-id", "May")
+
+    assert "permission" not in str(exc_info.value).lower()
+    assert "no sheet changes were made" in str(exc_info.value).lower()

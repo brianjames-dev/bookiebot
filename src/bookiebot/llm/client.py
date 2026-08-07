@@ -7,6 +7,7 @@ from __future__ import annotations
 
 import asyncio
 import json
+import logging
 import os
 from copy import deepcopy
 from dataclasses import dataclass
@@ -31,6 +32,80 @@ else:  # pragma: no cover - runtime fallback
 from dotenv import load_dotenv
 
 load_dotenv()
+
+logger = logging.getLogger(__name__)
+
+_NON_RETRYABLE_QUOTA_CODES = {
+    "credit_balance_exhausted",
+    "insufficient_quota",
+    "organization_spend_limit_exceeded",
+    "organization_usage_limit_exceeded",
+    "project_spend_limit_exceeded",
+}
+
+
+def _positive_int_env(name: str, default: int) -> int:
+    try:
+        return max(1, int(os.getenv(name, str(default))))
+    except ValueError:
+        return default
+
+
+def _positive_float_env(name: str, default: float) -> float:
+    try:
+        return max(0.0, float(os.getenv(name, str(default))))
+    except ValueError:
+        return default
+
+
+def _openai_error_status(exc: Exception) -> int | None:
+    for candidate in (
+        getattr(exc, "http_status", None),
+        getattr(exc, "status_code", None),
+        getattr(getattr(exc, "response", None), "status_code", None),
+    ):
+        if candidate is None:
+            continue
+        try:
+            return int(candidate)
+        except (TypeError, ValueError):
+            continue
+    return None
+
+
+def _openai_error_code(exc: Exception) -> str:
+    code = getattr(exc, "code", None) or getattr(exc, "error_code", None)
+    if not code:
+        error = getattr(exc, "error", None)
+        if isinstance(error, dict):
+            code = error.get("code") or error.get("type")
+    return str(code or "").strip().lower()
+
+
+def _openai_retry_after(exc: Exception) -> float | None:
+    headers = getattr(exc, "headers", None) or getattr(getattr(exc, "response", None), "headers", None)
+    if not headers:
+        return None
+    raw = headers.get("retry-after") or headers.get("Retry-After")
+    try:
+        return max(0.0, float(raw)) if raw is not None else None
+    except (TypeError, ValueError):
+        return None
+
+
+def _is_retryable_openai_error(exc: Exception) -> bool:
+    if _openai_error_code(exc) in _NON_RETRYABLE_QUOTA_CODES:
+        return False
+    status = _openai_error_status(exc)
+    if status in {408, 409, 429, 500, 502, 503, 504}:
+        return True
+    return type(exc).__name__ in {
+        "APIConnectionError",
+        "APITimeoutError",
+        "RateLimitError",
+        "ServiceUnavailableError",
+        "Timeout",
+    }
 
 
 class LLMClient(Protocol):
@@ -75,6 +150,9 @@ class OpenAIClient(LLMClient):
         if not self._api_key:
             raise RuntimeError("OPENAI_API_KEY must be set to use OpenAIClient.")
         self._openai.api_key = self._api_key
+        self._max_attempts = _positive_int_env("BOOKIEBOT_OPENAI_MAX_ATTEMPTS", 3)
+        self._base_retry_delay = _positive_float_env("BOOKIEBOT_OPENAI_RETRY_BASE_SECONDS", 0.75)
+        self._max_retry_delay = _positive_float_env("BOOKIEBOT_OPENAI_RETRY_MAX_SECONDS", 8.0)
 
     async def complete(
         self,
@@ -91,8 +169,29 @@ class OpenAIClient(LLMClient):
                 **kwargs,
             )
 
-        response = await asyncio.to_thread(_call)
-        return response.choices[0].message.content  # type: ignore[index]
+        for attempt in range(1, self._max_attempts + 1):
+            try:
+                response = await asyncio.to_thread(_call)
+                return response.choices[0].message.content  # type: ignore[index]
+            except Exception as exc:
+                if attempt >= self._max_attempts or not _is_retryable_openai_error(exc):
+                    raise
+                delay = _openai_retry_after(exc)
+                if delay is None:
+                    delay = min(self._base_retry_delay * (2 ** (attempt - 1)), self._max_retry_delay)
+                logger.warning(
+                    "Transient OpenAI request failed; retrying intent request",
+                    extra={
+                        "attempt": attempt,
+                        "max_attempts": self._max_attempts,
+                        "retry_delay_seconds": delay,
+                        "status": _openai_error_status(exc),
+                        "error_code": _openai_error_code(exc) or None,
+                    },
+                )
+                await asyncio.sleep(delay)
+
+        raise RuntimeError("OpenAI request retry loop ended unexpectedly.")
 
 
 class FixtureLLMClient(LLMClient):

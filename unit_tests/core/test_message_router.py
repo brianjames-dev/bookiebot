@@ -3,6 +3,7 @@ from types import SimpleNamespace
 from unittest.mock import AsyncMock
 
 from bookiebot.core.message_router import _action_management_intent
+from bookiebot.core.message_router import _bill_payment_intent
 from bookiebot.core.message_router import _format_processing_error
 from bookiebot.core.message_router import _maybe_typing
 
@@ -161,6 +162,37 @@ def test_split_last_expense_by_income_routes_without_llm():
 
 def test_new_logged_expense_with_split_instruction_is_not_mistaken_for_recent_action():
     assert _action_management_intent("log a $100 grocery expense and split by income") is None
+
+
+@pytest.mark.parametrize(
+    ("content", "expected"),
+    [
+        ("Water bill 148.82", ("log_water_paid", {"amount": 148.82})),
+        ("Log Water bill $148.82", ("log_water_paid", {"amount": 148.82})),
+        ("Rent 2100 split by income", ("log_rent_paid", {"amount": 2100.0, "split_method": "income"})),
+        ("PG&E bill was $95.12", ("log_pge_paid", {"amount": 95.12})),
+        ("Recology payment 86", ("log_recology_paid", {"amount": 86.0})),
+    ],
+)
+def test_bill_payments_route_without_llm(content, expected):
+    assert _bill_payment_intent(content) == expected
+
+
+@pytest.mark.parametrize(
+    ("content", "expected_intent"),
+    [
+        ("Did I pay the water bill?", "query_water_paid"),
+        ("Have I paid rent?", "query_rent_paid"),
+        ("Check whether PG&E was paid", "query_pge_paid"),
+        ("Was the trash bill paid?", "query_recology_paid"),
+    ],
+)
+def test_bill_payment_queries_route_without_llm(content, expected_intent):
+    assert _bill_payment_intent(content) == (expected_intent, {})
+
+
+def test_ambiguous_water_purchase_still_uses_llm():
+    assert _bill_payment_intent("I bought water for 4.50 at Target") is None
 
 
 def test_indexed_equal_split_routes_without_llm():
@@ -458,3 +490,98 @@ async def test_on_message_pending_move_item_can_be_canceled(monkeypatch):
     assert message.channel.sent == [("Canceled.", {})]
     assert undo.pending_move_item(actor_key) is None
     handle_intent.assert_not_awaited()
+
+
+@pytest.mark.asyncio
+async def test_on_message_parser_failure_does_not_call_generic_fallback(monkeypatch):
+    import bookiebot.core.message_router as router
+    from bookiebot.intents.parser import IntentParserError
+
+    class DummyClient:
+        def __init__(self):
+            self.user = SimpleNamespace(id=1)
+            self.events = {}
+
+        def event(self, func):
+            self.events[func.__name__] = func
+            return func
+
+    class DummyChannel:
+        id = 123
+        name = "bookiebot"
+
+        def __init__(self):
+            self.sent = []
+
+        async def send(self, content=None, **kwargs):
+            self.sent.append((content, kwargs))
+
+    monkeypatch.setattr(router.config, "CHANNEL_ID", None)
+    monkeypatch.setattr(router.config, "CHANNEL_NAME", "bookiebot")
+    monkeypatch.setattr(
+        router,
+        "parse_message_llm",
+        AsyncMock(side_effect=IntentParserError("Intent parsing is temporarily unavailable.")),
+    )
+    handle_intent = AsyncMock()
+    monkeypatch.setattr(router, "handle_intent", handle_intent)
+
+    client = DummyClient()
+    router.register_events(client, SimpleNamespace())
+    message = SimpleNamespace(
+        content="some unsupported request",
+        author=SimpleNamespace(id=830984827904851969, name="hannerish"),
+        channel=DummyChannel(),
+    )
+
+    await client.events["on_message"](message)
+
+    assert message.channel.sent == [
+        (
+            "❌ BookieBot's intent parser is temporarily unavailable, so I did not make any changes. "
+            "Please try again in a moment.",
+            {},
+        )
+    ]
+    handle_intent.assert_not_awaited()
+
+
+@pytest.mark.asyncio
+async def test_on_message_water_bill_bypasses_llm(monkeypatch):
+    import bookiebot.core.message_router as router
+
+    class DummyClient:
+        def __init__(self):
+            self.user = SimpleNamespace(id=1)
+            self.events = {}
+
+        def event(self, func):
+            self.events[func.__name__] = func
+            return func
+
+    class DummyChannel:
+        id = 123
+        name = "bookiebot"
+
+        async def send(self, content=None, **kwargs):
+            raise AssertionError(f"Unexpected response: {content}")
+
+    monkeypatch.setattr(router.config, "CHANNEL_ID", None)
+    monkeypatch.setattr(router.config, "CHANNEL_NAME", "bookiebot")
+    parse_message = AsyncMock(side_effect=AssertionError("LLM should not be called"))
+    handle_intent = AsyncMock()
+    monkeypatch.setattr(router, "parse_message_llm", parse_message)
+    monkeypatch.setattr(router, "handle_intent", handle_intent)
+
+    client = DummyClient()
+    router.register_events(client, SimpleNamespace())
+    message = SimpleNamespace(
+        content="Water bill 148.82",
+        author=SimpleNamespace(id=676638528590970917, name="deebers"),
+        channel=DummyChannel(),
+    )
+
+    await client.events["on_message"](message)
+
+    handle_intent.assert_awaited_once_with("log_water_paid", {"amount": 148.82}, message)
+    parse_message.assert_not_awaited()

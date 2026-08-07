@@ -1,7 +1,9 @@
 import asyncio
 import json
 
-from bookiebot.intents.parser import parse_message_llm
+import pytest
+
+from bookiebot.intents.parser import IntentParserError, parse_message_llm
 from bookiebot.intents.explorer import INTENTS
 from bookiebot.llm.client import FixtureLLMClient, LLMClient
 
@@ -62,3 +64,30 @@ def test_student_loan_payment_intents_are_retired_from_parser_prompt():
     assert "query_student_loans_paid" not in prompt
     assert "tracked as subscription autopay" in prompt
     assert "return the fallback intent" in prompt
+
+
+class _FailingLLMClient(LLMClient):
+    async def complete(self, *, messages, temperature=0.0, **kwargs):
+        raise RuntimeError("OpenAI returned 500")
+
+
+def test_parse_message_llm_does_not_turn_provider_errors_into_fallback():
+    with pytest.raises(IntentParserError, match="temporarily unavailable"):
+        asyncio.run(parse_message_llm("Water bill 148.82", llm_client=_FailingLLMClient()))
+
+
+class _MalformedLLMClient(LLMClient):
+    async def complete(self, *, messages, temperature=0.0, **kwargs):
+        return "not json"
+
+
+def test_parse_message_llm_rejects_malformed_provider_output():
+    with pytest.raises(IntentParserError, match="invalid response"):
+        asyncio.run(parse_message_llm("anything", llm_client=_MalformedLLMClient()))
+
+
+def test_parse_message_llm_rejects_unknown_intents():
+    client = FixtureLLMClient({"intent": "made_up_intent", "entities": {}})
+
+    with pytest.raises(IntentParserError, match="invalid response"):
+        asyncio.run(parse_message_llm("anything", llm_client=client))

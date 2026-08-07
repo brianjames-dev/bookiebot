@@ -338,6 +338,18 @@ Decision: Changing an outstanding split creates a child split action that recalc
 
 Rationale: Editing the original split in place would erase how responsibility changed, while treating cancellation as transaction deletion would corrupt the bank-clearing history. Reversible lineage preserves each allocation decision, keeps reconciliation anchored to gross, and gives outstanding and paid receivables intentionally different safety boundaries.
 
+## 2026-08-07 - Keep Parser Failures Separate From Conversational Fallback
+
+Decision: Retry transient OpenAI transport/server/rate failures at the LLM client boundary. If retries are exhausted, or the provider returns malformed or unknown structured intent data, raise a parser failure and tell the user no change was made. Reserve the `fallback` intent for an explicit valid model decision that the message does not match BookieBot functionality. Route high-confidence bill log/check grammar for Rent, PG&E, Recology, and Water before the LLM.
+
+Rationale: Treating an OpenAI `500` as `fallback` caused a second model call and generic budgeting advice for a valid mutation request. The error boundary must distinguish "unsupported request" from "intent service unavailable," while local routing keeps a small set of safety-critical, unambiguous bill commands operational without turning the router into a second general parser.
+
+## 2026-08-07 - Minimize Reads Before Bill-Payment Writes
+
+Decision: Cache current-month worksheet handles by spreadsheet/month, load a bill row once, reuse that row's prior value for undo metadata, and treat the successful Google Sheets update response as write confirmation instead of issuing a read-before-write plus read-after-write. Retry only classified pre-write read-quota failures with bounded asynchronous backoff and distinguish them from permissions/missing-sheet errors.
+
+Rationale: Google Sheets enforces a per-user read quota for the shared service account. Reopening the same workbook/tab and rereading the target cell around every idempotent bill-cell update consumed avoidable quota. Pre-write read retries are safe because no mutation has occurred; explicit classification also prevents a quota `429` from being presented as a sharing/permission problem.
+
 ## Pending Decisions
 
 - Where should durable system events live: banking database only, Google Sheets only, or dual-write during transition?

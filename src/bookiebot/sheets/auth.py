@@ -31,6 +31,7 @@ load_dotenv()
 
 SCOPES = ["https://www.googleapis.com/auth/spreadsheets"]
 _GC: Any = None
+_MONTH_WORKSHEET_BY_KEY = {}
 _ACTION_LOG_WORKSHEET_BY_TITLE = {}
 _SUBSCRIPTION_SCHEDULE_WORKSHEET_BY_KEY = {}
 _BILL_SCHEDULE_WORKSHEET_BY_KEY = {}
@@ -62,7 +63,11 @@ def get_gspread_client():
 
 
 def _open_month_sheet(spreadsheet_id: str):
-    return get_month_worksheet(_get_gc(), spreadsheet_id, get_current_month_name())
+    month_name = get_current_month_name()
+    cache_key = (spreadsheet_id, month_name)
+    if cache_key not in _MONTH_WORKSHEET_BY_KEY:
+        _MONTH_WORKSHEET_BY_KEY[cache_key] = get_month_worksheet(_get_gc(), spreadsheet_id, month_name)
+    return _MONTH_WORKSHEET_BY_KEY[cache_key]
 
 
 def get_expense_worksheet():

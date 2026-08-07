@@ -61,6 +61,13 @@ _SPLIT_VERBS = {"split"}
 _CATEGORIES = {"grocery", "groceries", "gas", "food", "shopping", "need", "needs"}
 _CANCEL_WORDS = {"cancel", "nevermind", "never mind", "stop"}
 
+_BILL_INTENTS = {
+    "rent": ("log_rent_paid", "query_rent_paid"),
+    "pge": ("log_pge_paid", "query_pge_paid"),
+    "recology": ("log_recology_paid", "query_recology_paid"),
+    "water": ("log_water_paid", "query_water_paid"),
+}
+
 
 @asynccontextmanager
 async def _maybe_typing(message: Any) -> AsyncIterator[None]:
@@ -348,6 +355,43 @@ def _recent_query_intent(content: str) -> tuple[str, dict] | None:
     return None
 
 
+def _bill_payment_intent(content: str) -> tuple[str, dict] | None:
+    """Recognize unambiguous bill logs/checks without depending on the LLM."""
+    text = " ".join(content.lower().split())
+    if re.search(r"\bp\s*g\s*(?:&|and)?\s*e\b|\bpge\b|\bgas and electric\b", text):
+        bill_key = "pge"
+    elif re.search(r"\brecology\b|\btrash\b|\bgarbage\b|\bwaste bill\b", text):
+        bill_key = "recology"
+    elif re.search(r"\brent\b", text):
+        bill_key = "rent"
+    elif re.search(r"\bwater\b", text):
+        bill_key = "water"
+    else:
+        return None
+
+    looks_like_query = bool(
+        re.search(r"\b(?:did|have|has)\b.*\b(?:pay|paid)\b", text)
+        or re.search(r"^(?:check|is|was)\b.*\bpaid\b", text)
+        or re.search(r"\bpaid\s*\?\s*$", text)
+    )
+    log_intent, query_intent = _BILL_INTENTS[bill_key]
+    if looks_like_query:
+        return query_intent, {}
+
+    if bill_key == "water" and re.search(r"\b(?:bought|purchased|drink|bottle)\b", text):
+        return None
+
+    amount_match = re.search(r"(?<![\w/])\$?(\d+(?:,\d{3})*(?:\.\d{1,2})?)(?![\w/])", text)
+    if amount_match is None:
+        return None
+    amount = float(amount_match.group(1).replace(",", ""))
+    entities: dict[str, Any] = {"amount": amount}
+    split_directive = requested_split_directive({}, content)
+    if split_directive in {"income", "equal", "prompt"}:
+        entities["split_method"] = split_directive
+    return log_intent, entities
+
+
 def register_events(client, tree):
     @client.event
     async def on_ready():
@@ -480,6 +524,23 @@ def register_events(client, tree):
             await handle_intent(intent, entities, message)
             return
 
+        bill_payment = _bill_payment_intent(content)
+        if bill_payment:
+            intent, entities = bill_payment
+            logger.info(
+                "Recognized bill intent without LLM",
+                extra={"intent": intent, "entities": entities, "user_id": str(message.author.id)},
+            )
+            try:
+                await handle_intent(intent, entities, message)
+            except Exception as exc:
+                logger.exception(
+                    "Failed to handle deterministic bill intent",
+                    extra={"exception": str(exc), "intent": intent, "entities": entities},
+                )
+                await message.channel.send(_format_processing_error(intent, entities, exc))
+            return
+
         reimbursement = _reimbursement_intent(content)
         if reimbursement:
             intent, entities = reimbursement
@@ -525,7 +586,10 @@ def register_events(client, tree):
             )
         except Exception as e:
             logger.exception("Failed to parse intent", extra={"exception": str(e)})
-            await message.channel.send("❌ Sorry, I couldn’t understand your request.")
+            await message.channel.send(
+                "❌ BookieBot's intent parser is temporarily unavailable, so I did not make any changes. "
+                "Please try again in a moment."
+            )
             return
 
         if not intent:

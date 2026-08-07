@@ -47,6 +47,10 @@ class SpreadsheetAccessError(SheetRoutingError):
     """Raised when a configured spreadsheet cannot be opened."""
 
 
+class SpreadsheetQuotaError(SheetRoutingError):
+    """Raised when Google Sheets temporarily rejects a read for quota reasons."""
+
+
 class MissingMonthWorksheetError(SheetRoutingError):
     """Raised when a monthly tab is missing from a configured spreadsheet."""
 
@@ -263,10 +267,27 @@ def get_shared_expenses_spreadsheet_id(year: int | str) -> str:
     return get_year_config(year).shared_expenses_spreadsheet_id
 
 
+def is_google_sheets_quota_error(exc: Exception) -> bool:
+    status = getattr(getattr(exc, "response", None), "status_code", None)
+    if status is None:
+        status = getattr(exc, "status_code", None)
+    text = f"{type(exc).__name__}: {exc}".lower()
+    return status == 429 or ("429" in text and ("quota" in text or "too many requests" in text))
+
+
+def spreadsheet_read_quota_error() -> SpreadsheetQuotaError:
+    return SpreadsheetQuotaError(
+        "Google Sheets is temporarily rate-limiting BookieBot's reads. "
+        "No sheet changes were made. Please wait about a minute and try again."
+    )
+
+
 def get_month_worksheet(gc: Any, spreadsheet_id: str, month_name: str) -> Any:
     try:
         spreadsheet = gc.open_by_key(spreadsheet_id)
     except Exception as exc:
+        if is_google_sheets_quota_error(exc):
+            raise spreadsheet_read_quota_error() from exc
         service_account_email = str(getattr(gc, "bookiebot_service_account_email", "") or "").strip()
         account_hint = f" Active service account: {service_account_email}." if service_account_email else ""
         raise SpreadsheetAccessError(
@@ -278,6 +299,8 @@ def get_month_worksheet(gc: Any, spreadsheet_id: str, month_name: str) -> Any:
     try:
         return spreadsheet.worksheet(month_name)
     except Exception as exc:
+        if is_google_sheets_quota_error(exc):
+            raise spreadsheet_read_quota_error() from exc
         raise MissingMonthWorksheetError(
             f"Worksheet '{month_name}' was not found in spreadsheet '{spreadsheet_id}'."
         ) from exc

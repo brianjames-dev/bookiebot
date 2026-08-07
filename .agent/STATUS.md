@@ -1,29 +1,39 @@
 # Agent Status
 
-Last updated: 2026-08-03
+Last updated: 2026-08-07
 
 ## Active Focus
 
-Recent split transactions now expose dedicated method-change and cancellation workflows for both normal expenses and bills while preserving gross reconciliation history. The next step is production verification, followed by gross correction, partial reimbursement, paid-split correction, and split-aware transaction mutation work.
+Bill logging and intent parsing now fail conservatively through transient OpenAI and Google Sheets errors, and terse bill commands no longer depend on the LLM. The immediate next step is production verification of this reliability slice, followed by the existing split lifecycle work.
 
 ## On Deck
 
-1. Deploy and manually verify split creation/settlement in checklist item 74 and recent split changes/cancellation in checklist item 75.
-2. Continue the deferred split lifecycle: correct gross after splitting, partial reimbursement, explicit paid-split undo, and split-aware update/move/delete/undo.
-3. Deploy and manually verify prior-month paycheck carry-forward in Projected mode in checklist item 73.
-4. Deploy and manually verify Wants subscriptions in Burn Rate in checklist item 72.
-5. Deploy and manually verify selected-month subscription scoping in checklist item 71.
-6. Deploy and manually verify Daily Spending bill coverage and outlier scaling in checklist item 70.
-7. Deploy and manually verify the monthly savings workflow and corrected Saved-card targets in checklist items 60-61 and 69.
-8. Deploy and manually verify the expense-report corrections in checklist item 67.
-9. Deploy and manually verify typed `recent` opens the short-lived launcher and keeps the resulting DM session ephemeral.
-10. Deploy and manually verify `View Inbox` and `Reconcile Now` show `BookieBot is typing...` without a temporary thinking message.
-11. Manually verify shared Needs logging plus update/move/delete/undo behavior in Discord and Google Sheets.
-12. Manually verify recent transactions and reconciliation after the latest reliability fixes.
-13. Consider a richer Discord button flow for grouped amount adjustments if the current UX feels too manual.
-14. Harden recent-action pending state across restarts/deploys, since selections currently live only in process memory.
-15. Improve targeted recent-action search so commands can find older matches, not only the latest 10 recent actions.
-16. Explore clarifying questions before logging when BookieBot is uncertain instead of guessing or silently failing.
+1. Deploy and manually verify parser and bill-payment reliability in checklist item 76.
+2. Deploy and manually verify split creation/settlement in checklist item 74 and recent split changes/cancellation in checklist item 75.
+3. Continue the deferred split lifecycle: correct gross after splitting, partial reimbursement, explicit paid-split undo, and split-aware update/move/delete/undo.
+4. Deploy and manually verify prior-month paycheck carry-forward in Projected mode in checklist item 73.
+5. Deploy and manually verify Wants subscriptions in Burn Rate in checklist item 72.
+6. Deploy and manually verify selected-month subscription scoping in checklist item 71.
+7. Deploy and manually verify Daily Spending bill coverage and outlier scaling in checklist item 70.
+8. Deploy and manually verify the monthly savings workflow and corrected Saved-card targets in checklist items 60-61 and 69.
+9. Deploy and manually verify the expense-report corrections in checklist item 67.
+10. Deploy and manually verify typed `recent` opens the short-lived launcher and keeps the resulting DM session ephemeral.
+11. Deploy and manually verify `View Inbox` and `Reconcile Now` show `BookieBot is typing...` without a temporary thinking message.
+12. Manually verify shared Needs logging plus update/move/delete/undo behavior in Discord and Google Sheets.
+13. Manually verify recent transactions and reconciliation after the latest reliability fixes.
+14. Consider a richer Discord button flow for grouped amount adjustments if the current UX feels too manual.
+15. Harden recent-action pending state across restarts/deploys, since selections currently live only in process memory.
+16. Improve targeted recent-action search so commands can find older matches, not only the latest 10 recent actions.
+17. Explore clarifying questions before logging when BookieBot is uncertain instead of guessing or silently failing.
+
+## Completed 2026-08-07
+
+- Added deterministic routing for Rent, PG&E, Recology/trash, and Water log/check messages. Terse commands such as `Water bill 148.82` now reach `log_water_paid` without an OpenAI request while ambiguous purchases such as bottled water still use normal intent parsing.
+- Added bounded OpenAI retry/backoff for transient `429`, `5xx`, timeout, and connection failures while leaving billing/spend quota failures non-retryable.
+- Parser transport errors, malformed JSON, and unknown intents now remain explicit parser failures instead of being converted to the conversational fallback and a second generic GPT call. Discord reports that no change was made and asks the user to retry.
+- Distinguished Google Sheets read-quota failures from genuine spreadsheet permission/missing-tab errors. Bill logging retries read-quota failures asynchronously, then returns a concise no-mutation message if the quota remains exhausted.
+- Cached current-month worksheet handles and reduced bill-payment mutation from three income-sheet reads to one by reusing the already loaded prior value and trusting a successful update response.
+- Verification: focused parser/router/LLM/Sheets/handler suite `221 passed`; full suite `488 passed`; Pyright reported zero errors; `git diff --check` passed. Production verification is checklist item 76 below.
 
 ## Completed 2026-08-03
 
@@ -557,6 +567,11 @@ Use a test row or low-risk real row in Discord:
     - Change a `$200.00` Brian split from By income to 50/50. Expected: the visible personal share changes from `$129.46` to `$100.00`, partner responsibility changes from `$70.54` to `$100.00`, and the preserved gross/bank candidate remains `$200.00`. Undo should return the split to By income.
     - Choose `Cancel split`, then `Keep split`. Expected: nothing changes. Repeat and choose `Confirm cancel split`. Expected: the visible amount returns to `$200.00`, the reimbursement is voided/removed from outstanding totals, and the original expense/payment returns to Recent Transactions with `Split` available again.
     - Mark a separate reimbursement received, then attempt Change split and Cancel split. Expected: both are refused with settlement-correction guidance; the personal amount, received ledger state, and bank lineage remain unchanged.
+76. After deployment, send `Water bill 148.82`, `Log Water bill 148.82`, `Rent 2100`, and one paid-status question such as `Did I pay the water bill?`.
+    - Expected: each unambiguous bill message routes without an OpenAI request; the logs say `Recognized bill intent without LLM`; the payment command writes once and returns the normal success/split prompt.
+    - Temporarily simulate or observe an OpenAI `500` on a non-deterministic request. Expected: BookieBot retries the intent request; if all attempts fail, Discord says the parser is temporarily unavailable and explicitly says no changes were made. It does not send generic budgeting advice.
+    - If Google Sheets returns a read-quota `429`, expected: BookieBot retries with bounded backoff. If quota remains exhausted, it says Sheets is temporarily rate-limiting reads and no sheet changes were made; it does not mislabel the failure as a spreadsheet-sharing problem or dump `APIError` details.
+    - If a genuine spreadsheet permission error occurs, expected: the existing access message still names the active service account so the sheet can be shared with that account.
 
 ## Verification Baseline
 
@@ -570,6 +585,18 @@ python -m pytest unit_tests/intents/test_handlers.py unit_tests/core/test_messag
 Latest verification:
 
 ```bash
+PYTHONPATH=src venv/bin/python -m pytest unit_tests/llm/test_client.py unit_tests/intents/test_parser.py unit_tests/core/test_message_router.py unit_tests/sheets/test_routing.py unit_tests/sheets/test_auth.py unit_tests/sheets/test_utils.py unit_tests/intents/test_handlers.py -q
+# passed: 221 passed
+
+PYTHONPATH=src venv/bin/python -m pytest unit_tests -q
+# passed: 488 passed, 1 warning
+
+pyright --pythonpath venv/bin/python --pythonversion 3.12
+# passed: 0 errors, 0 warnings, 0 informations
+
+git diff --check
+# passed
+
 PYTHONPATH=src venv/bin/python -m pytest unit_tests/sheets/test_collaboration.py unit_tests/test_splits.py unit_tests/intents/test_handlers.py unit_tests/banking/test_reconciliation.py unit_tests/banking/test_store.py unit_tests/core/test_bank_reconciliation.py -q
 # passed: 226 passed
 

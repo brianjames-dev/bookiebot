@@ -1,4 +1,5 @@
 import json
+import logging
 from datetime import date
 from typing import Any, Dict, Optional
 
@@ -10,6 +11,11 @@ from bookiebot.llm.client import LLMClient, OpenAIClient
 load_dotenv()
 
 _DEFAULT_LLM_CLIENT: Optional[LLMClient] = None
+logger = logging.getLogger(__name__)
+
+
+class IntentParserError(RuntimeError):
+    """Raised when intent parsing failed rather than deliberately choosing fallback."""
 
 
 def _get_default_client() -> LLMClient:
@@ -210,13 +216,27 @@ async def parse_message_llm(user_message: str, *, llm_client: Optional[LLMClient
             ],
             temperature=0,
         )
+    except Exception as exc:
+        logger.exception("Intent provider request failed")
+        raise IntentParserError("Intent parsing is temporarily unavailable.") from exc
+
+    try:
         if isinstance(raw_response, str):
             parsed = json.loads(raw_response)
         elif isinstance(raw_response, dict):
             parsed = raw_response
         else:
             raise ValueError("LLM response must be JSON string or dict.")
+        if not isinstance(parsed, dict):
+            raise ValueError("LLM response must be a JSON object.")
+        if not isinstance(parsed.get("intent"), str) or not parsed["intent"].strip():
+            raise ValueError("LLM response must include a non-empty intent.")
+        if parsed["intent"] != "fallback" and parsed["intent"] not in INTENTS:
+            raise ValueError(f"LLM response included unknown intent: {parsed['intent']}")
+        entities = parsed.setdefault("entities", {})
+        if not isinstance(entities, dict):
+            raise ValueError("LLM response entities must be a JSON object.")
         return parsed
-    except Exception as e:
-        print("[ERROR] Parsing error:", e)
-        return {"intent": "fallback", "entities": {}}
+    except (json.JSONDecodeError, TypeError, ValueError) as exc:
+        logger.warning("Intent provider returned an invalid response", extra={"exception": str(exc)})
+        raise IntentParserError("The intent provider returned an invalid response.") from exc

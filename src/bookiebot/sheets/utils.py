@@ -8,7 +8,14 @@ from zoneinfo import ZoneInfo
 from bookiebot.sheets.config import get_category_columns, normalize_expense_category
 from dateutil import parser as dateparser
 from collections import defaultdict, Counter
-from bookiebot.sheets.routing import get_user_config, resolve_actor_key, UnknownDiscordUserError
+from bookiebot.sheets.routing import (
+    SpreadsheetQuotaError,
+    UnknownDiscordUserError,
+    get_user_config,
+    is_google_sheets_quota_error,
+    resolve_actor_key,
+    spreadsheet_read_quota_error,
+)
 
 import gspread
 from gspread.utils import rowcol_to_a1
@@ -1461,8 +1468,15 @@ def log_payment(category_label, amount, *, return_action_id: bool = False):
     Finds the row where column B matches category_label (case-insensitive),
     and writes the amount to column C of that row.
     """
-    ws = _income_ws()
-    rows = ws.get_all_values()
+    try:
+        ws = _income_ws()
+        rows = ws.get_all_values()
+    except SpreadsheetQuotaError:
+        raise
+    except Exception as exc:
+        if is_google_sheets_quota_error(exc):
+            raise spreadsheet_read_quota_error() from exc
+        raise
     discord_user_id = get_current_discord_user_id()
 
     for row_idx, row in enumerate(rows):
@@ -1473,23 +1487,8 @@ def log_payment(category_label, amount, *, return_action_id: bool = False):
         if label_cell.startswith(category_label.lower()):
             # Write to column C (3)
             cell_to_update = rowcol_to_a1(row_idx + 1, 3)
-            previous_value = ws.acell(cell_to_update).value
+            previous_value = row[2] if len(row) > 2 else ""
             ws.update_acell(cell_to_update, str(amount))
-
-            actual_value = ws.acell(cell_to_update).value
-            if abs(clean_money(actual_value) - clean_money(str(amount))) > 0.001:
-                logger.error(
-                    "Payment update did not verify",
-                    extra={
-                        "category": category_label,
-                        "amount": amount,
-                        "actual_value": actual_value,
-                        "cell": cell_to_update,
-                        "worksheet": getattr(ws, "title", ""),
-                        "user_id": discord_user_id,
-                    },
-                )
-                return (False, None) if return_action_id else False
 
             logger.info(
                 "Payment logged",

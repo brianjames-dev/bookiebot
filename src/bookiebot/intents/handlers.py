@@ -1,6 +1,9 @@
 # all intent handlers
 from contextlib import asynccontextmanager
+import asyncio
+import logging
 import os
+import random
 import re
 import time
 from collections.abc import AsyncIterator
@@ -27,6 +30,7 @@ from collections.abc import Awaitable, Callable
 from typing import Any, AsyncContextManager, cast
 from bookiebot.sheets.utils import resolve_query_persons, get_local_today
 from bookiebot.sheets.routing import (
+    SpreadsheetQuotaError,
     SheetRoutingError,
     UnknownDiscordUserError,
     actor_key_aliases,
@@ -83,6 +87,34 @@ IntentEntities = dict[str, Any]
 IntentHandler = Callable[[IntentEntities, Any], Awaitable[None]]
 _RECENT_FOLLOWUP_TTL_SECONDS = 600.0
 _RECENT_PRIVATE_FOLLOWUPS: dict[str, tuple[float, Callable[..., Awaitable[Any]]]] = {}
+logger = logging.getLogger(__name__)
+
+
+def _payment_log_retry_attempts() -> int:
+    try:
+        return max(1, int(os.getenv("BOOKIEBOT_SHEETS_READ_MAX_ATTEMPTS", "4")))
+    except ValueError:
+        return 4
+
+
+async def _log_payment_with_retry(logger_func: Callable[..., Any], amount: Any) -> tuple[bool, str | None]:
+    attempts = _payment_log_retry_attempts()
+    for attempt in range(1, attempts + 1):
+        try:
+            return cast(
+                tuple[bool, str | None],
+                await asyncio.to_thread(logger_func, amount, return_action_id=True),
+            )
+        except SpreadsheetQuotaError:
+            if attempt >= attempts:
+                raise
+            delay = min(float(2 ** (attempt - 1)), 8.0) + random.uniform(0.0, 1.0)
+            logger.warning(
+                "Google Sheets read quota reached while logging payment; retrying",
+                extra={"attempt": attempt, "max_attempts": attempts, "retry_delay_seconds": delay},
+            )
+            await asyncio.sleep(delay)
+    raise RuntimeError("Payment retry loop ended unexpectedly.")
 
 
 @asynccontextmanager
@@ -1648,7 +1680,7 @@ async def log_rent_paid_handler(entities, message):
         await message.channel.send("❌ Please specify the amount you paid for rent.")
         return
 
-    success, action_id = cast(tuple[bool, str | None], su.log_rent_paid(amount, return_action_id=True))
+    success, action_id = await _log_payment_with_retry(su.log_rent_paid, amount)
     if success:
         await message.channel.send(f"✅ Logged rent as paid for {_budget_profile_name(message)}: ${amount:.2f}")
         await continue_split_after_log(
@@ -1668,7 +1700,7 @@ async def log_pge_paid_handler(entities, message):
         await message.channel.send("❌ Please specify the amount you paid for PG&E.")
         return
 
-    success, action_id = cast(tuple[bool, str | None], su.log_pge_paid(amount, return_action_id=True))
+    success, action_id = await _log_payment_with_retry(su.log_pge_paid, amount)
     if success:
         await message.channel.send(f"✅ Logged PG&E as paid for {_budget_profile_name(message)}: ${amount:.2f}")
         await continue_split_after_log(
@@ -1688,7 +1720,7 @@ async def log_recology_paid_handler(entities, message):
         await message.channel.send("❌ Please specify the amount you paid for Recology.")
         return
 
-    success, action_id = cast(tuple[bool, str | None], su.log_recology_paid(amount, return_action_id=True))
+    success, action_id = await _log_payment_with_retry(su.log_recology_paid, amount)
     if success:
         await message.channel.send(f"✅ Logged Recology as paid for {_budget_profile_name(message)}: ${amount:.2f}")
         await continue_split_after_log(
@@ -1708,7 +1740,7 @@ async def log_water_paid_handler(entities, message):
         await message.channel.send("❌ Please specify the amount you paid for water.")
         return
 
-    success, action_id = cast(tuple[bool, str | None], su.log_water_paid(amount, return_action_id=True))
+    success, action_id = await _log_payment_with_retry(su.log_water_paid, amount)
     if success:
         await message.channel.send(f"✅ Logged water as paid for {_budget_profile_name(message)}: ${amount:.2f}")
         await continue_split_after_log(

@@ -56,13 +56,30 @@ def test_resolve_query_persons_disambiguates_shared_shortcut_relay_id():
     assert result == ["Brian (BofA)", "Brian (AL)"]
 
 
-def test_log_payment_updates_and_verifies_income_cell():
+def test_log_payment_updates_income_cell():
     repo = SheetsRepoStub(income_rows=[["", "Rent", ""]])
 
     with repo.patched():
         assert su.log_payment("rent", 1625) is True
 
     assert repo.income.acell("C1").value == "1625"
+
+
+def test_log_payment_reuses_loaded_row_instead_of_reading_cell_before_and_after_write(monkeypatch):
+    ws = MagicMock()
+    ws.title = "August"
+    ws.get_all_values.return_value = [["", "Water", "$100.00"]]
+    monkeypatch.setattr(su, "_income_ws", lambda: ws)
+    record_action = MagicMock(return_value="action-id")
+    monkeypatch.setattr(su, "record_undo_action", record_action)
+
+    result = su.log_payment("water", 148.82, return_action_id=True)
+
+    assert result == (True, "action-id")
+    ws.get_all_values.assert_called_once_with()
+    ws.acell.assert_not_called()
+    ws.update_acell.assert_called_once_with("C1", "148.82")
+    assert record_action.call_args.args[1].previous_values == ["$100.00"]
 
 
 def test_log_payment_returns_false_when_label_missing():

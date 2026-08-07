@@ -1,6 +1,6 @@
 # Finance Operations Workstream
 
-Last updated: 2026-08-03
+Last updated: 2026-08-07
 
 ## Goal
 
@@ -544,6 +544,17 @@ Status: Complete in code and focused/browser verification; production confirmati
 - Regression coverage rejects the removed markup and styling while continuing to assert the compression trigger and chart data paths.
 - Live Brian August browser verification confirmed the chart still compresses the rent outlier, the pill and copy are absent, the page has no horizontal overflow, and browser logs are clean.
 - Verification: focused report suite `44 passed`; full suite `432 passed, 1 skipped`; Pyright clean; frontend typecheck/build passed; `git diff --check` passed.
+
+### 2026-08-07 Intent And Bill-Payment Reliability Follow-Up
+
+Status: Complete in code and automated verification; production confirmation remains in `.agent/STATUS.md` checklist item 76.
+
+- Unambiguous Rent, PG&E, Recology/trash, and Water logs/checks route locally before the LLM. This keeps critical bill mutation available during a transient OpenAI incident and preserves LLM parsing for genuinely ambiguous purchases.
+- The OpenAI client retries transient server/rate/connection failures with bounded backoff. Parser infrastructure failures and invalid/unknown structured responses now raise through the parser boundary instead of becoming a legitimate `fallback` and triggering generic advice.
+- Google Sheets `429` read-quota errors are distinct from permissions and missing worksheets. Bill-payment reads retry asynchronously and report a no-mutation outcome after exhaustion.
+- Current-month worksheet handles are cached per spreadsheet/month. Bill-payment logging reuses the loaded row's previous value and removes two redundant `acell` reads, reducing the mutation path from three income-sheet reads to one after worksheet resolution.
+- Verification: focused reliability suite `221 passed`; full suite `488 passed`; Pyright clean; `git diff --check` passed.
+- Manual test: deploy, send `Water bill 148.82` and a bill-status query, then confirm local routing, the normal success/split flow, and the bounded no-generic-response behavior under simulated OpenAI `500` and Sheets read-quota `429` failures.
 
 ## Open Questions
 
