@@ -9,7 +9,7 @@ from bookiebot.sheets.undo import change_split_recent_action, split_recent_actio
 from bookiebot.ui.recent_actions import ChangeSplitMethodView, SplitMethodView
 
 
-SplitDirective = Literal["income", "equal", "prompt", "none"]
+SplitDirective = Literal["income", "equal", "covered", "prompt", "none"]
 SPLIT_PROMPT = "How do you want to split this expense?"
 
 
@@ -31,6 +31,12 @@ def requested_split_directive(data: dict[str, Any], content: str = "") -> SplitD
         return "income"
     if re.search(r"\b50\s*/\s*50\b", text) or ("split" in text and re.search(r"\b(?:evenly|equally)\b", text)):
         return "equal"
+    if re.search(r"\bcover(?:ed)?\b.*\bfor\s+(?:hannah|brian|them|her|him)\b", text):
+        return "covered"
+    if re.search(r"\b(?:hannah|brian|they|she|he)\s+owes?\s+me\s+(?:all|the\s+full\s+amount|for\s+(?:this|that|the|my))\b", text):
+        return "covered"
+    if re.search(r"\b(?:they|partner)\s+owe(?:s)?\s+(?:it\s+)?all\b", text):
+        return "covered"
     if re.search(r"\bsplit\b", text):
         return "prompt"
     return None
@@ -125,7 +131,7 @@ async def continue_split_after_log(
     directive = requested_split_directive(data, getattr(message, "content", ""))
     if directive == "none":
         return
-    if directive in {"income", "equal"}:
+    if directive in {"income", "equal", "covered"}:
         with sheet_user_context(actor_key):
             success, detail = split_recent_action(
                 actor_key,

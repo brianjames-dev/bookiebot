@@ -177,7 +177,7 @@ def get_shared_reimbursements_worksheet():
         worksheet = spreadsheet.add_worksheet(
             title=SHARED_REIMBURSEMENTS_WORKSHEET_TITLE,
             rows=1000,
-            cols=22,
+            cols=25,
         )
     _SHARED_REIMBURSEMENTS_WORKSHEET_BY_KEY[cache_key] = worksheet
     return worksheet

@@ -1785,8 +1785,10 @@ def split_recent_action(
     from bookiebot.sheets.collaboration import (
         allocation_for_source_action,
         append_allocation,
+        expense_person_for_owner,
         new_allocation,
         normalize_split_method,
+        partner_owner_key,
         payer_owner_from_person,
         remove_allocation,
         split_amounts,
@@ -1796,7 +1798,7 @@ def split_recent_action(
 
     method = normalize_split_method(split_method)
     if method is None:
-        return False, "Choose either By income or 50/50 for this split."
+        return False, "Choose By income, 50/50, or They owe all for this split."
 
     logged = select_recent_action(
         user_key,
@@ -1818,6 +1820,12 @@ def split_recent_action(
     amount_column = field_columns.get("amount")
     if amount_column is None:
         return False, "I could not find the amount cell for that transaction."
+    person_column = field_columns.get("person")
+    if method == "covered" and (action.worksheet != "expense" or person_column is None):
+        return (
+            False,
+            "They owe all is currently available only for shared expense rows, not rent or utility payment cells.",
+        )
 
     ws = _worksheet(action.worksheet)
     gross_value = _sheet_value(ws.cell(action.row, amount_column).value)
@@ -1833,14 +1841,22 @@ def split_recent_action(
     field_values = dict(zip(fields, current_values, strict=False))
     payer = field_values.get("person") or action.metadata.get("person") or get_user_config(user_key).name
     payer_owner = payer_owner_from_person(payer, user_key)
+    responsible_owner = partner_owner_key(payer_owner) if method == "covered" else payer_owner
+    responsible_person = expense_person_for_owner(
+        responsible_owner,
+        original_person=payer,
+    )
     try:
         payer_share, partner_share = split_amounts(gross_amount, method, payer_owner)
     except ValueError as exc:
         return False, str(exc)
 
+    visible_amount = gross_amount if method == "covered" else payer_share
     after_values = list(current_values)
     if "amount" in fields:
-        after_values[fields.index("amount")] = f"{payer_share:.2f}"
+        after_values[fields.index("amount")] = f"{visible_amount:.2f}"
+    if "person" in fields:
+        after_values[fields.index("person")] = responsible_person
 
     allocation = new_allocation(
         actor_key=user_key,
@@ -1856,20 +1872,31 @@ def split_recent_action(
         split_method=method,
         payer_share=payer_share,
         partner_share=partner_share,
+        responsible_owner_key=responsible_owner,
+        original_person=payer,
+        responsible_person=responsible_person,
     )
+
+    update_columns = [amount_column]
+    update_values: list[Any] = [_sheet_user_entered_value("amount", visible_amount)]
+    previous_values = [gross_value]
+    if method == "covered" and person_column is not None:
+        update_columns.append(person_column)
+        update_values.append(responsible_person)
+        previous_values.append(field_values.get("person", payer))
 
     try:
         _update_contiguous_row(
             ws,
             action.row,
-            [amount_column],
-            [_sheet_user_entered_value("amount", payer_share)],
+            update_columns,
+            update_values,
         )
         append_allocation(allocation)
     except Exception as exc:
         logger.exception("Failed to persist shared expense allocation", extra={"exception": str(exc)})
         try:
-            _update_contiguous_row(ws, action.row, [amount_column], [gross_value])
+            _update_contiguous_row(ws, action.row, update_columns, previous_values)
         except Exception:
             logger.exception("Failed to roll back expense amount after split persistence failure")
         return False, "Something went wrong while saving that split. The original amount was left in place."
@@ -1880,8 +1907,8 @@ def split_recent_action(
             worksheet=action.worksheet,
             kind="restore_cells",
             row=action.row,
-            columns=[amount_column],
-            previous_values=[gross_value],
+            columns=update_columns,
+            previous_values=previous_values,
             new_values=after_values,
             metadata={
                 **action.metadata,
@@ -1893,6 +1920,9 @@ def split_recent_action(
                 "payer_share": f"{payer_share:.2f}",
                 "partner_share": f"{partner_share:.2f}",
                 "split_method": method,
+                "original_person": payer,
+                "responsible_owner_key": responsible_owner,
+                "responsible_person": responsible_person,
                 "split_operation": "apply",
                 "display_fields": json.dumps(fields),
             },
@@ -1902,7 +1932,7 @@ def split_recent_action(
     if split_action_id is None:
         try:
             remove_allocation(allocation.allocation_id)
-            _update_contiguous_row(ws, action.row, [amount_column], [gross_value])
+            _update_contiguous_row(ws, action.row, update_columns, previous_values)
         except Exception:
             logger.exception("Failed to roll back split after action-log failure")
         return False, "Something went wrong while recording the split. The original amount was restored."
@@ -1917,6 +1947,12 @@ def split_recent_action(
     ratio_detail = "64.73% / 35.27%" if method == "income" else "50% / 50%"
     if payer_owner == "hannah" and method == "income":
         ratio_detail = "35.27% / 64.73%"
+    if method == "covered":
+        return (
+            True,
+            f"Covered expense recorded. {payer_name} paid ${gross_amount:.2f}; "
+            f"{partner_name} owns the full ${gross_amount:.2f} expense and owes {payer_name} ${partner_share:.2f}.",
+        )
     return (
         True,
         f"Split applied ({split_method_label(method)}, {ratio_detail}). "
@@ -1933,8 +1969,11 @@ def change_split_recent_action(
 ) -> tuple[bool, str]:
     """Change an outstanding split method while retaining its immutable gross amount."""
     from bookiebot.sheets.collaboration import (
+        allocation_visible_amount,
         allocation_by_id,
+        expense_person_for_owner,
         normalize_split_method,
+        partner_owner_key,
         split_amounts,
         split_method_label,
         update_allocation,
@@ -1942,7 +1981,7 @@ def change_split_recent_action(
 
     method = normalize_split_method(split_method)
     if method is None:
-        return False, "Choose either By income or 50/50 for this split."
+        return False, "Choose By income, 50/50, or They owe all for this split."
     logged = select_recent_action(user_key, action_id=action_id)
     if logged is None or logged.action.metadata.get("type") != "split":
         return False, "I could not find that active split."
@@ -1963,31 +2002,61 @@ def change_split_recent_action(
     amount_column = _field_columns_for_action(action).get("amount")
     if amount_column is None:
         return False, "I could not find the amount cell for that split."
+    person_column = _field_columns_for_action(action).get("person")
+    if method == "covered" and (action.worksheet != "expense" or person_column is None):
+        return (
+            False,
+            "They owe all is currently available only for shared expense rows, not rent or utility payment cells.",
+        )
     ws = _worksheet(action.worksheet)
     current_value = _sheet_value(ws.cell(action.row, amount_column).value)
     try:
         current_amount = float(current_value.replace("$", "").replace(",", "").strip())
     except ValueError:
         return False, "I could not read the current personal-share amount for that split."
-    if round(current_amount, 2) != round(allocation.payer_share, 2):
+    if round(current_amount, 2) != round(allocation_visible_amount(allocation), 2):
         return (
             False,
-            "The visible amount no longer matches this split's recorded personal share, so I did not overwrite it.",
+            "The visible amount no longer matches this split's recorded responsibility, so I did not overwrite it.",
+        )
+
+    current_person = _sheet_value(ws.cell(action.row, person_column).value) if person_column else ""
+    expected_person = allocation.responsible_person or allocation.original_person or allocation.payer
+    if person_column and expected_person and current_person != expected_person:
+        return (
+            False,
+            "The visible person no longer matches this split's recorded responsibility, so I did not overwrite it.",
         )
 
     payer_share, partner_share = split_amounts(allocation.gross_amount, method, allocation.owner_key)
+    responsible_owner = partner_owner_key(allocation.owner_key) if method == "covered" else allocation.owner_key
+    responsible_person = expense_person_for_owner(
+        responsible_owner,
+        original_person=allocation.original_person or allocation.payer,
+    )
+    visible_amount = allocation.gross_amount if method == "covered" else payer_share
     field_columns = _field_columns_for_action(action)
     fields = list(field_columns)
     current_values = [_sheet_value(ws.cell(action.row, field_columns[field]).value) for field in fields]
     after_values = list(current_values)
-    after_values[fields.index("amount")] = f"{payer_share:.2f}"
+    after_values[fields.index("amount")] = f"{visible_amount:.2f}"
+    if "person" in fields:
+        after_values[fields.index("person")] = responsible_person
+
+    update_columns = [amount_column]
+    update_values: list[Any] = [_sheet_user_entered_value("amount", visible_amount)]
+    previous_values = [current_value]
+    if person_column is not None and current_person != responsible_person:
+        update_columns.append(person_column)
+        update_values.append(responsible_person)
+        previous_values.append(current_person)
 
     try:
         _update_contiguous_row(
             ws,
             action.row,
-            [amount_column],
-            [_sheet_user_entered_value("amount", payer_share)],
+            update_columns,
+            update_values,
         )
     except Exception:
         logger.exception("Failed to update the visible amount while changing a split")
@@ -1999,8 +2068,8 @@ def change_split_recent_action(
             worksheet=action.worksheet,
             kind="restore_cells",
             row=action.row,
-            columns=[amount_column],
-            previous_values=[current_value],
+            columns=update_columns,
+            previous_values=previous_values,
             new_values=after_values,
             metadata={
                 **action.metadata,
@@ -2011,9 +2080,13 @@ def change_split_recent_action(
                 "previous_split_method": allocation.split_method,
                 "previous_payer_share": f"{allocation.payer_share:.2f}",
                 "previous_partner_share": f"{allocation.partner_share:.2f}",
+                "previous_responsible_owner_key": allocation.responsible_owner_key,
+                "previous_responsible_person": allocation.responsible_person,
                 "split_method": method,
                 "payer_share": f"{payer_share:.2f}",
                 "partner_share": f"{partner_share:.2f}",
+                "responsible_owner_key": responsible_owner,
+                "responsible_person": responsible_person,
                 "display_fields": json.dumps(fields),
             },
             description=f"changed split for {allocation.item or allocation.source_category or 'shared expense'}",
@@ -2021,7 +2094,7 @@ def change_split_recent_action(
     )
     if changed_action_id is None:
         try:
-            _update_contiguous_row(ws, action.row, [amount_column], [current_value])
+            _update_contiguous_row(ws, action.row, update_columns, previous_values)
         except Exception:
             logger.exception("Failed to restore the visible amount after split action-log failure")
         return False, "Something went wrong while recording that split change. The existing split was restored."
@@ -2033,25 +2106,35 @@ def change_split_recent_action(
             split_method=method,
             payer_share=payer_share,
             partner_share=partner_share,
+            responsible_owner_key=responsible_owner,
+            responsible_person=responsible_person,
         )
         if updated is None:
             raise RuntimeError("Shared reimbursement row disappeared during split change.")
     except Exception:
         logger.exception("Failed to update reimbursement ledger while changing a split")
         try:
-            _update_contiguous_row(ws, action.row, [amount_column], [current_value])
+            _update_contiguous_row(ws, action.row, update_columns, previous_values)
             update_allocation(
                 allocation_id,
                 split_action_id=logged.id,
                 split_method=allocation.split_method,
                 payer_share=allocation.payer_share,
                 partner_share=allocation.partner_share,
+                responsible_owner_key=allocation.responsible_owner_key,
+                responsible_person=allocation.responsible_person,
             )
             _mark_undone(changed_action_id)
         except Exception:
             logger.exception("Failed to roll back an incomplete split change")
         return False, "Something went wrong while saving that split change. The existing split was restored."
 
+    if method == "covered":
+        return (
+            True,
+            f"Split changed to Covered. Original: ${allocation.gross_amount:.2f}. "
+            f"{allocation.partner} owns the full expense and owes {allocation.payer} ${partner_share:.2f}.",
+        )
     return (
         True,
         f"Split changed to {split_method_label(method)}. Original: ${allocation.gross_amount:.2f}. "
@@ -2061,7 +2144,7 @@ def change_split_recent_action(
 
 def cancel_split_recent_action(user_key: str | None, *, action_id: str) -> tuple[bool, str]:
     """Cancel an outstanding split, restore gross, and retain voided audit history."""
-    from bookiebot.sheets.collaboration import allocation_by_id, update_allocation
+    from bookiebot.sheets.collaboration import allocation_by_id, allocation_visible_amount, update_allocation
 
     logged = select_recent_action(user_key, action_id=action_id)
     if logged is None or logged.action.metadata.get("type") != "split":
@@ -2080,17 +2163,35 @@ def cancel_split_recent_action(user_key: str | None, *, action_id: str) -> tuple
     amount_column = _field_columns_for_action(action).get("amount")
     if amount_column is None:
         return False, "I could not find the amount cell for that split."
+    person_column = _field_columns_for_action(action).get("person")
     ws = _worksheet(action.worksheet)
     current_value = _sheet_value(ws.cell(action.row, amount_column).value)
     try:
         current_amount = float(current_value.replace("$", "").replace(",", "").strip())
     except ValueError:
         return False, "I could not read the current personal-share amount for that split."
-    if round(current_amount, 2) != round(allocation.payer_share, 2):
+    if round(current_amount, 2) != round(allocation_visible_amount(allocation), 2):
         return (
             False,
-            "The visible amount no longer matches this split's recorded personal share, so I did not cancel it.",
+            "The visible amount no longer matches this split's recorded responsibility, so I did not cancel it.",
         )
+
+    current_person = _sheet_value(ws.cell(action.row, person_column).value) if person_column else ""
+    expected_person = allocation.responsible_person or allocation.original_person or allocation.payer
+    if person_column and expected_person and current_person != expected_person:
+        return (
+            False,
+            "The visible person no longer matches this split's recorded responsibility, so I did not cancel it.",
+        )
+
+    restore_columns = [amount_column]
+    restore_values: list[Any] = [_sheet_user_entered_value("amount", allocation.gross_amount)]
+    current_values = [current_value]
+    original_person = allocation.original_person or allocation.payer
+    if person_column is not None and current_person != original_person:
+        restore_columns.append(person_column)
+        restore_values.append(original_person)
+        current_values.append(current_person)
 
     log_data = _read_log_data()
     if log_data is None:
@@ -2109,8 +2210,8 @@ def cancel_split_recent_action(user_key: str | None, *, action_id: str) -> tuple
         _update_contiguous_row(
             ws,
             action.row,
-            [amount_column],
-            [_sheet_user_entered_value("amount", allocation.gross_amount)],
+            restore_columns,
+            restore_values,
         )
         voided = update_allocation(allocation_id, status="void")
         if voided is None:
@@ -2130,7 +2231,7 @@ def cancel_split_recent_action(user_key: str | None, *, action_id: str) -> tuple
     except Exception:
         logger.exception("Failed to cancel an outstanding split")
         try:
-            _update_contiguous_row(ws, action.row, [amount_column], [current_value])
+            _update_contiguous_row(ws, action.row, restore_columns, current_values)
             update_allocation(
                 allocation_id,
                 status=allocation.status,
@@ -2395,6 +2496,8 @@ def _apply_undo_action(action: UndoAction, log_data: _ActionLogData | None = Non
                         split_method=previous_method,
                         payer_share=previous_payer_share,
                         partner_share=previous_partner_share,
+                        responsible_owner_key=action.metadata.get("previous_responsible_owner_key", ""),
+                        responsible_person=action.metadata.get("previous_responsible_person", ""),
                     )
                 except Exception:
                     logger.exception("Failed to restore reimbursement ledger while undoing a split change")
@@ -2411,7 +2514,7 @@ def _apply_undo_action(action: UndoAction, log_data: _ActionLogData | None = Non
                     voided = None
                 if allocation_id and voided is None:
                     _update_contiguous_row(ws, action.row, action.columns, current_values)
-                    return False, "I could not safely cancel that split, so its expense amount was left unchanged."
+                    return False, "I could not safely cancel that split, so its expense responsibility was left unchanged."
         else:
             _update_contiguous_row(ws, action.row, action.columns, action.previous_values)
     else:

@@ -1,9 +1,12 @@
 from __future__ import annotations
 
 from bookiebot.sheets.collaboration import (
+    LEGACY_SHARED_REIMBURSEMENT_HEADERS,
+    SHARED_REIMBURSEMENT_HEADERS,
     append_allocation,
     list_allocations,
     mark_reimbursed,
+    matching_outstanding_obligations,
     new_allocation,
     split_amounts,
 )
@@ -38,6 +41,34 @@ def test_equal_split_assigns_rounding_remainder_to_payer():
 
     assert payer_share == 5.01
     assert partner_share == 5.0
+
+
+def test_covered_split_assigns_full_responsibility_to_partner():
+    payer_share, partner_share = split_amounts(200, "covered", "brian")
+
+    assert payer_share == 0
+    assert partner_share == 200
+
+
+def test_legacy_reimbursement_header_is_extended_without_losing_existing_rows():
+    actor_key = "676638528590970917"
+    legacy_row = [
+        "alloc-1", "2026-08-03T10:00:00-07:00", "2026-08-03T10:00:00-07:00",
+        actor_key, "brian", "Brian (BofA)", "Hannah", "expense-1", "split-1",
+        "expense", "grocery", "3", "8/3/2026", "Groceries", "Safeway",
+        "200.00", "income", "129.46", "70.54", "outstanding", "0.00", "",
+    ]
+    repo = SheetsRepoStub(
+        shared_reimbursements_rows=[LEGACY_SHARED_REIMBURSEMENT_HEADERS, legacy_row],
+    )
+
+    with repo.patched():
+        allocations = list_allocations(actor_key)
+
+    assert repo.shared_reimbursements.get_all_values()[0] == SHARED_REIMBURSEMENT_HEADERS
+    assert allocations[0].gross_amount == 200
+    assert allocations[0].responsible_owner_key == "brian"
+    assert allocations[0].original_person == "Brian (BofA)"
 
 
 def test_shared_allocation_round_trips_and_reimbursement_only_changes_settlement_state():
@@ -111,6 +142,137 @@ def test_split_recent_expense_nets_visible_amount_but_preserves_gross_action_for
         assert "split grocery expense" in undo_detail
         assert repo.expense.cell(row, 2).value == "$200.00"
         assert list_allocations(actor_key) == []
+
+
+def test_covered_expense_moves_visible_responsibility_but_preserves_payer_gross_lineage():
+    actor_key = "676638528590970917"
+    repo = SheetsRepoStub(expense_rows=[[], []])
+
+    with repo.patched(), sheet_user_context(actor_key):
+        values = {
+            "date": "8/3/2026",
+            "amount": 200,
+            "location": "Safeway",
+            "person": "Brian (BofA)",
+        }
+        row = log_category_row(values, repo.expense, "grocery")
+        source_action_id = record_expense_undo("grocery", row, values, values["person"], actor_key)
+
+        success, detail = split_recent_action(
+            actor_key,
+            split_method="covered",
+            action_id=source_action_id,
+        )
+
+        assert success is True
+        assert "Brian paid $200.00" in detail
+        assert "Hannah owns the full $200.00 expense" in detail
+        assert repo.expense.cell(row, 2).value == "$200.00"
+        assert repo.expense.cell(row, 4).value == "Hannah"
+        allocation = list_allocations(actor_key)[0]
+        assert allocation.payer_share == 0
+        assert allocation.partner_share == 200
+        assert allocation.responsible_owner_key == "hannah"
+        assert allocation.original_person == "Brian (BofA)"
+        assert allocation.responsible_person == "Hannah"
+
+        source = next(logged for logged in read_active_logged_actions(actor_key) if logged.id == source_action_id)
+        assert source.action.new_values[1] == "200"
+        assert source.action.new_values[-1] == "Brian (BofA)"
+
+        obligations = matching_outstanding_obligations("830984827904851969")
+        assert [item.allocation_id for item in obligations] == [allocation.allocation_id]
+
+        undone, undo_detail = undo_last_action(actor_key)
+
+        assert undone is True
+        assert "split grocery expense" in undo_detail
+        assert repo.expense.cell(row, 2).value == "$200.00"
+        assert repo.expense.cell(row, 4).value == "Brian (BofA)"
+        assert list_allocations(actor_key) == []
+
+
+def test_covered_mode_is_rejected_for_personal_budget_payment_cells():
+    actor_key = "676638528590970917"
+    repo = SheetsRepoStub(income_rows=[["", "PG&E", ""]])
+
+    with repo.patched(), sheet_user_context(actor_key):
+        logged, action_id = sheet_utils.log_pge_paid(100, return_action_id=True)
+        success, detail = split_recent_action(actor_key, split_method="covered", action_id=action_id)
+
+    assert logged is True
+    assert success is False
+    assert "only for shared expense rows" in detail
+    assert repo.income.cell(1, 3).value == "100"
+    assert repo.shared_reimbursements.get_all_values() == [SHARED_REIMBURSEMENT_HEADERS]
+
+
+def test_covered_split_can_be_changed_and_undone_with_person_attribution_restored():
+    actor_key = "676638528590970917"
+    repo = SheetsRepoStub(expense_rows=[[], []])
+
+    with repo.patched(), sheet_user_context(actor_key):
+        values = {
+            "date": "8/3/2026",
+            "amount": 200,
+            "location": "Safeway",
+            "person": "Brian (BofA)",
+        }
+        row = log_category_row(values, repo.expense, "grocery")
+        source_action_id = record_expense_undo("grocery", row, values, values["person"], actor_key)
+        split_recent_action(actor_key, split_method="income", action_id=source_action_id)
+        income_split_id = recent_actions(actor_key, 1)[0].id
+
+        changed, _detail = change_split_recent_action(
+            actor_key,
+            split_method="covered",
+            action_id=income_split_id,
+        )
+
+        assert changed is True
+        assert repo.expense.cell(row, 2).value == "$200.00"
+        assert repo.expense.cell(row, 4).value == "Hannah"
+        covered = list_allocations(actor_key)[0]
+        assert covered.split_method == "covered"
+        assert covered.responsible_owner_key == "hannah"
+
+        undone, _undo_detail = undo_last_action(actor_key)
+
+        assert undone is True
+        assert repo.expense.cell(row, 2).value == "$129.46"
+        assert repo.expense.cell(row, 4).value == "Brian (BofA)"
+        restored = list_allocations(actor_key)[0]
+        assert restored.split_method == "income"
+        assert restored.responsible_owner_key == "brian"
+        assert restored.responsible_person == "Brian (BofA)"
+
+
+def test_cancel_covered_split_restores_original_payer_attribution_and_voids_receivable():
+    actor_key = "676638528590970917"
+    repo = SheetsRepoStub(expense_rows=[[], []])
+
+    with repo.patched(), sheet_user_context(actor_key):
+        values = {
+            "date": "8/3/2026",
+            "amount": 200,
+            "location": "Safeway",
+            "person": "Brian (BofA)",
+        }
+        row = log_category_row(values, repo.expense, "grocery")
+        source_action_id = record_expense_undo("grocery", row, values, values["person"], actor_key)
+        split_recent_action(actor_key, split_method="covered", action_id=source_action_id)
+        split_action_id = recent_actions(actor_key, 1)[0].id
+
+        canceled, detail = cancel_split_recent_action(actor_key, action_id=split_action_id)
+
+        assert canceled is True
+        assert "Restored the original $200.00 expense" in detail
+        assert repo.expense.cell(row, 2).value == "$200.00"
+        assert repo.expense.cell(row, 4).value == "Brian (BofA)"
+        assert list_allocations(actor_key) == []
+        voided = list_allocations(actor_key, include_void=True)[0]
+        assert voided.status == "void"
+        assert recent_actions(actor_key, 1)[0].id == source_action_id
 
 
 def test_budget_payment_cells_can_be_split_without_changing_the_gross_action_amount():

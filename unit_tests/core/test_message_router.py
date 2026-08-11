@@ -160,6 +160,13 @@ def test_split_last_expense_by_income_routes_without_llm():
     )
 
 
+def test_covered_last_expense_routes_without_llm():
+    assert _action_management_intent("I covered the last expense for Hannah") == (
+        "split_recent_action",
+        {"split_method": "covered", "index": 1},
+    )
+
+
 def test_new_logged_expense_with_split_instruction_is_not_mistaken_for_recent_action():
     assert _action_management_intent("log a $100 grocery expense and split by income") is None
 
@@ -207,7 +214,14 @@ def test_indexed_equal_split_routes_without_llm():
 def test_reimbursement_commands_route_without_llm():
     from bookiebot.core.message_router import _reimbursement_intent
 
-    assert _reimbursement_intent("What does Hannah owe me?") == ("query_shared_reimbursements", {})
+    assert _reimbursement_intent("What does Hannah owe me?") == (
+        "query_shared_reimbursements",
+        {"direction": "owed_to_me"},
+    )
+    assert _reimbursement_intent("What do I owe Brian?") == (
+        "query_shared_reimbursements",
+        {"direction": "owed_by_me"},
+    )
     assert _reimbursement_intent("Hannah reimbursed me for PG&E") == (
         "mark_shared_reimbursement_received",
         {"match_text": "pg&e"},

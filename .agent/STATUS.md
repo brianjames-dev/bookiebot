@@ -1,31 +1,39 @@
 # Agent Status
 
-Last updated: 2026-08-07
+Last updated: 2026-08-11
 
 ## Active Focus
 
-Quarterly utility history now omits off-cycle chart points instead of drawing false `$0` bills. The immediate next steps are production verification of this chart correction and the parser/bill reliability slice, followed by the existing split lifecycle work.
+Covered shared expenses now separate the bank payer from the person whose budget owns the full expense. The immediate next step is production verification of this new 0/100 allocation flow, followed by the existing deployment checks and deferred split lifecycle work.
 
 ## On Deck
 
-1. Deploy and manually verify quarterly utility history in checklist item 77.
-2. Deploy and manually verify parser and bill-payment reliability in checklist item 76.
-3. Deploy and manually verify split creation/settlement in checklist item 74 and recent split changes/cancellation in checklist item 75.
-4. Continue the deferred split lifecycle: correct gross after splitting, partial reimbursement, explicit paid-split undo, and split-aware update/move/delete/undo.
-5. Deploy and manually verify prior-month paycheck carry-forward in Projected mode in checklist item 73.
-6. Deploy and manually verify Wants subscriptions in Burn Rate in checklist item 72.
-7. Deploy and manually verify selected-month subscription scoping in checklist item 71.
-8. Deploy and manually verify Daily Spending bill coverage and outlier scaling in checklist item 70.
-9. Deploy and manually verify the monthly savings workflow and corrected Saved-card targets in checklist items 60-61 and 69.
-10. Deploy and manually verify the expense-report corrections in checklist item 67.
-11. Deploy and manually verify typed `recent` opens the short-lived launcher and keeps the resulting DM session ephemeral.
-12. Deploy and manually verify `View Inbox` and `Reconcile Now` show `BookieBot is typing...` without a temporary thinking message.
-13. Manually verify shared Needs logging plus update/move/delete/undo behavior in Discord and Google Sheets.
-14. Manually verify recent transactions and reconciliation after the latest reliability fixes.
-15. Consider a richer Discord button flow for grouped amount adjustments if the current UX feels too manual.
-16. Harden recent-action pending state across restarts/deploys, since selections currently live only in process memory.
-17. Improve targeted recent-action search so commands can find older matches, not only the latest 10 recent actions.
-18. Explore clarifying questions before logging when BookieBot is uncertain instead of guessing or silently failing.
+1. Deploy and manually verify covered shared expenses in checklist item 78.
+2. Deploy and manually verify quarterly utility history in checklist item 77.
+3. Deploy and manually verify parser and bill-payment reliability in checklist item 76.
+4. Deploy and manually verify split creation/settlement in checklist item 74 and recent split changes/cancellation in checklist item 75.
+5. Continue the deferred split lifecycle: correct gross after splitting, partial reimbursement, explicit paid-split undo, and split-aware update/move/delete/undo.
+6. Deploy and manually verify prior-month paycheck carry-forward in Projected mode in checklist item 73.
+7. Deploy and manually verify Wants subscriptions in Burn Rate in checklist item 72.
+8. Deploy and manually verify selected-month subscription scoping in checklist item 71.
+9. Deploy and manually verify Daily Spending bill coverage and outlier scaling in checklist item 70.
+10. Deploy and manually verify the monthly savings workflow and corrected Saved-card targets in checklist items 60-61 and 69.
+11. Deploy and manually verify the expense-report corrections in checklist item 67.
+12. Deploy and manually verify typed `recent` opens the short-lived launcher and keeps the resulting DM session ephemeral.
+13. Deploy and manually verify `View Inbox` and `Reconcile Now` show `BookieBot is typing...` without a temporary thinking message.
+14. Manually verify shared Needs logging plus update/move/delete/undo behavior in Discord and Google Sheets.
+15. Manually verify recent transactions and reconciliation after the latest reliability fixes.
+16. Consider a richer Discord button flow for grouped amount adjustments if the current UX feels too manual.
+17. Harden recent-action pending state across restarts/deploys, since selections currently live only in process memory.
+18. Improve targeted recent-action search so commands can find older matches, not only the latest 10 recent actions.
+19. Explore clarifying questions before logging when BookieBot is uncertain instead of guessing or silently failing.
+
+## Completed 2026-08-11
+
+- Added `They owe all` / covered allocation support for shared expense rows. The payer's source action retains the immutable gross bank amount, while the visible shared expense keeps the full amount and moves to the responsible partner's `person` bucket.
+- Extended `Shared Reimbursements` append-only with responsible owner, original person, and responsible person fields; existing 22-column ledgers migrate in place without losing rows.
+- Added covered language at log time and through Recent Transactions, conversion between covered and ordinary split methods, two-direction reimbursement queries, and safe undo/cancel restoration of both amount and person. Rent and utility payment cells reject covered mode until cross-workbook bill attribution is designed.
+- Updated the expense-report reimbursement payload/card detail and rebuilt the committed frontend asset. Verification: focused suite `288 passed`; full suite `503 passed`; Pyright `0 errors`; frontend typecheck/build passed; `git diff --check` passed. Production verification is checklist item 78 below.
 
 ## Completed 2026-08-07
 
@@ -578,6 +586,10 @@ Use a test row or low-risk real row in Discord:
     - If a genuine spreadsheet permission error occurs, expected: the existing access message still names the active service account so the sheet can be shared with that account.
 77. After deployment, open an expense report whose utility history includes a quarterly bill such as Recology across both billing and off-cycle months.
     - Expected: the quarterly series connects its configured pull months, such as May and August, with one visible line and dots only at those billing months. It has no `$0` nodes at June or July and does not appear in those months' tooltips. Monthly utility series continue to show their normal month-by-month points, and scheduled quarterly months remain eligible to show a real `$0` when the expected bill has not been entered.
+78. After deployment, log a low-risk shared expense with `I covered $20 at Safeway for Hannah`, or select a recent shared expense and choose `They owe all`; undo or cancel the test afterward.
+    - Expected: the source action and bank reconciliation retain the `$20.00` gross under the payer; the shared expense row keeps `$20.00` but its Person changes to Hannah; Brian's expense totals exclude it while Hannah's include it; `Shared Reimbursements` shows Brian paid, Hannah responsible, Brian share `$0.00`, and `$20.00` outstanding.
+    - Ask `What does Hannah owe me?` as Brian and `What do I owe Brian?` as Hannah. Expected: both return the same outstanding covered expense from their respective directions.
+    - Change the covered allocation to 50/50, then undo. Expected: the visible row moves back to the payer at the payer share, and undo returns the full amount/person to Hannah. Canceling an outstanding covered allocation restores the original payer person and voids the receivable. Trying `They owe all` on Rent or a utility payment is refused without changing that payment cell.
 
 ## Verification Baseline
 

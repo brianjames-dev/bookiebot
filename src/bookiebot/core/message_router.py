@@ -57,7 +57,7 @@ _ACTION_NOUNS = {
 _DELETE_VERBS = {"clear", "delete", "remove", "erase"}
 _UPDATE_VERBS = {"change", "correct", "edit", "fix", "redo", "update"}
 _MOVE_VERBS = {"categorize", "move", "reclassify", "recategorize"}
-_SPLIT_VERBS = {"split"}
+_SPLIT_VERBS = {"cover", "covered", "split"}
 _CATEGORIES = {"grocery", "groceries", "gas", "food", "shopping", "need", "needs"}
 _CANCEL_WORDS = {"cancel", "nevermind", "never mind", "stop"}
 
@@ -218,7 +218,12 @@ def _extract_action_match_text(content: str) -> str | None:
         "of",
         "should",
         "by",
+        "brian",
+        "hannah",
+        "her",
+        "him",
         "income",
+        "them",
         "evenly",
         "equally",
         "split",
@@ -249,14 +254,14 @@ def _action_management_intent(content: str) -> tuple[str, dict] | None:
     looks_like_new_log = bool(re.search(r"\$?\d+(?:\.\d{1,2})?", text)) and bool(
         words & {"add", "bought", "log", "logged", "paid", "purchase", "purchased", "spent"}
     )
+    split_directive = requested_split_directive({}, text)
 
-    if "split" in words and not looks_like_new_log and (
+    if ("split" in words or split_directive == "covered") and not looks_like_new_log and (
         has_action_noun or bool(words & {"it", "that", "last", "one"})
     ):
-        directive = requested_split_directive({}, text)
         entities: dict[str, Any] = {}
-        if directive in {"income", "equal"}:
-            entities["split_method"] = directive
+        if split_directive in {"income", "equal", "covered"}:
+            entities["split_method"] = split_directive
         if words & {"it", "that", "last", "one"}:
             entities["index"] = 1
         match_text = _extract_action_match_text(text)
@@ -316,7 +321,7 @@ def _indexed_action_intent(content: str) -> tuple[str, dict] | None:
     if words & _SPLIT_VERBS:
         directive = requested_split_directive({}, rest)
         entities: dict[str, Any] = {"index": index}
-        if directive in {"income", "equal"}:
+        if directive in {"income", "equal", "covered"}:
             entities["split_method"] = directive
         return "split_recent_action", entities
     return None
@@ -324,10 +329,12 @@ def _indexed_action_intent(content: str) -> tuple[str, dict] | None:
 
 def _reimbursement_intent(content: str) -> tuple[str, dict] | None:
     text = " ".join(content.lower().split())
+    if re.search(r"\b(?:what|how much)\s+do\s+i\s+owe\s+(?:hannah|brian)\b", text):
+        return "query_shared_reimbursements", {"direction": "owed_by_me"}
     if re.search(r"\b(?:what|how much)\s+does\s+(?:hannah|brian)\s+owe\b", text) or (
         "reimbursement" in text and bool(re.search(r"\b(?:show|list|outstanding|owe|owed)\b", text))
     ):
-        return "query_shared_reimbursements", {}
+        return "query_shared_reimbursements", {"direction": "owed_to_me"}
     if not re.search(r"\b(?:reimbursed|reimbursement received|paid me back|got paid back)\b", text):
         return None
     match = re.search(r"\bfor\s+(.+)$", text)

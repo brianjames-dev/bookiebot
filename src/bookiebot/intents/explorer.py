@@ -109,8 +109,8 @@ INTENT_DETAILS = {
         ["move the Chipotle expense to food", "that grocery expense should be shopping"]
     ),
     "split_recent_action": (
-        "Split a recent expense by household income or evenly.",
-        ["split the last expense by income", "split transaction 2 evenly"]
+        "Split a recent expense by household income, evenly, or mark it fully covered for the other person.",
+        ["split the last expense by income", "split transaction 2 evenly", "I covered the last expense for Hannah"]
     ),
     "query_shared_reimbursements": (
         "Show outstanding shared-expense reimbursements.",

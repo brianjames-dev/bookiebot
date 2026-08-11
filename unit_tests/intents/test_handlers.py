@@ -148,7 +148,11 @@ async def test_grocery_log_automatically_offers_approved_split_buttons(monkeypat
         channel=DummyChannel(),
         mentions=[],
     )
-    monkeypatch.setattr(writer, "resolve_query_persons", lambda *_args, **_kwargs: ["Brian (BofA)"])
+    monkeypatch.setattr(
+        writer,
+        "resolve_query_persons",
+        lambda _user, person=None, *_args, **_kwargs: ["Hannah"] if person == "Hannah" else ["Brian (BofA)"],
+    )
     repo = SheetsRepoStub(expense_rows=[[], []])
 
     with repo.patched():
@@ -160,7 +164,12 @@ async def test_grocery_log_automatically_offers_approved_split_buttons(monkeypat
 
         prompt, kwargs = brian_message.channel.sent[-1]
         assert prompt == "How do you want to split this expense?"
-        assert [child.label for child in kwargs["view"].children] == ["By income", "50/50", "No split"]
+        assert [child.label for child in kwargs["view"].children] == [
+            "By income",
+            "50/50",
+            "They owe all",
+            "No split",
+        ]
         assert repo.expense.cell(3, 2).value == "$200.00"
         assert repo.shared_reimbursements.get_all_values() == []
 
@@ -195,6 +204,85 @@ async def test_explicit_income_split_nets_grocery_immediately(monkeypatch):
         assert repo.expense.cell(3, 2).value == "$129.46"
         assert "Hannah owes: $70.54" in (brian_message.channel.sent[-1][0] or "")
         assert repo.shared_reimbursements.get_all_values()[1][15] == "200.00"
+
+
+@pytest.mark.asyncio
+async def test_explicit_covered_expense_is_attributed_to_partner_immediately(monkeypatch):
+    import bookiebot.sheets.writer as writer
+
+    brian_message = SimpleNamespace(
+        content="I covered $200 of groceries at Safeway for Hannah",
+        author=SimpleNamespace(name="deebers", id=676638528590970917, mention="<@676638528590970917>"),
+        channel=DummyChannel(),
+        mentions=[],
+    )
+    monkeypatch.setattr(
+        writer,
+        "resolve_query_persons",
+        lambda _user, person=None, *_args, **_kwargs: ["Hannah"] if person == "Hannah" else ["Brian (BofA)"],
+    )
+    repo = SheetsRepoStub(expense_rows=[[], []])
+
+    with repo.patched():
+        await ih.handle_intent(
+            "log_expense",
+            {
+                "type": "expense",
+                "category": "grocery",
+                "amount": 200,
+                "item": "groceries",
+                "location": "Safeway",
+                "person": "Hannah",
+                "split_method": "covered",
+            },
+            brian_message,
+        )
+
+        assert repo.expense.cell(3, 2).value == "$200.00"
+        assert repo.expense.cell(3, 4).value == "Hannah"
+        assert "Hannah owns the full $200.00 expense" in (brian_message.channel.sent[-1][0] or "")
+        ledger_row = repo.shared_reimbursements.get_all_values()[1]
+        assert ledger_row[17:19] == ["0.00", "200.00"]
+        assert ledger_row[22:25] == ["hannah", "Brian (BofA)", "Hannah"]
+
+
+@pytest.mark.asyncio
+async def test_reimbursement_query_can_show_what_current_user_owes(message):
+    from bookiebot.sheets.collaboration import append_allocation, new_allocation
+    from bookiebot.sheets.routing import sheet_user_context
+
+    brian_key = "676638528590970917"
+    repo = SheetsRepoStub()
+    allocation = new_allocation(
+        actor_key=brian_key,
+        payer="Brian (BofA)",
+        source_action_id="expense-1",
+        source_worksheet="expense",
+        source_category="grocery",
+        source_row=3,
+        expense_date="8/3/2026",
+        item="Groceries",
+        location="Safeway",
+        gross_amount=200,
+        split_method="covered",
+        payer_share=0,
+        partner_share=200,
+        responsible_owner_key="hannah",
+        original_person="Brian (BofA)",
+        responsible_person="Hannah",
+    )
+
+    with repo.patched(), sheet_user_context(brian_key):
+        append_allocation(allocation)
+        await ih.query_shared_reimbursements_handler({"direction": "owed_by_me"}, message)
+
+    assert message.channel.sent == [
+        (
+            "You owe $200.00 across 1 shared expense(s):\n"
+            "- Groceries at Safeway — $200.00 owed to Brian (BofA)",
+            {},
+        )
+    ]
 
 
 @pytest.mark.asyncio

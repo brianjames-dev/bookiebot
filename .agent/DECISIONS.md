@@ -350,6 +350,12 @@ Decision: Cache current-month worksheet handles by spreadsheet/month, load a bil
 
 Rationale: Google Sheets enforces a per-user read quota for the shared service account. Reopening the same workbook/tab and rereading the target cell around every idempotent bill-cell update consumed avoidable quota. Pre-write read retries are safe because no mutation has occurred; explicit classification also prevents a quota `429` from being presented as a sharing/permission problem.
 
+## 2026-08-11 - Model Covered Expenses As 0/100 Responsibility Allocations
+
+Decision: A shared expense paid by one person but wholly owned by the other uses the existing split lineage with method `covered`, payer share `$0`, and partner share equal to the immutable gross. The source action retains the payer/person and gross for bank reconciliation. The visible shared-expense row retains the gross amount but changes its Person to the responsible partner so that partner's budget/report owns the spending. `Shared Reimbursements` remains payer-owned and adds responsible owner, original person, and responsible person columns; counterpart queries may read that canonical ledger without mirroring rows. Reimbursement settlement remains ledger-only. Covered mode is limited to shared expense rows until personal bill cells support explicit cross-workbook ownership.
+
+Rationale: Payment, budget responsibility, and reimbursement are three separate facts. Logging repayment as income, zeroing the expense, or duplicating the expense would distort reports or bank reconciliation. A 0/100 allocation reuses the established gross/action/settlement lineage while person attribution makes the expense visible to the person who ultimately owns it. One canonical receivable avoids dual-ledger synchronization, and the shared-row boundary prevents implicit cross-workbook mutations for Rent and utilities.
+
 ## Pending Decisions
 
 - Where should durable system events live: banking database only, Google Sheets only, or dual-write during transition?

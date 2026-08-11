@@ -29,6 +29,8 @@ export interface SharedReimbursementItem {
   location: string
   payer: string
   partner: string
+  responsibleOwner: string
+  responsiblePerson: string
   grossAmount: number
   personalShare: number
   partnerShare: number

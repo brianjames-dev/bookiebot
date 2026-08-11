@@ -2434,6 +2434,8 @@ def _shared_reimbursement_payload(item: SharedAllocation) -> dict[str, Any]:
         "location": item.location,
         "payer": item.payer,
         "partner": item.partner,
+        "responsibleOwner": item.responsible_owner_key,
+        "responsiblePerson": item.responsible_person,
         "grossAmount": round(item.gross_amount, 2),
         "personalShare": round(item.payer_share, 2),
         "partnerShare": round(item.partner_share, 2),

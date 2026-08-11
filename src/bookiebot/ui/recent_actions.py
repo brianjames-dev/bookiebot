@@ -74,6 +74,7 @@ class SplitMethodView(ViewBase):  # type: ignore[misc]
         super().__init__(timeout=300)
         self.add_item(RecentActionButton("By income", "income", callback_func))
         self.add_item(RecentActionButton("50/50", "equal", callback_func))
+        self.add_item(RecentActionButton("They owe all", "covered", callback_func))
         self.add_item(RecentActionButton("No split", "no_split", callback_func))
 
 
@@ -82,6 +83,7 @@ class ChangeSplitMethodView(ViewBase):  # type: ignore[misc]
         super().__init__(timeout=300)
         self.add_item(RecentActionButton("By income", "income", callback_func))
         self.add_item(RecentActionButton("50/50", "equal", callback_func))
+        self.add_item(RecentActionButton("They owe all", "covered", callback_func))
         self.add_item(RecentActionButton("Cancel", "cancel", callback_func))
 
 

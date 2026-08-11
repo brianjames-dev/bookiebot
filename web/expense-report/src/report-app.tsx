@@ -870,7 +870,12 @@ function SharedReimbursementsCard({ items }: { items: SharedReimbursementItem[] 
                 <tr key={item.id}>
                   <td>
                     <strong>{item.item}</strong>
-                    <span>{[item.location, item.date, item.splitMethod].filter(Boolean).join(" · ")}</span>
+                    <span>{[
+                      item.location,
+                      item.date,
+                      item.splitMethod,
+                      item.responsiblePerson ? `Expense: ${item.responsiblePerson}` : "",
+                    ].filter(Boolean).join(" · ")}</span>
                   </td>
                   <td>{formatMoney(item.grossAmount)}</td>
                   <td>{formatMoney(item.personalShare)}</td>

@@ -16,7 +16,8 @@ from bookiebot.sheets.income import (
 )
 from bookiebot.sheets.utils import resolve_query_persons
 from bookiebot.sheets.repo import get_sheets_repo
-from bookiebot.sheets.routing import get_current_discord_user_id
+from bookiebot.sheets.routing import get_current_discord_user_id, get_user_config
+from bookiebot.sheets.collaboration import normalize_split_method, payer_owner_from_person
 from bookiebot.sheets.undo import UndoAction, _sheet_user_entered_value, _update_contiguous_row, record_undo_action
 from bookiebot.splits import continue_split_after_log
 
@@ -320,6 +321,16 @@ async def write_expense_to_sheet(data, message):
 
     # Determine `person(s)` to log
     person = (data.get("person") or "").strip()
+    if person and normalize_split_method(data.get("split_method")) == "covered":
+        actor_key = get_current_discord_user_id() or discord_user_id
+        actor_owner = get_user_config(actor_key, discord_user).budget_owner_key
+        mentioned_owner = payer_owner_from_person(person, actor_key)
+        if mentioned_owner != actor_owner:
+            # In "I covered this for Hannah", Hannah is the responsible partner,
+            # not the bank payer. Resolve the payer from the message author/card.
+            data["covered_for_person"] = person
+            person = ""
+            data.pop("person", None)
     if person.lower() in {"total", "all", "both", "everyone", "all persons", "all people"}:
         person = ""
     if not person:

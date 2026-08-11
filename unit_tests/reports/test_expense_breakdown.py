@@ -549,9 +549,11 @@ def test_report_uses_personal_share_for_totals_and_exposes_gross_reimbursement_a
             "date": "8/3/2026",
             "item": "Groceries",
             "location": "Safeway",
-            "payer": "Brian (BofA)",
-            "partner": "Hannah",
-            "grossAmount": 200.0,
+                "payer": "Brian (BofA)",
+                "partner": "Hannah",
+                "responsibleOwner": "brian",
+                "responsiblePerson": "Brian (BofA)",
+                "grossAmount": 200.0,
             "personalShare": 129.46,
             "partnerShare": 70.54,
             "receivedAmount": 0.0,
@@ -560,6 +562,47 @@ def test_report_uses_personal_share_for_totals_and_exposes_gross_reimbursement_a
             "status": "outstanding",
         }
     ]
+
+
+def test_covered_expense_counts_for_responsible_partner_instead_of_bank_payer():
+    shared_rows = [
+        ["hdr"] * 28,
+        ["hdr"] * 28,
+        _row({"A": "08/03/2026", "B": "200.00", "C": "Safeway", "D": "Hannah"}),
+    ]
+    reimbursement_row = [
+        "alloc-covered", "2026-08-03T10:00:00-07:00", "2026-08-03T10:00:00-07:00",
+        routing.DEFAULT_BRIAN_DISCORD_USER_IDS[0], "brian", "Brian (BofA)", "Hannah",
+        "expense-1", "split-1", "expense", "grocery", "3", "8/3/2026", "Groceries",
+        "Safeway", "200.00", "covered", "0.00", "200.00", "outstanding", "0.00", "",
+        "hannah", "Brian (BofA)", "Hannah",
+    ]
+    worksheets = ReportWorksheets(
+        shared_expenses=InMemoryWorksheet(shared_rows),
+        personal_budget=InMemoryWorksheet([]),
+        shared_reimbursements=InMemoryWorksheet([SHARED_REIMBURSEMENT_HEADERS, reimbursement_row]),
+    )
+
+    brian_report = build_expense_breakdown_report(
+        actor_key=routing.DEFAULT_BRIAN_DISCORD_USER_IDS[0],
+        owner_name="Brian",
+        persons=["Brian (BofA)", "Brian (AL)"],
+        month=BudgetMonth(2026, 8),
+        worksheets=worksheets,
+    )
+    hannah_report = build_expense_breakdown_report(
+        actor_key=routing.DEFAULT_HANNAH_DISCORD_USER_IDS[0],
+        owner_name="Hannah",
+        persons=["Hannah"],
+        month=BudgetMonth(2026, 8),
+        worksheets=worksheets,
+    )
+
+    assert brian_report.shared_total == 0
+    assert brian_report.shared_reimbursements[0].payer_share == 0
+    assert brian_report.shared_reimbursements[0].responsible_person == "Hannah"
+    assert hannah_report.shared_total == 200
+    assert hannah_report.breakdown["grocery"]["amount"] == 200
 
 
 def test_income_entries_parse_shifted_dated_header_layout():

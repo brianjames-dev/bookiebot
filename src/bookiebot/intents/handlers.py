@@ -43,7 +43,9 @@ from bookiebot.sheets.collaboration import (
     allocation_label,
     mark_reimbursed,
     matching_outstanding_allocations,
+    matching_outstanding_obligations,
     normalize_split_method,
+    obligation_label,
 )
 from bookiebot.splits import change_split_method_view, continue_split_after_log, split_method_view
 from bookiebot.sheets.undo import (
@@ -349,15 +351,26 @@ async def split_recent_action_handler(entities: IntentEntities, message: Any) ->
     await _send_action_result(message, success, detail)
 
 
-async def query_shared_reimbursements_handler(_entities: IntentEntities, message: Any) -> None:
+async def query_shared_reimbursements_handler(entities: IntentEntities, message: Any) -> None:
     actor_key = _message_actor_key(message)
-    allocations = matching_outstanding_allocations(actor_key)
+    direction = str(entities.get("direction") or "owed_to_me").strip().lower()
+    owed_by_me = direction == "owed_by_me"
+    allocations = (
+        matching_outstanding_obligations(actor_key)
+        if owed_by_me
+        else matching_outstanding_allocations(actor_key)
+    )
     if not allocations:
-        await message.channel.send("No shared-expense reimbursements are currently outstanding.")
+        detail = "you owe" if owed_by_me else "owed to you"
+        await message.channel.send(f"No shared-expense reimbursements are currently {detail}.")
         return
     total = round(sum(allocation.outstanding_amount for allocation in allocations), 2)
-    lines = [f"{allocations[0].partner} owes ${total:.2f} across {len(allocations)} shared expense(s):"]
-    lines.extend(f"- {allocation_label(allocation)}" for allocation in allocations)
+    if owed_by_me:
+        lines = [f"You owe ${total:.2f} across {len(allocations)} shared expense(s):"]
+        lines.extend(f"- {obligation_label(allocation)}" for allocation in allocations)
+    else:
+        lines = [f"{allocations[0].partner} owes ${total:.2f} across {len(allocations)} shared expense(s):"]
+        lines.extend(f"- {allocation_label(allocation)}" for allocation in allocations)
     await message.channel.send("\n".join(lines))
 
 

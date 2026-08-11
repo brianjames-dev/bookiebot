@@ -104,12 +104,12 @@ async def parse_message_llm(user_message: str, *, llm_client: Optional[LLMClient
         "index": <1 for "last one", or explicit number if provided>,
         "action_id": "<id if provided>",
         "match_text": "<store/item/description/category text if provided>",
-        "split_method": <"income" for by-income, "equal" for 50/50/evenly, otherwise omit>
+        "split_method": <"income" for by-income, "equal" for 50/50/evenly, "covered" when the payer covered the full expense for the other person, otherwise omit>
       }}
 
     If the message asks what Hannah/Brian owes for shared expenses or asks to list outstanding reimbursements, use:
     - intent: "query_shared_reimbursements"
-    - entities: {{}}
+    - entities: {{ "direction": <"owed_to_me" or "owed_by_me" when explicit, otherwise omit> }}
 
     If the message says a shared-expense reimbursement was received, use:
     - intent: "mark_shared_reimbursement_received"
@@ -164,7 +164,11 @@ async def parse_message_llm(user_message: str, *, llm_client: Optional[LLMClient
         - item: short label for what was bought (e.g., "coffee", "gas", "groceries", or "Starbucks reload")
         - location: where it was bought (e.g., Trader Joe's, Shell, Ulta)
         - category: one of ["grocery", "gas", "food", "shopping"]
-        - split_method: only when explicitly requested: "income", "equal", or "prompt" using the same rules above
+        - split_method: only when explicitly requested: "income", "equal", "covered", or "prompt" using the same rules above
+
+    For a covered expense such as "I covered groceries for Hannah", the named partner is the person responsible
+    for the expense, not the payer/card. Set `split_method` to "covered" and omit `person` unless the payer/card is
+    separately explicit (for example, "on my AL card").
 
     ❗ Do NOT leave "item" blank — if unsure, infer based on the location or context (e.g., "coffee" for Starbucks).
 
