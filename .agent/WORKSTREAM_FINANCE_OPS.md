@@ -211,6 +211,7 @@ Status: Complete in code and automated verification as of 2026-08-11; production
 - Implemented Slice I with ledger migration, Discord UI/parser/router support, person-aware split lineage, report payload detail, and focused regression coverage.
 - Confirmed Brian-side fronted spending becomes Hannah-side shared expense activity without changing the source action's bank-clearing gross.
 - Confirmed fronted method changes, undo, and cancellation keep the current row and reimbursement ledger synchronized; paid allocations retain the existing protected lifecycle.
+- Migrated the sole live pre-cleanup `$11.99` allocation from the discarded development value `covered` to canonical `fronted`; verified its linked Hannah expense, Brian owed-to-me lookup, and August Expense Breakdown entry. This was a one-time data correction, not a compatibility alias.
 
 ### 2026-08-03 Work Log
 

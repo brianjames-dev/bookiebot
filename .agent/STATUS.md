@@ -35,6 +35,7 @@ Fronted shared expenses now separate the bank payer from the person whose budget
 - Added fronted language at log time and through Recent Transactions, conversion between fronted and ordinary split methods, two-direction reimbursement queries, and safe undo/cancel restoration of both amount and person. Natural “I covered this for…” wording maps to the same Fronted action. Rent and utility payment cells reject fronted mode until cross-workbook bill attribution is designed.
 - Standardized `fronted` end to end across parser entities, Discord component IDs, action metadata, ledger rows, report labels, and tests. The earlier internal `covered` value is deliberately not retained as a stored-data alias because this workflow is new.
 - Updated the expense-report reimbursement payload/card detail and rebuilt the committed frontend asset. After the canonical Fronted naming cleanup, verification is: focused suite `291 passed`; full suite `506 passed`; Pyright `0 errors`; frontend typecheck/build passed; `git diff --check` passed. Production verification is checklist item 78 below.
+- Migrated the one live pre-cleanup `$11.99` Safeway allocation from the discarded development value `covered` to canonical `fronted`. Read-only verification confirmed the linked August Grocery row remains `$11.99` and assigned to Hannah; the current owed-to-Brian query and August Expense Breakdown both load the outstanding `$11.99` receivable again. No legacy parsing alias was added.
 
 ## Completed 2026-08-07
 
@@ -591,6 +592,7 @@ Use a test row or low-risk real row in Discord:
     - Expected: the source action and bank reconciliation retain the `$20.00` gross under the payer; the shared expense row keeps `$20.00` but its Person changes to Hannah; Brian's expense totals exclude it while Hannah's include it; `Shared Reimbursements` shows Brian paid, Hannah responsible, Brian share `$0.00`, and `$20.00` outstanding.
     - Ask `What does Hannah owe me?` as Brian and `What do I owe Brian?` as Hannah. Expected: both return the same outstanding fronted expense from their respective directions.
     - Change the fronted allocation to 50/50, then undo. Expected: the visible row moves back to the payer at the payer share, and undo returns the full amount/person to Hannah. Canceling an outstanding fronted allocation restores the original payer person and voids the receivable. Trying `Fronted` on Rent or a utility payment is refused without changing that payment cell.
+    - Partial production verification: Brian's live `$11.99` Safeway expense remains assigned to Hannah, and Brian's owed-to-me query plus the August report both show the outstanding Fronted reimbursement. Hannah's counterpart query and the change/undo/cancel paths remain to be checked.
 
 ## Verification Baseline
 
