@@ -564,17 +564,17 @@ def test_report_uses_personal_share_for_totals_and_exposes_gross_reimbursement_a
     ]
 
 
-def test_covered_expense_counts_for_responsible_partner_instead_of_bank_payer():
+def test_fronted_expense_counts_for_responsible_partner_instead_of_bank_payer():
     shared_rows = [
         ["hdr"] * 28,
         ["hdr"] * 28,
         _row({"A": "08/03/2026", "B": "200.00", "C": "Safeway", "D": "Hannah"}),
     ]
     reimbursement_row = [
-        "alloc-covered", "2026-08-03T10:00:00-07:00", "2026-08-03T10:00:00-07:00",
+        "alloc-fronted", "2026-08-03T10:00:00-07:00", "2026-08-03T10:00:00-07:00",
         routing.DEFAULT_BRIAN_DISCORD_USER_IDS[0], "brian", "Brian (BofA)", "Hannah",
         "expense-1", "split-1", "expense", "grocery", "3", "8/3/2026", "Groceries",
-        "Safeway", "200.00", "covered", "0.00", "200.00", "outstanding", "0.00", "",
+        "Safeway", "200.00", "fronted", "0.00", "200.00", "outstanding", "0.00", "",
         "hannah", "Brian (BofA)", "Hannah",
     ]
     worksheets = ReportWorksheets(
@@ -601,6 +601,7 @@ def test_covered_expense_counts_for_responsible_partner_instead_of_bank_payer():
     assert brian_report.shared_total == 0
     assert brian_report.shared_reimbursements[0].payer_share == 0
     assert brian_report.shared_reimbursements[0].responsible_person == "Hannah"
+    assert expense_breakdown.split_method_label(brian_report.shared_reimbursements[0].split_method) == "Fronted"
     assert hannah_report.shared_total == 200
     assert hannah_report.breakdown["grocery"]["amount"] == 200
 

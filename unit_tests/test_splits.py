@@ -12,9 +12,11 @@ from bookiebot.ui.recent_actions import CancelSplitConfirmView, ChangeSplitMetho
         ("paid PG&E $200 split by income", "income"),
         ("groceries $100 split evenly", "equal"),
         ("groceries $100 50/50", "equal"),
-        ("I covered $100 of groceries for Hannah", "covered"),
-        ("cover this expense for Hannah", "covered"),
-        ("Hannah owes me the full amount for this expense", "covered"),
+        ("I covered $100 of groceries for Hannah", "fronted"),
+        ("cover this expense for Hannah", "fronted"),
+        ("I fronted $100 of groceries for Hannah", "fronted"),
+        ("front this expense for Hannah", "fronted"),
+        ("Hannah owes me the full amount for this expense", "fronted"),
         ("log this and split", "prompt"),
         ("no split on this one", "none"),
         ("ordinary coffee purchase", None),
@@ -46,7 +48,7 @@ def test_automatic_split_prompt_rules(category, location, payment, expected):
 async def test_split_method_buttons_use_approved_labels_and_no_split_is_secondary():
     view = SplitMethodView(lambda *_args: None)
 
-    assert [child.label for child in view.children] == ["By income", "50/50", "They owe all", "No split"]
+    assert [child.label for child in view.children] == ["By income", "50/50", "Fronted", "No split"]
     assert view.children[-1].style.name == "secondary"
 
 
@@ -55,7 +57,7 @@ async def test_split_change_and_cancel_confirmation_buttons_are_explicit():
     change_view = ChangeSplitMethodView(lambda *_args: None)
     cancel_view = CancelSplitConfirmView(lambda *_args: None)
 
-    assert [child.label for child in change_view.children] == ["By income", "50/50", "They owe all", "Cancel"]
+    assert [child.label for child in change_view.children] == ["By income", "50/50", "Fronted", "Cancel"]
     assert change_view.children[-1].style.name == "secondary"
     assert [child.label for child in cancel_view.children] == ["Confirm cancel split", "Keep split"]
     assert cancel_view.children[0].style.name == "danger"

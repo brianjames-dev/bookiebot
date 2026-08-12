@@ -1798,7 +1798,7 @@ def split_recent_action(
 
     method = normalize_split_method(split_method)
     if method is None:
-        return False, "Choose By income, 50/50, or They owe all for this split."
+        return False, "Choose By income, 50/50, or Fronted for this split."
 
     logged = select_recent_action(
         user_key,
@@ -1821,10 +1821,10 @@ def split_recent_action(
     if amount_column is None:
         return False, "I could not find the amount cell for that transaction."
     person_column = field_columns.get("person")
-    if method == "covered" and (action.worksheet != "expense" or person_column is None):
+    if method == "fronted" and (action.worksheet != "expense" or person_column is None):
         return (
             False,
-            "They owe all is currently available only for shared expense rows, not rent or utility payment cells.",
+            "Fronted is currently available only for shared expense rows, not rent or utility payment cells.",
         )
 
     ws = _worksheet(action.worksheet)
@@ -1841,7 +1841,7 @@ def split_recent_action(
     field_values = dict(zip(fields, current_values, strict=False))
     payer = field_values.get("person") or action.metadata.get("person") or get_user_config(user_key).name
     payer_owner = payer_owner_from_person(payer, user_key)
-    responsible_owner = partner_owner_key(payer_owner) if method == "covered" else payer_owner
+    responsible_owner = partner_owner_key(payer_owner) if method == "fronted" else payer_owner
     responsible_person = expense_person_for_owner(
         responsible_owner,
         original_person=payer,
@@ -1851,7 +1851,7 @@ def split_recent_action(
     except ValueError as exc:
         return False, str(exc)
 
-    visible_amount = gross_amount if method == "covered" else payer_share
+    visible_amount = gross_amount if method == "fronted" else payer_share
     after_values = list(current_values)
     if "amount" in fields:
         after_values[fields.index("amount")] = f"{visible_amount:.2f}"
@@ -1880,7 +1880,7 @@ def split_recent_action(
     update_columns = [amount_column]
     update_values: list[Any] = [_sheet_user_entered_value("amount", visible_amount)]
     previous_values = [gross_value]
-    if method == "covered" and person_column is not None:
+    if method == "fronted" and person_column is not None:
         update_columns.append(person_column)
         update_values.append(responsible_person)
         previous_values.append(field_values.get("person", payer))
@@ -1947,10 +1947,10 @@ def split_recent_action(
     ratio_detail = "64.73% / 35.27%" if method == "income" else "50% / 50%"
     if payer_owner == "hannah" and method == "income":
         ratio_detail = "35.27% / 64.73%"
-    if method == "covered":
+    if method == "fronted":
         return (
             True,
-            f"Covered expense recorded. {payer_name} paid ${gross_amount:.2f}; "
+            f"Fronted expense recorded. {payer_name} paid ${gross_amount:.2f}; "
             f"{partner_name} owns the full ${gross_amount:.2f} expense and owes {payer_name} ${partner_share:.2f}.",
         )
     return (
@@ -1981,7 +1981,7 @@ def change_split_recent_action(
 
     method = normalize_split_method(split_method)
     if method is None:
-        return False, "Choose By income, 50/50, or They owe all for this split."
+        return False, "Choose By income, 50/50, or Fronted for this split."
     logged = select_recent_action(user_key, action_id=action_id)
     if logged is None or logged.action.metadata.get("type") != "split":
         return False, "I could not find that active split."
@@ -2003,10 +2003,10 @@ def change_split_recent_action(
     if amount_column is None:
         return False, "I could not find the amount cell for that split."
     person_column = _field_columns_for_action(action).get("person")
-    if method == "covered" and (action.worksheet != "expense" or person_column is None):
+    if method == "fronted" and (action.worksheet != "expense" or person_column is None):
         return (
             False,
-            "They owe all is currently available only for shared expense rows, not rent or utility payment cells.",
+            "Fronted is currently available only for shared expense rows, not rent or utility payment cells.",
         )
     ws = _worksheet(action.worksheet)
     current_value = _sheet_value(ws.cell(action.row, amount_column).value)
@@ -2029,12 +2029,12 @@ def change_split_recent_action(
         )
 
     payer_share, partner_share = split_amounts(allocation.gross_amount, method, allocation.owner_key)
-    responsible_owner = partner_owner_key(allocation.owner_key) if method == "covered" else allocation.owner_key
+    responsible_owner = partner_owner_key(allocation.owner_key) if method == "fronted" else allocation.owner_key
     responsible_person = expense_person_for_owner(
         responsible_owner,
         original_person=allocation.original_person or allocation.payer,
     )
-    visible_amount = allocation.gross_amount if method == "covered" else payer_share
+    visible_amount = allocation.gross_amount if method == "fronted" else payer_share
     field_columns = _field_columns_for_action(action)
     fields = list(field_columns)
     current_values = [_sheet_value(ws.cell(action.row, field_columns[field]).value) for field in fields]
@@ -2129,10 +2129,10 @@ def change_split_recent_action(
             logger.exception("Failed to roll back an incomplete split change")
         return False, "Something went wrong while saving that split change. The existing split was restored."
 
-    if method == "covered":
+    if method == "fronted":
         return (
             True,
-            f"Split changed to Covered. Original: ${allocation.gross_amount:.2f}. "
+            f"Split changed to Fronted. Original: ${allocation.gross_amount:.2f}. "
             f"{allocation.partner} owns the full expense and owes {allocation.payer} ${partner_share:.2f}.",
         )
     return (

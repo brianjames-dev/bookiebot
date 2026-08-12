@@ -4,11 +4,11 @@ Last updated: 2026-08-11
 
 ## Active Focus
 
-Covered shared expenses now separate the bank payer from the person whose budget owns the full expense. The immediate next step is production verification of this new 0/100 allocation flow, followed by the existing deployment checks and deferred split lifecycle work.
+Fronted shared expenses now separate the bank payer from the person whose budget owns the full expense. The immediate next step is production verification of this new 0/100 allocation flow, followed by the existing deployment checks and deferred split lifecycle work.
 
 ## On Deck
 
-1. Deploy and manually verify covered shared expenses in checklist item 78.
+1. Deploy and manually verify fronted shared expenses in checklist item 78.
 2. Deploy and manually verify quarterly utility history in checklist item 77.
 3. Deploy and manually verify parser and bill-payment reliability in checklist item 76.
 4. Deploy and manually verify split creation/settlement in checklist item 74 and recent split changes/cancellation in checklist item 75.
@@ -30,10 +30,11 @@ Covered shared expenses now separate the bank payer from the person whose budget
 
 ## Completed 2026-08-11
 
-- Added `They owe all` / covered allocation support for shared expense rows. The payer's source action retains the immutable gross bank amount, while the visible shared expense keeps the full amount and moves to the responsible partner's `person` bucket.
+- Added `Fronted` as the canonical 0/100 allocation for shared expense rows. The payer's source action retains the immutable gross bank amount, while the visible shared expense keeps the full amount and moves to the responsible partner's `person` bucket.
 - Extended `Shared Reimbursements` append-only with responsible owner, original person, and responsible person fields; existing 22-column ledgers migrate in place without losing rows.
-- Added covered language at log time and through Recent Transactions, conversion between covered and ordinary split methods, two-direction reimbursement queries, and safe undo/cancel restoration of both amount and person. Rent and utility payment cells reject covered mode until cross-workbook bill attribution is designed.
-- Updated the expense-report reimbursement payload/card detail and rebuilt the committed frontend asset. Verification: focused suite `288 passed`; full suite `503 passed`; Pyright `0 errors`; frontend typecheck/build passed; `git diff --check` passed. Production verification is checklist item 78 below.
+- Added fronted language at log time and through Recent Transactions, conversion between fronted and ordinary split methods, two-direction reimbursement queries, and safe undo/cancel restoration of both amount and person. Natural “I covered this for…” wording maps to the same Fronted action. Rent and utility payment cells reject fronted mode until cross-workbook bill attribution is designed.
+- Standardized `fronted` end to end across parser entities, Discord component IDs, action metadata, ledger rows, report labels, and tests. The earlier internal `covered` value is deliberately not retained as a stored-data alias because this workflow is new.
+- Updated the expense-report reimbursement payload/card detail and rebuilt the committed frontend asset. After the canonical Fronted naming cleanup, verification is: focused suite `291 passed`; full suite `506 passed`; Pyright `0 errors`; frontend typecheck/build passed; `git diff --check` passed. Production verification is checklist item 78 below.
 
 ## Completed 2026-08-07
 
@@ -586,10 +587,10 @@ Use a test row or low-risk real row in Discord:
     - If a genuine spreadsheet permission error occurs, expected: the existing access message still names the active service account so the sheet can be shared with that account.
 77. After deployment, open an expense report whose utility history includes a quarterly bill such as Recology across both billing and off-cycle months.
     - Expected: the quarterly series connects its configured pull months, such as May and August, with one visible line and dots only at those billing months. It has no `$0` nodes at June or July and does not appear in those months' tooltips. Monthly utility series continue to show their normal month-by-month points, and scheduled quarterly months remain eligible to show a real `$0` when the expected bill has not been entered.
-78. After deployment, log a low-risk shared expense with `I covered $20 at Safeway for Hannah`, or select a recent shared expense and choose `They owe all`; undo or cancel the test afterward.
+78. After deployment, log a low-risk shared expense with `I fronted $20 at Safeway for Hannah`, or select a recent shared expense and choose `Fronted`; undo or cancel the test afterward.
     - Expected: the source action and bank reconciliation retain the `$20.00` gross under the payer; the shared expense row keeps `$20.00` but its Person changes to Hannah; Brian's expense totals exclude it while Hannah's include it; `Shared Reimbursements` shows Brian paid, Hannah responsible, Brian share `$0.00`, and `$20.00` outstanding.
-    - Ask `What does Hannah owe me?` as Brian and `What do I owe Brian?` as Hannah. Expected: both return the same outstanding covered expense from their respective directions.
-    - Change the covered allocation to 50/50, then undo. Expected: the visible row moves back to the payer at the payer share, and undo returns the full amount/person to Hannah. Canceling an outstanding covered allocation restores the original payer person and voids the receivable. Trying `They owe all` on Rent or a utility payment is refused without changing that payment cell.
+    - Ask `What does Hannah owe me?` as Brian and `What do I owe Brian?` as Hannah. Expected: both return the same outstanding fronted expense from their respective directions.
+    - Change the fronted allocation to 50/50, then undo. Expected: the visible row moves back to the payer at the payer share, and undo returns the full amount/person to Hannah. Canceling an outstanding fronted allocation restores the original payer person and voids the receivable. Trying `Fronted` on Rent or a utility payment is refused without changing that payment cell.
 
 ## Verification Baseline
 

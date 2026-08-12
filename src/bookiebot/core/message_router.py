@@ -57,7 +57,7 @@ _ACTION_NOUNS = {
 _DELETE_VERBS = {"clear", "delete", "remove", "erase"}
 _UPDATE_VERBS = {"change", "correct", "edit", "fix", "redo", "update"}
 _MOVE_VERBS = {"categorize", "move", "reclassify", "recategorize"}
-_SPLIT_VERBS = {"cover", "covered", "split"}
+_SPLIT_VERBS = {"cover", "covered", "front", "fronted", "split"}
 _CATEGORIES = {"grocery", "groceries", "gas", "food", "shopping", "need", "needs"}
 _CANCEL_WORDS = {"cancel", "nevermind", "never mind", "stop"}
 
@@ -256,11 +256,11 @@ def _action_management_intent(content: str) -> tuple[str, dict] | None:
     )
     split_directive = requested_split_directive({}, text)
 
-    if ("split" in words or split_directive == "covered") and not looks_like_new_log and (
+    if ("split" in words or split_directive == "fronted") and not looks_like_new_log and (
         has_action_noun or bool(words & {"it", "that", "last", "one"})
     ):
         entities: dict[str, Any] = {}
-        if split_directive in {"income", "equal", "covered"}:
+        if split_directive in {"income", "equal", "fronted"}:
             entities["split_method"] = split_directive
         if words & {"it", "that", "last", "one"}:
             entities["index"] = 1
@@ -321,7 +321,7 @@ def _indexed_action_intent(content: str) -> tuple[str, dict] | None:
     if words & _SPLIT_VERBS:
         directive = requested_split_directive({}, rest)
         entities: dict[str, Any] = {"index": index}
-        if directive in {"income", "equal", "covered"}:
+        if directive in {"income", "equal", "fronted"}:
             entities["split_method"] = directive
         return "split_recent_action", entities
     return None

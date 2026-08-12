@@ -321,14 +321,14 @@ async def write_expense_to_sheet(data, message):
 
     # Determine `person(s)` to log
     person = (data.get("person") or "").strip()
-    if person and normalize_split_method(data.get("split_method")) == "covered":
+    if person and normalize_split_method(data.get("split_method")) == "fronted":
         actor_key = get_current_discord_user_id() or discord_user_id
         actor_owner = get_user_config(actor_key, discord_user).budget_owner_key
         mentioned_owner = payer_owner_from_person(person, actor_key)
         if mentioned_owner != actor_owner:
             # In "I covered this for Hannah", Hannah is the responsible partner,
             # not the bank payer. Resolve the payer from the message author/card.
-            data["covered_for_person"] = person
+            data["fronted_for_person"] = person
             person = ""
             data.pop("person", None)
     if person.lower() in {"total", "all", "both", "everyone", "all persons", "all people"}:

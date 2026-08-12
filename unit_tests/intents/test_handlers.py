@@ -167,7 +167,7 @@ async def test_grocery_log_automatically_offers_approved_split_buttons(monkeypat
         assert [child.label for child in kwargs["view"].children] == [
             "By income",
             "50/50",
-            "They owe all",
+            "Fronted",
             "No split",
         ]
         assert repo.expense.cell(3, 2).value == "$200.00"
@@ -207,7 +207,7 @@ async def test_explicit_income_split_nets_grocery_immediately(monkeypatch):
 
 
 @pytest.mark.asyncio
-async def test_explicit_covered_expense_is_attributed_to_partner_immediately(monkeypatch):
+async def test_explicit_fronted_expense_is_attributed_to_partner_immediately(monkeypatch):
     import bookiebot.sheets.writer as writer
 
     brian_message = SimpleNamespace(
@@ -233,13 +233,14 @@ async def test_explicit_covered_expense_is_attributed_to_partner_immediately(mon
                 "item": "groceries",
                 "location": "Safeway",
                 "person": "Hannah",
-                "split_method": "covered",
+                "split_method": "fronted",
             },
             brian_message,
         )
 
         assert repo.expense.cell(3, 2).value == "$200.00"
         assert repo.expense.cell(3, 4).value == "Hannah"
+        assert "Fronted expense recorded" in (brian_message.channel.sent[-1][0] or "")
         assert "Hannah owns the full $200.00 expense" in (brian_message.channel.sent[-1][0] or "")
         ledger_row = repo.shared_reimbursements.get_all_values()[1]
         assert ledger_row[17:19] == ["0.00", "200.00"]
@@ -264,7 +265,7 @@ async def test_reimbursement_query_can_show_what_current_user_owes(message):
         item="Groceries",
         location="Safeway",
         gross_amount=200,
-        split_method="covered",
+        split_method="fronted",
         payer_share=0,
         partner_share=200,
         responsible_owner_key="hannah",

@@ -160,10 +160,15 @@ def test_split_last_expense_by_income_routes_without_llm():
     )
 
 
-def test_covered_last_expense_routes_without_llm():
+def test_fronted_last_expense_routes_without_llm():
     assert _action_management_intent("I covered the last expense for Hannah") == (
         "split_recent_action",
-        {"split_method": "covered", "index": 1},
+        {"split_method": "fronted", "index": 1},
+    )
+
+    assert _action_management_intent("I fronted the last expense for Hannah") == (
+        "split_recent_action",
+        {"split_method": "fronted", "index": 1},
     )
 
 

@@ -20,7 +20,7 @@ from bookiebot.sheets.utils import clean_money
 
 logger = logging.getLogger(__name__)
 
-SplitMethod = Literal["income", "equal", "covered"]
+SplitMethod = Literal["income", "equal", "fronted"]
 AllocationStatus = Literal["outstanding", "reimbursed", "void"]
 
 BRIAN_ANNUAL_INCOME = Decimal("156000")
@@ -101,23 +101,19 @@ def normalize_split_method(value: Any) -> SplitMethod | None:
     if normalized in {"equal", "even", "evenly", "50/50", "50 50", "half"}:
         return "equal"
     if normalized in {
-        "covered",
-        "cover",
-        "covered for them",
-        "they owe all",
-        "they owe me all",
-        "100% owed",
-        "100 percent owed",
+        "front",
+        "fronted",
+        "fronted for them",
     }:
-        return "covered"
+        return "fronted"
     return None
 
 
 def split_method_label(method: SplitMethod) -> str:
     if method == "income":
         return "By income"
-    if method == "covered":
-        return "Covered"
+    if method == "fronted":
+        return "Fronted"
     return "50/50"
 
 
@@ -134,7 +130,7 @@ def split_amounts(gross_amount: Any, method: SplitMethod, payer_owner: str) -> t
     gross = Decimal(str(clean_money(str(gross_amount)))).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
     if gross <= 0:
         raise ValueError("Split expenses must have an amount greater than zero.")
-    if method == "covered":
+    if method == "fronted":
         return 0.0, float(gross)
     if method == "equal":
         ratio = Decimal("0.5")
@@ -174,7 +170,7 @@ def expense_person_for_owner(owner_key: str, *, original_person: str = "") -> st
 
 
 def allocation_visible_amount(allocation: SharedAllocation) -> float:
-    if allocation.split_method == "covered":
+    if allocation.split_method == "fronted":
         return round(allocation.partner_share, 2)
     return round(allocation.payer_share, 2)
 
@@ -326,9 +322,9 @@ def _parse_allocation(row: list[str]) -> SharedAllocation | None:
             status=status,
             received_amount=clean_money(padded[20]),
             received_at=padded[21],
-            responsible_owner_key=padded[22] or (partner_owner_key(padded[4]) if method == "covered" else padded[4]),
+            responsible_owner_key=padded[22] or (partner_owner_key(padded[4]) if method == "fronted" else padded[4]),
             original_person=padded[23] or padded[5],
-            responsible_person=padded[24] or (padded[6] if method == "covered" else padded[5]),
+            responsible_person=padded[24] or (padded[6] if method == "fronted" else padded[5]),
         )
     except (TypeError, ValueError):
         logger.warning("Skipping malformed shared reimbursement row", extra={"row": row})

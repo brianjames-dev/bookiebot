@@ -167,7 +167,7 @@ Status: Complete first pass as of 2026-06-20. Recent-action update, move, delete
 ### Target Invariants
 
 - The original bank-clearing amount remains immutable in the source action lineage and available for reconciliation.
-- The visible expense amount/person represent the budget owner responsible for that spending: the payer's share for ordinary splits, or the partner's full amount for a covered 0/100 allocation.
+- The visible expense amount/person represent the budget owner responsible for that spending: the payer's share for ordinary splits, or the partner's full amount for a fronted 0/100 allocation.
 - Partner responsibility is a reimbursement receivable, not income and not negative spending.
 - Settlement changes the reimbursement state only; it does not change the personal expense after the split is applied.
 - Every split links the source action, current sheet row, gross amount, method, both shares, and settlement state in the visible `Shared Reimbursements` worksheet.
@@ -196,21 +196,21 @@ Status: Partial as of 2026-08-03. Method changes and outstanding split cancellat
 6. Make update, move, delete, and undo fully split-aware, including ledger row references and reconciliation lineage synchronization.
 7. Harden pending split selections across restarts/deploys and add any lifecycle audit events required by production use.
 
-### Slice I - Covered Shared Expenses
+### Slice I - Fronted Shared Expenses
 
 Status: Complete in code and automated verification as of 2026-08-11; production confirmation remains in `.agent/STATUS.md` checklist item 78.
 
-- Added `covered` / `They owe all` as a 0/100 allocation for shared expense rows only.
+- Added canonical `fronted` allocation state and the `Fronted` control as a 0/100 allocation for shared expense rows only.
 - Preserve the payer and gross source action for reconciliation while moving the visible full expense to the partner's Person bucket.
 - Extend the reimbursement ledger with responsible owner, original person, and responsible person fields through an append-only migration of existing ledgers.
-- Support covered-at-log-time language, Recent Transactions application, method changes, undo/cancel restoration, and reimbursement queries in both owed-to-me and owed-by-me directions.
-- Keep personal budget payment cells out of covered mode until cross-workbook Rent/utility attribution has an explicit design.
+- Support fronted-at-log-time language, Recent Transactions application, method changes, undo/cancel restoration, and reimbursement queries in both owed-to-me and owed-by-me directions.
+- Keep personal budget payment cells out of fronted mode until cross-workbook Rent/utility attribution has an explicit design.
 
 ### 2026-08-11 Work Log
 
 - Implemented Slice I with ledger migration, Discord UI/parser/router support, person-aware split lineage, report payload detail, and focused regression coverage.
-- Confirmed Brian-side covered spending becomes Hannah-side shared expense activity without changing the source action's bank-clearing gross.
-- Confirmed covered method changes, undo, and cancellation keep the current row and reimbursement ledger synchronized; paid allocations retain the existing protected lifecycle.
+- Confirmed Brian-side fronted spending becomes Hannah-side shared expense activity without changing the source action's bank-clearing gross.
+- Confirmed fronted method changes, undo, and cancellation keep the current row and reimbursement ledger synchronized; paid allocations retain the existing protected lifecycle.
 
 ### 2026-08-03 Work Log
 

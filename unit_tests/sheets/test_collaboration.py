@@ -8,6 +8,7 @@ from bookiebot.sheets.collaboration import (
     mark_reimbursed,
     matching_outstanding_obligations,
     new_allocation,
+    normalize_split_method,
     split_amounts,
 )
 from bookiebot.sheets.undo import (
@@ -43,11 +44,16 @@ def test_equal_split_assigns_rounding_remainder_to_payer():
     assert partner_share == 5.0
 
 
-def test_covered_split_assigns_full_responsibility_to_partner():
-    payer_share, partner_share = split_amounts(200, "covered", "brian")
+def test_fronted_split_assigns_full_responsibility_to_partner():
+    payer_share, partner_share = split_amounts(200, "fronted", "brian")
 
     assert payer_share == 0
     assert partner_share == 200
+
+
+def test_fronted_is_the_only_canonical_full_reimbursement_method_value():
+    assert normalize_split_method("fronted") == "fronted"
+    assert normalize_split_method("covered") is None
 
 
 def test_legacy_reimbursement_header_is_extended_without_losing_existing_rows():
@@ -144,7 +150,7 @@ def test_split_recent_expense_nets_visible_amount_but_preserves_gross_action_for
         assert list_allocations(actor_key) == []
 
 
-def test_covered_expense_moves_visible_responsibility_but_preserves_payer_gross_lineage():
+def test_fronted_expense_moves_visible_responsibility_but_preserves_payer_gross_lineage():
     actor_key = "676638528590970917"
     repo = SheetsRepoStub(expense_rows=[[], []])
 
@@ -160,11 +166,12 @@ def test_covered_expense_moves_visible_responsibility_but_preserves_payer_gross_
 
         success, detail = split_recent_action(
             actor_key,
-            split_method="covered",
+            split_method="fronted",
             action_id=source_action_id,
         )
 
         assert success is True
+        assert "Fronted expense recorded" in detail
         assert "Brian paid $200.00" in detail
         assert "Hannah owns the full $200.00 expense" in detail
         assert repo.expense.cell(row, 2).value == "$200.00"
@@ -192,13 +199,13 @@ def test_covered_expense_moves_visible_responsibility_but_preserves_payer_gross_
         assert list_allocations(actor_key) == []
 
 
-def test_covered_mode_is_rejected_for_personal_budget_payment_cells():
+def test_fronted_mode_is_rejected_for_personal_budget_payment_cells():
     actor_key = "676638528590970917"
     repo = SheetsRepoStub(income_rows=[["", "PG&E", ""]])
 
     with repo.patched(), sheet_user_context(actor_key):
         logged, action_id = sheet_utils.log_pge_paid(100, return_action_id=True)
-        success, detail = split_recent_action(actor_key, split_method="covered", action_id=action_id)
+        success, detail = split_recent_action(actor_key, split_method="fronted", action_id=action_id)
 
     assert logged is True
     assert success is False
@@ -207,7 +214,7 @@ def test_covered_mode_is_rejected_for_personal_budget_payment_cells():
     assert repo.shared_reimbursements.get_all_values() == [SHARED_REIMBURSEMENT_HEADERS]
 
 
-def test_covered_split_can_be_changed_and_undone_with_person_attribution_restored():
+def test_fronted_split_can_be_changed_and_undone_with_person_attribution_restored():
     actor_key = "676638528590970917"
     repo = SheetsRepoStub(expense_rows=[[], []])
 
@@ -225,16 +232,16 @@ def test_covered_split_can_be_changed_and_undone_with_person_attribution_restore
 
         changed, _detail = change_split_recent_action(
             actor_key,
-            split_method="covered",
+            split_method="fronted",
             action_id=income_split_id,
         )
 
         assert changed is True
         assert repo.expense.cell(row, 2).value == "$200.00"
         assert repo.expense.cell(row, 4).value == "Hannah"
-        covered = list_allocations(actor_key)[0]
-        assert covered.split_method == "covered"
-        assert covered.responsible_owner_key == "hannah"
+        fronted = list_allocations(actor_key)[0]
+        assert fronted.split_method == "fronted"
+        assert fronted.responsible_owner_key == "hannah"
 
         undone, _undo_detail = undo_last_action(actor_key)
 
@@ -247,7 +254,7 @@ def test_covered_split_can_be_changed_and_undone_with_person_attribution_restore
         assert restored.responsible_person == "Brian (BofA)"
 
 
-def test_cancel_covered_split_restores_original_payer_attribution_and_voids_receivable():
+def test_cancel_fronted_split_restores_original_payer_attribution_and_voids_receivable():
     actor_key = "676638528590970917"
     repo = SheetsRepoStub(expense_rows=[[], []])
 
@@ -260,7 +267,7 @@ def test_cancel_covered_split_restores_original_payer_attribution_and_voids_rece
         }
         row = log_category_row(values, repo.expense, "grocery")
         source_action_id = record_expense_undo("grocery", row, values, values["person"], actor_key)
-        split_recent_action(actor_key, split_method="covered", action_id=source_action_id)
+        split_recent_action(actor_key, split_method="fronted", action_id=source_action_id)
         split_action_id = recent_actions(actor_key, 1)[0].id
 
         canceled, detail = cancel_split_recent_action(actor_key, action_id=split_action_id)
