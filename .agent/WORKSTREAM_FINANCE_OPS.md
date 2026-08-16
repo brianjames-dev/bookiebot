@@ -1,6 +1,6 @@
 # Finance Operations Workstream
 
-Last updated: 2026-08-07
+Last updated: 2026-08-16
 
 ## Goal
 
@@ -582,6 +582,18 @@ Status: Complete in code and automated/browser verification; production confirma
 - Regression coverage uses May/August Recology hits, rejects June/July points, and requires Recharts to connect valid hits across the off-cycle gaps. Local browser verification confirmed one quarterly line with nodes only at May/August alongside continuous monthly series, with no browser warnings or errors.
 - Verification: report suite `47 passed`; full suite `490 passed`; Pyright clean; frontend typecheck/build passed; `git diff --check` passed.
 - Manual test: open a report spanning quarterly billing and off-cycle months and confirm configured pull months remain connected while only those months receive nodes for that quarterly bill.
+
+### 2026-08-16 Shared Expense-Report Carousel Viewport Follow-Up
+
+Status: Complete in code and automated/responsive browser verification; production confirmation remains in `.agent/STATUS.md` checklist item 79.
+
+- Replaced the per-slide top-chart cards with one full-width card that acts as the shared carousel viewport for Category Mix, Burn Rate, Calendar, and Bills & Utilities.
+- Kept the existing swipe, desktop previous/next, tooltip dismissal, and active-indicator behavior; navigation remains outside the shared viewport.
+- Changed the horizontal track from cross-axis stretching to natural-height top alignment, preventing Category Mix, Burn Rate, and Bills & Utilities plots from expanding to the Calendar panel's height.
+- Changed Calendar rows from flexible fill tracks to content-sized tracks with smaller responsive minimums, reducing the shared section height while allowing busy rows to grow for visible markers.
+- Added focused source regressions and rebuilt the embedded report assets. Desktop and `390x844` checks confirmed the shared card remains stable across panel changes, Calendar fits the viewport, shorter graphs retain natural plot heights, and the page has no horizontal overflow or browser warnings/errors.
+- Verification: report suite `49 passed`; full suite `507 passed`; Pyright clean; frontend typecheck/build passed; `git diff --check` passed.
+- Manual test: open a report at desktop and phone widths, switch/swipe across all four panels, and confirm the card border stays stationary, graphs are not vertically stretched, Calendar rows remain readable, and the indicator stays outside below the card.
 
 ## Open Questions
 

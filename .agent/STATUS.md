@@ -1,32 +1,41 @@
 # Agent Status
 
-Last updated: 2026-08-11
+Last updated: 2026-08-16
 
 ## Active Focus
 
-Fronted shared expenses now separate the bank payer from the person whose budget owns the full expense. The immediate next step is production verification of this new 0/100 allocation flow, followed by the existing deployment checks and deferred split lifecycle work.
+The expense-report top charts now share one stable full-width carousel card without stretching shorter graphs to the Calendar panel's height. The immediate next step is production verification of this responsive layout, followed by the existing fronted-expense and deployment checks.
 
 ## On Deck
 
-1. Deploy and manually verify fronted shared expenses in checklist item 78.
-2. Deploy and manually verify quarterly utility history in checklist item 77.
-3. Deploy and manually verify parser and bill-payment reliability in checklist item 76.
-4. Deploy and manually verify split creation/settlement in checklist item 74 and recent split changes/cancellation in checklist item 75.
-5. Continue the deferred split lifecycle: correct gross after splitting, partial reimbursement, explicit paid-split undo, and split-aware update/move/delete/undo.
-6. Deploy and manually verify prior-month paycheck carry-forward in Projected mode in checklist item 73.
-7. Deploy and manually verify Wants subscriptions in Burn Rate in checklist item 72.
-8. Deploy and manually verify selected-month subscription scoping in checklist item 71.
-9. Deploy and manually verify Daily Spending bill coverage and outlier scaling in checklist item 70.
-10. Deploy and manually verify the monthly savings workflow and corrected Saved-card targets in checklist items 60-61 and 69.
-11. Deploy and manually verify the expense-report corrections in checklist item 67.
-12. Deploy and manually verify typed `recent` opens the short-lived launcher and keeps the resulting DM session ephemeral.
-13. Deploy and manually verify `View Inbox` and `Reconcile Now` show `BookieBot is typing...` without a temporary thinking message.
-14. Manually verify shared Needs logging plus update/move/delete/undo behavior in Discord and Google Sheets.
-15. Manually verify recent transactions and reconciliation after the latest reliability fixes.
-16. Consider a richer Discord button flow for grouped amount adjustments if the current UX feels too manual.
-17. Harden recent-action pending state across restarts/deploys, since selections currently live only in process memory.
-18. Improve targeted recent-action search so commands can find older matches, not only the latest 10 recent actions.
-19. Explore clarifying questions before logging when BookieBot is uncertain instead of guessing or silently failing.
+1. Deploy and manually verify the shared expense-report chart viewport in checklist item 79.
+2. Deploy and manually verify fronted shared expenses in checklist item 78.
+3. Deploy and manually verify quarterly utility history in checklist item 77.
+4. Deploy and manually verify parser and bill-payment reliability in checklist item 76.
+5. Deploy and manually verify split creation/settlement in checklist item 74 and recent split changes/cancellation in checklist item 75.
+6. Continue the deferred split lifecycle: correct gross after splitting, partial reimbursement, explicit paid-split undo, and split-aware update/move/delete/undo.
+7. Deploy and manually verify prior-month paycheck carry-forward in Projected mode in checklist item 73.
+8. Deploy and manually verify Wants subscriptions in Burn Rate in checklist item 72.
+9. Deploy and manually verify selected-month subscription scoping in checklist item 71.
+10. Deploy and manually verify Daily Spending bill coverage and outlier scaling in checklist item 70.
+11. Deploy and manually verify the monthly savings workflow and corrected Saved-card targets in checklist items 60-61 and 69.
+12. Deploy and manually verify the expense-report corrections in checklist item 67.
+13. Deploy and manually verify typed `recent` opens the short-lived launcher and keeps the resulting DM session ephemeral.
+14. Deploy and manually verify `View Inbox` and `Reconcile Now` show `BookieBot is typing...` without a temporary thinking message.
+15. Manually verify shared Needs logging plus update/move/delete/undo behavior in Discord and Google Sheets.
+16. Manually verify recent transactions and reconciliation after the latest reliability fixes.
+17. Consider a richer Discord button flow for grouped amount adjustments if the current UX feels too manual.
+18. Harden recent-action pending state across restarts/deploys, since selections currently live only in process memory.
+19. Improve targeted recent-action search so commands can find older matches, not only the latest 10 recent actions.
+20. Explore clarifying questions before logging when BookieBot is uncertain instead of guessing or silently failing.
+
+## Completed 2026-08-16
+
+- Replaced the four per-slide top-chart cards with one full-width carousel card shared by Category Mix, Burn Rate, Calendar, and Bills & Utilities; the existing navigation/indicator remains outside the shared card.
+- Top-aligned carousel panels at their natural content heights so shorter Recharts plots no longer inherit the Calendar panel's height. Calendar rows now use content-sized tracks with smaller desktop/mobile minimums, reducing the overall section height without clipping busy days.
+- Added a focused regression for the shared viewport structure, natural-height panel alignment, and calendar row sizing, then rebuilt the committed frontend assets.
+- Verification: report suite `49 passed`; full suite `507 passed`; Pyright `0 errors`; frontend typecheck/build passed; desktop and `390x844` browser checks found a stable shared card, no horizontal overflow, and no browser warnings/errors; `git diff --check` passed.
+- Production verification is checklist item 79 below.
 
 ## Completed 2026-08-11
 
@@ -593,6 +602,8 @@ Use a test row or low-risk real row in Discord:
     - Ask `What does Hannah owe me?` as Brian and `What do I owe Brian?` as Hannah. Expected: both return the same outstanding fronted expense from their respective directions.
     - Change the fronted allocation to 50/50, then undo. Expected: the visible row moves back to the payer at the payer share, and undo returns the full amount/person to Hannah. Canceling an outstanding fronted allocation restores the original payer person and voids the receivable. Trying `Fronted` on Rent or a utility payment is refused without changing that payment cell.
     - Partial production verification: Brian's live `$11.99` Safeway expense remains assigned to Hannah, and Brian's owed-to-me query plus the August report both show the outstanding Fronted reimbursement. Hannah's counterpart query and the change/undo/cancel paths remain to be checked.
+79. After deployment, open an expense breakdown report at desktop and phone widths and switch through Category Mix, Burn Rate, Calendar, and Bills & Utilities.
+    - Expected: one full-width card border remains stationary while the four panels slide inside it; no panel renders its own nested card border; shorter chart plots keep their natural height instead of stretching to match Calendar; Calendar rows remain compact but expand for their visible markers; the previous/next controls and active indicator remain below and outside the shared card; mobile swiping still changes panels; the page has no horizontal overflow.
 
 ## Verification Baseline
 
@@ -606,6 +617,24 @@ python -m pytest unit_tests/intents/test_handlers.py unit_tests/core/test_messag
 Latest verification:
 
 ```bash
+PYTHONPATH=src venv/bin/python -m pytest unit_tests/reports/test_expense_breakdown.py -q
+# passed: 49 passed
+
+PYTHONPATH=src venv/bin/python -m pytest unit_tests -q
+# passed: 507 passed, 1 warning
+
+pyright --pythonpath venv/bin/python --pythonversion 3.12
+# passed: 0 errors, 0 warnings, 0 informations
+
+cd web/expense-report && npm run typecheck && npm run build
+# passed
+
+Desktop and 390x844 local browser verification
+# passed: one stable shared card; natural 260-360px graph heights; compact content-sized Calendar rows; indicator outside; no horizontal overflow or browser warnings/errors
+
+git diff --check
+# passed
+
 PYTHONPATH=src venv/bin/python -m pytest unit_tests/reports/test_expense_breakdown.py -q
 # passed: 47 passed
 

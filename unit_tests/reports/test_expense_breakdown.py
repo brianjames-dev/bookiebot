@@ -81,6 +81,28 @@ def test_daily_spending_bars_share_the_blue_corner_radius():
     assert "radius={[6, 6, 2, 2]}" not in chart_source
 
 
+def test_top_chart_carousel_uses_one_viewport_without_stretching_panels():
+    source = (Path(__file__).resolve().parents[2] / "web/expense-report/src/report-app.tsx").read_text()
+    styles = (Path(__file__).resolve().parents[2] / "web/expense-report/src/styles.css").read_text()
+    carousel_source = source.split('<Card\n          className="bb-analytics-card bb-chart-carousel"', 1)[1].split(
+        "<ChartCarouselNavigation", 1
+    )[0]
+
+    assert 'role="region"' in carousel_source
+    assert 'aria-label="Budget charts"' in carousel_source
+    assert 'className="bb-chart-carousel-slide"' in carousel_source
+    assert '<Card className="bb-analytics-card">' not in carousel_source
+    assert ".bb-chart-carousel-track {" in styles
+    assert "align-items: flex-start;" in styles
+    assert ".bb-chart-carousel-slide {" in styles
+    assert "flex-direction: column;" in styles
+    assert "grid-auto-rows: minmax(82px, max-content);" in styles
+    assert "grid-auto-rows: minmax(66px, max-content);" in styles
+    assert "grid-auto-rows: minmax(54px, max-content);" in styles
+    assert "grid-auto-rows: minmax(92px, 1fr);" not in styles
+    assert "grid-auto-rows: minmax(54px, 1fr);" not in styles
+
+
 def test_daily_spending_includes_bills_and_compresses_strong_outliers():
     source = (Path(__file__).resolve().parents[2] / "web/expense-report/src/report-app.tsx").read_text()
     styles = (Path(__file__).resolve().parents[2] / "web/expense-report/src/styles.css").read_text()

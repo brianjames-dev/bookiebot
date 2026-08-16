@@ -759,8 +759,11 @@ export function ExpenseReportApp({ report }: { report: ExpenseReportData }) {
           />
         </section>
 
-        <div
-          className="bb-chart-carousel"
+        <Card
+          className="bb-analytics-card bb-chart-carousel"
+          role="region"
+          aria-roledescription="carousel"
+          aria-label="Budget charts"
           data-dragging={chartTouch?.dragging ? "true" : "false"}
           data-tooltip-cooldown={chartTooltipCooldown ? "true" : "false"}
           onTouchStart={handleChartTouchStart}
@@ -774,22 +777,20 @@ export function ExpenseReportApp({ report }: { report: ExpenseReportData }) {
           >
             {chartPanels.map((panel, index) => (
               <div className="bb-chart-carousel-slide" key={panel.id} aria-hidden={index !== activeChartIndex}>
-                <Card className="bb-analytics-card">
-                  <CardHeader className="bb-analytics-header">
-                    <div className="bb-card-title-row bb-analytics-title-row">
-                      <div className="bb-title-with-accessory">
-                        <CardTitle>{panel.title}</CardTitle>
-                        {panel.titleAccessory}
-                      </div>
-                      {panel.headerControl ? <div className="bb-analytics-header-controls">{panel.headerControl}</div> : null}
+                <CardHeader className="bb-analytics-header">
+                  <div className="bb-card-title-row bb-analytics-title-row">
+                    <div className="bb-title-with-accessory">
+                      <CardTitle>{panel.title}</CardTitle>
+                      {panel.titleAccessory}
                     </div>
-                  </CardHeader>
-                  <CardContent>{panel.content}</CardContent>
-                </Card>
+                    {panel.headerControl ? <div className="bb-analytics-header-controls">{panel.headerControl}</div> : null}
+                  </div>
+                </CardHeader>
+                <CardContent>{panel.content}</CardContent>
               </div>
             ))}
           </div>
-        </div>
+        </Card>
         <ChartCarouselNavigation
           panels={chartPanels}
           activeIndex={activeChartIndex}

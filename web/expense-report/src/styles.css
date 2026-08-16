@@ -758,7 +758,7 @@ summary {
 }
 
 .bb-calendar-grid {
-  grid-auto-rows: minmax(92px, 1fr);
+  grid-auto-rows: minmax(82px, max-content);
   min-height: 0;
 }
 
@@ -1039,7 +1039,7 @@ summary {
 
 .bb-chart-carousel-track {
   display: flex;
-  align-items: stretch;
+  align-items: flex-start;
   gap: var(--bb-chart-carousel-gap);
   min-width: 0;
   width: 100%;
@@ -1053,13 +1053,9 @@ summary {
 
 .bb-chart-carousel-slide {
   display: flex;
+  flex-direction: column;
   flex: 0 0 100%;
   min-width: 0;
-}
-
-.bb-chart-carousel-slide > .bb-card {
-  flex: 1 1 auto;
-  height: auto;
 }
 
 .bb-chart-carousel[data-dragging="true"] .recharts-tooltip-wrapper,
@@ -2066,7 +2062,7 @@ tr:last-child td {
   }
 
   .bb-calendar-grid {
-    grid-auto-rows: minmax(72px, 1fr);
+    grid-auto-rows: minmax(66px, max-content);
   }
 
   .bb-subscription-marker {
@@ -2093,7 +2089,7 @@ tr:last-child td {
   }
 
   .bb-calendar-grid {
-    grid-auto-rows: minmax(54px, 1fr);
+    grid-auto-rows: minmax(54px, max-content);
   }
 
   .bb-calendar-day-number {
