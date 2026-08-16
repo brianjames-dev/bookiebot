@@ -9,6 +9,7 @@ import {
   type RefObject,
   type TouchEvent,
 } from "react"
+import { createPortal } from "react-dom"
 import {
   Bar,
   BarChart,
@@ -371,6 +372,10 @@ function projectedCategoryBalances(
 
 function categoryBalanceTotal(balances: CategoryBalances) {
   return roundCurrency(Object.values(balances.remaining).reduce((total, amount) => total + amount, 0))
+}
+
+function categoryBudgetTotal(budgets: CategoryBalanceAmounts) {
+  return roundCurrency(Object.values(budgets).reduce((total, amount) => total + amount, 0))
 }
 
 const CATEGORY_BALANCE_PRIORITIES: Array<[BudgetCategoryKey, BudgetCategoryKey[]]> = [
@@ -1409,7 +1414,7 @@ const CategoryMixChart = memo(function CategoryMixChart({
   const pieLayout = useExpensePieLayout(chartData, pieHostSize)
   const spentTotal = amountRowsTotal(chartData.filter((item) => item.key !== "left"))
   const pressure = categoryMixPressure(filter, categoryBalances, spentTotal)
-  const selectedBudget = filter === "all" ? 0 : categoryBudgets[filter]
+  const selectedBudget = filter === "all" ? categoryBudgetTotal(categoryBudgets) : categoryBudgets[filter]
   const usedPercent = selectedBudget > 0 ? (spentTotal / selectedBudget) * 100 : 0
 
   return (
@@ -1419,7 +1424,7 @@ const CategoryMixChart = memo(function CategoryMixChart({
           <div className="bb-chart-kicker">{filter === "savings" ? "Saved" : "Spent"}</div>
           <div className="bb-chart-total">{formatMoney(spentTotal)}</div>
           <div className="bb-chart-mode-note">{projected ? "Projected" : "Current"}</div>
-          {filter !== "all" && selectedBudget > 0 ? (
+          {selectedBudget > 0 ? (
             <div className="bb-chart-budget-note">
               {formatMoney(selectedBudget)} budget • {usedPercent.toFixed(2)}% used
             </div>
@@ -1438,7 +1443,7 @@ const CategoryMixChart = memo(function CategoryMixChart({
           </CategoryMixPieMotionHost>
         </ChartContainer>
       </div>
-      <DetailsPanel summary="Categories" collapseKey={collapseKey}>
+      <ModalDetails summary="Categories" title="Category details" collapseKey={collapseKey}>
         <div className="bb-legend-list">
           {chartData.map((item) => (
             <div className="bb-legend-row" key={item.key}>
@@ -1450,7 +1455,7 @@ const CategoryMixChart = memo(function CategoryMixChart({
             </div>
           ))}
         </div>
-      </DetailsPanel>
+      </ModalDetails>
     </div>
   )
 }, areCategoryMixChartPropsEqual)
@@ -2758,6 +2763,79 @@ function DetailsPanel({
   )
 }
 
+function ModalDetails({
+  summary,
+  title,
+  children,
+  collapseKey = 0,
+}: {
+  summary: string
+  title: string
+  children: ReactNode
+  collapseKey?: number
+}) {
+  const [open, setOpen] = useState(false)
+  const dialogRef = useRef<HTMLDialogElement | null>(null)
+
+  useEffect(() => {
+    setOpen(false)
+  }, [collapseKey])
+
+  useEffect(() => {
+    const dialog = dialogRef.current
+    if (!dialog) {
+      return
+    }
+    if (open && !dialog.open) {
+      dialog.showModal()
+    } else if (!open && dialog.open) {
+      dialog.close()
+    }
+  }, [open])
+
+  const close = () => setOpen(false)
+  const modal = typeof document === "undefined" ? null : createPortal(
+    <dialog
+      ref={dialogRef}
+      className="bb-details-dialog"
+      aria-label={title}
+      onCancel={close}
+      onClose={close}
+      onClick={(event) => {
+        if (event.target === event.currentTarget) {
+          close()
+        }
+      }}
+    >
+      <div className="bb-details-dialog-surface">
+        <div className="bb-details-dialog-header">
+          <strong>{title}</strong>
+          <button type="button" className="bb-details-dialog-close" aria-label={`Close ${title}`} onClick={close}>
+            <span aria-hidden="true">×</span>
+          </button>
+        </div>
+        <div className="bb-details-dialog-body">{children}</div>
+      </div>
+    </dialog>,
+    document.body,
+  )
+
+  return (
+    <div className="bb-modal-details">
+      <button
+        type="button"
+        className="bb-details-toggle"
+        aria-haspopup="dialog"
+        aria-expanded={open}
+        onClick={() => setOpen(true)}
+      >
+        {summary}
+      </button>
+      {modal}
+    </div>
+  )
+}
+
 function ExpandRowsButton({
   expanded,
   total,
@@ -3189,9 +3267,9 @@ function CalendarAnalyticsPanel({
             filter={filter}
           />
           {subscriptionItems.length ? (
-            <DetailsPanel summary="Details" collapseKey={collapseKey}>
+            <ModalDetails summary="Details" title="Calendar details" collapseKey={collapseKey}>
               <SubscriptionAllItemsGrid items={subscriptionItems} />
-            </DetailsPanel>
+            </ModalDetails>
           ) : null}
         </div>
       </div>
@@ -3274,25 +3352,12 @@ function FinancialCalendar({
       <div className="bb-calendar-grid">
         {days.map((day, index) => {
           const dayEvents = day === null ? [] : eventsByDay.get(day) ?? []
-          const indexedEvents = dayEvents.map((event, eventIndex) => ({ event, eventIndex }))
-          const subscriptionEvents = indexedEvents.filter(({ event }) => event.kind === "subscription")
           const filteredEvents = filter === "all"
-            ? indexedEvents
-            : subscriptionEvents
-          const visibleEventIndexes = new Set(filteredEvents.slice(0, 3).map(({ eventIndex }) => eventIndex))
-          const renderableEventIndexes = new Set([
-            ...indexedEvents.slice(0, 3).map(({ eventIndex }) => eventIndex),
-            ...subscriptionEvents.slice(0, 3).map(({ eventIndex }) => eventIndex),
-          ])
-          const overflowGroups: Array<{ filter: CalendarFilter; events: CalendarEvent[] }> = [
-            { filter: "all", events: indexedEvents.slice(3).map(({ event }) => event) },
-            {
-              filter: "subscription",
-              events: subscriptionEvents.slice(3).map(({ event }) => event),
-            },
-          ]
+            ? dayEvents
+            : dayEvents.filter((event) => event.kind === "subscription")
           const isToday = day !== null && isCurrentCalendarDay(year, month, day)
           const hasHit = day !== null && day <= elapsedDays
+          const markerIsPending = !hasHit || filteredEvents.every((event) => event.projectedOnly)
           return (
             <div
               key={`${day ?? "blank"}-${index}`}
@@ -3308,64 +3373,59 @@ function FinancialCalendar({
                 <>
                   <div className="bb-calendar-day-number">{day}</div>
                   <div className="bb-calendar-marker-stack">
-                    {indexedEvents
-                      .filter(({ eventIndex }) => renderableEventIndexes.has(eventIndex))
-                      .map(({ event: item, eventIndex }) => {
-                        const style = calendarEventStyle(item)
-                        const isVisible = visibleEventIndexes.has(eventIndex)
-                        return (
-                          <button
-                            type="button"
-                            key={calendarEventKey(item, eventIndex)}
-                            className={[
-                              "bb-subscription-marker",
-                              "bb-calendar-marker-transition",
-                              hasHit && !item.projectedOnly ? "" : "bb-subscription-marker-pending",
-                            ].filter(Boolean).join(" ")}
-                            data-visible={isVisible ? "true" : "false"}
-                            data-calendar-event-kind={item.kind}
-                            style={{
-                              color: style.color,
-                              backgroundColor: style.background,
-                              borderColor: style.color,
-                            }}
-                            aria-label={calendarEventLabel(item)}
-                            aria-hidden={!isVisible}
-                            tabIndex={isVisible ? 0 : -1}
-                          >
-                            <span className="bb-subscription-marker-dot" />
-                            <span className="bb-subscription-marker-name">{item.label}</span>
-                            <span className="bb-subscription-marker-amount">{formatMoney(item.amount)}</span>
-                            <CalendarEventTooltip event={item} />
-                          </button>
-                        )
-                      })}
-                    {overflowGroups
-                      .filter((overflowGroup) => overflowGroup.events.length > 0)
-                      .map((overflowGroup) => {
-                        const hiddenCount = overflowGroup.events.length
-                        const isVisible = overflowGroup.filter === filter
-                        return (
-                          <button
-                            type="button"
-                            key={`overflow-${overflowGroup.filter}`}
-                            className={[
-                              "bb-subscription-marker",
-                              "bb-subscription-marker-more",
-                              "bb-calendar-marker-transition",
-                              hasHit ? "" : "bb-subscription-marker-pending",
-                            ].filter(Boolean).join(" ")}
-                            data-visible={isVisible ? "true" : "false"}
-                            data-calendar-overflow-filter={overflowGroup.filter}
-                            aria-label={`${hiddenCount} more event${hiddenCount === 1 ? "" : "s"} on day ${day}`}
-                            aria-hidden={!isVisible}
-                            tabIndex={isVisible ? 0 : -1}
-                          >
-                            +{hiddenCount} more
-                            <CalendarOverflowTooltip events={overflowGroup.events} day={day} />
-                          </button>
-                        )
-                      })}
+                    {filteredEvents.length === 1 ? (() => {
+                      const item = filteredEvents[0]
+                      const style = calendarEventStyle(item)
+                      return (
+                        <button
+                          type="button"
+                          key={calendarEventKey(item, 0)}
+                          className={[
+                            "bb-subscription-marker",
+                            "bb-calendar-marker-transition",
+                            markerIsPending ? "bb-subscription-marker-pending" : "",
+                          ].filter(Boolean).join(" ")}
+                          data-calendar-event-kind={item.kind}
+                          style={{
+                            color: style.color,
+                            backgroundColor: style.background,
+                            borderColor: style.color,
+                          }}
+                          aria-label={calendarEventLabel(item)}
+                        >
+                          <span className="bb-subscription-marker-dot" />
+                          <span className="bb-subscription-marker-name">{item.label}</span>
+                          <span className="bb-subscription-marker-amount">{formatMoney(item.amount)}</span>
+                          <CalendarEventTooltip event={item} />
+                        </button>
+                      )
+                    })() : filteredEvents.length > 1 ? (() => {
+                      const style = calendarEventStyle(filteredEvents[0])
+                      const total = filteredEvents.reduce((sum, event) => sum + event.amount, 0)
+                      return (
+                        <button
+                          type="button"
+                          key={`events-${filter}-${day}`}
+                          className={[
+                            "bb-subscription-marker",
+                            "bb-subscription-marker-more",
+                            "bb-calendar-marker-transition",
+                            markerIsPending ? "bb-subscription-marker-pending" : "",
+                          ].filter(Boolean).join(" ")}
+                          style={{
+                            color: style.color,
+                            backgroundColor: style.background,
+                            borderColor: style.color,
+                          }}
+                          aria-label={`${filteredEvents.length} events on day ${day}`}
+                        >
+                          <span className="bb-subscription-marker-dot" />
+                          <span className="bb-subscription-marker-name">{filteredEvents.length} events</span>
+                          <span className="bb-subscription-marker-amount">{formatMoney(total)}</span>
+                          <CalendarOverflowTooltip events={filteredEvents} day={day} />
+                        </button>
+                      )
+                    })() : null}
                   </div>
                 </>
               )}

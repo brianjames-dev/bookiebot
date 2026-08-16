@@ -356,6 +356,12 @@ Decision: A shared expense paid by one person but wholly owned by the other uses
 
 Rationale: Payment, budget responsibility, and reimbursement are three separate facts. Logging repayment as income, zeroing the expense, or duplicating the expense would distort reports or bank reconciliation. A 0/100 allocation reuses the established gross/action/settlement lineage while person attribution makes the expense visible to the person who ultimately owns it. One canonical receivable avoids dual-ledger synchronization, and the shared-row boundary prevents implicit cross-workbook mutations for Rent and utilities.
 
+## 2026-08-16 - Keep The Top Report Carousel At One Stable Stage Height
+
+Decision: Category Mix, Burn Rate, Calendar, and Bills & Utilities share one fixed responsive carousel stage height. Burn Rate and Bills details remain inline and consume chart space inside that fixed stage; the larger Category Mix and Calendar details open in bounded dialogs. Calendar dates use equal-height rows and at most one marker per date, with multi-event tooltips carrying the full event list.
+
+Rationale: A multipage chart surface should not move surrounding content or change height as the user switches pages, opens details, or encounters a busy calendar date. Reserving one stable stage preserves spatial continuity while still giving compact details a useful inline relationship and moving large datasets to an appropriately scrollable overlay.
+
 ## Pending Decisions
 
 - Where should durable system events live: banking database only, Google Sheets only, or dual-write during transition?

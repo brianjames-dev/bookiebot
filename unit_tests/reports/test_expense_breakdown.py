@@ -81,7 +81,7 @@ def test_daily_spending_bars_share_the_blue_corner_radius():
     assert "radius={[6, 6, 2, 2]}" not in chart_source
 
 
-def test_top_chart_carousel_uses_one_full_bleed_surface_without_panel_cards():
+def test_top_chart_carousel_uses_one_fixed_full_bleed_surface_without_panel_cards():
     source = (Path(__file__).resolve().parents[2] / "web/expense-report/src/report-app.tsx").read_text()
     styles = (Path(__file__).resolve().parents[2] / "web/expense-report/src/styles.css").read_text()
     carousel_source = source.split('<section\n          className="bb-chart-carousel-band"', 1)[1].split(
@@ -102,19 +102,46 @@ def test_top_chart_carousel_uses_one_full_bleed_surface_without_panel_cards():
     assert "background: hsl(var(--card));" in band_styles
     assert "box-shadow: 0 0 0 100vmax hsl(var(--card));" in band_styles
     assert "clip-path: inset(0 -100vmax);" in band_styles
+    assert "height: var(--bb-chart-carousel-stage-height);" in band_styles
     assert "width: 100vw;" not in styles
     assert ".bb-chart-carousel-track {" in styles
-    assert "align-items: flex-start;" in styles
+    assert "height: 100%;" in styles
+    assert "align-items: stretch;" in styles
     assert ".bb-chart-carousel-slide {" in styles
     assert "flex-direction: column;" in styles
     assert ".bb-chart-carousel .bb-chart-container," in styles
     assert ".bb-chart-carousel .bb-subscription-calendar {" in styles
     assert "background: transparent;" in styles
-    assert "grid-auto-rows: minmax(82px, max-content);" in styles
-    assert "grid-auto-rows: minmax(66px, max-content);" in styles
-    assert "grid-auto-rows: minmax(54px, max-content);" in styles
-    assert "grid-auto-rows: minmax(92px, 1fr);" not in styles
-    assert "grid-auto-rows: minmax(54px, 1fr);" not in styles
+    assert "grid-auto-rows: minmax(0, 1fr);" in styles
+    assert "grid-auto-rows: minmax(82px, max-content);" not in styles
+    assert "grid-auto-rows: minmax(66px, max-content);" not in styles
+    assert "grid-auto-rows: minmax(54px, max-content);" not in styles
+
+
+def test_top_chart_details_percent_and_calendar_markers_keep_stage_stable():
+    source = (Path(__file__).resolve().parents[2] / "web/expense-report/src/report-app.tsx").read_text()
+    styles = (Path(__file__).resolve().parents[2] / "web/expense-report/src/styles.css").read_text()
+    category_source = source.split("const CategoryMixChart = memo", 1)[1].split("type CategoryMixPieMotionHostProps", 1)[0]
+    calendar_source = source.split("function FinancialCalendar", 1)[1].split("function calendarEventKey", 1)[0]
+
+    assert 'filter === "all" ? categoryBudgetTotal(categoryBudgets) : categoryBudgets[filter]' in category_source
+    assert "filter !== \"all\" && selectedBudget > 0" not in category_source
+    assert '<ModalDetails summary="Categories"' in category_source
+    assert '<ModalDetails summary="Details"' in source.split("function CalendarAnalyticsPanel", 1)[1].split(
+        "function CalendarChangingValue", 1
+    )[0]
+    assert '<DetailsPanel summary="Details" collapseKey={collapseKey}>' in source.split(
+        "function BurnRateChart", 1
+    )[1].split("function burnRateDailyPaceLabel", 1)[0]
+    assert '<DetailsPanel summary="Details" collapseKey={collapseKey}>' in source.split(
+        "function BillsUtilitiesPanel", 1
+    )[1].split("function BillsUtilitiesChart", 1)[0]
+    assert "filteredEvents.length === 1" in calendar_source
+    assert "CalendarOverflowTooltip events={filteredEvents}" in calendar_source
+    assert "visibleEventIndexes" not in calendar_source
+    assert "overflowGroups" not in calendar_source
+    assert ".bb-details-dialog" in styles
+    assert ".bb-chart-carousel .bb-details-content-inner" in styles
 
 
 def test_daily_spending_includes_bills_and_compresses_strong_outliers():

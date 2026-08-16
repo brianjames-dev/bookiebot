@@ -583,17 +583,18 @@ Status: Complete in code and automated/browser verification; production confirma
 - Verification: report suite `47 passed`; full suite `490 passed`; Pyright clean; frontend typecheck/build passed; `git diff --check` passed.
 - Manual test: open a report spanning quarterly billing and off-cycle months and confirm configured pull months remain connected while only those months receive nodes for that quarterly bill.
 
-### 2026-08-16 Shared Expense-Report Carousel Viewport Follow-Up
+### 2026-08-16 Fixed Expense-Report Carousel Stage Follow-Up
 
 Status: Complete in code and automated/responsive browser verification; production confirmation remains in `.agent/STATUS.md` checklist item 79.
 
 - Replaced the per-slide top-chart cards with one edge-to-edge shaded band that acts as the shared carousel viewport for Category Mix, Burn Rate, Calendar, and Bills & Utilities. The band itself is borderless and square, while each graph/calendar surface is transparent and borderless rather than appearing as another container.
 - Kept the existing swipe, desktop previous/next, tooltip dismissal, and active-indicator behavior; navigation remains outside the shared viewport.
-- Changed the horizontal track from cross-axis stretching to natural-height top alignment, preventing Category Mix, Burn Rate, and Bills & Utilities plots from expanding to the Calendar panel's height.
-- Changed Calendar rows from flexible fill tracks to content-sized tracks with smaller responsive minimums, reducing the shared section height while allowing busy rows to grow for visible markers.
-- Added focused source regressions and rebuilt the embedded report assets. Desktop and `390x844` checks confirmed the full-bleed band remains stable across panel changes, contains zero nested cards, keeps navigation outside on the page background, lets Calendar fit the viewport, preserves shorter graphs' natural plot heights, and has no horizontal overflow or new browser warnings/errors.
-- Verification: report suite `49 passed`; full suite `507 passed`; Pyright clean; frontend typecheck/build passed; `git diff --check` passed.
-- Manual test: open a report at desktop and phone widths, switch/swipe across all four panels, and confirm one differently shaded edge-to-edge band stays stationary without a border or rounded corners, graph surfaces have no individual container styling, graphs are not vertically stretched, Calendar rows remain readable, and the indicator stays outside below the band.
+- Established one fixed responsive stage height for all four pages. Burn Rate and Bills & Utilities use the full available chart row when details are closed and surrender space to bounded, scrollable inline details when opened without changing the stage height.
+- Moved the larger Category Mix and Calendar detail datasets into bounded native dialogs so opening them never changes carousel geometry. Category Mix All now reports the summed category budget and its percentage used.
+- Changed Calendar rows to equal fractional tracks and consolidated every multi-event date into one marker whose tooltip lists all events. Event count can no longer enlarge a date cell or the shared stage.
+- Added focused source regressions and rebuilt the embedded report assets. Desktop and `390x844` checks confirmed stable `640px`/`540px` stage heights across all pages, graph expansion and shrink behavior, modal detail rendering, one marker per date, complete aggregate tooltips, navigation outside on the page background, no horizontal overflow, and no browser warnings/errors.
+- Verification: report suite `50 passed`; full suite `508 passed`; Pyright clean; frontend typecheck/build passed; `git diff --check` passed.
+- Manual test: open a report at desktop and phone widths, switch/swipe across all four panels, open and close each details control, and confirm the stage never changes height; Burn/Bills graphs resize inside it; Category/Calendar details appear in scrollable dialogs; Category All shows total `% used`; multi-event calendar dates retain one marker whose tooltip lists every event; and the indicator stays outside below the band.
 
 ## Open Questions
 
