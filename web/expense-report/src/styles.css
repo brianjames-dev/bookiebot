@@ -995,20 +995,19 @@ summary {
   display: contents;
 }
 
-.bb-analytics-card {
+.bb-chart-carousel {
   display: flex;
   flex-direction: column;
-  overflow: visible;
 }
 
-.bb-analytics-card .bb-card-content {
+.bb-chart-carousel .bb-card-content {
   display: flex;
   flex: 1;
   min-height: 0;
   padding-top: 14px;
 }
 
-.bb-analytics-card .bb-card-content > * {
+.bb-chart-carousel .bb-card-content > * {
   flex: 1;
   min-height: 0;
 }
@@ -1028,9 +1027,22 @@ summary {
   min-width: 0;
 }
 
+.bb-main > .bb-chart-carousel-band {
+  position: relative;
+  width: 100%;
+  min-width: 0;
+  max-width: 100%;
+  background: hsl(var(--card));
+  color: hsl(var(--card-foreground));
+  box-shadow: 0 0 0 100vmax hsl(var(--card));
+  clip-path: inset(0 -100vmax);
+}
+
 .bb-chart-carousel {
   --bb-chart-carousel-gap: 16px;
+  width: min(var(--bb-content-max), calc(100% - var(--bb-page-gutter) - var(--bb-page-gutter)));
   min-width: 0;
+  margin: 0 auto;
   overflow: hidden;
   overscroll-behavior-x: contain;
   overscroll-behavior-y: auto;
@@ -1056,6 +1068,14 @@ summary {
   flex-direction: column;
   flex: 0 0 100%;
   min-width: 0;
+}
+
+.bb-chart-carousel .bb-chart-container,
+.bb-chart-carousel .bb-subscription-calendar {
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
 }
 
 .bb-chart-carousel[data-dragging="true"] .recharts-tooltip-wrapper,
@@ -1355,12 +1375,12 @@ summary {
   }
 }
 
-.bb-analytics-card .bb-chart-box {
+.bb-chart-carousel .bb-chart-box {
   height: 100%;
   min-height: 280px;
 }
 
-.bb-analytics-card .bb-category-chart-box {
+.bb-chart-carousel .bb-category-chart-box {
   min-height: 360px;
 }
 
@@ -1421,7 +1441,7 @@ summary {
   min-height: 300px;
 }
 
-.bb-analytics-card .bb-bills-chart-box {
+.bb-chart-carousel .bb-bills-chart-box {
   height: 100%;
   min-height: 280px;
 }
@@ -1933,7 +1953,7 @@ tr:last-child td {
   }
 
   .bb-category-chart-box,
-  .bb-analytics-card .bb-category-chart-box {
+  .bb-chart-carousel .bb-category-chart-box {
     height: 100%;
     min-height: 280px;
   }
@@ -2028,9 +2048,9 @@ tr:last-child td {
     min-height: 260px;
   }
 
-  .bb-analytics-card .bb-chart-box,
-  .bb-analytics-card .bb-category-chart-box,
-  .bb-analytics-card .bb-bills-chart-box {
+  .bb-chart-carousel .bb-chart-box,
+  .bb-chart-carousel .bb-category-chart-box,
+  .bb-chart-carousel .bb-bills-chart-box {
     height: 100%;
     min-height: 260px;
   }

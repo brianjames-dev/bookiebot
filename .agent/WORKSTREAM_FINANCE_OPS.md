@@ -587,13 +587,13 @@ Status: Complete in code and automated/browser verification; production confirma
 
 Status: Complete in code and automated/responsive browser verification; production confirmation remains in `.agent/STATUS.md` checklist item 79.
 
-- Replaced the per-slide top-chart cards with one full-width card that acts as the shared carousel viewport for Category Mix, Burn Rate, Calendar, and Bills & Utilities.
+- Replaced the per-slide top-chart cards with one edge-to-edge shaded band that acts as the shared carousel viewport for Category Mix, Burn Rate, Calendar, and Bills & Utilities. The band itself is borderless and square, while each graph/calendar surface is transparent and borderless rather than appearing as another container.
 - Kept the existing swipe, desktop previous/next, tooltip dismissal, and active-indicator behavior; navigation remains outside the shared viewport.
 - Changed the horizontal track from cross-axis stretching to natural-height top alignment, preventing Category Mix, Burn Rate, and Bills & Utilities plots from expanding to the Calendar panel's height.
 - Changed Calendar rows from flexible fill tracks to content-sized tracks with smaller responsive minimums, reducing the shared section height while allowing busy rows to grow for visible markers.
-- Added focused source regressions and rebuilt the embedded report assets. Desktop and `390x844` checks confirmed the shared card remains stable across panel changes, Calendar fits the viewport, shorter graphs retain natural plot heights, and the page has no horizontal overflow or browser warnings/errors.
+- Added focused source regressions and rebuilt the embedded report assets. Desktop and `390x844` checks confirmed the full-bleed band remains stable across panel changes, contains zero nested cards, keeps navigation outside on the page background, lets Calendar fit the viewport, preserves shorter graphs' natural plot heights, and has no horizontal overflow or new browser warnings/errors.
 - Verification: report suite `49 passed`; full suite `507 passed`; Pyright clean; frontend typecheck/build passed; `git diff --check` passed.
-- Manual test: open a report at desktop and phone widths, switch/swipe across all four panels, and confirm the card border stays stationary, graphs are not vertically stretched, Calendar rows remain readable, and the indicator stays outside below the card.
+- Manual test: open a report at desktop and phone widths, switch/swipe across all four panels, and confirm one differently shaded edge-to-edge band stays stationary without a border or rounded corners, graph surfaces have no individual container styling, graphs are not vertically stretched, Calendar rows remain readable, and the indicator stays outside below the band.
 
 ## Open Questions
 

@@ -81,21 +81,35 @@ def test_daily_spending_bars_share_the_blue_corner_radius():
     assert "radius={[6, 6, 2, 2]}" not in chart_source
 
 
-def test_top_chart_carousel_uses_one_viewport_without_stretching_panels():
+def test_top_chart_carousel_uses_one_full_bleed_surface_without_panel_cards():
     source = (Path(__file__).resolve().parents[2] / "web/expense-report/src/report-app.tsx").read_text()
     styles = (Path(__file__).resolve().parents[2] / "web/expense-report/src/styles.css").read_text()
-    carousel_source = source.split('<Card\n          className="bb-analytics-card bb-chart-carousel"', 1)[1].split(
+    carousel_source = source.split('<section\n          className="bb-chart-carousel-band"', 1)[1].split(
         "<ChartCarouselNavigation", 1
     )[0]
 
     assert 'role="region"' in carousel_source
     assert 'aria-label="Budget charts"' in carousel_source
+    assert 'className="bb-chart-carousel"' in carousel_source
     assert 'className="bb-chart-carousel-slide"' in carousel_source
-    assert '<Card className="bb-analytics-card">' not in carousel_source
+    assert '<Card className="bb-analytics-card"' not in carousel_source
+    assert "</section>" in carousel_source
+    assert ".bb-main > .bb-chart-carousel-band {" in styles
+    band_styles = styles.split(".bb-main > .bb-chart-carousel-band {", 1)[1].split("}", 1)[0]
+    assert "width: 100%;" in band_styles
+    assert "min-width: 0;" in band_styles
+    assert "max-width: 100%;" in band_styles
+    assert "background: hsl(var(--card));" in band_styles
+    assert "box-shadow: 0 0 0 100vmax hsl(var(--card));" in band_styles
+    assert "clip-path: inset(0 -100vmax);" in band_styles
+    assert "width: 100vw;" not in styles
     assert ".bb-chart-carousel-track {" in styles
     assert "align-items: flex-start;" in styles
     assert ".bb-chart-carousel-slide {" in styles
     assert "flex-direction: column;" in styles
+    assert ".bb-chart-carousel .bb-chart-container," in styles
+    assert ".bb-chart-carousel .bb-subscription-calendar {" in styles
+    assert "background: transparent;" in styles
     assert "grid-auto-rows: minmax(82px, max-content);" in styles
     assert "grid-auto-rows: minmax(66px, max-content);" in styles
     assert "grid-auto-rows: minmax(54px, max-content);" in styles

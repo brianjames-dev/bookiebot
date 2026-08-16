@@ -4,7 +4,7 @@ Last updated: 2026-08-16
 
 ## Active Focus
 
-The expense-report top charts now share one stable full-width carousel card without stretching shorter graphs to the Calendar panel's height. The immediate next step is production verification of this responsive layout, followed by the existing fronted-expense and deployment checks.
+The expense-report top charts now share one edge-to-edge shaded carousel band without an outer card or per-graph surfaces, and shorter graphs no longer stretch to the Calendar panel's height. The immediate next step is production verification of this responsive layout, followed by the existing fronted-expense and deployment checks.
 
 ## On Deck
 
@@ -31,10 +31,10 @@ The expense-report top charts now share one stable full-width carousel card with
 
 ## Completed 2026-08-16
 
-- Replaced the four per-slide top-chart cards with one full-width carousel card shared by Category Mix, Burn Rate, Calendar, and Bills & Utilities; the existing navigation/indicator remains outside the shared card.
+- Replaced the four per-slide top-chart cards with one edge-to-edge shaded band shared by Category Mix, Burn Rate, Calendar, and Bills & Utilities. The shared band has no border or corner radius, each graph/calendar surface is transparent and borderless, and the existing navigation/indicator remains outside on the page background.
 - Top-aligned carousel panels at their natural content heights so shorter Recharts plots no longer inherit the Calendar panel's height. Calendar rows now use content-sized tracks with smaller desktop/mobile minimums, reducing the overall section height without clipping busy days.
-- Added a focused regression for the shared viewport structure, natural-height panel alignment, and calendar row sizing, then rebuilt the committed frontend assets.
-- Verification: report suite `49 passed`; full suite `507 passed`; Pyright `0 errors`; frontend typecheck/build passed; desktop and `390x844` browser checks found a stable shared card, no horizontal overflow, and no browser warnings/errors; `git diff --check` passed.
+- Added a focused regression for the full-bleed shared surface, absence of panel cards, natural-height panel alignment, mobile width constraints, and calendar row sizing, then rebuilt the committed frontend assets.
+- Verification: report suite `49 passed`; full suite `507 passed`; Pyright `0 errors`; frontend typecheck/build passed; desktop and `390x844` browser checks found one edge-to-edge shaded band, transparent/borderless chart surfaces, zero nested cards, navigation outside the band, and no horizontal overflow or new browser warnings/errors; `git diff --check` passed.
 - Production verification is checklist item 79 below.
 
 ## Completed 2026-08-11
@@ -603,7 +603,7 @@ Use a test row or low-risk real row in Discord:
     - Change the fronted allocation to 50/50, then undo. Expected: the visible row moves back to the payer at the payer share, and undo returns the full amount/person to Hannah. Canceling an outstanding fronted allocation restores the original payer person and voids the receivable. Trying `Fronted` on Rent or a utility payment is refused without changing that payment cell.
     - Partial production verification: Brian's live `$11.99` Safeway expense remains assigned to Hannah, and Brian's owed-to-me query plus the August report both show the outstanding Fronted reimbursement. Hannah's counterpart query and the change/undo/cancel paths remain to be checked.
 79. After deployment, open an expense breakdown report at desktop and phone widths and switch through Category Mix, Burn Rate, Calendar, and Bills & Utilities.
-    - Expected: one full-width card border remains stationary while the four panels slide inside it; no panel renders its own nested card border; shorter chart plots keep their natural height instead of stretching to match Calendar; Calendar rows remain compact but expand for their visible markers; the previous/next controls and active indicator remain below and outside the shared card; mobile swiping still changes panels; the page has no horizontal overflow.
+    - Expected: one edge-to-edge background band, visibly shaded from the page, remains stationary while the four panels slide inside it; the band has no outer border or rounded corners and no graph/calendar renders its own background, border, or card; shorter chart plots keep their natural height instead of stretching to match Calendar; Calendar rows remain compact but expand for their visible markers; the previous/next controls and active indicator remain below and outside the band on the page background; mobile swiping still changes panels; the page has no horizontal overflow.
 
 ## Verification Baseline
 

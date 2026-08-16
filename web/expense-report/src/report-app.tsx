@@ -759,38 +759,42 @@ export function ExpenseReportApp({ report }: { report: ExpenseReportData }) {
           />
         </section>
 
-        <Card
-          className="bb-analytics-card bb-chart-carousel"
+        <section
+          className="bb-chart-carousel-band"
           role="region"
           aria-roledescription="carousel"
           aria-label="Budget charts"
-          data-dragging={chartTouch?.dragging ? "true" : "false"}
-          data-tooltip-cooldown={chartTooltipCooldown ? "true" : "false"}
-          onTouchStart={handleChartTouchStart}
-          onTouchMove={handleChartTouchMove}
-          onTouchEnd={handleChartTouchEnd}
-          onTouchCancel={handleChartTouchCancel}
         >
           <div
-            className={chartTouch?.dragging ? "bb-chart-carousel-track bb-chart-carousel-track-dragging" : "bb-chart-carousel-track"}
-            style={{ transform: carouselTransform }}
+            className="bb-chart-carousel"
+            data-dragging={chartTouch?.dragging ? "true" : "false"}
+            data-tooltip-cooldown={chartTooltipCooldown ? "true" : "false"}
+            onTouchStart={handleChartTouchStart}
+            onTouchMove={handleChartTouchMove}
+            onTouchEnd={handleChartTouchEnd}
+            onTouchCancel={handleChartTouchCancel}
           >
-            {chartPanels.map((panel, index) => (
-              <div className="bb-chart-carousel-slide" key={panel.id} aria-hidden={index !== activeChartIndex}>
-                <CardHeader className="bb-analytics-header">
-                  <div className="bb-card-title-row bb-analytics-title-row">
-                    <div className="bb-title-with-accessory">
-                      <CardTitle>{panel.title}</CardTitle>
-                      {panel.titleAccessory}
+            <div
+              className={chartTouch?.dragging ? "bb-chart-carousel-track bb-chart-carousel-track-dragging" : "bb-chart-carousel-track"}
+              style={{ transform: carouselTransform }}
+            >
+              {chartPanels.map((panel, index) => (
+                <div className="bb-chart-carousel-slide" key={panel.id} aria-hidden={index !== activeChartIndex}>
+                  <CardHeader className="bb-analytics-header">
+                    <div className="bb-card-title-row bb-analytics-title-row">
+                      <div className="bb-title-with-accessory">
+                        <CardTitle>{panel.title}</CardTitle>
+                        {panel.titleAccessory}
+                      </div>
+                      {panel.headerControl ? <div className="bb-analytics-header-controls">{panel.headerControl}</div> : null}
                     </div>
-                    {panel.headerControl ? <div className="bb-analytics-header-controls">{panel.headerControl}</div> : null}
-                  </div>
-                </CardHeader>
-                <CardContent>{panel.content}</CardContent>
-              </div>
-            ))}
+                  </CardHeader>
+                  <CardContent>{panel.content}</CardContent>
+                </div>
+              ))}
+            </div>
           </div>
-        </Card>
+        </section>
         <ChartCarouselNavigation
           panels={chartPanels}
           activeIndex={activeChartIndex}
