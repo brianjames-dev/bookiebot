@@ -15,7 +15,7 @@ class _APIError(RuntimeError):
 
 def _client(fake_openai, *, attempts: int = 3) -> OpenAIClient:
     client = OpenAIClient.__new__(OpenAIClient)
-    client._openai = fake_openai
+    client._client = fake_openai
     client._model = "test-model"
     client._max_attempts = attempts
     client._base_retry_delay = 0.01
@@ -27,7 +27,7 @@ def _client(fake_openai, *, attempts: int = 3) -> OpenAIClient:
 async def test_openai_client_retries_transient_server_error(monkeypatch):
     calls = 0
 
-    class ChatCompletion:
+    class Completions:
         @staticmethod
         def create(**kwargs):
             nonlocal calls
@@ -38,7 +38,7 @@ async def test_openai_client_retries_transient_server_error(monkeypatch):
 
     sleep = AsyncMock()
     monkeypatch.setattr("bookiebot.llm.client.asyncio.sleep", sleep)
-    client = _client(SimpleNamespace(ChatCompletion=ChatCompletion))
+    client = _client(SimpleNamespace(chat=SimpleNamespace(completions=Completions)))
 
     result = await client.complete(messages=[{"role": "user", "content": "hi"}])
 
@@ -51,7 +51,7 @@ async def test_openai_client_retries_transient_server_error(monkeypatch):
 async def test_openai_client_does_not_retry_billing_quota_errors(monkeypatch):
     calls = 0
 
-    class ChatCompletion:
+    class Completions:
         @staticmethod
         def create(**kwargs):
             nonlocal calls
@@ -60,7 +60,7 @@ async def test_openai_client_does_not_retry_billing_quota_errors(monkeypatch):
 
     sleep = AsyncMock()
     monkeypatch.setattr("bookiebot.llm.client.asyncio.sleep", sleep)
-    client = _client(SimpleNamespace(ChatCompletion=ChatCompletion))
+    client = _client(SimpleNamespace(chat=SimpleNamespace(completions=Completions)))
 
     with pytest.raises(_APIError, match="credit balance exhausted"):
         await client.complete(messages=[{"role": "user", "content": "hi"}])

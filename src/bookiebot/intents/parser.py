@@ -219,6 +219,7 @@ async def parse_message_llm(user_message: str, *, llm_client: Optional[LLMClient
                 {"role": "user", "content": user_message},
             ],
             temperature=0,
+            response_format={"type": "json_object"},
         )
     except Exception as exc:
         logger.exception("Intent provider request failed")

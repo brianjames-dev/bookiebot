@@ -137,19 +137,18 @@ class LLMMessage:
 
 class OpenAIClient(LLMClient):
     """
-    Thin wrapper around the OpenAI ChatCompletion API that executes requests
+    Thin wrapper around the modern OpenAI chat-completions client that executes requests
     in a worker thread so the Discord event loop stays responsive.
     """
 
-    def __init__(self, *, model: str = "gpt-3.5-turbo", api_key: Optional[str] = None):
+    def __init__(self, *, model: Optional[str] = None, api_key: Optional[str] = None):
         import openai  # Imported lazily so tests without the SDK still run.
 
-        self._openai = openai
-        self._model = model
+        self._model = model or os.getenv("BOOKIEBOT_INTENT_MODEL", "gpt-4.1-mini").strip() or "gpt-4.1-mini"
         self._api_key = api_key or os.getenv("OPENAI_API_KEY")
         if not self._api_key:
             raise RuntimeError("OPENAI_API_KEY must be set to use OpenAIClient.")
-        self._openai.api_key = self._api_key
+        self._client = openai.OpenAI(api_key=self._api_key, max_retries=0)
         self._max_attempts = _positive_int_env("BOOKIEBOT_OPENAI_MAX_ATTEMPTS", 3)
         self._base_retry_delay = _positive_float_env("BOOKIEBOT_OPENAI_RETRY_BASE_SECONDS", 0.75)
         self._max_retry_delay = _positive_float_env("BOOKIEBOT_OPENAI_RETRY_MAX_SECONDS", 8.0)
@@ -162,7 +161,8 @@ class OpenAIClient(LLMClient):
         **kwargs: Any,
     ) -> str:
         def _call():
-            return self._openai.ChatCompletion.create(
+            create = cast(Any, self._client.chat.completions.create)
+            return create(
                 model=self._model,
                 messages=messages,
                 temperature=temperature,

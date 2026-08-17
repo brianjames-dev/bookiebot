@@ -1,6 +1,6 @@
 # Finance Operations Workstream
 
-Last updated: 2026-08-16
+Last updated: 2026-08-17
 
 ## Goal
 
@@ -634,6 +634,26 @@ Status: Complete in code and automated verification; production confirmation rem
 - `/debug_bank_reconciliation_policy`
 - `/debug_recent_actions`
 - `/debug_recent_action_lineage`
+
+## Conversational Agent Finance Boundary
+
+Status: Initial read-only LangGraph slice complete in code and automated verification as of 2026-08-17; production confirmation remains in `.agent/STATUS.md`.
+
+- Only an explicit valid parser `fallback` enters the conversational graph. Parser/provider failures retain the existing no-change error and never become agent runs.
+- Existing deterministic and intent-handler paths remain authoritative for logging, payment, update, move, split, delete, undo, and reconciliation behavior.
+- Agent tools derive the budget owner from trusted Discord runtime context. The model cannot supply or switch an owner identifier.
+- The initial tool set reads current budget posture, category/store spending, largest/date-specific expenses, subscriptions, and bill status. It exposes no bank, action-log, reconciliation, or sheet mutation tool.
+- Conversation checkpoints are keyed by guild/channel/user. Postgres is used when `BOOKIEBOT_AGENT_DATABASE_URL` or `BANK_DATABASE_URL` is configured; otherwise memory is process-local.
+- Model calls, tool calls, recursion, and elapsed runtime are bounded. Tool failures return a no-mutation result so the agent can explain unavailable data without leaking implementation errors.
+
+### 2026-08-17 Work Log
+
+- Replaced the stateless legacy fallback ChatCompletion with a LangGraph/LangChain agent while preserving the command router and the explicit parser-failure boundary.
+- Added actor-scoped read adapters for BookieBot financial data and regression coverage for user isolation, no-write schemas, runtime tool-context injection, per-thread memory, fallback integration, and Discord response chunking.
+- Upgraded the OpenAI client SDK, moved intent parsing to a configurable current model with JSON response mode, and added configurable persistent checkpointing through Postgres.
+- Verification: focused agent/parser/router/handler/LLM suite `182 passed`; full suite `530 passed` with one existing Kaleido warning; Pyright clean; graph/checkpointer construction, dependency resolution, and `git diff --check` passed.
+
+Open follow-up: any future write-capable planner must emit high-level proposals, reuse existing guarded handlers, and pause for explicit Discord approval; raw Sheets or reconciliation mutation functions must not become model tools.
 
 ## Files To Inspect Before Editing
 

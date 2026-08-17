@@ -368,6 +368,12 @@ Decision: A user profile keeps one list of person/card labels for historical and
 
 Rationale: Removing AL from the shared person list would hide historical AL expenses from ordinary queries, while always retaining both labels in the logging resolver forces an unnecessary choice for every new expense. Separate active and historical concerns preserve accurate reporting, remove current friction, and allow a future card to restore the choice flow through configuration.
 
+## 2026-08-17 - Keep The Conversational Graph Read-Only And Behind Explicit Fallback
+
+Decision: Preserve deterministic routing and the existing intent handlers as the only mutation authority. Only a valid parser decision of `fallback` enters the LangGraph conversational agent. Its initial tools are read-only financial adapters whose actor comes from trusted Discord runtime context, never model arguments. Conversation checkpoints are scoped by guild, channel, and user; use `BOOKIEBOT_AGENT_DATABASE_URL`, then `BANK_DATABASE_URL`, for durable Postgres state and otherwise fall back to process-local memory. Parser/provider failures remain no-change errors and never enter the graph.
+
+Rationale: BookieBot's logging, recent-action, split, and reconciliation flows already encode confirmation and lineage guarantees that a general tool loop must not bypass. A read-only fallback provides natural conversation and multi-tool financial reasoning immediately while keeping user isolation and mutation safety explicit. Per-user thread keys prevent cross-user memory leakage, and optional durable checkpoints allow Railway restarts without making the agent unavailable when Postgres is absent.
+
 ## Pending Decisions
 
 - Where should durable system events live: banking database only, Google Sheets only, or dual-write during transition?

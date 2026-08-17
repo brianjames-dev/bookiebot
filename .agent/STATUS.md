@@ -1,34 +1,47 @@
 # Agent Status
 
-Last updated: 2026-08-16
+Last updated: 2026-08-17
 
 ## Active Focus
 
-Brian's normal expense logging now defaults directly to `Brian (BofA)` without a card prompt, while historical AL activity remains queryable and a configurable multi-method list can restore the chooser later. The immediate next step is production verification of this default, followed by the shared expense-report viewport and existing deployment checks.
+Unsupported messages now enter an actor-scoped, read-only LangGraph conversational agent with isolated conversation memory, while all existing command and mutation workflows remain authoritative. The immediate next step is production verification of the conversational fallback and its Postgres checkpoints, followed by the existing deployment checks.
 
 ## On Deck
 
-1. Deploy and manually verify Brian's BofA expense default in checklist item 80.
-2. Deploy and manually verify the shared expense-report chart viewport in checklist item 79.
-3. Deploy and manually verify fronted shared expenses in checklist item 78.
-4. Deploy and manually verify quarterly utility history in checklist item 77.
-5. Deploy and manually verify parser and bill-payment reliability in checklist item 76.
-6. Deploy and manually verify split creation/settlement in checklist item 74 and recent split changes/cancellation in checklist item 75.
-7. Continue the deferred split lifecycle: correct gross after splitting, partial reimbursement, explicit paid-split undo, and split-aware update/move/delete/undo.
-8. Deploy and manually verify prior-month paycheck carry-forward in Projected mode in checklist item 73.
-9. Deploy and manually verify Wants subscriptions in Burn Rate in checklist item 72.
-10. Deploy and manually verify selected-month subscription scoping in checklist item 71.
-11. Deploy and manually verify Daily Spending bill coverage and outlier scaling in checklist item 70.
-12. Deploy and manually verify the monthly savings workflow and corrected Saved-card targets in checklist items 60-61 and 69.
-13. Deploy and manually verify the expense-report corrections in checklist item 67.
-14. Deploy and manually verify typed `recent` opens the short-lived launcher and keeps the resulting DM session ephemeral.
-15. Deploy and manually verify `View Inbox` and `Reconcile Now` show `BookieBot is typing...` without a temporary thinking message.
-16. Manually verify shared Needs logging plus update/move/delete/undo behavior in Discord and Google Sheets.
-17. Manually verify recent transactions and reconciliation after the latest reliability fixes.
-18. Consider a richer Discord button flow for grouped amount adjustments if the current UX feels too manual.
-19. Harden recent-action pending state across restarts/deploys, since selections currently live only in process memory.
-20. Improve targeted recent-action search so commands can find older matches, not only the latest 10 recent actions.
-21. Explore clarifying questions before logging when BookieBot is uncertain instead of guessing or silently failing.
+1. Deploy and manually verify the LangGraph conversational fallback in checklist item 81.
+2. Deploy and manually verify Brian's BofA expense default in checklist item 80.
+3. Deploy and manually verify the shared expense-report chart viewport in checklist item 79.
+4. Deploy and manually verify fronted shared expenses in checklist item 78.
+5. Deploy and manually verify quarterly utility history in checklist item 77.
+6. Deploy and manually verify parser and bill-payment reliability in checklist item 76.
+7. Deploy and manually verify split creation/settlement in checklist item 74 and recent split changes/cancellation in checklist item 75.
+8. Continue the deferred split lifecycle: correct gross after splitting, partial reimbursement, explicit paid-split undo, and split-aware update/move/delete/undo.
+9. Deploy and manually verify prior-month paycheck carry-forward in Projected mode in checklist item 73.
+10. Deploy and manually verify Wants subscriptions in Burn Rate in checklist item 72.
+11. Deploy and manually verify selected-month subscription scoping in checklist item 71.
+12. Deploy and manually verify Daily Spending bill coverage and outlier scaling in checklist item 70.
+13. Deploy and manually verify the monthly savings workflow and corrected Saved-card targets in checklist items 60-61 and 69.
+14. Deploy and manually verify the expense-report corrections in checklist item 67.
+15. Deploy and manually verify typed `recent` opens the short-lived launcher and keeps the resulting DM session ephemeral.
+16. Deploy and manually verify `View Inbox` and `Reconcile Now` show `BookieBot is typing...` without a temporary thinking message.
+17. Manually verify shared Needs logging plus update/move/delete/undo behavior in Discord and Google Sheets.
+18. Manually verify recent transactions and reconciliation after the latest reliability fixes.
+19. Consider a richer Discord button flow for grouped amount adjustments if the current UX feels too manual.
+20. Harden recent-action pending state across restarts/deploys, since selections currently live only in process memory.
+21. Improve targeted recent-action search so commands can find older matches, not only the latest 10 recent actions.
+22. Explore clarifying questions before logging when BookieBot is uncertain instead of guessing or silently failing.
+
+## Completed 2026-08-17
+
+- Replaced the stateless `gpt-3.5-turbo` fallback with a LangGraph/LangChain conversational agent. Only an explicit valid parser `fallback` enters the graph; parser/provider failures retain the existing no-change response.
+- Kept all logging, bill payment, recent-action, split, undo, and reconciliation operations in their existing guarded handlers. The graph exposes seven read-only tools for budget snapshot, category/store spending, largest/date-specific expenses, subscriptions, and bill status.
+- Derived tool ownership exclusively from trusted Discord runtime context and scoped checkpoints by guild/channel/user. Unknown users can converse but cannot read private BookieBot data, and the model has no owner argument or mutation tool.
+- Added bounded request, recursion, model-call, and tool-call limits; safe read-tool failure results; Discord-safe response chunking; and structured completion logs that record tool names without arguments or results.
+- Added durable LangGraph Postgres checkpoints through `BOOKIEBOT_AGENT_DATABASE_URL`, falling back to `BANK_DATABASE_URL` and then process-local memory if no database is configured or setup is unavailable.
+- Upgraded to the modern OpenAI SDK and configurable `gpt-4.1-mini` defaults. Intent parsing now requests provider JSON mode while retaining its validated intent/fallback boundary.
+- Added regression coverage for tool schemas, no-write exposure, actor isolation, unknown-user denial, Needs normalization, real graph tool execution, per-thread memory, fallback integration, long-response chunking, and the OpenAI client migration.
+- Verification: focused agent/parser/router/handler/LLM suite `182 passed`; full suite `530 passed` with one existing Kaleido deprecation warning; Pyright `0 errors`; graph/checkpointer construction smoke test passed; dependency resolution and `git diff --check` passed.
+- Production verification is checklist item 81 below.
 
 ## Completed 2026-08-16
 
@@ -622,6 +635,13 @@ Use a test row or low-risk real row in Discord:
 80. After deployment, log a normal Brian expense without naming a card, such as `Spent $5 on coffee`.
     - Expected: BookieBot immediately logs the expense for `Brian (BofA)` and continues any applicable split flow. It does not ask whether the card was BofA or AL, and the written shared-expense row plus recent action both use `Brian (BofA)`.
     - Temporarily configure `BRIAN_EXPENSE_PAYMENT_METHODS="Brian (BofA),Brian (Test Card)"`, restart, and log another low-risk expense without naming a method. Expected: the chooser returns with exactly BofA and Test Card, no row is written until a choice is made, and the selected label is written afterward. Restore the production value to `Brian (BofA)` after the check.
+81. After deployment, send a non-command question such as `Explain compound interest in plain English`.
+    - Expected: BookieBot answers naturally through the LangGraph fallback. Logs show one completed conversational response and no tool names; no sheet or reconciliation state changes.
+    - Ask `Based on my current budget, could I afford a $100 dinner?` and then `What if it were $150?`. Expected: the first response uses one or more read-only financial tools, the second understands the prior question in the same channel/user thread, and structured logs list tool names without tool arguments, results, or financial values.
+    - Repeat a budget question as the other configured Discord user. Expected: that user receives only their own budget data. An unmapped test user may receive a general answer but any financial tool reports that no mapped profile was available and performs no Sheet read.
+    - Send an unsupported mutation such as `Transfer $50 from checking to savings for me`. Expected: the agent explicitly says it cannot perform the change and that no change was made. Existing direct commands such as `Spent $5 on coffee` continue through the normal intent handler rather than the graph.
+    - With `BOOKIEBOT_AGENT_DATABASE_URL` or `BANK_DATABASE_URL` configured, confirm startup-on-first-use logs `durable_memory=true`, send a conversational follow-up, restart the bot, and send another follow-up in the same channel. Expected: the thread resumes. Without either URL, logs state that process-local memory is active and a restart intentionally clears the conversation.
+    - Temporarily cause a read-tool failure and an intent-parser provider failure. Expected: the read-tool path explains that data is unavailable and no changes were made; the parser failure keeps the existing parser-unavailable response and never invokes the graph.
 
 ## Verification Baseline
 
@@ -635,6 +655,24 @@ python -m pytest unit_tests/intents/test_handlers.py unit_tests/core/test_messag
 Latest verification:
 
 ```bash
+PYTHONPATH=src venv/bin/python -m pytest unit_tests/agent unit_tests/llm/test_client.py unit_tests/intents/test_parser.py unit_tests/core/test_message_router.py unit_tests/intents/test_handlers.py -q
+# passed: 182 passed
+
+PYTHONPATH=src venv/bin/python -m pytest unit_tests -q
+# passed: 530 passed, 1 existing Kaleido deprecation warning
+
+PYTHONPATH=src venv/bin/python -m pyright --pythonpath venv/bin/python --pythonversion 3.12
+# passed: 0 errors, 0 warnings, 0 informations
+
+LangGraph construction smoke test with a dummy OpenAI key and process-local checkpointer
+# passed: CompiledStateGraph + InMemorySaver
+
+venv/bin/python -m pip install --dry-run -r requirements.txt
+# passed: dependency resolution succeeds
+
+git diff --check
+# passed
+
 PYTHONPATH=src venv/bin/python -m pytest unit_tests/reports/test_expense_breakdown.py -q
 # passed: 54 passed
 

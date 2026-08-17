@@ -24,7 +24,6 @@ from bookiebot.reports.expense_breakdown import (
     month_from_entities_or_message,
     write_expense_breakdown_report,
 )
-import openai
 from datetime import datetime
 from collections.abc import Awaitable, Callable
 from typing import Any, AsyncContextManager, cast
@@ -39,6 +38,8 @@ from bookiebot.sheets.routing import (
     sheet_user_context,
 )
 from bookiebot.sheets.config import expense_category_label
+from bookiebot.agent.context import conversation_context_from_message
+from bookiebot.agent.service import get_conversation_service
 from bookiebot.sheets.collaboration import (
     allocation_label,
     mark_reimbursed,
@@ -1151,35 +1152,21 @@ def _without_single_candidate_instruction(content: str, actions: list[Any]) -> s
 # FALLBACK HANDLER
 async def fallback_handler(user_message: str, message: Any, context: Any = None) -> None:
     """
-    If no intent matched, use GPT to generate a general helpful response.
-    Optionally include context from last output.
+    If no command intent matched, use the read-only LangGraph agent.
     """
-    prompt = f"""
-You are a helpful financial assistant. The user previously saw this context (if any):
-\"\"\"{context}\"\"\"
-
-Now the user asks:
-\"\"\"{user_message}\"\"\"
-
-Please respond helpfully and clearly.
-"""
     try:
-        response = cast(
-            Any,
-            openai.ChatCompletion.create(
-                model="gpt-3.5-turbo",
-                messages=[
-                    {"role": "system", "content": "You are a financial assistant chatbot."},
-                    {"role": "user", "content": prompt}
-                ],
-                temperature=0.5
-            ),
+        agent_context = conversation_context_from_message(message)
+        reply = await get_conversation_service().respond(
+            user_message,
+            context=agent_context,
         )
-        reply = response.choices[0].message.content
-        await message.channel.send(reply)
-    except Exception as e:
-        print("[ERROR] fallback_handler failed:", e)
-        await message.channel.send("❌ Sorry, I couldn't process your request.")
+        for chunk in _discord_message_chunks(reply):
+            await message.channel.send(chunk)
+    except Exception:
+        logger.exception("LangGraph fallback handler failed")
+        await message.channel.send(
+            "❌ Sorry, I couldn't process that conversational request. No changes were made."
+        )
 
 
 # QUERY HANDLERS

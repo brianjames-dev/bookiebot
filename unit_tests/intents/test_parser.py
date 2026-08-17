@@ -34,9 +34,11 @@ def test_parse_message_llm_handles_json_strings():
 class _CapturingLLMClient(LLMClient):
     def __init__(self):
         self.messages = []
+        self.kwargs = {}
 
     async def complete(self, *, messages, temperature=0.0, **kwargs):
         self.messages = messages
+        self.kwargs = kwargs
         return {"intent": "log_need_expense", "entities": {"item": "copay", "location": "Kaiser", "amount": 40}}
 
 
@@ -50,6 +52,7 @@ def test_need_expense_prompt_uses_shared_expense_fields():
     assert "same separated expense fields as other shared expenses" in prompt
     assert "handler routes it to the shared Needs category and timestamps it" in prompt
     assert "only include the description of the expense and the amount" not in prompt
+    assert client.kwargs["response_format"] == {"type": "json_object"}
 
 
 def test_student_loan_payment_intents_are_retired_from_parser_prompt():

@@ -34,6 +34,28 @@ It leverages agentic AI to understand natural language commands, update a Google
 > 💬 *"Show me my top 3 expenses this month"*\
 > 📝 Bot fetches and lists your largest expenses.
 
+## Conversational LangGraph Agent
+
+Messages that do not match a BookieBot command now enter a LangGraph conversational agent instead of a stateless generic fallback. The agent can answer normal questions directly and can combine these read-only tools when a response depends on the requesting user's live BookieBot data:
+
+- Current budget snapshot, income, remaining budget, daily pace, and burn rate
+- Category and merchant spending
+- Largest expenses and expenses on a requested date
+- Subscriptions and current bill-payment status
+
+Existing command routing remains authoritative for every mutation. The conversational agent cannot log, update, move, split, delete, reconcile, or pay anything. Tool identity comes from the trusted Discord message context rather than model-generated owner arguments, and conversation threads are isolated by guild, channel, and Discord user.
+
+The agent uses process-local LangGraph memory by default. Set `BOOKIEBOT_AGENT_DATABASE_URL` for durable Postgres checkpoints; when it is omitted, an existing `BANK_DATABASE_URL` is reused. If neither URL is configured, conversational memory resets when the bot process restarts.
+
+```env
+BOOKIEBOT_INTENT_MODEL=gpt-4.1-mini
+BOOKIEBOT_AGENT_MODEL=gpt-4.1-mini
+BOOKIEBOT_AGENT_DATABASE_URL=
+BOOKIEBOT_AGENT_TIMEOUT_SECONDS=45
+BOOKIEBOT_AGENT_MAX_MODEL_CALLS=6
+BOOKIEBOT_AGENT_MAX_TOOL_CALLS=8
+```
+
 ## 🎭 Daily Avatar Rotation
 
 BookieBot can rotate its Discord profile picture once per day. Add square avatar images to:

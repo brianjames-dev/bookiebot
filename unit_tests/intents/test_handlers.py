@@ -2580,19 +2580,26 @@ async def test_query_savings_checks(monkeypatch, message):
 
 @pytest.mark.asyncio
 async def test_fallback(monkeypatch, message):
-    class _Choice:
-        def __init__(self, content):
-            self.message = SimpleNamespace(content=content)
-
-    class _Response:
-        def __init__(self, content):
-            self.choices = [_Choice(content)]
-
-    monkeypatch.setattr(ih.openai.ChatCompletion, "create", lambda *a, **k: _Response("fallback reply"))
+    responder = SimpleNamespace(respond=AsyncMock(return_value="fallback reply"))
+    monkeypatch.setattr(ih, "get_conversation_service", lambda: responder)
 
     await ih.handle_intent("unknown_intent", {}, message)
 
+    context = responder.respond.await_args.kwargs["context"]
+    assert context.actor_key == str(message.author.id)
+    assert context.thread_id.endswith(f":{message.author.id}")
     assert any("fallback" in (msg or "").lower() or "sorry" in (msg or "").lower() for msg, _ in message.channel.sent)
+
+
+@pytest.mark.asyncio
+async def test_fallback_splits_long_agent_responses_for_discord(monkeypatch, message):
+    responder = SimpleNamespace(respond=AsyncMock(return_value=("a" * 1900) + "\n" + ("b" * 100)))
+    monkeypatch.setattr(ih, "get_conversation_service", lambda: responder)
+
+    await ih.handle_intent("fallback", {}, message)
+
+    assert len(message.channel.sent) == 2
+    assert all(len(content) <= 1900 for content, _kwargs in message.channel.sent)
 
 
 @pytest.mark.asyncio
