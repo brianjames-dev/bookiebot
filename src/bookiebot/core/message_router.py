@@ -28,7 +28,12 @@ from bookiebot.core.bank_reconciliation import ensure_bank_reconciliation_loop, 
 from bookiebot.core.subscription_reminders import ensure_subscription_reminder_loop
 from bookiebot.core.web_server import ensure_web_server
 from bookiebot.intents.parser import parse_message_llm
-from bookiebot.intents.handlers import handle_intent, send_recent_workflow_message
+from bookiebot.intents.handlers import (
+    CONVERSATIONAL_READ_INTENTS,
+    conversational_read_intent_handler,
+    handle_intent,
+    send_recent_workflow_message,
+)
 from bookiebot.intents import explorer as intent_explorer
 from bookiebot.sheets.routing import resolve_actor_key
 from bookiebot.sheets.undo import (
@@ -67,6 +72,36 @@ _BILL_INTENTS = {
     "recology": ("log_recology_paid", "query_recology_paid"),
     "water": ("log_water_paid", "query_water_paid"),
 }
+
+_IMPERATIVE_TRANSFER_RE = re.compile(
+    r"^(?:(?:please|kindly)\s+)?(?:transfer|move|send|put|take|withdraw|deposit)\b"
+    r"|^(?:can|could|would|will)\s+you\s+(?:(?:please|kindly)\s+)?"
+    r"(?:transfer|move|send|put|take|withdraw|deposit)\b",
+    re.IGNORECASE,
+)
+
+
+def _unsupported_bank_transfer_request(content: str) -> bool:
+    """Identify bank-transfer instructions that BookieBot must never reinterpret as savings logs."""
+    normalized = " ".join(content.strip().split())
+    if not _IMPERATIVE_TRANSFER_RE.search(normalized):
+        return False
+    lowered = normalized.lower()
+    has_account = any(
+        term in lowered
+        for term in ("checking", "savings", "bank account", "account")
+    )
+    padded = f" {lowered} "
+    has_direction = any(term in padded for term in (" from ", " to ", " into "))
+    return has_account and has_direction
+
+
+async def _dispatch_intent(intent: str, entities: dict[str, Any], message: Any) -> None:
+    """Keep mutations deterministic while giving supported reads an LLM response layer."""
+    if intent in CONVERSATIONAL_READ_INTENTS:
+        await conversational_read_intent_handler(intent, entities, message)
+        return
+    await handle_intent(intent, entities, message)
 
 
 @asynccontextmanager
@@ -446,6 +481,13 @@ def register_events(client, tree):
             await message.channel.send(output)
             return
 
+        if _unsupported_bank_transfer_request(content):
+            await message.channel.send(
+                "I can record a savings contribution, but I can't move money between bank accounts. "
+                "No changes were made."
+            )
+            return
+
         actor_key = resolve_actor_key(
             getattr(message.author, "id", None),
             getattr(message.author, "name", None) or getattr(message.author, "display_name", None),
@@ -457,7 +499,7 @@ def register_events(client, tree):
                 await send_recent_workflow_message(message, "Canceled.")
                 return
             action_id, category = pending_item_move
-            await handle_intent(
+            await _dispatch_intent(
                 "move_recent_action",
                 {"action_id": action_id, "category": category, "updates": {"item": content.strip()}},
                 message,
@@ -476,7 +518,7 @@ def register_events(client, tree):
                 amount_match = re.search(r"\$?\s*(\d+(?:\.\d{1,2})?)", value)
                 if amount_match:
                     value = amount_match.group(1)
-            await handle_intent("update_recent_action", {"action_id": action_id, "updates": {field: value}}, message)
+            await _dispatch_intent("update_recent_action", {"action_id": action_id, "updates": {field: value}}, message)
             return
         expired_notice = pop_pending_action_expiration_notice(actor_key)
         if expired_notice:
@@ -491,26 +533,26 @@ def register_events(client, tree):
                 await send_recent_workflow_message(message, f"❌ {expired_notice}")
                 return
             if pending_kind == "update":
-                await handle_intent("update_recent_action", {"index": idx}, message)
+                await _dispatch_intent("update_recent_action", {"index": idx}, message)
                 return
             if pending_kind == "delete":
-                await handle_intent("delete_recent_action", {"index": idx}, message)
+                await _dispatch_intent("delete_recent_action", {"index": idx}, message)
                 return
             if pending_kind == "move":
-                await handle_intent("move_recent_action", {"index": idx}, message)
+                await _dispatch_intent("move_recent_action", {"index": idx}, message)
                 return
             output = intent_explorer.describe_intent(idx)
             await message.channel.send(output)
             return
 
         if content.lower() in {"undo", "undo last", "undo last transaction", "remove last entry"}:
-            await handle_intent("undo_last_transaction", {}, message)
+            await _dispatch_intent("undo_last_transaction", {}, message)
             return
 
         if content.lower().startswith(("delete #", "remove #", "clear #")):
             idx_text = content.split("#", 1)[1].strip()
             if idx_text.isdigit():
-                await handle_intent("delete_recent_action", {"index": int(idx_text)}, message)
+                await _dispatch_intent("delete_recent_action", {"index": int(idx_text)}, message)
                 return
 
         if (
@@ -518,7 +560,7 @@ def register_events(client, tree):
             and pending_action_selection_count(actor_key, "delete") == 1
             and set(re.findall(r"[a-z']+", content.lower())) & _DELETE_VERBS
         ):
-            await handle_intent("delete_recent_action", {"index": 1}, message)
+            await _dispatch_intent("delete_recent_action", {"index": 1}, message)
             return
         expired_notice = pop_pending_action_expiration_notice(actor_key)
         if expired_notice:
@@ -528,7 +570,7 @@ def register_events(client, tree):
         recent_query = _recent_query_intent(content)
         if recent_query:
             intent, entities = recent_query
-            await handle_intent(intent, entities, message)
+            await _dispatch_intent(intent, entities, message)
             return
 
         bill_payment = _bill_payment_intent(content)
@@ -539,7 +581,7 @@ def register_events(client, tree):
                 extra={"intent": intent, "entities": entities, "user_id": str(message.author.id)},
             )
             try:
-                await handle_intent(intent, entities, message)
+                await _dispatch_intent(intent, entities, message)
             except Exception as exc:
                 logger.exception(
                     "Failed to handle deterministic bill intent",
@@ -551,13 +593,13 @@ def register_events(client, tree):
         reimbursement = _reimbursement_intent(content)
         if reimbursement:
             intent, entities = reimbursement
-            await handle_intent(intent, entities, message)
+            await _dispatch_intent(intent, entities, message)
             return
 
         indexed_action = _indexed_action_intent(content)
         if indexed_action:
             intent, entities = indexed_action
-            await handle_intent(intent, entities, message)
+            await _dispatch_intent(intent, entities, message)
             return
 
         action_management = _action_management_intent(content)
@@ -574,7 +616,7 @@ def register_events(client, tree):
                 return
             if pending_kind == "move" and intent == "move_recent_action":
                 entities.setdefault("index", 1)
-            await handle_intent(intent, entities, message)
+            await _dispatch_intent(intent, entities, message)
             return
 
         try:
@@ -611,7 +653,7 @@ def register_events(client, tree):
             )
 
         try:
-            await handle_intent(intent, entities, message)
+            await _dispatch_intent(intent, entities, message)
         except Exception as e:
             logger.exception(
                 "Failed to handle intent",

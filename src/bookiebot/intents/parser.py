@@ -141,6 +141,10 @@ async def parse_message_llm(user_message: str, *, llm_client: Optional[LLMClient
     - Use "query_savings" when checking the current monthly savings contribution.
     - For logging, extract entities as: {{ "amount": <float> }}.
     Logging savings replaces the current monthly total; it does not add a separate paycheck deposit.
+    BookieBot cannot move money between bank accounts. If the user instructs BookieBot to transfer,
+    move, or send money to/from checking, savings, or another bank account, return "fallback" and
+    never reinterpret that instruction as "log_savings". A statement that the user already made a
+    transfer may be logged only when they clearly ask BookieBot to record that completed contribution.
 
     If the message is about logging a Need expense, use the same separated expense fields as other shared expenses:
     - amount: float (do not include $)

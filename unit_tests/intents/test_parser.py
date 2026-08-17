@@ -69,6 +69,21 @@ def test_student_loan_payment_intents_are_retired_from_parser_prompt():
     assert "return the fallback intent" in prompt
 
 
+def test_parser_prompt_never_reinterprets_bank_transfer_instructions_as_savings_logs():
+    client = _CapturingLLMClient()
+
+    asyncio.run(
+        parse_message_llm(
+            "Please transfer $50 from checking to savings",
+            llm_client=client,
+        )
+    )
+
+    prompt = client.messages[0]["content"]
+    assert "cannot move money between bank accounts" in prompt
+    assert 'never reinterpret that instruction as "log_savings"' in prompt
+
+
 class _FailingLLMClient(LLMClient):
     async def complete(self, *, messages, temperature=0.0, **kwargs):
         raise RuntimeError("OpenAI returned 500")

@@ -9,7 +9,7 @@ import pytest
 
 from bookiebot.agent.context import ConversationContext
 from bookiebot.agent import tools as agent_tools
-from bookiebot.agent.service import LangGraphConversationService
+from bookiebot.agent.service import LangGraphConversationService, SYSTEM_PROMPT
 
 
 class _Graph:
@@ -36,6 +36,13 @@ def _context() -> ConversationContext:
         guild_id="300",
         thread_id="discord:300:200:676638528590970917",
     )
+
+
+def test_system_prompt_requires_synthesis_instead_of_raw_tool_output():
+    normalized = " ".join(SYSTEM_PROMPT.split())
+
+    assert "Synthesize them in your own words" in normalized
+    assert "Do not merely echo a legacy command response" in normalized
 
 
 @pytest.mark.asyncio

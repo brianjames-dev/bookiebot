@@ -604,3 +604,159 @@ async def test_on_message_water_bill_bypasses_llm(monkeypatch):
 
     handle_intent.assert_awaited_once_with("log_water_paid", {"amount": 148.82}, message)
     parse_message.assert_not_awaited()
+
+
+@pytest.mark.asyncio
+async def test_dispatch_supported_read_intent_uses_conversational_agent(monkeypatch):
+    import bookiebot.core.message_router as router
+
+    conversational = AsyncMock()
+    legacy = AsyncMock()
+    monkeypatch.setattr(router, "conversational_read_intent_handler", conversational)
+    monkeypatch.setattr(router, "handle_intent", legacy)
+    message = SimpleNamespace(content="Can I afford dinner?")
+    entities = {"person": None}
+
+    await router._dispatch_intent("query_remaining_budget", entities, message)
+
+    conversational.assert_awaited_once_with("query_remaining_budget", entities, message)
+    legacy.assert_not_awaited()
+
+
+@pytest.mark.asyncio
+async def test_parsed_read_question_reaches_conversational_agent_not_legacy_output(monkeypatch):
+    import bookiebot.core.message_router as router
+
+    class DummyClient:
+        def __init__(self):
+            self.user = SimpleNamespace(id=1)
+            self.events = {}
+
+        def event(self, func):
+            self.events[func.__name__] = func
+            return func
+
+    class DummyChannel:
+        id = 123
+        name = "bookiebot"
+        guild = None
+
+        async def send(self, content=None, **kwargs):
+            raise AssertionError(f"Router should not send a legacy response: {content}")
+
+    monkeypatch.setattr(router.config, "CHANNEL_ID", None)
+    monkeypatch.setattr(router.config, "CHANNEL_NAME", "bookiebot")
+    monkeypatch.setattr(
+        router,
+        "parse_message_llm",
+        AsyncMock(return_value={"intent": "query_remaining_budget", "entities": {}}),
+    )
+    conversational = AsyncMock()
+    legacy = AsyncMock()
+    monkeypatch.setattr(router, "conversational_read_intent_handler", conversational)
+    monkeypatch.setattr(router, "handle_intent", legacy)
+
+    client = DummyClient()
+    router.register_events(client, SimpleNamespace())
+    message = SimpleNamespace(
+        content="Based on my budget, can I afford a $100 dinner?",
+        author=SimpleNamespace(id=676638528590970917, name="deebers"),
+        channel=DummyChannel(),
+    )
+
+    await client.events["on_message"](message)
+
+    conversational.assert_awaited_once_with(
+        "query_remaining_budget",
+        {"person": None},
+        message,
+    )
+    legacy.assert_not_awaited()
+
+
+@pytest.mark.asyncio
+async def test_dispatch_mutation_intent_stays_deterministic(monkeypatch):
+    import bookiebot.core.message_router as router
+
+    conversational = AsyncMock()
+    legacy = AsyncMock()
+    monkeypatch.setattr(router, "conversational_read_intent_handler", conversational)
+    monkeypatch.setattr(router, "handle_intent", legacy)
+    message = SimpleNamespace(content="Set savings to $50")
+    entities = {"amount": 50.0}
+
+    await router._dispatch_intent("log_savings", entities, message)
+
+    legacy.assert_awaited_once_with("log_savings", entities, message)
+    conversational.assert_not_awaited()
+
+
+def test_imperative_bank_transfer_is_not_a_savings_log_command():
+    import bookiebot.core.message_router as router
+
+    assert router._unsupported_bank_transfer_request(
+        "Please transfer $50 from my checking account to savings."
+    ) is True
+    assert router._unsupported_bank_transfer_request(
+        "Can you move $50 from checking into my savings account?"
+    ) is True
+    assert router._unsupported_bank_transfer_request("Transfer $50 to savings") is True
+    assert router._unsupported_bank_transfer_request(
+        "Please put $50 from checking into savings"
+    ) is True
+    assert router._unsupported_bank_transfer_request("Deposit $50 into savings") is True
+    assert router._unsupported_bank_transfer_request(
+        "I transferred $50 to savings yesterday"
+    ) is False
+
+
+@pytest.mark.asyncio
+async def test_on_message_rejects_bank_transfer_before_parser_or_mutation(monkeypatch):
+    import bookiebot.core.message_router as router
+
+    class DummyClient:
+        def __init__(self):
+            self.user = SimpleNamespace(id=1)
+            self.events = {}
+
+        def event(self, func):
+            self.events[func.__name__] = func
+            return func
+
+    class DummyChannel:
+        id = 123
+        name = "bookiebot"
+        guild = None
+
+        def __init__(self):
+            self.sent = []
+
+        async def send(self, content=None, **kwargs):
+            self.sent.append((content, kwargs))
+
+    monkeypatch.setattr(router.config, "CHANNEL_ID", None)
+    monkeypatch.setattr(router.config, "CHANNEL_NAME", "bookiebot")
+    parse_message = AsyncMock(side_effect=AssertionError("Parser should not be called"))
+    handle_intent = AsyncMock(side_effect=AssertionError("No intent should mutate state"))
+    monkeypatch.setattr(router, "parse_message_llm", parse_message)
+    monkeypatch.setattr(router, "handle_intent", handle_intent)
+
+    client = DummyClient()
+    router.register_events(client, SimpleNamespace())
+    message = SimpleNamespace(
+        content="Please transfer $50 from my checking account to savings.",
+        author=SimpleNamespace(id=676638528590970917, name="deebers"),
+        channel=DummyChannel(),
+    )
+
+    await client.events["on_message"](message)
+
+    assert message.channel.sent == [
+        (
+            "I can record a savings contribution, but I can't move money between bank accounts. "
+            "No changes were made.",
+            {},
+        )
+    ]
+    parse_message.assert_not_awaited()
+    handle_intent.assert_not_awaited()

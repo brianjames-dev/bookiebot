@@ -374,6 +374,12 @@ Decision: Preserve deterministic routing and the existing intent handlers as the
 
 Rationale: BookieBot's logging, recent-action, split, and reconciliation flows already encode confirmation and lineage guarantees that a general tool loop must not bypass. A read-only fallback provides natural conversation and multi-tool financial reasoning immediately while keeping user isolation and mutation safety explicit. Per-user thread keys prevent cross-user memory leakage, and optional durable checkpoints allow Railway restarts without making the agent unavailable when Postgres is absent.
 
+## 2026-08-17 - Use LangGraph As The Response Layer For Supported Reads
+
+Decision: Supersede only the “explicit fallback only” routing portion of the preceding decision. Valid fallback messages and recognized read intents covered by the graph's actor-scoped tools enter LangGraph; the model must synthesize a direct answer from tool data rather than return a legacy handler's preformatted string. Specialized visual/report reads and reads without a matching graph tool retain their existing handlers. Every logging, payment, savings, recent-action, split, undo, and reconciliation mutation remains deterministic and unavailable as a model tool. Imperative bank-transfer requests are rejected before intent parsing so they cannot be reclassified as savings writes.
+
+Rationale: Intent recognition is useful for identifying BookieBot concepts, but a read classification should not bypass conversational reasoning. Sending supported reads through the graph allows follow-ups, multi-tool answers, and useful interpretation while preserving exact tool facts and trusted actor scope. Keeping mutation authority outside the graph preserves the existing confirmation and lineage rules; the pre-parser transfer boundary closes the observed ambiguity between moving bank funds and recording a completed savings contribution.
+
 ## Pending Decisions
 
 - Where should durable system events live: banking database only, Google Sheets only, or dual-write during transition?

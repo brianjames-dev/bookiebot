@@ -4,11 +4,11 @@ Last updated: 2026-08-17
 
 ## Active Focus
 
-Unsupported messages now enter an actor-scoped, read-only LangGraph conversational agent with isolated conversation memory, while all existing command and mutation workflows remain authoritative. The immediate next step is production verification of the conversational fallback and its Postgres checkpoints, followed by the existing deployment checks.
+Unsupported messages and tool-supported read intents now enter an actor-scoped, read-only LangGraph conversational agent with isolated conversation memory and LLM-synthesized answers, while all mutation workflows remain deterministic. The immediate next step is production verification of the response layer, transfer refusal, and Postgres checkpoints, followed by the existing deployment checks.
 
 ## On Deck
 
-1. Deploy and manually verify the LangGraph conversational fallback in checklist item 81.
+1. Deploy and manually verify the LangGraph conversational/read response layer and bank-transfer refusal in checklist item 81.
 2. Deploy and manually verify Brian's BofA expense default in checklist item 80.
 3. Deploy and manually verify the shared expense-report chart viewport in checklist item 79.
 4. Deploy and manually verify fronted shared expenses in checklist item 78.
@@ -33,7 +33,11 @@ Unsupported messages now enter an actor-scoped, read-only LangGraph conversation
 
 ## Completed 2026-08-17
 
-- Replaced the stateless `gpt-3.5-turbo` fallback with a LangGraph/LangChain conversational agent. Only an explicit valid parser `fallback` enters the graph; parser/provider failures retain the existing no-change response.
+- Routed recognized read intents supported by the agent's seven tools through LangGraph, including the budget, category, largest expense, subscription, date, merchant, and bill questions exercised in Discord. The model now receives live tool data and is instructed to answer in its own words with concise interpretation while preserving exact facts.
+- Kept specialized report/chart reads and all writes on their existing handlers. Logging, savings, bill payments, recent actions, splits, undo, and reconciliation are still unavailable as agent tools.
+- Blocked imperative bank-transfer requests before intent parsing after production testing showed `Please transfer $50 from my checking account to savings` was incorrectly interpreted as setting savings. The bot now says it cannot move bank funds and confirms no change; explicitly recording an already-completed transfer remains possible.
+- Added routing, synthesis, tool-eligibility, and transfer-safety regressions. Verification: focused agent/parser/router/handler suite `188 passed`; full suite `539 passed` with one existing Kaleido deprecation warning; Pyright `0 errors`; `git diff --check` passed.
+- Replaced the stateless `gpt-3.5-turbo` fallback with a LangGraph/LangChain conversational agent. Valid fallback messages and tool-supported read intents enter the graph; parser/provider failures retain the existing no-change response.
 - Kept all logging, bill payment, recent-action, split, undo, and reconciliation operations in their existing guarded handlers. The graph exposes seven read-only tools for budget snapshot, category/store spending, largest/date-specific expenses, subscriptions, and bill status.
 - Derived tool ownership exclusively from trusted Discord runtime context and scoped checkpoints by guild/channel/user. Unknown users can converse but cannot read private BookieBot data, and the model has no owner argument or mutation tool.
 - Added bounded request, recursion, model-call, and tool-call limits; safe read-tool failure results; Discord-safe response chunking; and structured completion logs that record tool names without arguments or results.
@@ -638,8 +642,9 @@ Use a test row or low-risk real row in Discord:
 81. After deployment, send a non-command question such as `Explain compound interest in plain English`.
     - Expected: BookieBot answers naturally through the LangGraph fallback. Logs show one completed conversational response and no tool names; no sheet or reconciliation state changes.
     - Ask `Based on my current budget, could I afford a $100 dinner?` and then `What if it were $150?`. Expected: the first response uses one or more read-only financial tools, the second understands the prior question in the same channel/user thread, and structured logs list tool names without tool arguments, results, or financial values.
+    - Repeat `Give me a quick assessment of my Needs spending`, `What are my three largest expenses?`, `Summarize my subscriptions and current bill status together`, `What expenses did I log on August 15, 2026?`, and `How much have I spent at Costco, and what was the largest purchase there?`. Expected: each reply is newly phrased by the LLM from exact tool facts, can combine tools where requested, and does not repeat the old canned intent-handler layout.
     - Repeat a budget question as the other configured Discord user. Expected: that user receives only their own budget data. An unmapped test user may receive a general answer but any financial tool reports that no mapped profile was available and performs no Sheet read.
-    - Send an unsupported mutation such as `Transfer $50 from checking to savings for me`. Expected: the agent explicitly says it cannot perform the change and that no change was made. Existing direct commands such as `Spent $5 on coffee` continue through the normal intent handler rather than the graph.
+    - Send `Please transfer $50 from my checking account to savings`. Expected: the pre-parser safety boundary says BookieBot can record savings but cannot move bank funds, explicitly confirms no change, and does not alter the savings cell or create an undo action. `I transferred $50 to savings; record that contribution` may use the existing deterministic savings handler. Existing direct commands such as `Spent $5 on coffee` continue through the normal intent handler rather than the graph.
     - With `BOOKIEBOT_AGENT_DATABASE_URL` or `BANK_DATABASE_URL` configured, confirm startup-on-first-use logs `durable_memory=true`, send a conversational follow-up, restart the bot, and send another follow-up in the same channel. Expected: the thread resumes. Without either URL, logs state that process-local memory is active and a restart intentionally clears the conversation.
     - Temporarily cause a read-tool failure and an intent-parser provider failure. Expected: the read-tool path explains that data is unavailable and no changes were made; the parser failure keeps the existing parser-unavailable response and never invokes the graph.
 
@@ -655,11 +660,11 @@ python -m pytest unit_tests/intents/test_handlers.py unit_tests/core/test_messag
 Latest verification:
 
 ```bash
-PYTHONPATH=src venv/bin/python -m pytest unit_tests/agent unit_tests/llm/test_client.py unit_tests/intents/test_parser.py unit_tests/core/test_message_router.py unit_tests/intents/test_handlers.py -q
-# passed: 182 passed
+PYTHONPATH=src venv/bin/python -m pytest unit_tests/agent unit_tests/intents/test_parser.py unit_tests/core/test_message_router.py unit_tests/intents/test_handlers.py -q
+# passed: 188 passed
 
 PYTHONPATH=src venv/bin/python -m pytest unit_tests -q
-# passed: 530 passed, 1 existing Kaleido deprecation warning
+# passed: 539 passed, 1 existing Kaleido deprecation warning
 
 PYTHONPATH=src venv/bin/python -m pyright --pythonpath venv/bin/python --pythonversion 3.12
 # passed: 0 errors, 0 warnings, 0 informations

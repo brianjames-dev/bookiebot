@@ -36,7 +36,7 @@ It leverages agentic AI to understand natural language commands, update a Google
 
 ## Conversational LangGraph Agent
 
-Messages that do not match a BookieBot command now enter a LangGraph conversational agent instead of a stateless generic fallback. The agent can answer normal questions directly and can combine these read-only tools when a response depends on the requesting user's live BookieBot data:
+Messages that do not match a BookieBot command enter a LangGraph conversational agent instead of a stateless generic fallback. Recognized read questions covered by the agent's tools also use this path, so the model interprets live tool data and answers in its own words instead of returning the legacy intent handler's preformatted string. The agent can answer normal questions directly and can combine these read-only tools when a response depends on the requesting user's live BookieBot data:
 
 - Current budget snapshot, income, remaining budget, daily pace, and burn rate
 - Category and merchant spending
@@ -44,6 +44,8 @@ Messages that do not match a BookieBot command now enter a LangGraph conversatio
 - Subscriptions and current bill-payment status
 
 Existing command routing remains authoritative for every mutation. The conversational agent cannot log, update, move, split, delete, reconcile, or pay anything. Tool identity comes from the trusted Discord message context rather than model-generated owner arguments, and conversation threads are isolated by guild, channel, and Discord user.
+
+Imperative bank-transfer requests are rejected before intent parsing so wording such as `Transfer $50 from checking to savings` cannot be misread as setting the monthly savings contribution. A completed transfer can still be recorded when the user explicitly asks BookieBot to log it.
 
 The agent uses process-local LangGraph memory by default. Set `BOOKIEBOT_AGENT_DATABASE_URL` for durable Postgres checkpoints; when it is omitted, an existing `BANK_DATABASE_URL` is reused. If neither URL is configured, conversational memory resets when the bot process restarts.
 

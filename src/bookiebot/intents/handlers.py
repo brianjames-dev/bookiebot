@@ -93,6 +93,26 @@ _RECENT_PRIVATE_FOLLOWUPS: dict[str, tuple[float, Callable[..., Awaitable[Any]]]
 logger = logging.getLogger(__name__)
 
 
+CONVERSATIONAL_READ_INTENTS = frozenset(
+    {
+        "query_average_daily_spend",
+        "query_burn_rate",
+        "query_expenses_on_day",
+        "query_largest_single_expense",
+        "query_pge_paid",
+        "query_recology_paid",
+        "query_remaining_budget",
+        "query_rent_paid",
+        "query_subscriptions",
+        "query_top_n_expenses",
+        "query_total_for_category",
+        "query_total_for_store",
+        "query_total_income",
+        "query_water_paid",
+    }
+)
+
+
 def _payment_log_retry_attempts() -> int:
     try:
         return max(1, int(os.getenv("BOOKIEBOT_SHEETS_READ_MAX_ATTEMPTS", "4")))
@@ -1150,9 +1170,28 @@ def _without_single_candidate_instruction(content: str, actions: list[Any]) -> s
 
 
 # FALLBACK HANDLER
+async def conversational_read_intent_handler(
+    intent: str,
+    entities: IntentEntities,
+    message: Any,
+) -> None:
+    """Let the read-only agent synthesize a natural answer for a known read intent."""
+    if intent not in CONVERSATIONAL_READ_INTENTS:
+        raise ValueError(f"Intent is not agent-readable: {intent}")
+    logger.info(
+        "Routing recognized read intent through LangGraph",
+        extra={"intent": intent, "entity_names": sorted(entities)},
+    )
+    await fallback_handler(
+        message.content,
+        message,
+        context={"routed_intent": intent, "entities": entities},
+    )
+
+
 async def fallback_handler(user_message: str, message: Any, context: Any = None) -> None:
     """
-    If no command intent matched, use the read-only LangGraph agent.
+    Use the read-only LangGraph agent for fallback and supported read intents.
     """
     try:
         agent_context = conversation_context_from_message(message)

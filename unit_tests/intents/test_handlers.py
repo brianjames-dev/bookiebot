@@ -2603,6 +2603,47 @@ async def test_fallback_splits_long_agent_responses_for_discord(monkeypatch, mes
 
 
 @pytest.mark.asyncio
+async def test_conversational_read_intent_uses_agent_instead_of_legacy_handler(monkeypatch, message):
+    responder = SimpleNamespace(respond=AsyncMock(return_value="You can afford it, with room left."))
+    legacy = AsyncMock(side_effect=AssertionError("Legacy query response should not be sent"))
+    monkeypatch.setattr(ih, "get_conversation_service", lambda: responder)
+    monkeypatch.setitem(ih.INTENT_HANDLERS, "query_remaining_budget", legacy)
+    message.content = "Based on my current budget, can I afford a $100 dinner?"
+
+    await ih.conversational_read_intent_handler(
+        "query_remaining_budget",
+        {"person": None},
+        message,
+    )
+
+    responder.respond.assert_awaited_once()
+    assert message.channel.sent == [("You can afford it, with room left.", {})]
+    legacy.assert_not_awaited()
+
+
+def test_screenshot_read_intents_are_agent_eligible_but_mutations_are_not():
+    expected = {
+        "query_remaining_budget",
+        "query_total_for_category",
+        "query_top_n_expenses",
+        "query_subscriptions",
+        "query_expenses_on_day",
+        "query_total_for_store",
+    }
+
+    assert expected <= ih.CONVERSATIONAL_READ_INTENTS
+    assert {
+        "log_expense",
+        "log_income",
+        "log_savings",
+        "update_recent_action",
+        "move_recent_action",
+        "delete_recent_action",
+        "undo_last_transaction",
+    }.isdisjoint(ih.CONVERSATIONAL_READ_INTENTS)
+
+
+@pytest.mark.asyncio
 @pytest.mark.parametrize("intent", ["log_student_loan_paid", "query_student_loans_paid"])
 async def test_retired_student_loan_intents_use_fallback_without_sheet_helpers(monkeypatch, message, intent):
     fallback = AsyncMock()
