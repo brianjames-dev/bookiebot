@@ -189,8 +189,6 @@ type ChartPanel = {
   id: string
   title: string
   content: ReactNode
-  titleAccessory?: ReactNode
-  headerControl?: ReactNode
 }
 
 type CalendarFilter = "all" | "subscription"
@@ -503,8 +501,24 @@ function clamp(value: number, min: number, max: number) {
   return Math.min(max, Math.max(min, value))
 }
 
+function useViewportScrollbarWidth() {
+  useLayoutEffect(() => {
+    const root = document.documentElement
+    const update = () => {
+      root.style.setProperty("--bb-viewport-scrollbar-width", `${Math.max(window.innerWidth - root.clientWidth, 0)}px`)
+    }
+    update()
+    window.addEventListener("resize", update)
+    return () => {
+      window.removeEventListener("resize", update)
+      root.style.removeProperty("--bb-viewport-scrollbar-width")
+    }
+  }, [])
+}
+
 export function ExpenseReportApp({ report }: { report: ExpenseReportData }) {
   const { theme, toggleTheme } = useExpenseReportTheme()
+  useViewportScrollbarWidth()
   const dailySpendingDetailsOpen = useMediaQuery("(min-width: 861px)")
   const [projectionActive, setProjectionActive] = useState(false)
   const [categoryMixFilter, setCategoryMixFilter] = useState<CategoryMixFilter>("all")
@@ -557,7 +571,6 @@ export function ExpenseReportApp({ report }: { report: ExpenseReportData }) {
     {
       id: "category",
       title: "Category Mix",
-      headerControl: <CategoryMixFilterControl filter={categoryMixFilter} onFilterChange={switchCategoryMixFilter} />,
       content: (
         <CategoryMixChart
           data={activeReport.breakdown}
@@ -565,6 +578,7 @@ export function ExpenseReportApp({ report }: { report: ExpenseReportData }) {
           categoryBudgets={activeReport.categoryBudgets}
           amountSaved={activeReport.metrics.amountSaved}
           filter={categoryMixFilter}
+          onFilterChange={switchCategoryMixFilter}
           projected={projectionActive}
           collapseKey={chartCollapseKey}
         />
@@ -575,7 +589,6 @@ export function ExpenseReportApp({ report }: { report: ExpenseReportData }) {
           {
             id: "burn-rate",
             title: "Burn Rate",
-            titleAccessory: <BurnRateInfoButton />,
             content: (
               <BurnRateChart
                 burnRate={activeReport.burnRate}
@@ -589,7 +602,6 @@ export function ExpenseReportApp({ report }: { report: ExpenseReportData }) {
     {
       id: "calendar",
       title: "Calendar",
-      headerControl: <CalendarFilterControl filter={calendarFilter} onFilterChange={switchCalendarFilter} />,
       content: (
         <CalendarAnalyticsPanel
           year={report.year}
@@ -598,6 +610,7 @@ export function ExpenseReportApp({ report }: { report: ExpenseReportData }) {
           elapsedDays={report.elapsedDays}
           events={activeReport.calendarEvents}
           filter={calendarFilter}
+          onFilterChange={switchCalendarFilter}
           projected={projectionActive}
           needs={report.subscriptionsNeeds}
           wants={report.subscriptionsWants}
@@ -785,15 +798,6 @@ export function ExpenseReportApp({ report }: { report: ExpenseReportData }) {
             >
               {chartPanels.map((panel, index) => (
                 <div className="bb-chart-carousel-slide" key={panel.id} aria-hidden={index !== activeChartIndex}>
-                  <CardHeader className="bb-analytics-header">
-                    <div className="bb-card-title-row bb-analytics-title-row">
-                      <div className="bb-title-with-accessory">
-                        <CardTitle>{panel.title}</CardTitle>
-                        {panel.titleAccessory}
-                      </div>
-                      {panel.headerControl ? <div className="bb-analytics-header-controls">{panel.headerControl}</div> : null}
-                    </div>
-                  </CardHeader>
                   <CardContent>{panel.content}</CardContent>
                 </div>
               ))}
@@ -1082,11 +1086,14 @@ function BurnRateChart({
   const categoryPressure = categoryMixPressure("wants", categoryBalances, burnRate.spent)
 
   return (
-    <div className="bb-chart-stack">
-      <div className="bb-panel-head bb-burn-rate-summary">
+    <div className="bb-chart-stack bb-chart-page">
+      <div className="bb-panel-head bb-burn-rate-summary bb-chart-page-header">
         <div className="bb-burn-rate-primary">
           <div>
-            <div className="bb-chart-kicker">{statusLabel}</div>
+            <div className="bb-title-with-accessory">
+              <div className="bb-chart-kicker">{statusLabel}</div>
+              <BurnRateInfoButton />
+            </div>
             <div className={isOver ? "bb-burn-rate-value bb-negative" : "bb-burn-rate-value bb-positive"}>{differenceLabel}</div>
             <div className="bb-burn-rate-note">
               {burnRate.elapsedDays} of {burnRate.daysInMonth} days counted
@@ -1102,7 +1109,7 @@ function BurnRateChart({
       </div>
       <ChartContainer
         config={{ variance: { label: "Variance", color: lineColor } }}
-        className="bb-chart-box bb-chart-box-wide"
+        className="bb-chart-box bb-chart-box-wide bb-chart-page-body"
       >
         <ResponsiveContainer width="100%" height="100%">
           <LineChart data={chartSeries} margin={{ top: 20, right: 22, left: 0, bottom: 8 }}>
@@ -1137,17 +1144,19 @@ function BurnRateChart({
           </LineChart>
         </ResponsiveContainer>
       </ChartContainer>
-      <DetailsPanel summary="Details" collapseKey={collapseKey}>
-        <StatList
-          rows={[
-            ["Limit", formatMoney(burnRate.budget)],
-            ["Spent", formatMoney(burnRate.spent)],
-            ["Left", formatMoney(burnRate.remaining)],
-            ["Allowed/day", formatMoney(burnRate.allowedDailyAverage)],
-            ["Actual/day", formatMoney(burnRate.actualDailyAverage)],
-          ]}
-        />
-      </DetailsPanel>
+      <div className="bb-chart-page-footer">
+        <DetailsPanel summary="Details" collapseKey={collapseKey}>
+          <StatList
+            rows={[
+              ["Limit", formatMoney(burnRate.budget)],
+              ["Spent", formatMoney(burnRate.spent)],
+              ["Left", formatMoney(burnRate.remaining)],
+              ["Allowed/day", formatMoney(burnRate.allowedDailyAverage)],
+              ["Actual/day", formatMoney(burnRate.actualDailyAverage)],
+            ]}
+          />
+        </DetailsPanel>
+      </div>
     </div>
   )
 }
@@ -1395,6 +1404,7 @@ type CategoryMixChartProps = {
   categoryBudgets: CategoryBalanceAmounts
   amountSaved: number
   filter: CategoryMixFilter
+  onFilterChange: (filter: CategoryMixFilter) => void
   projected: boolean
   collapseKey: number
 }
@@ -1405,11 +1415,13 @@ const CategoryMixChart = memo(function CategoryMixChart({
   categoryBudgets,
   amountSaved,
   filter,
+  onFilterChange,
   projected,
   collapseKey,
 }: CategoryMixChartProps) {
   const selectedRollover = categoryMixRollover(categoryBalances, filter)
-  const chartData = categoryMixRows(data, selectedRollover, filter, amountSaved)
+  const transferRows = categoryMixTransferRows(categoryBalances, filter)
+  const chartData = categoryMixRows(data, selectedRollover, filter, amountSaved, transferRows)
   const [pieHostRef, pieHostSize] = useElementSize<HTMLDivElement>()
   const pieLayout = useExpensePieLayout(chartData, pieHostSize)
   const spentTotal = amountRowsTotal(chartData.filter((item) => item.key !== "left"))
@@ -1418,8 +1430,8 @@ const CategoryMixChart = memo(function CategoryMixChart({
   const usedPercent = selectedBudget > 0 ? (spentTotal / selectedBudget) * 100 : 0
 
   return (
-    <div className="bb-chart-stack">
-      <div className="bb-panel-head">
+    <div className="bb-chart-stack bb-chart-page">
+      <div className="bb-panel-head bb-chart-page-header bb-category-mix-summary">
         <div>
           <div className="bb-chart-kicker">{filter === "savings" ? "Saved" : "Spent"}</div>
           <div className="bb-chart-total">{formatMoney(spentTotal)}</div>
@@ -1430,9 +1442,12 @@ const CategoryMixChart = memo(function CategoryMixChart({
             </div>
           ) : null}
         </div>
-        {pressure ? <CategoryMixPressureBar pressure={pressure} /> : null}
+        <div className="bb-chart-page-header-actions">
+          <CategoryMixFilterControl filter={filter} onFilterChange={onFilterChange} />
+          {pressure ? <CategoryMixPressureBar pressure={pressure} /> : null}
+        </div>
       </div>
-      <div className="bb-chart-layout bb-category-chart-layout">
+      <div className="bb-chart-layout bb-category-chart-layout bb-chart-page-body">
         <ChartContainer config={chartConfig(chartData)} className="bb-chart-box bb-category-chart-box">
           <CategoryMixPieMotionHost
             hostRef={pieHostRef}
@@ -1443,19 +1458,21 @@ const CategoryMixChart = memo(function CategoryMixChart({
           </CategoryMixPieMotionHost>
         </ChartContainer>
       </div>
-      <ModalDetails summary="Categories" title="Category details" collapseKey={collapseKey}>
-        <div className="bb-legend-list">
-          {chartData.map((item) => (
-            <div className="bb-legend-row" key={item.key}>
-              <span className="bb-swatch" style={{ backgroundColor: item.color }} />
-              <span>{item.label}</span>
-              <strong>
-                {formatMoney(item.amount)} <span>{formatPct(item.percentage)}</span>
-              </strong>
-            </div>
-          ))}
-        </div>
-      </ModalDetails>
+      <div className="bb-chart-page-footer">
+        <ModalDetails summary="Categories" title="Category details" collapseKey={collapseKey}>
+          <div className="bb-legend-list">
+            {chartData.map((item) => (
+              <div className="bb-legend-row" key={item.key}>
+                <span className="bb-swatch" style={{ backgroundColor: item.color }} />
+                <span>{item.label}</span>
+                <strong>
+                  {formatMoney(item.amount)} <span>{formatPct(item.percentage)}</span>
+                </strong>
+              </div>
+            ))}
+          </div>
+        </ModalDetails>
+      </div>
     </div>
   )
 }, areCategoryMixChartPropsEqual)
@@ -1537,6 +1554,9 @@ function areCategoryMixPieSurfacePropsEqual(
 function areCategoryMixChartPropsEqual(previous: CategoryMixChartProps, next: CategoryMixChartProps) {
   return (
     previous.amountSaved === next.amountSaved &&
+    previous.categoryBudgets.needs === next.categoryBudgets.needs &&
+    previous.categoryBudgets.wants === next.categoryBudgets.wants &&
+    previous.categoryBudgets.savings === next.categoryBudgets.savings &&
     categoryBalancesEqual(previous.categoryBalances, next.categoryBalances) &&
     previous.filter === next.filter &&
     previous.projected === next.projected &&
@@ -1687,6 +1707,7 @@ function categoryMixRows(
   rolloverAmount: number,
   filter: CategoryMixFilter,
   amountSaved: number,
+  transferRows: BreakdownItem[] = [],
 ) {
   let filtered = data.filter((item) => {
     if (filter === "needs") return CATEGORY_NEEDS_KEYS.has(item.key)
@@ -1704,6 +1725,7 @@ function categoryMixRows(
         }]
       : []
   }
+  filtered = [...filtered, ...transferRows]
   const positiveLeftAmount = Math.max(roundCurrency(rolloverAmount), 0)
   const rows =
     positiveLeftAmount > 0
@@ -1723,6 +1745,24 @@ function categoryMixRows(
     ...item,
     percentage: total ? roundCurrency((item.amount / total) * 100) : 0,
   }))
+}
+
+function categoryMixTransferRows(
+  balances: CategoryBalances,
+  filter: CategoryMixFilter,
+): BreakdownItem[] {
+  if (filter === "all") {
+    return []
+  }
+  return balances.transfers
+    .filter((transfer) => transfer.from === filter)
+    .map((transfer) => ({
+      key: `coverage-${transfer.from}-${transfer.to}`,
+      label: `${CATEGORY_BALANCE_LABELS[transfer.to]} overspend coverage`,
+      amount: transfer.amount,
+      percentage: 0,
+      color: transfer.to === "needs" ? "#f97316" : transfer.to === "wants" ? "#ec4899" : "#22c55e",
+    }))
 }
 
 type ElementSize = {
@@ -2763,6 +2803,42 @@ function DetailsPanel({
   )
 }
 
+function useModalPageScrollLock(locked: boolean) {
+  useLayoutEffect(() => {
+    if (!locked) {
+      return undefined
+    }
+    const body = document.body
+    const root = document.documentElement
+    const scrollY = window.scrollY
+    const previous = {
+      bodyPosition: body.style.position,
+      bodyTop: body.style.top,
+      bodyWidth: body.style.width,
+      bodyOverflow: body.style.overflow,
+      bodyPaddingRight: body.style.paddingRight,
+      rootOverflow: root.style.overflow,
+    }
+    const scrollbarWidth = Math.max(window.innerWidth - root.clientWidth, 0)
+    body.style.position = "fixed"
+    body.style.top = `-${scrollY}px`
+    body.style.width = "100%"
+    body.style.overflow = "hidden"
+    body.style.paddingRight = scrollbarWidth > 0 ? `${scrollbarWidth}px` : previous.bodyPaddingRight
+    root.style.overflow = "hidden"
+
+    return () => {
+      body.style.position = previous.bodyPosition
+      body.style.top = previous.bodyTop
+      body.style.width = previous.bodyWidth
+      body.style.overflow = previous.bodyOverflow
+      body.style.paddingRight = previous.bodyPaddingRight
+      root.style.overflow = previous.rootOverflow
+      window.scrollTo(0, scrollY)
+    }
+  }, [locked])
+}
+
 function ModalDetails({
   summary,
   title,
@@ -2776,6 +2852,7 @@ function ModalDetails({
 }) {
   const [open, setOpen] = useState(false)
   const dialogRef = useRef<HTMLDialogElement | null>(null)
+  useModalPageScrollLock(open)
 
   useEffect(() => {
     setOpen(false)
@@ -3215,6 +3292,7 @@ function CalendarAnalyticsPanel({
   elapsedDays,
   events,
   filter,
+  onFilterChange,
   projected,
   needs,
   wants,
@@ -3226,6 +3304,7 @@ function CalendarAnalyticsPanel({
   elapsedDays: number
   events: CalendarEvent[]
   filter: CalendarFilter
+  onFilterChange: (filter: CalendarFilter) => void
   projected: boolean
   needs: SubscriptionItem[]
   wants: SubscriptionItem[]
@@ -3245,8 +3324,8 @@ function CalendarAnalyticsPanel({
         data-state="active"
         data-bb-calendar-filter={filter}
       >
-        <div className="bb-subscription-panel">
-          <div className="bb-panel-head bb-subscription-summary">
+        <div className="bb-subscription-panel bb-chart-page">
+          <div className="bb-panel-head bb-subscription-summary bb-chart-page-header">
             <div>
               <div className="bb-subscription-total" data-bb-calendar-static-label="month">
                 {monthOnlyLabel(monthLabel)}
@@ -3255,22 +3334,29 @@ function CalendarAnalyticsPanel({
                 <CalendarChangingValue value={formatMoney(outflowTotal)} />
               </div>
             </div>
-            <Badge variant="secondary">
-              <CalendarChangingValue value={`${totalEvents.length} total`} />
-            </Badge>
+            <div className="bb-chart-page-header-actions">
+              <CalendarFilterControl filter={filter} onFilterChange={onFilterChange} />
+              <Badge variant="secondary">
+                <CalendarChangingValue value={`${totalEvents.length} total`} />
+              </Badge>
+            </div>
           </div>
-          <FinancialCalendar
-            year={year}
-            month={month}
-            elapsedDays={elapsedDays}
-            events={events}
-            filter={filter}
-          />
-          {subscriptionItems.length ? (
-            <ModalDetails summary="Details" title="Calendar details" collapseKey={collapseKey}>
-              <SubscriptionAllItemsGrid items={subscriptionItems} />
-            </ModalDetails>
-          ) : null}
+          <div className="bb-chart-page-body">
+            <FinancialCalendar
+              year={year}
+              month={month}
+              elapsedDays={elapsedDays}
+              events={events}
+              filter={filter}
+            />
+          </div>
+          <div className="bb-chart-page-footer">
+            {subscriptionItems.length ? (
+              <ModalDetails summary="Details" title="Calendar details" collapseKey={collapseKey}>
+                <SubscriptionAllItemsGrid items={subscriptionItems} showAll />
+              </ModalDetails>
+            ) : null}
+          </div>
         </div>
       </div>
     </div>
@@ -3523,8 +3609,8 @@ function BillsUtilitiesPanel({
   const currentTotal = billsUtilitiesPanelTotal(items, billEvents, projected)
 
   return (
-    <div className="bb-bills-analytics">
-      <div className="bb-panel-head bb-bills-analytics-head">
+    <div className="bb-bills-analytics bb-chart-page">
+      <div className="bb-panel-head bb-bills-analytics-head bb-chart-page-header">
         <div>
           <div className="bb-chart-kicker">Bills & Utilities</div>
           <div className="bb-chart-total">{formatMoney(currentTotal)}</div>
@@ -3533,15 +3619,17 @@ function BillsUtilitiesPanel({
         <Badge variant="secondary">{items.length} tracked</Badge>
       </div>
       {!items.length ? (
-        <div className="bb-empty">No bill history found.</div>
+        <div className="bb-empty bb-chart-page-body">No bill history found.</div>
       ) : (
-        <>
-          <BillsUtilitiesChart items={items} billEvents={billEvents} year={year} month={month} />
+        <BillsUtilitiesChart items={items} billEvents={billEvents} year={year} month={month} />
+      )}
+      <div className="bb-chart-page-footer">
+        {items.length ? (
           <DetailsPanel summary="Details" collapseKey={collapseKey}>
             <BillsUtilitiesSummary items={items} />
           </DetailsPanel>
-        </>
-      )}
+        ) : null}
+      </div>
     </div>
   )
 }
@@ -3561,7 +3649,7 @@ function BillsUtilitiesChart({
   const eventByLabel = billEventByLabel(billEvents)
 
   return (
-    <ChartContainer config={utilityHistoryChartConfig(items)} className="bb-bills-chart-box">
+    <ChartContainer config={utilityHistoryChartConfig(items)} className="bb-bills-chart-box bb-chart-page-body">
       <ResponsiveContainer width="100%" height="100%">
         <LineChart data={rows} margin={{ top: 12, right: 20, left: 0, bottom: 6 }}>
           <CartesianGrid vertical={false} strokeDasharray="3 3" />
@@ -3980,14 +4068,14 @@ function SubscriptionOverflowTooltip({ items, day }: { items: SubscriptionItem[]
   )
 }
 
-function SubscriptionAllItemsGrid({ items }: { items: SubscriptionItem[] }) {
+function SubscriptionAllItemsGrid({ items, showAll = false }: { items: SubscriptionItem[]; showAll?: boolean }) {
   const needs = items.filter((item) => subscriptionToneForItem(item) === "needs")
   const wants = items.filter((item) => subscriptionToneForItem(item) === "wants")
 
   return (
     <div className="bb-subscription-all-grid">
-      <SubscriptionCompactTable title="Needs" items={needs} tone="needs" />
-      <SubscriptionCompactTable title="Wants" items={wants} tone="wants" />
+      <SubscriptionCompactTable title="Needs" items={needs} tone="needs" showAll={showAll} />
+      <SubscriptionCompactTable title="Wants" items={wants} tone="wants" showAll={showAll} />
     </div>
   )
 }
@@ -3996,17 +4084,19 @@ function SubscriptionCompactTable({
   title,
   items,
   tone,
+  showAll = false,
 }: {
   title: string
   items: SubscriptionItem[]
   tone: Exclude<SubscriptionTone, "all">
+  showAll?: boolean
 }) {
   const [expanded, setExpanded] = useState(false)
   const toneConfig = SUBSCRIPTION_TONES[tone]
   const total = items.reduce((sum, item) => sum + item.amount, 0)
   const visibleItems = items.slice(0, 5)
-  const rows = expanded ? items : visibleItems
-  const hasMore = items.length > visibleItems.length
+  const rows = showAll || expanded ? items : visibleItems
+  const hasMore = !showAll && items.length > visibleItems.length
 
   return (
     <section className="bb-subscription-compact-group" aria-label={`${title} subs`}>

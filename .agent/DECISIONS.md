@@ -358,9 +358,9 @@ Rationale: Payment, budget responsibility, and reimbursement are three separate 
 
 ## 2026-08-16 - Keep The Top Report Carousel At One Stable Stage Height
 
-Decision: Category Mix, Burn Rate, Calendar, and Bills & Utilities share one fixed responsive carousel stage height. Burn Rate and Bills details remain inline and consume chart space inside that fixed stage; the larger Category Mix and Calendar details open in bounded dialogs. Calendar dates use equal-height rows and at most one marker per date, with multi-event tooltips carrying the full event list.
+Decision: Category Mix, Burn Rate, Calendar, and Bills & Utilities share one fixed responsive carousel stage that reaches both viewport edges. Every page uses the same header, flexible graph, and footer regions. Burn Rate and Bills details remain inline and consume graph space inside that fixed stage; the larger Category Mix and Calendar details open in bounded dialogs that lock document scrolling and scroll internally. Calendar dates use equal-height rows and at most one marker per date, with multi-event tooltips carrying the full event list. A filtered category's effective usage includes coverage it donates to another category's overspend, but the aggregate All view excludes transfers to avoid double-counting.
 
-Rationale: A multipage chart surface should not move surrounding content or change height as the user switches pages, opens details, or encounters a busy calendar date. Reserving one stable stage preserves spatial continuity while still giving compact details a useful inline relationship and moving large datasets to an appropriately scrollable overlay.
+Rationale: A multipage chart surface should read as one continuous viewport, not four padded cards, and should not move surrounding content or change height as the user switches pages, opens details, or encounters a busy calendar date. Shared regions preserve alignment while allowing each graph to use the remaining space. Scroll isolation prevents a dialog interaction from displacing the report beneath it. Treating donated coverage as effective category usage makes the donor chart and percentage agree with the visible reduction in its available budget without inflating whole-budget spending.
 
 ## Pending Decisions
 

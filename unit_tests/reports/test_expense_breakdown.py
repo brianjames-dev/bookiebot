@@ -93,6 +93,7 @@ def test_top_chart_carousel_uses_one_fixed_full_bleed_surface_without_panel_card
     assert 'className="bb-chart-carousel"' in carousel_source
     assert 'className="bb-chart-carousel-slide"' in carousel_source
     assert '<Card className="bb-analytics-card"' not in carousel_source
+    assert "<CardHeader" not in carousel_source
     assert "</section>" in carousel_source
     assert ".bb-main > .bb-chart-carousel-band {" in styles
     band_styles = styles.split(".bb-main > .bb-chart-carousel-band {", 1)[1].split("}", 1)[0]
@@ -103,7 +104,10 @@ def test_top_chart_carousel_uses_one_fixed_full_bleed_surface_without_panel_card
     assert "box-shadow: 0 0 0 100vmax hsl(var(--card));" in band_styles
     assert "clip-path: inset(0 -100vmax);" in band_styles
     assert "height: var(--bb-chart-carousel-stage-height);" in band_styles
-    assert "width: 100vw;" not in styles
+    carousel_styles = styles.split(".bb-chart-carousel {", 2)[2].split("}", 1)[0]
+    assert "width: var(--bb-chart-carousel-viewport-width);" in carousel_styles
+    assert "margin-left: calc((100% - var(--bb-chart-carousel-viewport-width)) / 2);" in carousel_styles
+    assert "padding: 0;" in styles.split(".bb-chart-carousel-slide > .bb-card-content {", 1)[1].split("}", 1)[0]
     assert ".bb-chart-carousel-track {" in styles
     assert "height: 100%;" in styles
     assert "align-items: stretch;" in styles
@@ -142,6 +146,41 @@ def test_top_chart_details_percent_and_calendar_markers_keep_stage_stable():
     assert "overflowGroups" not in calendar_source
     assert ".bb-details-dialog" in styles
     assert ".bb-chart-carousel .bb-details-content-inner" in styles
+
+
+def test_top_chart_pages_share_regions_lock_modals_and_show_complete_details():
+    source = (Path(__file__).resolve().parents[2] / "web/expense-report/src/report-app.tsx").read_text()
+    styles = (Path(__file__).resolve().parents[2] / "web/expense-report/src/styles.css").read_text()
+    carousel_source = source.split('<section\n          className="bb-chart-carousel-band"', 1)[1].split(
+        "<ChartCarouselNavigation", 1
+    )[0]
+    calendar_panel = source.split("function CalendarAnalyticsPanel", 1)[1].split("function CalendarChangingValue", 1)[0]
+
+    assert source.count("bb-chart-page-header") >= 4
+    assert source.count("bb-chart-page-body") >= 4
+    assert source.count("bb-chart-page-footer") >= 4
+    assert "panel.titleAccessory" not in carousel_source
+    assert "panel.headerControl" not in carousel_source
+    assert "useModalPageScrollLock(open)" in source
+    assert 'body.style.position = "fixed"' in source
+    assert "window.scrollTo(0, scrollY)" in source
+    assert '<SubscriptionAllItemsGrid items={subscriptionItems} showAll />' in calendar_panel
+    assert "const rows = showAll || expanded ? items : visibleItems" in source
+    assert "const hasMore = !showAll && items.length > visibleItems.length" in source
+    assert ".bb-details-dialog-body" in styles
+    assert "overflow: auto;" in styles
+
+
+def test_category_mix_counts_donor_transfers_as_effective_category_usage():
+    source = (Path(__file__).resolve().parents[2] / "web/expense-report/src/report-app.tsx").read_text()
+    category_source = source.split("const CategoryMixChart = memo", 1)[1].split("type CategoryMixPieMotionHostProps", 1)[0]
+    transfer_source = source.split("function categoryMixTransferRows", 1)[1].split("function categoryMixPressure", 1)[0]
+
+    assert "const transferRows = categoryMixTransferRows(categoryBalances, filter)" in category_source
+    assert "categoryMixRows(data, selectedRollover, filter, amountSaved, transferRows)" in category_source
+    assert "transfer.from === filter" in transfer_source
+    assert 'label: `${CATEGORY_BALANCE_LABELS[transfer.to]} overspend coverage`' in transfer_source
+    assert "spentTotal / selectedBudget" in category_source
 
 
 def test_daily_spending_includes_bills_and_compresses_strong_outliers():
@@ -1773,7 +1812,7 @@ def test_report_frontend_keeps_saved_amount_actual_and_out_of_spending():
     assert "categorySpendingForBreakdown(" in source
     assert "projectedCategoryBalances(categoryBudgets, categorySpending)" in source
     assert "budgetData={activeReport.budgetBreakdown}" not in source
-    assert "categoryMixRows(data, selectedRollover, filter, amountSaved)" in source
+    assert "categoryMixRows(data, selectedRollover, filter, amountSaved, transferRows)" in source
     assert "categoryBudgets={activeReport.categoryBudgets}" in source
     assert "Budget remaining" in source
     assert "usedPercent.toFixed(2)" in source

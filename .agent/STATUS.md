@@ -4,7 +4,7 @@ Last updated: 2026-08-16
 
 ## Active Focus
 
-The expense-report top charts now share one fixed-height, edge-to-edge shaded stage. Charts fill its available space, inline Burn Rate/Bills details shrink their graph instead of growing the stage, Category/Calendar details open in dialogs, and Calendar days never grow for event count. The immediate next step is production verification of this responsive layout, followed by the existing fronted-expense and deployment checks.
+The expense-report top charts now share one fixed-height shaded stage that reaches both viewport edges. Every page uses the same header/graph/footer regions, modal details lock the underlying document while their own content can scroll, and category coverage transfers are reflected in both recipient and donor usage. The immediate next step is production verification of this responsive layout, followed by the existing fronted-expense and deployment checks.
 
 ## On Deck
 
@@ -36,7 +36,11 @@ The expense-report top charts now share one fixed-height, edge-to-edge shaded st
 - Moved Category Mix and Calendar details into bounded, scrollable dialogs so their larger datasets no longer change carousel geometry. Category Mix All now shows the total budget and percentage used.
 - Calendar weeks now divide the available height evenly, every day renders at most one event marker, and multi-event days consolidate all entries and their total into that marker's tooltip.
 - Added focused regressions for the fixed full-bleed stage, responsive chart fill, All percentage, dialog details, single-marker calendar days, and equal-height calendar rows, then rebuilt the committed frontend assets.
-- Verification: report suite `50 passed`; full suite `508 passed`; Pyright `0 errors`; frontend typecheck/build passed; desktop and `390x844` browser checks found identical stage heights across all four pages (`640px` desktop, `540px` phone), graph shrink-with-details behavior, stable dialog geometry, one marker per calendar day, complete aggregated tooltips, no horizontal overflow, and no browser warnings/errors; `git diff --check` passed.
+- Removed all carousel-side gutters so each page enters and exits directly at the viewport edges. Category Mix, Burn Rate, Calendar, and Bills & Utilities now use the same header/body/footer grid, with the graph occupying whatever middle space remains and the lower control region aligned across pages.
+- Removed the redundant outer Category Mix and Calendar headings and the duplicate Bills & Utilities heading. Category Mix keeps its Spent/Saved summary in the upper region, while Calendar keeps only the month, outflow subtitle, filter, and event count.
+- Locked document scrolling whenever Category or Calendar details are open. Dialog bodies retain bounded scrolling and restore the exact page position on close; the Calendar dialog now renders every matching Needs and Wants subscription immediately.
+- Counted cross-category coverage as effective donor usage in filtered Category Mix views. A `$1,000` Needs overage covered by Wants now renders Needs at `$6,417.86 / 118.46%` and Wants at `$2,556.33 / 78.64%`, including a `$1,000.00` coverage slice, without double-counting the All view.
+- Verification: report suite `52 passed`; full suite `509 passed, 1 skipped`; Pyright `0 errors` with the project Python 3.12 environment; frontend typecheck/build passed; desktop and `390x844` browser checks confirmed exact viewport-width slides (`1425px`/`375px` client widths), zero side padding or horizontal overflow, fixed `640px`/`540px` stages, aligned lower regions, cleaned headings, complete 10-row subscription details, contained modal scrolling with page-position restoration, and the donor/recipient overspend figures above; `git diff --check` passed.
 - Production verification is checklist item 79 below.
 
 ## Completed 2026-08-11

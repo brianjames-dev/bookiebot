@@ -1004,7 +1004,7 @@ summary {
   display: flex;
   flex: 1;
   min-height: 0;
-  padding-top: 14px;
+  padding: 0;
 }
 
 .bb-chart-carousel .bb-card-content > * {
@@ -1042,10 +1042,11 @@ summary {
 
 .bb-chart-carousel {
   --bb-chart-carousel-gap: 16px;
-  width: min(var(--bb-content-max), calc(100% - var(--bb-page-gutter) - var(--bb-page-gutter)));
+  --bb-chart-carousel-viewport-width: calc(100vw - var(--bb-viewport-scrollbar-width, 0px));
+  width: var(--bb-chart-carousel-viewport-width);
   height: 100%;
   min-width: 0;
-  margin: 0 auto;
+  margin-left: calc((100% - var(--bb-chart-carousel-viewport-width)) / 2);
   overflow: hidden;
   overscroll-behavior-x: contain;
   overscroll-behavior-y: auto;
@@ -1077,11 +1078,13 @@ summary {
 }
 
 .bb-chart-carousel-slide > .bb-card-content {
+  padding: 0;
   overflow: hidden;
 }
 
 .bb-chart-carousel .bb-chart-container,
 .bb-chart-carousel .bb-subscription-calendar {
+  padding: 0;
   border: 0;
   border-radius: 0;
   background: transparent;
@@ -1225,6 +1228,50 @@ summary {
   align-content: stretch;
   min-width: 0;
   min-height: 0;
+}
+
+.bb-chart-page {
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr) auto;
+  gap: 16px;
+  width: 100%;
+  height: 100%;
+  min-width: 0;
+  min-height: 0;
+}
+
+.bb-chart-page-header {
+  align-content: start;
+  min-width: 0;
+  min-height: 0;
+}
+
+.bb-chart-page-header-actions {
+  display: flex;
+  align-items: flex-start;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+  gap: 10px;
+  min-width: 0;
+  margin-left: auto;
+}
+
+.bb-chart-page-header-actions .bb-category-pressure {
+  flex-basis: 100%;
+}
+
+.bb-chart-page-body {
+  width: 100%;
+  height: 100%;
+  min-width: 0;
+  min-height: 0;
+}
+
+.bb-chart-page-footer {
+  display: grid;
+  align-content: start;
+  min-width: 0;
+  min-height: 42px;
 }
 
 .bb-panel-head {
