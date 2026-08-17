@@ -40,6 +40,32 @@ def test_brian_user_resolves_to_brian_budget_spreadsheet():
     assert sheet_id == "1ArI4qapaj-LGg7v5OC47WdfYijjLdu3QPRPgKLbgD3U"
 
 
+def test_brian_defaults_expense_logging_to_bofa_while_retaining_historical_cards():
+    config = routing.get_user_config(BRIAN_ID)
+
+    assert config.expense_payment_methods == ("Brian (BofA)",)
+    assert config.expense_persons == ("Brian (BofA)", "Brian (AL)")
+
+
+def test_brian_expense_payment_methods_can_be_expanded_from_environment(monkeypatch):
+    monkeypatch.setenv(
+        "BRIAN_EXPENSE_PAYMENT_METHODS",
+        "Brian (BofA),Brian (Future Card)",
+    )
+
+    config = routing.get_user_config(BRIAN_ID)
+
+    assert config.expense_payment_methods == (
+        "Brian (BofA)",
+        "Brian (Future Card)",
+    )
+    assert config.expense_persons == (
+        "Brian (BofA)",
+        "Brian (AL)",
+        "Brian (Future Card)",
+    )
+
+
 def test_hannah_user_resolves_to_hannah_budget_spreadsheet():
     sheet_id = routing.get_budget_spreadsheet_id_for_user(HANNAH_ID, 2026)
     assert sheet_id == "1lEULEvZ5UzjuhnGPncpvh56xxA8JsfYyns0JS_Okmsg"

@@ -4,33 +4,38 @@ Last updated: 2026-08-16
 
 ## Active Focus
 
-The expense-report shared chart stage now also preserves actual dates for every logged income event, exposes a compact count beside consolidated mobile calendar nodes, keeps Calendar totals before its tabs, isolates modal touch gestures from the carousel, and aligns the Burn Rate pace pill with the graph's right edge. The immediate next step is production verification of this responsive layout, followed by the existing fronted-expense and deployment checks.
+Brian's normal expense logging now defaults directly to `Brian (BofA)` without a card prompt, while historical AL activity remains queryable and a configurable multi-method list can restore the chooser later. The immediate next step is production verification of this default, followed by the shared expense-report viewport and existing deployment checks.
 
 ## On Deck
 
-1. Deploy and manually verify the shared expense-report chart viewport in checklist item 79.
-2. Deploy and manually verify fronted shared expenses in checklist item 78.
-3. Deploy and manually verify quarterly utility history in checklist item 77.
-4. Deploy and manually verify parser and bill-payment reliability in checklist item 76.
-5. Deploy and manually verify split creation/settlement in checklist item 74 and recent split changes/cancellation in checklist item 75.
-6. Continue the deferred split lifecycle: correct gross after splitting, partial reimbursement, explicit paid-split undo, and split-aware update/move/delete/undo.
-7. Deploy and manually verify prior-month paycheck carry-forward in Projected mode in checklist item 73.
-8. Deploy and manually verify Wants subscriptions in Burn Rate in checklist item 72.
-9. Deploy and manually verify selected-month subscription scoping in checklist item 71.
-10. Deploy and manually verify Daily Spending bill coverage and outlier scaling in checklist item 70.
-11. Deploy and manually verify the monthly savings workflow and corrected Saved-card targets in checklist items 60-61 and 69.
-12. Deploy and manually verify the expense-report corrections in checklist item 67.
-13. Deploy and manually verify typed `recent` opens the short-lived launcher and keeps the resulting DM session ephemeral.
-14. Deploy and manually verify `View Inbox` and `Reconcile Now` show `BookieBot is typing...` without a temporary thinking message.
-15. Manually verify shared Needs logging plus update/move/delete/undo behavior in Discord and Google Sheets.
-16. Manually verify recent transactions and reconciliation after the latest reliability fixes.
-17. Consider a richer Discord button flow for grouped amount adjustments if the current UX feels too manual.
-18. Harden recent-action pending state across restarts/deploys, since selections currently live only in process memory.
-19. Improve targeted recent-action search so commands can find older matches, not only the latest 10 recent actions.
-20. Explore clarifying questions before logging when BookieBot is uncertain instead of guessing or silently failing.
+1. Deploy and manually verify Brian's BofA expense default in checklist item 80.
+2. Deploy and manually verify the shared expense-report chart viewport in checklist item 79.
+3. Deploy and manually verify fronted shared expenses in checklist item 78.
+4. Deploy and manually verify quarterly utility history in checklist item 77.
+5. Deploy and manually verify parser and bill-payment reliability in checklist item 76.
+6. Deploy and manually verify split creation/settlement in checklist item 74 and recent split changes/cancellation in checklist item 75.
+7. Continue the deferred split lifecycle: correct gross after splitting, partial reimbursement, explicit paid-split undo, and split-aware update/move/delete/undo.
+8. Deploy and manually verify prior-month paycheck carry-forward in Projected mode in checklist item 73.
+9. Deploy and manually verify Wants subscriptions in Burn Rate in checklist item 72.
+10. Deploy and manually verify selected-month subscription scoping in checklist item 71.
+11. Deploy and manually verify Daily Spending bill coverage and outlier scaling in checklist item 70.
+12. Deploy and manually verify the monthly savings workflow and corrected Saved-card targets in checklist items 60-61 and 69.
+13. Deploy and manually verify the expense-report corrections in checklist item 67.
+14. Deploy and manually verify typed `recent` opens the short-lived launcher and keeps the resulting DM session ephemeral.
+15. Deploy and manually verify `View Inbox` and `Reconcile Now` show `BookieBot is typing...` without a temporary thinking message.
+16. Manually verify shared Needs logging plus update/move/delete/undo behavior in Discord and Google Sheets.
+17. Manually verify recent transactions and reconciliation after the latest reliability fixes.
+18. Consider a richer Discord button flow for grouped amount adjustments if the current UX feels too manual.
+19. Harden recent-action pending state across restarts/deploys, since selections currently live only in process memory.
+20. Improve targeted recent-action search so commands can find older matches, not only the latest 10 recent actions.
+21. Explore clarifying questions before logging when BookieBot is uncertain instead of guessing or silently failing.
 
 ## Completed 2026-08-16
 
+- Separated active expense payment methods from the broader person/card list used for historical queries. Brian keeps BofA and AL query coverage, but omitted payment methods now resolve through the active list, whose default is only `Brian (BofA)`.
+- Made active methods configurable with `BRIAN_EXPENSE_PAYMENT_METHODS`. One configured method logs immediately; two or more restore the existing card chooser with those exact labels. The Apple Shortcut Brian route uses the same default.
+- Added regressions proving a normal `$5` Brian food expense—with either no person or generic `Brian`—writes `Brian (BofA)` without a prompt, multiple configured methods restore the chooser without writing early, and future method labels join query coverage. Focused routing/handler verification is `134 passed`; full verification is `516 passed, 1 skipped`; Pyright reports `0 errors`.
+- Production verification is checklist item 80 below.
 - Replaced the four per-slide top-chart cards with one edge-to-edge shaded band shared by Category Mix, Burn Rate, Calendar, and Bills & Utilities. The shared band has no border or corner radius, each graph/calendar surface is transparent and borderless, and the existing navigation/indicator remains outside on the page background.
 - Fixed the carousel stage height across all four pages and made each graph fill the remaining space. Opening Burn Rate or Bills & Utilities details now shrinks the graph inside that stage; long inline details scroll rather than increasing the stage height.
 - Moved Category Mix and Calendar details into bounded, scrollable dialogs so their larger datasets no longer change carousel geometry. Category Mix All now shows the total budget and percentage used.
@@ -614,6 +619,9 @@ Use a test row or low-risk real row in Discord:
     - Expected: one edge-to-edge background band, visibly shaded from the page, keeps exactly the same responsive height while the four panels slide inside it; the band has no outer border or rounded corners and no graph/calendar renders its own background, border, or card. Burn Rate and Bills & Utilities graphs fill unused vertical space, then shrink inside the unchanged stage when Details opens. Category Mix Categories and Calendar Details open in bounded dialogs without moving the stage. Category Mix All shows its total budget and `% used`. Calendar weeks stay equal-height, each date has at most one marker, and a multi-event marker tooltip lists every event for that day. The previous/next controls and active indicator remain below and outside the band; mobile swiping still works; the page has no horizontal overflow.
     - Confirm a multi-event phone calendar date shows `+N` beside its node and the tooltip lists every event. Confirm non-paycheck income rows appear on their actual logged dates, the `# total` pill is left of All/Subs, and the Burn Rate saving/overspending pill shares the graph's right edge.
     - Open Category or Calendar details, then drag horizontally across both the dialog body and backdrop. Expected: the dialog stays open, its content can scroll vertically when needed, the underlying chart does not move, and closing restores the same page Y position and exact carousel width with no horizontal overflow.
+80. After deployment, log a normal Brian expense without naming a card, such as `Spent $5 on coffee`.
+    - Expected: BookieBot immediately logs the expense for `Brian (BofA)` and continues any applicable split flow. It does not ask whether the card was BofA or AL, and the written shared-expense row plus recent action both use `Brian (BofA)`.
+    - Temporarily configure `BRIAN_EXPENSE_PAYMENT_METHODS="Brian (BofA),Brian (Test Card)"`, restart, and log another low-risk expense without naming a method. Expected: the chooser returns with exactly BofA and Test Card, no row is written until a choice is made, and the selected label is written afterward. Restore the production value to `Brian (BofA)` after the check.
 
 ## Verification Baseline
 
@@ -631,7 +639,7 @@ PYTHONPATH=src venv/bin/python -m pytest unit_tests/reports/test_expense_breakdo
 # passed: 54 passed
 
 PYTHONPATH=src venv/bin/python -m pytest unit_tests -q
-# passed: 511 passed, 1 skipped
+# passed: 516 passed, 1 skipped
 
 pyright --pythonpath venv/bin/python --pythonversion 3.12
 # passed: 0 errors, 0 warnings, 0 informations

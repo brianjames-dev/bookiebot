@@ -1,4 +1,4 @@
-from typing import Any, TYPE_CHECKING
+from typing import Any, Iterable, TYPE_CHECKING
 import os
 
 # Disable discord voice/audio stack to avoid loading audioop (deprecated in Python 3.13)
@@ -98,7 +98,8 @@ class CardButton(ButtonBase):  # type: ignore[misc]
 
 
 class CardButtonView(ViewBase):  # type: ignore[misc]
-    def __init__(self, callback_func):
+    def __init__(self, callback_func, labels: Iterable[str] | None = None):
         super().__init__(timeout=60)
-        for label in ["Brian (BofA)", "Brian (AL)"]:
+        configured_labels = tuple(labels) if labels is not None else ("Brian (BofA)", "Brian (AL)")
+        for label in configured_labels:
             self.add_item(CardButton(label, callback_func))

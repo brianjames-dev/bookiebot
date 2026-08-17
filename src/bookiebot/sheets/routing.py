@@ -60,6 +60,7 @@ class DiscordUserConfig:
     name: str
     budget_owner_key: str
     expense_persons: tuple[str, ...]
+    expense_payment_methods: tuple[str, ...]
 
 
 @dataclass(frozen=True)
@@ -94,32 +95,45 @@ def _configured_user_ids(owner_key: str, defaults: tuple[str, ...]) -> tuple[str
     return tuple(dict.fromkeys(str(value).strip() for value in values if str(value).strip()))
 
 
+def _configured_expense_payment_methods(owner_key: str, defaults: tuple[str, ...]) -> tuple[str, ...]:
+    configured = _csv_env_values(f"{owner_key.upper()}_EXPENSE_PAYMENT_METHODS")
+    values = configured or defaults
+    return tuple(dict.fromkeys(str(value).strip() for value in values if str(value).strip()))
+
+
 def get_discord_user_config() -> dict[str, DiscordUserConfig]:
     brian_ids = _configured_user_ids("brian", DEFAULT_BRIAN_DISCORD_USER_IDS)
     hannah_ids = _configured_user_ids("hannah", DEFAULT_HANNAH_DISCORD_USER_IDS)
+    brian_payment_methods = _configured_expense_payment_methods("brian", ("Brian (BofA)",))
+    hannah_payment_methods = _configured_expense_payment_methods("hannah", ("Hannah",))
+    brian_expense_persons = tuple(dict.fromkeys(("Brian (BofA)", "Brian (AL)", *brian_payment_methods)))
 
     config: dict[str, DiscordUserConfig] = {}
     for user_id in brian_ids:
         config[user_id] = DiscordUserConfig(
             name="Brian",
             budget_owner_key="brian",
-            expense_persons=("Brian (BofA)", "Brian (AL)"),
+            expense_persons=brian_expense_persons,
+            expense_payment_methods=brian_payment_methods,
         )
     for user_id in hannah_ids:
         config[user_id] = DiscordUserConfig(
             name="Hannah",
             budget_owner_key="hannah",
             expense_persons=("Hannah",),
+            expense_payment_methods=hannah_payment_methods,
         )
     config[BRIAN_SHORTCUT_ACTOR_KEY] = DiscordUserConfig(
         name="Brian",
         budget_owner_key="brian",
-        expense_persons=("Brian (BofA)", "Brian (AL)"),
+        expense_persons=brian_expense_persons,
+        expense_payment_methods=brian_payment_methods,
     )
     config[HANNAH_SHORTCUT_ACTOR_KEY] = DiscordUserConfig(
         name="Hannah",
         budget_owner_key="hannah",
         expense_persons=("Hannah",),
+        expense_payment_methods=hannah_payment_methods,
     )
     return config
 

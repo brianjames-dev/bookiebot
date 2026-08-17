@@ -16,7 +16,7 @@ from bookiebot.sheets.income import (
 )
 from bookiebot.sheets.utils import resolve_query_persons
 from bookiebot.sheets.repo import get_sheets_repo
-from bookiebot.sheets.routing import get_current_discord_user_id, get_user_config
+from bookiebot.sheets.routing import UnknownDiscordUserError, get_current_discord_user_id, get_user_config
 from bookiebot.sheets.collaboration import normalize_split_method, payer_owner_from_person
 from bookiebot.sheets.undo import UndoAction, _sheet_user_entered_value, _update_contiguous_row, record_undo_action
 from bookiebot.splits import continue_split_after_log
@@ -320,10 +320,17 @@ async def write_expense_to_sheet(data, message):
     logger.debug("Discord user", extra={"user": discord_user})
 
     # Determine `person(s)` to log
+    actor_key = get_current_discord_user_id() or discord_user_id
+    try:
+        actor_config = get_user_config(actor_key, discord_user)
+    except UnknownDiscordUserError:
+        actor_config = None
     person = (data.get("person") or "").strip()
+    if actor_config is not None and person.casefold() == actor_config.name.casefold():
+        person = ""
+        data.pop("person", None)
     if person and normalize_split_method(data.get("split_method")) == "fronted":
-        actor_key = get_current_discord_user_id() or discord_user_id
-        actor_owner = get_user_config(actor_key, discord_user).budget_owner_key
+        actor_owner = actor_config.budget_owner_key if actor_config is not None else ""
         mentioned_owner = payer_owner_from_person(person, actor_key)
         if mentioned_owner != actor_owner:
             # In "I covered this for Hannah", Hannah is the responsible partner,
@@ -334,8 +341,8 @@ async def write_expense_to_sheet(data, message):
     if person.lower() in {"total", "all", "both", "everyone", "all persons", "all people"}:
         person = ""
     if not person:
-        persons_to_log = resolve_query_persons(discord_user, None, discord_user_id)
-        logger.debug("Resolved persons", extra={"persons": persons_to_log})
+        persons_to_log = list(actor_config.expense_payment_methods) if actor_config is not None else []
+        logger.debug("Resolved active expense payment methods", extra={"persons": persons_to_log})
         if not persons_to_log:
             await message.channel.send("❌ Could not determine person for logging.")
             return
@@ -346,7 +353,7 @@ async def write_expense_to_sheet(data, message):
             await message.channel.send(f"❌ Could not resolve specified person: {person}")
             return
 
-    # If multiple (ambiguous Brian), ask which card
+    # Ask only when multiple active payment methods are configured.
     if len(persons_to_log) > 1:
         pending_data_by_user[discord_user] = {
             "data": data,
@@ -390,7 +397,7 @@ async def write_expense_to_sheet(data, message):
                 category=category,
             )
 
-        view = CardButtonView(handle_selection)
+        view = CardButtonView(handle_selection, persons_to_log)
         await message.channel.send(
             f"{message.author.mention}, which card did you use?",
             view=view

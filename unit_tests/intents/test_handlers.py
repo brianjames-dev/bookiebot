@@ -139,6 +139,68 @@ async def test_log_expense_calls_writer(monkeypatch, message):
 
 
 @pytest.mark.asyncio
+@pytest.mark.parametrize("person", [None, "Brian"])
+async def test_brian_expense_without_specific_payment_method_defaults_to_bofa(person):
+    brian_message = SimpleNamespace(
+        content="spent $5 on coffee",
+        author=SimpleNamespace(name="deebers", id=676638528590970917, mention="<@676638528590970917>"),
+        channel=DummyChannel(),
+        mentions=[],
+    )
+    repo = SheetsRepoStub(expense_rows=[[], []])
+    entities = {"type": "expense", "category": "food", "amount": 5, "item": "Coffee"}
+    if person is not None:
+        entities["person"] = person
+
+    with repo.patched():
+        await ih.handle_intent(
+            "log_expense",
+            entities,
+            brian_message,
+        )
+
+    assert repo.expense.cell(3, 18).value == "Brian (BofA)"
+    assert [content for content, _kwargs in brian_message.channel.sent] == [
+        "✅ Food expense logged: $5 for Brian (BofA)"
+    ]
+
+
+@pytest.mark.asyncio
+async def test_brian_expense_chooser_returns_when_multiple_payment_methods_are_configured(monkeypatch):
+    import bookiebot.sheets.writer as writer
+
+    monkeypatch.setenv(
+        "BRIAN_EXPENSE_PAYMENT_METHODS",
+        "Brian (BofA),Brian (Future Card)",
+    )
+    brian_message = SimpleNamespace(
+        content="spent $5 on coffee",
+        author=SimpleNamespace(name="deebers", id=676638528590970917, mention="<@676638528590970917>"),
+        channel=DummyChannel(),
+        mentions=[],
+    )
+    repo = SheetsRepoStub(expense_rows=[[], []])
+
+    try:
+        with repo.patched():
+            await ih.handle_intent(
+                "log_expense",
+                {"type": "expense", "category": "food", "amount": 5, "item": "Coffee"},
+                brian_message,
+            )
+
+        prompt, kwargs = brian_message.channel.sent[-1]
+        assert prompt == "<@676638528590970917>, which card did you use?"
+        assert [child.label for child in kwargs["view"].children] == [
+            "Brian (BofA)",
+            "Brian (Future Card)",
+        ]
+        assert repo.expense.cell(3, 18).value == ""
+    finally:
+        writer.pending_data_by_user.pop("deebers", None)
+
+
+@pytest.mark.asyncio
 async def test_grocery_log_automatically_offers_approved_split_buttons(monkeypatch):
     import bookiebot.sheets.writer as writer
 

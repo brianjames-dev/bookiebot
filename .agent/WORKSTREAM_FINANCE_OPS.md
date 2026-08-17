@@ -602,6 +602,16 @@ Status: Complete in code and automated/responsive browser verification; producti
 - Verification: report suite `54 passed`; full suite `511 passed, 1 skipped`; Pyright clean with the project Python 3.12 environment; frontend typecheck/build passed; `git diff --check` passed. A `390x844` browser check confirmed visible `+1` nodes, count-before-tabs ordering, an unchanged Calendar transform during a modal swipe, exact `375px` carousel restoration with zero overflow, and matching `x=359` Burn Rate pill/graph right edges.
 - Manual test: open a report at desktop and phone widths; switch/swipe across all four panels and confirm the shaded shell enters from both viewport edges while every page's text, graph, and footer controls retain the same horizontal, top, and bottom gutters. Confirm the stage and lower control row never move and each graph fills its available middle row. Confirm Category shows only Spent/Saved, Calendar shows only month/outflow, and Bills & Utilities appears once. Open Category and Calendar details after scrolling the page, attempt to scroll outside the dialog, scroll a long dialog internally, close it, and confirm the page remains at its prior Y position. Confirm Calendar details lists every Needs/Wants subscription. In a report where Needs overspend is covered by Wants, compare both filtered charts and subtitles with the coverage callout and confirm All does not double-count the transfer. Confirm multi-event calendar dates retain one marker whose tooltip lists every event and the indicator remains outside below the band.
 
+### 2026-08-16 Brian Expense Payment-Method Default
+
+Status: Complete in code and automated verification; production confirmation remains in `.agent/STATUS.md` checklist item 80.
+
+- Split each user profile's historical/query person labels from its active expense payment-method labels. Brian's historical BofA/AL data remains in normal query coverage, while the active logging default contains only `Brian (BofA)`.
+- An expense with no explicit person/card now logs immediately when exactly one active method exists. Multiple active methods continue to pause before mutation and show the existing chooser.
+- Added `BRIAN_EXPENSE_PAYMENT_METHODS` and `HANNAH_EXPENSE_PAYMENT_METHODS` examples. The chooser builds its buttons from the configured list, so a future card can be added through configuration instead of another code change.
+- Verification: routing/handler suite `134 passed`; full suite `516 passed, 1 skipped`; Pyright `0 errors`; `git diff --check` passed.
+- Manual test: as Brian, log an ordinary expense without naming a card and confirm it writes `Brian (BofA)` without a card prompt. Temporarily configure two active methods, restart, confirm the chooser contains those exact labels and no row is written before selection, then restore the BofA-only production value.
+
 ## Open Questions
 
 - What should the canonical recent-action lineage model look like?

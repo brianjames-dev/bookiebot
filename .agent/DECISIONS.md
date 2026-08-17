@@ -362,6 +362,12 @@ Decision: Category Mix, Burn Rate, Calendar, and Bills & Utilities share one fix
 
 Rationale: A multipage chart surface should read as one continuous viewport, not four padded cards, without placing labels or data against the physical screen edge. Separating the full-bleed shell from its inset content preserves both effects and avoids reintroducing per-slide containers. The stage should not move surrounding content or change height as the user switches pages, opens details, or encounters a busy calendar date. Shared regions preserve alignment while allowing each graph to use the remaining space. Scroll isolation prevents a dialog interaction from displacing the report beneath it. Treating donated coverage as effective category usage makes the donor chart and percentage agree with the visible reduction in its available budget without inflating whole-budget spending.
 
+## 2026-08-16 - Separate Active Expense Payment Methods From Query Persons
+
+Decision: A user profile keeps one list of person/card labels for historical and reporting coverage and a separate configured list of active payment methods for new expense logging. When an expense omits its method, one active label is selected automatically; multiple active labels show the existing pre-write chooser. Brian's active default is `Brian (BofA)`, while `Brian (AL)` remains in query coverage. Active labels can be replaced through `<OWNER>_EXPENSE_PAYMENT_METHODS` without changing code.
+
+Rationale: Removing AL from the shared person list would hide historical AL expenses from ordinary queries, while always retaining both labels in the logging resolver forces an unnecessary choice for every new expense. Separate active and historical concerns preserve accurate reporting, remove current friction, and allow a future card to restore the choice flow through configuration.
+
 ## Pending Decisions
 
 - Where should durable system events live: banking database only, Google Sheets only, or dual-write during transition?
