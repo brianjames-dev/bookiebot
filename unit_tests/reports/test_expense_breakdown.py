@@ -147,6 +147,8 @@ def test_top_chart_details_percent_and_calendar_markers_keep_stage_stable():
     )[1].split("function BillsUtilitiesChart", 1)[0]
     assert "filteredEvents.length === 1" in calendar_source
     assert "CalendarOverflowTooltip events={filteredEvents}" in calendar_source
+    assert 'className="bb-calendar-marker-count"' in calendar_source
+    assert "+{filteredEvents.length - 1}" in calendar_source
     assert "visibleEventIndexes" not in calendar_source
     assert "overflowGroups" not in calendar_source
     assert ".bb-details-dialog" in styles
@@ -169,11 +171,34 @@ def test_top_chart_pages_share_regions_lock_modals_and_show_complete_details():
     assert "useModalPageScrollLock(open)" in source
     assert 'body.style.position = "fixed"' in source
     assert "window.scrollTo(0, scrollY)" in source
+    modal_lock_source = source.split("function useModalPageScrollLock", 1)[1].split("function ModalDetails", 1)[0]
+    assert 'root.style.setProperty("--bb-viewport-scrollbar-width"' in modal_lock_source
+    assert "onTouchStart={(event) => event.stopPropagation()}" in source
+    assert "onTouchMove={(event) => event.stopPropagation()}" in source
+    assert "onTouchEnd={(event) => event.stopPropagation()}" in source
+    assert "onTouchCancel={(event) => event.stopPropagation()}" in source
     assert '<SubscriptionAllItemsGrid items={subscriptionItems} showAll />' in calendar_panel
     assert "const rows = showAll || expanded ? items : visibleItems" in source
     assert "const hasMore = !showAll && items.length > visibleItems.length" in source
     assert ".bb-details-dialog-body" in styles
     assert "overflow: auto;" in styles
+
+
+def test_top_chart_mobile_counts_control_order_and_burn_pill_alignment():
+    source = (Path(__file__).resolve().parents[2] / "web/expense-report/src/report-app.tsx").read_text()
+    styles = (Path(__file__).resolve().parents[2] / "web/expense-report/src/styles.css").read_text()
+    calendar_panel = source.split("function CalendarAnalyticsPanel", 1)[1].split("function CalendarChangingValue", 1)[0]
+    header_actions = calendar_panel.split('<div className="bb-chart-page-header-actions">', 1)[1].split("</div>", 1)[0]
+
+    assert header_actions.index('<Badge variant="secondary">') < header_actions.index("<CalendarFilterControl")
+    assert ".bb-calendar-marker-count {" in styles
+    assert "display: none;" in styles.split(".bb-calendar-marker-count {", 1)[1].split("}", 1)[0]
+    mobile_styles = styles.split("@media (max-width: 520px)", 1)[1]
+    assert ".bb-calendar-marker-count {" in mobile_styles
+    assert "display: inline-flex;" in mobile_styles.split(".bb-calendar-marker-count {", 1)[1].split("}", 1)[0]
+    assert ".bb-burn-rate-actions {" in styles
+    assert "margin-left: auto;" in styles.split(".bb-burn-rate-actions {", 1)[1].split("}", 1)[0]
+    assert "flex: 1 1 360px;" in styles.split(".bb-burn-rate-primary {", 1)[1].split("}", 1)[0]
 
 
 def test_category_mix_counts_donor_transfers_as_effective_category_usage():
@@ -1426,6 +1451,50 @@ def test_current_month_income_projection_uses_logged_income_date_as_biweekly_anc
         ("Paycheck", 2, False),
         ("Projected paycheck", 16, True),
         ("Projected paycheck", 30, True),
+    ]
+
+
+def test_calendar_keeps_each_non_paycheck_income_on_its_logged_day(monkeypatch):
+    monkeypatch.setattr(
+        expense_breakdown,
+        "now_pacific",
+        lambda: datetime(2026, 7, 18, 12, 0, tzinfo=routing.PACIFIC_TZ),
+    )
+    personal_rows = [
+        ["", "Date:", "Source:", "Amount:", "Biweekly Income Source:", "xAI"],
+        ["", "7/2/2026", "xAI", "$2,000.00", "Biweekly Income Start:", "7/2/2026"],
+        ["", "7/9/2026", "Internet stipend", "$150.00"],
+        ["", "7/17/2026", "Refund", "$42.50"],
+        ["", "Monthly Income:", "", "$2,192.50"],
+    ]
+    report = build_expense_breakdown_report(
+        actor_key="hannah",
+        owner_name="Hannah",
+        persons=["Hannah"],
+        month=BudgetMonth(2026, 7),
+        worksheets=ReportWorksheets(
+            shared_expenses=InMemoryWorksheet([["hdr"] * 28, ["hdr"] * 28]),
+            personal_budget=InMemoryWorksheet(personal_rows),
+            subscriptions=InMemoryWorksheet([]),
+        ),
+    )
+
+    payload_match = re.search(
+        r'<script id="bookiebot-expense-report-data" type="application/json">(.*?)</script>',
+        render_expense_breakdown_html(report),
+    )
+    assert payload_match is not None
+    payload = json.loads(payload_match.group(1))
+    actual_income_events = [
+        item
+        for item in payload["calendarEvents"]
+        if item["kind"] == "income" and not item["projectedOnly"]
+    ]
+
+    assert [(item["label"], item["day"], item["amount"]) for item in actual_income_events] == [
+        ("xAI", 2, 2000.0),
+        ("Internet stipend", 9, 150.0),
+        ("Refund", 17, 42.5),
     ]
 
 

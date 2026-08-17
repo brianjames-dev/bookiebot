@@ -1050,7 +1050,15 @@ def _income_calendar_events(
         events.append(CalendarEvent("income", item.label, item.amount, day, "income", projected_only=False))
 
     for item in other_entries:
-        events.append(CalendarEvent("income", item.label, item.amount, 1, "income", projected_only=False))
+        parsed_date = _parse_date(item.date)
+        day = (
+            parsed_date.day
+            if parsed_date is not None
+            and parsed_date.year == month.year
+            and parsed_date.month == month.month
+            else 1
+        )
+        events.append(CalendarEvent("income", item.label, item.amount, day, "income", projected_only=False))
 
     parsed_total = round(sum(item.amount for item in current_entries), 2)
     unparsed_total = round(income_total - parsed_total, 2)

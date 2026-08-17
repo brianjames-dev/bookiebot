@@ -4,7 +4,7 @@ Last updated: 2026-08-16
 
 ## Active Focus
 
-The expense-report top charts now share one fixed-height shaded stage whose shell reaches both viewport edges while its text, graphs, and controls use responsive horizontal and vertical inner gutters. Every page uses the same header/graph/footer regions, modal details lock the underlying document while their own content can scroll, and category coverage transfers are reflected in both recipient and donor usage. The immediate next step is production verification of this responsive layout, followed by the existing fronted-expense and deployment checks.
+The expense-report shared chart stage now also preserves actual dates for every logged income event, exposes a compact count beside consolidated mobile calendar nodes, keeps Calendar totals before its tabs, isolates modal touch gestures from the carousel, and aligns the Burn Rate pace pill with the graph's right edge. The immediate next step is production verification of this responsive layout, followed by the existing fronted-expense and deployment checks.
 
 ## On Deck
 
@@ -40,7 +40,9 @@ The expense-report top charts now share one fixed-height shaded stage whose shel
 - Removed the redundant outer Category Mix and Calendar headings and the duplicate Bills & Utilities heading. Category Mix keeps its Spent/Saved summary in the upper region, while Calendar keeps only the month, outflow subtitle, filter, and event count.
 - Locked document scrolling whenever Category or Calendar details are open. Dialog bodies retain bounded scrolling and restore the exact page position on close; the Calendar dialog now renders every matching Needs and Wants subscription immediately.
 - Counted cross-category coverage as effective donor usage in filtered Category Mix views. A `$1,000` Needs overage covered by Wants now renders Needs at `$6,417.86 / 118.46%` and Wants at `$2,556.33 / 78.64%`, including a `$1,000.00` coverage slice, without double-counting the All view.
-- Verification: report suite `52 passed`; full suite `509 passed, 1 skipped`; Pyright `0 errors` with the project Python 3.12 environment; frontend typecheck/build passed; desktop and `390x844` browser checks confirmed exact viewport-width slides at `x=0` (`1425px`/`375px` client widths), horizontal content insets at `56px`/`16px`, top and bottom insets at `32px`/`16px`, no horizontal overflow, fixed `640px`/`540px` stages, aligned lower regions, cleaned headings, complete 10-row subscription details, contained modal scrolling with page-position restoration, and the donor/recipient overspend figures above; browser diagnostics and `git diff --check` were clean.
+- Preserved each non-paycheck income row's valid selected-month date in Calendar instead of forcing those actual events to day 1. Consolidated mobile markers now show a `+N` indicator beside their node while retaining every event in the tooltip, and Calendar's `# total` pill appears before All/Subs.
+- Stopped touch events inside the Category/Calendar dialogs from bubbling into the parent carousel. Closing a dialog now recalculates scrollbar-width compensation so the shared stage returns to its exact viewport width without horizontal drift. Burn Rate's pace pill expands with its summary row and aligns to the graph's right content edge.
+- Verification: report suite `54 passed`; full suite `511 passed, 1 skipped`; Pyright `0 errors` with the project Python 3.12 environment; frontend typecheck/build passed; desktop and `390x844` browser checks confirmed exact viewport-width slides at `x=0` (`1425px`/`375px` client widths), horizontal content insets at `56px`/`16px`, top and bottom insets at `32px`/`16px`, no horizontal overflow, fixed `640px`/`540px` stages, aligned lower regions, cleaned headings, complete 10-row subscription details, consolidated `+1` mobile markers, count-before-tabs ordering, unchanged carousel transform during a modal swipe, restored `375px` carousel width after close, and matching `x=359` right edges for the Burn Rate pill and graph; browser diagnostics and `git diff --check` were clean.
 - Production verification is checklist item 79 below.
 
 ## Completed 2026-08-11
@@ -610,6 +612,8 @@ Use a test row or low-risk real row in Discord:
     - Partial production verification: Brian's live `$11.99` Safeway expense remains assigned to Hannah, and Brian's owed-to-me query plus the August report both show the outstanding Fronted reimbursement. Hannah's counterpart query and the change/undo/cancel paths remain to be checked.
 79. After deployment, open an expense breakdown report at desktop and phone widths and switch through Category Mix, Burn Rate, Calendar, and Bills & Utilities.
     - Expected: one edge-to-edge background band, visibly shaded from the page, keeps exactly the same responsive height while the four panels slide inside it; the band has no outer border or rounded corners and no graph/calendar renders its own background, border, or card. Burn Rate and Bills & Utilities graphs fill unused vertical space, then shrink inside the unchanged stage when Details opens. Category Mix Categories and Calendar Details open in bounded dialogs without moving the stage. Category Mix All shows its total budget and `% used`. Calendar weeks stay equal-height, each date has at most one marker, and a multi-event marker tooltip lists every event for that day. The previous/next controls and active indicator remain below and outside the band; mobile swiping still works; the page has no horizontal overflow.
+    - Confirm a multi-event phone calendar date shows `+N` beside its node and the tooltip lists every event. Confirm non-paycheck income rows appear on their actual logged dates, the `# total` pill is left of All/Subs, and the Burn Rate saving/overspending pill shares the graph's right edge.
+    - Open Category or Calendar details, then drag horizontally across both the dialog body and backdrop. Expected: the dialog stays open, its content can scroll vertically when needed, the underlying chart does not move, and closing restores the same page Y position and exact carousel width with no horizontal overflow.
 
 ## Verification Baseline
 
@@ -624,10 +628,10 @@ Latest verification:
 
 ```bash
 PYTHONPATH=src venv/bin/python -m pytest unit_tests/reports/test_expense_breakdown.py -q
-# passed: 49 passed
+# passed: 54 passed
 
 PYTHONPATH=src venv/bin/python -m pytest unit_tests -q
-# passed: 507 passed, 1 warning
+# passed: 511 passed, 1 skipped
 
 pyright --pythonpath venv/bin/python --pythonversion 3.12
 # passed: 0 errors, 0 warnings, 0 informations

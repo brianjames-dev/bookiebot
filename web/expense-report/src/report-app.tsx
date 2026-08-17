@@ -2834,6 +2834,7 @@ function useModalPageScrollLock(locked: boolean) {
       body.style.overflow = previous.bodyOverflow
       body.style.paddingRight = previous.bodyPaddingRight
       root.style.overflow = previous.rootOverflow
+      root.style.setProperty("--bb-viewport-scrollbar-width", `${Math.max(window.innerWidth - root.clientWidth, 0)}px`)
       window.scrollTo(0, scrollY)
     }
   }, [locked])
@@ -2878,6 +2879,10 @@ function ModalDetails({
       aria-label={title}
       onCancel={close}
       onClose={close}
+      onTouchStart={(event) => event.stopPropagation()}
+      onTouchMove={(event) => event.stopPropagation()}
+      onTouchEnd={(event) => event.stopPropagation()}
+      onTouchCancel={(event) => event.stopPropagation()}
       onClick={(event) => {
         if (event.target === event.currentTarget) {
           close()
@@ -3335,10 +3340,10 @@ function CalendarAnalyticsPanel({
               </div>
             </div>
             <div className="bb-chart-page-header-actions">
-              <CalendarFilterControl filter={filter} onFilterChange={onFilterChange} />
               <Badge variant="secondary">
                 <CalendarChangingValue value={`${totalEvents.length} total`} />
               </Badge>
+              <CalendarFilterControl filter={filter} onFilterChange={onFilterChange} />
             </div>
           </div>
           <div className="bb-chart-page-body">
@@ -3506,6 +3511,9 @@ function FinancialCalendar({
                           aria-label={`${filteredEvents.length} events on day ${day}`}
                         >
                           <span className="bb-subscription-marker-dot" />
+                          <span className="bb-calendar-marker-count" aria-hidden="true">
+                            +{filteredEvents.length - 1}
+                          </span>
                           <span className="bb-subscription-marker-name">{filteredEvents.length} events</span>
                           <span className="bb-subscription-marker-amount">{formatMoney(total)}</span>
                           <CalendarOverflowTooltip events={filteredEvents} day={day} />

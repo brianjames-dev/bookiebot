@@ -452,6 +452,7 @@ summary {
 .bb-burn-rate-primary {
   display: flex;
   align-items: center;
+  flex: 1 1 360px;
   flex-wrap: wrap;
   gap: 14px 20px;
   min-width: 0;
@@ -475,7 +476,7 @@ summary {
   align-items: center;
   flex: 0 0 auto;
   gap: 8px;
-  margin-left: 0;
+  margin-left: auto;
 }
 
 .bb-burn-rate-info {
@@ -881,6 +882,10 @@ summary {
   flex: 0 0 auto;
   border-radius: 999px;
   background: currentColor;
+}
+
+.bb-calendar-marker-count {
+  display: none;
 }
 
 .bb-subscription-marker-name,
@@ -2318,5 +2323,13 @@ tr:last-child td {
     min-width: 20px;
     padding: 0 4px;
     font-size: 10px;
+  }
+
+  .bb-calendar-marker-count {
+    display: inline-flex;
+    align-items: center;
+    font-size: 9px;
+    font-variant-numeric: tabular-nums;
+    line-height: 1;
   }
 }
