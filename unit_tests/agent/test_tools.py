@@ -1,4 +1,4 @@
-from unittest.mock import AsyncMock
+from unittest.mock import AsyncMock, MagicMock
 
 from langchain_core.utils.function_calling import convert_to_openai_tool
 import pytest
@@ -26,6 +26,7 @@ def test_agent_exposes_only_read_only_tools():
         "get_bill_status",
         "get_budget_snapshot",
         "get_expenses_on_date",
+        "get_financial_report",
         "get_largest_expenses",
         "get_spending_by_category",
         "get_store_spending",
@@ -100,3 +101,91 @@ async def test_category_tool_normalizes_needs_without_accepting_an_owner(monkeyp
 
     assert result == {"owner": "Brian", "period": "current month", "category": "needs", "total": 125.5}
     total_for_category.assert_awaited_once_with("need_expenses", ("Brian (BofA)", "Brian (AL)"))
+
+
+@pytest.mark.asyncio
+async def test_financial_report_tool_uses_canonical_mode_views_and_trusted_actor(monkeypatch):
+    report = object()
+    build_report = MagicMock(return_value=report)
+    payload = {
+        "ownerName": "Brian",
+        "monthLabel": "August 2026",
+        "generatedAt": "Aug 17, 2026 1:00 AM PDT",
+        "elapsedDays": 17,
+        "daysInMonth": 31,
+        "metrics": {"fixedCommitments": 2500.0},
+        "modeViews": {
+            "current": {
+                "metrics": {
+                    "monthlyIncome": 3137.49,
+                    "totalExpenses": 2671.9,
+                    "incomeAfterExpenses": 465.59,
+                    "amountSaved": 0.0,
+                    "savingsIdeal": 627.5,
+                    "savingsMinimum": 313.75,
+                },
+                "categoryBudgets": {"needs": 1568.75, "wants": 941.24, "savings": 627.5},
+                "categorySpending": {"needs": 2417.25, "wants": 254.65, "savings": 0.0},
+                "categoryBalances": {"remaining": {"needs": 0.0, "wants": 92.99, "savings": 372.6}},
+                "burnRate": {"status": "over"},
+                "breakdown": [],
+                "calendarEvents": [],
+                "utilityHistory": [],
+            },
+            "projected": {
+                "metrics": {
+                    "monthlyIncome": 6274.98,
+                    "totalExpenses": 3935.56,
+                    "incomeAfterExpenses": 2339.42,
+                    "amountSaved": 0.0,
+                    "savingsIdeal": 1255.0,
+                    "savingsMinimum": 627.5,
+                },
+                "categoryBudgets": {"needs": 3137.49, "wants": 1882.49, "savings": 1255.0},
+                "categorySpending": {"needs": 3417.25, "wants": 518.31, "savings": 0.0},
+                "categoryBalances": {"remaining": {"needs": 0.0, "wants": 1084.93, "savings": 1254.49}},
+                "burnRate": {"status": "under"},
+                "breakdown": [],
+                "calendarEvents": [],
+                "utilityHistory": [],
+            },
+        },
+    }
+    monkeypatch.setattr(agent_tools, "build_expense_breakdown_report", build_report)
+    monkeypatch.setattr(agent_tools, "expense_breakdown_client_payload", MagicMock(return_value=payload))
+
+    result = await agent_tools.load_financial_report(
+        _context(),
+        section="overview",
+        mode="comparison",
+        month="August 2026",
+        limit=10,
+    )
+
+    assert result["source"] == "expense_breakdown_report"
+    assert result["owner"] == "Brian"
+    assert result["section"] == "overview"
+    assert result["current"]["metrics"]["incomeAfterExpenses"] == 465.59
+    assert result["projected"]["metrics"]["incomeAfterExpenses"] == 2339.42
+    assert result["changes"]["incomeAfterExpenses"] == 1873.83
+    assert build_report.call_args.kwargs["actor_key"] == "676638528590970917"
+    assert build_report.call_args.kwargs["owner_name"] == "Brian"
+    assert build_report.call_args.kwargs["persons"] == ["Brian (BofA)", "Brian (AL)"]
+    assert build_report.call_args.kwargs["month"].label == "August 2026"
+
+
+@pytest.mark.asyncio
+async def test_unknown_actor_cannot_build_canonical_financial_report(monkeypatch):
+    build_report = MagicMock()
+    monkeypatch.setattr(agent_tools, "build_expense_breakdown_report", build_report)
+
+    result = await agent_tools.load_financial_report(
+        _context("unknown-user"),
+        section="overview",
+        mode="comparison",
+        month="current month",
+        limit=10,
+    )
+
+    assert result["error"].startswith("This Discord account is not mapped")
+    build_report.assert_not_called()

@@ -4,35 +4,40 @@ Last updated: 2026-08-17
 
 ## Active Focus
 
-Unsupported messages and tool-supported read intents now enter an actor-scoped, read-only LangGraph conversational agent with isolated conversation memory and LLM-synthesized answers, while all mutation workflows remain deterministic. The immediate next step is production verification of the response layer, transfer refusal, and Postgres checkpoints, followed by the existing deployment checks.
+Unsupported messages and tool-supported read intents now enter an actor-scoped, read-only LangGraph agent with isolated memory and LLM-synthesized answers. The web Expense Breakdown page and agent now share server-computed Current/Projected views. All mutation workflows remain deterministic. The immediate next step is production verification of the canonical report tool in checklist item 82, followed by the existing deployment checks.
 
 ## On Deck
 
-1. Deploy and manually verify the LangGraph conversational/read response layer and bank-transfer refusal in checklist item 81.
-2. Deploy and manually verify Brian's BofA expense default in checklist item 80.
-3. Deploy and manually verify the shared expense-report chart viewport in checklist item 79.
-4. Deploy and manually verify fronted shared expenses in checklist item 78.
-5. Deploy and manually verify quarterly utility history in checklist item 77.
-6. Deploy and manually verify parser and bill-payment reliability in checklist item 76.
-7. Deploy and manually verify split creation/settlement in checklist item 74 and recent split changes/cancellation in checklist item 75.
-8. Continue the deferred split lifecycle: correct gross after splitting, partial reimbursement, explicit paid-split undo, and split-aware update/move/delete/undo.
-9. Deploy and manually verify prior-month paycheck carry-forward in Projected mode in checklist item 73.
-10. Deploy and manually verify Wants subscriptions in Burn Rate in checklist item 72.
-11. Deploy and manually verify selected-month subscription scoping in checklist item 71.
-12. Deploy and manually verify Daily Spending bill coverage and outlier scaling in checklist item 70.
-13. Deploy and manually verify the monthly savings workflow and corrected Saved-card targets in checklist items 60-61 and 69.
-14. Deploy and manually verify the expense-report corrections in checklist item 67.
-15. Deploy and manually verify typed `recent` opens the short-lived launcher and keeps the resulting DM session ephemeral.
-16. Deploy and manually verify `View Inbox` and `Reconcile Now` show `BookieBot is typing...` without a temporary thinking message.
-17. Manually verify shared Needs logging plus update/move/delete/undo behavior in Discord and Google Sheets.
-18. Manually verify recent transactions and reconciliation after the latest reliability fixes.
-19. Consider a richer Discord button flow for grouped amount adjustments if the current UX feels too manual.
-20. Harden recent-action pending state across restarts/deploys, since selections currently live only in process memory.
-21. Improve targeted recent-action search so commands can find older matches, not only the latest 10 recent actions.
-22. Explore clarifying questions before logging when BookieBot is uncertain instead of guessing or silently failing.
+1. Deploy and manually verify canonical Current/Projected report tools in checklist item 82.
+2. Deploy and manually verify the LangGraph conversational/read response layer and bank-transfer refusal in checklist item 81.
+3. Deploy and manually verify Brian's BofA expense default in checklist item 80.
+4. Deploy and manually verify the shared expense-report chart viewport in checklist item 79.
+5. Deploy and manually verify fronted shared expenses in checklist item 78.
+6. Deploy and manually verify quarterly utility history in checklist item 77.
+7. Deploy and manually verify parser and bill-payment reliability in checklist item 76.
+8. Deploy and manually verify split creation/settlement in checklist item 74 and recent split changes/cancellation in checklist item 75.
+9. Continue the deferred split lifecycle: correct gross after splitting, partial reimbursement, explicit paid-split undo, and split-aware update/move/delete/undo.
+10. Deploy and manually verify prior-month paycheck carry-forward in Projected mode in checklist item 73.
+11. Deploy and manually verify Wants subscriptions in Burn Rate in checklist item 72.
+12. Deploy and manually verify selected-month subscription scoping in checklist item 71.
+13. Deploy and manually verify Daily Spending bill coverage and outlier scaling in checklist item 70.
+14. Deploy and manually verify the monthly savings workflow and corrected Saved-card targets in checklist items 60-61 and 69.
+15. Deploy and manually verify the expense-report corrections in checklist item 67.
+16. Deploy and manually verify typed `recent` opens the short-lived launcher and keeps the resulting DM session ephemeral.
+17. Deploy and manually verify `View Inbox` and `Reconcile Now` show `BookieBot is typing...` without a temporary thinking message.
+18. Manually verify shared Needs logging plus update/move/delete/undo behavior in Discord and Google Sheets.
+19. Manually verify recent transactions and reconciliation after the latest reliability fixes.
+20. Consider a richer Discord button flow for grouped amount adjustments if the current UX feels too manual.
+21. Harden recent-action pending state across restarts/deploys, since selections currently live only in process memory.
+22. Improve targeted recent-action search so commands can find older matches, not only the latest 10 recent actions.
+23. Explore clarifying questions before logging when BookieBot is uncertain instead of guessing or silently failing.
 
 ## Completed 2026-08-17
 
+- Promoted the Expense Breakdown payload to the canonical Current/Projected calculation boundary. Python now computes both mode views—income, expenses, savings targets, category budgets/spending/cascade balances, money left, burn rate, calendar events, and utility history—and the React page consumes them with its previous calculations retained as an old-payload fallback.
+- Added actor-scoped `get_financial_report`, the eighth read-only agent tool. Its focused sections cover overview, categories and Need details, cash flow, subscriptions/bills/utility commitments, full burn-rate series, transaction/merchant activity, and shared reimbursements for current, projected, comparison, and historical-month questions.
+- Expanded conversational routing for non-visual read intents such as projections, savings, category ranking, weekly/daily patterns, merchant/item frequency, and budget duration. Visual Expense Breakdown and Daily Calendar commands retain their specialized handlers; every mutation remains outside the graph.
+- Added canonical payload parity, Projected math, tool schema/actor isolation, focused-section, synthesis guidance, and routing regressions; rebuilt the committed report asset. Focused agent/router/handler/report verification is `237 passed`; the full suite is `541 passed` with one existing Kaleido warning; Pyright is clean; frontend typecheck/build passed. A read-only live Brian August smoke check successfully returned coherent Current and Projected overview metrics from the new tool.
 - Routed recognized read intents supported by the agent's seven tools through LangGraph, including the budget, category, largest expense, subscription, date, merchant, and bill questions exercised in Discord. The model now receives live tool data and is instructed to answer in its own words with concise interpretation while preserving exact facts.
 - Kept specialized report/chart reads and all writes on their existing handlers. Logging, savings, bill payments, recent actions, splits, undo, and reconciliation are still unavailable as agent tools.
 - Blocked imperative bank-transfer requests before intent parsing after production testing showed `Please transfer $50 from my checking account to savings` was incorrectly interpreted as setting savings. The bot now says it cannot move bank funds and confirms no change; explicitly recording an already-completed transfer remains possible.
@@ -647,6 +652,13 @@ Use a test row or low-risk real row in Discord:
     - Send `Please transfer $50 from my checking account to savings`. Expected: the pre-parser safety boundary says BookieBot can record savings but cannot move bank funds, explicitly confirms no change, and does not alter the savings cell or create an undo action. `I transferred $50 to savings; record that contribution` may use the existing deterministic savings handler. Existing direct commands such as `Spent $5 on coffee` continue through the normal intent handler rather than the graph.
     - With `BOOKIEBOT_AGENT_DATABASE_URL` or `BANK_DATABASE_URL` configured, confirm startup-on-first-use logs `durable_memory=true`, send a conversational follow-up, restart the bot, and send another follow-up in the same channel. Expected: the thread resumes. Without either URL, logs state that process-local memory is active and a restart intentionally clears the conversation.
     - Temporarily cause a read-tool failure and an intent-parser provider failure. Expected: the read-tool path explains that data is unavailable and no changes were made; the parser failure keeps the existing parser-unavailable response and never invokes the graph.
+82. After deployment, open the current Expense Breakdown page and keep its Current/Projected values available for comparison with Discord.
+    - Ask `Compare my current finances with the projected end of this month. Include income, total expenses, money left, and minimum and ideal savings.` Expected: every Current and Projected amount exactly matches the corresponding web toggle, each mode is clearly labeled, and the answer explains the changes rather than mixing modes.
+    - Ask `How does my Needs budget look now versus projected, including any money moved between Needs, Wants, and Savings?` Expected: the response uses the same category budgets, spending, cascade transfers, remaining balances, and overspending state as Category Mix in both modes.
+    - Ask `What income, bills, utilities, and subscriptions have hit so far, and what is still projected later this month?` Expected: actual versus upcoming calendar events are distinguished; all scheduled subscriptions are available; projected bills use the same amounts as the web Calendar and Bills & Utilities panels.
+    - Ask `Explain my current burn rate, then tell me how the projected income changes the safe daily amount.` Expected: allowed/actual daily rates, pace status, and remaining Wants money match the Burn Rate panel in each mode.
+    - Ask for `activity`, merchant patterns, Need details, reimbursements, and a named historical month in separate natural-language prompts. Expected: each uses the focused canonical report section for the requesting Discord actor, and no raw worksheet or other user's data is exposed.
+    - Open a newly generated report after deploy. Expected: both toggles render normally from server `modeViews`; an older saved report without `modeViews` still renders through the client fallback.
 
 ## Verification Baseline
 
@@ -660,11 +672,11 @@ python -m pytest unit_tests/intents/test_handlers.py unit_tests/core/test_messag
 Latest verification:
 
 ```bash
-PYTHONPATH=src venv/bin/python -m pytest unit_tests/agent unit_tests/intents/test_parser.py unit_tests/core/test_message_router.py unit_tests/intents/test_handlers.py -q
-# passed: 188 passed
+PYTHONPATH=src venv/bin/python -m pytest unit_tests/agent unit_tests/core/test_message_router.py unit_tests/intents/test_handlers.py unit_tests/reports/test_expense_breakdown.py -q
+# passed: 237 passed
 
 PYTHONPATH=src venv/bin/python -m pytest unit_tests -q
-# passed: 539 passed, 1 existing Kaleido deprecation warning
+# passed: 541 passed, 1 existing Kaleido deprecation warning
 
 PYTHONPATH=src venv/bin/python -m pyright --pythonpath venv/bin/python --pythonversion 3.12
 # passed: 0 errors, 0 warnings, 0 informations
@@ -677,6 +689,12 @@ venv/bin/python -m pip install --dry-run -r requirements.txt
 
 git diff --check
 # passed
+
+cd web/expense-report && npm run typecheck && npm run build
+# passed
+
+Read-only live Brian current-month get_financial_report overview/comparison smoke test
+# passed: coherent Current and Projected metrics returned from canonical report payload
 
 PYTHONPATH=src venv/bin/python -m pytest unit_tests/reports/test_expense_breakdown.py -q
 # passed: 54 passed

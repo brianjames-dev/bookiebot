@@ -588,34 +588,7 @@ def write_expense_breakdown_report(report: ExpenseBreakdownReport, *, report_dir
 
 
 def render_expense_breakdown_html(report: ExpenseBreakdownReport) -> str:
-    non_zero_breakdown = [
-        (key, info)
-        for key, info in report.breakdown.items()
-        if float(info.get("amount") or 0.0) > 0
-    ]
-    activity_entries = _report_activity_entries(report)
-    top_entries = _report_highlight_entries(report, activity_entries)
-    person_totals = _person_totals(activity_entries)
-    merchant_totals = _merchant_totals(activity_entries)
-    merchant_occurrences = _merchant_occurrences(activity_entries)
-    daily_totals = _daily_totals(activity_entries)
-    budget_group_totals = {
-        "Needs": round(report.category_spending.get("needs", 0.0), 2),
-        "Wants": round(report.category_spending.get("wants", 0.0), 2),
-    }
-    balance_after_expenses = report.net_total
-    payload = _report_client_payload(
-        report=report,
-        activity_entries=activity_entries,
-        breakdown_items=non_zero_breakdown,
-        daily_totals=daily_totals,
-        budget_group_totals=budget_group_totals,
-        person_totals=person_totals,
-        merchant_totals=merchant_totals,
-        merchant_occurrences=merchant_occurrences,
-        top_entries=top_entries,
-        balance_after_expenses=balance_after_expenses,
-    )
+    payload = expense_breakdown_client_payload(report)
 
     return f"""<!doctype html>
 <html lang="en">
@@ -635,6 +608,38 @@ def render_expense_breakdown_html(report: ExpenseBreakdownReport) -> str:
 </body>
 </html>
 """
+
+
+def expense_breakdown_client_payload(report: ExpenseBreakdownReport) -> dict[str, Any]:
+    """Return the canonical data payload consumed by the web report and read-only agent."""
+    non_zero_breakdown = [
+        (key, info)
+        for key, info in report.breakdown.items()
+        if float(info.get("amount") or 0.0) > 0
+    ]
+    activity_entries = _report_activity_entries(report)
+    top_entries = _report_highlight_entries(report, activity_entries)
+    person_totals = _person_totals(activity_entries)
+    merchant_totals = _merchant_totals(activity_entries)
+    merchant_occurrences = _merchant_occurrences(activity_entries)
+    daily_totals = _daily_totals(activity_entries)
+    budget_group_totals = {
+        "Needs": round(report.category_spending.get("needs", 0.0), 2),
+        "Wants": round(report.category_spending.get("wants", 0.0), 2),
+    }
+    balance_after_expenses = report.net_total
+    return _report_client_payload(
+        report=report,
+        activity_entries=activity_entries,
+        breakdown_items=non_zero_breakdown,
+        daily_totals=daily_totals,
+        budget_group_totals=budget_group_totals,
+        person_totals=person_totals,
+        merchant_totals=merchant_totals,
+        merchant_occurrences=merchant_occurrences,
+        top_entries=top_entries,
+        balance_after_expenses=balance_after_expenses,
+    )
 
 
 def _is_current_month(month: BudgetMonth) -> bool:
@@ -2292,7 +2297,7 @@ def _report_client_payload(
         report.month,
     )
 
-    return {
+    payload: dict[str, Any] = {
         "ownerName": report.owner_name,
         "monthLabel": report.month.label,
         "year": report.month.year,
@@ -2369,6 +2374,205 @@ def _report_client_payload(
             )
         ],
     }
+    payload["modeViews"] = {
+        "current": _report_mode_view_from_payload(payload, projected=False),
+        "projected": _report_mode_view_from_payload(payload, projected=True),
+    }
+    return payload
+
+
+def expense_breakdown_mode_view(
+    report: ExpenseBreakdownReport,
+    mode: str,
+) -> dict[str, Any]:
+    """Return the exact Current or Projected view used by the expense-report UI."""
+    normalized = mode.strip().lower()
+    if normalized not in {"current", "projected"}:
+        raise ValueError("Mode must be 'current' or 'projected'.")
+    payload = expense_breakdown_client_payload(report)
+    return dict(payload["modeViews"][normalized])
+
+
+def _report_mode_view_from_payload(
+    payload: dict[str, Any],
+    *,
+    projected: bool,
+) -> dict[str, Any]:
+    breakdown = _projected_breakdown_from_payload(payload) if projected else list(payload["breakdown"])
+    income_projection = payload["incomeProjection"]
+    savings_projection = payload["savingsProjection"]
+    monthly_income = round(
+        float(
+            income_projection["projectedAmount"]
+            if projected
+            else income_projection["currentAmount"]
+        ),
+        2,
+    )
+    amount_saved = round(float(savings_projection["currentAmount"]), 2)
+    savings_ideal = round(
+        float(
+            savings_projection["projectedIdeal"]
+            if projected
+            else savings_projection["currentIdeal"]
+        ),
+        2,
+    )
+    savings_minimum = round(
+        float(
+            savings_projection["projectedMinimum"]
+            if projected
+            else savings_projection["currentMinimum"]
+        ),
+        2,
+    )
+    category_budgets = (
+        _category_budgets_for_income(monthly_income)
+        if projected
+        else dict(payload.get("categoryBudgets") or _category_budgets_for_income(monthly_income))
+    )
+    category_spending = _category_spending_for_breakdown(
+        breakdown,
+        amount_saved,
+        fallback=payload.get("categorySpending"),
+    )
+    category_balances = _cascade_category_balances(
+        round(category_budgets["needs"] - category_spending["needs"], 2),
+        round(category_budgets["wants"] - category_spending["wants"], 2),
+        round(category_budgets["savings"] - category_spending["savings"], 2),
+    )
+    income_after_expenses = round(sum(category_balances["remaining"].values()), 2)
+    burn_rate = payload.get("burnRate")
+    if projected:
+        burn_rate = _projected_burn_rate_from_payload(burn_rate, category_balances)
+
+    return {
+        "metrics": {
+            "totalExpenses": (
+                round(sum(float(item.get("amount") or 0.0) for item in breakdown), 2)
+                if projected
+                else round(float(payload["metrics"].get("totalExpenses") or 0.0), 2)
+            ),
+            "monthlyIncome": monthly_income,
+            "incomeAfterExpenses": income_after_expenses,
+            "amountSaved": amount_saved,
+            "savingsIdeal": savings_ideal,
+            "savingsMinimum": savings_minimum,
+        },
+        "categoryBalances": category_balances,
+        "categoryBudgets": {key: round(float(value), 2) for key, value in category_budgets.items()},
+        "categorySpending": category_spending,
+        "breakdown": breakdown,
+        "burnRate": burn_rate,
+        "calendarEvents": list(payload["calendarEvents"]),
+        "utilityHistory": list(payload["utilityHistory"]),
+    }
+
+
+def _projected_breakdown_from_payload(payload: dict[str, Any]) -> list[dict[str, Any]]:
+    subscription_needs = round(
+        sum(float(item.get("amount") or 0.0) for item in payload["subscriptionsNeeds"]),
+        2,
+    )
+    subscription_wants = round(
+        sum(float(item.get("amount") or 0.0) for item in payload["subscriptionsWants"]),
+        2,
+    )
+    bills_utilities = round(
+        sum(float(item.get("currentAmount") or 0.0) for item in payload["utilityHistory"]),
+        2,
+    )
+    rent = round(
+        sum(
+            float(item.get("amount") or 0.0)
+            for item in payload["calendarEvents"]
+            if item.get("kind") == "bill" and item.get("group") == "rent"
+        ),
+        2,
+    )
+    replacements = {
+        "static_bills_subscriptions_needs": subscription_needs,
+        "subscriptions_wants": subscription_wants,
+        "rent": rent,
+        "bills_utilities": bills_utilities,
+    }
+    source_rows = payload.get("budgetBreakdown") or payload["breakdown"]
+    rows: list[dict[str, Any]] = []
+    for source in source_rows:
+        item = dict(source)
+        replacement = replacements.get(str(item.get("key")))
+        if replacement:
+            item["amount"] = replacement
+        else:
+            item["amount"] = round(float(item.get("amount") or 0.0), 2)
+        rows.append(item)
+    total = round(sum(float(item["amount"]) for item in rows), 2)
+    for item in rows:
+        item["percentage"] = round(float(item["amount"]) / total * 100, 2) if total else 0.0
+    return rows
+
+
+def _category_budgets_for_income(monthly_income: float) -> dict[str, float]:
+    needs = round(monthly_income * 0.5, 2)
+    savings = round(monthly_income * 0.2, 2)
+    wants = round(monthly_income - needs - savings, 2)
+    return {"needs": needs, "wants": wants, "savings": savings}
+
+
+def _category_spending_for_breakdown(
+    breakdown: list[dict[str, Any]],
+    amount_saved: float,
+    *,
+    fallback: dict[str, Any] | None,
+) -> dict[str, float]:
+    amounts = {str(item.get("key")): float(item.get("amount") or 0.0) for item in breakdown}
+    needs = round(sum(amounts.get(key, 0.0) for key in NEEDS_BREAKDOWN_KEYS), 2)
+    wants = round(sum(amounts.get(key, 0.0) for key in WANTS_BREAKDOWN_KEYS), 2)
+    return {
+        "needs": needs if needs > 0 else round(float((fallback or {}).get("needs") or 0.0), 2),
+        "wants": wants if wants > 0 else round(float((fallback or {}).get("wants") or 0.0), 2),
+        "savings": round(amount_saved, 2),
+    }
+
+
+def _projected_burn_rate_from_payload(
+    burn_rate: dict[str, Any] | None,
+    category_balances: dict[str, Any],
+) -> dict[str, Any] | None:
+    if burn_rate is None:
+        return None
+    projected = dict(burn_rate)
+    spent = round(float(burn_rate.get("spent") or 0.0), 2)
+    budget = round(spent + float(category_balances["remaining"]["wants"]), 2)
+    days_in_month = int(burn_rate.get("daysInMonth") or 0)
+    elapsed_days = int(burn_rate.get("elapsedDays") or 0)
+    expected_spend = round(budget * (elapsed_days / days_in_month), 2) if days_in_month else 0.0
+    allowed_daily_average = round(budget / days_in_month, 2) if days_in_month else 0.0
+    actual_daily_average = round(spent / elapsed_days, 2) if elapsed_days else 0.0
+    total_difference = round(spent - expected_spend, 2)
+    series: list[dict[str, Any]] = []
+    for source in burn_rate.get("series") or []:
+        point = dict(source)
+        point_expected = round(budget * (int(point["day"]) / days_in_month), 2) if days_in_month else 0.0
+        actual_spend = point.get("actualSpend")
+        point["expectedSpend"] = point_expected
+        point["variance"] = None if actual_spend is None else round(float(actual_spend) - point_expected, 2)
+        series.append(point)
+    projected.update(
+        {
+            "budget": budget,
+            "spent": spent,
+            "remaining": round(budget - spent, 2),
+            "expectedSpend": expected_spend,
+            "allowedDailyAverage": allowed_daily_average,
+            "actualDailyAverage": actual_daily_average,
+            "dailyDifference": round(actual_daily_average - allowed_daily_average, 2),
+            "totalDifference": total_difference,
+            "status": "not_started" if elapsed_days == 0 else "over" if total_difference > 0 else "under",
+            "series": series,
+        }
+    )
+    return projected
 
 
 def _amount_row(label: str, amount: float) -> dict[str, Any]:

@@ -12,6 +12,7 @@ from bookiebot.reports.expense_breakdown import (
     BudgetMonth,
     ReportWorksheets,
     build_expense_breakdown_report,
+    expense_breakdown_client_payload,
     parse_budget_month,
     render_expense_breakdown_html,
     write_expense_breakdown_report,
@@ -416,6 +417,7 @@ def test_build_expense_breakdown_report_aggregates_shared_and_personal_data():
     )
     assert payload_match is not None
     payload = json.loads(payload_match.group(1))
+    assert expense_breakdown_client_payload(report) == payload
     assert [item["label"] for item in payload["breakdown"]][:3] == [
         "Rent",
         "Bills & Utilities",
@@ -1112,6 +1114,22 @@ def test_current_month_calendar_events_include_projected_income_subscriptions_an
     ]
 
     assert payload["incomeProjection"] == {"currentAmount": 2000.0, "projectedAmount": 6000.0, "savingsGoal": 1200.0}
+    projected = payload["modeViews"]["projected"]
+    assert projected["metrics"] == {
+        "totalExpenses": 1970.0,
+        "monthlyIncome": 6000.0,
+        "incomeAfterExpenses": 4030.0,
+        "amountSaved": 0.0,
+        "savingsIdeal": 1200.0,
+        "savingsMinimum": 600.0,
+    }
+    assert projected["categoryBudgets"] == {"needs": 3000.0, "wants": 1800.0, "savings": 1200.0}
+    assert projected["categorySpending"] == {"needs": 1940.0, "wants": 30.0, "savings": 0.0}
+    assert projected["categoryBalances"]["remaining"] == {
+        "needs": 1060.0,
+        "wants": 1770.0,
+        "savings": 1200.0,
+    }
     assert payload["breakdown"][2]["label"] == "Subs (Needs)"
     assert payload["breakdown"][2]["amount"] == 15.0
     assert events[("income", "Paycheck")] == {
@@ -1885,6 +1903,7 @@ def test_report_frontend_keeps_saved_amount_actual_and_out_of_spending():
     assert "const budgetRemaining = categoryBalanceTotal(categoryBalances)" in source
     assert "categorySpendingForBreakdown(" in source
     assert "projectedCategoryBalances(categoryBudgets, categorySpending)" in source
+    assert "report.modeViews?.projected" in source
     assert "budgetData={activeReport.budgetBreakdown}" not in source
     assert "categoryMixRows(data, selectedRollover, filter, amountSaved, transferRows)" in source
     assert "categoryBudgets={activeReport.categoryBudgets}" in source

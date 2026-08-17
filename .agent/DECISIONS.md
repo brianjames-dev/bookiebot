@@ -380,6 +380,12 @@ Decision: Supersede only the “explicit fallback only” routing portion of the
 
 Rationale: Intent recognition is useful for identifying BookieBot concepts, but a read classification should not bypass conversational reasoning. Sending supported reads through the graph allows follow-ups, multi-tool answers, and useful interpretation while preserving exact tool facts and trusted actor scope. Keeping mutation authority outside the graph preserves the existing confirmation and lineage rules; the pre-parser transfer boundary closes the observed ambiguity between moving bank funds and recording a completed savings contribution.
 
+## 2026-08-17 - Share Server-Computed Current And Projected Report Views
+
+Decision: The Expense Breakdown server payload is the canonical calculation boundary for both Current and Projected views. It computes mode-specific income, scheduled outflows, savings targets, 50/30/20 category budgets, category spending and cascade balances, money left, burn rate, and calendar data. The React page consumes these `modeViews` when present and retains its prior client calculations only for backward compatibility with older saved payloads. The read-only LangGraph agent accesses the same payload through one sectioned `get_financial_report` tool; it does not receive raw worksheets, report rendering, or any mutation capability.
+
+Rationale: Projected financial advice is only trustworthy when Discord and the web toggle use the same calculation result. Letting React and agent adapters independently reconstruct projections would invite drift in paycheck carry-forward, scheduled subscriptions and utilities, savings targets, category coverage, and remaining money. A shared server view keeps those values identical, while focused tool sections limit model context and preserve the trusted actor boundary.
+
 ## Pending Decisions
 
 - Where should durable system events live: banking database only, Google Sheets only, or dual-write during transition?

@@ -127,7 +127,7 @@ This could live in a new Google Sheet tab or a small local database.
 
 ### 8. Multi-Action Agent Planning
 
-Foundation status (2026-08-17): unsupported messages and tool-supported read intents now enter an actor-scoped LangGraph agent with read-only financial tools and per-conversation checkpoints. Write planning and ordered reuse of mutation handlers remain intentionally pending.
+Foundation status (2026-08-17): unsupported messages and tool-supported read intents now enter an actor-scoped LangGraph agent with read-only financial tools and per-conversation checkpoints. The canonical Expense Breakdown payload is exposed through focused Current/Projected report sections, while write planning and ordered reuse of mutation handlers remain intentionally pending.
 
 Allow one message to produce several steps instead of exactly one intent.
 
@@ -181,7 +181,7 @@ This would make BookieBot easier to debug and allow questions like, "Why did you
 
 ### 12. Modern LLM Interface
 
-Foundation status (2026-08-17): the OpenAI SDK and default model were modernized, intent responses request JSON mode, and both fallback and supported read intents now use LangGraph/LangChain tool calling with LLM-synthesized answers. Replacing the large single-intent prompt with a validated command/conversation/clarification router remains pending.
+Foundation status (2026-08-17): the OpenAI SDK and default model were modernized, intent responses request JSON mode, and both fallback and supported read intents now use LangGraph/LangChain tool calling with LLM-synthesized answers. Server-computed Current/Projected views are shared by the web report and agent. Replacing the large single-intent prompt with a validated command/conversation/clarification router remains pending.
 
 Upgrade the LLM client and parser to use structured outputs with a current model instead of relying on free-form JSON from an older chat completion interface.
 

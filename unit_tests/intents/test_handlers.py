@@ -2633,6 +2633,19 @@ def test_screenshot_read_intents_are_agent_eligible_but_mutations_are_not():
 
     assert expected <= ih.CONVERSATIONAL_READ_INTENTS
     assert {
+        "query_projected_spending",
+        "query_savings",
+        "query_highest_expense_category",
+        "query_spent_this_week",
+        "query_weekend_vs_weekday",
+        "query_no_spend_days",
+        "query_total_for_item",
+        "query_best_worst_day_of_week",
+        "query_longest_no_spend_streak",
+        "query_most_frequent_purchases",
+        "query_days_budget_lasts",
+    } <= ih.CONVERSATIONAL_READ_INTENTS
+    assert {
         "log_expense",
         "log_income",
         "log_savings",

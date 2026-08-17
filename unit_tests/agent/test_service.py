@@ -43,6 +43,9 @@ def test_system_prompt_requires_synthesis_instead_of_raw_tool_output():
 
     assert "Synthesize them in your own words" in normalized
     assert "Do not merely echo a legacy command response" in normalized
+    assert "canonical source shared with the web Expense Breakdown page" in normalized
+    assert 'get_financial_report with mode "comparison"' in normalized
+    assert "Do not infer category health from a spending total alone" in normalized
 
 
 @pytest.mark.asyncio

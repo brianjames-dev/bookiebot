@@ -96,19 +96,30 @@ logger = logging.getLogger(__name__)
 CONVERSATIONAL_READ_INTENTS = frozenset(
     {
         "query_average_daily_spend",
+        "query_best_worst_day_of_week",
         "query_burn_rate",
+        "query_days_budget_lasts",
         "query_expenses_on_day",
+        "query_highest_expense_category",
         "query_largest_single_expense",
+        "query_longest_no_spend_streak",
+        "query_most_frequent_purchases",
+        "query_no_spend_days",
         "query_pge_paid",
         "query_recology_paid",
         "query_remaining_budget",
         "query_rent_paid",
+        "query_projected_spending",
+        "query_savings",
+        "query_spent_this_week",
         "query_subscriptions",
         "query_top_n_expenses",
         "query_total_for_category",
+        "query_total_for_item",
         "query_total_for_store",
         "query_total_income",
         "query_water_paid",
+        "query_weekend_vs_weekday",
     }
 )
 

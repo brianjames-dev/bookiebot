@@ -42,6 +42,9 @@ Messages that do not match a BookieBot command enter a LangGraph conversational 
 - Category and merchant spending
 - Largest expenses and expenses on a requested date
 - Subscriptions and current bill-payment status
+- The canonical Expense Breakdown dataset, including exact Current and Projected views for income, outflows, savings targets, category budgets/cascade balances, burn rate, scheduled cash flow, commitments, activity, utility history, and reimbursements
+
+For planning questions, the agent uses `get_financial_report` with one focused section (`overview`, `categories`, `cash_flow`, `commitments`, `burn_rate`, `activity`, or `reimbursements`) and a `current`, `projected`, or `comparison` mode. These mode views are calculated on the server and are also consumed by the web report, so an agent answer about Projected income or money left uses the same values as the page's Projected button. Historical months can be requested explicitly.
 
 Existing command routing remains authoritative for every mutation. The conversational agent cannot log, update, move, split, delete, reconcile, or pay anything. Tool identity comes from the trusted Discord message context rather than model-generated owner arguments, and conversation threads are isolated by guild, channel, and Discord user.
 

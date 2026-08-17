@@ -42,6 +42,7 @@ import type {
   ExpenseEntry,
   ExpenseReportData,
   OccurrenceRow,
+  ReportModeView,
   SharedReimbursementItem,
   SubscriptionItem,
   UtilityHistoryItem,
@@ -239,25 +240,13 @@ type ChartTouchState = {
   dragging: boolean
 }
 
-type ReportView = {
-  metrics: {
-    totalExpenses: number
-    monthlyIncome: number
-    incomeAfterExpenses: number
-    amountSaved: number
-    savingsIdeal: number
-    savingsMinimum: number
-  }
-  categoryBalances: CategoryBalances
-  categoryBudgets: CategoryBalanceAmounts
-  categorySpending: CategoryBalanceAmounts
-  breakdown: BreakdownItem[]
-  burnRate: BurnRate | null
-  calendarEvents: CalendarEvent[]
-  utilityHistory: UtilityHistoryItem[]
-}
+type ReportView = ReportModeView
 
 function buildReportView(report: ExpenseReportData, projected: boolean): ReportView {
+  const serverView = projected ? report.modeViews?.projected : report.modeViews?.current
+  if (serverView) {
+    return serverView
+  }
   const breakdown = projected ? projectedBreakdown(report) : report.breakdown
   const monthlyIncome = projected ? report.incomeProjection.projectedAmount : report.incomeProjection.currentAmount
   const savings = savingsForMode(report, projected)

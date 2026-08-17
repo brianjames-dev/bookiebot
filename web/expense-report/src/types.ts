@@ -151,6 +151,26 @@ export interface BurnRatePoint {
   variance: number | null
 }
 
+export interface ReportModeMetrics {
+  totalExpenses: number
+  monthlyIncome: number
+  incomeAfterExpenses: number
+  amountSaved: number
+  savingsIdeal: number
+  savingsMinimum: number
+}
+
+export interface ReportModeView {
+  metrics: ReportModeMetrics
+  categoryBalances: CategoryBalances
+  categoryBudgets: CategoryBalanceAmounts
+  categorySpending: CategoryBalanceAmounts
+  breakdown: BreakdownItem[]
+  burnRate: BurnRate | null
+  calendarEvents: CalendarEvent[]
+  utilityHistory: UtilityHistoryItem[]
+}
+
 export interface ExpenseReportData {
   ownerName: string
   monthLabel: string
@@ -181,4 +201,8 @@ export interface ExpenseReportData {
   sharedReimbursements: SharedReimbursementItem[]
   subscriptionsNeeds: SubscriptionItem[]
   subscriptionsWants: SubscriptionItem[]
+  modeViews?: {
+    current: ReportModeView
+    projected: ReportModeView
+  }
 }
