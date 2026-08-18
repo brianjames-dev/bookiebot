@@ -938,17 +938,37 @@ class BankStore:
                 )
                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 ON CONFLICT(bank_transaction_id) DO UPDATE SET
-                    classification = excluded.classification,
+                    classification = CASE
+                        WHEN bank_reconciliation_items.status IN ('confirmed', 'ignored', 'import_requested')
+                        THEN bank_reconciliation_items.classification
+                        ELSE excluded.classification
+                    END,
                     status = CASE
                         WHEN bank_reconciliation_items.status IN ('confirmed', 'ignored', 'import_requested')
                         THEN bank_reconciliation_items.status
                         ELSE excluded.status
                     END,
-                    matched_action_log_id = excluded.matched_action_log_id,
-                    matched_sheet_ref = excluded.matched_sheet_ref,
-                    confidence = excluded.confidence,
+                    matched_action_log_id = CASE
+                        WHEN bank_reconciliation_items.status IN ('confirmed', 'ignored', 'import_requested')
+                        THEN bank_reconciliation_items.matched_action_log_id
+                        ELSE excluded.matched_action_log_id
+                    END,
+                    matched_sheet_ref = CASE
+                        WHEN bank_reconciliation_items.status IN ('confirmed', 'ignored', 'import_requested')
+                        THEN bank_reconciliation_items.matched_sheet_ref
+                        ELSE excluded.matched_sheet_ref
+                    END,
+                    confidence = CASE
+                        WHEN bank_reconciliation_items.status IN ('confirmed', 'ignored', 'import_requested')
+                        THEN bank_reconciliation_items.confidence
+                        ELSE excluded.confidence
+                    END,
                     last_seen_at = excluded.last_seen_at,
-                    notes = excluded.notes
+                    notes = CASE
+                        WHEN bank_reconciliation_items.status IN ('confirmed', 'ignored', 'import_requested')
+                        THEN bank_reconciliation_items.notes
+                        ELSE excluded.notes
+                    END
                 """,
                 (
                     owner_key,

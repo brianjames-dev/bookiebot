@@ -1109,6 +1109,81 @@ def test_confirm_reconciliation_item_hides_it_from_review(tmp_path):
     assert store.unresolved_reconciliation_items("brian") == []
 
 
+def test_upsert_reconciliation_item_preserves_terminal_match_metadata(tmp_path):
+    store = _store(tmp_path)
+    item = store.upsert_item(
+        owner_key="brian",
+        provider="plaid",
+        item_id="item-brian",
+        access_token="access-sandbox-brian",
+        institution_name="Plaid Sandbox",
+    )
+    store.upsert_accounts(
+        [
+            BankAccount(
+                item_id=item.id,
+                provider_account_id="account-brian",
+                owner_key="brian",
+                name="Brian Checking",
+                mask="1111",
+                type="depository",
+                subtype="checking",
+                official_name=None,
+                current_balance=500.0,
+                available_balance=450.0,
+            )
+        ]
+    )
+    store.upsert_transactions(
+        [
+            {
+                "transaction_id": "txn-open",
+                "account_id": "account-brian",
+                "date": "2026-05-17",
+                "name": "Unlogged Coffee",
+                "amount": 12.34,
+                "pending": False,
+            }
+        ],
+        owner_key="brian",
+    )
+    transaction = store.recent_transactions("brian", limit=1)[0]
+    open_item = store.upsert_reconciliation_item(
+        owner_key="brian",
+        transaction=transaction,
+        classification="expense",
+        status="needs_review",
+        confidence=0.6,
+    )
+    store.confirm_reconciliation_item(
+        "brian",
+        open_item.id,
+        matched_action_log_id="abc123",
+        matched_sheet_ref="expense!row 5",
+        notes="matched existing row",
+    )
+
+    # Forced re-preview style upsert must not wipe confirmed match lineage.
+    re_upserted = store.upsert_reconciliation_item(
+        owner_key="brian",
+        transaction=transaction,
+        classification="transfer_or_payment",
+        status="matched",
+        confidence=0.99,
+        notes="overwrite attempt",
+        matched_action_log_id="wrong-id",
+        matched_sheet_ref="expense!row 99",
+    )
+
+    assert re_upserted.status == "confirmed"
+    assert re_upserted.classification == "expense"
+    assert re_upserted.matched_action_log_id == "abc123"
+    assert re_upserted.matched_sheet_ref == "expense!row 5"
+    assert re_upserted.confidence == 0.6
+    assert "matched existing row" in (re_upserted.notes or "")
+    assert "overwrite attempt" not in (re_upserted.notes or "")
+
+
 def test_reopen_reconciliation_item_returns_confirmed_item_to_review(tmp_path):
     store = _store(tmp_path)
     item = store.upsert_item(
