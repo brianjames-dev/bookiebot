@@ -1295,3 +1295,30 @@ def test_matched_action_log_ids_splits_group_matches(tmp_path):
     )
 
     assert store.matched_action_log_ids("brian") == {"minted123", "zazzle123"}
+
+
+def test_claim_plaid_webhook_event_is_atomic(tmp_path):
+    store = _store(tmp_path)
+    store.upsert_item(
+        owner_key="brian",
+        provider="plaid",
+        item_id="plaid-item-1",
+        access_token="access-sandbox-brian",
+        institution_name="Plaid Sandbox",
+    )
+    event = store.enqueue_plaid_webhook(
+        {
+            "webhook_type": "TRANSACTIONS",
+            "webhook_code": "SYNC_UPDATES_AVAILABLE",
+            "item_id": "plaid-item-1",
+        }
+    )
+
+    first = store.claim_plaid_webhook_event(event.id)
+    second = store.claim_plaid_webhook_event(event.id)
+
+    assert first is not None
+    assert first[0].id == event.id
+    assert first[0].status == "processing"
+    assert second is None
+    assert store.pending_plaid_webhook_events() == []
