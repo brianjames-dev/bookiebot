@@ -51,11 +51,11 @@ class InMemoryWorksheet:
         row_idx, col_idx = self._ensure_position(row, col)
         return Cell(row=row, col=col, value=self._rows[row_idx][col_idx])
 
-    def find(self, needle: str) -> Cell:
+    def find(self, needle: str | re.Pattern[str]) -> Cell:
         needle_lower = str(needle).lower()
         for r, row in enumerate(self._rows, start=1):
             for c, value in enumerate(row, start=1):
-                if needle_lower in str(value).lower():
+                if (needle.search(str(value)) if isinstance(needle, re.Pattern) else needle_lower in str(value).lower()):
                     return Cell(row=r, col=c, value=value)
         raise ValueError(f"Value '{needle}' not found in sheet '{self.title}'.")
 

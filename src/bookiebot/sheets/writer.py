@@ -10,6 +10,7 @@ import os
 from zoneinfo import ZoneInfo
 from bookiebot.sheets.config import expense_category_label, get_category_columns, normalize_expense_category
 from bookiebot.sheets.income import (
+    MONTHLY_INCOME_SUMMARY_PATTERN,
     copy_income_row_properties as _copy_income_row_properties,
     income_sheet_layout as _income_sheet_layout,
     repair_income_summary_formula as _repair_income_summary_formula,
@@ -110,7 +111,7 @@ def log_income_row(
 
 def log_income_row(data: dict[str, Any], worksheet: Any, *, return_action_id: bool = False, metadata_extra: dict | None = None):
     try:
-        summary_cell = worksheet.find("Monthly Income:")
+        summary_cell = worksheet.find(MONTHLY_INCOME_SUMMARY_PATTERN)
         summary_row = summary_cell.row
     except Exception as e:
         logger.error("Could not find 'Monthly Income:' in the sheet.", extra={"exception": str(e)})

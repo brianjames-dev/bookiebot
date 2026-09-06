@@ -689,3 +689,13 @@ Status: Complete in code; production deployment/manual confirmation remains in `
 - README documents editable sheet settings. No sheet mutation or deployment was performed; latest verification is recorded in `.agent/STATUS.md`.
 
 - Verification: focused reports/agent suite `96 passed`; full suite `568 passed` with one existing Kaleido warning; Pyright clean; frontend typecheck/build and `git diff --check` passed. A read-only live July–September check resolves `xAI` and projects `$7,654.39` from August 28 salary plus September actual income.
+
+### 2026-09-05 Unified Income Grid And Permanent Anchor
+
+Status: Complete in code and live four-tab migration; deployed-bot and next natural rollover confirmation remain `.agent/STATUS.md` checklist item 84.
+
+- Unified `E1:F5` grids on Brian/Hannah Budget 2026 Template and September tabs, preserving `xAI` / July 2 and `Sonic` / August 21 respectively. Both retain biweekly mode with fixed salary blank; strict dropdown, currency, and date validation are installed.
+- Updated the repository and live Apps Script income helpers/month/year rollover; executed the targeted migration successfully. New months copy latest settings, annual rollover carries the prior plan, and existing months preserve edits. Unrelated live script code was preserved.
+- Canonical Paycheck Anchor Date is permanent; actual receipts fill nearby scheduled slots without cadence drift. Legacy anchor semantics remain compatible. The unified anchor survives first-income deletion and undo; exact Monthly Income matching prevents fixed salary from corrupting actual reads/writes.
+- Executed Node regression coverage for migration and month/year rollover plus Python schedule, lookup, and lifecycle tests. Full suite `577 passed`, Pyright clean. API readback and browser checks verified all four grids and no value/formula changes outside them. Existing unrelated Template reference errors remain untouched.
+- README and durable decisions document setup and semantics. Agents.md records the user's default commit/push preference.

@@ -20,6 +20,7 @@ from bookiebot.sheets.routing import (
 import gspread
 from gspread.utils import rowcol_to_a1
 from bookiebot.sheets.repo import get_sheets_repo
+from bookiebot.sheets.income import MONTHLY_INCOME_SUMMARY_PATTERN, income_sheet_layout
 from bookiebot.sheets.routing import get_current_discord_user_id
 from bookiebot.sheets.undo import UndoAction, record_undo_action
 
@@ -376,8 +377,9 @@ async def total_income():
     if ws is None:
         return 0.0
     try:
-        cell = ws.find("Monthly Income:")
-        income_val = ws.cell(cell.row, cell.col + 1).value
+        cell = ws.find(MONTHLY_INCOME_SUMMARY_PATTERN)
+        layout = income_sheet_layout(ws, cell.row)
+        income_val = ws.cell(cell.row, layout["amount"]).value
         income_val = income_val.strip()
 
         # Try to convert to float if possible

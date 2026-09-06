@@ -179,6 +179,15 @@ const SHARED_EXPENSES_DATE_COLUMN_MAP = {
 const PERSONAL_BUDGET_INCOME_HEADER_SCAN_ROWS = 20;
 const PERSONAL_BUDGET_INCOME_HEADER_SCAN_COLUMNS = 10;
 
+const INCOME_SETTINGS_RANGE = "E1:F5";
+const INCOME_PROJECTION_MODES = ["biweekly", "fixed monthly", "off"];
+const INCOME_SETTING_LABELS = {
+  source: ["Main Income Source:", "Biweekly Income Source:"],
+  mode: ["Income Projection Mode:"],
+  amount: ["Fixed Monthly Income:"],
+  anchor: ["Paycheck Anchor Date:", "Biweekly Income Start:"],
+};
+
 /***********************
  * MAIN ENTRY POINT
  ***********************/
@@ -509,6 +518,14 @@ function createYearFilesFromTemplates(year) {
 }
 
 function initializeNewYearFiles(config) {
+  const previousConfig = getYearConfig(config.year - 1);
+  for (const key of ["brianBudgetId", "hannahBudgetId"]) {
+    const ss = SpreadsheetApp.openById(config[key]);
+    const settings = previousConfig
+      ? resolvePersonalBudgetIncomeSettings(SpreadsheetApp.openById(previousConfig[key]), "December", true)
+      : readPersonalBudgetIncomeSettings(getMonthlyTemplateSheet(ss));
+    writePersonalBudgetIncomeSettings(getMonthlyTemplateSheet(ss), settings);
+  }
   ensureMonthExistsInSharedExpenses(config.sharedExpensesId, "January");
 
   ensureMonthExistsInPersonalBudget(
@@ -594,6 +611,10 @@ function ensureMonthExistsInPersonalBudget(
      *   expense file and owner-specific row.
      */
     ensureMonthLabel(sheet, monthName);
+    // Existing canonical settings are never overwritten on daily runs.
+    if (!hasPersonalBudgetIncomeSettings(sheet)) {
+      writePersonalBudgetIncomeSettings(sheet, resolvePersonalBudgetIncomeSettings(ss, monthName, true));
+    }
 
     updatePersonalBudgetImportRanges(
       sheet,
@@ -615,7 +636,9 @@ function ensureMonthExistsInPersonalBudget(
    * - Replace the template month label
    * - Relink formulas
    */
+  const incomeSettings = resolvePersonalBudgetIncomeSettings(ss, monthName, false);
   sheet = createMonthSheet(ss, monthName);
+  writePersonalBudgetIncomeSettings(sheet, incomeSettings);
 
   updatePersonalBudgetImportRanges(
     sheet,
@@ -684,6 +707,108 @@ function createMonthSheet(ss, monthName) {
   ss.moveActiveSheet(allSheets.length + 1);
 
   return newSheet;
+}
+
+function normalizeIncomeSettingLabel(value) {
+  return String(value || "").trim().replace(/:\s*$/, "").trim().toLowerCase();
+}
+
+function readPersonalBudgetIncomeSettings(sheet) {
+  const values = {};
+  for (const row of sheet.getDataRange().getValues()) {
+    for (let column = 0; column < row.length - 1; column++) {
+      const value = row[column + 1];
+      if (value !== "" && value !== null && !String(value).startsWith("<")) {
+        values[normalizeIncomeSettingLabel(row[column])] = value;
+      }
+    }
+  }
+  const settings = {};
+  for (const [key, labels] of Object.entries(INCOME_SETTING_LABELS)) {
+    const label = labels.map(normalizeIncomeSettingLabel).find((label) => label in values);
+    if (label !== undefined) settings[key] = values[label];
+  }
+  if (settings.mode !== undefined) settings.mode = normalizeIncomeSettingLabel(settings.mode);
+  else if (settings.amount !== undefined) settings.mode = "fixed monthly";
+  return settings;
+}
+
+function mergePersonalBudgetIncomeSettings(previous, current) {
+  let result = { ...previous };
+  if (current.source !== undefined && normalizeIncomeSettingLabel(current.source) !== normalizeIncomeSettingLabel(previous.source)) {
+    result = {};
+  }
+  if (current.mode !== undefined && current.mode !== result.mode) delete result.amount;
+  return { ...result, ...current };
+}
+
+function resolvePersonalBudgetIncomeSettings(ss, monthName, includeSelected) {
+  let settings = readPersonalBudgetIncomeSettings(getMonthlyTemplateSheet(ss));
+  const end = MONTH_NAMES.indexOf(monthName) + (includeSelected ? 1 : 0);
+  for (const name of MONTH_NAMES.slice(0, end)) {
+    const sheet = ss.getSheetByName(name);
+    if (sheet) settings = mergePersonalBudgetIncomeSettings(settings, readPersonalBudgetIncomeSettings(sheet));
+  }
+  return settings;
+}
+
+function hasPersonalBudgetIncomeSettings(sheet) {
+  const rows = sheet.getRange(INCOME_SETTINGS_RANGE).getValues();
+  return ["Label", "Main Income Source:", "Income Projection Mode:", "Fixed Monthly Income:", "Paycheck Anchor Date:"]
+    .every((label, index) => rows[index][0] === label);
+}
+
+function writePersonalBudgetIncomeSettings(sheet, settings) {
+  const range = sheet.getRange(INCOME_SETTINGS_RANGE);
+  const allowed = new Set(["label", ...Object.values(INCOME_SETTING_LABELS).flat().map(normalizeIncomeSettingLabel)]);
+  for (const row of range.getValues()) {
+    if ((row[0] !== "" || row[1] !== "") && !allowed.has(normalizeIncomeSettingLabel(row[0]))) {
+      throw new Error(`Cannot place income settings on ${sheet.getName()}!${INCOME_SETTINGS_RANGE}: unrelated cells are occupied.`);
+    }
+  }
+  range.clearDataValidations();
+  range.setValues([
+    ["Label", "Value"],
+    ["Main Income Source:", settings.source ?? ""],
+    ["Income Projection Mode:", settings.mode ?? "biweekly"],
+    ["Fixed Monthly Income:", settings.amount ?? ""],
+    ["Paycheck Anchor Date:", settings.anchor ?? ""],
+  ]);
+  range.setFontFamily("Arial").setFontSize(9).setVerticalAlignment("middle").setHorizontalAlignment("left");
+  range.setBorder(true, true, true, true, true, true, "#000000", SpreadsheetApp.BorderStyle.SOLID);
+  sheet.getRange("E1:F1").setBackground("#274e13").setFontColor("#ffffff").setFontWeight("bold");
+  sheet.getRange("E2:E5").setBackground("#38761d").setFontColor("#ffffff").setFontWeight("bold");
+  sheet.getRange("F2:F5").setBackground("#d9ead3").setFontColor("#000000").setFontWeight("normal");
+  sheet.getRange("F2:F3").setNumberFormat("@");
+  sheet.getRange("F3").setDataValidation(SpreadsheetApp.newDataValidation()
+    .requireValueInList(INCOME_PROJECTION_MODES, true).setAllowInvalid(false)
+    .setHelpText("Choose biweekly, fixed monthly, or off. New months inherit the latest month’s settings.").build());
+  sheet.getRange("F4").setNumberFormat("$#,##0.00").setDataValidation(SpreadsheetApp.newDataValidation()
+    .requireNumberGreaterThanOrEqualTo(0).setAllowInvalid(false)
+    .setHelpText("Monthly take-home salary; used only in fixed monthly mode.").build());
+  sheet.getRange("F5").setNumberFormat("M/d/yyyy").setDataValidation(SpreadsheetApp.newDataValidation()
+    .requireDate().setAllowInvalid(false)
+    .setHelpText("One payday anchor. Biweekly paydays repeat every 14 days from this date indefinitely.").build());
+  // These notes already exist in legacy templates; move/update their meaning.
+  sheet.getRange("F2").setNote("Main employer/source used to identify salary entries.");
+  sheet.getRange("F4").clearNote();
+  sheet.getRange("F5").setNote("One payday anchor. Biweekly paydays repeat every 14 days from this date indefinitely.");
+}
+
+/** Migrate only the current month and internal Template in both annual budgets. */
+function upgradeCurrentIncomeSettings() {
+  seedKnown2026ConfigIfMissing();
+  const today = new Date();
+  const config = getYearConfig(getYear(today));
+  if (!config) throw new Error("Current-year budget configuration is missing.");
+  for (const key of ["brianBudgetId", "hannahBudgetId"]) {
+    const ss = SpreadsheetApp.openById(config[key]);
+    const monthName = getMonthName(today);
+    const settings = resolvePersonalBudgetIncomeSettings(ss, monthName, true);
+    const sheet = ss.getSheetByName(monthName);
+    if (sheet) writePersonalBudgetIncomeSettings(sheet, settings);
+    writePersonalBudgetIncomeSettings(getMonthlyTemplateSheet(ss), settings);
+  }
 }
 
 function getMonthlyTemplateSheet(ss) {

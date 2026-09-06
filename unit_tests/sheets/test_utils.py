@@ -337,6 +337,20 @@ async def test_total_income_valid(mock_get_income_worksheet):
 
 
 @pytest.mark.asyncio
+async def test_total_income_reads_actual_amount_column_not_fixed_salary_setting():
+    repo = SheetsRepoStub(income_rows=[
+        ["", "", "", "", "Label", "Value"],
+        ["", "", "", "", "Main Income Source:", "xAI"],
+        ["", "", "", "", "Income Projection Mode:", "fixed monthly"],
+        ["", "Date:", "Source:", "Amount:", "Fixed Monthly Income:", "6000"],
+        ["", "9/2/2026", "xAI", "3000", "Paycheck Anchor Date:", "7/2/2026"],
+        ["", "Monthly Income:", "", "3000"],
+    ])
+    with repo.patched():
+        assert await su.total_income() == 3000
+
+
+@pytest.mark.asyncio
 @patch("bookiebot.sheets.utils.get_income_worksheet")
 async def test_total_income_invalid_value(mock_get_income_worksheet):
     mock_ws = MagicMock()

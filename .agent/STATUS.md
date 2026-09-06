@@ -4,36 +4,44 @@ Last updated: 2026-09-05
 
 ## Active Focus
 
-The user-requested deterministic income projection fix is implemented: explicit source settings survive blank months, only matching payroll labels supply biweekly estimates, and optional fixed monthly take-home salary is supported. The Projected Income card and read-only report tools explain the basis. Production deployment/manual verification is next in checklist item 83; existing deployment checks remain queued.
+Unified income settings are live in E1:F5 on Brian/Hannah Budget 2026 Template and September tabs. The live Apps Script and repository script now preserve settings/dropdowns through monthly and annual rollover. The canonical Paycheck Anchor Date repeats every fourteen days indefinitely without deposit-date drift; legacy tabs retain their previous bootstrap behavior. Backend/report and income-write safeguards are verified. Next is deployed-bot/next-rollover confirmation in checklist item 84.
 
 ## On Deck
 
-1. Deploy and manually verify deterministic income settings and fixed monthly salary in checklist item 83.
-2. Deploy and manually verify canonical Current/Projected report tools in checklist item 82.
-3. Deploy and manually verify the LangGraph conversational/read response layer and bank-transfer refusal in checklist item 81.
-4. Deploy and manually verify Brian's BofA expense default in checklist item 80.
-5. Deploy and manually verify the shared expense-report chart viewport in checklist item 79.
-6. Deploy and manually verify fronted shared expenses in checklist item 78.
-7. Deploy and manually verify quarterly utility history in checklist item 77.
-8. Deploy and manually verify parser and bill-payment reliability in checklist item 76.
-9. Deploy and manually verify split creation/settlement in checklist item 74 and recent split changes/cancellation in checklist item 75.
-10. Continue the deferred split lifecycle: correct gross after splitting, partial reimbursement, explicit paid-split undo, and split-aware update/move/delete/undo.
-11. Deploy and manually verify prior-month paycheck carry-forward in Projected mode in checklist item 73.
-12. Deploy and manually verify Wants subscriptions in Burn Rate in checklist item 72.
-13. Deploy and manually verify selected-month subscription scoping in checklist item 71.
-14. Deploy and manually verify Daily Spending bill coverage and outlier scaling in checklist item 70.
-15. Deploy and manually verify the monthly savings workflow and corrected Saved-card targets in checklist items 60-61 and 69.
-16. Deploy and manually verify the expense-report corrections in checklist item 67.
-17. Deploy and manually verify typed `recent` opens the short-lived launcher and keeps the resulting DM session ephemeral.
-18. Deploy and manually verify `View Inbox` and `Reconcile Now` show `BookieBot is typing...` without a temporary thinking message.
-19. Manually verify shared Needs logging plus update/move/delete/undo behavior in Discord and Google Sheets.
-20. Manually verify recent transactions and reconciliation after the latest reliability fixes.
-21. Consider a richer Discord button flow for grouped amount adjustments if the current UX feels too manual.
-22. Harden recent-action pending state across restarts/deploys, since selections currently live only in process memory.
-23. Improve targeted recent-action search so commands can find older matches, not only the latest 10 recent actions.
-24. Explore clarifying questions before logging when BookieBot is uncertain instead of guessing or silently failing.
+1. Verify the deployed bot and next monthly rollover against the live unified settings in checklist item 84.
+2. Deploy and manually verify deterministic income settings and fixed monthly salary in checklist item 83.
+3. Deploy and manually verify canonical Current/Projected report tools in checklist item 82.
+4. Deploy and manually verify the LangGraph conversational/read response layer and bank-transfer refusal in checklist item 81.
+5. Deploy and manually verify Brian's BofA expense default in checklist item 80.
+6. Deploy and manually verify the shared expense-report chart viewport in checklist item 79.
+7. Deploy and manually verify fronted shared expenses in checklist item 78.
+8. Deploy and manually verify quarterly utility history in checklist item 77.
+9. Deploy and manually verify parser and bill-payment reliability in checklist item 76.
+10. Deploy and manually verify split creation/settlement in checklist item 74 and recent split changes/cancellation in checklist item 75.
+11. Continue the deferred split lifecycle: correct gross after splitting, partial reimbursement, explicit paid-split undo, and split-aware update/move/delete/undo.
+12. Deploy and manually verify prior-month paycheck carry-forward in Projected mode in checklist item 73.
+13. Deploy and manually verify Wants subscriptions in Burn Rate in checklist item 72.
+14. Deploy and manually verify selected-month subscription scoping in checklist item 71.
+15. Deploy and manually verify Daily Spending bill coverage and outlier scaling in checklist item 70.
+16. Deploy and manually verify the monthly savings workflow and corrected Saved-card targets in checklist items 60-61 and 69.
+17. Deploy and manually verify the expense-report corrections in checklist item 67.
+18. Deploy and manually verify typed `recent` opens the short-lived launcher and keeps the resulting DM session ephemeral.
+19. Deploy and manually verify `View Inbox` and `Reconcile Now` show `BookieBot is typing...` without a temporary thinking message.
+20. Manually verify shared Needs logging plus update/move/delete/undo behavior in Discord and Google Sheets.
+21. Manually verify recent transactions and reconciliation after the latest reliability fixes.
+22. Consider a richer Discord button flow for grouped amount adjustments if the current UX feels too manual.
+23. Harden recent-action pending state across restarts/deploys, since selections currently live only in process memory.
+24. Improve targeted recent-action search so commands can find older matches, not only the latest 10 recent actions.
+25. Explore clarifying questions before logging when BookieBot is uncertain instead of guessing or silently failing.
 
 ## Completed 2026-09-05
+
+- Unified the live Template and September income controls in both annual budgets at `E1:F5`: source `F2`, strict mode dropdown `F3`, numeric monthly take-home amount `F4`, and permanent payday anchor `F5`. Brian retains `xAI` / `7/2/2026`, Hannah retains `Sonic` / `8/21/2026`; both remain biweekly with fixed amounts blank. Readback confirmed every value/formula outside the grid stayed unchanged.
+- Updated the repository `.gs` and applied the same income helpers/rollover functions to the live Budget Automation Script, preserving unrelated live code. Saved editor content was verified before running `upgradeCurrentIncomeSettings`; the run completed successfully. Function fingerprints match the tested local versions. New months inherit the latest effective settings rather than stale Template values; new annual workbooks inherit the previous year's plan; existing months are not overwritten on daily runs.
+- Added canonical `Paycheck Anchor Date` semantics: static fourteen-day occurrences from the selected date across arbitrary future months/years; dated receipts fill the nearest unfilled slot without shifting the plan. Legacy `Biweekly Income Start` remains a bootstrap alias for historical compatibility. Brian's migrated September schedule is September 10/24; Hannah's is September 4/18.
+- Protected the canonical date through first-income deletion/undo and fixed Monthly Income lookups to match the whole label, preventing the new Fixed Monthly Income cell from becoming the actual-income summary. Actual-income reads now discover the Amount column from the table header.
+- Added executed Node tests for Apps Script migration, strict dropdown/date validation, monthly/year rollover, stale-template precedence, collision guards, and existing-month preservation; added Python fixed-anchor, actual-income lookup, and logging/delete/undo regressions. Full verification: `577 passed` (one existing Kaleido warning), Pyright `0 errors`, and `git diff --check` passed. All four live grids were inspected visually and through the Sheets API. Existing Template `#REF!` outputs and Hannah's zero-income division errors are outside this change and remain unchanged.
+- Updated README, workstream/decision tracking, and Agents.md with the user's standing instruction to commit and push verified changes by default. Backups/readback snapshots are in ignored `data/income-settings-migration/`. Backend deployment verification remains checklist item 84; no future live month was created for testing.
 
 - Implemented the user's income-projection priority. July source/start settings now survive blank August/September settings; current-month explicit values win, and employer changes reset the inherited salary plan. Earlier tabs from the configured previous annual workbook also supply settings across year rollover.
 - Removed arbitrary single-income, keyword, fuzzy-substring, and hardcoded-date fallbacks. `xAI`, `xAI paycheck`, and `xAI income` share a finite payroll-label rule; rewards, bonuses, and other employers stay separate. Biweekly amount history remains limited to the immediately previous month; missing information is explained in the report.
@@ -675,6 +683,12 @@ Use a test row or low-risk real row in Discord:
     - Leave the next month's settings blank and confirm the plan persists. Change the employer and confirm the old amount/start do not carry into the new plan. Set mode to `off` and confirm income remains actual-only; malformed mode/amount displays a setting message instead of an inferred salary.
     - Ask Discord to explain projected income and compare the answer with the page. Confirm the source/mode and totals agree; older saved reports still render, and completed months stay actual-only.
 
+84. Unified settings grid and permanent paycheck anchor (2026-09-05):
+    - Live grids are complete: open Brian and Hannah Budget 2026, Template and September, and inspect `E1:F5`. `F3` must offer only `biweekly`, `fixed monthly`, and `off`; `F4` accepts a nonnegative currency amount and `F5` accepts a date. Select/reload the desired mode to verify persistence. Source/date are already seeded; fixed amounts intentionally remain blank.
+    - After the pushed backend deploys, reload September Projected: Brian's July 2 anchor produces September 10/24 and Hannah's August 21 anchor produces September 4/18. Early/late salary receipts keep their real dates and remove the nearest scheduled occurrence without reanchoring. Fixed monthly mode retains its month-end salary remainder estimate.
+    - At the next normal monthly rollover, verify the new tab copies the latest month's source/mode/amount/anchor and validations. Re-running rollover must not overwrite edits in an existing month. January should inherit the previous annual workbook's plan; executed Node regressions cover these paths without creating live future tabs.
+    - In a test workbook, log two salary entries, delete the first, then undo: the complete settings grid and anchor must survive and the Monthly Income formula must sum only the actual Amount column. A fixed salary amount must never be read/written as actual income.
+
 ## Verification Baseline
 
 Recommended targeted tests for the active workstream:
@@ -685,6 +699,24 @@ python -m pytest unit_tests/intents/test_handlers.py unit_tests/core/test_messag
 ```
 
 Latest verification (2026-09-05):
+
+```bash
+PYTHONPATH=src venv/bin/python -m pytest unit_tests -q
+# passed: 577 passed, 1 existing Kaleido deprecation warning
+
+PYTHONPATH=src venv/bin/python -m pyright --pythonpath venv/bin/python --pythonversion 3.12
+# passed: 0 errors, 0 warnings, 0 informations
+
+node unit_tests/scripts/income_settings_test.cjs
+# passed: migration, validations, month/year rollover, collision and preservation checks
+
+git diff --check
+# passed
+```
+
+Live Apps Script `upgradeCurrentIncomeSettings` execution completed; four-tab API readback confirms E1:F5 settings/validations and unchanged values/formulas elsewhere. Browser checks confirm all grids are legible and the mode dropdown exposes the three intended values.
+
+Earlier income-projection verification:
 
 ```bash
 PYTHONPATH=src venv/bin/python -m pytest unit_tests/reports unit_tests/agent -q

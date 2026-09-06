@@ -114,6 +114,7 @@ class IncomeProjectionConfig:
     anchor_date: datetime | None = None
     mode: str | None = None
     fixed_monthly_amount: float | None = None
+    anchor_is_fixed: bool = False
 
 
 @dataclass(frozen=True)
@@ -284,6 +285,7 @@ INCOME_PROJECTION_MODE_LABELS = ("income projection mode",)
 INCOME_PROJECTION_AMOUNT_LABELS = ("fixed monthly income",)
 INCOME_SOURCE_SUFFIXES = ("income", "paycheck", "payroll", "salary", "wages")
 INCOME_PROJECTION_START_LABELS = (
+    "paycheck anchor date",
     "biweekly income start",
     "biweekly income start date",
     "biweekly start date",
@@ -1176,7 +1178,7 @@ def _prior_month_paycheck_reference(
                 or parsed_date.year != previous_month.year
                 or parsed_date.month != previous_month.month
                 or (
-                    projection_config and projection_config.anchor_date
+                    projection_config and not projection_config.anchor_is_fixed and projection_config.anchor_date
                     and parsed_date.date() < projection_config.anchor_date.date()
                 )
             ):
@@ -1216,6 +1218,7 @@ def _income_projection_config_with_history(
             anchor_date=config.anchor_date or resolved.anchor_date,
             mode=mode,
             fixed_monthly_amount=amount,
+            anchor_is_fixed=config.anchor_is_fixed if config.anchor_date is not None else resolved.anchor_is_fixed,
         )
     return resolved
 
@@ -1237,6 +1240,8 @@ def _paycheck_anchor_date(
     projection_config: IncomeProjectionConfig | None = None,
     projection_reference: PaymentItem | None = None,
 ) -> datetime | None:
+    if projection_config and projection_config.anchor_is_fixed and projection_config.anchor_date is not None:
+        return projection_config.anchor_date
     parsed_dates = [
         parsed
         for item in income_entries
@@ -1280,6 +1285,20 @@ def _projected_biweekly_pay_days(
         projection_reference,
     )
     scheduled_days = _biweekly_pay_days(month, anchor_date)
+    if projection_config and projection_config.anchor_is_fixed:
+        # Each actual salary receipt fills the nearest remaining scheduled slot.
+        # Early/late receipts retain their actual dates without shifting the plan.
+        remaining = list(scheduled_days)
+        dated_days = sorted(
+            parsed.day for item in income_entries
+            if (parsed := _parse_date(item.date)) is not None
+            and parsed.year == month.year and parsed.month == month.month
+        )
+        for day in dated_days:
+            if remaining:
+                remaining.remove(min(remaining, key=lambda scheduled: (abs(scheduled - day), scheduled)))
+        undated_count = len(income_entries) - len(dated_days)
+        return remaining[undated_count:]
     parsed_dates = [
         parsed
         for item in income_entries
@@ -1590,6 +1609,7 @@ def _income_projection_config(rows: list[list[str]]) -> IncomeProjectionConfig:
         anchor_date=_parse_date(setting(INCOME_PROJECTION_START_LABELS) or ""),
         mode=mode,
         fixed_monthly_amount=amount,
+        anchor_is_fixed="paycheck anchor date" in values,
     )
 
 
@@ -2621,6 +2641,7 @@ def _income_projection_settings_payload(report: ExpenseBreakdownReport) -> dict[
         "mode": mode,
         "source": source,
         "anchorDate": config.anchor_date.strftime("%Y-%m-%d") if config.anchor_date else None,
+        "anchorIsFixed": config.anchor_is_fixed,
         "fixedMonthlyAmount": config.fixed_monthly_amount,
         "description": description,
     }

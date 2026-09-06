@@ -394,6 +394,14 @@ Add `Income Projection Mode` (`biweekly`, `fixed monthly`, `off`) and `Fixed Mon
 
 Rationale: Brian's only explicit source/start setting was in July; blank August settings let September lose that identity and extrapolate credit card rewards. August's legitimate rows also use `xAI paycheck` and `xAI income`, so a finite payroll-suffix rule preserves those labels without accepting unrelated bonuses. User-maintained recurring settings should outlive an empty tab, while observed amounts retain a separate freshness limit. A fixed net monthly target provides stable salary budgeting independent of two/three-paycheck months and avoids subtracting rewards from salary still expected.
 
+## 2026-09-05 - Unify Income Controls And Persist A Permanent Payday Anchor
+
+Decision: Use one `E1:F5` grid on personal-budget Templates and monthly tabs: header, Main Income Source, Income Projection Mode, Fixed Monthly Income, Paycheck Anchor Date. Preserve green label/input styling; mode is a strict three-option dropdown, salary is nonnegative currency, and anchor is a typed valid date. Place source/mode/amount above income rows and the anchor on the existing protected first-income row. Extend its existing deletion/undo preservation to the new anchor label; match Monthly Income exactly and discover its Amount column so the new fixed-income setting cannot be treated as an actual total.
+
+Apps Script resolves Template defaults then prior months chronologically, applies the latest month to newly created tabs, and carries the prior year's effective plan into new annual templates. Existing canonical months are left alone on daily rollover. A new employer resets inherited salary settings. The canonical anchor repeats every fourteen days from that date indefinitely; actual early/late receipts fill nearest unfilled selected-month slots without shifting the plan. Preserve the old `Biweekly Income Start` bootstrap behavior only for unmigrated historical tabs. Fixed monthly mode remains a monthly target with a month-end remainder estimate; observed biweekly paycheck amounts retain their separate prior-month freshness rule.
+
+Rationale: Separate alternative settings tables were confusing and ordinary template copies could overwrite the user's last selected mode. A single typed grid and explicit rollover precedence make the current choice visible and durable. Positioning the grid around the existing first-income-row safeguard avoids losing settings to whole-row insertion/deletion. Separating a permanent scheduled payday from observed deposit dates fulfills the user's requested date-onward cadence without falsifying actual receipt dates.
+
 ## Pending Decisions
 
 - Where should durable system events live: banking database only, Google Sheets only, or dual-write during transition?

@@ -185,3 +185,42 @@ def test_standard_payroll_suffixes_match_but_rewards_and_bonus_labels_do_not(suf
         ("9/3/2026", "xAI bonus", "100"), ("9/4/2026", "xAI rewards income", "50"),
         settings=(("Main Income Source", "xAI"), ("Fixed Monthly Income", "6000"))))
     assert report.expense_breakdown_client_payload(result)["incomeProjection"]["projectedAmount"] == 6150
+
+
+@pytest.mark.parametrize("actual_day", [9, 10, 11])
+def test_permanent_paycheck_anchor_does_not_shift_for_early_or_late_deposits(actual_day):
+    result = build(income_rows((f"9/{actual_day}/2026", "xAI paycheck", "3000"), settings=(
+        ("Main Income Source", "xAI"), ("Income Projection Mode", "biweekly"),
+        ("Paycheck Anchor Date", "7/2/2026"),
+    )))
+    assert result.income_projection_config.anchor_is_fixed
+    assert [(e.day, e.amount) for e in result.calendar_events if e.projected_only] == [(24, 3000)]
+    assert [e.day for e in result.calendar_events if not e.projected_only] == [actual_day]
+
+
+def test_permanent_anchor_carries_across_months_years_and_never_projects_before_start():
+    settings = report._income_projection_config([
+        ["Main Income Source", "xAI"], ["Paycheck Anchor Date", "7/2/2026"],
+    ])
+    inherited = report._income_projection_config_with_history(report.IncomeProjectionConfig(), (
+        report.BudgetHistoryRows(report.BudgetMonth(2026, 7), [["Main Income Source", "xAI"], ["Paycheck Anchor Date", "7/2/2026"]]),
+    ), report.BudgetMonth(2027, 1))
+    assert inherited.anchor_is_fixed
+    for year in [2026, 2027, 2035]:
+        month = report.BudgetMonth(year, 9)
+        days = report._projected_biweekly_pay_days([], month, settings)
+        assert len(days) in [2, 3]
+        assert all((datetime(year, 9, day) - datetime(2026, 7, 2)).days % 14 == 0 for day in days)
+    assert report._projected_biweekly_pay_days([], report.BudgetMonth(2026, 6), settings) == []
+
+
+def test_permanent_anchor_removes_dated_and_undated_receipts_only_once():
+    settings = report.IncomeProjectionConfig(source_label="xAI", anchor_date=datetime(2026, 7, 2), anchor_is_fixed=True)
+    receipts = [report.PaymentItem("xAI", 3000, "income", date="7/17/2026"), report.PaymentItem("xAI", 3000, "income")]
+    assert report._projected_biweekly_pay_days(receipts, report.BudgetMonth(2026, 7), settings) == [30]
+
+
+def test_new_payday_anchor_can_use_prior_month_salary_amount_without_projecting_before_start():
+    prior = report.BudgetHistoryRows(report.BudgetMonth(2026, 8), income_rows(("8/28/2026", "xAI", "3000")))
+    result = build(income_rows(settings=(("Main Income Source", "xAI"), ("Paycheck Anchor Date", "9/10/2026"))), [prior])
+    assert [(e.day, e.amount) for e in result.calendar_events if e.projected_only] == [(10, 3000), (24, 3000)]

@@ -2,11 +2,13 @@ from __future__ import annotations
 
 import copy
 import logging
+import re
 from typing import Any
 
 from openpyxl.utils import get_column_letter
 
 logger = logging.getLogger(__name__)
+MONTHLY_INCOME_SUMMARY_PATTERN = re.compile(r"^\s*Monthly Income:\s*$", re.IGNORECASE)
 
 
 def income_sheet_layout(
@@ -27,7 +29,7 @@ def income_sheet_layout(
             None,
         )
     if resolved_summary_row is None:
-        resolved_summary_row = int(worksheet.find("Monthly Income:").row)
+        resolved_summary_row = int(worksheet.find(MONTHLY_INCOME_SUMMARY_PATTERN).row)
 
     for row_number, row in enumerate(resolved_rows[: max(0, resolved_summary_row - 1)], start=1):
         columns_by_header: dict[str, int] = {}
@@ -61,7 +63,7 @@ def repair_income_summary_formula(
     summary_row: int | None = None,
 ) -> None:
     resolved_summary_row = int(
-        summary_row if summary_row is not None else worksheet.find("Monthly Income:").row
+        summary_row if summary_row is not None else worksheet.find(MONTHLY_INCOME_SUMMARY_PATTERN).row
     )
     resolved_layout = layout or income_sheet_layout(worksheet, resolved_summary_row)
     first_income_row = resolved_layout["header_row"] + 1

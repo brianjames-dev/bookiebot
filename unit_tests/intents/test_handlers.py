@@ -1149,6 +1149,35 @@ async def test_undo_new_first_income_preserves_biweekly_config_and_repairs_formu
 
 
 @pytest.mark.asyncio
+async def test_unified_income_settings_survive_logging_first_row_delete_and_undo(message):
+    settings = [
+        ["Label", "Value"],
+        ["Main Income Source:", "xAI"],
+        ["Income Projection Mode:", "biweekly"],
+        ["Fixed Monthly Income:", ""],
+        ["Paycheck Anchor Date:", "7/2/2026"],
+    ]
+    rows = [["", "", "", "", *pair] for pair in settings]
+    rows[3][:4] = ["", "Date:", "Source:", "Amount:"]
+    rows[4][:4] = ["", "", "<Enter Source>", "0"]
+    rows.append(["", "Monthly Income:", "", ""])
+    repo = SheetsRepoStub(income_rows=rows)
+    with repo.patched():
+        for day in [10, 24]:
+            await ih.handle_intent("log_income", {
+                "type": "income", "date": f"2026-09-{day}", "amount": 3000, "source": "xAI",
+            }, message)
+        assert [row[4:6] for row in repo.income.get_all_values()[:5]] == settings
+        await ih.handle_intent("delete_recent_action", {"index": 2}, message)
+        assert [row[4:6] for row in repo.income.get_all_values()[:5]] == settings
+        assert repo.income.cell(5, 2).value == "9/24/2026"
+        await ih.handle_intent("undo_last_transaction", {}, message)
+        assert [row[4:6] for row in repo.income.get_all_values()[:5]] == settings
+        assert repo.income.cell(5, 2).value == "9/10/2026"
+        assert repo.income.cell(6, 2).value == "9/24/2026"
+
+
+@pytest.mark.asyncio
 async def test_delete_and_undo_later_income_repairs_summary_formula(message):
     repo = SheetsRepoStub(
         income_rows=[

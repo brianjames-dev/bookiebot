@@ -54,8 +54,11 @@ _PENDING_SELECTION_EXPIRED_MESSAGE = "That recent transaction selection expired.
 _RECENT_ACTION_OFFSET_BY_USER: dict[str, int] = {}
 _LOG_HEADERS = ["id", "created_at", "user_key", "status", "undone_at", "action_json"]
 _LOG_HEADER_READY: weakref.WeakSet[Any] = weakref.WeakSet()
-_BIWEEKLY_INCOME_LABELS = {"biweekly income source", "biweekly income start"}
-_BIWEEKLY_INCOME_START_LABEL = "biweekly income start"
+_INCOME_SETTINGS_LABELS = {
+    "biweekly income source", "biweekly income start", "main income source",
+    "income projection mode", "fixed monthly income", "paycheck anchor date",
+}
+_INCOME_ANCHOR_LABELS = {"biweekly income start", "paycheck anchor date"}
 
 
 @dataclass
@@ -205,7 +208,7 @@ def _income_row_property_bounds(
 
     for row in rows[:summary_row]:
         for column, value in enumerate(row, start=1):
-            if _normalized_sheet_label(value) in _BIWEEKLY_INCOME_LABELS:
+            if _normalized_sheet_label(value) in _INCOME_SETTINGS_LABELS:
                 end_column = max(end_column, column + 1)
     return start_column, end_column
 
@@ -213,7 +216,7 @@ def _income_row_property_bounds(
 def _income_anchor_columns(rows: list[list[Any]], row: int) -> tuple[int, int] | None:
     values = rows[row - 1] if 0 < row <= len(rows) else []
     for column, value in enumerate(values, start=1):
-        if _normalized_sheet_label(value) == _BIWEEKLY_INCOME_START_LABEL:
+        if _normalized_sheet_label(value) in _INCOME_ANCHOR_LABELS:
             return column, column + 1
     return None
 
