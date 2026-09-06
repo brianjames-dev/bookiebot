@@ -728,8 +728,8 @@ User authorized all batches incrementally on 2026-09-06. STATUS is the active qu
 | Batch | Findings / acceptance | Status |
 | --- | --- | --- |
 | 1 | A01: bill questions/negation never write; A02: updated payments/savings retain their type and cannot delete budget rows | Complete 2026-09-06; 647 tests and Pyright passed |
-| 2 | A03–A04: income row shifts update only the correct owner's references, including bill/savings actions | In progress |
-| 3 | A05: delete/move undo preserves another user's intervening edits and consistent action history | Pending |
+| 2 | A03–A04: income row shifts update only the correct owner's references, including bill/savings actions | Complete 2026-09-06; 663 tests and Pyright passed |
+| 3 | A05: delete/move undo preserves another user's intervening edits and consistent action history | In progress |
 | 4 | A06–A07: reject unsupported historical destinations before writing; durable claims prevent stale/concurrent/retried duplicate imports | Pending |
 | 5 | A08–A09: changed matches reopen; transient reminder failures retry; webhook processing recovers after restart | Pending |
 | 6 | A10–A11: every private report route enforces signed access; live rendering yields the event loop; history uses bounded batch reads | Pending |
@@ -741,3 +741,7 @@ Preserve intentional semantics: existing affirmative bill shorthand, actual/expe
 ### Audit Batch 1 work log — 2026-09-06
 
 Completed affirmative bill grammar/read-only diversion before pending edits, canonical payment/savings update lineage, capability restrictions, and physical income-table deletion guards. Historical repeated-update records recover source type from loaded lineage without extra Sheets reads or migration. Added 47 regression cases; full suite 647 passed and Pyright clean. Manual acceptance is recorded in STATUS. Next: owner-scoped row shifting.
+
+### Audit Batch 2 work log — 2026-09-06
+
+Completed one owner-alias-aware personal-budget reference repair path used by insert/delete/restore/placeholder cleanup. Repairs active/inactive action lineages, fixed payment/savings references, saved income boundaries, and the owner's linked split-ledger rows. Reference failure regressions prove rollback; stale fixed-label guards fail before mutation. Added 16 cases; focused 277/full 663 passed, Pyright clean. Manual acceptance is in STATUS. Next: shared expense undo preservation.

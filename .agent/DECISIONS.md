@@ -429,3 +429,9 @@ Utility chart history uses nullable amounts for unpaid open/future billing month
 Decision: Deterministic bill writes accept explicit logging/completed-payment grammar and supported terse bill/amount forms. Other bill questions/statements and negation enter the read-only conversational path before pending mutation handling, never a parser that can reinterpret them as writes. Preserve canonical transaction type across update lineage; a personal-budget worksheet name does not imply income. Recover legacy repeated-update type from loaded parents, keep payment/savings deletion restrictions, and validate income-table bounds before physical deletion.
 
 Rationale: Affordability questions could overwrite bill payments, and repeated payment updates could expose deletion of a whole budget row. These safeguards retain intended logging behavior while closing those unintended write paths.
+
+## 2026-09-06 - Scope Personal-Budget Structural References To Their Owner
+
+Decision: Structural income edits use one owner-alias-aware repair path for all personal-budget action types, inactive undo lineages, saved table boundaries, and linked split-ledger rows. Read affected stores before mutation; restore structure and references if reference persistence fails. Validate payment/savings labels before edits, split operations, or undo. Unmapped standalone worksheet calls retain their existing behavior without assuming an owner.
+
+Rationale: Shared action history does not imply shared personal-budget row coordinates. Income edits shift later payment and savings rows as well as income, and undo can reactivate older lineage records. Central ownership and target checks prevent cross-owner or stale-cell mutations.
