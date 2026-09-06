@@ -2541,6 +2541,50 @@ def _latest_logged_action(
     return _latest_raw_logged_action(user_key, log_data)
 
 
+def _restore_removed_category_row(
+    ws: Any, *, category: str, row: int, columns: list[int], values: list[str],
+    restored_ids: set[str], log_data: _ActionLogData | None,
+) -> None:
+    """Insert the removed row into current contents, never replay neighbors' history."""
+    from bookiebot.sheets.config import get_category_columns
+
+    if not columns or len(values) != len(columns):
+        raise ValueError("The saved transaction has an invalid row snapshot.")
+    data = log_data or _read_log_data()
+    if data is None:
+        raise RuntimeError("Could not read action history before restoring the transaction.")
+    first_row = int(get_category_columns[category]["start_row"])
+    rows = ws.get_all_values()
+    # Include partially entered/manual rows, even when their amount is blank.
+    end_row = max((index for index, cells in enumerate(rows, 1)
+                   if index >= first_row and any(column <= len(cells) and str(cells[column - 1]).strip()
+                                                 for column in columns)), default=first_row - 1)
+    start_row = max(first_row, min(row, end_row + 1))
+    current = [[_sheet_value(rows[index - 1][column - 1]) if column <= len(rows[index - 1]) else ""
+                for column in columns] for index in range(start_row, end_row + 1)]
+    _shift_logged_action_rows(category=category, lower_row=start_row, upper_row=end_row,
+                              delta=1, exclude_ids=restored_ids, log_data=data)
+    for record in data.records:
+        if record.logged.id in restored_ids and _action_category(record.logged.action) == category:
+            record.logged.action.row = start_row
+            _write_logged_action(data.ws, record.row_index, record.logged)
+    _restore_category_snapshot(ws, start_row, columns, [values, *current])
+
+
+def _moved_destination_is_unchanged(ws: Any, action: UndoAction) -> bool:
+    fields = _field_columns_for_action(action)
+    expected = _field_values_for_action(action)
+    for field, column in fields.items():
+        current = _sheet_value(ws.cell(action.row, column).value).strip()
+        saved = _sheet_value(expected.get(field, "")).strip()
+        if field == "amount":
+            if _money_display_value(current) != _money_display_value(saved):
+                return False
+        elif current != saved:
+            return False
+    return bool(fields)
+
+
 def _apply_undo_action(
     action: UndoAction, log_data: _ActionLogData | None = None, *, action_id: str = "", user_key: str | None = None,
 ) -> tuple[bool, str]:
@@ -2548,42 +2592,33 @@ def _apply_undo_action(
     if not _fixed_budget_target_matches(ws, action):
         return False, _STALE_BUDGET_TARGET_MESSAGE
     if action.kind == "move_expense":
+        if not _moved_destination_is_unchanged(ws, action):
+            return False, "That moved transaction changed after it was saved, so I did not undo it."
         if "source_category_snapshot" in action.metadata:
             source_category = action.metadata["source_category"]
-            source_start_row = int(action.metadata["source_compact_start_row"])
-            source_end_row = int(action.metadata["source_compact_end_row"])
             source_columns = [int(col) for col in json.loads(action.metadata["source_category_columns"])]
             source_snapshot = json.loads(action.metadata["source_category_snapshot"])
-            _shift_logged_action_rows(
-                category=source_category,
-                lower_row=source_start_row,
-                upper_row=source_end_row - 1,
-                delta=1,
-                exclude_ids={action.metadata.get("source_action_id", "")},
-                log_data=log_data,
+            _restore_removed_category_row(
+                ws, category=source_category,
+                row=int(action.metadata.get("source_row", action.metadata["source_compact_start_row"])),
+                columns=source_columns, values=source_snapshot[0],
+                restored_ids={action.metadata.get("source_action_id", "")}, log_data=log_data,
             )
-            _restore_category_snapshot(ws, source_start_row, source_columns, source_snapshot)
         else:
             source_row = int(action.metadata["source_row"])
             source_columns = [int(col) for col in json.loads(action.metadata["source_columns"])]
             source_values = [_sheet_value(value) for value in json.loads(action.metadata["source_values"])]
+            if any(_sheet_value(ws.cell(source_row, column).value).strip() for column in source_columns):
+                return False, "The original position changed, so I did not undo this older move."
             _update_contiguous_row(ws, source_row, source_columns, source_values)
         _update_contiguous_row(ws, action.row, action.columns, action.previous_values)
     elif action.kind == "compact_category_cells":
-        category = action.metadata["category"]
         snapshot = json.loads(action.metadata["category_snapshot"])
-        start_row = int(action.metadata["compact_start_row"])
-        end_row = int(action.metadata["compact_end_row"])
-        deleted_ids = _deleted_action_ids(action)
-        _shift_logged_action_rows(
-            category=category,
-            lower_row=start_row,
-            upper_row=end_row - 1,
-            delta=1,
-            exclude_ids=deleted_ids,
-            log_data=log_data,
+        _restore_removed_category_row(
+            ws, category=action.metadata["category"], row=action.row,
+            columns=action.columns, values=snapshot[0],
+            restored_ids=_deleted_action_ids(action), log_data=log_data,
         )
-        _restore_category_snapshot(ws, start_row, action.columns, snapshot)
     elif action.kind == "delete_row":
         if action.worksheet == "income" and _is_income_display_action(action):
             deleted_row, delete_metadata = _income_row_delete_snapshot(ws, action.row)

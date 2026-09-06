@@ -4,43 +4,46 @@ Last updated: 2026-09-06
 
 ## Active Focus
 
-Implement the twelve September 6 audit findings in eight incremental, verified batches, as authorized by the user. Batches 1–2 are complete and verified; Batch 3 is active: preserve intervening shared-expense edits during undo. Each batch receives focused regressions, broader verification, tracking updates, and its own commit/push before proceeding. Existing deployment checklists remain below the audit queue.
+Implement the twelve September 6 audit findings in eight incremental, verified batches, as authorized by the user. Batches 1–3 are complete and verified; Batch 4 is active: durable, recoverable bank imports. Each batch receives focused regressions, broader verification, tracking updates, and its own commit/push before proceeding. Existing deployment checklists remain below the audit queue.
 
 ## On Deck
 
-1. Audit Batch 3 (A05): preserve intervening shared-expense edits during delete/move undo.
-2. Audit Batch 4 (A06–A07): supported date destinations and durable, recoverable bank import claims.
-3. Audit Batch 5 (A08–A09): reopen materially changed bank matches; retry failed reminder preparation; reclaim abandoned webhook work.
-4. Audit Batch 6 (A10–A11): authorize all report routes; offload/coalesce report builds and batch history reads.
-5. Audit Batch 7 (A12): safe incident-text handling, routine CI, and real Postgres storage contract checks.
-6. Audit Batch 8: focused structural cleanup after correctness fixes; preserve historical compatibility.
+1. Audit Batch 4 (A06–A07): supported date destinations and durable, recoverable bank import claims.
+2. Audit Batch 5 (A08–A09): reopen materially changed bank matches; retry failed reminder preparation; reclaim abandoned webhook work.
+3. Audit Batch 6 (A10–A11): authorize all report routes; offload/coalesce report builds and batch history reads.
+4. Audit Batch 7 (A12): safe incident-text handling, routine CI, and real Postgres storage contract checks.
+5. Audit Batch 8: focused structural cleanup after correctness fixes; preserve historical compatibility.
 
-7. Verify deployed expected-income projections and the next monthly rollover against checklist item 85.
-8. Deploy and manually verify canonical Current/Projected report tools in checklist item 82.
-9. Deploy and manually verify the LangGraph conversational/read response layer and bank-transfer refusal in checklist item 81.
-10. Deploy and manually verify Brian's BofA expense default in checklist item 80.
-11. Deploy and manually verify the shared expense-report chart viewport in checklist item 79.
-12. Deploy and manually verify fronted shared expenses in checklist item 78.
-13. Deploy and manually verify quarterly utility history in checklist item 77.
-14. Deploy and manually verify parser and bill-payment reliability in checklist item 76.
-15. Deploy and manually verify split creation/settlement in checklist item 74 and recent split changes/cancellation in checklist item 75.
-16. Continue the deferred split lifecycle: correct gross after splitting, partial reimbursement, explicit paid-split undo, and split-aware update/move/delete/undo.
-17. Deploy and manually verify prior-month paycheck carry-forward in Projected mode in checklist item 73.
-18. Deploy and manually verify Wants subscriptions in Burn Rate in checklist item 72.
-19. Deploy and manually verify selected-month subscription scoping in checklist item 71.
-20. Deploy and manually verify Daily Spending bill coverage and outlier scaling in checklist item 70.
-21. Deploy and manually verify the monthly savings workflow and corrected Saved-card targets in checklist items 60-61 and 69.
-22. Deploy and manually verify the expense-report corrections in checklist item 67.
-23. Deploy and manually verify typed `recent` opens the short-lived launcher and keeps the resulting DM session ephemeral.
-24. Deploy and manually verify `View Inbox` and `Reconcile Now` show `BookieBot is typing...` without a temporary thinking message.
-25. Manually verify shared Needs logging plus update/move/delete/undo behavior in Discord and Google Sheets.
-26. Manually verify recent transactions and reconciliation after the latest reliability fixes.
-27. Consider a richer Discord button flow for grouped amount adjustments if the current UX feels too manual.
-28. Harden recent-action pending state across restarts/deploys, since selections currently live only in process memory.
-29. Improve targeted recent-action search so commands can find older matches, not only the latest 10 recent actions.
-30. Explore clarifying questions before logging when BookieBot is uncertain instead of guessing or silently failing.
+6. Verify deployed expected-income projections and the next monthly rollover against checklist item 85.
+7. Deploy and manually verify canonical Current/Projected report tools in checklist item 82.
+8. Deploy and manually verify the LangGraph conversational/read response layer and bank-transfer refusal in checklist item 81.
+9. Deploy and manually verify Brian's BofA expense default in checklist item 80.
+10. Deploy and manually verify the shared expense-report chart viewport in checklist item 79.
+11. Deploy and manually verify fronted shared expenses in checklist item 78.
+12. Deploy and manually verify quarterly utility history in checklist item 77.
+13. Deploy and manually verify parser and bill-payment reliability in checklist item 76.
+14. Deploy and manually verify split creation/settlement in checklist item 74 and recent split changes/cancellation in checklist item 75.
+15. Continue the deferred split lifecycle: correct gross after splitting, partial reimbursement, explicit paid-split undo, and split-aware update/move/delete/undo.
+16. Deploy and manually verify prior-month paycheck carry-forward in Projected mode in checklist item 73.
+17. Deploy and manually verify Wants subscriptions in Burn Rate in checklist item 72.
+18. Deploy and manually verify selected-month subscription scoping in checklist item 71.
+19. Deploy and manually verify Daily Spending bill coverage and outlier scaling in checklist item 70.
+20. Deploy and manually verify the monthly savings workflow and corrected Saved-card targets in checklist items 60-61 and 69.
+21. Deploy and manually verify the expense-report corrections in checklist item 67.
+22. Deploy and manually verify typed `recent` opens the short-lived launcher and keeps the resulting DM session ephemeral.
+23. Deploy and manually verify `View Inbox` and `Reconcile Now` show `BookieBot is typing...` without a temporary thinking message.
+24. Manually verify shared Needs logging plus update/move/delete/undo behavior in Discord and Google Sheets.
+25. Manually verify recent transactions and reconciliation after the latest reliability fixes.
+26. Consider a richer Discord button flow for grouped amount adjustments if the current UX feels too manual.
+27. Harden recent-action pending state across restarts/deploys, since selections currently live only in process memory.
+28. Improve targeted recent-action search so commands can find older matches, not only the latest 10 recent actions.
+29. Explore clarifying questions before logging when BookieBot is uncertain instead of guessing or silently failing.
 
 ## Completed 2026-09-06
+
+- Audit Batch 3 (A05): delete/move undo restores just the removed transaction into current category contents and repairs current action references. Later corrections, new expenses, and partially entered manual rows survive. A moved destination that changed, or an occupied legacy source position, blocks undo before mutation.
+- Verification: six new interleaved-user regressions; focused suite **283 passed**; full suite **669 passed**, Pyright **0 errors** (one existing Kaleido warning).
+- Manual check in a test workbook after deployment: Brian deletes or moves a Food expense; Hannah corrects a remaining Food amount and adds another expense; Brian undoes. Confirm both Hannah entries survive and each user's subsequent update still targets the correct transaction. A manual edit of the moved destination must make undo refuse safely.
 
 - Audit Batch 2 (A03–A04): income insertion, deletion, restoration, and placeholder cleanup now share owner-scoped reference repair for payment/savings/income actions, inactive lineages, saved summary coordinates, and split-ledger rows. Preflight required stores; roll back a completed structural edit on reference-write failure. Fixed budget labels are checked before editing/undoing stale actions; legacy lineage cannot inherit another owner's type.
 - Verification: 16 new regression cases; focused suite **277 passed**; full suite **663 passed**, Pyright **0 errors** (one existing Kaleido warning).

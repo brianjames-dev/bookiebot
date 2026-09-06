@@ -435,3 +435,9 @@ Rationale: Affordability questions could overwrite bill payments, and repeated p
 Decision: Structural income edits use one owner-alias-aware repair path for all personal-budget action types, inactive undo lineages, saved table boundaries, and linked split-ledger rows. Read affected stores before mutation; restore structure and references if reference persistence fails. Validate payment/savings labels before edits, split operations, or undo. Unmapped standalone worksheet calls retain their existing behavior without assuming an owner.
 
 Rationale: Shared action history does not imply shared personal-budget row coordinates. Income edits shift later payment and savings rows as well as income, and undo can reactivate older lineage records. Central ownership and target checks prevent cross-owner or stale-cell mutations.
+
+## 2026-09-06 - Undo Shared Rows Against Current Contents
+
+Decision: Treat delete/move snapshots as a source for the removed transaction only. Restore that row at its tracked position and shift the current category contents and action references. Include partially entered rows. Verify a moved destination still matches its saved fields before clearing it; refuse occupied legacy non-compacting restore positions.
+
+Rationale: Whole-category snapshot replay overwrote another user's later corrections or additions. Current-state restoration preserves those edits while retaining historical action compatibility. This does not make separate Google Sheets and action-log writes a single atomic transaction.
