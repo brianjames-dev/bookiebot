@@ -699,3 +699,14 @@ Status: Complete in code and live four-tab migration; deployed-bot and next natu
 - Canonical Paycheck Anchor Date is permanent; actual receipts fill nearby scheduled slots without cadence drift. Legacy anchor semantics remain compatible. The unified anchor survives first-income deletion and undo; exact Monthly Income matching prevents fixed salary from corrupting actual reads/writes.
 - Executed Node regression coverage for migration and month/year rollover plus Python schedule, lookup, and lifecycle tests. Full suite `577 passed`, Pyright clean. API readback and browser checks verified all four grids and no value/formula changes outside them. Existing unrelated Template reference errors remain untouched.
 - README and durable decisions document setup and semantics. Agents.md records the user's default commit/push preference.
+
+
+### 2026-09-05 - Final Horizontal Income Settings And Explicit Expectations
+
+Status: Complete; deployed-bot/natural-rollover manual checks are in STATUS checklist 85.
+
+- Migrated both annual budgets' Template and September to B4:E5 settings above B7:D7 transactions with a blank buffer row. Kept darker green styling, biweekly default, and persistent source/mode/expectation/anchor controls.
+- Biweekly forecasts now use the entered per-paycheck expectation; fixed monthly uses one persistent monthly net target. Actual receipts fill periods within +/-3 days, including across month/year boundaries, without changing the expectation or moving actual dollars. Multiple deposits fill one period; undated/out-of-window receipts fill none.
+- Removed live Apps Script automatic placeholder-row insertion/styling. New monthly settings reference the preceding configured grid; explicit overrides remain local. Historical layouts retain required compatibility handling.
+- Shifted six September action-log row references and two split-ledger source rows with the layout migration. Verified all other values/formulas after reference adjustment; old dropdown/note remnants were removed. Added delete-snapshot compatibility so undo cannot restore the obsolete settings area.
+- Full verification: `597 passed`, Pyright clean, Node migration/rollover/reference checks passed. Four-tab API readback and visual checks passed. Existing unrelated Template reference errors and Hannah's zero-income division errors remain unchanged.

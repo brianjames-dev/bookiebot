@@ -115,6 +115,7 @@ class IncomeProjectionConfig:
     mode: str | None = None
     fixed_monthly_amount: float | None = None
     anchor_is_fixed: bool = False
+    expected_amount: float | None = None
 
 
 @dataclass(frozen=True)
@@ -166,6 +167,7 @@ class ExpenseBreakdownReport:
     income_entries: list[PaymentItem] = field(default_factory=list)
     income_projection_config: IncomeProjectionConfig = field(default_factory=IncomeProjectionConfig)
     income_projection_reference: PaymentItem | None = None
+    income_projection_receipts: list[PaymentItem] = field(default_factory=list)
     shared_reimbursements: list[SharedAllocation] = field(default_factory=list)
     raw_sheets: list[RawSheet] = field(default_factory=list)
 
@@ -282,7 +284,7 @@ INCOME_PROJECTION_SOURCE_LABELS = (
     "paycheck income source",
 )
 INCOME_PROJECTION_MODE_LABELS = ("income projection mode",)
-INCOME_PROJECTION_AMOUNT_LABELS = ("fixed monthly income",)
+INCOME_PROJECTION_AMOUNT_LABELS = ("expected income amount", "fixed monthly income")
 INCOME_SOURCE_SUFFIXES = ("income", "paycheck", "payroll", "salary", "wages")
 INCOME_PROJECTION_START_LABELS = (
     "paycheck anchor date",
@@ -394,7 +396,7 @@ def load_report_worksheets(actor_key: str, month: BudgetMonth) -> ReportWorkshee
         subscriptions=_worksheet_by_name(personal_spreadsheet, "Subscriptions") if personal_spreadsheet is not None else None,
         bill_schedule=_worksheet_by_name(personal_spreadsheet, "_BookieBot Bill Schedule") if personal_spreadsheet is not None else None,
         shared_reimbursements=_worksheet_by_name(personal_spreadsheet, "Shared Reimbursements") if personal_spreadsheet is not None else None,
-        budget_history=_optional_previous_year_budget_history(actor_key, month) + budget_history,
+        budget_history=_optional_previous_year_budget_history(actor_key, month) + budget_history + _optional_next_year_income_history(actor_key, month),
     )
 
 
@@ -434,6 +436,11 @@ def build_expense_breakdown_report(
         month,
         income_projection_config,
     )
+    income_projection_receipts = [
+        *income_entries,
+        *(entry for item in budget_history if item.month != month
+          for entry in _income_entries(item.rows)[0]),
+    ]
     needs_rollover, wants_rollover = _category_rollover_amounts(personal_rows)
     savings_deposits = _savings_deposits(personal_rows)
     amount_saved = _amount_saved(personal_rows, deposits=savings_deposits)
@@ -474,6 +481,7 @@ def build_expense_breakdown_report(
         income_total=income_total,
         income_projection_config=income_projection_config,
         income_projection_reference=income_projection_reference,
+        income_projection_receipts=income_projection_receipts,
         utility_history=utility_history,
         bill_schedule_rows=bill_schedule_rows,
     )
@@ -552,6 +560,7 @@ def build_expense_breakdown_report(
         income_entries=income_entries,
         income_projection_config=income_projection_config,
         income_projection_reference=income_projection_reference,
+        income_projection_receipts=income_projection_receipts,
         shared_reimbursements=shared_reimbursements,
         raw_sheets=[
             RawSheet("Shared Expenses", _compact_rows(shared_rows)),
@@ -685,7 +694,7 @@ def _optional_budget_history(actor_key: str, month: BudgetMonth) -> tuple[Budget
         history = _budget_history_from_spreadsheet(spreadsheet, month)
     except Exception:
         pass
-    return _optional_previous_year_budget_history(actor_key, month) + history
+    return _optional_previous_year_budget_history(actor_key, month) + history + _optional_next_year_income_history(actor_key, month)
 
 
 def _optional_previous_year_budget_history(
@@ -703,9 +712,23 @@ def _optional_previous_year_budget_history(
         return ()
 
 
+def _optional_next_year_income_history(actor_key: str, month: BudgetMonth) -> tuple[BudgetHistoryRows, ...]:
+    if month.month != 12:
+        return ()
+    try:
+        from bookiebot.sheets.auth import get_gspread_client
+        from bookiebot.sheets.routing import get_budget_spreadsheet_id_for_user
+
+        book = get_gspread_client().open_by_key(get_budget_spreadsheet_id_for_user(actor_key, month.year + 1))
+        january = _worksheet_by_name(book, "January")
+        return (BudgetHistoryRows(BudgetMonth(month.year + 1, 1), _rows(january)),) if january is not None else ()
+    except Exception:
+        return ()
+
+
 def _budget_history_from_spreadsheet(spreadsheet: Any, month: BudgetMonth) -> tuple[BudgetHistoryRows, ...]:
     history: list[BudgetHistoryRows] = []
-    for month_number in range(1, month.month + 1):
+    for month_number in range(1, min(month.month + 1, 12) + 1):
         worksheet = _worksheet_by_name(spreadsheet, calendar.month_name[month_number])
         if worksheet is None:
             continue
@@ -919,6 +942,7 @@ def _calendar_events(
     income_total: float,
     income_projection_config: IncomeProjectionConfig,
     income_projection_reference: PaymentItem | None,
+    income_projection_receipts: list[PaymentItem],
     utility_history: list[UtilityHistoryItem],
     bill_schedule_rows: list[list[str]],
 ) -> list[CalendarEvent]:
@@ -933,6 +957,7 @@ def _calendar_events(
             month,
             income_projection_config,
             income_projection_reference,
+            income_projection_receipts,
         )
     )
     return sorted(events, key=lambda item: (item.day, item.kind, item.label.lower()))
@@ -1020,6 +1045,7 @@ def _income_calendar_events(
     month: BudgetMonth,
     projection_config: IncomeProjectionConfig | None = None,
     projection_reference: PaymentItem | None = None,
+    projection_receipts: list[PaymentItem] | None = None,
 ) -> list[CalendarEvent]:
     days_in_month = calendar.monthrange(month.year, month.month)[1]
     current_entries = income_entries or (
@@ -1029,7 +1055,7 @@ def _income_calendar_events(
     )
     paycheck_entries = _paycheck_income_entries(current_entries, projection_config)
     other_entries = [item for item in current_entries if item not in paycheck_entries]
-    pay_days = _biweekly_pay_days(
+    pay_days = [] if projection_config and projection_config.mode == "fixed monthly" else _biweekly_pay_days(
         month,
         _paycheck_anchor_date(paycheck_entries, month, projection_config, projection_reference),
     )
@@ -1038,6 +1064,7 @@ def _income_calendar_events(
         month,
         projection_config,
         projection_reference,
+        projection_receipts,
     )
     events: list[CalendarEvent] = []
 
@@ -1071,6 +1098,7 @@ def _income_calendar_events(
         month,
         projection_config,
         projection_reference,
+        projection_receipts,
     )
     paycheck_amount = _projected_paycheck_amount(
         current_entries,
@@ -1099,12 +1127,14 @@ def _projected_income_total(
     month: BudgetMonth,
     projection_config: IncomeProjectionConfig | None = None,
     projection_reference: PaymentItem | None = None,
+    projection_receipts: list[PaymentItem] | None = None,
 ) -> float:
     if _is_completed_month(month) or not _configured_income_source(projection_config):
         return round(income_total, 2)
     mode = projection_config.mode if projection_config else None
     if mode == "fixed monthly":
-        target = (projection_config.fixed_monthly_amount if projection_config else None) or 0.0
+        target = ((projection_config.expected_amount if projection_config.expected_amount is not None
+                   else projection_config.fixed_monthly_amount) if projection_config else None) or 0.0
         received = sum(item.amount for item in _paycheck_income_entries(income_entries, projection_config))
         return round(income_total + max(0.0, target - received), 2)
     if mode not in {None, "biweekly"}:
@@ -1127,6 +1157,7 @@ def _projected_income_total(
         month,
         projection_config,
         projection_reference,
+        projection_receipts,
     )
     projected_total = round(
         income_total + paycheck_amount * len(projected_pay_days),
@@ -1218,6 +1249,7 @@ def _income_projection_config_with_history(
             anchor_date=config.anchor_date or resolved.anchor_date,
             mode=mode,
             fixed_monthly_amount=amount,
+            expected_amount=config.expected_amount if config.expected_amount is not None else resolved.expected_amount,
             anchor_is_fixed=config.anchor_is_fixed if config.anchor_date is not None else resolved.anchor_is_fixed,
         )
     return resolved
@@ -1228,6 +1260,8 @@ def _projected_paycheck_amount(
     projection_config: IncomeProjectionConfig | None = None,
     projection_reference: PaymentItem | None = None,
 ) -> float:
+    if projection_config and projection_config.expected_amount is not None:
+        return round(projection_config.expected_amount, 2)
     paycheck_entries = _paycheck_income_entries(income_entries, projection_config)
     if paycheck_entries:
         return round(sum(item.amount for item in paycheck_entries) / len(paycheck_entries), 2)
@@ -1240,6 +1274,8 @@ def _paycheck_anchor_date(
     projection_config: IncomeProjectionConfig | None = None,
     projection_reference: PaymentItem | None = None,
 ) -> datetime | None:
+    if projection_config and projection_config.expected_amount is not None:
+        return projection_config.anchor_date
     if projection_config and projection_config.anchor_is_fixed and projection_config.anchor_date is not None:
         return projection_config.anchor_date
     parsed_dates = [
@@ -1277,6 +1313,7 @@ def _projected_biweekly_pay_days(
     month: BudgetMonth,
     projection_config: IncomeProjectionConfig | None = None,
     projection_reference: PaymentItem | None = None,
+    projection_receipts: list[PaymentItem] | None = None,
 ) -> list[int]:
     anchor_date = _paycheck_anchor_date(
         income_entries,
@@ -1285,6 +1322,16 @@ def _projected_biweekly_pay_days(
         projection_reference,
     )
     scheduled_days = _biweekly_pay_days(month, anchor_date)
+    if projection_config and projection_config.expected_amount is not None:
+        # Amount-independent, one pay period per date window. Multiple deposits
+        # can fulfill one slot; an undated or out-of-window receipt fills none.
+        receipts = _paycheck_income_entries(
+            projection_receipts if projection_receipts is not None else income_entries, projection_config,
+        )
+        dates = [parsed.date() for item in receipts if (parsed := _parse_date(item.date)) is not None]
+        return [day for day in scheduled_days
+                if not any(abs((datetime(month.year, month.month, day).date() - received).days) <= 3
+                           for received in dates)]
     if projection_config and projection_config.anchor_is_fixed:
         # Each actual salary receipt fills the nearest remaining scheduled slot.
         # Early/late receipts retain their actual dates without shifting the plan.
@@ -1577,7 +1624,11 @@ def _income_entry_from_layout(row: list[str], layout: _IncomeTableLayout) -> Pay
 
 def _income_projection_config(rows: list[list[str]]) -> IncomeProjectionConfig:
     values: dict[str, str] = {}
-    for row in rows:
+    for row_index, row in enumerate(rows):
+        horizontal = sum(_normalize_label(cell) in (
+            INCOME_PROJECTION_SOURCE_LABELS + INCOME_PROJECTION_START_LABELS
+            + INCOME_PROJECTION_MODE_LABELS + INCOME_PROJECTION_AMOUNT_LABELS
+        ) for cell in row) == 4
         for index, value in enumerate(row):
             normalized = _normalize_label(value)
             if normalized not in (
@@ -1585,8 +1636,9 @@ def _income_projection_config(rows: list[list[str]]) -> IncomeProjectionConfig:
                 + INCOME_PROJECTION_MODE_LABELS + INCOME_PROJECTION_AMOUNT_LABELS
             ):
                 continue
-            # Read only the adjacent value, never another setting or income row.
-            text = _cell(row, index + 1)
+            text = _cell(rows[row_index + 1], index) if horizontal and row_index + 1 < len(rows) else _cell(row, index + 1)
+            if normalized == "expected income amount" and not text:
+                values[normalized] = "0"  # Explicit blank disables estimates.
             if text and not text.startswith("<"):
                 values[normalized] = text
 
@@ -1603,12 +1655,14 @@ def _income_projection_config(rows: list[list[str]]) -> IncomeProjectionConfig:
             else 0.0
         )
     mode_text = setting(INCOME_PROJECTION_MODE_LABELS)
-    mode = _normalize_label(mode_text) if mode_text else ("fixed monthly" if amount is not None else None)
+    explicit_expected = "expected income amount" in values
+    mode = _normalize_label(mode_text) if mode_text else ("biweekly" if explicit_expected else "fixed monthly" if amount is not None else None)
     return IncomeProjectionConfig(
         source_label=setting(INCOME_PROJECTION_SOURCE_LABELS),
         anchor_date=_parse_date(setting(INCOME_PROJECTION_START_LABELS) or ""),
         mode=mode,
-        fixed_monthly_amount=amount,
+        fixed_monthly_amount=amount if not explicit_expected else None,
+        expected_amount=amount if explicit_expected else None,
         anchor_is_fixed="paycheck anchor date" in values,
     )
 
@@ -2628,21 +2682,24 @@ def _income_projection_settings_payload(report: ExpenseBreakdownReport) -> dict[
     elif not source:
         description = "Set Main Income Source to project income"
     elif mode == "fixed monthly":
-        amount = config.fixed_monthly_amount or 0.0
-        description = f"{source} · fixed ${amount:,.2f}/month" if amount > 0 else "Set Fixed Monthly Income to project salary"
+        amount = (config.expected_amount if config.expected_amount is not None else config.fixed_monthly_amount) or 0.0
+        description = f"{source} · fixed ${amount:,.2f}/month" if amount > 0 else "Set Expected Income Amount to project salary"
     else:
         paycheck_amount = _projected_paycheck_amount(report.income_entries, config, report.income_projection_reference)
         description = f"{source} · biweekly"
         if paycheck_amount <= 0:
-            description += " · waiting for a matching paycheck"
+            description += " · set Expected Income Amount" if config.expected_amount is not None else " · waiting for a matching paycheck"
         elif _paycheck_anchor_date(_paycheck_income_entries(report.income_entries, config), report.month, config, report.income_projection_reference) is None:
-            description += " · set Biweekly Income Start"
+            description += " · set Paycheck Anchor Date" if config.expected_amount is not None else " · set Biweekly Income Start"
+        elif config.expected_amount is not None:
+            description += f" · expected ${paycheck_amount:,.2f}/paycheck"
     return {
         "mode": mode,
         "source": source,
         "anchorDate": config.anchor_date.strftime("%Y-%m-%d") if config.anchor_date else None,
         "anchorIsFixed": config.anchor_is_fixed,
-        "fixedMonthlyAmount": config.fixed_monthly_amount,
+        "fixedMonthlyAmount": (config.expected_amount if config.expected_amount is not None else config.fixed_monthly_amount) if mode == "fixed monthly" else None,
+        "expectedIncomeAmount": config.expected_amount,
         "description": description,
     }
 
@@ -2654,6 +2711,7 @@ def _income_projection_payload(report: ExpenseBreakdownReport) -> dict[str, Any]
         report.month,
         report.income_projection_config,
         report.income_projection_reference,
+        report.income_projection_receipts,
     )
     return {
         "currentAmount": round(report.income_total, 2),
@@ -2670,6 +2728,7 @@ def _savings_projection_payload(report: ExpenseBreakdownReport) -> dict[str, Any
         report.month,
         report.income_projection_config,
         report.income_projection_reference,
+        report.income_projection_receipts,
     )
     current_ideal = round(
         report.income_total * 0.2

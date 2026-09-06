@@ -407,3 +407,14 @@ Rationale: Separate alternative settings tables were confusing and ordinary temp
 - Where should durable system events live: banking database only, Google Sheets only, or dual-write during transition?
 - What exact reconciliation states should replace or extend the current status set?
 - What should the canonical model be for recent-action lineages after update, move, delete, and undo?
+
+
+## 2026-09-05 - Separate Income Expectations From Actual Receipts
+
+Decision: Supersede the E1:F5 layout with a horizontal B4:E5 grid above the transaction table, with row 6 blank and B7:D7 Date/Source/Amount headers. Expected Income Amount is explicit net income per paycheck in biweekly mode (default) or per month in fixed monthly mode. A blank/zero/invalid expected amount produces no estimate; logged income never rewrites or determines the new grid's expectation. Retain legacy label parsing and legacy observed-paycheck semantics for unmigrated historical tabs.
+
+Use the canonical anchor itself and every 14 days afterward. A matching source deposit within an inclusive three-calendar-day window fulfills its scheduled period regardless of amount; multiple deposits can fulfill one period, while undated/out-of-window deposits fill none. Read adjacent month/year receipts for boundary matching, but keep actual dollars and calendar events in their receipt month. Fixed monthly ignores the anchor and projects only the unreceived part of its monthly net target.
+
+New monthly grids reference the latest configured preceding monthly grid so copied future settings do not hide later corrections; replacing a formula creates an explicit override. Source changes do not carry a different employer's referenced amount/date. New annual Templates snapshot the prior year's effective settings. The dedicated current-month migration shifts dependent personal-budget action-log and split-ledger row references with the three-row insertion; ordinary daily rollover does not move existing rows. Remove live auto-appended placeholder formatting, and retain overlap-preservation code only where legacy tabs/actions still require it.
+
+Rationale: An hourly paycheck can vary without changing the expected next paycheck. Keeping user expectations separate from receipts and placing settings entirely above transaction rows makes both the financial projection and sheet mutation behavior deterministic.

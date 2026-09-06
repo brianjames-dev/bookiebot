@@ -206,7 +206,7 @@ def _income_row_property_bounds(
     start_column = min(columns)
     end_column = max(columns)
 
-    for row in rows[:summary_row]:
+    for row in rows[layout["header_row"] - 1:summary_row]:
         for column, value in enumerate(row, start=1):
             if _normalized_sheet_label(value) in _INCOME_SETTINGS_LABELS:
                 end_column = max(end_column, column + 1)

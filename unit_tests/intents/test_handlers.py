@@ -2696,3 +2696,26 @@ async def test_retired_student_loan_intents_use_fallback_without_sheet_helpers(m
     fallback.assert_awaited_once_with(message.content, message, context=None)
     assert not hasattr(ih.su, "log_student_loan_paid")
     assert not hasattr(ih.su, "check_student_loan_paid")
+
+
+@pytest.mark.asyncio
+async def test_horizontal_income_settings_stay_above_log_delete_and_undo(message):
+    settings = [
+        ['', 'Main Income Source:', 'Income Projection Mode:', 'Expected Income Amount:', 'Paycheck Anchor Date:'],
+        ['', 'xAI', 'biweekly', '3775', '7/2/2026'],
+    ]
+    repo = SheetsRepoStub(income_rows=[[], ['', 'September'], [], *settings, [],
+        ['', 'Date:', 'Source:', 'Amount:'], ['', '', '<Enter Source>', '0'],
+        ['', 'Monthly Income:', '', '']])
+    with repo.patched():
+        for day in [10, 24]:
+            await ih.handle_intent('log_income', {'type':'income','date':f'2026-09-{day}', 'amount':3100,'source':'xAI'}, message)
+        assert repo.income.get_all_values()[3:6] == [*settings, []]
+        await ih.handle_intent('delete_recent_action', {'index':2}, message)
+        assert repo.income.cell(8,2).value == '9/24/2026'
+        assert repo.income.get_all_values()[3:6] == [*settings, []]
+        await ih.handle_intent('undo_last_transaction', {}, message)
+        assert repo.income.get_all_values()[3:6] == [*settings, []]
+        assert repo.income.cell(8,2).value == '9/10/2026'
+        assert repo.income.cell(9,2).value == '9/24/2026'
+        assert repo.income.cell(10,4).value == '=SUM(D8:D9)'

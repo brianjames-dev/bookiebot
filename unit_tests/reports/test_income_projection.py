@@ -224,3 +224,107 @@ def test_new_payday_anchor_can_use_prior_month_salary_amount_without_projecting_
     prior = report.BudgetHistoryRows(report.BudgetMonth(2026, 8), income_rows(("8/28/2026", "xAI", "3000")))
     result = build(income_rows(settings=(("Main Income Source", "xAI"), ("Paycheck Anchor Date", "9/10/2026"))), [prior])
     assert [(e.day, e.amount) for e in result.calendar_events if e.projected_only] == [(10, 3000), (24, 3000)]
+
+
+def grid_rows(*entries, source='xAI', mode='biweekly', amount='3775', anchor='7/2/2026'):
+    return [[], ['', 'September'], [],
+            ['', 'Main Income Source:', 'Income Projection Mode:', 'Expected Income Amount:', 'Paycheck Anchor Date:'],
+            ['', source, mode, amount, anchor], [],
+            ['', 'Date:', 'Source:', 'Amount:'],
+            *[['', *entry] for entry in entries],
+            ['', 'Monthly Income:', '', str(sum(float(entry[2]) for entry in entries))]]
+
+
+@pytest.mark.parametrize('day', [7, 9, 10, 11, 13])
+def test_expected_paycheck_does_not_change_after_a_smaller_actual(day):
+    result = build(grid_rows((f'9/{day}/2026', 'xAI paycheck', '3100'), ('9/5/2026', 'Rewards', '50')))
+    payload = report.expense_breakdown_client_payload(result)
+    assert result.income_projection_config.expected_amount == 3775
+    assert result.income_total == 3150
+    assert payload['incomeProjection']['projectedAmount'] == 6925
+    assert [(e.day, e.amount) for e in result.calendar_events if e.projected_only] == [(24, 3775)]
+    assert 'expected $3,775.00/paycheck' in payload['incomeProjectionSettings']['description']
+
+
+def test_split_deposits_fill_one_pay_period_and_outside_window_fills_none():
+    result = build(grid_rows(('9/9/2026', 'xAI', '2000'), ('9/11/2026', 'xAI', '1100'), ('9/20/2026', 'xAI', '100')))
+    assert [(e.day, e.amount) for e in result.calendar_events if e.projected_only] == [(24, 3775)]
+    assert report.expense_breakdown_client_payload(result)['incomeProjection']['projectedAmount'] == 6975
+    outside = build(grid_rows(('9/6/2026', 'xAI', '3100')))
+    assert [e.day for e in outside.calendar_events if e.projected_only] == [10, 24]
+
+
+@pytest.mark.parametrize('amount', ['', 'invalid', '-100', '0'])
+def test_explicit_blank_or_invalid_expected_amount_never_uses_observed_or_prior_salary(amount):
+    prior = report.BudgetHistoryRows(report.BudgetMonth(2026, 8), grid_rows(('8/27/2026', 'xAI', '3700')))
+    result = build(grid_rows(('9/10/2026', 'xAI', '3100'), amount=amount), [prior])
+    payload = report.expense_breakdown_client_payload(result)
+    assert payload['incomeProjection']['projectedAmount'] == 3100
+    assert 'set Expected Income Amount' in payload['incomeProjectionSettings']['description']
+
+
+def test_expected_amount_requires_configured_anchor_even_if_deposit_has_date():
+    result = build(grid_rows(('9/10/2026', 'xAI', '3100'), anchor=''))
+    assert not any(e.projected_only for e in result.calendar_events)
+    assert 'set Paycheck Anchor Date' in report.expense_breakdown_client_payload(result)['incomeProjectionSettings']['description']
+
+
+def test_undated_income_does_not_consume_a_scheduled_paycheck():
+    result = build(grid_rows(('', 'xAI', '3100')))
+    assert [e.day for e in result.calendar_events if e.projected_only] == [10, 24]
+
+
+def test_cross_month_early_and_late_deposits_fill_slots_without_moving_actual_income():
+    august = report.BudgetHistoryRows(report.BudgetMonth(2026, 8), income_rows(('8/31/2026', 'xAI', '3100')))
+    october = report.BudgetHistoryRows(report.BudgetMonth(2026, 10), income_rows(('10/2/2026', 'xAI', '3600')))
+    result = build(grid_rows(anchor='9/2/2026'), [august, october])
+    assert result.income_total == 0
+    assert [(e.day, e.amount) for e in result.calendar_events if e.projected_only] == [(16, 3775)]
+    assert report.expense_breakdown_client_payload(result)['incomeProjection']['projectedAmount'] == 3775
+
+
+def test_new_anchor_and_expected_amount_carry_forward_until_changed():
+    july = report.BudgetHistoryRows(report.BudgetMonth(2026, 7), grid_rows())
+    september = report.BudgetHistoryRows(report.BudgetMonth(2026, 9), grid_rows(anchor='9/4/2026', amount='3800'))
+    result = build(income_rows(), [july, september], month=report.BudgetMonth(2035, 1))
+    assert result.income_projection_config.expected_amount == 3800
+    assert result.income_projection_config.anchor_date == datetime(2026, 9, 4)
+    assert all((datetime(2035, 1, e.day) - datetime(2026, 9, 4)).days % 14 == 0 for e in result.calendar_events if e.projected_only)
+    assert len([e for e in result.calendar_events if e.projected_only]) in [2, 3]
+
+
+def test_monthly_expected_amount_ignores_anchor_and_persists():
+    september = report.BudgetHistoryRows(report.BudgetMonth(2026, 9), grid_rows(mode='fixed monthly', amount='6000', anchor=''))
+    result = build(income_rows(('1/2/2027', 'xAI', '3100'), ('1/3/2027', 'Rewards', '50')), [september], month=report.BudgetMonth(2027, 1))
+    assert report.expense_breakdown_client_payload(result)['incomeProjection']['projectedAmount'] == 6050
+    assert [(e.day, e.amount) for e in result.calendar_events if e.projected_only] == [(31, 2900)]
+
+
+def test_blank_mode_defaults_to_biweekly_and_three_paycheck_month_uses_each_expected_amount():
+    result = build(grid_rows(mode='', anchor='10/2/2026'), month=report.BudgetMonth(2026, 10))
+    assert result.income_projection_config.mode == 'biweekly'
+    assert [e.day for e in result.calendar_events if e.projected_only] == [2, 16, 30]
+    assert report.expense_breakdown_client_payload(result)['incomeProjection']['projectedAmount'] == 11325
+
+
+def test_monthly_mode_does_not_use_anchor_even_for_undated_actual_income():
+    first = build(grid_rows(('', 'xAI', '3100'), mode='fixed monthly', amount='6000', anchor='7/2/2026'))
+    second = build(grid_rows(('', 'xAI', '3100'), mode='fixed monthly', amount='6000', anchor='9/4/2026'))
+    assert first.calendar_events == second.calendar_events
+
+
+def test_december_receipt_can_fulfill_january_payday():
+    december = report.BudgetHistoryRows(report.BudgetMonth(2026, 12), income_rows(('12/31/2026', 'xAI', '3100')))
+    result = build(grid_rows(anchor='1/2/2027'), [december], month=report.BudgetMonth(2027, 1))
+    assert result.income_total == 0
+    assert [e.day for e in result.calendar_events if e.projected_only] == [16, 30]
+
+
+def test_history_fetch_includes_following_month_but_future_settings_do_not_leak():
+    from unit_tests.reports.test_expense_breakdown import FakeSpreadsheet
+    book = FakeSpreadsheet({'September':InMemoryWorksheet(grid_rows()), 'October':InMemoryWorksheet(grid_rows(source='Future employer', amount='9999'))})
+    history = report._budget_history_from_spreadsheet(book, report.BudgetMonth(2026,9))
+    assert [item.month.month for item in history] == [9,10]
+    result = build(grid_rows(), history)
+    assert result.income_projection_config.source_label == 'xAI'
+    assert result.income_projection_config.expected_amount == 3775

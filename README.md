@@ -63,26 +63,28 @@ BOOKIEBOT_AGENT_MAX_TOOL_CALLS=8
 
 ## Income Projection Settings
 
-Brian Budget 2026 and Hannah Budget 2026 use one settings grid at **E1:F5** in their **Template** and **September** tabs:
+Personal monthly budget sheets use a horizontal green settings grid in **B4:E5**. Labels are in row 4, editable values in row 5; row 6 is blank, and **Date / Source / Amount** starts at **B7:D7**. Income rows can grow or shrink underneath the settings.
 
-| Cell | Label | Value |
+| Cell | Setting | Meaning |
 | --- | --- | --- |
-| F2 | Main Income Source | Employer/source, e.g. `xAI` or `Sonic` |
-| F3 | Income Projection Mode | Dropdown: `biweekly`, `fixed monthly`, `off` |
-| F4 | Fixed Monthly Income | Monthly net/take-home salary; blank until configured |
-| F5 | Paycheck Anchor Date | One known payday, e.g. `7/2/2026` |
+| B5 | Main Income Source | Employer/source such as `xAI` or `Sonic` |
+| C5 | Income Projection Mode | Dropdown: `biweekly` (default), `fixed monthly`, `off` |
+| D5 | Expected Income Amount | Expected net amount per paycheck in biweekly mode, or per month in fixed monthly mode |
+| E5 | Paycheck Anchor Date | Biweekly only: a known payday, e.g. `7/2/2026` |
 
-Select the mode in **F3**. For fixed monthly salary, enter your monthly take-home amount in **F4**, not gross annual salary. For biweekly pay, enter one payday in **F5**: scheduled paydays repeat every fourteen days from that date indefinitely, across months and years. Actual early/late deposits keep their real dates and fill the nearest scheduled slot without shifting the schedule. F4 is used only in fixed monthly mode, and F5 schedules only biweekly mode. `off` keeps projected income at actual income.
+For biweekly pay, enter the expected take-home paycheck in D5 and one payday in E5. Scheduled paydays are the anchor itself and every fourteen days afterward indefinitely. The expected amount is never inferred from or overwritten by actual deposits. For example, an expected $3,775 paycheck followed by a $3,100 actual deposit leaves the next payday projected at $3,775; a two-paycheck month projects $6,875 plus any other actual income. Blank, zero, or invalid expected amounts produce no estimated income and the report asks for Expected Income Amount.
 
-The Apps Script in `scripts/google-apps-script/budget-system-automation.gs` copies the latest effective monthly settings into each new month, including the dropdown and date/currency validation. January inherits the prior annual workbook's last effective plan. Existing monthly choices are not overwritten by daily rollover. The internal Template provides defaults when there is no earlier month; make ongoing changes in the current month. `upgradeCurrentIncomeSettings()` migrates only the current month and internal Template in each annual budget, preserving the existing source/date. The grid stays above inserted income rows, with its anchor protected during first-income-row deletion and undo.
+Only the configured main source fulfills a paycheck. Matching normalizes case, punctuation, and spacing and accepts the complete employer label with an optional standard suffix: `income`, `paycheck`, `payroll`, `salary`, or `wages`. Thus `xAI`, `xAI paycheck`, and `xAI income` match; `xAI bonus` and credit card rewards do not. Label one-time employer payments distinctly.
 
-Only the configured source contributes to the paycheck estimate. Matching normalizes case, punctuation, and spacing and accepts the complete employer label with an optional standard suffix: `income`, `paycheck`, `payroll`, `salary`, or `wages`. Thus `xAI`, `xAI paycheck`, and `xAI income` match; `xAI bonus` and credit card rewards do not. Give bonuses or other one-time employer payments a distinct Source label.
+A dated matching deposit within **three calendar days before or after** a scheduled payday fulfills that period regardless of amount. Multiple deposits in that window fulfill the same period, without consuming the following paycheck. Undated/out-of-window entries remain actual income without fulfilling a scheduled period. Adjacent month/year receipts are checked to avoid projecting an already-paid boundary payday. Actual dollars and calendar events remain in the month/date received; they are not moved to the scheduled month.
 
-Biweekly amounts use the average matching paycheck logged in the selected month, or the latest dated matching paycheck from the immediately prior month when none has been logged yet. The date schedule persists indefinitely; observed paycheck amounts retain this separate freshness limit. Without a usable amount, the report explains what is missing and leaves income at its logged total.
+For fixed monthly income, select `fixed monthly` in C5 and enter **monthly take-home income** in D5 once. No annual-salary field or gross-to-net conversion is involved. The date anchor is ignored. Projected income equals actual income plus any unreceived part of the monthly target: a $6,000 target with $3,100 salary and $50 rewards received projects $6,050. The remaining $2,900 appears as a month-end salary remainder estimate. Actual salary above the target is never reduced. `off` and completed-month reports use logged income only.
 
-Fixed monthly projected income is actual income plus any unreceived portion of the configured salary. A $6,000 target with $3,000 salary and $50 rewards received projects to $6,050. Actual salary above the target is never reduced, and two/three-paycheck months use the same monthly target. The Calendar shows any remaining fixed salary as one **Projected salary remainder** at month-end, a planning estimate rather than a promised deposit date. Current and completed-month income stay actual-only, and both the Income card and Discord report tools expose the resolved basis. Settings do not log transactions or change Budget formulas.
+The Apps Script copies the effective plan into each new month, including validations and formatting. New tabs reference the latest configured prior monthly grid, so corrections flow to future tabs that still inherit their values. Typing a value over a reference creates a monthly override. A changed source does not inherit a different employer's referenced amount/date. January receives the prior year's effective plan through its annual Template. Settings persist through empty months and annual rollover; make ongoing changes in the relevant month. A cleared expected amount explicitly disables the estimate. Source/date blanks retain earlier settings when resolving history.
 
-Legacy month tabs remain readable: `Biweekly Income Source` aliases the main source; `Biweekly Income Start` retains its older bootstrap/reanchor behavior until migrated to `Paycheck Anchor Date`. Blank settings inherit earlier values; a new employer resets its inherited amount/mode/date. Invalid mode/amount does not restore an old salary estimate. Exact Monthly Income label matching keeps the fixed-salary setting separate from actual-income reads and writes.
+`upgradeCurrentIncomeSettings()` migrates only the current month and internal Template in both annual budgets. It removes the old E1:F5 grid, inserts three rows above the income header, and updates the affected month's personal-budget action-log and split-ledger row references. Daily rollover never migrates existing tabs or overwrites their explicit settings. Manual income edits stamp dates and repair totals without appending styled placeholder rows. BookieBot still inserts transaction rows when needed and preserves ordinary formatting, totals, and undo behavior. Legacy overlapping-grid safeguards remain only for older tabs and saved actions.
+
+Legacy `Fixed Monthly Income` and `Biweekly Income Source/Start` settings remain readable for historical compatibility. Older grids retain their existing observed-paycheck projection behavior until migrated; the new Expected Income Amount grid always uses the explicit expectation. The web report and read-only report tools expose the same resolved projection basis.
 
 ## 🎭 Daily Avatar Rotation
 
