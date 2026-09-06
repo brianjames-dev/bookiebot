@@ -4,12 +4,11 @@ Last updated: 2026-09-06
 
 ## Active Focus
 
-All eight September 6 audit batches are implemented and verified locally. Each batch received focused regressions, broader verification, tracking updates, and an incremental commit/push. Final combined verification: 777 tests passed including real Postgres, Pyright clean, Apps Script and frontend checks passed. Remote CI is being checked on the final push. Deployment/manual acceptance remains separate; see `.agent/AUDIT_REMEDIATION_2026-09-06.md`.
+All eight September 6 audit batches are implemented and verified locally. Each batch received focused regressions, broader verification, tracking updates, and an incremental commit/push. Final combined verification: 777 tests passed including real Postgres, Pyright clean, Apps Script and frontend checks passed. GitHub Verification passed on implementation commit `6fd7ce8` ([run](https://github.com/brianjames-dev/bookiebot/actions/runs/34051590441)). The disposable local Postgres test container has been removed. Deployment/manual acceptance remains separate; see `.agent/AUDIT_REMEDIATION_2026-09-06.md`.
 
 ## On Deck
 
 1. Verify the deployed audit fixes in a test workbook/Sandbox using `.agent/AUDIT_REMEDIATION_2026-09-06.md`; complete the live acceptance checks without creating test transactions in real financial data.
-
 2. Verify deployed expected-income projections and the next monthly rollover against checklist item 85.
 3. Deploy and manually verify canonical Current/Projected report tools in checklist item 82.
 4. Deploy and manually verify the LangGraph conversational/read response layer and bank-transfer refusal in checklist item 81.
@@ -38,11 +37,11 @@ All eight September 6 audit batches are implemented and verified locally. Each b
 ## Completed 2026-09-06
 
 - Audit Batch 8: removed 21 unreferenced Python HTML helpers (313 dead lines) and extracted non-provisioning formatted/batched worksheet transport into `reports/worksheet_reads.py`. Earlier batches established shared owner-reference repair and bank-import services. Active report calculations, React code/assets, and historical fallbacks remain compatible.
-- Verification: four new reader contract cases; report/agent suite **141 passed**. Isolated before/after comparison: **71 identical payloads and 26 byte-identical HTML pages** across seven months. Final combined suite **777 passed**, including all real Postgres contracts; Pyright **0 errors**; Apps Script checks, frontend typecheck/build and asset parity passed. One existing Kaleido warning. New remote CI has passed its Python/database/type stages; final run completion is checked after push.
+- Verification: four new reader contract cases; report/agent suite **141 passed**. Isolated before/after comparison: **71 identical payloads and 26 byte-identical HTML pages** across seven months. Final combined suite **777 passed**, including all real Postgres contracts; Pyright **0 errors**; Apps Script checks, frontend typecheck/build and asset parity passed. One existing Kaleido warning. GitHub Verification passed all gates on `6fd7ce8` ([run](https://github.com/brianjames-dev/bookiebot/actions/runs/34051590441)).
 - Manual check after deployment: compare Current/Projected and historical reports against known test fixtures, verify charts and report totals match, and confirm a subsequent refresh reflects a test-sheet edit. The concise audit completion/manual checklist is `.agent/AUDIT_REMEDIATION_2026-09-06.md`.
 
 - Audit Batch 7 (A12): autofix PR metadata reads incident/output files through Python, preserves arbitrary text as data, and emits a safe one-line title; retry diagnostics stay in a file instead of a malformed environment heredoc. Added push/PR CI for Python/Pyright, real Postgres contracts, Apps Script, frontend typecheck/build and committed-asset parity. The same database contracts cover SQLite and isolated Postgres schemas.
-- Verification: **31 targeted tests passed**, including 18 SQLite/Postgres contract cases and nine metadata/log cases. Full integrated suite **773 passed** with real disposable Postgres; Pyright **0 errors**; Node income migration/rollover checks and frontend typecheck/build/asset parity passed. One existing Kaleido warning. Remote CI awaits the pushed workflow run.
+- Verification: **31 targeted tests passed**, including 18 SQLite/Postgres contract cases and nine metadata/log cases. Full integrated suite **773 passed** with real disposable Postgres; Pyright **0 errors**; Node income migration/rollover checks and frontend typecheck/build/asset parity passed. One existing Kaleido warning. Remote Verification passed on both the Batch 7 and final implementation commits.
 - Manual/operational check: inspect the new Verification workflow on the next push/PR. For a dry-run incident fixture, include apostrophes, multiline text, backticks, and literal shell substitutions; generated PR title/body must retain text without executing it. Local real-database checks use BOOKIEBOT_TEST_POSTGRES_URL and disposable schemas; they never read BANK_DATABASE_URL.
 
 - Audit Batch 6 (A10–A11): every private report route requires valid signed access, including filename-bound snapshot routes; report responses use private/no-store. Live builds run in bounded worker threads, coalesce only simultaneous equivalent requests, preserve actor context, and survive one request disconnecting. History uses one metadata plus one values request per annual scan; optional report lookups no longer provision missing sheets.

@@ -20,7 +20,7 @@ All eight approved batches are implemented. The original twelve findings were re
 - Apps Script income migration, settings, month/year rollover and collision checks: passed.
 - Frontend typecheck/build and committed-asset parity: passed.
 - Cleanup comparison: **71 identical payloads and 26 byte-identical HTML pages** across seven months.
-- GitHub Verification is enabled for pushes and pull requests. Final remote result is reported with the delivery; local results above are independently verified.
+- GitHub Verification: **passed all gates** on final implementation commit `6fd7ce8` ([run](https://github.com/brianjames-dev/bookiebot/actions/runs/34051590441)). It remains enabled for pushes and pull requests. The disposable local Postgres test container has been removed.
 
 ## Manual acceptance after deployment
 
