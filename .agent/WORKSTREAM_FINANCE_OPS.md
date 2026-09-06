@@ -715,3 +715,7 @@ Status: Complete; deployed-bot/natural-rollover manual checks are in STATUS chec
 
 - Removed Income card subtext in Current and Projected views; retained calculation and report-tool metadata. Rebuilt the committed frontend asset.
 - Verification: frontend typecheck/build passed. Manual check: generate a fresh expense report and toggle both modes; the Income card displays only its label and amount.
+
+### 2026-09-05 - Unpaid Utility Chart Points
+
+- Bills & Utilities chart now leaves unpaid current/future billing months blank (`null`), with zero appearing only after the month closes. Quarterly off-cycle months remain omitted; actual off-cycle payments remain visible. Regression checks cover monthly/quarterly rollover and actual receipts. Verification: 600 tests passed (existing Kaleido warning), Pyright clean, frontend typecheck/build passed. Manual check after deployment: generate a fresh September report; unpaid monthly utilities have no September dot and unpaid Recology stays blank outside its configured February/May/August/November cycle.

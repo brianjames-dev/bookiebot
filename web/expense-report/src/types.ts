@@ -45,7 +45,9 @@ export interface PaymentItem extends AmountRow {
   status?: string
 }
 
-export interface UtilityHistoryPoint extends AmountRow {
+export interface UtilityHistoryPoint {
+  label: string
+  amount: number | null
   month: number
 }
 

@@ -2199,3 +2199,29 @@ def test_expense_report_payload_falls_back_to_latest_matching_snapshot(tmp_path,
     }
 
     assert _static_report_path_for_payload(payload) == newer
+
+
+@pytest.mark.parametrize("now_month, expected", [(8, None), (9, 0.0)])
+def test_unpaid_utility_point_waits_until_billing_month_closes(monkeypatch, now_month, expected):
+    monkeypatch.setattr(expense_breakdown, "now_pacific", lambda: datetime(2026, now_month, 1, tzinfo=routing.PACIFIC_TZ))
+    schedule = [BILL_SCHEDULE_HEADERS, ["recology", "Recology", "quarterly", "20", "2,5,8,11", "Recology", "", "", ""]]
+    history = (
+        BudgetHistoryRows(BudgetMonth(2026, 5), [["Recology", "$145"], ["PG&E", "$100"]]),
+        BudgetHistoryRows(BudgetMonth(2026, 6), [["Recology", "$0"], ["PG&E", "$0"]]),
+        BudgetHistoryRows(BudgetMonth(2026, 8), [["Recology", "$0"], ["PG&E", "$0"]]),
+    )
+    items = expense_breakdown._utility_history_items(history, schedule, BudgetMonth(2026, 8))
+    by_label = {item.label: expense_breakdown._utility_history_payload(item) for item in items}
+    for label in ("Recology", "PG&E"):
+        assert by_label[label]["history"][-1] == {"label": "Aug", "month": 8, "amount": expected}
+    assert [point["month"] for point in by_label["Recology"]["history"]] == [5, 8]
+    assert by_label["PG&E"]["history"][1]["amount"] == 0.0
+
+
+def test_actual_current_off_cycle_utility_payment_is_visible(monkeypatch):
+    monkeypatch.setattr(expense_breakdown, "now_pacific", lambda: datetime(2026, 9, 5, tzinfo=routing.PACIFIC_TZ))
+    schedule = [BILL_SCHEDULE_HEADERS, ["recology", "Recology", "quarterly", "20", "2,5,8,11", "Recology", "", "", ""]]
+    items = expense_breakdown._utility_history_items(
+        (BudgetHistoryRows(BudgetMonth(2026, 9), [["Recology", "$123"]]),), schedule, BudgetMonth(2026, 9)
+    )
+    assert items[0].history == [("Sep", 9, 123.0)]

@@ -35,6 +35,8 @@ The final income settings grid is live at B4:E5 on both budgets' Template and Se
 
 ## Completed 2026-09-05
 
+- Bills & Utilities chart now leaves unpaid current/future billing months blank (`null`), with zero appearing only after the month closes. Quarterly off-cycle months remain omitted; actual off-cycle payments remain visible. Regression checks cover monthly/quarterly rollover and actual receipts. Verification: 600 tests passed (existing Kaleido warning), Pyright clean, frontend typecheck/build passed. Manual check after deployment: generate a fresh September report; unpaid monthly utilities have no September dot and unpaid Recology stays blank outside its configured February/May/August/November cycle.
+
 - Removed the Income card subtitle in both Current and Projected expense-report views and rebuilt the shipped frontend asset. Income calculations and projection metadata remain unchanged. Verification: frontend typecheck/build passed. Manual check: open a newly generated report and toggle Current/Projected; Income should show only its title and amount.
 
 - Completed the agreed final layout on Brian/Hannah Budget 2026 Template and September: four darker-green labels at B4:E4, values at B5:E5, blank row 6, Date/Source/Amount at B7:D7. Removed the old Label/Value grid and residual old-column notes/validations. Sources, modes, and anchors were preserved; expected amounts remain blank for user configuration.

@@ -3763,7 +3763,7 @@ function normalizeChartLabel(label: string) {
 }
 
 function utilityHistoryChartRows(items: UtilityHistoryItem[]) {
-  const rowsByMonth = new Map<number, Record<string, string | number>>()
+  const rowsByMonth = new Map<number, Record<string, string | number | null>>()
   for (const item of items) {
     for (const point of item.history) {
       const row = rowsByMonth.get(point.month) ?? { label: point.label, month: point.month }

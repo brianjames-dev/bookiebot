@@ -79,7 +79,7 @@ class UtilityHistoryItem:
     current_amount: float
     average_amount: float
     delta_amount: float
-    history: list[tuple[str, int, float]]
+    history: list[tuple[str, int, float | None]]
 
 
 @dataclass(frozen=True)
@@ -2078,13 +2078,18 @@ def _utility_history_items(
     for index, (key, bucket) in enumerate(sorted(by_label.items(), key=lambda item: item[1]["label"].lower())):
         amounts_by_month = bucket["amounts"]
         quarterly_pull_months = quarterly_months_by_label.get(key)
-        points = [
-            (month_labels[history_item.month.month], history_item.month.month, round(float(amounts_by_month.get(history_item.month.month, 0.0)), 2))
-            for history_item in history
-            if quarterly_pull_months is None or history_item.month.month in quarterly_pull_months
-        ]
+        points: list[tuple[str, int, float | None]] = []
+        for history_item in history:
+            month_number = history_item.month.month
+            amount = round(float(amounts_by_month.get(month_number, 0.0)), 2)
+            # Actual payments are visible even outside a scheduled billing month.
+            if not amount and quarterly_pull_months is not None and month_number not in quarterly_pull_months:
+                continue
+            # A template zero is not an unpaid bill until the month has closed.
+            chart_amount = amount if amount or _is_completed_month(history_item.month) else None
+            points.append((month_labels[month_number], month_number, chart_amount))
         current_amount = round(float(amounts_by_month.get(selected_month.month, 0.0)), 2)
-        prior_amounts = [amount for _label, month_number, amount in points if month_number < selected_month.month and amount > 0]
+        prior_amounts = [amount for _label, month_number, amount in points if month_number < selected_month.month and amount is not None and amount > 0]
         average_amount = round(sum(prior_amounts) / len(prior_amounts), 2) if prior_amounts else 0.0
         delta_amount = round(current_amount - average_amount, 2) if prior_amounts else 0.0
         items.append(
@@ -2813,7 +2818,7 @@ def _utility_history_payload(item: UtilityHistoryItem) -> dict[str, Any]:
         "averageAmount": round(item.average_amount, 2),
         "deltaAmount": round(item.delta_amount, 2),
         "history": [
-            {"label": label, "month": month, "amount": round(amount, 2)}
+            {"label": label, "month": month, "amount": round(amount, 2) if amount is not None else None}
             for label, month, amount in item.history
         ],
     }

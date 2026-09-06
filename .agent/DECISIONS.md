@@ -418,3 +418,7 @@ Use the canonical anchor itself and every 14 days afterward. A matching source d
 New monthly grids reference the latest configured preceding monthly grid so copied future settings do not hide later corrections; replacing a formula creates an explicit override. Source changes do not carry a different employer's referenced amount/date. New annual Templates snapshot the prior year's effective settings. The dedicated current-month migration shifts dependent personal-budget action-log and split-ledger row references with the three-row insertion; ordinary daily rollover does not move existing rows. Remove live auto-appended placeholder formatting, and retain overlap-preservation code only where legacy tabs/actions still require it.
 
 Rationale: An hourly paycheck can vary without changing the expected next paycheck. Keeping user expectations separate from receipts and placing settings entirely above transaction rows makes both the financial projection and sheet mutation behavior deterministic.
+
+### 2026-09-05 - Utility history distinguishes pending from zero
+
+Utility chart history uses nullable amounts for unpaid open/future billing months; only closed billing months receive zero. Quarterly non-billing months remain omitted, while actual payments remain visible regardless of schedule. Numeric current totals and projection calculations retain their existing semantics. This avoids displaying an unentered bill as a finalized zero payment.
