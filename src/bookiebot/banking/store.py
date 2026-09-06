@@ -6,6 +6,7 @@ import json
 from pathlib import Path
 import sqlite3
 from typing import Any, Iterator, Protocol
+from uuid import uuid4
 
 from bookiebot.banking.crypto import TokenCipher
 from bookiebot.banking.models import (
@@ -20,6 +21,9 @@ from bookiebot.banking.models import (
     ReconciliationItem,
     ReconciliationStatus,
 )
+
+
+WEBHOOK_LEASE_SECONDS = 300
 
 
 def utc_now_iso() -> str:
@@ -150,6 +154,40 @@ class BankStore:
             self._ensure_account_watch_column(conn)
             self._ensure_transaction_pending_link_column(conn)
             self._ensure_import_operations_table(conn)
+            self._ensure_reconciliation_events_table(conn)
+            self._ensure_webhook_claim_columns(conn)
+
+    def _ensure_webhook_claim_columns(self, conn: BankStoreConnection) -> None:
+        for column in ('claim_token TEXT', 'lease_expires_at TEXT', 'attempt_count INTEGER NOT NULL DEFAULT 0', 'next_attempt_at TEXT'):
+            try:
+                conn.execute(f'ALTER TABLE bank_webhook_events ADD COLUMN {column}')
+            except sqlite3.OperationalError as exc:
+                if 'duplicate column name' not in str(exc).lower():
+                    raise
+
+    def _ensure_reconciliation_events_table(self, conn: BankStoreConnection) -> None:
+        conn.execute(
+            """CREATE TABLE IF NOT EXISTS bank_reconciliation_events (
+                event_id TEXT PRIMARY KEY,
+                reconciliation_id INTEGER NOT NULL
+                    REFERENCES bank_reconciliation_items(id) ON DELETE CASCADE,
+                owner_key TEXT NOT NULL,
+                event_type TEXT NOT NULL,
+                occurred_at TEXT NOT NULL,
+                payload_json TEXT NOT NULL
+            )"""
+        )
+
+    def reconciliation_events(self, owner_key: str, reconciliation_id: int, limit: int = 25) -> list[dict[str, Any]]:
+        self.initialize()
+        with self.connect() as conn:
+            rows = conn.execute(
+                """SELECT * FROM bank_reconciliation_events
+                   WHERE owner_key = ? AND reconciliation_id = ?
+                   ORDER BY occurred_at DESC, event_id DESC LIMIT ?""",
+                (owner_key, int(reconciliation_id), max(1, min(int(limit), 100))),
+            ).fetchall()
+        return [{**dict(row), 'payload': json.loads(row['payload_json'])} for row in rows]
 
     def _ensure_import_operations_table(self, conn: BankStoreConnection) -> None:
         # Identical schema and transitions on SQLite and Postgres.
@@ -555,7 +593,6 @@ class BankStore:
                     transactions_cursor = excluded.transactions_cursor,
                     last_sync_at = excluded.last_sync_at,
                     last_success_at = excluded.last_success_at,
-                    webhook_pending = 0,
                     last_error = NULL
                 """,
                 (item_db_id, cursor, now, now),
@@ -684,6 +721,16 @@ class BankStore:
         now = utc_now_iso()
         with self.connect() as conn:
             for txn in transactions:
+                # Lock an existing transaction before inspecting its old value;
+                # the same UPDATE serializes writers on both database backends.
+                conn.execute(
+                    'UPDATE bank_transactions SET id = id WHERE provider_transaction_id = ?',
+                    (txn['transaction_id'],),
+                )
+                previous = conn.execute(
+                    'SELECT * FROM bank_transactions WHERE provider_transaction_id = ?',
+                    (txn['transaction_id'],),
+                ).fetchone()
                 account_row = conn.execute(
                     "SELECT id FROM bank_accounts WHERE provider_account_id = ?",
                     (txn.get("account_id"),),
@@ -732,6 +779,50 @@ class BankStore:
                         now,
                     ),
                 )
+                if previous is not None:
+                    current_values = {
+                        'amount': float(txn.get('amount') or 0), 'date': txn.get('date'),
+                        'authorized_date': txn.get('authorized_date'), 'account_id': account_id,
+                        'pending': 1 if txn.get('pending') else 0,
+                    }
+                    previous_values = {key: previous[key] for key in current_values}
+                    changed = [key for key in current_values if current_values[key] != previous_values[key]]
+                    if changed:
+                        # Serialize against confirmations too, so the event and
+                        # reopening describe the exact match being invalidated.
+                        conn.execute(
+                            'UPDATE bank_reconciliation_items SET id = id WHERE bank_transaction_id = ?',
+                            (previous['id'],),
+                        )
+                        matched = conn.execute(
+                            """SELECT * FROM bank_reconciliation_items
+                               WHERE bank_transaction_id = ? AND status IN ('matched', 'confirmed')""",
+                            (previous['id'],),
+                        ).fetchone()
+                        if matched is not None:
+                            payload = {
+                                'changed_fields': changed, 'before': previous_values, 'after': current_values,
+                                'previous_match': {
+                                    key: matched[key] for key in (
+                                        'status', 'classification', 'confidence', 'matched_action_log_id',
+                                        'matched_sheet_ref', 'resolved_at', 'notes',
+                                    )
+                                },
+                            }
+                            conn.execute(
+                                """INSERT INTO bank_reconciliation_events (
+                                    event_id, reconciliation_id, owner_key, event_type, occurred_at, payload_json
+                                ) VALUES (?, ?, ?, 'bank_transaction_modified', ?, ?)""",
+                                (uuid4().hex, matched['id'], matched['owner_key'], now, json.dumps(payload, sort_keys=True)),
+                            )
+                            conn.execute(
+                                """UPDATE bank_reconciliation_items
+                                   SET status = 'needs_review', matched_action_log_id = NULL, matched_sheet_ref = NULL,
+                                       resolved_at = NULL, ignored_at = NULL, confidence = 0, last_seen_at = ?,
+                                       notes = 'Bank transaction changed; previous match retained in reconciliation events.'
+                                   WHERE id = ?""",
+                                (now, matched['id']),
+                            )
         return len(transactions)
 
     def mark_transactions_removed(self, removed: list[dict[str, Any] | str]) -> int:
@@ -802,11 +893,15 @@ class BankStore:
                 SELECT *
                 FROM bank_webhook_events
                 WHERE provider = 'plaid'
-                  AND status IN ('pending', 'failed')
+                  AND (
+                    status = 'pending'
+                    OR (status = 'failed' AND (next_attempt_at IS NULL OR next_attempt_at <= ?))
+                    OR (status = 'processing' AND (lease_expires_at IS NULL OR lease_expires_at <= ?))
+                  )
                 ORDER BY received_at, id
                 LIMIT ?
                 """,
-                (safe_limit,),
+                (utc_now_iso(), utc_now_iso(), safe_limit),
             ).fetchall()
         events: list[tuple[PlaidWebhookEvent, dict[str, Any]]] = []
         for row in rows:
@@ -814,33 +909,64 @@ class BankStore:
             events.append((_plaid_webhook_event_from_row(row), payload if isinstance(payload, dict) else {}))
         return events
 
-    def mark_plaid_webhook_processing(self, event_id: int) -> None:
+    def claim_plaid_webhook_event(self, event_id: int) -> str | None:
         self.initialize()
+        now = utc_now_iso()
+        expires = (datetime.fromisoformat(now) + timedelta(seconds=WEBHOOK_LEASE_SECONDS)).isoformat()
+        claim_token = uuid4().hex
         with self.connect() as conn:
+            # Serialize claims for different events on the same linked item.
             conn.execute(
-                """
-                UPDATE bank_webhook_events
-                SET status = 'processing',
-                    error = NULL
-                WHERE id = ?
-                """,
+                """UPDATE bank_sync_state SET item_id = item_id WHERE item_id IN (
+                    SELECT i.id FROM bank_items i JOIN bank_webhook_events e ON e.item_id = i.item_id
+                    WHERE e.id = ?
+                )""",
                 (int(event_id),),
             )
+            claimed = conn.execute(
+                """
+                UPDATE bank_webhook_events
+                SET status = 'processing', error = NULL, claim_token = ?,
+                    lease_expires_at = ?, attempt_count = attempt_count + 1, next_attempt_at = NULL
+                WHERE id = ?
+                  AND (
+                    status = 'pending'
+                    OR (status = 'failed' AND (next_attempt_at IS NULL OR next_attempt_at <= ?))
+                    OR (status = 'processing' AND (lease_expires_at IS NULL OR lease_expires_at <= ?))
+                  )
+                  AND NOT EXISTS (
+                    SELECT 1 FROM bank_webhook_events other
+                    WHERE other.item_id = bank_webhook_events.item_id AND other.id != bank_webhook_events.id
+                      AND other.status = 'processing' AND other.lease_expires_at > ?
+                  )
+                """,
+                (claim_token, expires, int(event_id), now, now, now),
+            ).rowcount == 1
+        return claim_token if claimed else None
 
-    def mark_plaid_webhook_processed(self, event_id: int, item_id: str | None = None) -> None:
+    def mark_plaid_webhook_processing(self, event_id: int) -> str | None:
+        return self.claim_plaid_webhook_event(event_id)
+
+    def mark_plaid_webhook_processed(
+        self, event_id: int, item_id: str | None = None, *, claim_token: str | None = None,
+    ) -> bool:
         now = utc_now_iso()
         self.initialize()
+        claim_filter = "status = 'processing' AND claim_token = ?" if claim_token else "claim_token IS NULL"
+        params = (now, int(event_id), claim_token) if claim_token else (now, int(event_id))
         with self.connect() as conn:
-            conn.execute(
-                """
+            updated = conn.execute(
+                f"""
                 UPDATE bank_webhook_events
                 SET status = 'processed',
                     processed_at = ?,
-                    error = NULL
-                WHERE id = ?
+                    error = NULL, lease_expires_at = NULL, next_attempt_at = NULL
+                WHERE id = ? AND {claim_filter}
                 """,
-                (now, int(event_id)),
-            )
+                params,
+            ).rowcount == 1
+            if not updated:
+                return False
             if item_id:
                 remaining = conn.execute(
                     """
@@ -863,19 +989,29 @@ class BankStore:
                         """,
                         (item_id,),
                     )
+        return True
 
-    def mark_plaid_webhook_failed(self, event_id: int, error: str) -> None:
+    def mark_plaid_webhook_failed(self, event_id: int, error: str, *, claim_token: str | None = None) -> bool:
         self.initialize()
+        claim_filter = "status = 'processing' AND claim_token = ?" if claim_token else "claim_token IS NULL"
+        claim_params = (int(event_id), claim_token) if claim_token else (int(event_id),)
         with self.connect() as conn:
-            conn.execute(
-                """
+            row = conn.execute(
+                f'SELECT attempt_count FROM bank_webhook_events WHERE id = ? AND {claim_filter}',
+                claim_params,
+            ).fetchone()
+            if row is None:
+                return False
+            delay = min(3600, 60 * 2 ** min(max(int(row['attempt_count']) - 1, 0), 6))
+            next_attempt = (datetime.fromisoformat(utc_now_iso()) + timedelta(seconds=delay)).isoformat()
+            return conn.execute(
+                f"""
                 UPDATE bank_webhook_events
-                SET status = 'failed',
-                    error = ?
-                WHERE id = ?
+                SET status = 'failed', error = ?, next_attempt_at = ?, lease_expires_at = NULL
+                WHERE id = ? AND {claim_filter}
                 """,
-                (error[:1000], int(event_id)),
-            )
+                (error[:1000], next_attempt, *claim_params),
+            ).rowcount == 1
 
     def recent_transactions(
         self,

@@ -6,6 +6,7 @@ from dataclasses import dataclass
 from datetime import date, datetime
 import logging
 import os
+import time
 from collections.abc import Awaitable, Callable
 from typing import Any, cast
 
@@ -34,6 +35,8 @@ logger = logging.getLogger(__name__)
 
 _REMINDER_TASK: asyncio.Task | None = None
 _LAST_REMINDER_EVALUATION_DATE: dict[str, date] = {}
+_REMINDER_RETRY_AFTER: dict[str, float] = {}
+_REMINDER_FAILURES: dict[str, int] = {}
 
 
 @dataclass(frozen=True)
@@ -61,6 +64,7 @@ class PreparedReminderMessages:
     messages: list[str]
     sent_count: int
     post_send_events: list[PendingSystemEvent] | None = None
+    evaluation_succeeded: bool = True
 
 
 def _prepared(
@@ -68,8 +72,26 @@ def _prepared(
     messages: list[str],
     sent_count: int,
     events: list[PendingSystemEvent] | None = None,
+    evaluation_succeeded: bool = True,
 ) -> PreparedReminderMessages:
-    return PreparedReminderMessages(messages=messages, sent_count=sent_count, post_send_events=events or [])
+    return PreparedReminderMessages(
+        messages=messages, sent_count=sent_count, post_send_events=events or [],
+        evaluation_succeeded=evaluation_succeeded,
+    )
+
+
+def _schedule_reminder_retry(actor_key: str) -> None:
+    failures = min(_REMINDER_FAILURES.get(actor_key, 0) + 1, 7)
+    _REMINDER_FAILURES[actor_key] = failures
+    _REMINDER_RETRY_AFTER[actor_key] = time.monotonic() + min(3600, 60 * 2 ** (failures - 1))
+
+
+def _next_reminder_check_seconds() -> float:
+    interval = float(_check_interval_seconds())
+    if not _REMINDER_RETRY_AFTER:
+        return interval
+    remaining = [deadline - time.monotonic() for deadline in _REMINDER_RETRY_AFTER.values() if deadline > time.monotonic()]
+    return min(interval, max(1.0, min(remaining))) if remaining else interval
 
 
 def _pending_event(actor_key: str, event_type: str, metadata: dict[str, str], description: str) -> PendingSystemEvent:
@@ -405,13 +427,21 @@ async def send_due_subscription_reminders(client: Any, today: date | None = None
             continue
         if today is None and _LAST_REMINDER_EVALUATION_DATE.get(actor_key) == current:
             continue
+        if today is None and time.monotonic() < _REMINDER_RETRY_AFTER.get(actor_key, 0):
+            continue
         prepared = await asyncio.to_thread(_prepare_due_reminder_messages, actor_key, mention, current)
+        if not prepared.evaluation_succeeded:
+            if today is None:
+                _schedule_reminder_retry(actor_key)
+            continue
         delivered = True
         for message in prepared.messages:
             if not await _send_user_dm(client, actor_key, message):
                 delivered = False
                 break
         if not delivered:
+            if today is None:
+                _schedule_reminder_retry(actor_key)
             if fallback_channel is not None:
                 await fallback_channel.send(
                     f"{mention} I could not send your private bills and subscriptions digest. Please check your DM settings."
@@ -419,6 +449,8 @@ async def send_due_subscription_reminders(client: Any, today: date | None = None
             continue
         if today is None:
             _LAST_REMINDER_EVALUATION_DATE[actor_key] = current
+            _REMINDER_RETRY_AFTER.pop(actor_key, None)
+            _REMINDER_FAILURES.pop(actor_key, None)
         for event in prepared.post_send_events or []:
             if not await asyncio.to_thread(
                 record_system_event,
@@ -450,7 +482,7 @@ def _prepare_due_reminder_messages(actor_key: str, mention: str, current: date) 
                 "Subscription reminders skipped because Google Sheets read quota was exceeded",
                 extra={"actor_key": actor_key},
             )
-            return _prepared(messages=[], sent_count=0)
+            return _prepared(messages=[], sent_count=0, evaluation_succeeded=False)
         logger.exception("Failed to evaluate subscription reminders", extra={"actor_key": actor_key})
         try:
             with sheet_user_context(actor_key):
@@ -465,7 +497,7 @@ def _prepare_due_reminder_messages(actor_key: str, mention: str, current: date) 
                 )
             else:
                 logger.exception("Failed fallback subscription reminder evaluation", extra={"actor_key": actor_key})
-            return _prepared(messages=[], sent_count=0)
+            return _prepared(messages=[], sent_count=0, evaluation_succeeded=False)
 
     unsent_warnings: list[SubscriptionParseWarning] = []
     for warning in warnings:
@@ -567,7 +599,7 @@ async def run_subscription_reminder_loop(client: Any) -> None:
             raise
         except Exception:
             logger.exception("Subscription reminder loop failed")
-        await asyncio.sleep(_check_interval_seconds())
+        await asyncio.sleep(_next_reminder_check_seconds())
 
 
 def ensure_subscription_reminder_loop(client: Any) -> asyncio.Task | None:

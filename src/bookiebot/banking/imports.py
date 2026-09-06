@@ -8,6 +8,7 @@ write needs manual inspection; elapsed time alone never releases its claim.
 from __future__ import annotations
 
 from datetime import date
+import json
 import logging
 import math
 from typing import Any
@@ -51,11 +52,18 @@ def _recover_import(store: BankStore, operation: BankImportOperation) -> BankImp
         # An intentional undo/reopen must not turn an old form into a new import.
         return _recovery_result(operation)
     try:
+        request = json.loads(operation.request_json)
+        bank_date = date.fromisoformat(request['bank_date'])
+        current = now_pacific().date()
+        if (bank_date.year, bank_date.month) != (current.year, current.month):
+            return _recovery_result(operation)
         with sheet_user_context(operation.actor_key):
             matches = [
                 logged for logged in read_active_logged_actions(operation.actor_key)
                 if logged.action.metadata.get('bank_import_operation_id') == operation.operation_id
                 and logged.action.metadata.get('bank_reconciliation_id') == str(operation.reconciliation_id)
+                and logged.action.metadata.get('bank_import_target_year') == str(bank_date.year)
+                and logged.action.metadata.get('bank_import_target_month') == str(bank_date.month)
                 and logged.action.metadata.get('type') == operation.kind
                 and logged.action.worksheet == operation.kind
                 and logged.action.row > 0
@@ -139,6 +147,7 @@ def import_reconciliation_item(
     metadata = {
         'origin': 'bank_reconciliation', 'bank_reconciliation_id': str(reconciliation_id),
         'bank_import_operation_id': operation.operation_id,
+        'bank_import_target_year': str(bank_date.year), 'bank_import_target_month': str(bank_date.month),
     }
     try:
         with sheet_user_context(actor_key):

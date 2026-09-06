@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 import logging
 import os
 import time
@@ -43,7 +44,7 @@ from bookiebot.sheets.subscriptions import (
     next_pull_date,
     parse_visible_subscription_schedules,
 )
-from bookiebot.banking.store import BankStore
+from bookiebot.banking.store import BankStore, WEBHOOK_LEASE_SECONDS
 from bookiebot.sheets.undo import delete_recent_action, read_active_logged_actions, undo_logged_action, update_recent_action
 
 
@@ -438,14 +439,17 @@ class BankingService:
         failed = 0
         skipped = 0
         for event, payload in self.store.pending_plaid_webhook_events(limit=limit):
-            self.store.mark_plaid_webhook_processing(event.id)
+            claim_token = self.store.claim_plaid_webhook_event(event.id)
+            if claim_token is None:
+                skipped += 1
+                continue
             item_id = event.item_id or str(payload.get("item_id") or "").strip() or None
             try:
                 webhook_type = (event.webhook_type or "").upper()
                 webhook_code = (event.webhook_code or "").upper()
                 if webhook_type != "TRANSACTIONS":
                     skipped += 1
-                    self.store.mark_plaid_webhook_processed(event.id, item_id)
+                    self.store.mark_plaid_webhook_processed(event.id, item_id, claim_token=claim_token)
                     continue
                 if webhook_code not in {
                     "SYNC_UPDATES_AVAILABLE",
@@ -454,21 +458,23 @@ class BankingService:
                     "INITIAL_UPDATE",
                 }:
                     skipped += 1
-                    self.store.mark_plaid_webhook_processed(event.id, item_id)
+                    self.store.mark_plaid_webhook_processed(event.id, item_id, claim_token=claim_token)
                     continue
                 if not item_id:
                     skipped += 1
-                    self.store.mark_plaid_webhook_processed(event.id, item_id)
+                    self.store.mark_plaid_webhook_processed(event.id, item_id, claim_token=claim_token)
                     continue
                 item = self.store.get_item_by_provider_item_id(item_id)
                 if item is None:
                     raise RuntimeError(f"Unknown Plaid item_id {item_id}")
-                await self.sync_item(item)
-                self.store.mark_plaid_webhook_processed(event.id, item_id)
-                processed += 1
+                # Finish or cancel the network work before another worker can
+                # reclaim the five-minute lease after a crash.
+                await asyncio.wait_for(self.sync_item(item), timeout=WEBHOOK_LEASE_SECONDS - 60)
+                if self.store.mark_plaid_webhook_processed(event.id, item_id, claim_token=claim_token):
+                    processed += 1
             except Exception as exc:
                 failed += 1
-                self.store.mark_plaid_webhook_failed(event.id, f"{type(exc).__name__}: {exc}")
+                self.store.mark_plaid_webhook_failed(event.id, f"{type(exc).__name__}: {exc}", claim_token=claim_token)
                 logger.warning(
                     "Failed to process Plaid webhook event",
                     extra={"event_id": event.id, "item_id": item_id, "exception": str(exc)},

@@ -731,8 +731,8 @@ User authorized all batches incrementally on 2026-09-06. STATUS is the active qu
 | 2 | A03–A04: income row shifts update only the correct owner's references, including bill/savings actions | Complete 2026-09-06; 663 tests and Pyright passed |
 | 3 | A05: delete/move undo preserves another user's intervening edits and consistent action history | Complete 2026-09-06; 669 tests and Pyright passed |
 | 4 | A06–A07: reject unsupported historical destinations before writing; durable claims prevent stale/concurrent/retried duplicate imports | Complete 2026-09-06; 707 tests and Pyright passed |
-| 5 | A08–A09: changed matches reopen; transient reminder failures retry; webhook processing recovers after restart | In progress |
-| 6 | A10–A11: every private report route enforces signed access; live rendering yields the event loop; history uses bounded batch reads | Pending |
+| 5 | A08–A09: changed matches reopen; transient reminder failures retry; webhook processing recovers after restart | Complete 2026-09-06; 733 tests and Pyright passed |
+| 6 | A10–A11: every private report route enforces signed access; live rendering yields the event loop; history uses bounded batch reads | In progress |
 | 7 | A12: incident contents remain data; ordinary changes run quality gates; storage lifecycle tests exercise Postgres | Pending |
 | 8 | Remove proven unused rendering code and consolidate responsibilities where earlier batches establish safe seams | Pending |
 
@@ -753,3 +753,7 @@ Completed transaction-only restoration into current category contents. Undo no l
 ### Audit Batch 4 work log — 2026-09-06
 
 Completed shared expense/income import orchestration and durable SQLite/Postgres operation schema. Claims recheck owner, status, watched/posted state, amount and date atomically; uncertain outcomes hold the claim. Recovery links one tagged active action without invoking writers again. Completed or intentionally reopened items cannot be reimported by stale forms. Imports support only the current month until historical destination-aware undo exists; matching historical entries remains available. Added 38 cases; targeted 167/full 707 passed, Pyright clean. Manual acceptance is in STATUS. Next: bank/reminder/webhook lifecycle recovery.
+
+### Audit Batch 5 work log — 2026-09-06
+
+Completed atomic material-bank-change reopening and durable previous-match events without Sheets mutations; preserve explicit ignore policy. Reminder evaluation failure no longer consumes daily evaluation, and automatic retries use 60-second exponential backoff capped at one hour. Webhook claims expire after five minutes, use fencing tokens and per-item serialization, and retain pending state until work is acknowledged. Imports carry and verify target-month/year metadata during recovery. Added 26 cases; targeted 193/full 733 passed, Pyright clean. Manual acceptance is in STATUS. Next: reports.

@@ -449,3 +449,11 @@ Decision: One durable operation per reconciliation item owns any expense/income 
 Support current-month imports only and reject historical/future/invalid bank dates before a claim or sheet access. Destination-aware historical undo is required before enabling historical writes. Unsupported dates can still be matched to existing entries. An unrecorded/ambiguous write needs explicit inspection; no time-based claim release guesses that a financial write failed.
 
 Rationale: Sheets and the banking database cannot share a transaction. The durable guard prevents duplicate rows across concurrent forms, process restarts and lost responses while recording enough information to recover a known write safely.
+
+## 2026-09-06 - Recover Changed Matches And Interrupted Background Work
+
+Decision: A material bank amount/date/authorized-date/account/pending change reopens matched or confirmed reconciliation in the same database transaction as the new bank values. Save the previous match and changed fields in bank_reconciliation_events; clear stale live pointers/confidence. Preserve ignored items and never change Sheets from a bank modification.
+
+Reminder preparation explicitly reports success/failure; only successful evaluation/delivery consumes the day's evaluation. Failed preparation or DM delivery uses process-local exponential retry from 60 seconds to one hour, retaining existing durable post-send event semantics. Webhooks use five-minute durable leases, unique claim tokens, per-linked-item claim serialization, and failed-event backoff. A stale claim cannot acknowledge a replacement claim; sync is bounded below the lease duration. Current-month import recovery verifies saved year/month tags and requires manual inspection after rollover.
+
+Rationale: A bank update invalidates a prior comparison; an exception is not an empty successful reminder; and processing status must be reclaimable after a crash. Durable state/event changes support recovery without silently mutating financial rows or recording unsent digests.

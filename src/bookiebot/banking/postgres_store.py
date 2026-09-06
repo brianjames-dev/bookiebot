@@ -170,6 +170,12 @@ class PostgresBankStore(BankStore):
             )
 
             self._ensure_import_operations_table(conn)
+            self._ensure_reconciliation_events_table(conn)
+            self._ensure_webhook_claim_columns(conn)
+
+    def _ensure_webhook_claim_columns(self, conn: BankStoreConnection) -> None:
+        for column in ('claim_token TEXT', 'lease_expires_at TEXT', 'attempt_count INTEGER NOT NULL DEFAULT 0', 'next_attempt_at TEXT'):
+            conn.execute(f'ALTER TABLE bank_webhook_events ADD COLUMN IF NOT EXISTS {column}')
 
     def status(self, configured: bool, plaid_env: str) -> BankStatus:
         status = super().status(configured, plaid_env)

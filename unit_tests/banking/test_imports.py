@@ -67,6 +67,7 @@ def action_for(operation_id, reconciliation_id, *, kind='expense', action_id='re
         worksheet=kind, row=12, metadata={
             'type': kind, 'bank_import_operation_id': operation_id,
             'bank_reconciliation_id': str(reconciliation_id),
+            'bank_import_target_year': '2026', 'bank_import_target_month': '9',
         },
     ))
 
@@ -278,3 +279,41 @@ def test_uncertain_import_stays_visible_in_review_and_is_not_counted_confirmed(s
     assert buckets.needs_review == 1
     assert buckets.confirmed == 0
     assert store.resolved_reconciliation_items('brian') == []
+
+
+def test_recovery_does_not_search_a_different_month_or_year_action_log(store, writers, monkeypatch):
+    item = seed(store)
+    writers.expense.side_effect = TimeoutError()
+    assert submit(store, item).status == 'needs_recovery'
+    monkeypatch.setattr(imports, 'now_pacific', lambda: datetime(2027, 9, 6))
+    reader = Mock(side_effect=AssertionError('must not search another year'))
+    monkeypatch.setattr(imports, 'read_active_logged_actions', reader)
+    assert submit(store, item).status == 'needs_recovery'
+    reader.assert_not_called()
+    assert writers.expense.call_count == 1
+
+
+def test_recovery_requires_matching_action_target_period(store, writers):
+    item = seed(store)
+    writers.expense.side_effect = TimeoutError()
+    first = submit(store, item)
+    wrong_period = action_for(first.operation_id, item.id)
+    wrong_period.action.metadata['bank_import_target_month'] = '8'
+    writers.actions.append(wrong_period)
+    assert submit(store, item).status == 'needs_recovery'
+    assert writers.expense.call_count == 1
+
+
+def test_concurrent_operation_completion_is_idempotent(store, writers):
+    item = seed(store)
+    operation, claimed = store.claim_reconciliation_import(
+        'brian', item.id, operation_id='test-operation', actor_key='actor', kind='expense',
+        request={'bank_amount':20, 'bank_date':'2026-09-05'},
+    )
+    assert claimed
+    def complete(_):
+        return store.complete_reconciliation_import(operation, action_id='one-action', sheet_ref='expense!row 12')
+    with ThreadPoolExecutor(max_workers=2) as pool:
+        completed = list(pool.map(complete, range(2)))
+    assert [operation.status for operation in completed] == ['completed', 'completed']
+    assert store.get_reconciliation_item('brian', item.id).matched_action_log_id == 'one-action'
