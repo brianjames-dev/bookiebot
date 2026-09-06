@@ -710,3 +710,8 @@ Status: Complete; deployed-bot/natural-rollover manual checks are in STATUS chec
 - Removed live Apps Script automatic placeholder-row insertion/styling. New monthly settings reference the preceding configured grid; explicit overrides remain local. Historical layouts retain required compatibility handling.
 - Shifted six September action-log row references and two split-ledger source rows with the layout migration. Verified all other values/formulas after reference adjustment; old dropdown/note remnants were removed. Added delete-snapshot compatibility so undo cannot restore the obsolete settings area.
 - Full verification: `597 passed`, Pyright clean, Node migration/rollover/reference checks passed. Four-tab API readback and visual checks passed. Existing unrelated Template reference errors and Hannah's zero-income division errors remain unchanged.
+
+### 2026-09-05 - Income Card Presentation
+
+- Removed Income card subtext in Current and Projected views; retained calculation and report-tool metadata. Rebuilt the committed frontend asset.
+- Verification: frontend typecheck/build passed. Manual check: generate a fresh expense report and toggle both modes; the Income card displays only its label and amount.
