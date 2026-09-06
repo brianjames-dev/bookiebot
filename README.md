@@ -140,9 +140,9 @@ BRIAN_SUBSCRIPTION_REMINDER_SEND_HOUR=10
 HANNAH_SUBSCRIPTION_REMINDER_SEND_HOUR=8
 ```
 
-## Read-Only Bank Integration
+## Bank Integration And Confirmed Imports
 
-The Plaid-backed bank integration is in its first Sandbox-only implementation phase. It does not write bank transactions into budget sheets yet. The current slice can link a Plaid Sandbox Item, store the access token encrypted outside Google Sheets, fetch accounts, and sync transactions with Plaid's `/transactions/sync` cursor flow.
+The Plaid integration stores encrypted access tokens outside Google Sheets, fetches accounts, and syncs transactions through `/transactions/sync`. Reconciliation matches bank items to logged entries. Writing a new expense or income/refund requires explicit confirmation in the review form.
 
 Required environment variables:
 
@@ -168,7 +168,9 @@ Admin/debug commands:
 /debug_bank_reconcile
 ```
 
-The first production-facing goal is reconciliation: matching bank transactions against manually logged expenses, income, subscriptions, and bills before anything is imported into the sheet.
+Bank imports currently support posted transactions dated in the current month only. Previous/future months and invalid dates are rejected before writing; historical items can still be matched to existing rows. This restriction remains until historical destination-aware undo is supported.
+
+A durable import operation prevents duplicate writes from repeated forms or retries. If a write outcome is uncertain, the item remains in review. Reconcile Now can recover its uniquely tagged action-log entry without writing another row. An operation without a reliable action record requires inspection of the sheet and action history; waiting or reopening an old form never resets the claim.
 
 ## 📷 Screenshots
 

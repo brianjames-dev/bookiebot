@@ -10,6 +10,7 @@ from typing import Any, Iterator, Protocol
 from bookiebot.banking.crypto import TokenCipher
 from bookiebot.banking.models import (
     BankAccount,
+    BankImportOperation,
     BankStatus,
     BankTransaction,
     LinkedBankItem,
@@ -148,6 +149,149 @@ class BankStore:
             )
             self._ensure_account_watch_column(conn)
             self._ensure_transaction_pending_link_column(conn)
+            self._ensure_import_operations_table(conn)
+
+    def _ensure_import_operations_table(self, conn: BankStoreConnection) -> None:
+        # Identical schema and transitions on SQLite and Postgres.
+        conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS bank_import_operations (
+                operation_id TEXT PRIMARY KEY,
+                reconciliation_id INTEGER NOT NULL UNIQUE
+                    REFERENCES bank_reconciliation_items(id) ON DELETE CASCADE,
+                owner_key TEXT NOT NULL,
+                actor_key TEXT NOT NULL,
+                kind TEXT NOT NULL,
+                status TEXT NOT NULL,
+                request_json TEXT NOT NULL,
+                matched_action_log_id TEXT,
+                matched_sheet_ref TEXT,
+                created_at TEXT NOT NULL,
+                updated_at TEXT NOT NULL,
+                error TEXT
+            )
+            """
+        )
+
+    def get_import_operation(self, owner_key: str, reconciliation_id: int) -> BankImportOperation | None:
+        self.initialize()
+        with self.connect() as conn:
+            row = conn.execute(
+                "SELECT * FROM bank_import_operations WHERE owner_key = ? AND reconciliation_id = ?",
+                (owner_key, int(reconciliation_id)),
+            ).fetchone()
+        return BankImportOperation(**dict(row)) if row else None
+
+    def claim_reconciliation_import(
+        self, owner_key: str, reconciliation_id: int, *, operation_id: str,
+        actor_key: str, kind: str, request: dict[str, Any],
+    ) -> tuple[BankImportOperation | None, bool]:
+        """Atomically claim an eligible, unchanged transaction before touching Sheets."""
+        self.initialize()
+        now = utc_now_iso()
+        with self.connect() as conn:
+            claimed = conn.execute(
+                """
+                UPDATE bank_reconciliation_items
+                SET status = 'import_requested', last_seen_at = ?
+                WHERE id = ? AND owner_key = ?
+                  AND status IN ('needs_review', 'pending_user', 'conflict')
+                  AND NOT EXISTS (
+                    SELECT 1 FROM bank_import_operations o
+                    WHERE o.reconciliation_id = bank_reconciliation_items.id
+                  )
+                  AND EXISTS (
+                    SELECT 1 FROM bank_transactions t
+                    LEFT JOIN bank_accounts a ON a.id = t.account_id
+                    WHERE t.id = bank_reconciliation_items.bank_transaction_id
+                      AND t.owner_key = ? AND t.removed_at IS NULL AND t.pending = 0
+                      AND COALESCE(a.watched, 1) = 1
+                      AND t.amount = ? AND COALESCE(t.date, t.authorized_date, '') = ?
+                  )
+                """,
+                (now, int(reconciliation_id), owner_key, owner_key, request['bank_amount'], request['bank_date']),
+            ).rowcount == 1
+            if claimed:
+                conn.execute(
+                    """
+                    INSERT INTO bank_import_operations (
+                        operation_id, reconciliation_id, owner_key, actor_key, kind,
+                        status, request_json, created_at, updated_at
+                    ) VALUES (?, ?, ?, ?, ?, 'claimed', ?, ?, ?)
+                    """,
+                    (operation_id, int(reconciliation_id), owner_key, actor_key, kind,
+                     json.dumps(request, sort_keys=True), now, now),
+                )
+            row = conn.execute(
+                "SELECT * FROM bank_import_operations WHERE owner_key = ? AND reconciliation_id = ?",
+                (owner_key, int(reconciliation_id)),
+            ).fetchone()
+        return (BankImportOperation(**dict(row)) if row else None), claimed
+
+    def mark_import_writing(self, owner_key: str, operation_id: str) -> bool:
+        with self.connect() as conn:
+            return conn.execute(
+                """UPDATE bank_import_operations SET status = 'writing', updated_at = ?
+                   WHERE operation_id = ? AND owner_key = ? AND status = 'claimed'""",
+                (utc_now_iso(), operation_id, owner_key),
+            ).rowcount == 1
+
+    def mark_import_needs_recovery(self, owner_key: str, operation_id: str, error: str) -> None:
+        with self.connect() as conn:
+            conn.execute(
+                """UPDATE bank_import_operations
+                   SET status = 'needs_recovery', updated_at = ?, error = ?
+                   WHERE operation_id = ? AND owner_key = ? AND status != 'completed'""",
+                (utc_now_iso(), error[:1000], operation_id, owner_key),
+            )
+
+    def complete_reconciliation_import(
+        self, operation: BankImportOperation, *, action_id: str, sheet_ref: str,
+    ) -> BankImportOperation:
+        """Persist the written action and confirmation together; never overwrite another resolution."""
+        request = json.loads(operation.request_json)
+        now = utc_now_iso()
+        with self.connect() as conn:
+            # This update also serializes two recovery/completion attempts on Postgres.
+            updated = conn.execute(
+                """UPDATE bank_import_operations
+                   SET matched_action_log_id = ?, matched_sheet_ref = ?, updated_at = ?
+                   WHERE operation_id = ? AND owner_key = ? AND status != 'completed'
+                     AND (matched_action_log_id IS NULL OR matched_action_log_id = ?)""",
+                (action_id, sheet_ref, now, operation.operation_id, operation.owner_key, action_id),
+            ).rowcount
+            if updated:
+                confirmed = conn.execute(
+                    """
+                    UPDATE bank_reconciliation_items
+                    SET status = 'confirmed', resolved_at = ?, last_seen_at = ?,
+                        matched_action_log_id = ?, matched_sheet_ref = ?,
+                        notes = 'logged from bank reconciliation import'
+                    WHERE id = ? AND owner_key = ? AND status = 'import_requested'
+                      AND EXISTS (
+                        SELECT 1 FROM bank_transactions t
+                        WHERE t.id = bank_reconciliation_items.bank_transaction_id
+                          AND t.removed_at IS NULL AND t.pending = 0
+                          AND t.amount = ? AND COALESCE(t.date, t.authorized_date, '') = ?
+                      )
+                    """,
+                    (now, now, action_id, sheet_ref, operation.reconciliation_id, operation.owner_key,
+                     request['bank_amount'], request['bank_date']),
+                ).rowcount == 1
+                conn.execute(
+                    """UPDATE bank_import_operations SET status = ?, error = ?
+                       WHERE operation_id = ? AND owner_key = ?""",
+                    ('completed' if confirmed else 'needs_recovery',
+                     None if confirmed else 'Bank item changed after the sheet write; review the recorded action.',
+                     operation.operation_id, operation.owner_key),
+                )
+            row = conn.execute(
+                "SELECT * FROM bank_import_operations WHERE operation_id = ? AND owner_key = ?",
+                (operation.operation_id, operation.owner_key),
+            ).fetchone()
+        if row is None:
+            raise RuntimeError('Import operation disappeared during completion')
+        return BankImportOperation(**dict(row))
 
     def _ensure_account_watch_column(self, conn: BankStoreConnection) -> None:
         try:
@@ -824,9 +968,9 @@ class BankStore:
                         WHEN COALESCE(a.watched, 1) = 0 THEN 'unwatched'
                         WHEN t.pending = 1 THEN 'pending'
                         WHEN r.id IS NULL THEN 'not_reviewed'
-                        WHEN r.status IN ('needs_review', 'pending_user', 'conflict') THEN 'needs_review'
+                        WHEN r.status IN ('needs_review', 'pending_user', 'conflict', 'import_requested') THEN 'needs_review'
                         WHEN r.status = 'matched' THEN 'matched'
-                        WHEN r.status IN ('confirmed', 'import_requested') THEN 'confirmed'
+                        WHEN r.status = 'confirmed' THEN 'confirmed'
                         WHEN r.status = 'ignored' THEN 'ignored'
                         ELSE 'other'
                     END AS bucket,
@@ -1040,7 +1184,7 @@ class BankStore:
                   AND t.removed_at IS NULL
                   AND t.pending = 0
                   AND (t.account_id IS NULL OR COALESCE(a.watched, 1) = 1)
-                  AND r.status IN ('needs_review', 'pending_user', 'conflict')
+                  AND r.status IN ('needs_review', 'pending_user', 'conflict', 'import_requested')
                   {date_filter}
                 ORDER BY COALESCE(t.date, t.authorized_date, '') DESC, r.id DESC
                 LIMIT ?
@@ -1133,7 +1277,7 @@ class BankStore:
                 LEFT JOIN bank_accounts a ON a.id = t.account_id
                 WHERE r.owner_key = ?
                   AND t.removed_at IS NULL
-                  AND r.status IN ('confirmed', 'ignored', 'import_requested')
+                  AND r.status IN ('confirmed', 'ignored')
                 ORDER BY COALESCE(r.resolved_at, r.ignored_at, r.last_seen_at) DESC, r.id DESC
                 LIMIT ?
                 """,

@@ -730,8 +730,8 @@ User authorized all batches incrementally on 2026-09-06. STATUS is the active qu
 | 1 | A01: bill questions/negation never write; A02: updated payments/savings retain their type and cannot delete budget rows | Complete 2026-09-06; 647 tests and Pyright passed |
 | 2 | A03–A04: income row shifts update only the correct owner's references, including bill/savings actions | Complete 2026-09-06; 663 tests and Pyright passed |
 | 3 | A05: delete/move undo preserves another user's intervening edits and consistent action history | Complete 2026-09-06; 669 tests and Pyright passed |
-| 4 | A06–A07: reject unsupported historical destinations before writing; durable claims prevent stale/concurrent/retried duplicate imports | In progress |
-| 5 | A08–A09: changed matches reopen; transient reminder failures retry; webhook processing recovers after restart | Pending |
+| 4 | A06–A07: reject unsupported historical destinations before writing; durable claims prevent stale/concurrent/retried duplicate imports | Complete 2026-09-06; 707 tests and Pyright passed |
+| 5 | A08–A09: changed matches reopen; transient reminder failures retry; webhook processing recovers after restart | In progress |
 | 6 | A10–A11: every private report route enforces signed access; live rendering yields the event loop; history uses bounded batch reads | Pending |
 | 7 | A12: incident contents remain data; ordinary changes run quality gates; storage lifecycle tests exercise Postgres | Pending |
 | 8 | Remove proven unused rendering code and consolidate responsibilities where earlier batches establish safe seams | Pending |
@@ -749,3 +749,7 @@ Completed one owner-alias-aware personal-budget reference repair path used by in
 ### Audit Batch 3 work log — 2026-09-06
 
 Completed transaction-only restoration into current category contents. Undo no longer replays stale neighboring rows; it tracks intervening deletes, preserves corrections/new/draft rows, and repositions restored action lineages. Destination verification protects moved rows and occupied legacy restore positions. Six reproduced regressions now pass; focused 283/full 669 passed, Pyright clean. Manual acceptance is in STATUS. Next: durable bank imports.
+
+### Audit Batch 4 work log — 2026-09-06
+
+Completed shared expense/income import orchestration and durable SQLite/Postgres operation schema. Claims recheck owner, status, watched/posted state, amount and date atomically; uncertain outcomes hold the claim. Recovery links one tagged active action without invoking writers again. Completed or intentionally reopened items cannot be reimported by stale forms. Imports support only the current month until historical destination-aware undo exists; matching historical entries remains available. Added 38 cases; targeted 167/full 707 passed, Pyright clean. Manual acceptance is in STATUS. Next: bank/reminder/webhook lifecycle recovery.

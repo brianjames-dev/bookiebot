@@ -11,6 +11,7 @@ from bookiebot.banking.config import BankingConfig, load_banking_config
 from bookiebot.banking.crypto import TokenCipher
 from bookiebot.banking.models import (
     BankAccount,
+    BankImportResult,
     BankStatus,
     BankTransaction,
     LinkedBankItem,
@@ -621,6 +622,24 @@ class BankingService:
     def get_reconciliation_item(self, owner_key: str, reconciliation_id: int):
         return self.store.get_reconciliation_item(owner_key, reconciliation_id)
 
+    def import_reconciliation_item(
+        self, owner_key: str, reconciliation_id: int, *, actor_key: str,
+        kind: str, fields: dict[str, str], expected_amount: float, expected_date: str | None,
+    ) -> BankImportResult:
+        from bookiebot.banking.imports import import_reconciliation_item
+
+        return import_reconciliation_item(
+            self.store, owner_key, reconciliation_id, actor_key=actor_key, kind=kind,
+            fields=fields, expected_amount=expected_amount, expected_date=expected_date,
+        )
+
+    def recover_reconciliation_import(
+        self, owner_key: str, reconciliation_id: int, *, actor_key: str,
+    ) -> BankImportResult:
+        from bookiebot.banking.imports import recover_reconciliation_import
+
+        return recover_reconciliation_import(self.store, owner_key, reconciliation_id, actor_key=actor_key)
+
     def confirm_reconciliation_item(
         self,
         owner_key: str,
@@ -650,6 +669,8 @@ class BankingService:
         item = self.get_reconciliation_item(owner_key, reconciliation_id)
         if item is None:
             return None, [], []
+        if item.status == 'import_requested':
+            return item, [], []
         action_log = read_active_logged_actions(actor_key)
         excluded = self.store.matched_action_log_ids(owner_key)
         schedule_candidates = find_scheduled_pull_candidates(

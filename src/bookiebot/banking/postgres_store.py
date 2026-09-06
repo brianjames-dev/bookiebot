@@ -169,6 +169,8 @@ class PostgresBankStore(BankStore):
                 """
             )
 
+            self._ensure_import_operations_table(conn)
+
     def status(self, configured: bool, plaid_env: str) -> BankStatus:
         status = super().status(configured, plaid_env)
         return BankStatus(

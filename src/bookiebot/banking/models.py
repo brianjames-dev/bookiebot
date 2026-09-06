@@ -160,3 +160,27 @@ class PlaidWebhookEvent:
     received_at: str
     processed_at: str | None
     error: str | None
+
+
+@dataclass(frozen=True)
+class BankImportOperation:
+    operation_id: str
+    reconciliation_id: int
+    owner_key: str
+    actor_key: str
+    kind: str
+    status: str
+    request_json: str
+    matched_action_log_id: str | None
+    matched_sheet_ref: str | None
+    created_at: str
+    updated_at: str
+    error: str | None
+
+
+@dataclass(frozen=True)
+class BankImportResult:
+    status: str
+    message: str
+    operation_id: str | None = None
+    action_id: str | None = None

@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import asyncio
-from datetime import datetime
 from typing import Any
 
 import discord
@@ -11,28 +10,12 @@ from bookiebot.banking.formatting import (
     format_reconciliation_detail,
 )
 from bookiebot.banking.service import build_banking_service
-from bookiebot.sheets.config import get_category_columns
-from bookiebot.sheets.repo import get_sheets_repo
-from bookiebot.sheets.routing import sheet_user_context
-from bookiebot.sheets.writer import log_category_row, log_income_row, record_expense_undo
 from bookiebot.ui.bank_reconciliation import (
     BankExpenseFixedFieldsView,
     BankReconciliationDetailView,
     BankReconciliationGroupAdjustView,
     BankReconciliationLogChoiceView,
 )
-
-
-def _bank_date_to_sheet_date(value: str | None) -> str:
-    if not value:
-        current = datetime.now()
-        return f"{current.month}/{current.day}/{current.year}"
-    try:
-        parsed = datetime.strptime(value[:10], "%Y-%m-%d")
-    except ValueError:
-        current = datetime.now()
-        return f"{current.month}/{current.day}/{current.year}"
-    return f"{parsed.month}/{parsed.day}/{parsed.year}"
 
 
 def _default_expense_person(owner_key: str) -> str:
@@ -126,6 +109,15 @@ async def send_bank_reconciliation_detail(
                 skipped_ids=skipped,
                 session_item_ids=session_scope,
             )
+
+    if item.status == 'import_requested':
+        result = await asyncio.to_thread(
+            service.recover_reconciliation_import, owner_key, reconciliation_id, actor_key=actor_key,
+        )
+        await interaction.followup.send(content=result.message, ephemeral=True)
+        if result.status == 'completed':
+            await continue_session(interaction)
+        return
 
     async def handle_action(action_interaction: Any, action: str) -> None:
         await action_interaction.response.defer(ephemeral=True)
@@ -488,62 +480,13 @@ class _BankExpenseLogModal(discord.ui.Modal, title="Log bank item as expense"):
         self.location.default = source_name
 
     async def on_submit(self, interaction: discord.Interaction) -> None:
-        category = self.category
-        if category not in get_category_columns:
-            available = ", ".join(sorted(get_category_columns))
-            await interaction.response.send_message(
-                f"Unknown category `{category}`. Available categories: {available}.",
-                ephemeral=True,
-            )
-            return
-        person = self.person
-        transaction = self.item.transaction
-        values = {
-            "date": _bank_date_to_sheet_date(transaction.date or transaction.authorized_date),
-            "amount": abs(transaction.amount),
-            "item": str(self.item_name.value).strip(),
-            "location": str(self.location.value).strip(),
-            "person": person,
-        }
-        try:
-            with sheet_user_context(self.actor_key):
-                worksheet = get_sheets_repo().expense_sheet()
-                row = await asyncio.to_thread(log_category_row, values, worksheet, category)
-                action_id = await asyncio.to_thread(
-                    record_expense_undo,
-                    category,
-                    row,
-                    values,
-                    person,
-                    self.actor_key,
-                    {
-                        "origin": "bank_reconciliation",
-                        "bank_reconciliation_id": str(self.item.id),
-                    },
-                )
-            service = build_banking_service()
-            confirmed = await asyncio.to_thread(
-                service.confirm_reconciliation_item,
-                self.owner_key,
-                self.item.id,
-                matched_action_log_id=action_id,
-                matched_sheet_ref=f"expense!row {row}",
-                notes="logged as expense from bank reconciliation",
-            )
-        except Exception as exc:
-            await interaction.response.send_message(
-                f"Could not log expense: {type(exc).__name__}: {exc}",
-                ephemeral=True,
-            )
-            return
-        if confirmed is None:
-            await interaction.response.send_message("That bank reconciliation item was no longer available.", ephemeral=True)
-            return
-        await interaction.response.send_message(
-            f"Logged `{transaction.name}` as `{category}` expense: `${abs(transaction.amount):.2f}`.",
-            ephemeral=True,
+        await _submit_bank_import(
+            interaction, item=self.item, owner_key=self.owner_key, actor_key=self.actor_key,
+            kind="expense", fields={
+                "category": self.category, "person": self.person,
+                "item": str(self.item_name.value).strip(), "location": str(self.location.value).strip(),
+            }, continue_session=self.continue_session,
         )
-        await self.continue_session(interaction)
 
 
 class _BankIncomeLogModal(discord.ui.Modal, title="Log bank item as income/refund"):
@@ -562,46 +505,31 @@ class _BankIncomeLogModal(discord.ui.Modal, title="Log bank item as income/refun
         self.label.default = "refund"
 
     async def on_submit(self, interaction: discord.Interaction) -> None:
-        transaction = self.item.transaction
-        values = {
-            "source": str(self.source.value).strip(),
-            "label": str(self.label.value).strip(),
-            "amount": abs(transaction.amount),
-            "date": transaction.date or transaction.authorized_date,
-        }
-        try:
-            with sheet_user_context(self.actor_key):
-                worksheet = get_sheets_repo().income_sheet()
-                row, _description, _amount, action_id = await asyncio.to_thread(
-                    log_income_row,
-                    values,
-                    worksheet,
-                    return_action_id=True,
-                    metadata_extra={
-                        "origin": "bank_reconciliation",
-                        "bank_reconciliation_id": str(self.item.id),
-                    },
-                )
-            service = build_banking_service()
-            confirmed = await asyncio.to_thread(
-                service.confirm_reconciliation_item,
-                self.owner_key,
-                self.item.id,
-                matched_action_log_id=action_id,
-                matched_sheet_ref=f"income!row {row}",
-                notes="logged as income/refund from bank reconciliation",
-            )
-        except Exception as exc:
-            await interaction.response.send_message(
-                f"Could not log income/refund: {type(exc).__name__}: {exc}",
-                ephemeral=True,
-            )
-            return
-        if confirmed is None:
-            await interaction.response.send_message("That bank reconciliation item was no longer available.", ephemeral=True)
-            return
-        await interaction.response.send_message(
-            f"Logged `{transaction.name}` as income/refund: `${abs(transaction.amount):.2f}`.",
-            ephemeral=True,
+        await _submit_bank_import(
+            interaction, item=self.item, owner_key=self.owner_key, actor_key=self.actor_key,
+            kind="income", fields={
+                "source": str(self.source.value).strip(), "label": str(self.label.value).strip(),
+            }, continue_session=self.continue_session,
         )
-        await self.continue_session(interaction)
+
+
+async def _submit_bank_import(
+    interaction: Any, *, item: Any, owner_key: str, actor_key: str,
+    kind: str, fields: dict[str, str], continue_session: Any,
+) -> None:
+    await interaction.response.defer(ephemeral=True, thinking=True)
+    try:
+        service = build_banking_service()
+        result = await asyncio.to_thread(
+            service.import_reconciliation_item, owner_key, item.id, actor_key=actor_key,
+            kind=kind, fields=fields, expected_amount=item.transaction.amount,
+            expected_date=item.transaction.date or item.transaction.authorized_date,
+        )
+    except Exception:
+        await interaction.edit_original_response(
+            content="Could not complete the bank import. Open the current review to check its status before trying again."
+        )
+        return
+    await interaction.edit_original_response(content=result.message)
+    if result.status == "completed":
+        await continue_session(interaction)

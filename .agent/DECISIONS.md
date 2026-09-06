@@ -441,3 +441,11 @@ Rationale: Shared action history does not imply shared personal-budget row coord
 Decision: Treat delete/move snapshots as a source for the removed transaction only. Restore that row at its tracked position and shift the current category contents and action references. Include partially entered rows. Verify a moved destination still matches its saved fields before clearing it; refuse occupied legacy non-compacting restore positions.
 
 Rationale: Whole-category snapshot replay overwrote another user's later corrections or additions. Current-state restoration preserves those edits while retaining historical action compatibility. This does not make separate Google Sheets and action-log writes a single atomic transaction.
+
+## 2026-09-06 - Claim Bank Imports Durably Before Writing
+
+Decision: One durable operation per reconciliation item owns any expense/income import. Atomically claim the current eligible bank state before Sheets access; transition claimed → writing → completed, or needs_recovery after an uncertain result. Store requested destination/fields and tag action history with the operation ID. Confirm the reconciliation only if its state, amount and date still agree. Retries can recover a unique recorded action but cannot call the writer again after a claim may have written; intentional undo/reopen does not reset that guard.
+
+Support current-month imports only and reject historical/future/invalid bank dates before a claim or sheet access. Destination-aware historical undo is required before enabling historical writes. Unsupported dates can still be matched to existing entries. An unrecorded/ambiguous write needs explicit inspection; no time-based claim release guesses that a financial write failed.
+
+Rationale: Sheets and the banking database cannot share a transaction. The durable guard prevents duplicate rows across concurrent forms, process restarts and lost responses while recording enough information to recover a known write safely.
