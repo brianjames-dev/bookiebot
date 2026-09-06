@@ -733,8 +733,8 @@ User authorized all batches incrementally on 2026-09-06. STATUS is the active qu
 | 4 | A06–A07: reject unsupported historical destinations before writing; durable claims prevent stale/concurrent/retried duplicate imports | Complete 2026-09-06; 707 tests and Pyright passed |
 | 5 | A08–A09: changed matches reopen; transient reminder failures retry; webhook processing recovers after restart | Complete 2026-09-06; 733 tests and Pyright passed |
 | 6 | A10–A11: every private report route enforces signed access; live rendering yields the event loop; history uses bounded batch reads | Complete 2026-09-06; 746 tests and Pyright passed |
-| 7 | A12: incident contents remain data; ordinary changes run quality gates; storage lifecycle tests exercise Postgres | In progress |
-| 8 | Remove proven unused rendering code and consolidate responsibilities where earlier batches establish safe seams | Pending |
+| 7 | A12: incident contents remain data; ordinary changes run quality gates; storage lifecycle tests exercise Postgres | Complete 2026-09-06; 773 tests incl. real Postgres and quality gates passed |
+| 8 | Remove proven unused rendering code and consolidate responsibilities where earlier batches establish safe seams | In progress |
 
 Preserve intentional semantics: existing affirmative bill shorthand, actual/expected income separation, historical report compatibility, bank confirmation before import, immutable gross split amount, and reimbursement settlement without income. Historical bank writes may fail closed until destination-aware undo is supported. Audit completion is separate from deployment/manual confirmation; do not silently run migrations or mutate live test transactions.
 
@@ -763,3 +763,7 @@ Batch 5 copy follow-up: explicitly tell users that a sheet entry may already exi
 ### Audit Batch 6 work log — 2026-09-06
 
 Completed signed access on all report routes, no-store responses, bounded asynchronous live builds with actor-safe in-flight coalescing and cancellation isolation, batched formatted history reads, and non-provisioning optional sheet lookup. Historical payload/snapshot fallback remains supported behind signed access. Added 13 cases; targeted 280/full 746 passed, Pyright clean. Manual acceptance is in STATUS. Next: automation and database quality gates.
+
+### Audit Batch 7 work log — 2026-09-06
+
+Completed file-based autofix metadata and failure diagnostics, ordinary push/PR CI, and one storage contract across SQLite/Postgres. Tests prove owner isolation, transaction rollback, unique import claims, changed-match events, stale-worker fencing and concurrent same-item webhook serialization on a real temporary Postgres16 database. Nine arbitrary-text regressions also pass. Targeted 31/full 773 passed; Pyright, Node, frontend typecheck/build and asset parity passed. Remote workflow execution will be checked after push. Next: focused cleanup and final verification.

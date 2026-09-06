@@ -465,3 +465,11 @@ Decision: Require an unexpired signed token for live and saved reports; filename
 Read historical monthly values with one metadata query plus one formatted values batch per annual scan, retaining the existing lightweight adapter path. Report lookups for optional bill/reimbursement sheets never provision them.
 
 Rationale: A saved filename must not bypass expired access, and blocking Sheets/report work must not stall Discord. Bounded sharing and batching reduce redundant work while preserving current calculation and historical compatibility semantics.
+
+## 2026-09-06 - Keep Automation Text In Files And Run Backend Parity In CI
+
+Decision: Build autofix PR metadata from GITHUB_EVENT_PATH and the saved agent output with a Python helper. Sanitize the title for GitHub's line-based output protocol, write the full body to a file, and let retrying agents read a failure-log file. Never interpolate incident contents into shell code. Ordinary pushes/PRs run the agreed Python/type/Apps Script/frontend checks and real Postgres lifecycle contracts.
+
+Postgres tests require explicit BOOKIEBOT_TEST_POSTGRES_URL, create a random schema per case, and drop only that schema during cleanup. They do not use the application's banking database configuration; absent local test configuration skips only the Postgres cases, while CI supplies its own Postgres16 service.
+
+Rationale: Normal incident punctuation broke shell parsing, and mocked adapters could not prove database transaction/concurrency behavior. File boundaries and a shared persistent-store contract address both without changing application workflow semantics.

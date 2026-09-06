@@ -1,0 +1,62 @@
+name: Verification
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: verification-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: bookiebot_test
+          POSTGRES_PASSWORD: bookiebot_test
+          POSTGRES_DB: bookiebot_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U bookiebot_test -d bookiebot_test"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      PYTHONPATH: src
+      BOOKIEBOT_TEST_POSTGRES_URL: postgresql://bookiebot_test:bookiebot_test@localhost:5432/bookiebot_test
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+      - name: Install Python dependencies
+        run: python -m pip install -r requirements.txt
+      - name: Run Python and database contracts
+        run: python -m pytest unit_tests
+      - name: Check Python types
+        run: python -m pyright
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: web/expense-report/package-lock.json
+      - name: Check Apps Script income settings and rollover
+        run: node unit_tests/scripts/income_settings_test.cjs
+      - name: Install report dependencies
+        working-directory: web/expense-report
+        run: npm ci
+      - name: Typecheck and build report
+        working-directory: web/expense-report
+        run: |
+          npm run typecheck
+          npm run build
+      - name: Verify committed report assets match source
+        run: git diff --exit-code -- src/bookiebot/reports/assets

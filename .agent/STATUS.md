@@ -4,39 +4,42 @@ Last updated: 2026-09-06
 
 ## Active Focus
 
-Implement the twelve September 6 audit findings in eight incremental, verified batches, as authorized by the user. Batches 1–6 are complete and verified; Batch 7 is active: CI, safe automation metadata, and real Postgres contracts. Each batch receives focused regressions, broader verification, tracking updates, and its own commit/push before proceeding. Existing deployment checklists remain below the audit queue.
+Implement the twelve September 6 audit findings in eight incremental, verified batches, as authorized by the user. Batches 1–7 are complete and verified locally; Batch 8 is active: focused cleanup and final combined verification. Check the new remote CI after pushing. Each batch receives focused regressions, broader verification, tracking updates, and its own commit/push before proceeding. Existing deployment checklists remain below the audit queue.
 
 ## On Deck
 
-1. Audit Batch 7 (A12): safe incident-text handling, routine CI, and real Postgres storage contract checks.
-2. Audit Batch 8: focused structural cleanup after correctness fixes; preserve historical compatibility.
+1. Audit Batch 8: focused structural cleanup after correctness fixes; preserve historical compatibility.
 
-3. Verify deployed expected-income projections and the next monthly rollover against checklist item 85.
-4. Deploy and manually verify canonical Current/Projected report tools in checklist item 82.
-5. Deploy and manually verify the LangGraph conversational/read response layer and bank-transfer refusal in checklist item 81.
-6. Deploy and manually verify Brian's BofA expense default in checklist item 80.
-7. Deploy and manually verify the shared expense-report chart viewport in checklist item 79.
-8. Deploy and manually verify fronted shared expenses in checklist item 78.
-9. Deploy and manually verify quarterly utility history in checklist item 77.
-10. Deploy and manually verify parser and bill-payment reliability in checklist item 76.
-11. Deploy and manually verify split creation/settlement in checklist item 74 and recent split changes/cancellation in checklist item 75.
-12. Continue the deferred split lifecycle: correct gross after splitting, partial reimbursement, explicit paid-split undo, and split-aware update/move/delete/undo.
-13. Deploy and manually verify prior-month paycheck carry-forward in Projected mode in checklist item 73.
-14. Deploy and manually verify Wants subscriptions in Burn Rate in checklist item 72.
-15. Deploy and manually verify selected-month subscription scoping in checklist item 71.
-16. Deploy and manually verify Daily Spending bill coverage and outlier scaling in checklist item 70.
-17. Deploy and manually verify the monthly savings workflow and corrected Saved-card targets in checklist items 60-61 and 69.
-18. Deploy and manually verify the expense-report corrections in checklist item 67.
-19. Deploy and manually verify typed `recent` opens the short-lived launcher and keeps the resulting DM session ephemeral.
-20. Deploy and manually verify `View Inbox` and `Reconcile Now` show `BookieBot is typing...` without a temporary thinking message.
-21. Manually verify shared Needs logging plus update/move/delete/undo behavior in Discord and Google Sheets.
-22. Manually verify recent transactions and reconciliation after the latest reliability fixes.
-23. Consider a richer Discord button flow for grouped amount adjustments if the current UX feels too manual.
-24. Harden recent-action pending state across restarts/deploys, since selections currently live only in process memory.
-25. Improve targeted recent-action search so commands can find older matches, not only the latest 10 recent actions.
-26. Explore clarifying questions before logging when BookieBot is uncertain instead of guessing or silently failing.
+2. Verify deployed expected-income projections and the next monthly rollover against checklist item 85.
+3. Deploy and manually verify canonical Current/Projected report tools in checklist item 82.
+4. Deploy and manually verify the LangGraph conversational/read response layer and bank-transfer refusal in checklist item 81.
+5. Deploy and manually verify Brian's BofA expense default in checklist item 80.
+6. Deploy and manually verify the shared expense-report chart viewport in checklist item 79.
+7. Deploy and manually verify fronted shared expenses in checklist item 78.
+8. Deploy and manually verify quarterly utility history in checklist item 77.
+9. Deploy and manually verify parser and bill-payment reliability in checklist item 76.
+10. Deploy and manually verify split creation/settlement in checklist item 74 and recent split changes/cancellation in checklist item 75.
+11. Continue the deferred split lifecycle: correct gross after splitting, partial reimbursement, explicit paid-split undo, and split-aware update/move/delete/undo.
+12. Deploy and manually verify prior-month paycheck carry-forward in Projected mode in checklist item 73.
+13. Deploy and manually verify Wants subscriptions in Burn Rate in checklist item 72.
+14. Deploy and manually verify selected-month subscription scoping in checklist item 71.
+15. Deploy and manually verify Daily Spending bill coverage and outlier scaling in checklist item 70.
+16. Deploy and manually verify the monthly savings workflow and corrected Saved-card targets in checklist items 60-61 and 69.
+17. Deploy and manually verify the expense-report corrections in checklist item 67.
+18. Deploy and manually verify typed `recent` opens the short-lived launcher and keeps the resulting DM session ephemeral.
+19. Deploy and manually verify `View Inbox` and `Reconcile Now` show `BookieBot is typing...` without a temporary thinking message.
+20. Manually verify shared Needs logging plus update/move/delete/undo behavior in Discord and Google Sheets.
+21. Manually verify recent transactions and reconciliation after the latest reliability fixes.
+22. Consider a richer Discord button flow for grouped amount adjustments if the current UX feels too manual.
+23. Harden recent-action pending state across restarts/deploys, since selections currently live only in process memory.
+24. Improve targeted recent-action search so commands can find older matches, not only the latest 10 recent actions.
+25. Explore clarifying questions before logging when BookieBot is uncertain instead of guessing or silently failing.
 
 ## Completed 2026-09-06
+
+- Audit Batch 7 (A12): autofix PR metadata reads incident/output files through Python, preserves arbitrary text as data, and emits a safe one-line title; retry diagnostics stay in a file instead of a malformed environment heredoc. Added push/PR CI for Python/Pyright, real Postgres contracts, Apps Script, frontend typecheck/build and committed-asset parity. The same database contracts cover SQLite and isolated Postgres schemas.
+- Verification: **31 targeted tests passed**, including 18 SQLite/Postgres contract cases and nine metadata/log cases. Full integrated suite **773 passed** with real disposable Postgres; Pyright **0 errors**; Node income migration/rollover checks and frontend typecheck/build/asset parity passed. One existing Kaleido warning. Remote CI awaits the pushed workflow run.
+- Manual/operational check: inspect the new Verification workflow on the next push/PR. For a dry-run incident fixture, include apostrophes, multiline text, backticks, and literal shell substitutions; generated PR title/body must retain text without executing it. Local real-database checks use BOOKIEBOT_TEST_POSTGRES_URL and disposable schemas; they never read BANK_DATABASE_URL.
 
 - Audit Batch 6 (A10–A11): every private report route requires valid signed access, including filename-bound snapshot routes; report responses use private/no-store. Live builds run in bounded worker threads, coalesce only simultaneous equivalent requests, preserve actor context, and survive one request disconnecting. History uses one metadata plus one values request per annual scan; optional report lookups no longer provision missing sheets.
 - Verification: 13 new report access/concurrency/history cases; targeted suite **280 passed**; full suite **746 passed**, Pyright **0 errors** (one existing Kaleido warning). Existing report calculations and historical fallback tests pass.
