@@ -172,6 +172,12 @@ Bank imports currently support posted transactions dated in the current month on
 
 A durable import operation prevents duplicate writes from repeated forms or retries. If a write outcome is uncertain, the item remains in review. Reconcile Now can recover its uniquely tagged action-log entry without writing another row. An operation without a reliable action record requires inspection of the sheet and action history; waiting or reopening an old form never resets the claim.
 
+## Expense Report Access
+
+Live and saved expense reports require an unexpired signed report link. Direct filename links also need the token issued for that exact file. Responses are private and are not cached. If live refresh fails, a valid link can still show its saved snapshot.
+
+Live builds run outside the Discord event loop. `BOOKIEBOT_REPORT_MAX_CONCURRENT_BUILDS` defaults to `2` (supported range `1`–`8`); simultaneous requests for the same actor/month share work, while later refreshes read current sheet values. Historical reads are batched, and report reads do not create missing bill-schedule or reimbursement worksheets.
+
 ## 📷 Screenshots
 
 ### Intent Recognition – Page 1

@@ -732,8 +732,8 @@ User authorized all batches incrementally on 2026-09-06. STATUS is the active qu
 | 3 | A05: delete/move undo preserves another user's intervening edits and consistent action history | Complete 2026-09-06; 669 tests and Pyright passed |
 | 4 | A06–A07: reject unsupported historical destinations before writing; durable claims prevent stale/concurrent/retried duplicate imports | Complete 2026-09-06; 707 tests and Pyright passed |
 | 5 | A08–A09: changed matches reopen; transient reminder failures retry; webhook processing recovers after restart | Complete 2026-09-06; 733 tests and Pyright passed |
-| 6 | A10–A11: every private report route enforces signed access; live rendering yields the event loop; history uses bounded batch reads | In progress |
-| 7 | A12: incident contents remain data; ordinary changes run quality gates; storage lifecycle tests exercise Postgres | Pending |
+| 6 | A10–A11: every private report route enforces signed access; live rendering yields the event loop; history uses bounded batch reads | Complete 2026-09-06; 746 tests and Pyright passed |
+| 7 | A12: incident contents remain data; ordinary changes run quality gates; storage lifecycle tests exercise Postgres | In progress |
 | 8 | Remove proven unused rendering code and consolidate responsibilities where earlier batches establish safe seams | Pending |
 
 Preserve intentional semantics: existing affirmative bill shorthand, actual/expected income separation, historical report compatibility, bank confirmation before import, immutable gross split amount, and reimbursement settlement without income. Historical bank writes may fail closed until destination-aware undo is supported. Audit completion is separate from deployment/manual confirmation; do not silently run migrations or mutate live test transactions.
@@ -759,3 +759,7 @@ Completed shared expense/income import orchestration and durable SQLite/Postgres
 Completed atomic material-bank-change reopening and durable previous-match events without Sheets mutations; preserve explicit ignore policy. Reminder evaluation failure no longer consumes daily evaluation, and automatic retries use 60-second exponential backoff capped at one hour. Webhook claims expire after five minutes, use fencing tokens and per-item serialization, and retain pending state until work is acknowledged. Imports carry and verify target-month/year metadata during recovery. Added 26 cases; targeted 193/full 733 passed, Pyright clean. Manual acceptance is in STATUS. Next: reports.
 
 Batch 5 copy follow-up: explicitly tell users that a sheet entry may already exist when an import needs recovery, so they inspect the sheet before resolving it. This clarifies the partial-write outcome; import behavior and the passing 733-test verification remain unchanged.
+
+### Audit Batch 6 work log — 2026-09-06
+
+Completed signed access on all report routes, no-store responses, bounded asynchronous live builds with actor-safe in-flight coalescing and cancellation isolation, batched formatted history reads, and non-provisioning optional sheet lookup. Historical payload/snapshot fallback remains supported behind signed access. Added 13 cases; targeted 280/full 746 passed, Pyright clean. Manual acceptance is in STATUS. Next: automation and database quality gates.

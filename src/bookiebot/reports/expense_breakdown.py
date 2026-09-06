@@ -12,6 +12,7 @@ import secrets
 from typing import Any
 
 from openpyxl.utils import column_index_from_string
+from gspread.utils import absolute_range_name, fill_gaps
 
 from bookiebot.sheets.config import get_category_columns
 from bookiebot.sheets.collaboration import SharedAllocation, allocations_from_rows, split_method_label
@@ -375,8 +376,8 @@ def load_report_worksheets(actor_key: str, month: BudgetMonth) -> ReportWorkshee
             shared_expenses=repo.expense_sheet(),
             personal_budget=repo.income_sheet(),
             subscriptions=_optional_sheet(repo.subscriptions_sheet),
-            bill_schedule=_optional_sheet(repo.bill_schedule_sheet),
-            shared_reimbursements=_optional_sheet(repo.shared_reimbursements_sheet),
+            bill_schedule=_optional_sheet(repo.find_bill_schedule_sheet),
+            shared_reimbursements=_optional_sheet(repo.find_shared_reimbursements_sheet),
             budget_history=_optional_budget_history(actor_key, month),
         )
 
@@ -727,8 +728,33 @@ def _optional_next_year_income_history(actor_key: str, month: BudgetMonth) -> tu
 
 
 def _budget_history_from_spreadsheet(spreadsheet: Any, month: BudgetMonth) -> tuple[BudgetHistoryRows, ...]:
+    month_numbers = range(1, min(month.month + 1, 12) + 1)
+    if callable(getattr(spreadsheet, "worksheets", None)) and callable(getattr(spreadsheet, "values_batch_get", None)):
+        # One metadata fetch identifies existing tabs, so a missing future month
+        # cannot fail the whole values batch. Keep formatted/evaluated values,
+        # exactly as get_all_values does; do not cache mutable income settings.
+        titles = {worksheet.title for worksheet in spreadsheet.worksheets()}
+        selected = [number for number in month_numbers if calendar.month_name[number] in titles]
+        if not selected:
+            return ()
+        result = spreadsheet.values_batch_get(
+            [absolute_range_name(calendar.month_name[number]) for number in selected],
+            params={"valueRenderOption": "FORMATTED_VALUE"},
+        )
+        ranges = result.get("valueRanges", [])
+        if len(ranges) != len(selected):
+            raise ValueError("Incomplete budget history values response")
+        return tuple(
+            BudgetHistoryRows(
+                BudgetMonth(month.year, number),
+                [[str(value) for value in row] for row in fill_gaps(value_range.get("values", [[]]))],
+            )
+            for number, value_range in zip(selected, ranges)
+        )
+
+    # Preserve lightweight repository adapters without gspread's batch API.
     history: list[BudgetHistoryRows] = []
-    for month_number in range(1, min(month.month + 1, 12) + 1):
+    for month_number in month_numbers:
         worksheet = _worksheet_by_name(spreadsheet, calendar.month_name[month_number])
         if worksheet is None:
             continue

@@ -457,3 +457,11 @@ Decision: A material bank amount/date/authorized-date/account/pending change reo
 Reminder preparation explicitly reports success/failure; only successful evaluation/delivery consumes the day's evaluation. Failed preparation or DM delivery uses process-local exponential retry from 60 seconds to one hour, retaining existing durable post-send event semantics. Webhooks use five-minute durable leases, unique claim tokens, per-linked-item claim serialization, and failed-event backoff. A stale claim cannot acknowledge a replacement claim; sync is bounded below the lease duration. Current-month import recovery verifies saved year/month tags and requires manual inspection after rollover.
 
 Rationale: A bank update invalidates a prior comparison; an exception is not an empty successful reminder; and processing status must be reclaimable after a crash. Durable state/event changes support recovery without silently mutating financial rows or recording unsent digests.
+
+## 2026-09-06 - Authorize All Report Paths And Bound Live Reads
+
+Decision: Require an unexpired signed token for live and saved reports; filename routes additionally require the token's exact filename. Use private/no-store responses. Live reports run off the event loop with bounded concurrency (default two workers, configurable 1–8), bounded queued work, and in-flight coalescing keyed by actor/owner/persons/month/year. Request cancellation does not cancel shared work or free its slot early. Keep no completed-result cache so subsequent refreshes see edits; retain authorized snapshot fallback and retryable busy responses.
+
+Read historical monthly values with one metadata query plus one formatted values batch per annual scan, retaining the existing lightweight adapter path. Report lookups for optional bill/reimbursement sheets never provision them.
+
+Rationale: A saved filename must not bypass expired access, and blocking Sheets/report work must not stall Discord. Bounded sharing and batching reduce redundant work while preserving current calculation and historical compatibility semantics.
