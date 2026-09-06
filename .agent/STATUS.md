@@ -1,37 +1,51 @@
 # Agent Status
 
-Last updated: 2026-09-05
+Last updated: 2026-09-06
 
 ## Active Focus
 
-The final income settings grid is live at B4:E5 on both budgets' Template and September tabs, with a blank row 6 and income transactions starting at B7:D7. Explicit Expected Income Amount now drives biweekly or fixed monthly projections; deposits within three days fulfill one pay period without changing the expectation. Live Apps Script, row-reference migration, and regression verification are complete. Next is deployed-bot and natural rollover confirmation in checklist item 85.
+Implement the twelve September 6 audit findings in eight incremental, verified batches, as authorized by the user. Batch 1 is complete and verified; Batch 2 is active: owner-scoped structural row-reference repair. Each batch receives focused regressions, broader verification, tracking updates, and its own commit/push before proceeding. Existing deployment checklists remain below the audit queue.
 
 ## On Deck
 
-1. Verify deployed expected-income projections and the next monthly rollover against checklist item 85.
-2. Deploy and manually verify canonical Current/Projected report tools in checklist item 82.
-3. Deploy and manually verify the LangGraph conversational/read response layer and bank-transfer refusal in checklist item 81.
-4. Deploy and manually verify Brian's BofA expense default in checklist item 80.
-5. Deploy and manually verify the shared expense-report chart viewport in checklist item 79.
-6. Deploy and manually verify fronted shared expenses in checklist item 78.
-7. Deploy and manually verify quarterly utility history in checklist item 77.
-8. Deploy and manually verify parser and bill-payment reliability in checklist item 76.
-9. Deploy and manually verify split creation/settlement in checklist item 74 and recent split changes/cancellation in checklist item 75.
-10. Continue the deferred split lifecycle: correct gross after splitting, partial reimbursement, explicit paid-split undo, and split-aware update/move/delete/undo.
-11. Deploy and manually verify prior-month paycheck carry-forward in Projected mode in checklist item 73.
-12. Deploy and manually verify Wants subscriptions in Burn Rate in checklist item 72.
-13. Deploy and manually verify selected-month subscription scoping in checklist item 71.
-14. Deploy and manually verify Daily Spending bill coverage and outlier scaling in checklist item 70.
-15. Deploy and manually verify the monthly savings workflow and corrected Saved-card targets in checklist items 60-61 and 69.
-16. Deploy and manually verify the expense-report corrections in checklist item 67.
-17. Deploy and manually verify typed `recent` opens the short-lived launcher and keeps the resulting DM session ephemeral.
-18. Deploy and manually verify `View Inbox` and `Reconcile Now` show `BookieBot is typing...` without a temporary thinking message.
-19. Manually verify shared Needs logging plus update/move/delete/undo behavior in Discord and Google Sheets.
-20. Manually verify recent transactions and reconciliation after the latest reliability fixes.
-21. Consider a richer Discord button flow for grouped amount adjustments if the current UX feels too manual.
-22. Harden recent-action pending state across restarts/deploys, since selections currently live only in process memory.
-23. Improve targeted recent-action search so commands can find older matches, not only the latest 10 recent actions.
-24. Explore clarifying questions before logging when BookieBot is uncertain instead of guessing or silently failing.
+1. Audit Batch 2 (A03–A04): owner-scoped row-reference repair across income insertion/deletion/undo.
+2. Audit Batch 3 (A05): preserve intervening shared-expense edits during delete/move undo.
+3. Audit Batch 4 (A06–A07): supported date destinations and durable, recoverable bank import claims.
+4. Audit Batch 5 (A08–A09): reopen materially changed bank matches; retry failed reminder preparation; reclaim abandoned webhook work.
+5. Audit Batch 6 (A10–A11): authorize all report routes; offload/coalesce report builds and batch history reads.
+6. Audit Batch 7 (A12): safe incident-text handling, routine CI, and real Postgres storage contract checks.
+7. Audit Batch 8: focused structural cleanup after correctness fixes; preserve historical compatibility.
+
+8. Verify deployed expected-income projections and the next monthly rollover against checklist item 85.
+9. Deploy and manually verify canonical Current/Projected report tools in checklist item 82.
+10. Deploy and manually verify the LangGraph conversational/read response layer and bank-transfer refusal in checklist item 81.
+11. Deploy and manually verify Brian's BofA expense default in checklist item 80.
+12. Deploy and manually verify the shared expense-report chart viewport in checklist item 79.
+13. Deploy and manually verify fronted shared expenses in checklist item 78.
+14. Deploy and manually verify quarterly utility history in checklist item 77.
+15. Deploy and manually verify parser and bill-payment reliability in checklist item 76.
+16. Deploy and manually verify split creation/settlement in checklist item 74 and recent split changes/cancellation in checklist item 75.
+17. Continue the deferred split lifecycle: correct gross after splitting, partial reimbursement, explicit paid-split undo, and split-aware update/move/delete/undo.
+18. Deploy and manually verify prior-month paycheck carry-forward in Projected mode in checklist item 73.
+19. Deploy and manually verify Wants subscriptions in Burn Rate in checklist item 72.
+20. Deploy and manually verify selected-month subscription scoping in checklist item 71.
+21. Deploy and manually verify Daily Spending bill coverage and outlier scaling in checklist item 70.
+22. Deploy and manually verify the monthly savings workflow and corrected Saved-card targets in checklist items 60-61 and 69.
+23. Deploy and manually verify the expense-report corrections in checklist item 67.
+24. Deploy and manually verify typed `recent` opens the short-lived launcher and keeps the resulting DM session ephemeral.
+25. Deploy and manually verify `View Inbox` and `Reconcile Now` show `BookieBot is typing...` without a temporary thinking message.
+26. Manually verify shared Needs logging plus update/move/delete/undo behavior in Discord and Google Sheets.
+27. Manually verify recent transactions and reconciliation after the latest reliability fixes.
+28. Consider a richer Discord button flow for grouped amount adjustments if the current UX feels too manual.
+29. Harden recent-action pending state across restarts/deploys, since selections currently live only in process memory.
+30. Improve targeted recent-action search so commands can find older matches, not only the latest 10 recent actions.
+31. Explore clarifying questions before logging when BookieBot is uncertain instead of guessing or silently failing.
+
+## Completed 2026-09-06
+
+- Audit Batch 1 (A01–A02): deterministic bill writes now require affirmative logging/payment grammar; bill questions, future statements, and negation enter the read-only response path before pending mutation handling. Preserved supported shorthand and split directives. Payment/savings actions retain canonical source type through repeated/legacy updates and cannot delete budget rows; income deletion validates actual transaction-table bounds.
+- Verification: full local suite **647 passed** (one existing Kaleido deprecation warning; native renderer run outside sandbox), Pyright **0 errors**. Added 47 routing/capability regression cases; existing suite remains green.
+- Manual check after deployment in a test workbook: ask `Can I afford $2100 rent?`, `Do not log my $148.82 water bill`, and `Rent $2100?`; no payment or pending amount is changed. Log `Water bill 148.82` normally. Update Rent/savings repeatedly, open Recent, and confirm Delete is unavailable and direct deletion refuses without losing budget labels. Update/delete/undo genuine income and verify B4:E5 and totals remain intact.
 
 ## Completed 2026-09-05
 

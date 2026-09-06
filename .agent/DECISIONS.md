@@ -422,3 +422,10 @@ Rationale: An hourly paycheck can vary without changing the expected next payche
 ### 2026-09-05 - Utility history distinguishes pending from zero
 
 Utility chart history uses nullable amounts for unpaid open/future billing months; only closed billing months receive zero. Quarterly non-billing months remain omitted, while actual payments remain visible regardless of schedule. Numeric current totals and projection calculations retain their existing semantics. This avoids displaying an unentered bill as a finalized zero payment.
+
+
+## 2026-09-06 - Require Affirmative Bill Writes And Preserve Transaction Type
+
+Decision: Deterministic bill writes accept explicit logging/completed-payment grammar and supported terse bill/amount forms. Other bill questions/statements and negation enter the read-only conversational path before pending mutation handling, never a parser that can reinterpret them as writes. Preserve canonical transaction type across update lineage; a personal-budget worksheet name does not imply income. Recover legacy repeated-update type from loaded parents, keep payment/savings deletion restrictions, and validate income-table bounds before physical deletion.
+
+Rationale: Affordability questions could overwrite bill payments, and repeated payment updates could expose deletion of a whole budget row. These safeguards retain intended logging behavior while closing those unintended write paths.

@@ -207,6 +207,60 @@ def test_ambiguous_water_purchase_still_uses_llm():
     assert _bill_payment_intent("I bought water for 4.50 at Target") is None
 
 
+@pytest.mark.parametrize("bill", ["rent", "water bill", "PG&E", "Recology"])
+@pytest.mark.parametrize("statement", [
+    "Can I afford $2100 {bill}?",
+    "Do not log my $2100 {bill}",
+    "I haven't paid my $2100 {bill}",
+    "My {bill} will increase to $2100 next month",
+    "Should I update my {bill} amount to $2100?",
+    "2026-09-06 {bill} $2100",
+    "{bill} $2100?",
+])
+@pytest.mark.asyncio
+async def test_bill_non_commands_never_reach_mutations_or_parser(monkeypatch, bill, statement):
+    from bookiebot.core import message_router as router
+    from bookiebot.intents import handlers
+
+    class Client:
+        user = SimpleNamespace(id=1)
+
+        def event(self, fn):
+            setattr(self, fn.__name__, fn)
+            return fn
+
+    client = Client()
+    router.register_events(client, SimpleNamespace())
+    channel = SimpleNamespace(guild=None, id=123, name="bookiebot", send=AsyncMock())
+    message = SimpleNamespace(content=statement.format(bill=bill),
+        author=SimpleNamespace(id=676638528590970917, name="deebers"), channel=channel)
+    parser = AsyncMock(return_value={"intent": "log_rent_paid", "entities": {"amount": 2100}})
+    conversation = AsyncMock()
+    monkeypatch.setattr(router, "parse_message_llm", parser)
+    monkeypatch.setattr(handlers, "fallback_handler", conversation)
+    # A pending amount edit must not turn a new question into an update either.
+    monkeypatch.setattr(router, "pending_update_field", lambda actor: ("existing-action", "amount"))
+    for name in ["log_rent_paid", "log_water_paid", "log_pge_paid", "log_recology_paid"]:
+        monkeypatch.setattr(handlers.su, name, lambda *a, **k: pytest.fail("Unexpected payment write"))
+    monkeypatch.setattr(handlers, "update_recent_action", lambda *a, **k: pytest.fail("Unexpected recent write"))
+
+    await client.on_message(message)
+
+    parser.assert_not_awaited()
+    conversation.assert_awaited_once()
+    assert conversation.await_args.args[0] == message.content
+
+
+@pytest.mark.parametrize("content", [
+    "I paid $2,100 for rent", "Please log rent $2100", "Can you record $2100 for rent?",
+    "Rent payment was $2100 today", "Log $2100 rent and split evenly",
+])
+def test_affirmative_bill_commands_keep_the_explicit_amount(content):
+    intent, entities = _bill_payment_intent(content)
+    assert intent == "log_rent_paid"
+    assert entities["amount"] == 2100
+
+
 def test_indexed_equal_split_routes_without_llm():
     from bookiebot.core.message_router import _indexed_action_intent
 

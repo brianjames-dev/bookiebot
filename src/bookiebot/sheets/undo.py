@@ -265,6 +265,8 @@ def _income_row_delete_snapshot(ws: Any, row: int) -> tuple[list[str], dict[str,
         if any(str(value).strip() == "Monthly Income:" for value in values)
     )
     layout = income_sheet_layout(ws, summary_row, rows=rows)
+    if not layout["header_row"] < row < summary_row:
+        raise ValueError("The saved action no longer points to an income transaction row.")
     start_column, end_column = _income_row_property_bounds(rows, layout, summary_row)
     row_values = _income_rows_values(ws, row, row + 1, end_column)
     deleted_row = row_values[0]
@@ -539,6 +541,27 @@ def _read_log_data() -> _ActionLogData | None:
             records.append(_LogRecord(row_index=row_index, logged=_logged_action_from_row(row)))
         except Exception:
             logger.warning("Skipping malformed action log row", extra={"row": row})
+    # Older repeated updates stored source_type='update'. Recover the transaction
+    # type from the already-loaded lineage, never from the worksheet name (bills
+    # and savings share the personal income worksheet).
+    actions_by_id = {record.logged.id: record.logged for record in records}
+    for record in records:
+        action = record.logged.action
+        if action.metadata.get("type") != "update" or action.metadata.get("source_type") not in {None, "", "update"}:
+            continue
+        current = record.logged
+        seen = {current.id}
+        while current.action.metadata.get("type") == "update":
+            parent_id = current.action.metadata.get("updated_action_id", "")
+            parent = actions_by_id.get(parent_id)
+            if parent is None or parent_id in seen or parent.action.worksheet != action.worksheet:
+                break
+            seen.add(parent_id)
+            current = parent
+            source_type = _transaction_type(current.action)
+            if source_type and source_type != "update":
+                action.metadata["source_type"] = source_type
+                break
     return _ActionLogData(ws=ws, records=records)
 
 
@@ -794,6 +817,11 @@ def action_title(action: UndoAction) -> str:
     if action_type == "update":
         if _is_income_display_action(action):
             return "Updated: Income"
+        source_type = _transaction_type(action)
+        if source_type == "payment":
+            return f"Updated: {category or 'payment'} payment".title()
+        if source_type == "savings":
+            return f"Updated: {category or 'savings'} deposit".title()
         return f"Updated: {expense_category_label(category) if category else 'Transaction'} Expense"
     if action_type == "move":
         source = action.metadata.get("source_category", "unknown")
@@ -1146,6 +1174,7 @@ def _allowed_update_fields(action: UndoAction, metadata_extra: dict[str, str] | 
 
 def action_capabilities(action: UndoAction) -> ActionCapabilities:
     action_type = action.metadata.get("type")
+    transaction_type = _transaction_type(action)
     editable_fields = editable_fields_for_action(action)
 
     is_split = action_type == "split"
@@ -1157,7 +1186,9 @@ def action_capabilities(action: UndoAction) -> ActionCapabilities:
     can_move = action.worksheet == "expense" and action_type in {"expense", "update", "move"} and bool(action.metadata.get("category"))
     move_reason = "" if can_move else "I can only move normal expense rows between categories right now."
 
-    can_split = action_type in {"expense", "update", "move", "payment"}
+    can_split = (
+        action.worksheet == "expense" and action_type in {"expense", "update", "move"}
+    ) or transaction_type == "payment"
     split_reason = "" if can_split else "That transaction cannot be split, or already has an active split."
 
     can_change_split = is_split
@@ -1175,7 +1206,7 @@ def action_capabilities(action: UndoAction) -> ActionCapabilities:
             delete_reason = "I cannot delete that income row from recent transactions yet. Use undo if this was the last logged action."
         elif action_type == "need_expense":
             delete_reason = "I cannot delete Need expenses from recent transactions yet. Use undo if this was the last logged action."
-        elif action_type in {"payment", "savings"}:
+        elif transaction_type in {"payment", "savings"}:
             delete_reason = "I cannot delete payments or savings deposits from recent transactions yet. Use undo if this was the last logged action."
         else:
             delete_reason = "I cannot delete that transaction type from recent transactions yet. Use undo if this was the last logged action."
@@ -1312,11 +1343,13 @@ def _format_action_list_item(index: int, action: UndoAction) -> tuple[str, list[
     return f"{index}. {title}", lines
 
 
+def _transaction_type(action: UndoAction) -> str:
+    action_type = action.metadata.get("type", "")
+    return action.metadata.get("source_type", "") if action_type == "update" else action_type
+
+
 def _is_income_display_action(action: UndoAction) -> bool:
-    return action.metadata.get("type") == "income" or (
-        action.metadata.get("type") == "update"
-        and (action.metadata.get("source_type") == "income" or action.worksheet == "income")
-    )
+    return _transaction_type(action) == "income"
 
 
 def _income_data_lines(action: UndoAction, values: list[str] | None = None) -> list[str]:
@@ -2349,7 +2382,7 @@ def update_recent_action(
             metadata={
                 **logged.action.metadata,
                 "type": "update",
-                "source_type": logged.action.metadata.get("type", ""),
+                "source_type": _transaction_type(logged.action),
                 "updated_action_id": logged.id,
                 "display_fields": json.dumps(display_fields),
                 **(metadata_extra or {}),

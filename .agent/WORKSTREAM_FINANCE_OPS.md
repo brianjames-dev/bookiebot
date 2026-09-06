@@ -719,3 +719,25 @@ Status: Complete; deployed-bot/natural-rollover manual checks are in STATUS chec
 ### 2026-09-05 - Unpaid Utility Chart Points
 
 - Bills & Utilities chart now leaves unpaid current/future billing months blank (`null`), with zero appearing only after the month closes. Quarterly off-cycle months remain omitted; actual off-cycle payments remain visible. Regression checks cover monthly/quarterly rollover and actual receipts. Verification: 600 tests passed (existing Kaleido warning), Pyright clean, frontend typecheck/build passed. Manual check after deployment: generate a fresh September report; unpaid monthly utilities have no September dot and unpaid Recology stays blank outside its configured February/May/August/November cycle.
+
+
+## 2026-09-06 Architecture Audit Remediation
+
+User authorized all batches incrementally on 2026-09-06. STATUS is the active queue; existing deployment checks remain pending. Audited commit: 863432f162af95b6c29cf4567629e3fddf2b52f0. Offline baseline: 599 suite tests passed; isolated Kaleido test passed outside sandbox; Pyright, frontend typecheck/build, and Node rollover checks passed. All findings have offline reproductions; no live financial inspection was performed.
+
+| Batch | Findings / acceptance | Status |
+| --- | --- | --- |
+| 1 | A01: bill questions/negation never write; A02: updated payments/savings retain their type and cannot delete budget rows | Complete 2026-09-06; 647 tests and Pyright passed |
+| 2 | A03–A04: income row shifts update only the correct owner's references, including bill/savings actions | In progress |
+| 3 | A05: delete/move undo preserves another user's intervening edits and consistent action history | Pending |
+| 4 | A06–A07: reject unsupported historical destinations before writing; durable claims prevent stale/concurrent/retried duplicate imports | Pending |
+| 5 | A08–A09: changed matches reopen; transient reminder failures retry; webhook processing recovers after restart | Pending |
+| 6 | A10–A11: every private report route enforces signed access; live rendering yields the event loop; history uses bounded batch reads | Pending |
+| 7 | A12: incident contents remain data; ordinary changes run quality gates; storage lifecycle tests exercise Postgres | Pending |
+| 8 | Remove proven unused rendering code and consolidate responsibilities where earlier batches establish safe seams | Pending |
+
+Preserve intentional semantics: existing affirmative bill shorthand, actual/expected income separation, historical report compatibility, bank confirmation before import, immutable gross split amount, and reimbursement settlement without income. Historical bank writes may fail closed until destination-aware undo is supported. Audit completion is separate from deployment/manual confirmation; do not silently run migrations or mutate live test transactions.
+
+### Audit Batch 1 work log — 2026-09-06
+
+Completed affirmative bill grammar/read-only diversion before pending edits, canonical payment/savings update lineage, capability restrictions, and physical income-table deletion guards. Historical repeated-update records recover source type from loaded lineage without extra Sheets reads or migration. Added 47 regression cases; full suite 647 passed and Pyright clean. Manual acceptance is recorded in STATUS. Next: owner-scoped row shifting.
