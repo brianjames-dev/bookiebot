@@ -86,7 +86,7 @@ def test_top_chart_carousel_uses_one_fixed_full_bleed_surface_without_panel_card
     source = (Path(__file__).resolve().parents[2] / "web/expense-report/src/report-app.tsx").read_text()
     styles = (Path(__file__).resolve().parents[2] / "web/expense-report/src/styles.css").read_text()
     carousel_source = source.split('<section\n          className="bb-chart-carousel-band"', 1)[1].split(
-        "<ChartCarouselNavigation", 1
+        "</section>", 1
     )[0]
 
     assert 'role="region"' in carousel_source
@@ -95,7 +95,6 @@ def test_top_chart_carousel_uses_one_fixed_full_bleed_surface_without_panel_card
     assert 'className="bb-chart-carousel-slide"' in carousel_source
     assert '<Card className="bb-analytics-card"' not in carousel_source
     assert "<CardHeader" not in carousel_source
-    assert "</section>" in carousel_source
     assert ".bb-main > .bb-chart-carousel-band {" in styles
     band_styles = styles.split(".bb-main > .bb-chart-carousel-band {", 1)[1].split("}", 1)[0]
     assert "width: 100%;" in band_styles
@@ -112,7 +111,7 @@ def test_top_chart_carousel_uses_one_fixed_full_bleed_surface_without_panel_card
     chart_page_styles = styles.split(".bb-chart-page {", 1)[1].split("}", 1)[0]
     assert "--bb-chart-page-gutter: clamp(16px, 4vw, 56px);" in chart_page_styles
     assert "--bb-chart-page-block-gutter: clamp(16px, 3vw, 32px);" in chart_page_styles
-    assert "padding-inline: var(--bb-chart-page-gutter);" in chart_page_styles
+    assert "padding-inline: max(var(--bb-chart-page-gutter), calc((100% - var(--bb-content-max)) / 2));" in chart_page_styles
     assert "padding-block: var(--bb-chart-page-block-gutter);" in chart_page_styles
     assert ".bb-chart-carousel-track {" in styles
     assert "height: 100%;" in styles
@@ -160,7 +159,7 @@ def test_top_chart_pages_share_regions_lock_modals_and_show_complete_details():
     source = (Path(__file__).resolve().parents[2] / "web/expense-report/src/report-app.tsx").read_text()
     styles = (Path(__file__).resolve().parents[2] / "web/expense-report/src/styles.css").read_text()
     carousel_source = source.split('<section\n          className="bb-chart-carousel-band"', 1)[1].split(
-        "<ChartCarouselNavigation", 1
+        "</section>", 1
     )[0]
     calendar_panel = source.split("function CalendarAnalyticsPanel", 1)[1].split("function CalendarChangingValue", 1)[0]
 
@@ -183,6 +182,61 @@ def test_top_chart_pages_share_regions_lock_modals_and_show_complete_details():
     assert "const hasMore = !showAll && items.length > visibleItems.length" in source
     assert ".bb-details-dialog-body" in styles
     assert "overflow: auto;" in styles
+
+
+def test_top_chart_navigation_names_each_panel_and_excludes_inactive_controls_from_focus():
+    source = (Path(__file__).resolve().parents[2] / "web/expense-report/src/report-app.tsx").read_text()
+    panels = source.split("const chartPanels: ChartPanel[] = [", 1)[1].split("const defaultChartIndex", 1)[0]
+    carousel = source.split('<section\n          className="bb-chart-carousel-band"', 1)[1].split("</section>", 1)[0]
+    navigation = source.split("function ChartCarouselNavigation", 1)[1].split("function CategoryMixFilterControl", 1)[0]
+    selectors = source.split("function ChartCarouselIndicators", 1)[1].split("function ProjectionToggle", 1)[0]
+
+    # Navigation follows the available panels, including reports with no burn-rate data.
+    assert re.findall(r'id: "([^"]+)"', panels) == ["category", "burn-rate", "calendar", "bills"]
+    assert "activeReport.burnRate" in panels
+    assert "panels.map((panel, index)" in selectors
+    assert 'type="button"' in selectors
+    assert 'aria-label={`Show ${panel.title}`}' in selectors
+    assert "{panel.title}" in selectors
+    assert "onClick={() => onSelect(index)}" in selectors
+    assert "aria-pressed={index === activeIndex}" in selectors
+    assert 'aria-controls={`bb-chart-${panel.id}`}' in selectors
+    assert 'id={`bb-chart-${panel.id}`}' in carousel
+    assert "aria-label={panel.title}" in carousel
+    assert "aria-hidden={index !== activeChartIndex}" in carousel
+    assert 'inert: index !== activeChartIndex ? "" : undefined' in carousel
+    assert 'aria-label="Previous chart"' in navigation
+    assert "onClick={onPrevious} disabled={!canPrevious}" in navigation
+    assert 'aria-label="Next chart"' in navigation
+    assert "onClick={onNext} disabled={!canNext}" in navigation
+
+
+def test_reimbursement_disclosures_preserve_totals_and_complete_transaction_details():
+    source = (Path(__file__).resolve().parents[2] / "web/expense-report/src/report-app.tsx").read_text()
+    reimbursement = source.split("function SharedReimbursementsCard", 1)[1].split("function isInteractiveTouchTarget", 1)[0]
+    summary, ledger = reimbursement.split("{items.map((item) => (", 1)
+    entry_summary, details = ledger.split("</summary>", 1)
+
+    assert "if (!items.length)" in summary
+    assert "return null" in summary
+    for total, field in (
+        ("grossPaid", "grossAmount"),
+        ("personalShare", "personalShare"),
+        ("outstanding", "outstandingAmount"),
+        ("received", "receivedAmount"),
+    ):
+        assert f"const {total} = items.reduce((total, item) => total + item.{field}, 0)" in summary
+        assert f"formatMoney({total})" in summary
+    assert "items.filter((item) => item.outstandingAmount > 0).length" in summary
+    assert "<details" in entry_summary
+    assert "<summary>" in entry_summary
+    for field in ("item", "location", "date"):
+        assert f"item.{field}" in entry_summary
+    assert 'item.status === "reimbursed" ? "Received" : `${formatMoney(item.outstandingAmount)} due`' in entry_summary
+    for field in ("grossAmount", "personalShare", "partnerShare", "receivedAmount"):
+        assert f"formatMoney(item.{field})" in details
+    assert "item.splitMethod" in details
+    assert "item.responsiblePerson" in details
 
 
 def test_top_chart_mobile_counts_control_order_and_burn_pill_alignment():
@@ -230,6 +284,32 @@ def test_daily_spending_includes_bills_and_compresses_strong_outliers():
     assert 'dataKey="chartAmount"' in source
     assert "point.needsAmount" in source
     assert "point.wantsAmount" in source
+
+
+def test_category_pie_and_daily_transaction_labels_share_one_color_mapping():
+    source = (Path(__file__).resolve().parents[2] / "web/expense-report/src/report-app.tsx").read_text()
+    app = source.split("export function ExpenseReportApp", 1)[1].split("function SharedReimbursementsCard", 1)[0]
+    daily_table = source.split("function DailyEntriesTable", 1)[1].split("function compareDayGroups", 1)[0]
+
+    assert "color: CATEGORY_CHART_COLORS[item.key] ?? item.color" in app
+    assert "Object.fromEntries(chartBreakdown.map((item) => [item.label, item.color]))" in app
+    assert "data={chartBreakdown}" in app
+    assert "categoryColors={categoryColors}" in app
+    assert "color: categoryColors[entry.category]" in daily_table
+    assert "entry.categoryColor" not in daily_table
+
+
+def test_scheduled_daily_entries_use_pie_category_names_without_bucket_color_overrides():
+    source = (Path(__file__).resolve().parents[2] / "web/expense-report/src/report-app.tsx").read_text()
+    scheduled_entries = source.split("function dailyEntriesWithCalendarEvents", 1)[1].split("function dailyTotalsForEntries", 1)[0]
+
+    for key in ("rent", "bills_utilities", "static_bills_subscriptions_needs", "subscriptions_wants"):
+        assert json.dumps(expense_breakdown.CATEGORY_LABELS[key]) in scheduled_entries
+    assert 'bucket === "wants" ? "Subs (Wants)" : "Subs (Needs)"' in scheduled_entries
+    assert '"Subscription"' not in scheduled_entries
+    assert "categoryColor:" not in scheduled_entries
+    assert "NEEDS_BAR_COLOR" not in scheduled_entries
+    assert "WANTS_BAR_COLOR" not in scheduled_entries
 
 
 def test_bills_chart_connects_quarterly_hits_across_off_cycle_gaps():

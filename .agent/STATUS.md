@@ -1,37 +1,46 @@
 # Agent Status
 
-Last updated: 2026-09-05
+Last updated: 2026-09-06
 
 ## Active Focus
 
-The final income settings grid is live at B4:E5 on both budgets' Template and September tabs, with a blank row 6 and income transactions starting at B7:D7. Explicit Expected Income Amount now drives biweekly or fixed monthly projections; deposits within three days fulfill one pay period without changing the expectation. Live Apps Script, row-reference migration, and regression verification are complete. Next is deployed-bot and natural rollover confirmation in checklist item 85.
+The user's expense-report frontend overhaul is implemented and verified: a paper/ink ledger layout, unified metrics, named chart navigation, simplified reimbursement disclosures, and clearer category colors shared by the pie and Daily Spending. Review the refreshed design after deployment using checklist item 86. The existing expected-income and rollover verification queue remains below.
 
 ## On Deck
 
-1. Verify deployed expected-income projections and the next monthly rollover against checklist item 85.
-2. Deploy and manually verify canonical Current/Projected report tools in checklist item 82.
-3. Deploy and manually verify the LangGraph conversational/read response layer and bank-transfer refusal in checklist item 81.
-4. Deploy and manually verify Brian's BofA expense default in checklist item 80.
-5. Deploy and manually verify the shared expense-report chart viewport in checklist item 79.
-6. Deploy and manually verify fronted shared expenses in checklist item 78.
-7. Deploy and manually verify quarterly utility history in checklist item 77.
-8. Deploy and manually verify parser and bill-payment reliability in checklist item 76.
-9. Deploy and manually verify split creation/settlement in checklist item 74 and recent split changes/cancellation in checklist item 75.
-10. Continue the deferred split lifecycle: correct gross after splitting, partial reimbursement, explicit paid-split undo, and split-aware update/move/delete/undo.
-11. Deploy and manually verify prior-month paycheck carry-forward in Projected mode in checklist item 73.
-12. Deploy and manually verify Wants subscriptions in Burn Rate in checklist item 72.
-13. Deploy and manually verify selected-month subscription scoping in checklist item 71.
-14. Deploy and manually verify Daily Spending bill coverage and outlier scaling in checklist item 70.
-15. Deploy and manually verify the monthly savings workflow and corrected Saved-card targets in checklist items 60-61 and 69.
-16. Deploy and manually verify the expense-report corrections in checklist item 67.
-17. Deploy and manually verify typed `recent` opens the short-lived launcher and keeps the resulting DM session ephemeral.
-18. Deploy and manually verify `View Inbox` and `Reconcile Now` show `BookieBot is typing...` without a temporary thinking message.
-19. Manually verify shared Needs logging plus update/move/delete/undo behavior in Discord and Google Sheets.
-20. Manually verify recent transactions and reconciliation after the latest reliability fixes.
-21. Consider a richer Discord button flow for grouped amount adjustments if the current UX feels too manual.
-22. Harden recent-action pending state across restarts/deploys, since selections currently live only in process memory.
-23. Improve targeted recent-action search so commands can find older matches, not only the latest 10 recent actions.
-24. Explore clarifying questions before logging when BookieBot is uncertain instead of guessing or silently failing.
+1. Review the redesigned expense report after deployment against checklist item 86.
+2. Verify deployed expected-income projections and the next monthly rollover against checklist item 85.
+3. Deploy and manually verify canonical Current/Projected report tools in checklist item 82.
+4. Deploy and manually verify the LangGraph conversational/read response layer and bank-transfer refusal in checklist item 81.
+5. Deploy and manually verify Brian's BofA expense default in checklist item 80.
+6. Deploy and manually verify the shared expense-report chart viewport in checklist item 79.
+7. Deploy and manually verify fronted shared expenses in checklist item 78.
+8. Deploy and manually verify quarterly utility history in checklist item 77.
+9. Deploy and manually verify parser and bill-payment reliability in checklist item 76.
+10. Deploy and manually verify split creation/settlement in checklist item 74 and recent split changes/cancellation in checklist item 75.
+11. Continue the deferred split lifecycle: correct gross after splitting, partial reimbursement, explicit paid-split undo, and split-aware update/move/delete/undo.
+12. Deploy and manually verify prior-month paycheck carry-forward in Projected mode in checklist item 73.
+13. Deploy and manually verify Wants subscriptions in Burn Rate in checklist item 72.
+14. Deploy and manually verify selected-month subscription scoping in checklist item 71.
+15. Deploy and manually verify Daily Spending bill coverage and outlier scaling in checklist item 70.
+16. Deploy and manually verify the monthly savings workflow and corrected Saved-card targets in checklist items 60-61 and 69.
+17. Deploy and manually verify the expense-report corrections in checklist item 67.
+18. Deploy and manually verify typed `recent` opens the short-lived launcher and keeps the resulting DM session ephemeral.
+19. Deploy and manually verify `View Inbox` and `Reconcile Now` show `BookieBot is typing...` without a temporary thinking message.
+20. Manually verify shared Needs logging plus update/move/delete/undo behavior in Discord and Google Sheets.
+21. Manually verify recent transactions and reconciliation after the latest reliability fixes.
+22. Consider a richer Discord button flow for grouped amount adjustments if the current UX feels too manual.
+23. Harden recent-action pending state across restarts/deploys, since selections currently live only in process memory.
+24. Improve targeted recent-action search so commands can find older matches, not only the latest 10 recent actions.
+25. Explore clarifying questions before logging when BookieBot is uncertain instead of guessing or silently failing.
+
+## Completed 2026-09-06
+
+- Overhauled the embedded React expense report with warm paper/forest and dark ink themes, native serif headings, a single ruled four-metric summary, explicit Current/Projected controls, and named navigation for all existing carousel pages. Daily Spending and Largest/Most Frequent retain their charts, filters, tooltips, full detail lists, and financial calculations. Full-bleed chart surfaces keep their fixed stage and align their content with the report at wide widths.
+- Redesigned reimbursements around Outstanding, with Received/Gross paid/Your share in a compact statement. Each expense expands through native keyboard-accessible details to show every split field and receipt amount. Added semantic section headings, inactive-slide focus isolation, visible focus states, and reduced-motion treatment.
+- Incorporated design-review feedback: stronger dedicated category colors and matching square markers in Daily Spending. Pie slices, pie labels, and daily category text share one color map in both themes. Corrected scheduled bill/subscription rows that previously substituted broad Needs/Wants bar colors; subscription labels now match `Subs (Needs)` / `Subs (Wants)` in the pie.
+- Rebuilt both committed embedded frontend assets. Verification: report suite `113 passed`; full suite `604 passed` (one existing Kaleido warning); Pyright `0 errors`; frontend typecheck/build and `git diff --check` passed. Local synthetic browser checks covered desktop, 390px and 320px layouts without horizontal overflow, both themes, Current/Projected, all four charts, category/calendar details with scroll locking, daily filters, reimbursement disclosures, and Frequent highlights. All 31 visible daily category labels and markers matched their pie-slice colors in dark mode; light-mode colors also matched. Local preview data is synthetic and ignored under `data/design-preview/`.
+- Updated workstream and durable design decisions; production visual review remains checklist item 86.
 
 ## Completed 2026-09-05
 
@@ -706,6 +715,14 @@ Use a test row or low-risk real row in Discord:
     - On test-only month/year rollover, confirm settings/validations persist, earlier explicit corrections reach future inherited tabs, and typing a future override preserves it. No live future tabs were created for testing.
     - Log two income rows, delete the first, then undo. B4:E5 and blank row 6 stay unchanged, actual transactions remain below row 7, and the summary sums only D8 onward. In Discord, verify recent payment/split actions still target the moved budget rows.
 
+86. Expense-report design overhaul:
+    - Generate a fresh report after deployment; compare Current and Projected metrics with the prior report. Saved remains actual and Income has no extra subtitle.
+    - At desktop, 390px, and 320px widths, inspect both themes. Confirm the four metrics remain readable, all named chart buttons fit, and the report has no horizontal page scroll.
+    - Switch/swipe all four chart pages and their filters. Confirm stage height stays fixed, Category/Calendar details close with Escape and restore page position, and Burn Rate/Bills inline details still work.
+    - Compare each Category Mix slice and label with its Daily Spending colored label/marker, including Rent, Bills & Utilities, and both subscription categories. Switch Current/Projected and themes; category identities stay consistent.
+    - Switch Daily Spending through All/Needs/Wants, inspect tooltips and the rent outlier, then open daily details and read the complete transaction table. Switch Largest/Most Frequent and expand their complete lists.
+    - Expand pending, received, and fronted reimbursements by mouse and keyboard. Gross, personal share, partner share, received, outstanding, split method, location/date, and responsible person remain available. A report without reimbursements omits the section.
+
 ## Verification Baseline
 
 Recommended targeted tests for the active workstream:
@@ -715,7 +732,21 @@ python -m pytest unit_tests/banking/test_reconciliation.py unit_tests/banking/te
 python -m pytest unit_tests/intents/test_handlers.py unit_tests/core/test_message_router.py
 ```
 
-Latest verification (2026-09-05):
+Latest verification (2026-09-06):
+
+```bash
+PYTHONPATH=src venv/bin/python -m pytest unit_tests/reports -q
+# 113 passed
+PYTHONPATH=src venv/bin/python -m pytest unit_tests -q
+# 604 passed; one existing Kaleido deprecation warning (renderer run outside sandbox)
+PYTHONPATH=src venv/bin/python -m pyright --pythonpath venv/bin/python --pythonversion 3.12
+# 0 errors, 0 warnings, 0 informations
+npm run typecheck --prefix web/expense-report
+npm run build --prefix web/expense-report -- --configLoader runner
+# passed; runner avoids writing temporary config into the shared dependency directory
+```
+
+Previous verification (2026-09-05):
 
 ```bash
 PYTHONPATH=src venv/bin/python -m pytest unit_tests -q

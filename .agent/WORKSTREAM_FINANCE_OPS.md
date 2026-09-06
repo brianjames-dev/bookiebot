@@ -719,3 +719,11 @@ Status: Complete; deployed-bot/natural-rollover manual checks are in STATUS chec
 ### 2026-09-05 - Unpaid Utility Chart Points
 
 - Bills & Utilities chart now leaves unpaid current/future billing months blank (`null`), with zero appearing only after the month closes. Quarterly off-cycle months remain omitted; actual off-cycle payments remain visible. Regression checks cover monthly/quarterly rollover and actual receipts. Verification: 600 tests passed (existing Kaleido warning), Pyright clean, frontend typecheck/build passed. Manual check after deployment: generate a fresh September report; unpaid monthly utilities have no September dot and unpaid Recology stays blank outside its configured February/May/August/November cycle.
+
+### 2026-09-06 Expense Report Design Overhaul
+
+- Complete: redesigned the frontend as a paper/ink ledger, with a unified four-metric summary, explicit view controls, named carousel navigation, and consistent typography, tables, focus, and light/dark themes. Existing financial computations, chart stages/gestures/details, Daily Spending, and expense highlights remain intact.
+- Complete: simplified reimbursement presentation to an Outstanding summary plus a three-line account statement and expandable expense records. All original summary/item information remains available, with received amounts also visible per record.
+- Complete: following user design review, introduced distinct, stronger category colors shared by pie slices and daily labels, with matching square markers. Removed scheduled daily-row bucket color overrides; Needs/Wants subscriptions now use the same distinct labels/colors as the category chart.
+- Verification: 113 report tests, 604 full-suite tests (one existing Kaleido warning), clean Pyright, frontend typecheck/build, and diff check. Synthetic browser checks covered desktop/mobile layouts, both themes/modes, chart/detail interactions, reimbursements, and exact pie/daily color correspondence.
+- Pending: deployed visual acceptance in STATUS checklist 86. No reconciliation, transaction mutation, persistence, or split lifecycle behavior changed.

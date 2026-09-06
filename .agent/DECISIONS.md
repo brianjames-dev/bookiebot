@@ -422,3 +422,11 @@ Rationale: An hourly paycheck can vary without changing the expected next payche
 ### 2026-09-05 - Utility history distinguishes pending from zero
 
 Utility chart history uses nullable amounts for unpaid open/future billing months; only closed billing months receive zero. Quarterly non-billing months remain omitted, while actual payments remain visible regardless of schedule. Numeric current totals and projection calculations retain their existing semantics. This avoids displaying an unentered bill as a finalized zero payment.
+
+## 2026-09-06 - Present The Expense Report As A Ledger With Shared Category Identity
+
+Decision: Replace repeated metric/panel cards with a ruled summary and clearly separated report sections, preserving the existing full-bleed, fixed-height chart carousel. Expose all chart names before its viewport and make inactive slides inert; keep the existing touch and detail interactions. Show reimbursement Outstanding first, retain Received/Gross paid/Your share as a compact statement, and disclose each expense's complete split information through native details. Current/Projected controls explicitly show both choices and continue consuming the canonical report views.
+
+Use one frontend category color map for Category Mix slices/labels and Daily Spending labels/markers. Dedicated stronger category colors are separate from the page's paper/forest theme. Scheduled daily bill and subscription labels match the canonical category labels rather than overriding them with broad Needs/Wants bar colors; the daily graph itself retains its Needs/Wants series.
+
+Rationale: A financial ledger gives the report a distinct, readable hierarchy without changing the financial workflow. Showing balances first reduces reimbursement clutter while preserving all information. A single category identity makes the pie and transaction detail easy to cross-reference in either theme and prevents visually inconsistent bill/subscription colors.

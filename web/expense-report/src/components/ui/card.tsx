@@ -10,8 +10,8 @@ function CardHeader({ className, ...props }: React.HTMLAttributes<HTMLDivElement
   return <div className={cn("bb-card-header", className)} data-slot="card-header" {...props} />
 }
 
-function CardTitle({ className, ...props }: React.HTMLAttributes<HTMLDivElement>) {
-  return <div className={cn("bb-card-title", className)} data-slot="card-title" {...props} />
+function CardTitle({ className, ...props }: React.HTMLAttributes<HTMLHeadingElement>) {
+  return <h2 className={cn("bb-card-title", className)} data-slot="card-title" {...props} />
 }
 
 function CardDescription({ className, ...props }: React.HTMLAttributes<HTMLDivElement>) {

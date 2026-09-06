@@ -211,26 +211,26 @@ const DAILY_SPENDING_FILTERS: Array<{ value: DailySpendingFilter; label: string 
 const CATEGORY_NEEDS_KEYS = new Set(["rent", "bills_utilities", "static_bills_subscriptions_needs", "need_expenses", "grocery", "gas"])
 const CATEGORY_WANTS_KEYS = new Set(["subscriptions_wants", "food", "shopping"])
 const DAILY_WANTS_CATEGORIES = new Set(["Food", "Shopping"])
-const LEFT_CATEGORY_COLOR = "#166534"
-const SAVINGS_CATEGORY_COLOR = "#0f766e"
-const NEEDS_BAR_COLOR = "#2563eb"
-const WANTS_BAR_COLOR = "#7c3aed"
+const LEFT_CATEGORY_COLOR = "hsl(var(--category-remaining))"
+const SAVINGS_CATEGORY_COLOR = "hsl(var(--chart-5))"
+const NEEDS_BAR_COLOR = "hsl(var(--chart-1))"
+const WANTS_BAR_COLOR = "hsl(var(--chart-2))"
 const DAILY_SPENDING_BAR_RADIUS: [number, number, number, number] = [2, 2, 2, 2]
 const DAILY_SPENDING_GRID_COLOR = "hsl(var(--muted-foreground))"
 const DAILY_SPENDING_BOUNDARY_COLOR = "hsl(var(--foreground))"
-const TOP_EXPENSE_HEAT_COLORS = [
-  "#dc2626",
-  "#ef4444",
-  "#f97316",
-  "#f59e0b",
-  "#eab308",
-  "#06b6d4",
-  "#38bdf8",
-  "#60a5fa",
-  "#3b82f6",
-  "#2563eb",
-]
-const MERCHANT_BAR_COLOR = "#0891b2"
+const TOP_EXPENSE_HEAT_COLORS = Array.from({ length: 10 }, (_, index) => `hsl(var(--chart-1) / ${1 - index * 0.055})`)
+const MERCHANT_BAR_COLOR = "hsl(var(--chart-5))"
+const CATEGORY_CHART_COLORS: Record<string, string> = {
+  rent: "hsl(var(--category-rent))",
+  bills_utilities: "hsl(var(--category-bills))",
+  static_bills_subscriptions_needs: "hsl(var(--category-subs-needs))",
+  subscriptions_wants: "hsl(var(--category-subs-wants))",
+  need_expenses: "hsl(var(--category-need))",
+  grocery: "hsl(var(--category-grocery))",
+  gas: "hsl(var(--category-gas))",
+  food: "hsl(var(--category-food))",
+  shopping: "hsl(var(--category-shopping))",
+}
 
 type ChartTouchState = {
   startX: number
@@ -548,7 +548,8 @@ export function ExpenseReportApp({ report }: { report: ExpenseReportData }) {
     setProjectionActive((current) => !current)
   }
   const activeReport = buildReportView(report, projectionActive)
-  const categoryColors: Record<string, string> = Object.fromEntries(activeReport.breakdown.map((item) => [item.label, item.color]))
+  const chartBreakdown = activeReport.breakdown.map((item) => ({ ...item, color: CATEGORY_CHART_COLORS[item.key] ?? item.color }))
+  const categoryColors: Record<string, string> = Object.fromEntries(chartBreakdown.map((item) => [item.label, item.color]))
   const dailyEntries = filterDailyEntries(report.dailyEntries, dailySpendingFilter)
   const dailyCalendarEvents = dailySpendingCalendarEvents(activeReport.calendarEvents, dailySpendingFilter, projectionActive)
   const dailyTableEntries = dailyEntriesWithCalendarEvents(dailyEntries, dailyCalendarEvents, report.month)
@@ -562,7 +563,7 @@ export function ExpenseReportApp({ report }: { report: ExpenseReportData }) {
       title: "Category Mix",
       content: (
         <CategoryMixChart
-          data={activeReport.breakdown}
+          data={chartBreakdown}
           categoryBalances={activeReport.categoryBalances}
           categoryBudgets={activeReport.categoryBudgets}
           amountSaved={activeReport.metrics.amountSaved}
@@ -727,20 +728,26 @@ export function ExpenseReportApp({ report }: { report: ExpenseReportData }) {
 
   return (
     <div className="bb-page">
+      <div className="bb-masthead">
+        <span className="bb-wordmark"><span className="bb-wordmark-symbol" aria-hidden="true">b.</span>BookieBot</span>
+        <div className="bb-masthead-actions">
+          <span>{report.ownerName} / {report.year}</span>
+          <ThemeToggle theme={theme} onToggle={toggleTheme} />
+        </div>
+      </div>
       <header className="bb-page-header">
         <div className="bb-header-copy">
+          <p className="bb-report-period">{report.monthLabel}</p>
           <div className="bb-header-title-row">
             <h1>Expense Breakdown</h1>
-            <Badge variant="outline">{generatedTimeLabel(report.generatedAt)}</Badge>
           </div>
-          <p>{report.monthLabel} budget report for {report.ownerName}.</p>
         </div>
         <div className="bb-header-actions">
           <ProjectionToggle
             active={projectionActive}
             onToggle={toggleProjection}
           />
-          <ThemeToggle theme={theme} onToggle={toggleTheme} />
+          <span className="bb-report-updated">Updated {generatedTimeLabel(report.generatedAt)}</span>
         </div>
       </header>
 
@@ -765,6 +772,15 @@ export function ExpenseReportApp({ report }: { report: ExpenseReportData }) {
           />
         </section>
 
+        <ChartCarouselNavigation
+          panels={chartPanels}
+          activeIndex={activeChartIndex}
+          onSelect={switchChart}
+          onPrevious={() => moveChart(-1)}
+          onNext={() => moveChart(1)}
+          canPrevious={activeChartIndex > 0}
+          canNext={activeChartIndex < chartPanels.length - 1}
+        />
         <section
           className="bb-chart-carousel-band"
           role="region"
@@ -785,24 +801,23 @@ export function ExpenseReportApp({ report }: { report: ExpenseReportData }) {
               style={{ transform: carouselTransform }}
             >
               {chartPanels.map((panel, index) => (
-                <div className="bb-chart-carousel-slide" key={panel.id} aria-hidden={index !== activeChartIndex}>
+                <div
+                  className="bb-chart-carousel-slide"
+                  key={panel.id}
+                  id={`bb-chart-${panel.id}`}
+                  role="group"
+                  aria-roledescription="slide"
+                  aria-label={panel.title}
+                  aria-hidden={index !== activeChartIndex}
+                  {...{ inert: index !== activeChartIndex ? "" : undefined }}
+                >
                   <CardContent>{panel.content}</CardContent>
                 </div>
               ))}
             </div>
           </div>
         </section>
-        <ChartCarouselNavigation
-          panels={chartPanels}
-          activeIndex={activeChartIndex}
-          onSelect={switchChart}
-          onPrevious={() => moveChart(-1)}
-          onNext={() => moveChart(1)}
-          canPrevious={activeChartIndex > 0}
-          canNext={activeChartIndex < chartPanels.length - 1}
-        />
-
-        <Card>
+        <Card className="bb-report-section bb-daily-section">
           <CardHeader>
             <div className="bb-card-title-row bb-inline-toggle-row">
               <CardTitle>Daily Spending</CardTitle>
@@ -843,50 +858,48 @@ function SharedReimbursementsCard({ items }: { items: SharedReimbursementItem[] 
   const personalShare = items.reduce((total, item) => total + item.personalShare, 0)
   const outstanding = items.reduce((total, item) => total + item.outstandingAmount, 0)
   const received = items.reduce((total, item) => total + item.receivedAmount, 0)
+  const pendingCount = items.filter((item) => item.outstandingAmount > 0).length
 
   return (
-    <Card>
+    <Card className="bb-report-section bb-reimbursement-section">
       <CardHeader>
         <CardTitle>Shared Reimbursements</CardTitle>
       </CardHeader>
       <CardContent className="bb-reimbursement-content">
-        <div className="bb-reimbursement-summary" aria-label="Shared reimbursement summary">
-          <div><span>Gross paid</span><strong>{formatMoney(grossPaid)}</strong></div>
-          <div><span>Your share</span><strong>{formatMoney(personalShare)}</strong></div>
-          <div><span>Outstanding</span><strong>{formatMoney(outstanding)}</strong></div>
-          <div><span>Received</span><strong>{formatMoney(received)}</strong></div>
+        <div className="bb-reimbursement-overview">
+          <div className="bb-chart-kicker">Outstanding</div>
+          <div className="bb-reimbursement-total">{formatMoney(outstanding)}</div>
+          <p className="bb-reimbursement-note">{pendingCount ? `${pendingCount} shared expense${pendingCount === 1 ? "" : "s"} awaiting repayment` : "All reimbursements received"}</p>
+          <dl className="bb-reimbursement-summary" aria-label="Shared reimbursement summary">
+            <div><dt>Received</dt><dd>{formatMoney(received)}</dd></div>
+            <div><dt>Gross paid</dt><dd>{formatMoney(grossPaid)}</dd></div>
+            <div><dt>Your share</dt><dd>{formatMoney(personalShare)}</dd></div>
+          </dl>
         </div>
-        <div className="bb-table-wrap">
-          <table className="bb-reimbursement-table">
-            <thead>
-              <tr>
-                <th>Expense</th>
-                <th>Gross</th>
-                <th>Your share</th>
-                <th>Partner share</th>
-                <th>Status</th>
-              </tr>
-            </thead>
-            <tbody>
-              {items.map((item) => (
-                <tr key={item.id}>
-                  <td>
-                    <strong>{item.item}</strong>
-                    <span>{[
-                      item.location,
-                      item.date,
-                      item.splitMethod,
-                      item.responsiblePerson ? `Expense: ${item.responsiblePerson}` : "",
-                    ].filter(Boolean).join(" · ")}</span>
-                  </td>
-                  <td>{formatMoney(item.grossAmount)}</td>
-                  <td>{formatMoney(item.personalShare)}</td>
-                  <td>{formatMoney(item.partnerShare)}</td>
-                  <td>{item.status === "reimbursed" ? "Received" : `${formatMoney(item.outstandingAmount)} due`}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+        <div className="bb-reimbursement-ledger" aria-label="Shared expenses">
+          {items.map((item) => (
+            <details className="bb-reimbursement-entry" key={item.id}>
+              <summary>
+                <span className="bb-reimbursement-item">
+                  <strong>{item.item}</strong>
+                  <span>{[item.location, item.date].filter(Boolean).join(" · ")}</span>
+                </span>
+                <span className="bb-reimbursement-status" data-settled={item.status === "reimbursed"}>
+                  {item.status === "reimbursed" ? "Received" : `${formatMoney(item.outstandingAmount)} due`}
+                </span>
+                <span className="bb-disclosure-mark" aria-hidden="true" />
+              </summary>
+              <div className="bb-reimbursement-detail">
+                <dl>
+                  <div><dt>Gross paid</dt><dd>{formatMoney(item.grossAmount)}</dd></div>
+                  <div><dt>Your share</dt><dd>{formatMoney(item.personalShare)}</dd></div>
+                  <div><dt>Partner share</dt><dd>{formatMoney(item.partnerShare)}</dd></div>
+                  <div><dt>Received</dt><dd>{formatMoney(item.receivedAmount)}</dd></div>
+                </dl>
+                {item.splitMethod || item.responsiblePerson ? <p>{[item.splitMethod, item.responsiblePerson ? `Expense: ${item.responsiblePerson}` : ""].filter(Boolean).join(" · ")}</p> : null}
+              </div>
+            </details>
+          ))}
         </div>
       </CardContent>
     </Card>
@@ -916,13 +929,15 @@ function ChartCarouselNavigation({
 }) {
   return (
     <div className="bb-chart-carousel-nav">
-      <button type="button" className="bb-chart-carousel-button" aria-label="Previous chart" onClick={onPrevious} disabled={!canPrevious}>
-        {"<"}
-      </button>
       <ChartCarouselIndicators panels={panels} activeIndex={activeIndex} onSelect={onSelect} />
-      <button type="button" className="bb-chart-carousel-button" aria-label="Next chart" onClick={onNext} disabled={!canNext}>
-        {">"}
-      </button>
+      <div className="bb-chart-carousel-arrows">
+        <button type="button" className="bb-chart-carousel-button" aria-label="Previous chart" onClick={onPrevious} disabled={!canPrevious}>
+          <span aria-hidden="true">←</span>
+        </button>
+        <button type="button" className="bb-chart-carousel-button" aria-label="Next chart" onClick={onNext} disabled={!canNext}>
+          <span aria-hidden="true">→</span>
+        </button>
+      </div>
     </div>
   )
 }
@@ -1007,8 +1022,13 @@ function ChartCarouselIndicators({
           className="bb-chart-carousel-dot"
           data-state={index === activeIndex ? "active" : "inactive"}
           aria-label={`Show ${panel.title}`}
+          aria-pressed={index === activeIndex}
+          aria-controls={`bb-chart-${panel.id}`}
           onClick={() => onSelect(index)}
-        />
+        >
+          <span className="bb-chart-number" aria-hidden="true">{String(index + 1).padStart(2, "0")}</span>
+          {panel.title}
+        </button>
       ))}
     </div>
   )
@@ -1016,17 +1036,10 @@ function ChartCarouselIndicators({
 
 function ProjectionToggle({ active, onToggle }: { active: boolean; onToggle: () => void }) {
   return (
-    <button
-      type="button"
-      className="bb-metric-toggle"
-      aria-pressed={active}
-      aria-label="Toggle projected month view"
-      title="Toggle projected month view"
-      data-bb-tooltip-dismiss-trigger="projection"
-      onClick={onToggle}
-    >
-      Projected
-    </button>
+    <div className="bb-projection-control" role="group" aria-label="Report view" data-bb-tooltip-dismiss-trigger="projection">
+      <button type="button" className="bb-metric-toggle" aria-pressed={!active} onClick={() => { if (active) onToggle() }}>Current</button>
+      <button type="button" className="bb-metric-toggle" aria-pressed={active} onClick={() => { if (!active) onToggle() }}>Projected</button>
+    </div>
   )
 }
 
@@ -1326,18 +1339,16 @@ function MetricCard({
   const positive = accent && value !== null && value !== undefined && value >= 0
   const negative = value !== null && value !== undefined && value < 0
   return (
-    <Card>
-      <CardContent className="bb-metric-card">
-        <div className="bb-metric-head">
-          <div className="bb-metric-label">{label}</div>
-          {control}
-        </div>
-        <div className={negative ? "bb-metric-value bb-negative" : positive ? "bb-metric-value bb-positive" : "bb-metric-value"}>
-          {formatMoney(value)}
-        </div>
-        {description ? <div className="bb-metric-note">{description}</div> : null}
-      </CardContent>
-    </Card>
+    <div className="bb-metric-card" data-accent={accent || undefined}>
+      <div className="bb-metric-head">
+        <div className="bb-metric-label">{label}</div>
+        {control}
+      </div>
+      <div className={negative ? "bb-metric-value bb-negative" : positive ? "bb-metric-value bb-positive" : "bb-metric-value"}>
+        {formatMoney(value)}
+      </div>
+      {description ? <div className="bb-metric-note">{description}</div> : null}
+    </div>
   )
 }
 
@@ -1361,28 +1372,26 @@ function SavingsMetricCard({
   const minimumPercent = ideal > 0 ? clamp((minimum / ideal) * 100, 0, 100) : 0
   const tone = value <= 0 ? "empty" : value < minimum ? "low" : isSavingsNearGoal(value, ideal) ? "ideal" : "minimum"
   return (
-    <Card className="bb-savings-metric-card">
-      <CardContent className="bb-metric-card">
-        <div className="bb-metric-label">Saved</div>
-        <div className={`bb-metric-value bb-savings-value bb-savings-value-${tone}`}>{formatMoney(value)}</div>
-        <div
-          className={`bb-savings-progress bb-savings-progress-${tone}`}
-          role="img"
-          aria-label={`${formatMoney(value)} saved; minimum ${formatMoney(minimum)}; ideal ${formatMoney(ideal)}`}
-        >
-          <div className="bb-savings-progress-track">
-            <span className="bb-savings-progress-fill" style={{ width: `${progressPercent}%` }} />
-            {minimumPercent > 0 && minimumPercent < 100 ? (
-              <span className="bb-savings-progress-minimum-marker" style={{ left: `${minimumPercent}%` }} />
-            ) : null}
-          </div>
-          <div className="bb-savings-progress-labels">
-            <span>Minimum {formatMoney(minimum)}</span>
-            <span>Ideal {formatMoney(ideal)}</span>
-          </div>
+    <div className="bb-metric-card bb-savings-metric-card">
+      <div className="bb-metric-label">Saved</div>
+      <div className={`bb-metric-value bb-savings-value bb-savings-value-${tone}`}>{formatMoney(value)}</div>
+      <div
+        className={`bb-savings-progress bb-savings-progress-${tone}`}
+        role="img"
+        aria-label={`${formatMoney(value)} saved; minimum ${formatMoney(minimum)}; ideal ${formatMoney(ideal)}`}
+      >
+        <div className="bb-savings-progress-track">
+          <span className="bb-savings-progress-fill" style={{ width: `${progressPercent}%` }} />
+          {minimumPercent > 0 && minimumPercent < 100 ? (
+            <span className="bb-savings-progress-minimum-marker" style={{ left: `${minimumPercent}%` }} />
+          ) : null}
         </div>
-      </CardContent>
-    </Card>
+        <div className="bb-savings-progress-labels">
+          <span>Minimum {formatMoney(minimum)}</span>
+          <span>Ideal {formatMoney(ideal)}</span>
+        </div>
+      </div>
+    </div>
   )
 }
 
@@ -1749,7 +1758,7 @@ function categoryMixTransferRows(
       label: `${CATEGORY_BALANCE_LABELS[transfer.to]} overspend coverage`,
       amount: transfer.amount,
       percentage: 0,
-      color: transfer.to === "needs" ? "#f97316" : transfer.to === "wants" ? "#ec4899" : "#22c55e",
+      color: transfer.to === "needs" ? NEEDS_BAR_COLOR : transfer.to === "wants" ? WANTS_BAR_COLOR : SAVINGS_CATEGORY_COLOR,
     }))
 }
 
@@ -2299,9 +2308,7 @@ type DailySpendingAxis = {
   ticks: number[]
 }
 
-type DailyEntryDisplayRow = ExpenseEntry & {
-  categoryColor?: string
-}
+type DailyEntryDisplayRow = ExpenseEntry
 
 function DailySpendingChart({
   data,
@@ -2499,10 +2506,10 @@ function dailySpendingTickRange(step: number, max: number) {
 
 function dailySpendingCursorFill(filter: DailySpendingFilter) {
   if (filter === "needs") {
-    return "rgb(37 99 235 / 0.14)"
+    return "hsl(var(--chart-1) / 0.14)"
   }
   if (filter === "wants") {
-    return "rgb(124 58 237 / 0.14)"
+    return "hsl(var(--chart-2) / 0.14)"
   }
   return "hsl(var(--foreground) / 0.08)"
 }
@@ -2716,7 +2723,7 @@ function ExpenseInsightsCard({
   }
 
   return (
-    <Card>
+    <Card className="bb-report-section bb-highlights-section">
       <Tabs value={view} onValueChange={switchView} className="bb-card-tabs">
         <CardHeader>
           <div className="bb-card-title-row bb-inline-toggle-row">
@@ -3076,7 +3083,7 @@ function DailyEntriesTable({ entries, categoryColors }: { entries: DailyEntryDis
                   <div className="bb-transaction-list">
                     {dayEntries.map((entry, index) => (
                       <div key={`${entry.category}-${entry.amount}-${index}`}>
-                        <strong className="bb-transaction-category" style={{ color: entry.categoryColor ?? categoryColors[entry.category] }}>
+                        <strong className="bb-transaction-category" style={{ color: categoryColors[entry.category] }}>
                           {entry.category}
                         </strong>{" "}
                         {entry.item || entry.location || "Transaction"} - {formatMoney(entry.amount)}
@@ -3131,7 +3138,7 @@ function dailyEntriesWithCalendarEvents(
       const bucket = dailyCalendarEventBucket(event)
       const category = event.kind === "bill"
         ? event.group === "rent" ? "Rent" : "Bills & Utilities"
-        : "Subscription"
+        : bucket === "wants" ? "Subs (Wants)" : "Subs (Needs)"
       return {
         date: `${month}/${event.day}`,
         category,
@@ -3139,7 +3146,6 @@ function dailyEntriesWithCalendarEvents(
         person: event.kind === "bill" ? "Need bill" : bucket === "wants" ? "Want sub" : "Need sub",
         item: event.label,
         location: "",
-        categoryColor: bucket === "wants" ? WANTS_BAR_COLOR : NEEDS_BAR_COLOR,
       }
     }),
   ]
@@ -3232,18 +3238,18 @@ const CALENDAR_FILTERS: Array<{ value: CalendarFilter; label: string }> = [
 const CALENDAR_EVENT_STYLES: Record<CalendarEventKind, { label: string; color: string; background: string }> = {
   subscription: {
     label: "Sub",
-    color: "#7c3aed",
-    background: "rgb(124 58 237 / 0.1)",
+    color: "hsl(var(--chart-2))",
+    background: "hsl(var(--chart-2) / 0.1)",
   },
   bill: {
     label: "Bill",
-    color: "#ea580c",
-    background: "rgb(234 88 12 / 0.1)",
+    color: "hsl(var(--chart-3))",
+    background: "hsl(var(--chart-3) / 0.1)",
   },
   income: {
     label: "Income",
-    color: "#16a34a",
-    background: "rgb(22 163 74 / 0.1)",
+    color: "hsl(var(--success))",
+    background: "hsl(var(--success) / 0.1)",
   },
 }
 
@@ -3541,13 +3547,13 @@ function calendarEventsByDay(events: CalendarEvent[]) {
 
 function calendarEventStyle(event: CalendarEvent) {
   if (event.group === "static_bills_subscriptions_needs") {
-    return { ...CALENDAR_EVENT_STYLES.subscription, color: "#2563eb", background: "rgb(37 99 235 / 0.1)" }
+    return { ...CALENDAR_EVENT_STYLES.subscription, color: "hsl(var(--chart-1))", background: "hsl(var(--chart-1) / 0.1)" }
   }
   if (event.group === "subscriptions_wants") {
-    return { ...CALENDAR_EVENT_STYLES.subscription, color: "#7c3aed", background: "rgb(124 58 237 / 0.1)" }
+    return { ...CALENDAR_EVENT_STYLES.subscription, color: "hsl(var(--chart-2))", background: "hsl(var(--chart-2) / 0.1)" }
   }
   if (event.group === "rent") {
-    return { ...CALENDAR_EVENT_STYLES.bill, color: "#dc2626", background: "rgb(220 38 38 / 0.1)" }
+    return { ...CALENDAR_EVENT_STYLES.bill, color: "hsl(var(--chart-1))", background: "hsl(var(--chart-1) / 0.1)" }
   }
   return CALENDAR_EVENT_STYLES[event.kind]
 }
@@ -3823,13 +3829,13 @@ const SUBSCRIPTION_TONES: Record<SubscriptionTone, { label: string; color: strin
   },
   needs: {
     label: "Needs",
-    color: "#2563eb",
-    background: "rgb(37 99 235 / 0.1)",
+    color: "hsl(var(--chart-1))",
+    background: "hsl(var(--chart-1) / 0.1)",
   },
   wants: {
     label: "Wants",
-    color: "#7c3aed",
-    background: "rgb(124 58 237 / 0.1)",
+    color: "hsl(var(--chart-2))",
+    background: "hsl(var(--chart-2) / 0.1)",
   },
 }
 
