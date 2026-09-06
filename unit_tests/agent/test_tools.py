@@ -114,6 +114,7 @@ async def test_financial_report_tool_uses_canonical_mode_views_and_trusted_actor
         "elapsedDays": 17,
         "daysInMonth": 31,
         "metrics": {"fixedCommitments": 2500.0},
+        "incomeProjectionSettings": {"source": "xAI", "mode": "biweekly", "description": "xAI · biweekly"},
         "modeViews": {
             "current": {
                 "metrics": {
@@ -167,6 +168,7 @@ async def test_financial_report_tool_uses_canonical_mode_views_and_trusted_actor
     assert result["section"] == "overview"
     assert result["current"]["metrics"]["incomeAfterExpenses"] == 465.59
     assert result["projected"]["metrics"]["incomeAfterExpenses"] == 2339.42
+    assert result["projected"]["incomeProjectionSettings"] == payload["incomeProjectionSettings"]
     assert result["changes"]["incomeAfterExpenses"] == 1873.83
     assert build_report.call_args.kwargs["actor_key"] == "676638528590970917"
     assert build_report.call_args.kwargs["owner_name"] == "Brian"

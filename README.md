@@ -61,6 +61,36 @@ BOOKIEBOT_AGENT_MAX_MODEL_CALLS=6
 BOOKIEBOT_AGENT_MAX_TOOL_CALLS=8
 ```
 
+## Income Projection Settings
+
+Expense Breakdown uses explicit income settings in your personal Budget month tab. Put each label and its value in adjacent cells **beside the income table**, outside the Date/Source/Amount columns. Existing `Biweekly Income Source` and `Biweekly Income Start` cells remain supported.
+
+For biweekly paychecks:
+
+| Setting | Example value |
+| --- | --- |
+| Main Income Source | xAI |
+| Income Projection Mode | biweekly |
+| Biweekly Income Start | 7/2/2026 |
+
+Settings carry forward across blank months. Later explicit values override earlier settings; reports read earlier tabs in the selected annual workbook and, when configured and accessible, the previous annual workbook. Changing the employer resets its inherited amount, mode, and start date. Blank cells mean inherit; set `Income Projection Mode` to `off` to stop projections. If both source labels are present, `Main Income Source` takes precedence over the legacy `Biweekly Income Source` label.
+
+Only the configured source contributes to the paycheck estimate. Matching normalizes case, punctuation, and spacing and accepts the exact employer label with an optional standard suffix: `income`, `paycheck`, `payroll`, `salary`, or `wages`. Thus `xAI`, `xAI paycheck`, and `xAI income` match; `xAI bonus` and credit card rewards do not. Give bonuses or other one-time employer payments a distinct Source label. There is no fallback that turns a lone income event or generic “Paycheck” into the main source.
+
+Biweekly mode uses the average matching paycheck amount logged in the selected month, or the latest dated matching paycheck from the immediately prior month if none has been logged yet. The latest matching actual date anchors the next fourteen-day intervals; the configured start bootstraps undated entries. Settings persist, but older paycheck amounts are not reused indefinitely. Without a usable amount or date, the report explains what is missing and leaves income at its logged total.
+
+For the **same monthly take-home salary**, use these settings instead (the amount is only an example):
+
+| Setting | Example value |
+| --- | --- |
+| Main Income Source | xAI |
+| Income Projection Mode | fixed monthly |
+| Fixed Monthly Income | $6,000.00 |
+
+Use your monthly **net/take-home** amount, not gross annual salary. Entering `Fixed Monthly Income` also selects fixed monthly mode when no mode is specified in that tab. Projected income is logged income plus any unreceived portion of the configured salary. For example, $3,000 salary received plus $50 rewards projects to $6,050; already receiving more than the salary target never reduces actual income. Two- and three-paycheck months use the same fixed monthly target. Fixed mode requires a main source so salary already received can be identified without subtracting rewards or gifts.
+
+The Calendar shows the remaining fixed salary as a single **Projected salary remainder** on the last day of the month. This is a month-end planning estimate, not a promised deposit date. Current income stays actual-only; completed months remain actual-only in both modes. Invalid modes or amounts do not fall back to an old salary estimate. The Projected Income card and Discord report tools expose the resolved setting or missing-setting message. These settings affect reports only and do not write income transactions or change Budget formulas.
+
 ## 🎭 Daily Avatar Rotation
 
 BookieBot can rotate its Discord profile picture once per day. Add square avatar images to:

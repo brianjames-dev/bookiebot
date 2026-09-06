@@ -1,36 +1,45 @@
 # Agent Status
 
-Last updated: 2026-08-17
+Last updated: 2026-09-05
 
 ## Active Focus
 
-Unsupported messages and tool-supported read intents now enter an actor-scoped, read-only LangGraph agent with isolated memory and LLM-synthesized answers. The web Expense Breakdown page and agent now share server-computed Current/Projected views. All mutation workflows remain deterministic. The immediate next step is production verification of the canonical report tool in checklist item 82, followed by the existing deployment checks.
+The user-requested deterministic income projection fix is implemented: explicit source settings survive blank months, only matching payroll labels supply biweekly estimates, and optional fixed monthly take-home salary is supported. The Projected Income card and read-only report tools explain the basis. Production deployment/manual verification is next in checklist item 83; existing deployment checks remain queued.
 
 ## On Deck
 
-1. Deploy and manually verify canonical Current/Projected report tools in checklist item 82.
-2. Deploy and manually verify the LangGraph conversational/read response layer and bank-transfer refusal in checklist item 81.
-3. Deploy and manually verify Brian's BofA expense default in checklist item 80.
-4. Deploy and manually verify the shared expense-report chart viewport in checklist item 79.
-5. Deploy and manually verify fronted shared expenses in checklist item 78.
-6. Deploy and manually verify quarterly utility history in checklist item 77.
-7. Deploy and manually verify parser and bill-payment reliability in checklist item 76.
-8. Deploy and manually verify split creation/settlement in checklist item 74 and recent split changes/cancellation in checklist item 75.
-9. Continue the deferred split lifecycle: correct gross after splitting, partial reimbursement, explicit paid-split undo, and split-aware update/move/delete/undo.
-10. Deploy and manually verify prior-month paycheck carry-forward in Projected mode in checklist item 73.
-11. Deploy and manually verify Wants subscriptions in Burn Rate in checklist item 72.
-12. Deploy and manually verify selected-month subscription scoping in checklist item 71.
-13. Deploy and manually verify Daily Spending bill coverage and outlier scaling in checklist item 70.
-14. Deploy and manually verify the monthly savings workflow and corrected Saved-card targets in checklist items 60-61 and 69.
-15. Deploy and manually verify the expense-report corrections in checklist item 67.
-16. Deploy and manually verify typed `recent` opens the short-lived launcher and keeps the resulting DM session ephemeral.
-17. Deploy and manually verify `View Inbox` and `Reconcile Now` show `BookieBot is typing...` without a temporary thinking message.
-18. Manually verify shared Needs logging plus update/move/delete/undo behavior in Discord and Google Sheets.
-19. Manually verify recent transactions and reconciliation after the latest reliability fixes.
-20. Consider a richer Discord button flow for grouped amount adjustments if the current UX feels too manual.
-21. Harden recent-action pending state across restarts/deploys, since selections currently live only in process memory.
-22. Improve targeted recent-action search so commands can find older matches, not only the latest 10 recent actions.
-23. Explore clarifying questions before logging when BookieBot is uncertain instead of guessing or silently failing.
+1. Deploy and manually verify deterministic income settings and fixed monthly salary in checklist item 83.
+2. Deploy and manually verify canonical Current/Projected report tools in checklist item 82.
+3. Deploy and manually verify the LangGraph conversational/read response layer and bank-transfer refusal in checklist item 81.
+4. Deploy and manually verify Brian's BofA expense default in checklist item 80.
+5. Deploy and manually verify the shared expense-report chart viewport in checklist item 79.
+6. Deploy and manually verify fronted shared expenses in checklist item 78.
+7. Deploy and manually verify quarterly utility history in checklist item 77.
+8. Deploy and manually verify parser and bill-payment reliability in checklist item 76.
+9. Deploy and manually verify split creation/settlement in checklist item 74 and recent split changes/cancellation in checklist item 75.
+10. Continue the deferred split lifecycle: correct gross after splitting, partial reimbursement, explicit paid-split undo, and split-aware update/move/delete/undo.
+11. Deploy and manually verify prior-month paycheck carry-forward in Projected mode in checklist item 73.
+12. Deploy and manually verify Wants subscriptions in Burn Rate in checklist item 72.
+13. Deploy and manually verify selected-month subscription scoping in checklist item 71.
+14. Deploy and manually verify Daily Spending bill coverage and outlier scaling in checklist item 70.
+15. Deploy and manually verify the monthly savings workflow and corrected Saved-card targets in checklist items 60-61 and 69.
+16. Deploy and manually verify the expense-report corrections in checklist item 67.
+17. Deploy and manually verify typed `recent` opens the short-lived launcher and keeps the resulting DM session ephemeral.
+18. Deploy and manually verify `View Inbox` and `Reconcile Now` show `BookieBot is typing...` without a temporary thinking message.
+19. Manually verify shared Needs logging plus update/move/delete/undo behavior in Discord and Google Sheets.
+20. Manually verify recent transactions and reconciliation after the latest reliability fixes.
+21. Consider a richer Discord button flow for grouped amount adjustments if the current UX feels too manual.
+22. Harden recent-action pending state across restarts/deploys, since selections currently live only in process memory.
+23. Improve targeted recent-action search so commands can find older matches, not only the latest 10 recent actions.
+24. Explore clarifying questions before logging when BookieBot is uncertain instead of guessing or silently failing.
+
+## Completed 2026-09-05
+
+- Implemented the user's income-projection priority. July source/start settings now survive blank August/September settings; current-month explicit values win, and employer changes reset the inherited salary plan. Earlier tabs from the configured previous annual workbook also supply settings across year rollover.
+- Removed arbitrary single-income, keyword, fuzzy-substring, and hardcoded-date fallbacks. `xAI`, `xAI paycheck`, and `xAI income` share a finite payroll-label rule; rewards, bonuses, and other employers stay separate. Biweekly amount history remains limited to the immediately previous month; missing information is explained in the report.
+- Added `Main Income Source`, `Income Projection Mode` (`biweekly`, `fixed monthly`, `off`), and `Fixed Monthly Income` cells beside the existing income table. Fixed mode projects only unreceived salary, preserves additional actual income, and places a clearly labeled monthly remainder estimate at month-end. Current and completed-month accounting remain actual-only.
+- Exposed projection settings through the Income card and canonical agent overview/cash-flow sections; rebuilt the committed frontend asset. Updated README setup instructions and the durable decision/workstream log. No live sheet mutation or deployment was performed.
+- Verification results and read-only live check are recorded in the latest verification block below; manual steps are checklist item 83.
 
 ## Completed 2026-08-17
 
@@ -660,6 +669,12 @@ Use a test row or low-risk real row in Discord:
     - Ask for `activity`, merchant patterns, Need details, reimbursements, and a named historical month in separate natural-language prompts. Expected: each uses the focused canonical report section for the requesting Discord actor, and no raw worksheet or other user's data is exposed.
     - Open a newly generated report after deploy. Expected: both toggles render normally from server `modeViews`; an older saved report without `modeViews` still renders through the client fallback.
 
+83. Deterministic income source and fixed monthly salary (2026-09-05):
+    - Deploy and reload a live September report. Expected: the Projected Income card identifies `xAI · biweekly`; July's `xAI` / `7/2/2026` settings carry through blank later settings and August's `xAI paycheck` / `xAI income` entries supply the estimate. Credit card rewards remain actual additional income.
+    - In a test workbook, put `Main Income Source = xAI`, `Income Projection Mode = fixed monthly`, and `Fixed Monthly Income = 6000` in adjacent label/value cells beside the income table. With $3,000 salary and $50 rewards logged, Current is $3,050 and Projected is $6,050. Calendar shows only the remaining $3,000 as a projected month-end salary remainder. A three-paycheck month retains the same target.
+    - Leave the next month's settings blank and confirm the plan persists. Change the employer and confirm the old amount/start do not carry into the new plan. Set mode to `off` and confirm income remains actual-only; malformed mode/amount displays a setting message instead of an inferred salary.
+    - Ask Discord to explain projected income and compare the answer with the page. Confirm the source/mode and totals agree; older saved reports still render, and completed months stay actual-only.
+
 ## Verification Baseline
 
 Recommended targeted tests for the active workstream:
@@ -669,7 +684,28 @@ python -m pytest unit_tests/banking/test_reconciliation.py unit_tests/banking/te
 python -m pytest unit_tests/intents/test_handlers.py unit_tests/core/test_message_router.py
 ```
 
-Latest verification:
+Latest verification (2026-09-05):
+
+```bash
+PYTHONPATH=src venv/bin/python -m pytest unit_tests/reports unit_tests/agent -q
+# passed: 96 passed
+
+PYTHONPATH=src venv/bin/python -m pytest unit_tests -q
+# passed: 568 passed, 1 existing Kaleido deprecation warning
+
+PYTHONPATH=src venv/bin/python -m pyright --pythonpath venv/bin/python --pythonversion 3.12
+# passed: 0 errors, 0 warnings, 0 informations
+
+cd web/expense-report && npm run typecheck && npm run build
+# passed; committed frontend asset rebuilt
+
+git diff --check
+# passed
+```
+
+Read-only live check of Brian's July, August, and September 2026 Budget tabs: resolved source `xAI`, configured start `2026-07-02`, latest matching reference `xAI income` dated `8/28/2026` at `$3,776.31`. September actual income remains `$101.77`; projected income is `$7,654.39`, including projected checks of `$3,776.31` on September 11 and 25. No workbook writes were performed. Production page verification remains pending deployment.
+
+Earlier verification:
 
 ```bash
 PYTHONPATH=src venv/bin/python -m pytest unit_tests/agent unit_tests/core/test_message_router.py unit_tests/intents/test_handlers.py unit_tests/reports/test_expense_breakdown.py -q

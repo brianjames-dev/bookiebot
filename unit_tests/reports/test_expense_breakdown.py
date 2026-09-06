@@ -1074,6 +1074,8 @@ def test_current_month_calendar_events_include_projected_income_subscriptions_an
         ["10th", "Need Later", "$35.00", "", "20th", "Want Later", "$20.00", "", "", "", "", "", "", "", ""],
     ]
     personal_rows = [
+        ["Main Income Source", "Paycheck"],
+        ["Biweekly Income Start", "7/2/2026"],
         ["Paycheck", "$2,000.00"],
         ["Rent", "$1,750.00"],
         ["PG&E", "$140.00"],
@@ -1446,7 +1448,7 @@ def test_current_month_income_projection_uses_logged_income_date_as_biweekly_anc
         month=BudgetMonth(2026, 7),
         worksheets=ReportWorksheets(
             shared_expenses=InMemoryWorksheet([["hdr"] * 28, ["hdr"] * 28]),
-            personal_budget=InMemoryWorksheet([["07/02/2026", "Paycheck", "$2,000.00"]]),
+            personal_budget=InMemoryWorksheet([["Main Income Source", "Paycheck"], ["07/02/2026", "Paycheck", "$2,000.00"]]),
             subscriptions=InMemoryWorksheet([]),
         ),
     )
@@ -1850,6 +1852,7 @@ def test_savings_minimum_rounds_ten_percent_of_income_directly(monkeypatch):
         lambda: datetime(2026, 7, 10, 12, 0, tzinfo=routing.PACIFIC_TZ),
     )
     personal_rows = [
+        ["Main Income Source", "Sonic"],
         ["", "7/10/2026", "Sonic", "$1,619.47"],
         ["", "Monthly Income:", "", "$1,619.47"],
         _row(

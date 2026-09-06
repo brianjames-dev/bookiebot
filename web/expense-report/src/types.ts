@@ -182,6 +182,13 @@ export interface ExpenseReportData {
   metrics: Metrics
   categoryBalances?: CategoryBalances
   incomeProjection: IncomeProjection
+  incomeProjectionSettings?: {
+    mode: string
+    source: string | null
+    anchorDate: string | null
+    fixedMonthlyAmount: number | null
+    description: string
+  }
   savingsProjection: SavingsProjection
   burnRate: BurnRate | null
   breakdown: BreakdownItem[]

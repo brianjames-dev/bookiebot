@@ -300,6 +300,7 @@ def _financial_report_section(
     if section == "overview":
         return {
             "metrics": view["metrics"],
+            "incomeProjectionSettings": payload.get("incomeProjectionSettings"),
             "categoryBudgets": view["categoryBudgets"],
             "categorySpending": view["categorySpending"],
             "categoryBalances": view["categoryBalances"],
@@ -330,6 +331,7 @@ def _financial_report_section(
         return {
             "metrics": view["metrics"],
             "incomeProjection": payload["incomeProjection"],
+            "incomeProjectionSettings": payload.get("incomeProjectionSettings"),
             "savingsProjection": payload["savingsProjection"],
             "calendarEvents": events,
             "dailyTotals": payload["dailyTotals"],

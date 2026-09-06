@@ -1,6 +1,6 @@
 # Finance Operations Workstream
 
-Last updated: 2026-08-17
+Last updated: 2026-09-05
 
 ## Goal
 
@@ -677,3 +677,15 @@ Open follow-up: any future write-capable planner must emit high-level proposals,
 - `unit_tests/banking/test_reconciliation.py`
 - `unit_tests/banking/test_store.py`
 - `unit_tests/core/test_bank_reconciliation.py`
+
+### 2026-09-05 Deterministic Income Projection Follow-Up
+
+Status: Complete in code; production deployment/manual confirmation remains in `.agent/STATUS.md` checklist item 83. This supersedes only the earlier one-month configuration inheritance limit; prior-month observed paycheck amounts retain their freshness boundary.
+
+- Explicit source/start/mode/fixed amount settings persist across blank months, including earlier settings in the configured previous annual workbook. The selected month's explicit settings win; changing employers resets the inherited salary plan, and `off` stops projections.
+- Removed arbitrary income/keyword/fuzzy-label and hardcoded-cadence fallbacks. Complete employer labels and a finite set of standard payroll suffixes match deterministically; bonuses/rewards remain additional actual income.
+- Fixed monthly take-home mode projects only the unreceived salary portion and uses one labeled month-end estimate. Current/completed months stay actual-only; report/agent totals remain shared, with a visible resolved basis or missing-setting message.
+- Added regressions for July-to-September inheritance with actual August payroll label variants, rewards isolation, fixed targets/over-target salary, no double-counting, three-paycheck months, employer changes, off/invalid settings, year rollover, and missing source/anchor/history.
+- README documents editable sheet settings. No sheet mutation or deployment was performed; latest verification is recorded in `.agent/STATUS.md`.
+
+- Verification: focused reports/agent suite `96 passed`; full suite `568 passed` with one existing Kaleido warning; Pyright clean; frontend typecheck/build and `git diff --check` passed. A read-only live July–September check resolves `xAI` and projects `$7,654.39` from August 28 salary plus September actual income.

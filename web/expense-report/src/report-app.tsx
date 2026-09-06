@@ -750,7 +750,7 @@ export function ExpenseReportApp({ report }: { report: ExpenseReportData }) {
           <MetricCard
             label="Income"
             value={activeReport.metrics.monthlyIncome}
-            description={projectionActive ? "Projected month" : "Logged income"}
+            description={projectionActive ? (report.incomeProjectionSettings?.description ?? "Projected month") : "Logged income"}
           />
           <MetricCard label="Spent" value={spentTotal} />
           <MetricCard
