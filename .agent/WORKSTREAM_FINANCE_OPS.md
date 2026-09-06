@@ -757,3 +757,5 @@ Completed shared expense/income import orchestration and durable SQLite/Postgres
 ### Audit Batch 5 work log — 2026-09-06
 
 Completed atomic material-bank-change reopening and durable previous-match events without Sheets mutations; preserve explicit ignore policy. Reminder evaluation failure no longer consumes daily evaluation, and automatic retries use 60-second exponential backoff capped at one hour. Webhook claims expire after five minutes, use fencing tokens and per-item serialization, and retain pending state until work is acknowledged. Imports carry and verify target-month/year metadata during recovery. Added 26 cases; targeted 193/full 733 passed, Pyright clean. Manual acceptance is in STATUS. Next: reports.
+
+Batch 5 copy follow-up: explicitly tell users that a sheet entry may already exist when an import needs recovery, so they inspect the sheet before resolving it. This clarifies the partial-write outcome; import behavior and the passing 733-test verification remain unchanged.

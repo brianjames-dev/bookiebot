@@ -30,7 +30,7 @@ def _recovery_result(operation: BankImportOperation) -> BankImportResult:
     return BankImportResult(
         'needs_recovery',
         'This bank item has an import in progress or awaiting recovery. '
-        'No additional sheet row was written. Check its sheet entry and action history '
+        'A sheet entry may already exist, so the write will not be retried. Check the sheet and action history '
         f'before resolving import `{operation.operation_id}`.',
         operation.operation_id, operation.matched_action_log_id,
     )
