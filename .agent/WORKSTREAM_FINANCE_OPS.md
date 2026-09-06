@@ -734,7 +734,7 @@ User authorized all batches incrementally on 2026-09-06. STATUS is the active qu
 | 5 | A08–A09: changed matches reopen; transient reminder failures retry; webhook processing recovers after restart | Complete 2026-09-06; 733 tests and Pyright passed |
 | 6 | A10–A11: every private report route enforces signed access; live rendering yields the event loop; history uses bounded batch reads | Complete 2026-09-06; 746 tests and Pyright passed |
 | 7 | A12: incident contents remain data; ordinary changes run quality gates; storage lifecycle tests exercise Postgres | Complete 2026-09-06; 773 tests incl. real Postgres and quality gates passed |
-| 8 | Remove proven unused rendering code and consolidate responsibilities where earlier batches establish safe seams | In progress |
+| 8 | Remove proven unused rendering code and consolidate responsibilities where earlier batches establish safe seams | Complete 2026-09-06; 777 tests and final local quality gates passed |
 
 Preserve intentional semantics: existing affirmative bill shorthand, actual/expected income separation, historical report compatibility, bank confirmation before import, immutable gross split amount, and reimbursement settlement without income. Historical bank writes may fail closed until destination-aware undo is supported. Audit completion is separate from deployment/manual confirmation; do not silently run migrations or mutate live test transactions.
 
@@ -767,3 +767,9 @@ Completed signed access on all report routes, no-store responses, bounded asynch
 ### Audit Batch 7 work log — 2026-09-06
 
 Completed file-based autofix metadata and failure diagnostics, ordinary push/PR CI, and one storage contract across SQLite/Postgres. Tests prove owner isolation, transaction rollback, unique import claims, changed-match events, stale-worker fencing and concurrent same-item webhook serialization on a real temporary Postgres16 database. Nine arbitrary-text regressions also pass. Targeted 31/full 773 passed; Pyright, Node, frontend typecheck/build and asset parity passed. Remote workflow execution will be checked after push. Next: focused cleanup and final verification.
+
+### Audit Batch 8 work log — 2026-09-06
+
+Completed proven-unused HTML helper removal and separated worksheet transport from report assembly/calculations. Owner/lineage repair and import orchestration were consolidated in earlier batches; no additional abstraction was needed. Kept active payload and React historical fallback behavior. Added four reader contract cases; targeted 141 passed; comparison preserved 71 payloads and 26 HTML pages byte-for-byte; final full suite 777 passed including real Postgres, with Pyright/Node/frontend/asset parity clean. STATUS and AUDIT_REMEDIATION_2026-09-06.md contain final scope and manual acceptance.
+
+All twelve primary audit findings are addressed by the eight batches. Remaining design work is distinct: destination-aware historical import/undo, recovery for ordinary Sheets mutations whose action-log append fails, and the already deferred split/pending-selection lifecycle work. Separate Sheets and action-log writes are not globally atomic; Batch 4 specifically guards bank import duplication. Deployed/manual acceptance is pending; no live financial test mutations were performed during this implementation.

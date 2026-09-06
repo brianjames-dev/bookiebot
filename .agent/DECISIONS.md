@@ -473,3 +473,9 @@ Decision: Build autofix PR metadata from GITHUB_EVENT_PATH and the saved agent o
 Postgres tests require explicit BOOKIEBOT_TEST_POSTGRES_URL, create a random schema per case, and drop only that schema during cleanup. They do not use the application's banking database configuration; absent local test configuration skips only the Postgres cases, while CI supplies its own Postgres16 service.
 
 Rationale: Normal incident punctuation broke shell parsing, and mocked adapters could not prove database transaction/concurrency behavior. File boundaries and a shared persistent-store contract address both without changing application workflow semantics.
+
+## 2026-09-06 - Separate Report Transport At The Proven Read Boundary
+
+Decision: Keep owner/month selection and financial assembly in expense_breakdown.py; move optional existing-sheet lookup, formatted row normalization, and monthly batch/fallback reads into worksheet_reads.py. Remove only the closed family of 21 private HTML helpers proven to have no current callers. Preserve active payload calculations, frontend assets, and historical React fallback behavior.
+
+Rationale: The earlier report batching creates a useful transport seam without a wholesale rewrite. Before/after payload and HTML comparisons provide direct evidence that cleanup preserves report behavior.
