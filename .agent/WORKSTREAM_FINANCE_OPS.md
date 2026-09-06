@@ -730,10 +730,65 @@ Status: Complete; deployed-bot/natural-rollover manual checks are in STATUS chec
 
 ### 2026-09-06 Expense Report Motion And Responsive Polish
 
-Status: Implementation and targeted verification complete; combined full-suite verification and the requested merge to `main`/push are pending. Deployed manual acceptance is STATUS checklist 87, alongside the initial design checklist 86.
+Status: Implementation and combined verification with incoming main complete. Deployed manual acceptance is STATUS checklist 87, alongside the initial design checklist 86.
 
 - Reused one symmetric 240ms disclosure transition for inline details, full lists, and controlled reimbursement expansion. Dialogs now animate entry and exit while retaining focus trapping and page scroll locking until exit completes; closed disclosure content is inert and reduced-motion preferences remain supported.
 - Added measured sliding selections across report modes, chart navigation, filters, and highlights, plus a sliding theme switch. Expense Highlights keeps both views mounted for smooth transitions. Top metric amounts fit their actual column width on one line and restore their natural size when space returns.
 - Calendar markers adapt to day-cell width instead of relying only on viewport breakpoints, reducing from full labels to amounts to dot/count without overflow. Exact event information remains in tooltips and accessible labels.
 - Daily Spending grids now follow visible axis ticks, retain only the solid zero baseline, and include an upper dollar tick for empty and ordinary datasets; the compressed outlier's true-value upper guide remains near the top.
-- Verification so far: `122` report tests passed; frontend typecheck/build passed and embedded assets rebuilt. Browser QA passed across 320–1280px, with sampled intermediate motion, contained calendar labels/counts, exact long/signed metric fitting, upper daily guides, and preserved modal/highlight behavior. Combined full-suite verification remains pending. Financial calculations, reconciliation, persistence, and split lifecycle behavior are unchanged.
+- Verification so far: `122` report tests passed; frontend typecheck/build passed and embedded assets rebuilt. Browser QA passed across 320–1280px, with sampled intermediate motion, contained calendar labels/counts, exact long/signed metric fitting, upper daily guides, and preserved modal/highlight behavior. Combined verification with incoming main: `781 passed, 9 skipped` (optional local Postgres contracts; one existing Kaleido warning), Pyright `0 errors`. CI supplies Postgres for those opt-in contracts. Financial calculations, reconciliation, persistence, and split lifecycle behavior are unchanged.
+
+## 2026-09-06 Architecture Audit Remediation
+
+User authorized all batches incrementally on 2026-09-06. STATUS is the active queue; existing deployment checks remain pending. Audited commit: 863432f162af95b6c29cf4567629e3fddf2b52f0. Offline baseline: 599 suite tests passed; isolated Kaleido test passed outside sandbox; Pyright, frontend typecheck/build, and Node rollover checks passed. All findings have offline reproductions; no live financial inspection was performed.
+
+| Batch | Findings / acceptance | Status |
+| --- | --- | --- |
+| 1 | A01: bill questions/negation never write; A02: updated payments/savings retain their type and cannot delete budget rows | Complete 2026-09-06; 647 tests and Pyright passed |
+| 2 | A03–A04: income row shifts update only the correct owner's references, including bill/savings actions | Complete 2026-09-06; 663 tests and Pyright passed |
+| 3 | A05: delete/move undo preserves another user's intervening edits and consistent action history | Complete 2026-09-06; 669 tests and Pyright passed |
+| 4 | A06–A07: reject unsupported historical destinations before writing; durable claims prevent stale/concurrent/retried duplicate imports | Complete 2026-09-06; 707 tests and Pyright passed |
+| 5 | A08–A09: changed matches reopen; transient reminder failures retry; webhook processing recovers after restart | Complete 2026-09-06; 733 tests and Pyright passed |
+| 6 | A10–A11: every private report route enforces signed access; live rendering yields the event loop; history uses bounded batch reads | Complete 2026-09-06; 746 tests and Pyright passed |
+| 7 | A12: incident contents remain data; ordinary changes run quality gates; storage lifecycle tests exercise Postgres | Complete 2026-09-06; 773 tests incl. real Postgres and quality gates passed |
+| 8 | Remove proven unused rendering code and consolidate responsibilities where earlier batches establish safe seams | Complete 2026-09-06; 777 tests and final local quality gates passed |
+
+Preserve intentional semantics: existing affirmative bill shorthand, actual/expected income separation, historical report compatibility, bank confirmation before import, immutable gross split amount, and reimbursement settlement without income. Historical bank writes may fail closed until destination-aware undo is supported. Audit completion is separate from deployment/manual confirmation; do not silently run migrations or mutate live test transactions.
+
+### Audit Batch 1 work log — 2026-09-06
+
+Completed affirmative bill grammar/read-only diversion before pending edits, canonical payment/savings update lineage, capability restrictions, and physical income-table deletion guards. Historical repeated-update records recover source type from loaded lineage without extra Sheets reads or migration. Added 47 regression cases; full suite 647 passed and Pyright clean. Manual acceptance is recorded in STATUS. Next: owner-scoped row shifting.
+
+### Audit Batch 2 work log — 2026-09-06
+
+Completed one owner-alias-aware personal-budget reference repair path used by insert/delete/restore/placeholder cleanup. Repairs active/inactive action lineages, fixed payment/savings references, saved income boundaries, and the owner's linked split-ledger rows. Reference failure regressions prove rollback; stale fixed-label guards fail before mutation. Added 16 cases; focused 277/full 663 passed, Pyright clean. Manual acceptance is in STATUS. Next: shared expense undo preservation.
+
+### Audit Batch 3 work log — 2026-09-06
+
+Completed transaction-only restoration into current category contents. Undo no longer replays stale neighboring rows; it tracks intervening deletes, preserves corrections/new/draft rows, and repositions restored action lineages. Destination verification protects moved rows and occupied legacy restore positions. Six reproduced regressions now pass; focused 283/full 669 passed, Pyright clean. Manual acceptance is in STATUS. Next: durable bank imports.
+
+### Audit Batch 4 work log — 2026-09-06
+
+Completed shared expense/income import orchestration and durable SQLite/Postgres operation schema. Claims recheck owner, status, watched/posted state, amount and date atomically; uncertain outcomes hold the claim. Recovery links one tagged active action without invoking writers again. Completed or intentionally reopened items cannot be reimported by stale forms. Imports support only the current month until historical destination-aware undo exists; matching historical entries remains available. Added 38 cases; targeted 167/full 707 passed, Pyright clean. Manual acceptance is in STATUS. Next: bank/reminder/webhook lifecycle recovery.
+
+### Audit Batch 5 work log — 2026-09-06
+
+Completed atomic material-bank-change reopening and durable previous-match events without Sheets mutations; preserve explicit ignore policy. Reminder evaluation failure no longer consumes daily evaluation, and automatic retries use 60-second exponential backoff capped at one hour. Webhook claims expire after five minutes, use fencing tokens and per-item serialization, and retain pending state until work is acknowledged. Imports carry and verify target-month/year metadata during recovery. Added 26 cases; targeted 193/full 733 passed, Pyright clean. Manual acceptance is in STATUS. Next: reports.
+
+Batch 5 copy follow-up: explicitly tell users that a sheet entry may already exist when an import needs recovery, so they inspect the sheet before resolving it. This clarifies the partial-write outcome; import behavior and the passing 733-test verification remain unchanged.
+
+### Audit Batch 6 work log — 2026-09-06
+
+Completed signed access on all report routes, no-store responses, bounded asynchronous live builds with actor-safe in-flight coalescing and cancellation isolation, batched formatted history reads, and non-provisioning optional sheet lookup. Historical payload/snapshot fallback remains supported behind signed access. Added 13 cases; targeted 280/full 746 passed, Pyright clean. Manual acceptance is in STATUS. Next: automation and database quality gates.
+
+### Audit Batch 7 work log — 2026-09-06
+
+Completed file-based autofix metadata and failure diagnostics, ordinary push/PR CI, and one storage contract across SQLite/Postgres. Tests prove owner isolation, transaction rollback, unique import claims, changed-match events, stale-worker fencing and concurrent same-item webhook serialization on a real temporary Postgres16 database. Nine arbitrary-text regressions also pass. Targeted 31/full 773 passed; Pyright, Node, frontend typecheck/build and asset parity passed. Remote Verification subsequently passed on Batch 7 and the final implementation commit. Next: focused cleanup and final verification.
+
+### Audit Batch 8 work log — 2026-09-06
+
+Completed proven-unused HTML helper removal and separated worksheet transport from report assembly/calculations. Owner/lineage repair and import orchestration were consolidated in earlier batches; no additional abstraction was needed. Kept active payload and React historical fallback behavior. Added four reader contract cases; targeted 141 passed; comparison preserved 71 payloads and 26 HTML pages byte-for-byte; final full suite 777 passed including real Postgres, with Pyright/Node/frontend/asset parity clean. STATUS and AUDIT_REMEDIATION_2026-09-06.md contain final scope and manual acceptance.
+
+All twelve primary audit findings are addressed by the eight batches. Remaining design work is distinct: destination-aware historical import/undo, recovery for ordinary Sheets mutations whose action-log append fails, and the already deferred split/pending-selection lifecycle work. Separate Sheets and action-log writes are not globally atomic; Batch 4 specifically guards bank import duplication. Deployed/manual acceptance is pending; no live financial test mutations were performed during this implementation.
+
+Final remote verification: implementation commit `6fd7ce8` passed every GitHub Verification gate ([run](https://github.com/brianjames-dev/bookiebot/actions/runs/34051590441)). The disposable local Postgres container was stopped and removed; deployed/manual acceptance is the first on-deck item.

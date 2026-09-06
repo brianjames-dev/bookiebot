@@ -4,47 +4,83 @@ Last updated: 2026-09-06
 
 ## Active Focus
 
-The user's second expense-report design pass is implemented: symmetric disclosure and dialog motion, sliding selections, calendar markers that fit their day cells, labeled dotted upper Daily Spending guides, and top metric amounts that stay on one line. Targeted tests and the frontend build pass; full-suite and browser verification are in progress before the requested merge to `main` and push. Review the deployed design using checklist items 86–87. The existing expected-income and rollover verification queue remains below.
+The user's second expense-report design pass is implemented: symmetric disclosure and dialog motion, sliding selections, calendar markers that fit their day cells, labeled dotted upper Daily Spending guides, and top metric amounts that stay on one line. Combined verification with the latest audit fixes passed: 781 tests, nine optional local Postgres cases skipped, clean Pyright, frontend typecheck/build, and responsive browser checks. Review the deployed design using checklist items 86–87. The existing expected-income and rollover verification queue remains below.
+
+All eight September 6 audit batches are implemented and verified locally. Each batch received focused regressions, broader verification, tracking updates, and an incremental commit/push. Final combined verification: 777 tests passed including real Postgres, Pyright clean, Apps Script and frontend checks passed. GitHub Verification passed on implementation commit `6fd7ce8` ([run](https://github.com/brianjames-dev/bookiebot/actions/runs/34051590441)). The disposable local Postgres test container has been removed. Deployment/manual acceptance remains separate; see `.agent/AUDIT_REMEDIATION_2026-09-06.md`.
+
 
 ## On Deck
 
-1. Finish the expense-report polish verification, merge to `main` and push as requested, then review the deployed design against checklist items 86–87.
-2. Verify deployed expected-income projections and the next monthly rollover against checklist item 85.
-3. Deploy and manually verify canonical Current/Projected report tools in checklist item 82.
-4. Deploy and manually verify the LangGraph conversational/read response layer and bank-transfer refusal in checklist item 81.
-5. Deploy and manually verify Brian's BofA expense default in checklist item 80.
-6. Deploy and manually verify the shared expense-report chart viewport in checklist item 79.
-7. Deploy and manually verify fronted shared expenses in checklist item 78.
-8. Deploy and manually verify quarterly utility history in checklist item 77.
-9. Deploy and manually verify parser and bill-payment reliability in checklist item 76.
-10. Deploy and manually verify split creation/settlement in checklist item 74 and recent split changes/cancellation in checklist item 75.
-11. Continue the deferred split lifecycle: correct gross after splitting, partial reimbursement, explicit paid-split undo, and split-aware update/move/delete/undo.
-12. Deploy and manually verify prior-month paycheck carry-forward in Projected mode in checklist item 73.
-13. Deploy and manually verify Wants subscriptions in Burn Rate in checklist item 72.
-14. Deploy and manually verify selected-month subscription scoping in checklist item 71.
-15. Deploy and manually verify Daily Spending bill coverage and outlier scaling in checklist item 70.
-16. Deploy and manually verify the monthly savings workflow and corrected Saved-card targets in checklist items 60-61 and 69.
-17. Deploy and manually verify the expense-report corrections in checklist item 67.
-18. Deploy and manually verify typed `recent` opens the short-lived launcher and keeps the resulting DM session ephemeral.
-19. Deploy and manually verify `View Inbox` and `Reconcile Now` show `BookieBot is typing...` without a temporary thinking message.
-20. Manually verify shared Needs logging plus update/move/delete/undo behavior in Discord and Google Sheets.
-21. Manually verify recent transactions and reconciliation after the latest reliability fixes.
-22. Consider a richer Discord button flow for grouped amount adjustments if the current UX feels too manual.
-23. Harden recent-action pending state across restarts/deploys, since selections currently live only in process memory.
-24. Improve targeted recent-action search so commands can find older matches, not only the latest 10 recent actions.
-25. Explore clarifying questions before logging when BookieBot is uncertain instead of guessing or silently failing.
+1. Review the deployed expense-report design and motion/responsive polish against checklist items 86–87.
+2. Verify the deployed audit fixes in a test workbook/Sandbox using `.agent/AUDIT_REMEDIATION_2026-09-06.md`; complete the live acceptance checks without creating test transactions in real financial data.
+3. Verify deployed expected-income projections and the next monthly rollover against checklist item 85.
+4. Deploy and manually verify canonical Current/Projected report tools in checklist item 82.
+5. Deploy and manually verify the LangGraph conversational/read response layer and bank-transfer refusal in checklist item 81.
+6. Deploy and manually verify Brian's BofA expense default in checklist item 80.
+7. Deploy and manually verify the shared expense-report chart viewport in checklist item 79.
+8. Deploy and manually verify fronted shared expenses in checklist item 78.
+9. Deploy and manually verify quarterly utility history in checklist item 77.
+10. Deploy and manually verify parser and bill-payment reliability in checklist item 76.
+11. Deploy and manually verify split creation/settlement in checklist item 74 and recent split changes/cancellation in checklist item 75.
+12. Continue the deferred split lifecycle: correct gross after splitting, partial reimbursement, explicit paid-split undo, and split-aware update/move/delete/undo.
+13. Deploy and manually verify prior-month paycheck carry-forward in Projected mode in checklist item 73.
+14. Deploy and manually verify Wants subscriptions in Burn Rate in checklist item 72.
+15. Deploy and manually verify selected-month subscription scoping in checklist item 71.
+16. Deploy and manually verify Daily Spending bill coverage and outlier scaling in checklist item 70.
+17. Deploy and manually verify the monthly savings workflow and corrected Saved-card targets in checklist items 60-61 and 69.
+18. Deploy and manually verify the expense-report corrections in checklist item 67.
+19. Deploy and manually verify typed `recent` opens the short-lived launcher and keeps the resulting DM session ephemeral.
+20. Deploy and manually verify `View Inbox` and `Reconcile Now` show `BookieBot is typing...` without a temporary thinking message.
+21. Manually verify shared Needs logging plus update/move/delete/undo behavior in Discord and Google Sheets.
+22. Manually verify recent transactions and reconciliation after the latest reliability fixes.
+23. Consider a richer Discord button flow for grouped amount adjustments if the current UX feels too manual.
+24. Harden recent-action pending state across restarts/deploys, since selections currently live only in process memory.
+25. Improve targeted recent-action search so commands can find older matches, not only the latest 10 recent actions.
+26. Explore clarifying questions before logging when BookieBot is uncertain instead of guessing or silently failing.
 
 ## Completed 2026-09-06
 
 - Implemented the second frontend polish pass. All inline Details/View all and reimbursement disclosures share symmetric 240ms expansion/collapse, with closed content removed from keyboard navigation. Chart tooltips now fade in as well as out. Category/Calendar dialogs fade and move gently on entry/exit while retaining native focus trapping and page scroll locking until close completes. Reduced-motion preferences remain supported.
 - Added measured sliding selection indicators for report mode, chart navigation, category/daily/calendar/subscription filters, and expense highlights; the theme switch also slides. Largest/Most Frequent content transitions preserve its existing charts and lists. Top metric amounts fit their measured column width on one line and grow back when space returns.
 - Calendar markers now adapt to each day cell's width: name/amount, amount only, then dot/count, with exact event information retained in tooltips and accessible names. Daily Spending retains a solid zero baseline, removes the solid upper boundary, and always includes a labeled dotted guide near the top for ordinary, empty, and compressed-outlier views.
-- Rebuilt the embedded frontend assets. Current verification: report suite `122 passed`; frontend typecheck/build passed. Browser QA passed at 320, 700, 980, and 1280px: calendar text/counts stay contained, exact long and negative metric amounts fit and resize, daily upper guides are labeled/dotted, and highlights preserve their content and focus isolation. Animation-frame sampling confirms intermediate expansion/collapse, toggle, and modal poses; dialogs restore focus and page scrolling. No browser warnings/errors. Full-suite verification of the merged branch remains pending; deployed manual review is checklist item 87. The user requested merging the verified changes to `main` and pushing.
+- Rebuilt the embedded frontend assets. Current verification: report suite `122 passed`; frontend typecheck/build passed. Browser QA passed at 320, 700, 980, and 1280px: calendar text/counts stay contained, exact long and negative metric amounts fit and resize, daily upper guides are labeled/dotted, and highlights preserve their content and focus isolation. Animation-frame sampling confirms intermediate expansion/collapse, toggle, and modal poses; dialogs restore focus and page scrolling. No browser warnings/errors. Combined verification with incoming main: `781 passed, 9 skipped` (optional real Postgres contracts; one existing Kaleido warning), Pyright `0 errors`. Deployed manual review remains checklist item 87.
 - Overhauled the embedded React expense report with warm paper/forest and dark ink themes, native serif headings, a single ruled four-metric summary, explicit Current/Projected controls, and named navigation for all existing carousel pages. Daily Spending and Largest/Most Frequent retain their charts, filters, tooltips, full detail lists, and financial calculations. Full-bleed chart surfaces keep their fixed stage and align their content with the report at wide widths.
 - Redesigned reimbursements around Outstanding, with Received/Gross paid/Your share in a compact statement. Each expense expands through a controlled, keyboard-accessible disclosure to show every split field and receipt amount. Added semantic section headings, inactive-slide focus isolation, visible focus states, and reduced-motion treatment.
 - Incorporated design-review feedback: stronger dedicated category colors and matching square markers in Daily Spending. Pie slices, pie labels, and daily category text share one color map in both themes. Corrected scheduled bill/subscription rows that previously substituted broad Needs/Wants bar colors; subscription labels now match `Subs (Needs)` / `Subs (Wants)` in the pie.
 - Rebuilt both committed embedded frontend assets. Verification: report suite `113 passed`; full suite `604 passed` (one existing Kaleido warning); Pyright `0 errors`; frontend typecheck/build and `git diff --check` passed. Local synthetic browser checks covered desktop, 390px and 320px layouts without horizontal overflow, both themes, Current/Projected, all four charts, category/calendar details with scroll locking, daily filters, reimbursement disclosures, and Frequent highlights. All 31 visible daily category labels and markers matched their pie-slice colors in dark mode; light-mode colors also matched. Local preview data is synthetic and ignored under `data/design-preview/`.
 - Updated workstream and durable design decisions; production visual review remains checklist item 86.
+
+- Audit Batch 8: removed 21 unreferenced Python HTML helpers (313 dead lines) and extracted non-provisioning formatted/batched worksheet transport into `reports/worksheet_reads.py`. Earlier batches established shared owner-reference repair and bank-import services. Active report calculations, React code/assets, and historical fallbacks remain compatible.
+- Verification: four new reader contract cases; report/agent suite **141 passed**. Isolated before/after comparison: **71 identical payloads and 26 byte-identical HTML pages** across seven months. Final combined suite **777 passed**, including all real Postgres contracts; Pyright **0 errors**; Apps Script checks, frontend typecheck/build and asset parity passed. One existing Kaleido warning. GitHub Verification passed all gates on `6fd7ce8` ([run](https://github.com/brianjames-dev/bookiebot/actions/runs/34051590441)).
+- Manual check after deployment: compare Current/Projected and historical reports against known test fixtures, verify charts and report totals match, and confirm a subsequent refresh reflects a test-sheet edit. The concise audit completion/manual checklist is `.agent/AUDIT_REMEDIATION_2026-09-06.md`.
+
+- Audit Batch 7 (A12): autofix PR metadata reads incident/output files through Python, preserves arbitrary text as data, and emits a safe one-line title; retry diagnostics stay in a file instead of a malformed environment heredoc. Added push/PR CI for Python/Pyright, real Postgres contracts, Apps Script, frontend typecheck/build and committed-asset parity. The same database contracts cover SQLite and isolated Postgres schemas.
+- Verification: **31 targeted tests passed**, including 18 SQLite/Postgres contract cases and nine metadata/log cases. Full integrated suite **773 passed** with real disposable Postgres; Pyright **0 errors**; Node income migration/rollover checks and frontend typecheck/build/asset parity passed. One existing Kaleido warning. Remote Verification passed on both the Batch 7 and final implementation commits.
+- Manual/operational check: inspect the new Verification workflow on the next push/PR. For a dry-run incident fixture, include apostrophes, multiline text, backticks, and literal shell substitutions; generated PR title/body must retain text without executing it. Local real-database checks use BOOKIEBOT_TEST_POSTGRES_URL and disposable schemas; they never read BANK_DATABASE_URL.
+
+- Audit Batch 6 (A10–A11): every private report route requires valid signed access, including filename-bound snapshot routes; report responses use private/no-store. Live builds run in bounded worker threads, coalesce only simultaneous equivalent requests, preserve actor context, and survive one request disconnecting. History uses one metadata plus one values request per annual scan; optional report lookups no longer provision missing sheets.
+- Verification: 13 new report access/concurrency/history cases; targeted suite **280 passed**; full suite **746 passed**, Pyright **0 errors** (one existing Kaleido warning). Existing report calculations and historical fallback tests pass.
+- Manual check after deployment: open a fresh report, then test its filename URL without a token and with an expired or different-file token; all must deny access. Simultaneously refresh the same report and use Discord to confirm responsiveness. Edit the test sheet between completed refreshes and verify fresh values. Confirm missing optional schedule/reimbursement tabs are not created by report reads.
+
+- Audit Batch 5 (A08–A09): changed amount/date/account/posted state atomically reopens matched/confirmed bank items, clears stale match pointers, and preserves the previous match in database events; ignored items remain ignored. Failed reminder preparation is distinct from a successful empty digest and retries with bounded backoff. Webhooks have five-minute fenced claims, restart reclamation, per-item serialization, and bounded failed-event retries. Import recovery validates tagged target month/year and fails closed after rollover.
+- Verification: 26 new lifecycle/recovery cases; targeted suite **193 passed**; full suite **733 passed**, Pyright **0 errors** (one existing Kaleido warning). Real Postgres parity is exercised in Batch 7.
+- Manual check in Sandbox after deployment: modify a confirmed bank amount and verify Needs Review plus retained prior-match event, with no sheet mutation. Simulate a transient reminder read failure, then restore access and verify one successful digest and no premature sent state. Restart during a claimed webhook and verify it becomes reclaimable after lease expiry; a stale worker cannot acknowledge the replacement claim.
+
+- Audit Batch 4 (A06–A07): both bank import forms use one service with an atomic durable claim, explicit current bank-state checks, operation-tagged action history, conditional confirmation, and recovery without another sheet write. Unsupported historical/future/missing dates fail before claim or sheet access; incomplete imports remain visible for review. Reconcile Now recovers an unambiguous saved action, while uncertain/unlogged writes stay held for inspection.
+- Verification: 38 new import/modal/schema cases; targeted suite **167 passed**; full suite **707 passed**, Pyright **0 errors** (one existing Kaleido warning). Real Postgres lifecycle/concurrency validation is scheduled in Batch 7.
+- Manual check using Sandbox bank items and a test workbook after deployment: open two forms for one current-month item; submit both and verify exactly one row/action/link. Try a previous-month item and confirm zero writes. Interrupt after a recorded row but before confirmation, reopen review, and verify linkage recovers without another row. Inspect any operation marked needs_recovery before manually resolving it; time alone never releases a possibly written import.
+
+- Audit Batch 3 (A05): delete/move undo restores just the removed transaction into current category contents and repairs current action references. Later corrections, new expenses, and partially entered manual rows survive. A moved destination that changed, or an occupied legacy source position, blocks undo before mutation.
+- Verification: six new interleaved-user regressions; focused suite **283 passed**; full suite **669 passed**, Pyright **0 errors** (one existing Kaleido warning).
+- Manual check in a test workbook after deployment: Brian deletes or moves a Food expense; Hannah corrects a remaining Food amount and adds another expense; Brian undoes. Confirm both Hannah entries survive and each user's subsequent update still targets the correct transaction. A manual edit of the moved destination must make undo refuse safely.
+
+- Audit Batch 2 (A03–A04): income insertion, deletion, restoration, and placeholder cleanup now share owner-scoped reference repair for payment/savings/income actions, inactive lineages, saved summary coordinates, and split-ledger rows. Preflight required stores; roll back a completed structural edit on reference-write failure. Fixed budget labels are checked before editing/undoing stale actions; legacy lineage cannot inherit another owner's type.
+- Verification: 16 new regression cases; focused suite **277 passed**; full suite **663 passed**, Pyright **0 errors** (one existing Kaleido warning).
+- Manual check in a test workbook after deployment: log Brian and Hannah bill payments; add/delete/undo Brian income, then update both payments and savings. Verify each targets its original label, only Brian's row references move, and split-ledger links remain correct. Insert a manual row before a saved payment and confirm a stale update refuses safely.
+
+- Audit Batch 1 (A01–A02): deterministic bill writes now require affirmative logging/payment grammar; bill questions, future statements, and negation enter the read-only response path before pending mutation handling. Preserved supported shorthand and split directives. Payment/savings actions retain canonical source type through repeated/legacy updates and cannot delete budget rows; income deletion validates actual transaction-table bounds.
+- Verification: full local suite **647 passed** (one existing Kaleido deprecation warning; native renderer run outside sandbox), Pyright **0 errors**. Added 47 routing/capability regression cases; existing suite remains green.
+- Manual check after deployment in a test workbook: ask `Can I afford $2100 rent?`, `Do not log my $148.82 water bill`, and `Rent $2100?`; no payment or pending amount is changed. Log `Water bill 148.82` normally. Update Rent/savings repeatedly, open Recent, and confirm Delete is unavailable and direct deletion refuses without losing budget labels. Update/delete/undo genuine income and verify B4:E5 and totals remain intact.
 
 ## Completed 2026-09-05
 
@@ -748,13 +784,17 @@ Latest verification (2026-09-06, motion/layout polish):
 
 ```bash
 PYTHONPATH=src venv/bin/python -m pytest unit_tests/reports -q
-# 122 passed
+# 122 passed before merging incoming report backend tests
+PYTHONPATH=src venv/bin/python -m pytest unit_tests -q
+# 781 passed, 9 skipped (optional local Postgres), 1 existing Kaleido warning
+PYTHONPATH=src venv/bin/python -m pyright --pythonpath venv/bin/python --pythonversion 3.12
+# 0 errors, 0 warnings
 npm run typecheck --prefix web/expense-report
 npm run build --prefix web/expense-report -- --configLoader runner
 # passed; embedded assets rebuilt
 ```
 
-Browser QA passed across 320–1280px, including animation-frame sampling, calendar marker bounds, ordinary/long/negative metric fitting, daily upper guides, highlights, and dialog focus/scroll restoration. Full-suite verification of the merged branch and merge/push remain pending.
+Browser QA passed across 320–1280px, including animation-frame sampling, calendar marker bounds, ordinary/long/negative metric fitting, daily upper guides, highlights, and dialog focus/scroll restoration. Combined verification with incoming main passed: `781 passed, 9 skipped` (local opt-in Postgres cases), Pyright `0 errors`; one existing Kaleido deprecation warning. CI supplies its own Postgres service for the skipped contracts.
 
 Previous verification (2026-09-06, design overhaul):
 

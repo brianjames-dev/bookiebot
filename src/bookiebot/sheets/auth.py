@@ -90,6 +90,12 @@ def get_subscriptions_worksheet():
     return sheet.worksheet("Subscriptions")
 
 
+def get_existing_personal_worksheet(title: str) -> Any:
+    """Read a personal worksheet without provisioning it on a missing/error path."""
+    sheet_key = get_budget_spreadsheet_id_for_user(get_current_discord_user_id(), get_current_year())
+    return _get_gc().open_by_key(sheet_key).worksheet(title)
+
+
 def get_subscription_schedule_worksheet():
     year = get_current_year()
     sheet_key = get_budget_spreadsheet_id_for_user(get_current_discord_user_id(), year)

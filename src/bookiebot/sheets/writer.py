@@ -19,7 +19,10 @@ from bookiebot.sheets.utils import resolve_query_persons
 from bookiebot.sheets.repo import get_sheets_repo
 from bookiebot.sheets.routing import UnknownDiscordUserError, get_current_discord_user_id, get_user_config
 from bookiebot.sheets.collaboration import normalize_split_method, payer_owner_from_person
-from bookiebot.sheets.undo import UndoAction, _sheet_user_entered_value, _update_contiguous_row, record_undo_action
+from bookiebot.sheets.undo import (
+    UndoAction, _sheet_user_entered_value, _shift_income_logged_action_rows,
+    _update_contiguous_row, record_undo_action,
+)
 from bookiebot.splits import continue_split_after_log
 
 logger = logging.getLogger(__name__)
@@ -152,16 +155,22 @@ def log_income_row(data: dict[str, Any], worksheet: Any, *, return_action_id: bo
             row_values[first_income_column - 1 :],
         )
         for extra_placeholder_row in reversed(placeholder_rows[1:]):
-            worksheet.delete_rows(extra_placeholder_row)
+            previous_row = rows[extra_placeholder_row - 1]
+            _shift_income_logged_action_rows(
+                lower_row=extra_placeholder_row + 1, delta=-1,
+                mutate=lambda: worksheet.delete_rows(extra_placeholder_row),
+                rollback=lambda: worksheet.insert_row(previous_row, index=extra_placeholder_row, value_input_option="USER_ENTERED"),
+            )
         action_kind = "restore_cells"
         action_new_values = row_values[first_income_column - 1 :]
     else:
         income_row = summary_row
-        worksheet.insert_row(
-            row_values,
-            index=income_row,
-            value_input_option="USER_ENTERED",
-            inherit_from_before=income_row > 1,
+        _shift_income_logged_action_rows(
+            lower_row=income_row, delta=1,
+            mutate=lambda: worksheet.insert_row(
+                row_values, index=income_row, value_input_option="USER_ENTERED", inherit_from_before=income_row > 1,
+            ),
+            rollback=lambda: worksheet.delete_rows(income_row),
         )
         if income_row - 1 > layout["header_row"]:
             _copy_income_row_properties(

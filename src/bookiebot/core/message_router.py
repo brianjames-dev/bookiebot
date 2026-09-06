@@ -398,40 +398,64 @@ def _recent_query_intent(content: str) -> tuple[str, dict] | None:
 
 
 def _bill_payment_intent(content: str) -> tuple[str, dict] | None:
-    """Recognize unambiguous bill logs/checks without depending on the LLM."""
-    text = " ".join(content.lower().split())
-    if re.search(r"\bp\s*g\s*(?:&|and)?\s*e\b|\bpge\b|\bgas and electric\b", text):
-        bill_key = "pge"
-    elif re.search(r"\brecology\b|\btrash\b|\bgarbage\b|\bwaste bill\b", text):
-        bill_key = "recology"
-    elif re.search(r"\brent\b", text):
-        bill_key = "rent"
-    elif re.search(r"\bwater\b", text):
-        bill_key = "water"
-    else:
+    """Keep bill writes within affirmative grammar; route other bill talk read-only."""
+    text = " ".join(content.lower().replace("’", "'").split())
+    aliases = {
+        "pge": r"p\s*g\s*(?:&|and)?\s*e|pge|gas and electric",
+        "recology": r"recology|trash|garbage|waste bill",
+        "rent": r"rent",
+        "water": r"water",
+    }
+    bill_key = next((key for key, pattern in aliases.items()
+                     if re.search(r"\b(?:" + pattern + r")\b", text)), None)
+    if bill_key is None:
+        return None
+    if bill_key == "water" and re.search(r"\b(?:bought|purchased|drink|bottle|bottled)\b", text):
         return None
 
-    looks_like_query = bool(
-        re.search(r"\b(?:did|have|has)\b.*\b(?:pay|paid)\b", text)
-        or re.search(r"^(?:check|is|was)\b.*\bpaid\b", text)
-        or re.search(r"\bpaid\s*\?\s*$", text)
-    )
     log_intent, query_intent = _BILL_INTENTS[bill_key]
-    if looks_like_query:
+    if (re.search(r"\b(?:did|have|has)\b.*\b(?:pay|paid)\b", text)
+            or re.search(r"^(?:check|is|was)\b.*\bpaid\b", text)
+            or re.search(r"\bpaid\s*\?\s*$", text)):
         return query_intent, {}
 
-    if bill_key == "water" and re.search(r"\b(?:bought|purchased|drink|bottle)\b", text):
-        return None
+    # Never delegate a negated bill command to a parser that could turn it
+    # back into a write. The conversational fallback has no mutation tools.
+    if re.search(r"\b(?:not|never|don't|didn't|haven't|hasn't|won't|wouldn't|shouldn't|can't|cannot|no)\b", text):
+        return "fallback", {}
 
-    amount_match = re.search(r"(?<![\w/])\$?(\d+(?:,\d{3})*(?:\.\d{1,2})?)(?![\w/])", text)
-    if amount_match is None:
+    bill = r"(?:my |the )?(?:" + aliases[bill_key] + r")(?: bill| payment)?"
+    amount = r"\$?\s*(?P<amount>(?:\d{1,3}(?:,\d{3})+|\d+)(?:\.\d{1,2})?)"
+    command = r"(?:please )?(?:(?:can|could|would|will) you )?(?:please )?(?:log|record|add) "
+    if text.endswith("?") and not re.match(command, text):
+        return "fallback", {}
+    suffix = r"(?: today| yesterday)?(?: (?:and )?split(?: (?:by income|evenly|equally|50/50))?)?[.!?]?"
+    patterns = (
+        rf"(?:{command})?{bill}(?: (?:was|is|paid))? {amount}{suffix}",
+        rf"{command}{amount}(?: for)? {bill}{suffix}",
+        rf"(?:i (?:have )?|i've )?paid {amount}(?: for)? {bill}{suffix}",
+        rf"(?:i (?:have )?|i've )?paid {bill}(?: for)? {amount}{suffix}",
+    )
+    match = next((match for pattern in patterns if (match := re.fullmatch(pattern, text))), None)
+    if match is not None:
+        entities: dict[str, Any] = {"amount": float(match.group("amount").replace(",", ""))}
+        split_directive = requested_split_directive({}, content)
+        if split_directive in {"income", "equal", "prompt"}:
+            entities["split_method"] = split_directive
+        return log_intent, entities
+
+    # Explicit existing-action commands keep their normal guarded workflow.
+    # Questions and plans must not be mistaken for those commands either.
+    if _recent_query_intent(content):
         return None
-    amount = float(amount_match.group(1).replace(",", ""))
-    entities: dict[str, Any] = {"amount": amount}
-    split_directive = requested_split_directive({}, content)
-    if split_directive in {"income", "equal", "prompt"}:
-        entities["split_method"] = split_directive
-    return log_intent, entities
+    action_request = re.match(
+        r"^(?:please )?(?:(?:can|could|would|will) you (?:please )?)?"
+        r"(?:update|change|correct|edit|fix|delete|remove|move|split)\b", text,
+    )
+    if action_request and not re.search(r"\b(?:tomorrow|next month|plan to)\b", text):
+        if _indexed_action_intent(content) or _action_management_intent(content):
+            return None
+    return "fallback", {}
 
 
 def register_events(client, tree):
@@ -486,6 +510,12 @@ def register_events(client, tree):
                 "I can record a savings contribution, but I can't move money between bank accounts. "
                 "No changes were made."
             )
+            return
+
+        bill_payment = _bill_payment_intent(content)
+        if bill_payment and not bill_payment[0].startswith("log_"):
+            # A new question/negation is not a value for a pending mutation.
+            await _dispatch_intent(*bill_payment, message)
             return
 
         actor_key = resolve_actor_key(
@@ -573,7 +603,6 @@ def register_events(client, tree):
             await _dispatch_intent(intent, entities, message)
             return
 
-        bill_payment = _bill_payment_intent(content)
         if bill_payment:
             intent, entities = bill_payment
             logger.info(

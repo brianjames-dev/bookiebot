@@ -6,7 +6,7 @@ from datetime import datetime
 import json
 import logging
 import time
-from typing import Any, Literal
+from typing import Any, Callable, Literal
 import weakref
 from uuid import uuid4
 
@@ -20,7 +20,7 @@ from bookiebot.sheets.income import (
     repair_income_summary_formula,
 )
 from bookiebot.sheets.repo import get_sheets_repo
-from bookiebot.sheets.routing import actor_key_aliases, get_user_config, now_pacific
+from bookiebot.sheets.routing import actor_key_aliases, get_current_discord_user_id, get_user_config, now_pacific
 
 logger = logging.getLogger(__name__)
 
@@ -265,6 +265,8 @@ def _income_row_delete_snapshot(ws: Any, row: int) -> tuple[list[str], dict[str,
         if any(str(value).strip() == "Monthly Income:" for value in values)
     )
     layout = income_sheet_layout(ws, summary_row, rows=rows)
+    if not layout["header_row"] < row < summary_row:
+        raise ValueError("The saved action no longer points to an income transaction row.")
     start_column, end_column = _income_row_property_bounds(rows, layout, summary_row)
     row_values = _income_rows_values(ws, row, row + 1, end_column)
     deleted_row = row_values[0]
@@ -422,6 +424,15 @@ def _delete_income_row_preserving_layout(ws: Any, row: int, metadata: dict[str, 
     _repair_income_summary_from_metadata(ws, metadata, summary_row_offset=-1)
 
 
+def _restore_income_row_preserving_layout(
+    ws: Any, row: int, values: list[str], metadata: dict[str, str],
+) -> None:
+    _prepare_preserved_income_anchor_for_undo(ws, row, metadata)
+    ws.insert_row(values, index=row, value_input_option="USER_ENTERED", inherit_from_before=row > 1)
+    _restore_deleted_income_row_properties(ws, row, metadata)
+    _repair_income_summary_from_metadata(ws, metadata)
+
+
 @dataclass
 class LoggedAction:
     id: str
@@ -539,6 +550,33 @@ def _read_log_data() -> _ActionLogData | None:
             records.append(_LogRecord(row_index=row_index, logged=_logged_action_from_row(row)))
         except Exception:
             logger.warning("Skipping malformed action log row", extra={"row": row})
+    # Older repeated updates stored source_type='update'. Recover the transaction
+    # type from the already-loaded lineage, never from the worksheet name (bills
+    # and savings share the personal income worksheet).
+    actions_by_id = {record.logged.id: record.logged for record in records}
+    for record in records:
+        action = record.logged.action
+        if action.metadata.get("type") not in {"update", "split"} or action.metadata.get("source_type") not in {None, "", "update", "split"}:
+            continue
+        current = record.logged
+        seen = {current.id}
+        owner_aliases = actor_key_aliases(current.user_key) if current.user_key else {None}
+        while current.action.metadata.get("type") in {"update", "split"}:
+            parent_id = _lineage_parent_id(current.action) or ""
+            parent = actions_by_id.get(parent_id)
+            if (
+                parent is None or parent_id in seen or parent.action.worksheet != action.worksheet
+                or parent.user_key not in owner_aliases
+            ):
+                break
+            seen.add(parent_id)
+            current = parent
+            source_type = _transaction_type(current.action)
+            if source_type == "split":
+                source_type = current.action.metadata.get("source_type", "")
+            if source_type and source_type not in {"update", "split"}:
+                action.metadata["source_type"] = source_type
+                break
     return _ActionLogData(ws=ws, records=records)
 
 
@@ -673,6 +711,11 @@ def _lineage_id(logged: LoggedAction, actions_by_id: dict[str, LoggedAction]) ->
         parent = actions_by_id.get(parent_id)
         if parent is None:
             break
+        if current.action.worksheet == "income" and (
+            parent.action.worksheet != "income"
+            or parent.user_key not in (actor_key_aliases(current.user_key) if current.user_key else {None})
+        ):
+            break
         seen.add(parent_id)
         current = parent
     return current.id
@@ -794,6 +837,11 @@ def action_title(action: UndoAction) -> str:
     if action_type == "update":
         if _is_income_display_action(action):
             return "Updated: Income"
+        source_type = _transaction_type(action)
+        if source_type == "payment":
+            return f"Updated: {category or 'payment'} payment".title()
+        if source_type == "savings":
+            return f"Updated: {category or 'savings'} deposit".title()
         return f"Updated: {expense_category_label(category) if category else 'Transaction'} Expense"
     if action_type == "move":
         source = action.metadata.get("source_category", "unknown")
@@ -1146,6 +1194,7 @@ def _allowed_update_fields(action: UndoAction, metadata_extra: dict[str, str] | 
 
 def action_capabilities(action: UndoAction) -> ActionCapabilities:
     action_type = action.metadata.get("type")
+    transaction_type = _transaction_type(action)
     editable_fields = editable_fields_for_action(action)
 
     is_split = action_type == "split"
@@ -1157,7 +1206,9 @@ def action_capabilities(action: UndoAction) -> ActionCapabilities:
     can_move = action.worksheet == "expense" and action_type in {"expense", "update", "move"} and bool(action.metadata.get("category"))
     move_reason = "" if can_move else "I can only move normal expense rows between categories right now."
 
-    can_split = action_type in {"expense", "update", "move", "payment"}
+    can_split = (
+        action.worksheet == "expense" and action_type in {"expense", "update", "move"}
+    ) or transaction_type == "payment"
     split_reason = "" if can_split else "That transaction cannot be split, or already has an active split."
 
     can_change_split = is_split
@@ -1175,7 +1226,7 @@ def action_capabilities(action: UndoAction) -> ActionCapabilities:
             delete_reason = "I cannot delete that income row from recent transactions yet. Use undo if this was the last logged action."
         elif action_type == "need_expense":
             delete_reason = "I cannot delete Need expenses from recent transactions yet. Use undo if this was the last logged action."
-        elif action_type in {"payment", "savings"}:
+        elif transaction_type in {"payment", "savings"}:
             delete_reason = "I cannot delete payments or savings deposits from recent transactions yet. Use undo if this was the last logged action."
         else:
             delete_reason = "I cannot delete that transaction type from recent transactions yet. Use undo if this was the last logged action."
@@ -1312,11 +1363,38 @@ def _format_action_list_item(index: int, action: UndoAction) -> tuple[str, list[
     return f"{index}. {title}", lines
 
 
-def _is_income_display_action(action: UndoAction) -> bool:
-    return action.metadata.get("type") == "income" or (
-        action.metadata.get("type") == "update"
-        and (action.metadata.get("source_type") == "income" or action.worksheet == "income")
+def _transaction_type(action: UndoAction) -> str:
+    action_type = action.metadata.get("type", "")
+    return action.metadata.get("source_type", "") if action_type == "update" else action_type
+
+
+_STALE_BUDGET_TARGET_MESSAGE = "That saved action no longer points to its expected budget label, so I did not change anything."
+
+
+def _fixed_budget_target_matches(ws: Any, action: UndoAction) -> bool:
+    if action.worksheet != "income":
+        return True
+    source_type = _transaction_type(action)
+    if source_type == "split":
+        source_type = action.metadata.get("source_type", "")
+    if source_type not in {"payment", "savings"}:
+        return True
+    rows = ws.get_all_values()
+    values = rows[action.row - 1] if 0 < action.row <= len(rows) else []
+    amount_column = _field_columns_for_action(action).get("amount")
+    if source_type == "payment":
+        category = _normalized_sheet_label(action.metadata.get("category"))
+        label = _normalized_sheet_label(values[1]) if len(values) > 1 else ""
+        return bool(category) and amount_column == 3 and (label == category or label.startswith(category + " "))
+    savings_labels = {"enter monthly savings contribution", "enter 1st paycheck deposit", "enter 2nd paycheck deposit"}
+    return any(
+        _normalized_sheet_label(value) in savings_labels and amount_column == column + 3
+        for column, value in enumerate(values, start=1)
     )
+
+
+def _is_income_display_action(action: UndoAction) -> bool:
+    return _transaction_type(action) == "income"
 
 
 def _income_data_lines(action: UndoAction, values: list[str] | None = None) -> list[str]:
@@ -1536,25 +1614,80 @@ def _shift_income_logged_action_rows(
     *,
     lower_row: int,
     delta: int,
+    user_key: str | None = None,
     exclude_ids: set[str] | None = None,
     log_data: _ActionLogData | None = None,
+    mutate: Callable[[], None] | None = None,
+    rollback: Callable[[], None] | None = None,
 ) -> None:
+    """Move personal-sheet references with a structural edit, scoped to its owner.
+
+    Include inactive lineages: an active delete/split undo can reactivate them.
+    Read all affected stores before editing and roll back a completed structural
+    edit if its reference writes fail.
+    """
+    global _GLOBAL_LAST_ACTION
+    actor_key = user_key or get_current_discord_user_id()
+    if not actor_key:
+        if mutate:
+            mutate()
+        return
+    aliases = actor_key_aliases(actor_key)
     exclude_ids = exclude_ids or set()
     data = log_data or _read_log_data()
     if data is None:
         raise RuntimeError("Could not read action log for income row-reference updates.")
+    updates: list[tuple[_LogRecord, LoggedAction, LoggedAction]] = []
+    owner_action_ids: set[str] = set()
     for record in data.records:
         logged = record.logged
         if (
-            logged.id in exclude_ids
-            or logged.status != "active"
+            logged.user_key not in aliases
             or logged.action.worksheet != "income"
-            or not _is_income_display_action(logged.action)
-            or logged.action.row < lower_row
+            or logged.action.metadata.get("type") == "system_state"
         ):
             continue
-        logged.action.row += delta
-        _write_logged_action(data.ws, record.row_index, logged)
+        owner_action_ids.add(logged.id)
+        if logged.id in exclude_ids:
+            continue
+        shifted = copy.deepcopy(logged)
+        if shifted.action.row >= lower_row:
+            shifted.action.row += delta
+        for key in ("source_row", "income_header_row", "income_summary_row"):
+            value = _positive_metadata_int(shifted.action, key)
+            if value is not None and value >= lower_row:
+                shifted.action.metadata[key] = str(value + delta)
+        if shifted.action != logged.action:
+            updates.append((record, logged, shifted))
+
+    from bookiebot.sheets.collaboration import income_allocation_row_updates
+
+    ledger_ws, ledger_updates = income_allocation_row_updates(
+        actor_key, owner_action_ids, lower_row=lower_row, delta=delta,
+    )
+    if mutate:
+        mutate()
+    try:
+        for record, _original, shifted in updates:
+            _write_logged_action(data.ws, record.row_index, shifted)
+        for row, _original, shifted in ledger_updates:
+            _update_range(ledger_ws, row, 12, [[shifted]])
+    except Exception:
+        if mutate and rollback:
+            rollback()
+        for record, original, _shifted in updates:
+            _write_logged_action(data.ws, record.row_index, original)
+        for row, original, _shifted in ledger_updates:
+            _update_range(ledger_ws, row, 12, [[original]])
+        raise
+    for record, _original, shifted in updates:
+        record.logged = shifted
+    # The persisted log is authoritative after a row move; never fall back to a
+    # process-local action whose coordinates predate this edit.
+    for alias in aliases:
+        previous = _LAST_ACTION_BY_USER.pop(alias, None)
+        if previous is _GLOBAL_LAST_ACTION:
+            _GLOBAL_LAST_ACTION = None
 
 
 def _values_for_category(source_values: dict[str, str], destination_category: str, overrides: dict[str, Any]) -> dict[str, str]:
@@ -1831,6 +1964,8 @@ def split_recent_action(
         )
 
     ws = _worksheet(action.worksheet)
+    if not _fixed_budget_target_matches(ws, action):
+        return False, _STALE_BUDGET_TARGET_MESSAGE
     gross_value = _sheet_value(ws.cell(action.row, amount_column).value)
     try:
         gross_amount = float(gross_value.replace("$", "").replace(",", "").strip())
@@ -1916,7 +2051,7 @@ def split_recent_action(
             metadata={
                 **action.metadata,
                 "type": "split",
-                "source_type": action.metadata.get("type", ""),
+                "source_type": _transaction_type(action),
                 "source_action_id": logged.id,
                 "allocation_id": allocation.allocation_id,
                 "gross_amount": f"{gross_amount:.2f}",
@@ -2012,6 +2147,8 @@ def change_split_recent_action(
             "Fronted is currently available only for shared expense rows, not rent or utility payment cells.",
         )
     ws = _worksheet(action.worksheet)
+    if not _fixed_budget_target_matches(ws, action):
+        return False, _STALE_BUDGET_TARGET_MESSAGE
     current_value = _sheet_value(ws.cell(action.row, amount_column).value)
     try:
         current_amount = float(current_value.replace("$", "").replace(",", "").strip())
@@ -2168,6 +2305,8 @@ def cancel_split_recent_action(user_key: str | None, *, action_id: str) -> tuple
         return False, "I could not find the amount cell for that split."
     person_column = _field_columns_for_action(action).get("person")
     ws = _worksheet(action.worksheet)
+    if not _fixed_budget_target_matches(ws, action):
+        return False, _STALE_BUDGET_TARGET_MESSAGE
     current_value = _sheet_value(ws.cell(action.row, amount_column).value)
     try:
         current_amount = float(current_value.replace("$", "").replace(",", "").strip())
@@ -2309,6 +2448,8 @@ def update_recent_action(
 
     display_fields = list(field_columns.keys())
     ws = _worksheet(logged.action.worksheet)
+    if not _fixed_budget_target_matches(ws, logged.action):
+        return False, _STALE_BUDGET_TARGET_MESSAGE
     before_values = [
         _sheet_value(ws.cell(logged.action.row, col).value)
         for col in field_columns.values()
@@ -2349,7 +2490,7 @@ def update_recent_action(
             metadata={
                 **logged.action.metadata,
                 "type": "update",
-                "source_type": logged.action.metadata.get("type", ""),
+                "source_type": _transaction_type(logged.action),
                 "updated_action_id": logged.id,
                 "display_fields": json.dumps(display_fields),
                 **(metadata_extra or {}),
@@ -2400,49 +2541,93 @@ def _latest_logged_action(
     return _latest_raw_logged_action(user_key, log_data)
 
 
-def _apply_undo_action(action: UndoAction, log_data: _ActionLogData | None = None) -> tuple[bool, str]:
+def _restore_removed_category_row(
+    ws: Any, *, category: str, row: int, columns: list[int], values: list[str],
+    restored_ids: set[str], log_data: _ActionLogData | None,
+) -> None:
+    """Insert the removed row into current contents, never replay neighbors' history."""
+    from bookiebot.sheets.config import get_category_columns
+
+    if not columns or len(values) != len(columns):
+        raise ValueError("The saved transaction has an invalid row snapshot.")
+    data = log_data or _read_log_data()
+    if data is None:
+        raise RuntimeError("Could not read action history before restoring the transaction.")
+    first_row = int(get_category_columns[category]["start_row"])
+    rows = ws.get_all_values()
+    # Include partially entered/manual rows, even when their amount is blank.
+    end_row = max((index for index, cells in enumerate(rows, 1)
+                   if index >= first_row and any(column <= len(cells) and str(cells[column - 1]).strip()
+                                                 for column in columns)), default=first_row - 1)
+    start_row = max(first_row, min(row, end_row + 1))
+    current = [[_sheet_value(rows[index - 1][column - 1]) if column <= len(rows[index - 1]) else ""
+                for column in columns] for index in range(start_row, end_row + 1)]
+    _shift_logged_action_rows(category=category, lower_row=start_row, upper_row=end_row,
+                              delta=1, exclude_ids=restored_ids, log_data=data)
+    for record in data.records:
+        if record.logged.id in restored_ids and _action_category(record.logged.action) == category:
+            record.logged.action.row = start_row
+            _write_logged_action(data.ws, record.row_index, record.logged)
+    _restore_category_snapshot(ws, start_row, columns, [values, *current])
+
+
+def _moved_destination_is_unchanged(ws: Any, action: UndoAction) -> bool:
+    fields = _field_columns_for_action(action)
+    expected = _field_values_for_action(action)
+    for field, column in fields.items():
+        current = _sheet_value(ws.cell(action.row, column).value).strip()
+        saved = _sheet_value(expected.get(field, "")).strip()
+        if field == "amount":
+            if _money_display_value(current) != _money_display_value(saved):
+                return False
+        elif current != saved:
+            return False
+    return bool(fields)
+
+
+def _apply_undo_action(
+    action: UndoAction, log_data: _ActionLogData | None = None, *, action_id: str = "", user_key: str | None = None,
+) -> tuple[bool, str]:
     ws = _worksheet(action.worksheet)
+    if not _fixed_budget_target_matches(ws, action):
+        return False, _STALE_BUDGET_TARGET_MESSAGE
     if action.kind == "move_expense":
+        if not _moved_destination_is_unchanged(ws, action):
+            return False, "That moved transaction changed after it was saved, so I did not undo it."
         if "source_category_snapshot" in action.metadata:
             source_category = action.metadata["source_category"]
-            source_start_row = int(action.metadata["source_compact_start_row"])
-            source_end_row = int(action.metadata["source_compact_end_row"])
             source_columns = [int(col) for col in json.loads(action.metadata["source_category_columns"])]
             source_snapshot = json.loads(action.metadata["source_category_snapshot"])
-            _shift_logged_action_rows(
-                category=source_category,
-                lower_row=source_start_row,
-                upper_row=source_end_row - 1,
-                delta=1,
-                exclude_ids={action.metadata.get("source_action_id", "")},
-                log_data=log_data,
+            _restore_removed_category_row(
+                ws, category=source_category,
+                row=int(action.metadata.get("source_row", action.metadata["source_compact_start_row"])),
+                columns=source_columns, values=source_snapshot[0],
+                restored_ids={action.metadata.get("source_action_id", "")}, log_data=log_data,
             )
-            _restore_category_snapshot(ws, source_start_row, source_columns, source_snapshot)
         else:
             source_row = int(action.metadata["source_row"])
             source_columns = [int(col) for col in json.loads(action.metadata["source_columns"])]
             source_values = [_sheet_value(value) for value in json.loads(action.metadata["source_values"])]
+            if any(_sheet_value(ws.cell(source_row, column).value).strip() for column in source_columns):
+                return False, "The original position changed, so I did not undo this older move."
             _update_contiguous_row(ws, source_row, source_columns, source_values)
         _update_contiguous_row(ws, action.row, action.columns, action.previous_values)
     elif action.kind == "compact_category_cells":
-        category = action.metadata["category"]
         snapshot = json.loads(action.metadata["category_snapshot"])
-        start_row = int(action.metadata["compact_start_row"])
-        end_row = int(action.metadata["compact_end_row"])
-        deleted_ids = _deleted_action_ids(action)
-        _shift_logged_action_rows(
-            category=category,
-            lower_row=start_row,
-            upper_row=end_row - 1,
-            delta=1,
-            exclude_ids=deleted_ids,
-            log_data=log_data,
+        _restore_removed_category_row(
+            ws, category=action.metadata["category"], row=action.row,
+            columns=action.columns, values=snapshot[0],
+            restored_ids=_deleted_action_ids(action), log_data=log_data,
         )
-        _restore_category_snapshot(ws, start_row, action.columns, snapshot)
     elif action.kind == "delete_row":
         if action.worksheet == "income" and _is_income_display_action(action):
-            _deleted_row, delete_metadata = _income_row_delete_snapshot(ws, action.row)
-            _delete_income_row_preserving_layout(ws, action.row, delete_metadata)
+            deleted_row, delete_metadata = _income_row_delete_snapshot(ws, action.row)
+            _shift_income_logged_action_rows(
+                user_key=user_key, lower_row=action.row + 1, delta=-1,
+                exclude_ids={action_id}, log_data=log_data,
+                mutate=lambda: _delete_income_row_preserving_layout(ws, action.row, delete_metadata),
+                rollback=lambda: _restore_income_row_preserving_layout(ws, action.row, deleted_row, delete_metadata),
+            )
         elif hasattr(ws, "delete_rows"):
             ws.delete_rows(action.row)
         elif hasattr(ws, "delete_row"):
@@ -2450,24 +2635,16 @@ def _apply_undo_action(action: UndoAction, log_data: _ActionLogData | None = Non
         else:
             return False, "This sheet client cannot delete rows."
     elif action.kind == "restore_row":
-        _shift_income_logged_action_rows(
-            lower_row=action.row,
-            delta=1,
-            exclude_ids=_deleted_action_ids(action),
-            log_data=log_data,
-        )
         is_income_restore = action.worksheet == "income" and action.metadata.get("source_type") == "income"
         if is_income_restore:
-            _prepare_preserved_income_anchor_for_undo(ws, action.row, action.metadata)
-        ws.insert_row(
-            action.previous_values,
-            index=action.row,
-            value_input_option="USER_ENTERED",
-            inherit_from_before=action.row > 1,
-        )
-        if is_income_restore:
-            _restore_deleted_income_row_properties(ws, action.row, action.metadata)
-            _repair_income_summary_from_metadata(ws, action.metadata)
+            _shift_income_logged_action_rows(
+                user_key=user_key, lower_row=action.row, delta=1,
+                exclude_ids=_deleted_action_ids(action) | {action_id}, log_data=log_data,
+                mutate=lambda: _restore_income_row_preserving_layout(ws, action.row, action.previous_values, action.metadata),
+                rollback=lambda: _delete_income_row_preserving_layout(ws, action.row, action.metadata),
+            )
+        else:
+            ws.insert_row(action.previous_values, index=action.row, value_input_option="USER_ENTERED", inherit_from_before=action.row > 1)
     elif action.kind == "clear_cells":
         _update_contiguous_row(ws, action.row, action.columns, [""] * len(action.columns))
     elif action.kind == "restore_cells":
@@ -2595,14 +2772,16 @@ def _delete_income_action_with_compaction(user_key: str | None, logged: LoggedAc
             return False, "Something went wrong while reading the action log."
         lineage_ids = _active_lineage_ids(logged, log_data)
         deleted_row, delete_metadata = _income_row_delete_snapshot(ws, action.row)
-        _delete_income_row_preserving_layout(ws, action.row, delete_metadata)
-        _mark_logged_ids_undone(lineage_ids, log_data)
         _shift_income_logged_action_rows(
+            user_key=user_key,
             lower_row=action.row + 1,
             delta=-1,
             exclude_ids=lineage_ids,
             log_data=log_data,
+            mutate=lambda: _delete_income_row_preserving_layout(ws, action.row, delete_metadata),
+            rollback=lambda: _restore_income_row_preserving_layout(ws, action.row, deleted_row, delete_metadata),
         )
+        _mark_logged_ids_undone(lineage_ids, log_data)
     except Exception as e:
         logger.exception("Failed to compact deleted income", extra={"exception": str(e)})
         return False, "Something went wrong while deleting that income."
@@ -2710,7 +2889,7 @@ def undo_logged_action(user_key: str | None, action_id: str) -> tuple[bool, str]
     if logged is None:
         return False, f"I could not find active action `{action_id}`."
     try:
-        success, detail = _apply_undo_action(logged.action, log_data)
+        success, detail = _apply_undo_action(logged.action, log_data, action_id=logged.id, user_key=key)
     except Exception as e:
         logger.exception("Failed to undo logged action", extra={"exception": str(e), "action_id": action_id})
         return False, "Something went wrong while undoing that logged action."
@@ -2759,7 +2938,7 @@ def undo_last_action(user_key: str | None) -> tuple[bool, str]:
             return False, "I do not have a recent transaction to undo."
 
     try:
-        success, detail = _apply_undo_action(action, log_data)
+        success, detail = _apply_undo_action(action, log_data, action_id=logged.id if logged else "", user_key=key)
     except Exception as e:
         logger.exception("Failed to undo last action", extra={"exception": str(e)})
         if key:

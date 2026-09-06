@@ -438,3 +438,59 @@ Decision: Inline report disclosures, including reimbursements, use the same cont
 Fit calendar marker detail to its day cell, retaining exact event information in tooltips and accessible labels when names or amounts are hidden. Fit complete top metric amounts to their measured column width without wrapping. Daily Spending gridlines correspond to visible ticks, with a labeled dotted guide near the top and only the zero baseline solid.
 
 Rationale: Shared motion makes opening and closing equally predictable, while retaining dialog and disclosure accessibility during transitions. The containing element determines whether a financial label fits more reliably than viewport width alone. A top tick provides a readable scale reference without an unlabeled border; these presentation choices preserve the underlying financial values.
+
+## 2026-09-06 - Require Affirmative Bill Writes And Preserve Transaction Type
+
+Decision: Deterministic bill writes accept explicit logging/completed-payment grammar and supported terse bill/amount forms. Other bill questions/statements and negation enter the read-only conversational path before pending mutation handling, never a parser that can reinterpret them as writes. Preserve canonical transaction type across update lineage; a personal-budget worksheet name does not imply income. Recover legacy repeated-update type from loaded parents, keep payment/savings deletion restrictions, and validate income-table bounds before physical deletion.
+
+Rationale: Affordability questions could overwrite bill payments, and repeated payment updates could expose deletion of a whole budget row. These safeguards retain intended logging behavior while closing those unintended write paths.
+
+## 2026-09-06 - Scope Personal-Budget Structural References To Their Owner
+
+Decision: Structural income edits use one owner-alias-aware repair path for all personal-budget action types, inactive undo lineages, saved table boundaries, and linked split-ledger rows. Read affected stores before mutation; restore structure and references if reference persistence fails. Validate payment/savings labels before edits, split operations, or undo. Unmapped standalone worksheet calls retain their existing behavior without assuming an owner.
+
+Rationale: Shared action history does not imply shared personal-budget row coordinates. Income edits shift later payment and savings rows as well as income, and undo can reactivate older lineage records. Central ownership and target checks prevent cross-owner or stale-cell mutations.
+
+## 2026-09-06 - Undo Shared Rows Against Current Contents
+
+Decision: Treat delete/move snapshots as a source for the removed transaction only. Restore that row at its tracked position and shift the current category contents and action references. Include partially entered rows. Verify a moved destination still matches its saved fields before clearing it; refuse occupied legacy non-compacting restore positions.
+
+Rationale: Whole-category snapshot replay overwrote another user's later corrections or additions. Current-state restoration preserves those edits while retaining historical action compatibility. This does not make separate Google Sheets and action-log writes a single atomic transaction.
+
+## 2026-09-06 - Claim Bank Imports Durably Before Writing
+
+Decision: One durable operation per reconciliation item owns any expense/income import. Atomically claim the current eligible bank state before Sheets access; transition claimed → writing → completed, or needs_recovery after an uncertain result. Store requested destination/fields and tag action history with the operation ID. Confirm the reconciliation only if its state, amount and date still agree. Retries can recover a unique recorded action but cannot call the writer again after a claim may have written; intentional undo/reopen does not reset that guard.
+
+Support current-month imports only and reject historical/future/invalid bank dates before a claim or sheet access. Destination-aware historical undo is required before enabling historical writes. Unsupported dates can still be matched to existing entries. An unrecorded/ambiguous write needs explicit inspection; no time-based claim release guesses that a financial write failed.
+
+Rationale: Sheets and the banking database cannot share a transaction. The durable guard prevents duplicate rows across concurrent forms, process restarts and lost responses while recording enough information to recover a known write safely.
+
+## 2026-09-06 - Recover Changed Matches And Interrupted Background Work
+
+Decision: A material bank amount/date/authorized-date/account/pending change reopens matched or confirmed reconciliation in the same database transaction as the new bank values. Save the previous match and changed fields in bank_reconciliation_events; clear stale live pointers/confidence. Preserve ignored items and never change Sheets from a bank modification.
+
+Reminder preparation explicitly reports success/failure; only successful evaluation/delivery consumes the day's evaluation. Failed preparation or DM delivery uses process-local exponential retry from 60 seconds to one hour, retaining existing durable post-send event semantics. Webhooks use five-minute durable leases, unique claim tokens, per-linked-item claim serialization, and failed-event backoff. A stale claim cannot acknowledge a replacement claim; sync is bounded below the lease duration. Current-month import recovery verifies saved year/month tags and requires manual inspection after rollover.
+
+Rationale: A bank update invalidates a prior comparison; an exception is not an empty successful reminder; and processing status must be reclaimable after a crash. Durable state/event changes support recovery without silently mutating financial rows or recording unsent digests.
+
+## 2026-09-06 - Authorize All Report Paths And Bound Live Reads
+
+Decision: Require an unexpired signed token for live and saved reports; filename routes additionally require the token's exact filename. Use private/no-store responses. Live reports run off the event loop with bounded concurrency (default two workers, configurable 1–8), bounded queued work, and in-flight coalescing keyed by actor/owner/persons/month/year. Request cancellation does not cancel shared work or free its slot early. Keep no completed-result cache so subsequent refreshes see edits; retain authorized snapshot fallback and retryable busy responses.
+
+Read historical monthly values with one metadata query plus one formatted values batch per annual scan, retaining the existing lightweight adapter path. Report lookups for optional bill/reimbursement sheets never provision them.
+
+Rationale: A saved filename must not bypass expired access, and blocking Sheets/report work must not stall Discord. Bounded sharing and batching reduce redundant work while preserving current calculation and historical compatibility semantics.
+
+## 2026-09-06 - Keep Automation Text In Files And Run Backend Parity In CI
+
+Decision: Build autofix PR metadata from GITHUB_EVENT_PATH and the saved agent output with a Python helper. Sanitize the title for GitHub's line-based output protocol, write the full body to a file, and let retrying agents read a failure-log file. Never interpolate incident contents into shell code. Ordinary pushes/PRs run the agreed Python/type/Apps Script/frontend checks and real Postgres lifecycle contracts.
+
+Postgres tests require explicit BOOKIEBOT_TEST_POSTGRES_URL, create a random schema per case, and drop only that schema during cleanup. They do not use the application's banking database configuration; absent local test configuration skips only the Postgres cases, while CI supplies its own Postgres16 service.
+
+Rationale: Normal incident punctuation broke shell parsing, and mocked adapters could not prove database transaction/concurrency behavior. File boundaries and a shared persistent-store contract address both without changing application workflow semantics.
+
+## 2026-09-06 - Separate Report Transport At The Proven Read Boundary
+
+Decision: Keep owner/month selection and financial assembly in expense_breakdown.py; move optional existing-sheet lookup, formatted row normalization, and monthly batch/fallback reads into worksheet_reads.py. Remove only the closed family of 21 private HTML helpers proven to have no current callers. Preserve active payload calculations, frontend assets, and historical React fallback behavior.
+
+Rationale: The earlier report batching creates a useful transport seam without a wholesale rewrite. Before/after payload and HTML comparisons provide direct evidence that cleanup preserves report behavior.

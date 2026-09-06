@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 import base64
 import hashlib
 import hmac
@@ -16,6 +17,76 @@ from aiohttp import web
 
 _REPORT_NAME_RE = re.compile(r"^[A-Za-z0-9._-]+\.html$")
 _EPHEMERAL_REPORT_SECRET = base64.urlsafe_b64encode(os.urandom(32)).decode("ascii")
+
+
+class _ReportBuildBusy(RuntimeError):
+    pass
+
+
+class _ReportBuilds:
+    """Bound live reads and share only simultaneous requests for identical data."""
+
+    def __init__(self) -> None:
+        try:
+            limit = max(1, min(8, int(os.getenv("BOOKIEBOT_REPORT_MAX_CONCURRENT_BUILDS", "2"))))
+        except ValueError:
+            limit = 2
+        self._semaphore = asyncio.Semaphore(limit)
+        self._capacity = limit * 4
+        self._tasks: dict[tuple, asyncio.Task[str]] = {}
+
+    async def render(self, payload: dict) -> str:
+        key = (
+            str(payload["actor_key"]),
+            str(payload["owner_name"]),
+            tuple(sorted(str(person) for person in payload["persons"])),
+            int(payload["year"]),
+            int(payload["month"]),
+        )
+        task = self._tasks.get(key)
+        if task is None:
+            if len(self._tasks) >= self._capacity:
+                raise _ReportBuildBusy("Report refresh is busy. Please try again shortly.")
+            task = asyncio.create_task(self._render(payload))
+            self._tasks[key] = task
+            task.add_done_callback(lambda completed: self._finished(key, completed))
+        # An HTTP disconnect must not cancel another request's shared build or
+        # release its concurrency slot while the worker thread is still running.
+        return await asyncio.shield(task)
+
+    async def _render(self, payload: dict) -> str:
+        async with self._semaphore:
+            return await asyncio.to_thread(_render_live_report, payload)
+
+    def _finished(self, key: tuple, task: asyncio.Task[str]) -> None:
+        self._tasks.pop(key, None)
+        if not task.cancelled():
+            task.exception()  # Retrieve failures even if every requester disconnected.
+
+    async def close(self) -> None:
+        await asyncio.gather(*self._tasks.values(), return_exceptions=True)
+
+
+_REPORT_BUILDS = web.AppKey("bookiebot_report_builds", _ReportBuilds)
+
+
+def _render_live_report(payload: dict) -> str:
+    from bookiebot.reports.expense_breakdown import BudgetMonth, build_expense_breakdown_report, render_expense_breakdown_html
+    from bookiebot.sheets.routing import sheet_user_context
+
+    actor_key = str(payload["actor_key"])
+    with sheet_user_context(actor_key):
+        report = build_expense_breakdown_report(
+            actor_key=actor_key,
+            owner_name=str(payload["owner_name"]),
+            persons=[str(person) for person in payload["persons"]],
+            month=BudgetMonth(int(payload["year"]), int(payload["month"])),
+        )
+        return render_expense_breakdown_html(report)
+
+
+async def _close_report_builds(app: web.Application) -> None:
+    await app[_REPORT_BUILDS].close()
 
 
 def reports_dir() -> Path:
@@ -41,8 +112,8 @@ def public_base_url() -> str:
     return f"http://localhost:{port}"
 
 
-def public_report_url(filename: str) -> str:
-    return f"{public_base_url()}/reports/{quote(filename)}"
+def public_report_url(filename: str, *, token: str) -> str:
+    return f"{public_base_url()}/reports/{quote(filename)}?token={quote(token)}"
 
 
 def public_expense_report_url(token: str) -> str:
@@ -75,6 +146,8 @@ def create_expense_report_token(
 
 
 def register_report_routes(app: web.Application) -> None:
+    app[_REPORT_BUILDS] = _ReportBuilds()
+    app.on_cleanup.append(_close_report_builds)
     app.router.add_get("/reports/expense-breakdown", _serve_expense_breakdown_report)
     app.router.add_get("/reports/{name}", _serve_report)
 
@@ -91,20 +164,15 @@ async def _serve_expense_breakdown_report(request: web.Request) -> web.StreamRes
         return _report_file_response(snapshot_path)
 
     try:
-        from bookiebot.reports.expense_breakdown import BudgetMonth, build_expense_breakdown_report, render_expense_breakdown_html
-        from bookiebot.sheets.routing import sheet_user_context
-
-        actor_key = str(payload["actor_key"])
-        with sheet_user_context(actor_key):
-            report = build_expense_breakdown_report(
-                actor_key=actor_key,
-                owner_name=str(payload["owner_name"]),
-                persons=[str(person) for person in payload["persons"]],
-                month=BudgetMonth(int(payload["year"]), int(payload["month"])),
-            )
-        return web.Response(text=render_expense_breakdown_html(report), content_type="text/html")
+        html = await request.app[_REPORT_BUILDS].render(payload)
+        return web.Response(text=html, content_type="text/html", headers={"Cache-Control": "private, no-store"})
     except web.HTTPException:
         raise
+    except _ReportBuildBusy as exc:
+        snapshot_path = _static_report_path_for_payload(payload)
+        if snapshot_path is not None:
+            return _report_file_response(snapshot_path)
+        raise web.HTTPServiceUnavailable(text=str(exc), headers={"Retry-After": "5"}) from exc
     except Exception as exc:
         snapshot_path = _static_report_path_for_payload(payload)
         if snapshot_path is not None:
@@ -117,13 +185,14 @@ async def _serve_report(request: web.Request) -> web.StreamResponse:
     if not _REPORT_NAME_RE.fullmatch(name):
         raise web.HTTPNotFound()
 
-    path = (reports_dir() / name).resolve()
-    root = reports_dir()
     try:
-        path.relative_to(root)
+        payload = _verify_expense_report_token(request.query.get("token", "").strip())
     except ValueError as exc:
-        raise web.HTTPNotFound() from exc
-    if not path.is_file():
+        raise web.HTTPNotFound(text=str(exc)) from exc
+    if payload.get("filename") != name:
+        raise web.HTTPNotFound()
+    path = _safe_report_path(name)
+    if path is None or not path.is_file():
         raise web.HTTPNotFound()
 
     return _report_file_response(path)
@@ -132,7 +201,7 @@ async def _serve_report(request: web.Request) -> web.StreamResponse:
 def _report_file_response(path: Path) -> web.FileResponse:
     return web.FileResponse(
         path,
-        headers={"Cache-Control": "private, max-age=86400"},
+        headers={"Cache-Control": "private, no-store"},
     )
 
 

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 import logging
 import os
 import time
@@ -11,6 +12,7 @@ from bookiebot.banking.config import BankingConfig, load_banking_config
 from bookiebot.banking.crypto import TokenCipher
 from bookiebot.banking.models import (
     BankAccount,
+    BankImportResult,
     BankStatus,
     BankTransaction,
     LinkedBankItem,
@@ -42,7 +44,7 @@ from bookiebot.sheets.subscriptions import (
     next_pull_date,
     parse_visible_subscription_schedules,
 )
-from bookiebot.banking.store import BankStore
+from bookiebot.banking.store import BankStore, WEBHOOK_LEASE_SECONDS
 from bookiebot.sheets.undo import delete_recent_action, read_active_logged_actions, undo_logged_action, update_recent_action
 
 
@@ -437,14 +439,17 @@ class BankingService:
         failed = 0
         skipped = 0
         for event, payload in self.store.pending_plaid_webhook_events(limit=limit):
-            self.store.mark_plaid_webhook_processing(event.id)
+            claim_token = self.store.claim_plaid_webhook_event(event.id)
+            if claim_token is None:
+                skipped += 1
+                continue
             item_id = event.item_id or str(payload.get("item_id") or "").strip() or None
             try:
                 webhook_type = (event.webhook_type or "").upper()
                 webhook_code = (event.webhook_code or "").upper()
                 if webhook_type != "TRANSACTIONS":
                     skipped += 1
-                    self.store.mark_plaid_webhook_processed(event.id, item_id)
+                    self.store.mark_plaid_webhook_processed(event.id, item_id, claim_token=claim_token)
                     continue
                 if webhook_code not in {
                     "SYNC_UPDATES_AVAILABLE",
@@ -453,21 +458,23 @@ class BankingService:
                     "INITIAL_UPDATE",
                 }:
                     skipped += 1
-                    self.store.mark_plaid_webhook_processed(event.id, item_id)
+                    self.store.mark_plaid_webhook_processed(event.id, item_id, claim_token=claim_token)
                     continue
                 if not item_id:
                     skipped += 1
-                    self.store.mark_plaid_webhook_processed(event.id, item_id)
+                    self.store.mark_plaid_webhook_processed(event.id, item_id, claim_token=claim_token)
                     continue
                 item = self.store.get_item_by_provider_item_id(item_id)
                 if item is None:
                     raise RuntimeError(f"Unknown Plaid item_id {item_id}")
-                await self.sync_item(item)
-                self.store.mark_plaid_webhook_processed(event.id, item_id)
-                processed += 1
+                # Finish or cancel the network work before another worker can
+                # reclaim the five-minute lease after a crash.
+                await asyncio.wait_for(self.sync_item(item), timeout=WEBHOOK_LEASE_SECONDS - 60)
+                if self.store.mark_plaid_webhook_processed(event.id, item_id, claim_token=claim_token):
+                    processed += 1
             except Exception as exc:
                 failed += 1
-                self.store.mark_plaid_webhook_failed(event.id, f"{type(exc).__name__}: {exc}")
+                self.store.mark_plaid_webhook_failed(event.id, f"{type(exc).__name__}: {exc}", claim_token=claim_token)
                 logger.warning(
                     "Failed to process Plaid webhook event",
                     extra={"event_id": event.id, "item_id": item_id, "exception": str(exc)},
@@ -621,6 +628,24 @@ class BankingService:
     def get_reconciliation_item(self, owner_key: str, reconciliation_id: int):
         return self.store.get_reconciliation_item(owner_key, reconciliation_id)
 
+    def import_reconciliation_item(
+        self, owner_key: str, reconciliation_id: int, *, actor_key: str,
+        kind: str, fields: dict[str, str], expected_amount: float, expected_date: str | None,
+    ) -> BankImportResult:
+        from bookiebot.banking.imports import import_reconciliation_item
+
+        return import_reconciliation_item(
+            self.store, owner_key, reconciliation_id, actor_key=actor_key, kind=kind,
+            fields=fields, expected_amount=expected_amount, expected_date=expected_date,
+        )
+
+    def recover_reconciliation_import(
+        self, owner_key: str, reconciliation_id: int, *, actor_key: str,
+    ) -> BankImportResult:
+        from bookiebot.banking.imports import recover_reconciliation_import
+
+        return recover_reconciliation_import(self.store, owner_key, reconciliation_id, actor_key=actor_key)
+
     def confirm_reconciliation_item(
         self,
         owner_key: str,
@@ -650,6 +675,8 @@ class BankingService:
         item = self.get_reconciliation_item(owner_key, reconciliation_id)
         if item is None:
             return None, [], []
+        if item.status == 'import_requested':
+            return item, [], []
         action_log = read_active_logged_actions(actor_key)
         excluded = self.store.matched_action_log_ids(owner_key)
         schedule_candidates = find_scheduled_pull_candidates(

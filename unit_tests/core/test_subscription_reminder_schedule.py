@@ -115,6 +115,7 @@ def test_prepare_due_reminder_messages_stops_on_sheets_quota_error(monkeypatch, 
 
     assert prepared.sent_count == 0
     assert prepared.messages == []
+    assert prepared.evaluation_succeeded is False
     assert "Google Sheets read quota was exceeded" in caplog.text
 
 

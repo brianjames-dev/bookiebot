@@ -479,6 +479,35 @@ def update_allocation(allocation_id: str, **changes: Any) -> SharedAllocation | 
     return updated
 
 
+def income_allocation_row_updates(
+    actor_key: str,
+    action_ids: set[str],
+    *,
+    lower_row: int,
+    delta: int,
+) -> tuple[Any, list[tuple[int, int, int]]]:
+    """Plan source-row changes only for this owner's current action-log entries."""
+    ws = _worksheet()
+    rows = ws.get_all_values()
+    if not rows:
+        return ws, []
+    if rows[0][:len(LEGACY_SHARED_REIMBURSEMENT_HEADERS)] != LEGACY_SHARED_REIMBURSEMENT_HEADERS:
+        raise RuntimeError("Shared Reimbursements has an unexpected header row.")
+    aliases = actor_key_aliases(actor_key)
+    updates = []
+    for row_number, row in enumerate(rows[1:], start=2):
+        allocation = _parse_allocation(row)
+        if (
+            allocation is not None
+            and allocation.actor_key in aliases
+            and allocation.source_worksheet == "income"
+            and {allocation.source_action_id, allocation.split_action_id} & action_ids
+            and allocation.source_row >= lower_row
+        ):
+            updates.append((row_number, allocation.source_row, allocation.source_row + delta))
+    return ws, updates
+
+
 def remove_allocation(allocation_id: str) -> bool:
     found = _find_allocation_row(allocation_id)
     if found is None:
