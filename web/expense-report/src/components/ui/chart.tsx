@@ -166,6 +166,40 @@ type ChartTooltipRenderProps = {
   [key: string]: unknown
 }
 
+const ChartTooltipMotionFrame = React.forwardRef<
+  HTMLDivElement,
+  { dismissing: boolean; children: React.ReactNode }
+>(({ dismissing, children }, ref) => {
+  const [entered, setEntered] = React.useState(false)
+
+  React.useLayoutEffect(() => {
+    if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
+      setEntered(true)
+      return
+    }
+    // Mount at the hidden pose before transitioning. The frame survives data
+    // point changes and reverses naturally if dismissed/reopened mid-transition.
+    let frame = window.requestAnimationFrame(() => {
+      frame = window.requestAnimationFrame(() => setEntered(true))
+    })
+    return () => window.cancelAnimationFrame(frame)
+  }, [])
+
+  return (
+    <div
+      ref={ref}
+      className={cn(
+        "bb-chart-tooltip-frame",
+        !entered && "bb-chart-tooltip-frame-entering",
+        dismissing && "bb-chart-tooltip-frame-dismissing",
+      )}
+    >
+      {children}
+    </div>
+  )
+})
+ChartTooltipMotionFrame.displayName = "ChartTooltipMotionFrame"
+
 function ChartTooltipAutoDismissContent({
   content,
   dismissDelay,
@@ -323,12 +357,12 @@ function ChartTooltipAutoDismissContent({
   }
 
   return (
-    <div
+    <ChartTooltipMotionFrame
       ref={frameRef}
-      className={cn("bb-chart-tooltip-frame", phase === "dismissing" && "bb-chart-tooltip-frame-dismissing")}
+      dismissing={phase === "dismissing"}
     >
       {React.cloneElement(content, renderProps)}
-    </div>
+    </ChartTooltipMotionFrame>
   )
 }
 

@@ -1,6 +1,6 @@
 # Finance Operations Workstream
 
-Last updated: 2026-09-05
+Last updated: 2026-09-06
 
 ## Goal
 
@@ -727,3 +727,13 @@ Status: Complete; deployed-bot/natural-rollover manual checks are in STATUS chec
 - Complete: following user design review, introduced distinct, stronger category colors shared by pie slices and daily labels, with matching square markers. Removed scheduled daily-row bucket color overrides; Needs/Wants subscriptions now use the same distinct labels/colors as the category chart.
 - Verification: 113 report tests, 604 full-suite tests (one existing Kaleido warning), clean Pyright, frontend typecheck/build, and diff check. Synthetic browser checks covered desktop/mobile layouts, both themes/modes, chart/detail interactions, reimbursements, and exact pie/daily color correspondence.
 - Pending: deployed visual acceptance in STATUS checklist 86. No reconciliation, transaction mutation, persistence, or split lifecycle behavior changed.
+
+### 2026-09-06 Expense Report Motion And Responsive Polish
+
+Status: Implementation and targeted verification complete; combined full-suite verification and the requested merge to `main`/push are pending. Deployed manual acceptance is STATUS checklist 87, alongside the initial design checklist 86.
+
+- Reused one symmetric 240ms disclosure transition for inline details, full lists, and controlled reimbursement expansion. Dialogs now animate entry and exit while retaining focus trapping and page scroll locking until exit completes; closed disclosure content is inert and reduced-motion preferences remain supported.
+- Added measured sliding selections across report modes, chart navigation, filters, and highlights, plus a sliding theme switch. Expense Highlights keeps both views mounted for smooth transitions. Top metric amounts fit their actual column width on one line and restore their natural size when space returns.
+- Calendar markers adapt to day-cell width instead of relying only on viewport breakpoints, reducing from full labels to amounts to dot/count without overflow. Exact event information remains in tooltips and accessible labels.
+- Daily Spending grids now follow visible axis ticks, retain only the solid zero baseline, and include an upper dollar tick for empty and ordinary datasets; the compressed outlier's true-value upper guide remains near the top.
+- Verification so far: `122` report tests passed; frontend typecheck/build passed and embedded assets rebuilt. Browser QA passed across 320–1280px, with sampled intermediate motion, contained calendar labels/counts, exact long/signed metric fitting, upper daily guides, and preserved modal/highlight behavior. Combined full-suite verification remains pending. Financial calculations, reconciliation, persistence, and split lifecycle behavior are unchanged.

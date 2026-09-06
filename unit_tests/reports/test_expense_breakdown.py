@@ -215,7 +215,7 @@ def test_reimbursement_disclosures_preserve_totals_and_complete_transaction_deta
     source = (Path(__file__).resolve().parents[2] / "web/expense-report/src/report-app.tsx").read_text()
     reimbursement = source.split("function SharedReimbursementsCard", 1)[1].split("function isInteractiveTouchTarget", 1)[0]
     summary, ledger = reimbursement.split("{items.map((item) => (", 1)
-    entry_summary, details = ledger.split("</summary>", 1)
+    entry_summary, details = ledger.split('<div className="bb-reimbursement-detail">', 1)
 
     assert "if (!items.length)" in summary
     assert "return null" in summary
@@ -228,8 +228,8 @@ def test_reimbursement_disclosures_preserve_totals_and_complete_transaction_deta
         assert f"const {total} = items.reduce((total, item) => total + item.{field}, 0)" in summary
         assert f"formatMoney({total})" in summary
     assert "items.filter((item) => item.outstandingAmount > 0).length" in summary
-    assert "<details" in entry_summary
-    assert "<summary>" in entry_summary
+    assert "<AnimatedDisclosure" in entry_summary
+    assert "summary={" in entry_summary
     for field in ("item", "location", "date"):
         assert f"item.{field}" in entry_summary
     assert 'item.status === "reimbursed" ? "Received" : `${formatMoney(item.outstandingAmount)} due`' in entry_summary

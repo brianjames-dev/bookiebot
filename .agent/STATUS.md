@@ -4,11 +4,11 @@ Last updated: 2026-09-06
 
 ## Active Focus
 
-The user's expense-report frontend overhaul is implemented and verified: a paper/ink ledger layout, unified metrics, named chart navigation, simplified reimbursement disclosures, and clearer category colors shared by the pie and Daily Spending. Review the refreshed design after deployment using checklist item 86. The existing expected-income and rollover verification queue remains below.
+The user's second expense-report design pass is implemented: symmetric disclosure and dialog motion, sliding selections, calendar markers that fit their day cells, labeled dotted upper Daily Spending guides, and top metric amounts that stay on one line. Targeted tests and the frontend build pass; full-suite and browser verification are in progress before the requested merge to `main` and push. Review the deployed design using checklist items 86–87. The existing expected-income and rollover verification queue remains below.
 
 ## On Deck
 
-1. Review the redesigned expense report after deployment against checklist item 86.
+1. Finish the expense-report polish verification, merge to `main` and push as requested, then review the deployed design against checklist items 86–87.
 2. Verify deployed expected-income projections and the next monthly rollover against checklist item 85.
 3. Deploy and manually verify canonical Current/Projected report tools in checklist item 82.
 4. Deploy and manually verify the LangGraph conversational/read response layer and bank-transfer refusal in checklist item 81.
@@ -36,8 +36,12 @@ The user's expense-report frontend overhaul is implemented and verified: a paper
 
 ## Completed 2026-09-06
 
+- Implemented the second frontend polish pass. All inline Details/View all and reimbursement disclosures share symmetric 240ms expansion/collapse, with closed content removed from keyboard navigation. Chart tooltips now fade in as well as out. Category/Calendar dialogs fade and move gently on entry/exit while retaining native focus trapping and page scroll locking until close completes. Reduced-motion preferences remain supported.
+- Added measured sliding selection indicators for report mode, chart navigation, category/daily/calendar/subscription filters, and expense highlights; the theme switch also slides. Largest/Most Frequent content transitions preserve its existing charts and lists. Top metric amounts fit their measured column width on one line and grow back when space returns.
+- Calendar markers now adapt to each day cell's width: name/amount, amount only, then dot/count, with exact event information retained in tooltips and accessible names. Daily Spending retains a solid zero baseline, removes the solid upper boundary, and always includes a labeled dotted guide near the top for ordinary, empty, and compressed-outlier views.
+- Rebuilt the embedded frontend assets. Current verification: report suite `122 passed`; frontend typecheck/build passed. Browser QA passed at 320, 700, 980, and 1280px: calendar text/counts stay contained, exact long and negative metric amounts fit and resize, daily upper guides are labeled/dotted, and highlights preserve their content and focus isolation. Animation-frame sampling confirms intermediate expansion/collapse, toggle, and modal poses; dialogs restore focus and page scrolling. No browser warnings/errors. Full-suite verification of the merged branch remains pending; deployed manual review is checklist item 87. The user requested merging the verified changes to `main` and pushing.
 - Overhauled the embedded React expense report with warm paper/forest and dark ink themes, native serif headings, a single ruled four-metric summary, explicit Current/Projected controls, and named navigation for all existing carousel pages. Daily Spending and Largest/Most Frequent retain their charts, filters, tooltips, full detail lists, and financial calculations. Full-bleed chart surfaces keep their fixed stage and align their content with the report at wide widths.
-- Redesigned reimbursements around Outstanding, with Received/Gross paid/Your share in a compact statement. Each expense expands through native keyboard-accessible details to show every split field and receipt amount. Added semantic section headings, inactive-slide focus isolation, visible focus states, and reduced-motion treatment.
+- Redesigned reimbursements around Outstanding, with Received/Gross paid/Your share in a compact statement. Each expense expands through a controlled, keyboard-accessible disclosure to show every split field and receipt amount. Added semantic section headings, inactive-slide focus isolation, visible focus states, and reduced-motion treatment.
 - Incorporated design-review feedback: stronger dedicated category colors and matching square markers in Daily Spending. Pie slices, pie labels, and daily category text share one color map in both themes. Corrected scheduled bill/subscription rows that previously substituted broad Needs/Wants bar colors; subscription labels now match `Subs (Needs)` / `Subs (Wants)` in the pie.
 - Rebuilt both committed embedded frontend assets. Verification: report suite `113 passed`; full suite `604 passed` (one existing Kaleido warning); Pyright `0 errors`; frontend typecheck/build and `git diff --check` passed. Local synthetic browser checks covered desktop, 390px and 320px layouts without horizontal overflow, both themes, Current/Projected, all four charts, category/calendar details with scroll locking, daily filters, reimbursement disclosures, and Frequent highlights. All 31 visible daily category labels and markers matched their pie-slice colors in dark mode; light-mode colors also matched. Local preview data is synthetic and ignored under `data/design-preview/`.
 - Updated workstream and durable design decisions; production visual review remains checklist item 86.
@@ -723,6 +727,14 @@ Use a test row or low-risk real row in Discord:
     - Switch Daily Spending through All/Needs/Wants, inspect tooltips and the rent outlier, then open daily details and read the complete transaction table. Switch Largest/Most Frequent and expand their complete lists.
     - Expand pending, received, and fronted reimbursements by mouse and keyboard. Gross, personal share, partner share, received, outstanding, split method, location/date, and responsible person remain available. A report without reimbursements omits the section.
 
+87. Expense-report motion and responsive polish:
+    - Open a fresh report after deployment. Expand/collapse Bills & Utilities, Burn Rate, Daily Spending, View all lists, and each reimbursement repeatedly, including reversing direction mid-transition. Both directions should move smoothly at the same speed; collapsed content must not receive keyboard focus.
+    - Open Category Mix and Calendar dialogs, then close through their button, Escape, and backdrop. Entry/exit should fade and move smoothly, page scrolling must remain locked through exit, and focus/page position should return to the opener. Repeat with reduced motion enabled.
+    - Change Current/Projected, all chart/filter selections, Largest/Most Frequent, and the theme in both directions. Selected backgrounds or underlines should visibly slide to the new choice and settle correctly after rapid changes and viewport resizing.
+    - Resize the calendar through desktop, tablet, 390px, and 320px widths. On dates with several payments and large amounts, labels must fit inside their marker and day cell; compact dot/count markers must retain exact event names and amounts on hover/focus and in accessible labels.
+    - Switch Daily Spending through All/Needs/Wants with ordinary values, empty data, and a rent outlier. The zero baseline stays solid; a dotted line and dollar increment remain near the top, with no extra solid upper border. Hovered actual amounts and stacked totals remain unchanged.
+    - Inspect Income, Spent, Left, and Saved while narrowing/widening the page and switching Current/Projected. Every full currency amount remains on one line without overlapping its neighbor, and text returns to its larger size when space permits.
+
 ## Verification Baseline
 
 Recommended targeted tests for the active workstream:
@@ -732,7 +744,19 @@ python -m pytest unit_tests/banking/test_reconciliation.py unit_tests/banking/te
 python -m pytest unit_tests/intents/test_handlers.py unit_tests/core/test_message_router.py
 ```
 
-Latest verification (2026-09-06):
+Latest verification (2026-09-06, motion/layout polish):
+
+```bash
+PYTHONPATH=src venv/bin/python -m pytest unit_tests/reports -q
+# 122 passed
+npm run typecheck --prefix web/expense-report
+npm run build --prefix web/expense-report -- --configLoader runner
+# passed; embedded assets rebuilt
+```
+
+Browser QA passed across 320–1280px, including animation-frame sampling, calendar marker bounds, ordinary/long/negative metric fitting, daily upper guides, highlights, and dialog focus/scroll restoration. Full-suite verification of the merged branch and merge/push remain pending.
+
+Previous verification (2026-09-06, design overhaul):
 
 ```bash
 PYTHONPATH=src venv/bin/python -m pytest unit_tests/reports -q

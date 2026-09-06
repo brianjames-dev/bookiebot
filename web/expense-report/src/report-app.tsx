@@ -27,8 +27,10 @@ import {
 
 import { Badge } from "./components/ui/badge"
 import { Card, CardContent, CardHeader, CardTitle } from "./components/ui/card"
+import { FittedAmount } from "./components/ui/fitted-amount"
 import { ChartContainer, ChartTooltip, ChartTooltipContent, ChartTooltipDismissProvider } from "./components/ui/chart"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "./components/ui/tabs"
+import { AnimatedDisclosure, CollapsibleContent, SlidingSelection } from "./components/ui/motion"
 import type {
   AmountRow,
   BreakdownItem,
@@ -878,8 +880,8 @@ function SharedReimbursementsCard({ items }: { items: SharedReimbursementItem[] 
         </div>
         <div className="bb-reimbursement-ledger" aria-label="Shared expenses">
           {items.map((item) => (
-            <details className="bb-reimbursement-entry" key={item.id}>
-              <summary>
+            <AnimatedDisclosure key={item.id} summary={
+              <>
                 <span className="bb-reimbursement-item">
                   <strong>{item.item}</strong>
                   <span>{[item.location, item.date].filter(Boolean).join(" · ")}</span>
@@ -888,7 +890,8 @@ function SharedReimbursementsCard({ items }: { items: SharedReimbursementItem[] 
                   {item.status === "reimbursed" ? "Received" : `${formatMoney(item.outstandingAmount)} due`}
                 </span>
                 <span className="bb-disclosure-mark" aria-hidden="true" />
-              </summary>
+              </>
+            }>
               <div className="bb-reimbursement-detail">
                 <dl>
                   <div><dt>Gross paid</dt><dd>{formatMoney(item.grossAmount)}</dd></div>
@@ -898,7 +901,7 @@ function SharedReimbursementsCard({ items }: { items: SharedReimbursementItem[] 
                 </dl>
                 {item.splitMethod || item.responsiblePerson ? <p>{[item.splitMethod, item.responsiblePerson ? `Expense: ${item.responsiblePerson}` : ""].filter(Boolean).join(" · ")}</p> : null}
               </div>
-            </details>
+            </AnimatedDisclosure>
           ))}
         </div>
       </CardContent>
@@ -950,7 +953,8 @@ function CategoryMixFilterControl({
   onFilterChange: (filter: CategoryMixFilter) => void
 }) {
   return (
-    <div
+    <SlidingSelection
+      value={filter}
       className="bb-tabs-list bb-category-mix-filter"
       role="tablist"
       aria-label="Category mix filter"
@@ -969,7 +973,7 @@ function CategoryMixFilterControl({
           {item.label}
         </button>
       ))}
-    </div>
+    </SlidingSelection>
   )
 }
 
@@ -981,7 +985,8 @@ function DailySpendingFilterControl({
   onFilterChange: (filter: DailySpendingFilter) => void
 }) {
   return (
-    <div
+    <SlidingSelection
+      value={filter}
       className="bb-tabs-list bb-daily-spending-filter"
       role="tablist"
       aria-label="Daily spending filter"
@@ -1000,7 +1005,7 @@ function DailySpendingFilterControl({
           {item.label}
         </button>
       ))}
-    </div>
+    </SlidingSelection>
   )
 }
 
@@ -1014,7 +1019,7 @@ function ChartCarouselIndicators({
   onSelect: (index: number) => void
 }) {
   return (
-    <div className="bb-chart-carousel-indicators" aria-label="Budget chart position">
+    <SlidingSelection value={activeIndex} className="bb-chart-carousel-indicators" aria-label="Budget chart position">
       {panels.map((panel, index) => (
         <button
           type="button"
@@ -1030,16 +1035,16 @@ function ChartCarouselIndicators({
           {panel.title}
         </button>
       ))}
-    </div>
+    </SlidingSelection>
   )
 }
 
 function ProjectionToggle({ active, onToggle }: { active: boolean; onToggle: () => void }) {
   return (
-    <div className="bb-projection-control" role="group" aria-label="Report view" data-bb-tooltip-dismiss-trigger="projection">
+    <SlidingSelection value={Number(active)} className="bb-projection-control" role="group" aria-label="Report view" data-bb-tooltip-dismiss-trigger="projection">
       <button type="button" className="bb-metric-toggle" aria-pressed={!active} onClick={() => { if (active) onToggle() }}>Current</button>
       <button type="button" className="bb-metric-toggle" aria-pressed={active} onClick={() => { if (!active) onToggle() }}>Projected</button>
-    </div>
+    </SlidingSelection>
   )
 }
 
@@ -1048,19 +1053,18 @@ function ThemeToggle({ theme, onToggle }: { theme: ThemeMode; onToggle: () => vo
   return (
     <button type="button" className="bb-theme-toggle" aria-pressed={isDark} aria-label={`Turn dark mode ${isDark ? "off" : "on"}`} onClick={onToggle}>
       <span className="bb-theme-toggle-icon" aria-hidden="true">
-        {isDark ? (
+        <span className="bb-theme-toggle-track">
+          <svg viewBox="0 0 24 24" focusable="false">
+            <circle cx="12" cy="12" r="4" />
+            <path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4" />
+          </svg>
           <svg viewBox="0 0 24 24" focusable="false">
             <path
               className="bb-theme-toggle-moon"
               d="M20.6 14.1A8.3 8.3 0 0 1 9.9 3.4a8.7 8.7 0 1 0 10.7 10.7Z"
             />
           </svg>
-        ) : (
-          <svg viewBox="0 0 24 24" focusable="false">
-            <circle cx="12" cy="12" r="4" />
-            <path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4" />
-          </svg>
-        )}
+        </span>
       </span>
     </button>
   )
@@ -1344,9 +1348,9 @@ function MetricCard({
         <div className="bb-metric-label">{label}</div>
         {control}
       </div>
-      <div className={negative ? "bb-metric-value bb-negative" : positive ? "bb-metric-value bb-positive" : "bb-metric-value"}>
+      <FittedAmount className={negative ? "bb-metric-value bb-negative" : positive ? "bb-metric-value bb-positive" : "bb-metric-value"}>
         {formatMoney(value)}
-      </div>
+      </FittedAmount>
       {description ? <div className="bb-metric-note">{description}</div> : null}
     </div>
   )
@@ -1374,7 +1378,7 @@ function SavingsMetricCard({
   return (
     <div className="bb-metric-card bb-savings-metric-card">
       <div className="bb-metric-label">Saved</div>
-      <div className={`bb-metric-value bb-savings-value bb-savings-value-${tone}`}>{formatMoney(value)}</div>
+      <FittedAmount className={`bb-metric-value bb-savings-value bb-savings-value-${tone}`}>{formatMoney(value)}</FittedAmount>
       <div
         className={`bb-savings-progress bb-savings-progress-${tone}`}
         role="img"
@@ -2347,6 +2351,7 @@ function DailySpendingChart({
             <CartesianGrid
               className="bb-daily-spending-grid"
               vertical={false}
+              syncWithTicks
               stroke={DAILY_SPENDING_GRID_COLOR}
               strokeDasharray="3 3"
             />
@@ -2359,6 +2364,7 @@ function DailySpendingChart({
             <YAxis
               domain={axis.domain}
               ticks={axis.ticks}
+              interval="preserveStartEnd"
               scale={axis.compressed ? "linear" : "sqrt"}
               tick={{ fill: DAILY_SPENDING_GRID_COLOR }}
               tickFormatter={(value) => dailySpendingAxisTickLabel(Number(value), axis)}
@@ -2493,7 +2499,7 @@ function dailySpendingYAxisTicks([, max]: [number, number]) {
   for (let value = 200; value < max; value += 100) {
     ticks.push(value)
   }
-  return ticks.filter((value) => value < max)
+  return [...ticks.filter((value) => value < max), max]
 }
 
 function dailySpendingTickRange(step: number, max: number) {
@@ -2501,7 +2507,7 @@ function dailySpendingTickRange(step: number, max: number) {
   for (let value = 0; value < max; value += step) {
     ticks.push(value)
   }
-  return ticks
+  return [...ticks, max]
 }
 
 function dailySpendingCursorFill(filter: DailySpendingFilter) {
@@ -2728,25 +2734,25 @@ function ExpenseInsightsCard({
         <CardHeader>
           <div className="bb-card-title-row bb-inline-toggle-row">
             <CardTitle>Expense Highlights</CardTitle>
-            <TabsList data-bb-tooltip-dismiss-trigger="expense-highlights">
+            <TabsList activeValue={view} data-bb-tooltip-dismiss-trigger="expense-highlights">
               <TabsTrigger value="largest">Largest</TabsTrigger>
               <TabsTrigger value="merchants">Most Frequent</TabsTrigger>
             </TabsList>
           </div>
         </CardHeader>
         <CardContent className="bb-expense-insights-content">
-          <TabsContent value="largest">
+          <TabsContent value="largest" forceMount {...{ inert: view === "largest" ? undefined : "" }} aria-hidden={view !== "largest"}>
             <div className="bb-insight-panel">
               <TopExpensesChart entries={largestEntries} />
-              <HiddenListPanel total={largestEntries.length}>
+              <HiddenListPanel total={largestEntries.length} collapseKey={view}>
                 <TopExpensesTable entries={largestEntries} />
               </HiddenListPanel>
             </div>
           </TabsContent>
-          <TabsContent value="merchants">
+          <TabsContent value="merchants" forceMount {...{ inert: view === "merchants" ? undefined : "" }} aria-hidden={view !== "merchants"}>
             <div className="bb-insight-panel">
               <MerchantChart data={merchantOccurrences} />
-              <HiddenListPanel total={merchantOccurrences.length}>
+              <HiddenListPanel total={merchantOccurrences.length} collapseKey={view}>
                 <MerchantOccurrencesTable rows={merchantOccurrences} />
               </HiddenListPanel>
             </div>
@@ -2791,9 +2797,7 @@ function DetailsPanel({
       <button type="button" className="bb-details-toggle" aria-expanded={open} onClick={() => setOpen((current) => !current)}>
         {summary}
       </button>
-      <div className="bb-details-content" aria-hidden={!open}>
-        <div className="bb-details-content-inner">{children}</div>
-      </div>
+      <CollapsibleContent open={open}>{children}</CollapsibleContent>
     </div>
   )
 }
@@ -2846,34 +2850,49 @@ function ModalDetails({
   children: ReactNode
   collapseKey?: number
 }) {
-  const [open, setOpen] = useState(false)
+  const [phase, setPhase] = useState<"closed" | "opening" | "open" | "closing">("closed")
+  const open = phase !== "closed"
   const dialogRef = useRef<HTMLDialogElement | null>(null)
   useModalPageScrollLock(open)
 
   useEffect(() => {
-    setOpen(false)
+    setPhase((current) => current === "closed" ? current : "closing")
   }, [collapseKey])
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     const dialog = dialogRef.current
     if (!dialog) {
       return
     }
-    if (open && !dialog.open) {
-      dialog.showModal()
-    } else if (!open && dialog.open) {
-      dialog.close()
+    if (phase === "opening") {
+      if (!dialog.open) dialog.showModal()
+      // Commit the initial pose before starting the transition. Keep the native
+      // dialog/focus trap alive until the same transition finishes on closing.
+      let frame = requestAnimationFrame(() => {
+        frame = requestAnimationFrame(() => setPhase((current) => current === "opening" ? "open" : current))
+      })
+      return () => cancelAnimationFrame(frame)
     }
-  }, [open])
+    if (phase === "closed" && dialog.open) dialog.close()
+    if (phase === "closing") {
+      const duration = window.matchMedia("(prefers-reduced-motion: reduce)").matches ? 0 : 280
+      const timeout = window.setTimeout(() => setPhase((current) => current === "closing" ? "closed" : current), duration)
+      return () => window.clearTimeout(timeout)
+    }
+  }, [phase])
 
-  const close = () => setOpen(false)
+  const close = () => setPhase((current) => current === "closed" ? current : "closing")
   const modal = typeof document === "undefined" ? null : createPortal(
     <dialog
       ref={dialogRef}
       className="bb-details-dialog"
+      data-state={phase}
       aria-label={title}
-      onCancel={close}
-      onClose={close}
+      onCancel={(event) => { event.preventDefault(); close() }}
+      onClose={() => setPhase("closed")}
+      onTransitionEnd={(event) => {
+        if (event.target === event.currentTarget && event.propertyName === "opacity" && phase === "closing") setPhase("closed")
+      }}
       onTouchStart={(event) => event.stopPropagation()}
       onTouchMove={(event) => event.stopPropagation()}
       onTouchEnd={(event) => event.stopPropagation()}
@@ -2904,7 +2923,7 @@ function ModalDetails({
         className="bb-details-toggle"
         aria-haspopup="dialog"
         aria-expanded={open}
-        onClick={() => setOpen(true)}
+        onClick={() => setPhase("opening")}
       >
         {summary}
       </button>
@@ -2929,13 +2948,12 @@ function ExpandRowsButton({
   )
 }
 
-function HiddenListPanel({ children, total }: { children: ReactNode; total: number }) {
+function HiddenListPanel({ children, total, collapseKey }: { children: ReactNode; total: number; collapseKey?: string }) {
   const [expanded, setExpanded] = useState(false)
+  useEffect(() => setExpanded(false), [collapseKey])
   return (
     <div className="bb-hidden-list-panel">
-      <div className="bb-details-content" data-state={expanded ? "open" : "closed"} aria-hidden={!expanded}>
-        <div className="bb-details-content-inner">{children}</div>
-      </div>
+      <CollapsibleContent open={expanded}>{children}</CollapsibleContent>
       <ExpandRowsButton expanded={expanded} total={total} onToggle={() => setExpanded((current) => !current)} />
     </div>
   )
@@ -3261,7 +3279,8 @@ function CalendarFilterControl({
   onFilterChange: (filter: CalendarFilter) => void
 }) {
   return (
-    <div
+    <SlidingSelection
+      value={filter}
       className="bb-tabs-list bb-subscription-tone-control"
       role="tablist"
       aria-label="Calendar view"
@@ -3280,7 +3299,7 @@ function CalendarFilterControl({
           {item.label}
         </button>
       ))}
-    </div>
+    </SlidingSelection>
   )
 }
 
@@ -3502,7 +3521,7 @@ function FinancialCalendar({
                             backgroundColor: style.background,
                             borderColor: style.color,
                           }}
-                          aria-label={`${filteredEvents.length} events on day ${day}`}
+                          aria-label={`${filteredEvents.length} events on day ${day}: ${filteredEvents.map(calendarEventLabel).join("; ")}`}
                         >
                           <span className="bb-subscription-marker-dot" />
                           <span className="bb-calendar-marker-count" aria-hidden="true">
@@ -3878,7 +3897,7 @@ function SubscriptionToneControl({
   onToneChange: (tone: SubscriptionTone) => void
 }) {
   return (
-    <div className="bb-tabs-list bb-subscription-tone-control" role="tablist" aria-label="Subscription view">
+    <SlidingSelection value={tone} className="bb-tabs-list bb-subscription-tone-control" role="tablist" aria-label="Subscription view">
       {(Object.keys(SUBSCRIPTION_TONES) as SubscriptionTone[]).map((value) => (
         <button
           type="button"
@@ -3892,7 +3911,7 @@ function SubscriptionToneControl({
           {SUBSCRIPTION_TONES[value].label}
         </button>
       ))}
-    </div>
+    </SlidingSelection>
   )
 }
 

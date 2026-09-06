@@ -425,8 +425,16 @@ Utility chart history uses nullable amounts for unpaid open/future billing month
 
 ## 2026-09-06 - Present The Expense Report As A Ledger With Shared Category Identity
 
-Decision: Replace repeated metric/panel cards with a ruled summary and clearly separated report sections, preserving the existing full-bleed, fixed-height chart carousel. Expose all chart names before its viewport and make inactive slides inert; keep the existing touch and detail interactions. Show reimbursement Outstanding first, retain Received/Gross paid/Your share as a compact statement, and disclose each expense's complete split information through native details. Current/Projected controls explicitly show both choices and continue consuming the canonical report views.
+Decision: Replace repeated metric/panel cards with a ruled summary and clearly separated report sections, preserving the existing full-bleed, fixed-height chart carousel. Expose all chart names before its viewport and make inactive slides inert; keep the existing touch and detail interactions. Show reimbursement Outstanding first, retain Received/Gross paid/Your share as a compact statement, and disclose each expense's complete split information through a controlled, keyboard-accessible disclosure. Current/Projected controls explicitly show both choices and continue consuming the canonical report views.
 
 Use one frontend category color map for Category Mix slices/labels and Daily Spending labels/markers. Dedicated stronger category colors are separate from the page's paper/forest theme. Scheduled daily bill and subscription labels match the canonical category labels rather than overriding them with broad Needs/Wants bar colors; the daily graph itself retains its Needs/Wants series.
 
 Rationale: A financial ledger gives the report a distinct, readable hierarchy without changing the financial workflow. Showing balances first reduces reimbursement clutter while preserving all information. A single category identity makes the pie and transaction detail easy to cross-reference in either theme and prevents visually inconsistent bill/subscription colors.
+
+## 2026-09-06 - Share Expense Report Motion And Fit Content To Its Available Space
+
+Decision: Inline report disclosures, including reimbursements, use the same controlled 240ms expansion/collapse transition with inert closed content. This replaces the initial native-details implementation for reimbursements. Dialogs use a fade with a small translation/scale and remain open, focus trapped, and page-scroll locked until their exit finishes. Selection indicators move between measured button bounds; reduced-motion preferences shorten all motion.
+
+Fit calendar marker detail to its day cell, retaining exact event information in tooltips and accessible labels when names or amounts are hidden. Fit complete top metric amounts to their measured column width without wrapping. Daily Spending gridlines correspond to visible ticks, with a labeled dotted guide near the top and only the zero baseline solid.
+
+Rationale: Shared motion makes opening and closing equally predictable, while retaining dialog and disclosure accessibility during transitions. The containing element determines whether a financial label fits more reliably than viewport width alone. A top tick provides a readable scale reference without an unlabeled border; these presentation choices preserve the underlying financial values.

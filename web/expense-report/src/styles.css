@@ -30,6 +30,8 @@
   --bb-content-max: 1240px;
   --bb-page-gutter: clamp(16px, 4vw, 56px);
   --bb-display-font: "Iowan Old Style", "Palatino Linotype", "Book Antiqua", Georgia, serif;
+  --bb-motion-duration: 240ms;
+  --bb-motion-ease: cubic-bezier(0.22, 1, 0.36, 1);
 }
 
 :root[data-theme="dark"] {
@@ -197,16 +199,31 @@ summary {
 }
 
 .bb-theme-toggle-icon {
-  display: inline-flex;
+  display: inline-block;
   align-items: center;
   justify-content: center;
   width: 18px;
   height: 18px;
+  overflow: hidden;
   color: hsl(var(--muted-foreground));
   transition: color 160ms ease, transform 160ms ease;
 }
 
+.bb-theme-toggle-track {
+  display: flex;
+  flex: 0 0 36px;
+  width: 36px;
+  height: 18px;
+  transform: translateX(0);
+  transition: transform var(--bb-motion-duration) var(--bb-motion-ease);
+}
+
+.bb-theme-toggle[aria-pressed="true"] .bb-theme-toggle-track {
+  transform: translateX(-18px);
+}
+
 .bb-theme-toggle-icon svg {
+  flex: 0 0 18px;
   width: 18px;
   height: 18px;
   fill: none;
@@ -363,7 +380,34 @@ summary {
   line-height: 1.2;
   letter-spacing: -0.055em;
   font-variant-numeric: tabular-nums;
-  overflow-wrap: anywhere;
+  white-space: nowrap;
+}
+
+.bb-fitted-amount {
+  position: relative;
+  min-width: 0;
+  max-width: 100%;
+  height: 1lh;
+}
+
+.bb-fitted-amount-measure-box {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  visibility: hidden;
+  pointer-events: none;
+}
+
+.bb-fitted-amount-measure {
+  display: inline-block;
+  width: max-content;
+}
+
+.bb-fitted-amount-text {
+  display: inline-block;
+  font-size: calc(1em * var(--bb-amount-fit, 1));
+  letter-spacing: -0.055em;
+  vertical-align: baseline;
 }
 
 .bb-metric-note {
@@ -457,7 +501,6 @@ summary {
 }
 
 .bb-metric-toggle[aria-pressed="true"] {
-  background: hsl(var(--foreground));
   color: hsl(var(--background));
 }
 
@@ -595,8 +638,7 @@ summary {
   stroke-linecap: butt;
 }
 
-.bb-daily-spending-content .recharts-cartesian-grid-horizontal .bb-daily-spending-grid:first-child,
-.bb-daily-spending-content .recharts-cartesian-grid-horizontal .bb-daily-spending-grid:last-child {
+.bb-daily-spending-content .recharts-cartesian-grid-horizontal .bb-daily-spending-grid:first-child {
   stroke: hsl(var(--foreground));
   stroke-dasharray: none;
 }
@@ -807,6 +849,7 @@ summary {
 }
 
 .bb-calendar-day {
+  container: calendar-day / inline-size;
   display: grid;
   align-content: start;
   gap: 6px;
@@ -817,6 +860,11 @@ summary {
   border-radius: var(--radius);
   background: hsl(var(--card));
   transition: border-color 180ms ease-out, box-shadow 180ms ease-out;
+}
+
+.bb-calendar-day:hover,
+.bb-calendar-day:focus-within {
+  z-index: 30;
 }
 
 .bb-calendar-day-muted {
@@ -853,6 +901,7 @@ summary {
   align-items: center;
   gap: 5px;
   width: 100%;
+  max-width: 100%;
   min-width: 0;
   min-height: 22px;
   padding: 3px 6px;
@@ -931,11 +980,13 @@ summary {
 }
 
 .bb-subscription-marker-name {
+  flex: 1 1 0;
   min-width: 0;
 }
 
 .bb-subscription-marker-amount {
-  flex: 0 0 auto;
+  flex: 0 1 auto;
+  min-width: 0;
   font-variant-numeric: tabular-nums;
 }
 
@@ -1219,7 +1270,6 @@ summary {
 }
 
 .bb-chart-carousel-dot[data-state="active"] {
-  border-bottom-color: hsl(var(--primary));
   color: hsl(var(--foreground));
 }
 
@@ -1253,8 +1303,75 @@ summary {
 }
 
 .bb-tabs-trigger[data-state="active"] {
-  border-bottom-color: hsl(var(--primary));
   color: hsl(var(--foreground));
+}
+
+.bb-sliding-selection {
+  position: relative;
+  isolation: isolate;
+}
+
+.bb-sliding-selection > button {
+  position: relative;
+  z-index: 1;
+  transition: color var(--bb-motion-duration) var(--bb-motion-ease), background-color var(--bb-motion-duration) var(--bb-motion-ease);
+}
+
+.bb-selection-indicator {
+  position: absolute;
+  left: 0;
+  top: var(--bb-selection-y, 0px);
+  width: var(--bb-selection-width, 0px);
+  height: var(--bb-selection-height, 0px);
+  transform: translateX(var(--bb-selection-x, 0px));
+  background: hsl(var(--primary) / 0.08);
+  border-bottom: 2px solid hsl(var(--primary));
+  border-radius: 3px 3px 0 0;
+  pointer-events: none;
+}
+
+.bb-sliding-selection[data-selection-ready="true"] > .bb-selection-indicator {
+  transition: transform var(--bb-motion-duration) var(--bb-motion-ease), width var(--bb-motion-duration) var(--bb-motion-ease), height var(--bb-motion-duration) var(--bb-motion-ease);
+}
+
+.bb-projection-control > .bb-selection-indicator {
+  border: 0;
+  border-radius: 2px;
+  background: hsl(var(--foreground));
+}
+
+.bb-chart-carousel-indicators > .bb-selection-indicator {
+  top: auto;
+  bottom: 0;
+  height: 2px;
+  border: 0;
+  border-radius: 0;
+  background: hsl(var(--primary));
+}
+
+.bb-expense-insights-content > .bb-tabs-content {
+  grid-area: 1 / 1;
+  min-width: 0;
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+  transition: opacity var(--bb-motion-duration) var(--bb-motion-ease), transform var(--bb-motion-duration) var(--bb-motion-ease), visibility 0s linear var(--bb-motion-duration);
+}
+
+.bb-expense-insights-content > .bb-tabs-content:first-child {
+  transform: translateX(-14px);
+}
+
+.bb-expense-insights-content > .bb-tabs-content:last-child {
+  transform: translateX(14px);
+}
+
+.bb-expense-insights-content > .bb-tabs-content[data-state="active"] {
+  opacity: 1;
+  transform: translateX(0);
+  visibility: visible;
+  pointer-events: auto;
+  transition-delay: 0s;
 }
 
 .bb-tabs-content {
@@ -1703,7 +1820,7 @@ summary {
   min-height: 0;
   opacity: 0;
   overflow: hidden;
-  transition: grid-template-rows 220ms cubic-bezier(0.16, 1, 0.3, 1), opacity 180ms ease;
+  transition: grid-template-rows var(--bb-motion-duration) var(--bb-motion-ease), opacity var(--bb-motion-duration) var(--bb-motion-ease);
 }
 
 .bb-details-panel[data-state="open"] > .bb-details-content,
@@ -1743,11 +1860,25 @@ summary {
   background: hsl(var(--card));
   color: hsl(var(--card-foreground));
   box-shadow: 0 24px 72px rgb(0 0 0 / 0.32);
+  opacity: 0;
+  transform: translateY(12px) scale(0.98);
+  transition: opacity var(--bb-motion-duration) var(--bb-motion-ease), transform var(--bb-motion-duration) var(--bb-motion-ease);
+}
+
+.bb-details-dialog[data-state="open"] {
+  opacity: 1;
+  transform: translateY(0) scale(1);
 }
 
 .bb-details-dialog::backdrop {
   background: rgb(0 0 0 / 0.58);
   backdrop-filter: blur(2px);
+  opacity: 0;
+  transition: opacity var(--bb-motion-duration) var(--bb-motion-ease);
+}
+
+.bb-details-dialog[data-state="open"]::backdrop {
+  opacity: 1;
 }
 
 .bb-details-dialog-surface {
@@ -1898,6 +2029,7 @@ summary {
   transition: opacity 180ms ease-out, transform 180ms ease-out;
 }
 
+.bb-chart-tooltip-frame-entering,
 .bb-chart-tooltip-frame-dismissing {
   opacity: 0;
   transform: translateY(3px);
@@ -2191,19 +2323,22 @@ tr:last-child td {
 .bb-reimbursement-entry:last-child {
   border-bottom: 1px solid hsl(var(--border));
 }
-.bb-reimbursement-entry > summary {
+.bb-reimbursement-toggle {
+  appearance: none;
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto 14px;
   align-items: center;
   gap: 18px;
   padding: 20px 0;
+  width: 100%;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  text-align: left;
   cursor: pointer;
-  list-style: none;
 }
-.bb-reimbursement-entry > summary::-webkit-details-marker {
-  display: none;
-}
-.bb-reimbursement-entry > summary:hover .bb-reimbursement-item strong {
+.bb-reimbursement-toggle:hover .bb-reimbursement-item strong {
   color: hsl(var(--primary));
 }
 .bb-reimbursement-item {
@@ -2249,9 +2384,9 @@ tr:last-child td {
 }
 .bb-disclosure-mark::after {
   transform: rotate(90deg);
-  transition: transform 160ms ease;
+  transition: transform var(--bb-motion-duration) var(--bb-motion-ease);
 }
-.bb-reimbursement-entry[open] .bb-disclosure-mark::after {
+.bb-reimbursement-entry[data-state="open"] .bb-disclosure-mark::after {
   transform: rotate(0deg);
 }
 .bb-reimbursement-detail {
@@ -2456,7 +2591,7 @@ button:focus-visible, summary:focus-visible {
   .bb-card-title { font-size: 27px; }
   .bb-reimbursement-content { grid-template-columns: 1fr; gap: 28px; }
   .bb-reimbursement-summary { margin-top: 20px; }
-  .bb-reimbursement-entry > summary { gap: 12px; }
+  .bb-reimbursement-toggle { gap: 12px; }
   .bb-reimbursement-total { font-size: 38px; }
   .bb-chart-carousel-button {
     display: none;
@@ -2478,9 +2613,6 @@ button:focus-visible, summary:focus-visible {
     padding-inline: 5px;
   }
 
-  .bb-subscription-marker-amount {
-    display: none;
-  }
 }
 
 @media (max-width: 520px) {
@@ -2509,15 +2641,16 @@ button:focus-visible, summary:focus-visible {
   }
 
   .bb-subscription-marker {
-    width: 20px;
-    min-height: 18px;
+    width: fit-content;
+    min-height: 20px;
     justify-content: center;
-    padding: 0;
+    gap: 3px;
+    padding: 3px 5px;
   }
 
   .bb-calendar-marker-transition {
-    max-width: 20px;
-    margin: 0 3px 3px 0;
+    max-width: 100%;
+    margin: 0 0 3px;
     transition:
       max-width 220ms cubic-bezier(0.16, 1, 0.3, 1),
       max-height 220ms cubic-bezier(0.16, 1, 0.3, 1),
@@ -2564,9 +2697,7 @@ button:focus-visible, summary:focus-visible {
   }
 
   .bb-subscription-marker-more {
-    width: auto;
-    min-width: 20px;
-    padding: 0 4px;
+    min-width: 0;
     font-size: 10px;
   }
 
@@ -2576,6 +2707,57 @@ button:focus-visible, summary:focus-visible {
     font-size: 9px;
     font-variant-numeric: tabular-nums;
     line-height: 1;
+  }
+}
+
+/* Size event labels against their day cell, including the constrained carousel
+   content on wide screens. Exact amounts remain in the tooltip and aria-label. */
+@container calendar-day (max-width: 144px) {
+  .bb-subscription-marker-name {
+    display: none;
+  }
+
+  .bb-subscription-marker {
+    justify-content: center;
+  }
+}
+
+@container calendar-day (max-width: 92px) {
+  .bb-subscription-marker {
+    width: fit-content;
+    min-height: 20px;
+    gap: 3px;
+    padding: 3px 5px;
+  }
+
+  .bb-subscription-marker-amount {
+    display: none;
+  }
+
+  .bb-calendar-marker-count {
+    display: inline-flex;
+    flex: 0 1 auto;
+    min-width: 0;
+    overflow: hidden;
+    font-size: 9px;
+    font-variant-numeric: tabular-nums;
+    line-height: 1;
+  }
+}
+
+@container calendar-day (max-width: 32px) {
+  .bb-subscription-marker {
+    gap: 2px;
+    padding-inline: 2px;
+  }
+
+  .bb-subscription-marker-dot {
+    width: 4px;
+    height: 4px;
+  }
+
+  .bb-calendar-marker-count {
+    font-size: 8px;
   }
 }
 
