@@ -1,5 +1,6 @@
 import {
   memo,
+  useCallback,
   useEffect,
   useLayoutEffect,
   useRef,
@@ -30,6 +31,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "./components/ui/card"
 import { FittedAmount } from "./components/ui/fitted-amount"
 import { ReportMenu } from "./components/ui/report-menu"
 import { SharedReimbursementsCard } from "./shared-reimbursements"
+import { reportActivity, activitySummary, calendarActivityStatus, type ReportActivity } from "./report-activity"
 import { ChartContainer, ChartTooltip, ChartTooltipContent, ChartTooltipDismissProvider } from "./components/ui/chart"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "./components/ui/tabs"
 import { CollapsibleContent, SlidingSelection } from "./components/ui/motion"
@@ -516,6 +518,7 @@ export function ExpenseReportApp({ report, appControls, appAvatarUrl, appSession
 }) {
   const { theme, toggleTheme } = useExpenseReportTheme()
   useViewportScrollbarWidth()
+  const [inspection, setInspection] = useState<{key:string; title:string; entries:ReportActivity[]; total:number; note?:string} | null>(null)
   const dailySpendingDetailsOpen = useMediaQuery("(min-width: 861px)")
   const [projectionActive, setProjectionActive] = useState(false)
   const [categoryMixFilter, setCategoryMixFilter] = useState<CategoryMixFilter>("all")
@@ -563,6 +566,21 @@ export function ExpenseReportApp({ report, appControls, appAvatarUrl, appSession
   const dailyTableEntries = dailyEntriesWithCalendarEvents(dailyEntries, dailyCalendarEvents, report.month)
   const dailyTotals = dailyTotalsForEntries(dailyEntries, dailyCalendarEvents)
   const dailyTotal = dailySpendingTotal(dailyEntries, dailyCalendarEvents)
+  const allActivity = reportActivity(report, activeReport.calendarEvents, projectionActive)
+  const activityRef = useRef(allActivity)
+  activityRef.current = allActivity
+  const inspectCategory = useCallback((item: BreakdownItem) => {
+    setChartTooltipDismissRevision(current => current + 1)
+    setChartCollapseKey(current => current + 1)
+    const entries = activityRef.current.filter(entry => entry.category === item.label)
+    setInspection({key:`category-${item.key}`, title:item.label, entries, total:item.amount,
+      note:item.key === "left" ? "Available budget after spending and savings; this is a balance, not a transaction." : item.key === "savings" ? "Monthly savings deposits are summarized in Saved." : undefined})
+  }, [])
+  const inspectDay = (day: string) => {
+    dismissChartTooltips()
+    const entries = allActivity.filter(entry => entry.day === Number(day) && (dailySpendingFilter === "all" || dailyEntryFilter(entry) === dailySpendingFilter))
+    setInspection({key:`day-${day}`, title:`${monthOnlyLabel(report.monthLabel)} ${day}`, entries, total:activitySummary(entries).total})
+  }
   const spentTotal = amountRowsTotal(activeReport.breakdown)
   const defaultChartTab = report.burnRate ? "burn-rate" : "category"
   const chartPanels: ChartPanel[] = [
@@ -572,6 +590,7 @@ export function ExpenseReportApp({ report, appControls, appAvatarUrl, appSession
       content: (
         <CategoryMixChart
           data={chartBreakdown}
+          onInspect={inspectCategory}
           categoryBalances={activeReport.categoryBalances}
           categoryBudgets={activeReport.categoryBudgets}
           amountSaved={activeReport.metrics.amountSaved}
@@ -832,12 +851,13 @@ export function ExpenseReportApp({ report, appControls, appAvatarUrl, appSession
           <CardContent className="bb-daily-spending-content">
             <DailySpendingChart
               data={dailyTotals}
+              onInspectDay={inspectDay}
               total={dailyTotal}
               elapsedDays={report.elapsedDays}
               filter={dailySpendingFilter}
               defaultDetailsOpen={dailySpendingDetailsOpen}
             />
-            <DailyEntriesTable entries={dailyTableEntries} categoryColors={categoryColors} year={report.year} month={report.month} />
+            <DailyEntriesTable onInspectDay={inspectDay} entries={dailyTableEntries} categoryColors={categoryColors} year={report.year} month={report.month} />
           </CardContent>
         </Card>
 
@@ -850,10 +870,32 @@ export function ExpenseReportApp({ report, appControls, appAvatarUrl, appSession
           onViewChange={dismissChartTooltips}
         />
 
+        <ModalDetails summary="Transactions" title={inspection?.title ?? "Transactions"} selection={inspection?.key ?? null}
+          onDismiss={() => setInspection(null)} triggerHidden>
+          {inspection && <ActivityDetails entries={inspection.entries} total={inspection.total} note={inspection.note} colors={categoryColors} />}
+        </ModalDetails>
         </main>
       </ChartTooltipDismissProvider>
     </div>
   )
+}
+
+function ActivityDetails({entries, total, note, colors}: {entries:ReportActivity[];total:number;note?:string;colors:Record<string,string>}) {
+  const summary = activitySummary(entries)
+  const difference = Math.round((total-summary.total)*100)/100
+  return <div className="bb-activity-details">
+    <div className="bb-chart-total">{formatMoney(total)}</div>
+    {note ? <p>{note}</p> : <>
+      <p className="bb-activity-summary">Recorded {formatMoney(summary.recorded)} · Scheduled {formatMoney(summary.scheduled)}</p>
+      {Math.abs(difference) >= .01 && <p className="bb-activity-coverage">{formatMoney(difference)} is summarized outside these itemized entries.</p>}
+    </>}
+    {entries.length > 0 ? <ol className="bb-activity-list">{entries.map(entry => <li key={entry.id}>
+      <div><strong>{entry.item || entry.location || "Transaction"}</strong><span>{entry.location && entry.item ? entry.location+" · " : ""}{entry.date || "No date"}{entry.dateSource === "scheduled" ? " · scheduled date" : ""}</span>
+        <span style={{color:colors[entry.category]}}>{entry.category} · {entry.person}</span></div>
+      <div><strong>{formatMoney(entry.amount)}</strong><small className={`bb-activity-status bb-activity-${entry.status}`}>{entry.status === "recorded" ? "Recorded" : "Scheduled"}</small></div>
+    </li>)}</ol> : !note && <p className="bb-empty">No itemized transactions in this selection.</p>}
+    {summary.scheduled !== 0 && <p className="bb-activity-footnote">Scheduled subscriptions and future payments are estimates. A scheduled date does not confirm that a payment has posted.</p>}
+  </div>
 }
 
 function isInteractiveTouchTarget(target: EventTarget | null) {
@@ -1348,6 +1390,7 @@ function SavingsMetricCard({
 }
 
 type CategoryMixChartProps = {
+  onInspect: (item: BreakdownItem) => void
   data: BreakdownItem[]
   categoryBalances: CategoryBalances
   categoryBudgets: CategoryBalanceAmounts
@@ -1359,6 +1402,7 @@ type CategoryMixChartProps = {
 }
 
 const CategoryMixChart = memo(function CategoryMixChart({
+  onInspect,
   data,
   categoryBalances,
   categoryBudgets,
@@ -1403,7 +1447,7 @@ const CategoryMixChart = memo(function CategoryMixChart({
             layout={pieLayout}
             filter={filter}
           >
-            <CategoryMixPieSurface data={chartData} layout={pieLayout} />
+            <CategoryMixPieSurface data={chartData} layout={pieLayout} onInspect={onInspect} />
           </CategoryMixPieMotionHost>
         </ChartContainer>
       </div>
@@ -1458,11 +1502,12 @@ function CategoryMixPieMotionHost({ hostRef, layout, filter, children }: Categor
 }
 
 type CategoryMixPieSurfaceProps = {
+  onInspect: (item: BreakdownItem) => void
   data: BreakdownItem[]
   layout: ExpensePieLayout
 }
 
-const CategoryMixPieSurface = memo(function CategoryMixPieSurface({ data, layout }: CategoryMixPieSurfaceProps) {
+const CategoryMixPieSurface = memo(function CategoryMixPieSurface({ data, layout, onInspect }: CategoryMixPieSurfaceProps) {
   return (
     <ResponsiveContainer width="100%" height="100%">
       <PieChart margin={layout.margin}>
@@ -1485,7 +1530,8 @@ const CategoryMixPieSurface = memo(function CategoryMixPieSurface({ data, layout
           labelLine={layout.showLabels ? (props) => renderPieMetricLabelLine(props, layout) : false}
         >
           {data.map((item) => (
-            <Cell key={item.key} fill={item.color} />
+            <Cell key={item.key} fill={item.color} role="button" tabIndex={0} aria-label={`Inspect ${item.label}, ${formatMoney(item.amount)}`}
+              onClick={() => onInspect(item)} onKeyDown={(event) => { if(event.key === "Enter" || event.key === " ") { event.preventDefault(); onInspect(item) } }} />
           ))}
         </Pie>
       </PieChart>
@@ -1497,11 +1543,12 @@ function areCategoryMixPieSurfacePropsEqual(
   previous: CategoryMixPieSurfaceProps,
   next: CategoryMixPieSurfaceProps,
 ) {
-  return breakdownRowsEqual(previous.data, next.data) && expensePieLayoutsEqual(previous.layout, next.layout)
+  return previous.onInspect === next.onInspect && breakdownRowsEqual(previous.data, next.data) && expensePieLayoutsEqual(previous.layout, next.layout)
 }
 
 function areCategoryMixChartPropsEqual(previous: CategoryMixChartProps, next: CategoryMixChartProps) {
   return (
+    previous.onInspect === next.onInspect &&
     previous.amountSaved === next.amountSaved &&
     previous.categoryBudgets.needs === next.categoryBudgets.needs &&
     previous.categoryBudgets.wants === next.categoryBudgets.wants &&
@@ -2260,7 +2307,7 @@ type DailySpendingAxis = {
   ticks: number[]
 }
 
-type DailyEntryDisplayRow = ExpenseEntry
+type DailyEntryDisplayRow = ExpenseEntry & { status?: "recorded" | "scheduled" }
 
 function DailySpendingChart({
   data,
@@ -2268,7 +2315,9 @@ function DailySpendingChart({
   elapsedDays,
   filter,
   defaultDetailsOpen,
+  onInspectDay,
 }: {
+  onInspectDay: (day: string) => void
   data: DailySpendingRow[]
   total: number
   elapsedDays: number
@@ -2295,7 +2344,7 @@ function DailySpendingChart({
         className="bb-chart-box"
       >
         <ResponsiveContainer width="100%" height="100%">
-          <BarChart data={chartData} margin={{ top: 12, right: 16, left: 0, bottom: 0 }}>
+          <BarChart data={chartData} onClick={(state) => { if (state?.activeLabel !== undefined) onInspectDay(String(state.activeLabel)) }} margin={{ top: 12, right: 16, left: 0, bottom: 0 }}> 
             <CartesianGrid
               className="bb-daily-spending-grid"
               vertical={false}
@@ -2792,7 +2841,13 @@ function ModalDetails({
   title,
   children,
   collapseKey = 0,
+  selection,
+  onDismiss,
+  triggerHidden = false,
 }: {
+  selection?: string | null
+  onDismiss?: () => void
+  triggerHidden?: boolean
   summary: string
   title: string
   children: ReactNode
@@ -2808,7 +2863,10 @@ function ModalDetails({
     // closed-state cleanup then restores the original scroll position once.
     if (dialogRef.current?.open) dialogRef.current.close()
     setPhase("closed")
+    onDismiss?.()
   }
+
+  useEffect(() => { if (selection) setPhase("opening") }, [selection])
 
   useEffect(() => {
     setPhase((current) => current === "closed" ? current : "closing")
@@ -2876,7 +2934,7 @@ function ModalDetails({
 
   return (
     <div className="bb-modal-details">
-      <button
+      {!triggerHidden && <button
         type="button"
         className="bb-details-toggle"
         aria-haspopup="dialog"
@@ -2884,7 +2942,7 @@ function ModalDetails({
         onClick={() => setPhase("opening")}
       >
         {summary}
-      </button>
+      </button>}
       {modal}
     </div>
   )
@@ -3027,7 +3085,8 @@ function MerchantOccurrencesTable({ rows }: { rows: OccurrenceRow[] }) {
   )
 }
 
-function DailyEntriesTable({ entries, categoryColors, year, month }: {
+function DailyEntriesTable({ entries, categoryColors, year, month, onInspectDay }: {
+  onInspectDay?: (day: string) => void
   entries: DailyEntryDisplayRow[]
   categoryColors: Record<string, string>
   year: number
@@ -3060,14 +3119,14 @@ function DailyEntriesTable({ entries, categoryColors, year, month }: {
             return (
               <tr key={day}>
                 <td>
-                  <span
+                  <button type="button" onClick={() => onInspectDay?.(day)}
                     className={isToday ? "bb-daily-day bb-daily-day-today" : "bb-daily-day"}
                     aria-current={isToday ? "date" : undefined}
-                    aria-label={isToday ? `${day}, today` : undefined}
+                    aria-label={isToday ? `${day}, today` : `Inspect day ${day}`}
                     title={isToday ? "Today" : undefined}
                   >
                     {day}
-                  </span>
+                  </button>
                 </td>
                 <td className="bb-amount">{formatMoney(total)}</td>
                 <td>
@@ -3079,6 +3138,7 @@ function DailyEntriesTable({ entries, categoryColors, year, month }: {
                         </strong>{" "}
                         {entry.item || entry.location || "Transaction"} - {formatMoney(entry.amount)}
                         <span> ({entry.person})</span>
+                        {entry.status && <small className={`bb-activity-status bb-activity-${entry.status}`}>{entry.status === "scheduled" ? "Scheduled" : "Recorded"}</small>}
                       </div>
                     ))}
                   </div>
@@ -3124,7 +3184,7 @@ function dailyEntriesWithCalendarEvents(
   month: number,
 ): DailyEntryDisplayRow[] {
   return [
-    ...entries,
+    ...entries.map(entry => ({...entry, status: "recorded" as const})),
     ...calendarEvents.map((event) => {
       const bucket = dailyCalendarEventBucket(event)
       const category = event.kind === "bill"
@@ -3132,6 +3192,7 @@ function dailyEntriesWithCalendarEvents(
         : bucket === "wants" ? "Subs (Wants)" : "Subs (Needs)"
       return {
         date: `${month}/${event.day}`,
+        status: calendarActivityStatus(event),
         category,
         amount: event.amount,
         person: event.kind === "bill" ? "Need bill" : bucket === "wants" ? "Want sub" : "Need sub",
@@ -3344,6 +3405,7 @@ function CalendarAnalyticsPanel({
           <div className="bb-chart-page-footer">
             {subscriptionItems.length ? (
               <ModalDetails summary="Details" title="Calendar details" collapseKey={collapseKey}>
+                <p className="bb-activity-footnote">Recurring schedules · these dates and amounts do not confirm bank posting.</p>
                 <SubscriptionAllItemsGrid items={subscriptionItems} showAll />
               </ModalDetails>
             ) : null}
@@ -3558,14 +3620,14 @@ function calendarEventsStyle(events: CalendarEvent[]) {
 }
 
 function calendarEventLabel(event: CalendarEvent) {
-  return `${event.label} - ${calendarEventKindLabel(event)} - ${formatMoney(event.amount)}`
+  return `${event.label} - ${calendarEventKindLabel(event)} - ${formatMoney(event.amount)} - ${event.kind === "subscription" || event.projectedOnly ? "Scheduled" : "Recorded"}`
 }
 
 function CalendarEventTooltip({ event }: { event: CalendarEvent }) {
   return (
     <span className="bb-subscription-tooltip" role="tooltip">
       <strong className="bb-calendar-tooltip-category" style={{ color: calendarEventStyle(event).color }}>{event.label}</strong>
-      <span>{calendarEventKindLabel(event)}</span>
+      <span>{calendarEventKindLabel(event)} · {event.kind === "subscription" || event.projectedOnly ? "Scheduled" : "Recorded"}</span>
       <span className="bb-subscription-tooltip-amount">{formatMoney(event.amount)}</span>
     </span>
   )

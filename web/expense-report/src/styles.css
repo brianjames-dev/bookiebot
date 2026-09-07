@@ -3049,3 +3049,16 @@ button:focus-visible, summary:focus-visible {
   *, *::before, *::after { scroll-behavior: auto !important; animation-duration: 0.01ms !important; transition-duration: 0.01ms !important; }
   .bb-app-refresh-icon.is-refreshing { animation: none; }
 }
+
+/* One detail view connects categories and daily activity. */
+.bb-legend-inspect { width:100%; border:0; border-bottom:1px solid hsl(var(--border)); background:transparent; color:inherit; font:inherit; text-align:left; cursor:pointer; }
+.bb-legend-inspect:hover { background:hsl(var(--muted)); }
+.bb-daily-day { border:0; color:inherit; font:inherit; cursor:pointer; }
+.bb-activity-status { display:inline-block; font-size:10px; line-height:1.5; padding:1px 5px; margin-left:5px; border:1px solid hsl(var(--border)); border-radius:3px; color:hsl(var(--muted-foreground)); white-space:nowrap; }
+.bb-activity-scheduled { border-style:dashed; }
+.bb-activity-list { list-style:none; margin:20px 0; padding:0; }
+.bb-activity-list li { display:flex; justify-content:space-between; gap:16px; padding:14px 0; border-top:1px solid hsl(var(--border)); }
+.bb-activity-list li > div:first-child { min-width:0; overflow-wrap:anywhere; }
+.bb-activity-list li > div:last-child { flex-shrink:0; text-align:right; }
+.bb-activity-list span, .bb-activity-list small { display:block; margin:4px 0 0; font-size:12px; }
+.bb-activity-summary, .bb-activity-footnote, .bb-activity-coverage { font-size:13px; line-height:1.6; color:hsl(var(--muted-foreground)); }

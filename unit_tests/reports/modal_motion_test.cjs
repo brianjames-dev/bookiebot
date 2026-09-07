@@ -22,7 +22,9 @@ const { outputText } = ts.transpileModule(source.slice(start, end), {
 // Run the actual modal and its scroll lock with a deterministic hook/frame
 // scheduler. This exercises interrupted entrances/exits and native close order,
 // which a source-string or static markup test cannot verify.
-function harness(reducedMotion = false) {
+function harness(reducedMotion = false, options = {}) {
+  let selection = options.selection
+  let dismissCount = 0
   let cursor = 0
   let dirty = true
   let tree
@@ -86,7 +88,7 @@ function harness(reducedMotion = false) {
     while (dirty) {
       dirty = false
       cursor = 0
-      tree = runtime.ModalDetails({ summary: "Details", title: "Calendar details", children: "Bills" })
+      tree = runtime.ModalDetails({ summary: "Details", title: "Calendar details", children: "Bills", selection, triggerHidden: options.triggerHidden, onDismiss: () => { dismissCount++ } })
       tree.props.children[1].ref.current = dialog
       const updates = pending.splice(0)
       for (const update of updates) update.cleanup?.()
@@ -97,6 +99,8 @@ function harness(reducedMotion = false) {
   flush()
   return {
     dialog, body, win, calls, timers,
+    get dismissCount() { return dismissCount },
+    select(value) { act(() => { selection = value; dirty = true }) },
     get modal() { return tree.props.children[1] },
     get phase() { return tree.props.children[1].props["data-state"] },
     act,
@@ -163,3 +167,15 @@ assert.equal(rapid.dialog.open, false)
 assert.equal(rapid.win.scrollY, 640)
 
 console.log("Modal transition interruption, focus and scroll restoration checks passed")
+
+const selected = harness(false, {triggerHidden:true})
+selected.select("day-3")
+assert.equal(selected.phase, "opening")
+selected.frame(); selected.frame()
+assert.equal(selected.phase, "open")
+selected.cancel()
+assert.equal(selected.phase, "closing")
+assert.equal(selected.dismissCount, 0, "Keep content during exit")
+selected.transition()
+assert.equal(selected.phase, "closed")
+assert.equal(selected.dismissCount, 1, "Dismiss selected transaction only after exit")

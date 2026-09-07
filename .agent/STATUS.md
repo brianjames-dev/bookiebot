@@ -48,6 +48,8 @@ All eight September 6 audit batches are implemented and verified locally. Each b
 
 ## Completed 2026-09-07
 
+- Dashboard pass 2: Category Mix slices and Daily Spending bars/day numbers open one animated transaction view with exact dates, merchants, categories and totals. Recorded/scheduled amounts are distinguished; elapsed subscriptions remain estimates, bill schedule dates are labeled, and unitemized category residuals are explicit. Calendar tooltips/screen-reader labels state recorded/scheduled. Verification: 72 report/motion/presentation tests passed, controlled-modal exit regression passed, frontend typecheck/build passed. Synthetic iPhone checks matched category/day totals and retained smooth modal dismissal. Manual acceptance: tap pie slices and daily bars/numbers in both modes; confirm scheduled subscriptions and future bills are labeled and included only in the appropriate mode.
+
 - Dashboard pass 1: unpaid reimbursements now span configured annual owner ledgers, grouped by partner and oldest expense first. Selected-expense-month received history remains secondary; monthly financial metrics are unchanged. Canonical lifecycle deduplication rejects conflicting copies and marks failed/malformed coverage incomplete. Discord receipt matching reaches prior years and updates only the authoritative reimbursement row with state rechecks. Agent report summaries use full counts/totals before truncation.
 - Verification: full suite 896 passed, 22 optional Postgres cases skipped, one existing Kaleido warning; focused tie-conflict/agent parity checks passed. Frontend typecheck/build and reimbursement UI regressions passed. Synthetic phone browser check confirmed older-year disclosure and 390px containment. Manual acceptance is checklist 90.
 
