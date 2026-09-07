@@ -804,3 +804,7 @@ Final remote verification: implementation commit `6fd7ce8` passed every GitHub V
 ### Dashboard passes 2–7 work log — 2026-09-07
 
 Completed recorded/scheduled drilldowns, configured month history and matching-period comparisons, canonical metric explanations, presentation preferences and frontend update prompts. Added ephemeral owner-scoped Ask, durable opt-in phone push lifecycle with bounded delivery retries, and exact personal goal/contribution history. Fixed browser native-fetch receiver binding, late expired-endpoint replacement races, cold PostgreSQL schema concurrency and unmounted permission continuations. Bank-import/recent-action lifecycle backlog is unchanged. No production test transactions or external test notifications were created. Full regression and browser acceptance are recorded in STATUS; setup, architecture decisions and the ten-item dashboard roadmap are current.
+
+### Dashboard mode-switch regression — 2026-09-07
+
+Fixed a frontend-only blank page when Current/Projected or category filters changed the number/order of pie slices. Recharts renders previous sectors before synchronizing its data store; category-key matching replaces unsafe array-index lookup, with noninteractive departing slices. Real React/Recharts regression and phone-width stress checks cover transitions and correct drilldown targets. Full local suite 1,022 passed / 57 optional PostgreSQL skipped; frontend and type checks passed. Financial calculations, bank/reconciliation lifecycle and persistence are unchanged. Manual acceptance: STATUS checklist 92.

@@ -1571,8 +1571,11 @@ const CategoryMixPieSurface = memo(function CategoryMixPieSurface({ data, layout
           dataKey="amount"
           nameKey="label"
           shape={(props: unknown) => {
-            const sector = props as ComponentProps<typeof Sector> & {index:number}
-            const item = data[sector.index]
+            const { key: _key, ...sector } = props as ComponentProps<typeof Sector> & { key?: string; payload?: Pick<BreakdownItem, "key"> }
+            // Recharts can render its previous sectors while new data is being
+            // synchronized. Their indices no longer describe the current rows.
+            const item = data.find(row => row.key === sector.payload?.key)
+            if (!item) return <Sector {...sector} tabIndex={-1} aria-hidden="true" />
             return <Sector {...sector} tabIndex={0} role="button" aria-label={`Inspect ${item.label}, ${formatMoney(item.amount)}`}
               onClick={() => onInspect(item)} onKeyDown={(event) => { if (event.key === "Enter" || event.key === " ") { event.preventDefault(); onInspect(item) } }} />
           }}
