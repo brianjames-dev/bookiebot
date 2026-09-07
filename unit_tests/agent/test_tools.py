@@ -18,6 +18,23 @@ def _context(actor_key: str = "676638528590970917") -> ConversationContext:
     )
 
 
+def test_reimbursement_tool_summarizes_all_records_before_truncation():
+    payload = {
+        "sharedReimbursements": [{"id": "old", "receivedAmount": 35}, {"id": "new", "receivedAmount": 20}],
+        "openSharedReimbursements": [{"id": str(index), "outstandingAmount": 10} for index in range(60)],
+        "reimbursementCoverage": {"status": "partial", "years": [2026], "unavailableYears": [2025]},
+    }
+    result = agent_tools._financial_report_section(payload, {}, section="reimbursements", mode="current", limit=1)
+    assert len(result["sharedReimbursements"]) == len(result["openSharedReimbursements"]) == 1
+    summary = result["reimbursementSummary"]
+    assert summary["outstandingAmount"] == 600
+    assert summary["outstandingCount"] == 60
+    assert summary["receivedForSelectedMonthExpenses"] == 55
+    assert summary["itemsTruncated"] is True
+    assert "not cash received during that month" in summary["receivedScope"]
+    assert result["reimbursementCoverage"] == payload["reimbursementCoverage"]
+
+
 def test_agent_exposes_only_read_only_tools():
     tools = agent_tools.read_only_tools()
     names = {tool.name for tool in tools}

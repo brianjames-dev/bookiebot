@@ -367,7 +367,24 @@ def _financial_report_section(
             "merchantOccurrences": payload["merchantOccurrences"][:limit],
             "personTotals": payload["personTotals"][:limit],
         }
-    return {"sharedReimbursements": payload["sharedReimbursements"][:limit]}
+    monthly = payload["sharedReimbursements"]
+    reimbursement_section: dict[str, Any] = {"sharedReimbursements": monthly[:limit]}
+    if "openSharedReimbursements" in payload:
+        outstanding = payload["openSharedReimbursements"]
+        reimbursement_section.update({
+            "openSharedReimbursements": outstanding[:limit],
+            "reimbursementCoverage": payload.get("reimbursementCoverage"),
+            "reimbursementSummary": {
+                "outstandingAmount": round(sum(item["outstandingAmount"] for item in outstanding), 2),
+                "outstandingCount": len(outstanding),
+                "receivedForSelectedMonthExpenses": round(sum(item["receivedAmount"] for item in monthly), 2),
+                "selectedMonthExpenseCount": len(monthly),
+                "openScope": "Current outstanding across all configured annual payer ledgers, independent of selected report month.",
+                "receivedScope": "Lifetime receipts for expenses dated in the selected report month; not cash received during that month.",
+                "itemsTruncated": len(outstanding) > limit or len(monthly) > limit,
+            },
+        })
+    return reimbursement_section
 
 
 def _burn_rate_summary(burn_rate: dict[str, Any] | None) -> dict[str, Any] | None:

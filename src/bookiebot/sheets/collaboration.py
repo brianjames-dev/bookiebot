@@ -10,10 +10,10 @@ from uuid import uuid4
 from bookiebot.sheets.repo import get_sheets_repo
 from bookiebot.sheets.routing import (
     actor_key_aliases,
+    get_current_discord_user_id,
     get_discord_user_config,
     get_user_config,
     now_pacific,
-    sheet_user_context,
 )
 from bookiebot.sheets.utils import clean_money
 
@@ -381,9 +381,16 @@ def allocation_for_source_action(source_action_id: str, actor_key: str | None = 
 
 
 def matching_outstanding_allocations(actor_key: str | None, match_text: str = "") -> list[SharedAllocation]:
+    if not actor_key:
+        return []
+    from bookiebot.sheets.reimbursement_history import read_reimbursement_history
+
+    history = read_reimbursement_history(actor_key, as_of=now_pacific())
+    history.require_complete()
     needles = [part for part in str(match_text or "").lower().split() if part]
     matches: list[SharedAllocation] = []
-    for allocation in reversed(list_allocations(actor_key)):
+    for record in reversed(history.outstanding_records):
+        allocation = record.allocation
         if allocation.status != "outstanding" or allocation.outstanding_amount <= 0:
             continue
         haystack = " ".join(
@@ -408,12 +415,11 @@ def matching_outstanding_obligations(actor_key: str | None, match_text: str = ""
     payer_actor_key = actor_key_for_owner(partner_owner_key(current_owner))
     if payer_actor_key is None:
         return []
-    with sheet_user_context(payer_actor_key):
-        allocations = list_allocations(payer_actor_key)
+    allocations = matching_outstanding_allocations(payer_actor_key)
 
     needles = [part for part in str(match_text or "").lower().split() if part]
     matches: list[SharedAllocation] = []
-    for allocation in reversed(allocations):
+    for allocation in allocations:
         if allocation.status != "outstanding" or allocation.outstanding_amount <= 0:
             continue
         if owner_key_from_person(allocation.partner) != current_owner:
@@ -517,10 +523,23 @@ def remove_allocation(allocation_id: str) -> bool:
     return True
 
 
-def mark_reimbursed(allocation_id: str, *, received_at: datetime | None = None) -> SharedAllocation | None:
+def mark_reimbursed(
+    allocation_id: str,
+    *,
+    received_at: datetime | None = None,
+    actor_key: str | None = None,
+) -> SharedAllocation | None:
+    actor_key = actor_key or get_current_discord_user_id()
+    if actor_key:
+        return _mark_historical_reimbursement_received(
+            actor_key, allocation_id, received_at=received_at,
+        )
+    # Retain the injected-repository path for callers without an actor context.
     allocation = allocation_by_id(allocation_id)
     if allocation is None or allocation.status == "void":
         return None
+    if allocation.status == "reimbursed" or allocation.outstanding_amount <= 0:
+        return allocation
     timestamp = (received_at or now_pacific()).isoformat(timespec="seconds")
     return update_allocation(
         allocation_id,
@@ -528,6 +547,69 @@ def mark_reimbursed(allocation_id: str, *, received_at: datetime | None = None) 
         received_amount=allocation.partner_share,
         received_at=timestamp,
     )
+
+
+def _mark_historical_reimbursement_received(
+    actor_key: str,
+    allocation_id: str,
+    *,
+    received_at: datetime | None,
+) -> SharedAllocation | None:
+    from bookiebot.sheets.reimbursement_history import read_reimbursement_history
+
+    history = read_reimbursement_history(actor_key, as_of=now_pacific())
+    history.require_complete()
+    record = next((item for item in history.records if item.allocation.allocation_id == allocation_id), None)
+    if record is None or record.allocation.status == "void":
+        return None
+    if record.allocation.status == "outstanding" and record not in history.outstanding_records:
+        return None
+
+    # Re-read the authoritative sheet: inserting a row after the history lookup
+    # must never make a receipt update a different allocation.
+    ws = record.worksheet
+    rows = ws.get_all_values()
+    if not rows or rows[0][:len(LEGACY_SHARED_REIMBURSEMENT_HEADERS)] != LEGACY_SHARED_REIMBURSEMENT_HEADERS:
+        return None
+    matches = [
+        (row_number, allocation)
+        for row_number, row in enumerate(rows, start=1)
+        if (allocation := _parse_allocation(row)) is not None
+        and allocation.allocation_id == allocation_id
+    ]
+    if len(matches) != 1:
+        return None
+    row_number, allocation = matches[0]
+    if allocation != record.allocation:
+        # A concurrent receipt, correction, cancellation or split change needs
+        # a fresh selection instead of applying a receipt to stale amounts.
+        return None
+    if allocation.status == "reimbursed" or allocation.outstanding_amount <= 0:
+        return allocation
+    timestamp = (received_at or now_pacific()).isoformat(timespec="seconds")
+    updated = replace(
+        allocation,
+        updated_at=now_pacific().isoformat(timespec="seconds"),
+        status="reimbursed",
+        received_amount=allocation.partner_share,
+        received_at=timestamp,
+    )
+    updates = [
+        {"range": f"C{row_number}", "values": [[updated.updated_at]]},
+        {
+            "range": f"T{row_number}:V{row_number}",
+            "values": [[updated.status, f"{updated.received_amount:.2f}", updated.received_at]],
+        },
+    ]
+    if hasattr(ws, "batch_update"):
+        ws.batch_update(updates)
+    else:
+        for update in updates:
+            try:
+                ws.update(update["values"], range_name=update["range"])
+            except TypeError:
+                ws.update(update["range"], update["values"])
+    return updated
 
 
 def void_allocation(allocation_id: str) -> SharedAllocation | None:

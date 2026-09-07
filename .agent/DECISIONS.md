@@ -508,3 +508,9 @@ Rationale: Normal incident punctuation broke shell parsing, and mocked adapters 
 Decision: Keep owner/month selection and financial assembly in expense_breakdown.py; move optional existing-sheet lookup, formatted row normalization, and monthly batch/fallback reads into worksheet_reads.py. Remove only the closed family of 21 private HTML helpers proven to have no current callers. Preserve active payload calculations, frontend assets, and historical React fallback behavior.
 
 Rationale: The earlier report batching creates a useful transport seam without a wholesale rewrite. Before/after payload and HTML comparisons provide direct evidence that cleanup preserves report behavior.
+
+## 2026-09-07 - Carry Live Reimbursements Across Configured Annual Ledgers
+
+Decision: Read all configured owner annual ledgers through the current Pacific year without provisioning tabs or copying financial rows. Deduplicate allocation IDs by lifecycle update time; conflicting equal-time copies or malformed relevant records make coverage incomplete. Missing optional tabs are empty; read failures are not. Outstanding is the live unpaid balance across months, while received/gross/share summaries refer to expenses in the selected month, not receipt cash flow in that month. Historical snapshots do not reconstruct past unpaid balances.
+
+Settlement must have complete owner coverage, re-read the authoritative annual row and verify allocation identity/state before updating receipt fields. Do not write income or expense cells, copy old debt into the new year, or change source-row update/delete semantics. Repeated receipts are idempotent. Only configured workbook years can be scanned; unconfigured older books require configuration.

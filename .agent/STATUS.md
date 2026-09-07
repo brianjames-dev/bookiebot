@@ -4,6 +4,8 @@ Last updated: 2026-09-07
 
 ## Active Focus
 
+The user approved ten dashboard enhancements in separate passes; see `.agent/DASHBOARD_ROADMAP.md`. Pass 1 carry-forward is complete. The user authorized autonomous completion of all remaining passes in this run, with separate verified commits. Later passes cover drilldowns/projection labels, history/comparison, total explanations/device preferences/update prompt, report questions, opt-in phone notifications, and long-term savings goals.
+
 The compact expense-report header and phone polish are implemented and verified. Month/person replace the large title, theme/signout live in a three-dot menu, and refresh keeps one update time plus explicit errors. Calendar colors match categories, today is highlighted in Daily Spending, reimbursements use the chart-band background, and modal/chart resize motion is synchronized. Full suite: 846 passed, 22 optional database cases skipped; Pyright and frontend typecheck/build passed. Browser checks covered 320/390/1280px, light/dark themes, menu keyboard behavior, stale/refresh states, exact modal scroll restoration and Projected-state preservation. Deployed iPhone acceptance is checklist 89.
 
 The prior phone-app deployment was verified live at `edc2a2c`; the user confirmed setup works. Initial implementation verification included 863 tests with real Postgres. Keep checklist 88 for connection/reset/restart acceptance and `docs/PHONE_APP_SETUP.md` for setup/reconnection.
@@ -15,7 +17,7 @@ All eight September 6 audit batches are implemented and verified locally. Each b
 
 ## On Deck
 
-0. Review the compact header and motion/color polish on both installed iPhone apps using checklist 89.
+0. Complete remaining dashboard roadmap passes autonomously: drilldowns/recorded-vs-scheduled labels, history/comparisons, explanations/preferences/update prompt, read-only questions, opt-in notifications, durable savings goals. Pass 1 is complete; track each milestone in `.agent/DASHBOARD_ROADMAP.md`.
 
 1. Review the deployed expense-report design and motion/responsive polish against checklist items 86–87.
 2. Verify the deployed audit fixes in a test workbook/Sandbox using `.agent/AUDIT_REMEDIATION_2026-09-06.md`; complete the live acceptance checks without creating test transactions in real financial data.
@@ -45,6 +47,9 @@ All eight September 6 audit batches are implemented and verified locally. Each b
 26. Explore clarifying questions before logging when BookieBot is uncertain instead of guessing or silently failing.
 
 ## Completed 2026-09-07
+
+- Dashboard pass 1: unpaid reimbursements now span configured annual owner ledgers, grouped by partner and oldest expense first. Selected-expense-month received history remains secondary; monthly financial metrics are unchanged. Canonical lifecycle deduplication rejects conflicting copies and marks failed/malformed coverage incomplete. Discord receipt matching reaches prior years and updates only the authoritative reimbursement row with state rechecks. Agent report summaries use full counts/totals before truncation.
+- Verification: full suite 896 passed, 22 optional Postgres cases skipped, one existing Kaleido warning; focused tie-conflict/agent parity checks passed. Frontend typecheck/build and reimbursement UI regressions passed. Synthetic phone browser check confirmed older-year disclosure and 390px containment. Manual acceptance is checklist 90.
 
 - Simplified the report header with a compact month/person heading, accessible animated settings disclosure, icon refresh and a single update time. Preserved theme, signout, connection lifecycle, stale messages and Current/Projected state. Shared reimbursements now use the same full-width surface as the chart band.
 - Removed the extra Recharts line interpolation during Bills/Burn Rate disclosure resizing. Modal shade/surface animate together within a stationary native dialog; native close restores focus before page scroll unlocks. Calendar single/mixed dots and tooltip labels use the category palette; pending indicators retain full-strength colors. Daily dates highlight only the actual Pacific day in the matching report month/year.
@@ -1263,3 +1268,5 @@ git diff --check
 python -m pyright
 # Failed: pyright is not installed in the current Python environment.
 ```
+
+90. Dashboard reimbursement carry-forward: on each phone, verify older unpaid items retain dates and partner grouping; opening/closing entries and received history stays smooth. In a test workbook, settle an older allocation in Discord and refresh: it disappears from Outstanding without changing Income/Spent/Left/Saved. Simulate a ledger read failure and confirm an incomplete-balance message replaces any all-settled claim. Only configured annual workbooks are scanned.

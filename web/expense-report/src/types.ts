@@ -40,6 +40,14 @@ export interface SharedReimbursementItem {
   status: "outstanding" | "reimbursed" | "void"
 }
 
+export interface ReimbursementCoverage {
+  status: "complete" | "partial" | "unavailable"
+  asOf: string
+  years: number[]
+  unavailableYears: number[]
+  excludedRecords: number
+}
+
 export interface PaymentItem extends AmountRow {
   group: string
   status?: string
@@ -208,6 +216,8 @@ export interface ExpenseReportData {
   calendarEvents: CalendarEvent[]
   utilityHistory: UtilityHistoryItem[]
   sharedReimbursements: SharedReimbursementItem[]
+  openSharedReimbursements?: SharedReimbursementItem[]
+  reimbursementCoverage?: ReimbursementCoverage
   subscriptionsNeeds: SubscriptionItem[]
   subscriptionsWants: SubscriptionItem[]
   modeViews?: {

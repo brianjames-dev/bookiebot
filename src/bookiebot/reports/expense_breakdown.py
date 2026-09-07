@@ -21,8 +21,14 @@ from bookiebot.reports.worksheet_reads import (
     worksheet_rows as _rows,
 )
 from bookiebot.sheets.config import get_category_columns
-from bookiebot.sheets.collaboration import SharedAllocation, allocations_from_rows, split_method_label
+from bookiebot.sheets.collaboration import SharedAllocation, split_method_label
 from bookiebot.sheets.repo import get_sheets_repo
+from bookiebot.sheets.reimbursement_history import (
+    ReimbursementHistory,
+    ReimbursementLedger,
+    read_reimbursement_history,
+    reimbursement_history_from_ledgers,
+)
 from bookiebot.sheets.routing import PACIFIC_TZ, now_pacific, resolve_sheet_context
 from bookiebot.sheets.utils import clean_money
 
@@ -52,6 +58,7 @@ class ReportWorksheets:
     subscriptions: Any | None = None
     bill_schedule: Any | None = None
     budget_history: tuple[BudgetHistoryRows, ...] = ()
+    reimbursement_history: ReimbursementHistory | None = None
 
 
 @dataclass(frozen=True)
@@ -176,6 +183,8 @@ class ExpenseBreakdownReport:
     income_projection_reference: PaymentItem | None = None
     income_projection_receipts: list[PaymentItem] = field(default_factory=list)
     shared_reimbursements: list[SharedAllocation] = field(default_factory=list)
+    open_shared_reimbursements: list[SharedAllocation] | None = None
+    reimbursement_coverage: dict[str, Any] | None = None
     raw_sheets: list[RawSheet] = field(default_factory=list)
 
 
@@ -385,6 +394,7 @@ def load_report_worksheets(actor_key: str, month: BudgetMonth) -> ReportWorkshee
             bill_schedule=_optional_sheet(repo.find_bill_schedule_sheet),
             shared_reimbursements=_optional_sheet(repo.find_shared_reimbursements_sheet),
             budget_history=_optional_budget_history(actor_key, month),
+            reimbursement_history=read_reimbursement_history(actor_key),
         )
 
     from bookiebot.sheets.auth import get_gspread_client
@@ -404,6 +414,7 @@ def load_report_worksheets(actor_key: str, month: BudgetMonth) -> ReportWorkshee
         bill_schedule=_worksheet_by_name(personal_spreadsheet, "_BookieBot Bill Schedule") if personal_spreadsheet is not None else None,
         shared_reimbursements=_worksheet_by_name(personal_spreadsheet, "Shared Reimbursements") if personal_spreadsheet is not None else None,
         budget_history=_optional_previous_year_budget_history(actor_key, month) + budget_history + _optional_next_year_income_history(actor_key, month),
+        reimbursement_history=read_reimbursement_history(actor_key),
     )
 
 
@@ -416,15 +427,25 @@ def build_expense_breakdown_report(
     worksheets: ReportWorksheets | None = None,
 ) -> ExpenseBreakdownReport:
     selected = worksheets or load_report_worksheets(actor_key, month)
+    generated_at = now_pacific()
     shared_rows = _rows(selected.shared_expenses)
     personal_rows = _rows(selected.personal_budget)
     subscription_rows = _rows(selected.subscriptions) if selected.subscriptions is not None else []
     bill_schedule_rows = _rows(selected.bill_schedule) if selected.bill_schedule is not None else []
-    shared_reimbursement_rows = _rows(selected.shared_reimbursements) if selected.shared_reimbursements is not None else []
+    shared_reimbursement_rows = (
+        next((ledger.rows for ledger in selected.reimbursement_history.ledgers if ledger.year == month.year), [])
+        if selected.reimbursement_history is not None
+        else _rows(selected.shared_reimbursements) if selected.shared_reimbursements is not None else []
+    )
+    reimbursement_history = selected.reimbursement_history or reimbursement_history_from_ledgers(
+        actor_key,
+        [ReimbursementLedger(month.year, selected.shared_reimbursements, shared_reimbursement_rows)],
+        as_of=generated_at,
+    )
     shared_reimbursements = [
-        allocation
-        for allocation in allocations_from_rows(shared_reimbursement_rows)
-        if allocation.expense_date and _date_belongs_to_month(allocation.expense_date, month)
+        record.allocation for record in reimbursement_history.records
+        if record.allocation.status != "void"
+        and _date_belongs_to_month(record.allocation.expense_date, month)
     ]
 
     entries = _shared_expense_entries(shared_rows, persons, month)
@@ -540,7 +561,7 @@ def build_expense_breakdown_report(
         owner_name=owner_name,
         month=month,
         persons=persons,
-        generated_at=now_pacific(),
+        generated_at=generated_at,
         breakdown=breakdown,
         grand_total=grand_total,
         shared_total=shared_total,
@@ -569,6 +590,8 @@ def build_expense_breakdown_report(
         income_projection_reference=income_projection_reference,
         income_projection_receipts=income_projection_receipts,
         shared_reimbursements=shared_reimbursements,
+        open_shared_reimbursements=[record.allocation for record in reimbursement_history.outstanding_records],
+        reimbursement_coverage=reimbursement_history.coverage_payload(),
         raw_sheets=[
             RawSheet("Shared Expenses", _compact_rows(shared_rows)),
             RawSheet("Personal Budget", _compact_rows(personal_rows)),
@@ -2429,6 +2452,11 @@ def _report_client_payload(
         "current": _report_mode_view_from_payload(payload, projected=False),
         "projected": _report_mode_view_from_payload(payload, projected=True),
     }
+    if report.open_shared_reimbursements is not None:
+        payload["openSharedReimbursements"] = [
+            _shared_reimbursement_payload(item) for item in report.open_shared_reimbursements
+        ]
+        payload["reimbursementCoverage"] = report.reimbursement_coverage
     return payload
 
 

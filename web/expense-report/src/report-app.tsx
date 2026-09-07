@@ -29,9 +29,10 @@ import { Badge } from "./components/ui/badge"
 import { Card, CardContent, CardHeader, CardTitle } from "./components/ui/card"
 import { FittedAmount } from "./components/ui/fitted-amount"
 import { ReportMenu } from "./components/ui/report-menu"
+import { SharedReimbursementsCard } from "./shared-reimbursements"
 import { ChartContainer, ChartTooltip, ChartTooltipContent, ChartTooltipDismissProvider } from "./components/ui/chart"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "./components/ui/tabs"
-import { AnimatedDisclosure, CollapsibleContent, SlidingSelection } from "./components/ui/motion"
+import { CollapsibleContent, SlidingSelection } from "./components/ui/motion"
 import type {
   AmountRow,
   BreakdownItem,
@@ -46,7 +47,6 @@ import type {
   ExpenseReportData,
   OccurrenceRow,
   ReportModeView,
-  SharedReimbursementItem,
   SubscriptionItem,
   UtilityHistoryItem,
 } from "./types"
@@ -841,7 +841,8 @@ export function ExpenseReportApp({ report, appControls, appAvatarUrl, appSession
           </CardContent>
         </Card>
 
-        <SharedReimbursementsCard items={report.sharedReimbursements ?? []} />
+        <SharedReimbursementsCard items={report.sharedReimbursements ?? []} openItems={report.openSharedReimbursements}
+          coverage={report.reimbursementCoverage} monthLabel={report.monthLabel} />
 
         <ExpenseInsightsCard
           topEntries={report.topEntries}
@@ -852,63 +853,6 @@ export function ExpenseReportApp({ report, appControls, appAvatarUrl, appSession
         </main>
       </ChartTooltipDismissProvider>
     </div>
-  )
-}
-
-function SharedReimbursementsCard({ items }: { items: SharedReimbursementItem[] }) {
-  if (!items.length) {
-    return null
-  }
-  const grossPaid = items.reduce((total, item) => total + item.grossAmount, 0)
-  const personalShare = items.reduce((total, item) => total + item.personalShare, 0)
-  const outstanding = items.reduce((total, item) => total + item.outstandingAmount, 0)
-  const received = items.reduce((total, item) => total + item.receivedAmount, 0)
-  const pendingCount = items.filter((item) => item.outstandingAmount > 0).length
-
-  return (
-    <Card className="bb-report-section bb-reimbursement-section">
-      <CardHeader>
-        <CardTitle>Shared Reimbursements</CardTitle>
-      </CardHeader>
-      <CardContent className="bb-reimbursement-content">
-        <div className="bb-reimbursement-overview">
-          <div className="bb-chart-kicker">Outstanding</div>
-          <div className="bb-reimbursement-total">{formatMoney(outstanding)}</div>
-          <p className="bb-reimbursement-note">{pendingCount ? `${pendingCount} shared expense${pendingCount === 1 ? "" : "s"} awaiting repayment` : "All reimbursements received"}</p>
-          <dl className="bb-reimbursement-summary" aria-label="Shared reimbursement summary">
-            <div><dt>Received</dt><dd>{formatMoney(received)}</dd></div>
-            <div><dt>Gross paid</dt><dd>{formatMoney(grossPaid)}</dd></div>
-            <div><dt>Your share</dt><dd>{formatMoney(personalShare)}</dd></div>
-          </dl>
-        </div>
-        <div className="bb-reimbursement-ledger" aria-label="Shared expenses">
-          {items.map((item) => (
-            <AnimatedDisclosure key={item.id} summary={
-              <>
-                <span className="bb-reimbursement-item">
-                  <strong>{item.item}</strong>
-                  <span>{[item.location, item.date].filter(Boolean).join(" · ")}</span>
-                </span>
-                <span className="bb-reimbursement-status" data-settled={item.status === "reimbursed"}>
-                  {item.status === "reimbursed" ? "Received" : `${formatMoney(item.outstandingAmount)} due`}
-                </span>
-                <span className="bb-disclosure-mark" aria-hidden="true" />
-              </>
-            }>
-              <div className="bb-reimbursement-detail">
-                <dl>
-                  <div><dt>Gross paid</dt><dd>{formatMoney(item.grossAmount)}</dd></div>
-                  <div><dt>Your share</dt><dd>{formatMoney(item.personalShare)}</dd></div>
-                  <div><dt>Partner share</dt><dd>{formatMoney(item.partnerShare)}</dd></div>
-                  <div><dt>Received</dt><dd>{formatMoney(item.receivedAmount)}</dd></div>
-                </dl>
-                {item.splitMethod || item.responsiblePerson ? <p>{[item.splitMethod, item.responsiblePerson ? `Expense: ${item.responsiblePerson}` : ""].filter(Boolean).join(" · ")}</p> : null}
-              </div>
-            </AnimatedDisclosure>
-          ))}
-        </div>
-      </CardContent>
-    </Card>
   )
 }
 

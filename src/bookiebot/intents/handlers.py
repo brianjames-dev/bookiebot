@@ -49,6 +49,7 @@ from bookiebot.sheets.collaboration import (
     normalize_split_method,
     obligation_label,
 )
+from bookiebot.sheets.reimbursement_history import ReimbursementHistoryUnavailableError
 from bookiebot.splits import change_split_method_view, continue_split_after_log, split_method_view
 from bookiebot.sheets.undo import (
     cancel_split_recent_action,
@@ -388,11 +389,15 @@ async def query_shared_reimbursements_handler(entities: IntentEntities, message:
     actor_key = _message_actor_key(message)
     direction = str(entities.get("direction") or "owed_to_me").strip().lower()
     owed_by_me = direction == "owed_by_me"
-    allocations = (
-        matching_outstanding_obligations(actor_key)
-        if owed_by_me
-        else matching_outstanding_allocations(actor_key)
-    )
+    try:
+        allocations = (
+            matching_outstanding_obligations(actor_key)
+            if owed_by_me
+            else matching_outstanding_allocations(actor_key)
+        )
+    except ReimbursementHistoryUnavailableError:
+        await message.channel.send("I couldn't check all reimbursement records. Please try again shortly.")
+        return
     if not allocations:
         detail = "you owe" if owed_by_me else "owed to you"
         await message.channel.send(f"No shared-expense reimbursements are currently {detail}.")
@@ -416,7 +421,11 @@ async def mark_shared_reimbursement_received_handler(entities: IntentEntities, m
         or entities.get("item")
         or ""
     ).strip()
-    allocations = matching_outstanding_allocations(actor_key, match_text)
+    try:
+        allocations = matching_outstanding_allocations(actor_key, match_text)
+    except ReimbursementHistoryUnavailableError:
+        await message.channel.send("I couldn't check all reimbursement records. Nothing was marked received; please try again shortly.")
+        return
     if not allocations:
         await message.channel.send(
             f"I could not find an outstanding reimbursement matching '{match_text}'."
@@ -430,7 +439,11 @@ async def mark_shared_reimbursement_received_handler(entities: IntentEntities, m
         await message.channel.send("\n".join(lines))
         return
     allocation = allocations[0]
-    updated = mark_reimbursed(allocation.allocation_id)
+    try:
+        updated = mark_reimbursed(allocation.allocation_id, actor_key=actor_key)
+    except ReimbursementHistoryUnavailableError:
+        await message.channel.send("I couldn't check all reimbursement records. Nothing was marked received; please try again shortly.")
+        return
     if updated is None:
         await message.channel.send("❌ I could not mark that reimbursement received.")
         return

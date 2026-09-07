@@ -2578,6 +2578,32 @@ tr:last-child td {
   color: hsl(var(--muted-foreground));
   font-size: 13px;
 }
+.bb-reimbursement-warning {
+  margin: 12px 0 0;
+  color: hsl(var(--destructive));
+  font-size: 13px;
+}
+.bb-reimbursement-period {
+  margin: 28px 0 0;
+  font-size: 12px;
+  color: hsl(var(--muted-foreground));
+}
+.bb-reimbursement-period + .bb-reimbursement-summary { margin-top: 10px; }
+.bb-reimbursement-group + .bb-reimbursement-group,
+.bb-reimbursement-history { margin-top: 24px; }
+.bb-reimbursement-group h3 {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 16px;
+  margin: 0 0 12px;
+  font-size: 13px;
+  font-weight: 500;
+}
+.bb-reimbursement-group h3 > span:last-child { white-space: nowrap; font-variant-numeric: tabular-nums; }
+.bb-reimbursement-history > .bb-reimbursement-entry > .bb-details-content > .bb-details-content-inner {
+  padding: 0 0 0 14px;
+}
 .bb-reimbursement-summary dt {
   color: hsl(var(--muted-foreground));
 }
@@ -2654,7 +2680,7 @@ tr:last-child td {
   transform: rotate(90deg);
   transition: transform var(--bb-motion-duration) var(--bb-motion-ease);
 }
-.bb-reimbursement-entry[data-state="open"] .bb-disclosure-mark::after {
+.bb-reimbursement-entry[data-state="open"] > .bb-reimbursement-toggle .bb-disclosure-mark::after {
   transform: rotate(0deg);
 }
 .bb-reimbursement-detail {

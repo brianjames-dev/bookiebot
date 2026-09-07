@@ -1,5 +1,7 @@
 # BookieBot Agent Roadmap
 
+The user-approved expense dashboard expansion is tracked in [Dashboard Enhancement Roadmap](../.agent/DASHBOARD_ROADMAP.md). Its ten improvements ship in seven separate passes; `.agent/STATUS.md` identifies the active pass. This includes reimbursement carry-forward, linked drilldowns, historical comparisons, explainable totals, device preferences/update notices, in-app read-only questions, optional notifications, and long-term savings goals.
+
 BookieBot is already strong as a single-turn financial operator: it can parse natural language, log and query Google Sheets, and manage recent transactions through update, delete, move, and undo flows.
 
 The next best direction is to make it more proactive, context-aware, and capable of handling multi-step financial tasks without needing explicit commands for every action.

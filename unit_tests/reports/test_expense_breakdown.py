@@ -211,28 +211,13 @@ def test_top_chart_navigation_names_each_panel_and_excludes_inactive_controls_fr
     assert "onClick={onNext} disabled={!canNext}" in navigation
 
 
-def test_reimbursement_disclosures_preserve_totals_and_complete_transaction_details():
-    source = (Path(__file__).resolve().parents[2] / "web/expense-report/src/report-app.tsx").read_text()
-    reimbursement = source.split("function SharedReimbursementsCard", 1)[1].split("function isInteractiveTouchTarget", 1)[0]
-    summary, ledger = reimbursement.split("{items.map((item) => (", 1)
-    entry_summary, details = ledger.split('<div className="bb-reimbursement-detail">', 1)
-
-    assert "if (!items.length)" in summary
-    assert "return null" in summary
-    for total, field in (
-        ("grossPaid", "grossAmount"),
-        ("personalShare", "personalShare"),
-        ("outstanding", "outstandingAmount"),
-        ("received", "receivedAmount"),
-    ):
-        assert f"const {total} = items.reduce((total, item) => total + item.{field}, 0)" in summary
-        assert f"formatMoney({total})" in summary
-    assert "items.filter((item) => item.outstandingAmount > 0).length" in summary
-    assert "<AnimatedDisclosure" in entry_summary
-    assert "summary={" in entry_summary
-    for field in ("item", "location", "date"):
-        assert f"item.{field}" in entry_summary
-    assert 'item.status === "reimbursed" ? "Received" : `${formatMoney(item.outstandingAmount)} due`' in entry_summary
+def test_reimbursement_disclosures_preserve_complete_transaction_details():
+    source = (Path(__file__).resolve().parents[2] / "web/expense-report/src/shared-reimbursements.tsx").read_text()
+    entry = source.split("function ReimbursementEntry", 1)[1].split("export function SharedReimbursementsCard", 1)[0]
+    summary, details = entry.split('<div className="bb-reimbursement-detail">', 1)
+    assert "<AnimatedDisclosure" in summary
+    for field in ("item", "location", "date", "outstandingAmount"):
+        assert f"item.{field}" in summary
     for field in ("grossAmount", "personalShare", "partnerShare", "receivedAmount"):
         assert f"formatMoney(item.{field})" in details
     assert "item.splitMethod" in details
@@ -288,7 +273,7 @@ def test_daily_spending_includes_bills_and_compresses_strong_outliers():
 
 def test_category_pie_and_daily_transaction_labels_share_one_color_mapping():
     source = (Path(__file__).resolve().parents[2] / "web/expense-report/src/report-app.tsx").read_text()
-    app = source.split("export function ExpenseReportApp", 1)[1].split("function SharedReimbursementsCard", 1)[0]
+    app = source.split("export function ExpenseReportApp", 1)[1].split("function isInteractiveTouchTarget", 1)[0]
     daily_table = source.split("function DailyEntriesTable", 1)[1].split("function compareDayGroups", 1)[0]
 
     assert "color: CATEGORY_CHART_COLORS[item.key] ?? item.color" in app
