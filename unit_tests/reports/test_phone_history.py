@@ -144,3 +144,86 @@ async def test_comparison_route_ignores_caller_owner_and_returns_missing_baselin
     assert calls[0]["actor_key"] == ACTOR
     assert calls[0]["persons"] == ["Brian (BofA)"]
     assert response.headers["Cache-Control"] == "private, no-store"
+
+
+@pytest.mark.asyncio
+async def test_custom_comparison_reads_both_months_concurrently_and_preserves_matching_days(monkeypatch):
+    """A paired comparison must fit one live-build interval, not two in sequence."""
+    entered = []
+    both_started = asyncio.Event()
+    async def session(_request):
+        return SESSION
+    async def catalog(*args, **kwargs):
+        return {"months": [{"value": "2026-09"}, {"value": "2025-09"}],
+                "coverage": {"status": "complete", "unavailableYears": []}}
+    async def data(payload):
+        entered.append(payload)
+        if len(entered) == 2:
+            both_started.set()
+        await asyncio.wait_for(both_started.wait(), 1)
+        year, month = payload["year"], payload["month"]
+        return {"ownerName": payload["owner_name"], "year": year, "month": month,
+                "comparisonData": {"recordedExpenses": [
+                    {"date": f"{year}-{month:02d}-01", "amount": 25 if year == 2026 else 50},
+                    {"date": f"{year}-{month:02d}-20", "amount": 1000}],
+                    "recordedIncome": [], "scheduledExpenses": [],
+                    "unitemizedIncome": 0, "unitemizedExpenses": 0}}
+    monkeypatch.setattr(phone_app, "_session", session)
+    monkeypatch.setattr(history, "now_pacific", lambda: NOW)
+    monkeypatch.setattr(history, "phone_month_catalog", catalog)
+    app = web.Application()
+    app[reports_web._REPORT_BUILDS] = SimpleNamespace(data=data)
+    history.register_phone_history_routes(app)
+    from aiohttp.test_utils import TestClient, TestServer
+    async with TestClient(TestServer(app)) as client:
+        response = await client.get("/app/expenses/comparison?month=2026-09&compare_month=2025-09&actor_key=hannah")
+        result = await response.json()
+        assert response.status == 200
+        assert response.headers["Cache-Control"] == "private, no-store"
+    assert result["baselineMonth"] == "2025-09"
+    assert result["baselineKind"] == "selected-month"
+    assert result["throughDay"] == 7
+    assert result["selected"]["datedSpending"] == 25
+    assert result["baseline"]["datedSpending"] == 50
+    assert result["changeAmount"] == -25
+    assert all(payload["actor_key"] == ACTOR and payload["persons"] == ["Brian (BofA)"] for payload in entered)
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("baseline", ["2026-09", "2026-10", "", "2026-13", "2026-1", "0000-01", "../2025-01"])
+async def test_custom_comparison_rejects_same_future_and_invalid_month_before_reads(monkeypatch, baseline):
+    async def session(_request):
+        return SESSION
+    async def catalog(*args, **kwargs):
+        pytest.fail("Invalid comparison month must be rejected before sheet reads")
+    monkeypatch.setattr(phone_app, "_session", session)
+    monkeypatch.setattr(history, "now_pacific", lambda: NOW)
+    monkeypatch.setattr(history, "phone_month_catalog", catalog)
+    request = make_mocked_request("GET", f"/app/expenses/comparison?month=2026-09&compare_month={baseline}")
+    assert (await history._comparison(request)).status == 400
+
+
+@pytest.mark.asyncio
+async def test_missing_custom_month_stays_unavailable_instead_of_zero_or_unconfigured_read(monkeypatch):
+    calls = []
+    async def session(_request):
+        return SESSION
+    async def catalog(*args, **kwargs):
+        return {"months": [{"value": "2026-09"}],
+                "coverage": {"status": "partial", "unavailableYears": [2025]}}
+    async def data(payload):
+        calls.append((payload["year"], payload["month"]))
+        return {"ownerName": "Brian", "year": 2026, "month": 9,
+                "comparisonData": {"recordedExpenses": [], "recordedIncome": [], "scheduledExpenses": [],
+                                   "unitemizedIncome": 0, "unitemizedExpenses": 0}}
+    monkeypatch.setattr(phone_app, "_session", session)
+    monkeypatch.setattr(history, "now_pacific", lambda: NOW)
+    monkeypatch.setattr(history, "phone_month_catalog", catalog)
+    app = web.Application()
+    app[reports_web._REPORT_BUILDS] = SimpleNamespace(data=data)
+    request = make_mocked_request("GET", "/app/expenses/comparison?month=2026-09&compare_month=2025-09", app=app)
+    result = json.loads((await history._comparison(request)).text)
+    assert result["status"] == "unavailable"
+    assert result["baseline"] is None and result["changeAmount"] is None
+    assert "could not be checked" in result["coverageNote"]
+    assert calls == [(2026, 9)]

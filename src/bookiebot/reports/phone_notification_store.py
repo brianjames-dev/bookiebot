@@ -13,7 +13,8 @@ from urllib.parse import urlsplit
 from bookiebot.reports.app_access import AppAccessStore, AppSession, PostgresAppAccessStore, build_app_access_store
 
 DEFAULT_PREFERENCES = {"weekly": True, "upcoming": False, "showAmounts": False, "hour": 10}
-_HOSTS = {"web.push.apple.com", "fcm.googleapis.com", "updates.push.services.mozilla.com"}
+_HOSTS = {"fcm.googleapis.com", "updates.push.services.mozilla.com"}
+_APPLE_HOST = re.compile(r"(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+push\.apple\.com\Z")
 
 
 def session_hash(token: str) -> str:
@@ -30,7 +31,10 @@ def validate_subscription(value: Any) -> dict[str, Any]:
     if not isinstance(endpoint, str) or len(endpoint) > 2048 or any(ord(c) < 33 for c in endpoint):
         raise ValueError("Invalid phone subscription.")
     parsed = urlsplit(endpoint)
-    if (parsed.scheme != "https" or parsed.hostname not in _HOSTS or parsed.port not in (None, 443)
+    # Apple documents *.push.apple.com, rather than one permanent hostname.
+    # Match whole DNS labels so lookalikes cannot widen the outbound allowlist.
+    supported_host = parsed.hostname in _HOSTS or bool(_APPLE_HOST.fullmatch(parsed.hostname or ""))
+    if (parsed.scheme != "https" or not supported_host or parsed.port not in (None, 443)
             or parsed.username or parsed.password or parsed.fragment or not parsed.path.startswith("/")):
         raise ValueError("This phone's push provider is not supported.")
     keys = value.get("keys")
@@ -106,16 +110,24 @@ class PhoneNotificationStore:
         now = int(time.time())
         endpoint_hash = session_hash(subscription["endpoint"])
         with self.access.connect(write=True) as connection:
+            if isinstance(self.access, PostgresAppAccessStore):
+                # SQLite reserves its writer in connect(write=True). Postgres
+                # needs an endpoint lock before reading ownership so concurrent
+                # reconnects cannot delete a subscription another person claimed.
+                connection.execute("SELECT pg_advisory_xact_lock(84392506, ?)", (int(endpoint_hash[:8], 16) - 2**31,))
             # The cookie may have been revoked while permission/network UI was open.
-            valid = connection.execute("SELECT owner_key FROM app_phone_sessions WHERE token_hash = ? AND expires_at > ?", (token_hash, now)).fetchone()
-            if valid is None or valid["owner_key"] != session.owner_key:
+            valid = connection.execute("SELECT actor_key, owner_key FROM app_phone_sessions WHERE token_hash = ? AND expires_at > ?", (token_hash, now)).fetchone()
+            if valid is None or valid["owner_key"] != session.owner_key or valid["actor_key"] != session.actor_key:
                 raise ValueError("Reconnect this phone before enabling notifications.")
             existing = connection.execute("SELECT session_hash FROM app_push_subscriptions WHERE endpoint_hash = ?", (endpoint_hash,)).fetchone()
             if existing is not None and existing["session_hash"] != token_hash:
-                active = connection.execute("SELECT token_hash FROM app_phone_sessions WHERE token_hash = ? AND expires_at > ?", (existing["session_hash"], now)).fetchone()
-                if active is not None:
+                active = connection.execute("SELECT actor_key, owner_key FROM app_phone_sessions WHERE token_hash = ? AND expires_at > ?", (existing["session_hash"], now)).fetchone()
+                if active is not None and (active["owner_key"] != session.owner_key or active["actor_key"] != session.actor_key):
                     raise ValueError("This push subscription is connected to another phone session. Turn it off there first.")
-                connection.execute("DELETE FROM app_push_subscriptions WHERE endpoint_hash = ?", (endpoint_hash,))
+                # Reconnecting this same person replaces the HttpOnly cookie,
+                # while the browser retains its push endpoint. Their explicit
+                # Enable tap may rebind it; the old session loses eligibility.
+                connection.execute("DELETE FROM app_push_subscriptions WHERE endpoint_hash = ? AND session_hash = ?", (endpoint_hash, existing["session_hash"]))
             connection.execute("""INSERT INTO app_push_subscriptions (session_hash, endpoint_hash, subscription, preferences, updated_at)
                 VALUES (?, ?, ?, ?, ?) ON CONFLICT(session_hash) DO UPDATE SET endpoint_hash=excluded.endpoint_hash,
                 subscription=excluded.subscription, preferences=excluded.preferences, updated_at=excluded.updated_at""",
@@ -124,6 +136,17 @@ class PhoneNotificationStore:
     def unsubscribe(self, token_hash: str) -> None:
         with self.access.connect(write=True) as connection:
             connection.execute("DELETE FROM app_push_subscriptions WHERE session_hash = ?", (token_hash,))
+
+    def update_preferences(self, token_hash: str, session: AppSession, preferences: dict) -> None:
+        """Save an existing device's choices without re-enabling or replacing it."""
+        with self.access.connect(write=True) as connection:
+            now = int(time.time())
+            result = connection.execute("""UPDATE app_push_subscriptions SET preferences = ?, updated_at = ?
+                WHERE session_hash = ? AND EXISTS (SELECT 1 FROM app_phone_sessions
+                    WHERE token_hash = ? AND owner_key = ? AND actor_key = ? AND expires_at > ?)""",
+                (json.dumps(preferences), now, token_hash, token_hash, session.owner_key, session.actor_key, now))
+            if result.rowcount != 1:
+                raise ValueError("Enable notifications on this phone before saving preferences.")
 
     def expire_subscription(self, device: dict) -> bool:
         """Revoke only the subscription whose send the provider rejected.

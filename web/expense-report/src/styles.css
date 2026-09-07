@@ -123,6 +123,8 @@ summary {
 
 .bb-page-header {
   display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
   gap: 14px;
   width: min(var(--bb-content-max), 100%);
   min-width: 0;
@@ -148,14 +150,11 @@ summary {
   color: hsl(var(--muted-foreground));
 }
 
-.bb-report-context > span {
-  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-  font-size: 14px;
-  letter-spacing: 0;
-  color: hsl(var(--muted-foreground));
-}
+.bb-report-context { grid-column: 1; grid-row: 1; }
 
 .bb-header-actions {
+  grid-column: 1;
+  grid-row: 2;
   display: flex;
   align-items: flex-start;
   justify-content: space-between;
@@ -1434,6 +1433,15 @@ summary {
   flex-basis: 100%;
 }
 
+.bb-panel-head.bb-category-mix-summary {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+}
+.bb-category-mix-summary > :first-child { grid-column: 1; grid-row: 1 / span 2; }
+.bb-category-mix-summary .bb-chart-page-header-actions { display: contents; }
+.bb-category-mix-summary .bb-category-mix-filter { grid-column: 2; grid-row: 1; align-self: start; }
+.bb-category-mix-summary .bb-category-pressure { grid-column: 2; grid-row: 2; justify-self: end; }
+
 .bb-chart-page-body {
   width: 100%;
   height: 100%;
@@ -2074,6 +2082,25 @@ summary {
   overscroll-behavior: contain;
 }
 
+/* Let all five pace metrics contribute their height while the graph contracts. */
+.bb-burn-rate-page { row-gap: 8px; }
+.bb-chart-carousel .bb-burn-rate-page .bb-details-content-inner {
+  max-height: none;
+  overflow: hidden;
+}
+.bb-burn-rate-page .bb-stat-list {
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 12px;
+}
+.bb-burn-rate-page .bb-stat-row {
+  grid-template-columns: minmax(0, 1fr);
+  align-content: start;
+  gap: 4px;
+  padding: 0;
+  border: 0;
+}
+.bb-burn-rate-page .bb-stat-row strong { white-space: nowrap; }
+
 .bb-modal-details {
   display: grid;
   justify-items: start;
@@ -2090,6 +2117,7 @@ summary {
   margin: 0;
   padding: 16px;
   overflow: hidden;
+  overscroll-behavior: none;
   border: 0;
   background: transparent;
   color: hsl(var(--card-foreground));
@@ -2153,6 +2181,7 @@ summary {
 .bb-details-dialog-header strong {
   font-size: 16px;
 }
+.bb-details-dialog-header strong:focus { outline: none; }
 
 .bb-details-dialog-close {
   appearance: none;
@@ -2177,6 +2206,7 @@ summary {
   border-color: hsl(var(--muted));
   color: hsl(var(--foreground));
 }
+.bb-details-dialog-close svg { display: block; width: 16px; height: 16px; flex: none; }
 
 .bb-details-dialog-body {
   min-height: 0;
@@ -2514,6 +2544,13 @@ tr:last-child td {
   color: hsl(var(--primary-foreground));
   font: 25px/1 var(--bb-display-font);
 }
+.bb-report-owner {
+  margin-left: 6px;
+  color: hsl(var(--muted-foreground));
+  font-size: 13px;
+  font-weight: 400;
+  letter-spacing: 0;
+}
 .bb-report-period {
   font-size: 12px;
   text-transform: uppercase;
@@ -2546,15 +2583,11 @@ tr:last-child td {
   gap: 8px;
   padding-bottom: 8px;
 }
-.bb-chart-number {
-  font-size: 12px;
-  font-variant-numeric: tabular-nums;
-  color: hsl(var(--muted-foreground));
-}
 .bb-report-section {
   padding: 40px 0;
   border-bottom: 1px solid hsl(var(--border));
 }
+.bb-daily-section { border-bottom: 0; }
 .bb-report-section:last-child {
   padding-bottom: 0;
   border-bottom: 0;
@@ -2768,6 +2801,7 @@ button:focus-visible, summary:focus-visible {
 }
 
 @media (max-width: 420px) {
+  .bb-projection-control .bb-metric-toggle { padding-inline: 12px; }
   .bb-page {
     padding-top: 0;
     padding-bottom: 32px;
@@ -2861,6 +2895,7 @@ button:focus-visible, summary:focus-visible {
 }
 
 @media (max-width: 640px) {
+  .bb-burn-rate-page .bb-stat-list { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px 12px; }
   .bb-metrics-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); padding: 0; margin-bottom: 20px; }
   .bb-metric-card { padding: 20px 0 20px 20px; }
   .bb-metric-card:nth-child(odd) { border-left: 0; padding-left: 0; padding-right: 16px; }
@@ -2870,7 +2905,10 @@ button:focus-visible, summary:focus-visible {
   .bb-savings-progress-labels span:last-child { text-align: left; }
   .bb-chart-carousel-indicators { width: 100%; gap: 0; justify-content: space-between; }
   .bb-chart-carousel-dot { font-size: 12px; min-height: 52px; }
-  .bb-chart-number { display: none; }
+  .bb-panel-head.bb-category-mix-summary { grid-template-columns: minmax(0, 1fr); gap: 12px; }
+  .bb-category-mix-summary > :first-child { grid-column: 1; grid-row: 2; }
+  .bb-category-mix-summary .bb-category-mix-filter { grid-column: 1; grid-row: 1; justify-self: start; }
+  .bb-category-mix-summary .bb-category-pressure { grid-column: 1; grid-row: 3; justify-self: start; }
   .bb-report-section { padding: 32px 0; }
   .bb-card-title { font-size: 27px; }
   .bb-reimbursement-content { grid-template-columns: 1fr; gap: 28px; }
@@ -3070,6 +3108,11 @@ button:focus-visible, summary:focus-visible {
 .bb-metric-explanation dd { margin:0; white-space:nowrap; font-variant-numeric:tabular-nums; }
 .bb-metric-explanation dt small { display:block; margin-top:4px; font-size:11px; color:hsl(var(--muted-foreground)); }
 .bb-report-context > .bb-month-history { font:inherit; letter-spacing:inherit; color:inherit; }
+.bb-page-header > .bb-app-controls { display: contents; }
+.bb-page-header .bb-app-refresh { grid-column: 2; grid-row: 1; justify-self: end; }
+.bb-page-header .bb-app-status, .bb-page-header > .bb-report-updated { grid-column: 2; grid-row: 2; max-width: 160px; justify-self: end; }
+.bb-page-header .bb-app-controls[data-state="stale"] .bb-app-status,
+.bb-page-header .bb-app-controls[data-state="error"] .bb-app-status { grid-column: 1 / -1; grid-row: 3; justify-self: start; max-width: none; text-align: left; }
 .bb-page > .bb-app-update { width:min(var(--bb-content-max),100%); margin-inline:auto; }
 
 .bb-chart-box svg [role="button"] { cursor:pointer; }

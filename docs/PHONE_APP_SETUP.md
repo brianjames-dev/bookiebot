@@ -16,7 +16,7 @@ The Home Screen icon is the existing BookieBot holding a piggy bank (`assets/ava
 ## Using the dashboard
 
 - **History:** tap the month heading and choose an available month. **This month** returns to the live current month. The selection stays while that app view is open; a fresh launch starts at the current month.
-- **Comparisons:** open **Compare spending**, then choose **Last month** or **Last year**. Both sides cover the same calendar days, shortened when necessary for a shorter month. This compares dated recorded spending, not the whole Spent headline; notes identify excluded schedules, missing dates, and unavailable records.
+- **Comparisons:** open **Compare spending**. It starts with **Last month**; use **Compare with** to choose another available month. Both sides cover the same calendar days, shortened when necessary for a shorter month. This compares dated recorded spending, not the whole Spent headline; notes identify excluded schedules, missing dates, and unavailable records.
 - **Details:** tap a Category Mix slice, a Daily Spending bar, or a day number for its entries. Tap the **Income / Spent / Left / Saved** label to explain the active view's total. Recorded and scheduled amounts are labeled separately; a schedule is not confirmation that a bank payment posted.
 - **Reimbursements:** outstanding amounts stay visible across months and configured annual workbooks, with their original dates. Received history is scoped to the selected expense month. Older unpaid amounts do not inflate this month's spending, and receipts do not become income.
 - **View preferences:** Current/Projected and your selected chart are remembered on this phone for your account. Saved view preferences contain presentation choices, not expense data. They do not change the other person's phone.
@@ -31,7 +31,7 @@ Notifications require an installed Home Screen web app on **iOS 16.4 or later** 
 3. Leave **Show amounts on the Lock Screen** off for private, generic messages. Tap **Enable on this phone**, then allow notifications when iOS asks. Nothing subscribes until you do this.
 4. Optionally tap **Send a test**. This explicitly sends one generic test to this phone; setup does not send a test automatically. Check Notification Center and iPhone Focus settings if a test accepted by the push service is not visible.
 
-Use **Save preferences** after changing options, or **Turn off** to stop this phone's notifications. Each phone/session has separate settings. Signout, session expiry, or `/expense_app_reset` stops future sends; after reconnecting, enable notifications again if desired. Notifications already delivered may remain in Notification Center. Delivery depends on the running server, push service, and iPhone settings; reminders describe schedules rather than confirmed bank activity.
+After enabling, changes save automatically; **Save preferences** can retry a failed save. At least one notification type stays selected while On; use **Turn off** to stop this phone's notifications. Each phone/session has separate settings. Signout, session expiry, or `/expense_app_reset` stops future sends; after reconnecting, enable notifications again if desired. Notifications already delivered may remain in Notification Center. Delivery depends on the running server, push service, and iPhone settings; reminders describe schedules rather than confirmed bank activity.
 
 ## Personal savings goals
 

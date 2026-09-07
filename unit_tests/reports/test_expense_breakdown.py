@@ -169,8 +169,8 @@ def test_top_chart_pages_share_regions_lock_modals_and_show_complete_details():
     assert "panel.titleAccessory" not in carousel_source
     assert "panel.headerControl" not in carousel_source
     assert "useModalPageScrollLock(open)" in source
-    assert 'body.style.position = "fixed"' in source
-    assert "window.scrollTo(0, scrollY)" in source
+    assert 'body.style.position = "fixed"' not in source
+    assert "window.scrollTo(scrollX, scrollY)" in source
     modal_lock_source = source.split("function useModalPageScrollLock", 1)[1].split("function ModalDetails", 1)[0]
     assert 'root.style.setProperty("--bb-viewport-scrollbar-width"' in modal_lock_source
     assert "onTouchStart={(event) => event.stopPropagation()}" in source
@@ -182,6 +182,8 @@ def test_top_chart_pages_share_regions_lock_modals_and_show_complete_details():
     assert "const hasMore = !showAll && items.length > visibleItems.length" in source
     assert ".bb-details-dialog-body" in styles
     assert "overflow: auto;" in styles
+    burn_details = styles.split(".bb-chart-carousel .bb-burn-rate-page .bb-details-content-inner {", 1)[1].split("}", 1)[0]
+    assert "max-height: none" in burn_details
 
 
 def test_top_chart_navigation_names_each_panel_and_excludes_inactive_controls_from_focus():
@@ -198,6 +200,7 @@ def test_top_chart_navigation_names_each_panel_and_excludes_inactive_controls_fr
     assert 'type="button"' in selectors
     assert 'aria-label={`Show ${panel.title}`}' in selectors
     assert "{panel.title}" in selectors
+    assert "bb-chart-number" not in selectors
     assert "onClick={() => onSelect(index)}" in selectors
     assert "aria-pressed={index === activeIndex}" in selectors
     assert 'aria-controls={`bb-chart-${panel.id}`}' in selectors

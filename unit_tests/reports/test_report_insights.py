@@ -173,3 +173,12 @@ def test_comparison_rejects_cross_owner_or_wrong_period_payloads():
         compare(payload(2026, 9, []), payload(2026, 8, [], owner="Hannah"))
     with pytest.raises(ValueError, match="month did not match"):
         compare(payload(2026, 9, []), payload(2026, 8, []), baseline_month="2026-07")
+
+
+def test_historical_selected_month_against_current_month_clips_both_to_elapsed_days():
+    result = compare(payload(2026, 7, [(7, 30), (8, 500)]), payload(2026, 9, [(7, 20), (8, 1000)]), kind="selected-month")
+    assert result["throughDay"] == 7
+    assert result["selected"]["datedSpending"] == 30
+    assert result["baseline"]["datedSpending"] == 20
+    assert result["changeAmount"] == 10
+    assert "still in progress" in result["coverageNote"]

@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import calendar
+import asyncio
 from datetime import datetime
 import re
 from typing import Any
@@ -143,7 +144,15 @@ async def _comparison(request: web.Request) -> web.Response:
         raw_month = request.query.get("month")
         kind = request.query.get("baseline", "previous-month")
         selected_month = parse_phone_report_month(raw_month, current=current)
-        baseline_month = baseline_for_month(selected_month, kind)
+        raw_baseline = request.query.get("compare_month")
+        if raw_baseline is not None:
+            baseline_month = parse_phone_report_month(raw_baseline, current=current)
+            if baseline_month == selected_month:
+                raise InvalidReportMonthError("Choose a different month to compare.")
+            kind = "selected-month"
+        else:
+            # Retain compatibility with already-installed older app bundles.
+            baseline_month = baseline_for_month(selected_month, kind)
         catalog = await phone_month_catalog(request, session, current=current)
         available = {item["value"] for item in catalog["months"]}
         selected_key = f"{selected_month.year:04d}-{selected_month.month:02d}"
@@ -152,9 +161,17 @@ async def _comparison(request: web.Request) -> web.Response:
             if selected_month.year in catalog["coverage"]["unavailableYears"]:
                 return _json({"error": "Could not check this report month. Please try again."}, status=503)
             raise UnavailableReportMonthError("That month's report is not available.")
-        selected = await request.app[_REPORT_BUILDS].data(phone_report_payload(session, selected_month))
-        baseline = (await request.app[_REPORT_BUILDS].data(phone_report_payload(session, baseline_month))
-                    if baseline_key in available else None)
+        builds = request.app[_REPORT_BUILDS]
+        if baseline_key in available:
+            # Both reports share the existing bounded build queue. Sequential
+            # builds doubled comparison latency and frequently hit phone timeouts.
+            selected, baseline = await asyncio.gather(
+                builds.data(phone_report_payload(session, selected_month)),
+                builds.data(phone_report_payload(session, baseline_month)),
+            )
+        else:
+            selected = await builds.data(phone_report_payload(session, selected_month))
+            baseline = None
         if await _session(request) is None:
             return _json({"error": "Reconnect this phone using /expense_app in Discord."}, status=401)
         result = compare_report_periods(selected, baseline, baseline_month=baseline_key, baseline_kind=kind, as_of=current)

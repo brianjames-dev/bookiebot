@@ -62,9 +62,12 @@ async def _save(request: web.Request) -> web.Response:
         body = json.loads(raw)
         if not isinstance(body, dict):
             raise ValueError("Invalid notification request.")
-        subscription = validate_subscription(body.get("subscription"))
         preferences = validate_preferences(body.get("preferences"))
-        await asyncio.to_thread(lambda: build_phone_notification_store().subscribe(token_hash, session, subscription, preferences))
+        if "subscription" in body:
+            subscription = validate_subscription(body["subscription"])
+            await asyncio.to_thread(lambda: build_phone_notification_store().subscribe(token_hash, session, subscription, preferences))
+        else:
+            await asyncio.to_thread(lambda: build_phone_notification_store().update_preferences(token_hash, session, preferences))
         return _json({"enabled": True, "preferences": preferences})
     except (ValueError, TypeError):
         return _json({"error": "Could not save notifications. Choose a supported phone, notification type, and hour, then try again."}, status=400)

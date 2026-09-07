@@ -4,6 +4,7 @@ from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime
 import json
 import os
+from threading import Barrier
 from types import SimpleNamespace
 import uuid
 
@@ -99,6 +100,64 @@ def test_endpoint_cannot_be_stolen_by_another_active_owner(store):
     assert store.settings(first)["enabled"] is False
 
 
+def test_explicit_enable_after_same_person_reconnect_rebinds_the_phone_endpoint(store):
+    _, _, original = opt_in(store)
+    previous_device = store.active(0)[0]
+    token, session = store.access.consume_pairing(store.access.issue_pairing(BRIAN, "brian"))
+    replacement = storage.session_hash(token)
+    preferences = {**storage.DEFAULT_PREFERENCES, "upcoming": True, "hour": 17}
+    store.subscribe(replacement, session, json.loads(previous_device["subscription"]), preferences)
+    assert store.settings(original)["enabled"] is False
+    assert store.settings(replacement) == {"enabled": True, "preferences": preferences}
+    assert [row["session_hash"] for row in store.active(0)] == [replacement]
+    assert not store.still_matches(previous_device, 0)
+    assert not store.expire_subscription(previous_device)
+    store.unsubscribe(original)
+    assert store.settings(replacement)["enabled"] is True
+
+
+def test_concurrent_reconnects_recheck_endpoint_ownership_before_transferring(store):
+    token, _, _ = opt_in(store)
+    saved_subscription = json.loads(store.active(0)[0]["subscription"])
+    store.access.revoke_session(token)
+    attempts = [store.access.consume_pairing(store.access.issue_pairing(actor, owner))
+                for actor, owner in [(BRIAN, "brian"), (HANNAH, "hannah")] * 4]
+    start = Barrier(len(attempts))
+
+    def reconnect(attempt):
+        next_token, session = attempt
+        start.wait(timeout=10)
+        try:
+            store.subscribe(storage.session_hash(next_token), session, saved_subscription, dict(storage.DEFAULT_PREFERENCES))
+            return session.owner_key
+        except ValueError:
+            return None
+
+    with ThreadPoolExecutor(max_workers=len(attempts)) as pool:
+        owners = {owner for owner in pool.map(reconnect, attempts) if owner is not None}
+    assert len(owners) == 1, "Only the first owner's matching sessions may transfer the endpoint"
+    devices = store.active(0)
+    assert len(devices) == 1 and devices[0]["owner_key"] in owners
+
+
+def test_preferences_persist_without_replacing_or_enabling_a_subscription(store):
+    token, session, digest = opt_in(store)
+    device = store.active(0)[0]
+    preferences = {**storage.DEFAULT_PREFERENCES, "upcoming": True, "hour": 18}
+    store.update_preferences(digest, session, preferences)
+    reopened = storage.PhoneNotificationStore(store.access)
+    assert reopened.settings(digest) == {"enabled": True, "preferences": preferences}
+    assert reopened.active(0)[0]["subscription"] == device["subscription"]
+    assert not reopened.still_matches(device, 0)
+    store.unsubscribe(digest)
+    with pytest.raises(ValueError, match="Enable notifications"):
+        store.update_preferences(digest, session, preferences)
+    assert reopened.settings(digest)["enabled"] is False
+    store.access.revoke_session(token)
+    with pytest.raises(ValueError):
+        store.update_preferences(digest, session, preferences)
+
+
 def test_claim_is_atomic_retries_are_bounded_and_acceptance_is_durable(store):
     _, _, digest = opt_in(store)
     with ThreadPoolExecutor(max_workers=4) as pool:
@@ -141,10 +200,16 @@ def test_expired_send_only_revokes_the_subscription_it_sent(store, change):
     assert store.settings(digest)["enabled"] is (change != "unchanged")
 
 
-@pytest.mark.parametrize("url", ["http://web.push.apple.com/x", "https://127.0.0.1/x", "https://web.push.apple.com.evil.test/x", "https://web.push.apple.com@evil.test/x", "https://user@web.push.apple.com/x", "https://web.push.apple.com:8443/x", "https://web.push.apple.com/x#secret", "https://web.push.apple.com/\nfoo", "https://169.254.169.254/latest/meta-data"])
+@pytest.mark.parametrize("url", ["http://web.push.apple.com/x", "https://127.0.0.1/x", "https://web.push.apple.com.evil.test/x", "https://evilpush.apple.com/x", "https://push.apple.com/x", "https://.push.apple.com/x", "https://web..push.apple.com/x", "https://web.push.apple.com@evil.test/x", "https://user@web.push.apple.com/x", "https://web.push.apple.com:8443/x", "https://web.push.apple.com/x#secret", "https://web.push.apple.com/\nfoo", "https://169.254.169.254/latest/meta-data"])
 def test_untrusted_push_endpoints_are_rejected(url):
     with pytest.raises(ValueError):
         storage.validate_subscription({**subscription(), "endpoint": url})
+
+
+@pytest.mark.parametrize("host", ["web.push.apple.com", "region.web.push.apple.com", "fcm.googleapis.com", "updates.push.services.mozilla.com"])
+def test_documented_push_provider_endpoints_are_accepted(host):
+    value = {**subscription(), "endpoint": f"https://{host}/opaque-subscription"}
+    assert storage.validate_subscription(value) == value
 
 
 def test_invalid_keys_and_preferences_are_rejected():
@@ -202,6 +267,23 @@ async def test_routes_require_phone_session_same_origin_and_no_owner_input(phone
     assert "private_key" not in data and "subscription" not in data
     assert settings.headers["Cache-Control"] == "private, no-store"
     assert (await phone.client.delete("/app/notifications", headers=cookie(token))).status == 200
+    assert not phone.store.active(0)
+    assert not phone.sends
+
+
+@pytest.mark.asyncio
+async def test_phone_preferences_save_and_reload_without_browser_resubscription(phone):
+    token, _, digest = opt_in(phone.store)
+    before = phone.store.active(0)[0]["subscription"]
+    preferences = {**storage.DEFAULT_PREFERENCES, "upcoming": True, "showAmounts": True, "hour": 19}
+    result = await phone.client.post("/app/notifications", json={"preferences": preferences}, headers=cookie(token))
+    assert result.status == 200
+    assert await result.json() == {"enabled": True, "preferences": preferences}
+    settings = await phone.client.get("/app/notifications", headers=cookie(token))
+    assert (await settings.json())["preferences"] == preferences
+    assert phone.store.active(0)[0]["subscription"] == before
+    phone.store.unsubscribe(digest)
+    assert (await phone.client.post("/app/notifications", json={"preferences": preferences}, headers=cookie(token))).status == 400
     assert not phone.store.active(0)
     assert not phone.sends
 

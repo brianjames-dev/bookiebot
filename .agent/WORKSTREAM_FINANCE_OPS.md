@@ -808,3 +808,7 @@ Completed recorded/scheduled drilldowns, configured month history and matching-p
 ### Dashboard mode-switch regression — 2026-09-07
 
 Fixed a frontend-only blank page when Current/Projected or category filters changed the number/order of pie slices. Recharts renders previous sectors before synchronizing its data store; category-key matching replaces unsafe array-index lookup, with noninteractive departing slices. Real React/Recharts regression and phone-width stress checks cover transitions and correct drilldown targets. Full local suite 1,022 passed / 57 optional PostgreSQL skipped; frontend and type checks passed. Financial calculations, bank/reconciliation lifecycle and persistence are unchanged. Manual acceptance: STATUS checklist 92.
+
+### Dashboard reliability and layout follow-up — 2026-09-07
+
+Completed configurable matching-period comparisons with a bounded single-request phone lifecycle, stable modal geometry/focus, native iPhone notification enable and immediate preference persistence, same-person endpoint rebind with PostgreSQL ownership serialization, and the requested header/chart/detail refinements. The ten-item dashboard roadmap remains complete; bank reconciliation and recent-action backlog are unchanged. Full suite 1,104 passed with real PostgreSQL; typecheck/build, Pyright, Apps Script and phone/desktop browser checks passed. Per-phone opt-in/delivery acceptance is STATUS checklist 93.

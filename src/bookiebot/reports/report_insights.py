@@ -159,9 +159,12 @@ def compare_report_periods(
                      else calendar.monthrange(selected["year"], selected["month"])[1])
     base_year, base_number = map(int, baseline_month.split("-"))
     through_day = min(requested_day, calendar.monthrange(base_year, base_number)[1])
+    short_month_adjusted = through_day != requested_day
+    if (base_year, base_number) == (as_of.year, as_of.month):
+        through_day = min(through_day, as_of.day)
     result: dict[str, Any] = {
         "selectedMonth": selected_month, "baselineMonth": baseline_month, "baselineKind": baseline_kind,
-        "throughDay": through_day, "shortMonthAdjusted": through_day != requested_day,
+        "throughDay": through_day, "shortMonthAdjusted": short_month_adjusted,
         "selected": None, "baseline": None, "changeAmount": None, "changePercent": None,
         "status": "unavailable", "coverageNote": "The comparison month is unavailable.",
     }
@@ -185,8 +188,9 @@ def compare_report_periods(
         "Compares dated recorded expenses only. Undated costs, sheet adjustments and scheduled subscriptions are excluded."
         if partial else "Compares recorded spending over matching days in each month."
     )
-    if result["shortMonthAdjusted"]:
-        result["coverageNote"] += f" Both periods end on day {through_day} because the comparison month is shorter."
+    if through_day != requested_day:
+        reason = "the comparison month is still in progress" if (base_year, base_number) == (as_of.year, as_of.month) else "the comparison month is shorter"
+        result["coverageNote"] += f" Both periods end on day {through_day} because {reason}."
     return result
 
 

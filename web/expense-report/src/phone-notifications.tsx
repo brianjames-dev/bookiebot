@@ -48,6 +48,7 @@ export function PhoneNotifications() {
   const [preferences, setPreferences] = useState<Preferences>({ weekly: true, upcoming: false, showAmounts: false, hour: 10 })
   const [registration, setRegistration] = useState<ServiceWorkerRegistration | null>(null)
   const [supported, setSupported] = useState(false)
+  const [preparing, setPreparing] = useState(true)
   const [busy, setBusy] = useState(false)
   const [message, setMessage] = useState("")
   const [error, setError] = useState("")
@@ -64,7 +65,7 @@ export function PhoneNotifications() {
     const timeout = window.setTimeout(() => controller.abort(), 20_000)
     const canPush = window.isSecureContext && "serviceWorker" in navigator && "PushManager" in window && "Notification" in window
     setSupported(canPush)
-    setSettings(null); setRegistration(null); setBusy(false)
+    setSettings(null); setRegistration(null); setBusy(false); setPreparing(true)
     setError("")
     void (async () => {
       try {
@@ -80,7 +81,10 @@ export function PhoneNotifications() {
         }
       } catch (caught) {
         if (mounted.current && revision === generation.current) setError(caught instanceof Error ? caught.message : "Could not load notifications.")
-      } finally { window.clearTimeout(timeout) }
+      } finally {
+        window.clearTimeout(timeout)
+        if (mounted.current && revision === generation.current) setPreparing(false)
+      }
     })()
     return () => { mounted.current = false; generation.current++; controller.abort(); window.clearTimeout(timeout)
       operation.current?.abort(); operation.current = null }
@@ -102,31 +106,48 @@ export function PhoneNotifications() {
     }
   }
 
-  const save = async () => {
-    if (!settings || !registration) return
+  const save = async (nextPreferences = preferences) => {
+    if (!settings || (!settings.enabled && !registration)) return
     const action = beginOperation()
     if (!action) return
     try {
-      // Ask directly inside the tap handler, before any awaited network work.
-      const permission = await whileActive(Notification.requestPermission(), action.controller.signal)
-      if (!action.active()) return
-      if (permission !== "granted") throw new Error("Notifications are not allowed. You can change this in iPhone Settings → Notifications → BookieBot.")
-      let subscription = await whileActive(registration.pushManager.getSubscription(), action.controller.signal)
-      if (!action.active()) return
-      if (!subscription) {
-        subscription = await whileActive(registration.pushManager.subscribe({ userVisibleOnly: true,
+      const body: { preferences: Preferences; subscription?: PushSubscriptionJSON } = { preferences: nextPreferences }
+      if (!settings.enabled && registration) {
+        // subscribe handles permission and reuses an existing subscription.
+        // Call it in the tap itself: a separate permission/getSubscription
+        // chain can lose Safari's user activation before subscribing.
+        const subscription = await whileActive(registration.pushManager.subscribe({ userVisibleOnly: true,
           applicationServerKey: pushKeyBytes(settings.publicKey) }), action.controller.signal)
         if (!action.active()) return
+        body.subscription = subscription.toJSON()
       }
       // Navigation or reconnect may replace the HttpOnly session cookie while
       // any browser permission/subscription promise is pending.
       if (!action.active()) return
-      const data = await notificationRequest(endpoint, action.controller, { method: "POST", body: JSON.stringify({ subscription: subscription.toJSON(), preferences }) })
+      const data = await notificationRequest(endpoint, action.controller, { method: "POST", body: JSON.stringify(body) })
       if (!action.active()) return
-      setSettings({ ...settings, ...data })
+      const saved = checkedSettings({ ...settings, ...data })
+      setSettings(saved)
+      setPreferences(saved.preferences)
       setMessage("Notification preferences saved for this phone.")
-    } catch (caught) { action.failed(caught) }
+    } catch (caught) {
+      action.failed(caught instanceof Error && caught.name === "NotAllowedError"
+        ? new Error("Notifications are not allowed. Open BookieBot from your Home Screen and check iPhone Settings → Notifications → BookieBot, then try again.")
+        : caught)
+    }
     finally { action.finish() }
+  }
+
+  const changePreferences = (next: Preferences) => {
+    if (settings?.enabled && !next.weekly && !next.upcoming) {
+      setMessage("Use Turn off to stop all notifications on this phone.")
+      return
+    }
+    setPreferences(next)
+    setMessage("")
+    // Editing an opted-in phone saves immediately, without requesting browser
+    // permission or re-subscribing. Off phones still require the explicit tap.
+    if (settings?.enabled) void save(next)
   }
 
   const turnOff = async () => {
@@ -162,28 +183,29 @@ export function PhoneNotifications() {
   const toggle = (key: "weekly" | "upcoming" | "showAmounts", label: string) => (
     <label className="bb-notification-option">
       <span>{label}</span>
-      <input type="checkbox" role="switch" checked={preferences[key]} disabled={busy} onChange={(event) => setPreferences({ ...preferences, [key]: event.target.checked })} />
+      <input type="checkbox" role="switch" checked={preferences[key]} disabled={busy || !settings} onChange={(event) => changePreferences({ ...preferences, [key]: event.target.checked })} />
     </label>
   )
 
   return <section className="bb-notifications" aria-label="Phone notifications">
-    <AnimatedDisclosure summary={<><span className="bb-notification-title">Phone notifications</span><span className="bb-notification-state">{settings?.enabled ? "On" : "Off"}</span><span className="bb-disclosure-mark" aria-hidden="true" /></>}>
+    <AnimatedDisclosure summary={<><span className="bb-notification-title">Phone notifications</span><span className="bb-notification-state">{settings ? settings.enabled ? "On" : "Off" : error ? "Unavailable" : "Loading…"}</span><span className="bb-disclosure-mark" aria-hidden="true" /></>}>
       <div className="bb-notification-settings">
         <p>Choose what this phone receives. Each phone has its own preferences.</p>
         {!supported && <p>On iPhone, open BookieBot from your Home Screen to enable notifications. Requires iOS 16.4 or later.</p>}
         {toggle("weekly", "Weekly check-in · Mondays")}
         {toggle("upcoming", "Scheduled payments · day before")}
         <p className="bb-notification-hint">Payment reminders are additional to your Discord reminders and start only when selected.</p>
-        <label className="bb-notification-option"><span>Delivery time · Pacific</span><select aria-label="Notification delivery time" value={preferences.hour} disabled={busy} onChange={(event) => setPreferences({ ...preferences, hour: Number(event.target.value) })}>
+        <label className="bb-notification-option"><span>Delivery time · Pacific</span><select aria-label="Notification delivery time" value={preferences.hour} disabled={busy || !settings} onChange={(event) => changePreferences({ ...preferences, hour: Number(event.target.value) })}>
           {Array.from({ length: 15 }, (_, index) => index + 7).map((hour) => <option key={hour} value={hour}>{hour % 12 || 12} {hour < 12 ? "AM" : "PM"}</option>)}
         </select></label>
         {toggle("showAmounts", "Show amounts on the Lock Screen")}
         <p className="bb-notification-hint">Amounts stay private unless you enable them. Signing out or resetting phone access stops future sends.</p>
+        {settings?.enabled && <p className="bb-notification-hint">Changes save automatically. Choose at least one notification type, or use Turn off.</p>}
         <div className="bb-notification-actions">
-          <button className="bb-toolbar-button" type="button" onClick={() => void save()} disabled={busy || !settings || !registration || !supported || (!preferences.weekly && !preferences.upcoming)}>{busy ? "Saving…" : settings?.enabled ? "Save preferences" : "Enable on this phone"}</button>
+          <button className="bb-toolbar-button" type="button" onClick={() => void save()} disabled={busy || !settings || (!settings.enabled && (!registration || !supported)) || (!preferences.weekly && !preferences.upcoming)}>{busy ? "Saving…" : settings?.enabled ? "Save preferences" : "Enable on this phone"}</button>
           {settings?.enabled && <button className="bb-toolbar-button" type="button" disabled={busy} onClick={() => void turnOff()}>Turn off</button>}
           {settings?.enabled && <button className="bb-toolbar-button" type="button" disabled={busy} onClick={() => void sendTest()}>Send a test</button>}
-          {(!settings || (supported && !registration)) && error && <button className="bb-toolbar-button" type="button" disabled={busy} onClick={() => setAttempt((value) => value + 1)}>Try again</button>}
+          {(!settings || (supported && !registration)) && !preparing && <button className="bb-toolbar-button" type="button" disabled={busy} onClick={() => setAttempt((value) => value + 1)}>Try again</button>}
         </div>
         {error && <p className="bb-notification-error" role="alert">{error}</p>}
         {message && <p role="status">{message}</p>}

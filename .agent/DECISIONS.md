@@ -1,5 +1,13 @@
 # Agent Decisions
 
+## 2026-09-07 - Reliable Comparison And Phone Controls
+
+Compare Spending defaults to the previous month and accepts any other configured available month. Match elapsed days if either side is current. Keep one comparison build in flight per displayed report and reuse its results only until that report is refreshed or unmounted; private data remains no-store. Older installed bundles retain their baseline API compatibility.
+
+Start native push subscription directly from the explicit Enable tap. Enabled-device preference edits save immediately without permission or subscription work; the final notification type stays selected until Turn off. A same-actor/same-owner reconnect may explicitly rebind its retained endpoint, serialized by endpoint on PostgreSQL; another person cannot claim an active endpoint. Apple push validation admits only complete DNS labels beneath push.apple.com plus the existing Google/Mozilla providers.
+
+Dialogs keep the page in normal flow with stable scrollbar compensation and touch containment; initial focus goes to the title, keyboard Tab still highlights Close, and closing restores focus without scrolling. Month and refresh share a row; owner sits beside the wordmark.
+
 ## 2026-09-07 - Keep Routine Report Controls Compact
 
 Show month/person once and put theme/signout in an accessible three-dot disclosure. Keep Current/Projected visible and use an icon refresh with one update timestamp; refresh failures remain explicit and identify the last successful data. This changes presentation and control placement without changing session duration, data refresh triggers or financial calculations.

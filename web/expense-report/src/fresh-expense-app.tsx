@@ -68,7 +68,8 @@ export function FreshExpenseApp({ config }: { config: ExpenseAppConfig }) {
       appAvatarUrl={avatarUrl}
       appSession={{ signOut, signingOut: state.signingOut }}
       appMonthControl={monthControl}
-      appComparison={<ReportComparison report={state.report} onExpired={expire} />}
+      appComparison={<ReportComparison report={state.report} onExpired={expire}
+        catalog={history.catalog} catalogLoading={history.loading} catalogError={history.error} onCatalogRetry={history.refresh} />}
     />
   }
 

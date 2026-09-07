@@ -506,6 +506,7 @@ function useViewportScrollbarWidth() {
   useLayoutEffect(() => {
     const root = document.documentElement
     const update = () => {
+      if (root.dataset.bbModalScrollLock === "true") return
       root.style.setProperty("--bb-viewport-scrollbar-width", `${Math.max(window.innerWidth - root.clientWidth, 0)}px`)
     }
     update()
@@ -780,7 +781,7 @@ export function ExpenseReportApp({ report, appControls, appAvatarUrl, appSession
   return (
     <div className="bb-page">
       <div className="bb-masthead">
-        <span className="bb-wordmark">{appAvatarUrl ? <img className="bb-app-avatar" src={appAvatarUrl} alt="" /> : <span className="bb-wordmark-symbol" aria-hidden="true">b.</span>}BookieBot</span>
+        <span className="bb-wordmark">{appAvatarUrl ? <img className="bb-app-avatar" src={appAvatarUrl} alt="" /> : <span className="bb-wordmark-symbol" aria-hidden="true">b.</span>}BookieBot<span className="bb-report-owner">{report.ownerName}</span></span>
         <ReportMenu>
           <ThemeToggle theme={theme} onToggle={toggleTheme} />
           {appSession && <button type="button" className="bb-report-menu-action" disabled={appSession.signingOut} onClick={appSession.signOut}>
@@ -789,14 +790,14 @@ export function ExpenseReportApp({ report, appControls, appAvatarUrl, appSession
         </ReportMenu>
       </div>
       <header className="bb-page-header">
-        <h1 className="bb-report-context">{appMonthControl ?? report.monthLabel}<span> · </span><span>{report.ownerName}</span></h1>
+        <h1 className="bb-report-context">{appMonthControl ?? report.monthLabel}</h1>
         <div className="bb-header-actions">
           <ProjectionToggle
             active={projectionActive}
             onToggle={toggleProjection}
           />
-          {appControls ?? <span className="bb-report-updated">Updated {generatedTimeLabel(report.generatedAt)}</span>}
         </div>
+        {appControls ?? <span className="bb-report-updated">Updated {generatedTimeLabel(report.generatedAt)}</span>}
       </header>
       {appUpdate}
       <ChartTooltipDismissProvider revision={chartTooltipDismissRevision}>
@@ -1070,7 +1071,6 @@ function ChartCarouselIndicators({
           aria-controls={`bb-chart-${panel.id}`}
           onClick={() => onSelect(index)}
         >
-          <span className="bb-chart-number" aria-hidden="true">{String(index + 1).padStart(2, "0")}</span>
           {panel.title}
         </button>
       ))}
@@ -1132,7 +1132,7 @@ function BurnRateChart({
   const categoryPressure = categoryMixPressure("wants", categoryBalances, burnRate.spent)
 
   return (
-    <div className="bb-chart-stack bb-chart-page">
+    <div className="bb-chart-stack bb-chart-page bb-burn-rate-page">
       <div className="bb-panel-head bb-burn-rate-summary bb-chart-page-header">
         <div className="bb-burn-rate-primary">
           <div>
@@ -2868,32 +2868,31 @@ function useModalPageScrollLock(locked: boolean) {
     }
     const body = document.body
     const root = document.documentElement
+    const scrollX = window.scrollX
     const scrollY = window.scrollY
     const previous = {
-      bodyPosition: body.style.position,
-      bodyTop: body.style.top,
-      bodyWidth: body.style.width,
-      bodyOverflow: body.style.overflow,
       bodyPaddingRight: body.style.paddingRight,
       rootOverflow: root.style.overflow,
+      scrollLock: root.dataset.bbModalScrollLock,
     }
     const scrollbarWidth = Math.max(window.innerWidth - root.clientWidth, 0)
-    body.style.position = "fixed"
-    body.style.top = `-${scrollY}px`
-    body.style.width = "100%"
-    body.style.overflow = "hidden"
-    body.style.paddingRight = scrollbarWidth > 0 ? `${scrollbarWidth}px` : previous.bodyPaddingRight
+    // Keep the page in normal flow. Fixing/repositioning the whole body changes
+    // chart geometry and compositor layers on both edges of every dialog.
+    const paddingRight = Number.parseFloat(window.getComputedStyle(body).paddingRight) || 0
+    root.dataset.bbModalScrollLock = "true"
+    root.style.setProperty("--bb-viewport-scrollbar-width", `${scrollbarWidth}px`)
+    if (scrollbarWidth > 0) body.style.paddingRight = `${paddingRight + scrollbarWidth}px`
     root.style.overflow = "hidden"
 
     return () => {
-      body.style.position = previous.bodyPosition
-      body.style.top = previous.bodyTop
-      body.style.width = previous.bodyWidth
-      body.style.overflow = previous.bodyOverflow
       body.style.paddingRight = previous.bodyPaddingRight
       root.style.overflow = previous.rootOverflow
+      if (previous.scrollLock === undefined) delete root.dataset.bbModalScrollLock
+      else root.dataset.bbModalScrollLock = previous.scrollLock
       root.style.setProperty("--bb-viewport-scrollbar-width", `${Math.max(window.innerWidth - root.clientWidth, 0)}px`)
-      window.scrollTo(0, scrollY)
+      // Native focus restoration may scroll in some browsers. Correct only an
+      // actual change, avoiding another scroll event/repaint on normal exits.
+      if (window.scrollX !== scrollX || window.scrollY !== scrollY) window.scrollTo(scrollX, scrollY)
     }
   }, [locked])
 }
@@ -2918,12 +2917,14 @@ function ModalDetails({
   const [phase, setPhase] = useState<"closed" | "opening" | "open" | "closing">("closed")
   const open = phase !== "closed"
   const dialogRef = useRef<HTMLDialogElement | null>(null)
+  const titleRef = useRef<HTMLElement | null>(null)
+  const returnFocusRef = useRef<HTMLElement | SVGElement | null>(null)
   useModalPageScrollLock(open)
 
   const finishClose = () => {
-    // Let native focus restoration run while the page is still locked. The
-    // closed-state cleanup then restores the original scroll position once.
     if (dialogRef.current?.open) dialogRef.current.close()
+    if (returnFocusRef.current?.isConnected) returnFocusRef.current.focus({ preventScroll: true })
+    returnFocusRef.current = null
     setPhase("closed")
     onDismiss?.()
   }
@@ -2940,7 +2941,17 @@ function ModalDetails({
       return
     }
     if (phase === "opening") {
-      if (!dialog.open) dialog.showModal()
+      if (!dialog.open) {
+        const activeElement = document.activeElement
+        if (!returnFocusRef.current && activeElement && "focus" in activeElement) {
+          returnFocusRef.current = activeElement as HTMLElement | SVGElement
+        }
+        // Native showModal otherwise autofocuses Close, including its keyboard
+        // ring. Start at the title so the content is announced in reading order.
+        titleRef.current?.setAttribute("autofocus", "")
+        dialog.showModal()
+        titleRef.current?.focus({ preventScroll: true })
+      }
       // Commit the initial pose before starting the transition. Keep the native
       // dialog/focus trap alive until the same transition finishes on closing.
       let frame = requestAnimationFrame(() => {
@@ -2955,6 +2966,18 @@ function ModalDetails({
       return () => window.clearTimeout(timeout)
     }
   }, [phase])
+
+  useEffect(() => {
+    const dialog = dialogRef.current
+    if (!open || !dialog) return undefined
+    // A non-passive native listener also contains touch scrolling on iPhones.
+    // The body remains scrollable; its overscroll boundary is handled by CSS.
+    const containTouchScroll = (event: globalThis.TouchEvent) => {
+      if (!(event.target instanceof Element) || !event.target.closest(".bb-details-dialog-body")) event.preventDefault()
+    }
+    dialog.addEventListener("touchmove", containTouchScroll, { passive: false })
+    return () => dialog.removeEventListener("touchmove", containTouchScroll)
+  }, [open])
 
   const close = () => setPhase((current) => current === "closed" ? current : "closing")
   const modal = typeof document === "undefined" ? null : createPortal(
@@ -2983,9 +3006,11 @@ function ModalDetails({
         }}
       >
         <div className="bb-details-dialog-header">
-          <strong>{title}</strong>
+          <strong ref={titleRef} tabIndex={-1}>{title}</strong>
           <button type="button" className="bb-details-dialog-close" aria-label={`Close ${title}`} onClick={close}>
-            <span aria-hidden="true">×</span>
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden="true" focusable="false">
+              <path d="m6 6 12 12M18 6 6 18" />
+            </svg>
           </button>
         </div>
         <div className="bb-details-dialog-body">{children}</div>
@@ -3001,7 +3026,10 @@ function ModalDetails({
         className="bb-details-toggle"
         aria-haspopup="dialog"
         aria-expanded={open}
-        onClick={() => setPhase("opening")}
+        onClick={(event) => {
+          if (!dialogRef.current?.open) returnFocusRef.current = event.currentTarget
+          setPhase("opening")
+        }}
       >
         {summary}
       </button>}

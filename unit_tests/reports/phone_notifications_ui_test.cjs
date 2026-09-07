@@ -31,7 +31,7 @@ function load(file) {
   const { outputText } = ts.transpileModule(fs.readFileSync(file, "utf8"), {
     compilerOptions: { target: ts.ScriptTarget.ES2020, module: ts.ModuleKind.CommonJS, jsx: ts.JsxEmit.ReactJSX, esModuleInterop: true },
   })
-  vm.runInNewContext(outputText, { exports, require: localRequire, atob, AbortController, window: browserWindow,
+  vm.runInNewContext(outputText, { exports, require: localRequire, atob, AbortController, Error, window: browserWindow,
     navigator: browserNavigator, Notification: browserNotification, fetch: (...args) => browser.fetch(...args) })
   return exports
 }
@@ -90,7 +90,13 @@ function resetBrowser(changes = {}) {
   const subscription = { toJSON: () => ({ endpoint: "https://web.push.apple.com/example", keys: {} }), unsubscribe: async () => { steps.unsubscribe++ } }
   const registration = { pushManager: {
     getSubscription: () => { steps.get++; return changes.getSubscription ? changes.getSubscription() : Promise.resolve(subscription) },
-    subscribe: () => { steps.subscribe++; return changes.subscribe ? changes.subscribe() : Promise.resolve(subscription) },
+    subscribe: (options) => {
+      steps.subscribe++
+      if (changes.requireActivation && !browser.activation) return Promise.reject(Error("Push subscription requires the original tap"))
+      assert.equal(options.userVisibleOnly, true)
+      assert.equal(options.applicationServerKey.length, 65)
+      return changes.subscribe ? changes.subscribe() : Promise.resolve(subscription)
+    },
   } }
   browserNotification.permission = "default"
   browserWindow.PushManager = function () {}
@@ -114,42 +120,39 @@ async function tap(tree, text) {
   const selected = button(tree, text)
   assert.ok(selected, `Expected button ${text}`)
   assert.ok(!selected.props.disabled, `Expected enabled button ${text}`)
-  await act(async () => { selected.props.onClick(); await flush() })
+  await act(async () => {
+    browser.activation = true
+    try { selected.props.onClick() } finally { browser.activation = false }
+    await flush()
+  })
 }
 async function unmount(tree) { await act(async () => { tree.unmount(); await flush() }) }
 const mutations = state => state.calls.filter(call => ["POST", "DELETE"].includes(call.options.method))
 
 async function lifecycleContracts() {
-  // Run real React effects/cleanup while the OS permission prompt is pending.
-  const permission = deferred()
-  let state = resetBrowser({ permission: () => permission.promise })
+  // Real React handlers/effects must invoke subscribe before yielding the tap.
+  // The browser's subscribe call requests permission and reuses existing keys.
+  let state = resetBrowser({ requireActivation: true, getSubscription: () => Promise.resolve(null) })
   let tree = await mount()
   assert.equal(state.steps.permission, 0, "Loading settings must never ask for OS permission")
+  assert.equal(state.steps.subscribe, 0, "Loading settings must never subscribe automatically")
   await tap(tree, "Enable on this phone")
-  assert.equal(state.steps.permission, 1)
-  await unmount(tree)
-  await act(async () => { permission.resolve("granted"); await flush() })
-  assert.equal(mutations(state).length, 0, "A permission response after navigation/reconnect must never POST with the new cookie")
+  assert.ok(button(tree, "Turn off"), "The original user gesture reaches subscribe and the persisted device is On")
+  assert.equal(state.steps.subscribe, 1)
   assert.equal(state.steps.get, 0)
-  assert.equal(state.steps.unsubscribe, 0, "Late cleanup must not revoke a subscription reused by another page")
-
-  const getting = deferred()
-  state = resetBrowser({ getSubscription: () => getting.promise })
-  tree = await mount(); await tap(tree, "Enable on this phone")
-  assert.equal(state.steps.get, 1)
+  assert.equal(state.steps.permission, 0, "Do not separate permission and subscription into two asynchronous requests")
+  assert.deepEqual(JSON.parse(mutations(state)[0].options.body).preferences, prefs)
   await unmount(tree)
-  await act(async () => { getting.resolve(null); await flush() })
-  assert.equal(state.steps.subscribe, 0)
-  assert.equal(mutations(state).length, 0)
 
+  // Run real React cleanup while the OS prompt/subscription is pending.
   const subscribing = deferred()
-  state = resetBrowser({ getSubscription: () => Promise.resolve(null), subscribe: () => subscribing.promise })
+  state = resetBrowser({ subscribe: () => subscribing.promise })
   tree = await mount(); await tap(tree, "Enable on this phone")
   assert.equal(state.steps.subscribe, 1)
   await unmount(tree)
   await act(async () => { subscribing.resolve(state.subscription); await flush() })
   assert.equal(mutations(state).length, 0)
-  assert.equal(state.steps.unsubscribe, 0)
+  assert.equal(state.steps.unsubscribe, 0, "Late cleanup must not revoke a subscription reused by another page")
 
   const saving = deferred()
   state = resetBrowser({ fetch: (_url, options) => options.method === "POST" ? saving.promise : Promise.resolve(response({ enabled: false, preferences: prefs, publicKey })) })
@@ -178,14 +181,74 @@ async function lifecycleContracts() {
   await unmount(tree)
 
   const waiting = deferred()
-  state = resetBrowser({ permission: () => waiting.promise })
+  state = resetBrowser({ subscribe: () => waiting.promise })
   tree = await mount(); await tap(tree, "Enable on this phone")
   const timeout = [...timers.values()].find(timer => timer.delay === 30000)
   assert.ok(timeout)
   await act(async () => { timeout.callback(); await flush() })
-  assert.ok(!button(tree, "Enable on this phone").props.disabled, "A stuck permission step must release busy state after timeout")
-  await act(async () => { waiting.resolve("granted"); await flush() })
+  assert.ok(!button(tree, "Enable on this phone").props.disabled, "A stuck subscription step must release busy state after timeout")
+  await act(async () => { waiting.resolve(state.subscription); await flush() })
   assert.equal(mutations(state).length, 0)
+  await unmount(tree)
+
+  // Preferences save independently of browser permission/worker readiness,
+  // then survive a full React unmount and settings reload.
+  let persisted = { enabled: true, preferences: { ...prefs, hour: 12 }, publicKey }
+  let savingFails = false
+  state = resetBrowser({
+    register: () => Promise.reject(Error("Worker update temporarily unavailable")),
+    subscribe: () => { throw Error("Saving preferences must not touch browser subscription") },
+    permission: () => { throw Error("Saving preferences must not request permission") },
+    fetch: (_url, options) => {
+      if (options.method === "POST") {
+        if (savingFails) return Promise.reject(Error("Offline while saving"))
+        const body = JSON.parse(options.body)
+        assert.equal(body.subscription, undefined)
+        persisted = { ...persisted, preferences: body.preferences }
+      }
+      return Promise.resolve(response(persisted))
+    },
+  })
+  tree = await mount()
+  const requestsBeforeLastType = mutations(state).length
+  await act(async () => { tree.root.findAllByProps({ role: "switch" })[0].props.onChange({ target: { checked: false } }); await flush() })
+  assert.equal(tree.root.findAllByProps({ role: "switch" })[0].props.checked, true, "The last notification type stays selected; turning off has its own explicit action")
+  assert.equal(mutations(state).length, requestsBeforeLastType)
+  assert.equal(persisted.preferences.weekly, true)
+  assert.ok(tree.root.findByProps({ role: "status" }).children.join("").includes("Use Turn off"))
+  const switches = tree.root.findAllByProps({ role: "switch" })
+  await act(async () => { switches[1].props.onChange({ target: { checked: true } }); await flush() })
+  assert.equal(persisted.preferences.upcoming, true, "An opted-in phone automatically persists changed toggles")
+  const deliveryTime = tree.root.findByProps({ "aria-label": "Notification delivery time" })
+  await act(async () => { deliveryTime.props.onChange({ target: { value: "18" } }); await flush() })
+  assert.equal(persisted.preferences.hour, 18)
+  savingFails = true
+  await act(async () => { tree.root.findAllByProps({ role: "switch" })[2].props.onChange({ target: { checked: true } }); await flush() })
+  assert.equal(tree.root.findAllByProps({ role: "switch" })[2].props.checked, true, "A failed save keeps the user's selected preferences available to retry")
+  assert.equal(persisted.preferences.showAmounts, false)
+  assert.ok(tree.root.findByProps({ role: "alert" }).children.join("").includes("Offline"))
+  savingFails = false
+  await tap(tree, "Save preferences")
+  assert.equal(persisted.preferences.showAmounts, true)
+  assert.equal(state.steps.subscribe, 0)
+  assert.equal(state.steps.permission, 0)
+  await unmount(tree)
+  tree = await mount()
+  assert.equal(tree.root.findAllByProps({ role: "switch" })[1].props.checked, true)
+  assert.equal(tree.root.findByProps({ "aria-label": "Notification delivery time" }).props.value, 18)
+  await unmount(tree)
+
+  const loading = deferred()
+  state = resetBrowser({ fetch: () => loading.promise })
+  tree = await mount()
+  assert.ok(tree.root.findAllByProps({ role: "switch" }).every(node => node.props.disabled), "Loading cannot overwrite choices edited before settings arrived")
+  assert.equal(tree.root.findByProps({ className: "bb-notification-state" }).children.join(""), "Loading…")
+  await unmount(tree)
+
+  state = resetBrowser({ subscribe: () => Promise.reject(Object.assign(Error("Denied"), { name: "NotAllowedError" })) })
+  tree = await mount(); await tap(tree, "Enable on this phone")
+  assert.equal(mutations(state).length, 0)
+  assert.ok(tree.root.findByProps({ role: "alert" }).children.join("").includes("iPhone Settings"))
   await unmount(tree)
 
   state = resetBrowser()

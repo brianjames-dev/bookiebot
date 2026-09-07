@@ -1,5 +1,5 @@
-import { useEffect, useId, useRef, useState } from "react"
-import { CollapsibleContent, SlidingSelection } from "./components/ui/motion"
+import { useEffect, useId, useMemo, useRef, useState } from "react"
+import { CollapsibleContent } from "./components/ui/motion"
 import { FittedAmount } from "./components/ui/fitted-amount"
 import type { ExpenseReportData } from "./types"
 import "./report-history.css"
@@ -25,7 +25,7 @@ interface ComparisonPeriod {
 interface ReportPeriodComparison {
   selectedMonth: string
   baselineMonth: string
-  baselineKind: "previous-month" | "previous-year"
+  baselineKind: "previous-month" | "previous-year" | "selected-month"
   throughDay: number
   shortMonthAdjusted: boolean
   selected: ComparisonPeriod | null
@@ -38,8 +38,8 @@ interface ReportPeriodComparison {
 
 export class HistorySessionExpired extends Error {}
 
-export async function requestReportHistory<T>(url: string, controller: AbortController): Promise<T> {
-  const timer = setTimeout(() => controller.abort(), 30000)
+export async function requestReportHistory<T>(url: string, controller: AbortController, timeout = 30000): Promise<T> {
+  const timer = setTimeout(() => controller.abort(), timeout)
   try {
     const response = await fetch(url, {
       credentials: "same-origin", mode: "same-origin", cache: "no-store", redirect: "error", signal: controller.signal,
@@ -125,9 +125,16 @@ export function MonthHistoryControl({ monthLabel, selectedMonth, catalog, loadin
 
 const money = (value: number) => new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format(value)
 
-export function ReportComparison({ report, onExpired }: { report: ExpenseReportData; onExpired: () => void }) {
+export function ReportComparison({ report, onExpired, catalog, catalogLoading = false, catalogError = false, onCatalogRetry }: {
+  report: ExpenseReportData
+  onExpired: () => void
+  catalog?: ReportMonthCatalog | null
+  catalogLoading?: boolean
+  catalogError?: boolean
+  onCatalogRetry?: () => void
+}) {
   const [open, setOpen] = useState(false)
-  const [baseline, setBaseline] = useState<"previous-month" | "previous-year">("previous-month")
+  const [chosenMonth, setChosenMonth] = useState<string | null>(null)
   const [comparison, setComparison] = useState<ReportPeriodComparison | null>(null)
   const [error, setError] = useState(false)
   const [loading, setLoading] = useState(false)
@@ -136,25 +143,53 @@ export function ReportComparison({ report, onExpired }: { report: ExpenseReportD
   expired.current = onExpired
   const id = useId()
   const selectedMonth = `${report.year}-${String(report.month).padStart(2, "0")}`
+  const previousMonth = `${report.month === 1 ? report.year - 1 : report.year}-${String(report.month === 1 ? 12 : report.month - 1).padStart(2, "0")}`
+  const baseline = chosenMonth && chosenMonth !== selectedMonth ? chosenMonth : previousMonth
+  const options = (catalog?.months ?? []).filter((month) => month.value !== selectedMonth && month.value !== previousMonth)
+  // Results belong only to this displayed report. A fresh report invalidates
+  // them; tab changes and disclosure motion do not discard useful live reads.
+  // Keep one request in flight so quick selection changes cannot fill the
+  // server's bounded queue with builds that the phone has already abandoned.
+  const requests = useMemo(() => ({
+    active: false,
+    results: new Map<string, { result?: ReportPeriodComparison; failed?: boolean }>(),
+    pending: null as { controller: AbortController } | null,
+  }), [report])
+  useEffect(() => {
+    requests.active = true
+    return () => {
+      requests.active = false
+      requests.pending?.controller.abort()
+      requests.pending = null
+      requests.results.clear()
+    }
+  }, [requests])
   useEffect(() => {
     if (!open) return
-    let active = true
-    const controller = new AbortController()
-    setComparison(null)
-    setLoading(true)
-    setError(false)
-    requestReportHistory<ReportPeriodComparison>(`/app/expenses/comparison?month=${selectedMonth}&baseline=${baseline}`, controller).then((result) => {
-      if (result.selectedMonth !== selectedMonth || result.baselineKind !== baseline || typeof result.coverageNote !== "string") {
+    const saved = requests.results.get(baseline)
+    setComparison(saved?.result ?? null)
+    setLoading(!saved)
+    setError(Boolean(saved?.failed))
+    if (saved || requests.pending) return
+    const pending = { controller: new AbortController() }
+    requests.pending = pending
+    requestReportHistory<ReportPeriodComparison>(`/app/expenses/comparison?month=${selectedMonth}&compare_month=${baseline}`, pending.controller, 60000).then((result) => {
+      if (result.selectedMonth !== selectedMonth || result.baselineMonth !== baseline || typeof result.coverageNote !== "string") {
         throw new Error("Comparison did not match the selected report")
       }
-      if (active) setComparison(result)
+      if (requests.active && requests.pending === pending) requests.results.set(baseline, { result })
     }).catch((reason) => {
-      if (!active) return
+      if (!requests.active || requests.pending !== pending) return
       if (reason instanceof HistorySessionExpired) expired.current()
-      else setError(true)
-    }).finally(() => { if (active) setLoading(false) })
-    return () => { active = false; controller.abort() }
-  }, [open, baseline, report, selectedMonth, revision])
+      // Session expiry is terminal even if the parent has not unmounted yet.
+      requests.results.set(baseline, { failed: true })
+    }).finally(() => {
+      if (requests.active && requests.pending === pending) {
+        requests.pending = null
+        reload((value) => value + 1)
+      }
+    })
+  }, [open, baseline, requests, selectedMonth, revision])
 
   return <section className="bb-report-comparison" aria-label="Spending comparison">
     <button type="button" className="bb-comparison-toggle" aria-expanded={open} aria-controls={id} onClick={() => setOpen((value) => !value)}>
@@ -162,13 +197,20 @@ export function ReportComparison({ report, onExpired }: { report: ExpenseReportD
     </button>
     <CollapsibleContent open={open} id={id}>
       <div className="bb-comparison-content">
-        <SlidingSelection value={baseline} className="bb-comparison-options" aria-label="Comparison period">
-          <button type="button" aria-pressed={baseline === "previous-month"} onClick={() => setBaseline("previous-month")}>Last month</button>
-          <button type="button" aria-pressed={baseline === "previous-year"} onClick={() => setBaseline("previous-year")}>Last year</button>
-        </SlidingSelection>
+        <label className="bb-comparison-picker">
+          <span>Compare with</span>
+          <select aria-label="Comparison month" value={baseline} onChange={(event) => setChosenMonth(event.target.value)}>
+            <option value={previousMonth}>Last month · {reportMonthLabel(previousMonth)}</option>
+            {options.map((month) => <option key={month.value} value={month.value}>{month.label}</option>)}
+          </select>
+        </label>
+        {catalogLoading && !catalog && <p className="bb-comparison-note">Loading other months…</p>}
+        {(catalogError || (catalog && catalog.coverage.status !== "complete")) && <p className="bb-comparison-note">
+          Some comparison months couldn’t be checked. {onCatalogRetry && <button type="button" disabled={catalogLoading} onClick={onCatalogRetry}>Retry months</button>}
+        </p>}
         <div role="status" aria-live="polite" aria-busy={loading}>
           {loading && <p className="bb-comparison-note">Comparing matching days…</p>}
-          {error && <p className="bb-comparison-note">Couldn’t load the comparison. <button type="button" onClick={() => reload((value) => value + 1)}>Try again</button></p>}
+          {error && <p className="bb-comparison-note">Couldn’t load the comparison. <button type="button" onClick={() => { requests.results.delete(baseline); reload((value) => value + 1) }}>Try again</button></p>}
           {!loading && !error && comparison && <>
             <p className="bb-comparison-note">Dated recorded spending · days 1–{comparison.throughDay}</p>
             {comparison.baseline && comparison.selected && <>
