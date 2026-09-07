@@ -51,6 +51,7 @@ async function main() {
   const redeem = pairing.connect()
   assert.equal(pairingCalls[1].url, "/app/connect")
   assert.equal(pairingCalls[1].init.headers["X-BookieBot-App"], "1")
+  assert.equal(pairingCalls[1].init.referrerPolicy, "same-origin", "Reconnect must keep its real Origin under the no-referrer page policy")
   pairingCalls[1].resolve(response(200, { next: "/app/expenses" }))
   await redeem
   assert.equal(pairing.state.phase, "connected")

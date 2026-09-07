@@ -167,7 +167,8 @@ async def test_all_registered_private_phone_features_require_a_phone_session(pho
 
 
 @pytest.mark.asyncio
-@pytest.mark.parametrize("headers", [{}, {"X-BookieBot-App": "1", "Origin": "https://untrusted.test"}, {**HEADERS, "Sec-Fetch-Site": "cross-site"}])
+@pytest.mark.parametrize("headers", [{}, {"X-BookieBot-App": "1", "Origin": "https://untrusted.test"},
+                                     {**HEADERS, "Origin": "null"}, {**HEADERS, "Sec-Fetch-Site": "cross-site"}])
 async def test_cross_origin_pairing_and_logout_are_rejected(phone, headers):
     token = urlsplit(phone_app.create_phone_setup_url(BRIAN)).fragment
     for endpoint in ("/app/pairing", "/app/connect", "/app/logout"):

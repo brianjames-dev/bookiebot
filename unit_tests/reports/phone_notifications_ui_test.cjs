@@ -103,6 +103,12 @@ function resetBrowser(changes = {}) {
   browser.permission = () => { steps.permission++; return changes.permission ? changes.permission() : Promise.resolve("granted") }
   browserNavigator.serviceWorker = { register: () => { steps.register++; return changes.register ? changes.register() : Promise.resolve(registration) }, ready: Promise.resolve(registration) }
   browser.fetch = (url, options = {}) => {
+    if (["POST", "DELETE"].includes(options.method)) {
+      assert.equal(options.mode, "same-origin")
+      assert.equal(options.referrerPolicy, "same-origin", "Mutations must retain the app Origin despite the page's no-referrer policy")
+      assert.equal(options.credentials, "same-origin")
+      assert.equal(options.redirect, "error")
+    }
     calls.push({ url, options })
     return changes.fetch ? changes.fetch(url, options) : Promise.resolve(response(options.method === "POST"
       ? { enabled: true, preferences: prefs, message: "Accepted" }

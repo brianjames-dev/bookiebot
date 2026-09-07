@@ -4,6 +4,8 @@ Last updated: 2026-09-07
 
 ## Goal
 
+Phone notification origin repair (2026-09-07): Enable/preferences were rejected before storage because same-origin fetches inherited the page no-referrer policy and sent Origin:null. Explicit same-origin request referrer policy preserves the real origin; strict server checks remain. Existing-subscription re-enable and durable preference reload regression added; no delivery, reconciliation or sheet mutations changed. STATUS checklist 96 covers phone acceptance.
+
 Dashboard source-read reliability (2026-09-07): confirmed production Sheets per-user read quota exhaustion. Batched fresh report and comparison-year reads, bounded one-minute comparison-only reuse invalidated on refresh, safe quota feedback and actual HTTP-budget regressions are implemented. Reconciliation, settlement, sheet mutations and notification delivery are unchanged. Verification and device acceptance are tracked in STATUS checklist 95.
 
 Dashboard roadmap completion (2026-09-07): all seven passes / ten approved enhancements implemented. Reimbursement carry-forward and cross-year receipt handling remain as pass 1; subsequent report reads/drilldowns/history/explanations preserve canonical financial behavior. Read-only questions expose no mutation tools. Opt-in phone alerts and personal goal allocations use durable phone storage, independent of bank reconciliation and sheet savings. Combined suite: 1,078 passed with real PostgreSQL; Pyright, frontend, Apps Script and dependency audit checks passed. Responsive synthetic acceptance completed; per-phone opt-in and personal goal entry are intentional user actions described in STATUS checklist 91.

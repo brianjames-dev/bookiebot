@@ -20,8 +20,11 @@ async function whileActive<T>(promise: Promise<T>, signal: AbortSignal): Promise
 }
 
 async function notificationRequest(path: string, controller: AbortController, options: RequestInit = {}) {
+  // The page uses no-referrer. For same-origin POST/DELETE that also makes
+  // Origin null, so the server correctly refuses the save. Preserve the app
+  // origin for these requests while still withholding cross-origin referrers.
   const response = await whileActive(fetch(path, { ...options, headers, credentials: "same-origin", mode: "same-origin",
-    cache: "no-store", redirect: "error", signal: controller.signal }), controller.signal)
+    referrerPolicy: "same-origin", cache: "no-store", redirect: "error", signal: controller.signal }), controller.signal)
   const data = await whileActive(response.json(), controller.signal)
   if (!response.ok) throw new Error(data.error || "Could not update notifications. Please try again.")
   return data

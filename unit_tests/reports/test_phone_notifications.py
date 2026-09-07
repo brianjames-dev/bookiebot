@@ -393,3 +393,77 @@ def test_transport_encrypts_signs_and_disables_redirects(monkeypatch, tmp_path):
     assert client.trust_env is False and kwargs["allow_redirects"] is False and kwargs["timeout"] == 15
     assert "authorization" in {key.lower() for key in kwargs["headers"]}
     assert b"private test content" not in kwargs["data"]
+
+
+@pytest.mark.asyncio
+async def test_deployed_origin_enable_retry_and_existing_endpoint_persist_across_reloads(store, monkeypatch):
+    """A denied browser POST must recover using the endpoint it already created."""
+    origin = "https://bookiebot.example"
+    monkeypatch.setenv("BOOKIEBOT_PUBLIC_BASE_URL", origin)
+    monkeypatch.setattr(phone_app, "build_app_access_store", lambda: store.access)
+    current_store = store
+    monkeypatch.setattr(push, "build_phone_notification_store", lambda: current_store)
+    def unexpected_send(*args):
+        pytest.fail("Notification persistence tests must never deliver a phone push")
+    monkeypatch.setattr(push, "_send_push", unexpected_send)
+    app = web.Application()
+    push.register_phone_notification_routes(app, start_scheduler=False)
+    token, _ = store.access.consume_pairing(store.access.issue_pairing(BRIAN, "brian"))
+    digest = storage.session_hash(token)
+    retained_subscription = subscription("retained-browser-endpoint")
+    initial_preferences = {**storage.DEFAULT_PREFERENCES, "upcoming": True, "hour": 16}
+    changed_preferences = {**initial_preferences, "weekly": False, "showAmounts": True, "hour": 19}
+    def deployed_headers(session_token=token, request_origin=origin):
+        # The loopback server stands in for an HTTPS reverse proxy. Exercise
+        # the production cookie/origin path, not the local development cookie.
+        return {"X-BookieBot-App": "1", "Origin": request_origin, "Sec-Fetch-Site": "same-origin",
+                "Host": "bookiebot.example", "X-Forwarded-Proto": "https",
+                "Cookie": f"__Host-bb_phone={session_token}"}
+    async with TestClient(TestServer(app), cookie_jar=CookieJar(unsafe=True)) as client:
+        body = {"subscription": retained_subscription, "preferences": initial_preferences}
+        denied = await client.post("/app/notifications", json=body, headers=deployed_headers(request_origin="null"))
+        assert denied.status == 403
+        assert (await denied.json())["error"] == "Change notifications from BookieBot."
+        off = await client.get("/app/notifications", headers=deployed_headers())
+        off_settings = await off.json()
+        assert off.status == 200 and off_settings["enabled"] is False
+        assert not current_store.active(0)
+
+        accepted = await client.post("/app/notifications", json=body, headers=deployed_headers())
+        assert accepted.status == 200
+        assert await accepted.json() == {"enabled": True, "preferences": initial_preferences}
+        current_store = storage.PhoneNotificationStore(store.access)
+        reloaded = await client.get("/app/notifications", headers=deployed_headers())
+        settings = await reloaded.json()
+        assert settings == {"enabled": True, "preferences": initial_preferences, "publicKey": off_settings["publicKey"]}
+        assert json.loads(current_store.active(0)[0]["subscription"]) == retained_subscription
+
+        updated = await client.post("/app/notifications", json={"preferences": changed_preferences}, headers=deployed_headers())
+        assert updated.status == 200
+        current_store = storage.PhoneNotificationStore(store.access)
+        reloaded = await client.get("/app/notifications", headers=deployed_headers())
+        assert (await reloaded.json())["preferences"] == changed_preferences
+        assert json.loads(current_store.active(0)[0]["subscription"]) == retained_subscription
+
+        disabled = await client.delete("/app/notifications", headers=deployed_headers())
+        assert disabled.status == 200 and (await disabled.json())["enabled"] is False
+        current_store = storage.PhoneNotificationStore(store.access)
+        assert not current_store.settings(digest)["enabled"]
+        reenabled = await client.post("/app/notifications", json={"subscription": retained_subscription, "preferences": changed_preferences}, headers=deployed_headers())
+        assert reenabled.status == 200
+        current_store = storage.PhoneNotificationStore(store.access)
+        reloaded = await client.get("/app/notifications", headers=deployed_headers())
+        assert (await reloaded.json()) == {"enabled": True, "preferences": changed_preferences, "publicKey": off_settings["publicKey"]}
+        assert len(current_store.active(0)) == 1
+
+        other_token, _ = store.access.consume_pairing(store.access.issue_pairing(HANNAH, "hannah"))
+        other = await client.post("/app/notifications", json=body, headers=deployed_headers(other_token))
+        assert other.status == 400, "Another active owner cannot claim the retained browser endpoint"
+        assert current_store.settings(digest) == {"enabled": True, "preferences": changed_preferences}
+        assert not current_store.settings(storage.session_hash(other_token))["enabled"]
+        store.access.revoke_session(token)
+        for revoked_body in (body, {"preferences": initial_preferences}):
+            rejected = await client.post("/app/notifications", json=revoked_body, headers=deployed_headers())
+            assert rejected.status == 401
+        assert (await client.get("/app/notifications", headers=deployed_headers())).status == 401
+        assert not current_store.active(0)

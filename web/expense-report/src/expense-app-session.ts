@@ -38,6 +38,9 @@ async function requestApp<T>(fetcher: typeof fetch, url: string, controller: Abo
       fetcher(url, {
         ...options,
         credentials: "same-origin", mode: "same-origin", cache: "no-store", redirect: "error",
+        // Keep a real Origin on reconnect/signout POSTs under the page's
+        // no-referrer policy. Cross-origin referrers remain suppressed.
+        referrerPolicy: "same-origin",
         headers: { "X-BookieBot-App": "1", Accept: "application/json", ...options.headers },
         signal: controller.signal,
       }).then(async (response) => {

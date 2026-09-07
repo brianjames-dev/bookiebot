@@ -1,5 +1,9 @@
 # Agent Decisions
 
+## 2026-09-07 - Preserve Origin For Phone Save Requests
+
+Keep the page-level no-referrer privacy policy and strict configured-origin authorization guard. Set referrerPolicy: same-origin on notification and app-session fetches that use mode: same-origin, so POST/DELETE retain their real Origin instead of null. Cross-origin referrers, credentials and redirects remain restricted. Browser permission and an authenticated saved server subscription are distinct: Enable retries may reuse the existing browser endpoint, while On/preferences reflect durable server state. No subscription, schema, delivery or session-lifetime changes are needed. Verify browser-generated headers as well as mocked requests; the previous UI mocks omitted this Fetch-standard behavior. See https://fetch.spec.whatwg.org/#append-a-request-origin-header.
+
 ## 2026-09-07 - Batch Report Reads And Bound Comparison History Reuse
 
 Production logs confirmed Sheets read requests per minute per user were exhausted after repeated comparisons. Read each required workbook with one metadata call and one formatted values batch; preserve canonical calculations and optional reimbursement coverage. Full refresh never reads cached financial rows. Comparison reads only monthly personal/shared grids and schedule inputs for the requested year, builds canonical recorded/scheduled/residual values in memory, and retains those comparison inputs for at most 60 seconds. Month catalog reuse has the same limit; failed/partial catalogs and failed annual reads are not cached.

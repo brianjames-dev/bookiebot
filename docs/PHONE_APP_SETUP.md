@@ -24,6 +24,8 @@ The Home Screen icon is the existing BookieBot holding a piggy bank (`assets/ava
 
 ## Optional phone notifications
 
+If Enable previously showed “Change notifications from BookieBot,” load **Update now** first, then tap **Enable on this phone** again. Existing iPhone permission can be reused; the section must say **On** and confirm the save. Change one preference and refresh to confirm it persists. Reinstalling the Home Screen icon is unnecessary.
+
 Notifications require an installed Home Screen web app on **iOS 16.4 or later** and an explicit permission request from a button tap. [WebKit explains the requirement](https://webkit.org/blog/13878/web-push-for-web-apps-on-ios-and-ipados/).
 
 1. Open BookieBot from its **Home Screen icon**, then expand **Phone notifications**.
