@@ -188,10 +188,10 @@ async def _report_data(request: web.Request) -> web.Response:
         response = _json({"error": "Your report is busy refreshing. Please try again shortly."}, status=503)
         response.headers["Retry-After"] = "5"
         return response
-    except Exception:
-        logger.exception("Could not refresh phone expense report")
+    except Exception as exc:
+        from bookiebot.reports.read_errors import report_read_failure
         # This endpoint deliberately never substitutes a saved snapshot.
-        return _json({"error": "Could not refresh your expenses. Please try again."}, status=503)
+        return report_read_failure(exc, operation="refresh", message="Could not refresh your expenses. Please try again.")
 
 
 async def _logout(request: web.Request) -> web.Response:

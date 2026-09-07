@@ -37,6 +37,7 @@ interface ReportPeriodComparison {
 }
 
 export class HistorySessionExpired extends Error {}
+class HistorySourceBusy extends Error {}
 
 export async function requestReportHistory<T>(url: string, controller: AbortController, timeout = 30000): Promise<T> {
   const timer = setTimeout(() => controller.abort(), timeout)
@@ -53,7 +54,11 @@ export async function requestReportHistory<T>(url: string, controller: AbortCont
         headers: { "X-BookieBot-App": "1", Accept: "application/json" },
       }).then(async (response) => {
         if (response.status === 401) throw new HistorySessionExpired()
-        if (!response.ok) throw new Error("Report history is unavailable")
+        if (!response.ok) {
+          const detail = await response.json().catch(() => null)
+          if (detail?.code === "sheets_rate_limited") throw new HistorySourceBusy()
+          throw new Error("Report history is unavailable")
+        }
         return await response.json() as T
       }).then(resolve, reject)
     })
@@ -149,7 +154,7 @@ export function ReportComparison({ report, onExpired, catalog, catalogLoading = 
   const [open, setOpen] = useState(false)
   const [chosenMonth, setChosenMonth] = useState<string | null>(null)
   const [comparison, setComparison] = useState<ReportPeriodComparison | null>(null)
-  const [error, setError] = useState(false)
+  const [error, setError] = useState("")
   const [loading, setLoading] = useState(false)
   const [revision, reload] = useState(0)
   const expired = useRef(onExpired)
@@ -165,7 +170,7 @@ export function ReportComparison({ report, onExpired, catalog, catalogLoading = 
   // server's bounded queue with builds that the phone has already abandoned.
   const requests = useMemo(() => ({
     active: false,
-    results: new Map<string, { result?: ReportPeriodComparison; failed?: boolean }>(),
+    results: new Map<string, { result?: ReportPeriodComparison; failed?: boolean; message?: string }>(),
     pending: null as { controller: AbortController } | null,
   }), [report])
   useEffect(() => {
@@ -193,7 +198,7 @@ export function ReportComparison({ report, onExpired, catalog, catalogLoading = 
     const saved = requests.results.get(baseline)
     setComparison(saved?.result ?? null)
     setLoading(!saved)
-    setError(Boolean(saved?.failed))
+    setError(saved?.failed ? saved.message ?? "Couldn’t load the comparison." : "")
     if (saved || requests.pending || refreshing) return
     const pending = { controller: new AbortController() }
     requests.pending = pending
@@ -206,7 +211,9 @@ export function ReportComparison({ report, onExpired, catalog, catalogLoading = 
       if (!requests.active || requests.pending !== pending) return
       if (reason instanceof HistorySessionExpired) expired.current()
       // Session expiry is terminal even if the parent has not unmounted yet.
-      requests.results.set(baseline, { failed: true })
+      requests.results.set(baseline, { failed: true, message: reason instanceof HistorySourceBusy
+        ? "Google Sheets is temporarily busy. Wait about a minute, then try again."
+        : "Couldn’t load the comparison." })
     }).finally(() => {
       if (requests.active && requests.pending === pending) {
         requests.pending = null
@@ -234,7 +241,7 @@ export function ReportComparison({ report, onExpired, catalog, catalogLoading = 
         </p>}
         <div role="status" aria-live="polite" aria-busy={loading}>
           {loading && <p className="bb-comparison-note">{refreshing && !requests.pending ? "Waiting for the refreshed report…" : "Comparing matching days…"}</p>}
-          {error && <p className="bb-comparison-note">Couldn’t load the comparison. <button type="button" onClick={() => { requests.results.delete(baseline); reload((value) => value + 1) }}>Try again</button></p>}
+          {error && <p className="bb-comparison-note">{error} <button type="button" onClick={() => { requests.results.delete(baseline); reload((value) => value + 1) }}>Try again</button></p>}
           {!loading && !error && comparison && <>
             <p className="bb-comparison-note">Dated recorded spending · days 1–{comparison.throughDay}</p>
             {comparison.baseline && comparison.selected && <>

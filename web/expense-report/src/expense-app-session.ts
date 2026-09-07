@@ -25,6 +25,7 @@ export function expenseReportIdentity(report: ExpenseReportData) {
 }
 
 class ExpiredSession extends Error {}
+class ReportSourceBusy extends Error {}
 
 async function requestApp<T>(fetcher: typeof fetch, url: string, controller: AbortController,
   timeoutMs: number, options: RequestInit, read: (response: Response) => Promise<T>) {
@@ -41,7 +42,11 @@ async function requestApp<T>(fetcher: typeof fetch, url: string, controller: Abo
         signal: controller.signal,
       }).then(async (response) => {
         if (response.status === 401) throw new ExpiredSession()
-        if (!response.ok) throw new Error("Request unavailable")
+        if (!response.ok) {
+          const detail = await response.json().catch(() => null)
+          if (detail?.code === "sheets_rate_limited") throw new ReportSourceBusy()
+          throw new Error("Request unavailable")
+        }
         return read(response)
       }).then(resolve, reject)
     })
@@ -132,7 +137,9 @@ export class ExpenseAppSession {
       if (error instanceof ExpiredSession) {
         this.publish({ report: null, selectedMonth: null, updatedAt: null, phase: "expired", message: "" })
       } else {
-        this.publish({ phase: this.state.report ? "stale" : "error", message: selectedMonth && !this.state.report
+        this.publish({ phase: this.state.report ? "stale" : "error", message: error instanceof ReportSourceBusy
+          ? "Google Sheets is temporarily busy. Wait about a minute, then refresh."
+          : selectedMonth && !this.state.report
           ? `Couldn’t load ${selectedMonth}. Try again or return to this month.`
           : "Couldn’t refresh. Check your connection and try again." })
       }

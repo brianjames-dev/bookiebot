@@ -12,6 +12,52 @@ from typing import Any
 from gspread.utils import absolute_range_name, fill_gaps
 
 
+def read_workbook_tabs(gc: Any, spreadsheet_id: str, titles: Iterable[str]) -> dict[str, list[list[str]]]:
+    """Read existing requested tabs in one metadata call and one values batch.
+
+    Use the HTTP transport directly: opening a gspread Spreadsheet and then
+    looking up each Worksheet repeats metadata requests. Missing optional tabs
+    are omitted; failed or incomplete reads never masquerade as empty rows.
+    """
+    transport = gc.http_client
+    metadata = transport.fetch_sheet_metadata(spreadsheet_id)
+    sheets = metadata.get("sheets") if isinstance(metadata, dict) else None
+    if not isinstance(sheets, list):
+        raise ValueError("Incomplete workbook metadata")
+    available: set[str] = set()
+    for sheet in sheets:
+        properties = sheet.get("properties") if isinstance(sheet, dict) else None
+        title = properties.get("title") if isinstance(properties, dict) else None
+        if not isinstance(title, str) or not title or title in available:
+            raise ValueError("Invalid workbook tab metadata")
+        available.add(title)
+    selected = list(dict.fromkeys(title for title in titles if title in available))
+    if not selected:
+        return {}
+    result = transport.values_batch_get(spreadsheet_id, [absolute_range_name(title) for title in selected],
+                                        params={"valueRenderOption": "FORMATTED_VALUE"})
+    ranges = result.get("valueRanges") if isinstance(result, dict) else None
+    if not isinstance(ranges, list) or len(ranges) != len(selected):
+        raise ValueError("Incomplete workbook values response")
+    rows_by_title = {}
+    for title, value_range in zip(selected, ranges):
+        reported_range = value_range.get("range") if isinstance(value_range, dict) else None
+        if not isinstance(reported_range, str):
+            raise ValueError("Missing workbook values range")
+        reported_title = reported_range.rsplit("!", 1)[0]
+        if reported_title.startswith("'") and reported_title.endswith("'"):
+            reported_title = reported_title[1:-1].replace("''", "'")
+        if reported_title != title:
+            raise ValueError("Workbook values did not match the requested tab")
+        rows = value_range.get("values", [[]])
+        if not isinstance(rows, list) or not all(isinstance(row, list) and all(
+            isinstance(cell, (str, int, float, bool)) for cell in row
+        ) for row in rows):
+            raise ValueError("Invalid workbook values response")
+        rows_by_title[title] = [[str(value) for value in row] for row in fill_gaps(rows or [[]])]
+    return rows_by_title
+
+
 def optional_sheet(factory: Any) -> Any | None:
     try:
         return factory()

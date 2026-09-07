@@ -385,8 +385,16 @@ def _month_from_message(content: str) -> BudgetMonth:
 
 
 def load_report_worksheets(actor_key: str, month: BudgetMonth) -> ReportWorksheets:
+    from bookiebot.reports.batched_report_reads import batched_report_worksheets, can_batch_report_reads
+    from bookiebot.sheets.auth import get_gspread_client
+    from bookiebot.sheets.repo import GSpreadSheetsRepository
+
     if _is_current_month(month):
         repo = get_sheets_repo()
+        if isinstance(repo, GSpreadSheetsRepository):
+            gc = get_gspread_client()
+            if can_batch_report_reads(gc):
+                return batched_report_worksheets(actor_key, month, gc)
         return ReportWorksheets(
             shared_expenses=repo.expense_sheet(),
             personal_budget=repo.income_sheet(),
@@ -397,9 +405,9 @@ def load_report_worksheets(actor_key: str, month: BudgetMonth) -> ReportWorkshee
             reimbursement_history=read_reimbursement_history(actor_key),
         )
 
-    from bookiebot.sheets.auth import get_gspread_client
-
     gc = get_gspread_client()
+    if can_batch_report_reads(gc):
+        return batched_report_worksheets(actor_key, month, gc)
     context = resolve_sheet_context(actor_key, gc, month.as_datetime())
     personal_spreadsheet = _optional_spreadsheet_by_key(gc, context.personal_budget_spreadsheet_id)
     budget_history = (

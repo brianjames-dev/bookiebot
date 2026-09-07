@@ -171,6 +171,13 @@ async function main() {
   await finish(calls.at(-1), 503, {})
   assert.match(read(), /Couldn’t load/)
   click("Try again")
+  await finish(calls.at(-1), 503, { code: "sheets_rate_limited", error: "PRIVATE PROVIDER DETAILS" })
+  assert.match(read(), /Google Sheets.*minute/)
+  assert.ok(!read().includes("PRIVATE PROVIDER DETAILS"))
+  const quotaCalls = calls.length
+  await flush()
+  assert.equal(calls.length, quotaCalls, "Quota feedback must not automatically hammer the source")
+  click("Try again")
   await finish(calls.at(-1), 200, result("2026-08", "Retry succeeded"))
   assert.match(read(), /Retry succeeded/)
   assert.ok(!read().includes("OBSOLETE"))

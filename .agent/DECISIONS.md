@@ -1,5 +1,11 @@
 # Agent Decisions
 
+## 2026-09-07 - Batch Report Reads And Bound Comparison History Reuse
+
+Production logs confirmed Sheets read requests per minute per user were exhausted after repeated comparisons. Read each required workbook with one metadata call and one formatted values batch; preserve canonical calculations and optional reimbursement coverage. Full refresh never reads cached financial rows. Comparison reads only monthly personal/shared grids and schedule inputs for the requested year, builds canonical recorded/scheduled/residual values in memory, and retains those comparison inputs for at most 60 seconds. Month catalog reuse has the same limit; failed/partial catalogs and failed annual reads are not cached.
+
+Scope all cached values and in-flight work by actor, owner, persons and year. Any new direct report read invalidates that scope across years; generation tokens prevent older in-flight history or full-report handoffs from repopulating it. Rejected work leaves no unowned generation entries. Keep bounded workers/queue/cache and actual worker lifetime, plus the 10-second just-refreshed selected-report handoff. No offline/durable financial cache or mutation retry is added. Source quota errors expose a safe code and Retry-After: 60; logs contain operation, exception class and numeric status only.
+
 ## 2026-09-07 - Recover Comparison After Refresh Without Reopening
 
 Keep comparison requests coordinated with the primary refresh: retain an existing read, defer new reads while busy, and clear failed entries once when refresh finishes. Browser deadlines must reject independently of fetch/response-body cancellation so suspended transports cannot own a UI request slot forever.

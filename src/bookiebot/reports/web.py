@@ -18,6 +18,7 @@ from aiohttp import web
 _REPORT_NAME_RE = re.compile(r"^[A-Za-z0-9._-]+\.html$")
 _EPHEMERAL_REPORT_SECRET = base64.urlsafe_b64encode(os.urandom(32)).decode("ascii")
 _COMPARISON_HANDOFF_SECONDS = 10
+_COMPARISON_READ_SECONDS = 60
 
 
 class _ReportBuildBusy(RuntimeError):
@@ -25,7 +26,7 @@ class _ReportBuildBusy(RuntimeError):
 
 
 class _ReportBuilds:
-    """Bound live reads; hand just-completed data to an adjacent comparison."""
+    """Bound fresh reports and reuse comparison-only reads until refresh/expiry."""
 
     def __init__(self) -> None:
         try:
@@ -36,6 +37,9 @@ class _ReportBuilds:
         self._capacity = limit * 4
         self._tasks: dict[tuple, asyncio.Task[Any]] = {}
         self._comparison_handoffs: dict[tuple, tuple[float, dict[str, Any]]] = {}
+        self._history_reads: dict[tuple, tuple[float, Any]] = {}
+        self._history_epochs: dict[tuple, object] = {}
+        self._data_epochs: dict[tuple, object] = {}
 
     async def render(self, payload: dict) -> str:
         return await self._submit(payload, "html")
@@ -44,18 +48,56 @@ class _ReportBuilds:
         return await self._submit(payload, "data")
 
     async def catalog(self, payload: dict) -> dict[str, Any]:
-        return await self._submit(payload, "catalog")
+        return await self._history_read(payload, "catalog")
 
     async def comparison_data(self, payload: dict) -> dict[str, Any]:
         key = self._key(payload, "data")
-        # A newer refresh always takes precedence, including its failure.
-        if key in self._tasks:
+        # A current-generation refresh takes precedence, including its failure.
+        if key in self._tasks and self._data_epochs.get(key) is self._history_epochs.get(key[1:4]):
             return await self.data(payload)
         self._prune_handoffs()
         handoff = self._comparison_handoffs.get(key)
         if handoff is not None:
             return handoff[1]
-        return await self.data(payload)
+        # A whole comparison year costs one metadata/value pair per workbook.
+        # Subsequent month selections assemble from that same short-lived read,
+        # rather than rebuilding income projections, charts and reimbursements.
+        reports = await self._history_read({**payload, "month": 1}, "comparison-year")
+        result = reports.get(int(payload["month"]))
+        if result is None:
+            from bookiebot.reports.phone_history import UnavailableReportMonthError
+            raise UnavailableReportMonthError("That month's report is not available.")
+        return result
+
+    async def _history_read(self, payload: dict, representation: str) -> Any:
+        self._prune_history()
+        base = self._key(payload, representation)
+        epoch = self._history_epochs.setdefault(base[1:4], object())
+        key = (*base, epoch)
+        saved = self._history_reads.get(key)
+        if saved is not None:
+            return saved[1]
+        return await self._submit(payload, representation, key=key)
+
+    def _prune_history(self) -> None:
+        cutoff = time.monotonic() - _COMPARISON_READ_SECONDS
+        for key, (created, _) in list(self._history_reads.items()):
+            if created <= cutoff:
+                self._history_reads.pop(key, None)
+        active_scopes = {key[1:4] for key in (*self._tasks, *self._history_reads)}
+        for scope in list(self._history_epochs):
+            if scope not in active_scopes:
+                self._history_epochs.pop(scope, None)
+
+    def _invalidate_history(self, key: tuple) -> None:
+        scope = key[1:4]
+        self._history_epochs[scope] = object()
+        for saved in list(self._history_reads):
+            if saved[1:4] == scope:
+                self._history_reads.pop(saved, None)
+        for saved in list(self._comparison_handoffs):
+            if saved[1:4] == scope:
+                self._comparison_handoffs.pop(saved, None)
 
     @staticmethod
     def _key(payload: dict, representation: str) -> tuple:
@@ -74,16 +116,21 @@ class _ReportBuilds:
             if created <= cutoff:
                 self._comparison_handoffs.pop(key, None)
 
-    async def _submit(self, payload: dict, representation: str) -> Any:
-        key = self._key(payload, representation)
+    async def _submit(self, payload: dict, representation: str, *, key: tuple | None = None) -> Any:
+        key = key or self._key(payload, representation)
         task = self._tasks.get(key)
         if task is None:
             # Direct refresh never reads a handoff or falls back to an old one.
             self._comparison_handoffs.pop(key, None)
+            if representation in {"data", "html"}:
+                self._invalidate_history(key)
             if len(self._tasks) >= self._capacity:
+                self._prune_history()
                 raise _ReportBuildBusy("Report refresh is busy. Please try again shortly.")
             task = asyncio.create_task(self._render(payload, representation))
             self._tasks[key] = task
+            if representation == "data":
+                self._data_epochs[key] = self._history_epochs[key[1:4]]
             task.add_done_callback(lambda completed: self._finished(key, completed))
         # An HTTP disconnect must not cancel another request's shared build or
         # release its concurrency slot while the worker thread is still running.
@@ -91,23 +138,37 @@ class _ReportBuilds:
 
     async def _render(self, payload: dict, representation: str = "html") -> Any:
         async with self._semaphore:
-            renderer = (_render_live_report_catalog if representation == "catalog"
+            renderer = (_render_live_comparison_year if representation == "comparison-year"
+                        else _render_live_report_catalog if representation == "catalog"
                         else _render_live_report_data if representation == "data" else _render_live_report)
             return await asyncio.to_thread(renderer, payload)
 
     def _finished(self, key: tuple, task: asyncio.Task[Any]) -> None:
         self._tasks.pop(key, None)
+        data_epoch = self._data_epochs.pop(key, None)
         if not task.cancelled():
             error = task.exception()  # Retrieve failures even if every requester disconnected.
-            if error is None and key[0] == "data":
+            if error is None and key[0] == "data" and data_epoch is self._history_epochs.get(key[1:4]):
                 self._prune_handoffs()
                 self._comparison_handoffs[key] = (time.monotonic(), task.result())
                 while len(self._comparison_handoffs) > self._capacity:
                     self._comparison_handoffs.pop(next(iter(self._comparison_handoffs)))
+            elif error is None and key[0] in {"catalog", "comparison-year"}:
+                result = task.result()
+                # Partial catalogs may reflect a temporary source failure.
+                complete = key[0] != "catalog" or result.get("coverage", {}).get("status") == "complete"
+                if complete and self._history_epochs.get(key[1:4]) is key[-1]:
+                    self._history_reads[key] = (time.monotonic(), result)
+                    while len(self._history_reads) > self._capacity:
+                        self._history_reads.pop(next(iter(self._history_reads)))
+        self._prune_history()
 
     async def close(self) -> None:
         await asyncio.gather(*self._tasks.values(), return_exceptions=True)
         self._comparison_handoffs.clear()
+        self._history_reads.clear()
+        self._history_epochs.clear()
+        self._data_epochs.clear()
 
 
 _REPORT_BUILDS = web.AppKey("bookiebot_report_builds", _ReportBuilds)
@@ -149,6 +210,13 @@ def _render_live_report_catalog(payload: dict) -> dict[str, Any]:
     from bookiebot.sheets.routing import PACIFIC_TZ
     return load_phone_month_catalog(str(payload["actor_key"]), current=datetime(
         int(payload["year"]), int(payload["month"]), 1, tzinfo=PACIFIC_TZ))
+
+
+def _render_live_comparison_year(payload: dict) -> dict[int, dict[str, Any]]:
+    from bookiebot.reports.comparison_reads import load_comparison_year
+    from bookiebot.sheets.routing import sheet_user_context
+    with sheet_user_context(str(payload["actor_key"])):
+        return load_comparison_year(payload)
 
 
 async def _close_report_builds(app: web.Application) -> None:

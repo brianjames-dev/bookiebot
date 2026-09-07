@@ -160,6 +160,7 @@ async def test_comparison_handoff_is_short_lived_bounded_and_identity_scoped(mon
         calls.append(payload)
         return {"revision": len(calls)}
     monkeypatch.setattr(reports_web, "_render_live_report_data", render)
+    monkeypatch.setattr(reports_web, "_render_live_comparison_year", lambda payload: {9: render(payload)})
     builds = reports_web._ReportBuilds()
     payload = dict(actor_key="a", owner_name="Owner", persons=["B", "A"], year=2026, month=9)
     try:
@@ -172,7 +173,7 @@ async def test_comparison_handoff_is_short_lived_bounded_and_identity_scoped(mon
         assert await builds.comparison_data(payload) != fresh
         for change in ({"actor_key": "b"}, {"owner_name": "Other"}, {"persons": ["Other"]}, {"year": 2025}, {"month": 8}):
             count = len(calls)
-            await builds.comparison_data({**payload, **change})
+            await builds.data({**payload, **change})
             assert len(calls) == count + 1
         assert len(builds._comparison_handoffs) == builds._capacity
     finally:
@@ -194,6 +195,7 @@ async def test_comparison_waits_for_newer_refresh_and_never_revives_old_success(
                 raise RuntimeError("Synthetic refresh failure")
         return {"revision": len(calls)}
     monkeypatch.setattr(reports_web, "_render_live_report_data", render)
+    monkeypatch.setattr(reports_web, "_render_live_comparison_year", lambda payload: {9: render(payload)})
     builds = reports_web._ReportBuilds()
     payload = dict(actor_key="a", owner_name="Owner", persons=["A"], year=2026, month=9)
     try:

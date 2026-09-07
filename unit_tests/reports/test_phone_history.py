@@ -140,6 +140,7 @@ async def test_refresh_then_comparison_does_not_rebuild_the_just_loaded_month(mo
     monkeypatch.setattr(history, "now_pacific", lambda: NOW)
     monkeypatch.setattr(history, "phone_month_catalog", catalog)
     monkeypatch.setattr(reports_web, "_render_live_report_data", data)
+    monkeypatch.setattr(reports_web, "_render_live_comparison_year", lambda payload: {8: data({**payload, "month": 8})})
     app = web.Application()
     builds = app[reports_web._REPORT_BUILDS] = reports_web._ReportBuilds()
     try:

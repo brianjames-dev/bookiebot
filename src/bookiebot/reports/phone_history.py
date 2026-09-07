@@ -61,7 +61,10 @@ def load_phone_month_catalog(actor_key: str, *, current: datetime | None = None)
                 title = calendar.month_name[month]
                 if (year, month) <= (now.year, now.month) and title in personal and title in shared:
                     months.append({"value": f"{year:04d}-{month:02d}", "label": f"{title} {year}"})
-        except Exception:
+        except Exception as exc:
+            from bookiebot.reports.read_errors import is_report_quota_error
+            if is_report_quota_error(exc):
+                raise
             unavailable.append(year)
     return {
         "currentMonth": f"{now.year:04d}-{now.month:02d}",
@@ -128,8 +131,9 @@ async def _months(request: web.Request) -> web.Response:
         if await _session(request) is None:
             return _json({"error": "Reconnect this phone using /expense_app in Discord."}, status=401)
         return _json(catalog)
-    except Exception:
-        return _json({"error": "Could not load your report months. Please try again."}, status=503)
+    except Exception as exc:
+        from bookiebot.reports.read_errors import report_read_failure
+        return report_read_failure(exc, operation="catalog", message="Could not load your report months. Please try again.")
 
 
 async def _comparison(request: web.Request) -> web.Response:
@@ -184,8 +188,9 @@ async def _comparison(request: web.Request) -> web.Response:
         return _json({"error": str(exc)}, status=404)
     except _ReportBuildBusy:
         return _json({"error": "Your report is busy refreshing. Please try again shortly."}, status=503)
-    except Exception:
-        return _json({"error": "Could not compare your reports. Please try again."}, status=503)
+    except Exception as exc:
+        from bookiebot.reports.read_errors import report_read_failure
+        return report_read_failure(exc, operation="comparison", message="Could not compare your reports. Please try again.")
 
 
 def register_phone_history_routes(app: web.Application) -> None:
