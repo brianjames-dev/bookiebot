@@ -32,6 +32,7 @@ import { Badge } from "./components/ui/badge"
 import { Card, CardContent, CardHeader, CardTitle } from "./components/ui/card"
 import { FittedAmount } from "./components/ui/fitted-amount"
 import { ReportMenu } from "./components/ui/report-menu"
+import { SavingsGoals } from "./savings-goals"
 import { PhoneNotifications } from "./phone-notifications"
 import { ReportQuestions } from "./report-questions"
 import { SharedReimbursementsCard } from "./shared-reimbursements"
@@ -896,6 +897,8 @@ export function ExpenseReportApp({ report, appControls, appAvatarUrl, appSession
           merchantOccurrences={report.merchantOccurrences}
           onViewChange={dismissChartTooltips}
         />
+
+        {appSession && <SavingsGoals />}
 
         {appSession && <ReportQuestions month={`${report.year}-${String(report.month).padStart(2, "0")}`}
           mode={projectionActive ? "projected" : "current"} onShowSource={showQuestionSource} />}

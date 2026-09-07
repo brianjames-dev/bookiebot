@@ -534,3 +534,9 @@ Decision: Build a fresh selected owner/month/mode report server-side for each ex
 Decision: Store Web Push keys, session-bound subscriptions, preferences and durable delivery claims in the existing phone-access database. Generate VAPID keys once; require an explicit in-app enable and browser permission. Default opted-in preference is a private weekly Monday check-in at 10 AM Pacific; tomorrow payments and lock-screen amounts are separate choices. Restrict delivery to 7 AM–9 PM Pacific, deduplicate per session/event, bound retries, and disable revoked/expired sessions. A failed old endpoint must not delete a newer subscription.
 
 Use a push-only service worker without a fetch cache. Turn off removes server eligibility, retaining a browser endpoint potentially shared with a newer page. Component disposal cancels requests and invalidates pending permission/subscription operations before any mutation. Existing Discord reminders are unchanged; no automatic phone subscription or unsolicited test delivery.
+
+## 2026-09-07 - Track Personal Savings Goals as Manual Allocations
+
+Decision: Persist owner-scoped goals and contribution history in the phone database, using integer cents, owner transaction locks, optimistic versions and durable request IDs/fingerprints. Targets, optional dates, starting balances and contributions are explicit user entries. Reversals preserve history; archival preserves balances/history and supports restore. Serialize first-time PostgreSQL schema creation.
+
+Goal progress is separate from the selected expense month and monthly Saved metric. It does not infer bank balances, transfer money or write budget sheets. Start with personal ownership; shared goals require an explicit household membership model, which current phone identity does not provide.

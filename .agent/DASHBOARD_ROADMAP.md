@@ -10,13 +10,13 @@ Approved by the user on 2026-09-07. Deliver in separate, reviewable passes; pres
 | 4 | Explain headline totals; remember preferred view; deployed-update prompt | Complete | Income/Spent/Left/Saved explain canonical calculations. Each phone restores its own chart/mode preference. Update action loads the new frontend while preserving its authenticated connection. |
 | 5 | Ask BookieBot about the displayed report | Complete | Read-only, owner-scoped questions reuse the existing agent/report calculations, including selected month/mode; answers can identify supporting report details. Keep the entry point compact. |
 | 6 | Optional phone notifications | Complete | User chooses useful notification types, timing and amount visibility; explicit opt-in, per-device unsubscribe, deduplication, delivery tracking and no duplicated Discord reminders by default. |
-| 7 | Savings goals beyond the current month | Queued | Durable goal targets and accumulated balances, clear personal/shared ownership, progress without double-counting monthly savings. |
+| 7 | Savings goals beyond the current month | Complete | Durable goal targets and accumulated balances, clear personal/shared ownership, progress without double-counting monthly savings. |
 
-## Product decisions to settle when the relevant pass starts
+## Implemented defaults
 
-- Notifications: event types, quiet hours, whether amounts appear on the lock screen, and how phone alerts complement existing Discord reminders. Implementing notification infrastructure does not authorize unsolicited messages.
-- Long-term savings: goal names, target amounts/dates, starting balances, funding source, and personal versus household ownership. Reuse reliable existing data where possible; do not infer account balances from budget availability.
-- Assistant: keep answers read-only; confirm desired history retention when adding persistent app conversations.
+- Notifications require each phone’s opt-in. Monday at 10 AM Pacific is the initial weekly preference, tomorrow payments are optional, and lock-screen amounts start hidden. Existing Discord reminders are unchanged.
+- Savings goals belong to the signed-in person. Users explicitly enter targets, dates, starting balances and contributions. Contributions are manual allocations, never inferred bank balances or duplicated monthly savings. Shared goals await an explicit household-membership model.
+- Assistant answers are ephemeral and read-only; there is no persistent app conversation.
 
 ## Scope boundary
 
