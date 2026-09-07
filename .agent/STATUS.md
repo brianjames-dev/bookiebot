@@ -4,12 +4,16 @@ Last updated: 2026-09-06
 
 ## Active Focus
 
+Personal iPhone Home Screen access is implemented and verified: 863 tests passed including real Postgres, Pyright clean, frontend typecheck/build passed. Browser checks covered initial pairing, responsive app layout, fresh values with preserved Projected mode, explicit stale state, signout and pasted-link reconnection. Deploy and follow checklist 88 and `docs/PHONE_APP_SETUP.md` separately for Brian and Hannah.
+
 The user's second expense-report design pass is implemented: symmetric disclosure and dialog motion, sliding selections, calendar markers that fit their day cells, labeled dotted upper Daily Spending guides, and top metric amounts that stay on one line. Combined verification with the latest audit fixes passed: 781 tests, nine optional local Postgres cases skipped, clean Pyright, frontend typecheck/build, and responsive browser checks. Review the deployed design using checklist items 86–87. The existing expected-income and rollover verification queue remains below.
 
 All eight September 6 audit batches are implemented and verified locally. Each batch received focused regressions, broader verification, tracking updates, and an incremental commit/push. Final combined verification: 777 tests passed including real Postgres, Pyright clean, Apps Script and frontend checks passed. GitHub Verification passed on implementation commit `6fd7ce8` ([run](https://github.com/brianjames-dev/bookiebot/actions/runs/34051590441)). The disposable local Postgres test container has been removed. Deployment/manual acceptance remains separate; see `.agent/AUDIT_REMEDIATION_2026-09-06.md`.
 
 
 ## On Deck
+
+0. Deploy the personal phone app and complete acceptance in checklist 88.
 
 1. Review the deployed expense-report design and motion/responsive polish against checklist items 86–87.
 2. Verify the deployed audit fixes in a test workbook/Sandbox using `.agent/AUDIT_REMEDIATION_2026-09-06.md`; complete the live acceptance checks without creating test transactions in real financial data.
@@ -39,6 +43,8 @@ All eight September 6 audit batches are implemented and verified locally. Each b
 26. Explore clarifying questions before logging when BookieBot is uncertain instead of guessing or silently failing.
 
 ## Completed 2026-09-06
+
+- Added personal phone access through private Discord pairing, durable hashed single-use setup tokens and revocable sessions. Stable current-month app reads use the server's owner/default scope and Pacific clock. Foreground/manual refresh preserves same-month controls, identifies stale values, and clears data on expiry/signout. Added installed-app pasted-link reconnection, a fixed existing piggy-bank icon, and rotating in-app avatar. Existing financial calculations and signed report access remain unchanged. Verification: 863 tests passed including real Postgres, one existing Kaleido warning; Pyright clean; frontend typecheck/build and runtime session checks passed. Synthetic browser acceptance passed at desktop and 390px for pairing, fresh/stale data, view preservation, signout and reconnection. Phone/deployment guide, README and decisions updated.
 
 - Implemented the second frontend polish pass. All inline Details/View all and reimbursement disclosures share symmetric 240ms expansion/collapse, with closed content removed from keyboard navigation. Chart tooltips now fade in as well as out. Category/Calendar dialogs fade and move gently on entry/exit while retaining native focus trapping and page scroll locking until close completes. Reduced-motion preferences remain supported.
 - Added measured sliding selection indicators for report mode, chart navigation, category/daily/calendar/subscription filters, and expense highlights; the theme switch also slides. Largest/Most Frequent content transitions preserve its existing charts and lists. Top metric amounts fit their measured column width on one line and grow back when space returns.
@@ -770,6 +776,8 @@ Use a test row or low-risk real row in Discord:
     - Resize the calendar through desktop, tablet, 390px, and 320px widths. On dates with several payments and large amounts, labels must fit inside their marker and day cell; compact dot/count markers must retain exact event names and amounts on hover/focus and in accessible labels.
     - Switch Daily Spending through All/Needs/Wants with ordinary values, empty data, and a rent outlier. The zero baseline stays solid; a dotted line and dollar increment remain near the top, with no extra solid upper border. Hovered actual amounts and stacked totals remain unchanged.
     - Inspect Income, Spent, Left, and Saved while narrowing/widening the page and switching Current/Projected. Every full currency amount remains on one line without overlapping its neighbor, and text returns to its larger size when space permits.
+
+88. Personal phone app: follow `docs/PHONE_APP_SETUP.md` for both users; verify identity/default scope, cold/foreground/manual refresh, same-month filters, rollover, stale/error labels, Sign out, owner reset and pasted-link reconnection. Confirm sessions survive deployment with Postgres or a mounted volume and unauthenticated data/expired/replayed links fail.
 
 ## Verification Baseline
 

@@ -4,6 +4,8 @@ Last updated: 2026-09-06
 
 ## Goal
 
+Phone-app milestone (2026-09-06): implemented stable authenticated Home Screen access, private per-person Discord pairing, durable 180-day revocable sessions, fresh current-month reads, and installed-app reconnection. Existing avatar assets provide installation branding and daily in-app rotation. No financial mutation/reconciliation changes. Verification: 863 tests passed including real Postgres (one existing Kaleido warning), clean Pyright, frontend typecheck/build, and synthetic browser pairing/refresh/stale/signout/reconnect acceptance. Deployed phone acceptance remains STATUS checklist 88 and docs/PHONE_APP_SETUP.md.
+
 Make BookieBot's finance operations reliable, auditable, and easy to reason about. This includes bank reconciliation, transaction inbox behavior, event logging, and the recent transactions flow for update, move, delete, and undo.
 
 ## Priority Source

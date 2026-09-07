@@ -24,6 +24,7 @@ from bookiebot.reports.expense_breakdown import (
     month_from_entities_or_message,
     write_expense_breakdown_report,
 )
+from bookiebot.reports.scope import default_expense_report_persons as _expense_breakdown_persons
 from datetime import datetime
 from collections.abc import Awaitable, Callable
 from typing import Any, AsyncContextManager, cast
@@ -1410,14 +1411,6 @@ async def query_expense_breakdown_handler(entities, message):
         return
 
     await message.channel.send(content=text, file=chart_file)
-
-
-def _expense_breakdown_persons(owner_name: str, persons: list[str], requested_person: Any) -> list[str]:
-    requested = str(requested_person or "").strip().lower()
-    brian_cards = {"Brian (BofA)", "Brian (AL)"}
-    if owner_name == "Brian" and set(persons) == brian_cards and requested in {"", "brian"}:
-        return ["Brian (BofA)"]
-    return persons
 
 
 async def query_total_for_category_handler(entities, message):

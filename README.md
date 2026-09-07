@@ -174,6 +174,10 @@ A durable import operation prevents duplicate writes from repeated forms or retr
 
 ## Expense Report Access
 
+Use **`/expense_app`** from your own Discord account to install your personal iPhone Home Screen app. It opens the current month and refreshes on launch/foreground return. See [phone setup and deployment instructions](docs/PHONE_APP_SETUP.md), including reconnecting an existing icon. **`/expense_app_reset`** revokes your phone access. The icon reuses BookieBot's piggy-bank avatar; the avatar inside the app rotates daily.
+
+Phone sessions use durable storage: `BOOKIEBOT_APP_DATABASE_URL`, existing `BANK_DATABASE_URL`, or `DATABASE_URL`, in that order. Railway can alternatively use a mounted volume; ephemeral session storage is refused. This feature does not require Plaid.
+
 Live and saved expense reports require an unexpired signed report link. Direct filename links also need the token issued for that exact file. Responses are private and are not cached. If live refresh fails, a valid link can still show its saved snapshot.
 
 Live builds run outside the Discord event loop. `BOOKIEBOT_REPORT_MAX_CONCURRENT_BUILDS` defaults to `2` (supported range `1`–`8`); simultaneous requests for the same actor/month share work, while later refreshes read current sheet values. Historical reads are batched, and report reads do not create missing bill-schedule or reimbursement worksheets.

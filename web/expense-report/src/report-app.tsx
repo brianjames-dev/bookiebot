@@ -507,7 +507,7 @@ function useViewportScrollbarWidth() {
   }, [])
 }
 
-export function ExpenseReportApp({ report }: { report: ExpenseReportData }) {
+export function ExpenseReportApp({ report, appControls, appAvatarUrl }: { report: ExpenseReportData; appControls?: ReactNode; appAvatarUrl?: string }) {
   const { theme, toggleTheme } = useExpenseReportTheme()
   useViewportScrollbarWidth()
   const dailySpendingDetailsOpen = useMediaQuery("(min-width: 861px)")
@@ -731,7 +731,7 @@ export function ExpenseReportApp({ report }: { report: ExpenseReportData }) {
   return (
     <div className="bb-page">
       <div className="bb-masthead">
-        <span className="bb-wordmark"><span className="bb-wordmark-symbol" aria-hidden="true">b.</span>BookieBot</span>
+        <span className="bb-wordmark">{appAvatarUrl ? <img className="bb-app-avatar" src={appAvatarUrl} alt="" /> : <span className="bb-wordmark-symbol" aria-hidden="true">b.</span>}BookieBot</span>
         <div className="bb-masthead-actions">
           <span>{report.ownerName} / {report.year}</span>
           <ThemeToggle theme={theme} onToggle={toggleTheme} />
@@ -749,9 +749,10 @@ export function ExpenseReportApp({ report }: { report: ExpenseReportData }) {
             active={projectionActive}
             onToggle={toggleProjection}
           />
-          <span className="bb-report-updated">Updated {generatedTimeLabel(report.generatedAt)}</span>
+          {!appControls && <span className="bb-report-updated">Updated {generatedTimeLabel(report.generatedAt)}</span>}
         </div>
       </header>
+      {appControls}
 
       <ChartTooltipDismissProvider revision={chartTooltipDismissRevision}>
         <main className="bb-main" data-bb-tooltip-dismiss-revision={chartTooltipDismissRevision}>

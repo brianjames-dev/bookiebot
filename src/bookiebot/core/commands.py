@@ -30,10 +30,12 @@ from bookiebot.core.bank_reconciliation import (
 from bookiebot.core.bank_reconciliation_flow import send_bank_reconciliation_detail
 from bookiebot.logging_config import get_recent_logs, uptime_seconds
 from bookiebot.sheets.routing import (
+    APPLE_SHORTCUT_RELAY_USER_ID,
     get_current_year,
     get_user_config,
     get_year_config,
     MissingYearConfigError,
+    UnknownDiscordUserError,
     now_pacific,
     sheet_user_context,
 )
@@ -50,6 +52,14 @@ async def _send_bank_command_error(interaction: discord.Interaction, content: st
         await interaction.edit_original_response(content=content)
     else:
         await interaction.response.send_message(content, ephemeral=True)
+
+
+def _phone_command_actor_key(user: discord.abc.User) -> str:
+    actor_key = str(user.id)
+    if user.bot or not actor_key.isdecimal() or actor_key == APPLE_SHORTCUT_RELAY_USER_ID:
+        raise UnknownDiscordUserError("Phone access requires a mapped personal Discord account")
+    get_user_config(actor_key)
+    return actor_key
 
 
 def _bank_date_to_sheet_date(value: str | None) -> str:
@@ -173,6 +183,69 @@ def _log_bank_reconciliation_income(
 
 
 def register_commands(tree: app_commands.CommandTree):
+    @tree.command(name="expense_app", description="Set up your private BookieBot expense report on your phone")
+    async def expense_app(interaction: discord.Interaction):
+        try:
+            actor_key = _phone_command_actor_key(interaction.user)
+        except UnknownDiscordUserError:
+            await interaction.response.send_message(
+                "Use your own Discord account connected to a BookieBot budget to set up phone access.",
+                ephemeral=True,
+            )
+            return
+        except Exception:
+            await interaction.response.send_message("Phone setup is unavailable right now. Please try again shortly.", ephemeral=True)
+            return
+
+        await interaction.response.defer(ephemeral=True)
+        try:
+            from bookiebot.reports.phone_app import create_phone_setup_url
+
+            setup_url = await asyncio.to_thread(create_phone_setup_url, actor_key)
+        except Exception:
+            await interaction.edit_original_response(content="Phone setup is unavailable right now. Please try again shortly.")
+            return
+
+        view = discord.ui.View(timeout=900)
+        view.add_item(discord.ui.Button(label="Set up BookieBot", style=discord.ButtonStyle.link, url=setup_url))
+        await interaction.edit_original_response(
+            content=(
+                "Open this private setup link in Safari on your phone within 15 minutes. "
+                "Connect your phone, then use Share → Add to Home Screen to add BookieBot.\n\n"
+                "Already added BookieBot? Copy this setup link and paste it into the app’s Reconnect screen.\n"
+                f"<{setup_url}>\n\n"
+                "Keep this link private. Each person should run `/expense_app` from their own Discord account."
+            ),
+            view=view,
+        )
+
+    @tree.command(name="expense_app_reset", description="Disconnect all your phones and cancel pending BookieBot phone setup links")
+    async def expense_app_reset(interaction: discord.Interaction):
+        try:
+            actor_key = _phone_command_actor_key(interaction.user)
+        except UnknownDiscordUserError:
+            await interaction.response.send_message(
+                "Use your own Discord account connected to a BookieBot budget to reset phone access.",
+                ephemeral=True,
+            )
+            return
+        except Exception:
+            await interaction.response.send_message("Phone access could not be reset right now. Please try again shortly.", ephemeral=True)
+            return
+
+        await interaction.response.defer(ephemeral=True)
+        try:
+            from bookiebot.reports.phone_app import reset_phone_access
+
+            await asyncio.to_thread(reset_phone_access, actor_key)
+        except Exception:
+            await interaction.edit_original_response(content="Phone access could not be reset right now. Please try again shortly.")
+            return
+
+        await interaction.edit_original_response(
+            content="All your connected phones and pending setup links have been disconnected. Run `/expense_app` to connect a phone again.",
+        )
+
     @tree.command(name="debug_bank_status", description="(Admin) Show read-only bank integration status")
     async def debug_bank_status(interaction: discord.Interaction):
         if not auth.is_debug_allowed(interaction.user):

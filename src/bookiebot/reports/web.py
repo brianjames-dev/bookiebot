@@ -33,10 +33,17 @@ class _ReportBuilds:
             limit = 2
         self._semaphore = asyncio.Semaphore(limit)
         self._capacity = limit * 4
-        self._tasks: dict[tuple, asyncio.Task[str]] = {}
+        self._tasks: dict[tuple, asyncio.Task[Any]] = {}
 
     async def render(self, payload: dict) -> str:
+        return await self._submit(payload, "html")
+
+    async def data(self, payload: dict) -> dict[str, Any]:
+        return await self._submit(payload, "data")
+
+    async def _submit(self, payload: dict, representation: str) -> Any:
         key = (
+            representation,
             str(payload["actor_key"]),
             str(payload["owner_name"]),
             tuple(sorted(str(person) for person in payload["persons"])),
@@ -47,16 +54,17 @@ class _ReportBuilds:
         if task is None:
             if len(self._tasks) >= self._capacity:
                 raise _ReportBuildBusy("Report refresh is busy. Please try again shortly.")
-            task = asyncio.create_task(self._render(payload))
+            task = asyncio.create_task(self._render(payload, representation))
             self._tasks[key] = task
             task.add_done_callback(lambda completed: self._finished(key, completed))
         # An HTTP disconnect must not cancel another request's shared build or
         # release its concurrency slot while the worker thread is still running.
         return await asyncio.shield(task)
 
-    async def _render(self, payload: dict) -> str:
+    async def _render(self, payload: dict, representation: str = "html") -> Any:
         async with self._semaphore:
-            return await asyncio.to_thread(_render_live_report, payload)
+            renderer = _render_live_report_data if representation == "data" else _render_live_report
+            return await asyncio.to_thread(renderer, payload)
 
     def _finished(self, key: tuple, task: asyncio.Task[str]) -> None:
         self._tasks.pop(key, None)
@@ -83,6 +91,21 @@ def _render_live_report(payload: dict) -> str:
             month=BudgetMonth(int(payload["year"]), int(payload["month"])),
         )
         return render_expense_breakdown_html(report)
+
+
+def _render_live_report_data(payload: dict) -> dict[str, Any]:
+    from bookiebot.reports.expense_breakdown import BudgetMonth, build_expense_breakdown_report, expense_breakdown_client_payload
+    from bookiebot.sheets.routing import sheet_user_context
+
+    actor_key = str(payload["actor_key"])
+    with sheet_user_context(actor_key):
+        report = build_expense_breakdown_report(
+            actor_key=actor_key,
+            owner_name=str(payload["owner_name"]),
+            persons=[str(person) for person in payload["persons"]],
+            month=BudgetMonth(int(payload["year"]), int(payload["month"])),
+        )
+        return expense_breakdown_client_payload(report)
 
 
 async def _close_report_builds(app: web.Application) -> None:
@@ -146,10 +169,13 @@ def create_expense_report_token(
 
 
 def register_report_routes(app: web.Application) -> None:
+    from bookiebot.reports.phone_app import register_phone_app_routes
+
     app[_REPORT_BUILDS] = _ReportBuilds()
     app.on_cleanup.append(_close_report_builds)
     app.router.add_get("/reports/expense-breakdown", _serve_expense_breakdown_report)
     app.router.add_get("/reports/{name}", _serve_report)
+    register_phone_app_routes(app)
 
 
 async def _serve_expense_breakdown_report(request: web.Request) -> web.StreamResponse:

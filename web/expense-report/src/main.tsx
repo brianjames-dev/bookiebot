@@ -2,6 +2,8 @@ import React from "react"
 import { createRoot } from "react-dom/client"
 
 import { ExpenseReportApp } from "./report-app"
+import { FreshExpenseApp } from "./fresh-expense-app"
+import type { ExpenseAppConfig } from "./expense-app-session"
 import type { ExpenseReportData } from "./types"
 import "./styles.css"
 
@@ -16,9 +18,12 @@ function readReportData(): ExpenseReportData {
 const root = document.getElementById("bookiebot-expense-report-root")
 
 if (root) {
+  const appConfig = document.getElementById("bookiebot-expense-app-config")
   createRoot(root).render(
     <React.StrictMode>
-      <ExpenseReportApp report={readReportData()} />
+      {appConfig?.textContent
+        ? <FreshExpenseApp config={JSON.parse(appConfig.textContent) as ExpenseAppConfig} />
+        : <ExpenseReportApp report={readReportData()} />}
     </React.StrictMode>,
   )
 }

@@ -1,5 +1,13 @@
 # Agent Decisions
 
+## 2026-09-06 - Pair Personal Phones For Current Expense Reports
+
+Use stable `/app/expenses` with enrollment tied only to the actual mapped Discord interaction user. Fifteen-minute fragment links require explicit confirmation and atomic single-use redemption. Store token hashes and revocable 180-day read-only sessions in separate Postgres/durable SQLite tables; reject ephemeral Railway storage. Secure HttpOnly cookies identify the phone. Recheck revocation before delivering a report.
+
+Resolve owner/default person scope and current Pacific month server-side. Refresh on launch/foreground/manual action, preserve same-month UI state, and label stale responses rather than silently substituting snapshots. Keep financial data no-store. Installed-app reconnection accepts a pasted private link because Safari and installed apps have separate cookie stores after installation. Existing signed links remain separate.
+
+Use the existing piggy-bank avatar for installation and daily rotating avatar inside the app; do not promise automatic rotation of an iOS Home Screen icon.
+
 Record durable technical decisions here. Keep entries short and dated.
 
 ## 2026-06-14 - Use Agent Tracking Files
