@@ -2014,7 +2014,9 @@ def test_report_frontend_calendar_largest_and_burn_rate_presentation_regressions
     assert "after cross-category coverage" in source
     assert 'const dailySpendingDetailsOpen = useMediaQuery("(min-width: 861px)")' in source
     assert "defaultDetailsOpen={dailySpendingDetailsOpen}" in source
-    assert '<div className="bb-header-title-row">' in source
+    assert '<h1 className="bb-report-context">{report.monthLabel}' in source
+    assert "<ReportMenu>" in source
+    assert "<h1>Expense Breakdown</h1>" not in source
     assert "bb-burn-rate-primary" in source
 
 

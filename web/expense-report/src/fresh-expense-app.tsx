@@ -2,6 +2,7 @@ import { useEffect, useLayoutEffect, useRef, useState } from "react"
 
 import { ExpenseReportApp } from "./report-app"
 import { ExpenseAppReconnect } from "./expense-app-reconnect"
+import { AppRefreshControl } from "./app-refresh-control"
 import {
   ExpenseAppSession,
   expenseReportIdentity,
@@ -47,31 +48,7 @@ export function FreshExpenseApp({ config }: { config: ExpenseAppConfig }) {
   const busy = state.phase === "loading" || state.phase === "refreshing"
   const disconnected = state.phase === "expired" || state.phase === "signed-out"
   const avatarUrl = `/app/avatar.png?day=${new Date().toISOString().slice(0, 10)}`
-  const updated = state.updatedAt === null ? null : new Date(state.updatedAt).toLocaleString(undefined, {
-    month: "short", day: "numeric", hour: "numeric", minute: "2-digit",
-  })
-  const status = state.signingOut ? "Signing out…" : busy
-    ? state.report ? "Refreshing your report…" : "Opening your report…"
-    : state.phase === "stale" || state.phase === "error" ? state.message
-    : "Your report is up to date."
-
-  const controls = (
-    <div className="bb-app-controls" data-state={state.phase}>
-      <div className="bb-app-status" role="status" aria-live="polite" aria-atomic="true">
-        <span>{status}</span>
-        {updated && <span className="bb-app-updated">{state.phase === "stale" ? "Showing last update" : "Last updated"} {updated}</span>}
-      </div>
-      <div className="bb-app-buttons">
-        <button className="bb-app-button" type="button" disabled={busy || state.signingOut} onClick={refresh}>
-          <span className={busy ? "bb-app-refresh-icon is-refreshing" : "bb-app-refresh-icon"} aria-hidden="true">↻</span>
-          {busy ? "Refreshing" : "Refresh"}
-        </button>
-        <button className="bb-app-button bb-app-signout" type="button" disabled={state.signingOut} onClick={signOut}>
-          {state.signingOut ? "Signing out…" : "Sign out"}
-        </button>
-      </div>
-    </div>
-  )
+  const controls = <AppRefreshControl state={state} refresh={refresh} />
 
   if (state.report) {
     return <ExpenseReportApp
@@ -79,6 +56,7 @@ export function FreshExpenseApp({ config }: { config: ExpenseAppConfig }) {
       report={state.report}
       appControls={controls}
       appAvatarUrl={avatarUrl}
+      appSession={{ signOut, signingOut: state.signingOut }}
     />
   }
 

@@ -1,5 +1,11 @@
 # Agent Decisions
 
+## 2026-09-07 - Keep Routine Report Controls Compact
+
+Show month/person once and put theme/signout in an accessible three-dot disclosure. Keep Current/Projected visible and use an icon refresh with one update timestamp; refresh failures remain explicit and identify the last successful data. This changes presentation and control placement without changing session duration, data refresh triggers or financial calculations.
+
+Keep native modal focus trapping while a stationary dialog hosts the animated shade/surface; close natively before unlocking page scroll. Responsive line charts follow the existing disclosure animation directly instead of interpolating every resize again. Calendar category identity includes mixed-color day dots; today uses the same Pacific reporting clock.
+
 ## 2026-09-06 - Pair Personal Phones For Current Expense Reports
 
 Use stable `/app/expenses` with enrollment tied only to the actual mapped Discord interaction user. Fifteen-minute fragment links require explicit confirmation and atomic single-use redemption. Store token hashes and revocable 180-day read-only sessions in separate Postgres/durable SQLite tables; reject ephemeral Railway storage. Secure HttpOnly cookies identify the phone. Recheck revocation before delivering a report.

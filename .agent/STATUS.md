@@ -1,10 +1,12 @@
 # Agent Status
 
-Last updated: 2026-09-06
+Last updated: 2026-09-07
 
 ## Active Focus
 
-Personal iPhone Home Screen access is implemented and verified: 863 tests passed including real Postgres, Pyright clean, frontend typecheck/build passed. Browser checks covered initial pairing, responsive app layout, fresh values with preserved Projected mode, explicit stale state, signout and pasted-link reconnection. Deploy and follow checklist 88 and `docs/PHONE_APP_SETUP.md` separately for Brian and Hannah.
+The compact expense-report header and phone polish are implemented and verified. Month/person replace the large title, theme/signout live in a three-dot menu, and refresh keeps one update time plus explicit errors. Calendar colors match categories, today is highlighted in Daily Spending, reimbursements use the chart-band background, and modal/chart resize motion is synchronized. Full suite: 846 passed, 22 optional database cases skipped; Pyright and frontend typecheck/build passed. Browser checks covered 320/390/1280px, light/dark themes, menu keyboard behavior, stale/refresh states, exact modal scroll restoration and Projected-state preservation. Deployed iPhone acceptance is checklist 89.
+
+The prior phone-app deployment was verified live at `edc2a2c`; the user confirmed setup works. Initial implementation verification included 863 tests with real Postgres. Keep checklist 88 for connection/reset/restart acceptance and `docs/PHONE_APP_SETUP.md` for setup/reconnection.
 
 The user's second expense-report design pass is implemented: symmetric disclosure and dialog motion, sliding selections, calendar markers that fit their day cells, labeled dotted upper Daily Spending guides, and top metric amounts that stay on one line. Combined verification with the latest audit fixes passed: 781 tests, nine optional local Postgres cases skipped, clean Pyright, frontend typecheck/build, and responsive browser checks. Review the deployed design using checklist items 86–87. The existing expected-income and rollover verification queue remains below.
 
@@ -13,7 +15,7 @@ All eight September 6 audit batches are implemented and verified locally. Each b
 
 ## On Deck
 
-0. Deploy the personal phone app and complete acceptance in checklist 88.
+0. Review the compact header and motion/color polish on both installed iPhone apps using checklist 89.
 
 1. Review the deployed expense-report design and motion/responsive polish against checklist items 86–87.
 2. Verify the deployed audit fixes in a test workbook/Sandbox using `.agent/AUDIT_REMEDIATION_2026-09-06.md`; complete the live acceptance checks without creating test transactions in real financial data.
@@ -41,6 +43,12 @@ All eight September 6 audit batches are implemented and verified locally. Each b
 24. Harden recent-action pending state across restarts/deploys, since selections currently live only in process memory.
 25. Improve targeted recent-action search so commands can find older matches, not only the latest 10 recent actions.
 26. Explore clarifying questions before logging when BookieBot is uncertain instead of guessing or silently failing.
+
+## Completed 2026-09-07
+
+- Simplified the report header with a compact month/person heading, accessible animated settings disclosure, icon refresh and a single update time. Preserved theme, signout, connection lifecycle, stale messages and Current/Projected state. Shared reimbursements now use the same full-width surface as the chart band.
+- Removed the extra Recharts line interpolation during Bills/Burn Rate disclosure resizing. Modal shade/surface animate together within a stationary native dialog; native close restores focus before page scroll unlocks. Calendar single/mixed dots and tooltip labels use the category palette; pending indicators retain full-strength colors. Daily dates highlight only the actual Pacific day in the matching report month/year.
+- Added executed UI regressions for refresh status/menu semantics, category/day rendering and modal lifecycle/focus/scroll ordering. Targeted suite: 73 passed. Full suite: 846 passed, 22 optional Postgres tests skipped (no test DSN), one existing Kaleido warning. Pyright clean; frontend typecheck/build and diff check passed. Synthetic browser checks passed at 320/390/1280px with no horizontal overflow or console warnings/errors. Phone guide and durable workflow decision updated; actual iPhone visual acceptance remains checklist 89.
 
 ## Completed 2026-09-06
 
@@ -779,7 +787,11 @@ Use a test row or low-risk real row in Discord:
 
 88. Personal phone app: follow `docs/PHONE_APP_SETUP.md` for both users; verify identity/default scope, cold/foreground/manual refresh, same-month filters, rollover, stale/error labels, Sign out, owner reset and pasted-link reconnection. Confirm sessions survive deployment with Postgres or a mounted volume and unauthenticated data/expired/replayed links fail.
 
+89. Compact phone UI: fully close/reopen both installed apps after deployment. Verify compact month/person header, Current/Projected, refresh icon/time and three-dot theme/signout controls. Open/close Calendar and Category Mix dialogs via close/backdrop; confirm no final flash or page jump. Toggle Bills/Burn Rate Details and confirm lines resize with the layout. Compare calendar dots and tooltip labels to Category Mix (mixed days show multiple colors); verify today's existing Daily Spending row is highlighted, including near Pacific midnight, and reimbursements use the chart-band background in both themes. Offline/manual refresh must clearly label older data; reconnect and confirm fresh values without resetting Projected.
+
 ## Verification Baseline
+
+2026-09-07 compact phone UI: targeted report/frontend/motion suite **73 passed**; full unit suite **846 passed, 22 optional database tests skipped**, existing Kaleido warning; Pyright **0 errors**; frontend typecheck/build and diff check passed. Synthetic browser verification: 320/390/1280px, light/dark, no horizontal overflow; metrics start near y=201 at 390px, settings focus/Escape works, Calendar close/Escape preserves y=622.5, date 7 highlighted, matching chart/reimbursement backgrounds, Projected retained across successful/failed refreshes, console clean.
 
 Recommended targeted tests for the active workstream:
 

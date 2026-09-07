@@ -28,6 +28,7 @@ import {
 import { Badge } from "./components/ui/badge"
 import { Card, CardContent, CardHeader, CardTitle } from "./components/ui/card"
 import { FittedAmount } from "./components/ui/fitted-amount"
+import { ReportMenu } from "./components/ui/report-menu"
 import { ChartContainer, ChartTooltip, ChartTooltipContent, ChartTooltipDismissProvider } from "./components/ui/chart"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "./components/ui/tabs"
 import { AnimatedDisclosure, CollapsibleContent, SlidingSelection } from "./components/ui/motion"
@@ -507,7 +508,12 @@ function useViewportScrollbarWidth() {
   }, [])
 }
 
-export function ExpenseReportApp({ report, appControls, appAvatarUrl }: { report: ExpenseReportData; appControls?: ReactNode; appAvatarUrl?: string }) {
+export function ExpenseReportApp({ report, appControls, appAvatarUrl, appSession }: {
+  report: ExpenseReportData
+  appControls?: ReactNode
+  appAvatarUrl?: string
+  appSession?: { signOut: () => void; signingOut: boolean }
+}) {
   const { theme, toggleTheme } = useExpenseReportTheme()
   useViewportScrollbarWidth()
   const dailySpendingDetailsOpen = useMediaQuery("(min-width: 861px)")
@@ -732,27 +738,23 @@ export function ExpenseReportApp({ report, appControls, appAvatarUrl }: { report
     <div className="bb-page">
       <div className="bb-masthead">
         <span className="bb-wordmark">{appAvatarUrl ? <img className="bb-app-avatar" src={appAvatarUrl} alt="" /> : <span className="bb-wordmark-symbol" aria-hidden="true">b.</span>}BookieBot</span>
-        <div className="bb-masthead-actions">
-          <span>{report.ownerName} / {report.year}</span>
+        <ReportMenu>
           <ThemeToggle theme={theme} onToggle={toggleTheme} />
-        </div>
+          {appSession && <button type="button" className="bb-report-menu-action" disabled={appSession.signingOut} onClick={appSession.signOut}>
+            {appSession.signingOut ? "Signing out…" : "Sign out"}
+          </button>}
+        </ReportMenu>
       </div>
       <header className="bb-page-header">
-        <div className="bb-header-copy">
-          <p className="bb-report-period">{report.monthLabel}</p>
-          <div className="bb-header-title-row">
-            <h1>Expense Breakdown</h1>
-          </div>
-        </div>
+        <h1 className="bb-report-context">{report.monthLabel}<span> · </span><span>{report.ownerName}</span></h1>
         <div className="bb-header-actions">
           <ProjectionToggle
             active={projectionActive}
             onToggle={toggleProjection}
           />
-          {!appControls && <span className="bb-report-updated">Updated {generatedTimeLabel(report.generatedAt)}</span>}
+          {appControls ?? <span className="bb-report-updated">Updated {generatedTimeLabel(report.generatedAt)}</span>}
         </div>
       </header>
-      {appControls}
 
       <ChartTooltipDismissProvider revision={chartTooltipDismissRevision}>
         <main className="bb-main" data-bb-tooltip-dismiss-revision={chartTooltipDismissRevision}>
@@ -835,7 +837,7 @@ export function ExpenseReportApp({ report, appControls, appAvatarUrl }: { report
               filter={dailySpendingFilter}
               defaultDetailsOpen={dailySpendingDetailsOpen}
             />
-            <DailyEntriesTable entries={dailyTableEntries} categoryColors={categoryColors} />
+            <DailyEntriesTable entries={dailyTableEntries} categoryColors={categoryColors} year={report.year} month={report.month} />
           </CardContent>
         </Card>
 
@@ -1052,7 +1054,7 @@ function ProjectionToggle({ active, onToggle }: { active: boolean; onToggle: () 
 function ThemeToggle({ theme, onToggle }: { theme: ThemeMode; onToggle: () => void }) {
   const isDark = theme === "dark"
   return (
-    <button type="button" className="bb-theme-toggle" aria-pressed={isDark} aria-label={`Turn dark mode ${isDark ? "off" : "on"}`} onClick={onToggle}>
+    <button type="button" className="bb-theme-toggle bb-report-menu-action" aria-pressed={isDark} aria-label={`Turn dark mode ${isDark ? "off" : "on"}`} onClick={onToggle}>
       <span className="bb-theme-toggle-icon" aria-hidden="true">
         <span className="bb-theme-toggle-track">
           <svg viewBox="0 0 24 24" focusable="false">
@@ -1067,6 +1069,8 @@ function ThemeToggle({ theme, onToggle }: { theme: ThemeMode; onToggle: () => vo
           </svg>
         </span>
       </span>
+      <span>Dark mode</span>
+      <span className="bb-theme-setting">{isDark ? "On" : "Off"}</span>
     </button>
   )
 }
@@ -1142,10 +1146,9 @@ function BurnRateChart({
               dot={false}
               activeDot={renderBurnRateActiveDot}
               connectNulls={false}
-              isAnimationActive
-              animationBegin={0}
-              animationDuration={900}
-              animationEasing="ease-out"
+              // The disclosure already animates this chart's measured height.
+              // A second point interpolation lags behind that moving viewport.
+              isAnimationActive={false}
             />
           </LineChart>
         </ResponsiveContainer>
@@ -2856,6 +2859,13 @@ function ModalDetails({
   const dialogRef = useRef<HTMLDialogElement | null>(null)
   useModalPageScrollLock(open)
 
+  const finishClose = () => {
+    // Let native focus restoration run while the page is still locked. The
+    // closed-state cleanup then restores the original scroll position once.
+    if (dialogRef.current?.open) dialogRef.current.close()
+    setPhase("closed")
+  }
+
   useEffect(() => {
     setPhase((current) => current === "closed" ? current : "closing")
   }, [collapseKey])
@@ -2877,7 +2887,7 @@ function ModalDetails({
     if (phase === "closed" && dialog.open) dialog.close()
     if (phase === "closing") {
       const duration = window.matchMedia("(prefers-reduced-motion: reduce)").matches ? 0 : 280
-      const timeout = window.setTimeout(() => setPhase((current) => current === "closing" ? "closed" : current), duration)
+      const timeout = window.setTimeout(finishClose, duration)
       return () => window.clearTimeout(timeout)
     }
   }, [phase])
@@ -2890,10 +2900,7 @@ function ModalDetails({
       data-state={phase}
       aria-label={title}
       onCancel={(event) => { event.preventDefault(); close() }}
-      onClose={() => setPhase("closed")}
-      onTransitionEnd={(event) => {
-        if (event.target === event.currentTarget && event.propertyName === "opacity" && phase === "closing") setPhase("closed")
-      }}
+      onClose={(event) => { if (!event.currentTarget.open) setPhase("closed") }}
       onTouchStart={(event) => event.stopPropagation()}
       onTouchMove={(event) => event.stopPropagation()}
       onTouchEnd={(event) => event.stopPropagation()}
@@ -2904,7 +2911,13 @@ function ModalDetails({
         }
       }}
     >
-      <div className="bb-details-dialog-surface">
+      <div className="bb-details-dialog-shade" aria-hidden="true" onClick={close} />
+      <div
+        className="bb-details-dialog-surface"
+        onTransitionEnd={(event) => {
+          if (event.target === event.currentTarget && event.propertyName === "opacity" && phase === "closing") finishClose()
+        }}
+      >
         <div className="bb-details-dialog-header">
           <strong>{title}</strong>
           <button type="button" className="bb-details-dialog-close" aria-label={`Close ${title}`} onClick={close}>
@@ -3070,7 +3083,12 @@ function MerchantOccurrencesTable({ rows }: { rows: OccurrenceRow[] }) {
   )
 }
 
-function DailyEntriesTable({ entries, categoryColors }: { entries: DailyEntryDisplayRow[]; categoryColors: Record<string, string> }) {
+function DailyEntriesTable({ entries, categoryColors, year, month }: {
+  entries: DailyEntryDisplayRow[]
+  categoryColors: Record<string, string>
+  year: number
+  month: number
+}) {
   if (!entries.length) {
     return <div className="bb-empty">No shared expense entries found.</div>
   }
@@ -3094,9 +3112,19 @@ function DailyEntriesTable({ entries, categoryColors }: { entries: DailyEntryDis
         <tbody>
           {Array.from(grouped.entries()).sort(compareDayGroups).map(([day, dayEntries]) => {
             const total = dayEntries.reduce((sum, entry) => sum + entry.amount, 0)
+            const isToday = isCurrentCalendarDay(year, month, Number(day))
             return (
               <tr key={day}>
-                <td>{day}</td>
+                <td>
+                  <span
+                    className={isToday ? "bb-daily-day bb-daily-day-today" : "bb-daily-day"}
+                    aria-current={isToday ? "date" : undefined}
+                    aria-label={isToday ? `${day}, today` : undefined}
+                    title={isToday ? "Today" : undefined}
+                  >
+                    {day}
+                  </span>
+                </td>
                 <td className="bb-amount">{formatMoney(total)}</td>
                 <td>
                   <div className="bb-transaction-list">
@@ -3257,13 +3285,13 @@ const CALENDAR_FILTERS: Array<{ value: CalendarFilter; label: string }> = [
 const CALENDAR_EVENT_STYLES: Record<CalendarEventKind, { label: string; color: string; background: string }> = {
   subscription: {
     label: "Sub",
-    color: "hsl(var(--chart-2))",
-    background: "hsl(var(--chart-2) / 0.1)",
+    color: CATEGORY_CHART_COLORS.static_bills_subscriptions_needs,
+    background: "hsl(var(--category-subs-needs) / 0.1)",
   },
   bill: {
     label: "Bill",
-    color: "hsl(var(--chart-3))",
-    background: "hsl(var(--chart-3) / 0.1)",
+    color: CATEGORY_CHART_COLORS.bills_utilities,
+    background: "hsl(var(--category-bills) / 0.1)",
   },
   income: {
     label: "Income",
@@ -3505,7 +3533,7 @@ function FinancialCalendar({
                         </button>
                       )
                     })() : filteredEvents.length > 1 ? (() => {
-                      const style = calendarEventStyle(filteredEvents[0])
+                      const style = calendarEventsStyle(filteredEvents)
                       const total = filteredEvents.reduce((sum, event) => sum + event.amount, 0)
                       return (
                         <button
@@ -3524,7 +3552,7 @@ function FinancialCalendar({
                           }}
                           aria-label={`${filteredEvents.length} events on day ${day}: ${filteredEvents.map(calendarEventLabel).join("; ")}`}
                         >
-                          <span className="bb-subscription-marker-dot" />
+                          <span className="bb-subscription-marker-dot" style={{ background: style.dotBackground }} />
                           <span className="bb-calendar-marker-count" aria-hidden="true">
                             +{filteredEvents.length - 1}
                           </span>
@@ -3566,16 +3594,23 @@ function calendarEventsByDay(events: CalendarEvent[]) {
 }
 
 function calendarEventStyle(event: CalendarEvent) {
-  if (event.group === "static_bills_subscriptions_needs") {
-    return { ...CALENDAR_EVENT_STYLES.subscription, color: "hsl(var(--chart-1))", background: "hsl(var(--chart-1) / 0.1)" }
+  const fallback = CALENDAR_EVENT_STYLES[event.kind]
+  const color = event.kind === "income" ? fallback.color : CATEGORY_CHART_COLORS[event.group] ?? fallback.color
+  return { ...fallback, color, background: `color-mix(in srgb, ${color} 10%, transparent)` }
+}
+
+function calendarEventsStyle(events: CalendarEvent[]) {
+  const colors = [...new Set(events.map((event) => calendarEventStyle(event).color))]
+  if (colors.length === 1) {
+    return { ...calendarEventStyle(events[0]), dotBackground: colors[0] }
   }
-  if (event.group === "subscriptions_wants") {
-    return { ...CALENDAR_EVENT_STYLES.subscription, color: "hsl(var(--chart-2))", background: "hsl(var(--chart-2) / 0.1)" }
+  // A consolidated day can contain several categories; its dot shows each one
+  // instead of assigning every payment the first event's category color.
+  return {
+    color: "hsl(var(--muted-foreground))",
+    background: "hsl(var(--muted-foreground) / 0.08)",
+    dotBackground: `conic-gradient(${colors.map((color, index) => `${color} ${index * 100 / colors.length}% ${(index + 1) * 100 / colors.length}%`).join(", ")})`,
   }
-  if (event.group === "rent") {
-    return { ...CALENDAR_EVENT_STYLES.bill, color: "hsl(var(--chart-1))", background: "hsl(var(--chart-1) / 0.1)" }
-  }
-  return CALENDAR_EVENT_STYLES[event.kind]
 }
 
 function calendarEventLabel(event: CalendarEvent) {
@@ -3585,7 +3620,7 @@ function calendarEventLabel(event: CalendarEvent) {
 function CalendarEventTooltip({ event }: { event: CalendarEvent }) {
   return (
     <span className="bb-subscription-tooltip" role="tooltip">
-      <strong>{event.label}</strong>
+      <strong className="bb-calendar-tooltip-category" style={{ color: calendarEventStyle(event).color }}>{event.label}</strong>
       <span>{calendarEventKindLabel(event)}</span>
       <span className="bb-subscription-tooltip-amount">{formatMoney(event.amount)}</span>
     </span>
@@ -3597,7 +3632,11 @@ function CalendarOverflowTooltip({ events, day }: { events: CalendarEvent[]; day
     <span className="bb-subscription-tooltip bb-subscription-tooltip-wide" role="tooltip">
       <strong>More on day {day}</strong>
       {events.map((event, index) => (
-        <span key={`${event.kind}-${event.label}-${event.amount}-${index}`}>
+        <span
+          key={`${event.kind}-${event.label}-${event.amount}-${index}`}
+          className="bb-calendar-tooltip-category"
+          style={{ color: calendarEventStyle(event).color }}
+        >
           {event.label} - {calendarEventKindLabel(event)} - {formatMoney(event.amount)}
         </span>
       ))}
@@ -3689,6 +3728,9 @@ function BillsUtilitiesChart({
               connectNulls
               dot={{ r: 3 }}
               activeDot={{ r: 5 }}
+              // Follow each responsive resize frame; do not tween again after
+              // the shared disclosure has already reached its final height.
+              isAnimationActive={false}
             />
           ))}
         </LineChart>
@@ -3849,13 +3891,13 @@ const SUBSCRIPTION_TONES: Record<SubscriptionTone, { label: string; color: strin
   },
   needs: {
     label: "Needs",
-    color: "hsl(var(--chart-1))",
-    background: "hsl(var(--chart-1) / 0.1)",
+    color: CATEGORY_CHART_COLORS.static_bills_subscriptions_needs,
+    background: "hsl(var(--category-subs-needs) / 0.1)",
   },
   wants: {
     label: "Wants",
-    color: "hsl(var(--chart-2))",
-    background: "hsl(var(--chart-2) / 0.1)",
+    color: CATEGORY_CHART_COLORS.subscriptions_wants,
+    background: "hsl(var(--category-subs-wants) / 0.1)",
   },
 }
 
@@ -4262,9 +4304,17 @@ function monthOnlyLabel(monthLabel: string) {
   return monthLabel.split(/\s+/)[0] || monthLabel
 }
 
-function isCurrentCalendarDay(year: number, month: number, day: number) {
-  const today = new Date()
-  return today.getFullYear() === year && today.getMonth() + 1 === month && today.getDate() === day
+const PACIFIC_CALENDAR_DATE = new Intl.DateTimeFormat("en-US", {
+  timeZone: "America/Los_Angeles",
+  year: "numeric",
+  month: "numeric",
+  day: "numeric",
+})
+
+function isCurrentCalendarDay(year: number, month: number, day: number, now = new Date()) {
+  const parts = PACIFIC_CALENDAR_DATE.formatToParts(now)
+  const date = Object.fromEntries(parts.map((part) => [part.type, Number(part.value)]))
+  return date.year === year && date.month === month && date.day === day
 }
 
 function chartConfig(items: Array<AmountRow | BreakdownItem>) {

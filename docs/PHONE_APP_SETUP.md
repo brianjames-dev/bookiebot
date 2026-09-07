@@ -7,7 +7,7 @@ After deployment and the bot restart, repeat separately for Brian and Hannah:
 3. Verify your name and tap **Connect as Brian** or **Connect as Hannah**.
 4. When your report opens, tap Safari **Share** (or **More → Share**) → **Add to Home Screen**.
 5. Name it **BookieBot**, keep **Open as Web App** enabled if shown, and tap **Add**.
-6. Launch the icon. Confirm your name and current month. It refreshes on opening and returning from the background; **Refresh** updates it manually.
+6. Launch the icon. Confirm your name and current month. It refreshes on opening and returning from the background; the **↻ refresh icon** updates it manually. **Updated** shows the last successful fetch. The **•••** menu contains dark mode and sign out.
 
 Use current iOS when possible. Safari copies sign-in cookies into a newly installed Home Screen app on iOS 17.2 and later. If the app asks to connect, follow the reconnect steps below. Internet is required for fresh sheet values; failed refreshes explicitly identify the previous update.
 
@@ -22,7 +22,9 @@ Access lasts up to 180 days unless signed out or reset. Safari and an installed 
 3. Open your existing BookieBot icon and paste the URL into **Private setup link**.
 4. Tap **Continue**, verify your name, then **Connect as [your name]**.
 
-Hannah must request her own private link. **Sign out** disconnects this browser/app. **`/expense_app_reset`** revokes all your phone sessions and unused setup links, useful after losing a phone. It does not affect the other person or change expenses.
+Hannah must request her own private link. **••• → Sign out** disconnects this browser/app. **`/expense_app_reset`** revokes all your phone sessions and unused setup links, useful after losing a phone. It does not affect the other person or change expenses.
+
+Both phones use the same deployed frontend. After a design update, fully close the app from the app switcher and reopen it to load the new version; reinstalling normally is unnecessary. Refresh updates expense data within the currently loaded version.
 
 ## Deployment
 

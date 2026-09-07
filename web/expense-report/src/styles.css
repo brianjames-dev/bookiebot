@@ -122,14 +122,12 @@ summary {
 }
 
 .bb-page-header {
-  display: flex;
-  align-items: flex-end;
-  justify-content: space-between;
-  gap: 24px;
+  display: grid;
+  gap: 14px;
   width: min(var(--bb-content-max), 100%);
   min-width: 0;
   margin: 0 auto;
-  padding: 36px 0 30px;
+  padding: 8px 0 20px;
 }
 
 .bb-page-header > div {
@@ -137,12 +135,12 @@ summary {
 }
 
 .bb-page-header h1 {
-  margin: 5px 0 0;
+  margin: 0;
   font-family: var(--bb-display-font);
-  font-size: clamp(32px, 4vw, 48px);
+  font-size: clamp(22px, 2.5vw, 28px);
   font-weight: 400;
-  line-height: 1.12;
-  letter-spacing: -0.045em;
+  line-height: 1.3;
+  letter-spacing: -0.025em;
 }
 
 .bb-page-header p {
@@ -150,24 +148,18 @@ summary {
   color: hsl(var(--muted-foreground));
 }
 
-.bb-header-copy {
-  display: grid;
-  gap: 0;
-}
-
-.bb-header-title-row {
-  display: flex;
-  align-items: center;
-  flex-wrap: wrap;
-  gap: 10px;
-  min-width: 0;
+.bb-report-context > span {
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  font-size: 14px;
+  letter-spacing: 0;
+  color: hsl(var(--muted-foreground));
 }
 
 .bb-header-actions {
-  display: grid;
-  flex: 0 0 auto;
-  justify-items: end;
-  gap: 10px;
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
   min-width: 0;
 }
 
@@ -962,8 +954,8 @@ summary {
 }
 
 .bb-subscription-marker-dot {
-  width: 6px;
-  height: 6px;
+  width: 8px;
+  height: 8px;
   flex: 0 0 auto;
   border-radius: 999px;
   background: currentColor;
@@ -995,7 +987,12 @@ summary {
 }
 
 .bb-subscription-marker-pending {
-  opacity: 0.68;
+  border-style: dashed;
+}
+
+.bb-subscription-marker-pending .bb-subscription-marker-name,
+.bb-subscription-marker-pending .bb-subscription-marker-amount {
+  opacity: 0.72;
 }
 
 .bb-subscription-tooltip {
@@ -1028,6 +1025,16 @@ summary {
 
 .bb-subscription-tooltip strong {
   font-weight: 750;
+}
+
+.bb-calendar-tooltip-category::before {
+  content: "";
+  display: inline-block;
+  width: 7px;
+  height: 7px;
+  margin-right: 6px;
+  border-radius: 50%;
+  background: currentColor;
 }
 
 .bb-subscription-tooltip-amount {
@@ -1601,42 +1608,101 @@ summary {
   border-radius: 50%;
 }
 
-.bb-app-controls {
+.bb-icon-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 44px;
+  width: 44px;
+  height: 44px;
+  padding: 10px;
+  border: 0;
+  border-radius: var(--radius);
+  color: hsl(var(--foreground));
+  background: transparent;
+  cursor: pointer;
+  transition: background-color var(--bb-motion-duration) var(--bb-motion-ease), opacity var(--bb-motion-duration) var(--bb-motion-ease);
+}
+.bb-icon-button svg { width: 24px; height: 24px; }
+.bb-icon-button:hover { background: hsl(var(--foreground) / 0.06); }
+.bb-icon-button:disabled { cursor: default; opacity: 0.55; }
+.bb-icon-button:focus-visible,
+.bb-report-menu-action:focus-visible {
+  outline: 2px solid hsl(var(--primary));
+  outline-offset: 2px;
+}
+.bb-report-menu { position: relative; }
+.bb-report-menu-trigger svg { fill: currentColor; }
+.bb-report-menu-panel {
+  position: absolute;
+  z-index: 50;
+  top: calc(100% + 4px);
+  right: 0;
+  width: 210px;
+  padding: 6px;
+  border: 1px solid hsl(var(--border));
+  border-radius: var(--radius);
+  background: hsl(var(--card));
+  box-shadow: 0 10px 30px hsl(0 0% 0% / 0.16);
+  opacity: 0;
+  visibility: hidden;
+  transform: translateY(-5px);
+  transition: opacity var(--bb-motion-duration) var(--bb-motion-ease), transform var(--bb-motion-duration) var(--bb-motion-ease), visibility 0s linear var(--bb-motion-duration);
+}
+.bb-report-menu-panel[data-open="true"] {
+  opacity: 1;
+  visibility: visible;
+  transform: translateY(0);
+  transition-delay: 0s;
+}
+.bb-report-menu-action,
+.bb-theme-toggle.bb-report-menu-action {
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  gap: 14px 24px;
-  flex-wrap: wrap;
-  width: min(var(--bb-content-max), 100%);
-  margin: -8px auto 24px;
-  padding: 14px 0;
-  border-top: 1px solid hsl(var(--border));
-  border-bottom: 1px solid hsl(var(--border));
+  justify-content: flex-start;
+  gap: 10px;
+  width: 100%;
+  min-height: 44px;
+  height: auto;
+  padding: 10px;
+  border: 0;
+  border-radius: 2px;
+  color: hsl(var(--foreground));
+  background: transparent;
+  font: inherit;
+  font-size: 14px;
+  cursor: pointer;
+  transition: background-color var(--bb-motion-duration) var(--bb-motion-ease);
+}
+.bb-report-menu-action:hover { background: hsl(var(--foreground) / 0.06); }
+.bb-report-menu-action:disabled { cursor: default; opacity: 0.55; }
+.bb-theme-setting { margin-left: auto; color: hsl(var(--muted-foreground)); font-size: 12px; }
+
+.bb-app-controls {
+  display: grid;
+  justify-items: end;
+  gap: 2px;
+  min-width: 0;
+  max-width: 260px;
 }
 
 .bb-app-status {
   display: grid;
   gap: 2px;
   min-width: 0;
-  flex: 1 1 260px;
-  font-size: 13px;
+  text-align: right;
+  color: hsl(var(--muted-foreground));
+  font-size: 11px;
 }
 
 .bb-app-updated, .bb-app-owner {
   color: hsl(var(--muted-foreground));
-  font-size: 12px;
+  font-size: inherit;
 }
 
 .bb-app-controls[data-state="stale"] .bb-app-status > span:first-child,
 .bb-app-controls[data-state="error"] .bb-app-status > span:first-child {
   color: hsl(var(--destructive));
-}
-
-.bb-app-buttons {
-  display: flex;
-  flex: 0 1 auto;
-  flex-wrap: wrap;
-  gap: 8px;
 }
 
 .bb-app-button {
@@ -1665,15 +1731,12 @@ summary {
   cursor: default;
 }
 
-.bb-app-signout {
-  border-color: transparent;
-  color: hsl(var(--muted-foreground));
-}
-
 .bb-app-refresh-icon {
-  display: inline-block;
-  font-size: 19px;
-  line-height: 1;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.7;
+  stroke-linecap: round;
+  stroke-linejoin: round;
 }
 
 .bb-app-refresh-icon.is-refreshing {
@@ -1759,7 +1822,6 @@ summary {
 
 @media (max-width: 520px) {
   .bb-app-opening { margin-top: 28px; }
-  .bb-app-status { flex-basis: 100%; }
   .bb-app-loading-sheet { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
 
@@ -2019,43 +2081,64 @@ summary {
 }
 
 .bb-details-dialog {
-  width: min(620px, calc(100% - 32px));
-  max-width: 100%;
-  max-height: min(76vh, 680px);
-  margin: auto;
-  padding: 0;
+  position: fixed;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  max-width: none;
+  max-height: none;
+  margin: 0;
+  padding: 16px;
   overflow: hidden;
-  border: 1px solid hsl(var(--border));
-  border-radius: calc(var(--radius) + 4px);
-  background: hsl(var(--card));
+  border: 0;
+  background: transparent;
   color: hsl(var(--card-foreground));
-  box-shadow: 0 24px 72px rgb(0 0 0 / 0.32);
-  opacity: 0;
-  transform: translateY(12px) scale(0.98);
-  transition: opacity var(--bb-motion-duration) var(--bb-motion-ease), transform var(--bb-motion-duration) var(--bb-motion-ease);
 }
 
-.bb-details-dialog[data-state="open"] {
-  opacity: 1;
-  transform: translateY(0) scale(1);
+.bb-details-dialog[open] {
+  display: grid;
+  place-items: center;
 }
 
+/* Keep the native top-layer host still. Its children share one transition;
+   removing an independently blurred ::backdrop caused a final-frame repaint. */
 .bb-details-dialog::backdrop {
+  background: transparent;
+}
+
+.bb-details-dialog-shade {
+  position: absolute;
+  inset: 0;
   background: rgb(0 0 0 / 0.58);
-  backdrop-filter: blur(2px);
   opacity: 0;
   transition: opacity var(--bb-motion-duration) var(--bb-motion-ease);
 }
 
-.bb-details-dialog[data-state="open"]::backdrop {
-  opacity: 1;
-}
-
 .bb-details-dialog-surface {
+  position: relative;
   display: grid;
   grid-template-rows: auto minmax(0, 1fr);
+  width: min(620px, 100%);
   max-height: min(76vh, 680px);
+  max-height: min(76dvh, 680px);
   min-height: 0;
+  overflow: hidden;
+  border: 1px solid hsl(var(--border));
+  border-radius: calc(var(--radius) + 4px);
+  background: hsl(var(--card));
+  box-shadow: 0 24px 72px rgb(0 0 0 / 0.32);
+  opacity: 0;
+  transform: translate3d(0, 12px, 0) scale(0.98);
+  transition: opacity var(--bb-motion-duration) var(--bb-motion-ease), transform var(--bb-motion-duration) var(--bb-motion-ease);
+}
+
+.bb-details-dialog[data-state="open"] .bb-details-dialog-surface {
+  opacity: 1;
+  transform: translate3d(0, 0, 0) scale(1);
+}
+
+.bb-details-dialog[data-state="open"] .bb-details-dialog-shade {
+  opacity: 1;
 }
 
 .bb-details-dialog-header {
@@ -2364,6 +2447,21 @@ tr:last-child td {
   font-size: 13px;
 }
 
+.bb-daily-day {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 28px;
+  min-height: 28px;
+}
+
+.bb-daily-day-today {
+  border-radius: 50%;
+  background: hsl(var(--primary));
+  color: hsl(var(--primary-foreground));
+  font-weight: 750;
+}
+
 .bb-transaction-list {
   display: grid;
   gap: 6px;
@@ -2397,8 +2495,7 @@ tr:last-child td {
   justify-content: space-between;
   width: min(var(--bb-content-max), 100%);
   margin: auto;
-  padding: 16px 0;
-  border-bottom: 1px solid hsl(var(--border));
+  padding: 12px 0;
 }
 .bb-wordmark {
   display: flex;
@@ -2417,13 +2514,6 @@ tr:last-child td {
   color: hsl(var(--primary-foreground));
   font: 25px/1 var(--bb-display-font);
 }
-.bb-masthead-actions {
-  display: flex;
-  align-items: center;
-  gap: 20px;
-  font-size: 12px;
-  color: hsl(var(--muted-foreground));
-}
 .bb-report-period {
   font-size: 12px;
   text-transform: uppercase;
@@ -2435,6 +2525,7 @@ tr:last-child td {
 }
 .bb-projection-control {
   display: flex;
+  flex-shrink: 0;
   padding: 3px;
   border: 1px solid hsl(var(--border));
   border-radius: var(--radius);
@@ -2466,6 +2557,13 @@ tr:last-child td {
 }
 .bb-report-section:last-child {
   padding-bottom: 0;
+  border-bottom: 0;
+}
+.bb-main > .bb-reimbursement-section {
+  background: hsl(var(--card));
+  color: hsl(var(--card-foreground));
+  box-shadow: 0 0 0 100vmax hsl(var(--card));
+  clip-path: inset(0 -100vmax);
   border-bottom: 0;
 }
 .bb-reimbursement-total {
@@ -2597,7 +2695,6 @@ button:focus-visible, summary:focus-visible {
     grid-template-columns: 1fr;
   }
 
-  .bb-page-header { padding: 28px 0; }
   .bb-metric-card { padding-inline: 16px; }
   .bb-chart-side { border-left: 0; padding-left: 0; }
   .bb-reimbursement-content { gap: 28px; grid-template-columns: minmax(190px, 0.4fr) minmax(0, 1fr); }
@@ -2614,10 +2711,6 @@ button:focus-visible, summary:focus-visible {
 
   .bb-burn-rate-summary > .bb-category-pressure {
     justify-self: stretch;
-  }
-
-  .bb-header-actions {
-    justify-content: flex-end;
   }
 
   .bb-inline-toggle-row .bb-tabs-list {
@@ -2673,8 +2766,6 @@ button:focus-visible, summary:focus-visible {
   }
 
   .bb-card-header { padding: 0 0 20px; }
-
-  .bb-page-header h1 { font-size: 34px; }
 
   .bb-header-actions {
     gap: 8px;
@@ -2744,8 +2835,6 @@ button:focus-visible, summary:focus-visible {
 }
 
 @media (max-width: 640px) {
-  .bb-page-header { align-items: flex-start; flex-direction: column; gap: 20px; }
-  .bb-header-actions { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; width: 100%; }
   .bb-metrics-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); padding: 0; margin-bottom: 20px; }
   .bb-metric-card { padding: 20px 0 20px 20px; }
   .bb-metric-card:nth-child(odd) { border-left: 0; padding-left: 0; padding-right: 16px; }
@@ -2753,7 +2842,6 @@ button:focus-visible, summary:focus-visible {
   .bb-metric-value { font-size: 30px; }
   .bb-savings-progress-labels { flex-direction: column; }
   .bb-savings-progress-labels span:last-child { text-align: left; }
-  .bb-masthead-actions { gap: 12px; }
   .bb-chart-carousel-indicators { width: 100%; gap: 0; justify-content: space-between; }
   .bb-chart-carousel-dot { font-size: 12px; min-height: 52px; }
   .bb-chart-number { display: none; }

@@ -1,7 +1,23 @@
 from pathlib import Path
+import subprocess
+
+import pytest
 
 
 FRONTEND = Path(__file__).resolve().parents[2] / "web/expense-report/src"
+
+
+def test_calendar_colors_and_today_highlight_runtime():
+    root = Path(__file__).resolve().parents[2]
+    if not (root / "web/expense-report/node_modules/typescript").exists():
+        pytest.skip("Install frontend dependencies to execute presentation checks")
+    subprocess.run(
+        ["node", "unit_tests/reports/calendar_presentation_test.cjs"],
+        cwd=root,
+        check=True,
+        capture_output=True,
+        text=True,
+    )
 
 
 def test_calendar_markers_constrain_amounts_and_size_counts_to_the_day_cell():

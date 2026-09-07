@@ -8,11 +8,12 @@ ROOT = Path(__file__).resolve().parents[2]
 FRONTEND = ROOT / "web/expense-report/src"
 
 
-def test_disclosures_retain_content_and_exclude_collapsed_controls_from_focus():
+@pytest.mark.parametrize("script", ["motion_test.cjs", "modal_motion_test.cjs"])
+def test_disclosure_and_modal_motion_lifecycle(script):
     if not (ROOT / "web/expense-report/node_modules/typescript").exists():
         pytest.skip("Install the expense-report frontend dependencies to execute disclosure regression checks")
     subprocess.run(
-        ["node", "unit_tests/reports/motion_test.cjs"],
+        ["node", f"unit_tests/reports/{script}"],
         cwd=ROOT,
         check=True,
         capture_output=True,
@@ -34,7 +35,7 @@ def test_modal_exit_keeps_native_dialog_and_scroll_lock_until_motion_finishes():
     modal = source.split("function ModalDetails", 1)[1].split("function ExpandRowsButton", 1)[0]
     close = modal.split("const close =", 1)[1].split("const modal =", 1)[0]
     cancel = modal.split("onCancel={", 1)[1].split("onClose=", 1)[0]
-    transition = modal.split("onTransitionEnd={", 1)[1].split("onTouchStart=", 1)[0]
+    transition = modal.split("onTransitionEnd={", 1)[1].split("bb-details-dialog-header", 1)[0]
 
     # Escape/close must request an exit, not let the browser remove the dialog
     # immediately. Native focus trapping and scroll lock last through that exit.
@@ -52,6 +53,34 @@ def test_modal_exit_keeps_native_dialog_and_scroll_lock_until_motion_finishes():
     assert "window.setTimeout" in modal
     assert "window.clearTimeout" in modal
     assert "prefers-reduced-motion" in modal
+
+
+def test_modal_surface_and_shade_animate_inside_a_stable_native_top_layer():
+    styles = (FRONTEND / "styles.css").read_text()
+    host = styles.split(".bb-details-dialog {", 1)[1].split("}", 1)[0]
+    backdrop = styles.split(".bb-details-dialog::backdrop {", 1)[1].split("}", 1)[0]
+    shade = styles.split(".bb-details-dialog-shade {", 1)[1].split("}", 1)[0]
+    surface = styles.split(".bb-details-dialog-surface {", 1)[1].split("}", 1)[0]
+
+    # Native top-layer/blur removal must not repaint a still-visible overlay.
+    assert "transform:" not in host
+    assert "transition:" not in host
+    assert "background: transparent" in backdrop
+    assert "backdrop-filter" not in backdrop
+    assert "opacity var(--bb-motion-duration) var(--bb-motion-ease)" in shade
+    assert "opacity var(--bb-motion-duration) var(--bb-motion-ease)" in surface
+
+
+def test_line_coordinates_follow_disclosure_resize_without_a_second_animation():
+    source = (FRONTEND / "report-app.tsx").read_text()
+    for start, end in [
+        ("function BillsUtilitiesChart(", "function billsUtilitiesEvents("),
+        ("function BurnRateChart(", "function BurnRateInfoButton("),
+    ]:
+        chart = source.split(start, 1)[1].split(end, 1)[0]
+        line = chart.split("<Line\n", 1)[1].split("/>", 1)[0]
+        assert "isAnimationActive={false}" in line
+        assert "animationDuration" not in line
 
 
 def test_chart_tooltip_entry_reuses_exit_motion_without_resetting_retained_content():

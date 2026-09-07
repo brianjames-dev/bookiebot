@@ -1,8 +1,10 @@
 # Finance Operations Workstream
 
-Last updated: 2026-09-06
+Last updated: 2026-09-07
 
 ## Goal
+
+Phone UI polish (2026-09-07): compact header/settings menu, retained refresh/error semantics, stable modal closing and synchronized chart resizing, shared calendar category colors, current Pacific day highlight, and chart-colored reimbursement surface are implemented. No financial mutation or reconciliation changes. Targeted suite 73 passed; full suite 846 passed/22 optional database cases skipped; Pyright and frontend checks passed. Responsive synthetic browser acceptance passed; deployed iPhone visual acceptance is STATUS checklist 89. Prior live phone deployment/setup was confirmed.
 
 Phone-app milestone (2026-09-06): implemented stable authenticated Home Screen access, private per-person Discord pairing, durable 180-day revocable sessions, fresh current-month reads, and installed-app reconnection. Existing avatar assets provide installation branding and daily in-app rotation. No financial mutation/reconciliation changes. Verification: 863 tests passed including real Postgres (one existing Kaleido warning), clean Pyright, frontend typecheck/build, and synthetic browser pairing/refresh/stale/signout/reconnect acceptance. Deployed phone acceptance remains STATUS checklist 88 and docs/PHONE_APP_SETUP.md.
 
