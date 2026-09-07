@@ -812,3 +812,7 @@ Fixed a frontend-only blank page when Current/Projected or category filters chan
 ### Dashboard reliability and layout follow-up — 2026-09-07
 
 Completed configurable matching-period comparisons with a bounded single-request phone lifecycle, stable modal geometry/focus, native iPhone notification enable and immediate preference persistence, same-person endpoint rebind with PostgreSQL ownership serialization, and the requested header/chart/detail refinements. The ten-item dashboard roadmap remains complete; bank reconciliation and recent-action backlog are unchanged. Full suite 1,104 passed with real PostgreSQL; typecheck/build, Pyright, Apps Script and phone/desktop browser checks passed. Per-phone opt-in/delivery acceptance is STATUS checklist 93.
+
+### Dashboard refresh/comparison recovery — 2026-09-07
+
+Completed refresh coordination, independently bounded browser aborts, and comparison-only 10-second successful-report handoff with full identity scoping/fresh-read invalidation. Added finite gspread socket timeouts without mutation retries or early worker-slot release. Regression fixtures reproduced duplicate source reads and stalled transport recovery; phone QA recovered both error banners without app restart. Full local 1,051 passed / 60 optional PostgreSQL skipped; typecheck/build/Pyright passed. Reconciliation/recent-action backlog is unchanged; STATUS 94 records acceptance.

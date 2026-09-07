@@ -148,3 +148,71 @@ async def test_live_report_capacity_returns_retryable_response_without_snapshot(
     with pytest.raises(web.HTTPServiceUnavailable) as error:
         await reports_web._serve_expense_breakdown_report(_request(report_app, _token()))
     assert error.value.headers["Retry-After"] == "5"
+
+
+@pytest.mark.asyncio
+async def test_comparison_handoff_is_short_lived_bounded_and_identity_scoped(monkeypatch):
+    monkeypatch.setenv("BOOKIEBOT_REPORT_MAX_CONCURRENT_BUILDS", "1")
+    clock = [100.0]
+    monkeypatch.setattr(reports_web, "time", SimpleNamespace(monotonic=lambda: clock[0]))
+    calls = []
+    def render(payload):
+        calls.append(payload)
+        return {"revision": len(calls)}
+    monkeypatch.setattr(reports_web, "_render_live_report_data", render)
+    builds = reports_web._ReportBuilds()
+    payload = dict(actor_key="a", owner_name="Owner", persons=["B", "A"], year=2026, month=9)
+    try:
+        first = await builds.data(payload)
+        assert await builds.comparison_data({**payload, "persons": ["A", "B"]}) == first
+        fresh = await builds.data(payload)
+        assert fresh != first, "Manual refresh must bypass the comparison handoff"
+        assert await builds.comparison_data(payload) == fresh
+        clock[0] += reports_web._COMPARISON_HANDOFF_SECONDS
+        assert await builds.comparison_data(payload) != fresh
+        for change in ({"actor_key": "b"}, {"owner_name": "Other"}, {"persons": ["Other"]}, {"year": 2025}, {"month": 8}):
+            count = len(calls)
+            await builds.comparison_data({**payload, **change})
+            assert len(calls) == count + 1
+        assert len(builds._comparison_handoffs) == builds._capacity
+    finally:
+        await builds.close()
+    assert not builds._comparison_handoffs
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("fail", [False, True])
+async def test_comparison_waits_for_newer_refresh_and_never_revives_old_success(monkeypatch, fail):
+    started, release = threading.Event(), threading.Event()
+    calls = []
+    def render(_payload):
+        calls.append(len(calls) + 1)
+        if len(calls) == 2:
+            started.set()
+            assert release.wait(2)
+            if fail:
+                raise RuntimeError("Synthetic refresh failure")
+        return {"revision": len(calls)}
+    monkeypatch.setattr(reports_web, "_render_live_report_data", render)
+    builds = reports_web._ReportBuilds()
+    payload = dict(actor_key="a", owner_name="Owner", persons=["A"], year=2026, month=9)
+    try:
+        assert (await builds.data(payload))["revision"] == 1
+        refresh = asyncio.create_task(builds.data(payload))
+        assert await asyncio.to_thread(started.wait, 1)
+        comparison = asyncio.create_task(builds.comparison_data(payload))
+        await asyncio.sleep(0)
+        assert not comparison.done(), "Comparison must not show the previous successful refresh"
+        release.set()
+        results = await asyncio.gather(refresh, comparison, return_exceptions=True)
+        assert calls == [1, 2], "Overlapping callers share the actual newer read"
+        if fail:
+            assert all(isinstance(result, RuntimeError) for result in results)
+            assert not builds._comparison_handoffs
+            assert (await builds.comparison_data(payload))["revision"] == 3
+        else:
+            assert results == [{"revision": 2}, {"revision": 2}]
+            assert (await builds.comparison_data(payload))["revision"] == 2
+    finally:
+        release.set()
+        await builds.close()

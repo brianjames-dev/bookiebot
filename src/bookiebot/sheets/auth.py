@@ -30,6 +30,10 @@ from bookiebot.sheets.routing import (
 load_dotenv()
 
 SCOPES = ["https://www.googleapis.com/auth/spreadsheets"]
+# A stalled socket must eventually release its report worker. Keep individual
+# connection/read waits below the phone's 30-second refresh deadline; this does
+# not retry mutations or cancel a thread while a Sheets request is still active.
+_SHEETS_HTTP_TIMEOUT = (5, 20)
 _GC: Any = None
 _MONTH_WORKSHEET_BY_KEY = {}
 _ACTION_LOG_WORKSHEET_BY_TITLE = {}
@@ -50,11 +54,15 @@ def _get_gc():
         info = json.loads(service_account_json)
         creds = Credentials.from_service_account_info(info, scopes=SCOPES)
         gspread_client = cast(Any, gspread)
-        _GC = gspread_client.authorize(creds)
+        client = gspread_client.authorize(creds)
+        client.set_timeout(_SHEETS_HTTP_TIMEOUT)
         try:
-            setattr(_GC, "bookiebot_service_account_email", str(info.get("client_email") or ""))
+            setattr(client, "bookiebot_service_account_email", str(info.get("client_email") or ""))
         except Exception:
             pass
+        # Publish only after transport configuration, so concurrent callers
+        # cannot observe the default unbounded HTTP timeout.
+        _GC = client
     return _GC
 
 

@@ -119,6 +119,42 @@ async def test_history_endpoints_require_session_and_recheck_revocation(monkeypa
 
 
 @pytest.mark.asyncio
+async def test_refresh_then_comparison_does_not_rebuild_the_just_loaded_month(monkeypatch):
+    calls = []
+    async def session(_request):
+        return SESSION
+    async def catalog(*args, **kwargs):
+        return {"months": [{"value": "2026-09"}, {"value": "2026-08"}],
+                "coverage": {"status": "complete", "unavailableYears": []}}
+    def data(payload):
+        calls.append(payload["month"])
+        # Repeated full builds consume Sheets quota, even when the app already
+        # has this exact current-month result from its just-completed refresh.
+        if calls.count(9) > 1:
+            raise RuntimeError("Synthetic source read budget exceeded")
+        return {"ownerName": payload["owner_name"], "year": payload["year"], "month": payload["month"],
+                "comparisonData": {"recordedExpenses": [], "recordedIncome": [], "scheduledExpenses": [],
+                                   "unitemizedIncome": 0, "unitemizedExpenses": 0}}
+    monkeypatch.setattr(phone_app, "_session", session)
+    monkeypatch.setattr(phone_app, "now_pacific", lambda: NOW)
+    monkeypatch.setattr(history, "now_pacific", lambda: NOW)
+    monkeypatch.setattr(history, "phone_month_catalog", catalog)
+    monkeypatch.setattr(reports_web, "_render_live_report_data", data)
+    app = web.Application()
+    builds = app[reports_web._REPORT_BUILDS] = reports_web._ReportBuilds()
+    try:
+        refreshed = await phone_app._report_data(make_mocked_request("GET", "/app/expenses/data", app=app))
+        assert refreshed.status == 200
+        comparison = await history._comparison(make_mocked_request(
+            "GET", "/app/expenses/comparison?month=2026-09&compare_month=2026-08", app=app))
+        assert comparison.status == 200
+        assert calls == [9, 8]
+        assert comparison.headers["Cache-Control"] == "private, no-store"
+    finally:
+        await builds.close()
+
+
+@pytest.mark.asyncio
 async def test_comparison_route_ignores_caller_owner_and_returns_missing_baseline_explicitly(monkeypatch):
     calls = []
     async def session(_request):
@@ -133,7 +169,7 @@ async def test_comparison_route_ignores_caller_owner_and_returns_missing_baselin
         return {"ownerName": payload["owner_name"], "year": payload["year"], "month": payload["month"],
                 "comparisonData": {"recordedExpenses": [], "recordedIncome": [], "scheduledExpenses": [], "unitemizedIncome": 0, "unitemizedExpenses": 0}}
     app = web.Application()
-    app[reports_web._REPORT_BUILDS] = SimpleNamespace(data=data)
+    app[reports_web._REPORT_BUILDS] = SimpleNamespace(data=data, comparison_data=data)
     request = make_mocked_request("GET", "/app/expenses/comparison?month=2026-09&actor_key=hannah&owner_name=Hannah", app=app)
     response = await history._comparison(request)
     assert response.status == 200
@@ -172,7 +208,7 @@ async def test_custom_comparison_reads_both_months_concurrently_and_preserves_ma
     monkeypatch.setattr(history, "now_pacific", lambda: NOW)
     monkeypatch.setattr(history, "phone_month_catalog", catalog)
     app = web.Application()
-    app[reports_web._REPORT_BUILDS] = SimpleNamespace(data=data)
+    app[reports_web._REPORT_BUILDS] = SimpleNamespace(data=data, comparison_data=data)
     history.register_phone_history_routes(app)
     from aiohttp.test_utils import TestClient, TestServer
     async with TestClient(TestServer(app)) as client:
@@ -220,7 +256,7 @@ async def test_missing_custom_month_stays_unavailable_instead_of_zero_or_unconfi
     monkeypatch.setattr(history, "now_pacific", lambda: NOW)
     monkeypatch.setattr(history, "phone_month_catalog", catalog)
     app = web.Application()
-    app[reports_web._REPORT_BUILDS] = SimpleNamespace(data=data)
+    app[reports_web._REPORT_BUILDS] = SimpleNamespace(data=data, comparison_data=data)
     request = make_mocked_request("GET", "/app/expenses/comparison?month=2026-09&compare_month=2025-09", app=app)
     result = json.loads((await history._comparison(request)).text)
     assert result["status"] == "unavailable"

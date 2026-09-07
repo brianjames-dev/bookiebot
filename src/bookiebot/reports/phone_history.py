@@ -166,11 +166,11 @@ async def _comparison(request: web.Request) -> web.Response:
             # Both reports share the existing bounded build queue. Sequential
             # builds doubled comparison latency and frequently hit phone timeouts.
             selected, baseline = await asyncio.gather(
-                builds.data(phone_report_payload(session, selected_month)),
-                builds.data(phone_report_payload(session, baseline_month)),
+                builds.comparison_data(phone_report_payload(session, selected_month)),
+                builds.comparison_data(phone_report_payload(session, baseline_month)),
             )
         else:
-            selected = await builds.data(phone_report_payload(session, selected_month))
+            selected = await builds.comparison_data(phone_report_payload(session, selected_month))
             baseline = None
         if await _session(request) is None:
             return _json({"error": "Reconnect this phone using /expense_app in Discord."}, status=401)

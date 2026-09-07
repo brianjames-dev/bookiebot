@@ -1,5 +1,11 @@
 # Agent Decisions
 
+## 2026-09-07 - Recover Comparison After Refresh Without Reopening
+
+Keep comparison requests coordinated with the primary refresh: retain an existing read, defer new reads while busy, and clear failed entries once when refresh finishes. Browser deadlines must reject independently of fetch/response-body cancellation so suspended transports cannot own a UI request slot forever.
+
+A bounded in-memory handoff may reuse successful report data for comparisons for at most 10 seconds. It is keyed by actor, owner, person scope, year and month. Direct refresh always starts or joins fresh work and invalidates older handoffs before attempting it; comparison joins newer in-flight work and never falls back after its failure. This reduces duplicated Sheets calls directly after refresh without adding offline or persistent financial caching. Set finite gspread transport connect/read timeouts (5s/20s), including credential transport, while preserving actual worker lifetime and adding no mutation retries.
+
 ## 2026-09-07 - Reliable Comparison And Phone Controls
 
 Compare Spending defaults to the previous month and accepts any other configured available month. Match elapsed days if either side is current. Keep one comparison build in flight per displayed report and reuse its results only until that report is refreshed or unmounted; private data remains no-store. Older installed bundles retain their baseline API compatibility.

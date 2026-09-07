@@ -40,15 +40,27 @@ export class HistorySessionExpired extends Error {}
 
 export async function requestReportHistory<T>(url: string, controller: AbortController, timeout = 30000): Promise<T> {
   const timer = setTimeout(() => controller.abort(), timeout)
+  let abort: () => void = () => {}
   try {
-    const response = await fetch(url, {
-      credentials: "same-origin", mode: "same-origin", cache: "no-store", redirect: "error", signal: controller.signal,
-      headers: { "X-BookieBot-App": "1", Accept: "application/json" },
+    // Release the UI request slot independently of the browser transport. An
+    // aborted fetch/body can remain suspended while a phone loses connectivity.
+    return await new Promise<T>((resolve, reject) => {
+      abort = () => reject(new Error("Report history request interrupted"))
+      controller.signal.addEventListener("abort", abort, { once: true })
+      if (controller.signal.aborted) { abort(); return }
+      fetch(url, {
+        credentials: "same-origin", mode: "same-origin", cache: "no-store", redirect: "error", signal: controller.signal,
+        headers: { "X-BookieBot-App": "1", Accept: "application/json" },
+      }).then(async (response) => {
+        if (response.status === 401) throw new HistorySessionExpired()
+        if (!response.ok) throw new Error("Report history is unavailable")
+        return await response.json() as T
+      }).then(resolve, reject)
     })
-    if (response.status === 401) throw new HistorySessionExpired()
-    if (!response.ok) throw new Error("Report history is unavailable")
-    return await response.json() as T
-  } finally { clearTimeout(timer) }
+  } finally {
+    clearTimeout(timer)
+    controller.signal.removeEventListener("abort", abort)
+  }
 }
 
 export function reportMonthLabel(value: string | null) {
@@ -125,13 +137,14 @@ export function MonthHistoryControl({ monthLabel, selectedMonth, catalog, loadin
 
 const money = (value: number) => new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format(value)
 
-export function ReportComparison({ report, onExpired, catalog, catalogLoading = false, catalogError = false, onCatalogRetry }: {
+export function ReportComparison({ report, onExpired, catalog, catalogLoading = false, catalogError = false, onCatalogRetry, refreshing = false }: {
   report: ExpenseReportData
   onExpired: () => void
   catalog?: ReportMonthCatalog | null
   catalogLoading?: boolean
   catalogError?: boolean
   onCatalogRetry?: () => void
+  refreshing?: boolean
 }) {
   const [open, setOpen] = useState(false)
   const [chosenMonth, setChosenMonth] = useState<string | null>(null)
@@ -164,13 +177,24 @@ export function ReportComparison({ report, onExpired, catalog, catalogLoading = 
       requests.results.clear()
     }
   }, [requests])
+  const refreshCycle = useRef(false)
+  useEffect(() => {
+    if (!refreshing && !refreshCycle.current) return
+    refreshCycle.current = refreshing
+    // A refresh is also an explicit recovery attempt. Clear failures on both
+    // edges so a comparison that fails while refresh is busy gets one retry
+    // when it finishes, including when the original report remains stale.
+    for (const [month, saved] of requests.results) {
+      if (saved.failed) requests.results.delete(month)
+    }
+  }, [refreshing, requests])
   useEffect(() => {
     if (!open) return
     const saved = requests.results.get(baseline)
     setComparison(saved?.result ?? null)
     setLoading(!saved)
     setError(Boolean(saved?.failed))
-    if (saved || requests.pending) return
+    if (saved || requests.pending || refreshing) return
     const pending = { controller: new AbortController() }
     requests.pending = pending
     requestReportHistory<ReportPeriodComparison>(`/app/expenses/comparison?month=${selectedMonth}&compare_month=${baseline}`, pending.controller, 60000).then((result) => {
@@ -189,7 +213,7 @@ export function ReportComparison({ report, onExpired, catalog, catalogLoading = 
         reload((value) => value + 1)
       }
     })
-  }, [open, baseline, requests, selectedMonth, revision])
+  }, [open, baseline, requests, selectedMonth, revision, refreshing])
 
   return <section className="bb-report-comparison" aria-label="Spending comparison">
     <button type="button" className="bb-comparison-toggle" aria-expanded={open} aria-controls={id} onClick={() => setOpen((value) => !value)}>
@@ -209,7 +233,7 @@ export function ReportComparison({ report, onExpired, catalog, catalogLoading = 
           Some comparison months couldn’t be checked. {onCatalogRetry && <button type="button" disabled={catalogLoading} onClick={onCatalogRetry}>Retry months</button>}
         </p>}
         <div role="status" aria-live="polite" aria-busy={loading}>
-          {loading && <p className="bb-comparison-note">Comparing matching days…</p>}
+          {loading && <p className="bb-comparison-note">{refreshing && !requests.pending ? "Waiting for the refreshed report…" : "Comparing matching days…"}</p>}
           {error && <p className="bb-comparison-note">Couldn’t load the comparison. <button type="button" onClick={() => { requests.results.delete(baseline); reload((value) => value + 1) }}>Try again</button></p>}
           {!loading && !error && comparison && <>
             <p className="bb-comparison-note">Dated recorded spending · days 1–{comparison.throughDay}</p>

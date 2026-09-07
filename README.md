@@ -188,7 +188,7 @@ Phone sessions, savings goals, and notification settings use durable storage: `B
 
 Live and saved expense reports require an unexpired signed report link. Direct filename links also need the token issued for that exact file. Responses are private and are not cached. If live refresh fails, a valid link can still show its saved snapshot.
 
-Live builds run outside the Discord event loop. `BOOKIEBOT_REPORT_MAX_CONCURRENT_BUILDS` defaults to `2` (supported range `1`–`8`); simultaneous requests for the same actor/month share work, while later refreshes read current sheet values. Historical reads are batched, and report reads do not create missing bill-schedule or reimbursement worksheets.
+Live builds run outside the Discord event loop. `BOOKIEBOT_REPORT_MAX_CONCURRENT_BUILDS` defaults to `2` (supported range `1`–`8`); simultaneous requests for the same actor/month share work, while later refreshes read current sheet values. A comparison can reuse the last successful matching report for up to 10 seconds to avoid rebuilding a just-refreshed month; every regular refresh bypasses and invalidates that handoff. Sheets connections and reads have finite socket timeouts. Historical reads are batched, and report reads do not create missing bill-schedule or reimbursement worksheets.
 
 ## Verification
 

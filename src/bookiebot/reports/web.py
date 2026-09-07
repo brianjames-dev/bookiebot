@@ -17,6 +17,7 @@ from aiohttp import web
 
 _REPORT_NAME_RE = re.compile(r"^[A-Za-z0-9._-]+\.html$")
 _EPHEMERAL_REPORT_SECRET = base64.urlsafe_b64encode(os.urandom(32)).decode("ascii")
+_COMPARISON_HANDOFF_SECONDS = 10
 
 
 class _ReportBuildBusy(RuntimeError):
@@ -24,7 +25,7 @@ class _ReportBuildBusy(RuntimeError):
 
 
 class _ReportBuilds:
-    """Bound live reads and share only simultaneous requests for identical data."""
+    """Bound live reads; hand just-completed data to an adjacent comparison."""
 
     def __init__(self) -> None:
         try:
@@ -34,6 +35,7 @@ class _ReportBuilds:
         self._semaphore = asyncio.Semaphore(limit)
         self._capacity = limit * 4
         self._tasks: dict[tuple, asyncio.Task[Any]] = {}
+        self._comparison_handoffs: dict[tuple, tuple[float, dict[str, Any]]] = {}
 
     async def render(self, payload: dict) -> str:
         return await self._submit(payload, "html")
@@ -44,8 +46,20 @@ class _ReportBuilds:
     async def catalog(self, payload: dict) -> dict[str, Any]:
         return await self._submit(payload, "catalog")
 
-    async def _submit(self, payload: dict, representation: str) -> Any:
-        key = (
+    async def comparison_data(self, payload: dict) -> dict[str, Any]:
+        key = self._key(payload, "data")
+        # A newer refresh always takes precedence, including its failure.
+        if key in self._tasks:
+            return await self.data(payload)
+        self._prune_handoffs()
+        handoff = self._comparison_handoffs.get(key)
+        if handoff is not None:
+            return handoff[1]
+        return await self.data(payload)
+
+    @staticmethod
+    def _key(payload: dict, representation: str) -> tuple:
+        return (
             representation,
             str(payload["actor_key"]),
             str(payload["owner_name"]),
@@ -53,8 +67,19 @@ class _ReportBuilds:
             int(payload["year"]),
             int(payload["month"]),
         )
+
+    def _prune_handoffs(self) -> None:
+        cutoff = time.monotonic() - _COMPARISON_HANDOFF_SECONDS
+        for key, (created, _) in list(self._comparison_handoffs.items()):
+            if created <= cutoff:
+                self._comparison_handoffs.pop(key, None)
+
+    async def _submit(self, payload: dict, representation: str) -> Any:
+        key = self._key(payload, representation)
         task = self._tasks.get(key)
         if task is None:
+            # Direct refresh never reads a handoff or falls back to an old one.
+            self._comparison_handoffs.pop(key, None)
             if len(self._tasks) >= self._capacity:
                 raise _ReportBuildBusy("Report refresh is busy. Please try again shortly.")
             task = asyncio.create_task(self._render(payload, representation))
@@ -70,13 +95,19 @@ class _ReportBuilds:
                         else _render_live_report_data if representation == "data" else _render_live_report)
             return await asyncio.to_thread(renderer, payload)
 
-    def _finished(self, key: tuple, task: asyncio.Task[str]) -> None:
+    def _finished(self, key: tuple, task: asyncio.Task[Any]) -> None:
         self._tasks.pop(key, None)
         if not task.cancelled():
-            task.exception()  # Retrieve failures even if every requester disconnected.
+            error = task.exception()  # Retrieve failures even if every requester disconnected.
+            if error is None and key[0] == "data":
+                self._prune_handoffs()
+                self._comparison_handoffs[key] = (time.monotonic(), task.result())
+                while len(self._comparison_handoffs) > self._capacity:
+                    self._comparison_handoffs.pop(next(iter(self._comparison_handoffs)))
 
     async def close(self) -> None:
         await asyncio.gather(*self._tasks.values(), return_exceptions=True)
+        self._comparison_handoffs.clear()
 
 
 _REPORT_BUILDS = web.AppKey("bookiebot_report_builds", _ReportBuilds)
