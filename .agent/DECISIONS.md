@@ -524,3 +524,7 @@ Decision: Chart drilldowns reuse the displayed report’s owner, mode and filter
 Decision: History is authenticated and bounded to actual configured personal/shared month tabs, without provisioning workbooks. Comparisons use recorded dated entries over matching elapsed periods, clip both sides for short months, and disclose undated/unitemized/scheduled coverage and missing history. Headline explanations are assembled alongside canonical metrics and reconcile exactly to the displayed mode. Historical refresh preserves the selected month; This month returns to the moving current month.
 
 Store only presentation preferences (chart/mode) locally, scoped by owner. Fingerprint deployed frontend assets and offer an explicit Update now action; do not reload automatically or cache private financial reports. CI installs frontend dependencies before running executed UI regression contracts.
+
+## 2026-09-07 - Keep Phone Questions Ephemeral and Read-Only
+
+Decision: Build a fresh selected owner/month/mode report server-side for each explicit question. Reuse the configured AI provider with two closure-bound read tools only; no mutation tools, Discord memory or persistent conversation/checkpointer. Validate authorization before and after provider work, bound request size/concurrency/rate, retain full summary totals before itemization limits, and return supporting report sections. Changing month/mode or clearing the answer discards the phone interaction.

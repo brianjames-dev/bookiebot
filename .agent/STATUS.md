@@ -48,6 +48,8 @@ All eight September 6 audit batches are implemented and verified locally. Each b
 
 ## Completed 2026-09-07
 
+- 2026-09-07 — Dashboard pass 5: compact read-only Ask BookieBot for the selected owner/month/mode. Reuses the existing AI provider with only report-read tools, exact totals before itemization caps, source links, bounded requests, cancellation and no saved conversation. No expense/money mutation tools are exposed. Model/HTTP/UI regression suite: 29 passed. Manual check: expand Ask, submit a report question, follow its source, then change month or mode and confirm the old answer clears.
+
 - 2026-09-07 — Dashboard passes 3–4: authenticated month history, matching-period comparisons with missing-data coverage, canonical headline-total explanations, per-phone/owner chart and mode preferences, and explicit deployed-frontend update prompts. Historical refresh stays on the selected month; This month restores automatic current-month behavior. Regression coverage includes dates, short months, missing history, stale requests, exact total components, persisted view validation, and update lifecycle. Full combined run reached 1,066 passes; its one obsolete bundled-text assertion was narrowed to actual UI text and is being rerun.
 - Manual check: switch to a previous month and compare matching elapsed days; use This month; tap each headline label in both modes; reload to check remembered mode/chart; deploy a changed frontend and use Update now without reconnecting.
 

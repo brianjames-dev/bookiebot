@@ -284,6 +284,8 @@ async def _asset(request: web.Request) -> web.StreamResponse:
 def register_phone_app_routes(app: web.Application) -> None:
     from bookiebot.reports.phone_history import register_phone_history_routes
     register_phone_history_routes(app)
+    from bookiebot.reports.phone_questions import register_phone_question_routes
+    register_phone_question_routes(app)
     app.router.add_get("/app/version", app_version)
     app.router.add_get("/app/expenses", _expense_app)
     app.router.add_get("/app/expenses/data", _report_data)

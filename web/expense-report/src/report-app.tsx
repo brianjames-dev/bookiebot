@@ -32,6 +32,7 @@ import { Badge } from "./components/ui/badge"
 import { Card, CardContent, CardHeader, CardTitle } from "./components/ui/card"
 import { FittedAmount } from "./components/ui/fitted-amount"
 import { ReportMenu } from "./components/ui/report-menu"
+import { ReportQuestions } from "./report-questions"
 import { SharedReimbursementsCard } from "./shared-reimbursements"
 import { reportActivity, activitySummary, activityDay, calendarActivityStatus, type ReportActivity } from "./report-activity"
 import type { MetricExplanation } from "./types"
@@ -691,6 +692,22 @@ export function ExpenseReportApp({ report, appControls, appAvatarUrl, appSession
     viewPreferences.setChartId(chartPanels[next].id as PreferredChart)
   }
 
+  const showQuestionSource = (section: string) => {
+    const chart: Record<string, string> = { categories: "category", cash_flow: "calendar", commitments: "bills", burn_rate: "burn-rate" }
+    const selectors: Record<string, string> = { overview: ".bb-metrics-grid", activity: ".bb-daily-section", reimbursements: ".bb-reimbursement-section" }
+    if (chart[section]) {
+      const index = chartPanels.findIndex(panel => panel.id === chart[section])
+      if (index < 0) return
+      switchChart(index)
+    }
+    const target = document.querySelector<HTMLElement>(chart[section] ? ".bb-chart-carousel-band" : selectors[section] || ".bb-metrics-grid")
+    if (target) {
+      target.tabIndex = -1
+      target.focus({ preventScroll: true })
+      target.scrollIntoView({ behavior: window.matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth", block: "start" })
+    }
+  }
+
   const moveChart = (direction: -1 | 1) => {
     switchChart(activeChartIndex + direction)
   }
@@ -878,6 +895,9 @@ export function ExpenseReportApp({ report, appControls, appAvatarUrl, appSession
           merchantOccurrences={report.merchantOccurrences}
           onViewChange={dismissChartTooltips}
         />
+
+        {appSession && <ReportQuestions month={`${report.year}-${String(report.month).padStart(2, "0")}`}
+          mode={projectionActive ? "projected" : "current"} onShowSource={showQuestionSource} />}
 
         <ModalDetails summary="Calculation" title={`${metricInspection?.title ?? "Total"} explained`} selection={metricInspection?.title ?? null}
           onDismiss={() => setMetricInspection(null)} triggerHidden>
