@@ -5,6 +5,7 @@ import {
   useLayoutEffect,
   useRef,
   useState,
+  type ComponentProps,
   type CSSProperties,
   type ReactNode,
   type RefObject,
@@ -22,6 +23,7 @@ import {
   PieChart,
   ReferenceLine,
   ResponsiveContainer,
+  Sector,
   XAxis,
   YAxis,
 } from "recharts"
@@ -31,7 +33,9 @@ import { Card, CardContent, CardHeader, CardTitle } from "./components/ui/card"
 import { FittedAmount } from "./components/ui/fitted-amount"
 import { ReportMenu } from "./components/ui/report-menu"
 import { SharedReimbursementsCard } from "./shared-reimbursements"
-import { reportActivity, activitySummary, calendarActivityStatus, type ReportActivity } from "./report-activity"
+import { reportActivity, activitySummary, activityDay, calendarActivityStatus, type ReportActivity } from "./report-activity"
+import type { MetricExplanation } from "./types"
+import { useReportViewPreferences, type PreferredChart } from "./report-view-preferences"
 import { ChartContainer, ChartTooltip, ChartTooltipContent, ChartTooltipDismissProvider } from "./components/ui/chart"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "./components/ui/tabs"
 import { CollapsibleContent, SlidingSelection } from "./components/ui/motion"
@@ -510,17 +514,22 @@ function useViewportScrollbarWidth() {
   }, [])
 }
 
-export function ExpenseReportApp({ report, appControls, appAvatarUrl, appSession }: {
+export function ExpenseReportApp({ report, appControls, appAvatarUrl, appSession, appMonthControl, appComparison, appUpdate }: {
+  appUpdate?: ReactNode
+  appMonthControl?: ReactNode
+  appComparison?: ReactNode
   report: ExpenseReportData
   appControls?: ReactNode
   appAvatarUrl?: string
   appSession?: { signOut: () => void; signingOut: boolean }
 }) {
   const { theme, toggleTheme } = useExpenseReportTheme()
+  const [metricInspection, setMetricInspection] = useState<MetricExplanation | null>(null)
   useViewportScrollbarWidth()
   const [inspection, setInspection] = useState<{key:string; title:string; entries:ReportActivity[]; total:number; note?:string} | null>(null)
   const dailySpendingDetailsOpen = useMediaQuery("(min-width: 861px)")
-  const [projectionActive, setProjectionActive] = useState(false)
+  const viewPreferences = useReportViewPreferences(report.ownerName, Boolean(report.burnRate), Boolean(appSession))
+  const projectionActive = viewPreferences.mode === "projected"
   const [categoryMixFilter, setCategoryMixFilter] = useState<CategoryMixFilter>("all")
   const [calendarFilter, setCalendarFilter] = useState<CalendarFilter>("all")
   const [dailySpendingFilter, setDailySpendingFilter] = useState<DailySpendingFilter>("all")
@@ -556,7 +565,7 @@ export function ExpenseReportApp({ report, appControls, appAvatarUrl, appSession
   }
   const toggleProjection = () => {
     dismissChartTooltips()
-    setProjectionActive((current) => !current)
+    viewPreferences.setMode(projectionActive ? "current" : "projected")
   }
   const activeReport = buildReportView(report, projectionActive)
   const chartBreakdown = activeReport.breakdown.map((item) => ({ ...item, color: CATEGORY_CHART_COLORS[item.key] ?? item.color }))
@@ -564,8 +573,9 @@ export function ExpenseReportApp({ report, appControls, appAvatarUrl, appSession
   const dailyEntries = filterDailyEntries(report.dailyEntries, dailySpendingFilter)
   const dailyCalendarEvents = dailySpendingCalendarEvents(activeReport.calendarEvents, dailySpendingFilter, projectionActive)
   const dailyTableEntries = dailyEntriesWithCalendarEvents(dailyEntries, dailyCalendarEvents, report.month)
-  const dailyTotals = dailyTotalsForEntries(dailyEntries, dailyCalendarEvents)
+  const dailyTotals = dailyTotalsForEntries(dailyEntries, dailyCalendarEvents, report.year, report.month)
   const dailyTotal = dailySpendingTotal(dailyEntries, dailyCalendarEvents)
+  const metricDetails = report.metricExplanations?.[projectionActive ? "projected" : "current"]
   const allActivity = reportActivity(report, activeReport.calendarEvents, projectionActive)
   const activityRef = useRef(allActivity)
   activityRef.current = allActivity
@@ -578,11 +588,10 @@ export function ExpenseReportApp({ report, appControls, appAvatarUrl, appSession
   }, [])
   const inspectDay = (day: string) => {
     dismissChartTooltips()
-    const entries = allActivity.filter(entry => entry.day === Number(day) && (dailySpendingFilter === "all" || dailyEntryFilter(entry) === dailySpendingFilter))
-    setInspection({key:`day-${day}`, title:`${monthOnlyLabel(report.monthLabel)} ${day}`, entries, total:activitySummary(entries).total})
+    const entries = allActivity.filter(entry => (Number.isFinite(Number(day)) ? entry.day === Number(day) : entry.day === null) && (dailySpendingFilter === "all" || dailyEntryFilter(entry) === dailySpendingFilter))
+    setInspection({key:`day-${day}`, title:Number.isFinite(Number(day)) ? `${monthOnlyLabel(report.monthLabel)} ${day}` : "Entries without a date", entries, total:activitySummary(entries).total})
   }
   const spentTotal = amountRowsTotal(activeReport.breakdown)
-  const defaultChartTab = report.burnRate ? "burn-rate" : "category"
   const chartPanels: ChartPanel[] = [
     {
       id: "category",
@@ -650,11 +659,7 @@ export function ExpenseReportApp({ report, appControls, appAvatarUrl, appSession
       ),
     },
   ]
-  const defaultChartIndex = Math.max(0, chartPanels.findIndex((panel) => panel.id === defaultChartTab))
-  const [activeChartIndex, setActiveChartIndex] = useState(defaultChartIndex)
-  useEffect(() => {
-    setActiveChartIndex((current) => Math.min(current, chartPanels.length - 1))
-  }, [chartPanels.length])
+  const activeChartIndex = Math.max(0, chartPanels.findIndex(panel => panel.id === viewPreferences.chartId))
 
   useEffect(() => {
     return () => {
@@ -683,7 +688,7 @@ export function ExpenseReportApp({ report, appControls, appAvatarUrl, appSession
     setChartCollapseKey((current) => current + 1)
     setChartTooltipDismissRevision((current) => current + 1)
     startChartTooltipCooldown()
-    setActiveChartIndex(next)
+    viewPreferences.setChartId(chartPanels[next].id as PreferredChart)
   }
 
   const moveChart = (direction: -1 | 1) => {
@@ -765,7 +770,7 @@ export function ExpenseReportApp({ report, appControls, appAvatarUrl, appSession
         </ReportMenu>
       </div>
       <header className="bb-page-header">
-        <h1 className="bb-report-context">{report.monthLabel}<span> · </span><span>{report.ownerName}</span></h1>
+        <h1 className="bb-report-context">{appMonthControl ?? report.monthLabel}<span> · </span><span>{report.ownerName}</span></h1>
         <div className="bb-header-actions">
           <ProjectionToggle
             active={projectionActive}
@@ -774,28 +779,32 @@ export function ExpenseReportApp({ report, appControls, appAvatarUrl, appSession
           {appControls ?? <span className="bb-report-updated">Updated {generatedTimeLabel(report.generatedAt)}</span>}
         </div>
       </header>
-
+      {appUpdate}
       <ChartTooltipDismissProvider revision={chartTooltipDismissRevision}>
         <main className="bb-main" data-bb-tooltip-dismiss-revision={chartTooltipDismissRevision}>
         <section className="bb-metrics-grid" aria-label="Budget metrics">
           <MetricCard
             label="Income"
+            onExplain={metricDetails ? () => setMetricInspection(metricDetails.income) : undefined}
             value={activeReport.metrics.monthlyIncome}
           />
-          <MetricCard label="Spent" value={spentTotal} />
+          <MetricCard label="Spent" value={spentTotal} onExplain={metricDetails ? () => setMetricInspection(metricDetails.spent) : undefined} />
           <MetricCard
             label="Left"
+            onExplain={metricDetails ? () => setMetricInspection(metricDetails.left) : undefined}
             value={activeReport.metrics.incomeAfterExpenses}
             description="Budget remaining"
             accent
           />
           <SavingsMetricCard
+            onExplain={metricDetails ? () => setMetricInspection(metricDetails.saved) : undefined}
             value={activeReport.metrics.amountSaved}
             minimum={activeReport.metrics.savingsMinimum}
             ideal={activeReport.metrics.savingsIdeal}
           />
         </section>
 
+        {appComparison}
         <ChartCarouselNavigation
           panels={chartPanels}
           activeIndex={activeChartIndex}
@@ -870,6 +879,10 @@ export function ExpenseReportApp({ report, appControls, appAvatarUrl, appSession
           onViewChange={dismissChartTooltips}
         />
 
+        <ModalDetails summary="Calculation" title={`${metricInspection?.title ?? "Total"} explained`} selection={metricInspection?.title ?? null}
+          onDismiss={() => setMetricInspection(null)} triggerHidden>
+          {metricInspection && <MetricExplanationDetails detail={metricInspection} />}
+        </ModalDetails>
         <ModalDetails summary="Transactions" title={inspection?.title ?? "Transactions"} selection={inspection?.key ?? null}
           onDismiss={() => setInspection(null)} triggerHidden>
           {inspection && <ActivityDetails entries={inspection.entries} total={inspection.total} note={inspection.note} colors={categoryColors} />}
@@ -878,6 +891,17 @@ export function ExpenseReportApp({ report, appControls, appAvatarUrl, appSession
       </ChartTooltipDismissProvider>
     </div>
   )
+}
+
+function MetricExplanationDetails({detail}: {detail:MetricExplanation}) {
+  return <div className="bb-metric-explanation">
+    <div className="bb-chart-total">{formatMoney(detail.value)}</div>
+    <p>{detail.equation}</p>
+    <dl>{detail.components.map((component,index) => <div key={index}><dt>{component.label}
+      {component.date && <small>{component.date}</small>}{component.source === "scheduled" && <small>Scheduled estimate</small>}</dt>
+      <dd>{formatMoney(component.amount)}</dd></div>)}</dl>
+    {detail.notes.map((note,index)=><p className="bb-activity-footnote" key={index}>{note}</p>)}
+  </div>
 }
 
 function ActivityDetails({entries, total, note, colors}: {entries:ReportActivity[];total:number;note?:string;colors:Record<string,string>}) {
@@ -1323,7 +1347,9 @@ function MetricCard({
   description,
   accent = false,
   control,
+  onExplain,
 }: {
+  onExplain?: () => void
   label: string
   value: number | null | undefined
   description?: string
@@ -1335,7 +1361,7 @@ function MetricCard({
   return (
     <div className="bb-metric-card" data-accent={accent || undefined}>
       <div className="bb-metric-head">
-        <div className="bb-metric-label">{label}</div>
+        <div className="bb-metric-label">{onExplain ? <button type="button" className="bb-metric-explain" aria-label={`Explain ${label}`} onClick={onExplain}>{label}<span aria-hidden="true">ⓘ</span></button> : label}</div>
         {control}
       </div>
       <FittedAmount className={negative ? "bb-metric-value bb-negative" : positive ? "bb-metric-value bb-positive" : "bb-metric-value"}>
@@ -1354,10 +1380,12 @@ function isSavingsNearGoal(value: number | null | undefined, goal: number | null
 }
 
 function SavingsMetricCard({
+  onExplain,
   value,
   minimum,
   ideal,
 }: {
+  onExplain?: () => void
   value: number
   minimum: number
   ideal: number
@@ -1367,7 +1395,7 @@ function SavingsMetricCard({
   const tone = value <= 0 ? "empty" : value < minimum ? "low" : isSavingsNearGoal(value, ideal) ? "ideal" : "minimum"
   return (
     <div className="bb-metric-card bb-savings-metric-card">
-      <div className="bb-metric-label">Saved</div>
+      <div className="bb-metric-label">{onExplain ? <button type="button" className="bb-metric-explain" aria-label="Explain Saved" onClick={onExplain}>Saved<span aria-hidden="true">ⓘ</span></button> : "Saved"}</div>
       <FittedAmount className={`bb-metric-value bb-savings-value bb-savings-value-${tone}`}>{formatMoney(value)}</FittedAmount>
       <div
         className={`bb-savings-progress bb-savings-progress-${tone}`}
@@ -1516,6 +1544,12 @@ const CategoryMixPieSurface = memo(function CategoryMixPieSurface({ data, layout
           data={data}
           dataKey="amount"
           nameKey="label"
+          shape={(props: unknown) => {
+            const sector = props as ComponentProps<typeof Sector> & {index:number}
+            const item = data[sector.index]
+            return <Sector {...sector} tabIndex={0} role="button" aria-label={`Inspect ${item.label}, ${formatMoney(item.amount)}`}
+              onClick={() => onInspect(item)} onKeyDown={(event) => { if (event.key === "Enter" || event.key === " ") { event.preventDefault(); onInspect(item) } }} />
+          }}
           cx={layout.cx}
           cy={layout.cy}
           innerRadius={layout.innerRadius}
@@ -1530,8 +1564,7 @@ const CategoryMixPieSurface = memo(function CategoryMixPieSurface({ data, layout
           labelLine={layout.showLabels ? (props) => renderPieMetricLabelLine(props, layout) : false}
         >
           {data.map((item) => (
-            <Cell key={item.key} fill={item.color} role="button" tabIndex={0} aria-label={`Inspect ${item.label}, ${formatMoney(item.amount)}`}
-              onClick={() => onInspect(item)} onKeyDown={(event) => { if(event.key === "Enter" || event.key === " ") { event.preventDefault(); onInspect(item) } }} />
+            <Cell key={item.key} fill={item.color} />
           ))}
         </Pie>
       </PieChart>
@@ -2344,7 +2377,7 @@ function DailySpendingChart({
         className="bb-chart-box"
       >
         <ResponsiveContainer width="100%" height="100%">
-          <BarChart data={chartData} onClick={(state) => { if (state?.activeLabel !== undefined) onInspectDay(String(state.activeLabel)) }} margin={{ top: 12, right: 16, left: 0, bottom: 0 }}> 
+          <BarChart data={chartData} onClick={(state) => { if (state?.activeLabel !== undefined) onInspectDay(String(state.activeLabel)) }} margin={{ top: 12, right: 16, left: 0, bottom: 0 }}>
             <CartesianGrid
               className="bb-daily-spending-grid"
               vertical={false}
@@ -3098,7 +3131,7 @@ function DailyEntriesTable({ entries, categoryColors, year, month, onInspectDay 
 
   const grouped = new Map<string, DailyEntryDisplayRow[]>()
   for (const entry of entries) {
-    const day = entry.date ? entry.date.split("/")[1] || entry.date : "No date"
+    const day = dailyEntryDayLabel(entry, year, month) ?? "No date"
     grouped.set(day, [...(grouped.get(day) || []), entry])
   }
 
@@ -3203,10 +3236,10 @@ function dailyEntriesWithCalendarEvents(
   ]
 }
 
-function dailyTotalsForEntries(entries: ExpenseEntry[], calendarEvents: CalendarEvent[]) {
+function dailyTotalsForEntries(entries: ExpenseEntry[], calendarEvents: CalendarEvent[], year?: number, month?: number) {
   const totals = new Map<string, DailySpendingRow>()
   for (const entry of entries) {
-    const day = dailyEntryDayLabel(entry)
+    const day = dailyEntryDayLabel(entry, year, month)
     if (day === null) {
       continue
     }
@@ -3243,12 +3276,14 @@ function addDailySpendingAmount(
   })
 }
 
-function dailyEntryDayLabel(entry: ExpenseEntry) {
-  if (!entry.date || entry.date.trim().toLowerCase() === "no date") {
-    return null
-  }
-  const label = entry.date.split("/")[1] || entry.date
-  return label.trim().toLowerCase() === "no date" ? null : label
+function dailyEntryDayLabel(entry: ExpenseEntry, year?: number, month?: number) {
+  const value = entry.date?.trim() ?? ""
+  const iso = /^(\d{4})-(\d{2})-\d{2}$/.exec(value)
+  const us = /^(\d{1,2})\/\d{1,2}(?:\/(\d{2}|\d{4}))?$/.exec(value)
+  const parsedYear = iso ? Number(iso[1]) : us?.[2] ? Number(us[2]) + (us[2].length === 2 ? 2000 : 0) : 2000
+  const parsedMonth = Number(iso ? iso[2] : us?.[1])
+  const day = activityDay(value, year ?? parsedYear, month ?? parsedMonth)
+  return day === null ? null : String(day)
 }
 
 function dailySpendingCalendarEvents(events: CalendarEvent[], filter: DailySpendingFilter, projected: boolean) {
@@ -3620,14 +3655,14 @@ function calendarEventsStyle(events: CalendarEvent[]) {
 }
 
 function calendarEventLabel(event: CalendarEvent) {
-  return `${event.label} - ${calendarEventKindLabel(event)} - ${formatMoney(event.amount)} - ${event.kind === "subscription" || event.projectedOnly ? "Scheduled" : "Recorded"}`
+  return `${event.label} - ${calendarEventKindLabel(event)} - ${formatMoney(event.amount)} - ${event.kind === "subscription" || (event.kind === "income" && event.projectedOnly) ? "Scheduled" : "Recorded"}`
 }
 
 function CalendarEventTooltip({ event }: { event: CalendarEvent }) {
   return (
     <span className="bb-subscription-tooltip" role="tooltip">
       <strong className="bb-calendar-tooltip-category" style={{ color: calendarEventStyle(event).color }}>{event.label}</strong>
-      <span>{calendarEventKindLabel(event)} · {event.kind === "subscription" || event.projectedOnly ? "Scheduled" : "Recorded"}</span>
+      <span>{calendarEventKindLabel(event)} · {event.kind === "subscription" || (event.kind === "income" && event.projectedOnly) ? "Scheduled" : "Recorded"}</span>
       <span className="bb-subscription-tooltip-amount">{formatMoney(event.amount)}</span>
     </span>
   )

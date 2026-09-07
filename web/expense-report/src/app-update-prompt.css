@@ -1,0 +1,9 @@
+.bb-app-update { display: grid; grid-template-rows: 0fr; transition: grid-template-rows 220ms ease, opacity 220ms ease; opacity: 0; }
+.bb-app-update[data-open="true"] { grid-template-rows: 1fr; opacity: 1; }
+.bb-app-update-clip { min-height: 0; overflow: hidden; }
+.bb-app-update-content { display: flex; align-items: center; justify-content: space-between; gap: 14px; padding: 14px 0; border-bottom: 1px solid hsl(var(--border)); }
+.bb-app-update-content p { margin: 0; font-size: .875rem; color: hsl(var(--muted-foreground)); }
+.bb-app-update-actions { display: flex; gap: 8px; flex-shrink: 0; }
+.bb-app-update-actions .bb-toolbar-button { padding: 8px 12px; font-size: .82rem; }
+@media (max-width: 460px) { .bb-app-update-content { align-items: flex-start; flex-direction: column; } }
+@media (prefers-reduced-motion: reduce) { .bb-app-update { transition: none; } }

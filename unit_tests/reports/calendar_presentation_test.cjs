@@ -12,7 +12,7 @@ const source = fs.readFileSync("web/expense-report/src/report-app.tsx", "utf8")
 const file = ts.createSourceFile("report-app.tsx", source, ts.ScriptTarget.Latest, true, ts.ScriptKind.TSX)
 const names = new Set([
   "money", "CATEGORY_CHART_COLORS", "CALENDAR_EVENT_STYLES", "WEEKDAY_LABELS", "SUBSCRIPTION_TONES", "PACIFIC_CALENDAR_DATE",
-  "formatMoney", "DailyEntriesTable", "compareDayGroups", "isCurrentCalendarDay",
+  "formatMoney", "dailyEntryDayLabel", "DailyEntriesTable", "compareDayGroups", "isCurrentCalendarDay",
   "FinancialCalendar", "calendarEventsByDay", "calendarEventKey", "calendarEventStyle",
   "calendarEventsStyle", "calendarEventLabel", "calendarEventKindLabel",
   "CalendarEventTooltip", "CalendarOverflowTooltip",
@@ -23,7 +23,10 @@ const declarations = file.statements.filter((statement) => {
   return false
 })
 assert.equal(declarations.length, names.size)
-const compiled = ts.transpileModule(declarations.map((node) => node.getText(file)).join("\n"), {
+const activitySource = fs.readFileSync("web/expense-report/src/report-activity.ts", "utf8")
+const activityFile = ts.createSourceFile("report-activity.ts", activitySource, ts.ScriptTarget.Latest, true)
+const activityDeclaration = activityFile.statements.find(node => ts.isFunctionDeclaration(node) && node.name?.text === "activityDay").getText(activityFile).replace("export ", "")
+const compiled = ts.transpileModule(activityDeclaration + "\n" + declarations.map((node) => node.getText(file)).join("\n"), {
   compilerOptions: { target: ts.ScriptTarget.ES2020, module: ts.ModuleKind.CommonJS, jsx: ts.JsxEmit.ReactJSX },
 }).outputText
 const frozen = new Date("2026-09-07T06:55:00Z") // September 6, 11:55 PM Pacific.
@@ -128,3 +131,12 @@ assert.ok(!daily([entries[1]]).includes('aria-current="date"'), "No invented ent
 assert.ok(!daily([]).includes("<tr>"))
 assert.ok(!daily([{ ...entries[0], date: "" }]).includes('aria-current="date"'))
 console.log("Calendar category colors and Pacific-day highlight checks passed")
+
+assert.equal(runtime.dailyEntryDayLabel({date:"2026-09-03"}), "3")
+assert.equal(runtime.dailyEntryDayLabel({date:"9/03/2026"}), "3")
+assert.equal(runtime.dailyEntryDayLabel({date:""}), null)
+assert.equal((daily([{...entries[0],date:"2026-09-03"},{...entries[1],date:"9/3/2026"}]).match(/<tr>/g)||[]).length,2)
+
+assert.equal(runtime.dailyEntryDayLabel({date:"2/30/2026"}), null)
+assert.equal(runtime.dailyEntryDayLabel({date:"2026-09-03"},2026,8), null)
+assert.ok(daily([{...entries[0], date:"2/30/2026"}]).includes("No date"))

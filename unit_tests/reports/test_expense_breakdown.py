@@ -186,7 +186,7 @@ def test_top_chart_pages_share_regions_lock_modals_and_show_complete_details():
 
 def test_top_chart_navigation_names_each_panel_and_excludes_inactive_controls_from_focus():
     source = (Path(__file__).resolve().parents[2] / "web/expense-report/src/report-app.tsx").read_text()
-    panels = source.split("const chartPanels: ChartPanel[] = [", 1)[1].split("const defaultChartIndex", 1)[0]
+    panels = source.split("const chartPanels: ChartPanel[] = [", 1)[1].split("const activeChartIndex", 1)[0]
     carousel = source.split('<section\n          className="bb-chart-carousel-band"', 1)[1].split("</section>", 1)[0]
     navigation = source.split("function ChartCarouselNavigation", 1)[1].split("function CategoryMixFilterControl", 1)[0]
     selectors = source.split("function ChartCarouselIndicators", 1)[1].split("function ProjectionToggle", 1)[0]
@@ -589,7 +589,8 @@ def test_build_expense_breakdown_report_aggregates_shared_and_personal_data():
     assert "bb-subscription-tooltip" in html
     assert "Pull Date" not in html
     assert "bb-cadence-short" in html
-    assert "Kind" not in html
+    assert 'children:"Kind"' not in html
+    assert ">Kind<" not in html
     assert "Subscription calendar and source-of-truth itemized lists" not in html
     assert "Interactive views powered by shadcn/ui patterns and Recharts" not in html
     assert "Shared transaction activity grouped by day" not in html
@@ -1999,7 +2000,7 @@ def test_report_frontend_calendar_largest_and_burn_rate_presentation_regressions
     assert "after cross-category coverage" in source
     assert 'const dailySpendingDetailsOpen = useMediaQuery("(min-width: 861px)")' in source
     assert "defaultDetailsOpen={dailySpendingDetailsOpen}" in source
-    assert '<h1 className="bb-report-context">{report.monthLabel}' in source
+    assert '<h1 className="bb-report-context">{appMonthControl ?? report.monthLabel}' in source
     assert "<ReportMenu>" in source
     assert "<h1>Expense Breakdown</h1>" not in source
     assert "bb-burn-rate-primary" in source

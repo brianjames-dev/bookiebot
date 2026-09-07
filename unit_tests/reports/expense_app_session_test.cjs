@@ -180,6 +180,48 @@ async function main() {
   assert.equal(lifecycle.calls.length, 4)
   lifecycle.session.dispose()
 
+  const history = fixture()
+  await load(history)
+  const august = history.session.selectMonth("2026-08")
+  const obsoleteAugust = history.calls.at(-1)
+  assert.equal(obsoleteAugust.url, "/app/expenses/data?month=2026-08")
+  assert.equal(history.session.state.report, null, "A requested month never displays the old month's report")
+  const july = history.session.selectMonth("2026-07")
+  assert.equal(obsoleteAugust.init.signal.aborted, true)
+  history.calls.at(-1).resolve(response(200, report(7, 123)))
+  await july
+  obsoleteAugust.resolve(response(200, report(8, 999)))
+  await august
+  assert.equal(history.session.state.report.month, 7, "Latest month selection wins even when an older response arrives late")
+  history.advance()
+  const refreshJuly = history.session.refresh()
+  assert.equal(history.calls.at(-1).url, "/app/expenses/data?month=2026-07", "Foreground refresh retains a selected historical month")
+  history.calls.at(-1).resolve(response(200, report(7, 130)))
+  await refreshJuly
+  const failedMonth = history.session.selectMonth("2026-06")
+  history.calls.at(-1).resolve(response(503, {}))
+  await failedMonth
+  assert.equal(history.session.state.phase, "error")
+  assert.equal(history.session.state.report, null)
+  assert.equal(history.session.state.selectedMonth, "2026-06")
+  assert.match(history.session.state.message, /2026-06/)
+  const wrongMonth = history.session.selectMonth("2026-05")
+  history.calls.at(-1).resolve(response(200, report(9)))
+  await wrongMonth
+  assert.equal(history.session.state.report, null, "A mismatched server period is rejected")
+  const backToCurrent = history.session.selectMonth(null)
+  assert.equal(history.calls.at(-1).url, config.reportUrl)
+  history.calls.at(-1).resolve(response(200, report(10)))
+  await backToCurrent
+  assert.equal(history.session.state.selectedMonth, null)
+  assert.equal(history.session.state.report.month, 10, "This month follows a month rollover")
+  assert.throws(() => history.session.selectMonth("2026-99"), /valid report month/)
+  history.session.expire()
+  assert.equal(history.session.state.phase, "expired")
+  assert.equal(history.session.state.report, null)
+  assert.equal(history.session.state.selectedMonth, null)
+  history.session.dispose()
+
   const disposed = fixture()
   let publications = 0
   disposed.session.subscribe(() => publications++)

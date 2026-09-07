@@ -12,6 +12,7 @@ from aiohttp import web
 
 from bookiebot.reports.app_access import AppSession, SESSION_TTL_SECONDS, build_app_access_store
 from bookiebot.reports.scope import default_expense_report_persons
+from bookiebot.reports.phone_version import app_version, frontend_version
 from bookiebot.sheets.routing import APPLE_SHORTCUT_RELAY_USER_ID, get_user_config, now_pacific
 
 logger = logging.getLogger(__name__)
@@ -163,20 +164,26 @@ async def _connect_phone(request: web.Request) -> web.Response:
 
 async def _report_data(request: web.Request) -> web.Response:
     from bookiebot.reports.web import _REPORT_BUILDS, _ReportBuildBusy
+    from bookiebot.reports.phone_history import available_phone_month, InvalidReportMonthError, UnavailableReportMonthError
     try:
         session = await _session(request)
         if session is None:
             return _json({"error": "Reconnect this phone using /expense_app in Discord."}, status=401)
         owner = _valid_owner(session)
         current = now_pacific()
+        selected = await available_phone_month(request, session, request.query.get("month"), current=current)
         payload = dict(actor_key=session.actor_key, owner_name=owner.name,
                        persons=default_expense_report_persons(owner.name, list(owner.expense_persons)),
-                       year=current.year, month=current.month)
+                       year=selected.year, month=selected.month)
         report = await request.app[_REPORT_BUILDS].data(payload)
         # A reset/sign-out while Sheets is loading must also revoke this response.
         if await _session(request) is None:
             return _json({"error": "Reconnect this phone using /expense_app in Discord."}, status=401)
         return _json(report)
+    except InvalidReportMonthError as exc:
+        return _json({"error": str(exc)}, status=400)
+    except UnavailableReportMonthError as exc:
+        return _json({"error": str(exc)}, status=404)
     except _ReportBuildBusy:
         response = _json({"error": "Your report is busy refreshing. Please try again shortly."}, status=503)
         response.headers["Retry-After"] = "5"
@@ -218,7 +225,7 @@ def _page_head() -> str:
 
 
 async def _expense_app(_request: web.Request) -> web.Response:
-    config = json.dumps({"reportUrl": "/app/expenses/data", "logoutUrl": "/app/logout", "ownerName": "BookieBot"})
+    config = json.dumps({"reportUrl": "/app/expenses/data", "logoutUrl": "/app/logout", "ownerName": "BookieBot", "version": frontend_version()})
     html = f'''<!doctype html><html lang="en"><head>{_page_head()}</head><body>
 <div id="bookiebot-expense-report-root"></div><noscript>Please enable JavaScript to open BookieBot.</noscript>
 <script id="bookiebot-expense-app-config" type="application/json">{config}</script>
@@ -275,6 +282,9 @@ async def _asset(request: web.Request) -> web.StreamResponse:
 
 
 def register_phone_app_routes(app: web.Application) -> None:
+    from bookiebot.reports.phone_history import register_phone_history_routes
+    register_phone_history_routes(app)
+    app.router.add_get("/app/version", app_version)
     app.router.add_get("/app/expenses", _expense_app)
     app.router.add_get("/app/expenses/data", _report_data)
     app.router.add_get("/app/connect", _setup_page)

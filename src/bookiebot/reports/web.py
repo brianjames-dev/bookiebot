@@ -41,6 +41,9 @@ class _ReportBuilds:
     async def data(self, payload: dict) -> dict[str, Any]:
         return await self._submit(payload, "data")
 
+    async def catalog(self, payload: dict) -> dict[str, Any]:
+        return await self._submit(payload, "catalog")
+
     async def _submit(self, payload: dict, representation: str) -> Any:
         key = (
             representation,
@@ -63,7 +66,8 @@ class _ReportBuilds:
 
     async def _render(self, payload: dict, representation: str = "html") -> Any:
         async with self._semaphore:
-            renderer = _render_live_report_data if representation == "data" else _render_live_report
+            renderer = (_render_live_report_catalog if representation == "catalog"
+                        else _render_live_report_data if representation == "data" else _render_live_report)
             return await asyncio.to_thread(renderer, payload)
 
     def _finished(self, key: tuple, task: asyncio.Task[str]) -> None:
@@ -106,6 +110,14 @@ def _render_live_report_data(payload: dict) -> dict[str, Any]:
             month=BudgetMonth(int(payload["year"]), int(payload["month"])),
         )
         return expense_breakdown_client_payload(report)
+
+
+def _render_live_report_catalog(payload: dict) -> dict[str, Any]:
+    from datetime import datetime
+    from bookiebot.reports.phone_history import load_phone_month_catalog
+    from bookiebot.sheets.routing import PACIFIC_TZ
+    return load_phone_month_catalog(str(payload["actor_key"]), current=datetime(
+        int(payload["year"]), int(payload["month"]), 1, tzinfo=PACIFIC_TZ))
 
 
 async def _close_report_builds(app: web.Application) -> None:

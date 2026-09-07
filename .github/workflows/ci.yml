@@ -39,10 +39,6 @@ jobs:
           cache: pip
       - name: Install Python dependencies
         run: python -m pip install -r requirements.txt
-      - name: Run Python and database contracts
-        run: python -m pytest unit_tests
-      - name: Check Python types
-        run: python -m pyright
       - uses: actions/setup-node@v4
         with:
           node-version: "22"
@@ -53,6 +49,11 @@ jobs:
       - name: Install report dependencies
         working-directory: web/expense-report
         run: npm ci
+      # Install JS dependencies first so pytest executes the UI runtime contracts.
+      - name: Run Python and database contracts
+        run: python -m pytest unit_tests
+      - name: Check Python types
+        run: python -m pyright
       - name: Typecheck and build report
         working-directory: web/expense-report
         run: |

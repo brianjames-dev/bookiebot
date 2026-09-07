@@ -2457,6 +2457,9 @@ def _report_client_payload(
             _shared_reimbursement_payload(item) for item in report.open_shared_reimbursements
         ]
         payload["reimbursementCoverage"] = report.reimbursement_coverage
+    from bookiebot.reports.report_insights import comparison_data, metric_explanations
+    payload["comparisonData"] = comparison_data(report, payload)
+    payload["metricExplanations"] = metric_explanations(report, payload)
     return payload
 
 

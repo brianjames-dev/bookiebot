@@ -21,8 +21,10 @@ export function calendarActivityCategory(event: CalendarEvent) {
     : (event.group === 'subscriptions_wants' || event.group === 'wants') ? 'Subs (Wants)' : 'Subs (Needs)'
 }
 export function calendarActivityStatus(event: CalendarEvent): ActivityStatus {
-  // A subscription's scheduled pull passing does not prove it posted at a bank.
-  return event.kind === 'subscription' || event.projectedOnly ? 'scheduled' : 'recorded'
+  // A subscription’s scheduled pull passing does not prove it posted at a bank.
+  // Bill amounts come from recorded payments/current utilities; projectedOnly
+  // marks their due date, not the provenance of that already recorded amount.
+  return event.kind === 'subscription' || (event.kind === 'income' && event.projectedOnly) ? 'scheduled' : 'recorded'
 }
 export function reportActivity(report: ExpenseReportData, events: CalendarEvent[], projected: boolean): ReportActivity[] {
   return [

@@ -518,3 +518,9 @@ Settlement must have complete owner coverage, re-read the authoritative annual r
 ## 2026-09-07 - Distinguish Recorded Activity From Scheduled Estimates
 
 Decision: Chart drilldowns reuse the displayed report’s owner, mode and filtered activity. Recorded expense rows remain distinct from elapsed subscription estimates and future commitments. A recorded bill amount can have a scheduled date; label that date rather than implying bank posting. Category totals may include summarized amounts without itemized rows; disclose the residual, do not invent transactions to reconcile it. All selections retain the existing modal motion, focus and scroll lifecycle.
+
+## 2026-09-07 - Explain and Compare Canonical Reports
+
+Decision: History is authenticated and bounded to actual configured personal/shared month tabs, without provisioning workbooks. Comparisons use recorded dated entries over matching elapsed periods, clip both sides for short months, and disclose undated/unitemized/scheduled coverage and missing history. Headline explanations are assembled alongside canonical metrics and reconcile exactly to the displayed mode. Historical refresh preserves the selected month; This month returns to the moving current month.
+
+Store only presentation preferences (chart/mode) locally, scoped by owner. Fingerprint deployed frontend assets and offer an explicit Update now action; do not reload automatically or cache private financial reports. CI installs frontend dependencies before running executed UI regression contracts.

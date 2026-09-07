@@ -4,10 +4,12 @@ export interface ExpenseAppConfig {
   reportUrl: string
   logoutUrl: string
   ownerName: string
+  version?: string
 }
 
 export interface ExpenseAppState {
   report: ExpenseReportData | null
+  selectedMonth: string | null
   phase: "loading" | "ready" | "refreshing" | "stale" | "error" | "expired" | "signed-out"
   updatedAt: number | null
   signingOut: boolean
@@ -15,7 +17,7 @@ export interface ExpenseAppState {
 }
 
 export const initialExpenseAppState: ExpenseAppState = {
-  report: null, phase: "loading", updatedAt: null, signingOut: false, message: "",
+  report: null, selectedMonth: null, phase: "loading", updatedAt: null, signingOut: false, message: "",
 }
 
 export function expenseReportIdentity(report: ExpenseReportData) {
@@ -105,14 +107,21 @@ export class ExpenseAppSession {
     if (!force && this.now() - this.lastCheck < this.dedupMs) return Promise.resolve()
     this.lastCheck = this.now()
     const revision = ++this.revision
+    const selectedMonth = this.state.selectedMonth
+    const reportUrl = selectedMonth
+      ? `${this.config.reportUrl}${this.config.reportUrl.includes("?") ? "&" : "?"}month=${encodeURIComponent(selectedMonth)}`
+      : this.config.reportUrl
     this.publish({ phase: this.state.report ? "refreshing" : "loading", message: "" })
-    const job = this.request(this.config.reportUrl, "GET", async (response) => {
+    const job = this.request(reportUrl, "GET", async (response) => {
       const report = await response.json() as ExpenseReportData
       if (!report || typeof report.ownerName !== "string" || !Number.isInteger(report.year)
         || !Number.isInteger(report.month) || report.month < 1 || report.month > 12
         || !report.metrics || !report.incomeProjection || !report.savingsProjection
         || !Array.isArray(report.breakdown) || !Array.isArray(report.dailyEntries)) {
         throw new Error("Report unavailable")
+      }
+      if (selectedMonth && `${report.year}-${String(report.month).padStart(2, "0")}` !== selectedMonth) {
+        throw new Error("The report month did not match the selection")
       }
       return report
     }).then((report) => {
@@ -121,9 +130,11 @@ export class ExpenseAppSession {
     }).catch((error: unknown) => {
       if (revision !== this.revision || this.disposed) return
       if (error instanceof ExpiredSession) {
-        this.publish({ report: null, updatedAt: null, phase: "expired", message: "" })
+        this.publish({ report: null, selectedMonth: null, updatedAt: null, phase: "expired", message: "" })
       } else {
-        this.publish({ phase: this.state.report ? "stale" : "error", message: "Couldn’t refresh. Check your connection and try again." })
+        this.publish({ phase: this.state.report ? "stale" : "error", message: selectedMonth && !this.state.report
+          ? `Couldn’t load ${selectedMonth}. Try again or return to this month.`
+          : "Couldn’t refresh. Check your connection and try again." })
       }
     }).finally(() => {
       if (revision === this.revision) {
@@ -133,6 +144,26 @@ export class ExpenseAppSession {
     })
     this.inFlight = job
     return job
+  }
+
+  selectMonth(month: string | null): Promise<void> {
+    if (this.disposed || this.state.signingOut || ["expired", "signed-out"].includes(this.state.phase)) return Promise.resolve()
+    if (month !== null && !/^[1-9]\d{3}-(?:0[1-9]|1[0-2])$/.test(month)) throw new Error("Choose a valid report month")
+    if (month === this.state.selectedMonth) return this.refresh(true)
+    ++this.revision
+    this.controller?.abort()
+    this.inFlight = null
+    this.lastCheck = -Infinity
+    // An old report must never sit under a newly requested month heading.
+    this.publish({ selectedMonth: month, report: null, updatedAt: null, phase: "loading", message: "" })
+    return this.refresh(true)
+  }
+
+  expire() {
+    ++this.revision
+    this.controller?.abort()
+    this.inFlight = null
+    this.publish({ report: null, selectedMonth: null, updatedAt: null, signingOut: false, phase: "expired", message: "" })
   }
 
   pause() {
@@ -153,11 +184,11 @@ export class ExpenseAppSession {
     this.logoutFlight = this.request(this.config.logoutUrl, "POST", async (response) => {
       if (response.status !== 204) throw new Error("Sign out unavailable")
     }).then(() => {
-      if (revision === this.revision) this.publish({ report: null, updatedAt: null, phase: "signed-out", message: "" })
+      if (revision === this.revision) this.publish({ report: null, selectedMonth: null, updatedAt: null, phase: "signed-out", message: "" })
     }).catch((error: unknown) => {
       if (revision !== this.revision) return
       if (error instanceof ExpiredSession) {
-        this.publish({ report: null, updatedAt: null, phase: "expired", message: "" })
+        this.publish({ report: null, selectedMonth: null, updatedAt: null, phase: "expired", message: "" })
       } else {
         this.publish({ phase: this.state.report ? "stale" : "error", message: "Couldn’t sign out. Check your connection and try again." })
       }

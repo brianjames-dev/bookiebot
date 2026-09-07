@@ -69,7 +69,7 @@ async def test_setup_link_is_private_one_time_and_preview_safe(phone):
 @pytest.mark.asyncio
 async def test_phone_data_ignores_caller_identity_and_selects_current_month(phone, monkeypatch):
     await connect(phone)
-    first = await phone.client.get(f"/app/expenses/data?actor_key={HANNAH}&owner_name=Hannah&month=1&year=2025")
+    first = await phone.client.get(f"/app/expenses/data?actor_key={HANNAH}&owner_name=Hannah&year=2025")
     assert await first.json() == {"ownerName": "Brian", "year": 2026, "month": 9, "persons": ["Brian (BofA)"], "revision": 1}
     assert first.headers["Cache-Control"] == "private, no-store"
     monkeypatch.setattr(phone_app, "now_pacific", lambda: datetime(2026, 10, 1))
@@ -80,6 +80,28 @@ async def test_phone_data_ignores_caller_identity_and_selects_current_month(phon
     third = await phone.client.get("/app/expenses/data")
     assert (await third.json())["persons"] == ["Hannah"]
     assert phone.calls[-1]["actor_key"] == HANNAH
+
+
+@pytest.mark.asyncio
+async def test_phone_history_validates_selection_without_accepting_owner_overrides(phone, monkeypatch):
+    await connect(phone)
+    catalog_calls = []
+    def catalog(payload):
+        catalog_calls.append(payload)
+        return {"months": [{"value": "2026-08"}], "coverage": {"status": "complete", "unavailableYears": []}}
+    monkeypatch.setattr(reports_web, "_render_live_report_catalog", catalog)
+    malformed = await phone.client.get("/app/expenses/data?month=1")
+    future = await phone.client.get("/app/expenses/data?month=2026-10")
+    assert malformed.status == future.status == 400
+    assert phone.calls == catalog_calls == []
+    missing = await phone.client.get("/app/expenses/data?month=2026-07")
+    assert missing.status == 404
+    assert phone.calls == []
+    selected = await phone.client.get(f"/app/expenses/data?month=2026-08&actor_key={HANNAH}&owner_name=Hannah&persons=Hannah")
+    assert selected.status == 200
+    assert (await selected.json())["month"] == 8
+    assert phone.calls[0]["persons"] == ["Brian (BofA)"]
+    assert phone.calls[0]["actor_key"] == BRIAN
 
 
 @pytest.mark.asyncio
@@ -180,3 +202,19 @@ async def test_invalid_inputs_expiry_and_mapped_actor_only(phone, monkeypatch):
     monkeypatch.setenv("BOOKIEBOT_PUBLIC_BASE_URL", "http://public.example")
     with pytest.raises(ValueError, match="HTTPS"):
         phone_app.create_phone_setup_url(BRIAN)
+
+
+@pytest.mark.asyncio
+async def test_frontend_update_version_matches_shell_and_contains_no_private_data(phone):
+    import json
+    import re
+    response = await phone.client.get('/app/version')
+    assert response.status == 200
+    assert response.headers['Cache-Control'] == 'no-store'
+    version = await response.json()
+    assert set(version) == {'version'}
+    assert re.fullmatch(r'[a-f0-9]{24}', version['version'])
+    shell = await (await phone.client.get('/app/expenses')).text()
+    config = json.loads(re.search(r'id="bookiebot-expense-app-config" type="application/json">(.*?)</script>', shell).group(1))
+    assert config['version'] == version['version']
+    assert not phone.calls

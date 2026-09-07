@@ -3062,3 +3062,15 @@ button:focus-visible, summary:focus-visible {
 .bb-activity-list li > div:last-child { flex-shrink:0; text-align:right; }
 .bb-activity-list span, .bb-activity-list small { display:block; margin:4px 0 0; font-size:12px; }
 .bb-activity-summary, .bb-activity-footnote, .bb-activity-coverage { font-size:13px; line-height:1.6; color:hsl(var(--muted-foreground)); }
+
+.bb-metric-explain { display:flex; align-items:center; gap:7px; padding:0; color:inherit; background:transparent; border:0; font:inherit; cursor:pointer; }
+.bb-metric-explain span { font-size:12px; opacity:.7; }
+.bb-metric-explanation dl { margin:22px 0; }
+.bb-metric-explanation dl > div { display:flex; justify-content:space-between; gap:16px; padding:12px 0; border-bottom:1px solid hsl(var(--border)); }
+.bb-metric-explanation dd { margin:0; white-space:nowrap; font-variant-numeric:tabular-nums; }
+.bb-metric-explanation dt small { display:block; margin-top:4px; font-size:11px; color:hsl(var(--muted-foreground)); }
+.bb-report-context > .bb-month-history { font:inherit; letter-spacing:inherit; color:inherit; }
+.bb-page > .bb-app-update { width:min(var(--bb-content-max),100%); margin-inline:auto; }
+
+.bb-chart-box svg [role="button"] { cursor:pointer; }
+.bb-chart-box svg [role="button"]:focus-visible { outline:2px solid hsl(var(--foreground)) !important; outline-offset:3px; stroke:hsl(var(--foreground)); stroke-width:3px; }

@@ -182,6 +182,7 @@ export interface ReportModeView {
 }
 
 export interface ExpenseReportData {
+  metricExplanations?: Record<"current" | "projected", Record<"income" | "spent" | "left" | "saved", MetricExplanation>>
   ownerName: string
   monthLabel: string
   year: number
@@ -224,4 +225,12 @@ export interface ExpenseReportData {
     current: ReportModeView
     projected: ReportModeView
   }
+}
+
+export interface MetricExplanation {
+  title: string
+  value: number
+  equation: string
+  components: Array<{label:string; amount:number; source?:string; date?:string|null}>
+  notes: string[]
 }
