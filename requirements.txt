@@ -21,3 +21,6 @@ vcrpy
 aiohttp
 audioop-lts; python_version >= "3.13"
 psycopg[binary]==3.2.3
+
+# Opt-in phone Web Push transport (no report caching).
+pywebpush==2.5.0

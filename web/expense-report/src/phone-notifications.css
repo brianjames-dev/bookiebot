@@ -1,0 +1,17 @@
+.bb-notifications { margin-top: 24px; border-top: 1px solid hsl(var(--border)); }
+.bb-notifications .bb-reimbursement-toggle { align-items: center; gap: 12px; }
+.bb-notification-state { margin-left: auto; color: hsl(var(--muted-foreground)); font-size: .82rem; }
+.bb-notification-settings { padding: 8px 0 24px; max-width: 560px; }
+.bb-notification-settings p { margin: 8px 0 16px; line-height: 1.5; color: hsl(var(--muted-foreground)); }
+.bb-notification-option { display: flex; gap: 18px; align-items: center; justify-content: space-between; margin: 18px 0; }
+.bb-notification-option select { background: hsl(var(--background)); color: hsl(var(--foreground)); border: 1px solid hsl(var(--border)); border-radius: 5px; padding: 7px 10px; font: inherit; }
+.bb-notification-option input { appearance: none; position: relative; margin: 0; width: 42px; height: 25px; flex: 0 0 42px; border: 1px solid hsl(var(--border)); border-radius: 20px; background: hsl(var(--muted)); cursor: pointer; transition: background 220ms ease; }
+.bb-notification-option input::after { content: ""; position: absolute; left: 3px; top: 3px; width: 17px; height: 17px; background: hsl(var(--muted-foreground)); border-radius: 50%; transition: transform 220ms ease, background 220ms ease; }
+.bb-notification-option input:checked { background: hsl(var(--primary)); }
+.bb-notification-option input:checked::after { transform: translateX(17px); background: hsl(var(--primary-foreground)); }
+.bb-notification-option input:focus-visible { outline: 2px solid hsl(var(--primary)); outline-offset: 3px; }
+.bb-notification-option input:disabled { opacity: .5; }
+.bb-notification-hint { font-size: .8rem; }
+.bb-notification-actions { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 22px; }
+.bb-notification-settings .bb-notification-error { color: hsl(var(--destructive)); }
+@media (prefers-reduced-motion: reduce) { .bb-notification-option input, .bb-notification-option input::after { transition: none; } }

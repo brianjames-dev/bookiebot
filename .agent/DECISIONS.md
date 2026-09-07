@@ -528,3 +528,9 @@ Store only presentation preferences (chart/mode) locally, scoped by owner. Finge
 ## 2026-09-07 - Keep Phone Questions Ephemeral and Read-Only
 
 Decision: Build a fresh selected owner/month/mode report server-side for each explicit question. Reuse the configured AI provider with two closure-bound read tools only; no mutation tools, Discord memory or persistent conversation/checkpointer. Validate authorization before and after provider work, bound request size/concurrency/rate, retain full summary totals before itemization limits, and return supporting report sections. Changing month/mode or clearing the answer discards the phone interaction.
+
+## 2026-09-07 - Opt In Per Device to Private Phone Alerts
+
+Decision: Store Web Push keys, session-bound subscriptions, preferences and durable delivery claims in the existing phone-access database. Generate VAPID keys once; require an explicit in-app enable and browser permission. Default opted-in preference is a private weekly Monday check-in at 10 AM Pacific; tomorrow payments and lock-screen amounts are separate choices. Restrict delivery to 7 AM–9 PM Pacific, deduplicate per session/event, bound retries, and disable revoked/expired sessions. A failed old endpoint must not delete a newer subscription.
+
+Use a push-only service worker without a fetch cache. Turn off removes server eligibility, retaining a browser endpoint potentially shared with a newer page. Component disposal cancels requests and invalidates pending permission/subscription operations before any mutation. Existing Discord reminders are unchanged; no automatic phone subscription or unsolicited test delivery.

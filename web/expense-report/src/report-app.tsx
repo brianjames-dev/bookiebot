@@ -32,6 +32,7 @@ import { Badge } from "./components/ui/badge"
 import { Card, CardContent, CardHeader, CardTitle } from "./components/ui/card"
 import { FittedAmount } from "./components/ui/fitted-amount"
 import { ReportMenu } from "./components/ui/report-menu"
+import { PhoneNotifications } from "./phone-notifications"
 import { ReportQuestions } from "./report-questions"
 import { SharedReimbursementsCard } from "./shared-reimbursements"
 import { reportActivity, activitySummary, activityDay, calendarActivityStatus, type ReportActivity } from "./report-activity"
@@ -898,6 +899,8 @@ export function ExpenseReportApp({ report, appControls, appAvatarUrl, appSession
 
         {appSession && <ReportQuestions month={`${report.year}-${String(report.month).padStart(2, "0")}`}
           mode={projectionActive ? "projected" : "current"} onShowSource={showQuestionSource} />}
+
+        {appSession && <PhoneNotifications />}
 
         <ModalDetails summary="Calculation" title={`${metricInspection?.title ?? "Total"} explained`} selection={metricInspection?.title ?? null}
           onDismiss={() => setMetricInspection(null)} triggerHidden>

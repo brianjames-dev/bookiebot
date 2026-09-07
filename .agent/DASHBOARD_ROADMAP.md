@@ -9,7 +9,7 @@ Approved by the user on 2026-09-07. Deliver in separate, reviewable passes; pres
 | 3 | Historical months and fair comparisons | Complete | Month picker uses authenticated, bounded historical reads. Compare matching elapsed periods by default; handle short months/missing history and provide an obvious return to the current month. |
 | 4 | Explain headline totals; remember preferred view; deployed-update prompt | Complete | Income/Spent/Left/Saved explain canonical calculations. Each phone restores its own chart/mode preference. Update action loads the new frontend while preserving its authenticated connection. |
 | 5 | Ask BookieBot about the displayed report | Complete | Read-only, owner-scoped questions reuse the existing agent/report calculations, including selected month/mode; answers can identify supporting report details. Keep the entry point compact. |
-| 6 | Optional phone notifications | Queued | User chooses useful notification types, timing and amount visibility; explicit opt-in, per-device unsubscribe, deduplication, delivery tracking and no duplicated Discord reminders by default. |
+| 6 | Optional phone notifications | Complete | User chooses useful notification types, timing and amount visibility; explicit opt-in, per-device unsubscribe, deduplication, delivery tracking and no duplicated Discord reminders by default. |
 | 7 | Savings goals beyond the current month | Queued | Durable goal targets and accumulated balances, clear personal/shared ownership, progress without double-counting monthly savings. |
 
 ## Product decisions to settle when the relevant pass starts
