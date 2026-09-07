@@ -39,6 +39,15 @@ async function main() {
   assert.ok(markup.includes("This app doesn’t save a conversation"))
   assert.match(markup, /<button type="button"[^>]*>What is driving my spending\?<\/button>/, "Suggestions fill the input; they are not form submissions")
   assert.match(markup, /<button type="submit" disabled="">Ask BookieBot<\/button>/)
+  const nativeStates = []
+  const nativeClient = new ReportQuestionClient("2026-09", "current", state => nativeStates.push(state), function browserFetch() {
+    "use strict"
+    assert.equal(this, undefined, "Native fetch cannot use the report client as its receiver")
+    return Promise.resolve(response(answer()))
+  })
+  await nativeClient.ask("Explain my total")
+  assert.equal(nativeStates.at(-1).phase, "answered", "Browser-compatible fetch invocation reaches the answer")
+  nativeClient.dispose()
   const states = [], calls = [], first = deferred()
   const client = new ReportQuestionClient("2026-09", "current", state => states.push(state), (url, options) => { calls.push({ url, options }); return first.promise })
   assert.equal(calls.length, 0)

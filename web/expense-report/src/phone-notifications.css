@@ -1,5 +1,7 @@
-.bb-notifications { margin-top: 24px; border-top: 1px solid hsl(var(--border)); }
-.bb-notifications .bb-reimbursement-toggle { align-items: center; gap: 12px; }
+.bb-notifications { margin-top: 0; }
+.bb-notifications .bb-reimbursement-entry { border-top: 0; }
+.bb-notifications .bb-reimbursement-toggle { display: flex; align-items: center; gap: 12px; }
+.bb-notification-title { text-align: left; }
 .bb-notification-state { margin-left: auto; color: hsl(var(--muted-foreground)); font-size: .82rem; }
 .bb-notification-settings { padding: 8px 0 24px; max-width: 560px; }
 .bb-notification-settings p { margin: 8px 0 16px; line-height: 1.5; color: hsl(var(--muted-foreground)); }

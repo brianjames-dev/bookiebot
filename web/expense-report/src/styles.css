@@ -3074,3 +3074,23 @@ button:focus-visible, summary:focus-visible {
 
 .bb-chart-box svg [role="button"] { cursor:pointer; }
 .bb-chart-box svg [role="button"]:focus-visible { outline:2px solid hsl(var(--foreground)) !important; outline-offset:3px; stroke:hsl(var(--foreground)); stroke-width:3px; }
+
+/* Shared phone settings and update actions. */
+.bb-toolbar-button {
+  appearance: none;
+  min-height: 44px;
+  padding: 10px 14px;
+  border: 1px solid hsl(var(--border));
+  border-radius: var(--radius);
+  background: transparent;
+  color: hsl(var(--foreground));
+  font: inherit;
+  font-size: 14px;
+  line-height: 1.3;
+  cursor: pointer;
+  transition: background var(--bb-motion-duration) var(--bb-motion-ease), color var(--bb-motion-duration) var(--bb-motion-ease);
+}
+.bb-toolbar-button:hover:not(:disabled) { background: hsl(var(--muted)); }
+.bb-toolbar-button:focus-visible { outline: 2px solid hsl(var(--primary)); outline-offset: 3px; }
+.bb-toolbar-button:disabled { opacity: .5; cursor: default; }
+@media (prefers-reduced-motion: reduce) { .bb-toolbar-button { transition: none; } }

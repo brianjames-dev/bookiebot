@@ -4,7 +4,7 @@ Last updated: 2026-09-07
 
 ## Active Focus
 
-The user approved ten dashboard enhancements in separate passes; see `.agent/DASHBOARD_ROADMAP.md`. Pass 1 carry-forward is complete. The user authorized autonomous completion of all remaining passes in this run, with separate verified commits. Later passes cover drilldowns/projection labels, history/comparison, total explanations/device preferences/update prompt, report questions, opt-in phone notifications, and long-term savings goals.
+All ten approved dashboard enhancements are implemented in seven reviewable passes; see `.agent/DASHBOARD_ROADMAP.md`. Carry-forward reimbursements, transaction drilldowns, recorded/scheduled labels, history and fair comparisons, headline explanations, device view preferences, update prompts, read-only Ask, opt-in phone notifications and durable personal savings goals are complete. Combined local verification: 1,078 tests passed including real PostgreSQL, Pyright 0 errors, frontend typecheck/build and Apps Script checks passed, npm audit 0 vulnerabilities. Browser QA covered 320/390/1280px, both themes, category keyboard drilldowns, source navigation, historical missing-data states, goal contribution/reversal/archive/restore/persistence, remembered views and explicit updates preserving access. Main/CI/live-deployment evidence is reported in the task completion response.
 
 The compact expense-report header and phone polish are implemented and verified. Month/person replace the large title, theme/signout live in a three-dot menu, and refresh keeps one update time plus explicit errors. Calendar colors match categories, today is highlighted in Daily Spending, reimbursements use the chart-band background, and modal/chart resize motion is synchronized. Full suite: 846 passed, 22 optional database cases skipped; Pyright and frontend typecheck/build passed. Browser checks covered 320/390/1280px, light/dark themes, menu keyboard behavior, stale/refresh states, exact modal scroll restoration and Projected-state preservation. Deployed iPhone acceptance is checklist 89.
 
@@ -17,7 +17,7 @@ All eight September 6 audit batches are implemented and verified locally. Each b
 
 ## On Deck
 
-0. Complete remaining dashboard roadmap passes autonomously: drilldowns/recorded-vs-scheduled labels, history/comparisons, explanations/preferences/update prompt, read-only questions, opt-in notifications, durable savings goals. Pass 1 is complete; track each milestone in `.agent/DASHBOARD_ROADMAP.md`.
+0. Optional device acceptance for the completed dashboard: each phone can enable its own notifications and create its own savings goals using `docs/PHONE_APP_SETUP.md`; checklist 91 covers these explicit personal choices. Implementation is complete.
 
 1. Review the deployed expense-report design and motion/responsive polish against checklist items 86–87.
 2. Verify the deployed audit fixes in a test workbook/Sandbox using `.agent/AUDIT_REMEDIATION_2026-09-06.md`; complete the live acceptance checks without creating test transactions in real financial data.
@@ -47,6 +47,8 @@ All eight September 6 audit batches are implemented and verified locally. Each b
 26. Explore clarifying questions before logging when BookieBot is uncertain instead of guessing or silently failing.
 
 ## Completed 2026-09-07
+
+- 2026-09-07 — Final dashboard integration: registered and authenticated all 11 private endpoints; rejected unauthenticated/report-token/cross-origin/revoked access before private report, storage, provider or push work. Browser QA found and fixed native `fetch` receiver binding in Ask and added its regression. Notification/update actions now have consistent 44px controls and disclosure alignment. Full suite: 1,078 passed (one existing Kaleido deprecation), Pyright clean, frontend typecheck/build, Apps Script checks and npm audit passed. Setup guide, README, roadmap, decisions and workstream updated. No production financial data, AI provider calls or external phone sends were used for QA.
 
 - 2026-09-07 — Dashboard pass 7: durable personal savings goals, targets/dates/starting balances, contributions with paged history and explicit reversals, edit/archive/restore and exact cent-based totals. Per-owner locks, optimistic versions and idempotent requests prevent duplicate allocations; cold PostgreSQL schema creation is serialized. Goals never alter budget-sheet savings or bank balances. SQLite/Postgres/HTTP/UI contracts pass. Manual check with a disposable goal: add a contribution, retry an uncertain request, reverse it, archive/restore, and confirm monthly Saved is unchanged.
 
@@ -1281,3 +1283,5 @@ python -m pyright
 ```
 
 90. Dashboard reimbursement carry-forward: on each phone, verify older unpaid items retain dates and partner grouping; opening/closing entries and received history stays smooth. In a test workbook, settle an older allocation in Discord and refresh: it disappears from Outstanding without changing Income/Spent/Left/Saved. Simulate a ledger read failure and confirm an incomplete-balance message replaces any all-settled claim. Only configured annual workbooks are scanned.
+
+91. Completed dashboard phone acceptance: fully close/reopen BookieBot for this first update; later deployments offer Update now. Select a historical month and Compare spending, return with This month, tap headline labels and category/day drilldowns, and reload to check chart/mode preferences. Ask a report question and follow a source; switching views clears the answer. Under Savings goals, explicitly create a personal goal and record only funds you intend to allocate; contribution history, reversals and archival persist separately from monthly Saved. For notifications, each installed iPhone app independently taps Enable on this phone, allows permission, optionally changes timing/types/amount privacy, then explicitly sends a test; Turn off stops server eligibility. Device delivery requires the owner's actual opt-in and was not sent during automated testing.

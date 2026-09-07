@@ -167,7 +167,7 @@ export function PhoneNotifications() {
   )
 
   return <section className="bb-notifications" aria-label="Phone notifications">
-    <AnimatedDisclosure summary={<><span className="bb-disclosure-mark" aria-hidden="true" /><span>Phone notifications</span><span className="bb-notification-state">{settings?.enabled ? "On" : "Off"}</span></>}>
+    <AnimatedDisclosure summary={<><span className="bb-notification-title">Phone notifications</span><span className="bb-notification-state">{settings?.enabled ? "On" : "Off"}</span><span className="bb-disclosure-mark" aria-hidden="true" /></>}>
       <div className="bb-notification-settings">
         <p>Choose what this phone receives. Each phone has its own preferences.</p>
         {!supported && <p>On iPhone, open BookieBot from your Home Screen to enable notifications. Requires iOS 16.4 or later.</p>}

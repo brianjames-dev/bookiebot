@@ -20,6 +20,7 @@ HEADERS = {"X-BookieBot-App": "1", "Origin": "http://127.0.0.1"}
 @pytest_asyncio.fixture
 async def phone(tmp_path, monkeypatch):
     monkeypatch.setenv("BOOKIEBOT_PUBLIC_BASE_URL", "http://127.0.0.1")
+    monkeypatch.setenv("BOOKIEBOT_PHONE_NOTIFICATIONS_ENABLED", "false")
     store = AppAccessStore(tmp_path / "access.sqlite3")
     store.initialize()
     monkeypatch.setattr(phone_app, "build_app_access_store", lambda: store)
@@ -116,6 +117,53 @@ async def test_shell_is_public_but_data_requires_session_not_report_token(phone)
     response = await phone.client.get(f"/app/expenses/data?token={token}")
     assert response.status == 401
     assert not phone.calls
+
+
+@pytest.mark.asyncio
+async def test_all_registered_private_phone_features_require_a_phone_session(phone, monkeypatch):
+    from bookiebot.reports import phone_goals, phone_notifications, phone_questions
+
+    forbidden_calls = []
+
+    def forbidden(*args, **kwargs):
+        forbidden_calls.append("private work")
+        raise AssertionError("An unauthorized phone request reached private work")
+
+    monkeypatch.setattr(reports_web, "_render_live_report_catalog", forbidden)
+    monkeypatch.setattr(phone_goals, "build_goals_store", forbidden)
+    monkeypatch.setattr(phone_notifications, "build_phone_notification_store", forbidden)
+    monkeypatch.setattr(phone_notifications, "_send_push", forbidden)
+    monkeypatch.setattr(phone_questions, "answer_report_question", forbidden)
+    token = reports_web.create_expense_report_token(
+        actor_key=BRIAN, owner_name="Brian", persons=["Brian (BofA)"], year=2026, month=9)
+    endpoints = [
+        ("GET", "/app/expenses/data"),
+        ("GET", "/app/expenses/months"),
+        ("GET", "/app/expenses/comparison"),
+        ("POST", "/app/expenses/ask"),
+        ("GET", "/app/notifications"),
+        ("POST", "/app/notifications"),
+        ("DELETE", "/app/notifications"),
+        ("POST", "/app/notifications/test"),
+        ("GET", "/app/goals"),
+        ("POST", "/app/goals"),
+        ("GET", "/app/goals/example/contributions"),
+    ]
+    for suffix in ("", f"?token={token}"):
+        for method, endpoint in endpoints:
+            response = await phone.client.request(method, endpoint + suffix, headers=HEADERS)
+            assert response.status == 401, (method, endpoint)
+            assert response.headers["Cache-Control"] == "private, no-store"
+    await connect(phone)
+    for method, endpoint in endpoints:
+        if method != "GET":
+            response = await phone.client.request(method, endpoint, headers={**HEADERS, "Origin": "https://untrusted.test"})
+            assert response.status == 403, (method, endpoint)
+    phone_app.reset_phone_access(BRIAN)
+    for method, endpoint in endpoints:
+        assert (await phone.client.request(method, endpoint, headers=HEADERS)).status == 401
+    assert forbidden_calls == []
+    assert phone.calls == []
 
 
 @pytest.mark.asyncio

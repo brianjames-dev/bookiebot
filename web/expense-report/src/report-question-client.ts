@@ -42,7 +42,9 @@ export class ReportQuestionClient {
     let timedOut = false
     const timer = setTimeout(() => { timedOut = true; controller.abort() }, 60_000)
     try {
-      const response = await this.fetcher("/app/expenses/ask", {
+      // Native browser fetch must not receive this client as its receiver.
+      const fetcher = this.fetcher
+      const response = await fetcher("/app/expenses/ask", {
         method: "POST", credentials: "same-origin", cache: "no-store", redirect: "error",
         headers: { "Content-Type": "application/json", "X-BookieBot-App": "1" },
         body: JSON.stringify({ question: text, month: this.month, mode: this.mode }), signal: controller.signal,
