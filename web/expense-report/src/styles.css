@@ -2478,6 +2478,10 @@ tr:last-child td {
 }
 
 .bb-daily-day {
+  border: 0;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -3091,7 +3095,6 @@ button:focus-visible, summary:focus-visible {
 /* One detail view connects categories and daily activity. */
 .bb-legend-inspect { width:100%; border:0; border-bottom:1px solid hsl(var(--border)); background:transparent; color:inherit; font:inherit; text-align:left; cursor:pointer; }
 .bb-legend-inspect:hover { background:hsl(var(--muted)); }
-.bb-daily-day { border:0; color:inherit; font:inherit; cursor:pointer; }
 .bb-activity-status { display:inline-block; font-size:10px; line-height:1.5; padding:1px 5px; margin-left:5px; border:1px solid hsl(var(--border)); border-radius:3px; color:hsl(var(--muted-foreground)); white-space:nowrap; }
 .bb-activity-scheduled { border-style:dashed; }
 .bb-activity-list { list-style:none; margin:20px 0; padding:0; }

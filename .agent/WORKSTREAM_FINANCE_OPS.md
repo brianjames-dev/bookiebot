@@ -4,6 +4,8 @@ Last updated: 2026-09-07
 
 ## Goal
 
+Dashboard theme polish (2026-09-07): fixed Safari menu taps being canceled by null-target blur, and the Daily Spending today-color cascade. Theme persistence and existing colors remain; actual WebKit/Chromium checks and focused regressions pass, full suite 1,096 passed / 61 optional PostgreSQL skipped. No finance, persistence or delivery behavior changed. STATUS checklist 97 covers phone acceptance.
+
 Phone notification origin repair (2026-09-07): Enable/preferences were rejected before storage because same-origin fetches inherited the page no-referrer policy and sent Origin:null. Explicit same-origin request referrer policy preserves the real origin; strict server checks remain. Existing-subscription re-enable and durable preference reload regression added; no delivery, reconciliation or sheet mutations changed. STATUS checklist 96 covers phone acceptance.
 
 Dashboard source-read reliability (2026-09-07): confirmed production Sheets per-user read quota exhaustion. Batched fresh report and comparison-year reads, bounded one-minute comparison-only reuse invalidated on refresh, safe quota feedback and actual HTTP-budget regressions are implemented. Reconciliation, settlement, sheet mutations and notification delivery are unchanged. Verification and device acceptance are tracked in STATUS checklist 95.
