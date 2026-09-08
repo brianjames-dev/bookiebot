@@ -1,5 +1,11 @@
 # Agent Decisions
 
+## 2026-09-08 - Keep One Reimbursement Receipt Open Per Expense Month
+
+Each keyed expense-month group owns one expanded allocation ID. Opening a sibling closes the previous row in the same render; other months, monthly Totals and the outer View expenses disclosure remain independent. Extend AnimatedDisclosure with paired controlled open/onOpenChange props while retaining its existing standalone state and CollapsibleContent animation/inert behavior. Allocation IDs preserve expansion through reordering and received-status updates without transferring it to another expense.
+
+Consolidate receipt metadata before four consistently aligned financial rows. Payer identifies who paid; responsibility identifies the budget charged. Normal copy says Paid by … / Split by income (or 50/50) with …; fronted copy says Fronted for …. Omit a separate budget label only when it repeats the payer or the explicit fronted recipient; preserve differing account/display labels. Keep unknown split text and optional location, use honest missing-date/partner fallbacks, and do not reinterpret financial amounts. Smaller serif month headings restore This month/Selected month pills. The outstanding overview and Totals control remain unchanged.
+
 ## 2026-09-08 - Show Reimbursement Months As Parts Of The Outstanding Balance
 
 Replace independent max-scaled bars with one segmented bar whose cent-based portions sum to the same outstanding headline. Matching legend swatches and exact amounts identify up to four expense-month buckets, retaining Earlier expenses and Undated. This depicts outstanding composition, not repayment progress; received amounts never enter its denominator. Incomplete coverage remains explicit.

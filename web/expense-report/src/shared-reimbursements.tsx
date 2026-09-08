@@ -95,10 +95,18 @@ export function reimbursementLedger(items: SharedReimbursementItem[], openItems:
   }))
 }
 
-function ReimbursementEntry({ item }: { item: SharedReimbursementItem }) {
+function ReimbursementEntry({ item, open, onOpenChange }: { item: SharedReimbursementItem; open: boolean; onOpenChange: (open: boolean) => void }) {
   const received = item.status === "reimbursed" || item.outstandingAmount <= 0
+  const payer = item.payer.trim()
+  const partner = item.partner.trim() || "Partner"
+  const responsible = item.responsiblePerson.trim()
+  const method = item.splitMethod.trim()
+  const fronted = method.toLowerCase() === "fronted"
+  const splitLabel = fronted ? "Fronted" : method.toLowerCase() === "by income" ? "Split by income" : method ? `Split ${method}` : "Split"
+  const showBudget = responsible && responsible.toLowerCase() !== payer.toLowerCase()
+    && !(fronted && responsible.toLowerCase() === partner.toLowerCase())
   return (
-    <AnimatedDisclosure summary={
+    <AnimatedDisclosure open={open} onOpenChange={onOpenChange} summary={
       <>
         <span className="bb-reimbursement-item">
           <strong title={item.item}>{item.item}</strong>
@@ -110,21 +118,20 @@ function ReimbursementEntry({ item }: { item: SharedReimbursementItem }) {
       </>
     }>
       <div className="bb-reimbursement-detail">
-        <dl className="bb-reimbursement-receipt-meta">
-          <div><dt>Date</dt><dd>{item.date.trim() || "Undated"}</dd></div>
-          <div><dt>With</dt><dd>{item.partner.trim() || "Partner"}</dd></div>
-          {item.location.trim() && <div className="bb-reimbursement-location"><dt>Location</dt><dd>{item.location}</dd></div>}
-        </dl>
+        <div className="bb-reimbursement-receipt-meta">
+          <p className="bb-reimbursement-date">{item.date.trim() || "Undated"}{item.location.trim() && <> · {item.location.trim()}</>}</p>
+          <p className="bb-reimbursement-arrangement">
+            {payer && <>Paid by <strong>{payer}</strong> · </>}
+            {splitLabel} {fronted ? "for" : "with"} <strong>{partner}</strong>
+            {showBudget && <> · Budget: <strong>{responsible}</strong></>}
+          </p>
+        </div>
         <dl className="bb-reimbursement-split">
           <div className="bb-reimbursement-gross"><dt>Gross paid</dt><dd><FittedAmount className="bb-reimbursement-receipt-amount">{formatMoney(item.grossAmount)}</FittedAmount></dd></div>
           <div className="bb-reimbursement-share"><dt>Your share</dt><dd><FittedAmount className="bb-reimbursement-receipt-amount">{formatMoney(item.personalShare)}</FittedAmount></dd></div>
           <div className="bb-reimbursement-share"><dt>Partner share</dt><dd><FittedAmount className="bb-reimbursement-receipt-amount">{formatMoney(item.partnerShare)}</FittedAmount></dd></div>
           <div className="bb-reimbursement-received" data-received={item.receivedAmount > 0}><dt>Received</dt><dd><FittedAmount className="bb-reimbursement-receipt-amount">{formatMoney(item.receivedAmount)}</FittedAmount></dd></div>
         </dl>
-        {item.splitMethod.trim() || item.responsiblePerson.trim() ? <dl className="bb-reimbursement-methods">
-          {item.splitMethod.trim() && <div><dt>Split method</dt><dd>{item.splitMethod.trim()}</dd></div>}
-          {item.responsiblePerson.trim() && <div><dt>Expense for</dt><dd>{item.responsiblePerson.trim()}</dd></div>}
-        </dl> : null}
       </div>
     </AnimatedDisclosure>
   )
@@ -182,12 +189,9 @@ export function SharedReimbursementsCard({ items, openItems, receivedItems, cove
             </>}>
               <div className="bb-reimbursement-groups">
                 {monthly.length > 0 && !ledger.some((group) => group.key === selectedMonth) && <MonthHeading label={monthLabel} items={monthly} />}
-                {ledger.map((group) => <section className="bb-reimbursement-group" key={group.key} aria-label={`${group.label} expenses`}>
-                  <MonthHeading label={group.label} tag={group.key === coverage?.asOf.slice(0, 7)
-                    ? "This month" : group.key === selectedMonth ? "Selected month" : undefined}
-                    items={group.key === selectedMonth && monthly.length > 0 ? monthly : undefined} />
-                  {group.items.map((item) => <ReimbursementEntry key={item.id} item={item} />)}
-                </section>)}
+                {ledger.map((group) => <ReimbursementMonth key={group.key} group={group}
+                  tag={group.key === coverage?.asOf.slice(0, 7) ? "This month" : group.key === selectedMonth ? "Selected month" : undefined}
+                  monthlyItems={group.key === selectedMonth && monthly.length > 0 ? monthly : undefined} />)}
               </div>
             </AnimatedDisclosure>
           </div>}
@@ -195,6 +199,19 @@ export function SharedReimbursementsCard({ items, openItems, receivedItems, cove
       </CardContent>
     </Card>
   )
+}
+
+function ReimbursementMonth({ group, tag, monthlyItems }: {
+  group: ReturnType<typeof reimbursementLedger>[number]
+  tag?: string
+  monthlyItems?: SharedReimbursementItem[]
+}) {
+  const [openId, setOpenId] = useState<string | null>(null)
+  return <section className="bb-reimbursement-group" aria-label={`${group.label} expenses`}>
+    <MonthHeading label={group.label} tag={tag} items={monthlyItems} />
+    {group.items.map((item) => <ReimbursementEntry key={item.id} item={item} open={openId === item.id}
+      onOpenChange={(open) => setOpenId(open ? item.id : null)} />)}
+  </section>
 }
 
 function MonthHeading({ label, tag, items }: { label: string; tag?: string; items?: SharedReimbursementItem[] }) {

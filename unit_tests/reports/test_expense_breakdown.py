@@ -222,12 +222,10 @@ def test_reimbursement_disclosures_preserve_complete_transaction_details():
     for field in ("item", "outstandingAmount"):
         assert f"item.{field}" in summary
     assert "item.item" not in details, "The expanded receipt must not repeat its summary title"
-    for field in ("location", "date", "partner"):
-        assert f"item.{field}" in details
+    for field in ("location", "date", "payer", "partner", "splitMethod", "responsiblePerson"):
+        assert f"item.{field}" in entry
     for field in ("grossAmount", "personalShare", "partnerShare", "receivedAmount"):
         assert f"formatMoney(item.{field})" in details
-    assert "item.splitMethod" in details
-    assert "item.responsiblePerson" in details
 
 
 def test_top_chart_mobile_counts_control_order_and_burn_pill_alignment():

@@ -241,9 +241,10 @@ const compactLabel = expenseDetails.button.findByProps({className:"bb-reimbursem
 assert.equal(compactLabel.findAllByType("strong").length,1)
 assert.equal(compactLabel.findAllByType("span").length,1,"The compact item label contains no date/partner subtitle")
 const receiptMeta = expenseDetails.content.findByProps({className:"bb-reimbursement-receipt-meta"})
-assert.equal(receiptMeta.type,"dl")
-assert.deepEqual(definitionPairs(receiptMeta),[["Date","9/3/2026"],["With","Hannah"],["Location","Test Store"]],
-  "The full location, expense date and partner remain distinct labeled fields")
+assert.equal(receiptMeta.type,"div")
+assert.equal(renderedText(receiptMeta.findByProps({className:"bb-reimbursement-date"})),"9/3/2026 · Test Store")
+assert.equal(renderedText(receiptMeta.findByProps({className:"bb-reimbursement-arrangement"})),"Paid by Brian · Split 50/50 with Hannah",
+  "The compact metadata retains date, location, payer, partner and split method")
 assert.equal(expenseDetails.content.props.inert,"", "Individual financial details remain a separate disclosure")
 renderer.act(() => expenseDetails.button.props.onClick())
 assert.equal(expenseDetails.content.props.inert,undefined)
@@ -265,23 +266,37 @@ const auditExpense = tree.root.findAllByProps({className:"bb-reimbursement-entry
 const auditDisclosure = disclosure(auditExpense)
 const auditFields = definitionPairs(auditDisclosure.content)
 assert.deepEqual(auditFields,[
-  ["Date","9/4/2026"],["With","Hannah"],["Location","Neighborhood Market"],
   ["Gross paid","$200.00"],["Your share","$125.00"],["Partner share","$75.00"],["Received","$20.00"],
-  ["Split method","By income"],["Expense for","Brian"],
-],"Partial receipts and responsibility remain complete and individually labeled")
+],"Partial receipts retain all four individually labeled financial values")
+assert.equal(renderedText(auditDisclosure.content.findByProps({className:"bb-reimbursement-date"})),"9/4/2026 · Neighborhood Market")
+assert.equal(renderedText(auditDisclosure.content.findByProps({className:"bb-reimbursement-arrangement"})),"Paid by Brian · Split by income with Hannah",
+  "The arrangement identifies the payer without repeating a matching budget owner")
 assert.equal(new Set(auditFields.map(([label]) => label)).size,auditFields.length,"Receipt fields are not duplicated")
 renderer.act(() => auditDisclosure.button.props.onClick())
 assert.equal(renderedText(auditExpense).split(auditItem.item).length-1,1)
 renderer.act(() => tree.unmount())
-const minimalItem = item("Receipt with missing optional metadata",{date:" ",location:" ",partner:" ",splitMethod:" \t",responsiblePerson:" \n"})
+const minimalItem = item("Receipt with missing optional metadata",{date:" ",location:" ",payer:" ",partner:" ",splitMethod:" \t",responsiblePerson:" \n"})
 renderer.act(() => { tree = renderer.create(React.createElement(SharedReimbursementsCard,propsFor({items:[minimalItem],openItems:[minimalItem]}))) })
 const minimalExpense = tree.root.findAllByProps({className:"bb-reimbursement-entry"})[1]
-const minimalFields = definitionPairs(disclosure(minimalExpense).content)
-assert.deepEqual(minimalFields.slice(0,2),[["Date","Undated"],["With","Partner"]])
-assert.ok(!minimalFields.some(([label]) => ["Location","Split method","Expense for"].includes(label)),
-  "Missing optional metadata does not produce empty labels or separators")
-assert.equal(minimalFields.length,6,"Date and partner fallbacks retain all four financial values")
+const minimalDetails = disclosure(minimalExpense).content
+assert.equal(renderedText(minimalDetails.findByProps({className:"bb-reimbursement-date"})),"Undated")
+assert.equal(renderedText(minimalDetails.findByProps({className:"bb-reimbursement-arrangement"})),"Split with Partner",
+  "Whitespace-only optional metadata does not produce empty labels or separators")
+assert.equal(definitionPairs(minimalDetails).length,4,"Metadata fallbacks retain all four financial values")
 renderer.act(() => tree.unmount())
+for (const [changes, expected] of [
+  [{payer:" Brian ",partner:" Hannah ",responsiblePerson:" bRIAN ",splitMethod:" By income "},"Paid by Brian · Split by income with Hannah"],
+  [{splitMethod:"70/30",responsiblePerson:"Joint budget"},"Paid by Brian · Split 70/30 with Hannah · Budget: Joint budget"],
+  [{splitMethod:"Fronted",responsiblePerson:" hANNAH "},"Paid by Brian · Fronted for Hannah"],
+  [{splitMethod:"fronted",responsiblePerson:"Joint budget"},"Paid by Brian · Fronted for Hannah · Budget: Joint budget"],
+  [{splitMethod:"",responsiblePerson:"Hannah"},"Paid by Brian · Split with Hannah · Budget: Hannah"],
+]) {
+  const arrangementItem = item("Arrangement receipt",changes)
+  renderer.act(() => { tree = renderer.create(React.createElement(SharedReimbursementsCard,propsFor({items:[arrangementItem],openItems:[arrangementItem]}))) })
+  assert.equal(renderedText(tree.root.findByProps({className:"bb-reimbursement-arrangement"})),expected,
+    "Custom splits, fronted expenses and a distinct budget owner retain their meaning")
+  renderer.act(() => tree.unmount())
+}
 renderer.act(() => { tree = renderer.create(React.createElement(SharedReimbursementsCard, propsFor({
   items:[item("Future expense",{date:"9/20/2026"})],openItems:[older],
 }))) })
@@ -309,5 +324,76 @@ for (let ancestor = warning.parent; ancestor; ancestor = ancestor.parent) {
   assert.notEqual(ancestor.props.inert,"", "Incomplete coverage is always visible outside the closed financial details")
   assert.notEqual(ancestor.props["aria-hidden"],true)
 }
+renderer.act(() => tree.unmount())
+// The shared disclosure still works by itself, while controlled callers own
+// the open state used by the month accordion.
+const { AnimatedDisclosure } = load(path.join(frontend,"src/components/ui/motion.tsx"))
+let standalone, controlled, controlledOpen = false
+const requests = []
+renderer.act(() => { standalone = renderer.create(React.createElement(AnimatedDisclosure,{summary:"Standalone"},"Detail")) })
+const single = disclosure(standalone.root)
+assert.equal(single.button.props["aria-expanded"],false)
+renderer.act(() => single.button.props.onClick())
+assert.equal(single.button.props["aria-expanded"],true)
+assert.equal(single.content.props.inert,undefined)
+renderer.act(() => single.button.props.onClick())
+assert.equal(single.content.props.inert,"")
+renderer.act(() => { single.button.props.onClick(); single.button.props.onClick() })
+assert.equal(single.button.props["aria-expanded"],false,"Batched standalone toggles compose against the latest state")
+renderer.act(() => standalone.unmount())
+const controlledComponent = () => React.createElement(AnimatedDisclosure,{
+  summary:"Controlled",open:controlledOpen,onOpenChange:next=>requests.push(next),
+},"Controlled detail")
+renderer.act(() => { controlled = renderer.create(controlledComponent()) })
+const controlledRow = disclosure(controlled.root)
+const controlledId = controlledRow.content.props.id
+renderer.act(() => controlledRow.button.props.onClick())
+assert.deepEqual(requests,[true])
+assert.equal(controlledRow.button.props["aria-expanded"],false,"Controlled state changes only after its owner updates it")
+controlledOpen = true
+renderer.act(() => controlled.update(controlledComponent()))
+assert.equal(controlledRow.content.props.inert,undefined)
+assert.equal(controlledRow.content.props.id,controlledId)
+renderer.act(() => controlledRow.button.props.onClick())
+assert.deepEqual(requests,[true,false])
+assert.equal(controlledRow.button.props["aria-expanded"],true)
+controlledOpen = false
+renderer.act(() => controlled.update(controlledComponent()))
+assert.equal(controlledRow.content.props.inert,"")
+assert.equal(controlledRow.content.props["data-state"],"closed")
+renderer.act(() => controlled.unmount())
+
+const receiptA = item("Accordion receipt A",{date:"9/5/2026"})
+const receiptB = item("Accordion receipt B",{date:"9/2/2026"})
+let accordionProps = propsFor({items:[receiptA,receiptB],openItems:[receiptA,older,receiptB]})
+renderer.act(() => { tree = renderer.create(React.createElement(SharedReimbursementsCard,accordionProps)) })
+function receiptRow(title) {
+  let row = tree.root.findByProps({title})
+  while (row && row.props.className !== "bb-reimbursement-entry") row = row.parent
+  assert.ok(row)
+  return disclosure(row)
+}
+renderer.act(() => disclosure(tree.root.findByProps({className:"bb-reimbursement-open-list"})).button.props.onClick())
+renderer.act(() => receiptRow(receiptA.item).button.props.onClick())
+assert.equal(receiptRow(receiptA.item).button.props["aria-expanded"],true)
+renderer.act(() => receiptRow(receiptB.item).button.props.onClick())
+assert.equal(receiptRow(receiptA.item).button.props["aria-expanded"],false,"Opening another expense closes the previous expense in that month")
+assert.equal(receiptRow(receiptA.item).content.props.inert,"")
+assert.equal(receiptRow(receiptB.item).button.props["aria-expanded"],true)
+renderer.act(() => receiptRow(older.item).button.props.onClick())
+assert.equal(receiptRow(receiptB.item).button.props["aria-expanded"],true,"Different months keep independent open expenses")
+renderer.act(() => receiptRow(receiptB.item).button.props.onClick())
+assert.equal(receiptRow(receiptB.item).button.props["aria-expanded"],false,"Clicking the current expense closes it")
+assert.equal(receiptRow(older.item).button.props["aria-expanded"],true)
+renderer.act(() => receiptRow(receiptB.item).button.props.onClick())
+const updatedB = {...receiptB,date:"9/9/2026",status:"reimbursed",outstandingAmount:0,receivedAmount:40}
+accordionProps = propsFor({items:[updatedB,receiptA],openItems:[older,receiptA],receivedItems:[updatedB]})
+renderer.act(() => tree.update(React.createElement(SharedReimbursementsCard,accordionProps)))
+assert.equal(receiptRow(receiptB.item).button.props["aria-expanded"],true,"Reordering and receipt updates preserve the open allocation id")
+assert.equal(receiptRow(older.item).button.props["aria-expanded"],true)
+assert.match(renderedText(receiptRow(receiptB.item).button),/Received/)
+const activeByMonth = tree.root.findAllByProps({className:"bb-reimbursement-group"}).map(group =>
+  group.findAllByProps({className:"bb-reimbursement-toggle"}).filter(button=>button.props["aria-expanded"]).length)
+assert.deepEqual(activeByMonth,[1,1])
 renderer.act(() => tree.unmount())
 console.log("Reimbursement carry-forward, timeline and disclosure checks passed")

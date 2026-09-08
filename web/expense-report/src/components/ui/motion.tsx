@@ -22,8 +22,12 @@ export function CollapsibleContent({
   )
 }
 
-export function AnimatedDisclosure({ summary, children }: { summary: ReactNode; children: ReactNode }) {
-  const [open, setOpen] = useState(false)
+export function AnimatedDisclosure({ summary, children, open: controlledOpen, onOpenChange }: {
+  summary: ReactNode
+  children: ReactNode
+} & ({ open: boolean; onOpenChange: (open: boolean) => void } | { open?: undefined; onOpenChange?: undefined })) {
+  const [localOpen, setLocalOpen] = useState(false)
+  const open = controlledOpen ?? localOpen
   const contentId = useId()
   return (
     <div className="bb-reimbursement-entry" data-state={open ? "open" : "closed"}>
@@ -32,7 +36,7 @@ export function AnimatedDisclosure({ summary, children }: { summary: ReactNode; 
         className="bb-reimbursement-toggle"
         aria-expanded={open}
         aria-controls={contentId}
-        onClick={() => setOpen((current) => !current)}
+        onClick={() => onOpenChange ? onOpenChange(!open) : setLocalOpen((current) => !current)}
       >
         {summary}
       </button>
