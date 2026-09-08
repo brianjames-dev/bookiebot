@@ -1295,3 +1295,139 @@ def test_matched_action_log_ids_splits_group_matches(tmp_path):
     )
 
     assert store.matched_action_log_ids("brian") == {"minted123", "zazzle123"}
+
+
+def test_upsert_preserves_terminal_match_lineage(tmp_path):
+    store = _store(tmp_path)
+    item = store.upsert_item(
+        owner_key="brian",
+        provider="plaid",
+        item_id="item-brian",
+        access_token="access-sandbox-brian",
+        institution_name="Plaid Sandbox",
+    )
+    store.upsert_accounts(
+        [
+            BankAccount(
+                item_id=item.id,
+                provider_account_id="account-brian",
+                owner_key="brian",
+                name="Brian Checking",
+                mask="1111",
+                type="depository",
+                subtype="checking",
+                official_name=None,
+                current_balance=500.0,
+                available_balance=450.0,
+            )
+        ]
+    )
+    store.upsert_transactions(
+        [
+            {
+                "transaction_id": "txn-confirmed",
+                "account_id": "account-brian",
+                "date": "2026-05-17",
+                "name": "Coffee",
+                "amount": 12.34,
+                "pending": False,
+            }
+        ],
+        owner_key="brian",
+    )
+    transaction = store.recent_transactions("brian", limit=1)[0]
+    confirmed = store.upsert_reconciliation_item(
+        owner_key="brian",
+        transaction=transaction,
+        classification="expense",
+        status="needs_review",
+        confidence=0.5,
+        matched_action_log_id="action-1",
+        matched_sheet_ref="expense!row 4",
+        notes="initial",
+    )
+    store.confirm_reconciliation_item("brian", confirmed.id, matched_action_log_id="action-1", matched_sheet_ref="expense!row 4")
+    updated = store.upsert_reconciliation_item(
+        owner_key="brian",
+        transaction=transaction,
+        classification="transfer",
+        status="needs_review",
+        confidence=0.1,
+        matched_action_log_id=None,
+        matched_sheet_ref=None,
+        notes="preview overwrite",
+    )
+    assert updated.status == "confirmed"
+    assert updated.matched_action_log_id == "action-1"
+    assert updated.matched_sheet_ref == "expense!row 4"
+    assert updated.classification == "expense"
+    assert updated.notes == "initial; logged from bank review" or updated.notes.startswith("initial")
+
+
+def test_confirm_reconciliation_item_rejects_terminal_status(tmp_path):
+    store = _store(tmp_path)
+    item = store.upsert_item(
+        owner_key="brian",
+        provider="plaid",
+        item_id="item-brian",
+        access_token="access-sandbox-brian",
+        institution_name="Plaid Sandbox",
+    )
+    store.upsert_accounts(
+        [
+            BankAccount(
+                item_id=item.id,
+                provider_account_id="account-brian",
+                owner_key="brian",
+                name="Brian Checking",
+                mask="1111",
+                type="depository",
+                subtype="checking",
+                official_name=None,
+                current_balance=500.0,
+                available_balance=450.0,
+            )
+        ]
+    )
+    store.upsert_transactions(
+        [
+            {
+                "transaction_id": "txn-open",
+                "account_id": "account-brian",
+                "date": "2026-05-17",
+                "name": "Coffee",
+                "amount": 12.34,
+                "pending": False,
+            }
+        ],
+        owner_key="brian",
+    )
+    transaction = store.recent_transactions("brian", limit=1)[0]
+    open_item = store.upsert_reconciliation_item(
+        owner_key="brian",
+        transaction=transaction,
+        classification="expense",
+        status="needs_review",
+        confidence=0.5,
+    )
+    first = store.confirm_reconciliation_item("brian", open_item.id, matched_action_log_id="abc")
+    second = store.confirm_reconciliation_item("brian", open_item.id, matched_action_log_id="def")
+    assert first is not None and first.status == "confirmed"
+    assert second is None
+
+
+def test_get_access_token_requires_matching_owner(tmp_path):
+    store = _store(tmp_path)
+    item = store.upsert_item(
+        owner_key="brian",
+        provider="plaid",
+        item_id="item-brian",
+        access_token="access-sandbox-brian",
+        institution_name="Plaid Sandbox",
+    )
+    assert store.get_access_token(item.id, owner_key="brian") == "access-sandbox-brian"
+    try:
+        store.get_access_token(item.id, owner_key="hannah")
+        assert False, "expected KeyError"
+    except KeyError:
+        pass
