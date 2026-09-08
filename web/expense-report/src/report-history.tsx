@@ -69,7 +69,9 @@ export async function requestReportHistory<T>(url: string, controller: AbortCont
 }
 
 export function reportMonthLabel(value: string | null) {
-  if (!value || !/^\d{4}-\d{2}$/.test(value)) return "This month"
+  if (!value || !/^\d{4}-\d{2}$/.test(value)) {
+    return new Intl.DateTimeFormat("en-US", { month: "long", year: "numeric", timeZone: "America/Los_Angeles" }).format(new Date())
+  }
   const [year, month] = value.split("-").map(Number)
   return new Intl.DateTimeFormat("en-US", { month: "long", year: "numeric", timeZone: "UTC" }).format(new Date(Date.UTC(year, month - 1, 1)))
 }
@@ -129,11 +131,10 @@ export function MonthHistoryControl({ monthLabel, selectedMonth, catalog, loadin
       <span aria-hidden="true">{monthLabel}<span className="bb-month-chevron">⌄</span></span>
       <select aria-label="Report month" value={selectedMonth ?? ""} disabled={disabled || (loading && !catalog)}
         onChange={(event) => onSelect(event.target.value || null)}>
-        <option value="">{catalog ? `${reportMonthLabel(catalog.currentMonth)} · Current` : "This month"}</option>
+        <option value="">{reportMonthLabel(catalog?.currentMonth ?? null)}</option>
         {options.map((month) => <option key={month.value} value={month.value}>{month.label}</option>)}
       </select>
     </span>
-    {selectedMonth && <button className="bb-history-current" type="button" disabled={disabled} onClick={() => onSelect(null)}>This month</button>}
     {(error || partial) && <span className="bb-history-catalog-status" role="status">
       {error ? "History couldn’t load." : "Some history is unavailable."} <button type="button" disabled={loading || disabled} onClick={onRetry}>Retry</button>
     </span>}
@@ -141,6 +142,51 @@ export function MonthHistoryControl({ monthLabel, selectedMonth, catalog, loadin
 }
 
 const money = (value: number) => new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format(value)
+
+function ComparisonResult({ comparison }: { comparison: ReportPeriodComparison }) {
+  const [detailsOpen, setDetailsOpen] = useState(false)
+  const detailsId = useId()
+  const { selected, baseline } = comparison
+  if (!selected || !baseline) return <p className="bb-comparison-note">{comparison.coverageNote}</p>
+
+  const excluded = [
+    { label: "Without dates", selected: selected.undatedSpending, baseline: baseline.undatedSpending },
+    { label: "Scheduled subscriptions", selected: selected.scheduledSpending, baseline: baseline.scheduledSpending },
+    { label: "Sheet adjustments", selected: selected.unitemizedSpending, baseline: baseline.unitemizedSpending },
+  ].filter((row) => row.selected !== 0 || row.baseline !== 0)
+  const change = comparison.changeAmount
+  return <>
+    <p className="bb-comparison-note bb-comparison-period">Recorded spending · days 1–{comparison.throughDay}</p>
+    <div className="bb-comparison-values">
+      <div><span>{reportMonthLabel(comparison.selectedMonth)}</span><FittedAmount className="bb-comparison-amount">{money(selected.datedSpending)}</FittedAmount></div>
+      <div><span>{reportMonthLabel(comparison.baselineMonth)}</span><FittedAmount className="bb-comparison-amount">{money(baseline.datedSpending)}</FittedAmount></div>
+    </div>
+    <div className="bb-comparison-footer">
+      {change !== null && <p className="bb-comparison-change">
+        {change === 0 ? "Same spending" : <><strong>{money(Math.abs(change))}</strong> {change < 0 ? "less" : "more"}</>}
+        {comparison.changePercent !== null && comparison.changePercent !== 0 && <span className="bb-comparison-percent"> · {Math.abs(comparison.changePercent)}%</span>}
+      </p>}
+      <button type="button" className="bb-comparison-details-toggle" aria-expanded={detailsOpen} aria-controls={detailsId}
+        onClick={() => setDetailsOpen((value) => !value)}>
+        Details<span className="bb-disclosure-mark" aria-hidden="true" />
+      </button>
+    </div>
+    <CollapsibleContent open={detailsOpen} id={detailsId}>
+      <div className="bb-comparison-details">
+        <p className="bb-comparison-note">{comparison.coverageNote}</p>
+        {excluded.length > 0 && <table className="bb-comparison-exclusions">
+          <caption>Excluded amounts</caption>
+          <thead><tr><th scope="col">Type</th><th scope="col">{reportMonthLabel(comparison.selectedMonth)}</th><th scope="col">{reportMonthLabel(comparison.baselineMonth)}</th></tr></thead>
+          <tbody>{excluded.map((row) => <tr key={row.label}>
+            <th scope="row">{row.label}</th>
+            <td><FittedAmount className="bb-comparison-excluded-amount">{money(row.selected)}</FittedAmount></td>
+            <td><FittedAmount className="bb-comparison-excluded-amount">{money(row.baseline)}</FittedAmount></td>
+          </tr>)}</tbody>
+        </table>}
+      </div>
+    </CollapsibleContent>
+  </>
+}
 
 export function ReportComparison({ report, onExpired, catalog, catalogLoading = false, catalogError = false, onCatalogRetry, refreshing = false }: {
   report: ExpenseReportData
@@ -231,7 +277,7 @@ export function ReportComparison({ report, onExpired, catalog, catalogLoading = 
         <label className="bb-comparison-picker">
           <span>Compare with</span>
           <select aria-label="Comparison month" value={baseline} onChange={(event) => setChosenMonth(event.target.value)}>
-            <option value={previousMonth}>Last month · {reportMonthLabel(previousMonth)}</option>
+            <option value={previousMonth}>{reportMonthLabel(previousMonth)}</option>
             {options.map((month) => <option key={month.value} value={month.value}>{month.label}</option>)}
           </select>
         </label>
@@ -242,26 +288,7 @@ export function ReportComparison({ report, onExpired, catalog, catalogLoading = 
         <div role="status" aria-live="polite" aria-busy={loading}>
           {loading && <p className="bb-comparison-note">{refreshing && !requests.pending ? "Waiting for the refreshed report…" : "Comparing matching days…"}</p>}
           {error && <p className="bb-comparison-note">{error} <button type="button" onClick={() => { requests.results.delete(baseline); reload((value) => value + 1) }}>Try again</button></p>}
-          {!loading && !error && comparison && <>
-            <p className="bb-comparison-note">Dated recorded spending · days 1–{comparison.throughDay}</p>
-            {comparison.baseline && comparison.selected && <>
-              <div className="bb-comparison-values">
-                <div><span>{reportMonthLabel(comparison.selectedMonth)}</span><FittedAmount className="bb-comparison-amount">{money(comparison.selected.datedSpending)}</FittedAmount></div>
-                <div><span>{reportMonthLabel(comparison.baselineMonth)}</span><FittedAmount className="bb-comparison-amount">{money(comparison.baseline.datedSpending)}</FittedAmount></div>
-              </div>
-              {comparison.changeAmount !== null && <p className="bb-comparison-change">
-                {comparison.changeAmount === 0 ? "The same spending" : `${money(Math.abs(comparison.changeAmount))} ${comparison.changeAmount < 0 ? "less" : "more"}`}
-                {comparison.changePercent !== null && comparison.changePercent !== 0 ? ` (${Math.abs(comparison.changePercent)}%)` : ""}
-              </p>}
-            </>}
-            <p className="bb-comparison-note">{comparison.coverageNote}</p>
-            {comparison.status === "partial" && comparison.selected && comparison.baseline && <p className="bb-comparison-note">
-              Without dates: {money(comparison.selected.undatedSpending)} / {money(comparison.baseline.undatedSpending)}.
-              Scheduled subscriptions excluded: {money(comparison.selected.scheduledSpending)} / {money(comparison.baseline.scheduledSpending)}.
-              {(comparison.selected.unitemizedSpending !== 0 || comparison.baseline.unitemizedSpending !== 0)
-                && <> Sheet amounts outside dated records: {money(comparison.selected.unitemizedSpending)} / {money(comparison.baseline.unitemizedSpending)}.</>}
-            </p>}
-          </>}
+          {!loading && !error && comparison && <ComparisonResult key={`${comparison.selectedMonth}:${comparison.baselineMonth}`} comparison={comparison} />}
         </div>
       </div>
     </CollapsibleContent>

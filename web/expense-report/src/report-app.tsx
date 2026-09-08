@@ -781,7 +781,7 @@ export function ExpenseReportApp({ report, appControls, appAvatarUrl, appSession
   return (
     <div className="bb-page">
       <div className="bb-masthead">
-        <span className="bb-wordmark">{appAvatarUrl ? <img className="bb-app-avatar" src={appAvatarUrl} alt="" /> : <span className="bb-wordmark-symbol" aria-hidden="true">b.</span>}BookieBot<span className="bb-report-owner">{report.ownerName}</span></span>
+        <span className="bb-wordmark">{appAvatarUrl ? <img className="bb-app-avatar" src={appAvatarUrl} alt="" /> : <span className="bb-wordmark-symbol" aria-hidden="true">b.</span>}BookieBot<span className="bb-report-owner"><span aria-hidden="true">•</span>{" "}{report.ownerName}</span></span>
         <ReportMenu>
           <ThemeToggle theme={theme} onToggle={toggleTheme} />
           {appSession && <button type="button" className="bb-report-menu-action" disabled={appSession.signingOut} onClick={appSession.signOut}>

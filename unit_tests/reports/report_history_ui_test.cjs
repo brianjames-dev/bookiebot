@@ -72,9 +72,12 @@ async function main() {
   assert.match(text(picker), /Some history is unavailable/)
   select.props.onChange({target:{value:"2026-08"}})
   assert.equal(selection, "2026-08")
-  button(picker, "This month").props.onClick()
+  select.props.onChange({target:{value:""}})
   assert.equal(selection, null)
+  assert.deepEqual(nodes(picker).filter(node => node?.type === "option").map(node => text(node)), ["September 2026", "August 2026"])
+  assert.ok(!button(picker, "This month"), "The month dropdown also provides the return to the automatic current month")
   assert.equal(pure.reportMonthLabel("2026-08"), "August 2026")
+  assert.match(pure.reportMonthLabel(null), /^[A-Z][a-z]+ \d{4}$/, "The opening view uses a month name, not a relative label")
 
   const catalog = harness()
   let enabled = true, expired = 0
@@ -97,6 +100,10 @@ async function main() {
 
   const React = req("react")
   const renderer = req("react-test-renderer")
+  const motion = { exports: {}, require: req }
+  vm.runInNewContext(ts.transpileModule(fs.readFileSync("web/expense-report/src/components/ui/motion.tsx", "utf8"), {
+    compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2020, jsx: ts.JsxEmit.ReactJSX },
+  }).outputText, motion)
   const calls = [], timers = new Map()
   let timerId = 0, ignoreAbort = false
   const runtime = { exports: {}, AbortController, Intl, Date,
@@ -108,7 +115,7 @@ async function main() {
     }),
     require: name => name === "react" ? React : name.endsWith(".css") ? {}
       : name.startsWith("./components") ? {
-        CollapsibleContent: ({children}) => React.createElement("div", null, children),
+        CollapsibleContent: motion.exports.CollapsibleContent,
         FittedAmount: ({children}) => React.createElement("span", null, children),
       } : req(name),
   }
@@ -123,13 +130,14 @@ async function main() {
   const props = () => ({report, refreshing:mainRefreshing, catalog:months, onExpired:()=>expired++})
   const component = () => React.createElement(runtime.exports.ReportComparison, props())
   const read = () => text(tree.toJSON())
-  const findButton = label => tree.root.findAllByType("button").find(item => item.children.join("") === label
+  const findButton = label => tree.root.findAllByType("button").find(item => text(item.props.children) === label
     || item.findAllByType("span").some(span => span.children.join("") === label))
   const click = label => renderer.act(() => findButton(label).props.onClick())
   const selectMonth = value => renderer.act(() => tree.root.findByProps({"aria-label":"Comparison month"}).props.onChange({target:{value}}))
+  const period = amount => ({datedSpending:amount,undatedSpending:0,scheduledSpending:0,unitemizedSpending:0,complete:true})
   const result = (baseline, note) => ({selectedMonth:"2026-09", baselineMonth:baseline,
-    baselineKind:"selected-month", throughDay:7, status:"complete", selected:{datedSpending:25},
-    baseline:{datedSpending:50}, changeAmount:-25, changePercent:-50, coverageNote:note})
+    baselineKind:"selected-month", throughDay:7, status:"complete", selected:period(25),
+    baseline:period(50), changeAmount:-25, changePercent:-50, coverageNote:note})
   const finish = async (call, status, data) => renderer.act(async () => { call.resolve(response(status, data)); await flush() })
   renderer.act(() => { tree = renderer.create(component()) })
   assert.equal(calls.length, 0, "Closed comparisons do not fetch two reports")
@@ -141,6 +149,7 @@ async function main() {
   assert.ok([...timers.values()].some(timer => timer.delay === 60000), "Paired live builds have a 60s budget")
   assert.ok(!findButton("Last year"), "Comparison uses one accessible month dropdown")
   assert.equal(tree.root.findAllByType("option").length, 2, "Selected month is excluded and previous month is not duplicated")
+  assert.deepEqual(tree.root.findAllByType("option").map(option => option.children.join("")), ["August 2026", "September 2025"])
   selectMonth("2025-09")
   selectMonth("2026-08")
   click("Compare spending")
@@ -154,7 +163,21 @@ async function main() {
   assert.ok(!read().includes("August completed"), "A superseded reply never displays for the new month")
   await finish(calls.at(-1), 200, result("2025-09", "September completed"))
   assert.match(read(), /September completed/)
+  const detailsPanel = () => tree.root.findAllByType("div").find(item => item.props.id === findButton("Details").props["aria-controls"])
+  assert.equal(findButton("Details").props["aria-expanded"], false)
+  assert.equal(detailsPanel().props["aria-hidden"], true)
+  assert.equal(detailsPanel().props.inert, "", "Calculation notes start hidden from keyboard and screen reader navigation")
+  assert.match(text(detailsPanel().props.children), /September completed/)
+  const beforeDetails = calls.length
+  click("Details")
+  assert.equal(detailsPanel().props["data-state"], "open")
+  assert.equal(detailsPanel().props.inert, undefined)
+  click("Details")
+  assert.equal(detailsPanel().props["data-state"], "closed")
+  assert.equal(calls.length, beforeDetails, "Calculation notes do not trigger another comparison read")
+  click("Details")
   selectMonth("2026-08")
+  assert.equal(findButton("Details").props["aria-expanded"], false, "A different month starts with its own compact summary")
   assert.match(read(), /August completed/)
   assert.equal(calls.length, 2, "Revisiting a month reuses its result for this displayed report")
   renderer.act(() => tree.update(component()))
@@ -215,6 +238,35 @@ async function main() {
   await finish(stalledTransport, 200, result("2026-08", "STALE HUNG RESPONSE"))
   assert.match(read(), /Recovered from stalled transport/)
   assert.ok(!read().includes("STALE HUNG RESPONSE"))
+
+  report = {...report}
+  renderer.act(() => tree.update(component()))
+  const partial = {...result("2026-08", "Undated costs, sheet adjustments and scheduled subscriptions are excluded."),status:"partial",
+    selected:{...period(540.01),undatedSpending:2287.40,scheduledSpending:92.48,unitemizedSpending:-100},
+    baseline:{...period(349.31),undatedSpending:2563.71,scheduledSpending:92.48},changeAmount:190.70,changePercent:54.6}
+  await finish(calls.at(-1), 200, partial)
+  assert.match(read(), /Recorded spending · days 1– 7/)
+  assert.match(text(tree.root.findByProps({className:"bb-comparison-change"}).props.children), /\$190.70\s+more.*54.6/)
+  assert.equal(detailsPanel().props["aria-hidden"], true)
+  click("Details")
+  const exclusions = tree.root.findByType("table")
+  assert.equal(exclusions.findByType("caption").children.join(""), "Excluded amounts")
+  const rows = exclusions.findByType("tbody").findAllByType("tr")
+  assert.deepEqual(rows.map(row => text(row.props.children)), ["Without dates $2,287.40 $2,563.71", "Scheduled subscriptions $92.48 $92.48", "Sheet adjustments -$100.00 $0.00"])
+  assert.match(text(exclusions.findByType("thead").props.children), /September 2026.*August 2026/)
+
+  report = {...report}
+  renderer.act(() => tree.update(component()))
+  await finish(calls.at(-1), 200, {...result("2026-08", "Matching days"),selected:period(0),baseline:period(0),changeAmount:0,changePercent:null})
+  assert.equal(text(tree.root.findByProps({className:"bb-comparison-change"}).props.children), "Same spending")
+  assert.equal(tree.root.findAllByType("table").length, 0, "Zero exclusions do not create unnecessary rows")
+
+  report = {...report}
+  renderer.act(() => tree.update(component()))
+  await finish(calls.at(-1), 200, {...result("2026-08", "The comparison month is unavailable."),status:"unavailable",baseline:null,changeAmount:null,changePercent:null})
+  assert.ok(!findButton("Details"), "Unavailable data cannot be hidden behind a successful-result disclosure")
+  assert.match(read(), /The comparison month is unavailable/)
+  assert.equal(tree.root.findAllByProps({className:"bb-comparison-values"}).length, 0, "Missing months are never presented as zero spending")
   report = {...report}
   renderer.act(() => tree.update(component()))
   const expiredBefore = expired

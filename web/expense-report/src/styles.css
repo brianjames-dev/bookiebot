@@ -2549,7 +2549,9 @@ tr:last-child td {
   font: 25px/1 var(--bb-display-font);
 }
 .bb-report-owner {
-  margin-left: 6px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
   color: hsl(var(--muted-foreground));
   font-size: 13px;
   font-weight: 400;

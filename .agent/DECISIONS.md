@@ -1,5 +1,9 @@
 # Agent Decisions
 
+## 2026-09-08 - Keep Comparison Methodology In Details
+
+Show matching days, two month totals and the amount/percentage change in the default comparison view. Keep methodology and nonzero excluded amounts behind an animated, accessible Details disclosure with labeled month columns. Unavailable-month and request errors stay visible. Month options use month/year names only; selecting the current month still sends null and follows the automatic current-month lifecycle. The redundant This month shortcut is removed. Comparison calculations, request coordination, refresh invalidation and sessions are unchanged.
+
 ## 2026-09-07 - Preserve Origin For Phone Save Requests
 
 Keep the page-level no-referrer privacy policy and strict configured-origin authorization guard. Set referrerPolicy: same-origin on notification and app-session fetches that use mode: same-origin, so POST/DELETE retain their real Origin instead of null. Cross-origin referrers, credentials and redirects remain restricted. Browser permission and an authenticated saved server subscription are distinct: Enable retries may reuse the existing browser endpoint, while On/preferences reflect durable server state. No subscription, schema, delivery or session-lifetime changes are needed. Verify browser-generated headers as well as mocked requests; the previous UI mocks omitted this Fetch-standard behavior. See https://fetch.spec.whatwg.org/#append-a-request-origin-header.

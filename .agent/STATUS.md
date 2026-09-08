@@ -1,8 +1,10 @@
 # Agent Status
 
-Last updated: 2026-09-07
+Last updated: 2026-09-08
 
 ## Active Focus
+
+Compact comparison presentation implemented: matching days, month totals and difference stay visible; calculation notes and labeled excluded amounts live in an animated Details disclosure. Missing-data and request errors remain inline. Both month selectors list month/year names only; selecting the current month retains automatic current-month behavior. The masthead now separates BookieBot and owner with a decorative bullet. Focused checks 41 passed; full local suite 1,096 passed / 61 optional PostgreSQL skipped, Pyright/typecheck/build clean. WebKit passed at 320/390/1280px in both themes, including symmetric 240ms Details motion, no overflow, inline unavailable reasons and current-month selection. Visual review removed a stray table rule and restored a 44px native Safari picker. Deployment evidence is in the completion response; phone acceptance is checklist 98.
 
 Theme dropdown and Daily Spending contrast fixes implemented. WebKit reproduced a tap blurring the menu before click; dismissal now uses actual outside focus/pointer targets, preserving theme actions, keyboard navigation and animated exit. The day-button reset now precedes today styling so the existing contrasting text token and bold weight apply. Full local suite: 1,096 passed / 61 optional PostgreSQL skipped; Pyright/typecheck/build passed. WebKit phone and Chromium desktop checks cover toggles, dismissal and persisted theme; computed WebKit today contrast is 8.11 in dark mode and 6.77 in light mode. Deployment evidence is in the completion response; phone acceptance is checklist 97.
 
@@ -29,7 +31,7 @@ All eight September 6 audit batches are implemented and verified locally. Each b
 
 ## On Deck
 
-0. Optional device acceptance for the completed dashboard: each phone can enable its own notifications and create its own savings goals using `docs/PHONE_APP_SETUP.md`; checklists 91, 93, 94, 95, 96 and 97 cover these explicit personal choices and the latest reliability fixes. Implementation is complete.
+0. Optional device acceptance for the completed dashboard: each phone can enable its own notifications and create its own savings goals using `docs/PHONE_APP_SETUP.md`; checklists 91, 93, 94, 95, 96, 97 and 98 cover these explicit personal choices and the latest reliability fixes. Implementation is complete.
 
 1. Review the deployed expense-report design and motion/responsive polish against checklist items 86–87.
 2. Verify the deployed audit fixes in a test workbook/Sandbox using `.agent/AUDIT_REMEDIATION_2026-09-06.md`; complete the live acceptance checks without creating test transactions in real financial data.
@@ -57,6 +59,10 @@ All eight September 6 audit batches are implemented and verified locally. Each b
 24. Harden recent-action pending state across restarts/deploys, since selections currently live only in process memory.
 25. Improve targeted recent-action search so commands can find older matches, not only the latest 10 recent actions.
 26. Explore clarifying questions before logging when BookieBot is uncertain instead of guessing or silently failing.
+
+## Completed 2026-09-08
+
+- 2026-09-08 — Simplified Compare spending around matched days, two month totals and the difference; moved methodology and nonzero exclusions into accessible animated Details with labeled month columns. Preserved signed sheet adjustments, zero-baseline handling, unavailable explanations and all comparison request/refresh behavior. Month options now show names/years without relative prefixes; current-month selection still sends null and replaces the redundant shortcut. Added decorative owner separator in the masthead. Executed real disclosure-state/current-selection/labeled-exclusion regressions plus existing comparison lifecycle checks. Focused 41 passed; full 1,096 passed / 61 optional PostgreSQL skipped; Pyright/typecheck/build clean. Phone guide and presentation decision updated. WebKit verified 320/390/1280px in both themes, symmetric 240ms motion with intermediate frames, month-labeled exclusions, current-month null routing and visible unavailable states. No page errors or external requests. Final visual polish removed the last-row border fragment and enforced a 44px native picker height in Safari.
 
 ## Completed 2026-09-07
 
@@ -1321,3 +1327,5 @@ python -m pyright
 96. Notification enable/save recovery: load Update now in each Home Screen app. Choose notification preferences, then tap Enable on this phone again; existing browser permission/subscription can be reused. Verify On and saved confirmation, change delivery time or a toggle, refresh and confirm On plus the saved choices persist. Turn off and re-enable should also succeed. Reinstalling/re-pairing is unnecessary. If desired, explicitly tap Send a test to check real iPhone delivery; no test push is sent automatically.
 
 97. Theme and today-date acceptance: load Update now on each phone. Open the three-dot menu and toggle Dark mode off/on, including taps on the icon and On/Off text. Refresh or reopen and verify the selected theme remains. Today’s Daily Spending number should be bold dark ink on pale green in dark mode, and light on deep green in light mode. Other dates remain unchanged. Keyboard users can activate with Enter/Space, leave the menu with Tab, or dismiss with Escape.
+
+98. Compact comparison acceptance: load Update now. Open Compare spending and confirm the selected range, two totals and amount/percentage change appear without the calculation paragraphs. Details opens/closes smoothly and lists excluded amounts under the matching month names. Change comparison months, refresh, and verify errors still appear directly if a request fails. Both month dropdowns list names/years only; select the current month from the page picker to return to its automatic view. Confirm the masthead reads BookieBot • Brian/Hannah.
