@@ -9,7 +9,7 @@ After deployment and the bot restart, repeat separately for Brian and Hannah:
 5. Name it **BookieBot**, keep **Open as Web App** enabled if shown, and tap **Add**.
 6. Launch the icon. Confirm your name and current month. The selected report refreshes on opening and returning from the background; the **↻ refresh icon** updates it manually. **Updated** shows the last successful fetch. The **•••** menu contains dark mode and sign out.
 
-Use current iOS when possible. Safari copies sign-in cookies into a newly installed Home Screen app on iOS 17.2 and later. If the app asks to connect, follow the reconnect steps below. Internet is required for fresh sheet values; failed refreshes explicitly identify the previous update.
+Use current iOS when possible. Safari copies sign-in cookies into a newly installed Home Screen app on iOS 17.2 and later. If the app asks to connect, follow the reconnect steps below. Internet is required for fresh sheet values; failed refreshes keep the last report and its update time. If Google Sheets takes too long, the app identifies that timeout. Try Refresh again shortly; after a successful refresh, unavailable month history is checked once automatically. You can also use the history warning’s Retry button. A timeout does not require reinstalling or signing in again.
 
 The Home Screen icon is the existing BookieBot holding a piggy bank (`assets/avatars/avatar1.PNG`). The avatar inside the app follows the daily rotation. iOS controls the installed icon; automatic Home Screen icon rotation is not promised.
 

@@ -5,6 +5,7 @@ import logging
 from typing import Literal
 
 from aiohttp import web
+from requests import Timeout as RequestsTimeout
 
 from bookiebot.sheets.routing import SpreadsheetQuotaError
 
@@ -34,6 +35,18 @@ def is_report_quota_error(error: BaseException) -> bool:
     return _upstream_status(error) == 429
 
 
+def is_report_timeout_error(error: BaseException) -> bool:
+    """Recognize source deadlines by exception type without inspecting messages."""
+    seen: set[int] = set()
+    current: BaseException | None = error
+    while current is not None and id(current) not in seen:
+        seen.add(id(current))
+        if isinstance(current, (RequestsTimeout, TimeoutError)):
+            return True
+        current = current.__cause__ or current.__context__
+    return False
+
+
 def report_read_failure(
     error: BaseException, *, operation: Literal["refresh", "comparison", "catalog"], message: str,
 ) -> web.Response:
@@ -50,5 +63,12 @@ def report_read_failure(
             "error": "Google Sheets is temporarily limiting report reads. Please wait about a minute and try again.",
         }, status=503)
         response.headers["Retry-After"] = "60"
+        return response
+    if is_report_timeout_error(error):
+        response = _json({
+            "code": "source_timeout",
+            "error": "Google Sheets took too long to respond. Please try again shortly.",
+        }, status=503)
+        response.headers["Retry-After"] = "15"
         return response
     return _json({"code": "report_unavailable", "error": message}, status=503)

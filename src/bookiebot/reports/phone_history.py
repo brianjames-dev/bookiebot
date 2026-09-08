@@ -4,6 +4,7 @@ from __future__ import annotations
 import calendar
 import asyncio
 from datetime import datetime
+import logging
 import re
 from typing import Any
 
@@ -17,6 +18,8 @@ from bookiebot.sheets.routing import (
     PACIFIC_TZ, get_budget_spreadsheet_id_for_user, get_shared_expenses_spreadsheet_id,
     get_user_config, now_pacific,
 )
+
+logger = logging.getLogger(__name__)
 
 
 class InvalidReportMonthError(ValueError):
@@ -50,6 +53,7 @@ def load_phone_month_catalog(actor_key: str, *, current: datetime | None = None)
     months = []
     unavailable = []
     checked = []
+    timed_out = False
     for year in configured_reimbursement_workbooks(actor_key, now.year):
         try:
             personal_id = get_budget_spreadsheet_id_for_user(actor_key, year)
@@ -62,15 +66,22 @@ def load_phone_month_catalog(actor_key: str, *, current: datetime | None = None)
                 if (year, month) <= (now.year, now.month) and title in personal and title in shared:
                     months.append({"value": f"{year:04d}-{month:02d}", "label": f"{title} {year}"})
         except Exception as exc:
-            from bookiebot.reports.read_errors import is_report_quota_error
+            from bookiebot.reports.read_errors import is_report_quota_error, is_report_timeout_error
+            logger.warning("Report history read failed operation=catalog year=%s error=%s", year, type(exc).__name__)
             if is_report_quota_error(exc):
                 raise
+            timed_out = timed_out or is_report_timeout_error(exc)
             unavailable.append(year)
+    coverage: dict[str, Any] = {
+        "status": "partial" if unavailable and checked else "unavailable" if unavailable else "complete",
+        "unavailableYears": unavailable,
+    }
+    if timed_out:
+        coverage["code"] = "source_timeout"
     return {
         "currentMonth": f"{now.year:04d}-{now.month:02d}",
         "months": sorted(months, key=lambda item: item["value"], reverse=True),
-        "coverage": {"status": "partial" if unavailable and checked else "unavailable" if unavailable else "complete",
-                     "unavailableYears": unavailable},
+        "coverage": coverage,
     }
 
 

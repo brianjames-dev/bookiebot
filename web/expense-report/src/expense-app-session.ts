@@ -26,14 +26,17 @@ export function expenseReportIdentity(report: ExpenseReportData) {
 
 class ExpiredSession extends Error {}
 class ReportSourceBusy extends Error {}
+class ReportSourceTimeout extends Error {}
+class AppRequestTimeout extends Error {}
 
 async function requestApp<T>(fetcher: typeof fetch, url: string, controller: AbortController,
   timeoutMs: number, options: RequestInit, read: (response: Response) => Promise<T>) {
-  const timeout = setTimeout(() => controller.abort(), timeoutMs)
+  let timedOut = false
+  const timeout = setTimeout(() => { timedOut = true; controller.abort() }, timeoutMs)
   let abort: () => void = () => {}
   try {
     return await new Promise<T>((resolve, reject) => {
-      abort = () => reject(new Error("Request interrupted"))
+      abort = () => reject(timedOut ? new AppRequestTimeout() : new Error("Request interrupted"))
       controller.signal.addEventListener("abort", abort, { once: true })
       fetcher(url, {
         ...options,
@@ -48,6 +51,7 @@ async function requestApp<T>(fetcher: typeof fetch, url: string, controller: Abo
         if (!response.ok) {
           const detail = await response.json().catch(() => null)
           if (detail?.code === "sheets_rate_limited") throw new ReportSourceBusy()
+          if (detail?.code === "source_timeout") throw new ReportSourceTimeout()
           throw new Error("Request unavailable")
         }
         return read(response)
@@ -142,9 +146,13 @@ export class ExpenseAppSession {
       } else {
         this.publish({ phase: this.state.report ? "stale" : "error", message: error instanceof ReportSourceBusy
           ? "Google Sheets is temporarily busy. Wait about a minute, then refresh."
+          : error instanceof ReportSourceTimeout
+          ? "Google Sheets took too long to respond. Try refreshing again shortly."
+          : error instanceof AppRequestTimeout
+          ? "Refresh is taking longer than expected. Try again."
           : selectedMonth && !this.state.report
           ? `Couldn’t load ${selectedMonth}. Try again or return to this month.`
-          : "Couldn’t refresh. Check your connection and try again." })
+          : "Couldn’t refresh right now. Try again." })
       }
     }).finally(() => {
       if (revision === this.revision) {

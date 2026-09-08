@@ -85,6 +85,18 @@ async function main() {
   assert.equal(f.session.state.report, previous)
   assert.equal(f.session.state.updatedAt, updatedAt)
   assert.ok(f.session.state.message.includes("Couldn’t refresh"))
+  assert.ok(!f.session.state.message.includes("connection"), "An unspecified server failure must not blame the phone connection")
+  const sourceTimeout = f.session.refresh(true)
+  f.calls.at(-1).resolve(response(503, { code: "source_timeout", error: "PRIVATE WORKBOOK AND PROVIDER DETAILS" }))
+  await sourceTimeout
+  assert.equal(f.session.state.phase,"stale")
+  assert.equal(f.session.state.report,previous)
+  assert.equal(f.session.state.updatedAt,updatedAt)
+  assert.match(f.session.state.message,/Google Sheets took too long/)
+  assert.ok(!f.session.state.message.includes("PRIVATE"))
+  const afterSourceTimeout = f.calls.length
+  await flush()
+  assert.equal(f.calls.length,afterSourceTimeout,"A source timeout cannot start an automatic retry loop")
   const limited = f.session.refresh(true)
   f.calls.at(-1).resolve(response(503, { code: "sheets_rate_limited", error: "provider-private-details" }))
   await limited
@@ -147,10 +159,24 @@ async function main() {
   await timed
   assert.equal(timeout.calls[0].init.signal.aborted, true)
   assert.equal(timeout.session.state.phase, "error")
+  assert.match(timeout.session.state.message,/taking longer than expected/)
   timeout.calls[0].resolve(response(200, report()))
   await flush()
   assert.equal(timeout.session.state.report, null, "Late data cannot override a timeout")
   timeout.session.dispose()
+  const staleTimeout = fixture({timeoutMs:10})
+  await load(staleTimeout)
+  const beforeDeadline = staleTimeout.session.state.report
+  const timestampBeforeDeadline = staleTimeout.session.state.updatedAt
+  await staleTimeout.session.refresh(true)
+  assert.equal(staleTimeout.session.state.report,beforeDeadline)
+  assert.equal(staleTimeout.session.state.updatedAt,timestampBeforeDeadline)
+  assert.equal(staleTimeout.session.state.phase,"stale")
+  assert.match(staleTimeout.session.state.message,/taking longer than expected/)
+  assert.equal(staleTimeout.calls.length,2)
+  await load(staleTimeout,report(9,75))
+  assert.equal(staleTimeout.session.state.phase,"ready","A client deadline releases the slot for an explicit retry")
+  staleTimeout.session.dispose()
 
   const lifecycle = fixture()
   const browser = new EventTarget()

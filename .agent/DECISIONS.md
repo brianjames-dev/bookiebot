@@ -1,5 +1,11 @@
 # Agent Decisions
 
+## 2026-09-08 - Recover History After A Successful Report Refresh
+
+Keep an unavailable/partial month catalog recoverable without restarting the app: each newly successful report result permits at most one catalog recheck if the catalog is still incomplete or failed. Wait for any in-flight catalog request, consume the recovery attempt before reloading, preserve available month options, and do not retry because of renders or failed refreshes. No polling timer, longer deadline or repeated automatic source retry is added.
+
+Classify source timeouts by exception types and causal chain, preserve quota precedence, and return safe source_timeout feedback (503, Retry-After 15). Partial catalog responses retain their available months and identify timeout coverage. Browser-deadline expiration and generic refresh failures use distinct, neutral copy while retaining the last report and timestamp. No provider messages, workbook IDs or financial values enter the new diagnostic logs.
+
 ## 2026-09-08 - Unify Reimbursement Expenses And Receipts
 
 Use one expandable ledger for canonical outstanding and fully received allocations across configured payer years plus selected-expense-month records. Add optional receivedSharedReimbursements from the existing history snapshot; no extra sheet reads or receipt events. Deduplicate whole records by allocation ID, with selected-month records overriding duplicates (including received/void), and never infer identity from matching dates or amounts. Group by validated original expense month, selected month first, then newest other months, Undated last. Label This month from coverage.asOf in Pacific time, not the browser clock; historical selection is labeled Selected month. Received status stays on the expense after settlement, including older carried expenses. Monthly statement totals remain scoped only to selected-month expenses, including partial receipts.

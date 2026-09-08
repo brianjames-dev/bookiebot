@@ -6,6 +6,7 @@ from types import SimpleNamespace
 from aiohttp import web
 from aiohttp.test_utils import make_mocked_request
 import pytest
+import requests
 
 from bookiebot.reports import phone_history as history, phone_app, web as reports_web
 from bookiebot.reports.expense_breakdown import BudgetMonth
@@ -61,6 +62,52 @@ def test_failed_metadata_is_incomplete_not_missing_history(monkeypatch):
     result = history.load_phone_month_catalog(ACTOR, current=NOW)
     assert result["months"] == []
     assert result["coverage"] == {"status": "unavailable", "unavailableYears": [2026]}
+
+
+@pytest.mark.parametrize("failure", [requests.ReadTimeout, TimeoutError, RuntimeError])
+def test_catalog_preserves_available_months_and_identifies_timeout_without_retry(monkeypatch, caplog, failure):
+    private = "synthetic-workbook-id bearer-synthetic-secret private-expense-123.45"
+    calls = []
+    failing = True
+    def fetch(key):
+        calls.append(key)
+        if key == "personal-2025" and failing:
+            raise failure(private)
+        return {"sheets": [{"properties": {"title": "September"}}]}
+    monkeypatch.setattr(history, "configured_reimbursement_workbooks", lambda *a: {2025: "personal-2025", 2026: "personal-2026"})
+    monkeypatch.setattr(history, "get_budget_spreadsheet_id_for_user", lambda actor, year: f"personal-{year}")
+    monkeypatch.setattr(history, "get_shared_expenses_spreadsheet_id", lambda year: f"shared-{year}")
+    monkeypatch.setattr("bookiebot.sheets.auth.get_gspread_client", lambda: SimpleNamespace(
+        http_client=SimpleNamespace(fetch_sheet_metadata=fetch)))
+    result = history.load_phone_month_catalog(ACTOR, current=NOW)
+    assert calls == ["personal-2025", "personal-2026", "shared-2026"]
+    assert result["months"] == [{"value": "2026-09", "label": "September 2026"}]
+    expected_coverage = {"status": "partial", "unavailableYears": [2025]}
+    if failure is not RuntimeError:
+        expected_coverage["code"] = "source_timeout"
+    assert result["coverage"] == expected_coverage
+    assert f"operation=catalog year=2025 error={failure.__name__}" in caplog.text
+    assert private not in caplog.text and private not in json.dumps(result)
+    assert all(record.exc_info is None for record in caplog.records)
+    failing = False
+    recovered = history.load_phone_month_catalog(ACTOR, current=NOW)
+    assert len(recovered["months"]) == 2
+    assert recovered["coverage"] == {"status": "complete", "unavailableYears": []}
+
+
+def test_catalog_quota_takes_precedence_over_a_timeout_from_an_earlier_year(monkeypatch):
+    from bookiebot.sheets.routing import SpreadsheetQuotaError
+    def fetch(key):
+        if key == "personal-2025":
+            raise requests.ReadTimeout("Synthetic timeout")
+        raise SpreadsheetQuotaError("Synthetic quota")
+    monkeypatch.setattr(history, "configured_reimbursement_workbooks", lambda *a: {2025: "personal-2025", 2026: "personal-2026"})
+    monkeypatch.setattr(history, "get_budget_spreadsheet_id_for_user", lambda actor, year: f"personal-{year}")
+    monkeypatch.setattr(history, "get_shared_expenses_spreadsheet_id", lambda year: f"shared-{year}")
+    monkeypatch.setattr("bookiebot.sheets.auth.get_gspread_client", lambda: SimpleNamespace(
+        http_client=SimpleNamespace(fetch_sheet_metadata=fetch)))
+    with pytest.raises(SpreadsheetQuotaError):
+        history.load_phone_month_catalog(ACTOR, current=NOW)
 
 
 @pytest.mark.asyncio

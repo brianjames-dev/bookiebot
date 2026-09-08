@@ -7,7 +7,7 @@ import "./report-history.css"
 export interface ReportMonthCatalog {
   currentMonth: string
   months: { value: string; label: string }[]
-  coverage: { status: "complete" | "partial" | "unavailable"; unavailableYears: number[] }
+  coverage: { status: "complete" | "partial" | "unavailable"; unavailableYears: number[]; code?: "source_timeout" }
 }
 
 interface ComparisonPeriod {
@@ -38,15 +38,25 @@ interface ReportPeriodComparison {
 
 export class HistorySessionExpired extends Error {}
 class HistorySourceBusy extends Error {}
+class HistorySourceTimeout extends Error {}
+class HistoryRequestTimeout extends Error {}
+
+function historyErrorMessage(reason: unknown, subject: "History" | "The comparison") {
+  if (reason instanceof HistorySourceBusy) return "Google Sheets is temporarily busy. Wait about a minute, then try again."
+  if (reason instanceof HistorySourceTimeout) return "Google Sheets took too long to respond. Try again shortly."
+  if (reason instanceof HistoryRequestTimeout) return `${subject} is taking longer than expected. Try again.`
+  return subject === "History" ? "History couldn’t load right now." : "Couldn’t load the comparison."
+}
 
 export async function requestReportHistory<T>(url: string, controller: AbortController, timeout = 30000): Promise<T> {
-  const timer = setTimeout(() => controller.abort(), timeout)
+  let timedOut = false
+  const timer = setTimeout(() => { timedOut = true; controller.abort() }, timeout)
   let abort: () => void = () => {}
   try {
     // Release the UI request slot independently of the browser transport. An
     // aborted fetch/body can remain suspended while a phone loses connectivity.
     return await new Promise<T>((resolve, reject) => {
-      abort = () => reject(new Error("Report history request interrupted"))
+      abort = () => reject(timedOut ? new HistoryRequestTimeout() : new Error("Report history request interrupted"))
       controller.signal.addEventListener("abort", abort, { once: true })
       if (controller.signal.aborted) { abort(); return }
       fetch(url, {
@@ -57,6 +67,7 @@ export async function requestReportHistory<T>(url: string, controller: AbortCont
         if (!response.ok) {
           const detail = await response.json().catch(() => null)
           if (detail?.code === "sheets_rate_limited") throw new HistorySourceBusy()
+          if (detail?.code === "source_timeout") throw new HistorySourceTimeout()
           throw new Error("Report history is unavailable")
         }
         return await response.json() as T
@@ -76,9 +87,10 @@ export function reportMonthLabel(value: string | null) {
   return new Intl.DateTimeFormat("en-US", { month: "long", year: "numeric", timeZone: "UTC" }).format(new Date(Date.UTC(year, month - 1, 1)))
 }
 
-export function useReportMonthCatalog(enabled: boolean, onExpired: () => void, reportMonth?: string) {
+export function useReportMonthCatalog(enabled: boolean, onExpired: () => void, reportMonth?: string, successfulReport?: ExpenseReportData | null) {
   const [catalog, setCatalog] = useState<ReportMonthCatalog | null>(null)
   const [error, setError] = useState(false)
+  const [errorMessage, setErrorMessage] = useState("")
   const [loading, setLoading] = useState(false)
   const [revision, reload] = useState(0)
   const expired = useRef(onExpired)
@@ -86,16 +98,29 @@ export function useReportMonthCatalog(enabled: boolean, onExpired: () => void, r
   // Only an automatic current-month rollover needs a new catalog. Historical
   // selection changes use the existing picker options and the server validates.
   const current = useRef(reportMonth)
+  const lastSuccess = useRef(successfulReport)
+  const recoveryPending = useRef(false)
   useEffect(() => {
     if (reportMonth && current.current && reportMonth > current.current) reload((value) => value + 1)
     if (reportMonth && (!current.current || reportMonth > current.current)) current.current = reportMonth
   }, [reportMonth])
   useEffect(() => {
-    if (!enabled) { setCatalog(null); setError(false); setLoading(false); return }
+    if (successfulReport && successfulReport !== lastSuccess.current) recoveryPending.current = true
+    lastSuccess.current = successfulReport
+    if (!enabled) { recoveryPending.current = false; return }
+    if (!recoveryPending.current || loading) return
+    // One successful report can recover a failed catalog once. Wait for an
+    // existing catalog read and consume the attempt before starting another.
+    recoveryPending.current = false
+    if (error || (catalog && catalog.coverage.status !== "complete")) reload((value) => value + 1)
+  }, [successfulReport, enabled, loading, error, catalog])
+  useEffect(() => {
+    if (!enabled) { setCatalog(null); setError(false); setErrorMessage(""); setLoading(false); return }
     let active = true
     const controller = new AbortController()
     setLoading(true)
     setError(false)
+    setErrorMessage("")
     requestReportHistory<ReportMonthCatalog>("/app/expenses/months", controller).then((result) => {
       if (!/^\d{4}-\d{2}$/.test(result.currentMonth) || !Array.isArray(result.months)
         || !result.months.every((item) => /^\d{4}-\d{2}$/.test(item.value) && typeof item.label === "string")
@@ -104,19 +129,20 @@ export function useReportMonthCatalog(enabled: boolean, onExpired: () => void, r
     }).catch((reason) => {
       if (!active) return
       if (reason instanceof HistorySessionExpired) expired.current()
-      else setError(true)
+      else { setError(true); setErrorMessage(historyErrorMessage(reason, "History")) }
     }).finally(() => { if (active) setLoading(false) })
     return () => { active = false; controller.abort() }
   }, [enabled, revision])
-  return { catalog, loading, error, refresh: () => reload((value) => value + 1) }
+  return { catalog, loading, error, errorMessage, refresh: () => reload((value) => value + 1) }
 }
 
-export function MonthHistoryControl({ monthLabel, selectedMonth, catalog, loading, error, onSelect, onRetry, disabled = false }: {
+export function MonthHistoryControl({ monthLabel, selectedMonth, catalog, loading, error, errorMessage, onSelect, onRetry, disabled = false }: {
   monthLabel: string
   selectedMonth: string | null
   catalog: ReportMonthCatalog | null
   loading: boolean
   error: boolean
+  errorMessage?: string
   onSelect: (value: string | null) => void
   onRetry: () => void
   disabled?: boolean
@@ -136,7 +162,8 @@ export function MonthHistoryControl({ monthLabel, selectedMonth, catalog, loadin
       </select>
     </span>
     {(error || partial) && <span className="bb-history-catalog-status" role="status">
-      {error ? "History couldn’t load." : "Some history is unavailable."} <button type="button" disabled={loading || disabled} onClick={onRetry}>Retry</button>
+      {error ? errorMessage || "History couldn’t load." : catalog?.coverage.code === "source_timeout"
+        ? "Some history couldn’t be checked because Google Sheets timed out." : "Some history is unavailable."} <button type="button" disabled={loading || disabled} onClick={onRetry}>Retry</button>
     </span>}
   </span>
 }
@@ -188,12 +215,13 @@ function ComparisonResult({ comparison }: { comparison: ReportPeriodComparison }
   </>
 }
 
-export function ReportComparison({ report, onExpired, catalog, catalogLoading = false, catalogError = false, onCatalogRetry, refreshing = false }: {
+export function ReportComparison({ report, onExpired, catalog, catalogLoading = false, catalogError = false, catalogErrorMessage, onCatalogRetry, refreshing = false }: {
   report: ExpenseReportData
   onExpired: () => void
   catalog?: ReportMonthCatalog | null
   catalogLoading?: boolean
   catalogError?: boolean
+  catalogErrorMessage?: string
   onCatalogRetry?: () => void
   refreshing?: boolean
 }) {
@@ -257,9 +285,7 @@ export function ReportComparison({ report, onExpired, catalog, catalogLoading = 
       if (!requests.active || requests.pending !== pending) return
       if (reason instanceof HistorySessionExpired) expired.current()
       // Session expiry is terminal even if the parent has not unmounted yet.
-      requests.results.set(baseline, { failed: true, message: reason instanceof HistorySourceBusy
-        ? "Google Sheets is temporarily busy. Wait about a minute, then try again."
-        : "Couldn’t load the comparison." })
+      requests.results.set(baseline, { failed: true, message: historyErrorMessage(reason, "The comparison") })
     }).finally(() => {
       if (requests.active && requests.pending === pending) {
         requests.pending = null
@@ -283,7 +309,9 @@ export function ReportComparison({ report, onExpired, catalog, catalogLoading = 
         </label>
         {catalogLoading && !catalog && <p className="bb-comparison-note">Loading other months…</p>}
         {(catalogError || (catalog && catalog.coverage.status !== "complete")) && <p className="bb-comparison-note">
-          Some comparison months couldn’t be checked. {onCatalogRetry && <button type="button" disabled={catalogLoading} onClick={onCatalogRetry}>Retry months</button>}
+          {catalogError && catalogErrorMessage ? catalogErrorMessage : catalog?.coverage.code === "source_timeout"
+            ? "Some comparison months couldn’t be checked because Google Sheets timed out."
+            : "Some comparison months couldn’t be checked."} {onCatalogRetry && <button type="button" disabled={catalogLoading} onClick={onCatalogRetry}>Retry months</button>}
         </p>}
         <div role="status" aria-live="polite" aria-busy={loading}>
           {loading && <p className="bb-comparison-note">{refreshing && !requests.pending ? "Waiting for the refreshed report…" : "Comparing matching days…"}</p>}

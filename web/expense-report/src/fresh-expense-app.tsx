@@ -54,9 +54,9 @@ export function FreshExpenseApp({ config }: { config: ExpenseAppConfig }) {
   const avatarUrl = `/app/avatar.png?day=${new Date().toISOString().slice(0, 10)}`
   const controls = <AppRefreshControl state={state} refresh={refresh} />
   const reportMonth = state.report ? `${state.report.year}-${String(state.report.month).padStart(2, "0")}` : undefined
-  const history = useReportMonthCatalog(!disconnected, expire, reportMonth)
+  const history = useReportMonthCatalog(!disconnected, expire, reportMonth, state.report)
   const monthControl = <MonthHistoryControl monthLabel={state.report?.monthLabel ?? reportMonthLabel(state.selectedMonth)}
-    selectedMonth={state.selectedMonth} catalog={history.catalog} loading={history.loading} error={history.error}
+    selectedMonth={state.selectedMonth} catalog={history.catalog} loading={history.loading} error={history.error} errorMessage={history.errorMessage}
     onSelect={selectMonth} onRetry={history.refresh} disabled={state.signingOut} />
 
   if (state.report) {
@@ -69,7 +69,7 @@ export function FreshExpenseApp({ config }: { config: ExpenseAppConfig }) {
       appSession={{ signOut, signingOut: state.signingOut }}
       appMonthControl={monthControl}
       appComparison={<ReportComparison report={state.report} onExpired={expire} refreshing={busy}
-        catalog={history.catalog} catalogLoading={history.loading} catalogError={history.error} onCatalogRetry={history.refresh} />}
+        catalog={history.catalog} catalogLoading={history.loading} catalogError={history.error} catalogErrorMessage={history.errorMessage} onCatalogRetry={history.refresh} />}
     />
   }
 

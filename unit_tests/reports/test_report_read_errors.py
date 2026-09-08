@@ -65,14 +65,67 @@ def test_other_read_failure_is_logged_without_raw_provider_details(caplog):
     assert PRIVATE not in caplog.text and PRIVATE not in response.text
 
 
+@pytest.mark.parametrize("kind", ["read", "connect", "builtin", "cause", "context", "cycle"])
+def test_timeout_recognition_uses_exception_types_and_causal_chain(kind):
+    error = requests.ReadTimeout(PRIVATE)
+    if kind == "connect":
+        error = requests.ConnectTimeout(PRIVATE)
+    elif kind == "builtin":
+        error = TimeoutError(PRIVATE)
+    elif kind in {"cause", "context", "cycle"}:
+        outer = RuntimeError(PRIVATE)
+        if kind == "context":
+            outer.__context__ = error
+        else:
+            outer.__cause__ = error
+        if kind == "cycle":
+            error.__cause__ = outer
+        error = outer
+    assert read_errors.is_report_timeout_error(error)
+    misleading = RuntimeError("ReadTimeout: timed out " + PRIVATE)
+    misleading.__cause__ = ValueError(PRIVATE)
+    misleading.__cause__.__cause__ = misleading
+    assert not read_errors.is_report_timeout_error(misleading)
+
+
+@pytest.mark.parametrize("operation", ["refresh", "comparison", "catalog"])
+def test_timeout_response_and_log_identify_source_without_private_details(caplog, operation):
+    error = RuntimeError(PRIVATE)
+    error.__cause__ = requests.ReadTimeout(PRIVATE)
+    response = read_errors.report_read_failure(error, operation=operation, message="Refresh unavailable.")
+    assert response.status == 503
+    assert response.headers["Retry-After"] == "15"
+    assert response.headers["Cache-Control"] == "private, no-store"
+    body = json.loads(response.text)
+    assert body["code"] == "source_timeout"
+    assert "Google Sheets" in body["error"] and "too long" in body["error"]
+    assert PRIVATE not in response.text and PRIVATE not in caplog.text
+    assert f"operation={operation} error=RuntimeError upstream_status=unknown" in caplog.text
+    assert all(record.exc_info is None for record in caplog.records)
+
+
+def test_quota_takes_precedence_over_timeout_in_the_same_causal_chain():
+    error = requests.ReadTimeout(PRIVATE)
+    error.__cause__ = provider_error()
+    response = read_errors.report_read_failure(error, operation="refresh", message="Refresh unavailable.")
+    assert json.loads(response.text)["code"] == "sheets_rate_limited"
+    assert response.headers["Retry-After"] == "60"
+
+
 @pytest.mark.asyncio
 @pytest.mark.parametrize("route", ["refresh", "comparison", "catalog"])
-async def test_phone_read_routes_surface_quota_without_exposing_provider_payload(monkeypatch, caplog, route):
+@pytest.mark.parametrize("failure,code,retry_after", [
+    (provider_error, "sheets_rate_limited", "60"),
+    (lambda: requests.ReadTimeout(PRIVATE), "source_timeout", "15"),
+])
+async def test_phone_read_routes_surface_source_errors_without_exposing_payload(
+    monkeypatch, caplog, route, failure, code, retry_after,
+):
     async def session(_request):
         return AppSession(DEFAULT_BRIAN_DISCORD_USER_IDS[0], "brian", 9999999999)
 
     async def limited(*_args, **_kwargs):
-        raise provider_error()
+        raise failure()
 
     monkeypatch.setattr(phone_app, "_session", session)
     monkeypatch.setattr(phone_app, "_valid_owner", lambda _session: SimpleNamespace(name="Synthetic", expense_persons=[]))
@@ -82,7 +135,7 @@ async def test_phone_read_routes_surface_quota_without_exposing_provider_payload
     request = make_mocked_request("GET", "/app/expenses/data", app=web.Application())
     response = await handlers[route](request)
     assert response.status == 503
-    assert response.headers["Retry-After"] == "60"
-    assert json.loads(response.text)["code"] == "sheets_rate_limited"
+    assert response.headers["Retry-After"] == retry_after
+    assert json.loads(response.text)["code"] == code
     assert f"operation={route}" in caplog.text
     assert PRIVATE not in caplog.text and PRIVATE not in response.text

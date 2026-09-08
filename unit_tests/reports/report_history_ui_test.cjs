@@ -201,6 +201,13 @@ async function main() {
   await flush()
   assert.equal(calls.length, quotaCalls, "Quota feedback must not automatically hammer the source")
   click("Try again")
+  await finish(calls.at(-1),503,{code:"source_timeout",error:"PRIVATE PROVIDER TIMEOUT"})
+  assert.match(read(),/Google Sheets took too long/)
+  assert.ok(!read().includes("PRIVATE PROVIDER"))
+  const timeoutCalls = calls.length
+  await flush()
+  assert.equal(calls.length,timeoutCalls,"Source timeouts remain explicit retry states")
+  click("Try again")
   await finish(calls.at(-1), 200, result("2026-08", "Retry succeeded"))
   assert.match(read(), /Retry succeeded/)
   assert.ok(!read().includes("OBSOLETE"))
@@ -218,7 +225,7 @@ async function main() {
   const timedOut = calls.at(-1)
   await renderer.act(async () => { [...timers.values()].find(timer => timer.delay === 60000).fn(); await flush() })
   assert.equal(timedOut.init.signal.aborted, true)
-  assert.match(read(), /Couldn’t load/)
+  assert.match(read(), /taking longer than expected/)
   click("Try again")
   await finish(calls.at(-1), 200, result("2026-08", "Recovered from timeout"))
   // A timeout must release the client queue even if a suspended browser's
@@ -229,7 +236,7 @@ async function main() {
   const stalledTransport = calls.at(-1)
   await renderer.act(async () => { [...timers.values()].find(timer => timer.delay === 60000).fn(); await flush() })
   assert.equal(stalledTransport.init.signal.aborted, true)
-  assert.match(read(), /Couldn’t load/, "Timeout must finish even when transport ignores cancellation")
+  assert.match(read(), /taking longer than expected/, "Timeout must finish even when transport ignores cancellation")
   ignoreAbort = false
   click("Try again")
   const transportRetry = calls.at(-1)
@@ -398,6 +405,69 @@ async function main() {
   stopWatching(); stop(); session.dispose()
   renderer.act(() => tree.unmount())
   assert.equal(timers.size, 0)
+
+  // A recovered main report should clear a stale catalog warning once. Keep
+  // actual React effects so catalog retries cannot be hidden by hook stubs.
+  let catalogReport = liveReport(), catalogState, catalogTree
+  function CatalogProbe() {
+    catalogState = runtime.exports.useReportMonthCatalog(true,()=>{},"2026-09",catalogReport)
+    return React.createElement(runtime.exports.MonthHistoryControl,{
+      monthLabel:"September 2026",selectedMonth:null,catalog:catalogState.catalog,
+      loading:catalogState.loading,error:catalogState.error,errorMessage:catalogState.errorMessage,
+      onSelect:()=>{},onRetry:catalogState.refresh,
+    })
+  }
+  const catalogPartial = {...months,coverage:{status:"partial",unavailableYears:[2025],code:"source_timeout"}}
+  const initialCatalogCalls = calls.length
+  renderer.act(() => { catalogTree = renderer.create(React.createElement(CatalogProbe)) })
+  await finish(calls.at(-1),200,catalogPartial)
+  assert.match(text(catalogTree.toJSON()),/Google Sheets timed out/)
+  assert.equal(catalogState.catalog.months.length,3,"Partial reads keep usable month options")
+  assert.equal(calls.length,initialCatalogCalls+1)
+  renderer.act(() => catalogTree.update(React.createElement(CatalogProbe)))
+  assert.equal(calls.length,initialCatalogCalls+1,"Rerenders and failed main refreshes with unchanged report do not retry history")
+  catalogReport = liveReport()
+  renderer.act(() => catalogTree.update(React.createElement(CatalogProbe)))
+  assert.equal(calls.length,initialCatalogCalls+2,"A newly successful report retries incomplete history once")
+  assert.equal(catalogState.catalog.months.length,3,"Recovery retains partial choices while it checks the missing months")
+  await finish(calls.at(-1),200,months)
+  assert.equal(catalogState.catalog.coverage.status,"complete")
+  assert.ok(!text(catalogTree.toJSON()).includes("timed out"))
+  catalogReport = liveReport()
+  renderer.act(() => catalogTree.update(React.createElement(CatalogProbe)))
+  assert.equal(calls.length,initialCatalogCalls+2,"Fresh reports do not re-fetch an already complete catalog")
+
+  renderer.act(() => catalogState.refresh())
+  await finish(calls.at(-1),503,{code:"source_timeout",error:"PRIVATE CATALOG DETAILS"})
+  assert.match(text(catalogTree.toJSON()),/Google Sheets took too long/)
+  assert.ok(!text(catalogTree.toJSON()).includes("PRIVATE"))
+  catalogReport = liveReport()
+  renderer.act(() => catalogTree.update(React.createElement(CatalogProbe)))
+  const recoveryCalls = calls.length
+  await finish(calls.at(-1),200,catalogPartial)
+  renderer.act(() => catalogTree.update(React.createElement(CatalogProbe)))
+  assert.equal(calls.length,recoveryCalls,"An incomplete recovery result cannot create another recovery attempt")
+
+  renderer.act(() => catalogState.refresh())
+  const existingCatalog = calls.at(-1)
+  catalogReport = liveReport()
+  renderer.act(() => catalogTree.update(React.createElement(CatalogProbe)))
+  assert.equal(calls.at(-1),existingCatalog,"A successful report waits for the existing catalog read")
+  assert.equal(existingCatalog.init.signal.aborted,false)
+  await finish(existingCatalog,200,catalogPartial)
+  assert.notEqual(calls.at(-1),existingCatalog,"Pending success recovers once after the existing incomplete read")
+  await finish(calls.at(-1),200,months)
+  assert.equal(catalogState.catalog.coverage.status,"complete")
+  renderer.act(() => catalogState.refresh())
+  const slowCatalog = calls.at(-1)
+  const beforeCatalogDeadline = calls.length
+  await renderer.act(async () => { [...timers.values()].find(timer => timer.delay === 30000).fn(); await flush() })
+  assert.equal(slowCatalog.init.signal.aborted,true)
+  assert.match(catalogState.errorMessage,/History is taking longer than expected/)
+  assert.equal(catalogState.catalog.months.length,3,"A catalog deadline preserves known month choices")
+  assert.equal(calls.length,beforeCatalogDeadline,"A client catalog deadline cannot start another request")
+  renderer.act(() => catalogTree.unmount())
+  assert.equal(timers.size,0)
   console.log("Month picker, comparison and report-refresh lifecycle checks passed")
 }
 main().catch(error => { console.error(error); process.exitCode = 1 })
