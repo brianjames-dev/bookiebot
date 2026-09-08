@@ -891,7 +891,8 @@ export function ExpenseReportApp({ report, appControls, appAvatarUrl, appSession
         </Card>
 
         <SharedReimbursementsCard items={report.sharedReimbursements ?? []} openItems={report.openSharedReimbursements}
-          coverage={report.reimbursementCoverage} monthLabel={report.monthLabel} />
+          receivedItems={report.receivedSharedReimbursements} coverage={report.reimbursementCoverage}
+          monthLabel={report.monthLabel} year={report.year} month={report.month} />
 
         <ExpenseInsightsCard
           topEntries={report.topEntries}

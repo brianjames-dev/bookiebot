@@ -1,5 +1,11 @@
 # Agent Decisions
 
+## 2026-09-08 - Unify Reimbursement Expenses And Receipts
+
+Use one expandable ledger for canonical outstanding and fully received allocations across configured payer years plus selected-expense-month records. Add optional receivedSharedReimbursements from the existing history snapshot; no extra sheet reads or receipt events. Deduplicate whole records by allocation ID, with selected-month records overriding duplicates (including received/void), and never infer identity from matching dates or amounts. Group by validated original expense month, selected month first, then newest other months, Undated last. Label This month from coverage.asOf in Pacific time, not the browser clock; historical selection is labeled Selected month. Received status stays on the expense after settlement, including older carried expenses. Monthly statement totals remain scoped only to selected-month expenses, including partial receipts.
+
+Overview bars still use only open allocations and show amounts due, scaled to the largest month without a progress-track background. The older four-row cap and exact cent totals remain. Split audit information stays behind each compact row; one outer disclosure replaces separate outstanding/statement controls. No financial calculations, settlement, storage schema or sheet mutations change. This supersedes the separate statement disclosure below.
+
 ## 2026-09-08 - Keep Reimbursement Overview In One Time Scope
 
 The primary reimbursement total and expense-month bars use only the same outstanding allocations: all configured months for current payloads, selected expense month for legacy snapshots. Sum graph amounts in cents; show no more than four rows by combining earlier dated months, retaining an explicit Undated bucket. The full oldest-first partner ledger remains under View expenses. Keep selected-expense-month Received/Gross paid/Your share and received entries in a separate statement disclosure; never combine those receipts with the all-month balance in a repayment percentage. Incomplete coverage remains visible even at zero. No settlement, sheet mutation, financial metric or receipt lifecycle changes.

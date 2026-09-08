@@ -4,6 +4,8 @@ Last updated: 2026-09-08
 
 ## Goal
 
+Unified reimbursement ledger (2026-09-08): compact month-grouped expense/received rows replace separate outstanding and statement disclosures. The report exposes canonical received allocations from the already-read owner-scoped history so older settled expenses remain visible. Monthly receipts and all-month open totals keep their separate calculation scopes; no new sheet reads, settlement, persistence or reconciliation semantics. Full 1,099 tests passed / 61 optional PostgreSQL skipped, Pyright/frontend checks clean; responsive WebKit verified six viewport/theme layouts and twelve edge states. STATUS checklist 100 covers phone acceptance.
+
 Reimbursement visual overview (2026-09-08): outstanding-by-expense-month chart and compact disclosures replace the initial long ledger/statement. All graph inputs are the same outstanding allocations as the headline; selected-expense-month receipts stay separate. Existing carry-forward, owner isolation, settlement and financial calculations remain. Cent/date/coverage/disclosure regressions, responsive WebKit QA and full 1,096-test verification pass; STATUS checklist 99 covers phone acceptance. No finance-operations backlog semantics changed.
 
 Dashboard comparison presentation (2026-09-08): compact matched-day summary, animated calculation details with month-labeled exclusions, month-only selector labels, and masthead owner separator implemented. Current-month routing, comparison lifecycle, financial calculations and mutations are unchanged. Focused 41 passed; full suite 1,096 passed / 61 optional PostgreSQL skipped; Pyright/frontend checks clean. STATUS checklist 98 covers phone acceptance.

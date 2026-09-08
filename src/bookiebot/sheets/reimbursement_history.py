@@ -78,6 +78,17 @@ class ReimbursementHistory:
             and expense_date <= self.as_of.date()
         )
 
+    @property
+    def received_records(self) -> tuple[AllocationRecord, ...]:
+        """Keep settled expenses in the read-only ledger after their balance clears."""
+        return tuple(
+            record for record in self.records
+            if record.allocation.status != "void"
+            and record.allocation.outstanding_amount <= 0
+            and (expense_date := _expense_date(record.allocation.expense_date)) is not None
+            and expense_date <= self.as_of.date()
+        )
+
     def require_complete(self) -> None:
         if self.status != "complete":
             raise ReimbursementHistoryUnavailableError(

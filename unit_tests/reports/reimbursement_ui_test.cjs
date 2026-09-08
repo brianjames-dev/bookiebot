@@ -25,7 +25,7 @@ function load(file) {
   vm.runInNewContext(outputText, { exports, require: localRequire })
   return exports
 }
-const { SharedReimbursementsCard, reimbursementGroups, reimbursementTimeline } = load(path.join(frontend, "src/shared-reimbursements.tsx"))
+const { SharedReimbursementsCard, reimbursementGroups, reimbursementTimeline, reimbursementLedger } = load(path.join(frontend, "src/shared-reimbursements.tsx"))
 const item = (id, changes = {}) => ({
   id, date: "9/3/2026", item: id, location: "Test Store", payer: "Brian", partner: "Hannah",
   responsibleOwner: "", responsiblePerson: "", grossAmount: 100, personalShare: 60,
@@ -34,23 +34,23 @@ const item = (id, changes = {}) => ({
 const older = item("Last year's groceries", {date:"12/20/2025", outstandingAmount:25, receivedAmount:15})
 const newer = item("This month's dinner")
 const settled = item("Received dinner", {status:"reimbursed", outstandingAmount:0, receivedAmount:40})
+const oldReceipt = {...older,status:"reimbursed",outstandingAmount:0,receivedAmount:40}
 const complete = {status:"complete", asOf:"2026-09-07", years:[2025,2026], unavailableYears:[], excludedRecords:0}
 const propsFor = (props = {}) => ({
-  items: [settled], openItems:[older,newer], coverage:complete, monthLabel:"September 2026", ...props,
+  items: [settled], openItems:[older,newer], coverage:complete, monthLabel:"September 2026", year:2026, month:9, ...props,
 })
 const render = (props = {}) => renderToStaticMarkup(React.createElement(SharedReimbursementsCard, propsFor(props)))
 const html = render()
-assert.ok(html.includes("$65.00") && html.includes("Across all months"))
-assert.ok(html.includes('aria-label="Owed by Hannah"'))
-assert.ok(html.indexOf("Last year&#x27;s groceries") < html.indexOf("This month&#x27;s dinner"), "Oldest outstanding expense comes first")
+assert.ok(html.includes("$65.00"))
+assert.ok(html.includes('aria-label="September 2026 expenses"') && html.includes('aria-label="December 2025 expenses"'))
+assert.ok(html.indexOf("This month&#x27;s dinner") < html.indexOf("Last year&#x27;s groceries"), "The selected expense month comes first")
 assert.ok(html.includes("12/20/2025"), "Carried items retain their original date")
 const summary = /<dl class="bb-reimbursement-summary"[\s\S]*?<\/dl>/.exec(html)[0]
 assert.ok(summary.includes("$100.00") && summary.includes("$60.00") && summary.includes("$40.00"))
 assert.ok(!summary.includes("$300.00"), "Old debt must not enter the selected expense-month statement")
-const history = html.slice(html.indexOf('class="bb-reimbursement-history"'))
-assert.ok(history.includes("September 2026 expenses"))
-assert.ok(history.includes('aria-expanded="false"') && history.includes('inert=""'), "Received history starts collapsed")
-assert.ok(history.includes("Received dinner"))
+assert.ok(!html.includes('class="bb-reimbursement-history"'), "Received and due expenses share one ledger")
+assert.ok(html.includes("Received dinner") && html.includes("This month"))
+assert.ok(html.includes('aria-expanded="false"') && html.includes('inert=""'), "The unified ledger starts collapsed")
 assert.ok(render({items:[],openItems:[older]}).includes("Last year&#x27;s groceries"), "Old debt remains visible in a month without new shared purchases")
 assert.equal(render({items:[],openItems:[]}), "")
 const partial = render({items:[],openItems:[],coverage:{...complete,status:"partial",unavailableYears:[2025]}})
@@ -60,12 +60,48 @@ const unavailable = render({items:[],openItems:[],coverage:{...complete,status:"
 assert.ok(unavailable.includes("Known outstanding") && unavailable.includes("balance may be incomplete"))
 assert.ok(!unavailable.includes("No outstanding reimbursements"))
 const legacy = render({items:[newer],openItems:undefined,coverage:undefined})
-assert.ok(legacy.includes("$40.00") && !legacy.includes("Across all months"), "Saved older payloads remain month-scoped")
+assert.ok(legacy.includes("$40.00") && legacy.includes('class="bb-reimbursement-note">September 2026'), "Saved older payloads remain month-scoped")
 const groups = reimbursementGroups([newer, older, item("Alex share",{partner:"Alex",outstandingAmount:12}),
   item("Void",{status:"void"}), item("Received",{status:"reimbursed"}), item("Zero",{outstandingAmount:0})])
 assert.deepEqual(Array.from(groups, g => [g.partner,g.amount]), [["Alex",12],["Hannah",65]])
 const chronological = reimbursementGroups([item("later",{date:"1/2/2026"}),item("earlier",{date:"2025-12-31"})])
 assert.equal(chronological[0].items[0].id,"earlier")
+
+const partialCurrent = {...newer,receivedAmount:15,outstandingAmount:25}
+const voided = item("Cancelled expense",{status:"void"})
+const unified = reimbursementLedger([partialCurrent,settled,voided], [
+  older,newer,item(settled.id),item(voided.id),item("Ignore received history",{status:"reimbursed"}),
+  item("Ignore zero",{outstandingAmount:0}),item("Ignore negative",{outstandingAmount:-5}),
+], "2026-09")
+assert.deepEqual(Array.from(unified,group => group.key),["2026-09","2025-12"])
+const unifiedItems = Array.from(unified).flatMap(group => Array.from(group.items))
+assert.equal(unifiedItems.length,3, "Overlapping monthly and open records appear only once")
+assert.equal(unifiedItems.find(entry => entry.id === newer.id).receivedAmount,15)
+assert.equal(unifiedItems.find(entry => entry.id === newer.id).outstandingAmount,25)
+assert.equal(unifiedItems.find(entry => entry.id === settled.id).status,"reimbursed",
+  "A monthly receipt must not be overwritten by a repeated open record")
+assert.ok(!unifiedItems.some(entry => entry.id === voided.id), "A monthly void must suppress a repeated open record")
+assert.deepEqual(Array.from(reimbursementLedger([], [
+  item("Old",{date:"7/2/2026"}),item("Current",{date:"9/2/2026"}),item("Selected",{date:"8/2/2026"}),
+  item("Unknown",{date:"2026-02-30"}),
+], "2026-08"),group => group.key),["2026-08","2026-09","2026-07","undated"],
+  "Selected month comes first, then newest months, with uncertain dates last")
+assert.equal(reimbursementLedger([
+  item("First purchase",{item:"Same description"}),item("Second purchase",{item:"Same description"}),
+],[],"2026-09")[0].items.length,2, "Matching names, dates and amounts cannot identify duplicate expenses")
+const receivedLedger = reimbursementLedger([settled,voided],[older,newer,item(voided.id)],"2026-09",[
+  oldReceipt,{...voided,status:"reimbursed",outstandingAmount:0,receivedAmount:40},partialCurrent,
+])
+const receivedLedgerItems = Array.from(receivedLedger).flatMap(group => Array.from(group.items))
+assert.equal(receivedLedgerItems.length,3)
+assert.equal(receivedLedgerItems.find(entry => entry.id === older.id).status,"reimbursed",
+  "A carried expense remains listed as received after it leaves the open-items source")
+assert.equal(receivedLedgerItems.find(entry => entry.id === newer.id).outstandingAmount,40,
+  "Partial payments are not mistaken for fully received historical records")
+assert.ok(!receivedLedgerItems.some(entry => entry.id === voided.id), "Monthly voids also suppress repeated receipt-history records")
+assert.equal(reimbursementLedger([partialCurrent],[],"2026-09",[
+  {...newer,status:"reimbursed",receivedAmount:40,outstandingAmount:0},
+])[0].items[0].receivedAmount,15, "A complete monthly record wins over a repeated history record")
 
 // The graph has one scope: outstanding amounts, organized by expense month.
 // Partial receipts affect the remaining debt, not a separate monthly denominator.
@@ -83,6 +119,12 @@ assert.deepEqual(timeline([
   item("Leap day",{date:"2024-02-29",outstandingAmount:1}),
   item("Invalid day",{date:"2026-02-30",outstandingAmount:2}),
 ]), [["February 2024",1],["Undated",2]], "Invalid dates must not invent an expense month")
+assert.deepEqual(timeline([
+  item("Short year",{date:"9/3/26",outstandingAmount:1}),
+  item("Earlier century",{date:"1/1/69",outstandingAmount:2}),
+  item("Later century",{date:"1/1/68",outstandingAmount:3}),
+]), [["January 1969",2],["September 2026",1],["January 2068",3]],
+  "Two-digit date years follow the backend parser's century pivot")
 const sixMonths = Array.from({length:6}, (_,index) => item(`Month ${index+1}`, {
   date:`${index+1}/2/2026`,outstandingAmount:index+1,
 }))
@@ -101,6 +143,15 @@ const partialReceipt = render({items:[older],openItems:[older]})
 const partialReceiptSummary = /<dl class="bb-reimbursement-summary"[\s\S]*?<\/dl>/.exec(partialReceipt)[0]
 assert.ok(partialReceiptSummary.includes("$15.00"), "The monthly statement includes partial receipts, even before full settlement")
 assert.ok(!partialReceipt.includes("$125.00"), "Gross amounts are not combined with outstanding amounts for a chart total")
+const receivedOnly = render({items:[],openItems:[],receivedItems:[oldReceipt]})
+assert.ok(receivedOnly.includes("Last year&#x27;s groceries") && receivedOnly.includes("Received"))
+assert.ok(receivedOnly.includes("View 1") && receivedOnly.includes("No outstanding reimbursements"))
+assert.ok(!receivedOnly.includes('aria-label="Outstanding by expense month"'))
+assert.ok(!receivedOnly.includes('class="bb-reimbursement-summary"'), "Past receipts do not invent totals for an empty selected expense month")
+const withOldReceipt = render({receivedItems:[oldReceipt],openItems:[newer]})
+const receiptScopedSummary = /<dl class="bb-reimbursement-summary"[\s\S]*?<\/dl>/.exec(withOldReceipt)[0]
+assert.ok(receiptScopedSummary.includes("$40.00") && !receiptScopedSummary.includes("$80.00"),
+  "A prior expense month's receipt does not enter selected-month receipt totals")
 
 // Use the real disclosure component: retaining hidden detail text for exit
 // animation must not expose either long ledger until its own button is opened.
@@ -112,14 +163,12 @@ const bars = chart.findAllByProps({className:"bb-reimbursement-bar-track"})
 const widths = bars.map(bar => parseFloat(bar.findByType("span").props.style.width))
 assert.equal(tree.root.findByProps({className:"bb-reimbursement-total"}).props.children,"$65.00")
 assert.ok(widths.every(width => Number.isFinite(width) && width > 0 && width <= 100))
-assert.ok(Math.abs(widths[0] - 25 / 65 * 100) < 1e-9)
-assert.ok(Math.abs(widths[1] - 40 / 65 * 100) < 1e-9)
-assert.ok(Math.abs(widths.reduce((sum,width) => sum + width,0) - 100) < 1e-9,
-  "Every bar uses the same outstanding total, without monthly receipts or gross amounts in its denominator")
+assert.ok(Math.abs(widths[0] - 25 / 40 * 100) < 1e-9)
+assert.equal(widths[1],100, "Bars compare money owed; the largest expense month sets the scale")
 assert.ok(bars.every(bar => bar.props["aria-hidden"] === "true" || bar.props["aria-hidden"] === true),
   "Decorative bars do not duplicate their visible amount labels for assistive technology")
 const openList = tree.root.findByProps({className:"bb-reimbursement-open-list"})
-const monthlyStatement = tree.root.findByProps({className:"bb-reimbursement-history"})
+assert.equal(tree.root.findAllByProps({className:"bb-reimbursement-history"}).length,0)
 function disclosure(host) {
   const button = host.findAllByType("button").find(node => node.props["aria-controls"])
   assert.ok(button, "Each summary must control its own disclosure")
@@ -127,21 +176,22 @@ function disclosure(host) {
   assert.ok(content)
   return {button,content}
 }
-const openLedger = disclosure(openList), statement = disclosure(monthlyStatement)
-for (const {button,content} of [openLedger,statement]) {
-  assert.equal(button.props["aria-expanded"],false)
-  assert.equal(content.props["aria-hidden"],true)
-  assert.equal(content.props.inert,"")
-}
-assert.notEqual(openLedger.button.props["aria-controls"],statement.button.props["aria-controls"])
+const openLedger = disclosure(openList)
+assert.equal(openLedger.button.props["aria-expanded"],false)
+assert.equal(openLedger.content.props["aria-hidden"],true)
+assert.equal(openLedger.content.props.inert,"")
+const monthGroups = openList.findAllByProps({className:"bb-reimbursement-group"})
+assert.equal(monthGroups[0].props["aria-label"],"September 2026 expenses")
+assert.equal(monthGroups[0].findByProps({className:"bb-reimbursement-month-tag"}).children.join(""),"This month")
+assert.equal(monthGroups[0].findAllByProps({className:"bb-reimbursement-entry"}).length,2,
+  "Received and outstanding expenses are grouped together by their original expense month")
+assert.equal(monthGroups[0].findAllByProps({className:"bb-reimbursement-summary"}).length,1)
+assert.equal(monthGroups[1].findAllByProps({className:"bb-reimbursement-summary"}).length,0,
+  "Carried-forward debts do not acquire a misleading complete monthly statement")
 renderer.act(() => openLedger.button.props.onClick())
 assert.equal(openLedger.button.props["aria-expanded"],true)
 assert.equal(openLedger.content.props["data-state"],"open")
 assert.equal(openLedger.content.props.inert,undefined)
-assert.equal(statement.content.props.inert,"", "Opening old debt does not expand the monthly statement")
-renderer.act(() => statement.button.props.onClick())
-assert.equal(statement.content.props["aria-hidden"],false)
-assert.equal(statement.content.props.inert,undefined)
 const expense = openList.findAllByProps({className:"bb-reimbursement-entry"})[1]
 const expenseDetails = disclosure(expense)
 assert.equal(expenseDetails.content.props.inert,"", "Individual financial details remain a separate disclosure")
@@ -150,6 +200,24 @@ assert.equal(expenseDetails.content.props.inert,undefined)
 renderer.act(() => openLedger.button.props.onClick())
 assert.equal(openLedger.content.props.inert,"")
 assert.equal(openLedger.content.props["data-state"],"closed", "Closing retains the same animation container")
+renderer.act(() => tree.unmount())
+renderer.act(() => { tree = renderer.create(React.createElement(SharedReimbursementsCard, propsFor({
+  items:[item("Future expense",{date:"9/20/2026"})],openItems:[older],
+}))) })
+assert.equal(tree.root.findByProps({className:"bb-reimbursement-total"}).props.children,"$25.00",
+  "Future-dated monthly records may be inspected without entering the currently outstanding balance")
+assert.equal(tree.root.findByProps({"aria-label":"Outstanding by expense month"}).findAllByType("li").length,1)
+assert.equal(tree.root.findAllByProps({className:"bb-reimbursement-group"})[0].props["aria-label"],"September 2026 expenses")
+renderer.act(() => tree.unmount())
+renderer.act(() => { tree = renderer.create(React.createElement(SharedReimbursementsCard, propsFor({
+  items:[{...settled,date:"8/3/2026"}],month:8,monthLabel:"August 2026",
+}))) })
+const historicalGroups = tree.root.findAllByProps({className:"bb-reimbursement-group"})
+assert.equal(historicalGroups[0].props["aria-label"],"August 2026 expenses")
+assert.equal(historicalGroups[0].findByProps({className:"bb-reimbursement-month-tag"}).children.join(""),"Selected month")
+assert.equal(historicalGroups[1].props["aria-label"],"September 2026 expenses")
+assert.equal(historicalGroups[1].findByProps({className:"bb-reimbursement-month-tag"}).children.join(""),"This month",
+  "Current-month labels follow the report's Pacific as-of date, not the browser's clock")
 renderer.act(() => tree.unmount())
 renderer.act(() => { tree = renderer.create(React.createElement(SharedReimbursementsCard, propsFor({
   coverage:{...complete,status:"partial",unavailableYears:[2025]},

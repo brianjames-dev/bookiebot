@@ -35,6 +35,7 @@ def test_open_balances_survive_month_and_year_changes_without_changing_monthly_f
         assert [item["id"] for item in payload["sharedReimbursements"]] == selected
         assert [item["id"] for item in payload["openSharedReimbursements"]] == ["november", "old", "january"]
         assert sum(item["outstandingAmount"] for item in payload["openSharedReimbursements"]) == 275
+        assert payload["receivedSharedReimbursements"] == []
         assert payload["metrics"] == baseline["metrics"]
         assert payload["modeViews"] == baseline["modeViews"]
         assert payload["dailyEntries"] == baseline["dailyEntries"]
@@ -54,18 +55,22 @@ def test_monthly_history_keeps_received_items_while_outstanding_uses_latest_life
     payload = reports.expense_breakdown_client_payload(build(BudgetMonth(2026, 12), snapshot))
     assert payload["openSharedReimbursements"] == []
     assert [(item["id"], item["receivedAmount"]) for item in payload["sharedReimbursements"]] == [("received", 100)]
+    assert [(item["id"], item["receivedAmount"]) for item in payload["receivedSharedReimbursements"]] == [("received", 100)]
     assert payload["metrics"]["monthlyIncome"] == 5000
 
 
-def test_cross_owner_rows_never_escape_in_either_reimbursement_field(monkeypatch):
+def test_cross_owner_rows_never_escape_in_any_reimbursement_field(monkeypatch):
     monkeypatch.setattr(reports, "now_pacific", lambda: NOW)
     snapshot = history.reimbursement_history_from_ledgers(BRIAN, [ledger(2026,
         allocation(),
         allocation("other", actor_key=HANNAH, owner_key="hannah", payer="Hannah", partner="Brian"),
+        allocation("other-received", actor_key=HANNAH, owner_key="hannah", payer="Hannah", partner="Brian",
+                   status="reimbursed", received_amount=100),
     )], as_of=NOW)
     payload = reports.expense_breakdown_client_payload(build(BudgetMonth(2026, 12), snapshot))
     assert [item["id"] for item in payload["sharedReimbursements"]] == ["old"]
     assert [item["id"] for item in payload["openSharedReimbursements"]] == ["old"]
+    assert payload["receivedSharedReimbursements"] == []
 
 
 def test_incomplete_history_preserves_explicit_coverage_in_report_payload(monkeypatch):
@@ -81,4 +86,66 @@ def test_incomplete_history_preserves_explicit_coverage_in_report_payload(monkey
     unavailable = replace(snapshot, records=(), ledgers=(), years=(), unavailable_years=(2026, 2027))
     payload = reports.expense_breakdown_client_payload(build(BudgetMonth(2027, 1), unavailable))
     assert payload["openSharedReimbursements"] == []
+    assert payload["receivedSharedReimbursements"] == []
     assert payload["reimbursementCoverage"]["status"] == "unavailable"
+
+
+def test_received_expenses_survive_report_month_changes_without_additional_sheet_reads(monkeypatch):
+    monkeypatch.setattr(reports, "now_pacific", lambda: NOW)
+    original = allocation("older")
+    received = replace(original, status="reimbursed", received_amount=100,
+                       updated_at="2027-01-06T10:00:00-08:00")
+    all_ledgers = [ledger(2026, received), ledger(2027, original,
+        allocation("current", expense_date="1/4/2027", status="reimbursed", received_amount=100),
+        allocation("partial", expense_date="1/5/2027", received_amount=25),
+    )]
+    snapshot = history.reimbursement_history_from_ledgers(BRIAN, all_ledgers, as_of=NOW)
+    def unexpected_read(*_args, **_kwargs):
+        raise AssertionError("Received rows must reuse the loaded reimbursement snapshot")
+    for source in all_ledgers:
+        monkeypatch.setattr(source.worksheet, "get_all_values", unexpected_read)
+    for month, monthly_ids in [(BudgetMonth(2026, 12), ["older"]),
+                               (BudgetMonth(2027, 1), ["current", "partial"])]:
+        report = build(month, snapshot)
+        payload = reports.expense_breakdown_client_payload(report)
+        assert [item["id"] for item in payload["sharedReimbursements"]] == monthly_ids
+        assert [item["id"] for item in payload["openSharedReimbursements"]] == ["partial"]
+        assert [(item["id"], item["date"], item["receivedAmount"], item["outstandingAmount"])
+                for item in payload["receivedSharedReimbursements"]] == [
+                    ("older", "12/30/2026", 100, 0), ("current", "1/4/2027", 100, 0)]
+        without_received = reports.expense_breakdown_client_payload(
+            replace(report, received_shared_reimbursements=None))
+        assert "receivedSharedReimbursements" not in without_received
+        assert {key: value for key, value in payload.items() if key != "receivedSharedReimbursements"} == without_received
+
+
+def test_received_history_excludes_void_future_and_invalid_expense_dates(monkeypatch):
+    monkeypatch.setattr(reports, "now_pacific", lambda: NOW)
+    settled = allocation("settled", status="reimbursed", received_amount=100)
+    snapshot = history.reimbursement_history_from_ledgers(BRIAN, [
+        ledger(2026, settled),
+        ledger(2027,
+            replace(settled, status="void", updated_at="2027-01-06T10:00:00-08:00"),
+            allocation("zero-balance", received_amount=100),
+            allocation("today", expense_date="2027-01-07", status="reimbursed", received_amount=100),
+            allocation("future", expense_date="1/8/2027", status="reimbursed", received_amount=100),
+            allocation("invalid", expense_date="2/30/2026", status="reimbursed", received_amount=100),
+        ),
+    ], as_of=NOW)
+    payload = reports.expense_breakdown_client_payload(build(BudgetMonth(2027, 1), snapshot))
+    assert [item["id"] for item in payload["receivedSharedReimbursements"]] == ["zero-balance", "today"]
+    assert payload["reimbursementCoverage"]["status"] == "partial"
+    assert payload["reimbursementCoverage"]["excludedRecords"] == 1
+
+
+def test_legacy_reports_omit_optional_all_month_reimbursement_payloads(monkeypatch):
+    monkeypatch.setattr(reports, "now_pacific", lambda: NOW)
+    snapshot = history.reimbursement_history_from_ledgers(BRIAN, [], as_of=NOW)
+    report = replace(build(BudgetMonth(2027, 1), snapshot),
+                     open_shared_reimbursements=None, received_shared_reimbursements=None,
+                     reimbursement_coverage=None)
+    payload = reports.expense_breakdown_client_payload(report)
+    assert payload["sharedReimbursements"] == []
+    assert "openSharedReimbursements" not in payload
+    assert "receivedSharedReimbursements" not in payload
+    assert "reimbursementCoverage" not in payload

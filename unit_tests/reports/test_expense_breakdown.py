@@ -219,8 +219,10 @@ def test_reimbursement_disclosures_preserve_complete_transaction_details():
     entry = source.split("function ReimbursementEntry", 1)[1].split("export function SharedReimbursementsCard", 1)[0]
     summary, details = entry.split('<div className="bb-reimbursement-detail">', 1)
     assert "<AnimatedDisclosure" in summary
-    for field in ("item", "location", "date", "outstandingAmount"):
+    for field in ("item", "date", "partner", "outstandingAmount"):
         assert f"item.{field}" in summary
+    for field in ("item", "location", "date", "partner"):
+        assert f"item.{field}" in details
     for field in ("grossAmount", "personalShare", "partnerShare", "receivedAmount"):
         assert f"formatMoney(item.{field})" in details
     assert "item.splitMethod" in details

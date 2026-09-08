@@ -186,6 +186,7 @@ class ExpenseBreakdownReport:
     open_shared_reimbursements: list[SharedAllocation] | None = None
     reimbursement_coverage: dict[str, Any] | None = None
     raw_sheets: list[RawSheet] = field(default_factory=list)
+    received_shared_reimbursements: list[SharedAllocation] | None = None
 
 
 @dataclass(frozen=True)
@@ -599,6 +600,7 @@ def build_expense_breakdown_report(
         income_projection_receipts=income_projection_receipts,
         shared_reimbursements=shared_reimbursements,
         open_shared_reimbursements=[record.allocation for record in reimbursement_history.outstanding_records],
+        received_shared_reimbursements=[record.allocation for record in reimbursement_history.received_records],
         reimbursement_coverage=reimbursement_history.coverage_payload(),
         raw_sheets=[
             RawSheet("Shared Expenses", _compact_rows(shared_rows)),
@@ -2465,6 +2467,10 @@ def _report_client_payload(
             _shared_reimbursement_payload(item) for item in report.open_shared_reimbursements
         ]
         payload["reimbursementCoverage"] = report.reimbursement_coverage
+    if report.received_shared_reimbursements is not None:
+        payload["receivedSharedReimbursements"] = [
+            _shared_reimbursement_payload(item) for item in report.received_shared_reimbursements
+        ]
     from bookiebot.reports.report_insights import comparison_data, metric_explanations
     payload["comparisonData"] = comparison_data(report, payload)
     payload["metricExplanations"] = metric_explanations(report, payload)

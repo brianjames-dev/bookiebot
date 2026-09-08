@@ -23,29 +23,41 @@ export function reimbursementGroups(items: SharedReimbursementItem[]) {
 function expenseDateOrder(value: string) {
   const iso = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value.trim())
   if (iso) return Number(iso[1]) * 10000 + Number(iso[2]) * 100 + Number(iso[3])
-  const parts = /^(\d{1,2})\/(\d{1,2})\/(\d{4})$/.exec(value.trim())
-  return parts ? Number(parts[3]) * 10000 + Number(parts[1]) * 100 + Number(parts[2]) : Number.MAX_SAFE_INTEGER
+  const parts = /^(\d{1,2})\/(\d{1,2})\/(\d{2}|\d{4})$/.exec(value.trim())
+  if (!parts) return Number.MAX_SAFE_INTEGER
+  let year = Number(parts[3])
+  if (parts[3].length === 2) year += year <= 68 ? 2000 : 1900
+  return year * 10000 + Number(parts[1]) * 100 + Number(parts[2])
+}
+
+function expenseMonthKey(date: string) {
+  const order = expenseDateOrder(date)
+  const year = Math.floor(order / 10000)
+  const month = Math.floor(order / 100) % 100
+  const day = order % 100
+  const dated = year >= 1000 && year <= 9999 && month >= 1 && month <= 12
+    && day >= 1 && day <= new Date(Date.UTC(year, month, 0)).getUTCDate()
+  return dated ? `${year}-${String(month).padStart(2, "0")}` : "undated"
+}
+
+function expenseMonthLabel(key: string) {
+  if (key === "undated") return "Undated"
+  const [year, month] = key.split("-").map(Number)
+  return new Intl.DateTimeFormat("en-US", {
+    month: "long", year: "numeric", timeZone: "UTC",
+  }).format(new Date(Date.UTC(year, month - 1, 1)))
 }
 
 export function reimbursementTimeline(items: SharedReimbursementItem[]) {
   const months = new Map<string, number>()
   for (const group of reimbursementGroups(items)) {
     for (const item of group.items) {
-      const order = expenseDateOrder(item.date)
-      const year = Math.floor(order / 10000)
-      const month = Math.floor(order / 100) % 100
-      const day = order % 100
-      const dated = year >= 1000 && year <= 9999 && month >= 1 && month <= 12
-        && day >= 1 && day <= new Date(Date.UTC(year, month, 0)).getUTCDate()
-      const key = dated ? `${year}-${String(month).padStart(2, "0")}` : "undated"
+      const key = expenseMonthKey(item.date)
       months.set(key, (months.get(key) ?? 0) + Math.round(item.outstandingAmount * 100))
     }
   }
   const rows = [...months.entries()].sort(([a], [b]) => a.localeCompare(b)).map(([key, cents]) => {
-    const [year, month] = key.split("-").map(Number)
-    const label = key === "undated" ? "Undated" : new Intl.DateTimeFormat("en-US", {
-      month: "long", year: "numeric", timeZone: "UTC",
-    }).format(new Date(Date.UTC(year, month - 1, 1)))
+    const label = expenseMonthLabel(key)
     return { key, label, amount: cents / 100, months: [label] }
   })
   if (rows.length <= 4) return rows
@@ -56,22 +68,54 @@ export function reimbursementTimeline(items: SharedReimbursementItem[]) {
   }, ...rows.slice(-3)]
 }
 
+export function reimbursementLedger(items: SharedReimbursementItem[], openItems: SharedReimbursementItem[], selectedMonth: string, receivedItems: SharedReimbursementItem[] = []) {
+  // Both lists come from one history snapshot. A complete monthly record wins
+  // if a legacy snapshot repeats an id, including a received or void record.
+  const allocations = new Map(openItems.filter((item) => item.status === "outstanding" && item.outstandingAmount > 0).map((item) => [item.id, item]))
+  for (const item of receivedItems) {
+    if (item.status !== "void" && (item.status === "reimbursed" || item.outstandingAmount <= 0)) allocations.set(item.id, item)
+  }
+  for (const item of items) allocations.set(item.id, item)
+  const months = new Map<string, SharedReimbursementItem[]>()
+  for (const item of allocations.values()) {
+    if (item.status === "void") continue
+    const key = expenseMonthKey(item.date)
+    months.set(key, [...(months.get(key) ?? []), item])
+  }
+  return [...months.entries()].sort(([a], [b]) => {
+    if (a === selectedMonth) return -1
+    if (b === selectedMonth) return 1
+    if (a === "undated") return 1
+    if (b === "undated") return -1
+    return b.localeCompare(a)
+  }).map(([key, entries]) => ({
+    key, label: expenseMonthLabel(key),
+    items: entries.sort((a, b) => expenseDateOrder(a.date) - expenseDateOrder(b.date) || a.id.localeCompare(b.id)),
+  }))
+}
+
 function ReimbursementEntry({ item }: { item: SharedReimbursementItem }) {
   const received = item.status === "reimbursed" || item.outstandingAmount <= 0
+  const order = expenseDateOrder(item.date)
+  const dateLabel = expenseMonthKey(item.date) === "undated" ? "Undated" : new Intl.DateTimeFormat("en-US", {
+    month: "short", day: "numeric", timeZone: "UTC",
+  }).format(new Date(Date.UTC(Math.floor(order / 10000), Math.floor(order / 100) % 100 - 1, order % 100)))
   return (
     <AnimatedDisclosure summary={
       <>
         <span className="bb-reimbursement-item">
-          <strong>{item.item}</strong>
-          <span>{[item.location, item.date].filter(Boolean).join(" · ")}</span>
+          <strong title={item.item}>{item.item}</strong>
+          <span>{dateLabel} · {item.partner.trim() || "Partner"}</span>
         </span>
-        <span className="bb-reimbursement-status" data-settled={received}>
-          {received ? "Received" : `${formatMoney(item.outstandingAmount)} due`}
-        </span>
+        <div className="bb-reimbursement-status" data-settled={received}>
+          {received ? "Received" : <><FittedAmount className="bb-reimbursement-due">{formatMoney(item.outstandingAmount)}</FittedAmount><small>due</small></>}
+        </div>
         <span className="bb-disclosure-mark" aria-hidden="true" />
       </>
     }>
       <div className="bb-reimbursement-detail">
+        <h4>{item.item}</h4>
+        <p className="bb-reimbursement-receipt-meta">{[item.location, item.date, `With ${item.partner.trim() || "Partner"}`].filter(Boolean).join(" · ")}</p>
         <dl>
           <div><dt>Gross paid</dt><dd>{formatMoney(item.grossAmount)}</dd></div>
           <div><dt>Your share</dt><dd>{formatMoney(item.personalShare)}</dd></div>
@@ -84,11 +128,14 @@ function ReimbursementEntry({ item }: { item: SharedReimbursementItem }) {
   )
 }
 
-export function SharedReimbursementsCard({ items, openItems, coverage, monthLabel }: {
+export function SharedReimbursementsCard({ items, openItems, receivedItems, coverage, monthLabel, year, month }: {
   items: SharedReimbursementItem[]
   openItems?: SharedReimbursementItem[]
+  receivedItems?: SharedReimbursementItem[]
   coverage?: ReimbursementCoverage
   monthLabel: string
+  year: number
+  month: number
 }) {
   const monthly = items.filter((item) => item.status !== "void")
   const outstandingItems = openItems ?? monthly
@@ -96,10 +143,13 @@ export function SharedReimbursementsCard({ items, openItems, coverage, monthLabe
   const timeline = reimbursementTimeline(outstandingItems)
   const incomplete = coverage !== undefined && coverage.status !== "complete"
   const count = groups.reduce((sum, group) => sum + group.items.length, 0)
-  if (!monthly.length && !count && !incomplete) return null
+  const selectedMonth = `${year}-${String(month).padStart(2, "0")}`
+  const ledger = reimbursementLedger(items, openItems ?? [], selectedMonth, receivedItems)
+  const expenseCount = ledger.reduce((sum, group) => sum + group.items.length, 0)
+  if (!expenseCount && !count && !incomplete) return null
   const outstanding = groups.reduce((sum, group) => sum + Math.round(group.amount * 100), 0) / 100
-  const received = monthly.filter((item) => item.status === "reimbursed" || item.outstandingAmount <= 0)
   const allMonths = openItems !== undefined
+  const largestMonth = Math.max(...timeline.map((row) => row.amount), 0)
 
   return (
     <Card className="bb-report-section bb-reimbursement-section">
@@ -109,47 +159,33 @@ export function SharedReimbursementsCard({ items, openItems, coverage, monthLabe
           <div className="bb-reimbursement-overview">
             <div className="bb-chart-kicker">{incomplete ? "Known outstanding" : "Outstanding"}</div>
             <FittedAmount className="bb-reimbursement-total">{formatMoney(outstanding)}</FittedAmount>
-            <p className="bb-reimbursement-note">{allMonths ? "Across all months" : monthLabel}</p>
+            {!allMonths && <p className="bb-reimbursement-note">{monthLabel}</p>}
             {!count && !incomplete && <p className="bb-reimbursement-note bb-reimbursement-settled">No outstanding reimbursements{allMonths ? "." : " for these expenses."}</p>}
           </div>
           {timeline.length > 0 && <figure className="bb-reimbursement-timeline" aria-label="Outstanding by expense month">
-            <figcaption>By expense month</figcaption>
+            <figcaption>Remaining reimbursement for each expense month. Longer bars mean more money is still due.</figcaption>
             <ol>{timeline.map((row) => <li key={row.key}>
-              <div className="bb-reimbursement-bar-label"><span title={row.months.join(", ")}>{row.label}</span><FittedAmount className="bb-reimbursement-bar-amount">{formatMoney(row.amount)}</FittedAmount></div>
-              <div className="bb-reimbursement-bar-track" aria-hidden="true"><span style={{ width: `${row.amount / outstanding * 100}%` }} /></div>
+              <div className="bb-reimbursement-bar-label"><span title={row.months.join(", ")}>{row.label}</span><FittedAmount className="bb-reimbursement-bar-amount">{`${formatMoney(row.amount)} due`}</FittedAmount></div>
+              <div className="bb-reimbursement-bar-track" aria-hidden="true"><span style={{ width: `${row.amount / largestMonth * 100}%` }} /></div>
             </li>)}</ol>
           </figure>}
         </div>
         {incomplete && <p className="bb-reimbursement-warning" role="status">Some reimbursement records couldn’t be checked. This balance may be incomplete.</p>}
         <div className="bb-reimbursement-ledger" aria-label="Shared expenses">
-          {count > 0 && <div className="bb-reimbursement-open-list">
+          {expenseCount > 0 && <div className="bb-reimbursement-open-list">
             <AnimatedDisclosure summary={<>
-              <span className="bb-reimbursement-item"><strong>View {count} {count === 1 ? "expense" : "expenses"}</strong></span>
-              <span className="bb-reimbursement-status">Outstanding</span><span className="bb-disclosure-mark" aria-hidden="true" />
+              <span className="bb-reimbursement-item"><strong>View {expenseCount} {expenseCount === 1 ? "expense" : "expenses"}</strong></span>
+              <span className="bb-disclosure-mark" aria-hidden="true" />
             </>}>
               <div className="bb-reimbursement-groups">
-                {groups.map((group) => <section className="bb-reimbursement-group" key={group.partner} aria-label={`Owed by ${group.partner}`}>
-                  <h3><span>Owed by {group.partner}</span><span>{formatMoney(group.amount)}</span></h3>
+                {ledger.map((group) => <section className="bb-reimbursement-group" key={group.key} aria-label={`${group.label} expenses`}>
+                  <h3><span>{group.label}</span>{group.key === coverage?.asOf.slice(0, 7)
+                    ? <span className="bb-reimbursement-month-tag">This month</span>
+                    : group.key === selectedMonth ? <span className="bb-reimbursement-month-tag">Selected month</span> : null}</h3>
                   {group.items.map((item) => <ReimbursementEntry key={item.id} item={item} />)}
+                  {group.key === selectedMonth && monthly.length > 0 && <MonthlySummary items={monthly} monthLabel={monthLabel} />}
                 </section>)}
-              </div>
-            </AnimatedDisclosure>
-          </div>}
-          {monthly.length > 0 && <div className="bb-reimbursement-history">
-            <AnimatedDisclosure summary={<>
-              <span className="bb-reimbursement-item"><strong>{monthLabel}</strong><span>Expense statement</span></span>
-              <span className="bb-reimbursement-status">Details</span><span className="bb-disclosure-mark" aria-hidden="true" />
-            </>}>
-              <div className="bb-reimbursement-statement">
-                <dl className="bb-reimbursement-summary" aria-label={`Reimbursements for ${monthLabel} expenses`}>
-                  <div><dt>Received</dt><dd>{formatMoney(monthly.reduce((sum, item) => sum + item.receivedAmount, 0))}</dd></div>
-                  <div><dt>Gross paid</dt><dd>{formatMoney(monthly.reduce((sum, item) => sum + item.grossAmount, 0))}</dd></div>
-                  <div><dt>Your share</dt><dd>{formatMoney(monthly.reduce((sum, item) => sum + item.personalShare, 0))}</dd></div>
-                </dl>
-                {received.length > 0 && <div className="bb-reimbursement-received">
-                  <h3>Received <span>For {monthLabel} expenses</span></h3>
-                  {received.map((item) => <ReimbursementEntry key={item.id} item={item} />)}
-                </div>}
+                {monthly.length > 0 && !ledger.some((group) => group.key === selectedMonth) && <MonthlySummary items={monthly} monthLabel={monthLabel} />}
               </div>
             </AnimatedDisclosure>
           </div>}
@@ -157,4 +193,17 @@ export function SharedReimbursementsCard({ items, openItems, coverage, monthLabe
       </CardContent>
     </Card>
   )
+}
+
+function MonthlySummary({ items, monthLabel }: { items: SharedReimbursementItem[]; monthLabel: string }) {
+  const total = (field: "receivedAmount" | "grossAmount" | "personalShare") =>
+    formatMoney(items.reduce((sum, item) => sum + Math.round(item[field] * 100), 0) / 100)
+  return <div className="bb-reimbursement-month-summary">
+    <p>{monthLabel} totals</p>
+    <dl className="bb-reimbursement-summary" aria-label={`Reimbursements for ${monthLabel} expenses`}>
+      <div><dt>Gross paid</dt><dd><FittedAmount className="bb-reimbursement-summary-amount">{total("grossAmount")}</FittedAmount></dd></div>
+      <div><dt>Your share</dt><dd><FittedAmount className="bb-reimbursement-summary-amount">{total("personalShare")}</FittedAmount></dd></div>
+      <div><dt>Received</dt><dd><FittedAmount className="bb-reimbursement-summary-amount">{total("receivedAmount")}</FittedAmount></dd></div>
+    </dl>
+  </div>
 }

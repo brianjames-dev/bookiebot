@@ -218,6 +218,7 @@ export interface ExpenseReportData {
   utilityHistory: UtilityHistoryItem[]
   sharedReimbursements: SharedReimbursementItem[]
   openSharedReimbursements?: SharedReimbursementItem[]
+  receivedSharedReimbursements?: SharedReimbursementItem[]
   reimbursementCoverage?: ReimbursementCoverage
   subscriptionsNeeds: SubscriptionItem[]
   subscriptionsWants: SubscriptionItem[]
