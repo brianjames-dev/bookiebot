@@ -1,5 +1,6 @@
+import { useId, useState } from "react"
 import { Card, CardContent, CardHeader, CardTitle } from "./components/ui/card"
-import { AnimatedDisclosure } from "./components/ui/motion"
+import { AnimatedDisclosure, CollapsibleContent } from "./components/ui/motion"
 import { FittedAmount } from "./components/ui/fitted-amount"
 import type { ReimbursementCoverage, SharedReimbursementItem } from "./types"
 
@@ -96,16 +97,11 @@ export function reimbursementLedger(items: SharedReimbursementItem[], openItems:
 
 function ReimbursementEntry({ item }: { item: SharedReimbursementItem }) {
   const received = item.status === "reimbursed" || item.outstandingAmount <= 0
-  const order = expenseDateOrder(item.date)
-  const dateLabel = expenseMonthKey(item.date) === "undated" ? "Undated" : new Intl.DateTimeFormat("en-US", {
-    month: "short", day: "numeric", timeZone: "UTC",
-  }).format(new Date(Date.UTC(Math.floor(order / 10000), Math.floor(order / 100) % 100 - 1, order % 100)))
   return (
     <AnimatedDisclosure summary={
       <>
         <span className="bb-reimbursement-item">
           <strong title={item.item}>{item.item}</strong>
-          <span>{dateLabel} · {item.partner.trim() || "Partner"}</span>
         </span>
         <div className="bb-reimbursement-status" data-settled={received}>
           {received ? "Received" : <><FittedAmount className="bb-reimbursement-due">{formatMoney(item.outstandingAmount)}</FittedAmount><small>due</small></>}
@@ -149,7 +145,6 @@ export function SharedReimbursementsCard({ items, openItems, receivedItems, cove
   if (!expenseCount && !count && !incomplete) return null
   const outstanding = groups.reduce((sum, group) => sum + Math.round(group.amount * 100), 0) / 100
   const allMonths = openItems !== undefined
-  const largestMonth = Math.max(...timeline.map((row) => row.amount), 0)
 
   return (
     <Card className="bb-report-section bb-reimbursement-section">
@@ -163,10 +158,12 @@ export function SharedReimbursementsCard({ items, openItems, receivedItems, cove
             {!count && !incomplete && <p className="bb-reimbursement-note bb-reimbursement-settled">No outstanding reimbursements{allMonths ? "." : " for these expenses."}</p>}
           </div>
           {timeline.length > 0 && <figure className="bb-reimbursement-timeline" aria-label="Outstanding by expense month">
-            <figcaption>Remaining reimbursement for each expense month. Longer bars mean more money is still due.</figcaption>
-            <ol>{timeline.map((row) => <li key={row.key}>
-              <div className="bb-reimbursement-bar-label"><span title={row.months.join(", ")}>{row.label}</span><FittedAmount className="bb-reimbursement-bar-amount">{`${formatMoney(row.amount)} due`}</FittedAmount></div>
-              <div className="bb-reimbursement-bar-track" aria-hidden="true"><span style={{ width: `${row.amount / largestMonth * 100}%` }} /></div>
+            <figcaption>Each segment shows that expense month’s share of the {incomplete ? "known " : ""}outstanding balance.</figcaption>
+            <div className="bb-reimbursement-bar-track" aria-hidden="true">
+              {timeline.map((row, index) => <span key={row.key} data-segment={index} style={{ width: `${Math.round(row.amount * 100) / Math.round(outstanding * 100) * 100}%` }} />)}
+            </div>
+            <ol>{timeline.map((row, index) => <li key={row.key} data-segment={index}>
+              <div className="bb-reimbursement-bar-label"><span title={row.months.join(", ")}><i className="bb-reimbursement-swatch" aria-hidden="true" />{row.label}</span><FittedAmount className="bb-reimbursement-bar-amount">{formatMoney(row.amount)}</FittedAmount></div>
             </li>)}</ol>
           </figure>}
         </div>
@@ -178,14 +175,13 @@ export function SharedReimbursementsCard({ items, openItems, receivedItems, cove
               <span className="bb-disclosure-mark" aria-hidden="true" />
             </>}>
               <div className="bb-reimbursement-groups">
+                {monthly.length > 0 && !ledger.some((group) => group.key === selectedMonth) && <MonthHeading label={monthLabel} items={monthly} />}
                 {ledger.map((group) => <section className="bb-reimbursement-group" key={group.key} aria-label={`${group.label} expenses`}>
-                  <h3><span>{group.label}</span>{group.key === coverage?.asOf.slice(0, 7)
-                    ? <span className="bb-reimbursement-month-tag">This month</span>
-                    : group.key === selectedMonth ? <span className="bb-reimbursement-month-tag">Selected month</span> : null}</h3>
+                  <MonthHeading label={group.label} tag={group.key === coverage?.asOf.slice(0, 7)
+                    ? "This month" : group.key === selectedMonth ? "Selected month" : undefined}
+                    items={group.key === selectedMonth && monthly.length > 0 ? monthly : undefined} />
                   {group.items.map((item) => <ReimbursementEntry key={item.id} item={item} />)}
-                  {group.key === selectedMonth && monthly.length > 0 && <MonthlySummary items={monthly} monthLabel={monthLabel} />}
                 </section>)}
-                {monthly.length > 0 && !ledger.some((group) => group.key === selectedMonth) && <MonthlySummary items={monthly} monthLabel={monthLabel} />}
               </div>
             </AnimatedDisclosure>
           </div>}
@@ -195,11 +191,25 @@ export function SharedReimbursementsCard({ items, openItems, receivedItems, cove
   )
 }
 
+function MonthHeading({ label, tag, items }: { label: string; tag?: string; items?: SharedReimbursementItem[] }) {
+  const [open, setOpen] = useState(false)
+  const id = useId()
+  return <div className="bb-reimbursement-month-heading">
+    <h3><span>{label}</span>{tag && <span className="bb-reimbursement-month-tag">{tag}</span>}</h3>
+    {items && <>
+      <button type="button" className="bb-reimbursement-month-info" aria-label={`${label} reimbursement totals`}
+        aria-expanded={open} aria-controls={id} onClick={() => setOpen((current) => !current)}>
+        <span aria-hidden="true">i</span>
+      </button>
+      <CollapsibleContent open={open} id={id}><MonthlySummary items={items} monthLabel={label} /></CollapsibleContent>
+    </>}
+  </div>
+}
+
 function MonthlySummary({ items, monthLabel }: { items: SharedReimbursementItem[]; monthLabel: string }) {
   const total = (field: "receivedAmount" | "grossAmount" | "personalShare") =>
     formatMoney(items.reduce((sum, item) => sum + Math.round(item[field] * 100), 0) / 100)
   return <div className="bb-reimbursement-month-summary">
-    <p>{monthLabel} totals</p>
     <dl className="bb-reimbursement-summary" aria-label={`Reimbursements for ${monthLabel} expenses`}>
       <div><dt>Gross paid</dt><dd><FittedAmount className="bb-reimbursement-summary-amount">{total("grossAmount")}</FittedAmount></dd></div>
       <div><dt>Your share</dt><dd><FittedAmount className="bb-reimbursement-summary-amount">{total("personalShare")}</FittedAmount></dd></div>

@@ -1,5 +1,11 @@
 # Agent Decisions
 
+## 2026-09-08 - Show Reimbursement Months As Parts Of The Outstanding Balance
+
+Replace independent max-scaled bars with one segmented bar whose cent-based portions sum to the same outstanding headline. Matching legend swatches and exact amounts identify up to four expense-month buckets, retaining Earlier expenses and Undated. This depicts outstanding composition, not repayment progress; received amounts never enter its denominator. Incomplete coverage remains explicit.
+
+Separate month headings visually from one-line expense rows. Keep date, partner and full audit fields inside each row; reveal selected-expense-month totals from an accessible info disclosure beside its heading. Reuse the existing symmetric CollapsibleContent animation in flow, avoiding another modal/scroll-lock lifecycle. This supersedes the prior monthly-summary footer and max-scaled bars without changing ledger scope, calculations, receipt history, persistence or sheet reads.
+
 ## 2026-09-08 - Recover History After A Successful Report Refresh
 
 Keep an unavailable/partial month catalog recoverable without restarting the app: each newly successful report result permits at most one catalog recheck if the catalog is still incomplete or failed. Wait for any in-flight catalog request, consume the recovery attempt before reloading, preserve available month options, and do not retry because of renders or failed refreshes. No polling timer, longer deadline or repeated automatic source retry is added.

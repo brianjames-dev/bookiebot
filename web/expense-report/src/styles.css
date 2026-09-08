@@ -2619,12 +2619,18 @@ tr:last-child td {
 .bb-reimbursement-timeline { min-width: 0; margin: 0; }
 .bb-reimbursement-timeline figcaption { position: absolute; width: 1px; height: 1px; margin: -1px; padding: 0; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
 .bb-reimbursement-timeline ol { list-style: none; margin: 0; padding: 0; }
-.bb-reimbursement-timeline li + li { margin-top: 14px; }
-.bb-reimbursement-bar-label { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 40%); align-items: baseline; gap: 12px; margin-bottom: 6px; font-size: 13px; }
-.bb-reimbursement-bar-label > span { overflow-wrap: anywhere; }
+.bb-reimbursement-timeline li + li { margin-top: 10px; }
+.bb-reimbursement-timeline [data-segment="0"] { --bb-segment-color: var(--chart-2); }
+.bb-reimbursement-timeline [data-segment="1"] { --bb-segment-color: var(--primary); }
+.bb-reimbursement-timeline [data-segment="2"] { --bb-segment-color: var(--chart-5); }
+.bb-reimbursement-timeline [data-segment="3"] { --bb-segment-color: var(--chart-4); }
+.bb-reimbursement-bar-label { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 40%); align-items: baseline; gap: 12px; font-size: 13px; }
+.bb-reimbursement-bar-label > span { display: flex; align-items: baseline; gap: 8px; overflow-wrap: anywhere; }
+.bb-reimbursement-swatch { flex: 0 0 8px; width: 8px; height: 8px; border-radius: 1px; background: hsl(var(--bb-segment-color)); }
 .bb-reimbursement-bar-amount { font-size: 13px; font-weight: 500; font-variant-numeric: tabular-nums; text-align: right; }
-.bb-reimbursement-bar-track { height: 8px; overflow: hidden; border-radius: 2px; }
-.bb-reimbursement-bar-track > span { display: block; height: 100%; background: hsl(var(--primary)); transition: width var(--bb-motion-duration) var(--bb-motion-ease); }
+.bb-reimbursement-bar-track { display: flex; height: 16px; margin-bottom: 14px; overflow: hidden; border-radius: 2px; }
+.bb-reimbursement-bar-track > span { flex-shrink: 0; height: 100%; background: hsl(var(--bb-segment-color)); transition: width var(--bb-motion-duration) var(--bb-motion-ease); }
+.bb-reimbursement-bar-track > span + span { box-shadow: inset 1px 0 hsl(var(--card)); }
 .bb-reimbursement-ledger { margin-top: 24px; }
 .bb-reimbursement-ledger > div > .bb-reimbursement-entry { border-bottom: 0; }
 .bb-reimbursement-ledger > div:last-child > .bb-reimbursement-entry { border-bottom: 1px solid hsl(var(--border)); }
@@ -2643,25 +2649,31 @@ tr:last-child td {
   color: hsl(var(--destructive));
   font-size: 13px;
 }
-.bb-reimbursement-group + .bb-reimbursement-group { margin-top: 24px; }
-.bb-reimbursement-group h3 {
+.bb-reimbursement-group + .bb-reimbursement-group { margin-top: 20px; }
+.bb-reimbursement-month-heading { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; min-height: 44px; padding-left: 10px; background: hsl(var(--foreground) / 0.045); border-left: 2px solid hsl(var(--primary) / 0.5); }
+.bb-reimbursement-month-heading h3 {
   display: flex;
   flex-wrap: wrap;
-  align-items: baseline;
-  gap: 6px 10px;
-  margin: 0 0 12px;
-  font-size: 13px;
-  font-weight: 500;
+  align-items: center;
+  gap: 4px 8px;
+  margin: 0;
+  padding: 8px 0;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.015em;
 }
-.bb-reimbursement-month-tag { padding: 2px 7px; border-radius: 4px; background: hsl(var(--primary) / 0.12); color: hsl(var(--primary)); font-size: 10px; font-weight: 500; }
-.bb-reimbursement-group > .bb-reimbursement-entry > .bb-reimbursement-toggle { grid-template-columns: minmax(0, 1fr) minmax(76px, 30%) 12px; gap: 12px; padding: 12px 0; }
-.bb-reimbursement-group .bb-reimbursement-item { gap: 2px; }
+.bb-reimbursement-month-tag { color: hsl(var(--primary)); font-size: 10px; font-weight: 500; letter-spacing: 0; }
+.bb-reimbursement-month-info { display: grid; place-items: center; width: 44px; height: 44px; padding: 0; border: 0; background: transparent; color: hsl(var(--muted-foreground)); font: inherit; cursor: pointer; transition: color var(--bb-motion-duration) var(--bb-motion-ease); }
+.bb-reimbursement-month-info > span { display: grid; place-items: center; width: 16px; height: 16px; border: 1px solid currentColor; border-radius: 50%; font-size: 11px; font-family: Georgia, serif; font-style: italic; line-height: 1; }
+.bb-reimbursement-month-info:hover, .bb-reimbursement-month-info[aria-expanded="true"] { color: hsl(var(--primary)); }
+.bb-reimbursement-month-heading > .bb-details-content { grid-column: 1 / -1; }
+.bb-reimbursement-group > .bb-reimbursement-entry { border-top: 0; border-bottom: 1px solid hsl(var(--border) / 0.65); }
+.bb-reimbursement-group > .bb-reimbursement-entry > .bb-reimbursement-toggle { grid-template-columns: minmax(0, 1fr) minmax(90px, 35%) 12px; gap: 10px; min-height: 44px; padding: 11px 0; }
 .bb-reimbursement-group .bb-reimbursement-item strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 14px; }
-.bb-reimbursement-group .bb-reimbursement-item > span { font-size: 11px; }
 .bb-reimbursement-group .bb-reimbursement-status { min-width: 0; text-align: right; font-size: 13px; }
-.bb-reimbursement-group .bb-reimbursement-status small { display: block; color: hsl(var(--muted-foreground)); font-size: 10px; }
-.bb-reimbursement-month-summary { padding: 12px 0 0; border-top: 1px solid hsl(var(--border)); }
-.bb-reimbursement-month-summary > p { margin: 0 0 8px; color: hsl(var(--muted-foreground)); font-size: 11px; }
+.bb-reimbursement-group .bb-reimbursement-status[data-settled="false"] { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: baseline; gap: 4px; }
+.bb-reimbursement-group .bb-reimbursement-status small { color: hsl(var(--muted-foreground)); font-size: 10px; }
+.bb-reimbursement-month-summary { padding: 4px 12px 14px 0; }
 .bb-reimbursement-month-summary .bb-reimbursement-summary { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
 .bb-reimbursement-month-summary .bb-reimbursement-summary > div { display: block; min-width: 0; border: 0; padding: 0; font-size: 13px; }
 .bb-reimbursement-month-summary .bb-reimbursement-summary dt { margin-bottom: 4px; font-size: 11px; }
