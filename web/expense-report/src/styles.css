@@ -2649,27 +2649,30 @@ tr:last-child td {
   color: hsl(var(--destructive));
   font-size: 13px;
 }
-.bb-reimbursement-group + .bb-reimbursement-group { margin-top: 20px; }
-.bb-reimbursement-month-heading { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; min-height: 44px; padding-left: 10px; background: hsl(var(--foreground) / 0.045); border-left: 2px solid hsl(var(--primary) / 0.5); }
+.bb-reimbursement-group + .bb-reimbursement-group { margin-top: 28px; }
+.bb-reimbursement-month-heading { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: 0 12px; min-height: 44px; margin-bottom: 4px; border-bottom: 1px solid hsl(var(--primary) / 0.5); }
 .bb-reimbursement-month-heading h3 {
   display: flex;
   flex-wrap: wrap;
-  align-items: center;
-  gap: 4px 8px;
+  align-items: baseline;
+  gap: 4px 10px;
   margin: 0;
   padding: 8px 0;
-  font-size: 12px;
-  font-weight: 600;
-  letter-spacing: 0.015em;
+  font-size: 22px;
+  font-family: var(--bb-display-font);
+  font-weight: 400;
+  letter-spacing: -0.025em;
 }
-.bb-reimbursement-month-tag { color: hsl(var(--primary)); font-size: 10px; font-weight: 500; letter-spacing: 0; }
-.bb-reimbursement-month-info { display: grid; place-items: center; width: 44px; height: 44px; padding: 0; border: 0; background: transparent; color: hsl(var(--muted-foreground)); font: inherit; cursor: pointer; transition: color var(--bb-motion-duration) var(--bb-motion-ease); }
-.bb-reimbursement-month-info > span { display: grid; place-items: center; width: 16px; height: 16px; border: 1px solid currentColor; border-radius: 50%; font-size: 11px; font-family: Georgia, serif; font-style: italic; line-height: 1; }
-.bb-reimbursement-month-info:hover, .bb-reimbursement-month-info[aria-expanded="true"] { color: hsl(var(--primary)); }
+.bb-reimbursement-month-tag { color: hsl(var(--primary)); font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; font-size: 9px; font-weight: 500; letter-spacing: 0.06em; text-transform: uppercase; }
+.bb-reimbursement-month-totals-toggle { display: flex; align-items: center; justify-content: flex-end; gap: 6px; min-width: 44px; min-height: 44px; padding: 0; border: 0; background: transparent; color: hsl(var(--muted-foreground)); font: inherit; font-size: 11px; cursor: pointer; transition: color var(--bb-motion-duration) var(--bb-motion-ease); }
+.bb-reimbursement-month-totals-toggle svg { width: 12px; height: 12px; transition: transform var(--bb-motion-duration) var(--bb-motion-ease); }
+.bb-reimbursement-month-totals-toggle[aria-expanded="true"] svg { transform: rotate(180deg); }
+.bb-reimbursement-month-totals-toggle:hover, .bb-reimbursement-month-totals-toggle[aria-expanded="true"] { color: hsl(var(--primary)); }
 .bb-reimbursement-month-heading > .bb-details-content { grid-column: 1 / -1; }
 .bb-reimbursement-group > .bb-reimbursement-entry { border-top: 0; border-bottom: 1px solid hsl(var(--border) / 0.65); }
 .bb-reimbursement-group > .bb-reimbursement-entry > .bb-reimbursement-toggle { grid-template-columns: minmax(0, 1fr) minmax(90px, 35%) 12px; gap: 10px; min-height: 44px; padding: 11px 0; }
 .bb-reimbursement-group .bb-reimbursement-item strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 14px; }
+.bb-reimbursement-group > .bb-reimbursement-entry[data-state="open"] > .bb-reimbursement-toggle .bb-reimbursement-item strong { white-space: normal; }
 .bb-reimbursement-group .bb-reimbursement-status { min-width: 0; text-align: right; font-size: 13px; }
 .bb-reimbursement-group .bb-reimbursement-status[data-settled="false"] { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: baseline; gap: 4px; }
 .bb-reimbursement-group .bb-reimbursement-status small { color: hsl(var(--muted-foreground)); font-size: 10px; }
@@ -2758,31 +2761,41 @@ tr:last-child td {
   transform: rotate(0deg);
 }
 .bb-reimbursement-detail {
-  padding: 0 0 20px;
+  margin: 0 0 16px;
+  padding: 14px 16px;
+  background: hsl(var(--background) / 0.65);
 }
-.bb-reimbursement-detail h4 { margin: 0 0 4px; font-size: 14px; font-weight: 500; overflow-wrap: anywhere; }
-.bb-reimbursement-detail .bb-reimbursement-receipt-meta { margin: 0 0 16px; overflow-wrap: anywhere; }
 .bb-reimbursement-detail dl {
   display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 16px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px 20px;
   margin: 0;
 }
+.bb-reimbursement-detail dl > div { min-width: 0; }
 .bb-reimbursement-detail dt {
-  font-size: 12px;
+  font-size: 10px;
+  letter-spacing: 0.025em;
   color: hsl(var(--muted-foreground));
 }
 .bb-reimbursement-detail dd {
   margin: 4px 0 0;
-  font-size: 14px;
-  font-variant-numeric: tabular-nums;
+  font-size: 12px;
   overflow-wrap: anywhere;
 }
-.bb-reimbursement-detail p {
-  margin: 16px 0 0;
-  font-size: 12px;
-  color: hsl(var(--muted-foreground));
-}
+.bb-reimbursement-location { grid-column: 1 / -1; }
+.bb-reimbursement-detail .bb-reimbursement-split { margin-top: 16px; row-gap: 14px; }
+.bb-reimbursement-gross, .bb-reimbursement-received { grid-column: 1 / -1; display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 65%); align-items: baseline; gap: 12px; }
+.bb-reimbursement-detail .bb-reimbursement-gross { padding-bottom: 12px; border-bottom: 1px solid hsl(var(--border) / 0.65); }
+.bb-reimbursement-gross dd, .bb-reimbursement-received dd { text-align: right; }
+.bb-reimbursement-detail .bb-reimbursement-gross dd { margin: 0; font-size: 24px; font-weight: 500; letter-spacing: -0.04em; }
+.bb-reimbursement-detail .bb-reimbursement-share dd { font-size: 17px; font-weight: 500; }
+.bb-reimbursement-share + .bb-reimbursement-share { padding-left: 16px; border-left: 1px solid hsl(var(--border) / 0.65); }
+.bb-reimbursement-detail .bb-reimbursement-received { padding-top: 10px; border-top: 1px solid hsl(var(--border) / 0.65); }
+.bb-reimbursement-detail .bb-reimbursement-received dd { margin: 0; font-size: 16px; }
+.bb-reimbursement-received[data-received="true"] dt, .bb-reimbursement-received[data-received="true"] dd { color: hsl(var(--success)); }
+.bb-reimbursement-received[data-received="true"] dt::before { content: "✓"; margin-right: 5px; }
+.bb-reimbursement-detail .bb-reimbursement-methods { margin-top: 16px; }
+.bb-reimbursement-receipt-amount { font-variant-numeric: tabular-nums; }
 button:focus-visible, summary:focus-visible {
   outline: 2px solid hsl(var(--primary));
   outline-offset: 3px;
@@ -2802,7 +2815,6 @@ button:focus-visible, summary:focus-visible {
   .bb-chart-side { border-left: 0; padding-left: 0; }
   .bb-reimbursement-at-glance { column-gap: 28px; }
   .bb-chart-carousel-arrows { display: none; }
-  .bb-reimbursement-detail dl { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 
   .bb-page-header .bb-badge {
     justify-self: start;
@@ -2956,7 +2968,6 @@ button:focus-visible, summary:focus-visible {
   .bb-report-section { padding: 32px 0; }
   .bb-card-title { font-size: 27px; }
   .bb-reimbursement-at-glance { grid-template-columns: 1fr; gap: 24px; }
-  .bb-reimbursement-detail dl { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .bb-reimbursement-toggle { gap: 12px; }
   .bb-reimbursement-total { font-size: 38px; }
   .bb-chart-carousel-button {

@@ -110,15 +110,21 @@ function ReimbursementEntry({ item }: { item: SharedReimbursementItem }) {
       </>
     }>
       <div className="bb-reimbursement-detail">
-        <h4>{item.item}</h4>
-        <p className="bb-reimbursement-receipt-meta">{[item.location, item.date, `With ${item.partner.trim() || "Partner"}`].filter(Boolean).join(" · ")}</p>
-        <dl>
-          <div><dt>Gross paid</dt><dd>{formatMoney(item.grossAmount)}</dd></div>
-          <div><dt>Your share</dt><dd>{formatMoney(item.personalShare)}</dd></div>
-          <div><dt>Partner share</dt><dd>{formatMoney(item.partnerShare)}</dd></div>
-          <div><dt>Received</dt><dd>{formatMoney(item.receivedAmount)}</dd></div>
+        <dl className="bb-reimbursement-receipt-meta">
+          <div><dt>Date</dt><dd>{item.date.trim() || "Undated"}</dd></div>
+          <div><dt>With</dt><dd>{item.partner.trim() || "Partner"}</dd></div>
+          {item.location.trim() && <div className="bb-reimbursement-location"><dt>Location</dt><dd>{item.location}</dd></div>}
         </dl>
-        {item.splitMethod || item.responsiblePerson ? <p>{[item.splitMethod, item.responsiblePerson ? `Expense: ${item.responsiblePerson}` : ""].filter(Boolean).join(" · ")}</p> : null}
+        <dl className="bb-reimbursement-split">
+          <div className="bb-reimbursement-gross"><dt>Gross paid</dt><dd><FittedAmount className="bb-reimbursement-receipt-amount">{formatMoney(item.grossAmount)}</FittedAmount></dd></div>
+          <div className="bb-reimbursement-share"><dt>Your share</dt><dd><FittedAmount className="bb-reimbursement-receipt-amount">{formatMoney(item.personalShare)}</FittedAmount></dd></div>
+          <div className="bb-reimbursement-share"><dt>Partner share</dt><dd><FittedAmount className="bb-reimbursement-receipt-amount">{formatMoney(item.partnerShare)}</FittedAmount></dd></div>
+          <div className="bb-reimbursement-received" data-received={item.receivedAmount > 0}><dt>Received</dt><dd><FittedAmount className="bb-reimbursement-receipt-amount">{formatMoney(item.receivedAmount)}</FittedAmount></dd></div>
+        </dl>
+        {item.splitMethod.trim() || item.responsiblePerson.trim() ? <dl className="bb-reimbursement-methods">
+          {item.splitMethod.trim() && <div><dt>Split method</dt><dd>{item.splitMethod.trim()}</dd></div>}
+          {item.responsiblePerson.trim() && <div><dt>Expense for</dt><dd>{item.responsiblePerson.trim()}</dd></div>}
+        </dl> : null}
       </div>
     </AnimatedDisclosure>
   )
@@ -197,9 +203,10 @@ function MonthHeading({ label, tag, items }: { label: string; tag?: string; item
   return <div className="bb-reimbursement-month-heading">
     <h3><span>{label}</span>{tag && <span className="bb-reimbursement-month-tag">{tag}</span>}</h3>
     {items && <>
-      <button type="button" className="bb-reimbursement-month-info" aria-label={`${label} reimbursement totals`}
+      <button type="button" className="bb-reimbursement-month-totals-toggle" aria-label={`${label} reimbursement totals`}
         aria-expanded={open} aria-controls={id} onClick={() => setOpen((current) => !current)}>
-        <span aria-hidden="true">i</span>
+        <span>Totals</span>
+        <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" aria-hidden="true" focusable="false"><path d="m3 6 5 5 5-5" /></svg>
       </button>
       <CollapsibleContent open={open} id={id}><MonthlySummary items={items} monthLabel={label} /></CollapsibleContent>
     </>}

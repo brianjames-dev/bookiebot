@@ -189,6 +189,16 @@ function disclosure(host) {
   assert.ok(content)
   return {button,content}
 }
+function renderedText(node) {
+  if (typeof node === "string" || typeof node === "number") return String(node)
+  if (node?.props?.["aria-hidden"] === true || node?.props?.["aria-hidden"] === "true") return ""
+  return (node?.children ?? []).map(renderedText).join("")
+}
+function definitionPairs(host) {
+  const labels = host.findAllByType("dt"), values = host.findAllByType("dd")
+  assert.equal(labels.length,values.length,"Every receipt field must retain its own labeled value")
+  return labels.map((label,index) => [renderedText(label),renderedText(values[index])])
+}
 const openLedger = disclosure(openList)
 assert.equal(openLedger.button.props["aria-expanded"],false)
 assert.equal(openLedger.content.props["aria-hidden"],true)
@@ -204,6 +214,9 @@ assert.equal(monthGroups[1].findAllByProps({className:"bb-reimbursement-summary"
 const totalsButton = monthGroups[0].findByProps({"aria-label":"September 2026 reimbursement totals"})
 assert.equal(totalsButton.type,"button")
 assert.equal(totalsButton.props.type,"button")
+assert.equal(totalsButton.props.className,"bb-reimbursement-month-totals-toggle")
+assert.equal(renderedText(totalsButton),"Totals","Month totals use a visible label instead of an information-only icon")
+assert.equal(totalsButton.findAllByType("svg").length,1,"The Totals control retains its disclosure chevron")
 assert.equal(totalsButton.props["aria-expanded"],false)
 const totalsPanel = monthGroups[0].findAllByType("div").find(node => node.props.id === totalsButton.props["aria-controls"])
 assert.ok(totalsPanel,"The month info button must control the selected expense-month totals")
@@ -228,14 +241,46 @@ const compactLabel = expenseDetails.button.findByProps({className:"bb-reimbursem
 assert.equal(compactLabel.findAllByType("strong").length,1)
 assert.equal(compactLabel.findAllByType("span").length,1,"The compact item label contains no date/partner subtitle")
 const receiptMeta = expenseDetails.content.findByProps({className:"bb-reimbursement-receipt-meta"})
-assert.match(receiptMeta.children.join(""),/Test Store.*9\/3\/2026.*Hannah/,
-  "The full location, expense date and partner remain available in expanded details")
+assert.equal(receiptMeta.type,"dl")
+assert.deepEqual(definitionPairs(receiptMeta),[["Date","9/3/2026"],["With","Hannah"],["Location","Test Store"]],
+  "The full location, expense date and partner remain distinct labeled fields")
 assert.equal(expenseDetails.content.props.inert,"", "Individual financial details remain a separate disclosure")
 renderer.act(() => expenseDetails.button.props.onClick())
 assert.equal(expenseDetails.content.props.inert,undefined)
+const expenseTitle = renderedText(compactLabel)
+assert.equal(renderedText(expense).split(expenseTitle).length-1,1,"An expanded receipt shows its item title only once")
+assert.deepEqual(definitionPairs(expenseDetails.content.findByProps({className:"bb-reimbursement-split"})),[
+  ["Gross paid","$100.00"],["Your share","$60.00"],["Partner share","$40.00"],["Received","$40.00"],
+],"The financial hierarchy preserves every named amount")
 renderer.act(() => openLedger.button.props.onClick())
 assert.equal(openLedger.content.props.inert,"")
 assert.equal(openLedger.content.props["data-state"],"closed", "Closing retains the same animation container")
+renderer.act(() => tree.unmount())
+const auditItem = item("A long grocery receipt title that must remain available without being repeated",{
+  date:"9/4/2026",location:"Neighborhood Market",partner:"Hannah",grossAmount:200,personalShare:125,
+  partnerShare:75,receivedAmount:20,outstandingAmount:55,splitMethod:"By income",responsiblePerson:"Brian",
+})
+renderer.act(() => { tree = renderer.create(React.createElement(SharedReimbursementsCard,propsFor({items:[auditItem],openItems:[auditItem]}))) })
+const auditExpense = tree.root.findAllByProps({className:"bb-reimbursement-entry"})[1]
+const auditDisclosure = disclosure(auditExpense)
+const auditFields = definitionPairs(auditDisclosure.content)
+assert.deepEqual(auditFields,[
+  ["Date","9/4/2026"],["With","Hannah"],["Location","Neighborhood Market"],
+  ["Gross paid","$200.00"],["Your share","$125.00"],["Partner share","$75.00"],["Received","$20.00"],
+  ["Split method","By income"],["Expense for","Brian"],
+],"Partial receipts and responsibility remain complete and individually labeled")
+assert.equal(new Set(auditFields.map(([label]) => label)).size,auditFields.length,"Receipt fields are not duplicated")
+renderer.act(() => auditDisclosure.button.props.onClick())
+assert.equal(renderedText(auditExpense).split(auditItem.item).length-1,1)
+renderer.act(() => tree.unmount())
+const minimalItem = item("Receipt with missing optional metadata",{date:" ",location:" ",partner:" ",splitMethod:" \t",responsiblePerson:" \n"})
+renderer.act(() => { tree = renderer.create(React.createElement(SharedReimbursementsCard,propsFor({items:[minimalItem],openItems:[minimalItem]}))) })
+const minimalExpense = tree.root.findAllByProps({className:"bb-reimbursement-entry"})[1]
+const minimalFields = definitionPairs(disclosure(minimalExpense).content)
+assert.deepEqual(minimalFields.slice(0,2),[["Date","Undated"],["With","Partner"]])
+assert.ok(!minimalFields.some(([label]) => ["Location","Split method","Expense for"].includes(label)),
+  "Missing optional metadata does not produce empty labels or separators")
+assert.equal(minimalFields.length,6,"Date and partner fallbacks retain all four financial values")
 renderer.act(() => tree.unmount())
 renderer.act(() => { tree = renderer.create(React.createElement(SharedReimbursementsCard, propsFor({
   items:[item("Future expense",{date:"9/20/2026"})],openItems:[older],

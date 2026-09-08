@@ -4,7 +4,7 @@
 
 Replace independent max-scaled bars with one segmented bar whose cent-based portions sum to the same outstanding headline. Matching legend swatches and exact amounts identify up to four expense-month buckets, retaining Earlier expenses and Undated. This depicts outstanding composition, not repayment progress; received amounts never enter its denominator. Incomplete coverage remains explicit.
 
-Separate month headings visually from one-line expense rows. Keep date, partner and full audit fields inside each row; reveal selected-expense-month totals from an accessible info disclosure beside its heading. Reuse the existing symmetric CollapsibleContent animation in flow, avoiding another modal/scroll-lock lifecycle. This supersedes the prior monthly-summary footer and max-scaled bars without changing ledger scope, calculations, receipt history, persistence or sheet reads.
+Separate month headings visually from one-line expense rows. The September 8 follow-up uses serif headings with a rule and an explicit Totals button/rotating chevron for selected-expense-month totals, replacing the info icon to accurately signal expansion. Keep one item title in the summary (unwrapped when expanded); date/partner/location, gross/shares/received and split responsibility use separate receipt groups inside each row. Reuse the existing symmetric CollapsibleContent animation in flow, avoiding another modal/scroll-lock lifecycle. This supersedes the prior monthly-summary footer and max-scaled bars without changing ledger scope, calculations, receipt history, persistence or sheet reads.
 
 ## 2026-09-08 - Recover History After A Successful Report Refresh
 

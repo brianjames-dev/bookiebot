@@ -221,7 +221,8 @@ def test_reimbursement_disclosures_preserve_complete_transaction_details():
     assert "<AnimatedDisclosure" in summary
     for field in ("item", "outstandingAmount"):
         assert f"item.{field}" in summary
-    for field in ("item", "location", "date", "partner"):
+    assert "item.item" not in details, "The expanded receipt must not repeat its summary title"
+    for field in ("location", "date", "partner"):
         assert f"item.{field}" in details
     for field in ("grossAmount", "personalShare", "partnerShare", "receivedAmount"):
         assert f"formatMoney(item.{field})" in details
