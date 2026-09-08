@@ -151,14 +151,21 @@ async def _bank_exchange_public_token(request: web.Request) -> web.Response:
         return _json_error(f"{type(exc).__name__}: {exc}", status=500)
 
 
+def _verify_plaid_webhook_secret(request: web.Request):
+    secret = _plaid_webhook_secret()
+    if not secret:
+        return _json_error("Plaid webhook secret is not configured", status=503)
+    supplied = request.headers.get("X-BookieBot-Webhook-Secret", "").strip()
+    if not supplied or not hmac.compare_digest(supplied, secret):
+        return _json_error("Invalid webhook secret", status=401)
+    return None
+
+
 async def _bank_plaid_webhook(request: web.Request) -> web.Response:
     try:
-        secret = _plaid_webhook_secret()
-        if secret:
-            supplied = request.headers.get("X-BookieBot-Webhook-Secret", "").strip()
-            supplied = supplied or request.query.get("secret", "").strip()
-            if not hmac.compare_digest(supplied, secret):
-                return _json_error("Invalid webhook secret", status=401)
+        auth_error = _verify_plaid_webhook_secret(request)
+        if auth_error is not None:
+            return auth_error
         body = await _request_json(request)
         service = build_banking_service()
         event = service.receive_plaid_webhook(body)
