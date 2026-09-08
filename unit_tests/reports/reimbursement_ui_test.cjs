@@ -25,7 +25,7 @@ function load(file) {
   vm.runInNewContext(outputText, { exports, require: localRequire })
   return exports
 }
-const { SharedReimbursementsCard, reimbursementGroups, reimbursementTimeline, reimbursementLedger } = load(path.join(frontend, "src/shared-reimbursements.tsx"))
+const { SharedReimbursementsCard, reimbursementGroups, reimbursementTimeline, reimbursementLedger, reimbursementVisual } = load(path.join(frontend, "src/shared-reimbursements.tsx"))
 const item = (id, changes = {}) => ({
   id, date: "9/3/2026", item: id, location: "Test Store", payer: "Brian", partner: "Hannah",
   responsibleOwner: "", responsiblePerson: "", grossAmount: 100, personalShare: 60,
@@ -36,6 +36,60 @@ const newer = item("This month's dinner")
 const settled = item("Received dinner", {status:"reimbursed", outstandingAmount:0, receivedAmount:40})
 const oldReceipt = {...older,status:"reimbursed",outstandingAmount:0,receivedAmount:40}
 const complete = {status:"complete", asOf:"2026-09-07", years:[2025,2026], unavailableYears:[], excludedRecords:0}
+
+// The receipt bar partitions the original gross payment. Only the partner's
+// share is divided into actual money received and the balance still due.
+const partialUtility = item("PG&E", {
+  grossAmount:160.35, personalShare:103.80, partnerShare:56.55, receivedAmount:20, outstandingAmount:36.55,
+  splitMethod:"By income",
+})
+const settledRent = item("Rent", {
+  grossAmount:3250, personalShare:2103.73, partnerShare:1146.27, receivedAmount:1146.27,
+  outstandingAmount:0, status:"reimbursed",
+})
+const frontedReceipt = item("Fronted purchase", {
+  payer:"Hannah", partner:"Brian (BofA)", grossAmount:75, personalShare:0, partnerShare:75,
+  receivedAmount:20, outstandingAmount:55, splitMethod:"Fronted", responsiblePerson:"Brian (BofA)",
+})
+for (const allocation of [newer,partialUtility,settledRent,frontedReceipt,
+  item("Binary rounding",{grossAmount:0.30,personalShare:0.01,partnerShare:0.29,receivedAmount:0.10,outstandingAmount:0.19}),
+  item("Zero remaining without terminal status",{receivedAmount:40,outstandingAmount:0}),
+]) {
+  const visual = reimbursementVisual(allocation)
+  assert.ok(visual, "Consistent cent amounts should have a faithful visual")
+  const grossCents = Math.round(allocation.grossAmount * 100)
+  for (const [segment,field] of [["personal","personalShare"],["received","receivedAmount"],["outstanding","outstandingAmount"]]) {
+    assert.ok(Math.abs(visual[segment] - Math.round(allocation[field] * 100) / grossCents * 100) < 1e-9,
+      `${segment} is its exact source amount as a share of gross, not of monthly spending or the partner balance`)
+  }
+  assert.ok(Math.abs(visual.personal + visual.received + visual.outstanding - 100) < 1e-9)
+}
+const invalidVisualChanges = [
+  {grossAmount:0,personalShare:0,partnerShare:0,receivedAmount:0,outstandingAmount:0},
+  {grossAmount:-100}, {personalShare:-1}, {partnerShare:-1}, {receivedAmount:-1}, {outstandingAmount:-1},
+  {grossAmount:101}, {receivedAmount:20}, {outstandingAmount:39.99},
+  {grossAmount:100.001,personalShare:60.001},
+  {grossAmount:NaN}, {personalShare:Infinity}, {partnerShare:-Infinity}, {receivedAmount:NaN}, {outstandingAmount:Infinity},
+  {grossAmount:Number.MAX_SAFE_INTEGER,personalShare:Number.MAX_SAFE_INTEGER,partnerShare:0,receivedAmount:0,outstandingAmount:0},
+  {status:"reimbursed"},
+]
+assert.equal(reimbursementVisual(item("Voided source",{status:"void"})),null)
+for (const changes of invalidVisualChanges) {
+  assert.equal(reimbursementVisual(item("Invalid amount",changes)),null,
+    "Malformed, non-cent or contradictory source amounts must not be repaired into a chart")
+}
+for (const grossCents of [1,3,7,10,29,30,31,99,101,133,16035,325000]) {
+  const personalCents = Math.floor(grossCents * 0.6)
+  const partnerCents = grossCents - personalCents
+  const receivedCents = Math.floor(partnerCents / 3)
+  const visual = reimbursementVisual(item("Cent precision",{
+    grossAmount:grossCents/100,personalShare:personalCents/100,partnerShare:partnerCents/100,
+    receivedAmount:receivedCents/100,outstandingAmount:(partnerCents-receivedCents)/100,
+  }))
+  assert.ok(visual,`A valid ${grossCents}-cent expense must not fail because of binary decimal representation`)
+  assert.ok(Math.abs(visual.personal + visual.received + visual.outstanding - 100) < 1e-9)
+}
+
 const propsFor = (props = {}) => ({
   items: [settled], openItems:[older,newer], coverage:complete, monthLabel:"September 2026", year:2026, month:9, ...props,
 })
@@ -199,6 +253,33 @@ function definitionPairs(host) {
   assert.equal(labels.length,values.length,"Every receipt field must retain its own labeled value")
   return labels.map((label,index) => [renderedText(label),renderedText(values[index])])
 }
+function assertReceiptVisual(host, allocation) {
+  const chart = host.findByProps({className:"bb-reimbursement-visual"})
+  const payer = allocation.payer.trim()
+  const partner = allocation.partner.trim() || "Partner"
+  const paidLabel = payer ? `${payer} paid` : "Paid"
+  const currency = value => new Intl.NumberFormat("en-US",{style:"currency",currency:"USD"}).format(value)
+  assert.equal(chart.props.role,"img")
+  assert.equal(chart.props["aria-label"],`${paidLabel} ${currency(allocation.grossAmount)}. Your share ${currency(allocation.personalShare)}. ${partner}’s share ${currency(allocation.partnerShare)}: ${currency(allocation.receivedAmount)} received${payer ? ` by ${payer}` : ""} from ${partner}; ${currency(allocation.outstandingAmount)} still owed.`,
+    "The visual retains all five exact amounts and explains that the partner paid the original payer back")
+  const segments = chart.findByProps({className:"bb-reimbursement-visual-segments"})
+  assert.equal(segments.props["aria-hidden"],"true")
+  const expected = reimbursementVisual(allocation)
+  assert.deepEqual(segments.findAllByType("span").map(segment=>segment.props["data-portion"]),["personal","received","outstanding"])
+  for (const segment of segments.findAllByType("span")) {
+    assert.ok(Math.abs(parseFloat(segment.props.style.width) - expected[segment.props["data-portion"]]) < 1e-9)
+  }
+  const title = chart.findByProps({className:"bb-reimbursement-visual-total"})
+  assert.equal(title.props["aria-hidden"],"true","The in-bar visual total does not duplicate the chart description for screen readers")
+  assert.equal(title.children.map(renderedText).join(""),`${paidLabel} · ${currency(allocation.grossAmount)}`)
+  const legend = host.findByProps({className:"bb-reimbursement-visual-legend"})
+  assert.deepEqual(definitionPairs(legend),[["Yours",currency(allocation.personalShare)],[`${partner} paid`,currency(allocation.receivedAmount)]],
+    "Two compact footer labels show supplied amounts, including zero, without repeating the header's amount due")
+  assert.deepEqual(legend.findAllByType("i").map(key=>key.props["data-portion"]),["personal","received"])
+  assert.equal(host.findAllByProps({className:"bb-reimbursement-split"}).length,0,
+    "Valid visual receipts do not also render the previous repeated amount grid")
+  return chart
+}
 const openLedger = disclosure(openList)
 assert.equal(openLedger.button.props["aria-expanded"],false)
 assert.equal(openLedger.content.props["aria-hidden"],true)
@@ -242,17 +323,17 @@ assert.equal(compactLabel.findAllByType("strong").length,1)
 assert.equal(compactLabel.findAllByType("span").length,1,"The compact item label contains no date/partner subtitle")
 const receiptMeta = expenseDetails.content.findByProps({className:"bb-reimbursement-receipt-meta"})
 assert.equal(receiptMeta.type,"div")
-assert.equal(renderedText(receiptMeta.findByProps({className:"bb-reimbursement-date"})),"9/3/2026 · Test Store")
-assert.equal(renderedText(receiptMeta.findByProps({className:"bb-reimbursement-arrangement"})),"Paid by Brian · Split 50/50 with Hannah",
-  "The compact metadata retains date, location, payer, partner and split method")
+assert.equal(renderedText(receiptMeta.findByProps({className:"bb-reimbursement-date"})),"Sep 3")
+assert.equal(receiptMeta.findByProps({title:"9/3/2026"}).props["aria-label"],"9/3/2026","A compact date retains its original full date accessibly")
+assert.equal(renderedText(receiptMeta.findByProps({className:"bb-reimbursement-location"})),"Test Store")
+assert.equal(renderedText(receiptMeta.findByProps({className:"bb-reimbursement-arrangement"})),"Split 50/50",
+  "The compact metadata retains the method while the chart and footer identify the payer and partner")
 assert.equal(expenseDetails.content.props.inert,"", "Individual financial details remain a separate disclosure")
 renderer.act(() => expenseDetails.button.props.onClick())
 assert.equal(expenseDetails.content.props.inert,undefined)
 const expenseTitle = renderedText(compactLabel)
 assert.equal(renderedText(expense).split(expenseTitle).length-1,1,"An expanded receipt shows its item title only once")
-assert.deepEqual(definitionPairs(expenseDetails.content.findByProps({className:"bb-reimbursement-split"})),[
-  ["Gross paid","$100.00"],["Your share","$60.00"],["Partner share","$40.00"],["Received","$40.00"],
-],"The financial hierarchy preserves every named amount")
+assertReceiptVisual(expenseDetails.content,settled)
 renderer.act(() => openLedger.button.props.onClick())
 assert.equal(openLedger.content.props.inert,"")
 assert.equal(openLedger.content.props["data-state"],"closed", "Closing retains the same animation container")
@@ -264,14 +345,12 @@ const auditItem = item("A long grocery receipt title that must remain available 
 renderer.act(() => { tree = renderer.create(React.createElement(SharedReimbursementsCard,propsFor({items:[auditItem],openItems:[auditItem]}))) })
 const auditExpense = tree.root.findAllByProps({className:"bb-reimbursement-entry"})[1]
 const auditDisclosure = disclosure(auditExpense)
-const auditFields = definitionPairs(auditDisclosure.content)
-assert.deepEqual(auditFields,[
-  ["Gross paid","$200.00"],["Your share","$125.00"],["Partner share","$75.00"],["Received","$20.00"],
-],"Partial receipts retain all four individually labeled financial values")
-assert.equal(renderedText(auditDisclosure.content.findByProps({className:"bb-reimbursement-date"})),"9/4/2026 · Neighborhood Market")
-assert.equal(renderedText(auditDisclosure.content.findByProps({className:"bb-reimbursement-arrangement"})),"Paid by Brian · Split by income with Hannah",
-  "The arrangement identifies the payer without repeating a matching budget owner")
-assert.equal(new Set(auditFields.map(([label]) => label)).size,auditFields.length,"Receipt fields are not duplicated")
+assertReceiptVisual(auditDisclosure.content,auditItem)
+assert.equal(renderedText(auditDisclosure.content.findByProps({className:"bb-reimbursement-date"})),"Sep 4")
+assert.equal(auditDisclosure.content.findByProps({title:"9/4/2026"}).props["aria-label"],"9/4/2026")
+assert.equal(renderedText(auditDisclosure.content.findByProps({className:"bb-reimbursement-location"})),"Neighborhood Market")
+assert.equal(renderedText(auditDisclosure.content.findByProps({className:"bb-reimbursement-arrangement"})),"By income",
+  "A matching budget owner is not repeated beneath the original payer's bar label")
 renderer.act(() => auditDisclosure.button.props.onClick())
 assert.equal(renderedText(auditExpense).split(auditItem.item).length-1,1)
 renderer.act(() => tree.unmount())
@@ -280,21 +359,66 @@ renderer.act(() => { tree = renderer.create(React.createElement(SharedReimbursem
 const minimalExpense = tree.root.findAllByProps({className:"bb-reimbursement-entry"})[1]
 const minimalDetails = disclosure(minimalExpense).content
 assert.equal(renderedText(minimalDetails.findByProps({className:"bb-reimbursement-date"})),"Undated")
-assert.equal(renderedText(minimalDetails.findByProps({className:"bb-reimbursement-arrangement"})),"Split with Partner",
+assert.equal(renderedText(minimalDetails.findByProps({className:"bb-reimbursement-arrangement"})),"Split",
   "Whitespace-only optional metadata does not produce empty labels or separators")
-assert.equal(definitionPairs(minimalDetails).length,4,"Metadata fallbacks retain all four financial values")
+assert.equal(minimalDetails.findAllByProps({className:"bb-reimbursement-location"}).length,0)
+assertReceiptVisual(minimalDetails,minimalItem)
 renderer.act(() => tree.unmount())
 for (const [changes, expected] of [
-  [{payer:" Brian ",partner:" Hannah ",responsiblePerson:" bRIAN ",splitMethod:" By income "},"Paid by Brian · Split by income with Hannah"],
-  [{splitMethod:"70/30",responsiblePerson:"Joint budget"},"Paid by Brian · Split 70/30 with Hannah · Budget: Joint budget"],
-  [{splitMethod:"Fronted",responsiblePerson:" hANNAH "},"Paid by Brian · Fronted for Hannah"],
-  [{splitMethod:"fronted",responsiblePerson:"Joint budget"},"Paid by Brian · Fronted for Hannah · Budget: Joint budget"],
-  [{splitMethod:"",responsiblePerson:"Hannah"},"Paid by Brian · Split with Hannah · Budget: Hannah"],
+  [{payer:" Brian ",partner:" Hannah ",responsiblePerson:" bRIAN ",splitMethod:" By income "},"By income"],
+  [{splitMethod:"70/30",responsiblePerson:"Joint budget"},"Split 70/30 · Budget: Joint budget"],
+  [{splitMethod:"Fronted",responsiblePerson:" hANNAH "},"Fronted for Hannah"],
+  [{splitMethod:"fronted",responsiblePerson:"Joint budget"},"Fronted for Hannah · Budget: Joint budget"],
+  [{splitMethod:"",responsiblePerson:"Hannah"},"Split · Budget: Hannah"],
 ]) {
   const arrangementItem = item("Arrangement receipt",changes)
   renderer.act(() => { tree = renderer.create(React.createElement(SharedReimbursementsCard,propsFor({items:[arrangementItem],openItems:[arrangementItem]}))) })
   assert.equal(renderedText(tree.root.findByProps({className:"bb-reimbursement-arrangement"})),expected,
     "Custom splits, fronted expenses and a distinct budget owner retain their meaning")
+  assertReceiptVisual(disclosure(tree.root.findAllByProps({className:"bb-reimbursement-entry"})[1]).content,arrangementItem)
+  renderer.act(() => tree.unmount())
+}
+for (const visualItem of [newer,partialUtility,settledRent,frontedReceipt,
+  item("Different named people",{payer:"Avery",partner:"Jordan",responsiblePerson:"Other budget"}),
+  item("Received zero balance",{receivedAmount:40,outstandingAmount:0}),
+]) {
+  renderer.act(() => { tree = renderer.create(React.createElement(SharedReimbursementsCard,propsFor({items:[visualItem],openItems:[]}))) })
+  const visualExpense = tree.root.findAllByProps({className:"bb-reimbursement-entry"})[1]
+  const visualDisclosure = disclosure(visualExpense)
+  assertReceiptVisual(visualDisclosure.content,visualItem)
+  assert.equal(visualDisclosure.button.props["aria-expanded"],false)
+  const keys = visualDisclosure.button.findAllByProps({className:"bb-reimbursement-due-key"})
+  assert.equal(keys.length,visualItem.outstandingAmount > 0 ? 1 : 0,
+    "Only a chart with a remaining balance can have an owed key; browser checks verify its expanded-only CSS")
+  for (const key of keys) assert.equal(key.props["aria-hidden"],"true","The owed pattern does not alter the amount-due button's accessible label")
+  if (visualItem.outstandingAmount > 0) assert.ok(renderedText(visualDisclosure.button).includes("due"))
+  renderer.act(() => visualDisclosure.button.props.onClick())
+  assert.equal(visualExpense.props["data-state"],"open")
+  assert.equal(visualDisclosure.content.props.inert,undefined)
+  assertReceiptVisual(visualDisclosure.content,visualItem)
+  if (visualItem === frontedReceipt) {
+    assert.equal(renderedText(visualDisclosure.content.findByProps({className:"bb-reimbursement-arrangement"})),"Fronted for Brian (BofA)")
+  }
+  renderer.act(() => visualDisclosure.button.props.onClick())
+  assert.equal(visualExpense.props["data-state"],"closed")
+  assert.equal(visualDisclosure.content.props.inert,"")
+  assert.equal(visualDisclosure.content.findAllByProps({className:"bb-reimbursement-visual"}).length,1,
+    "The chart stays mounted through the existing exit animation")
+  renderer.act(() => tree.unmount())
+}
+for (const changes of invalidVisualChanges) {
+  const invalid = item("Legacy amount fallback",changes)
+  renderer.act(() => { tree = renderer.create(React.createElement(SharedReimbursementsCard,propsFor({items:[invalid],openItems:[]}))) })
+  const invalidExpense = tree.root.findAllByProps({className:"bb-reimbursement-entry"})[1]
+  const invalidDetails = disclosure(invalidExpense).content
+  assert.equal(invalidDetails.findAllByProps({role:"img"}).length,0,"Inconsistent data cannot produce a plausible but invented chart")
+  assert.equal(disclosure(invalidExpense).button.findAllByProps({className:"bb-reimbursement-due-key"}).length,0)
+  const currency = value => new Intl.NumberFormat("en-US",{style:"currency",currency:"USD"}).format(value)
+  assert.deepEqual(definitionPairs(invalidDetails),[
+    ["Gross paid",currency(invalid.grossAmount)],["Your share",currency(invalid.personalShare)],
+    ["Partner share",currency(invalid.partnerShare)],["Received",currency(invalid.receivedAmount)],
+    ["Outstanding",currency(invalid.outstandingAmount)],
+  ],"The legacy fallback preserves each reported amount, including the outstanding balance")
   renderer.act(() => tree.unmount())
 }
 renderer.act(() => { tree = renderer.create(React.createElement(SharedReimbursementsCard, propsFor({

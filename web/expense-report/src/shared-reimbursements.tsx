@@ -95,6 +95,26 @@ export function reimbursementLedger(items: SharedReimbursementItem[], openItems:
   }))
 }
 
+export function reimbursementVisual(item: SharedReimbursementItem) {
+  const amounts = [item.grossAmount, item.personalShare, item.partnerShare, item.receivedAmount, item.outstandingAmount]
+  // Only chart an exact allocation of the recorded gross. Older snapshots may
+  // contain inconsistent values; preserve those labels instead of normalizing.
+  if (amounts.some((amount) => !Number.isFinite(amount) || amount < 0
+    || !Number.isSafeInteger(Math.round(amount * 100))
+    || Math.abs(amount * 100 - Math.round(amount * 100)) > 1e-6)) return null
+  const [gross, personal, partner, received, outstanding] = amounts.map((amount) => Math.round(amount * 100))
+  if (gross <= 0 || personal + partner !== gross || received + outstanding !== partner
+    || item.status === "void" || (item.status === "reimbursed" && outstanding > 0)) return null
+  return { personal: personal / gross * 100, received: received / gross * 100, outstanding: outstanding / gross * 100 }
+}
+
+function compactExpenseDate(date: string) {
+  if (expenseMonthKey(date) === "undated") return date.trim() || "Undated"
+  const order = expenseDateOrder(date)
+  return new Intl.DateTimeFormat("en-US", { month: "short", day: "numeric", timeZone: "UTC" })
+    .format(new Date(Date.UTC(Math.floor(order / 10000), Math.floor(order / 100) % 100 - 1, order % 100)))
+}
+
 function ReimbursementEntry({ item, open, onOpenChange }: { item: SharedReimbursementItem; open: boolean; onOpenChange: (open: boolean) => void }) {
   const received = item.status === "reimbursed" || item.outstandingAmount <= 0
   const payer = item.payer.trim()
@@ -102,9 +122,11 @@ function ReimbursementEntry({ item, open, onOpenChange }: { item: SharedReimburs
   const responsible = item.responsiblePerson.trim()
   const method = item.splitMethod.trim()
   const fronted = method.toLowerCase() === "fronted"
-  const splitLabel = fronted ? "Fronted" : method.toLowerCase() === "by income" ? "Split by income" : method ? `Split ${method}` : "Split"
+  const splitLabel = fronted ? "Fronted" : method.toLowerCase() === "by income" ? "By income" : method ? `Split ${method}` : "Split"
   const showBudget = responsible && responsible.toLowerCase() !== payer.toLowerCase()
     && !(fronted && responsible.toLowerCase() === partner.toLowerCase())
+  const visual = reimbursementVisual(item)
+  const paidLabel = payer ? `${payer} paid` : "Paid"
   return (
     <AnimatedDisclosure open={open} onOpenChange={onOpenChange} summary={
       <>
@@ -112,26 +134,44 @@ function ReimbursementEntry({ item, open, onOpenChange }: { item: SharedReimburs
           <strong title={item.item}>{item.item}</strong>
         </span>
         <div className="bb-reimbursement-status" data-settled={received}>
-          {received ? "Received" : <><FittedAmount className="bb-reimbursement-due">{formatMoney(item.outstandingAmount)}</FittedAmount><small>due</small></>}
+          {received ? "Received" : <>
+            <FittedAmount className="bb-reimbursement-due">{formatMoney(item.outstandingAmount)}</FittedAmount>
+            {visual && <i className="bb-reimbursement-due-key" aria-hidden="true" />}<small>due</small>
+          </>}
         </div>
         <span className="bb-disclosure-mark" aria-hidden="true" />
       </>
     }>
       <div className="bb-reimbursement-detail">
         <div className="bb-reimbursement-receipt-meta">
-          <p className="bb-reimbursement-date">{item.date.trim() || "Undated"}{item.location.trim() && <> · {item.location.trim()}</>}</p>
+          <p className="bb-reimbursement-date"><span title={item.date.trim() || undefined} aria-label={item.date.trim() || "Undated"}>{compactExpenseDate(item.date)}</span></p>
           <p className="bb-reimbursement-arrangement">
-            {payer && <>Paid by <strong>{payer}</strong> · </>}
-            {splitLabel} {fronted ? "for" : "with"} <strong>{partner}</strong>
+            {!visual && payer && <>Paid by <strong>{payer}</strong> · </>}
+            {splitLabel}{fronted ? <> for <strong>{partner}</strong></> : !visual && <> with <strong>{partner}</strong></>}
             {showBudget && <> · Budget: <strong>{responsible}</strong></>}
           </p>
+          {item.location.trim() && <p className="bb-reimbursement-location">{item.location.trim()}</p>}
         </div>
-        <dl className="bb-reimbursement-split">
+        {visual ? <>
+          <div className="bb-reimbursement-visual" role="img" aria-label={`${paidLabel} ${formatMoney(item.grossAmount)}. Your share ${formatMoney(item.personalShare)}. ${partner}’s share ${formatMoney(item.partnerShare)}: ${formatMoney(item.receivedAmount)} received${payer ? ` by ${payer}` : ""} from ${partner}; ${formatMoney(item.outstandingAmount)} still owed.`}>
+            <div className="bb-reimbursement-visual-segments" aria-hidden="true">
+              <span data-portion="personal" style={{ width: `${visual.personal}%` }} />
+              <span data-portion="received" style={{ width: `${visual.received}%` }} />
+              <span data-portion="outstanding" style={{ width: `${visual.outstanding}%` }} />
+            </div>
+            <span className="bb-reimbursement-visual-total" aria-hidden="true">{paidLabel} · <span>{formatMoney(item.grossAmount)}</span></span>
+          </div>
+          <dl className="bb-reimbursement-visual-legend">
+            <div><dt><i className="bb-reimbursement-visual-key" data-portion="personal" aria-hidden="true" /><span>Yours</span></dt><dd>{formatMoney(item.personalShare)}</dd></div>
+            <div><dt><i className="bb-reimbursement-visual-key" data-portion="received" aria-hidden="true" /><span>{partner} paid</span></dt><dd>{formatMoney(item.receivedAmount)}</dd></div>
+          </dl>
+        </> : <dl className="bb-reimbursement-split">
           <div className="bb-reimbursement-gross"><dt>Gross paid</dt><dd><FittedAmount className="bb-reimbursement-receipt-amount">{formatMoney(item.grossAmount)}</FittedAmount></dd></div>
           <div className="bb-reimbursement-share"><dt>Your share</dt><dd><FittedAmount className="bb-reimbursement-receipt-amount">{formatMoney(item.personalShare)}</FittedAmount></dd></div>
           <div className="bb-reimbursement-share"><dt>Partner share</dt><dd><FittedAmount className="bb-reimbursement-receipt-amount">{formatMoney(item.partnerShare)}</FittedAmount></dd></div>
           <div className="bb-reimbursement-received" data-received={item.receivedAmount > 0}><dt>Received</dt><dd><FittedAmount className="bb-reimbursement-receipt-amount">{formatMoney(item.receivedAmount)}</FittedAmount></dd></div>
-        </dl>
+          <div><dt>Outstanding</dt><dd><FittedAmount className="bb-reimbursement-receipt-amount">{formatMoney(item.outstandingAmount)}</FittedAmount></dd></div>
+        </dl>}
       </div>
     </AnimatedDisclosure>
   )

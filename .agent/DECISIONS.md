@@ -1,5 +1,11 @@
 # Agent Decisions
 
+## 2026-09-08 - Show Each Reimbursement As One Allocation Bar
+
+Use the approved option A receipt: a slim bar divides the original gross into the payer’s own share, recorded partner repayments and the remaining receivable. Deep blue/brown fills and brown hatching support ivory total text. The row’s due amount is the outstanding legend; its hatch marker appears only while expanded. Two aligned keys below show Yours and the named partner’s paid amount. Retain the original date, split method, location and any differing budget responsibility; fronted expenses remain explicit. The bar’s accessible description includes all five recorded amounts, including the full partner share. Long payer labels may wrap instead of shrinking into unreadable text.
+
+Calculate presentation proportions only from finite, nonnegative, safe cent values satisfying both stored allocation equations. Zero gross, inconsistent status/amounts and malformed legacy values retain five labeled amounts instead of an invented proportion. Never infer receipt amounts or recompute income/50-50 shares. Reuse the existing per-month accordion and symmetric motion. The outstanding overview, monthly Totals, financial calculations, persistence and source reads are unchanged.
+
 ## 2026-09-08 - Keep One Reimbursement Receipt Open Per Expense Month
 
 Each keyed expense-month group owns one expanded allocation ID. Opening a sibling closes the previous row in the same render; other months, monthly Totals and the outer View expenses disclosure remain independent. Extend AnimatedDisclosure with paired controlled open/onOpenChange props while retaining its existing standalone state and CollapsibleContent animation/inert behavior. Allocation IDs preserve expansion through reordering and received-status updates without transferring it to another expense.
