@@ -4,6 +4,8 @@ Last updated: 2026-09-08
 
 ## Goal
 
+Reimbursement visual overview (2026-09-08): outstanding-by-expense-month chart and compact disclosures replace the initial long ledger/statement. All graph inputs are the same outstanding allocations as the headline; selected-expense-month receipts stay separate. Existing carry-forward, owner isolation, settlement and financial calculations remain. Cent/date/coverage/disclosure regressions, responsive WebKit QA and full 1,096-test verification pass; STATUS checklist 99 covers phone acceptance. No finance-operations backlog semantics changed.
+
 Dashboard comparison presentation (2026-09-08): compact matched-day summary, animated calculation details with month-labeled exclusions, month-only selector labels, and masthead owner separator implemented. Current-month routing, comparison lifecycle, financial calculations and mutations are unchanged. Focused 41 passed; full suite 1,096 passed / 61 optional PostgreSQL skipped; Pyright/frontend checks clean. STATUS checklist 98 covers phone acceptance.
 
 Dashboard theme polish (2026-09-07): fixed Safari menu taps being canceled by null-target blur, and the Daily Spending today-color cascade. Theme persistence and existing colors remain; actual WebKit/Chromium checks and focused regressions pass, full suite 1,096 passed / 61 optional PostgreSQL skipped. No finance, persistence or delivery behavior changed. STATUS checklist 97 covers phone acceptance.

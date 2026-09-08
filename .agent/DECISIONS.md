@@ -1,5 +1,9 @@
 # Agent Decisions
 
+## 2026-09-08 - Keep Reimbursement Overview In One Time Scope
+
+The primary reimbursement total and expense-month bars use only the same outstanding allocations: all configured months for current payloads, selected expense month for legacy snapshots. Sum graph amounts in cents; show no more than four rows by combining earlier dated months, retaining an explicit Undated bucket. The full oldest-first partner ledger remains under View expenses. Keep selected-expense-month Received/Gross paid/Your share and received entries in a separate statement disclosure; never combine those receipts with the all-month balance in a repayment percentage. Incomplete coverage remains visible even at zero. No settlement, sheet mutation, financial metric or receipt lifecycle changes.
+
 ## 2026-09-08 - Keep Comparison Methodology In Details
 
 Show matching days, two month totals and the amount/percentage change in the default comparison view. Keep methodology and nonzero excluded amounts behind an animated, accessible Details disclosure with labeled month columns. Unavailable-month and request errors stay visible. Month options use month/year names only; selecting the current month still sends null and follows the automatic current-month lifecycle. The redundant This month shortcut is removed. Comparison calculations, request coordination, refresh invalidation and sessions are unchanged.
