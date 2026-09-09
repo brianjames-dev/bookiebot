@@ -7,7 +7,7 @@ type WidgetMode = "current" | "projected"
 interface Connection { id: string; label: string; mode: WidgetMode; status: "pending" | "active"; createdAt: string; expiresAt: string; lastUsedAt: string | null }
 interface Pairing { id: string; setupCode: string; expiresAt: string }
 interface Settings { connections: Connection[]; scriptUrl: string; setupInstructionsUrl: string }
-interface WidgetSettingsProps { ownerName: string; defaultMode: WidgetMode }
+interface WidgetSettingsProps { ownerName: string; defaultMode: WidgetMode; onOpenGuide: () => void }
 const endpoint = "/app/widgets/settings"
 const isDate = (value: unknown): value is string => typeof value === "string" && Number.isFinite(Date.parse(value))
 const isMode = (value: unknown): value is WidgetMode => value === "current" || value === "projected"
@@ -69,7 +69,7 @@ export function WidgetSettings(props: WidgetSettingsProps) {
   return <WidgetSettingsContent key={props.ownerName} {...props} />
 }
 
-function WidgetSettingsContent({ ownerName, defaultMode }: WidgetSettingsProps) {
+function WidgetSettingsContent({ ownerName, defaultMode, onOpenGuide }: WidgetSettingsProps) {
   const [settings, setSettings] = useState<Settings | null>(null)
   const [loading, setLoading] = useState(true)
   const [busy, setBusy] = useState(false)
@@ -162,7 +162,7 @@ function WidgetSettingsContent({ ownerName, defaultMode }: WidgetSettingsProps) 
     <div className="bb-widget-heading"><h2 id={`${id}-title`}>Widgets</h2><button className="bb-settings-action" type="button" disabled={busy} onClick={() => void run()} aria-label="Refresh widgets">{busy && !loading ? "Checking…" : "Refresh"}</button></div>
     <p className="bb-settings-note">{ownerName}’s budget remaining and available today, on the Home Screen.<br />Read-only access. Each person pairs their own widget.</p>
     <div className="bb-widget-actions">
-      <a className="bb-toolbar-button" href={settings?.scriptUrl ?? "/app/widgets/script"} download="BookieBot.js">Download Scriptable script</a>
+      <button className="bb-toolbar-button" type="button" onClick={onOpenGuide}>Set up widget</button>
       <button type="button" className="bb-settings-action" disabled={!canCreate} aria-expanded={formOpen} aria-controls={`${id}-form`} onClick={() => { setFormOpen(value => !value); setError("") }}>Pair a widget</button>
     </div>
     <CollapsibleContent open={formOpen} id={`${id}-form`}>
@@ -175,9 +175,9 @@ function WidgetSettingsContent({ ownerName, defaultMode }: WidgetSettingsProps) 
     <CollapsibleContent open={Boolean(pairing)}>
       {pairing && <div className="bb-widget-pairing">
         <h3>Connect in Scriptable</h3>
-        <ol><li>Add the downloaded script to Scriptable, named BookieBot.</li><li>Run it and paste this one-time setup code.</li><li>Add a Scriptable widget and select BookieBot.</li></ol>
+        <ol><li>Open Scriptable and run your BookieBot script.</li><li>Paste this setup code and tap Pair this phone.</li><li>Wait for your name and figures, then select that same script in Edit Widget.</li></ol>
         <label className="bb-widget-code-label">Setup code<input aria-label="Widget setup code" value={pairing.setupCode} readOnly autoComplete="off" spellCheck={false} onFocus={event => event.target.select()} /></label>
-        <div className="bb-widget-actions"><button className="bb-toolbar-button" type="button" onClick={() => void copy()}>Copy setup code</button><button className="bb-settings-action" type="button" onClick={() => { copyGeneration.current++; setPairing(null); setMessage("") }}>Done</button></div>
+        <div className="bb-widget-actions"><button className="bb-toolbar-button" type="button" onClick={() => void copy()}>Copy setup code</button><a className="bb-settings-action" href="scriptable:///">Open Scriptable</a><button className="bb-settings-action" type="button" onClick={() => { copyGeneration.current++; setPairing(null); setMessage("") }}>Done</button></div>
         <p className="bb-settings-note">Expires {dateLabel(pairing.expiresAt)}. Keep this code private.</p>
       </div>}
     </CollapsibleContent>
@@ -195,6 +195,6 @@ function WidgetSettingsContent({ ownerName, defaultMode }: WidgetSettingsProps) 
     </div>}
     {error && <p className="bb-widget-error" role="alert">{error}</p>}
     {message && <p className="bb-settings-note" role="status">{message}</p>}
-    <p className="bb-settings-note bb-widget-help">iOS controls refresh timing; check the widget’s timestamp. <a href={settings?.setupInstructionsUrl ?? "/app/widgets/help"} target="_blank" rel="noreferrer">Phone setup guide</a></p>
+    <p className="bb-settings-note bb-widget-help">iOS controls refresh timing; check the widget’s timestamp. <button type="button" className="bb-settings-action" onClick={onOpenGuide}>Setup guide</button></p>
   </section>
 }

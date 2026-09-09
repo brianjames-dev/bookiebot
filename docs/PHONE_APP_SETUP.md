@@ -71,9 +71,9 @@ Hannah must request her own private link. **Settings → Account → Sign out** 
 
 ## Optional Home Screen widget
 
-Open **Settings → Widgets** to download the Scriptable script and pair this person's widget. It shows budget remaining, available today, the BookieBot avatar, your name, Current/Projected mode and its source update time. Brian and Hannah create separate connections. Modes and removal are managed here; access is read-only and cannot change expenses or sign into the web app.
+Open **Settings → Widgets → Set up widget** to copy the Scriptable script, then return and pair this person's widget. The guide stays inside the app with **Back to Settings**, preserving any in-progress setup code. Public help pages also have a Settings return link. It shows budget remaining, available today, the BookieBot avatar, your name, Current/Projected mode and its source update time. Brian and Hannah create separate connections. Modes and removal are managed here; access is read-only and cannot change expenses or sign into the web app.
 
-Follow [the six-step Scriptable setup guide](SCRIPTABLE_WIDGETS.md). iOS controls refresh timing, so inspect the timestamp/age and stale label. Tapping opens the browser's BookieBot page, which may need its own sign-in; use your existing BookieBot icon to open the installed web app directly. No native build or Apple developer membership is needed.
+Follow [the Scriptable setup and pairing recovery guide](SCRIPTABLE_WIDGETS.md). “Pair this phone” means that script still needs its setup link pasted while running inside Scriptable. iOS controls refresh timing, so inspect the timestamp/age and stale label. Tapping a widget with figures opens the browser's BookieBot page, which may need its own sign-in; the revised script opens Scriptable when pairing/retry is needed. Replace the existing script's contents without renaming it to obtain script updates. Use your existing BookieBot icon to open the installed web app directly. No native build or Apple developer membership is needed.
 
 ## App updates and unfinished work
 

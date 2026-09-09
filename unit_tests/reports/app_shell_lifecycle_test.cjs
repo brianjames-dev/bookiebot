@@ -13,10 +13,11 @@ const events = name => ({
   dispatchEvent(event) { listeners[name].get(event.type)?.forEach(cb => cb(event)) },
 })
 class Element { focus() {} closest() { return this } matches() { return false } }
-let sharedFocuses = 0, sharedScrolls = 0
+let sharedFocuses = 0, sharedScrolls = 0, widgetFocuses = 0, widgetScrolls = 0
 const sharedTarget = { focus() { sharedFocuses++ }, scrollIntoView() { sharedScrolls++ } }
+const widgetTarget = { focus() { widgetFocuses++ }, scrollIntoView() { widgetScrolls++; win.scrollY = 480 } }
 const win = { ...events('window'), scrollY: 0, innerHeight: 800, navigator: { onLine: true },
-  scrollTo({ top }) { this.scrollY = top }, location: { reload() { reloads++ } },
+  scrollTo({ top }) { this.scrollY = top }, location: { hash: '', origin: 'https://bookiebot.example', reload() { reloads++ } },
   visualViewport: { ...events('viewport'), height: 800 }, matchMedia: () => ({ matches: false }),
   localStorage: { getItem: key => storage.get(key), setItem: (key, value) => storage.set(key, value) },
   setTimeout(cb, delay) { const id = ++timerId; timers.set(id, { cb, delay }); return id }, clearTimeout(id) { timers.delete(id) },
@@ -24,7 +25,7 @@ const win = { ...events('window'), scrollY: 0, innerHeight: 800, navigator: { on
 }
 const doc = { ...events('document'), visibilityState: 'visible', activeElement: new Element(),
   documentElement: { dataset: {}, style: {}, scrollHeight: 6000 },
-  querySelector: selector => selector === '.bb-shell-shared .bb-reimbursement-section' ? sharedTarget : null,
+  querySelector: selector => selector === '.bb-shell-shared .bb-reimbursement-section' ? sharedTarget : selector === '.bb-widget-settings' ? widgetTarget : null,
 }
 const konsta = new Module(path.join(frontend, '__shell_konsta.cjs'), module)
 konsta.filename = path.join(frontend, '__shell_konsta.cjs'); konsta.require = req
@@ -42,7 +43,7 @@ function load(file) {
     return load([base + '.tsx', base + '.ts'].find(fs.existsSync))
   }
   const code = ts.transpileModule(fs.readFileSync(file, 'utf8'), { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2020, jsx: ts.JsxEmit.ReactJSX, esModuleInterop: true } }).outputText
-  vm.runInNewContext(code, { exports, require: requireModule, AbortController, Error, Event, CustomEvent: Event,
+  vm.runInNewContext(code, { exports, require: requireModule, AbortController, Error, Event, CustomEvent: Event, URL,
     window: win, document: doc, HTMLElement: Element, Element, Node: Element,
     fetch: (...args) => request(...args), crypto: { randomUUID: () => `shell-command-${++commandId}` },
     setTimeout: win.setTimeout, clearTimeout: win.clearTimeout,
@@ -91,10 +92,19 @@ const rawReport = tree => tree.root.findAll(node => node.type === 'div' && node.
 const dialogs = []
 const create = content => Renderer.create(content, { createNodeMock: el => el.type === 'dialog' ? (() => { const dialog = { dataset: {}, open: false, showModal() { this.open = true }, close() { this.open = false } }; dialogs.push(dialog); return dialog })() : null })
 const allocation = { id: 'power', payerOwner: 'brian', partnerOwner: 'hannah', payerPerson: 'Brian', item: 'Power', location: '', expenseDate: '2026-09-03', category: 'need', grossCents: 20000, payerShareCents: 10000, partnerShareCents: 10000, settledCents: 0, outstandingCents: 10000, method: 'equal', version: 1, projectedVersion: 1, accounting: 'cash_v1', status: 'outstanding' }
-let owner = 'brian', pending, writes = [], reads = { goals: 0, reimbursements: 0 }
+let owner = 'brian', pending, writes = [], reads = { goals: 0, reimbursements: 0 }, widgetReads = 0, widgetWrites = [], widgetConnections = []
 request = async (url, options = {}) => {
   if (url === '/app/version') return response({ version: 'shell-version-2' })
-  if (url === '/app/widgets/settings') return response({ connections: [], scriptUrl: '/app/widgets/script', setupInstructionsUrl: '/app/widgets/help' })
+  if (url === '/app/widgets/script') return { ok: true, text: async () => '// BookieBot Home Screen widget\nconst BOOKIEBOT_ORIGIN = "https://bookiebot.example";' }
+  if (url === '/app/widgets/settings') {
+    const result = { connections: widgetConnections, scriptUrl: '/app/widgets/script', setupInstructionsUrl: '/app/widgets/help' }
+    if (!options.body) { widgetReads++; return response(result) }
+    const body = JSON.parse(options.body); widgetWrites.push(body)
+    assert.equal(body.operation, 'pair')
+    const connection = { id: 'synthetic-widget', label: body.label, mode: body.mode, status: 'pending', createdAt: new Date().toISOString(), expiresAt: new Date(Date.now() + 600000).toISOString(), lastUsedAt: null }
+    widgetConnections = [connection]
+    return response({ ...result, connections: widgetConnections, pairing: { id: connection.id, setupCode: 'https://bookiebot.example/app/widgets/connect#bbw_pair_abcdefghijklmnopqrstuvwxyz01234567890123456', expiresAt: connection.expiresAt } })
+  }
   if (options.body) { writes.push({ url, body: JSON.parse(options.body) }); return pending.promise }
   if (url === '/app/goals') { reads.goals++; return response({ goals: [] }) }
   if (url === '/app/reimbursements') { reads.reimbursements++; return response({ enabled: true, ownerKey: owner, currency: 'USD', allocations: [allocation], events: [] }) }
@@ -132,6 +142,30 @@ async function main() {
   await tap(tree, 'Settings'); await tap(tree, 'Notification fixture')
   assert.equal(button(tree, 'Settings').props['aria-current'], 'page')
   assert.ok(visible(tools), 'Header tools remain accessible on Settings')
+  // Widget setup is a temporary view, not a document navigation or form reset.
+  await tap(tree, 'Pair a widget'); await fill(tree, 'Widget name', 'Private widget draft')
+  const widgetReadsBeforeGuide = widgetReads, financialReadsBeforeGuide = { ...reads }
+  win.scrollY = 640; await tap(tree, 'Set up widget')
+  assert.equal(screen(tree), 'settings'); assert.equal(win.scrollY, 0)
+  assert.ok(button(tree, 'Back to Settings')); assert.equal(button(tree, 'Pair a widget'), undefined)
+  assert.equal(tree.root.findAll(node => node.type === 'main' && !node.props.hidden).length, 1)
+  win.scrollY = 310; await tap(tree, 'Back to Settings')
+  assert.equal(win.scrollY, 640); assert.equal(input(tree, 'Widget name').props.value, 'Private widget draft')
+  await run(() => form(tree).props.onSubmit({ preventDefault() {} }))
+  const setupCode = () => tree.root.findByProps({ 'aria-label': 'Widget setup code' }).props.value
+  const retainedCode = setupCode()
+  assert.equal(widgetWrites.length, 1)
+  win.scrollY = 700; await tap(tree, 'Setup guide'); await tap(tree, 'Settings')
+  assert.equal(screen(tree), 'settings'); assert.equal(win.scrollY, 700); assert.equal(setupCode(), retainedCode, 'The gear returns from setup without leaving Settings or replacing its code')
+  await tap(tree, 'Setup guide'); win.scrollY = 360; await tap(tree, 'Spending'); await tap(tree, 'Settings')
+  assert.equal(win.scrollY, 700); assert.equal(setupCode(), retainedCode, 'A tab detour returns to the original Settings position, not guide scroll')
+  await tap(tree, 'Setup guide'); await tap(tree, 'Get a setup code')
+  assert.equal(widgetFocuses, 1); assert.equal(widgetScrolls, 1); assert.equal(win.scrollY, 480)
+  assert.equal(setupCode(), retainedCode); assert.equal(widgetWrites.length, 1, 'Returning to pairing never creates another grant')
+  assert.equal(widgetReads, widgetReadsBeforeGuide); assert.deepEqual(reads, financialReadsBeforeGuide)
+  assert.equal(button(tree, 'Notification fixture').props['aria-pressed'], true)
+  assert.equal(guard.dirty, true, 'Hidden forms and pairing codes stay registered with the work guard')
+  await tap(tree, 'Done')
   for (const name of ['Overview', 'Spending', 'Shared', 'Savings', 'Settings']) await tap(tree, name)
   assert.equal(reads.goals, 1); assert.equal(reads.reimbursements, 1, 'Navigating all screens never recreates financial controllers')
   assert.equal(rawReport(tree).props['data-report-instance'], initialReportInstance)
@@ -187,6 +221,28 @@ async function main() {
   await tap(tree, 'Savings'); assert.equal(form(tree), undefined, 'Explicit discard closes the retained new-goal form')
   await tap(tree, 'Settings'); await tap(tree, 'Sign out'); assert.equal(signouts, 1)
   await run(() => tree.unmount())
+
+  // Public guide return links use a single allowlisted, non-authenticating hash.
+  for (const [hash, expected] of [['#settings', 'settings'], ['#bbw_pair_private', 'overview'], ['#https://other.example', 'overview'], ['#Settings', 'overview']]) {
+    win.location.hash = hash
+    await run(() => { tree = create(shell(report)) })
+    assert.equal(screen(tree), expected)
+    await run(() => tree.unmount())
+  }
+  win.location.hash = ''
+  await run(() => { tree = create(shell(report)) })
+  await tap(tree, 'Savings'); win.scrollY = 210
+  await run(() => { win.location.hash = '#settings'; win.dispatchEvent(new Event('hashchange')) })
+  assert.equal(screen(tree), 'settings')
+  await tap(tree, 'Setup guide')
+  await run(() => win.dispatchEvent(new Event('hashchange')))
+  assert.ok(button(tree, 'Pair a widget'), 'An explicit Settings hash returns from guide to Settings')
+  await run(() => { win.location.hash = '#bbw_pair_private'; win.dispatchEvent(new Event('hashchange')) })
+  assert.equal(screen(tree), 'settings', 'Unknown/credential-like fragments neither route nor authenticate')
+  await tap(tree, 'Back'); assert.equal(screen(tree), 'savings'); assert.equal(win.scrollY, 210)
+  assert.equal(win.location.hash, '#bbw_pair_private', 'App navigation does not rewrite browser history or fragments')
+  await run(() => tree.unmount())
+  win.location.hash = ''; widgetConnections = []
 
   // Exercise the real FreshExpenseApp ownership boundary, with only its network/catalog transport replaced.
   let session

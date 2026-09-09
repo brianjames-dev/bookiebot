@@ -395,6 +395,27 @@ async def test_script_and_help_are_public_but_never_authenticated_links(client):
     assert "iOS chooses refresh timing" in help_page
 
 
+@pytest.mark.asyncio
+@pytest.mark.parametrize("path", ["/app/widgets/help", "/app/widgets/connect"])
+async def test_widget_setup_pages_return_to_settings_without_pairing_or_exposing_secrets(client, path):
+    issued = client.widgets.issue_pairing(BRIAN, "brian", "Phone", "current")
+    response = await client.http.get(path)
+    page = await response.text()
+    assert response.status == 200 and not response.cookies
+    assert response.headers["Cache-Control"] == "private, no-store"
+    assert response.headers["Referrer-Policy"] == "no-referrer"
+    assert page.count('← Back to Settings</a>') == 2
+    assert 'href="/app/expenses#settings"' in page
+    assert "Back to Settings" in page and "does not pair the widget" in page
+    assert "inside the Scriptable app" in page and "Pair this phone" in page
+    assert 'href="https://apps.apple.com/app/scriptable/id1405459188" target="_blank" rel="noreferrer"' in page
+    assert "Copy script" in page
+    assert 'href="/app/widgets/script"' not in page and f'href="{ORIGIN}/app/widgets/script"' not in page
+    assert "bbw_pair_" not in page and "bbw_read_" not in page
+    assert issued["pairingToken"] not in page
+    assert client.widgets.list_connections("brian")["connections"][0]["status"] == "pending"
+
+
 def test_widget_values_match_real_canonical_report_modes(monkeypatch):
     from bookiebot.reports import expense_breakdown as reports
     from unit_tests.support.sheets_repo_stub import InMemoryWorksheet

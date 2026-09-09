@@ -1,0 +1,16 @@
+.bb-widget-guide { display: grid; gap: 28px; min-width: 0; max-width: 720px; }
+.bb-widget-guide h2 { font-size: 18px; line-height: 1.35; margin: 0 0 8px; font-weight: 600; }
+.bb-widget-guide p { font-size: 15px; line-height: 1.65; margin: 8px 0; }
+.bb-widget-guide .bb-settings-note { font-size: 13px; }
+.bb-widget-guide a, .bb-widget-guide-inline { color: hsl(var(--primary)); text-underline-offset: 3px; }
+.bb-widget-guide-recovery { background: hsl(var(--card)); border-radius: 16px; padding: 20px; min-width: 0; }
+.bb-widget-guide-steps { display: grid; gap: 28px; margin: 0; padding-left: 25px; }
+.bb-widget-guide-steps > li { min-width: 0; padding-left: 4px; }
+.bb-widget-guide-steps > li::marker { color: hsl(var(--primary)); font-weight: 600; }
+.bb-widget-guide-inline { display: inline; padding: 0; border: 0; background: none; font: inherit; text-decoration: underline; cursor: pointer; }
+.bb-widget-script-label { display: grid; min-width: 0; gap: 8px; margin-top: 12px; font-size: 13px; }
+.bb-widget-script-label textarea { box-sizing: border-box; width: 100%; max-width: 100%; min-width: 0; height: 180px; resize: vertical; padding: 12px; font: 12px/1.5 ui-monospace, monospace; color: hsl(var(--foreground)); background: hsl(var(--background)); border: 1px solid hsl(var(--border)); border-radius: 6px; }
+.bb-widget-guide .bb-widget-error { color: hsl(var(--destructive)); font-size: 13px; }
+.bb-widget-guide button:disabled { opacity: .5; cursor: default; }
+.bb-widget-guide .bb-toolbar-button { min-height: 44px; }
+.bb-widget-guide button:focus-visible, .bb-widget-guide a:focus-visible, .bb-widget-script-label textarea:focus-visible { outline: 2px solid hsl(var(--primary)); outline-offset: 3px; }

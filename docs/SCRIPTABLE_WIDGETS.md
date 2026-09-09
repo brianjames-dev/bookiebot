@@ -7,7 +7,7 @@ The small and medium widgets show your name, BookieBot avatar, Current/Projected
 ## Set up each iPhone
 
 1. Install **Scriptable** from the App Store and open it once.
-2. In your existing **BookieBot → Settings → Widgets**, download the Scriptable script. Add the downloaded code to Scriptable: use **Share → Scriptable** if offered; otherwise open the `.js` file, copy its text, tap **+** in Scriptable, and paste into a new script. Name it **BookieBot**. The download already contains the correct server address; no code changes are needed.
+2. In your existing **BookieBot → Settings → Widgets → Set up widget**, tap **Copy script**. In Scriptable, tap **+**, paste the code and name the script **BookieBot**. The code already contains the correct server address. If copying is blocked, select/copy the text shown below the button. The guide has **Back to Settings** at both ends; opening it keeps any pending setup code and form intact. Setup no longer sends you into a raw script/download screen with no app navigation.
 3. Back in **Settings → Widgets**, choose **Current** or **Projected**, create a pairing code and copy its private setup link. Run **BookieBot** inside Scriptable, paste the link when asked, and tap **Pair this phone**. The link expires after **10 minutes** and works once. Keep it private.
 4. Confirm the preview shows **your name** and the expected amounts. The widget reads the current calendar month in BookieBot's Pacific timezone. Its view is the mode chosen for this connection in Settings, independent of the dashboard's selected view.
 5. Hold an empty area of the iPhone Home Screen, then **Edit → Add Widget → Scriptable**. Choose **Small** or **Medium**, add it, and tap **Done**. Hold the new widget, tap **Edit Widget**, and select the **BookieBot** script. Leave the parameter empty. These steps follow [Apple's widget setup guide](https://support.apple.com/en-us/118610).
@@ -15,9 +15,21 @@ The small and medium widgets show your name, BookieBot avatar, Current/Projected
 
 If the setup link expires or pairing fails, create a new one in BookieBot. Reusing a consumed link cannot recover a lost credential. Keep the Scriptable script's name unchanged after pairing; access is scoped to both that name and the BookieBot server.
 
+## If you see “Pair this phone”
+
+The script is installed, but that copy cannot find a saved pairing. A Home Screen preview does not complete setup, and opening the private setup link in a browser only shows instructions.
+
+1. In BookieBot, create and copy a fresh setup code under **Settings → Widgets → Pair a widget**.
+2. Open the **Scriptable app itself** and run your **BookieBot** script. Paste the code into its prompt and tap **Pair this phone**. Wait for your name and figures in the preview.
+3. Hold the Home Screen widget → **Edit Widget** and choose that exact script. Keep Parameter empty. If you renamed or imported a duplicate, it uses a different pairing; choose the original paired script or pair the new copy with a fresh code.
+
+These steps work with the original script. Version **1.1** also makes an unpaired widget's tap open its exact Scriptable script and confirms the person's name after pairing. To install that improvement, use **Copy script** in the setup guide and replace the contents of your existing Scriptable script **without changing its name**. Updating the website does not update downloaded scripts, and importing another copy can create a differently named script.
+
+Standalone setup/help pages also have **Back to Settings**. If opened in a different browser, that browser may need its own BookieBot sign-in; your existing BookieBot Home Screen icon returns to the installed app.
+
 ## What tapping opens
 
-The widget asks iOS to open your BookieBot server's **`/app/expenses` HTTPS page**. The link contains no account identifier, pairing code or read credential. Scriptable documents that a widget's [`url` overrides its configured tap action](https://docs.scriptable.app/listwidget/#url).
+When figures are displayed, the widget asks iOS to open your BookieBot server's **`/app/expenses` HTTPS page**. The link contains no account identifier, pairing code or read credential. Scriptable documents that a widget's [`url` overrides its configured tap action](https://docs.scriptable.app/listwidget/#url). In version 1.1, unpaired, revoked or unavailable widgets instead use [the current script's run URL](https://docs.scriptable.app/urlscheme/#forrunningscript) to open Scriptable for pairing/retry; that URL also contains no credential.
 
 **Expect the default browser to open.** This is not a native universal link, and we cannot promise that iOS will launch the installed BookieBot Home Screen app. The browser may have a different login session or account from your installed web app. If it asks to reconnect, use your own fresh `/expense_app` link from Discord in that browser. The widget credential cannot sign the browser in. Use your existing BookieBot icon whenever you want to open the installed app directly.
 

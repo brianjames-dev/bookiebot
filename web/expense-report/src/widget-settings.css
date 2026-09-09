@@ -1,4 +1,4 @@
-.bb-widget-settings { min-width: 0; }
+.bb-widget-settings { min-width: 0; scroll-margin-top: calc(max(18px, env(safe-area-inset-top, 0px)) + 64px); }
 .bb-widget-heading, .bb-widget-connection-heading { display: flex; align-items: center; justify-content: space-between; gap: 16px; }
 .bb-widget-heading h2 { margin: 0; }
 .bb-widget-heading .bb-settings-action { font-size: 13px; }

@@ -7,7 +7,7 @@ const req = createRequire(path.resolve('web/expense-report/package.json'))
 const React = req('react'), renderer = req('react-test-renderer'), ts = req('typescript')
 globalThis.IS_REACT_ACT_ENVIRONMENT = true
 const requests = [], timers = new Map(), workHistory = [], copied = []
-let serial = 0, tree, owner = 'Brian', clipboardFailure = false
+let serial = 0, tree, owner = 'Brian', clipboardFailure = false, guides = 0
 const source = ts.transpileModule(fs.readFileSync('web/expense-report/src/widget-settings.tsx', 'utf8'), {
   compilerOptions: {module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2020, jsx: ts.JsxEmit.ReactJSX},
 }).outputText
@@ -20,7 +20,7 @@ const runtime = {exports: {}, URL, Date, Error, AbortController,
   } : name === './app-work-guard' ? {useAppWorkStatus: value=>{workHistory.push(value);return value=>workHistory.push(value)}} : req(name),
 }
 vm.runInNewContext(source,runtime)
-const component = ()=>React.createElement(runtime.exports.WidgetSettings, {ownerName:owner, defaultMode:'projected'})
+const component = ()=>React.createElement(runtime.exports.WidgetSettings, {ownerName:owner, defaultMode:'projected', onOpenGuide:()=>guides++})
 const text = node=>typeof node==='string'||typeof node==='number'?String(node):Array.isArray(node)?node.map(text).join(''):node?.children?node.children.map(text).join(''):''
 const rendered = ()=>text(tree.toJSON())
 const button = label => tree.root.findAllByType('button').find(node=>text(node)===label)
@@ -61,6 +61,13 @@ const lastWork = ()=>workHistory.at(-1)
   assert.equal(lastWork().dirty,true,'A setup code is held in memory and guarded until copied/finished')
   assert.equal(byAria('Widget setup code').props.readOnly,true)
   assert.equal(byAria('Widget setup code').props.autoComplete,'off')
+  const beforeGuide=requests.length, setupCode=byAria('Widget setup code').props.value
+  await click(button('Set up widget'))
+  await click(button('Setup guide'))
+  assert.equal(guides,2,'Guide uses in-app navigation rather than leaving Settings')
+  assert.equal(requests.length,beforeGuide,'Opening help never creates or redeems a pairing')
+  assert.equal(byAria('Widget setup code').props.value,setupCode,'Opening help preserves the in-memory setup secret')
+  assert.equal(tree.root.findAllByType('a').find(node=>text(node)==='Open Scriptable').props.href,'scriptable:///','Opening Scriptable carries no credential')
   await click(button('Copy setup code'))
   assert.equal(copied.length,1)
   assert.match(rendered(),/Setup code copied/)
@@ -123,7 +130,7 @@ const lastWork = ()=>workHistory.at(-1)
   await click(byAria('Refresh widgets'))
   await respond(latestRequest(),{...base([]),scriptUrl:'https://other.example/leak'})
   assert.match(rendered(),/Phone 0/,'Malformed settings never replace the last known safe list')
-  assert.equal(tree.root.findAllByType('a')[0].props.href,'/app/widgets/script')
+  assert.ok(button('Set up widget'),'Malformed links cannot replace the internal setup guide')
   await click(byAria('Refresh widgets'))
   await respond(latestRequest(),base([]))
   // A malformed or cross-origin setup response is never displayed or copied.

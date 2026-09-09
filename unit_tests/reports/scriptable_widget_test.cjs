@@ -11,6 +11,7 @@ const now = Date.parse('2026-09-09T18:00:00Z');
 const paired = { token: readToken, connectionId: 'connection-brian', ownerName: 'Brian', mode: 'projected', expiresAt: '2027-03-09T18:00:00Z' };
 const payload = (extra = {}) => ({ schemaVersion: 1, connectionId: paired.connectionId, ownerName: 'Brian', mode: 'projected', month: '2026-09', asOfDate: '2026-09-09', timezone: 'America/Los_Angeles', budgetRemaining: 4321.09, availableToday: 25.75, todayState: 'under', updatedAt: '2026-09-09T17:55:00Z', staleAfterSeconds: 1800, refreshAfterSeconds: 900, avatarUrl: origin + '/app/avatar.png?day=2026-09-09', appUrl: origin + '/app/expenses', status: 'fresh', ...extra });
 const keyFor = (scriptName = 'BookieBot', server = origin) => 'bookiebot.widget.v1.' + encodeURIComponent(server) + '.' + encodeURIComponent(scriptName);
+const runUrl = (name = 'BookieBot') => 'scriptable:///run/' + encodeURIComponent(name);
 function storage(profile = paired) {
   return { keychain: new Map(profile ? [[keyFor(), JSON.stringify({ ...profile, origin })]] : []), files: new Map() };
 }
@@ -78,6 +79,7 @@ async function run(options = {}) {
     FileManager: { local: () => local },
     Keychain: { get: (key) => { if (options.keychainLocked || !state.keychain.has(key)) throw new Error('unavailable'); return state.keychain.get(key); }, contains: (key) => state.keychain.has(key), set: (key, value) => state.keychain.set(key, value), remove: (key) => state.keychain.delete(key) },
     Script: { name: () => options.scriptName || 'BookieBot', setWidget: (widget) => widgets.push(widget), complete: () => {} },
+    URLScheme: { forRunningScript: () => runUrl(options.scriptName) },
     config: { runsInApp: Boolean(options.app), runsInWidget: !options.app, widgetFamily: options.family || 'small' },
     Color: class { constructor(value) { this.value = value; } }, Font: { semiboldSystemFont: (size) => size, systemFont: (size) => size }, Size: class { constructor(width, height) { this.width = width; this.height = height; } },
     SFSymbol: { named: () => ({ image: { kind: 'fallback' } }) },
@@ -92,10 +94,15 @@ async function contracts() {
   assert.equal(check.requests.length, 0);
   assert.equal(check.alerts.length, 0, 'widget background must never prompt');
   assert(check.texts.includes('Pair this phone'));
+  assert(check.texts.includes('Tap to pair in Scriptable'));
+  assert.equal(check.widgets[0].url, runUrl(), 'an unpaired widget must open its own setup script, not the budget page');
   assert.equal(check.widgets[0].refreshAfterDate, undefined);
 
   check = await run({ app: true, state: storage(null) });
   assert.equal(check.alerts[0].secure, true);
+  assert.equal(check.alerts[1].title, 'Paired with Brian');
+  assert(check.alerts[1].message.includes('BookieBot'));
+  assert(check.alerts[1].message.includes('Keep this script name'));
   const pairRequest = check.requests.find((request) => request.url.endsWith('/pair'));
   assert.equal(pairRequest.method, 'POST');
   assert.deepEqual(JSON.parse(pairRequest.body), { pairingToken });
@@ -111,6 +118,17 @@ async function contracts() {
   assert(check.images.some((image) => image.value.kind === 'avatar'));
   assert([...check.state.files.values()].every((value) => !JSON.stringify(value).includes(readToken)), 'secret must never reach the snapshot cache');
 
+  check = await run({ app: true, state: storage(null), choices: [-1] });
+  assert.equal(check.requests.length, 0);
+  assert.equal(check.widgets.length, 0, 'canceling setup must not immediately show a misleading unpaired preview');
+  assert.equal(check.state.keychain.size, 0);
+  check = await run({ app: true, state: storage(null), status: 503 });
+  assert.equal(check.alerts[1].title, 'Paired with Brian', 'a delayed financial refresh must not undo successful pairing');
+  assert(check.state.keychain.get(keyFor()).includes(readToken));
+  assert(check.texts.includes('Budget unavailable'));
+  assert(check.texts.includes('Tap to retry in Scriptable'));
+  assert.equal(check.widgets[0].url, runUrl());
+
   for (const link of [
     'https://attacker.test/app/widgets/connect#' + pairingToken,
     origin + '@attacker.test/app/widgets/connect#' + pairingToken,
@@ -123,6 +141,7 @@ async function contracts() {
     assert.equal(check.requests.length, 0, 'invalid setup URL must never make a request');
     assert.equal(check.state.keychain.size, 0);
     assert(check.alerts[1].message.startsWith('Use a new'));
+    assert.equal(check.widgets.length, 0, 'failed setup should stop at its actionable error instead of an unpaired preview');
   }
   check = await run({ app: true, state: storage(null), pairStatus: 410 });
   assert.equal(check.state.keychain.size, 0);
@@ -149,6 +168,8 @@ async function contracts() {
     assert.equal(revoked.keychain.size, 0);
     assert.equal(revoked.files.size, 0);
     assert.equal(check.widgets[0].refreshAfterDate, undefined);
+    assert.equal(check.widgets[0].url, runUrl());
+    assert(check.texts.includes('Tap to pair again'));
     assert(!check.texts.some((value) => value.includes('$')));
   }
   const expired = storage({ ...paired, expiresAt: '2026-09-09T17:00:00Z' });
@@ -158,6 +179,10 @@ async function contracts() {
 
   check = await run({ state: cached, scriptName: 'Other widget' });
   assert.equal(check.requests.length, 0, 'another script name cannot adopt this profile');
+  assert.equal(check.widgets[0].url, runUrl('Other widget'), 'recovery must target the script selected on this widget');
+  check = await run({ state: storage(null), scriptName: 'Brian & Hannah / Widget 🐷' });
+  assert.equal(check.widgets[0].url, runUrl('Brian & Hannah / Widget 🐷'));
+  assert(!check.widgets[0].url.includes('bbw_'), 'setup deep link must never embed a credential');
   check = await run({ state: cached, origin: 'https://another.test' });
   assert.equal(check.requests.length, 0, 'another origin cannot adopt this profile');
   for (const extra of [
@@ -216,6 +241,13 @@ async function contracts() {
   assert(![...check.state.files.values()].some((value) => JSON.stringify(value).includes('must-not-be-cached')));
 
   const replace = storage(); await run({ state: replace });
+  const beforeCanceledReplace = { profile: replace.keychain.get(keyFor()), files: [...replace.files.entries()] };
+  for (const replacementAttempt of [{ choices: [1, -1] }, { choices: [1, 0], pairStatus: 410 }]) {
+    check = await run({ app: true, state: replace, ...replacementAttempt });
+    assert.equal(check.widgets.length, 0);
+    assert.equal(replace.keychain.get(keyFor()), beforeCanceledReplace.profile);
+    assert.deepEqual([...replace.files.entries()], beforeCanceledReplace.files, 'canceling or failing re-pair must retain the existing pairing/cache');
+  }
   const hannah = { ...paired, connectionId: 'connection-hannah', ownerName: 'Hannah', token: 'bbw_read_' + 'h'.repeat(43) };
   check = await run({ app: true, state: replace, choices: [1, 0], pairReply: hannah, reply: payload({ connectionId: hannah.connectionId, ownerName: hannah.ownerName }) });
   assert(check.texts.includes('Hannah'));

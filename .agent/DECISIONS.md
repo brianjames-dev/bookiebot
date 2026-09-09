@@ -1,5 +1,11 @@
 # Agent Decisions
 
+## 2026-09-09 - Keep Widget Setup Recoverable Inside Settings
+
+Widget setup is a temporary Settings view with explicit Back controls, public-script copying and a selectable fallback. Replace raw-download navigation in both in-app and public setup guides: a JavaScript file cannot contain app Back controls. Retain the public script endpoint for copying and compatibility. Hide rather than unmount the underlying Settings controller so pending one-time codes and edited forms survive help, Back, gear and tab navigation. Public help/connect pages provide fixed `/app/expenses#settings` return links; the shell accepts only that exact destination on initial load/hash changes. The fragment carries no authority, does not bypass normal sign-in and is never copied from a pairing link. Installing/opening Scriptable leaves the main Settings view available.
+
+The Scriptable unpaired screenshot indicates no valid local server/script-name profile, not a financial-data error. Interactive setup happens inside Scriptable. Version 1.1 confirms the paired person and exact script name, stops cleanly after canceled/failed setup, and uses Scriptable's current-script run URL for missing/revoked/unavailable states. Widgets with figures retain the credential-free HTTPS dashboard tap. Website releases cannot update downloaded scripts: replace the existing script's contents without renaming it to retain its existing Keychain scope. Grants, origin checks, caches, revocation and calculations keep their existing semantics.
+
 ## 2026-09-09 - Persistent Header Tools And Stable Ask Panel Motion
 
 Use the installed Konsta top Toolbar and ToolbarPane for a compact glass chat/Settings capsule, fixed within the page gutter and safe area on every authenticated screen. Reserve masthead space, retain 44px native buttons and explicit keyboard focus styling, and avoid forcing focus on pointer taps. Keep the existing Konsta side panel rather than introducing a second messaging surface.

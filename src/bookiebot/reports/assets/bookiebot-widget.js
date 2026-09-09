@@ -1,4 +1,4 @@
-// BookieBot Home Screen widget · v1
+// BookieBot Home Screen widget · v1.1
 // Download this script from your own BookieBot Settings → Widgets.
 // Credentials belong in Scriptable Keychain, never in this file or a widget parameter.
 const BOOKIEBOT_ORIGIN = "__BOOKIEBOT_ORIGIN__";
@@ -122,6 +122,11 @@ async function pair() {
   if (previous) removeCache(previous.connectionId);
   const saved = { origin: BOOKIEBOT_ORIGIN, token: next.token, connectionId: next.connectionId, ownerName: next.ownerName, mode: next.mode, expiresAt: next.expiresAt };
   Keychain.set(profileKey, JSON.stringify(saved));
+  const confirmation = new Alert();
+  confirmation.title = "Paired with " + saved.ownerName;
+  confirmation.message = "When you edit the Home Screen widget, select the script “" + Script.name() + "”. Keep this script name unchanged so the widget can find its pairing. iOS may take a little time to update the Home Screen.";
+  confirmation.addAction("Show preview");
+  await confirmation.presentAlert();
   return saved;
 }
 async function snapshot(current) {
@@ -206,8 +211,10 @@ async function render(current, result) {
   const widget = new ListWidget();
   widget.backgroundColor = BB.background;
   widget.setPadding(12, 14, 12, 14);
-  if (trustedOrigin()) widget.url = BOOKIEBOT_ORIGIN + "/app/expenses";
   const data = result.data;
+  // ListWidget.url overrides the Home Screen's On Tap setting. Recovery must run
+  // this exact script in Scriptable; populated widgets keep the normal browser link.
+  if (trustedOrigin()) widget.url = data ? BOOKIEBOT_ORIGIN + "/app/expenses" : URLScheme.forRunningScript();
   const small = config.widgetFamily === "small";
   const header = widget.addStack();
   header.centerAlignContent();
@@ -222,7 +229,7 @@ async function render(current, result) {
   if (!data) {
     widget.addSpacer();
     text(widget, result.state === "reconnect" ? "Reconnect widget" : result.state === "unpaired" ? "Pair this phone" : "Budget unavailable", 15, BB.text, true);
-    const helper = text(widget, result.state === "unavailable" ? "Try again in Scriptable" : "Open this script to set up", 11, BB.muted);
+    const helper = text(widget, result.state === "unavailable" ? "Tap to retry in Scriptable" : result.state === "reconnect" ? "Tap to pair again" : "Tap to pair in Scriptable", 11, BB.muted);
     helper.lineLimit = 2;
     widget.addSpacer();
     if (current && result.state === "unavailable") widget.refreshAfterDate = new Date(Date.now() + 900000);
@@ -266,7 +273,7 @@ async function main() {
     Script.setWidget(widget);
     if (config.runsInApp) {
       const alert = new Alert(); alert.title = "Download the configured script";
-      alert.message = "Use Download Scriptable script in your BookieBot Settings → Widgets. That copy includes your trusted server address.";
+      alert.message = "Use Copy script in your BookieBot Settings → Widgets → Set up widget. That copy includes your trusted server address.";
       alert.addAction("OK"); await alert.presentAlert();
     }
     Script.complete(); return;
@@ -274,14 +281,21 @@ async function main() {
   let current = profile();
   if (config.runsInApp) {
     try {
-      if (!current) current = await pair();
+      if (!current) {
+        current = await pair();
+        if (!current) { Script.complete(); return; }
+      }
       else {
         const menu = new Alert(); menu.title = "BookieBot · " + current.ownerName;
         menu.message = "Widget view comes from Settings → Widgets. Updating here fetches a new snapshot; iOS chooses when the Home Screen redraws.";
         menu.addAction("Refresh & preview"); menu.addAction("Pair again"); menu.addDestructiveAction("Forget this phone"); menu.addCancelAction("Cancel");
         const action = await menu.presentSheet();
         if (action < 0) { Script.complete(); return; }
-        if (action === 1) current = await pair() || current;
+        if (action === 1) {
+          const replacement = await pair();
+          if (!replacement) { Script.complete(); return; }
+          current = replacement;
+        }
         if (action === 2) {
           const confirm = new Alert(); confirm.title = "Forget widget access?";
           confirm.message = "Removes the credential and cached amounts from this Scriptable profile. Also revoke this connection in BookieBot Settings → Widgets.";
@@ -294,6 +308,7 @@ async function main() {
       // Pairing errors are our own generic messages, never raw server bodies or URLs with secrets.
       alert.message = error.message.startsWith("Use a new") || error.message.startsWith("This setup") || error.message.startsWith("Pairing could") ? error.message : "Try a new setup link from Settings → Widgets.";
       alert.addAction("OK"); await alert.presentAlert();
+      Script.complete(); return;
     }
   }
   const result = current ? await snapshot(current) : { state: "unpaired" };
