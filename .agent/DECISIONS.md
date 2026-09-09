@@ -1,5 +1,11 @@
 # Agent Decisions
 
+## 2026-09-09 - Verify Native Widget Authorization And Pairing Readiness
+
+Scriptable request properties cross a native JavaScriptCore bridge. Assemble Authorization and JSON Content-Type in an ordinary local object and assign the complete `Request.headers` dictionary; never mutate a dictionary returned by its getter. A native JSExport reproduction showed nested mutations being discarded, matching a successful pairing followed by an unauthorized first read that clears local access. Script tests must emulate copying getters and exercise real local HTTP routes, not only hand-built payloads. Version 1.2 reads the credential back from Keychain before claiming pairing success, with sanitized recovery guidance if secure storage fails; no plaintext credential fallback.
+
+Keep the grant lifecycle and revocation behavior. Settings labels a redeemed but never-read grant Paired; Connected requires a recorded successful read. This proves a server read, not the iOS Home Screen's rendering or refresh schedule. Small and Medium may use one script/profile; separate pairings are needed per person, not per size. Existing valid profiles survive script replacement under the same name. Pair again only if the previous local credential was lost. Website releases cannot replace installed Scriptable source.
+
 ## 2026-09-09 - Keep Widget Setup Recoverable Inside Settings
 
 Widget setup is a temporary Settings view with explicit Back controls, public-script copying and a selectable fallback. Replace raw-download navigation in both in-app and public setup guides: a JavaScript file cannot contain app Back controls. Retain the public script endpoint for copying and compatibility. Hide rather than unmount the underlying Settings controller so pending one-time codes and edited forms survive help, Back, gear and tab navigation. Public help/connect pages provide fixed `/app/expenses#settings` return links; the shell accepts only that exact destination on initial load/hash changes. The fragment carries no authority, does not bypass normal sign-in and is never copied from a pairing link. Installing/opening Scriptable leaves the main Settings view available.

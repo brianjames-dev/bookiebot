@@ -19,6 +19,7 @@ async function run(options = {}) {
   const state = options.state || storage();
   const requests = [], texts = [], dates = [], alerts = [], images = [], widgets = [];
   const choices = [...(options.choices || [])];
+  let didWriteKeychain = false;
   const instant = options.now || now;
   class Clock extends Date { constructor(...args) { super(...(args.length ? args : [instant])); } static now() { return instant; } }
   class Item { constructor(value) { this.value = value; } applyRelativeStyle() { this.relative = true; } }
@@ -36,11 +37,17 @@ async function run(options = {}) {
   class Widget extends Stack { async presentSmall() { this.preview = 'small'; } async presentMedium() { this.preview = 'medium'; } }
   class Request {
     constructor(url) { this.url = url; requests.push(this); }
+    // Native Scriptable properties bridge dictionaries through JavaScriptCore.
+    // Reading headers returns a copy; only assigning the property updates the request.
+    get headers() { return { ...(this._headers || {}) }; }
+    set headers(value) { this._headers = { ...value }; }
     async loadJSON() {
       assert.equal(this.timeoutInterval, 10);
       assert.equal(this.allowInsecureRequest, false);
       assert.equal(this.onRedirect({ url: 'https://attacker.test' }), null);
       const isPair = this.url.endsWith('/pair');
+      if (isPair) assert.equal(this.headers['Content-Type'], 'application/json', 'pairing must send its JSON content type through the native property setter');
+      else assert.equal(this.headers.Authorization, 'Bearer ' + (options.pairReply?.token || readToken), 'data reads must send the paired bearer through the native property setter');
       const reply = isPair ? options.pairReply || paired : options.reply || payload();
       this.response = { statusCode: isPair ? options.pairStatus || 200 : options.status || 200, url: options.redirect || this.url };
       if (options.throw || (isPair && options.pairThrow)) throw new Error('Network error with sensitive internal URL');
@@ -77,7 +84,20 @@ async function run(options = {}) {
   const context = {
     Date: Clock, Intl, Number, JSON, encodeURIComponent,
     FileManager: { local: () => local },
-    Keychain: { get: (key) => { if (options.keychainLocked || !state.keychain.has(key)) throw new Error('unavailable'); return state.keychain.get(key); }, contains: (key) => state.keychain.has(key), set: (key, value) => state.keychain.set(key, value), remove: (key) => state.keychain.delete(key) },
+    Keychain: {
+      get: (key) => {
+        if (options.keychainLocked || (didWriteKeychain && options.keychainReadbackFailure === 'throw') || !state.keychain.has(key)) throw new Error('Private Keychain error ' + readToken);
+        if (didWriteKeychain && options.keychainReadbackFailure === 'mismatch') return '{malformed ' + readToken;
+        return state.keychain.get(key);
+      },
+      contains: (key) => state.keychain.has(key),
+      set: (key, value) => {
+        if (options.keychainWriteFailure) throw new Error('Private Keychain write error ' + readToken);
+        didWriteKeychain = true;
+        state.keychain.set(key, value);
+      },
+      remove: (key) => state.keychain.delete(key),
+    },
     Script: { name: () => options.scriptName || 'BookieBot', setWidget: (widget) => widgets.push(widget), complete: () => {} },
     URLScheme: { forRunningScript: () => runUrl(options.scriptName) },
     config: { runsInApp: Boolean(options.app), runsInWidget: !options.app, widgetFamily: options.family || 'small' },
@@ -100,10 +120,11 @@ async function contracts() {
 
   check = await run({ app: true, state: storage(null) });
   assert.equal(check.alerts[0].secure, true);
+  const pairRequest = check.requests.find((request) => request.url.endsWith('/pair'));
+  assert.equal(pairRequest.headers['Content-Type'], 'application/json', 'pairing content type must survive the native dictionary copy');
   assert.equal(check.alerts[1].title, 'Paired with Brian');
   assert(check.alerts[1].message.includes('BookieBot'));
   assert(check.alerts[1].message.includes('Keep this script name'));
-  const pairRequest = check.requests.find((request) => request.url.endsWith('/pair'));
   assert.equal(pairRequest.method, 'POST');
   assert.deepEqual(JSON.parse(pairRequest.body), { pairingToken });
   assert.equal(pairRequest.headers.Authorization, undefined);
@@ -117,6 +138,27 @@ async function contracts() {
   assert.equal(check.dates[0].relative, true, 'native WidgetDate must continue showing age while execution is delayed');
   assert(check.images.some((image) => image.value.kind === 'avatar'));
   assert([...check.state.files.values()].every((value) => !JSON.stringify(value).includes(readToken)), 'secret must never reach the snapshot cache');
+
+  const newlyPaired = check.state;
+  check = await run({ state: newlyPaired, family: 'medium' });
+  assert.equal(check.alerts.length, 0, 'the Home Screen execution reuses the pairing without a prompt');
+  assert.equal(check.requests.find((request) => request.url.endsWith('/data')).headers.Authorization, 'Bearer ' + readToken);
+  assert(check.texts.includes('$4,321.09') && check.texts.includes('$25.75'));
+  assert.equal(newlyPaired.keychain.size, 1, 'the first authorized Home Screen read preserves the paired credential');
+
+  for (const failure of [{ keychainReadbackFailure: 'throw' }, { keychainReadbackFailure: 'mismatch' }, { keychainWriteFailure: true }]) {
+    check = await run({ app: true, state: storage(null), ...failure });
+    assert(check.alerts.at(-1).message.startsWith('Secure storage could not confirm this pairing.'));
+    assert(!check.alerts.some((alert) => alert.title === 'Paired with Brian'), 'do not announce success before secure storage is verified');
+    assert.equal(check.requests.length, 1, 'an unconfirmed credential cannot fetch financial data');
+    assert.equal(check.widgets.length, 0, 'storage failures stop at their actionable message');
+    assert.equal(check.state.files.size, 0, 'credentials cannot fall back to ordinary files');
+    assert(!JSON.stringify(check.alerts).includes(readToken), 'never expose native Keychain errors or credential values');
+    if (!failure.keychainWriteFailure) {
+      check = await run({ state: check.state });
+      assert(check.texts.includes('$4,321.09'), 'a temporary readback failure must preserve the safely stored credential for retry');
+    }
+  }
 
   check = await run({ app: true, state: storage(null), choices: [-1] });
   assert.equal(check.requests.length, 0);

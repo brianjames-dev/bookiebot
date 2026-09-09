@@ -99,7 +99,9 @@ function WidgetSettingsContent({ ownerName, defaultMode, onOpenGuide }: WidgetSe
     if (!previous) return
     const row = data.connections.find(connection => connection.id === previous.id)
     if (row?.status === "pending" && Date.parse(previous.expiresAt) > Date.now()) return
-    if (row?.status === "active") setMessage("Widget connected. Add it to your Home Screen in Scriptable.")
+    if (row?.status === "active") setMessage(row.lastUsedAt
+      ? "Widget connected. Add it to your Home Screen in Scriptable."
+      : "Pairing accepted. Run BookieBot in Scriptable and check the preview.")
     copyGeneration.current++; setPairing(null)
   }
 
@@ -185,8 +187,8 @@ function WidgetSettingsContent({ ownerName, defaultMode, onOpenGuide }: WidgetSe
     {settings && <div className="bb-widget-connections">
       {settings.connections.length === 0 && <p className="bb-settings-note">No widgets paired yet.</p>}
       {settings.connections.map(connection => <div className="bb-widget-connection" key={connection.id}>
-        <div className="bb-widget-connection-heading"><strong>{connection.label}</strong><span>{connection.status === "active" ? "Connected" : "Awaiting setup"}</span></div>
-        <p className="bb-settings-note">{connection.status === "pending" ? `Setup expires ${dateLabel(connection.expiresAt)}` : connection.lastUsedAt ? `Last checked ${dateLabel(connection.lastUsedAt)}` : "Waiting for its first refresh"}</p>
+        <div className="bb-widget-connection-heading"><strong>{connection.label}</strong><span>{connection.status === "pending" ? "Awaiting setup" : connection.lastUsedAt ? "Connected" : "Paired"}</span></div>
+        <p className="bb-settings-note">{connection.status === "pending" ? `Setup expires ${dateLabel(connection.expiresAt)}` : connection.lastUsedAt ? `Last checked ${dateLabel(connection.lastUsedAt)}` : "Run BookieBot in Scriptable to verify its first refresh."}</p>
         <div className="bb-widget-connection-controls"><select aria-label={`Budget view for ${connection.label}`} value={connection.mode} disabled={busy || needsRefresh} onChange={event => { if (event.target.value !== connection.mode) void run({ operation: "mode", id: connection.id, mode: event.target.value }) }}><option value="current">Current</option><option value="projected">Projected</option></select>
           <button className="bb-settings-action" type="button" disabled={busy || needsRefresh} aria-expanded={confirmRevoke === connection.id} onClick={() => setConfirmRevoke(value => value === connection.id ? null : connection.id)}>Remove</button></div>
         <CollapsibleContent open={confirmRevoke === connection.id}><div className="bb-widget-revoke"><p>Remove access for {connection.label}? Its next refresh will require pairing again.</p><div className="bb-widget-actions"><button className="bb-toolbar-button" type="button" disabled={busy || needsRefresh} onClick={() => void run({ operation: "revoke", id: connection.id })}>Remove widget access</button><button className="bb-settings-action" type="button" disabled={busy} onClick={() => setConfirmRevoke(null)}>Keep widget</button></div></div></CollapsibleContent>

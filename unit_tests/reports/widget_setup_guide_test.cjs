@@ -22,7 +22,7 @@ const text=node=>typeof node==='string'?node:Array.isArray(node)?node.map(text).
 const button=label=>tree.root.findAllByType('button').find(node=>text(node)===label)
 const click=async label=>act(async()=>{const node=button(label);assert.ok(node,label);assert.ok(!node.props.disabled);await node.props.onClick()})
 const createGuide=()=>act(async()=>{tree=create(React.createElement(runtime.exports.WidgetSetupGuide,{onBack:()=>back++,onPair:()=>pair++}))})
-const code='// BookieBot Home Screen widget · v1.1\nconst BOOKIEBOT_ORIGIN = "https://bookiebot.example";'
+const code='// BookieBot Home Screen widget · v1.2\nconst BOOKIEBOT_ORIGIN = "https://bookiebot.example";'
 const respond=(request,value=code,status=200)=>act(async()=>request.resolve({ok:status===200,text:async()=>value}))
 ;(async()=>{
   await createGuide()

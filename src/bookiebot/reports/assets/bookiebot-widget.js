@@ -1,4 +1,4 @@
-// BookieBot Home Screen widget · v1.1
+// BookieBot Home Screen widget · v1.2
 // Download this script from your own BookieBot Settings → Widgets.
 // Credentials belong in Scriptable Keychain, never in this file or a widget parameter.
 const BOOKIEBOT_ORIGIN = "__BOOKIEBOT_ORIGIN__";
@@ -89,8 +89,11 @@ function makeRequest(path, token) {
   request.timeoutInterval = 10;
   request.allowInsecureRequest = false;
   request.onRedirect = () => null;
-  request.headers = { Accept: "application/json", "Cache-Control": "no-cache" };
-  if (token) request.headers.Authorization = "Bearer " + token;
+  // Scriptable bridges native dictionaries by value. Mutating request.headers
+  // after reading it changes a copy and can silently omit the bearer.
+  const headers = { Accept: "application/json", "Cache-Control": "no-cache" };
+  if (token) headers.Authorization = "Bearer " + token;
+  request.headers = headers;
   return request;
 }
 function acceptedResponse(request, expectedUrl) {
@@ -110,7 +113,7 @@ async function pair() {
   if (!/^bbw_pair_[A-Za-z0-9_-]{43}$/.test(token)) throw new Error("Use a new setup link from this BookieBot server. Other sites and modified links are not accepted.");
   const request = makeRequest("/app/widgets/pair");
   request.method = "POST";
-  request.headers["Content-Type"] = "application/json";
+  request.headers = { ...request.headers, "Content-Type": "application/json" };
   request.body = JSON.stringify({ pairingToken: token });
   let value;
   try { value = await request.loadJSON(); } catch (_) { throw new Error("Pairing could not finish. Create a fresh setup link in BookieBot and try again."); }
@@ -119,9 +122,17 @@ async function pair() {
     throw new Error("This setup link could not be used. Create a new one in Settings → Widgets.");
   }
   const previous = profile();
-  if (previous) removeCache(previous.connectionId);
   const saved = { origin: BOOKIEBOT_ORIGIN, token: next.token, connectionId: next.connectionId, ownerName: next.ownerName, mode: next.mode, expiresAt: next.expiresAt };
-  Keychain.set(profileKey, JSON.stringify(saved));
+  const serialized = JSON.stringify(saved);
+  try {
+    Keychain.set(profileKey, serialized);
+    if (Keychain.get(profileKey) !== serialized) throw new Error("Secure storage readback did not match");
+  } catch (_) {
+    // Keep a potentially valid Keychain write for the next unlocked run. Never
+    // announce success or fall back to plaintext if the write cannot be verified.
+    throw new Error("Secure storage could not confirm this pairing. Unlock your phone, then run this script again in Scriptable. If it still asks to pair, use a fresh setup link.");
+  }
+  if (previous) removeCache(previous.connectionId);
   const confirmation = new Alert();
   confirmation.title = "Paired with " + saved.ownerName;
   confirmation.message = "When you edit the Home Screen widget, select the script “" + Script.name() + "”. Keep this script name unchanged so the widget can find its pairing. iOS may take a little time to update the Home Screen.";
@@ -306,7 +317,7 @@ async function main() {
     } catch (error) {
       const alert = new Alert(); alert.title = "Couldn't pair BookieBot";
       // Pairing errors are our own generic messages, never raw server bodies or URLs with secrets.
-      alert.message = error.message.startsWith("Use a new") || error.message.startsWith("This setup") || error.message.startsWith("Pairing could") ? error.message : "Try a new setup link from Settings → Widgets.";
+      alert.message = error.message.startsWith("Use a new") || error.message.startsWith("This setup") || error.message.startsWith("Pairing could") || error.message.startsWith("Secure storage could") ? error.message : "Try a new setup link from Settings → Widgets.";
       alert.addAction("OK"); await alert.presentAlert();
       Script.complete(); return;
     }
