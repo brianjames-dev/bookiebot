@@ -178,22 +178,66 @@ async function main() {
   class FixtureSession {
     constructor() { session = this; this.listeners = new Set() }
     subscribe(fn) { this.listeners.add(fn); fn({ ...realSession.initialExpenseAppState, phase: 'ready', report }); return () => this.listeners.delete(fn) }
-    emit(next) { this.listeners.forEach(fn => fn({ ...realSession.initialExpenseAppState, phase: 'ready', report: next })) }
+    emitState(next) { this.listeners.forEach(fn => fn({ ...realSession.initialExpenseAppState, ...next })) }
+    emit(next) { this.emitState({ phase: 'ready', report: next }) }
     async refresh() {} dispose() {} async signOut() {} async selectMonth() {} expire() {}
   }
   mocks.set(src('expense-app-session.ts'), { ...realSession, ExpenseAppSession: FixtureSession, watchExpenseAppLifecycle: () => () => {} })
-  mocks.set(src('app-refresh-control.tsx'), { AppRefreshControl: () => null })
+  mocks.set(src('app-refresh-control.tsx'), { AppRefreshControl: ({ state }) => h('p', { 'data-refresh-phase': state.phase }, state.message || state.phase) })
   mocks.set(src('expense-app-reconnect.tsx'), { ExpenseAppReconnect: () => null })
   mocks.set(src('report-history.tsx'), { MonthHistoryControl: () => null, ReportComparison: () => null, reportMonthLabel: () => 'September 2026', useReportMonthCatalog: () => ({ catalog: null, loading: false, error: false, refresh() {} }) })
   const { FreshExpenseApp } = load(src('fresh-expense-app.tsx'))
   const config = { reportUrl: '/synthetic-report', logoutUrl: '/synthetic-logout', ownerName: 'Brian', version: 'shell-version-1' }
   await run(() => { tree = create(h(FreshExpenseApp, { config })) })
   await tap(tree, 'Savings'); await tap(tree, '＋ Goal'); await fill(tree, 'Goal name', 'Private Brian draft')
+  await fill(tree, 'Target ($)', '1000')
+  await tap(tree, 'Shared'); await tap(tree, 'View 1 expense')
+  const freshDisclosure = tree.root.findAllByType('button').filter(visible).find(node => node.props.className === 'bb-reimbursement-toggle')
+  await run(() => freshDisclosure.props.onClick()); await tap(tree, 'Record received')
+  await fill(tree, 'Amount ($)', '16.25'); await fill(tree, 'Note', 'Private receipt draft')
+  const beforePendingReads = { ...reads }, beforePendingReportInstance = rawReport(tree).props['data-report-instance']
+  await run(() => ask.onShowSource('reimbursements'))
+  const beforePendingFocus = sharedFocuses
+  // This is the intermediate state published by ExpenseAppSession.selectMonth,
+  // not a direct replacement with an already-loaded report.
+  await run(() => session.emitState({ report: null, selectedMonth: '2026-08', phase: 'loading', message: 'Loading August' }))
+  await run(() => { for (const [id, timer] of [...timers]) if (timer.delay === 280) { timers.delete(id); timer.cb() } })
+  assert.equal(sharedFocuses, beforePendingFocus, 'Starting a pending month cancels previously scheduled source focus')
+  assert.equal(nav.sourceRequest, null)
+  assert.equal(screen(tree), 'shared'); assert.equal(input(tree, 'Amount ($)').props.value, '16.25')
+  assert.equal(input(tree, 'Note').props.value, 'Private receipt draft')
+  assert.equal(rawReport(tree).props['data-report-instance'], beforePendingReportInstance, 'The owner shell and old report remain mounted during loading')
+  assert.equal(ask.month, '2026-08'); assert.equal(ask.open, false)
+  await tap(tree, 'Overview')
+  assert.equal(visible(rawReport(tree)), false, 'The retained previous month is never shown as the pending month')
+  assert.ok(tree.root.findAll(node => node.type === 'main' && node.props.className === 'bb-shell-report-loading bb-main').some(visible))
+  assert.ok(tree.root.findAll(node => node.type === 'p' && node.props['data-refresh-phase'] === 'loading').some(visible))
+  assert.equal(button(tree, 'Ask BookieBot').props.disabled, true)
+  for (const label of ['Overview', 'Spending', 'Shared', 'Savings']) assert.ok(!button(tree, label).props.disabled)
+  await tap(tree, 'Savings'); assert.equal(input(tree, 'Goal name').props.value, 'Private Brian draft'); assert.equal(input(tree, 'Target ($)').props.value, '1000')
+  await run(() => session.emitState({ report: null, selectedMonth: '2026-08', phase: 'error', message: 'Could not load August' }))
+  assert.equal(screen(tree), 'savings'); assert.equal(input(tree, 'Goal name').props.value, 'Private Brian draft')
+  await tap(tree, 'Shared'); assert.equal(input(tree, 'Amount ($)').props.value, '16.25'); assert.equal(input(tree, 'Note').props.value, 'Private receipt draft')
+  await tap(tree, 'Overview'); assert.equal(visible(rawReport(tree)), false)
+  assert.ok(tree.root.findAll(node => node.type === 'p' && node.props['data-refresh-phase'] === 'error').some(visible), 'A failed month retains a visible refresh/error state')
+  assert.equal(button(tree, 'Ask BookieBot').props.disabled, true)
+  assert.deepEqual(reads, beforePendingReads, 'Intermediate loading and failure do not remount the financial controllers')
+  await run(() => session.emit({ ...report, month: 8, monthLabel: 'August 2026', generatedAt: 'after-pending-month' }))
+  assert.equal(visible(rawReport(tree)), true); assert.notEqual(rawReport(tree).props['data-report-instance'], beforePendingReportInstance)
+  assert.equal(button(tree, 'Ask BookieBot').props.disabled, false)
+  await tap(tree, 'Savings'); assert.equal(input(tree, 'Goal name').props.value, 'Private Brian draft')
+  await tap(tree, 'Shared'); assert.equal(input(tree, 'Amount ($)').props.value, '16.25'); assert.equal(input(tree, 'Note').props.value, 'Private receipt draft')
   const beforeOwnerReads = reads.goals
   owner = 'hannah'; await run(() => session.emit({ ...report, ownerName: 'Hannah', generatedAt: 'owner-changed' }))
   assert.equal(screen(tree), 'overview'); assert.equal(reads.goals, beforeOwnerReads + 1)
   await tap(tree, 'Savings'); assert.equal(form(tree), undefined, 'Owner-keyed real shell disposes previous financial forms')
   await tap(tree, '＋ Goal'); assert.equal(input(tree, 'Goal name').props.value, '')
+  await fill(tree, 'Goal name', 'Private Hannah draft')
+  await run(() => session.emitState({ report: null, selectedMonth: '2026-07', phase: 'expired' }))
+  assert.equal(tree.root.findAllByType(ExpenseAppShell).length, 0, 'Expiration clears the retained owner shell and its financial drafts')
+  assert.equal(tree.root.findAllByType('form').length, 0)
+  assert.equal(tree.root.findAllByType('nav').length, 0)
+  assert.ok(text(tree.root).includes('Reconnect to BookieBot'))
   await run(() => tree.unmount())
   assert.equal(intervals.size, 0)
   assert.ok([...listeners.window.values(), ...listeners.document.values(), ...listeners.viewport.values()].every(set => !set.size), 'Shell, guard, version, and controllers clean up every listener')
