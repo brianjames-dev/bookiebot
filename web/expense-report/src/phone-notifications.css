@@ -1,5 +1,5 @@
 .bb-notifications { margin-top: 0; }
-.bb-notifications .bb-reimbursement-entry { border-top: 0; }
+.bb-notifications .bb-reimbursement-entry, .bb-notifications .bb-reimbursement-entry:last-child { border: 0; }
 .bb-notifications .bb-reimbursement-toggle { display: flex; align-items: center; gap: 12px; }
 .bb-notification-title { text-align: left; }
 .bb-notification-state { margin-left: auto; color: hsl(var(--muted-foreground)); font-size: .82rem; }

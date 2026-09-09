@@ -2600,7 +2600,7 @@ tr:last-child td {
 }
 .bb-report-section {
   padding: 40px 0;
-  border-bottom: 1px solid hsl(var(--border));
+  border-bottom: 0;
 }
 .bb-daily-section { border-bottom: 0; }
 .bb-report-section:last-child {
