@@ -192,11 +192,11 @@ Status: Complete first pass as of 2026-06-20. Recent-action update, move, delete
 
 ## Shared Expense Responsibility And Reimbursements
 
-### 2026-09-08 Approved Confirmed-Repayment Ledger — Implemented, Rollout In Progress
+### 2026-09-08 Approved Confirmed-Repayment Ledger — Implemented And Migrated
 
 The user approved payer/ownership hardening, fail-closed mutation guards, canonical storage and repairs. They chose retaining gross under the original payer until confirmed repayment; each partial receipt amends that source and records the debtor's linked expense. Both directions and reviewed equal offsets are in scope. This supersedes the older target invariants below for migrated/new canonical allocations. Paid legacy history remains read-only until a separately reviewed correction/import can establish counterpart history safely.
 
-Implementation adds durable household transactions, idempotency/version checks, pending sender reports/recipient confirmation, partial/full receipt events, atomic offset/reversal groups, ID-anchored recoverable sheet projection, phone actions and a plan-first migration. Full local verification passed 1,617 tests including PostgreSQL, with clean Pyright/frontend/Apps Script checks and responsive WebKit lifecycle acceptance. Production migration and rollout remain in progress; `docs/REIMBURSEMENTS.md` records operator and phone acceptance steps.
+Implementation adds durable household transactions, idempotency/version checks, pending sender reports/recipient confirmation, partial/full receipt events, atomic offset/reversal groups, ID-anchored recoverable sheet projection, phone actions and a plan-first migration. Full local verification passed 1,617 tests including PostgreSQL, with clean Pyright/frontend/Apps Script checks and responsive WebKit lifecycle acceptance. Main CI passed; production migration registered seven reviewed records, verified all expense/ledger projections, corrected the approved payer/name incident and preserved two received records and void history. An independent source/mirror/both-owner readback passed; no synthetic payments were written. Final phone activation/acceptance is tracked in STATUS checklist 109 and the completion response; `docs/REIMBURSEMENTS.md` records operator and phone acceptance steps.
 
 ### 2026-09-08 Read-Only Integrity Audit — Remediation Above
 
