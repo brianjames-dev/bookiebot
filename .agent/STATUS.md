@@ -4,6 +4,8 @@ Last updated: 2026-09-08
 
 ## Active Focus
 
+Reimbursement integrity audit (2026-09-08): confirmed that a partner name inside a NEED item can override the authenticated payer and produce a logical ledger owner that disagrees with its workbook. A read-only investigation also reproduced paid-split undo proceeding after one failed ledger read, and settlement row identity changing between its final read and write. 85 existing focused tests passed; both failures were reproduced only with in-memory sheets. No app logic or financial records changed. Recommended fixes and a both-owner spending/cash model are pending; the user received a detailed local report.
+
 Savings overview/date containment (2026-09-08): renamed the section Savings, added the canonical total across all recorded goals (including archived) above a Goals subsection, and applied the existing lighter card background. Native date fields now use padding/border wrappers and constrained grid tracks for the documented iOS date-width bug. Focused lifecycle regression passed; full local suite 1,116 passed / 61 optional PostgreSQL skipped; Pyright/typecheck/build clean. WebKit verified blank/filled date fields and validation at 320/390/1280px in both themes, 18 total layouts through $299,999,999.97, and full-width background/menu containment. Phone acceptance is checklist 108, including actual iOS picker verification; deployment evidence is in the completion response.
 
 Lower-dashboard divider cleanup (2026-09-08): removed decorative section, savings-row/history and nested Ask BookieBot/Phone notifications rules. Existing spacing, headings, progress bars and control outlines provide separation. Focused UI/motion 10 passed; frontend typecheck/build clean. WebKit passed 320/390/1280px in both themes: computed decorative borders are zero, progress/control outlines remain, and menus/disclosures work without overflow/errors. Phone acceptance is checklist 107; browser and deployment evidence is in the completion response.
@@ -51,36 +53,40 @@ All eight September 6 audit batches are implemented and verified locally. Each b
 
 ## On Deck
 
-0. Optional device acceptance for the completed dashboard: each phone can enable its own notifications and create its own savings goals using `docs/PHONE_APP_SETUP.md`; checklists 91, 93, 94, 95, 96, 97, 98, 99, 100, 101, 102, 103, 104, 105, 106, 107 and 108 cover these explicit personal choices and the latest reliability fixes. Implementation is complete.
+0. Reimbursement integrity follow-up: separate payer/account from names in item descriptions, enforce logical/physical ledger ownership, and fail closed before undo when settlement state is unavailable. Review the proposed both-owner allocation/receipt/cash model and staged live correction before implementing it. The September 8 audit made no financial mutations. Details are in the Shared Expense Responsibility section of `.agent/WORKSTREAM_FINANCE_OPS.md`.
 
-1. Review the deployed expense-report design and motion/responsive polish against checklist items 86–87.
-2. Verify the deployed audit fixes in a test workbook/Sandbox using `.agent/AUDIT_REMEDIATION_2026-09-06.md`; complete the live acceptance checks without creating test transactions in real financial data.
-3. Verify deployed expected-income projections and the next monthly rollover against checklist item 85.
-4. Deploy and manually verify canonical Current/Projected report tools in checklist item 82.
-5. Deploy and manually verify the LangGraph conversational/read response layer and bank-transfer refusal in checklist item 81.
-6. Deploy and manually verify Brian's BofA expense default in checklist item 80.
-7. Deploy and manually verify the shared expense-report chart viewport in checklist item 79.
-8. Deploy and manually verify fronted shared expenses in checklist item 78.
-9. Deploy and manually verify quarterly utility history in checklist item 77.
-10. Deploy and manually verify parser and bill-payment reliability in checklist item 76.
-11. Deploy and manually verify split creation/settlement in checklist item 74 and recent split changes/cancellation in checklist item 75.
-12. Continue the deferred split lifecycle: correct gross after splitting, partial reimbursement, explicit paid-split undo, and split-aware update/move/delete/undo.
-13. Deploy and manually verify prior-month paycheck carry-forward in Projected mode in checklist item 73.
-14. Deploy and manually verify Wants subscriptions in Burn Rate in checklist item 72.
-15. Deploy and manually verify selected-month subscription scoping in checklist item 71.
-16. Deploy and manually verify Daily Spending bill coverage and outlier scaling in checklist item 70.
-17. Deploy and manually verify the monthly savings workflow and corrected Saved-card targets in checklist items 60-61 and 69.
-18. Deploy and manually verify the expense-report corrections in checklist item 67.
-19. Deploy and manually verify typed `recent` opens the short-lived launcher and keeps the resulting DM session ephemeral.
-20. Deploy and manually verify `View Inbox` and `Reconcile Now` show `BookieBot is typing...` without a temporary thinking message.
-21. Manually verify shared Needs logging plus update/move/delete/undo behavior in Discord and Google Sheets.
-22. Manually verify recent transactions and reconciliation after the latest reliability fixes.
-23. Consider a richer Discord button flow for grouped amount adjustments if the current UX feels too manual.
-24. Harden recent-action pending state across restarts/deploys, since selections currently live only in process memory.
-25. Improve targeted recent-action search so commands can find older matches, not only the latest 10 recent actions.
-26. Explore clarifying questions before logging when BookieBot is uncertain instead of guessing or silently failing.
+1. Optional device acceptance for the completed dashboard: each phone can enable its own notifications and create its own savings goals using `docs/PHONE_APP_SETUP.md`; checklists 91, 93, 94, 95, 96, 97, 98, 99, 100, 101, 102, 103, 104, 105, 106, 107 and 108 cover these explicit personal choices and the latest reliability fixes. Implementation is complete.
+
+2. Review the deployed expense-report design and motion/responsive polish against checklist items 86–87.
+3. Verify the deployed audit fixes in a test workbook/Sandbox using `.agent/AUDIT_REMEDIATION_2026-09-06.md`; complete the live acceptance checks without creating test transactions in real financial data.
+4. Verify deployed expected-income projections and the next monthly rollover against checklist item 85.
+5. Deploy and manually verify canonical Current/Projected report tools in checklist item 82.
+6. Deploy and manually verify the LangGraph conversational/read response layer and bank-transfer refusal in checklist item 81.
+7. Deploy and manually verify Brian's BofA expense default in checklist item 80.
+8. Deploy and manually verify the shared expense-report chart viewport in checklist item 79.
+9. Deploy and manually verify fronted shared expenses in checklist item 78.
+10. Deploy and manually verify quarterly utility history in checklist item 77.
+11. Deploy and manually verify parser and bill-payment reliability in checklist item 76.
+12. Deploy and manually verify split creation/settlement in checklist item 74 and recent split changes/cancellation in checklist item 75.
+13. Continue the deferred split lifecycle: correct gross after splitting, partial reimbursement, explicit paid-split undo, and split-aware update/move/delete/undo.
+14. Deploy and manually verify prior-month paycheck carry-forward in Projected mode in checklist item 73.
+15. Deploy and manually verify Wants subscriptions in Burn Rate in checklist item 72.
+16. Deploy and manually verify selected-month subscription scoping in checklist item 71.
+17. Deploy and manually verify Daily Spending bill coverage and outlier scaling in checklist item 70.
+18. Deploy and manually verify the monthly savings workflow and corrected Saved-card targets in checklist items 60-61 and 69.
+19. Deploy and manually verify the expense-report corrections in checklist item 67.
+20. Deploy and manually verify typed `recent` opens the short-lived launcher and keeps the resulting DM session ephemeral.
+21. Deploy and manually verify `View Inbox` and `Reconcile Now` show `BookieBot is typing...` without a temporary thinking message.
+22. Manually verify shared Needs logging plus update/move/delete/undo behavior in Discord and Google Sheets.
+23. Manually verify recent transactions and reconciliation after the latest reliability fixes.
+24. Consider a richer Discord button flow for grouped amount adjustments if the current UX feels too manual.
+25. Harden recent-action pending state across restarts/deploys, since selections currently live only in process memory.
+26. Improve targeted recent-action search so commands can find older matches, not only the latest 10 recent actions.
+27. Explore clarifying questions before logging when BookieBot is uncertain instead of guessing or silently failing.
 
 ## Completed 2026-09-08
+
+- 2026-09-08 — Completed a read-only reimbursement audit using the reported message, matching source/action/ledger rows, code review and 85 existing focused tests. Confirmed payer attribution from a beneficiary/item name and incompatible ledger ownership. Fault injection reproduced unsafe paid undo after an unavailable ledger read and a receipt redirected by an insertion between final validation and row update. Documented missing counterpart spending, full-only receipt commands, paid corrections, durable recovery and cash-versus-share semantics. Report and isolated reproduction evidence were saved locally; proposed remediation was added to the finance backlog. No code or live financial changes were made.
 
 - 2026-09-08 — Added the user-confirmed total recorded across goals to Savings, with Goals underneath. Sum balanceCents exactly once across active/completed/archived goals; archive/restore preserves the total, loading/auth errors do not invent zero, and existing warnings preserve stale/uncertain state. Reused FittedAmount and the card-color band; background-only clipping preserves dropdown overflow. Native date inputs retain required/min/max/value behavior while wrappers own padding and borders, addressing iOS WebKit 301648; empty-date height and focus remain visible. Added lifecycle regression coverage for totals, exact cents, canonical-source counting, mutations, failures and date submission. Full local 1,116 passed / 61 optional PostgreSQL skipped, Pyright/typecheck/build clean. README, phone guide, presentation/total decision and checklist 108 updated. No storage, bank, monthly Saved or sheet changes.
 

@@ -192,6 +192,14 @@ Status: Complete first pass as of 2026-06-20. Recent-action update, move, delete
 
 ## Shared Expense Responsibility And Reimbursements
 
+### 2026-09-08 Read-Only Integrity Audit — Follow-up Pending
+
+- Confirmed production payer misattribution: a partner name inside an item can populate `person`, which the ordinary split path trusts over the authenticated actor. The resulting logical ledger owner can disagree with the payer workbook; current report ownership filtering then excludes that record. Separate actor, payer/account and beneficiary; validate storage ownership before writing. Preserve a linked audit correction rather than patching one visible cell.
+- Reproduced P1 in memory: a reimbursement read failure becomes `[]`; paid-split undo treats the missing allocation as permission, then a later successful update voids the paid allocation and restores gross. Missing/unavailable settlement state must prohibit mutation (`collaboration.list_allocations`, `undo._apply_undo_action`).
+- Reproduced concurrent row-race risk in memory: insertion after receipt's final ID check but before numeric-row update can settle another allocation. Review serialization, canonical storage, protected sheet projections and recovery; do not assume a reread is compare-and-swap.
+- Design gaps: ordinary splits create only the payer's net expense, no partner expense; receipt commands settle the full share with no amount; paid corrections/partial events and full mutation lifecycle remain pending. The proposed model preserves original gross, both owners' expense shares and receipt cash flows separately. Income weights are fixed constants and should be explicit/snapshotted if made configurable.
+- Verification: 85 existing collaboration/settlement/undo/reconciliation tests passed, plus two isolated fault reproductions. No live writes or app logic changes. Detailed incident evidence remains in the user's local report rather than checked into repository history. Remediation and the accounting model require a subsequent implementation pass.
+
 ### Target Invariants
 
 - The original bank-clearing amount remains immutable in the source action lineage and available for reconciliation.
