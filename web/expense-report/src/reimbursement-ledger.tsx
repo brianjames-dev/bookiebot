@@ -250,7 +250,9 @@ function LedgerContents({ snapshot, disabled, run, refresh, refreshing }: {
       <button type="button" aria-pressed={direction === "to"} onClick={() => setDirection("to")}>Owed to you<FittedAmount className="bb-ledger-direction-amount">{money(totals.to)}</FittedAmount></button>
       <button type="button" aria-pressed={direction === "from"} onClick={() => setDirection("from")}>You owe<FittedAmount className="bb-ledger-direction-amount">{money(totals.from)}</FittedAmount></button>
     </SlidingSelection>
-    <div className="bb-ledger-net"><span>{totals.net > 0 ? "Net owed to you" : totals.net < 0 ? "Net you owe" : "Net balance"}</span><strong>{money(Math.abs(totals.net))}</strong></div>
+    {totals[direction] > 0
+      ? <div className="bb-ledger-net"><span>{totals.net > 0 ? "Net owed to you" : totals.net < 0 ? "Net you owe" : "Net balance"}</span><strong>{money(Math.abs(totals.net))}</strong></div>
+      : <p className="bb-ledger-empty">{direction === "from" ? "You don’t currently owe any money." : "No one currently owes you money."}</p>}
     {snapshot.projectionPending && <div className="bb-ledger-message" role="status"><p>Recorded. Expense sheets are still syncing.</p><button type="button" disabled={disabled || refreshing} onClick={refresh}>Refresh</button></div>}
     {snapshot.error && <p className="bb-ledger-note" role="status">{snapshot.error}</p>}
     {rows.length > 0 && <figure className="bb-reimbursement-timeline bb-ledger-timeline" aria-label={`${direction === "to" ? "Owed to you" : "You owe"} by expense month`}>
@@ -262,10 +264,12 @@ function LedgerContents({ snapshot, disabled, run, refresh, refreshing }: {
       <RetainedPanel id={offsetId} open={offsetOpen}><OffsetEditor allocations={allocations} events={events} owner={ownerKey} disabled={disabled} run={run} close={() => setOffsetOpen(false)} /></RetainedPanel></>}
     {incoming.length > 0 && <section className="bb-ledger-incoming" aria-label="Payments awaiting your confirmation"><h3>Awaiting your confirmation</h3>
       {incoming.map(event => <IncomingPayment key={event.id} event={event} allocation={allocations.find(item => item.id === event.allocationId)!} disabled={disabled} run={run} />)}</section>}
-    <button className="bb-ledger-list-toggle" type="button" aria-expanded={listOpen} aria-controls={listId} onClick={() => setListOpen(!listOpen)}>
-      <span>{shown.length ? `View ${shown.length} expense${shown.length === 1 ? "" : "s"}` : "No shared expenses in this direction"}</span><span aria-hidden="true">{listOpen ? "−" : "+"}</span>
-    </button>
-    <CollapsibleContent id={listId} open={listOpen}><div className="bb-reimbursement-groups">{months(shown).map(group => <LedgerMonth key={`${direction}:${group.key}`} group={group} events={events} reversibleIds={reversibleIds} owner={ownerKey} disabled={disabled} run={run} />)}</div></CollapsibleContent>
+    {shown.length > 0 && <>
+      <button className="bb-ledger-list-toggle" type="button" aria-expanded={listOpen} aria-controls={listId} onClick={() => setListOpen(!listOpen)}>
+        <span>{`View ${shown.length} expense${shown.length === 1 ? "" : "s"}`}</span><span className="bb-disclosure-mark" aria-hidden="true" />
+      </button>
+      <CollapsibleContent id={listId} open={listOpen}><div className="bb-reimbursement-groups">{months(shown).map(group => <LedgerMonth key={`${direction}:${group.key}`} group={group} events={events} reversibleIds={reversibleIds} owner={ownerKey} disabled={disabled} run={run} />)}</div></CollapsibleContent>
+    </>}
   </>
 }
 

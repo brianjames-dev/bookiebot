@@ -8,7 +8,7 @@
 .bb-history-catalog-status { flex-basis: 100%; color: hsl(var(--muted-foreground)); font: 400 12px/1.5 -apple-system, sans-serif; }
 .bb-report-comparison { border-bottom: 1px solid hsl(var(--border)); }
 .bb-comparison-toggle { display: flex; align-items: center; gap: 14px; justify-content: space-between; width: 100%; min-height: 48px; padding: 12px 0; color: hsl(var(--muted-foreground)); border: 0; background: none; font: 500 13px/1.4 -apple-system, sans-serif; cursor: pointer; }
-.bb-comparison-toggle[aria-expanded="true"] .bb-disclosure-mark { transform: rotate(45deg); }
+.bb-comparison-toggle[aria-expanded="true"] .bb-disclosure-mark::after { transform: rotate(0deg); }
 .bb-comparison-content { max-width: 720px; padding: 0 0 16px; }
 .bb-comparison-picker { display: flex; align-items: center; flex-wrap: wrap; gap: 8px 12px; color: hsl(var(--muted-foreground)); font-size: 12px; }
 .bb-comparison-picker select { height: 44px; min-height: 44px; max-width: 100%; min-width: 0; padding: 8px 32px 8px 12px; border: 1px solid hsl(var(--border)); border-radius: 4px; background-color: hsl(var(--background)); color: hsl(var(--foreground)); font: 500 13px/1.4 -apple-system, sans-serif; cursor: pointer; }
@@ -23,7 +23,7 @@
 .bb-comparison-percent { color: hsl(var(--muted-foreground)); white-space: nowrap; }
 .bb-comparison-details-toggle { display: inline-flex; align-items: center; gap: 8px; min-height: 44px; margin-left: auto; padding: 8px 0 8px 8px; border: 0; background: none; color: hsl(var(--muted-foreground)); font: 500 12px/1.5 -apple-system, sans-serif; cursor: pointer; }
 .bb-comparison-details-toggle:hover { color: hsl(var(--foreground)); }
-.bb-comparison-details-toggle[aria-expanded="true"] .bb-disclosure-mark { transform: rotate(45deg); }
+.bb-comparison-details-toggle[aria-expanded="true"] .bb-disclosure-mark::after { transform: rotate(0deg); }
 .bb-comparison-note { color: hsl(var(--muted-foreground)); font-size: 12px; line-height: 1.65; margin: 12px 0 0; }
 .bb-comparison-details { padding-top: 4px; }
 .bb-comparison-details > .bb-comparison-note { margin-top: 0; }

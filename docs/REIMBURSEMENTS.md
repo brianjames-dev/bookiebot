@@ -7,6 +7,7 @@ For a $200 purchase split equally, the payer initially records $200 and is owed 
 ## Phone workflow
 
 - **Owed to you / You owe** shows both directions and the net difference. The month segments describe which purchases make up the selected balance.
+- A direction with no outstanding debt shows a simple message. Existing settled history remains available; an empty direction has no expense-list disclosure.
 - Expand an expense to see its split, confirmed payments and remaining amount.
 - **Record received** confirms a full or partial amount already received.
 - **Record sent payment** records the debtor's report. It stays pending until the recipient selects **Confirm received**. Pending reports must be resolved before recording another direct receipt or offset for that expense.

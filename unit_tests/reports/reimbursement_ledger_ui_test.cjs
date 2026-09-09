@@ -47,6 +47,7 @@ const fallback = React.createElement("p", null, "Legacy reimbursement overview")
 const markup = renderToStaticMarkup(React.createElement(ReimbursementLedger, { fallback }))
 assert.ok(markup.includes("Loading reimbursements"))
 assert.ok(!markup.includes("$0") && !markup.includes("Legacy reimbursement overview"))
+assert.ok(!markup.includes("currently owes") && !markup.includes("currently owe"), "Loading is not a confirmed zero-debt state")
 for (const [amount, expected] of [["0.29", 29], [" 10.5 ", 1050], ["0", 0]]) assert.equal(reimbursementAmountCents(amount), expected)
 for (const amount of ["-1", "1.001", "1e3", "Infinity", "1,000", "$10", ""]) assert.equal(reimbursementAmountCents(amount), null)
 const clone = value => JSON.parse(JSON.stringify(value))
@@ -156,6 +157,77 @@ async function compactAndSentContracts() {
   assert.ok(text(tree.root).includes("You owe$60.00"), "Reporting a sent payment does not reduce debt before recipient confirmation")
   assert.ok(text(tree.root).includes("awaiting confirmation"))
   assert.deepEqual(dispatched, ["bookiebot:reimbursements-changed"])
+  await unmount(tree)
+}
+
+async function emptyDirectionsAndMarkerContracts() {
+  let state = fixture({ post: (body, state) => {
+    assert.equal(body.operation, "confirm_payment")
+    state.snapshot.events.find(event => event.id === body.eventId).status = "confirmed"
+    const item = state.snapshot.allocations.find(item => item.id === body.allocationId)
+    item.settledCents += 1000; item.outstandingCents -= 1000; item.version++
+    return response(clone(state.snapshot))
+  } })
+  state.snapshot.allocations = state.snapshot.allocations.filter(item => item.payerOwner === "brian")
+  state.snapshot.events.push(receipt({ id: "pending-a", kind: "report_payment", actorOwner: "hannah", amountCents: 1000, status: "pending" }))
+  state.snapshot.projectionPending = true
+  state.snapshot.error = "The worksheet view needs another sync."
+  let tree = await mount()
+  const list = button(tree.root, "View ", true)
+  const marker = list.find(node => hasClass(node, "bb-disclosure-mark"))
+  assert.equal(marker.props["aria-hidden"], "true")
+  assert.deepEqual(marker.children, [], "The disclosure mark is made of CSS strokes rather than swapping text glyphs")
+  for (const expanded of [true, false, true, false]) {
+    await tap(list)
+    assert.equal(list.props["aria-expanded"], expanded)
+    assert.equal(list.find(node => hasClass(node, "bb-disclosure-mark")), marker, "Rapid toggles preserve the same animating stroke element")
+    assert.equal(tree.root.find(node => typeof node.type === "string" && node.props.id === list.props["aria-controls"]).props["aria-hidden"], !expanded)
+  }
+  await tap(button(tree.root, "You owe", true))
+  assert.ok(text(tree.root).includes("You don’t currently owe any money."))
+  assert.equal(tree.root.findAll(node => hasClass(node, "bb-ledger-net")).length, 0, "An empty direction does not show the opposite direction's net balance")
+  assert.equal(button(tree.root, "View ", true), undefined, "No records means no empty expandable list")
+  assert.ok(text(tree.root).includes("Recorded. Expense sheets are still syncing."))
+  assert.ok(text(tree.root).includes("The worksheet view needs another sync."))
+  assert.ok(text(tree.root).includes("Awaiting your confirmation"), "Necessary incoming payment review remains available from an empty direction")
+  await tap(button(tree.root, "Review")); await tap(button(tree.root, "Confirm received"))
+  assert.equal(writes(state).length, 1)
+  assert.ok(!text(tree.root).includes("Awaiting your confirmation"))
+  assert.ok(text(tree.root).includes("You don’t currently owe any money."))
+  await tap(button(tree.root, "Owed to you", true))
+  assert.ok(button(tree.root, "View 3 expenses"))
+  assert.ok(text(tree.root).includes("Net owed to you$95.00"))
+  await unmount(tree)
+
+  state = fixture()
+  state.snapshot.allocations = [clone(sample.allocations[2])]
+  state.snapshot.events = []
+  tree = await mount()
+  assert.ok(text(tree.root).includes("No one currently owes you money."))
+  assert.equal(button(tree.root, "View ", true), undefined)
+  assert.equal(tree.root.findAll(node => hasClass(node, "bb-ledger-net")).length, 0)
+  await tap(button(tree.root, "You owe", true)); await expand(tree, "Hannah groceries")
+  assert.ok(button(tree.root, "Record sent payment"), "The populated direction keeps its legitimate actions")
+  state.snapshot.allocations[0].settledCents = 6000; state.snapshot.allocations[0].outstandingCents = 0
+  state.snapshot.allocations[0].status = "settled"; state.snapshot.allocations[0].version++
+  state.snapshot.events = [receipt({ allocationId: "c", payeeOwner: "hannah", debtorOwner: "brian", actorOwner: "hannah", amountCents: 6000 })]
+  await act(async () => { for (const callback of listeners.window.get("focus")) callback(); await flush() })
+  assert.ok(text(tree.root).includes("You don’t currently owe any money."))
+  assert.equal(tree.root.findAll(node => hasClass(node, "bb-ledger-net")).length, 0)
+  assert.ok(button(tree.root, "View 1 expense"), "A paid record remains accessible after its outstanding balance reaches zero")
+  await tap(button(tree.root, "History (1)"))
+  assert.ok(text(tree.root).includes("$60.00"))
+  assert.equal(button(tree.root, "Record sent payment"), undefined)
+  await unmount(tree)
+
+  state = fixture({ post: () => { throw Error("Response lost") } })
+  state.snapshot.allocations = state.snapshot.allocations.filter(item => item.payerOwner === "brian")
+  tree = await mount(); await expand(tree, "PG&E"); await tap(button(tree.root, "Record received")); await fill(tree, "Amount", "1.00"); await submit(tree)
+  await tap(button(tree.root, "You owe", true))
+  assert.ok(text(tree.root).includes("You don’t currently owe any money."))
+  assert.ok(text(tree.root).includes("This record may have saved."))
+  assert.ok(button(tree.root, "Retry this record"), "Changing to an empty direction does not discard uncertain-write recovery")
+  assert.equal(writes(state).length, 1)
   await unmount(tree)
 }
 
@@ -368,6 +440,7 @@ async function inFlightContracts() {
 
 ;(async () => {
   await compactAndSentContracts()
+  await emptyDirectionsAndMarkerContracts()
   await receiptAndReversalContracts()
   await confirmationAndOffsetContracts()
   await pendingAndDateContracts()

@@ -6,6 +6,7 @@
 .bb-ledger-directions > button[aria-pressed="true"] { color: hsl(var(--primary)); }
 .bb-ledger-net { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; font-size: 12px; color: hsl(var(--muted-foreground)); }
 .bb-ledger-net strong { font-weight: 500; color: hsl(var(--foreground)); font-variant-numeric: tabular-nums; }
+.bb-ledger-empty { margin: 16px 0; color: hsl(var(--muted-foreground)); font-size: 14px; line-height: 1.5; }
 .bb-ledger-timeline { margin-top: 22px; }
 .bb-ledger-note { font-size: 12px; color: hsl(var(--muted-foreground)); line-height: 1.5; margin: 10px 0; overflow-wrap: anywhere; }
 .bb-ledger-message { margin: 12px 0; font-size: 13px; line-height: 1.5; }
@@ -14,6 +15,8 @@
 .bb-ledger-message button:hover, .bb-ledger-actions button:hover, .bb-ledger-incoming-row > button:hover, .bb-ledger-history-row > button:hover { background: hsl(var(--foreground) / .06); }
 .bb-ledger-offset-toggle { display: block; padding: 5px 0; margin-top: 12px; border: 0; background: transparent; color: hsl(var(--primary)); font-size: 12px; }
 .bb-ledger-list-toggle { width: 100%; display: flex; justify-content: space-between; align-items: center; gap: 12px; margin-top: 16px; padding: 10px 0; border: 0; background: transparent; text-align: left; font-size: 14px; }
+.bb-ledger-list-toggle .bb-disclosure-mark { flex-shrink: 0; }
+.bb-ledger-list-toggle[aria-expanded="true"] .bb-disclosure-mark::after { transform: rotate(0deg); }
 .bb-ledger-actions { display: flex; flex-wrap: wrap; gap: 8px; margin: 14px 0 4px; }
 .bb-canonical-reimbursements .bb-reimbursement-group > .bb-reimbursement-entry { border-bottom: 0; }
 .bb-ledger-form { margin: 18px 0 8px; }
