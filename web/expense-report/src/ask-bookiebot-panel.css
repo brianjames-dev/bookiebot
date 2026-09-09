@@ -9,7 +9,10 @@
   margin: 0;
   padding: 0;
   border: 0;
-  overflow: hidden;
+  /* Unlike hidden, clip cannot acquire a programmatic horizontal scroll offset
+     when native dialog autofocus encounters the offscreen panel. */
+  overflow: clip;
+  outline: none;
   background: transparent;
   color: hsl(var(--foreground));
 }
@@ -19,7 +22,8 @@
   inset: 0;
   background: #07120e66;
   opacity: 0;
-  transition: opacity 240ms var(--bb-motion-ease);
+  transition: opacity var(--bb-motion-duration) var(--bb-motion-ease);
+  will-change: opacity;
 }
 .bb-ask-dialog .bb-ask-panel-surface {
   position: absolute;
@@ -33,19 +37,22 @@
   min-height: 0;
   overflow: hidden;
   border-radius: 26px;
-  background: hsl(var(--card) / .98);
-  -webkit-backdrop-filter: blur(20px);
-  backdrop-filter: blur(20px);
+  /* Keep glass on the small toolbars; a nearly opaque reading surface does
+     not need to resample and blur every chart underneath during its slide. */
+  background: hsl(var(--card));
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
   color: hsl(var(--foreground));
   box-shadow: 0 18px 70px #0003, inset 0 1px 0 #fff2;
   touch-action: auto;
   visibility: visible;
   translate: none;
-  transform: translateX(calc(100% + 20px));
-  transition: transform 240ms var(--bb-motion-ease);
+  transform: translate3d(calc(100% + 20px), 0, 0);
+  transition: transform var(--bb-motion-duration) var(--bb-motion-ease);
+  will-change: transform;
 }
 .bb-ask-dialog[data-open="true"] .bb-ask-panel-shade { opacity: 1; }
-.bb-ask-dialog[data-open="true"] .bb-ask-panel-surface { transform: translateX(0); }
+.bb-ask-dialog[data-open="true"] .bb-ask-panel-surface { transform: translate3d(0, 0, 0); }
 .bb-ask-panel-header {
   display: flex;
   align-items: center;

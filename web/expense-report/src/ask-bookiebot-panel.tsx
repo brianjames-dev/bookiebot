@@ -1,4 +1,4 @@
-import { useId, useLayoutEffect, useRef, useState } from "react"
+import { useId, useLayoutEffect, useRef, useState, type RefObject } from "react"
 import { createPortal } from "react-dom"
 import { Panel } from "konsta/react"
 import { ReportQuestions } from "./report-questions"
@@ -11,13 +11,19 @@ export interface AskBookieBotPanelProps {
   month: string
   mode: QuestionMode
   onShowSource?: (section: string) => void
+  openerRef?: RefObject<HTMLElement | null>
 }
 
 /** The wrapper stays mounted: dismissing it never disposes the question client. */
-export function AskBookieBotPanel({ open, onClose, month, mode, onShowSource }: AskBookieBotPanelProps) {
+export function AskBookieBotPanel({ open, onClose, month, mode, onShowSource, openerRef }: AskBookieBotPanelProps) {
   const dialogRef = useRef<HTMLDialogElement>(null)
+  const surfaceRef = useRef<HTMLDivElement>(null)
   const titleRef = useRef<HTMLHeadingElement>(null)
   const returnFocus = useRef<HTMLElement | null>(null)
+  const requestedOpen = useRef(open)
+  requestedOpen.current = open
+  const pendingSource = useRef<string | null>(null)
+  const closeTimer = useRef(0)
   const [present, setPresent] = useState(false)
   const [visible, setVisible] = useState(false)
   const titleId = useId()
@@ -25,34 +31,47 @@ export function AskBookieBotPanel({ open, onClose, month, mode, onShowSource }: 
   const monthLabel = /^\d{4}-\d{2}$/.test(month)
     ? new Date(`${month}-01T12:00:00`).toLocaleDateString("en-US", { month: "long", year: "numeric" }) : month
 
+  const finishClose = () => {
+    if (requestedOpen.current || !dialogRef.current?.open) return
+    window.clearTimeout(closeTimer.current)
+    dialogRef.current.close()
+    if (returnFocus.current?.isConnected) returnFocus.current.focus({ preventScroll: true })
+    returnFocus.current = null
+    setPresent(false)
+  }
+
+  useLayoutEffect(() => { pendingSource.current = null }, [month, mode])
+
   useLayoutEffect(() => {
     const dialog = dialogRef.current
     if (!dialog) return
     let frame = 0
-    let timer = 0
     if (open) {
+      pendingSource.current = null
       if (!dialog.open) {
-        returnFocus.current = document.activeElement instanceof HTMLElement ? document.activeElement : null
-        titleRef.current?.setAttribute("autofocus", "")
+        returnFocus.current = openerRef?.current ?? (document.activeElement instanceof HTMLElement ? document.activeElement : null)
+        // Native showModal autofocus must target the stationary host. Focusing
+        // an offscreen sliding heading first makes WebKit scroll the dialog
+        // horizontally, then jump back when the transition ends.
+        dialog.setAttribute("autofocus", "")
         dialog.showModal()
         titleRef.current?.focus({ preventScroll: true })
+        setPresent(true)
+        // Establish the closed pose only on a fresh presentation. A reopen
+        // during exit reverses the current CSS transition without a frame reset.
+        frame = requestAnimationFrame(() => {
+          frame = requestAnimationFrame(() => setVisible(true))
+        })
+      } else {
+        setVisible(true)
       }
-      setPresent(true)
-      // Keep the closed pose for the first paint, including a rapid reopen.
-      frame = requestAnimationFrame(() => {
-        frame = requestAnimationFrame(() => setVisible(true))
-      })
     } else {
       setVisible(false)
-      const finish = () => {
-        if (dialog.open) dialog.close()
-        if (returnFocus.current?.isConnected) returnFocus.current.focus({ preventScroll: true })
-        returnFocus.current = null
-        setPresent(false)
-      }
-      if (dialog.open) timer = window.setTimeout(finish, window.matchMedia("(prefers-reduced-motion: reduce)").matches ? 0 : 240)
+      // Normal completion comes from the surface's transform transitionend.
+      // The buffered fallback also covers no-motion, interrupted or hidden tabs.
+      if (dialog.open) closeTimer.current = window.setTimeout(finishClose, window.matchMedia("(prefers-reduced-motion: reduce)").matches ? 0 : 320)
     }
-    return () => { cancelAnimationFrame(frame); window.clearTimeout(timer) }
+    return () => { cancelAnimationFrame(frame); window.clearTimeout(closeTimer.current) }
   }, [open])
 
   useLayoutEffect(() => {
@@ -98,9 +117,18 @@ export function AskBookieBotPanel({ open, onClose, month, mode, onShowSource }: 
     }
   }, [present])
 
+  useLayoutEffect(() => {
+    // Restore the page lock first, then navigate. Switching screens behind a
+    // moving panel repaints the backdrop and can overwrite saved scroll offsets.
+    if (present || !pendingSource.current) return
+    const source = pendingSource.current
+    pendingSource.current = null
+    onShowSource?.(source)
+  }, [present, onShowSource])
+
   if (typeof document === "undefined") return null
   return createPortal(
-    <dialog ref={dialogRef} className="bb-ask-dialog" data-open={visible ? "true" : "false"}
+    <dialog ref={dialogRef} tabIndex={-1} className="bb-ask-dialog" data-open={visible ? "true" : "false"}
       aria-labelledby={titleId} aria-describedby={contextId}
       onCancel={(event) => { event.preventDefault(); onClose() }}
       onKeyDown={(event) => {
@@ -121,7 +149,10 @@ export function AskBookieBotPanel({ open, onClose, month, mode, onShowSource }: 
       }}
       onClick={(event) => { if (event.target === event.currentTarget) onClose() }}>
       <div className="bb-ask-panel-shade" aria-hidden="true" onClick={onClose} />
-      <Panel floating side="right" opened={visible} backdrop={false} className="bb-ask-panel-surface">
+      <Panel ref={surfaceRef} floating side="right" opened={visible} backdrop={false} className="bb-ask-panel-surface"
+        onTransitionEnd={(event: React.TransitionEvent<HTMLDivElement>) => {
+          if (event.target === surfaceRef.current && event.propertyName === "transform") finishClose()
+        }}>
         <header className="bb-ask-panel-header">
           <div><h2 id={titleId} ref={titleRef} tabIndex={-1}>Ask BookieBot</h2>
             <p id={contextId}>{monthLabel} <span aria-hidden="true">·</span> {mode === "current" ? "Current" : "Projected"}</p></div>
@@ -131,8 +162,8 @@ export function AskBookieBotPanel({ open, onClose, month, mode, onShowSource }: 
         </header>
         <div className="bb-ask-panel-body">
           <ReportQuestions embedded month={month} mode={mode} onShowSource={onShowSource ? (source) => {
+            pendingSource.current = source
             onClose()
-            onShowSource(source)
           } : undefined} />
         </div>
       </Panel>

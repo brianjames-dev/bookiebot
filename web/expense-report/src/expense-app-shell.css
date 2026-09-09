@@ -1,10 +1,17 @@
 .bb-app-shell { --bb-nav-height: 92px; padding-bottom: calc(var(--bb-nav-height) + env(safe-area-inset-bottom, 0px) + 24px); }
 .bb-app-shell [hidden], .bb-app-shell .bb-main[hidden], .bb-app-shell .bb-page-header[hidden] { display: none !important; }
-.bb-app-shell .bb-shell-masthead { padding-top: max(18px, env(safe-area-inset-top, 0px)); }
-.bb-app-shell .bb-shell-header-actions { display: flex; align-items: center; gap: 4px; flex-shrink: 0; }
-.bb-app-shell .bb-shell-icon { border: 0; background: transparent; color: hsl(var(--foreground)); border-radius: 50%; width: 44px; height: 44px; display: grid; place-items: center; cursor: pointer; }
+.bb-app-shell .bb-shell-masthead { box-sizing: border-box; min-height: calc(max(18px, env(safe-area-inset-top, 0px)) + 64px); padding-top: max(18px, env(safe-area-inset-top, 0px)); padding-right: 108px; }
+.bb-app-shell .bb-shell-masthead .bb-wordmark { min-width: 0; }
+.bb-app-shell .bb-shell-header-actions { position: fixed; z-index: 60; top: max(18px, env(safe-area-inset-top, 0px)); right: max(var(--bb-page-gutter), calc((100vw - var(--bb-content-max)) / 2), env(safe-area-inset-right, 0px)); width: 96px; height: 52px; margin: 0; padding: 0; pointer-events: none; }
+.bb-app-shell .bb-shell-toolbar-inner { width: 100%; height: 52px; padding: 0; }
+.bb-app-shell .bb-shell-toolbar-pane { box-sizing: border-box; width: 100%; padding: 4px; color: hsl(var(--foreground)); pointer-events: auto; touch-action: manipulation; }
+.bb-app-shell .bb-shell-icon { appearance: none; flex: 0 0 44px; border: 0; padding: 0; background: transparent; color: hsl(var(--foreground)); border-radius: 50%; width: 44px; height: 44px; display: grid; place-items: center; cursor: pointer; -webkit-tap-highlight-color: transparent; transition: background-color var(--bb-motion-duration) var(--bb-motion-ease), color var(--bb-motion-duration) var(--bb-motion-ease); }
 .bb-shell-icon svg { width: 21px; height: 21px; }
-.bb-app-shell .bb-shell-icon:hover, .bb-app-shell .bb-shell-icon[aria-current="page"] { background: hsl(var(--foreground) / .06); color: hsl(var(--primary)); }
+.bb-app-shell .bb-shell-icon[aria-current="page"], .bb-app-shell .bb-shell-icon[aria-expanded="true"] { background: hsl(var(--foreground) / .06); color: hsl(var(--primary)); }
+.bb-app-shell .bb-shell-icon:focus:not(:focus-visible) { outline: none; box-shadow: none; }
+.bb-app-shell .bb-shell-icon:focus-visible { outline: 2px solid hsl(var(--primary)); outline-offset: 1px; }
+.bb-app-shell .bb-shell-icon:disabled { opacity: .45; cursor: default; }
+@media (hover: hover) { .bb-app-shell .bb-shell-icon:hover:not(:disabled) { background: hsl(var(--foreground) / .06); color: hsl(var(--primary)); } }
 .bb-app-shell .bb-report-screen { width: 100%; }
 .bb-app-shell .bb-report-content > .bb-main { gap: 0; }
 .bb-app-shell .bb-report-content { min-width: 0; }
@@ -44,9 +51,9 @@
 .bb-setting-switch[aria-checked="true"] span { transform: translateX(20px); }
 .bb-app-shell[data-keyboard-open="true"] .bb-app-update { bottom: 12px; }
 @media (min-width: 861px) { .bb-app-shell .bb-bottom-navigation { bottom: 12px; } .bb-app-shell .bb-shell-masthead { margin-bottom: 26px; } }
-@media (max-width: 390px) { .bb-app-shell .bb-wordmark { gap: 7px; font-size: 17px; } .bb-app-shell .bb-app-avatar { width: 36px; height: 36px; } .bb-app-shell .bb-report-owner { font-size: 12px; } .bb-app-shell .bb-shell-header-actions { gap: 0; } }
+@media (max-width: 390px) { .bb-app-shell .bb-wordmark { gap: 7px; font-size: 17px; } .bb-app-shell .bb-app-avatar { width: 36px; height: 36px; } .bb-app-shell .bb-report-owner { font-size: 12px; } }
 @media (max-width: 480px) {
   .bb-app-shell .bb-page-header { grid-template-columns: minmax(0, 1fr) 44px; gap: 8px 12px; }
   .bb-app-shell .bb-page-header .bb-app-status { grid-column: 1 / -1; grid-row: 3; justify-self: start; max-width: none; }
 }
-@media (prefers-reduced-motion: reduce) { .bb-app-shell .bb-bottom-navigation *, .bb-app-shell .bb-setting-switch * { transition-duration: 0ms !important; } }
+@media (prefers-reduced-motion: reduce) { .bb-app-shell .bb-bottom-navigation *, .bb-app-shell .bb-setting-switch *, .bb-app-shell .bb-shell-icon { transition-duration: 0ms !important; } }

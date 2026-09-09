@@ -74,7 +74,7 @@ let guard
 function Observe() { guard = useAppWorkGuard(); return null }
 const report = { ownerName: 'Brian', year: 2026, month: 9, monthLabel: 'September 2026', generatedAt: 'first', burnRate: {} }
 const props = data => ({ report: data, controls: h('p', null, 'Refresh fixture'), monthControl: h('p', null, 'Month fixture'), comparison: h('p', null, 'Comparison fixture'), avatarUrl: '/synthetic-avatar.png', initialVersion: 'shell-version-1', signingOut: false, signOut() { signouts++ } })
-const shell = data => h(AppWorkGuardProvider, null, h(Observe), h(ExpenseAppShell, props(data)))
+const shell = data => h(konsta.exports.KonstaProvider, { theme: 'ios', dark: true }, h(AppWorkGuardProvider, null, h(Observe), h(ExpenseAppShell, props(data))))
 const flush = async () => { for (let i = 0; i < 32; i++) await Promise.resolve() }
 const run = async fn => act(async () => { fn(); await flush() })
 const response = (data, status = 200) => ({ status, ok: status < 400, json: async () => data })
@@ -104,6 +104,18 @@ async function main() {
   let tree
   await run(() => { tree = create(shell(report)) })
   assert.equal(screen(tree), 'overview'); assert.equal(reads.goals, 1); assert.equal(reads.reimbursements, 1)
+  const tools = tree.root.findAll(node => node.type === 'div' && node.props.role === 'group' && node.props['aria-label'] === 'BookieBot tools')[0]
+  assert.ok(tools.props.className.includes('k-toolbar'), 'Persistent actions use the installed Konsta top Toolbar')
+  assert.ok(tools.findAll(node => node.type === 'div' && node.props.className?.includes('k-toolbar-pane')).length, 'Toolbar actions share the Konsta glass pane')
+  const askTrigger = button(tree, 'Ask BookieBot')
+  assert.equal(askTrigger.props['aria-haspopup'], 'dialog')
+  assert.equal(askTrigger.props['aria-expanded'], false)
+  await run(() => askTrigger.props.onClick({ currentTarget: { focus() { throw Error('A pointer tap must not force focus') } } }))
+  assert.equal(ask.open, true)
+  assert.equal(button(tree, 'Ask BookieBot').props['aria-expanded'], true)
+  assert.ok(ask.openerRef, 'The dialog gets an explicit opener for accessible return focus without forcing focus on tap')
+  await run(() => ask.onClose())
+  assert.equal(button(tree, 'Ask BookieBot').props['aria-expanded'], false)
   const initialReportInstance = rawReport(tree).props['data-report-instance']
   for (const label of ['Overview', 'Spending', 'Shared', 'Savings']) {
     const node = button(tree, label)
@@ -118,6 +130,8 @@ async function main() {
   const disclosure = tree.root.findAllByType('button').filter(visible).find(node => node.props.className === 'bb-reimbursement-toggle')
   await run(() => disclosure.props.onClick()); await tap(tree, 'Record received'); await fill(tree, 'Amount ($)', '37.25'); await fill(tree, 'Note', 'Payment draft')
   await tap(tree, 'Settings'); await tap(tree, 'Notification fixture')
+  assert.equal(button(tree, 'Settings').props['aria-current'], 'page')
+  assert.ok(visible(tools), 'Header tools remain accessible on Settings')
   for (const name of ['Overview', 'Spending', 'Shared', 'Savings', 'Settings']) await tap(tree, name)
   assert.equal(reads.goals, 1); assert.equal(reads.reimbursements, 1, 'Navigating all screens never recreates financial controllers')
   assert.equal(rawReport(tree).props['data-report-instance'], initialReportInstance)

@@ -11,12 +11,12 @@ global.IS_REACT_ACT_ENVIRONMENT = true
 const frames = new Map(), timers = new Map(), nodes = new Map(), requests = [], sources = []
 let sequence = 0
 class Element {
-  constructor() { this.style = { overflow: "", paddingRight: "", setProperty(name, value) { this[name] = value } }; this.dataset = {}; this.isConnected = true; this.open = false; this.clientWidth = 390 }
+  constructor() { this.style = { overflow: "", paddingRight: "", setProperty(name, value) { this[name] = value } }; this.dataset = {}; this.attributes = {}; this.isConnected = true; this.open = false; this.clientWidth = 390; this.presentations = 0 }
   focus() { document.activeElement = this }
-  setAttribute() {}
+  setAttribute(name, value) { this.attributes[name] = value }
   addEventListener() {}
   removeEventListener() {}
-  showModal() { this.open = true }
+  showModal() { assert.equal(this.attributes.autofocus, "", "Native autofocus targets the stationary host before any moving content"); this.open = true; this.presentations++ }
   close() { this.open = false }
   getClientRects() { return [{}] }
   closest() { return null }
@@ -93,10 +93,16 @@ async function main() {
   await act(async () => closeButton().props.onClick())
   assert.equal(panel().props.opened, false)
   assert.equal(dialog().open, true, "Native focus trap persists through the exit animation")
-  assert.equal([...timers.values()][0].delay, 240)
+  assert.equal([...timers.values()][0].delay, 320, "Buffered fallback does not cut off a late final animation frame")
   assert.equal(requests[0].options.signal.aborted, false, "Closing does not cancel the in-flight read")
-  await finishClose()
+  const transitionEnd = event => act(async () => panel().props.onTransitionEnd(event))
+  const surface = () => [...nodes.entries()].find(([key]) => key.includes("bb-ask-panel-surface"))[1]
+  await transitionEnd({ target: new Element(), propertyName: "transform" })
+  await transitionEnd({ target: surface(), propertyName: "opacity" })
+  assert.equal(dialog().open, true, "Nested/unrelated transitions cannot close the modal early")
+  await transitionEnd({ target: surface(), propertyName: "transform" })
   assert.equal(dialog().open, false); assert.equal(document.activeElement, opener)
+  assert.equal(timers.size, 0, "Actual transform completion cancels the fallback timer")
   assert.equal(document.documentElement.style.overflow, "")
   await act(async () => { requests[0].resolve(response()); await flush() })
   assert.equal(work.pending, false)
@@ -105,7 +111,8 @@ async function main() {
   assert.ok(text().includes("You have $300 left."), "Hidden completion remains available when reopened")
   assert.equal(requests.length, 1)
   await act(async () => tree.root.findAllByType("button").find(node => node.children.join("") === "Headline totals").props.onClick())
-  assert.deepEqual(sources, ["overview"]); await finishClose()
+  assert.deepEqual(sources, [], "Source navigation waits until the panel has closed")
+  await finishClose(); assert.deepEqual(sources, ["overview"])
   await act(async () => controls.setMonth("2026-08"))
   assert.equal(textarea().props.value, ""); assert.equal(work.dirty, false)
   assert.ok(!text().includes("You have $300 left."))
@@ -119,7 +126,13 @@ async function main() {
   let prevented = false
   await act(async () => tree.root.findByProps({ className: "bb-ask-dialog" }).props.onCancel({ preventDefault() { prevented = true } }))
   assert.equal(prevented, true); assert.equal(dialog().open, true)
-  await act(async () => controls.setOpen(true)); await frame(); await frame(); await finishClose()
+  const presentations = dialog().presentations
+  await act(async () => controls.setOpen(true))
+  assert.equal(panel().props.opened, true, "Rapid reopen reverses immediately instead of waiting for another cold-entry frame")
+  assert.equal(frames.size, 0)
+  assert.equal(dialog().presentations, presentations, "Reversal does not repeat native autofocus")
+  await transitionEnd({ target: surface(), propertyName: "transform" })
+  await finishClose()
   assert.equal(dialog().open, true, "Rapid reopening cancels a stale close timer")
   await act(async () => tree.unmount())
   assert.equal(document.documentElement.style.overflow, "", "Unmount releases the page lock")

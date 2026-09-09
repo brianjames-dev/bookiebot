@@ -1,5 +1,5 @@
 import { useEffect, useLayoutEffect, useRef, useState, type ComponentProps, type ReactNode } from "react"
-import { Tabbar, TabbarLink, ToolbarPane } from "konsta/react"
+import { Tabbar, TabbarLink, Toolbar, ToolbarPane } from "konsta/react"
 import { ArrowLeft, House, MessageCircle, PiggyBank, ReceiptText, Settings, Users } from "lucide-react"
 import { AppNavigationContext, nextScrollNavigation, screenForReportSource, screenTitles, type AppScreen, type MainScreen, type ScrollNavigationState } from "./app-navigation"
 import { ExpenseReportApp, useExpenseReportTheme } from "./report-app"
@@ -40,6 +40,7 @@ export function ExpenseAppShell({ report, controls, monthControl, comparison, av
   const [availableVersion, setAvailableVersion] = useState<string | null>(null)
   const [compact, setCompact] = useState(false)
   const [keyboardOpen, setKeyboardOpen] = useState(false)
+  const askTriggerRef = useRef<HTMLButtonElement>(null)
   const screenRef = useRef(screen)
   const positions = useRef<Partial<Record<AppScreen, number>>>({})
   const sourceId = useRef(0)
@@ -121,10 +122,12 @@ export function ExpenseAppShell({ report, controls, monthControl, comparison, av
     <div className="bb-page bb-app-shell k-ios" data-screen={screen} data-keyboard-open={keyboardOpen}>
       <header className="bb-masthead bb-shell-masthead">
         <span className="bb-wordmark"><img className="bb-app-avatar" src={avatarUrl} alt="" />BookieBot<span className="bb-report-owner"><span aria-hidden="true">•</span>{" "}{report.ownerName}</span></span>
-        <div className="bb-shell-header-actions">
-          <button type="button" className="bb-shell-icon" aria-label="Ask BookieBot" aria-expanded={askOpen} disabled={!monthlyReady} onClick={event => { event.currentTarget.focus({ preventScroll: true }); setAskOpen(true) }}><MessageCircle aria-hidden="true" /></button>
-          <button type="button" className="bb-shell-icon" aria-label="Settings" aria-current={screen === "settings" ? "page" : undefined} onClick={() => selectScreen(screen === "settings" ? lastMain : "settings")}><Settings aria-hidden="true" /></button>
-        </div>
+        <Toolbar top className="bb-shell-header-actions" role="group" aria-label="BookieBot tools" innerClassName="bb-shell-toolbar-inner">
+          <ToolbarPane className="bb-shell-toolbar-pane">
+            <button ref={askTriggerRef} type="button" className="bb-shell-icon" aria-label="Ask BookieBot" aria-haspopup="dialog" aria-expanded={askOpen && monthlyReady} disabled={!monthlyReady} onClick={() => setAskOpen(true)}><MessageCircle aria-hidden="true" /></button>
+            <button type="button" className="bb-shell-icon" aria-label="Settings" aria-current={screen === "settings" ? "page" : undefined} onClick={() => selectScreen(screen === "settings" ? lastMain : "settings")}><Settings aria-hidden="true" /></button>
+          </ToolbarPane>
+        </Toolbar>
       </header>
 
       <div className="bb-shell-report" hidden={!reportVisible || !monthlyReady}>
@@ -166,7 +169,7 @@ export function ExpenseAppShell({ report, controls, monthControl, comparison, av
             label={screenTitles[id]} icon={<Icon size={23} strokeWidth={1.7} aria-hidden="true" />} onClick={() => selectScreen(id)} />)}
         </ToolbarPane>
       </Tabbar>
-      <AskBookieBotPanel open={askOpen && monthlyReady} onClose={() => setAskOpen(false)} month={questionMonth ?? `${report.year}-${String(report.month).padStart(2, "0")}`} mode={preferences.mode} onShowSource={showSource} />
+      <AskBookieBotPanel open={askOpen && monthlyReady} openerRef={askTriggerRef} onClose={() => setAskOpen(false)} month={questionMonth ?? `${report.year}-${String(report.month).padStart(2, "0")}`} mode={preferences.mode} onShowSource={showSource} />
       <AppUpdatePrompt initialVersion={initialVersion} onAvailabilityChange={setAvailableVersion} />
     </div>
   </AppNavigationContext.Provider>

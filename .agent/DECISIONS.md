@@ -1,5 +1,11 @@
 # Agent Decisions
 
+## 2026-09-09 - Persistent Header Tools And Stable Ask Panel Motion
+
+Use the installed Konsta top Toolbar and ToolbarPane for a compact glass chat/Settings capsule, fixed within the page gutter and safe area on every authenticated screen. Reserve masthead space, retain 44px native buttons and explicit keyboard focus styling, and avoid forcing focus on pointer taps. Keep the existing Konsta side panel rather than introducing a second messaging surface.
+
+Native dialog autofocus targets its stationary host before the offscreen heading receives preventScroll focus; overflow: clip prevents WebKit from acquiring the horizontal scroll offset that caused the measured end-of-animation snap. Animate the opaque reading surface with the shared 240ms transform duration, leaving glass blur on the small toolbar. Preserve the native modal and scroll lock until the surface transform completes, with a buffered fallback and reduced-motion handling. Rapid reopening reverses the current transition; source navigation waits for dismissal and scroll restoration. Drafts, pending questions and owner/month/mode scope retain their existing behavior.
+
 ## 2026-09-09 - Optional Scriptable Widgets With Separate Read-Only Pairing
 
 Keep the deployed web app; distribute a small/medium Scriptable widget from Settings → Widgets without a native build or Apple developer membership. Pair separately from each authenticated owner's Settings using a one-use 256-bit `bbw_pair_` credential in a URL fragment (10-minute expiry). Exchange it for a separately namespaced `bbw_read_` bearer grant, stored only as a hash on the existing durable phone database. Grants expire after 365 days, have an owner-selected Current/Projected mode and explicit owner-scoped revocation; cap pending plus active connections at five per owner. Serialize pairing/redemption/revocation with the owner's database lock. Ordinary web sign-out leaves this separately paired access intact; `/expense_app_reset` also revokes all of that owner's widgets.
