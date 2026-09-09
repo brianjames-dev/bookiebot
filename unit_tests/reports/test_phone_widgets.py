@@ -410,6 +410,11 @@ async def test_widget_setup_pages_return_to_settings_without_pairing_or_exposing
     assert "inside the Scriptable app" in page and "Pair this phone" in page
     assert 'href="https://apps.apple.com/app/scriptable/id1405459188" target="_blank" rel="noreferrer"' in page
     assert "Copy script" in page
+    assert "Theme &amp; preview" in page
+    assert "version 1.3" in page and "No new pairing is needed" in page
+    assert "<code>editorial</code>" in page and "<code>two-tone</code>" in page
+    assert "An empty Parameter uses your saved theme" in page
+    assert "Never paste a setup code into Parameter" in page
     assert 'href="/app/widgets/script"' not in page and f'href="{ORIGIN}/app/widgets/script"' not in page
     assert "bbw_pair_" not in page and "bbw_read_" not in page
     assert issued["pairingToken"] not in page

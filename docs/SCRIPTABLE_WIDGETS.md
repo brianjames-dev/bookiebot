@@ -2,7 +2,15 @@
 
 Keep your existing BookieBot web app. [Scriptable](https://scriptable.app/) runs this optional Home Screen widget; there is no native BookieBot build, weekly signing or Apple developer membership.
 
-The small and medium widgets show your name, BookieBot avatar, Current/Projected view, budget remaining, available today, and the snapshot's update time. **Medium** gives the amounts more room. Each person pairs their own phone from their own BookieBot account.
+The small and medium widgets show your name, BookieBot avatar, Current/Projected view, budget remaining, available today, and the snapshot's update time. Both sizes offer **Editorial** and **Two-tone** themes. **Medium** gives the amounts more room. Each person pairs their own phone from their own BookieBot account.
+
+## Already connected? Add themes
+
+1. In **BookieBot → Settings → Widgets → Set up widget**, tap **Copy script**. Replace the code in your existing Scriptable script **without renaming it**. Its first line should end in **v1.3**. Your existing pairing stays usable; no new setup code is needed.
+2. Run that script in Scriptable → **Theme & preview** → choose **Editorial** or **Two-tone** → **Small** or **Medium**. The theme is saved as this script's default on this phone. Editorial is the starting default.
+3. To show both designs at once, choose the **same script** for each Home Screen widget. In **Edit Widget → Parameter**, enter `editorial` for one and `two-tone` for the other. An empty Parameter follows the saved default. Never put a setup code or private link in Parameter.
+
+Themes change appearance only. Both widgets keep the same account, Current/Projected mode, amounts and refresh behavior. Brian and Hannah choose their own themes independently. iOS controls when an existing Home Screen widget redraws; a successful preview does not force an immediate Home Screen update.
 
 ## Set up each iPhone
 
@@ -10,19 +18,19 @@ The small and medium widgets show your name, BookieBot avatar, Current/Projected
 2. In your existing **BookieBot → Settings → Widgets → Set up widget**, tap **Copy script**. In Scriptable, tap **+**, paste the code and name the script **BookieBot**. The code already contains the correct server address. If copying is blocked, select/copy the text shown below the button. The guide has **Back to Settings** at both ends; opening it keeps any pending setup code and form intact. Setup no longer sends you into a raw script/download screen with no app navigation.
 3. Back in **Settings → Widgets**, choose **Current** or **Projected**, create a pairing code and copy its private setup link. Run **BookieBot** inside Scriptable, paste the link when asked, and tap **Pair this phone**. The link expires after **10 minutes** and works once. Keep it private.
 4. Confirm the preview shows **your name** and the expected amounts. Run the same script again and choose **Refresh & preview** to check that the connection survived. In BookieBot, tap Widgets → **Refresh**: **Connected / Last checked** confirms a successful budget read. **Paired** alone only means the server accepted the setup code. The widget reads the current calendar month in BookieBot's Pacific timezone. Its view is the mode chosen for this connection in Settings, independent of the dashboard's selected view.
-5. Hold an empty area of the iPhone Home Screen, then **Edit → Add Widget → Scriptable**. Choose **Small** or **Medium**, add it, and tap **Done**. Hold the new widget, tap **Edit Widget**, and select the **BookieBot** script. Leave the parameter empty and **When Interacting → Open App** unchanged; the script sets its tap destination. Small and Medium can both select the same paired script and share its mode/access. These steps follow [Apple's widget setup guide](https://support.apple.com/en-us/118610).
+5. Hold an empty area of the iPhone Home Screen, then **Edit → Add Widget → Scriptable**. Choose **Small** or **Medium**, add it, and tap **Done**. Hold the new widget, tap **Edit Widget**, and select the **BookieBot** script. Leave Parameter empty to use your saved theme, and **When Interacting → Open App** unchanged; the script sets its tap destination. Small and Medium can both select the same paired script and share its mode/access. These steps follow [Apple's widget setup guide](https://support.apple.com/en-us/118610).
 6. Tap the widget once and check the destination described below. Repeat setup on the other person's phone using their own BookieBot Settings, never by sharing a pairing link.
 
 If the setup link expires or pairing fails, create a new one in BookieBot. Reusing a consumed link cannot recover a lost credential. Keep the Scriptable script's name unchanged after pairing; access is scoped to both that name and the BookieBot server.
 
 ## If you see “Pair this phone”
 
-The script is installed, but that copy cannot find a saved pairing. Versions 1.0–1.1 contained a native request-header assignment bug: pairing could succeed, then the first read could lose its authorization and clear the local connection. Install **version 1.2** before pairing again. A Home Screen preview does not complete setup, and opening the private setup link in a browser only shows instructions.
+The script is installed, but that copy cannot find a saved pairing. Versions 1.0–1.1 contained a native request-header assignment bug: pairing could succeed, then the first read could lose its authorization and clear the local connection. Install the latest script, **version 1.3**, before pairing again; it retains the authorization fix from version 1.2. A Home Screen preview does not complete setup, and opening the private setup link in a browser only shows instructions.
 
-1. In **Settings → Widgets → Set up widget**, tap **Copy script**. Replace all the code in your existing Scriptable **BookieBot** script without changing its name. The first line should end in **v1.2**. Website updates do not replace installed scripts.
+1. In **Settings → Widgets → Set up widget**, tap **Copy script**. Replace all the code in your existing Scriptable **BookieBot** script without changing its name. The first line should end in **v1.3**. Website updates do not replace installed scripts.
 2. Run that script inside the **Scriptable app itself**. If it asks to pair, create and copy one fresh setup code under **Settings → Widgets → Pair a widget**, then paste it into the script's prompt. Codes already used cannot recover a lost credential. If you have reached five connections, remove an unused failed connection first.
 3. Confirm your name and figures in the preview. Run the same script again: it should offer **Refresh & preview**, not ask to pair. Refresh the Widgets list in BookieBot and confirm **Connected / Last checked**. If pairing or secure storage reports an error, keep the exact error text; don't repeatedly create new codes.
-4. Hold each Home Screen widget → **Edit Widget** and choose that exact script. Both sizes can share it. Keep Parameter empty and When Interacting at Open App. If you renamed or imported a duplicate, choose the original paired script or pair the new copy with a fresh code. Remove obsolete connections from BookieBot once the working one is identified.
+4. Hold each Home Screen widget → **Edit Widget** and choose that exact script. Both sizes can share it. Leave Parameter empty for the saved theme (or enter `editorial` / `two-tone`), and keep When Interacting at Open App. If you renamed or imported a duplicate, choose the original paired script or pair the new copy with a fresh code. Remove obsolete connections from BookieBot once the working one is identified.
 
 Version **1.2** assigns complete native request headers and verifies that Scriptable can read back its secure credential before claiming pairing succeeded. It retains version 1.1's recovery tap destination and identity confirmation. No account, financial or grant migration is needed; an existing valid local pairing remains usable.
 
@@ -42,8 +50,8 @@ Budget amounts come from the same server calculations as the dashboard; the scri
 
 The script requests another refresh after 15 minutes. **iOS decides the actual timing**, and can delay it for battery or usage reasons; Scriptable's [`refreshAfterDate` is an earliest time, not a schedule guarantee](https://docs.scriptable.app/listwidget/#refreshafterdate). Opening the web app does not force iOS to redraw its widget.
 
-- **Updated** shows when BookieBot produced that snapshot, in the phone's local date/time. **Age** uses Scriptable's [native relative date](https://docs.scriptable.app/widgetdate/) so the displayed age can advance even between script runs.
-- **Stale** appears when a run cannot fetch fresh data, the snapshot is over 30 minutes old, or it belongs to an earlier Pacific day/month. The previous numbers and their original timestamp remain visible. If iOS has not run the script again, the age and timestamp are the freshness indicators; the Stale label itself cannot change until another run.
+- **Timestamp** shows when BookieBot produced that snapshot, in the phone's local date/time. Version 1.3 uses one compact absolute timestamp, so it remains meaningful even if iOS delays the next run.
+- **Stale** appears when a run cannot fetch fresh data, the snapshot is over 30 minutes old, or it belongs to an earlier Pacific day/month. The previous numbers and their original timestamp remain visible. If iOS has not run the script again, compare the timestamp with the current time; the Stale label itself cannot change until another run.
 - **Budget unavailable** means there is no usable snapshot. **—** means that particular metric is unavailable; it does not mean zero.
 - For an immediate check, open Scriptable, run **BookieBot**, and choose **Refresh & preview**. This requests a snapshot for the preview; within the five-minute server reuse window, it may show the same source data and timestamp. iOS still controls when the Home Screen redraws. For a live financial decision, open BookieBot and refresh there.
 
@@ -62,7 +70,7 @@ To remove it fully, revoke the connection in BookieBot, run the script and choos
 ## Quick acceptance check
 
 - Compare the two numbers with **Overview → Budget remaining** and **Burn Rate → Available today** for the same person, current month and mode. Check both Current and Projected after changing the widget connection's mode.
-- Preview Small and Medium; confirm the name, avatar and full amounts fit. The timestamp and age must remain visible.
+- Preview Small and Medium in both Editorial and Two-tone; confirm the name, avatar, full amounts and source timestamp fit. Set two Home Screen widgets to `editorial` and `two-tone`; both should keep the same pairing and figures. Clear Parameter to return to the saved default.
 - Tap the Home Screen widget: record whether your default browser opens, which account it shows, and whether it needs its own sign-in. The installed BookieBot icon should continue to work independently.
 - After one successful in-app preview, enable Airplane Mode and run **Refresh & preview**: the saved numbers should be marked **Stale**, with the original timestamp. To check the Home Screen widget's offline behavior, first let that widget itself fetch successfully online; a preview may use a different cache, and iOS may purge either cache. Restore connectivity and repeat.
 - Revoke a test connection in Settings, then run the script: old amounts should disappear and **Reconnect widget** should appear. Pair again only if you want to keep using it.

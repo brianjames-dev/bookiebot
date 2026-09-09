@@ -1,17 +1,57 @@
-// BookieBot Home Screen widget · v1.2
+// BookieBot Home Screen widget · v1.3
 // Download this script from your own BookieBot Settings → Widgets.
 // Credentials belong in Scriptable Keychain, never in this file or a widget parameter.
 const BOOKIEBOT_ORIGIN = "__BOOKIEBOT_ORIGIN__";
 
 const BB = {
   background: new Color("17201C"), text: new Color("F0EDE5"),
-  muted: new Color("AAAFA5"), sage: new Color("96C4B0"), warning: new Color("DAA383"),
+  muted: new Color("AAAFA5"), sage: new Color("B4D5C1"), warning: new Color("DAA383"),
+  panel: new Color("AECABA"), ink: new Color("183127"), negativeInk: new Color("78351F"),
 };
 const files = FileManager.local();
 const scope = encodeURIComponent(BOOKIEBOT_ORIGIN) + "." + encodeURIComponent(Script.name());
 const profileKey = "bookiebot.widget.v1." + scope;
+const themeKey = "bookiebot.widget.theme.v1." + scope;
 const cacheRoot = files.joinPath(files.cacheDirectory(), "bookiebot-widget-" + scope);
 
+function normalizedTheme(value) {
+  if (typeof value !== "string") return null;
+  const name = value.trim().toLowerCase();
+  if (name === "editorial" || name === "a") return "editorial";
+  if (name === "two-tone" || name === "two tone" || name === "c") return "two-tone";
+  return null;
+}
+function preferredTheme() {
+  try { return normalizedTheme(Keychain.get(themeKey)) || "editorial"; } catch (_) { return "editorial"; }
+}
+function widgetTheme() {
+  // A widget parameter is only a presentation enum, never a credential, URL or
+  // account selector. Different Home Screen sizes can share the same pairing.
+  const parameter = typeof args === "undefined" ? null : args.widgetParameter;
+  return normalizedTheme(parameter) || preferredTheme();
+}
+async function chooseThemePreview() {
+  const current = preferredTheme();
+  const themeMenu = new Alert(); themeMenu.title = "Widget theme";
+  themeMenu.message = "Default: " + (current === "editorial" ? "Editorial" : "Two-tone") + ". To give individual widgets different looks, set their Parameter to editorial or two-tone.";
+  themeMenu.addAction("Editorial"); themeMenu.addAction("Two-tone"); themeMenu.addCancelAction("Cancel");
+  const choice = await themeMenu.presentSheet();
+  if (choice < 0) return null;
+  const theme = choice === 1 ? "two-tone" : "editorial";
+  const sizeMenu = new Alert(); sizeMenu.title = "Preview size";
+  sizeMenu.addAction("Small"); sizeMenu.addAction("Medium"); sizeMenu.addCancelAction("Cancel");
+  const size = await sizeMenu.presentSheet();
+  if (size < 0) return null;
+  try {
+    Keychain.set(themeKey, theme);
+    if (Keychain.get(themeKey) !== theme) throw new Error("Theme preference was not saved");
+  } catch (_) {
+    const alert = new Alert(); alert.title = "Preview only";
+    alert.message = "The default theme couldn't be saved. Try again with your phone unlocked, or set this widget's Parameter to " + theme + ". Your pairing is unchanged.";
+    alert.addAction("Show preview"); await alert.presentAlert();
+  }
+  return { theme, family: size === 0 ? "small" : "medium" };
+}
 function trustedOrigin() {
   return /^https:\/\/[a-z0-9](?:[a-z0-9.-]*[a-z0-9])?(?::[0-9]{1,5})?$/.test(BOOKIEBOT_ORIGIN);
 }
@@ -198,8 +238,11 @@ function money(value) {
   const absolute = Math.abs(value).toFixed(2).split(".");
   return (value < 0 ? "−" : "") + "$" + absolute[0].replace(/\B(?=(\d{3})+(?!\d))/g, ",") + "." + absolute[1];
 }
-function amount(parent, value, size, color) {
+function amount(parent, value, size, color, editorial = false) {
   const item = text(parent, money(value), size, color, true);
+  if (editorial) {
+    try { item.font = new Font("Georgia", size); } catch (_) { item.font = Font.systemFont(size); }
+  } else item.font = Font.semiboldRoundedSystemFont(size);
   // Native WidgetText shrinks to its available width, preserving cents on narrow widgets.
   item.minimumScaleFactor = 0.35;
   return item;
@@ -207,37 +250,59 @@ function amount(parent, value, size, color) {
 function stamp(date) {
   const format = new DateFormatter();
   format.locale = "en_US";
-  format.dateFormat = "MMM d, h:mm a";
+  format.dateFormat = "MMM d '·' h:mm a";
   return format.string(date);
 }
-function dateElement(parent, date, size, color) {
-  const item = parent.addDate(date);
-  item.applyRelativeStyle();
-  item.font = Font.systemFont(size);
-  item.textColor = color;
-  item.lineLimit = 1;
-  item.minimumScaleFactor = 0.65;
+function background(parent, light = false) {
+  const gradient = new LinearGradient();
+  gradient.colors = light ? [new Color("BAD4C3"), BB.panel] : [new Color("23382D"), new Color("14211B")];
+  gradient.locations = [0, 1];
+  gradient.startPoint = new Point(0, 0);
+  gradient.endPoint = new Point(1, 1);
+  parent.backgroundGradient = gradient;
 }
-async function render(current, result) {
-  const widget = new ListWidget();
-  widget.backgroundColor = BB.background;
-  widget.setPadding(12, 14, 12, 14);
-  const data = result.data;
-  // ListWidget.url overrides the Home Screen's On Tap setting. Recovery must run
-  // this exact script in Scriptable; populated widgets keep the normal browser link.
-  if (trustedOrigin()) widget.url = data ? BOOKIEBOT_ORIGIN + "/app/expenses" : URLScheme.forRunningScript();
-  const small = config.widgetFamily === "small";
-  const header = widget.addStack();
+function identityHeader(parent, imageValue, name, mode, small, inlineMode = false) {
+  const header = parent.addStack();
   header.centerAlignContent();
-  const image = header.addImage(data ? await avatar(current, data, result.state === "loaded") : SFSymbol.named("book.closed.fill").image);
-  image.imageSize = new Size(26, 26);
-  image.cornerRadius = 13;
-  header.addSpacer(7);
+  const image = header.addImage(imageValue);
+  const size = small ? 24 : 28;
+  image.imageSize = new Size(size, size);
+  image.cornerRadius = size / 2;
+  header.addSpacer(small ? 6 : 8);
   const identity = header.addStack();
   identity.layoutVertically();
-  text(identity, data ? data.ownerName : (current ? current.ownerName : "BookieBot"), 12, BB.text, true);
-  text(identity, data ? (data.mode === "current" ? "Current" : "Projected") : "Home Screen", 10, BB.muted);
+  text(identity, name, small ? 11 : 13, BB.text, true);
+  if (!inlineMode) text(identity, mode, small ? 9 : 10, BB.muted);
+  header.addSpacer();
+  if (inlineMode) text(header, mode, 10, BB.muted);
+}
+function freshness(parent, data, stale, small) {
+  // One absolute source timestamp stays truthful even if iOS delays execution.
+  // The Stale flag is evaluated at each run; never render a frozen relative age.
+  const row = parent.addStack();
+  row.centerAlignContent();
+  const color = stale ? BB.warning : BB.muted;
+  const clock = row.addImage(SFSymbol.named("clock").image);
+  clock.imageSize = new Size(small ? 9 : 11, small ? 9 : 11);
+  clock.tintColor = color;
+  row.addSpacer(4);
+  text(row, (stale ? "Stale · " : "") + stamp(new Date(data.updatedAt)), small ? 8.5 : 9, color);
+  row.addSpacer();
+}
+async function render(current, result, theme = "editorial", family = "medium") {
+  const widget = new ListWidget();
+  widget.backgroundColor = BB.background;
+  background(widget);
+  const small = family === "small";
+  const twoTone = theme === "two-tone";
+  widget.setPadding(twoTone ? 0 : 11, twoTone ? 0 : 12, twoTone ? 0 : 10, twoTone ? 0 : 12);
+  const data = result.data;
+  // ListWidget.url overrides On Tap; styles and parameters never control authority.
+  if (trustedOrigin()) widget.url = data ? BOOKIEBOT_ORIGIN + "/app/expenses" : URLScheme.forRunningScript();
+  const picture = data ? await avatar(current, data, result.state === "loaded") : SFSymbol.named("book.closed.fill").image;
   if (!data) {
+    widget.setPadding(12, 14, 12, 14);
+    identityHeader(widget, picture, current ? current.ownerName : "BookieBot", "Home Screen", small);
     widget.addSpacer();
     text(widget, result.state === "reconnect" ? "Reconnect widget" : result.state === "unpaired" ? "Pair this phone" : "Budget unavailable", 15, BB.text, true);
     const helper = text(widget, result.state === "unavailable" ? "Tap to retry in Scriptable" : result.state === "reconnect" ? "Tap to pair again" : "Tap to pair in Scriptable", 11, BB.muted);
@@ -248,39 +313,71 @@ async function render(current, result) {
   }
   const stale = staleResult(result);
   widget.refreshAfterDate = new Date(Date.now() + data.refreshAfterSeconds * 1000);
-  widget.addSpacer(small ? 5 : 10);
-  if (small) {
-    text(widget, "Budget remaining", 10, BB.muted);
-    amount(widget, data.budgetRemaining, 24, data.budgetRemaining < 0 ? BB.warning : BB.sage);
-    widget.addSpacer(3);
-    const today = widget.addStack();
-    text(today, "Available today", 10, BB.muted);
-    today.addSpacer(6);
-    today.addSpacer();
-    amount(today, data.availableToday, 14, data.availableToday < 0 ? BB.warning : BB.text);
-  } else {
+  const mode = data.mode === "current" ? "Current" : "Projected";
+  const budgetColor = data.budgetRemaining < 0 ? BB.warning : BB.sage;
+  const todayColor = data.availableToday < 0 ? BB.warning : BB.text;
+  if (!twoTone) {
+    identityHeader(widget, picture, data.ownerName, mode, small, !small);
+    widget.addSpacer(small ? 5 : 12);
     const metrics = widget.addStack();
-    const left = metrics.addStack(); left.layoutVertically();
+    if (small) metrics.layoutVertically();
+    const budget = metrics.addStack(); budget.layoutVertically();
+    text(budget, "Budget remaining", small ? 10 : 11, BB.muted);
+    amount(budget, data.budgetRemaining, small ? 30 : 35, budgetColor, true);
+    metrics.addSpacer(small ? 4 : 16);
+    const today = metrics.addStack();
+    if (small) {
+      today.centerAlignContent();
+      text(today, "Available today", 9, BB.muted);
+      today.addSpacer(4); today.addSpacer();
+    } else {
+      today.layoutVertically();
+      text(today, "Available today", 11, BB.muted);
+      today.addSpacer(3);
+    }
+    amount(today, data.availableToday, small ? 14 : 27, todayColor);
+    widget.addSpacer();
+    freshness(widget, data, stale, small);
+  } else if (small) {
+    const top = widget.addStack(); top.layoutVertically(); top.setPadding(10, 12, 6, 12);
+    identityHeader(top, picture, data.ownerName, mode, true);
+    top.addSpacer(4);
+    text(top, "Budget remaining", 10, BB.muted);
+    amount(top, data.budgetRemaining, 27, budgetColor);
+    top.addSpacer();
+    const today = widget.addStack();
+    background(today, true); today.centerAlignContent(); today.setPadding(6, 12, 6, 12);
+    text(today, "Available today", 9, BB.ink);
+    today.addSpacer(4); today.addSpacer();
+    amount(today, data.availableToday, 14, data.availableToday < 0 ? BB.negativeInk : BB.ink);
+    const footer = widget.addStack(); footer.setPadding(6, 12, 8, 12);
+    freshness(footer, data, stale, true);
+  } else {
+    const columns = widget.addStack();
+    const left = columns.addStack(); left.layoutVertically(); left.setPadding(12, 12, 11, 12);
+    identityHeader(left, picture, data.ownerName, mode, false);
+    left.addSpacer();
+    left.addSpacer(6);
     text(left, "Budget remaining", 11, BB.muted);
-    amount(left, data.budgetRemaining, 29, data.budgetRemaining < 0 ? BB.warning : BB.sage);
-    metrics.addSpacer(20);
-    const right = metrics.addStack(); right.layoutVertically();
-    text(right, "Available today", 11, BB.muted);
-    amount(right, data.availableToday, 25, data.availableToday < 0 ? BB.warning : BB.text);
+    amount(left, data.budgetRemaining, 32, budgetColor);
+    left.addSpacer(); left.addSpacer(6);
+    freshness(left, data, stale, false);
+    columns.addSpacer();
+    const right = columns.addStack(); right.layoutVertically(); right.setPadding(12, 12, 12, 12);
+    background(right, true);
+    right.addSpacer();
+    text(right, "Available today", 11, BB.ink);
+    right.addSpacer(4);
+    amount(right, data.availableToday, 28, data.availableToday < 0 ? BB.negativeInk : BB.ink);
+    right.addSpacer();
   }
-  widget.addSpacer();
-  const color = stale ? BB.warning : BB.muted;
-  text(widget, (stale ? "Stale · " : "Updated · ") + stamp(new Date(data.updatedAt)), small ? 8 : 10, color);
-  const age = widget.addStack();
-  text(age, "Age", small ? 8 : 10, color);
-  age.addSpacer(3);
-  dateElement(age, new Date(data.updatedAt), small ? 8 : 10, color);
-  age.addSpacer();
   return widget;
 }
 async function main() {
+  let theme = widgetTheme();
+  let family = config.widgetFamily === "small" ? "small" : "medium";
   if (!trustedOrigin()) {
-    const widget = await render(null, { state: "unpaired" });
+    const widget = await render(null, { state: "unpaired" }, theme, family);
     Script.setWidget(widget);
     if (config.runsInApp) {
       const alert = new Alert(); alert.title = "Download the configured script";
@@ -299,7 +396,7 @@ async function main() {
       else {
         const menu = new Alert(); menu.title = "BookieBot · " + current.ownerName;
         menu.message = "Widget view comes from Settings → Widgets. Updating here fetches a new snapshot; iOS chooses when the Home Screen redraws.";
-        menu.addAction("Refresh & preview"); menu.addAction("Pair again"); menu.addDestructiveAction("Forget this phone"); menu.addCancelAction("Cancel");
+        menu.addAction("Refresh & preview"); menu.addAction("Pair again"); menu.addDestructiveAction("Forget this phone"); menu.addAction("Theme & preview"); menu.addCancelAction("Cancel");
         const action = await menu.presentSheet();
         if (action < 0) { Script.complete(); return; }
         if (action === 1) {
@@ -313,6 +410,11 @@ async function main() {
           confirm.addDestructiveAction("Forget"); confirm.addCancelAction("Cancel");
           if (await confirm.presentAlert() === 0) { forget(current); current = null; }
         }
+        if (action === 3) {
+          const preview = await chooseThemePreview();
+          if (!preview) { Script.complete(); return; }
+          theme = preview.theme; family = preview.family;
+        }
       }
     } catch (error) {
       const alert = new Alert(); alert.title = "Couldn't pair BookieBot";
@@ -323,10 +425,10 @@ async function main() {
     }
   }
   const result = current ? await snapshot(current) : { state: "unpaired" };
-  const widget = await render(current, result);
+  const widget = await render(current, result, theme, family);
   Script.setWidget(widget);
   if (config.runsInApp) {
-    if (config.widgetFamily === "small") await widget.presentSmall();
+    if (family === "small") await widget.presentSmall();
     else await widget.presentMedium();
   }
   Script.complete();

@@ -13,4 +13,8 @@
 .bb-widget-guide .bb-widget-error { color: hsl(var(--destructive)); font-size: 13px; }
 .bb-widget-guide button:disabled { opacity: .5; cursor: default; }
 .bb-widget-guide .bb-toolbar-button { min-height: 44px; }
+.bb-widget-theme-parameters { display: flex; flex-wrap: wrap; gap: 12px 32px; margin: 16px 0; }
+.bb-widget-theme-parameters > div { display: grid; gap: 4px; }
+.bb-widget-theme-parameters dt { font-size: 14px; font-weight: 600; }
+.bb-widget-theme-parameters dd { margin: 0; font-size: 14px; color: hsl(var(--muted-foreground)); }
 .bb-widget-guide button:focus-visible, .bb-widget-guide a:focus-visible, .bb-widget-script-label textarea:focus-visible { outline: 2px solid hsl(var(--primary)); outline-offset: 3px; }

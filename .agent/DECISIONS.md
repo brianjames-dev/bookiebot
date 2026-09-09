@@ -1,5 +1,11 @@
 # Agent Decisions
 
+## 2026-09-09 - Widget Themes Share One Secure Pairing
+
+The user approved Editorial (A) and Two-tone (C) after illustrated Small/Medium previews, and confirmed v1.2 pairing works on their phone. Ship both in one v1.3 script. Scriptable's Theme & preview menu saves an appearance-only enum in a separate script/server-scoped Keychain key, then previews the selected Small/Medium layout. An individual Home Screen widget can override it through the documented widgetParameter (`editorial` or `two-tone`); blank/invalid values use the saved default, initially Editorial. A theme parameter never chooses an account, URL, mode, cache or grant. Keep the credential format and key unchanged so upgrades and multiple widget sizes reuse working pairing.
+
+Editorial uses serif budget figures on deep pine; Two-tone gives the daily amount a sage band/panel with dark text and a distinct negative color. Use native widget stacks, gradients, fonts and automatic amount shrinking. The approved designs consolidate freshness into one absolute source date/time with explicit Stale text/color when evaluated stale on a run. This supersedes the earlier separate native Age row; do not replace it with a frozen relative-age string. iOS still controls redraws, so timestamp truth and source-cache semantics remain unchanged. Recovery states retain Scriptable tap routing, and populated widgets retain the credential-free browser URL. No backend/schema or financial changes.
+
 ## 2026-09-09 - Verify Native Widget Authorization And Pairing Readiness
 
 Scriptable request properties cross a native JavaScriptCore bridge. Assemble Authorization and JSON Content-Type in an ordinary local object and assign the complete `Request.headers` dictionary; never mutate a dictionary returned by its getter. A native JSExport reproduction showed nested mutations being discarded, matching a successful pairing followed by an unauthorized first read that clears local access. Script tests must emulate copying getters and exercise real local HTTP routes, not only hand-built payloads. Version 1.2 reads the credential back from Keychain before claiming pairing success, with sanitized recovery guidance if secure storage fails; no plaintext credential fallback.

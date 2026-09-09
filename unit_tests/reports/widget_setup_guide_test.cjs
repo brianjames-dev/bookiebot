@@ -22,7 +22,7 @@ const text=node=>typeof node==='string'?node:Array.isArray(node)?node.map(text).
 const button=label=>tree.root.findAllByType('button').find(node=>text(node)===label)
 const click=async label=>act(async()=>{const node=button(label);assert.ok(node,label);assert.ok(!node.props.disabled);await node.props.onClick()})
 const createGuide=()=>act(async()=>{tree=create(React.createElement(runtime.exports.WidgetSetupGuide,{onBack:()=>back++,onPair:()=>pair++}))})
-const code='// BookieBot Home Screen widget · v1.2\nconst BOOKIEBOT_ORIGIN = "https://bookiebot.example";'
+const code='// BookieBot Home Screen widget · v1.3\nconst BOOKIEBOT_ORIGIN = "https://bookiebot.example";'
 const respond=(request,value=code,status=200)=>act(async()=>request.resolve({ok:status===200,text:async()=>value}))
 ;(async()=>{
   await createGuide()
@@ -32,6 +32,13 @@ const respond=(request,value=code,status=200)=>act(async()=>request.resolve({ok:
   assert.equal(requests[0].options.redirect,'error')
   assert.ok(button('Loading script…').props.disabled)
   assert.equal(tree.root.findAllByType('button').filter(node=>text(node)==='Back to Settings').length,2)
+  const themeGuide=tree.root.findByProps({'aria-labelledby':'bb-widget-theme-heading'})
+  assert.match(text(themeGuide),/Theme & preview.*Editorial.*Two-tone.*Small or Medium/)
+  assert.deepEqual(themeGuide.findAllByType('code').map(text),['editorial','two-tone'])
+  assert.match(text(themeGuide),/An empty Parameter uses your saved theme/)
+  assert.match(text(themeGuide),/no new pairing is needed/)
+  assert.match(text(themeGuide),/Never paste a setup code into Parameter/)
+  assert.match(text(tree.toJSON()),/Version 1.3 adds themes; your pairing stays connected/)
   assert.ok(!tree.root.findAllByType('a').some(node=>node.props.href==='/app/widgets/script'),'Setup never navigates to a raw script with no Back control')
   for(const link of tree.root.findAllByType('a').filter(node=>node.props.href!=='scriptable:///')){
     assert.equal(link.props.target,'_blank','External import/install links preserve the guide')
@@ -68,5 +75,5 @@ const respond=(request,value=code,status=200)=>act(async()=>request.resolve({ok:
   assert.equal(unmounted.options.signal.aborted,true)
   await respond(unmounted)
   assert.equal(timers.size,0)
-  console.log('Widget guide navigation, public copy/download, clipboard fallback, timeout and unmount contracts passed')
+  console.log('Widget guide themes, navigation, public copy/download, clipboard fallback, timeout and unmount contracts passed')
 })().catch(error=>{console.error(error);process.exitCode=1})

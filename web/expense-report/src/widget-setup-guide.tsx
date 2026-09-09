@@ -54,14 +54,21 @@ export function WidgetSetupGuide({ onBack, onPair }: { onBack: () => void; onPai
     <ol className="bb-widget-guide-steps">
       <li><h2>Add the script</h2><p>Install <a href="https://apps.apple.com/app/scriptable/id1405459188" target="_blank" rel="noreferrer">Scriptable</a>. Copy the script below, tap <strong>+</strong> in Scriptable, paste it and name it <strong>BookieBot</strong>.</p>
         <div className="bb-widget-actions"><button type="button" className="bb-toolbar-button" disabled={loading || !source} onClick={() => void copyScript()}>{loading ? "Loading script…" : "Copy script"}</button></div>
-        <p className="bb-settings-note">Updating an existing widget? Replace the code in the same script; keep its name. Version 1.2 fixes lost connections after pairing.</p>
+        <p className="bb-settings-note">Already connected? Replace the code in the same script and keep its name. Version 1.3 adds themes; your pairing stays connected.</p>
         {error && <p className="bb-widget-error" role="alert">{error} <button type="button" className="bb-settings-action" onClick={() => setAttempt(value => value + 1)}>Try again</button></p>}
         {message && <p className="bb-settings-note" role="status">{message}</p>}
         <CollapsibleContent open={showCode}><label className="bb-widget-script-label">Select all and copy<textarea aria-label="BookieBot script" readOnly spellCheck={false} value={source} onFocus={event => event.target.select()} /></label></CollapsibleContent>
       </li>
       <li><h2>Connect your account</h2><p><button type="button" className="bb-widget-guide-inline" onClick={onPair}>Return to Widgets</button>, tap <strong>Pair a widget</strong>, choose Current or Projected, then create and copy the setup code.</p><p>Run BookieBot in Scriptable, paste the code and tap <strong>Pair this phone</strong>. Confirm your name and figures in the preview before continuing.</p><p className="bb-settings-note">Codes work once and expire in 10 minutes. Keep yours private; each person pairs from their own account.</p></li>
-      <li><h2>Add it to your Home Screen</h2><p>Hold an empty area → <strong>Edit → Add Widget → Scriptable</strong>. Choose Small or Medium. Hold the widget → <strong>Edit Widget → Script → BookieBot</strong>. Leave Parameter empty.</p><p className="bb-settings-note">Small and Medium can both use the same paired script. Leave When Interacting at Open App; the script sets the tap destination.</p><p className="bb-settings-note">A widget with figures opens BookieBot in your browser when tapped. Your browser may need its own sign-in. iOS decides refresh timing; check the timestamp.</p></li>
+      <li><h2>Add it to your Home Screen</h2><p>Hold an empty area → <strong>Edit → Add Widget → Scriptable</strong>. Choose Small or Medium. Hold the widget → <strong>Edit Widget → Script → BookieBot</strong>. Leave Parameter empty to use your saved theme.</p><p className="bb-settings-note">Small and Medium can both use the same paired script. Leave When Interacting at Open App; the script sets the tap destination.</p><p className="bb-settings-note">A widget with figures opens BookieBot in your browser when tapped. Your browser may need its own sign-in. iOS decides refresh timing; check the timestamp.</p></li>
     </ol>
+    <section className="bb-widget-guide-themes" aria-labelledby="bb-widget-theme-heading">
+      <h2 id="bb-widget-theme-heading">Choose a theme</h2>
+      <p>Run your paired BookieBot script → <strong>Theme &amp; preview</strong> → <strong>Editorial</strong> or <strong>Two-tone</strong> → Small or Medium. Editorial is the starting theme.</p>
+      <p>Want both on your Home Screen? Use the same script for each widget, then set <strong>Edit Widget → Parameter</strong>:</p>
+      <dl className="bb-widget-theme-parameters"><div><dt>Editorial</dt><dd><code>editorial</code></dd></div><div><dt>Two-tone</dt><dd><code>two-tone</code></dd></div></dl>
+      <p className="bb-settings-note">An empty Parameter uses your saved theme. Themes only change the look; no new pairing is needed. Never paste a setup code into Parameter.</p>
+    </section>
     <button type="button" className="bb-settings-back" onClick={onBack}><ArrowLeft aria-hidden="true" />Back to Settings</button>
   </div>
 }

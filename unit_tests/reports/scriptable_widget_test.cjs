@@ -101,15 +101,52 @@ async function run(options = {}) {
     Script: { name: () => options.scriptName || 'BookieBot', setWidget: (widget) => widgets.push(widget), complete: () => {} },
     URLScheme: { forRunningScript: () => runUrl(options.scriptName) },
     config: { runsInApp: Boolean(options.app), runsInWidget: !options.app, widgetFamily: options.family || 'small' },
-    Color: class { constructor(value) { this.value = value; } }, Font: { semiboldSystemFont: (size) => size, systemFont: (size) => size }, Size: class { constructor(width, height) { this.width = width; this.height = height; } },
+    args: { widgetParameter: options.theme },
+    Color: class { constructor(value) { this.value = value; } },
+    Font: class {
+      constructor(name,size) { this.name=name; this.size=size; }
+      static semiboldSystemFont(size) { return new this('system-semibold',size); }
+      static semiboldRoundedSystemFont(size) { return new this('rounded-semibold',size); }
+      static systemFont(size) { return new this('system',size); }
+    },
+    LinearGradient: class {}, Point: class { constructor(x,y) { this.x=x; this.y=y; } },
+    Size: class { constructor(width, height) { this.width = width; this.height = height; } },
     SFSymbol: { named: () => ({ image: { kind: 'fallback' } }) },
-    DateFormatter: class { string(date) { return new Intl.DateTimeFormat('en-US', { timeZone: 'America/Los_Angeles', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' }).format(date); } },
+    DateFormatter: class { string(date) { assert.equal(this.dateFormat,"MMM d '·' h:mm a"); return new Intl.DateTimeFormat('en-US', { timeZone: 'America/Los_Angeles', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' }).format(date).replace(',',' ·'); } },
     Request, Alert, ListWidget: Widget,
   };
   await vm.runInNewContext('(async () => {' + source.replace('__BOOKIEBOT_ORIGIN__', options.origin || origin) + '})()', context);
   return { state, requests, textItems: texts, texts: texts.map((item) => item.value), dates, alerts, images, widgets };
 }
 async function contracts() {
+  // Both visual themes use the same canonical values, grants and tap targets.
+  const flatten = node => [node, ...(node.children || []).flatMap(flatten)];
+  for (const theme of ['editorial','two-tone']) for (const family of ['small','medium']) {
+    for (const extra of [{}, {budgetRemaining:-4016.04,availableToday:-139.90}, {budgetRemaining:null,availableToday:null}]) {
+      const result = await run({theme,family,reply:payload(extra)});
+      const nodes=flatten(result.widgets[0]);
+      assert.equal(result.texts.filter(value=>value==='Budget remaining').length,1);
+      assert.equal(result.texts.filter(value=>value==='Available today').length,1);
+      assert.equal(result.texts.filter(value=>value==='Brian').length,1);
+      assert.equal(result.texts.filter(value=>value==='Projected').length,1);
+      assert.equal(result.texts.filter(value=>value.includes('Sep 9')).length,1);
+      assert(!result.texts.includes('Age'));
+      assert.equal(result.widgets[0].url,origin+'/app/expenses');
+      assert.equal(JSON.parse(result.state.keychain.get(keyFor())).token,readToken);
+      assert.equal(nodes.filter(node=>node.backgroundGradient?.colors?.[1]?.value==='AECABA').length,theme==='two-tone'?1:0,'only Two-tone paints the daily allowance panel');
+      const budget=result.textItems.find(item=>item.font.name==='Georgia');
+      assert.equal(Boolean(budget),theme==='editorial','Editorial uses the approved serif budget typography');
+      if(extra.availableToday===-139.90) {
+        assert.equal(result.textItems.find(item=>item.value==='−$139.90').textColor.value,theme==='two-tone'?'78351F':'DAA383','negative daily values remain readable on their surface');
+      }
+    }
+    const stale=await run({theme,family,reply:payload({updatedAt:'2026-09-09T16:00:00Z'})});
+    assert(stale.texts.some(value=>value.startsWith('Stale ·')));
+    const recovery=await run({theme,family,state:storage(null)});
+    assert(recovery.texts.includes('Pair this phone'));
+    assert.equal(recovery.widgets[0].url,runUrl());
+    assert.equal(recovery.requests.length,0,'theme selection cannot bypass missing credentials');
+  }
   let check = await run({ state: storage(null) });
   assert.equal(check.requests.length, 0);
   assert.equal(check.alerts.length, 0, 'widget background must never prompt');
@@ -134,8 +171,8 @@ async function contracts() {
   assert(check.texts.includes('$4,321.09') && check.texts.includes('$25.75'));
   assert.equal(check.widgets[0].url, origin + '/app/expenses');
   assert.equal(check.widgets[0].refreshAfterDate.getTime(), now + 900000);
-  assert.equal(check.dates[0].value.getTime(), Date.parse(payload().updatedAt));
-  assert.equal(check.dates[0].relative, true, 'native WidgetDate must continue showing age while execution is delayed');
+  assert(check.texts.includes('Sep 9 · 10:55 AM'), 'one absolute source timestamp stays truthful when iOS delays refresh');
+  assert.equal(check.dates.length, 0, 'the compact design must not duplicate its timestamp with an Age row');
   assert(check.images.some((image) => image.value.kind === 'avatar'));
   assert([...check.state.files.values()].every((value) => !JSON.stringify(value).includes(readToken)), 'secret must never reach the snapshot cache');
 
@@ -198,7 +235,7 @@ async function contracts() {
     assert(check.texts.some((line) => line.startsWith('Stale ·')));
     assert(check.texts.includes('$4,321.09'));
     assert.equal(cached.files.get(original[0]), original[1], 'failed refresh must not advance cached timestamps');
-    assert.equal(check.dates[0].value.getTime(), Date.parse(payload().updatedAt));
+    assert(check.texts.includes('Stale · Sep 9 · 10:55 AM'), 'failed refresh preserves the original timestamp');
   }
   check = await run({ state: storage(), throw: true });
   assert(check.texts.includes('Budget unavailable'));
@@ -245,7 +282,7 @@ async function contracts() {
   }
   // Midnight rollover follows Pacific, not UTC or the phone's travel timezone.
   check = await run({ now: Date.parse('2026-09-10T01:00:00Z'), reply: payload({ updatedAt: '2026-09-10T00:55:00Z' }) });
-  assert(check.texts.some((value) => value.startsWith('Updated ·')));
+  assert(check.texts.includes('Sep 9 · 5:55 PM'));
   check = await run({ family: 'medium', reply: payload({ mode: 'current', budgetRemaining: -145.01, availableToday: null, todayState: 'unavailable' }), avatarFailure: true });
   assert(check.texts.includes('Current') && check.texts.includes('−$145.01') && check.texts.includes('—'));
   assert(check.images.some((image) => image.value.kind === 'fallback'));
