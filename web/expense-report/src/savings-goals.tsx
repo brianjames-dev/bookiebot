@@ -1,6 +1,8 @@
-import { useCallback, useEffect, useId, useRef, useState, type FormEvent } from "react"
+import { useCallback, useEffect, useId, useRef, useState, type FormEvent, type ReactNode } from "react"
 import { Card, CardContent, CardHeader, CardTitle } from "./components/ui/card"
 import { CollapsibleContent } from "./components/ui/motion"
+import { FittedAmount } from "./components/ui/fitted-amount"
+import { ReportMenu } from "./components/ui/report-menu"
 import "./savings-goals.css"
 
 export interface SavingsGoal {
@@ -12,6 +14,8 @@ type Command = Record<string, unknown>
 type Run = (body: Command, done: () => void) => void
 const currency = new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" })
 const money = (cents: number) => currency.format(cents / 100)
+const compactMoney = (cents: number) => money(cents).replace(/\.00$/, "")
+type GoalView = "" | "overview" | "edit" | "contribute" | "history" | "archive"
 export function goalAmountCents(value: string): number | null {
   if (!/^\d+(?:\.\d{1,2})?$/.test(value.trim())) return null
   const [dollars, cents = ""] = value.trim().split(".")
@@ -56,6 +60,7 @@ export function SavingsGoals() {
   const [creating, setCreating] = useState(false)
   const showCreating = useClosingContent(creating, false)
   const [archived, setArchived] = useState(false)
+  const [activeGoal, setActiveGoal] = useState<{ id: string; view: GoalView } | null>(null)
   const [error, setError] = useState("")
   const [busy, setBusy] = useState(false)
   const [uncertain, setUncertain] = useState(false)
@@ -121,10 +126,12 @@ export function SavingsGoals() {
   const locked = busy || uncertain
   const activeGoals = goals.filter((goal) => !goal.archived)
   const oldGoals = goals.filter((goal) => goal.archived)
+  const goalEntry = (goal: SavingsGoal) => <GoalEntry key={goal.id} goal={goal} run={run} disabled={locked}
+    view={activeGoal?.id === goal.id ? activeGoal.view : ""}
+    onViewChange={(view) => { setActiveGoal(view ? { id: goal.id, view } : null); if (view) setCreating(false) }} />
   return <Card className="bb-report-section bb-goals-section">
     <CardHeader><div className="bb-goals-heading"><CardTitle>Savings goals</CardTitle>
-      <button type="button" disabled={locked || !loaded} aria-expanded={creating} aria-controls={createId} onClick={() => { setCreating(!creating); setError("") }}>＋ Goal</button></div>
-      <p className="bb-goals-note">Personal plans across months. Record money you’ve set aside; these allocations don’t move money or change monthly Saved.</p>
+      <button type="button" className="bb-goals-new" disabled={locked || !loaded} aria-expanded={creating} aria-controls={createId} onClick={() => { setCreating(!creating); setActiveGoal(null); setError("") }}>＋ Goal</button></div>
     </CardHeader>
     <CardContent>
       {error && <div className="bb-goals-message" role="alert"><p>{error}</p>
@@ -133,40 +140,71 @@ export function SavingsGoals() {
           : <button type="button" disabled={busy} onClick={() => { setError(""); void load() }}>Refresh goals</button>}</div>}
       {!loaded && !error && <p role="status">Loading your goals…</p>}
       <CollapsibleContent id={createId} open={creating}>{showCreating && <GoalEditor disabled={locked} run={run} close={() => setCreating(false)} />}</CollapsibleContent>
-      {loaded && !activeGoals.length && !creating && <p className="bb-goals-empty">Give your next milestone a name—an emergency fund, a trip, or something you’re looking forward to.</p>}
-      <div className="bb-goals-list">{activeGoals.map((goal) => <GoalEntry key={goal.id} goal={goal} run={run} disabled={locked} />)}</div>
+      {loaded && !activeGoals.length && !creating && <p className="bb-goals-empty">No goals yet.</p>}
+      <div className="bb-goals-list">{activeGoals.map(goalEntry)}</div>
       {!!oldGoals.length && <><button type="button" className="bb-goals-history-toggle" aria-expanded={archived} aria-controls={archivedId} onClick={() => setArchived(!archived)}>Archived goals ({oldGoals.length})</button>
-        <CollapsibleContent id={archivedId} open={archived}><div className="bb-goals-list">{oldGoals.map((goal) => <GoalEntry key={goal.id} goal={goal} run={run} disabled={locked} />)}</div></CollapsibleContent></>}
+        <div className="bb-goals-archived"><CollapsibleContent id={archivedId} open={archived}><div className="bb-goals-list">{oldGoals.map(goalEntry)}</div></CollapsibleContent></div></>}
     </CardContent>
   </Card>
 }
 
-function GoalEntry({ goal, run, disabled }: { goal: SavingsGoal; run: Run; disabled: boolean }) {
+function GoalActionPanel({ open, children }: { open: boolean; children: ReactNode }) {
+  const retained = useClosingContent(open, false)
+  return <CollapsibleContent open={open}>{retained && children}</CollapsibleContent>
+}
+
+function goalDateLabel(date: string) {
+  if (!date) return ""
+  const value = new Date(`${date}T12:00:00Z`)
+  if (Number.isNaN(value.getTime())) return date
+  return new Intl.DateTimeFormat("en-US", { month: "short", day: "numeric", timeZone: "UTC",
+    ...(date.slice(0, 4) !== localDate().slice(0, 4) ? { year: "numeric" } : {}) }).format(value)
+}
+
+function GoalEntry({ goal, run, disabled, view, onViewChange }: {
+  goal: SavingsGoal; run: Run; disabled: boolean; view: GoalView; onViewChange: (view: GoalView) => void
+}) {
   const detailId = useId()
-  const [mode, setMode] = useState<"" | "edit" | "contribute" | "history" | "archive">("")
-  const displayedMode = useClosingContent(mode, "")
+  const trigger = useRef<HTMLButtonElement>(null)
   const progress = goalProgress(goal)
-  const choose = (value: typeof mode) => setMode(mode === value ? "" : value)
-  return <article className="bb-goal" aria-label={goal.name}>
-    <div className="bb-goal-title"><h3>{goal.name}</h3>{goal.targetDate && <span>By {goal.targetDate}</span>}</div>
-    <p className="bb-goal-amount"><strong>{money(goal.balanceCents)}</strong><span>of {money(goal.targetCents)}</span></p>
-    <div className="bb-goal-progress" role="progressbar" aria-label={`${goal.name} progress`} aria-valuemin={0} aria-valuemax={100} aria-valuenow={Math.round(progress.percent)}><span style={{ width: `${progress.percent}%` }} /></div>
-    <p className="bb-goals-note">{progress.remainingCents ? `${money(progress.remainingCents)} to go` : "Target reached"} · {money(goal.startingCents)} starting balance</p>
-    <div className="bb-goals-actions">
-      {goal.archived ? <button type="button" disabled={disabled} onClick={() => run({ operation: "restore", goalId: goal.id, version: goal.version }, () => setMode(""))}>Restore</button> : <>
-        <button type="button" disabled={disabled} aria-expanded={mode === "contribute"} aria-controls={detailId} onClick={() => choose("contribute")}>Add contribution</button>
-        <button type="button" disabled={disabled} aria-expanded={mode === "edit"} aria-controls={detailId} onClick={() => choose("edit")}>Edit</button>
-        <button type="button" disabled={disabled} aria-expanded={mode === "archive"} aria-controls={detailId} onClick={() => choose("archive")}>Archive</button></>}
-      <button type="button" disabled={disabled} aria-expanded={mode === "history"} aria-controls={detailId} onClick={() => choose("history")}>History ({goal.contributionCount})</button>
+  const open = view !== ""
+  const close = () => { onViewChange(""); trigger.current?.focus({ preventScroll: true }) }
+  const progressBar = (mini: boolean) => <div className={`bb-goal-progress${mini ? " bb-goal-progress-mini" : ""}`}
+    role="progressbar" aria-label={`${goal.name}: ${money(goal.balanceCents)} set aside of ${money(goal.targetCents)}`}
+    aria-valuemin={0} aria-valuemax={100} aria-valuenow={Math.round(progress.percent)}
+    aria-valuetext={`${money(goal.balanceCents)} of ${money(goal.targetCents)}${!progress.remainingCents ? "; target reached" : ""}`}
+    aria-hidden={mini && open ? true : undefined}><span style={{ width: `${progress.percent}%` }} /></div>
+  return <article className="bb-goal" aria-label={goal.name} data-open={open}>
+    <div className="bb-goal-heading">
+      <h3><button ref={trigger} type="button" className="bb-goal-toggle" aria-expanded={open} aria-controls={detailId}
+        aria-label={`${goal.name}: ${money(goal.balanceCents)} set aside`} disabled={disabled} onClick={() => onViewChange(open ? "" : "overview")}>
+        <svg className="bb-goal-chevron" viewBox="0 0 16 16" aria-hidden="true"><path d="m6 4 4 4-4 4" /></svg>
+        <span className="bb-goal-name" title={goal.name}>{goal.name}</span>
+        <FittedAmount className={`bb-goal-balance${!progress.remainingCents ? " bb-goal-complete" : ""}`}>{compactMoney(goal.balanceCents)}</FittedAmount>
+      </button></h3>
+      <ReportMenu label={`${goal.name} options`} disabled={disabled} closeOnSelect>
+        {!goal.archived && <button className="bb-report-menu-action" type="button" disabled={disabled} onClick={() => onViewChange("contribute")}>Record contribution</button>}
+        <button className="bb-report-menu-action" type="button" disabled={disabled} onClick={() => onViewChange("history")}>History ({goal.contributionCount})</button>
+        {goal.archived ? <button className="bb-report-menu-action" type="button" disabled={disabled} onClick={() => run({ operation: "restore", goalId: goal.id, version: goal.version }, close)}>Restore goal</button> : <>
+          <button className="bb-report-menu-action" type="button" disabled={disabled} onClick={() => onViewChange("edit")}>Edit goal</button>
+          <button className="bb-report-menu-action bb-goal-archive-action" type="button" disabled={disabled} onClick={() => onViewChange("archive")}>Archive goal</button>
+        </>}
+      </ReportMenu>
     </div>
-    <CollapsibleContent id={detailId} open={mode !== ""}><div className="bb-goal-detail">
-      {displayedMode === "edit" && <GoalEditor key={goal.version} goal={goal} disabled={disabled} run={run} close={() => setMode("")} />}
-      {displayedMode === "contribute" && <ContributionEditor goal={goal} disabled={disabled} run={run} close={() => setMode("")} />}
-      {displayedMode === "history" && <ContributionHistory key={goal.version} goal={goal} disabled={disabled} run={run} />}
-      {displayedMode === "archive" && <><p>Archive {goal.name}? Its balance and contribution history stay saved, and you can restore it later.</p>
-        <div className="bb-goals-actions"><button type="button" disabled={disabled} onClick={() => run({ operation: "archive", goalId: goal.id, version: goal.version }, () => setMode(""))}>Archive goal</button>
-          <button type="button" disabled={disabled} onClick={() => setMode("")}>Cancel</button></div></>}
-    </div></CollapsibleContent>
+    {progressBar(true)}
+    <div id={detailId}>
+      <CollapsibleContent open={view === "overview"}><div className="bb-goal-overview">
+        <div className="bb-goal-meta"><span>{goal.targetDate && <time dateTime={goal.targetDate} title={goal.targetDate}>By {goalDateLabel(goal.targetDate)}</time>}</span><span>{progress.remainingCents ? `${Math.round(progress.percent)}% set aside` : "Target reached"}</span></div>
+        {progressBar(false)}
+        <div className="bb-goal-endpoints"><span><strong>{compactMoney(progress.remainingCents)}</strong> to go</span><span><strong>{compactMoney(goal.targetCents)}</strong> goal</span></div>
+      </div></CollapsibleContent>
+      <GoalActionPanel open={view === "edit"}><GoalEditor key={goal.version} goal={goal} disabled={disabled} run={run} close={close} /></GoalActionPanel>
+      <GoalActionPanel open={view === "contribute"}><ContributionEditor goal={goal} disabled={disabled} run={run} close={close} /></GoalActionPanel>
+      <GoalActionPanel open={view === "history"}><div className="bb-goal-history-heading"><h4>Contribution history</h4><button className="bb-goal-close" type="button" onClick={close}>Close</button></div><ContributionHistory key={goal.version} goal={goal} disabled={disabled} run={run} /></GoalActionPanel>
+      <GoalActionPanel open={view === "archive"}><div className="bb-goal-archive-confirm"><p>Archive {goal.name}? Its balance and history stay saved, and you can restore it later.</p>
+        <div className="bb-goals-actions"><button type="button" disabled={disabled} onClick={() => run({ operation: "archive", goalId: goal.id, version: goal.version }, close)}>Archive goal</button>
+          <button type="button" disabled={disabled} onClick={close}>Cancel</button></div></div></GoalActionPanel>
+    </div>
   </article>
 }
 
@@ -188,7 +226,7 @@ function GoalEditor({ goal, disabled, run, close }: { goal?: SavingsGoal; disabl
     <div className="bb-goal-fields"><label>Target ($)<input required inputMode="decimal" value={target} onChange={(event) => setTarget(event.target.value)} /></label>
       <label>Starting balance ($)<input required inputMode="decimal" value={starting} onChange={(event) => setStarting(event.target.value)} /></label></div>
     <label>Target date (optional)<input type="date" min="1900-01-01" max="2200-12-31" value={date} onChange={(event) => setDate(event.target.value)} /></label>
-    <p className="bb-goals-note">Enter only the amount already allocated to this goal before its contribution history. Don’t count the same money toward multiple goals.</p>
+    <p className="bb-goals-note">Starting balance excludes recorded contributions. Count each allocation toward one goal.</p>
     {error && <p role="alert">{error}</p>}
     <div className="bb-goals-actions"><button type="submit">Save goal</button><button type="button" onClick={close}>Cancel</button></div>
   </fieldset></form>
@@ -203,11 +241,11 @@ function ContributionEditor({ goal, disabled, run, close }: { goal: SavingsGoal;
     event.preventDefault(); const cents = goalAmountCents(amount)
     if (cents === null || cents <= 0) { setError("Enter a positive amount with at most two decimal places."); return }
     setError(""); run({ operation: "contribute", goalId: goal.id, version: goal.version, amountCents: cents, date, note }, close)
-  }}><fieldset disabled={disabled}><legend>Add to {goal.name}</legend>
+  }}><fieldset disabled={disabled}><legend>Record contribution</legend>
     <div className="bb-goal-fields"><label>Amount ($)<input required inputMode="decimal" value={amount} onChange={(event) => setAmount(event.target.value)} /></label>
       <label>Date<input required type="date" max={localDate()} value={date} onChange={(event) => setDate(event.target.value)} /></label></div>
     <label>Note (optional)<input maxLength={200} value={note} onChange={(event) => setNote(event.target.value)} placeholder="September allocation" /></label>
-    <p className="bb-goals-note">Record an allocation you already made. No bank transfer or monthly sheet entry is created.</p>
+    <p className="bb-goals-note">Records money set aside; no transfer or change to monthly Saved.</p>
     {error && <p role="alert">{error}</p>}
     <div className="bb-goals-actions"><button type="submit">Record contribution</button><button type="button" onClick={close}>Cancel</button></div>
   </fieldset></form>
@@ -227,7 +265,7 @@ function ContributionHistory({ goal, disabled, run }: { goal: SavingsGoal; disab
     finally { if (!signal?.aborted) setLoading(false) }
   }, [goal.id])
   useEffect(() => { const controller = new AbortController(); void load(0, controller.signal); return () => controller.abort() }, [load])
-  return <div className="bb-goal-history"><p className="bb-goals-note">Reversing removes a contribution from this goal’s balance and keeps its record. It does not move or refund money.</p>
+  return <div className="bb-goal-history"><div className="bb-goal-starting"><span>Starting balance</span><strong>{money(goal.startingCents)}</strong></div>
     {entries.map((entry) => <ContributionHistoryRow key={entry.id} entry={entry} goal={goal} run={run} disabled={disabled}
       open={reversing === entry.id} onToggle={() => setReversing(reversing === entry.id ? "" : entry.id)} onClose={() => setReversing("")} />)}
     {loading && <p role="status">Loading contributions…</p>}
@@ -249,7 +287,7 @@ function ContributionHistoryRow({ entry, goal, run, disabled, open, onToggle, on
     {entry.reversedAt && <span>Reversed</span>}</div>
     {canReverse && <button ref={trigger} type="button" disabled={disabled} aria-expanded={expanded} aria-controls={confirmationId} onClick={onToggle}>Reverse</button>}
     <CollapsibleContent id={confirmationId} open={expanded}>
-      <div className="bb-goal-reverse"><p>Remove {money(entry.amountCents)} from this goal’s balance?</p>
+      <div className="bb-goal-reverse"><p>Remove {money(entry.amountCents)} from this goal’s balance? Its history stays saved; no money moves.</p>
         <div className="bb-goals-actions"><button type="button" disabled={disabled} onClick={() => run({ operation: "reverse", goalId: goal.id, version: goal.version, contributionId: entry.id }, close)}>Confirm reversal</button>
           <button type="button" disabled={disabled} onClick={close}>Cancel</button></div>
       </div>

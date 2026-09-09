@@ -1,5 +1,11 @@
 # Agent Decisions
 
+## 2026-09-08 - Keep Savings Goals Compact Until Expanded
+
+Use the approved savings preview: initially collapsed rows show a left expansion chevron, exact fitted set-aside amount, thin progress bar and separate right-side options trigger. A single active goal/view coordinates overview, contribution, edit, history and archive disclosures; new-goal creation stays above the list. Overview retains target, remaining amount, optional date and progress, including dates on completed/archived goals. Starting balance and contribution records belong in History. Completion uses a full bar and expanded Target reached text, without another header icon.
+
+Reuse ReportMenu's Safari-safe outside focus/pointer dismissal, retained exit and ordinary keyboard buttons; optional label/disabled/close-on-select props preserve header-menu defaults. Each goal view has a separate retained CollapsibleContent so switches animate in flow. Keep read/save failures and uncertain-change recovery visible outside collapsed rows. Existing owner scope, integer cents, request IDs, optimistic versions, lazy paged history, reversible contributions, archival/restore and storage remain unchanged. Concise action-time guidance still distinguishes allocations from transfers and monthly Saved.
+
 ## 2026-09-08 - Show Each Reimbursement As One Allocation Bar
 
 Use the approved option A receipt: a slim bar divides the original gross into the payer’s own share, recorded partner repayments and the remaining receivable. Deep blue/brown fills and brown hatching support ivory total text. The row’s due amount is the outstanding legend; its hatch marker appears only while expanded. Two aligned keys below show Yours and the named partner’s paid amount. Retain the original date, split method, location and any differing budget responsibility; fronted expenses remain explicit. The bar’s accessible description includes all five recorded amounts, including the full partner share. Long payer labels may wrap instead of shrinking into unreadable text.

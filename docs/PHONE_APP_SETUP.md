@@ -39,7 +39,9 @@ After enabling, changes save automatically; **Save preferences** can retry a fai
 
 In **Savings goals**, tap **＋ Goal** and enter a name, target, optional date, and starting balance. The starting balance is money already allocated before this goal's contribution history. Goals belong to your account and survive months, reconnects, and deployments when the database is retained.
 
-Use **Add contribution** to record money you have set aside. **History → Reverse → Confirm reversal** removes an entry from the goal's balance while retaining its record. **Edit** changes the target/details; **Archive** keeps a goal and its history, and **Archived goals → Restore** brings it back.
+Goals start as compact rows with their name, exact amount set aside, and a thin progress bar. Tap the row or left chevron for its target, remaining amount, optional date, and progress; opening another goal closes the previous one. Completed goals keep their exact balance and show **Target reached** when expanded. The starting balance and contribution records are in **History**.
+
+Open a goal's **⋯** menu for **Record contribution**, **History**, **Edit goal**, or **Archive goal**. **History → Reverse → Confirm reversal** removes an entry from the goal's balance while retaining its record. Archiving keeps the balance/history; **Archived goals → ⋯ → Restore goal** brings it back. All row actions retain their existing confirmation and save recovery behavior.
 
 These are manual planning allocations, not bank balances or transfers. They do not read from or write to the monthly **Saved** amount. Do not count the same money toward multiple goals. If a connection fails while saving, **Retry this change** safely retries that request; **Check latest** reloads the saved state before you continue.
 

@@ -1,7 +1,9 @@
 import { useEffect, useId, useRef, useState, type ReactNode } from "react"
 
 /** A small disclosure, with ordinary button/tab behavior and a retained exit. */
-export function ReportMenu({ children }: { children: ReactNode }) {
+export function ReportMenu({ children, label = "Report settings", disabled = false, closeOnSelect = false }: {
+  children: ReactNode; label?: string; disabled?: boolean; closeOnSelect?: boolean
+}) {
   const [open, setOpen] = useState(false)
   const id = useId()
   const root = useRef<HTMLDivElement>(null)
@@ -36,10 +38,16 @@ export function ReportMenu({ children }: { children: ReactNode }) {
   return (
     <div className="bb-report-menu" ref={root}>
       <button ref={trigger} className="bb-icon-button bb-report-menu-trigger" type="button"
-        aria-label="Report settings" aria-expanded={open} aria-controls={id} onClick={() => setOpen((value) => !value)}>
+        disabled={disabled} aria-label={label} aria-expanded={open} aria-controls={id} onClick={() => setOpen((value) => !value)}>
         <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="5" cy="12" r="1.7" /><circle cx="12" cy="12" r="1.7" /><circle cx="19" cy="12" r="1.7" /></svg>
       </button>
       <div id={id} ref={panel} className="bb-report-menu-panel" data-open={open} aria-hidden={!open}
+        onClick={(event) => {
+          if (closeOnSelect && event.target instanceof Element && event.target.closest("button:not(:disabled)")) {
+            setOpen(false)
+            trigger.current?.focus({ preventScroll: true })
+          }
+        }}
         {...{ inert: !open ? "" : undefined }}>
         {children}
       </div>
