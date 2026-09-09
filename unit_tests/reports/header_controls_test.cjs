@@ -58,9 +58,12 @@ let serial = 0, focused = null, clicks = 0, tree
 class TestNode {
   constructor(inside) { this.inside = inside }
   focus() { focused = this }
+  contains() { return false }
 }
 const triggerNode = new TestNode(true), actionNode = new TestNode(true), outsideNode = new TestNode(false)
 const rootNode = { contains: node => node?.inside === true }
+const focusableAncestor = new TestNode(false)
+focusableAncestor.contains = node => node === rootNode
 const { ReportMenu: InteractiveMenu } = load("components/ui/report-menu.tsx", {
   Node: TestNode,
   document: {
@@ -83,7 +86,7 @@ const panel = () => tree.root.findByProps({ className: "bb-report-menu-panel" })
 const open = () => renderer.act(() => {
   trigger().props.onClick()
 })
-const dispatch = (type, event) => renderer.act(() => listeners.get(type)?.(event))
+const dispatch = (type, event) => renderer.act(() => listeners.get(type)?.({ ...event, type }))
 open()
 renderer.act(() => { for (const fn of frames.values()) fn(); frames.clear() })
 assert.equal(focused, actionNode, "Keyboard opening still focuses the first action")
@@ -96,9 +99,17 @@ renderer.act(() => tree.root.findAllByType("button")[1].props.onClick())
 assert.equal(clicks, 1)
 dispatch("focusin", { target: actionNode })
 assert.equal(trigger().props["aria-expanded"], true)
+dispatch("pointerdown", { target: actionNode })
+dispatch("focusin", { target: focusableAncestor })
+assert.equal(panel().props.inert, false, "Safari may focus the returning Settings section before delivering Remove's click")
+renderer.act(() => tree.root.findAllByType("button")[1].props.onClick())
+assert.equal(clicks, 2, "An ancestor focus fallback must not swallow the menu action")
 dispatch("focusin", { target: outsideNode })
 assert.equal(trigger().props["aria-expanded"], false, "Tabbing to an outside control dismisses the menu")
 assert.equal(listeners.size, 0)
+open()
+dispatch("pointerdown", { target: focusableAncestor })
+assert.equal(trigger().props["aria-expanded"], false, "An intentional outside tap on that ancestor still dismisses")
 open()
 dispatch("pointerdown", { target: outsideNode })
 assert.equal(trigger().props["aria-expanded"], false, "Outside taps still dismiss")

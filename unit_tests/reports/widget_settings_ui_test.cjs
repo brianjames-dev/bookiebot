@@ -8,6 +8,10 @@ const React = req('react'), renderer = req('react-test-renderer'), ts = req('typ
 globalThis.IS_REACT_ACT_ENVIRONMENT = true
 const requests = [], timers = new Map(), workHistory = [], copied = []
 let serial = 0, tree, owner = 'Brian', clipboardFailure = false, guides = 0
+const menuRuntime = {exports: {}, require: req, requestAnimationFrame: fn=>{fn();return 1}, cancelAnimationFrame: ()=>{}, document: {addEventListener(){}, removeEventListener(){}}}
+vm.runInNewContext(ts.transpileModule(fs.readFileSync('web/expense-report/src/components/ui/report-menu.tsx', 'utf8'), {
+  compilerOptions: {module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2020, jsx: ts.JsxEmit.ReactJSX},
+}).outputText, menuRuntime)
 const source = ts.transpileModule(fs.readFileSync('web/expense-report/src/widget-settings.tsx', 'utf8'), {
   compilerOptions: {module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2020, jsx: ts.JsxEmit.ReactJSX},
 }).outputText
@@ -17,7 +21,7 @@ const runtime = {exports: {}, URL, Date, Error, AbortController,
   fetch: (url,options)=>new Promise((resolve,reject)=>requests.push({url,options,resolve,reject})),
   require: name => name.endsWith('.css') ? {} : name === './components/ui/motion' ? {
     CollapsibleContent: ({open,id,children})=>React.createElement('div', {id,'data-open':open},children),
-  } : name === './app-work-guard' ? {useAppWorkStatus: value=>{workHistory.push(value);return value=>workHistory.push(value)}} : req(name),
+  } : name === './components/ui/report-menu' ? menuRuntime.exports : name === './app-work-guard' ? {useAppWorkStatus: value=>{workHistory.push(value);return value=>workHistory.push(value)}} : req(name),
 }
 vm.runInNewContext(source,runtime)
 const component = ()=>React.createElement(runtime.exports.WidgetSettings, {ownerName:owner, defaultMode:'projected', onOpenGuide:()=>guides++})
@@ -62,9 +66,9 @@ const lastWork = ()=>workHistory.at(-1)
   assert.equal(byAria('Widget setup code').props.readOnly,true)
   assert.equal(byAria('Widget setup code').props.autoComplete,'off')
   const beforeGuide=requests.length, setupCode=byAria('Widget setup code').props.value
-  await click(button('Set up widget'))
-  await click(button('Setup guide'))
-  assert.equal(guides,2,'Guide uses in-app navigation rather than leaving Settings')
+  assert.equal(tree.root.findAllByType('button').filter(node=>text(node)==='Setup & themes').length,1,'One entry point replaces duplicate guide links')
+  await click(button('Setup & themes'))
+  assert.equal(guides,1,'Guide uses in-app navigation rather than leaving Settings')
   assert.equal(requests.length,beforeGuide,'Opening help never creates or redeems a pairing')
   assert.equal(byAria('Widget setup code').props.value,setupCode,'Opening help preserves the in-memory setup secret')
   assert.equal(tree.root.findAllByType('a').find(node=>text(node)==='Open Scriptable').props.href,'scriptable:///','Opening Scriptable carries no credential')
@@ -81,7 +85,7 @@ const lastWork = ()=>workHistory.at(-1)
   assert.equal(lastWork().dirty,false)
   assert.match(rendered(),/Pairing accepted/)
   assert.match(rendered(),/Paired/)
-  assert.match(rendered(),/Run BookieBot in Scriptable to verify its first refresh/)
+  assert.match(rendered(),/Paired · Run in Scriptable/)
   assert.doesNotMatch(rendered(),/Connected|Widget connected|Last checked/,'Redeeming a code does not prove a successful budget read')
   await click(byAria('Refresh widgets'))
   await respond(latestRequest(),base([active('b1',b1.label)]))
@@ -92,8 +96,17 @@ const lastWork = ()=>workHistory.at(-1)
   assert.equal(byAria(`Budget view for ${b1.label}`).props.value,'projected','Mode is not represented as saved until the server confirms it')
   await respond(latestRequest(),base([{...active('b1',b1.label),mode:'current'}]))
   assert.equal(byAria(`Budget view for ${b1.label}`).props.value,'current')
-  assert.match(rendered(),/when iOS next refreshes/)
+  assert.match(rendered(),/next widget refresh/)
   const beforeRevoke=requests.length
+  const options = byAria(`${b1.label} options`)
+  assert.equal(options.props['aria-expanded'],false,'Secondary connection controls start collapsed')
+  const menu = tree.root.findAllByType('div').find(node=>node.props.id===options.props['aria-controls'])
+  assert.equal(menu.props.inert,true,'Closed options cannot receive keyboard focus')
+  assert.match(text(menu),/Last checked/,'Detailed timestamps live in the options menu')
+  assert.equal(menu.findAllByType('button').length,1,'Only removal is hidden; budget mode stays directly available')
+  await click(options)
+  assert.equal(options.props['aria-expanded'],true)
+  assert.equal(menu.props.inert,false)
   await click(button('Remove'))
   assert.equal(requests.length,beforeRevoke,'Removal requires an explicit confirmation')
   await click(button('Keep widget'))
@@ -137,7 +150,7 @@ const lastWork = ()=>workHistory.at(-1)
   await click(byAria('Refresh widgets'))
   await respond(latestRequest(),{...base([]),scriptUrl:'https://other.example/leak'})
   assert.match(rendered(),/Phone 0/,'Malformed settings never replace the last known safe list')
-  assert.ok(button('Set up widget'),'Malformed links cannot replace the internal setup guide')
+  assert.ok(button('Setup & themes'),'Malformed links cannot replace the internal setup guide')
   await click(byAria('Refresh widgets'))
   await respond(latestRequest(),base([]))
   // A malformed or cross-origin setup response is never displayed or copied.

@@ -1,5 +1,7 @@
 import { useEffect, useId, useRef, useState } from "react"
 import { CollapsibleContent } from "./components/ui/motion"
+import { ReportMenu } from "./components/ui/report-menu"
+import { RefreshCw } from "lucide-react"
 import { useAppWorkStatus } from "./app-work-guard"
 import "./widget-settings.css"
 
@@ -120,7 +122,7 @@ function WidgetSettingsContent({ ownerName, defaultMode, onOpenGuide }: WidgetSe
       acceptSettings(next)
       if (created) { copyGeneration.current++; setPairing(created); setFormOpen(false); setLabel(initialLabel); setMode(defaultMode) }
       else if (body?.operation === "revoke") { setConfirmRevoke(null); setMessage("Widget access removed.") }
-      else if (body?.operation === "mode") setMessage("Mode saved. It will appear when iOS next refreshes the widget.")
+      else if (body?.operation === "mode") setMessage("Saved. Updates on the next widget refresh.")
     } catch (caught) {
       if (!active()) return
       if (body) setNeedsRefresh(true)
@@ -161,14 +163,35 @@ function WidgetSettingsContent({ ownerName, defaultMode, onOpenGuide }: WidgetSe
   }
   const canCreate = Boolean(settings && settings.connections.length < 5 && !busy && !needsRefresh && !pairing)
   return <section className="bb-settings-section bb-widget-settings" aria-labelledby={`${id}-title`}>
-    <div className="bb-widget-heading"><h2 id={`${id}-title`}>Widgets</h2><button className="bb-settings-action" type="button" disabled={busy} onClick={() => void run()} aria-label="Refresh widgets">{busy && !loading ? "Checking…" : "Refresh"}</button></div>
-    <p className="bb-settings-note">{ownerName}’s budget remaining and available today, on the Home Screen.<br />Read-only access. Each person pairs their own widget.</p>
-    <div className="bb-widget-actions">
-      <button className="bb-toolbar-button" type="button" onClick={onOpenGuide}>Set up widget</button>
+    <div className="bb-widget-heading"><h2 id={`${id}-title`}>Widgets</h2><button className="bb-icon-button bb-widget-refresh" type="button" disabled={busy} aria-busy={busy} onClick={() => void run()} aria-label="Refresh widgets" title="Refresh widgets"><RefreshCw aria-hidden="true" /></button></div>
+    {loading && <p className="bb-settings-note" role="status">Loading widgets…</p>}
+    {settings && <div className="bb-widget-connections">
+      {settings.connections.length === 0 && <p className="bb-settings-note bb-widget-empty">No widgets paired yet.</p>}
+      {settings.connections.map(connection => <div className="bb-widget-connection" key={connection.id}>
+        <div className="bb-widget-connection-row">
+          <div className="bb-widget-connection-identity"><strong title={connection.label}>{connection.label}</strong>
+            <span className="bb-widget-connection-state" data-connected={Boolean(connection.status === "active" && connection.lastUsedAt)}>
+              {connection.status === "pending" ? "Awaiting setup" : connection.lastUsedAt ? "Connected" : "Paired · Run in Scriptable"}
+            </span>
+          </div>
+          <select aria-label={`Budget view for ${connection.label}`} value={connection.mode} disabled={busy || needsRefresh} onChange={event => { if (event.target.value !== connection.mode) void run({ operation: "mode", id: connection.id, mode: event.target.value }) }}><option value="current">Current</option><option value="projected">Projected</option></select>
+          <ReportMenu label={`${connection.label} options`} disabled={busy || needsRefresh} closeOnSelect>
+            <strong className="bb-widget-menu-label">{connection.label}</strong>
+            <p className="bb-widget-menu-note">{connection.status === "pending" ? `Setup expires ${dateLabel(connection.expiresAt)}` : connection.lastUsedAt ? `Last checked ${dateLabel(connection.lastUsedAt)}` : "Run BookieBot in Scriptable to check the first preview."}</p>
+            <button className="bb-report-menu-action" type="button" disabled={busy || needsRefresh} onClick={() => setConfirmRevoke(connection.id)}>Remove</button>
+          </ReportMenu>
+        </div>
+        <CollapsibleContent open={confirmRevoke === connection.id}><div className="bb-widget-revoke"><p>Remove access for {connection.label}? You’ll need to pair it again.</p><div className="bb-widget-actions"><button className="bb-toolbar-button" type="button" disabled={busy || needsRefresh} onClick={() => void run({ operation: "revoke", id: connection.id })}>Remove widget access</button><button className="bb-settings-action" type="button" disabled={busy} onClick={() => setConfirmRevoke(null)}>Keep widget</button></div></div></CollapsibleContent>
+      </div>)}
+      {settings.connections.length >= 5 && <p className="bb-settings-note">Five widgets are paired. Remove one to add another.</p>}
+    </div>}
+    <div className="bb-widget-actions bb-widget-main-actions">
       <button type="button" className="bb-settings-action" disabled={!canCreate} aria-expanded={formOpen} aria-controls={`${id}-form`} onClick={() => { setFormOpen(value => !value); setError("") }}>Pair a widget</button>
+      <button className="bb-settings-action" type="button" onClick={onOpenGuide}>Setup &amp; themes</button>
     </div>
     <CollapsibleContent open={formOpen} id={`${id}-form`}>
       <form className="bb-widget-form" onSubmit={event => { event.preventDefault(); if (canCreate && label.trim()) void run({ operation: "pair", label: label.trim(), mode }) }}>
+        <p className="bb-settings-note">Read-only access to {ownerName}’s budget. Small and Medium can share one pairing.</p>
         <label>Widget name<input autoComplete="off" maxLength={60} value={label} disabled={busy} onChange={event => setLabel(event.target.value)} /></label>
         <label>Budget view<select aria-label="New widget budget view" value={mode} disabled={busy} onChange={event => setMode(event.target.value as WidgetMode)}><option value="current">Current</option><option value="projected">Projected</option></select></label>
         <div className="bb-widget-actions"><button className="bb-toolbar-button" type="submit" disabled={!canCreate || !label.trim()}>Create setup code</button><button className="bb-settings-action" type="button" disabled={busy} onClick={discard}>Cancel</button></div>
@@ -177,26 +200,13 @@ function WidgetSettingsContent({ ownerName, defaultMode, onOpenGuide }: WidgetSe
     <CollapsibleContent open={Boolean(pairing)}>
       {pairing && <div className="bb-widget-pairing">
         <h3>Connect in Scriptable</h3>
-        <ol><li>Open Scriptable and run your BookieBot script.</li><li>Paste this setup code and tap Pair this phone.</li><li>Wait for your name and figures, then select that same script in Edit Widget.</li></ol>
+        <p className="bb-settings-note">Run BookieBot in Scriptable, then paste this code.</p>
         <label className="bb-widget-code-label">Setup code<input aria-label="Widget setup code" value={pairing.setupCode} readOnly autoComplete="off" spellCheck={false} onFocus={event => event.target.select()} /></label>
         <div className="bb-widget-actions"><button className="bb-toolbar-button" type="button" onClick={() => void copy()}>Copy setup code</button><a className="bb-settings-action" href="scriptable:///">Open Scriptable</a><button className="bb-settings-action" type="button" onClick={() => { copyGeneration.current++; setPairing(null); setMessage("") }}>Done</button></div>
         <p className="bb-settings-note">Expires {dateLabel(pairing.expiresAt)}. Keep this code private.</p>
       </div>}
     </CollapsibleContent>
-    {loading && <p className="bb-settings-note" role="status">Loading widgets…</p>}
-    {settings && <div className="bb-widget-connections">
-      {settings.connections.length === 0 && <p className="bb-settings-note">No widgets paired yet.</p>}
-      {settings.connections.map(connection => <div className="bb-widget-connection" key={connection.id}>
-        <div className="bb-widget-connection-heading"><strong>{connection.label}</strong><span>{connection.status === "pending" ? "Awaiting setup" : connection.lastUsedAt ? "Connected" : "Paired"}</span></div>
-        <p className="bb-settings-note">{connection.status === "pending" ? `Setup expires ${dateLabel(connection.expiresAt)}` : connection.lastUsedAt ? `Last checked ${dateLabel(connection.lastUsedAt)}` : "Run BookieBot in Scriptable to verify its first refresh."}</p>
-        <div className="bb-widget-connection-controls"><select aria-label={`Budget view for ${connection.label}`} value={connection.mode} disabled={busy || needsRefresh} onChange={event => { if (event.target.value !== connection.mode) void run({ operation: "mode", id: connection.id, mode: event.target.value }) }}><option value="current">Current</option><option value="projected">Projected</option></select>
-          <button className="bb-settings-action" type="button" disabled={busy || needsRefresh} aria-expanded={confirmRevoke === connection.id} onClick={() => setConfirmRevoke(value => value === connection.id ? null : connection.id)}>Remove</button></div>
-        <CollapsibleContent open={confirmRevoke === connection.id}><div className="bb-widget-revoke"><p>Remove access for {connection.label}? Its next refresh will require pairing again.</p><div className="bb-widget-actions"><button className="bb-toolbar-button" type="button" disabled={busy || needsRefresh} onClick={() => void run({ operation: "revoke", id: connection.id })}>Remove widget access</button><button className="bb-settings-action" type="button" disabled={busy} onClick={() => setConfirmRevoke(null)}>Keep widget</button></div></div></CollapsibleContent>
-      </div>)}
-      {settings.connections.length >= 5 && <p className="bb-settings-note">Five widgets are paired. Remove one to add another.</p>}
-    </div>}
     {error && <p className="bb-widget-error" role="alert">{error}</p>}
     {message && <p className="bb-settings-note" role="status">{message}</p>}
-    <p className="bb-settings-note bb-widget-help">iOS controls refresh timing; check the widget’s timestamp. <button type="button" className="bb-settings-action" onClick={onOpenGuide}>Setup guide</button></p>
   </section>
 }

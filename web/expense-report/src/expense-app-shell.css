@@ -32,7 +32,10 @@
 .bb-app-shell .bb-bottom-navigation[data-compact="true"] .bb-navigation-link > span > span:last-child { max-height: 0; opacity: 0; overflow: hidden; }
 .bb-app-shell .bb-navigation-link > span > span:last-child { max-height: 18px; opacity: 1; transition: max-height var(--bb-motion-duration) var(--bb-motion-ease), opacity var(--bb-motion-duration) var(--bb-motion-ease); }
 .bb-app-shell .bb-navigation-pane > span { transition-duration: var(--bb-motion-duration); transition-timing-function: var(--bb-motion-ease); }
-.bb-shell-settings { max-width: 720px; padding-top: 4px; gap: 32px; }
+.bb-app-shell .bb-shell-settings { --bb-settings-inset: clamp(12px, 3vw, 20px); max-width: 720px; padding-top: 4px; gap: 20px; }
+.bb-shell-settings > .bb-settings-section { width: auto; max-width: none; padding: 18px var(--bb-settings-inset); margin-inline: calc(-1 * var(--bb-settings-inset)); background: hsl(var(--card)); border-radius: 18px; }
+.bb-shell-settings > .bb-settings-heading { margin-bottom: 8px; }
+.bb-shell-settings .bb-settings-notifications .bb-notification-settings { padding-bottom: 0; }
 .bb-settings-heading h1 { font-family: var(--bb-display-font); font-size: clamp(30px, 5vw, 42px); font-weight: 400; margin: 12px 0 0; }
 .bb-settings-back { display: inline-flex; align-items: center; gap: 7px; min-height: 44px; padding: 0; background: transparent; border: 0; color: hsl(var(--primary)); font: inherit; cursor: pointer; }
 .bb-settings-back svg { width: 18px; height: 18px; }

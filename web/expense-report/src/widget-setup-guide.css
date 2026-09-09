@@ -2,12 +2,10 @@
 .bb-widget-guide h2 { font-size: 18px; line-height: 1.35; margin: 0 0 8px; font-weight: 600; }
 .bb-widget-guide p { font-size: 15px; line-height: 1.65; margin: 8px 0; }
 .bb-widget-guide .bb-settings-note { font-size: 13px; }
-.bb-widget-guide a, .bb-widget-guide-inline { color: hsl(var(--primary)); text-underline-offset: 3px; }
-.bb-widget-guide-recovery { background: hsl(var(--card)); border-radius: 16px; padding: 20px; min-width: 0; }
+.bb-widget-guide a { color: hsl(var(--primary)); text-underline-offset: 3px; }
 .bb-widget-guide-steps { display: grid; gap: 28px; margin: 0; padding-left: 25px; }
 .bb-widget-guide-steps > li { min-width: 0; padding-left: 4px; }
 .bb-widget-guide-steps > li::marker { color: hsl(var(--primary)); font-weight: 600; }
-.bb-widget-guide-inline { display: inline; padding: 0; border: 0; background: none; font: inherit; text-decoration: underline; cursor: pointer; }
 .bb-widget-script-label { display: grid; min-width: 0; gap: 8px; margin-top: 12px; font-size: 13px; }
 .bb-widget-script-label textarea { box-sizing: border-box; width: 100%; max-width: 100%; min-width: 0; height: 180px; resize: vertical; padding: 12px; font: 12px/1.5 ui-monospace, monospace; color: hsl(var(--foreground)); background: hsl(var(--background)); border: 1px solid hsl(var(--border)); border-radius: 6px; }
 .bb-widget-guide .bb-widget-error { color: hsl(var(--destructive)); font-size: 13px; }
@@ -18,3 +16,11 @@
 .bb-widget-theme-parameters dt { font-size: 14px; font-weight: 600; }
 .bb-widget-theme-parameters dd { margin: 0; font-size: 14px; color: hsl(var(--muted-foreground)); }
 .bb-widget-guide button:focus-visible, .bb-widget-guide a:focus-visible, .bb-widget-script-label textarea:focus-visible { outline: 2px solid hsl(var(--primary)); outline-offset: 3px; }
+.bb-widget-guide-extras { display: grid; gap: 4px; min-width: 0; }
+.bb-widget-guide-disclosure { display: flex; align-items: center; justify-content: space-between; gap: 16px; width: 100%; min-height: 48px; padding: 8px 0; background: none; border: 0; color: hsl(var(--foreground)); font: inherit; font-size: 16px; font-weight: 600; text-align: left; cursor: pointer; }
+.bb-widget-guide-disclosure svg { flex-shrink: 0; width: 18px; height: 18px; color: hsl(var(--muted-foreground)); transition: transform var(--bb-motion-duration) var(--bb-motion-ease); }
+.bb-widget-guide-disclosure[aria-expanded="true"] svg { transform: rotate(180deg); }
+.bb-widget-guide-extra-body { padding: 0 0 16px; min-width: 0; }
+.bb-widget-guide-help { display: grid; gap: 16px; }
+.bb-widget-guide-help h3 { font-size: 14px; font-weight: 600; line-height: 1.5; margin: 0; }
+.bb-widget-guide-help p { margin: 4px 0 0; }

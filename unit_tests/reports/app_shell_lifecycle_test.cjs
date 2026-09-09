@@ -145,7 +145,7 @@ async function main() {
   // Widget setup is a temporary view, not a document navigation or form reset.
   await tap(tree, 'Pair a widget'); await fill(tree, 'Widget name', 'Private widget draft')
   const widgetReadsBeforeGuide = widgetReads, financialReadsBeforeGuide = { ...reads }
-  win.scrollY = 640; await tap(tree, 'Set up widget')
+  win.scrollY = 640; await tap(tree, 'Setup & themes')
   assert.equal(screen(tree), 'settings'); assert.equal(win.scrollY, 0)
   assert.ok(button(tree, 'Back to Settings')); assert.equal(button(tree, 'Pair a widget'), undefined)
   assert.equal(tree.root.findAll(node => node.type === 'main' && !node.props.hidden).length, 1)
@@ -155,11 +155,11 @@ async function main() {
   const setupCode = () => tree.root.findByProps({ 'aria-label': 'Widget setup code' }).props.value
   const retainedCode = setupCode()
   assert.equal(widgetWrites.length, 1)
-  win.scrollY = 700; await tap(tree, 'Setup guide'); await tap(tree, 'Settings')
+  win.scrollY = 700; await tap(tree, 'Setup & themes'); await tap(tree, 'Settings')
   assert.equal(screen(tree), 'settings'); assert.equal(win.scrollY, 700); assert.equal(setupCode(), retainedCode, 'The gear returns from setup without leaving Settings or replacing its code')
-  await tap(tree, 'Setup guide'); win.scrollY = 360; await tap(tree, 'Spending'); await tap(tree, 'Settings')
+  await tap(tree, 'Setup & themes'); win.scrollY = 360; await tap(tree, 'Spending'); await tap(tree, 'Settings')
   assert.equal(win.scrollY, 700); assert.equal(setupCode(), retainedCode, 'A tab detour returns to the original Settings position, not guide scroll')
-  await tap(tree, 'Setup guide'); await tap(tree, 'Get a setup code')
+  await tap(tree, 'Setup & themes'); await tap(tree, 'Get a setup code')
   assert.equal(widgetFocuses, 1); assert.equal(widgetScrolls, 1); assert.equal(win.scrollY, 480)
   assert.equal(setupCode(), retainedCode); assert.equal(widgetWrites.length, 1, 'Returning to pairing never creates another grant')
   assert.equal(widgetReads, widgetReadsBeforeGuide); assert.deepEqual(reads, financialReadsBeforeGuide)
@@ -234,7 +234,7 @@ async function main() {
   await tap(tree, 'Savings'); win.scrollY = 210
   await run(() => { win.location.hash = '#settings'; win.dispatchEvent(new Event('hashchange')) })
   assert.equal(screen(tree), 'settings')
-  await tap(tree, 'Setup guide')
+  await tap(tree, 'Setup & themes')
   await run(() => win.dispatchEvent(new Event('hashchange')))
   assert.ok(button(tree, 'Pair a widget'), 'An explicit Settings hash returns from guide to Settings')
   await run(() => { win.location.hash = '#bbw_pair_private'; win.dispatchEvent(new Event('hashchange')) })

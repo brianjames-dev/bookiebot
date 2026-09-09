@@ -391,7 +391,7 @@ async def test_script_and_help_are_public_but_never_authenticated_links(client):
     assert response.headers["Content-Disposition"] == 'attachment; filename="BookieBot.js"'
     assert response.headers["Cache-Control"] == "private, no-store"
     help_page = await (await client.http.get("/app/widgets/help")).text()
-    assert "browser" in help_page and "15 minutes" in help_page
+    assert "browser" in help_page and "check the timestamp" in help_page
     assert "iOS chooses refresh timing" in help_page
 
 
@@ -411,7 +411,12 @@ async def test_widget_setup_pages_return_to_settings_without_pairing_or_exposing
     assert 'href="https://apps.apple.com/app/scriptable/id1405459188" target="_blank" rel="noreferrer"' in page
     assert "Copy script" in page
     assert "Theme &amp; preview" in page
-    assert "version 1.3" in page and "No new pairing is needed" in page
+    assert "version: 1.3" in page and "No new pairing is needed" in page
+    assert "Setup &amp; themes" in page
+    assert page.count("<li>") == 3
+    assert "<details" not in page and "<script" not in page
+    assert "the connection’s ⋯ menu → Remove" in page
+    assert "Read-only amounts are visible on your Home Screen" in page
     assert "<code>editorial</code>" in page and "<code>two-tone</code>" in page
     assert "An empty Parameter uses your saved theme" in page
     assert "Never paste a setup code into Parameter" in page

@@ -13,7 +13,11 @@ export function ReportMenu({ children, label = "Report settings", disabled = fal
   useEffect(() => {
     if (!open) return
     const outside = (event: PointerEvent | FocusEvent) => {
-      if (event.target instanceof Node && !root.current?.contains(event.target)) setOpen(false)
+      if (!(event.target instanceof Node) || root.current?.contains(event.target)) return
+      // Safari can focus a programmatically focusable ancestor during a tap on
+      // a menu action. Keep the action available until its click is delivered.
+      if (event.type === "focusin" && root.current && event.target.contains(root.current)) return
+      setOpen(false)
     }
     const escape = (event: KeyboardEvent) => {
       if (event.key !== "Escape") return

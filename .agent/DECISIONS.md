@@ -1,5 +1,11 @@
 # Agent Decisions
 
+## 2026-09-09 - Keep Settings Sections Distinct And Widget Controls Compact
+
+Use the existing lighter card surface and open spacing to separate Appearance, Notifications, Widgets, Account and About without decorative divider lines. Preserve the inner control width on narrow screens. Show each widget as one compact name/status row with its Current/Projected selector directly available; put last-check/setup-expiry details and confirmed removal in the existing animated ⋯ menu. Use one Setup & themes entry point, three short setup steps, and initially closed Themes/Help disclosures. Keep upgrade-in-place guidance beside Copy script and privacy/expiry guidance at pairing time. Preserve both Back controls, transient pairing state, uncertain-operation recovery and owner scope; this changes presentation only, not widget credentials, financial data or installed script behavior.
+
+ReportMenu must retain an action through Safari’s intermediate focus on a focusable ancestor (the Widgets return target). Ignore that ancestor-only focusin fallback; real outside pointer presses, focus on sibling controls and Escape still dismiss. Otherwise a tap on Remove can close the menu before its click is delivered.
+
 ## 2026-09-09 - Widget Themes Share One Secure Pairing
 
 The user approved Editorial (A) and Two-tone (C) after illustrated Small/Medium previews, and confirmed v1.2 pairing works on their phone. Ship both in one v1.3 script. Scriptable's Theme & preview menu saves an appearance-only enum in a separate script/server-scoped Keychain key, then previews the selected Small/Medium layout. An individual Home Screen widget can override it through the documented widgetParameter (`editorial` or `two-tone`); blank/invalid values use the saved default, initially Editorial. A theme parameter never chooses an account, URL, mode, cache or grant. Keep the credential format and key unchanged so upgrades and multiple widget sizes reuse working pairing.
