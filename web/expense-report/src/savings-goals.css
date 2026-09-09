@@ -1,5 +1,11 @@
-.bb-goals-section.bb-card { overflow: visible; }
-.bb-goals-section .bb-goals-heading { display: flex; align-items: center; justify-content: space-between; gap: 16px; }
+.bb-goals-section.bb-card { position: relative; isolation: isolate; overflow: visible; background: hsl(var(--card)); color: hsl(var(--card-foreground)); }
+/* Paint the full-width band without clipping the goal options menus. */
+.bb-goals-section::before { content: ""; position: absolute; inset: 0; z-index: -1; pointer-events: none; background: hsl(var(--card)); box-shadow: 0 0 0 100vmax hsl(var(--card)); clip-path: inset(0 -100vmax); }
+.bb-savings-summary { margin-top: 12px; max-width: 480px; min-width: 0; }
+.bb-savings-total, .bb-savings-total-placeholder { font-size: 42px; font-weight: 500; line-height: 1.2; letter-spacing: -0.04em; font-variant-numeric: tabular-nums; }
+.bb-savings-total-caption { margin: 6px 0 0; color: hsl(var(--muted-foreground)); font-size: 12px; line-height: 1.5; }
+.bb-goals-section .bb-goals-heading { display: flex; align-items: center; justify-content: space-between; gap: 16px; margin-bottom: 8px; }
+.bb-goals-heading h3 { margin: 0; font-size: 16px; font-weight: 500; }
 .bb-goals-section button { appearance: none; border: 1px solid hsl(var(--border)); border-radius: var(--radius); padding: 9px 13px; background: transparent; color: inherit; font: inherit; font-size: 13px; min-height: 44px; cursor: pointer; transition: background var(--bb-motion-duration) var(--bb-motion-ease), color var(--bb-motion-duration) var(--bb-motion-ease); }
 .bb-goals-section button:hover { background: hsl(var(--muted)); }
 .bb-goals-section button:disabled { opacity: .5; cursor: default; }
@@ -11,7 +17,7 @@
 .bb-goals-list { display: grid; gap: 0; }
 .bb-goal { position: relative; padding: 4px 0 14px; min-width: 0; }
 .bb-goal-heading { display: flex; align-items: center; min-width: 0; }
-.bb-goal-heading h3 { flex: 1; min-width: 0; margin: 0; font: inherit; }
+.bb-goal-heading h4 { flex: 1; min-width: 0; margin: 0; font: inherit; }
 .bb-goals-section .bb-goal-toggle { display: grid; grid-template-columns: 14px minmax(0, 1fr) minmax(80px, 36%); gap: 8px; align-items: center; width: 100%; min-width: 0; min-height: 48px; padding: 10px 4px 10px 0; text-align: left; border: 0; background: transparent; }
 .bb-goals-section .bb-goal-toggle:hover { background: transparent; color: hsl(var(--primary)); }
 .bb-goal-name { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 14px; font-weight: 500; }
@@ -41,8 +47,15 @@
 .bb-goal-form { margin: 12px 0; }
 .bb-goal-form fieldset { margin: 0; padding: 0; border: 0; min-width: 0; }
 .bb-goal-form legend { font-size: 14px; font-weight: 500; padding: 0; margin-bottom: 14px; }
-.bb-goal-form label { display: grid; gap: 7px; font-size: 12px; margin: 0 0 14px; color: hsl(var(--muted-foreground)); }
-.bb-goal-form input { box-sizing: border-box; width: 100%; min-width: 0; border: 1px solid hsl(var(--border)); border-radius: var(--radius); background: hsl(var(--background)); color: hsl(var(--foreground)); font: inherit; font-size: 16px; padding: 10px 11px; min-height: 44px; }
+.bb-goal-form label { display: grid; grid-template-columns: minmax(0, 1fr); min-width: 0; gap: 7px; font-size: 12px; margin: 0 0 14px; color: hsl(var(--muted-foreground)); }
+.bb-goal-form input { box-sizing: border-box; width: 100%; min-width: 0; max-width: 100%; border: 1px solid hsl(var(--border)); border-radius: var(--radius); background: hsl(var(--background)); color: hsl(var(--foreground)); font: inherit; font-size: 16px; padding: 10px 11px; min-height: 44px; }
+/* iOS date inputs miscalculate 100% width when padded (WebKit 301648).
+   The wrapper owns the box styling; the input retains its native date picker. */
+.bb-goal-date-field { display: block; box-sizing: border-box; min-width: 0; width: 100%; min-height: 44px; padding: 10px 11px; border: 1px solid hsl(var(--border)); border-radius: var(--radius); background: hsl(var(--background)); }
+.bb-goal-form input[type="date"] { display: block; -webkit-appearance: none; appearance: none; padding: 0; border: 0; border-radius: 0; min-height: 24px; background: transparent; line-height: 1.5; text-align: left; }
+.bb-goal-form input[type="date"]::-webkit-date-and-time-value { min-height: 1.5em; text-align: left; }
+.bb-goal-date-field:focus-within { outline: 2px solid hsl(var(--primary)); outline-offset: -2px; }
+.bb-goal-form input[type="date"]:focus-visible { outline: none; }
 .bb-goal-form input:focus-visible { outline: 2px solid hsl(var(--primary)); outline-offset: 2px; }
 .bb-goal-fields { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; }
 .bb-goal-form .bb-goals-actions > button[type="submit"] { background: hsl(var(--primary)); color: hsl(var(--primary-foreground)); border-color: transparent; }

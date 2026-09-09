@@ -126,12 +126,18 @@ export function SavingsGoals() {
   const locked = busy || uncertain
   const activeGoals = goals.filter((goal) => !goal.archived)
   const oldGoals = goals.filter((goal) => goal.archived)
+  const totalSavingsCents = goals.reduce((total, goal) => total + goal.balanceCents, 0)
   const goalEntry = (goal: SavingsGoal) => <GoalEntry key={goal.id} goal={goal} run={run} disabled={locked}
     view={activeGoal?.id === goal.id ? activeGoal.view : ""}
     onViewChange={(view) => { setActiveGoal(view ? { id: goal.id, view } : null); if (view) setCreating(false) }} />
   return <Card className="bb-report-section bb-goals-section">
-    <CardHeader><div className="bb-goals-heading"><CardTitle>Savings goals</CardTitle>
-      <button type="button" className="bb-goals-new" disabled={locked || !loaded} aria-expanded={creating} aria-controls={createId} onClick={() => { setCreating(!creating); setActiveGoal(null); setError("") }}>＋ Goal</button></div>
+    <CardHeader>
+      <CardTitle>Savings</CardTitle>
+      <div className="bb-savings-summary" aria-live="polite">
+        {loaded ? <FittedAmount className="bb-savings-total">{compactMoney(totalSavingsCents)}</FittedAmount>
+          : <span className="bb-savings-total-placeholder" aria-label="Savings total unavailable">—</span>}
+        <p className="bb-savings-total-caption">Recorded across goals{oldGoals.length > 0 ? " · includes archived" : ""}</p>
+      </div>
     </CardHeader>
     <CardContent>
       {error && <div className="bb-goals-message" role="alert"><p>{error}</p>
@@ -139,6 +145,9 @@ export function SavingsGoals() {
           <button type="button" disabled={busy} onClick={() => void checkLatest()}>Check latest</button></div>
           : <button type="button" disabled={busy} onClick={() => { setError(""); void load() }}>Refresh goals</button>}</div>}
       {!loaded && !error && <p role="status">Loading your goals…</p>}
+      <div className="bb-goals-heading"><h3>Goals</h3>
+        <button type="button" className="bb-goals-new" disabled={locked || !loaded} aria-expanded={creating} aria-controls={createId} onClick={() => { setCreating(!creating); setActiveGoal(null); setError("") }}>＋ Goal</button>
+      </div>
       <CollapsibleContent id={createId} open={creating}>{showCreating && <GoalEditor disabled={locked} run={run} close={() => setCreating(false)} />}</CollapsibleContent>
       {loaded && !activeGoals.length && !creating && <p className="bb-goals-empty">No goals yet.</p>}
       <div className="bb-goals-list">{activeGoals.map(goalEntry)}</div>
@@ -176,12 +185,12 @@ function GoalEntry({ goal, run, disabled, view, onViewChange }: {
     aria-hidden={mini && open ? true : undefined}><span style={{ width: `${progress.percent}%` }} /></div>
   return <article className="bb-goal" aria-label={goal.name} data-open={open}>
     <div className="bb-goal-heading">
-      <h3><button ref={trigger} type="button" className="bb-goal-toggle" aria-expanded={open} aria-controls={detailId}
+      <h4><button ref={trigger} type="button" className="bb-goal-toggle" aria-expanded={open} aria-controls={detailId}
         aria-label={`${goal.name}: ${money(goal.balanceCents)} set aside`} disabled={disabled} onClick={() => onViewChange(open ? "" : "overview")}>
         <svg className="bb-goal-chevron" viewBox="0 0 16 16" aria-hidden="true"><path d="m6 4 4 4-4 4" /></svg>
         <span className="bb-goal-name" title={goal.name}>{goal.name}</span>
         <FittedAmount className={`bb-goal-balance${!progress.remainingCents ? " bb-goal-complete" : ""}`}>{compactMoney(goal.balanceCents)}</FittedAmount>
-      </button></h3>
+      </button></h4>
       <ReportMenu label={`${goal.name} options`} disabled={disabled} closeOnSelect>
         {!goal.archived && <button className="bb-report-menu-action" type="button" disabled={disabled} onClick={() => onViewChange("contribute")}>Record contribution</button>}
         <button className="bb-report-menu-action" type="button" disabled={disabled} onClick={() => onViewChange("history")}>History ({goal.contributionCount})</button>
@@ -225,7 +234,7 @@ function GoalEditor({ goal, disabled, run, close }: { goal?: SavingsGoal; disabl
     <label>Goal name<input required maxLength={80} value={name} onChange={(event) => setName(event.target.value)} placeholder="Emergency fund" /></label>
     <div className="bb-goal-fields"><label>Target ($)<input required inputMode="decimal" value={target} onChange={(event) => setTarget(event.target.value)} /></label>
       <label>Starting balance ($)<input required inputMode="decimal" value={starting} onChange={(event) => setStarting(event.target.value)} /></label></div>
-    <label>Target date (optional)<input type="date" min="1900-01-01" max="2200-12-31" value={date} onChange={(event) => setDate(event.target.value)} /></label>
+    <label>Target date (optional)<span className="bb-goal-date-field"><input type="date" min="1900-01-01" max="2200-12-31" value={date} onChange={(event) => setDate(event.target.value)} /></span></label>
     <p className="bb-goals-note">Starting balance excludes recorded contributions. Count each allocation toward one goal.</p>
     {error && <p role="alert">{error}</p>}
     <div className="bb-goals-actions"><button type="submit">Save goal</button><button type="button" onClick={close}>Cancel</button></div>
@@ -243,7 +252,7 @@ function ContributionEditor({ goal, disabled, run, close }: { goal: SavingsGoal;
     setError(""); run({ operation: "contribute", goalId: goal.id, version: goal.version, amountCents: cents, date, note }, close)
   }}><fieldset disabled={disabled}><legend>Record contribution</legend>
     <div className="bb-goal-fields"><label>Amount ($)<input required inputMode="decimal" value={amount} onChange={(event) => setAmount(event.target.value)} /></label>
-      <label>Date<input required type="date" max={localDate()} value={date} onChange={(event) => setDate(event.target.value)} /></label></div>
+      <label>Date<span className="bb-goal-date-field"><input required type="date" max={localDate()} value={date} onChange={(event) => setDate(event.target.value)} /></span></label></div>
     <label>Note (optional)<input maxLength={200} value={note} onChange={(event) => setNote(event.target.value)} placeholder="September allocation" /></label>
     <p className="bb-goals-note">Records money set aside; no transfer or change to monthly Saved.</p>
     {error && <p role="alert">{error}</p>}

@@ -1,5 +1,11 @@
 # Agent Decisions
 
+## 2026-09-08 - Total Recorded Goal Savings Above Personal Goals
+
+The user confirmed that the Savings headline means money recorded across goals. Sum the API's canonical balanceCents once per owner-scoped goal, including completed and archived goals; never add starting/contribution subtotals again or combine this with monthly Saved or bank balances. Archival preserves records rather than removing money, so archive/restore leaves the total unchanged. Label the source and explicitly note archived inclusion when relevant. Unloaded/unauthorized data shows an unavailable total rather than a confirmed zero; existing stale-read and uncertain-save warnings remain visible. Goals sit below this total in the existing card-colored background band, painted separately so menus can overflow.
+
+Retain native date inputs and validation. Move their padding/border onto a sized wrapper to avoid iOS WebKit's padded 100%-width date-control bug (https://bugs.webkit.org/show_bug.cgi?id=301648); use constrained grid tracks and preserve empty-date height and visible focus. Desktop WebKit mobile emulation does not reproduce the iOS-only renderer bug, so real-device acceptance remains part of the phone checklist.
+
 ## 2026-09-08 - Keep Savings Goals Compact Until Expanded
 
 Use the approved savings preview: initially collapsed rows show a left expansion chevron, exact fitted set-aside amount, thin progress bar and separate right-side options trigger. A single active goal/view coordinates overview, contribution, edit, history and archive disclosures; new-goal creation stays above the list. Overview retains target, remaining amount, optional date and progress, including dates on completed/archived goals. Starting balance and contribution records belong in History. Completion uses a full bar and expanded Target reached text, without another header icon.

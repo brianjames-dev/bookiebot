@@ -70,6 +70,7 @@ assert.ok(!markup.includes("Personal plans across months"), "The goal list does 
 assert.ok(!markup.includes("don’t move money or change monthly Saved"))
 assert.ok(markup.includes("Loading your goals"))
 assert.ok(!markup.includes("$0.00"), "Unloaded balance must not look like a confirmed zero")
+assert.ok(!/class="bb-savings-total(?:\s|")/.test(markup), "The running total appears only after savings have loaded")
 assert.match(markup, /<button[^>]*disabled=""[^>]*>＋ Goal<\/button>/)
 const createButton = /<button[^>]*>＋ Goal<\/button>/.exec(markup)[0]
 assert.ok(createButton.includes('aria-expanded="false"'))
@@ -104,7 +105,7 @@ const clone = value => JSON.parse(JSON.stringify(value))
 const textOf = node => typeof node === "string" || typeof node === "number" ? String(node) : node.children.map(textOf).join("")
 const visible = node => {
   for (let current = node; current; current = current.parent) {
-    if (current.props["aria-hidden"] === true || current.props.inert !== undefined) return false
+    if (current.props["aria-hidden"] === true || current.props["aria-hidden"] === "true" || current.props.inert !== undefined) return false
   }
   return true
 }
@@ -116,6 +117,12 @@ const goalRow = (tree, name) => tree.root.findAllByType("article").find(node => 
 const options = row => buttons(row).find(node => node.props["aria-label"] === `${row.props["aria-label"]} options`)
 const disclosure = row => buttons(row).find(node => node.props["aria-expanded"] !== undefined && node !== options(row))
 const optionPanel = row => row.findAll(node => node.props.id === options(row).props["aria-controls"])[0]
+const savingsTotal = tree => tree.root.findAll(node => typeof node.type === "string"
+  && node.props.className?.split(" ").includes("bb-savings-total")).filter(visible)[0]
+const assertSavingsTotal = (tree, expected, explanation) => {
+  assert.ok(savingsTotal(tree), "A loaded savings section has a running total")
+  assert.equal(visibleText(savingsTotal(tree)), expected, explanation)
+}
 async function tap(node) {
   assert.ok(node, "Expected an accessible visible control")
   assert.ok(!node.props.disabled, `Expected an enabled control: ${textOf(node)}`)
@@ -206,6 +213,11 @@ const mutations = state => state.calls.filter(call => call.body)
 async function compactLifecycleContracts() {
   let state = fixture()
   let tree = await mount()
+  assert.equal(textOf(tree.root.findByType("h2")), "Savings")
+  assert.ok(tree.root.findAllByType("h3").some(node => textOf(node) === "Goals"))
+  assertSavingsTotal(tree, "$520", "Total includes all recorded goal balances, including archived and over-target amounts")
+  assert.ok(visibleText(tree.root).includes("Recorded across goals"), "The caption identifies allocation scope rather than bank cash")
+  assert.ok(visibleText(tree.root).includes("includes archived"), "The scope explicitly explains why hidden archived goals still count")
   assert.equal(mutations(state).length, 0, "Rendering goals is read-only")
   for (const name of ["Emergency fund", "Trip"]) {
     const row = goalRow(tree, name)
@@ -281,6 +293,9 @@ async function mutationLifecycleContracts() {
   await submit(tree)
   assert.equal(mutations(state).length, 0, "Invalid fractional cents never submit")
   await fill(tree, "Amount", "0.29")
+  const contributionDate = form(tree).findAllByType("input").find(node => node.props.type === "date")
+  assert.equal(contributionDate.props.required, true, "Contribution date keeps native required-date validation")
+  assert.match(contributionDate.props.max, /^\d{4}-\d{2}-\d{2}$/)
   await fill(tree, "Date", "2026-09-07")
   await fill(tree, "Note", "Small allocation")
   await submit(tree)
@@ -288,6 +303,7 @@ async function mutationLifecycleContracts() {
   assert.deepEqual({ ...contribution, requestId: undefined }, { operation: "contribute", goalId: "emergency", version: 4,
     amountCents: 29, date: "2026-09-07", note: "Small allocation", requestId: undefined })
   assert.ok(visibleText(goalRow(tree, "Emergency fund")).includes("$350.29"), "Successful changes reload the saved balance")
+  assertSavingsTotal(tree, "$520.29", "Confirmed contribution updates the running total with exact cents")
   assert.equal(form(tree), undefined, "Successful contribution closes the editor")
   await choose(tree, "Emergency fund", "Archive")
   assert.equal(mutations(state).length, 1, "Choosing archive only opens its confirmation")
@@ -296,12 +312,14 @@ async function mutationLifecycleContracts() {
   await choose(tree, "Emergency fund", "Archive")
   await tap(button(tree.root, "Archive goal"))
   assert.equal(mutations(state)[1].body.version, 5, "Archive uses the refreshed version")
+  assertSavingsTotal(tree, "$520.29", "Archiving retains recorded savings in the total")
   await tap(button(tree.root, "Archived goals (2)"))
   await tap(options(goalRow(tree, "Emergency fund")))
   assert.deepEqual(buttons(optionPanel(goalRow(tree, "Emergency fund"))).map(textOf), ["History (3)", "Restore goal"], "Archived goals expose history and restore, without editable actions")
   await choose(tree, "Emergency fund", "Restore")
   assert.equal(mutations(state)[2].body.operation, "restore")
   assert.equal(mutations(state)[2].body.version, 6)
+  assertSavingsTotal(tree, "$520.29", "Restoring does not count the same savings twice")
   assert.equal(disclosure(goalRow(tree, "Emergency fund")).props["aria-expanded"], false, "A restored goal returns as a compact row")
   await choose(tree, "Emergency fund", "History")
   await tap(button(tree.root, "Reverse"))
@@ -309,6 +327,7 @@ async function mutationLifecycleContracts() {
   assert.deepEqual({ ...mutations(state)[3].body, requestId: undefined }, { operation: "reverse", goalId: "emergency", version: 7,
     contributionId: "allocation-a", requestId: undefined })
   assert.ok(visibleText(goalRow(tree, "Emergency fund")).includes("$230.29"))
+  assertSavingsTotal(tree, "$400.29", "Confirmed reversal subtracts its recorded contribution from the total")
   await unmount(tree)
 }
 
@@ -423,11 +442,79 @@ async function archivedCompletionContract() {
   await unmount(tree)
 }
 
+async function runningTotalContracts() {
+  let state = fixture()
+  Object.assign(state.goals[0], { balanceCents: 35001, startingCents: 99999999, contributionCents: 12345678 })
+  let tree = await mount()
+  assertSavingsTotal(tree, "$520.01", "Only canonical balanceCents are summed; starting amounts and contributions are not counted again")
+  await unmount(tree)
+
+  state = fixture()
+  state.goals = []
+  tree = await mount()
+  assertSavingsTotal(tree, "$0", "A successfully loaded empty list confirms a zero recorded balance")
+  assert.ok(!visibleText(tree.root).includes("includes archived"), "No archived scope note appears when there are no archived goals")
+  await unmount(tree)
+
+  state = fixture()
+  state.goals = [{ ...sampleGoals[2], balanceCents: 5050 }]
+  tree = await mount()
+  assertSavingsTotal(tree, "$50.50", "Savings remain visible when every goal is archived")
+  await unmount(tree)
+
+  state = fixture({ post: (body, current) => {
+    assert.equal(body.operation, "edit")
+    Object.assign(current.goals[0], { startingCents: 15507, balanceCents: 35507, targetDate: body.targetDate, version: 5 })
+    return respond({})
+  } })
+  tree = await mount()
+  await choose(tree, "Emergency fund", "Edit goal")
+  const goalDate = form(tree).findAllByType("input").find(node => node.props.type === "date")
+  assert.equal(goalDate.props.value, "2026-12-31")
+  assert.equal(goalDate.props.min, "1900-01-01")
+  assert.equal(goalDate.props.max, "2200-12-31")
+  assert.ok(!goalDate.props.required, "Goal deadline remains an optional native date field")
+  await fill(tree, "Starting balance", "155.07")
+  await fill(tree, "Target date", "2027-03-18")
+  await submit(tree)
+  assert.equal(mutations(state)[0].body.startingCents, 15507)
+  assert.equal(mutations(state)[0].body.targetDate, "2027-03-18", "The wrapped native input still submits the selected ISO date")
+  assertSavingsTotal(tree, "$525.07", "A confirmed balance edit refreshes the running total")
+  await unmount(tree)
+}
+
+async function runningTotalReadRecoveryContracts() {
+  fixture()
+  const originalRequest = fetchRequest
+  let failure = "offline"
+  fetchRequest = (url, config) => failure === "offline" ? Promise.reject(Error("Offline"))
+    : failure === "unauthorized" ? Promise.resolve(respond({ error: "Sign in again." }, 401))
+    : originalRequest(url, config)
+  const tree = await mount()
+  assert.equal(savingsTotal(tree), undefined, "Failed initial loading never invents a zero savings balance")
+  assert.ok(button(tree.root, "Refresh goals"))
+  failure = ""
+  await tap(button(tree.root, "Refresh goals"))
+  assertSavingsTotal(tree, "$520", "A successful retry reveals the recorded balance")
+  failure = "offline"
+  await act(async () => {
+    for (const refresh of listeners.window.get("focus") || []) refresh()
+    await flush()
+  })
+  assertSavingsTotal(tree, "$520", "A temporary refresh failure preserves the last known savings total")
+  failure = "unauthorized"
+  await tap(button(tree.root, "Refresh goals"))
+  assert.equal(savingsTotal(tree), undefined, "Authentication expiry removes the previously loaded savings balance")
+  await unmount(tree)
+}
+
 ;(async () => {
   await compactLifecycleContracts()
   await mutationLifecycleContracts()
   await recoveryLifecycleContracts()
   await historyFailureAndCleanupContracts()
   await archivedCompletionContract()
+  await runningTotalContracts()
+  await runningTotalReadRecoveryContracts()
   console.log("Savings goals compact disclosures, menu actions, history, versioned mutations and safe recovery checks passed")
 })().catch(error => { console.error(error); process.exitCode = 1 })

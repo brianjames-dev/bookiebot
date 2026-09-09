@@ -35,9 +35,11 @@ Notifications require an installed Home Screen web app on **iOS 16.4 or later** 
 
 After enabling, changes save automatically; **Save preferences** can retry a failed save. At least one notification type stays selected while On; use **Turn off** to stop this phone's notifications. Each phone/session has separate settings. Signout, session expiry, or `/expense_app_reset` stops future sends; after reconnecting, enable notifications again if desired. Notifications already delivered may remain in Notification Center. Delivery depends on the running server, push service, and iPhone settings; reminders describe schedules rather than confirmed bank activity.
 
-## Personal savings goals
+## Personal savings
 
-In **Savings goals**, tap **＋ Goal** and enter a name, target, optional date, and starting balance. The starting balance is money already allocated before this goal's contribution history. Goals belong to your account and survive months, reconnects, and deployments when the database is retained.
+The **Savings** total adds the recorded balances of all your goals, including archived goals. Each balance already includes its starting amount and unreversed contributions; these are counted once. Archiving or restoring a goal does not change the total. This is independent of the selected expense month.
+
+Under **Savings → Goals**, tap **＋ Goal** and enter a name, target, optional date, and starting balance. The starting balance is money already allocated before this goal's contribution history. Goals belong to your account and survive months, reconnects, and deployments when the database is retained.
 
 Goals start as compact rows with their name, exact amount set aside, and a thin progress bar. Tap the row or left chevron for its target, remaining amount, optional date, and progress; opening another goal closes the previous one. Completed goals keep their exact balance and show **Target reached** when expanded. The starting balance and contribution records are in **History**.
 
