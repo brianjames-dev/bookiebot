@@ -1,11 +1,13 @@
 import React from "react"
 import { createRoot } from "react-dom/client"
+import "./konsta.css"
 
 import { ExpenseReportApp } from "./report-app"
 import { FreshExpenseApp } from "./fresh-expense-app"
 import type { ExpenseAppConfig } from "./expense-app-session"
 import type { ExpenseReportData } from "./types"
 import "./styles.css"
+import "./expense-app-shell.css"
 
 function readReportData(): ExpenseReportData {
   const script = document.getElementById("bookiebot-expense-report-data")

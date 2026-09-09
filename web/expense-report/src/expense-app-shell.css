@@ -1,0 +1,52 @@
+.bb-app-shell { --bb-nav-height: 92px; padding-bottom: calc(var(--bb-nav-height) + env(safe-area-inset-bottom, 0px) + 24px); }
+.bb-app-shell [hidden], .bb-app-shell .bb-main[hidden], .bb-app-shell .bb-page-header[hidden] { display: none !important; }
+.bb-app-shell .bb-shell-masthead { padding-top: max(18px, env(safe-area-inset-top, 0px)); }
+.bb-app-shell .bb-shell-header-actions { display: flex; align-items: center; gap: 4px; flex-shrink: 0; }
+.bb-app-shell .bb-shell-icon { border: 0; background: transparent; color: hsl(var(--foreground)); border-radius: 50%; width: 44px; height: 44px; display: grid; place-items: center; cursor: pointer; }
+.bb-shell-icon svg { width: 21px; height: 21px; }
+.bb-app-shell .bb-shell-icon:hover, .bb-app-shell .bb-shell-icon[aria-current="page"] { background: hsl(var(--foreground) / .06); color: hsl(var(--primary)); }
+.bb-app-shell .bb-report-screen { width: 100%; }
+.bb-app-shell .bb-report-content > .bb-main { gap: 0; }
+.bb-app-shell .bb-report-content { min-width: 0; }
+.bb-app-shell .bb-main > .bb-report-screen > .bb-chart-carousel-band { margin: 0; }
+.bb-app-shell .bb-shell-shared, .bb-app-shell .bb-shell-savings { padding-top: 14px; }
+.bb-app-shell .bb-shell-shared > .bb-report-section, .bb-app-shell .bb-shell-savings > .bb-report-section { margin-top: 0; }
+.bb-app-shell .bb-bottom-navigation { position: fixed; z-index: 50; left: 50%; bottom: 0; width: min(460px, 100%); transform: translateX(-50%); padding-inline: 12px; padding-bottom: max(12px, env(safe-area-inset-bottom, 0px)); height: auto; pointer-events: none; }
+.bb-app-shell .bb-bottom-navigation > div:last-child { height: 66px; padding: 0; width: 100%; gap: 0; transition: height var(--bb-motion-duration) var(--bb-motion-ease); }
+.bb-app-shell .bb-navigation-pane { width: 100%; pointer-events: auto; box-shadow: 0 5px 26px hsl(var(--foreground) / .10); color: hsl(var(--foreground)); }
+.bb-app-shell .bb-navigation-pane .k-glass { color: hsl(var(--foreground)); }
+.bb-app-shell .bb-navigation-link { flex: 1 1 0; min-width: 0; min-height: 44px; margin: 0; border: 0; background: transparent; padding: 7px 3px; color: hsl(var(--muted-foreground)); font: inherit; cursor: pointer; }
+.bb-app-shell .bb-navigation-link.k-tabbar-link-active { color: hsl(var(--primary)); }
+.bb-app-shell .bb-navigation-link > span { gap: 3px; }
+.bb-app-shell .bb-navigation-link > span > span:last-child { font-size: 11px; line-height: 15px; letter-spacing: 0; font-weight: 500; }
+.bb-app-shell .bb-navigation-link svg { flex-shrink: 0; }
+.bb-app-shell .bb-bottom-navigation[data-compact="true"] > div:last-child { height: 50px; }
+.bb-app-shell .bb-bottom-navigation[data-compact="true"] .bb-navigation-link { padding-top: 4px; padding-bottom: 4px; }
+.bb-app-shell .bb-bottom-navigation[data-compact="true"] .bb-navigation-link > span > span:last-child { max-height: 0; opacity: 0; overflow: hidden; }
+.bb-app-shell .bb-navigation-link > span > span:last-child { max-height: 18px; opacity: 1; transition: max-height var(--bb-motion-duration) var(--bb-motion-ease), opacity var(--bb-motion-duration) var(--bb-motion-ease); }
+.bb-app-shell .bb-navigation-pane > span { transition-duration: var(--bb-motion-duration); transition-timing-function: var(--bb-motion-ease); }
+.bb-shell-settings { max-width: 720px; padding-top: 4px; gap: 32px; }
+.bb-settings-heading h1 { font-family: var(--bb-display-font); font-size: clamp(30px, 5vw, 42px); font-weight: 400; margin: 12px 0 0; }
+.bb-settings-back { display: inline-flex; align-items: center; gap: 7px; min-height: 44px; padding: 0; background: transparent; border: 0; color: hsl(var(--primary)); font: inherit; cursor: pointer; }
+.bb-settings-back svg { width: 18px; height: 18px; }
+.bb-settings-section { min-width: 0; }
+.bb-settings-section h2 { font-size: 18px; margin: 0 0 14px; font-weight: 600; }
+.bb-settings-section .bb-notification-embedded-state h2 { margin: 0; color: hsl(var(--foreground)); }
+.bb-setting-row { display: flex; align-items: center; justify-content: space-between; gap: 16px; min-height: 48px; font-size: 15px; }
+.bb-setting-row > * { min-width: 0; overflow-wrap: anywhere; }
+.bb-settings-note, .bb-app-version { color: hsl(var(--muted-foreground)); font-size: 13px; line-height: 1.6; }
+.bb-settings-action { min-height: 44px; border: 0; background: transparent; color: hsl(var(--primary)); font: inherit; text-align: left; padding: 8px 0; cursor: pointer; }
+.bb-settings-action:disabled { opacity: .5; cursor: default; }
+.bb-setting-switch { width: 52px; height: 44px; padding: 6px 2px; border: 0; background: transparent; position: relative; flex: 0 0 52px; cursor: pointer; }
+.bb-setting-switch::before { content: ""; position: absolute; inset: 8px 2px; border-radius: 20px; background: hsl(var(--foreground) / .18); transition: background var(--bb-motion-duration); }
+.bb-setting-switch[aria-checked="true"]::before { background: hsl(var(--primary)); }
+.bb-setting-switch span { position: absolute; top: 11px; left: 5px; width: 22px; height: 22px; border-radius: 50%; background: hsl(var(--background)); box-shadow: 0 1px 3px #0002; transition: transform var(--bb-motion-duration) var(--bb-motion-ease); }
+.bb-setting-switch[aria-checked="true"] span { transform: translateX(20px); }
+.bb-app-shell[data-keyboard-open="true"] .bb-app-update { bottom: 12px; }
+@media (min-width: 861px) { .bb-app-shell .bb-bottom-navigation { bottom: 12px; } .bb-app-shell .bb-shell-masthead { margin-bottom: 26px; } }
+@media (max-width: 390px) { .bb-app-shell .bb-wordmark { gap: 7px; font-size: 17px; } .bb-app-shell .bb-app-avatar { width: 36px; height: 36px; } .bb-app-shell .bb-report-owner { font-size: 12px; } .bb-app-shell .bb-shell-header-actions { gap: 0; } }
+@media (max-width: 480px) {
+  .bb-app-shell .bb-page-header { grid-template-columns: minmax(0, 1fr) 44px; gap: 8px 12px; }
+  .bb-app-shell .bb-page-header .bb-app-status { grid-column: 1 / -1; grid-row: 3; justify-self: start; max-width: none; }
+}
+@media (prefers-reduced-motion: reduce) { .bb-app-shell .bb-bottom-navigation *, .bb-app-shell .bb-setting-switch * { transition-duration: 0ms !important; } }

@@ -1,5 +1,15 @@
 # Agent Decisions
 
+## 2026-09-09 - Persistent Phone Screens With Explicit Updates
+
+Use four Konsta iOS glass navigation tabs: Overview (metrics, comparison, four charts), Spending (daily activity and merchant highlights), Shared (both-direction reimbursement ledger), and Savings (recorded total and goals). Settings is a full screen reached from the header gear. Keep the report's existing palette, controls and calculations; scope Tailwind utilities without its preflight reset. Konsta 5 requires React 19, so migrate shared inert attributes to booleans and retain executed focus/lifecycle tests. Use a small native-button adapter for Konsta's forced link role.
+
+The authenticated owner keys a persistent shell. Tab changes hide mounted sections and restore independent scroll positions. Shared, Savings, notifications, Ask, and version state live outside month-keyed chart content. Month requests intentionally clear the session's current report: retain its last report only as shell identity, hide the old monthly content behind a requested-month loading/error view, and keep financial controllers/retries alive. Expiry/signout clears the retained report; another owner starts a fresh shell. No draft/financial data is written to browser storage. Mode/chart preferences retain their existing owner-scoped storage.
+
+Use one reusable Konsta month popover for report and comparison choices; only catalog months are selectable. Floating Ask retains its request/draft/answer on close, clears on month/mode change, and consumes source-navigation requests once after panel exit. Native dialog focus/scroll behavior and reduced motion remain explicit. A taller bottom sheet remains a possible later preference.
+
+Offer new frontend versions through a persistent Update/× toast. Dismiss only that version for this browser session; Settings retains the update action. Never auto-reload. A shared status registry blocks update/signout while tracked operations are pending or uncertain and asks before discarding drafts; it stores status/reset callbacks, not financial values. Exact financial retry commands remain in their original controllers. This changes navigation and presentation only, without sheet migration, new financial semantics, or native iOS distribution.
+
 ## 2026-09-08 - Confirmed Repayments Reduce The Payer's Original Expense
 
 The user explicitly chose gross-until-confirmed-repayment bookkeeping, superseding the net-payer-at-split and receipt-only rules from August 3/August 11/September 7. The authenticated payer defaults independently of names inside item text. Preserve the original purchase gross for bank matching; confirmed partial/full repayments reduce its visible expense and create linked debtor expense rows on the payment date. Debtor-reported transfers require recipient confirmation. Equal, explicitly reviewed allocations across opposing debts settle by offset, with no actual bank transfer. Reverse offset groups atomically and retain event history.

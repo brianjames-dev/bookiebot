@@ -9,6 +9,7 @@ const ts = frontendRequire("typescript")
 const React = frontendRequire("react")
 const { renderToStaticMarkup } = frontendRequire("react-dom/server")
 const Renderer = frontendRequire("react-test-renderer")
+global.IS_REACT_ACT_ENVIRONMENT = true
 const { act } = Renderer
 const timers = new Map(), listeners = { window: new Map(), document: new Map() }, dispatched = []
 let timerId = 0, requestId = 0
@@ -79,7 +80,7 @@ const flush = async () => { for (let i = 0; i < 24; i++) await Promise.resolve()
 const response = (body, status = 200) => ({ ok: status >= 200 && status < 300, status, json: async () => body })
 const deferred = () => { let resolve, reject; const promise = new Promise((yes, no) => { resolve = yes; reject = no }); return { promise, resolve, reject } }
 const visible = node => {
-  for (let parent = node; parent; parent = parent.parent) if ([true, "true"].includes(parent.props["aria-hidden"]) || parent.props.inert !== undefined) return false
+  for (let parent = node; parent; parent = parent.parent) if ([true, "true"].includes(parent.props["aria-hidden"]) || parent.props.inert === true || parent.props.inert === "") return false
   return true
 }
 const text = node => typeof node === "string" || typeof node === "number" ? String(node) : visible(node) ? node.children.map(text).join("") : ""

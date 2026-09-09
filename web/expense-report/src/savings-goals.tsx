@@ -3,6 +3,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "./components/ui/card"
 import { CollapsibleContent } from "./components/ui/motion"
 import { FittedAmount } from "./components/ui/fitted-amount"
 import { ReportMenu } from "./components/ui/report-menu"
+import { useAppWorkStatus } from "./app-work-guard"
 import "./savings-goals.css"
 
 export interface SavingsGoal {
@@ -64,6 +65,7 @@ export function SavingsGoals() {
   const [error, setError] = useState("")
   const [busy, setBusy] = useState(false)
   const [uncertain, setUncertain] = useState(false)
+  const updateWork = useAppWorkStatus({ label: "Savings goals", pending: busy, uncertain })
   const pending = useRef<{ body: Command; done: () => void } | null>(null)
   const mounted = useRef(true)
   const readId = useRef(0)
@@ -94,6 +96,7 @@ export function SavingsGoals() {
     const change = pending.current
     if (!change) return
     ++readId.current
+    updateWork({ label: "Savings goals", pending: true, uncertain })
     setBusy(true); setError("")
     try {
       await request("/app/goals", change.body)
@@ -119,6 +122,7 @@ export function SavingsGoals() {
     void execute()
   }
   const checkLatest = async () => {
+    updateWork({ label: "Savings goals", pending: true, uncertain })
     setBusy(true)
     if (await load()) { pending.current?.done(); pending.current = null; setUncertain(false); setError("") }
     if (mounted.current) setBusy(false)
@@ -223,6 +227,10 @@ function GoalEditor({ goal, disabled, run, close }: { goal?: SavingsGoal; disabl
   const [starting, setStarting] = useState(goal ? (goal.startingCents / 100).toFixed(2) : "0")
   const [date, setDate] = useState(goal?.targetDate ?? "")
   const [error, setError] = useState("")
+  const [initial] = useState({ name, target, starting, date })
+  useAppWorkStatus({ label: goal ? "Edit savings goal" : "New savings goal",
+    dirty: name !== initial.name || target !== initial.target || starting !== initial.starting || date !== initial.date,
+    onDiscard: () => { setName(initial.name); setTarget(initial.target); setStarting(initial.starting); setDate(initial.date); setError(""); close() } })
   const submit = (event: FormEvent) => {
     event.preventDefault()
     const targetCents = goalAmountCents(target), startingCents = goalAmountCents(starting)
@@ -246,6 +254,9 @@ function ContributionEditor({ goal, disabled, run, close }: { goal: SavingsGoal;
   const [date, setDate] = useState(localDate)
   const [note, setNote] = useState("")
   const [error, setError] = useState("")
+  const [initialDate] = useState(date)
+  useAppWorkStatus({ label: "Savings contribution", dirty: Boolean(amount || note || date !== initialDate),
+    onDiscard: () => { setAmount(""); setDate(initialDate); setNote(""); setError(""); close() } })
   return <form className="bb-goal-form" onSubmit={(event) => {
     event.preventDefault(); const cents = goalAmountCents(amount)
     if (cents === null || cents <= 0) { setError("Enter a positive amount with at most two decimal places."); return }

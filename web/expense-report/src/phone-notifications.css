@@ -16,4 +16,10 @@
 .bb-notification-hint { font-size: .8rem; }
 .bb-notification-actions { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 22px; }
 .bb-notification-settings .bb-notification-error { color: hsl(var(--destructive)); }
+.bb-notifications-embedded .bb-notification-settings { padding-top: 0; max-width: none; }
+.bb-notifications-embedded .bb-notification-embedded-state { display: flex; align-items: center; gap: 12px; margin-top: 0; }
+.bb-notification-embedded-state strong { margin-left: auto; font-size: .8rem; font-weight: 500; color: hsl(var(--foreground)); }
+.bb-notifications-embedded .bb-notification-option { min-width: 0; }
+.bb-notifications-embedded .bb-notification-option > span { min-width: 0; }
+.bb-notifications-embedded .bb-notification-option select { max-width: 120px; flex: 0 0 auto; }
 @media (prefers-reduced-motion: reduce) { .bb-notification-option input, .bb-notification-option input::after { transition: none; } }

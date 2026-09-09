@@ -52,6 +52,7 @@ assert.ok(menu.includes("Sign out"), "Closed menu retains its children for an an
 // Safari blurs a focused menu button to the body during a tap, with no related
 // focus target. The disclosure must survive until the click can reach it.
 const renderer = frontendRequire("react-test-renderer")
+globalThis.IS_REACT_ACT_ENVIRONMENT = true
 const listeners = new Map(), frames = new Map()
 let serial = 0, focused = null, clicks = 0, tree
 class TestNode {
@@ -90,7 +91,7 @@ dispatch("pointerdown", { target: actionNode })
 renderer.act(() => tree.root.findByProps({ className: "bb-report-menu" }).props.onBlur?.({
   currentTarget: rootNode, target: actionNode, relatedTarget: null,
 }))
-assert.equal(panel().props.inert, undefined, "A Safari tap's null-target blur cannot make the action inert before its click")
+assert.equal(panel().props.inert, false, "A Safari tap's null-target blur cannot make the action inert before its click")
 renderer.act(() => tree.root.findAllByType("button")[1].props.onClick())
 assert.equal(clicks, 1)
 dispatch("focusin", { target: actionNode })

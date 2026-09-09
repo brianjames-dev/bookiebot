@@ -207,7 +207,7 @@ def test_top_chart_navigation_names_each_panel_and_excludes_inactive_controls_fr
     assert 'id={`bb-chart-${panel.id}`}' in carousel
     assert "aria-label={panel.title}" in carousel
     assert "aria-hidden={index !== activeChartIndex}" in carousel
-    assert 'inert: index !== activeChartIndex ? "" : undefined' in carousel
+    assert 'inert={index !== activeChartIndex}' in carousel
     assert 'aria-label="Previous chart"' in navigation
     assert "onClick={onPrevious} disabled={!canPrevious}" in navigation
     assert 'aria-label="Next chart"' in navigation

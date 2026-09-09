@@ -48,7 +48,7 @@ export function ReportMenu({ children, label = "Report settings", disabled = fal
             trigger.current?.focus({ preventScroll: true })
           }
         }}
-        {...{ inert: !open ? "" : undefined }}>
+        inert={!open}>
         {children}
       </div>
     </div>

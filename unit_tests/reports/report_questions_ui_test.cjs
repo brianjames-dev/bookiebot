@@ -33,6 +33,9 @@ const response = (data, ok = true) => ({ ok, json: async () => data })
 const deferred = () => { let resolve; const promise = new Promise(r => { resolve = r }); return { promise, resolve } }
 async function main() {
   const markup = renderToStaticMarkup(React.createElement(ReportQuestions, { month: "2026-09", mode: "projected" }))
+  const embeddedMarkup = renderToStaticMarkup(React.createElement(ReportQuestions, { month: "2026-09", mode: "projected", embedded: true }))
+  assert.ok(!embeddedMarkup.includes('aria-expanded='), "Panel content does not render a nested disclosure")
+  assert.ok(embeddedMarkup.includes("Your question") && embeddedMarkup.includes("This app doesn’t save a conversation"))
   assert.ok(markup.includes("September 2026") && markup.includes("Projected"))
   assert.ok(markup.includes('aria-expanded="false"') && markup.includes('inert=""'))
   assert.ok(markup.includes('maxLength="2000"'))

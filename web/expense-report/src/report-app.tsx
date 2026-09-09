@@ -12,6 +12,7 @@ import {
   type TouchEvent,
 } from "react"
 import { createPortal } from "react-dom"
+import { ReportScreen, useAppNavigation } from "./app-navigation"
 import {
   Bar,
   BarChart,
@@ -140,15 +141,15 @@ function persistTheme(theme: ThemeMode) {
   }
 }
 
-function useExpenseReportTheme() {
+export function useExpenseReportTheme(enabled = true) {
   const [{ theme, hasOverride }, setThemeState] = useState<ThemeState>(initialThemeState)
 
   useEffect(() => {
-    applyTheme(theme)
-  }, [theme])
+    if (enabled) applyTheme(theme)
+  }, [theme, enabled])
 
   useEffect(() => {
-    if (typeof window === "undefined" || hasOverride) {
+    if (typeof window === "undefined" || hasOverride || !enabled) {
       return undefined
     }
 
@@ -165,7 +166,7 @@ function useExpenseReportTheme() {
 
     media.addListener(handleChange)
     return () => media.removeListener(handleChange)
-  }, [hasOverride])
+  }, [hasOverride, enabled])
 
   const toggleTheme = () => {
     setThemeState((current) => {
@@ -528,12 +529,14 @@ export function ExpenseReportApp({ report, appControls, appAvatarUrl, appSession
   appAvatarUrl?: string
   appSession?: { signOut: () => void; signingOut: boolean }
 }) {
-  const { theme, toggleTheme } = useExpenseReportTheme()
+  const navigation = useAppNavigation()
+  const { theme, toggleTheme } = useExpenseReportTheme(!navigation)
   const [metricInspection, setMetricInspection] = useState<MetricExplanation | null>(null)
   useViewportScrollbarWidth()
   const [inspection, setInspection] = useState<{key:string; title:string; entries:ReportActivity[]; total:number; note?:string} | null>(null)
   const dailySpendingDetailsOpen = useMediaQuery("(min-width: 861px)")
-  const viewPreferences = useReportViewPreferences(report.ownerName, Boolean(report.burnRate), Boolean(appSession))
+  const localPreferences = useReportViewPreferences(report.ownerName, Boolean(report.burnRate), Boolean(appSession))
+  const viewPreferences = navigation?.preferences ?? localPreferences
   const projectionActive = viewPreferences.mode === "projected"
   const [categoryMixFilter, setCategoryMixFilter] = useState<CategoryMixFilter>("all")
   const [calendarFilter, setCalendarFilter] = useState<CalendarFilter>("all")
@@ -716,6 +719,24 @@ export function ExpenseReportApp({ report, appControls, appAvatarUrl, appSession
     switchChart(activeChartIndex + direction)
   }
 
+  useEffect(() => {
+    if (!navigation) return
+    dismissChartTooltips()
+    setMetricInspection(null)
+    setInspection(null)
+  }, [navigation?.screen])
+
+  useEffect(() => {
+    const request = navigation?.sourceRequest
+    if (!request || request.section === "reimbursements") return
+    // Let the Ask panel finish its exit and release focus before the drilldown.
+    const timer = window.setTimeout(() => {
+      showQuestionSource(request.section)
+      navigation?.consumeSource?.(request.id)
+    }, 280)
+    return () => window.clearTimeout(timer)
+  }, [navigation?.sourceRequest?.id, navigation?.screen])
+
   const handleChartTouchStart = (event: TouchEvent<HTMLDivElement>) => {
     if (isInteractiveTouchTarget(event.target)) {
       return
@@ -780,8 +801,8 @@ export function ExpenseReportApp({ report, appControls, appAvatarUrl, appSession
   const carouselTransform = `translate3d(calc(${-activeChartIndex * 100}% - ${activeChartIndex * CHART_CAROUSEL_GAP}px + ${swipeOffset}px), 0, 0)`
 
   return (
-    <div className="bb-page">
-      <div className="bb-masthead">
+    <div className={navigation ? "bb-report-content" : "bb-page"}>
+      {!navigation && <div className="bb-masthead">
         <span className="bb-wordmark">{appAvatarUrl ? <img className="bb-app-avatar" src={appAvatarUrl} alt="" /> : <span className="bb-wordmark-symbol" aria-hidden="true">b.</span>}BookieBot<span className="bb-report-owner"><span aria-hidden="true">•</span>{" "}{report.ownerName}</span></span>
         <ReportMenu>
           <ThemeToggle theme={theme} onToggle={toggleTheme} />
@@ -789,8 +810,8 @@ export function ExpenseReportApp({ report, appControls, appAvatarUrl, appSession
             {appSession.signingOut ? "Signing out…" : "Sign out"}
           </button>}
         </ReportMenu>
-      </div>
-      <header className="bb-page-header">
+      </div>}
+      <header className="bb-page-header" hidden={Boolean(navigation && navigation.screen !== "overview" && navigation.screen !== "spending")}>
         <h1 className="bb-report-context">{appMonthControl ?? report.monthLabel}</h1>
         <div className="bb-header-actions">
           <ProjectionToggle
@@ -803,6 +824,7 @@ export function ExpenseReportApp({ report, appControls, appAvatarUrl, appSession
       {appUpdate}
       <ChartTooltipDismissProvider revision={chartTooltipDismissRevision}>
         <main className="bb-main" data-bb-tooltip-dismiss-revision={chartTooltipDismissRevision}>
+        <ReportScreen name="overview">
         <section className="bb-metrics-grid" aria-label="Budget metrics">
           <MetricCard
             label="Income"
@@ -863,7 +885,7 @@ export function ExpenseReportApp({ report, appControls, appAvatarUrl, appSession
                   aria-roledescription="slide"
                   aria-label={panel.title}
                   aria-hidden={index !== activeChartIndex}
-                  {...{ inert: index !== activeChartIndex ? "" : undefined }}
+                  inert={index !== activeChartIndex}
                 >
                   <CardContent>{panel.content}</CardContent>
                 </div>
@@ -871,6 +893,8 @@ export function ExpenseReportApp({ report, appControls, appAvatarUrl, appSession
             </div>
           </div>
         </section>
+        </ReportScreen>
+        <ReportScreen name="spending">
         <Card className="bb-report-section bb-daily-section">
           <CardHeader>
             <div className="bb-card-title-row bb-inline-toggle-row">
@@ -891,26 +915,29 @@ export function ExpenseReportApp({ report, appControls, appAvatarUrl, appSession
           </CardContent>
         </Card>
 
-        {appSession ? <ReimbursementLedger refreshKey={report.generatedAt} fallback={
+        {navigation && <ExpenseInsightsCard topEntries={report.topEntries} merchantOccurrences={report.merchantOccurrences} onViewChange={dismissChartTooltips} />}
+        </ReportScreen>
+
+        {!navigation && (appSession ? <ReimbursementLedger refreshKey={report.generatedAt} fallback={
           <SharedReimbursementsCard items={report.sharedReimbursements ?? []} openItems={report.openSharedReimbursements}
             receivedItems={report.receivedSharedReimbursements} coverage={report.reimbursementCoverage}
             monthLabel={report.monthLabel} year={report.year} month={report.month} />
         } /> : <SharedReimbursementsCard items={report.sharedReimbursements ?? []} openItems={report.openSharedReimbursements}
           receivedItems={report.receivedSharedReimbursements} coverage={report.reimbursementCoverage}
-          monthLabel={report.monthLabel} year={report.year} month={report.month} />}
+          monthLabel={report.monthLabel} year={report.year} month={report.month} />)}
 
-        <ExpenseInsightsCard
+        {!navigation && <ExpenseInsightsCard
           topEntries={report.topEntries}
           merchantOccurrences={report.merchantOccurrences}
           onViewChange={dismissChartTooltips}
-        />
+        />}
 
-        {appSession && <SavingsGoals />}
+        {!navigation && appSession && <SavingsGoals />}
 
-        {appSession && <ReportQuestions month={`${report.year}-${String(report.month).padStart(2, "0")}`}
+        {!navigation && appSession && <ReportQuestions month={`${report.year}-${String(report.month).padStart(2, "0")}`}
           mode={projectionActive ? "projected" : "current"} onShowSource={showQuestionSource} />}
 
-        {appSession && <PhoneNotifications />}
+        {!navigation && appSession && <PhoneNotifications />}
 
         <ModalDetails summary="Calculation" title={`${metricInspection?.title ?? "Total"} explained`} selection={metricInspection?.title ?? null}
           onDismiss={() => setMetricInspection(null)} triggerHidden>
@@ -1531,7 +1558,7 @@ const CategoryMixChart = memo(function CategoryMixChart({
 }, areCategoryMixChartPropsEqual)
 
 type CategoryMixPieMotionHostProps = {
-  hostRef: RefObject<HTMLDivElement>
+  hostRef: RefObject<HTMLDivElement | null>
   layout: ExpensePieLayout
   filter: CategoryMixFilter
   children: ReactNode
@@ -2806,7 +2833,7 @@ function ExpenseInsightsCard({
           </div>
         </CardHeader>
         <CardContent className="bb-expense-insights-content">
-          <TabsContent value="largest" forceMount {...{ inert: view === "largest" ? undefined : "" }} aria-hidden={view !== "largest"}>
+          <TabsContent value="largest" forceMount inert={view !== "largest"} aria-hidden={view !== "largest"}>
             <div className="bb-insight-panel">
               <TopExpensesChart entries={largestEntries} />
               <HiddenListPanel total={largestEntries.length} collapseKey={view}>
@@ -2814,7 +2841,7 @@ function ExpenseInsightsCard({
               </HiddenListPanel>
             </div>
           </TabsContent>
-          <TabsContent value="merchants" forceMount {...{ inert: view === "merchants" ? undefined : "" }} aria-hidden={view !== "merchants"}>
+          <TabsContent value="merchants" forceMount inert={view !== "merchants"} aria-hidden={view !== "merchants"}>
             <div className="bb-insight-panel">
               <MerchantChart data={merchantOccurrences} />
               <HiddenListPanel total={merchantOccurrences.length} collapseKey={view}>

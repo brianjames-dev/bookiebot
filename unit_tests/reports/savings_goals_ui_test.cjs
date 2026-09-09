@@ -9,6 +9,7 @@ const ts = frontendRequire("typescript")
 const React = frontendRequire("react")
 const { renderToStaticMarkup } = frontendRequire("react-dom/server")
 const TestRenderer = frontendRequire("react-test-renderer")
+global.IS_REACT_ACT_ENVIRONMENT = true
 const { act } = TestRenderer
 const timers = new Map()
 let nextTimer = 0
@@ -105,7 +106,7 @@ const clone = value => JSON.parse(JSON.stringify(value))
 const textOf = node => typeof node === "string" || typeof node === "number" ? String(node) : node.children.map(textOf).join("")
 const visible = node => {
   for (let current = node; current; current = current.parent) {
-    if (current.props["aria-hidden"] === true || current.props["aria-hidden"] === "true" || current.props.inert !== undefined) return false
+    if (current.props["aria-hidden"] === true || current.props["aria-hidden"] === "true" || current.props.inert === true || current.props.inert === "") return false
   }
   return true
 }
@@ -227,7 +228,7 @@ async function compactLifecycleContracts() {
     assert.equal(options(row).props["aria-expanded"], false)
     assert.equal(buttons(row).length, 2, "The collapsed row exposes just its disclosure and separate options button")
     const region = row.findAll(node => node.props.id === disclosure(row).props["aria-controls"])[0]
-    assert.ok(region.findAll(node => node.props["data-state"] === "closed").every(node => node.props.inert === ""), "Collapsed details cannot receive focus")
+    assert.ok(region.findAll(node => node.props["data-state"] === "closed").every(node => node.props.inert === true), "Collapsed details cannot receive focus")
     const progress = row.findAll(node => node.props.role === "progressbar").filter(visible)
     assert.equal(progress.length, 1, "The collapsed goal has one accessible progress indicator")
     assert.equal(progress[0].props["aria-valuenow"], name === "Emergency fund" ? 35 : 100)

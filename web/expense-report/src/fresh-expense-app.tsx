@@ -1,13 +1,14 @@
 import { useEffect, useLayoutEffect, useRef, useState } from "react"
 
-import { ExpenseReportApp } from "./report-app"
+import { KonstaProvider } from "konsta/react"
+import { ExpenseAppShell } from "./expense-app-shell"
+import { AppWorkGuardProvider } from "./app-work-guard"
+import type { ExpenseReportData } from "./types"
 import { ExpenseAppReconnect } from "./expense-app-reconnect"
 import { AppRefreshControl } from "./app-refresh-control"
-import { AppUpdatePrompt } from "./app-update-prompt"
 import { MonthHistoryControl, ReportComparison, reportMonthLabel, useReportMonthCatalog } from "./report-history"
 import {
   ExpenseAppSession,
-  expenseReportIdentity,
   initialExpenseAppState,
   watchExpenseAppLifecycle,
   type ExpenseAppConfig,
@@ -42,6 +43,10 @@ function useFreshExpenseReport(config: ExpenseAppConfig) {
 }
 
 export function FreshExpenseApp({ config }: { config: ExpenseAppConfig }) {
+  return <KonstaProvider theme="ios" dark><AppWorkGuardProvider><FreshExpenseContent config={config} /></AppWorkGuardProvider></KonstaProvider>
+}
+
+function FreshExpenseContent({ config }: { config: ExpenseAppConfig }) {
   useLayoutEffect(() => {
     try {
       const theme = window.localStorage.getItem("bookiebot-expense-report-theme")
@@ -54,6 +59,12 @@ export function FreshExpenseApp({ config }: { config: ExpenseAppConfig }) {
   const { state, refresh, signOut, selectMonth, expire } = useFreshExpenseReport(config)
   const busy = state.phase === "loading" || state.phase === "refreshing"
   const disconnected = state.phase === "expired" || state.phase === "signed-out"
+  // Month selection intentionally clears the report while loading. Keep the
+  // owner shell alive, but never present its old report as the requested month.
+  const lastReport = useRef<ExpenseReportData | null>(null)
+  if (disconnected) lastReport.current = null
+  else if (state.report) lastReport.current = state.report
+  const shellReport = state.report ?? lastReport.current
   const avatarUrl = `/app/avatar.png?day=${new Date().toISOString().slice(0, 10)}`
   const controls = <AppRefreshControl state={state} refresh={refresh} />
   const reportMonth = state.report ? `${state.report.year}-${String(state.report.month).padStart(2, "0")}` : undefined
@@ -62,16 +73,18 @@ export function FreshExpenseApp({ config }: { config: ExpenseAppConfig }) {
     selectedMonth={state.selectedMonth} catalog={history.catalog} loading={history.loading} error={history.error} errorMessage={history.errorMessage}
     onSelect={selectMonth} onRetry={history.refresh} disabled={state.signingOut} />
 
-  if (state.report) {
-    return <ExpenseReportApp
-      key={expenseReportIdentity(state.report)}
-      report={state.report}
-      appControls={controls}
-      appUpdate={<AppUpdatePrompt initialVersion={config.version ?? ""} />}
-      appAvatarUrl={avatarUrl}
-      appSession={{ signOut, signingOut: state.signingOut }}
-      appMonthControl={monthControl}
-      appComparison={<ReportComparison report={state.report} onExpired={expire} refreshing={busy}
+  if (shellReport) {
+    return <ExpenseAppShell
+      key={shellReport.ownerName}
+      report={shellReport}
+      monthlyReady={Boolean(state.report)}
+      questionMonth={state.selectedMonth ?? history.catalog?.currentMonth ?? reportMonth}
+      controls={controls}
+      initialVersion={config.version ?? ""}
+      avatarUrl={avatarUrl}
+      signOut={signOut} signingOut={state.signingOut}
+      monthControl={monthControl}
+      comparison={<ReportComparison report={shellReport} onExpired={expire} refreshing={busy || !state.report}
         catalog={history.catalog} catalogLoading={history.loading} catalogError={history.error} catalogErrorMessage={history.errorMessage} onCatalogRetry={history.refresh} />}
     />
   }

@@ -6,6 +6,14 @@ const { createRequire } = require("node:module")
 const frontend = path.join(__dirname, "../../web/expense-report")
 const frontendRequire = createRequire(path.join(frontend, "package.json"))
 const ts = frontendRequire("typescript")
+// Konsta exports ESM only. Bundle its actual implementation for this CJS harness.
+const { Module } = require("node:module")
+const konstaModule = new Module(path.join(frontend, "__konsta_test.cjs"), module)
+konstaModule.filename = path.join(frontend, "__konsta_test.cjs")
+konstaModule.paths = module.paths
+konstaModule.require = frontendRequire
+konstaModule._compile(frontendRequire("esbuild").buildSync({ stdin: { contents: 'export * from "konsta/react"', resolveDir: frontend }, bundle: true, platform: "node", format: "cjs", write: false, external: ["react", "react-dom"], logLevel: "silent" }).outputFiles[0].text, konstaModule.filename)
+
 const React = frontendRequire("react")
 const { renderToStaticMarkup } = frontendRequire("react-dom/server")
 const modules = new Map()
@@ -14,6 +22,7 @@ function load(file) {
   const exports = {}; modules.set(file, exports)
   const localRequire = (name) => {
     if (name.endsWith(".css")) return {}
+    if (name === "konsta/react") return konstaModule.exports
     if (!name.startsWith(".")) return frontendRequire(name)
     const base = path.resolve(path.dirname(file), name)
     return load([base + ".tsx", base + ".ts"].find(fs.existsSync))
@@ -66,8 +75,9 @@ async function updateContracts() {
   answer = response("version2")
   await watcher.check()
   assert.equal(watcher.availableVersion, "version2")
-  watcher.dismiss(); assert.equal(watcher.availableVersion, null)
-  await watcher.check(); assert.equal(watcher.availableVersion, null)
+  watcher.dismiss(); assert.equal(watcher.availableVersion, "version2", "Settings still exposes a dismissed update")
+  assert.equal(watcher.noticeVersion, null)
+  await watcher.check(); assert.equal(watcher.noticeVersion, null)
   answer = response("version3")
   await watcher.check(); assert.equal(watcher.availableVersion, "version3")
   answer = response("version4", 503)
@@ -78,6 +88,21 @@ async function updateContracts() {
   await watcher.check(); assert.equal(watcher.availableVersion, null)
   watcher.dispose(); const before = calls.length
   await watcher.check(); assert.equal(calls.length, before)
+
+  const dismissedValues = new Map()
+  const dismissedStorage = { getItem: key => dismissedValues.get(key), setItem: (key, value) => dismissedValues.set(key, value) }
+  const firstSession = new AppVersionWatcher("version1", { storage: dismissedStorage, fetch: async () => response("version5") })
+  await firstSession.check(); firstSession.dismiss(); firstSession.dispose()
+  const remounted = new AppVersionWatcher("version1", { storage: dismissedStorage, fetch: async () => response("version5") })
+  let available = null, notice = "initial"
+  remounted.subscribeAvailability(value => { available = value }); remounted.subscribe(value => { notice = value })
+  await remounted.check()
+  assert.equal(available, "version5"); assert.equal(notice, null, "Later persists across prompt remounts in this session")
+  assert.deepEqual([...dismissedValues.values()].map(JSON.parse), [["version5"]], "Only release version identifiers are stored")
+  remounted.dispose()
+  const blockedStorage = new AppVersionWatcher("version1", { storage: blocked, fetch: async () => response("version6") })
+  await blockedStorage.check(); assert.doesNotThrow(() => blockedStorage.dismiss()); await blockedStorage.check()
+  assert.equal(blockedStorage.noticeVersion, null); assert.equal(blockedStorage.availableVersion, "version6"); blockedStorage.dispose()
 
   let resolve, concurrent = 0
   const shared = new AppVersionWatcher("version1", { fetch: () => { concurrent++; return new Promise(done => { resolve = done }) } })

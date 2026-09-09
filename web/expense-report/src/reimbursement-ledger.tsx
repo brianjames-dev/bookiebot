@@ -2,6 +2,7 @@ import { useCallback, useEffect, useId, useRef, useState, type ReactNode } from 
 import { Card, CardContent, CardHeader, CardTitle } from "./components/ui/card"
 import { AnimatedDisclosure, CollapsibleContent, SlidingSelection } from "./components/ui/motion"
 import { FittedAmount } from "./components/ui/fitted-amount"
+import { useAppWorkStatus } from "./app-work-guard"
 import "./reimbursement-ledger.css"
 
 export interface LedgerAllocation {
@@ -136,6 +137,7 @@ export function ReimbursementLedger({ fallback, refreshKey }: { fallback: ReactN
   const [busy, setBusy] = useState(false)
   const [refreshing, setRefreshing] = useState(false)
   const [uncertain, setUncertain] = useState(false)
+  const updateWork = useAppWorkStatus({ label: "Reimbursements", pending: busy, uncertain })
   const [signedOut, setSignedOut] = useState(false)
   const mounted = useRef(false)
   const readId = useRef(0)
@@ -185,6 +187,7 @@ export function ReimbursementLedger({ fallback, refreshKey }: { fallback: ReactN
     ++readId.current; readController.current?.abort(); setRefreshing(false)
     const controller = new AbortController()
     writeController.current = controller
+    updateWork({ label: "Reimbursements", pending: true, uncertain })
     setBusy(true); setError("")
     try {
       const result = validate(await request<LedgerResponse>(change.body, controller.signal))
@@ -339,6 +342,9 @@ function PaymentEditor({ allocation, isPayer, disabled, run, close }: { allocati
   const [date, setDate] = useState(today)
   const [note, setNote] = useState("")
   const [error, setError] = useState("")
+  const [initial] = useState({ amount, date })
+  useAppWorkStatus({ label: "Reimbursement payment", dirty: amount !== initial.amount || date !== initial.date || Boolean(note),
+    onDiscard: () => { setAmount(initial.amount); setDate(initial.date); setNote(""); setError(""); close() } })
   const [version] = useState(allocation.version)
   const minDate = isoDate(allocation.expenseDate) || "1900-01-01"
   return <form className="bb-ledger-form" onSubmit={event => {
@@ -391,6 +397,9 @@ function OffsetEditor({ allocations, events, owner, disabled, run, close }: { al
   const [date, setDate] = useState(today)
   const [note, setNote] = useState("")
   const [error, setError] = useState("")
+  const [initial] = useState({ amounts, date })
+  useAppWorkStatus({ label: "Reimbursement offset", dirty: JSON.stringify(amounts) !== JSON.stringify(initial.amounts) || date !== initial.date || Boolean(note),
+    onDiscard: () => { setAmounts(initial.amounts); setDate(initial.date); setNote(""); setError(""); close() } })
   const entries = eligible.map(item => ({ allocationId: item.id, version: item.version, amountCents: reimbursementAmountCents(amounts[item.id] || "0"), item }))
   const validAmounts = entries.every(entry => entry.amountCents !== null && entry.amountCents <= entry.item.outstandingCents)
   const to = entries.filter(entry => entry.item.payerOwner === owner).reduce((sum, entry) => sum + (entry.amountCents ?? 0), 0)

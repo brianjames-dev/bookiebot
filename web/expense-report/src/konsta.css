@@ -1,0 +1,15 @@
+@layer theme, base, components, utilities;
+@import "tailwindcss/theme.css" layer(theme);
+@import "tailwindcss/utilities.css" layer(utilities);
+@import "konsta/react/theme.css";
+
+/* Keep the report's own reset, typography and palette. No Tailwind preflight. */
+@custom-variant dark (&:where([data-theme="dark"], [data-theme="dark"] *));
+@theme inline {
+  --color-primary: hsl(var(--primary));
+  --color-ios-primary: hsl(var(--primary));
+  --color-ios-light-surface: hsl(var(--background));
+  --color-ios-dark-surface: hsl(var(--background));
+  --color-ios-light-glass: hsl(var(--background) / .82);
+  --color-ios-dark-glass: hsl(var(--card) / .82);
+}

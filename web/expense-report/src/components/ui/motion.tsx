@@ -15,7 +15,7 @@ export function CollapsibleContent({
       className="bb-details-content"
       data-state={open ? "open" : "closed"}
       aria-hidden={!open}
-      {...{ inert: open ? undefined : "" }}
+      inert={!open}
     >
       <div className="bb-details-content-inner">{children}</div>
     </div>

@@ -1,9 +1,31 @@
-.bb-app-update { display: grid; grid-template-rows: 0fr; transition: grid-template-rows 220ms ease, opacity 220ms ease; opacity: 0; }
-.bb-app-update[data-open="true"] { grid-template-rows: 1fr; opacity: 1; }
-.bb-app-update-clip { min-height: 0; overflow: hidden; }
-.bb-app-update-content { display: flex; align-items: center; justify-content: space-between; gap: 14px; padding: 14px 0; border-bottom: 1px solid hsl(var(--border)); }
-.bb-app-update-content p { margin: 0; font-size: .875rem; color: hsl(var(--muted-foreground)); }
-.bb-app-update-actions { display: flex; gap: 8px; flex-shrink: 0; }
-.bb-app-update-actions .bb-toolbar-button { padding: 8px 12px; font-size: .82rem; }
-@media (max-width: 460px) { .bb-app-update-content { align-items: flex-start; flex-direction: column; } }
-@media (prefers-reduced-motion: reduce) { .bb-app-update { transition: none; } }
+.bb-app-update.k-toast { z-index: 80; bottom: calc(var(--bb-nav-height, 92px) + env(safe-area-inset-bottom, 0px) + 8px); left: max(12px, env(safe-area-inset-left)); right: max(12px, env(safe-area-inset-right)); transition-duration: 240ms; }
+.bb-page > .bb-app-update.k-toast { width: auto; margin: 0; }
+.bb-app-update > .k-glass { width: 100%; max-width: 540px; color: hsl(var(--foreground)); background: hsl(var(--card)); border: 1px solid hsl(var(--border)); border-radius: 14px; box-shadow: 0 6px 26px #0003; backdrop-filter: none; }
+.bb-app-update > .k-glass > div { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 14px 16px; }
+.bb-app-update-message { min-width: 0; }
+.bb-app-update-message p { margin: 0; font-size: .875rem; line-height: 1.45; }
+.bb-app-update-message small { display: block; margin-top: 4px; color: hsl(var(--muted-foreground)); font-size: .75rem; line-height: 1.4; }
+.bb-app-update > .k-glass > div > div:last-child { margin: 0; }
+.bb-app-update-actions { display: flex; align-items: center; gap: 2px; flex-shrink: 0; }
+.bb-app-update-actions button { min-height: 44px; padding: 8px; border: 0; border-radius: 7px; font: inherit; font-size: .82rem; background: transparent; color: hsl(var(--primary)); cursor: pointer; }
+.bb-app-update-actions .bb-app-update-now { font-weight: 650; }
+.bb-app-update-actions .bb-app-update-later { color: hsl(var(--muted-foreground)); }
+.bb-app-update-actions button:disabled { opacity: .5; cursor: default; }
+.bb-app-update-actions button:focus-visible, .bb-work-guard-actions button:focus-visible { outline: 2px solid hsl(var(--primary)); outline-offset: 2px; }
+.bb-work-guard-dialog { position: fixed; inset: 0; width: min(440px, calc(100% - 32px)); max-height: calc(100dvh - 48px); overflow: auto; margin: auto; padding: 24px; color: hsl(var(--foreground)); background: hsl(var(--card)); border: 1px solid hsl(var(--border)); border-radius: 16px; box-shadow: 0 16px 60px #0005; }
+.bb-work-guard-dialog[open] { animation: bb-work-dialog-in 240ms ease both; }
+.bb-work-guard-dialog[open]::backdrop { background: #0007; animation: bb-work-backdrop-in 240ms ease both; }
+.bb-work-guard-dialog[data-closing="true"] { animation-name: bb-work-dialog-out; }
+.bb-work-guard-dialog[data-closing="true"]::backdrop { animation-name: bb-work-backdrop-out; }
+.bb-work-guard-dialog h2 { margin: 0 0 12px; font-size: 1.25rem; }
+.bb-work-guard-dialog p { margin: 0 0 20px; color: hsl(var(--muted-foreground)); line-height: 1.5; font-size: .9rem; }
+.bb-work-guard-actions { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 8px; }
+.bb-work-guard-actions button { min-height: 44px; padding: 10px 12px; border: 1px solid hsl(var(--border)); border-radius: 8px; background: transparent; color: hsl(var(--foreground)); font: inherit; font-size: .85rem; cursor: pointer; }
+.bb-work-guard-actions button:last-child:not(:first-child) { color: hsl(var(--primary)); }
+.bb-work-guard-actions button:disabled { opacity: .5; cursor: default; }
+@keyframes bb-work-dialog-in { from { opacity: 0; transform: translateY(8px) scale(.98); } to { opacity: 1; transform: none; } }
+@keyframes bb-work-dialog-out { from { opacity: 1; transform: none; } to { opacity: 0; transform: translateY(8px) scale(.98); } }
+@keyframes bb-work-backdrop-in { from { opacity: 0; } to { opacity: 1; } }
+@keyframes bb-work-backdrop-out { from { opacity: 1; } to { opacity: 0; } }
+@media (max-width: 380px) { .bb-app-update > .k-glass > div { flex-wrap: wrap; gap: 4px; } .bb-app-update > .k-glass > div > div:last-child { margin-left: auto; } }
+@media (prefers-reduced-motion: reduce) { .bb-app-update.k-toast { transition: none; } .bb-work-guard-dialog[open], .bb-work-guard-dialog[open]::backdrop { animation: none; } }

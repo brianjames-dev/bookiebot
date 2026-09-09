@@ -10,6 +10,7 @@ const React = frontendRequire("react")
 const { renderToStaticMarkup } = frontendRequire("react-dom/server")
 const TestRenderer = frontendRequire("react-test-renderer")
 const { act } = TestRenderer
+global.IS_REACT_ACT_ENVIRONMENT = true
 const browser = {}
 const timers = new Map()
 let timerId = 0
@@ -37,6 +38,11 @@ function load(file) {
 }
 const { PhoneNotifications, pushKeyBytes } = load(path.join(frontend, "src/phone-notifications.tsx"))
 const html = renderToStaticMarkup(React.createElement(PhoneNotifications))
+const embeddedHtml = renderToStaticMarkup(React.createElement(PhoneNotifications, { embedded: true }))
+assert.ok(embeddedHtml.includes('aria-label="Phone notifications"'))
+assert.ok(!embeddedHtml.includes('aria-expanded='), "Settings embeds notifications without another collapsed heading")
+assert.ok(embeddedHtml.includes('role="status"') && embeddedHtml.includes("Loading…"), "Embedded settings retains device status")
+assert.equal([...embeddedHtml.matchAll(/role="switch"/g)].length, 3)
 assert.ok(html.includes('aria-label="Phone notifications"'))
 assert.ok(html.includes('aria-expanded="false"') && html.includes('inert=""'))
 assert.ok(html.includes("iOS 16.4"))
@@ -117,9 +123,9 @@ function resetBrowser(changes = {}) {
   return { calls, steps, subscription, registration }
 }
 const button = (tree, text) => tree.root.findAllByType("button").find(node => node.children.join("") === text)
-async function mount() {
+async function mount(props) {
   let tree
-  await act(async () => { tree = TestRenderer.create(React.createElement(PhoneNotifications)); await flush() })
+  await act(async () => { tree = TestRenderer.create(React.createElement(PhoneNotifications, props)); await flush() })
   return tree
 }
 async function tap(tree, text) {
@@ -139,7 +145,7 @@ async function lifecycleContracts() {
   // Real React handlers/effects must invoke subscribe before yielding the tap.
   // The browser's subscribe call requests permission and reuses existing keys.
   let state = resetBrowser({ requireActivation: true, getSubscription: () => Promise.resolve(null) })
-  let tree = await mount()
+  let tree = await mount({ embedded: true })
   assert.equal(state.steps.permission, 0, "Loading settings must never ask for OS permission")
   assert.equal(state.steps.subscribe, 0, "Loading settings must never subscribe automatically")
   await tap(tree, "Enable on this phone")

@@ -5,6 +5,7 @@ const vm = require("node:vm")
 const { createRequire } = require("node:module")
 const req = createRequire(path.resolve("web/expense-report/package.json"))
 const ts = req("typescript")
+globalThis.IS_REACT_ACT_ENVIRONMENT = true
 
 function harness() {
   const slots = [], pending = [], calls = []
@@ -36,7 +37,7 @@ function harness() {
     init.signal.addEventListener("abort", () => reject(new Error("aborted")), { once: true })
   })
   const require = name => name === "react" ? hooks : name.endsWith(".css") ? {}
-    : name.startsWith("./components") ? { CollapsibleContent: "disclosure", SlidingSelection: "selection", FittedAmount: "amount" } : req(name)
+    : name.startsWith("./components") ? { CollapsibleContent: "disclosure", SlidingSelection: "selection", FittedAmount: "amount", MonthPicker: "month-picker" } : req(name)
   const source = ts.transpileModule(fs.readFileSync("web/expense-report/src/report-history.tsx", "utf8"), {
     compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2020, jsx: ts.JsxEmit.ReactJSX },
   }).outputText
@@ -67,14 +68,26 @@ async function main() {
     catalog: { currentMonth: "2026-09", months: [{value:"2026-09",label:"September 2026"},{value:"2026-08",label:"August 2026"}], coverage:{status:"partial"}},
     onSelect: value => { selection = value }, onRetry: () => {},
   })
-  const select = nodes(picker).find(node => node?.type === "select")
-  assert.equal(select.props["aria-label"], "Report month")
+  const select = nodes(picker).find(node => node?.type === "month-picker")
+  assert.equal(select.props.label, "Report month")
   assert.match(text(picker), /Some history is unavailable/)
-  select.props.onChange({target:{value:"2026-08"}})
+  select.props.onSelect("2026-08")
   assert.equal(selection, "2026-08")
-  select.props.onChange({target:{value:""}})
+  select.props.onSelect("2026-09")
   assert.equal(selection, null)
-  assert.deepEqual(nodes(picker).filter(node => node?.type === "option").map(node => text(node)), ["September 2026", "August 2026"])
+  assert.deepEqual(Array.from(select.props.options, option => option.label), ["September 2026", "August 2026"])
+  const unavailablePicker = pure.MonthHistoryControl({ monthLabel:"December 2025", selectedMonth:"2025-12", catalog:null,
+    loading:true, error:true, onSelect:()=>{}, onRetry:()=>{} })
+  const unavailableControl = nodes(unavailablePicker).find(node => node?.type === "month-picker")
+  assert.equal(unavailableControl.props.disabled, true, "Initial history loading cannot open an incomplete picker")
+  assert.ok(unavailableControl.props.options.some(option => option.value === "2025-12"), "A loaded report remains represented while history is unavailable")
+  const currentPicker = pure.MonthHistoryControl({ monthLabel:"September 2026", selectedMonth:"2026-09", loading:false, error:false,
+    catalog:{ currentMonth:"2026-09", months:[{value:"2026-09",label:"September 2026"}],coverage:{status:"complete"}},
+    onSelect:value=>{selection=value},onRetry:()=>{} })
+  const currentControl = nodes(currentPicker).find(node => node?.type === "month-picker")
+  assert.equal(currentControl.props.options.length, 1, "Current month is never duplicated for an explicit current selection")
+  currentControl.props.onSelect("2026-09")
+  assert.equal(selection, null, "Selecting the current month resumes automatic rollover")
   assert.ok(!button(picker, "This month"), "The month dropdown also provides the return to the automatic current month")
   assert.equal(pure.reportMonthLabel("2026-08"), "August 2026")
   assert.match(pure.reportMonthLabel(null), /^[A-Z][a-z]+ \d{4}$/, "The opening view uses a month name, not a relative label")
@@ -117,6 +130,7 @@ async function main() {
       : name.startsWith("./components") ? {
         CollapsibleContent: motion.exports.CollapsibleContent,
         FittedAmount: ({children}) => React.createElement("span", null, children),
+        MonthPicker: ({ label, ...props }) => React.createElement("test-month-picker", { "aria-label":label, ...props }),
       } : req(name),
   }
   vm.runInNewContext(ts.transpileModule(fs.readFileSync("web/expense-report/src/report-history.tsx", "utf8"), {
@@ -133,7 +147,7 @@ async function main() {
   const findButton = label => tree.root.findAllByType("button").find(item => text(item.props.children) === label
     || item.findAllByType("span").some(span => span.children.join("") === label))
   const click = label => renderer.act(() => findButton(label).props.onClick())
-  const selectMonth = value => renderer.act(() => tree.root.findByProps({"aria-label":"Comparison month"}).props.onChange({target:{value}}))
+  const selectMonth = value => renderer.act(() => tree.root.findByProps({"aria-label":"Comparison month"}).props.onSelect(value))
   const period = amount => ({datedSpending:amount,undatedSpending:0,scheduledSpending:0,unitemizedSpending:0,complete:true})
   const result = (baseline, note) => ({selectedMonth:"2026-09", baselineMonth:baseline,
     baselineKind:"selected-month", throughDay:7, status:"complete", selected:period(25),
@@ -153,8 +167,8 @@ async function main() {
   assert.equal(oldMonth.init.credentials, "same-origin")
   assert.ok([...timers.values()].some(timer => timer.delay === 60000), "Paired live builds have a 60s budget")
   assert.ok(!findButton("Last year"), "Comparison uses one accessible month dropdown")
-  assert.equal(tree.root.findAllByType("option").length, 2, "Selected month is excluded and previous month is not duplicated")
-  assert.deepEqual(tree.root.findAllByType("option").map(option => option.children.join("")), ["August 2026", "September 2025"])
+  assert.equal(tree.root.findByProps({"aria-label":"Comparison month"}).props.options.length, 2, "Selected month is excluded and previous month is not duplicated")
+  assert.deepEqual(Array.from(tree.root.findByProps({"aria-label":"Comparison month"}).props.options, option => option.label), ["August 2026", "September 2025"])
   selectMonth("2025-09")
   selectMonth("2026-08")
   click("Compare spending")
@@ -176,13 +190,13 @@ async function main() {
   assert.deepEqual(detailsMarker.children, [])
   assert.equal(detailsMarker.props["aria-hidden"], "true")
   assert.equal(detailsPanel().props["aria-hidden"], true)
-  assert.equal(detailsPanel().props.inert, "", "Calculation notes start hidden from keyboard and screen reader navigation")
+  assert.equal(detailsPanel().props.inert, true, "Calculation notes start hidden from keyboard and screen reader navigation")
   assert.match(text(detailsPanel().props.children), /September completed/)
   const beforeDetails = calls.length
   click("Details")
   assert.equal(findButton("Details").findByProps({ className: "bb-disclosure-mark" }), detailsMarker)
   assert.equal(detailsPanel().props["data-state"], "open")
-  assert.equal(detailsPanel().props.inert, undefined)
+  assert.equal(detailsPanel().props.inert, false)
   click("Details")
   assert.equal(findButton("Details").findByProps({ className: "bb-disclosure-mark" }), detailsMarker, "Details collapse reuses the same CSS stroke element")
   assert.equal(detailsPanel().props["data-state"], "closed")

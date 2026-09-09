@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react"
 import { AnimatedDisclosure } from "./components/ui/motion"
+import { useAppWorkStatus } from "./app-work-guard"
 import "./phone-notifications.css"
 
 interface Preferences { weekly: boolean; upcoming: boolean; showAmounts: boolean; hour: number }
@@ -46,7 +47,7 @@ export function pushKeyBytes(value: string): Uint8Array<ArrayBuffer> {
   return Uint8Array.from(raw, (character) => character.charCodeAt(0))
 }
 
-export function PhoneNotifications() {
+export function PhoneNotifications({ embedded = false }: { embedded?: boolean } = {}) {
   const [settings, setSettings] = useState<Settings | null>(null)
   const [preferences, setPreferences] = useState<Preferences>({ weekly: true, upcoming: false, showAmounts: false, hour: 10 })
   const [registration, setRegistration] = useState<ServiceWorkerRegistration | null>(null)
@@ -59,6 +60,10 @@ export function PhoneNotifications() {
   const mounted = useRef(false)
   const generation = useRef(0)
   const operation = useRef<AbortController | null>(null)
+  const dirty = Boolean(settings && JSON.stringify(preferences) !== JSON.stringify(settings.preferences))
+  const discard = () => { if (settings) setPreferences(settings.preferences); setMessage("") }
+  const work = { label: "Phone notifications", pending: busy, dirty, onDiscard: discard }
+  const updateWork = useAppWorkStatus(work)
 
   useEffect(() => {
     const controller = new AbortController()
@@ -98,6 +103,7 @@ export function PhoneNotifications() {
     const revision = generation.current
     const controller = new AbortController()
     operation.current = controller
+    updateWork({ ...work, pending: true })
     const current = () => mounted.current && revision === generation.current && operation.current === controller
     const active = () => current() && !controller.signal.aborted
     const timeout = window.setTimeout(() => controller.abort(), 30_000)
@@ -190,9 +196,10 @@ export function PhoneNotifications() {
     </label>
   )
 
-  return <section className="bb-notifications" aria-label="Phone notifications">
-    <AnimatedDisclosure summary={<><span className="bb-notification-title">Phone notifications</span><span className="bb-notification-state">{settings ? settings.enabled ? "On" : "Off" : error ? "Unavailable" : "Loading…"}</span><span className="bb-disclosure-mark" aria-hidden="true" /></>}>
+  const stateLabel = settings ? settings.enabled ? "On" : "Off" : error ? "Unavailable" : "Loading…"
+  const body = (
       <div className="bb-notification-settings">
+        {embedded && <div className="bb-notification-embedded-state"><h2>Notifications</h2><strong role="status">{stateLabel}</strong></div>}
         <p>Choose what this phone receives. Each phone has its own preferences.</p>
         {!supported && <p>On iPhone, open BookieBot from your Home Screen to enable notifications. Requires iOS 16.4 or later.</p>}
         {toggle("weekly", "Weekly check-in · Mondays")}
@@ -213,6 +220,8 @@ export function PhoneNotifications() {
         {error && <p className="bb-notification-error" role="alert">{error}</p>}
         {message && <p role="status">{message}</p>}
       </div>
-    </AnimatedDisclosure>
+  )
+  return <section className={`bb-notifications${embedded ? " bb-notifications-embedded" : ""}`} aria-label="Phone notifications">
+    {embedded ? body : <AnimatedDisclosure summary={<><span className="bb-notification-title">Phone notifications</span><span className="bb-notification-state">{stateLabel}</span><span className="bb-disclosure-mark" aria-hidden="true" /></>}>{body}</AnimatedDisclosure>}
   </section>
 }

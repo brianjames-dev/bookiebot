@@ -1,6 +1,7 @@
 import { useEffect, useId, useMemo, useRef, useState } from "react"
 import { CollapsibleContent } from "./components/ui/motion"
 import { FittedAmount } from "./components/ui/fitted-amount"
+import { MonthPicker } from "./components/ui/month-picker"
 import type { ExpenseReportData } from "./types"
 import "./report-history.css"
 
@@ -147,20 +148,17 @@ export function MonthHistoryControl({ monthLabel, selectedMonth, catalog, loadin
   onRetry: () => void
   disabled?: boolean
 }) {
-  const options = catalog?.months.filter((month) => month.value !== catalog.currentMonth) ?? []
+  const currentParts = new Intl.DateTimeFormat("en-US", { year: "numeric", month: "2-digit", timeZone: "America/Los_Angeles" }).formatToParts(new Date())
+  const currentMonth = catalog?.currentMonth ?? `${currentParts.find(part => part.type === "year")?.value}-${currentParts.find(part => part.type === "month")?.value}`
+  const options = [{ value: currentMonth, label: reportMonthLabel(currentMonth) }, ...(catalog?.months.filter((month) => month.value !== currentMonth) ?? [])]
   if (selectedMonth && !options.some((item) => item.value === selectedMonth)) {
     options.unshift({ value: selectedMonth, label: reportMonthLabel(selectedMonth) })
   }
   const partial = catalog && catalog.coverage.status !== "complete"
   return <span className="bb-month-history">
-    <span className="bb-month-picker">
-      <span aria-hidden="true">{monthLabel}<span className="bb-month-chevron">⌄</span></span>
-      <select aria-label="Report month" value={selectedMonth ?? ""} disabled={disabled || (loading && !catalog)}
-        onChange={(event) => onSelect(event.target.value || null)}>
-        <option value="">{reportMonthLabel(catalog?.currentMonth ?? null)}</option>
-        {options.map((month) => <option key={month.value} value={month.value}>{month.label}</option>)}
-      </select>
-    </span>
+    <MonthPicker label="Report month" value={selectedMonth ?? currentMonth} triggerLabel={monthLabel} variant="title"
+      options={options} disabled={disabled || (loading && !catalog)}
+      onSelect={(value) => onSelect(value === currentMonth ? null : value)} />
     {(error || partial) && <span className="bb-history-catalog-status" role="status">
       {error ? errorMessage || "History couldn’t load." : catalog?.coverage.code === "source_timeout"
         ? "Some history couldn’t be checked because Google Sheets timed out." : "Some history is unavailable."} <button type="button" disabled={loading || disabled} onClick={onRetry}>Retry</button>
@@ -237,7 +235,8 @@ export function ReportComparison({ report, onExpired, catalog, catalogLoading = 
   const selectedMonth = `${report.year}-${String(report.month).padStart(2, "0")}`
   const previousMonth = `${report.month === 1 ? report.year - 1 : report.year}-${String(report.month === 1 ? 12 : report.month - 1).padStart(2, "0")}`
   const baseline = chosenMonth && chosenMonth !== selectedMonth ? chosenMonth : previousMonth
-  const options = (catalog?.months ?? []).filter((month) => month.value !== selectedMonth && month.value !== previousMonth)
+  const options = [{ value: previousMonth, label: reportMonthLabel(previousMonth) },
+    ...(catalog?.months ?? []).filter((month) => month.value !== selectedMonth && month.value !== previousMonth)]
   // Results belong only to this displayed report. A fresh report invalidates
   // them; tab changes and disclosure motion do not discard useful live reads.
   // Keep one request in flight so quick selection changes cannot fill the
@@ -300,13 +299,11 @@ export function ReportComparison({ report, onExpired, catalog, catalogLoading = 
     </button>
     <CollapsibleContent open={open} id={id}>
       <div className="bb-comparison-content">
-        <label className="bb-comparison-picker">
+        <div className="bb-comparison-picker">
           <span>Compare with</span>
-          <select aria-label="Comparison month" value={baseline} onChange={(event) => setChosenMonth(event.target.value)}>
-            <option value={previousMonth}>{reportMonthLabel(previousMonth)}</option>
-            {options.map((month) => <option key={month.value} value={month.value}>{month.label}</option>)}
-          </select>
-        </label>
+          <MonthPicker label="Comparison month" value={baseline} options={options} onSelect={setChosenMonth}
+            triggerLabel={reportMonthLabel(baseline)} />
+        </div>
         {catalogLoading && !catalog && <p className="bb-comparison-note">Loading other months…</p>}
         {(catalogError || (catalog && catalog.coverage.status !== "complete")) && <p className="bb-comparison-note">
           {catalogError && catalogErrorMessage ? catalogErrorMessage : catalog?.coverage.code === "source_timeout"
