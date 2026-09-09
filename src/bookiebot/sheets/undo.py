@@ -911,6 +911,26 @@ def _action_search_text(logged: LoggedAction) -> str:
     return " ".join(str(part).lower() for part in parts if part is not None)
 
 
+def _canonical_action(logged: LoggedAction | None) -> LoggedAction | None:
+    if logged is None:
+        return None
+    from bookiebot.reimbursements import service
+    if not service.enabled():
+        return logged
+    from bookiebot.reimbursements.store import build_reimbursement_store, ReimbursementNotFoundError
+    from dataclasses import replace
+    store = build_reimbursement_store()
+    allocation_id = logged.action.metadata.get("allocation_id", "")
+    try:
+        value = store.get_allocation(allocation_id) if allocation_id else store.find_by_source(logged.id, now_pacific().year)
+    except ReimbursementNotFoundError:
+        value = None
+    if value is None:
+        return logged
+    return replace(logged, action=replace(logged.action, metadata={**logged.action.metadata,
+        "accounting": value["accounting"], "allocation_id": value["id"], "canonical_reimbursement": "true"}))
+
+
 def select_recent_action(
     user_key: str | None,
     *,
@@ -920,16 +940,16 @@ def select_recent_action(
     limit: int = 10,
 ) -> LoggedAction | None:
     if action_id:
-        return active_logged_action_by_id(user_key, action_id)
+        return _canonical_action(active_logged_action_by_id(user_key, action_id))
     actions = recent_actions(user_key, limit)
     if index is not None and 1 <= index <= len(actions):
-        return actions[index - 1]
+        return _canonical_action(actions[index - 1])
     if match_text:
         needles = [part for part in match_text.lower().split() if part]
         for logged in actions:
             haystack = _action_search_text(logged)
             if all(needle in haystack for needle in needles):
-                return logged
+                return _canonical_action(logged)
     return None
 
 
@@ -1193,6 +1213,10 @@ def _allowed_update_fields(action: UndoAction, metadata_extra: dict[str, str] | 
 
 
 def action_capabilities(action: UndoAction) -> ActionCapabilities:
+    if action.metadata.get("canonical_reimbursement") == "true" or action.metadata.get("accounting") == "cash_v1":
+        reason = "Manage repayments for this linked expense in the app's Shared Reimbursements section."
+        return ActionCapabilities(False, False, False, False, False, False, False, [],
+                                  reason, reason, reason, reason, reason, reason)
     action_type = action.metadata.get("type")
     transaction_type = _transaction_type(action)
     editable_fields = editable_fields_for_action(action)
@@ -1979,6 +2003,8 @@ def split_recent_action(
     field_values = dict(zip(fields, current_values, strict=False))
     payer = field_values.get("person") or action.metadata.get("person") or get_user_config(user_key).name
     payer_owner = payer_owner_from_person(payer, user_key)
+    if payer_owner != get_user_config(user_key).budget_owner_key:
+        return False, "The purchase is logged for a different payer. That payer must apply the split from their own account."
     responsible_owner = partner_owner_key(payer_owner) if method == "fronted" else payer_owner
     responsible_person = expense_person_for_owner(
         responsible_owner,
@@ -1988,6 +2014,13 @@ def split_recent_action(
         payer_share, partner_share = split_amounts(gross_amount, method, payer_owner)
     except ValueError as exc:
         return False, str(exc)
+
+    from bookiebot.reimbursements import service as reimbursement_service
+    if reimbursement_service.enabled():
+        return reimbursement_service.record_split(
+            str(user_key), logged, ws, field_columns, field_values, payer, method,
+            gross_amount, payer_share, partner_share,
+        )
 
     visible_amount = gross_amount if method == "fronted" else payer_share
     after_values = list(current_values)
@@ -2126,6 +2159,9 @@ def change_split_recent_action(
 
     action = logged.action
     allocation_id = action.metadata.get("allocation_id", "")
+    from bookiebot.reimbursements.service import is_managed
+    if is_managed(allocation_id):
+        return False, "Manage this linked expense in the app's Shared Reimbursements section."
     allocation = allocation_by_id(allocation_id, user_key) if allocation_id else None
     if allocation is None or allocation.status == "void":
         return False, "I could not find an active reimbursement record for that split."
@@ -2291,6 +2327,9 @@ def cancel_split_recent_action(user_key: str | None, *, action_id: str) -> tuple
         return False, "I could not find that active split."
     action = logged.action
     allocation_id = action.metadata.get("allocation_id", "")
+    from bookiebot.reimbursements.service import is_managed
+    if is_managed(allocation_id):
+        return False, "Manage this linked expense in the app's Shared Reimbursements section."
     allocation = allocation_by_id(allocation_id, user_key) if allocation_id else None
     if allocation is None or allocation.status == "void":
         return False, "That split is no longer active."
@@ -2588,6 +2627,12 @@ def _moved_destination_is_unchanged(ws: Any, action: UndoAction) -> bool:
 def _apply_undo_action(
     action: UndoAction, log_data: _ActionLogData | None = None, *, action_id: str = "", user_key: str | None = None,
 ) -> tuple[bool, str]:
+    from bookiebot.reimbursements import service
+    if service.enabled():
+        from bookiebot.reimbursements.store import build_reimbursement_store
+        allocation_id = action.metadata.get("allocation_id", "")
+        if service.is_managed(allocation_id) or (action_id and build_reimbursement_store().find_by_source(action_id, now_pacific().year)):
+            return False, "This is a linked reimbursement expense. Reverse its payment from Shared Reimbursements instead."
     ws = _worksheet(action.worksheet)
     if not _fixed_budget_target_matches(ws, action):
         return False, _STALE_BUDGET_TARGET_MESSAGE
@@ -2654,7 +2699,12 @@ def _apply_undo_action(
 
             allocation_id = action.metadata.get("allocation_id", "")
             allocation = allocation_by_id(allocation_id) if allocation_id else None
-            if allocation is not None and (allocation.status == "reimbursed" or allocation.received_amount > 0):
+            if allocation is None or allocation.status == "void":
+                return (
+                    False,
+                    "I could not verify an active reimbursement record for that split, so I did not undo it.",
+                )
+            if allocation.status == "reimbursed" or allocation.received_amount > 0:
                 return (
                     False,
                     "That split has already been reimbursed. Undo-after-payment needs the planned settlement confirmation workflow.",

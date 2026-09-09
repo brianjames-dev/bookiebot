@@ -1,7 +1,182 @@
 import pytest
+from types import SimpleNamespace
 
 from bookiebot.sheets import writer
 from unit_tests.support.sheets_repo_stub import InMemoryWorksheet
+
+
+@pytest.mark.parametrize(
+    ("content", "owner", "expected"),
+    [
+        ("464.72 Hannah's T at Gameday NEED", "brian", ""),
+        ("464.72 Brian’s T at Gameday NEED", "hannah", ""),
+        ("I paid for Hannah's T, split by income with Hannah", "brian", ""),
+        ("I paid for Brian's T, split by income with Brian", "hannah", ""),
+        ("Hannah did not pay; I paid for Hannah's coffee", "brian", ""),
+        ("Hannah paid $20 for coffee", "brian", "Hannah"),
+        ("Coffee $20 paid by Brian", "hannah", "Brian"),
+        ("Coffee $20; payer: Hannah", "brian", "Hannah"),
+        ("I covered $20 for Hannah", "brian", ""),
+        ("I fronted $20 for Brian", "hannah", ""),
+        ("I paid for Hannah's T on my AL card", "brian", "Brian (AL)"),
+        ("Hannah's T using my Alaska card", "brian", "Brian (AL)"),
+        ("I used my Alaska card for Hannah's T", "brian", "Brian (AL)"),
+        ("Hannah's T on my BofA card", "brian", "Brian (BofA)"),
+        ("Hannah's T $20 Brian (AL)", "brian", "Brian (AL)"),
+        ("Hannah's T $20 on Brian (BofA)", "brian", "Brian (BofA)"),
+        ("Hannah's T with my Bank of America account", "brian", "Brian (BofA)"),
+        ("Hannah's T on Brian's AL card", "hannah", "Brian (AL)"),
+        ("Coffee on Hannah's card", "brian", "Hannah"),
+    ],
+)
+def test_expense_payer_requires_payment_evidence_not_an_item_or_partner_name(content, owner, expected):
+    assert writer._explicit_expense_payer(content, owner) == expected
+
+
+@pytest.mark.parametrize(
+    ("content", "owner"),
+    [
+        ("Brian paid $20 and Hannah paid $30 for dinner", "brian"),
+        ("I paid $20 on my AL card and on my BofA card", "brian"),
+        ("I paid $20 on my AL card", "hannah"),
+    ],
+)
+def test_expense_payer_rejects_conflicting_or_unmapped_payment_evidence(content, owner):
+    with pytest.raises(ValueError):
+        writer._explicit_expense_payer(content, owner)
+
+
+class _ExpenseChannel:
+    def __init__(self):
+        self.sent = []
+
+    async def send(self, content=None, **kwargs):
+        self.sent.append((content, kwargs))
+
+
+def _expense_message(owner, content):
+    name, user_id = ("deebers", 676638528590970917) if owner == "brian" else ("hannerish", 830984827904851969)
+    return SimpleNamespace(content=content, author=SimpleNamespace(name=name, id=user_id),
+                           channel=_ExpenseChannel(), mentions=[])
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    ("owner", "partner", "item", "expected_person", "payer_share", "partner_share"),
+    [
+        ("brian", "Hannah", "Hannah's T", "Brian (BofA)", 300.81, 163.91),
+        ("hannah", "Brian", "Brian’s T", "Hannah", 163.91, 300.81),
+    ],
+)
+@pytest.mark.parametrize("split_during_log", [False, True])
+async def test_need_possessive_item_preserves_authenticated_payer_and_split_direction(
+    owner, partner, item, expected_person, payer_share, partner_share, split_during_log,
+):
+    from bookiebot.intents.handlers import handle_intent
+    from bookiebot.sheets.collaboration import list_allocations
+    from bookiebot.sheets.routing import sheet_user_context
+    from bookiebot.sheets.undo import recent_actions, split_recent_action
+    from unit_tests.support.sheets_repo_stub import SheetsRepoStub
+
+    content = f"464.72 {item} at Gameday NEED"
+    entities = {"item": "T", "location": "Gameday", "amount": 464.72, "person": partner}
+    if split_during_log:
+        content += f" split by income with {partner}"
+        entities["split_method"] = "income"
+    message = _expense_message(owner, content)
+    actor = str(message.author.id)
+    repo = SheetsRepoStub(expense_rows=[[], []])
+
+    with repo.patched(), sheet_user_context(actor):
+        await handle_intent("log_need_expense", entities, message)
+        if not split_during_log:
+            assert repo.expense.cell(3, 32).value == "$464.72"
+            source = recent_actions(actor, 1)[0]
+            assert source.action.new_values[1] == item
+            assert source.action.new_values[2] == "464.72"
+            assert source.action.metadata["person"] == expected_person
+            success, _detail = split_recent_action(actor, split_method="income", action_id=source.id)
+            assert success
+        allocation = list_allocations(actor)[0]
+        assert allocation.owner_key == owner
+        assert allocation.payer == expected_person
+        assert allocation.partner == partner
+        assert allocation.item == item
+        assert allocation.gross_amount == 464.72
+        assert allocation.payer_share == payer_share
+        assert allocation.partner_share == partner_share
+        assert allocation.received_amount == 0
+        assert allocation.outstanding_amount == partner_share
+
+    assert repo.expense.cell(3, 31).value == item
+    assert repo.expense.cell(3, 32).value == f"${payer_share:.2f}"
+    assert repo.expense.cell(3, 34).value == expected_person
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    ("owner", "content", "parsed_person", "expected"),
+    [
+        ("brian", "I paid $20 for Hannah's coffee on my AL card", "Hannah", "Brian (AL)"),
+        ("brian", "I paid $20 for Hannah's coffee on my BofA card", "Hannah", "Brian (BofA)"),
+        ("brian", "Hannah paid $20 for coffee", "Hannah", "Hannah"),
+        ("hannah", "Brian paid $20 for coffee on Brian's AL card", "Brian (AL)", "Brian (AL)"),
+        ("brian", "Coffee with Hannah $20", "Hannah", "Brian (BofA)"),
+    ],
+)
+async def test_expense_logging_uses_explicit_card_or_payer_without_trusting_parsed_person(
+    owner, content, parsed_person, expected,
+):
+    from bookiebot.intents.handlers import handle_intent
+    from unit_tests.support.sheets_repo_stub import SheetsRepoStub
+
+    repo = SheetsRepoStub(expense_rows=[[], []])
+    with repo.patched():
+        await handle_intent("log_expense", {
+            "item": "coffee", "location": "Cafe", "amount": 20, "category": "food", "person": parsed_person,
+        }, _expense_message(owner, content))
+    assert repo.expense.cell(3, 18).value == expected
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(("owner", "partner", "person"), [
+    ("brian", "Hannah", "Brian (BofA)"), ("hannah", "Brian", "Hannah"),
+])
+@pytest.mark.parametrize("parsed_method", [True, False])
+async def test_fronted_beneficiary_does_not_replace_payer(owner, partner, person, parsed_method):
+    from bookiebot.intents.handlers import handle_intent
+    from bookiebot.sheets.collaboration import list_allocations
+    from bookiebot.sheets.routing import sheet_user_context
+    from unit_tests.support.sheets_repo_stub import SheetsRepoStub
+
+    message = _expense_message(owner, f"I covered $20 of coffee for {partner}")
+    repo = SheetsRepoStub(expense_rows=[[], []])
+    entities = {"item": "coffee", "location": "Cafe", "amount": 20, "category": "food", "person": partner}
+    if parsed_method:
+        entities["split_method"] = "fronted"
+    with repo.patched(), sheet_user_context(str(message.author.id)):
+        await handle_intent("log_expense", entities, message)
+        allocation = list_allocations(str(message.author.id))[0]
+    assert allocation.payer == person
+    assert allocation.owner_key == owner
+    assert allocation.partner == partner
+    assert allocation.payer_share == 0
+    assert allocation.partner_share == 20
+
+
+@pytest.mark.asyncio
+async def test_ambiguous_payer_stops_before_expense_write():
+    from bookiebot.intents.handlers import handle_intent
+    from unit_tests.support.sheets_repo_stub import SheetsRepoStub
+
+    message = _expense_message("brian", "Brian paid $20 and Hannah paid $30 for coffee")
+    repo = SheetsRepoStub(expense_rows=[[], []])
+    with repo.patched():
+        await handle_intent("log_expense", {
+            "item": "coffee", "location": "Cafe", "amount": 50, "category": "food", "person": "Hannah",
+        }, message)
+    assert repo.expense.get_all_values() == [[], []]
+    assert any("more than one payer" in content for content, _kwargs in message.channel.sent)
 
 
 @pytest.mark.asyncio

@@ -456,6 +456,22 @@ def build_expense_breakdown_report(
         if record.allocation.status != "void"
         and _date_belongs_to_month(record.allocation.expense_date, month)
     ]
+    open_reimbursements = [record.allocation for record in reimbursement_history.outstanding_records]
+    received_reimbursements = [record.allocation for record in reimbursement_history.received_records]
+    reimbursement_coverage = reimbursement_history.coverage_payload()
+    from bookiebot.reimbursements import service as reimbursement_service
+    if reimbursement_service.enabled():
+        from bookiebot.sheets.routing import get_user_config
+        owner = get_user_config(actor_key).budget_owner_key
+        ledger = reimbursement_service.snapshot(owner)
+        allocations = [reimbursement_service.allocation_as_legacy(value) for value in ledger["allocations"]
+                       if value["payerOwner"] == owner]
+        shared_reimbursements = [value for value in allocations if _date_belongs_to_month(value.expense_date, month)]
+        open_reimbursements = [value for value in allocations if value.outstanding_amount > 0]
+        received_reimbursements = [value for value in allocations if value.outstanding_amount <= 0]
+        reimbursement_coverage = {"status": "partial" if ledger["projectionPending"] else "complete",
+                                  "asOf": generated_at.date().isoformat(), "years": sorted({int(value["sourceYear"]) for value in ledger["allocations"]}),
+                                  "unavailableYears": [], "excludedRecords": 0}
 
     entries = _shared_expense_entries(shared_rows, persons, month)
     payments = _payment_items(personal_rows, bill_schedule_rows, month)
@@ -599,9 +615,9 @@ def build_expense_breakdown_report(
         income_projection_reference=income_projection_reference,
         income_projection_receipts=income_projection_receipts,
         shared_reimbursements=shared_reimbursements,
-        open_shared_reimbursements=[record.allocation for record in reimbursement_history.outstanding_records],
-        received_shared_reimbursements=[record.allocation for record in reimbursement_history.received_records],
-        reimbursement_coverage=reimbursement_history.coverage_payload(),
+        open_shared_reimbursements=open_reimbursements,
+        received_shared_reimbursements=received_reimbursements,
+        reimbursement_coverage=reimbursement_coverage,
         raw_sheets=[
             RawSheet("Shared Expenses", _compact_rows(shared_rows)),
             RawSheet("Personal Budget", _compact_rows(personal_rows)),

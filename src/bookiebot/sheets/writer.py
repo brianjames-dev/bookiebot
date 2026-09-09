@@ -7,6 +7,7 @@ from openpyxl.utils import column_index_from_string
 from bookiebot.ui.card import CardButtonView
 import asyncio
 import os
+import re
 from zoneinfo import ZoneInfo
 from bookiebot.sheets.config import expense_category_label, get_category_columns, normalize_expense_category
 from bookiebot.sheets.income import (
@@ -18,7 +19,6 @@ from bookiebot.sheets.income import (
 from bookiebot.sheets.utils import resolve_query_persons
 from bookiebot.sheets.repo import get_sheets_repo
 from bookiebot.sheets.routing import UnknownDiscordUserError, get_current_discord_user_id, get_user_config
-from bookiebot.sheets.collaboration import normalize_split_method, payer_owner_from_person
 from bookiebot.sheets.undo import (
     UndoAction, _sheet_user_entered_value, _shift_income_logged_action_rows,
     _update_contiguous_row, record_undo_action,
@@ -38,6 +38,67 @@ def _logged_expense_label(category: str) -> str:
     if category == "need_expenses":
         return "Need expense"
     return f"{expense_category_label(category)} expense"
+
+
+def _explicit_expense_payer(content: str, actor_owner: str) -> str:
+    """A parsed person is not payer evidence: require payment wording in the message."""
+    text = " ".join(str(content or "").casefold().replace("’", "'").split())
+    owners: set[str] = set()
+    accounts: set[str] = set()
+    payer_patterns = (
+        r"\b(?P<payer>i|brian|hannah)\s+(?:paid|spent|purchased|bought|fronted|covered)\b",
+        r"\bpaid\s+by\s+(?P<payer>brian|hannah)\b",
+        r"\b(?:payer|paid by)\s*:\s*(?P<payer>brian|hannah)\b",
+        r"\b(?:on|with|using|used|from)\s+(?P<payer>brian|hannah)'s\s+(?:card|account)\b",
+    )
+    for pattern in payer_patterns:
+        for match in re.finditer(pattern, text):
+            # An explicitly denied payer cannot authorize a different owner.
+            if re.search(r"\b(?:not|never|wasn't|was not)\s*$", text[:match.start()]):
+                continue
+            payer = match.group("payer")
+            owners.add(actor_owner if payer == "i" else payer)
+
+    card_pattern = (
+        r"\b(?:on|with|using|used|from)\s+(?:(?P<owner>my|brian's|hannah's|the)\s+)?"
+        r"(?P<card>alaska|al|bofa|bank of america)(?:\s+(?:card|account))?\b"
+    )
+    for match in re.finditer(card_pattern, text):
+        if re.search(r"\b(?:not|never)\s*$", text[:match.start()]):
+            continue
+        owner = match.group("owner")
+        payer = owner.removesuffix("'s") if owner in {"brian's", "hannah's"} else actor_owner
+        if payer != "brian":
+            raise ValueError("I could not map that card to your account. Specify who paid and which card they used.")
+        owners.add(payer)
+        accounts.add("Brian (AL)" if match.group("card") in {"al", "alaska"} else "Brian (BofA)")
+
+    # The canonical sheet card labels are also explicit account selections.
+    for match in re.finditer(r"\bbrian\s*\(\s*(?P<card>al|bofa)\s*\)", text):
+        if re.search(r"\b(?:not|never)\s*$", text[:match.start()]):
+            continue
+        owners.add("brian")
+        accounts.add("Brian (AL)" if match.group("card") == "al" else "Brian (BofA)")
+
+    if len(owners) > 1 or len(accounts) > 1:
+        raise ValueError("I found more than one payer or card. Specify who paid this expense before logging it.")
+    if accounts:
+        return next(iter(accounts))
+    if owners:
+        owner = next(iter(owners))
+        return "" if owner == actor_owner else owner.title()
+    return ""
+
+
+def _preserve_expense_item_name(data: dict[str, Any], content: str) -> None:
+    """Recover a possessive name the parser moved out of a literal item label."""
+    item = str(data.get("item") or data.get("food") or "").strip()
+    if not item or re.match(r"(?:brian|hannah)['’]s\b", item, re.IGNORECASE):
+        return
+    text = " ".join(str(content or "").split())
+    match = re.search(rf"\b(?:brian|hannah)['’]s\s+{re.escape(item)}(?!\w)", text, re.IGNORECASE)
+    if match:
+        data["item"] = match.group(0)
 
 
 async def _expense_sheet_with_retry(attempts: int = 2):
@@ -335,21 +396,19 @@ async def write_expense_to_sheet(data, message):
         actor_config = get_user_config(actor_key, discord_user)
     except UnknownDiscordUserError:
         actor_config = None
-    person = (data.get("person") or "").strip()
-    if actor_config is not None and person.casefold() == actor_config.name.casefold():
-        person = ""
-        data.pop("person", None)
-    if person and normalize_split_method(data.get("split_method")) == "fronted":
-        actor_owner = actor_config.budget_owner_key if actor_config is not None else ""
-        mentioned_owner = payer_owner_from_person(person, actor_key)
-        if mentioned_owner != actor_owner:
-            # In "I covered this for Hannah", Hannah is the responsible partner,
-            # not the bank payer. Resolve the payer from the message author/card.
-            data["fronted_for_person"] = person
-            person = ""
-            data.pop("person", None)
-    if person.lower() in {"total", "all", "both", "everyone", "all persons", "all people"}:
-        person = ""
+    # Item names and beneficiaries often contain the partner's name. The model's
+    # `person` field cannot override the authenticated payer without raw payment
+    # or account wording, for ordinary and fronted expenses alike.
+    try:
+        person = _explicit_expense_payer(
+            getattr(message, "content", ""),
+            actor_config.budget_owner_key if actor_config is not None else "",
+        )
+    except ValueError as exc:
+        await message.channel.send(f"❌ {exc}")
+        return
+    _preserve_expense_item_name(data, getattr(message, "content", ""))
+    data.pop("person", None)
     if not person:
         persons_to_log = list(actor_config.expense_payment_methods) if actor_config is not None else []
         logger.debug("Resolved active expense payment methods", extra={"persons": persons_to_log})

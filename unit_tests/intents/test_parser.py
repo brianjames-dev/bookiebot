@@ -55,6 +55,19 @@ def test_need_expense_prompt_uses_shared_expense_fields():
     assert client.kwargs["response_format"] == {"type": "json_object"}
 
 
+def test_expense_prompt_separates_payer_from_item_names_and_query_persons():
+    client = _CapturingLLMClient()
+
+    asyncio.run(parse_message_llm("464.72 Hannah's T at Gameday NEED", llm_client=client))
+
+    prompt = client.messages[0]["content"]
+    assert "`person` means who PAID, not who an item is for" in prompt
+    assert 'item "Hannah\'s T"' in prompt
+    assert "and NO `person`; the authenticated Discord user paid" in prompt
+    assert "Preserve names in the item text" in prompt
+    assert "query rule does not authorize expense logging to another payer" in prompt
+
+
 def test_student_loan_payment_intents_are_retired_from_parser_prompt():
     client = _CapturingLLMClient()
 

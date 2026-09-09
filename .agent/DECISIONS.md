@@ -1,5 +1,11 @@
 # Agent Decisions
 
+## 2026-09-08 - Confirmed Repayments Reduce The Payer's Original Expense
+
+The user explicitly chose gross-until-confirmed-repayment bookkeeping, superseding the net-payer-at-split and receipt-only rules from August 3/August 11/September 7. The authenticated payer defaults independently of names inside item text. Preserve the original purchase gross for bank matching; confirmed partial/full repayments reduce its visible expense and create linked debtor expense rows on the payment date. Debtor-reported transfers require recipient confirmation. Equal, explicitly reviewed allocations across opposing debts settle by offset, with no actual bank transfer. Reverse offset groups atomically and retain event history.
+
+Store allocations, receipts, versions and request fingerprints in the existing durable phone database; serialize the household across both actors. Sheets is a recoverable projection, never claimed to be part of the database transaction. Named source/event ranges and absolute target writes prevent ordinary row-insertion/retry redirection; manual identity/anchor drift fails closed. Existing received history imports read-only rather than inventing historical counterpart expenses. Plan and verify migration before enabling the feature. Canonical splits cannot use legacy direct-row mutations; future gross/method/cancel corrections require linked ledger workflows. Detailed rollout and acceptance checks: `docs/REIMBURSEMENTS.md`.
+
 ## 2026-09-08 - Total Recorded Goal Savings Above Personal Goals
 
 The user confirmed that the Savings headline means money recorded across goals. Sum the API's canonical balanceCents once per owner-scoped goal, including completed and archived goals; never add starting/contribution subtotals again or combine this with monthly Saved or bank balances. Archival preserves records rather than removing money, so archive/restore leaves the total unchanged. Label the source and explicitly note archived inclusion when relevant. Unloaded/unauthorized data shows an unavailable total rather than a confirmed zero; existing stale-read and uncertain-save warnings remain visible. Goals sit below this total in the existing card-colored background band, painted separately so menus can overflow.

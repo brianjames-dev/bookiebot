@@ -383,6 +383,9 @@ def allocation_for_source_action(source_action_id: str, actor_key: str | None = 
 def matching_outstanding_allocations(actor_key: str | None, match_text: str = "") -> list[SharedAllocation]:
     if not actor_key:
         return []
+    from bookiebot.reimbursements import service
+    if service.enabled():
+        return service.matching(get_user_config(actor_key).budget_owner_key, match_text)
     from bookiebot.sheets.reimbursement_history import read_reimbursement_history
 
     history = read_reimbursement_history(actor_key, as_of=now_pacific())
@@ -411,6 +414,9 @@ def matching_outstanding_allocations(actor_key: str | None, match_text: str = ""
 def matching_outstanding_obligations(actor_key: str | None, match_text: str = "") -> list[SharedAllocation]:
     if not actor_key:
         return []
+    from bookiebot.reimbursements import service
+    if service.enabled():
+        return service.matching(get_user_config(actor_key).budget_owner_key, match_text, owed_by=True)
     current_owner = get_user_config(actor_key).budget_owner_key
     payer_actor_key = actor_key_for_owner(partner_owner_key(current_owner))
     if payer_actor_key is None:
@@ -530,6 +536,11 @@ def mark_reimbursed(
     actor_key: str | None = None,
 ) -> SharedAllocation | None:
     actor_key = actor_key or get_current_discord_user_id()
+    from bookiebot.reimbursements import service
+    if service.enabled():
+        # Receipt commands must carry a durable request ID and explicit amount
+        # through the canonical service, never update an old numeric ledger row.
+        raise RuntimeError("Record this payment through the canonical reimbursement command.")
     if actor_key:
         return _mark_historical_reimbursement_received(
             actor_key, allocation_id, received_at=received_at,

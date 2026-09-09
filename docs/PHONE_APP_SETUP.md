@@ -82,3 +82,7 @@ On each iPhone, notifications must remain off until explicitly enabled. If desir
 Identity is server-derived; the default month is Pacific and historical selections are validated against available owner workbooks. Tokens are stored only as hashes; sessions use revocable secure HttpOnly cookies. Ask tools are read-only and confined to the selected report. No financial reports are stored for offline use; the push worker does not cache expense data.
 
 References: [Apple Home Screen setup](https://support.apple.com/guide/iphone/open-as-web-app-iphea86e5236/ios), [WebKit cookie transfer](https://webkit.org/blog/14787/webkit-features-in-safari-17-2/).
+
+## Shared reimbursement payments
+
+Once the canonical ledger is enabled, Shared Reimbursements shows **Owed to you** and **You owe**. Expand a row to record a full or partial amount. **Record sent payment** waits for the other person to **Confirm received**; only confirmed amounts change expense rows. **Offset balances** previews equal allocations in both directions before confirming. This records debt settlement without transferring money. History retains payments and reviewed reversals. A syncing notice means the payment is saved and expense-sheet updates are pending; use Refresh to retry. See [full workflow and safeguards](REIMBURSEMENTS.md).

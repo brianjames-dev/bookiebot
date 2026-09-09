@@ -150,7 +150,7 @@ async def parse_message_llm(user_message: str, *, llm_client: Optional[LLMClient
     - amount: float (do not include $)
     - item: short label for what was purchased or paid for
     - location: merchant, vendor, or place when provided or reasonably inferable
-    - person: only when explicitly provided; otherwise omit it so the Discord user is used
+    - person: only an explicitly stated payer/card; otherwise omit it so the Discord user is used
     Do NOT include a category or date; the handler routes it to the shared Needs category and timestamps it.
     User: "Need expense 45 for bus ticket at Golden Gate Transit"
     → {{ "intent": "log_need_expense", "entities": {{ "item": "bus ticket", "location": "Golden Gate Transit", "amount": 45 }} }}
@@ -182,11 +182,19 @@ async def parse_message_llm(user_message: str, *, llm_client: Optional[LLMClient
     - "Brian (AL)"
     - "TOTAL" (for combined totals)
 
-    If the message clearly mentions one of these names or "TOTAL", include it as `"person": "<name>"` in the entities.
-    If the message mentions "Brian", assume it refers to **both of Brian’s accounts combined** — leave `"person": "Brian"` to signal this, and the downstream code will sum both `"Brian (BofA)"` and `"Brian (AL)"`.
+    For expense logging (including Need expenses), `person` means who PAID, not who an item is for.
+    Names inside item descriptions, possessives, beneficiaries, or split partners do not identify the payer.
+    For example, "464.72 Hannah's T at Gameday NEED" has item "Hannah's T", location "Gameday",
+    amount 464.72, and NO `person`; the authenticated Discord user paid. The same rule applies to "Brian's T".
+    "I paid for Hannah's T, split by income with Hannah" also omits `person` and uses `split_method`: "income".
+    A different payer requires explicit payment wording, such as "Hannah paid $20 for coffee" or "paid by Brian".
+    Preserve names in the item text; never drop a possessive name to populate `person` instead.
+    For READ QUERIES, a mentioned name or "TOTAL" selects the person(s) to query.
+    In queries, "Brian" means both Brian accounts combined; leave `"person": "Brian"` so downstream code
+    can sum `"Brian (BofA)"` and `"Brian (AL)"`. This query rule does not authorize expense logging to another payer.
     If the message specifically mentions **“on my AL card”** or **“on my Alaska card”**, set `"person": "Brian (AL)"`.
     If the message specifically mentions **“on my BofA card”**, set `"person": "Brian (BofA)"`.
-    If no name is specified, and no "TOTAL" is mentioned, leave out `"person"` and default to the Discord user’s name.If no name or "TOTAL" is explicitly mentioned in the message, leave "person" out of entities.
+    If no payer/card is explicitly specified in an expense log, leave `person` out and default to the Discord user.
 
     Categorize EXPENSE as:
     - "grocery" = food or essentials from grocery stores (Trader Joe’s, Costco, Safeway). If the word "groceries" is mentioned, always choose "grocery".

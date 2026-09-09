@@ -412,7 +412,79 @@ async def query_shared_reimbursements_handler(entities: IntentEntities, message:
     await message.channel.send("\n".join(lines))
 
 
+async def _canonical_reimbursement_received(entities: IntentEntities, message: Any) -> None:
+    import asyncio
+    import hashlib
+    import re
+    from bookiebot.reimbursements import service
+    from bookiebot.reimbursements.store import build_reimbursement_store, ReimbursementConflictError
+    from bookiebot.sheets.routing import now_pacific
+    actor = _message_actor_key(message)
+    owner = get_user_config(actor).budget_owner_key
+    match = str(entities.get("match_text") or entities.get("description") or entities.get("item") or entities.get("location") or "").strip()
+    try:
+        message_id = getattr(message, "id", None)
+        if message_id is None:
+            await message.channel.send("Open Shared Reimbursements to record this payment safely.")
+            return
+        request_id = hashlib.sha256(f"discord-receipt:{actor}:{message_id}".encode()).hexdigest()
+        store = await asyncio.to_thread(build_reimbursement_store)
+
+        async def recover_committed() -> bool:
+            saved = await asyncio.to_thread(store.get_command_result, owner, request_id)
+            if saved is None:
+                return False
+            events = saved.get("events", [])
+            if (len(events) != 1 or events[0].get("kind") != "receive"
+                    or events[0].get("actorOwner") != owner or events[0].get("payeeOwner") != owner):
+                raise ReimbursementConflictError("This message does not identify a received-payment command.")
+            event = events[0]
+            from bookiebot.reimbursements.projection import sync_pending
+            synced = await asyncio.to_thread(sync_pending, store)
+            suffix = " Expense sheets are still syncing." if not synced else " Both expense records were updated."
+            await message.channel.send(
+                f"That message already recorded ${event['amountCents'] / 100:.2f} received from {event['debtorOwner'].title()}." + suffix)
+            return True
+
+        # A delivered message may already have committed even when its first
+        # response was lost. Recover its immutable result before looking at the
+        # now-changed outstanding balance, version, date or parsed entities.
+        if await recover_committed():
+            return
+        matches = await asyncio.to_thread(service.matching, owner, match)
+        if len(matches) != 1:
+            if await recover_committed():
+                return
+            await message.channel.send("Name one reimbursement, or open Shared Reimbursements in the app to choose it.")
+            return
+        allocation = await asyncio.to_thread(store.get_allocation, matches[0].allocation_id)
+        supplied = entities.get("amount")
+        if supplied is None and re.search(r"\$\s*\d|\b\d+(?:\.\d+)?\b", str(getattr(message, "content", ""))):
+            await message.channel.send("For a specific or partial amount, use Record received in Shared Reimbursements. Nothing was changed.")
+            return
+        amount = service.money_cents(supplied) if supplied is not None else allocation["outstandingCents"]
+        try:
+            result = await asyncio.to_thread(service.command, owner, {"operation": "receive", "requestId": request_id,
+                "allocationId": allocation["id"], "version": allocation["version"], "amountCents": amount,
+                "date": now_pacific().date().isoformat(), "note": "Recorded in Discord"})
+        except ReimbursementConflictError:
+            # Another delivery can commit between our lookup and command. Its
+            # original result wins; command fingerprint checks remain strict.
+            if await recover_committed():
+                return
+            raise
+        suffix = " Expense sheets are still syncing." if result["projectionPending"] else " Both expense records were updated."
+        await message.channel.send(f"Recorded ${amount / 100:.2f} received from {allocation['partnerOwner'].title()}." + suffix)
+    except Exception:
+        logger.exception("Canonical reimbursement receipt needs retry")
+        await message.channel.send("I couldn't verify this payment. Check Shared Reimbursements before recording another one.")
+
+
 async def mark_shared_reimbursement_received_handler(entities: IntentEntities, message: Any) -> None:
+    from bookiebot.reimbursements import service as reimbursement_service
+    if reimbursement_service.enabled():
+        await _canonical_reimbursement_received(entities, message)
+        return
     actor_key = _message_actor_key(message)
     match_text = str(
         entities.get("match_text")

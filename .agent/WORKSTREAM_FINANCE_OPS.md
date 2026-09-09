@@ -192,7 +192,13 @@ Status: Complete first pass as of 2026-06-20. Recent-action update, move, delete
 
 ## Shared Expense Responsibility And Reimbursements
 
-### 2026-09-08 Read-Only Integrity Audit — Follow-up Pending
+### 2026-09-08 Approved Confirmed-Repayment Ledger — Implemented, Rollout In Progress
+
+The user approved payer/ownership hardening, fail-closed mutation guards, canonical storage and repairs. They chose retaining gross under the original payer until confirmed repayment; each partial receipt amends that source and records the debtor's linked expense. Both directions and reviewed equal offsets are in scope. This supersedes the older target invariants below for migrated/new canonical allocations. Paid legacy history remains read-only until a separately reviewed correction/import can establish counterpart history safely.
+
+Implementation adds durable household transactions, idempotency/version checks, pending sender reports/recipient confirmation, partial/full receipt events, atomic offset/reversal groups, ID-anchored recoverable sheet projection, phone actions and a plan-first migration. Full local verification passed 1,617 tests including PostgreSQL, with clean Pyright/frontend/Apps Script checks and responsive WebKit lifecycle acceptance. Production migration and rollout remain in progress; `docs/REIMBURSEMENTS.md` records operator and phone acceptance steps.
+
+### 2026-09-08 Read-Only Integrity Audit — Remediation Above
 
 - Confirmed production payer misattribution: a partner name inside an item can populate `person`, which the ordinary split path trusts over the authenticated actor. The resulting logical ledger owner can disagree with the payer workbook; current report ownership filtering then excludes that record. Separate actor, payer/account and beneficiary; validate storage ownership before writing. Preserve a linked audit correction rather than patching one visible cell.
 - Reproduced P1 in memory: a reimbursement read failure becomes `[]`; paid-split undo treats the missing allocation as permission, then a later successful update voids the paid allocation and restores gross. Missing/unavailable settlement state must prohibit mutation (`collaboration.list_allocations`, `undo._apply_undo_action`).
@@ -200,7 +206,7 @@ Status: Complete first pass as of 2026-06-20. Recent-action update, move, delete
 - Design gaps: ordinary splits create only the payer's net expense, no partner expense; receipt commands settle the full share with no amount; paid corrections/partial events and full mutation lifecycle remain pending. The proposed model preserves original gross, both owners' expense shares and receipt cash flows separately. Income weights are fixed constants and should be explicit/snapshotted if made configurable.
 - Verification: 85 existing collaboration/settlement/undo/reconciliation tests passed, plus two isolated fault reproductions. No live writes or app logic changes. Detailed incident evidence remains in the user's local report rather than checked into repository history. Remediation and the accounting model require a subsequent implementation pass.
 
-### Target Invariants
+### Legacy Target Invariants (Superseded For Canonical Allocations)
 
 - The original bank-clearing amount remains immutable in the source action lineage and available for reconciliation.
 - The visible expense amount/person represent the budget owner responsible for that spending: the payer's share for ordinary splits, or the partner's full amount for a fronted 0/100 allocation.
@@ -222,15 +228,15 @@ Status: Complete in code and automated/browser verification as of 2026-08-03; pr
 
 ### Slice H - Split Lifecycle Completion
 
-Status: Partial as of 2026-08-03. Method changes and outstanding split cancellation are complete; the remaining settlement and mutation lifecycle work stays pending.
+Status: Partial as of 2026-09-08. Legacy method changes/cancellation remain available only for unmigrated records. Canonical partial receipts, sender confirmation, offsets and payment reversals are implemented; gross/method/cancel and direct source correction workflows remain deferred behind mutation guards.
 
 1. Complete 2026-08-03: change the split method and recalculate both shares without losing the original gross or settlement history.
 2. Complete 2026-08-03: remove an outstanding split by restoring the gross visible expense and voiding the receivable.
 3. Correct the actual gross amount after splitting and recalculate the active responsibility and reimbursement amounts.
-4. Record partial reimbursements and maintain accurate received/outstanding balances.
-5. Add an explicit confirmation/refund workflow before undoing or removing a split that has already been paid.
+4. Complete 2026-09-08: partial/full confirmed receipts, pending sender reports and equal reviewed offsets maintain both owners' balances with durable replay and expense projections.
+5. Partial 2026-09-08: reviewed payment reversals (whole-group for offsets) restore both expense projections. Removing a paid split or recording an actual refund remains a separate linked correction workflow.
 6. Make update, move, delete, and undo fully split-aware, including ledger row references and reconciliation lineage synchronization.
-7. Harden pending split selections across restarts/deploys and add any lifecycle audit events required by production use.
+7. Partial 2026-09-08: allocation/payment events and request recovery are durable across deploys. Pre-registration Discord split selections still use the existing short-lived interaction lifecycle.
 
 ### Slice I - Fronted Shared Expenses
 

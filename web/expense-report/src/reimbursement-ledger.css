@@ -1,0 +1,48 @@
+.bb-canonical-reimbursements button { font: inherit; cursor: pointer; min-height: 44px; color: inherit; transition: color var(--bb-motion-duration) var(--bb-motion-ease), background var(--bb-motion-duration) var(--bb-motion-ease); }
+.bb-canonical-reimbursements button:disabled { cursor: default; opacity: .5; }
+.bb-ledger-directions { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 4px; margin: 4px 0 14px; border: 1px solid hsl(var(--border)); border-radius: var(--radius); padding: 4px; }
+.bb-ledger-directions > button { min-width: 0; display: grid; gap: 7px; padding: 11px 8px; background: transparent; border: 0; text-align: left; font-size: 12px; color: hsl(var(--muted-foreground)); }
+.bb-ledger-direction-amount { font-size: clamp(17px, 4.7vw, 26px); font-weight: 500; letter-spacing: -.035em; color: hsl(var(--foreground)); font-variant-numeric: tabular-nums; }
+.bb-ledger-directions > button[aria-pressed="true"] { color: hsl(var(--primary)); }
+.bb-ledger-net { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; font-size: 12px; color: hsl(var(--muted-foreground)); }
+.bb-ledger-net strong { font-weight: 500; color: hsl(var(--foreground)); font-variant-numeric: tabular-nums; }
+.bb-ledger-timeline { margin-top: 22px; }
+.bb-ledger-note { font-size: 12px; color: hsl(var(--muted-foreground)); line-height: 1.5; margin: 10px 0; overflow-wrap: anywhere; }
+.bb-ledger-message { margin: 12px 0; font-size: 13px; line-height: 1.5; }
+.bb-ledger-message p { margin: 0 0 8px; }
+.bb-ledger-message button, .bb-ledger-actions button, .bb-ledger-incoming-row > button, .bb-ledger-history-row > button { appearance: none; background: transparent; border: 1px solid hsl(var(--border)); border-radius: var(--radius); padding: 9px 12px; font-size: 12px; }
+.bb-ledger-message button:hover, .bb-ledger-actions button:hover, .bb-ledger-incoming-row > button:hover, .bb-ledger-history-row > button:hover { background: hsl(var(--foreground) / .06); }
+.bb-ledger-offset-toggle { display: block; padding: 5px 0; margin-top: 12px; border: 0; background: transparent; color: hsl(var(--primary)); font-size: 12px; }
+.bb-ledger-list-toggle { width: 100%; display: flex; justify-content: space-between; align-items: center; gap: 12px; margin-top: 16px; padding: 10px 0; border: 0; background: transparent; text-align: left; font-size: 14px; }
+.bb-ledger-actions { display: flex; flex-wrap: wrap; gap: 8px; margin: 14px 0 4px; }
+.bb-canonical-reimbursements .bb-reimbursement-group > .bb-reimbursement-entry { border-bottom: 0; }
+.bb-ledger-form { margin: 18px 0 8px; }
+.bb-ledger-form fieldset { min-width: 0; border: 0; padding: 0; margin: 0; }
+.bb-ledger-form legend { font-size: 14px; font-weight: 500; margin: 0 0 14px; padding: 0; }
+.bb-ledger-form label { display: grid; grid-template-columns: minmax(0, 1fr); gap: 6px; margin: 0 0 12px; min-width: 0; color: hsl(var(--muted-foreground)); font-size: 12px; }
+.bb-ledger-form input { box-sizing: border-box; width: 100%; min-width: 0; max-width: 100%; min-height: 44px; padding: 10px 11px; border: 1px solid hsl(var(--border)); border-radius: var(--radius); background: hsl(var(--background)); color: hsl(var(--foreground)); font: inherit; font-size: 16px; }
+.bb-ledger-form input:focus-visible { outline: 2px solid hsl(var(--primary)); outline-offset: 2px; }
+.bb-ledger-fields { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+.bb-ledger-date-field { display: block; box-sizing: border-box; min-width: 0; width: 100%; min-height: 44px; padding: 10px 11px; border: 1px solid hsl(var(--border)); border-radius: var(--radius); background: hsl(var(--background)); }
+.bb-ledger-form input[type="date"] { display: block; -webkit-appearance: none; appearance: none; padding: 0; border: 0; border-radius: 0; min-height: 24px; background: transparent; line-height: 1.5; text-align: left; }
+.bb-ledger-form input[type="date"]::-webkit-date-and-time-value { min-height: 1.5em; text-align: left; }
+.bb-ledger-date-field:focus-within { outline: 2px solid hsl(var(--primary)); outline-offset: -2px; }
+.bb-ledger-form input[type="date"]:focus-visible { outline: none; }
+.bb-ledger-form .bb-ledger-actions > button[type="submit"] { color: hsl(var(--primary-foreground)); background: hsl(var(--primary)); border-color: transparent; }
+.bb-ledger-incoming { margin-top: 20px; }
+.bb-ledger-incoming h3 { margin: 0 0 6px; font-size: 13px; font-weight: 500; }
+.bb-ledger-incoming-row, .bb-ledger-history-row { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: 8px 12px; padding: 10px 0; font-size: 13px; }
+.bb-ledger-incoming-row > div:first-child, .bb-ledger-history-row > div:first-child { display: grid; gap: 4px; overflow-wrap: anywhere; }
+.bb-ledger-incoming-row strong, .bb-ledger-history-row strong { font-weight: 500; font-variant-numeric: tabular-nums; }
+.bb-ledger-incoming-row span, .bb-ledger-history-row span { color: hsl(var(--muted-foreground)); font-size: 12px; }
+.bb-ledger-incoming-row > .bb-details-content, .bb-ledger-history-row > .bb-details-content { grid-column: 1 / -1; }
+.bb-ledger-confirm { font-size: 13px; line-height: 1.5; padding: 4px 0 8px; }
+.bb-ledger-history { padding-top: 10px; }
+.bb-ledger-offset-side h4 { font-size: 13px; font-weight: 500; margin: 14px 0 10px; }
+.bb-ledger-form .bb-ledger-offset-entry { grid-template-columns: minmax(0, 1fr) 100px; align-items: center; gap: 12px; }
+.bb-ledger-offset-entry > span { overflow-wrap: anywhere; color: hsl(var(--foreground)); }
+.bb-ledger-offset-entry small { display: block; margin-top: 4px; color: hsl(var(--muted-foreground)); font-size: 11px; }
+.bb-ledger-offset-entry input { text-align: right; }
+.bb-ledger-offset-totals { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 12px; margin: 16px 0; font-size: 12px; color: hsl(var(--muted-foreground)); }
+.bb-ledger-offset-totals strong { display: block; margin-top: 4px; color: hsl(var(--foreground)); font-size: 15px; font-weight: 500; font-variant-numeric: tabular-nums; }
+@media (max-width: 420px) { .bb-ledger-fields { grid-template-columns: minmax(0, 1fr); gap: 0; } }

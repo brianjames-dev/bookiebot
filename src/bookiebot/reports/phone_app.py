@@ -290,6 +290,8 @@ def register_phone_app_routes(app: web.Application) -> None:
     register_phone_notification_routes(app)
     from bookiebot.reports.phone_goals import register_phone_goal_routes
     register_phone_goal_routes(app)
+    from bookiebot.reports.phone_reimbursements import register_phone_reimbursement_routes
+    register_phone_reimbursement_routes(app)
     app.router.add_get("/app/version", app_version)
     app.router.add_get("/app/expenses", _expense_app)
     app.router.add_get("/app/expenses/data", _report_data)

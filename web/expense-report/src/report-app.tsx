@@ -36,6 +36,7 @@ import { SavingsGoals } from "./savings-goals"
 import { PhoneNotifications } from "./phone-notifications"
 import { ReportQuestions } from "./report-questions"
 import { SharedReimbursementsCard } from "./shared-reimbursements"
+import { ReimbursementLedger } from "./reimbursement-ledger"
 import { reportActivity, activitySummary, activityDay, calendarActivityStatus, type ReportActivity } from "./report-activity"
 import type { MetricExplanation } from "./types"
 import { useReportViewPreferences, type PreferredChart } from "./report-view-preferences"
@@ -890,9 +891,13 @@ export function ExpenseReportApp({ report, appControls, appAvatarUrl, appSession
           </CardContent>
         </Card>
 
-        <SharedReimbursementsCard items={report.sharedReimbursements ?? []} openItems={report.openSharedReimbursements}
+        {appSession ? <ReimbursementLedger refreshKey={report.generatedAt} fallback={
+          <SharedReimbursementsCard items={report.sharedReimbursements ?? []} openItems={report.openSharedReimbursements}
+            receivedItems={report.receivedSharedReimbursements} coverage={report.reimbursementCoverage}
+            monthLabel={report.monthLabel} year={report.year} month={report.month} />
+        } /> : <SharedReimbursementsCard items={report.sharedReimbursements ?? []} openItems={report.openSharedReimbursements}
           receivedItems={report.receivedSharedReimbursements} coverage={report.reimbursementCoverage}
-          monthLabel={report.monthLabel} year={report.year} month={report.month} />
+          monthLabel={report.monthLabel} year={report.year} month={report.month} />}
 
         <ExpenseInsightsCard
           topEntries={report.topEntries}
