@@ -61,8 +61,10 @@ def create_phone_setup_url(actor_key: str) -> str:
 
 
 def reset_phone_access(actor_key: str) -> None:
+    from bookiebot.reports.widget_store import build_widget_store
     owner = _owner_for_actor(actor_key)
     build_app_access_store().revoke_owner(owner.budget_owner_key)
+    build_widget_store().revoke_owner(owner.budget_owner_key)
 
 
 def _valid_owner(session: AppSession):
@@ -292,6 +294,8 @@ def register_phone_app_routes(app: web.Application) -> None:
     register_phone_goal_routes(app)
     from bookiebot.reports.phone_reimbursements import register_phone_reimbursement_routes
     register_phone_reimbursement_routes(app)
+    from bookiebot.reports.phone_widgets import register_phone_widget_routes
+    register_phone_widget_routes(app)
     app.router.add_get("/app/version", app_version)
     app.router.add_get("/app/expenses", _expense_app)
     app.router.add_get("/app/expenses/data", _report_data)

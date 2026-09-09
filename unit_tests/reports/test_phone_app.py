@@ -8,7 +8,7 @@ from aiohttp.test_utils import TestClient, TestServer
 import pytest
 import pytest_asyncio
 
-from bookiebot.reports import phone_app, web as reports_web
+from bookiebot.reports import phone_app, widget_store, web as reports_web
 from bookiebot.reports.app_access import AppAccessStore
 from bookiebot.sheets.routing import DEFAULT_BRIAN_DISCORD_USER_IDS, DEFAULT_HANNAH_DISCORD_USER_IDS
 
@@ -24,6 +24,9 @@ async def phone(tmp_path, monkeypatch):
     store = AppAccessStore(tmp_path / "access.sqlite3")
     store.initialize()
     monkeypatch.setattr(phone_app, "build_app_access_store", lambda: store)
+    widgets = widget_store.WidgetStore(store)
+    widgets.initialize()
+    monkeypatch.setattr(widget_store, "build_widget_store", lambda: widgets)
     monkeypatch.setattr(phone_app, "now_pacific", lambda: datetime(2026, 9, 30, 23, 59))
     calls = []
     def data(payload):

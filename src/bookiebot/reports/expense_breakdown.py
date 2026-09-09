@@ -2404,6 +2404,7 @@ def _report_client_payload(
         "daysInMonth": days_in_month,
         "elapsedDays": elapsed_days,
         "generatedAt": report.generated_at.strftime("%b %-d, %Y %-I:%M %p %Z"),
+        "generatedAtIso": report.generated_at.isoformat(),
         "metrics": {
             "totalExpenses": report.personal_total,
             "sharedExpenses": report.shared_total,

@@ -9,6 +9,7 @@ import { ReimbursementLedger } from "./reimbursement-ledger"
 import { SharedReimbursementsCard } from "./shared-reimbursements"
 import { SavingsGoals } from "./savings-goals"
 import { PhoneNotifications } from "./phone-notifications"
+import { WidgetSettings } from "./widget-settings"
 import { AskBookieBotPanel } from "./ask-bookiebot-panel"
 import { AppUpdatePrompt } from "./app-update-prompt"
 import { useAppWorkGuard } from "./app-work-guard"
@@ -146,6 +147,7 @@ export function ExpenseAppShell({ report, controls, monthControl, comparison, av
           <div className="bb-setting-row"><span>Dark mode</span><button type="button" className="bb-setting-switch" role="switch" aria-label="Dark mode" aria-checked={theme === "dark"} onClick={toggleTheme}><span /></button></div>
         </section>
         <div className="bb-settings-section bb-settings-notifications"><PhoneNotifications embedded /></div>
+        <WidgetSettings ownerName={report.ownerName} defaultMode={preferences.mode} />
         <section className="bb-settings-section" aria-labelledby="bb-account-title"><h2 id="bb-account-title">Account</h2>
           <div className="bb-setting-row"><span>Signed in as</span><strong>{report.ownerName}</strong></div>
           <button type="button" className="bb-settings-action" disabled={signingOut} onClick={() => guard.requestAction({ kind: "signout", onProceed: signOut })}>{signingOut ? "Signing out…" : "Sign out"}</button>

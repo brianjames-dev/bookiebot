@@ -67,7 +67,13 @@ Access lasts up to 180 days from setup unless signed out or reset; opening the a
 3. Open your existing BookieBot icon and paste the URL into **Private setup link**.
 4. Tap **Continue**, verify your name, then **Connect as [your name]**.
 
-Hannah must request her own private link. **Settings → Account → Sign out** disconnects this browser/app. **`/expense_app_reset`** revokes all your phone sessions and unused setup links, useful after losing a phone. It does not affect the other person or change expenses.
+Hannah must request her own private link. **Settings → Account → Sign out** disconnects this browser/app. **`/expense_app_reset`** revokes all your phone sessions, unused setup links and widget connections, useful after losing a phone. It does not affect the other person or change expenses. Ordinary web sign-out leaves separately paired Scriptable widgets active; remove them in Settings → Widgets if desired.
+
+## Optional Home Screen widget
+
+Open **Settings → Widgets** to download the Scriptable script and pair this person's widget. It shows budget remaining, available today, the BookieBot avatar, your name, Current/Projected mode and its source update time. Brian and Hannah create separate connections. Modes and removal are managed here; access is read-only and cannot change expenses or sign into the web app.
+
+Follow [the six-step Scriptable setup guide](SCRIPTABLE_WIDGETS.md). iOS controls refresh timing, so inspect the timestamp/age and stale label. Tapping opens the browser's BookieBot page, which may need its own sign-in; use your existing BookieBot icon to open the installed web app directly. No native build or Apple developer membership is needed.
 
 ## App updates and unfinished work
 
@@ -82,7 +88,7 @@ Updates and signout wait for pending savings, reimbursement, notification or Ask
 The existing server hosts `/app/expenses`. Deploy updated main and restart BookieBot to sync the slash commands. A git push alone does not prove deployment.
 
 - Public HTTPS: `BOOKIEBOT_PUBLIC_BASE_URL`, existing `PUBLIC_BASE_URL`, or Railway public domain.
-- Durable database precedence: `BOOKIEBOT_APP_DATABASE_URL`, then `BANK_DATABASE_URL`, then `DATABASE_URL`. Existing Postgres can be reused. Phone sessions, personal goals/contribution history, notification subscriptions/preferences, delivery records, and push signing keys use their own `app_*` tables. Plaid is not required.
+- Durable database precedence: `BOOKIEBOT_APP_DATABASE_URL`, then `BANK_DATABASE_URL`, then `DATABASE_URL`. Existing Postgres can be reused. Phone sessions, personal goals/contribution history, notification subscriptions/preferences, delivery records, push signing keys and widget pairings/grants use their own `app_*` tables. Plaid is not required.
 - Railway without Postgres: mount a volume. The default file is `app-access.sqlite3` inside `RAILWAY_VOLUME_MOUNT_PATH`; an optional `BOOKIEBOT_APP_SQLITE_PATH` must be inside that mount. Setup refuses ephemeral Railway storage.
 - Local development defaults to `data/app-access.sqlite3` or `BOOKIEBOT_APP_SQLITE_PATH`.
 - Install the repository requirements, including the Web Push dependency. Push signing keys are generated and persisted automatically. Keep the database/volume across deployments; the running server checks opted-in notification schedules.

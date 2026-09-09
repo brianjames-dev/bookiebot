@@ -1,0 +1,30 @@
+.bb-widget-settings { min-width: 0; }
+.bb-widget-heading, .bb-widget-connection-heading { display: flex; align-items: center; justify-content: space-between; gap: 16px; }
+.bb-widget-heading h2 { margin: 0; }
+.bb-widget-heading .bb-settings-action { font-size: 13px; }
+.bb-widget-settings > .bb-settings-note { margin-top: 6px; }
+.bb-widget-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 18px; }
+.bb-widget-actions .bb-toolbar-button { white-space: normal; text-align: center; text-decoration: none; font-size: 14px; }
+.bb-widget-form { display: grid; gap: 16px; padding: 18px 0 8px; }
+.bb-widget-form label, .bb-widget-code-label { display: grid; gap: 8px; min-width: 0; font-size: 13px; color: hsl(var(--muted-foreground)); }
+.bb-widget-form input, .bb-widget-settings select, .bb-widget-code-label input { min-width: 0; max-width: 100%; box-sizing: border-box; min-height: 44px; border: 1px solid hsl(var(--border)); border-radius: 5px; background: hsl(var(--background)); color: hsl(var(--foreground)); font: inherit; font-size: 16px; padding: 8px 10px; }
+.bb-widget-form input, .bb-widget-code-label input { width: 100%; }
+.bb-widget-settings select { appearance: none; height: 44px; width: fit-content; background-image: linear-gradient(45deg, transparent 50%, hsl(var(--muted-foreground)) 50%), linear-gradient(135deg, hsl(var(--muted-foreground)) 50%, transparent 50%); background-position: calc(100% - 16px) 18px, calc(100% - 11px) 18px; background-size: 5px 5px; background-repeat: no-repeat; padding-right: 26px; }
+.bb-widget-form input:focus-visible, .bb-widget-settings select:focus-visible, .bb-widget-code-label input:focus-visible { outline: 2px solid hsl(var(--primary)); outline-offset: 2px; }
+.bb-widget-pairing { padding-top: 18px; }
+.bb-widget-pairing h3 { margin: 0 0 8px; font-size: 16px; font-weight: 600; }
+.bb-widget-pairing ol { color: hsl(var(--muted-foreground)); font-size: 14px; line-height: 1.6; padding-left: 22px; margin: 8px 0 16px; }
+.bb-widget-pairing .bb-widget-actions { margin-top: 10px; }
+.bb-widget-connections { display: grid; gap: 24px; margin-top: 22px; }
+.bb-widget-connection { min-width: 0; }
+.bb-widget-connection-heading strong { font-size: 15px; overflow-wrap: anywhere; min-width: 0; }
+.bb-widget-connection-heading > span { flex-shrink: 0; font-size: 12px; color: hsl(var(--muted-foreground)); }
+.bb-widget-connection > .bb-settings-note { margin: 4px 0 8px; }
+.bb-widget-connection-controls { display: flex; align-items: center; justify-content: space-between; gap: 16px; }
+.bb-widget-revoke { padding-top: 6px; }
+.bb-widget-revoke p { color: hsl(var(--muted-foreground)); font-size: 13px; line-height: 1.6; }
+.bb-widget-settings .bb-widget-error { font-size: 13px; line-height: 1.6; color: hsl(var(--destructive)); }
+.bb-widget-settings > .bb-widget-help { margin-top: 20px; }
+.bb-widget-help a { color: hsl(var(--primary)); text-underline-offset: 3px; }
+.bb-widget-settings button:disabled, .bb-widget-settings select:disabled { opacity: .5; cursor: default; }
+@media (max-width: 360px) { .bb-widget-connection-heading { gap: 8px; } .bb-widget-connection-heading > span { max-width: 95px; text-align: right; } }

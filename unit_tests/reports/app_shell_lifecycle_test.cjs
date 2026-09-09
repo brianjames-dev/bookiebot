@@ -94,6 +94,7 @@ const allocation = { id: 'power', payerOwner: 'brian', partnerOwner: 'hannah', p
 let owner = 'brian', pending, writes = [], reads = { goals: 0, reimbursements: 0 }
 request = async (url, options = {}) => {
   if (url === '/app/version') return response({ version: 'shell-version-2' })
+  if (url === '/app/widgets/settings') return response({ connections: [], scriptUrl: '/app/widgets/script', setupInstructionsUrl: '/app/widgets/help' })
   if (options.body) { writes.push({ url, body: JSON.parse(options.body) }); return pending.promise }
   if (url === '/app/goals') { reads.goals++; return response({ goals: [] }) }
   if (url === '/app/reimbursements') { reads.reimbursements++; return response({ enabled: true, ownerKey: owner, currency: 'USD', allocations: [allocation], events: [] }) }
