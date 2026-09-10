@@ -187,7 +187,7 @@ function WidgetSettingsContent({ ownerName, defaultMode, onOpenGuide }: WidgetSe
     </div>}
     <div className="bb-widget-actions bb-widget-main-actions">
       <button type="button" className="bb-settings-action" disabled={!canCreate} aria-expanded={formOpen} aria-controls={`${id}-form`} onClick={() => { setFormOpen(value => !value); setError("") }}>Pair a widget</button>
-      <button className="bb-settings-action" type="button" onClick={onOpenGuide}>Setup &amp; themes</button>
+      <button className="bb-settings-action" type="button" onClick={onOpenGuide}>Setup &amp; widgets</button>
     </div>
     <CollapsibleContent open={formOpen} id={`${id}-form`}>
       <form className="bb-widget-form" onSubmit={event => { event.preventDefault(); if (canCreate && label.trim()) void run({ operation: "pair", label: label.trim(), mode }) }}>

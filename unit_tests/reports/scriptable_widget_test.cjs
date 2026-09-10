@@ -10,6 +10,17 @@ const pairingToken = 'bbw_pair_' + 'p'.repeat(43);
 const now = Date.parse('2026-09-09T18:00:00Z');
 const paired = { token: readToken, connectionId: 'connection-brian', ownerName: 'Brian', mode: 'projected', expiresAt: '2027-03-09T18:00:00Z' };
 const payload = (extra = {}) => ({ schemaVersion: 1, connectionId: paired.connectionId, ownerName: 'Brian', mode: 'projected', month: '2026-09', asOfDate: '2026-09-09', timezone: 'America/Los_Angeles', budgetRemaining: 4321.09, availableToday: 25.75, todayState: 'under', updatedAt: '2026-09-09T17:55:00Z', staleAfterSeconds: 1800, refreshAfterSeconds: 900, avatarUrl: origin + '/app/avatar.png?day=2026-09-09', appUrl: origin + '/app/expenses', status: 'fresh', ...extra });
+const goalA = 'a'.repeat(32), goalB = 'b'.repeat(32);
+const typedPayload = (type, content = {}, extra = {}) => {
+  const base = payload(); delete base.budgetRemaining; delete base.availableToday; delete base.todayState;
+  const defaults = {
+    upcoming: { payments: [{ label: 'Internet', amount: 65, date: '2026-09-12', kind: 'bill' }, { label: 'Car insurance', amount: 124, date: '2026-09-18', kind: 'subscription' }], totalCount: 2, windowEnd: '2026-09-30' },
+    categories: { needs: { remaining: 640, budget: 2000 }, wants: { remaining: 225, budget: 500 } },
+    savings: { goal: { id: goalA, name: 'Wedding ring', balance: 3600, target: 6000, remaining: 2400, progress: 0.6 }, goals: [{ id: goalA, name: 'Wedding ring' }, { id: goalB, name: 'Emergency fund' }], emptyReason: null },
+    shared: { owedToYou: 118.89, youOwe: 42, partnerName: 'Hannah', pendingCount: 0, projectionPending: false },
+  };
+  return { ...base, schemaVersion: 2, type, content: { ...defaults[type], ...content }, ...extra };
+};
 const keyFor = (scriptName = 'BookieBot', server = origin) => 'bookiebot.widget.v1.' + encodeURIComponent(server) + '.' + encodeURIComponent(scriptName);
 const runUrl = (name = 'BookieBot') => 'scriptable:///run/' + encodeURIComponent(name);
 function storage(profile = paired) {
@@ -17,7 +28,7 @@ function storage(profile = paired) {
 }
 async function run(options = {}) {
   const state = options.state || storage();
-  const requests = [], texts = [], dates = [], alerts = [], images = [], widgets = [];
+  const requests = [], texts = [], dates = [], alerts = [], images = [], widgets = [], drawings = [];
   const choices = [...(options.choices || [])];
   let didWriteKeychain = false;
   const instant = options.now || now;
@@ -48,7 +59,7 @@ async function run(options = {}) {
       const isPair = this.url.endsWith('/pair');
       if (isPair) assert.equal(this.headers['Content-Type'], 'application/json', 'pairing must send its JSON content type through the native property setter');
       else assert.equal(this.headers.Authorization, 'Bearer ' + (options.pairReply?.token || readToken), 'data reads must send the paired bearer through the native property setter');
-      const reply = isPair ? options.pairReply || paired : options.reply || payload();
+      const reply = isPair ? options.pairReply || paired : options.replyForRequest ? await options.replyForRequest(this.url) : options.reply || payload();
       this.response = { statusCode: isPair ? options.pairStatus || 200 : options.status || 200, url: options.redirect || this.url };
       if (options.throw || (isPair && options.pairThrow)) throw new Error('Network error with sensitive internal URL');
       return reply;
@@ -74,6 +85,7 @@ async function run(options = {}) {
   }
   const local = {
     cacheDirectory: () => '/local/cache', joinPath: (...parts) => parts.join('/'),
+    listContents: (key) => [...state.files.keys()].filter((name) => name.startsWith(key + '/')).map((name) => name.slice(key.length + 1)),
     fileExists: (key) => state.files.has(key) || [...state.files.keys()].some((path) => path.startsWith(key + '/')),
     remove: (key) => { for (const path of state.files.keys()) if (path === key || path.startsWith(key + '/')) state.files.delete(path); },
     readString: (key) => { if (!state.files.has(key)) throw new Error('missing'); return state.files.get(key); },
@@ -101,8 +113,9 @@ async function run(options = {}) {
     Script: { name: () => options.scriptName || 'BookieBot', setWidget: (widget) => widgets.push(widget), complete: () => {} },
     URLScheme: { forRunningScript: () => runUrl(options.scriptName) },
     config: { runsInApp: Boolean(options.app), runsInWidget: !options.app, widgetFamily: options.family || 'small' },
-    args: { widgetParameter: options.theme },
-    Color: class { constructor(value) { this.value = value; } },
+    args: { widgetParameter: options.parameter === undefined ? options.theme : options.parameter },
+    Device: { screenSize: () => ({ width: options.deviceWidth || 430, height: 932 }) },
+    Color: class { constructor(value, alpha = 1) { this.value = value; this.alpha = alpha; } },
     Font: class {
       constructor(name,size) { this.name=name; this.size=size; }
       static semiboldSystemFont(size) { return new this('system-semibold',size); }
@@ -111,12 +124,168 @@ async function run(options = {}) {
     },
     LinearGradient: class {}, Point: class { constructor(x,y) { this.x=x; this.y=y; } },
     Size: class { constructor(width, height) { this.width = width; this.height = height; } },
-    SFSymbol: { named: () => ({ image: { kind: 'fallback' } }) },
+    SFSymbol: { named: (name) => ({ image: { kind: 'fallback', name } }) },
     DateFormatter: class { string(date) { assert.equal(this.dateFormat,"MMM d '·' h:mm a"); return new Intl.DateTimeFormat('en-US', { timeZone: 'America/Los_Angeles', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' }).format(date).replace(',',' ·'); } },
+    Rect: class { constructor(x,y,width,height) { Object.assign(this,{x,y,width,height}); } },
+    Path: class {
+      constructor() { this.commands = []; }
+      move(point) { this.commands.push({ method:'move',point }); }
+      addLine(point) { this.commands.push({ method:'line',point }); }
+      addRoundedRect(rect,cornerWidth,cornerHeight) { this.commands.push({ method:'roundedRect',rect,cornerWidth,cornerHeight }); }
+    },
+    DrawContext: class {
+      constructor() { this.commands = []; drawings.push(this); }
+      setFillColor(color) { this.fillColor = color; }
+      setStrokeColor(color) { this.strokeColor = color; }
+      setLineWidth(width) { this.lineWidth = width; }
+      setTextColor(color) { this.textColor = color; }
+      setFont(font) { this.font = font; }
+      setTextAlignedCenter() { this.textAlignment = 'center'; }
+      addPath(path) { this.path = JSON.parse(JSON.stringify(path.commands)); }
+      record(method,extra={}) { this.commands.push({method,...extra,fillColor:this.fillColor,strokeColor:this.strokeColor,lineWidth:this.lineWidth}); }
+      strokeEllipse(rect) { this.record('strokeEllipse',{rect}); }
+      fillEllipse(rect) { this.record('fillEllipse',{rect}); }
+      fillPath() { this.record('fillPath',{path:this.path}); this.path = null; }
+      strokePath() { this.record('strokePath',{path:this.path}); this.path = null; }
+      drawTextInRect(value,rect) { this.record('text',{value,rect,font:this.font,color:this.textColor,alignment:this.textAlignment}); }
+      getImage() {
+        assert(this.respectScreenScale === true && this.opaque === false,'drawings must be crisp and transparent');
+        assert(this.size.width > 0 && this.size.height > 0);
+        for(const command of this.commands) {
+          for(const record of command.path || [command]) {
+            const r = record.rect || record.point;
+            if(r) { for(const coordinate of Object.values(r)) assert(Number.isFinite(coordinate),'native drawing coordinates must be finite'); assert(r.x >= -0.001 && r.y >= -0.001); assert(r.x + (r.width||0) <= this.size.width + 0.001); assert(r.y + (r.height||0) <= this.size.height + 0.001); }
+          }
+        }
+        return {kind:'drawing',size:this.size,commands:JSON.parse(JSON.stringify(this.commands))};
+      }
+    },
     Request, Alert, ListWidget: Widget,
   };
   await vm.runInNewContext('(async () => {' + source.replace('__BOOKIEBOT_ORIGIN__', options.origin || origin) + '})()', context);
-  return { state, requests, textItems: texts, texts: texts.map((item) => item.value), dates, alerts, images, widgets };
+  return { state, requests, textItems: texts, texts: texts.map((item) => item.value), dates, alerts, images, widgets, drawings };
+}
+async function typedContracts() {
+  const flatten = node => [node, ...(node.children || []).flatMap(flatten)];
+  const parameters = ['upcoming','savings','categories','shared'];
+  for(const type of parameters) for(const theme of ['editorial','two-tone']) for(const family of ['small','medium']) for(const deviceWidth of [375,430]) {
+    const result = await run({parameter:type+';'+theme,family,deviceWidth,reply:typedPayload(type)});
+    assert(result.texts.includes('Brian'),type+' must render the paired owner');
+    assert.equal(result.requests[0].url,origin+'/app/widgets/data/'+type);
+    assert.equal(result.requests[0].method,undefined,'all new financial summaries are GETs');
+    assert.equal(result.widgets[0].url,origin+'/app/expenses');
+    assert(result.texts.some(value=>value.includes('Sep 9')));
+    assert.equal(result.dates.length,0,'retain the approved single absolute timestamp');
+    assert.equal(JSON.parse(result.state.keychain.get(keyFor())).token,readToken);
+    if(family==='medium') {
+      const footer=result.widgets[0].children[0].children[0].children.at(-1);
+      assert(footer.children[0].children,'the timestamp keeps the full left-column width instead of being squeezed by a leading spacer');
+    }
+    const nodes=flatten(result.widgets[0]);
+    const light=nodes.filter(n=>n.backgroundGradient?.colors?.[1]?.value==='AECABA');
+    assert.equal(light.length,theme==='two-tone'?1:0,type+' uses exactly the approved accent region');
+    if(type==='upcoming') {
+      assert(result.texts.includes('Scheduled'),'upcoming calendar is not mislabeled as unpaid or mode-dependent');
+      assert(result.texts.includes('Internet')&&result.texts.includes('Car insurance'));
+      assert(result.texts.includes('$65.00')&&result.texts.includes('$124.00'));
+    } else if(type==='categories') {
+      assert(result.texts.includes('$640.00')&&result.texts.includes('$225.00'));
+      assert.equal(result.drawings.length,2);
+      result.drawings.forEach((drawing,index)=>{
+        const widths=drawing.commands.filter(c=>c.method==='fillPath').map(c=>c.path[0].rect.width);
+        assert(Math.abs(widths[1]/widths[0]-[.32,.45][index])<1e-10,'category tracks depict remaining, not spent');
+      });
+    } else if(type==='savings') {
+      assert(result.texts.includes('Wedding ring')&&result.texts.includes('$3,600.00'));
+      if(family==='medium') {
+        const ring=result.drawings[0];
+        assert.equal(ring.size.width,102*(deviceWidth===375?155/176:1),'approved enlarged ring is retained');
+        assert(ring.commands.some(c=>c.method==='text'&&c.value==='60%'&&c.alignment==='center'));
+        const columns=result.widgets[0].children[0].children;
+        assert.equal(columns[0].size.width,Math.round((deviceWidth===375?329:376)*.56));
+      }
+    } else {
+      assert(result.texts.includes('With Hannah'));
+      assert(result.texts.includes('$118.89')&&result.texts.includes('$42.00'));
+      if(family==='medium') {
+        const columns=result.widgets[0].children[0].children;
+        assert(Math.abs(columns[0].size.width-columns[1].size.width)<=1,'Shared has balanced 50/50 columns');
+        const bodies=columns.map(c=>c.children[1]);
+        assert.equal(bodies[0].size.height,bodies[1].size.height,'Shared metric bodies share vertical bounds');
+        for(const body of bodies) assert(body.children[0].spacer&&body.children.at(-1).spacer,'Shared values are centered between header and footer');
+      }
+    }
+  }
+  for(const parameter of ['savings;editorial;goal='+goalA+';owner=hannah','shared;editorial;goal='+goalA,'savings;editorial;goal=not-valid','categories;https://attacker.test','budget;editorial;token=secret','../private;editorial']) {
+    const result=await run({parameter}); assert.equal(result.requests.length,0); assert(result.texts.includes('Check widget parameter'));
+  }
+  for(const parameter of [undefined,'editorial','a','two-tone','c','budget;editorial']) {
+    const result=await run({parameter}); assert(result.texts.includes('Budget remaining')); assert.equal(result.requests[0].url,origin+'/app/widgets/data');
+  }
+  const sharedState=storage();
+  await run({state:sharedState});
+  for(const type of parameters) await run({state:sharedState,parameter:type+';editorial',reply:typedPayload(type)});
+  assert.equal([...sharedState.files.keys()].filter(p=>p.endsWith('.json')).length,5,'each type caches separately under the same read-only grant');
+  for(const type of parameters) {
+    const result=await run({state:sharedState,parameter:type+';two-tone',status:503,reply:typedPayload(type)});
+    assert(result.texts.some(v=>v.startsWith('Stale ·'))); assert(!result.texts.includes('Budget remaining'));
+  }
+  const selected=storage();
+  await run({state:selected,parameter:'savings;editorial;goal='+goalA,reply:typedPayload('savings')});
+  let result=await run({state:selected,parameter:'savings;editorial;goal='+goalB,status:503,reply:typedPayload('savings')});
+  assert(result.texts.includes('Savings goal unavailable')); assert(!result.texts.includes('Wedding ring'),'a different goal never reuses another goal snapshot');
+  assert(selected.keychain.has(keyFor()));
+  result=await run({state:selected,parameter:'savings;editorial;goal='+goalB,reply:typedPayload('savings')});
+  assert(result.texts.includes('Savings goal unavailable'),'server response must match the requested goal');
+  result=await run({state:selected,parameter:'savings;editorial;goal='+goalA,reply:typedPayload('savings',{goal:null,emptyReason:'goal_unavailable'})});
+  assert(result.texts.includes('Goal unavailable')); assert(!result.texts.includes('$3,600.00'),'archival/foreign selection clears previously shown selected goal');
+  assert(selected.keychain.has(keyFor()));
+  result=await run({parameter:'savings;editorial',reply:typedPayload('savings',{goal:null,goals:[],emptyReason:'no_goals'})});
+  assert(result.texts.includes('No savings goals'));
+  for(const type of parameters) {
+    const stale=await run({parameter:type+';editorial',reply:typedPayload(type,{}, {updatedAt:'2026-09-09T16:00:00Z'})});
+    assert(stale.texts.some(v=>v.startsWith('Stale ·')));
+  }
+  for(const progress of [0,.01,.6,1]) {
+    result=await run({parameter:'savings;two-tone',family:'medium',reply:typedPayload('savings',{goal:{id:goalA,name:'Wedding ring',balance:progress*6000,target:6000,remaining:(1-progress)*6000,progress}})});
+    const ring=result.drawings[0];
+    assert(ring.commands.some(c=>c.method==='text'&&c.value===Math.round(progress*100)+'%'));
+    assert.equal(ring.commands.filter(c=>c.method==='fillEllipse').length,progress>0&&progress<1?2:0,'partial arcs have endpoint caps; empty/full rings have no dots/seams');
+    assert.equal(ring.commands.filter(c=>c.method==='strokeEllipse').length,progress===1?2:1);
+  }
+  result=await run({parameter:'savings;editorial',family:'medium',reply:typedPayload('savings',{goal:{id:goalA,name:'Wedding ring',balance:12000,target:6000,remaining:0,progress:1}})});
+  assert(result.texts.includes('$12,000.00')&&result.texts.includes('Goal reached'));
+  result=await run({parameter:'savings;editorial',reply:typedPayload('savings',{goal:{id:goalA,name:'Wedding ring',balance:0,target:0,remaining:0,progress:0}})});
+  assert(result.texts.includes('Savings goal unavailable'));
+  for(const theme of ['editorial','two-tone']) {
+    result=await run({parameter:'categories;'+theme,family:'medium',reply:typedPayload('categories',{needs:{remaining:-12.15,budget:2000},wants:{remaining:0,budget:0}})});
+    assert(result.texts.includes('−$12.15')&&result.texts.includes('$0.00'));
+    assert(result.drawings.every(d=>d.commands.filter(c=>c.method==='fillPath').length===1),'over-budget and zero-budget tracks stay empty');
+    result=await run({parameter:'shared;'+theme,reply:typedPayload('shared',{pendingCount:1,projectionPending:true})});
+    assert(result.texts.includes('Awaiting confirmation')); assert(result.texts.includes('$118.89')&&result.texts.includes('$42.00'));
+    result=await run({parameter:'shared;'+theme,reply:typedPayload('shared',{owedToYou:0,youOwe:0,projectionPending:true})});
+    assert(result.texts.includes('Sheet sync pending')); assert.equal(result.texts.filter(v=>v==='$0.00').length,2);
+  }
+  result=await run({parameter:'upcoming;editorial',reply:typedPayload('upcoming',{payments:[],totalCount:0})}); assert(result.texts.includes('No scheduled payments'));
+  result=await run({parameter:'upcoming;editorial',family:'medium',reply:typedPayload('upcoming',{payments:[{label:'A'.repeat(200),amount:1e12,date:'2026-09-30',kind:'bill'}],totalCount:1})});
+  assert(result.texts.includes('A'.repeat(200))&&result.texts.includes('$1,000,000,000,000.00')); assert(result.texts.includes('Nothing else scheduled'));
+  result=await run({parameter:'upcoming;editorial',reply:typedPayload('upcoming',{totalCount:8})}); assert(result.texts.includes('+6 more this month'));
+  const savedPreview=storage();
+  result=await run({state:savedPreview,app:true,choices:[3,4,1,1],reply:typedPayload('shared')});
+  assert(result.widgets[0].preview==='medium'&&result.texts.includes('Owed to you'));
+  assert.equal(JSON.parse(savedPreview.keychain.get(keyFor())).token,readToken);
+  result=await run({state:savedPreview,app:true,choices:[0],reply:typedPayload('shared')}); assert.equal(result.requests[0].url,origin+'/app/widgets/data/shared');
+  result=await run({state:savedPreview}); assert(result.texts.includes('Budget remaining'),'saving a preview never replaces blank-parameter Home Screen Budget widgets');
+  const savingsPreview=storage();
+  result=await run({state:savingsPreview,app:true,choices:[3,2,0,0,1],replyForRequest:()=>typedPayload('savings')});
+  assert(result.requests.some(r=>r.url.endsWith('/data/savings?goalId='+goalA)));
+  assert(result.texts.includes('Wedding ring'));
+  const before=[...savingsPreview.keychain.entries()];
+  await run({state:savingsPreview,app:true,choices:[3,-1]}); assert.deepEqual([...savingsPreview.keychain.entries()],before,'canceling widget selection cannot alter preferences/credentials');
+  const typeCachePaths=[...sharedState.files.keys()];
+  result=await run({state:sharedState,parameter:'shared;editorial',status:401});
+  assert(result.texts.includes('Reconnect widget')); assert.equal(sharedState.files.size,0,'revocation removes every widget type and avatar cache for the connection');
+  assert(typeCachePaths.length>5);
 }
 async function contracts() {
   // Both visual themes use the same canonical values, grants and tap targets.
@@ -340,7 +509,8 @@ async function contracts() {
   assert.equal(check.requests.length, 0);
   assert.equal(check.widgets[0].url, undefined);
   assert(check.alerts[0].title.includes('configured script'));
+  await typedContracts();
   console.log('Scriptable widget execution contracts passed: pairing, scoped cache, read-only requests, revocation, stale states, rendering and safe tap URL.');
 }
 if (require.main === module) contracts().catch((error) => { console.error(error); process.exitCode = 1; });
-module.exports = { run, payload, storage, paired };
+module.exports = { run, payload, typedPayload, storage, paired, goalA, goalB };

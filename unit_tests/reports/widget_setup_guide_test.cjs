@@ -5,7 +5,7 @@ const req = createRequire(path.resolve('web/expense-report/package.json'))
 const React = req('react'), {create, act} = req('react-test-renderer'), ts = req('typescript')
 global.IS_REACT_ACT_ENVIRONMENT = true
 const requests=[], timers=new Map(), copied=[]
-let serial=0, tree, back=0, pair=0, failCopy=false
+let serial=0, tree, back=0, pair=0, failCopy=false, deferredCopy=null
 const motionRuntime={exports:{},require:req}
 vm.runInNewContext(ts.transpileModule(fs.readFileSync('web/expense-report/src/components/ui/motion.tsx','utf8'),{
   compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2020,jsx:ts.JsxEmit.ReactJSX},
@@ -15,7 +15,7 @@ const source=ts.transpileModule(fs.readFileSync('web/expense-report/src/widget-s
 }).outputText
 const runtime={exports:{},AbortController,
   window:{setTimeout(fn){timers.set(++serial,fn);return serial},clearTimeout(id){timers.delete(id)}},
-  navigator:{clipboard:{writeText:async value=>{if(failCopy)throw Error('Denied');copied.push(value)}}},
+  navigator:{clipboard:{writeText:async value=>{if(deferredCopy)return deferredCopy(value);if(failCopy)throw Error('Denied');copied.push(value)}}},
   fetch:(url,options)=>new Promise((resolve,reject)=>requests.push({url,options,resolve,reject})),
   require:name=>name.endsWith('.css')?{}:name==='./components/ui/motion'?motionRuntime.exports:req(name),
 }
@@ -23,9 +23,14 @@ vm.runInNewContext(source,runtime)
 const text=node=>typeof node==='string'?node:Array.isArray(node)?node.map(text).join(''):node?.children?.map(text).join('')||''
 const button=label=>tree.root.findAllByType('button').find(node=>text(node)===label)
 const click=async label=>act(async()=>{const node=button(label);assert.ok(node,label);assert.ok(!node.props.disabled);await node.props.onClick()})
+const change=async(label,value)=>act(async()=>tree.root.findByProps({'aria-label':label}).props.onChange({target:{value}}))
+const parameter=()=>tree.root.findByProps({'aria-label':'Widget parameter'}).props.value
 const createGuide=()=>act(async()=>{tree=create(React.createElement(runtime.exports.WidgetSetupGuide,{onBack:()=>back++,onPair:()=>pair++}))})
-const code='// BookieBot Home Screen widget · v1.3\nconst BOOKIEBOT_ORIGIN = "https://bookiebot.example";'
+const code='// BookieBot Home Screen widget · v1.4\nconst BOOKIEBOT_ORIGIN = "https://bookiebot.example";'
 const respond=(request,value=code,status=200)=>act(async()=>request.resolve({ok:status===200,text:async()=>value}))
+const goalId=number=>number.toString(16).padStart(32,'0')
+const goal=(id,name,archived=false)=>({id,name,archived,targetCents:600000,balanceCents:360000})
+const respondGoals=(request,goals,status=200)=>act(async()=>request.resolve({ok:status===200,status,json:async()=>({goals})}))
 ;(async()=>{
   await createGuide()
   assert.equal(requests.length,1)
@@ -38,7 +43,7 @@ const respond=(request,value=code,status=200)=>act(async()=>request.resolve({ok:
   assert.equal(tree.root.findByType('ol').findAllByType('li').length,3,'Setup remains three short steps')
   assert.equal(tree.root.findAllByType('details').length,0,'Disclosures use shared animated motion')
   assert.equal(tree.root.findAllByProps({'aria-label':'Widget needs pairing'}).length,0,'Recovery no longer occupies the initial view')
-  const themesButton=button('Themes'), helpButton=button('Help')
+  const themesButton=button('Customize'), helpButton=button('Help')
   const themeGuide=tree.root.findAllByType('div').find(node=>node.props.id===themesButton.props['aria-controls'])
   const helpGuide=tree.root.findAllByType('div').find(node=>node.props.id===helpButton.props['aria-controls'])
   assert.notEqual(themesButton.props['aria-controls'],helpButton.props['aria-controls'])
@@ -48,22 +53,22 @@ const respond=(request,value=code,status=200)=>act(async()=>request.resolve({ok:
     assert.equal(content.props.inert,true,'Closed help cannot receive keyboard focus')
     assert.equal(content.props['data-state'],'closed')
   }
-  assert.match(text(themeGuide),/Theme & preview.*Editorial or Two-tone/)
-  assert.deepEqual(themeGuide.findAllByType('code').map(text),['editorial','two-tone'])
-  assert.match(text(themeGuide),/Leave Parameter empty for your saved theme/)
+  assert.match(text(themeGuide),/Widget & preview/)
+  assert.equal(themeGuide.findByProps({'aria-label':'Widget parameter'}).props.value,'budget;editorial')
+  assert.match(text(themeGuide),/Leave Parameter empty for Budget in your saved theme/)
   assert.match(text(themeGuide),/Never put a setup code here/)
   assert.match(text(helpGuide),/Replace its code and keep the same name/)
   assert.match(text(helpGuide),/pairing stays connected; no need to pair again/)
   assert.match(text(helpGuide),/iOS controls refresh timing/)
   assert.match(text(helpGuide),/browser.*separate sign-in/)
-  await click('Themes')
+  await click('Customize')
   assert.equal(themesButton.props['aria-expanded'],true)
   assert.equal(themeGuide.props['data-state'],'open')
   assert.equal(themeGuide.props.inert,false)
   assert.equal(helpButton.props['aria-expanded'],false,'Theme disclosure does not open troubleshooting')
   await click('Help')
   assert.equal(helpGuide.props['data-state'],'open')
-  await click('Themes')
+  await click('Customize')
   assert.equal(themeGuide.props['data-state'],'closed')
   assert.equal(helpGuide.props['data-state'],'open','Independent disclosures preserve their current state')
   await click('Help')
@@ -93,7 +98,107 @@ const respond=(request,value=code,status=200)=>act(async()=>request.resolve({ok:
   await act(async()=>bottomBack.props.onClick())
   assert.equal(pair,1);assert.equal(back,2)
   assert.equal(requests.length,1,'Help navigation does not create or redeem credentials')
+
+  await click('Customize')
+  assert.deepEqual(tree.root.findByProps({'aria-label':'Widget type'}).findAllByType('option').map(text),[
+    'Budget','Upcoming payments','Savings goal','Category budgets','Shared balance',
+  ])
+  await change('Widget theme','two-tone')
+  for(const type of ['upcoming','categories','shared','budget']) {
+    await change('Widget type',type)
+    assert.equal(parameter(),`${type};two-tone`)
+  }
+  assert.equal(requests.length,1,'Non-goal customization is entirely local')
+  await change('Widget type','https://attacker.test')
+  await change('Widget theme','editorial;goal=credential')
+  assert.equal(parameter(),'budget;two-tone','Native selectors also reject unsupported programmatic values')
+  failCopy=false
+  await click('Copy parameter')
+  assert.equal(copied.at(-1),'budget;two-tone')
+  assert.match(text(themeGuide),/Copied. Paste into Edit Widget → Parameter/)
+  await change('Widget type','savings')
+  const goalsRequest=requests.at(-1)
+  assert.equal(goalsRequest.url,'/app/goals')
+  assert.equal(goalsRequest.options.method,'GET')
+  assert.equal(goalsRequest.options.credentials,'same-origin')
+  assert.equal(goalsRequest.options.redirect,'error')
+  assert.equal(goalsRequest.options.cache,'no-store')
+  assert.equal(goalsRequest.options.body,undefined,'Selecting goals cannot mutate savings')
+  assert.equal(tree.root.findByProps({'aria-label':'Widget savings goal'}).props.disabled,true)
+  assert.equal(parameter(),'savings;two-tone','First active goal does not add an empty goal suffix')
+  await respondGoals(goalsRequest,[goal(goalId(1),'Wedding ring'),goal(goalId(2),'Trip'),goal(goalId(3),'Old goal',true)])
+  assert.deepEqual(tree.root.findByProps({'aria-label':'Widget savings goal'}).findAllByType('option').map(text),['First active goal','Wedding ring','Trip'])
+  await change('Widget savings goal',goalId(1))
+  assert.equal(parameter(),`savings;two-tone;goal=${goalId(1)}`)
+  await change('Widget savings goal',`${goalId(1)};theme=unknown`)
+  assert.equal(parameter(),`savings;two-tone;goal=${goalId(1)}`,'Goal parameters only use safe IDs from the authenticated catalog')
+  await click('Copy parameter')
+  assert.equal(copied.at(-1),parameter())
+  failCopy=true
+  await click('Copy parameter')
+  const parameterInput=tree.root.findByProps({'aria-label':'Widget parameter'})
+  assert.equal(parameterInput.props.readOnly,true)
+  assert.match(text(themeGuide),/Select and copy the parameter below/)
+  selected=false
+  parameterInput.props.onFocus({target:{select(){selected=true}}})
+  assert.equal(selected,true)
+  await change('Widget type','shared')
+  assert.equal(parameter(),'shared;two-tone','A chosen savings goal never leaks into another type')
+  assert(!text(themeGuide).includes('Select and copy the parameter below'),'Parameter changes clear obsolete clipboard feedback')
+  let finishCopy
+  deferredCopy=()=>new Promise(resolve=>{finishCopy=resolve})
+  await act(async()=>button('Copy parameter').props.onClick())
+  await change('Widget type','upcoming')
+  await act(async()=>finishCopy())
+  deferredCopy=null
+  assert(!text(themeGuide).includes('Copied. Paste into Edit Widget'),'An old clipboard result cannot confirm a newly selected parameter')
+  await change('Widget type','savings')
+  const canceledGoalRead=requests.at(-1)
+  assert.equal(button('Copy parameter').props.disabled,true,'Revalidate the selected goal before copying its ID again')
+  await change('Widget type','budget')
+  assert.equal(canceledGoalRead.options.signal.aborted,true)
+  await respondGoals(canceledGoalRead,[goal(goalId(4),'Late goal')])
+  await change('Widget type','savings')
+  const currentGoalsRead=requests.at(-1)
+  await respondGoals(currentGoalsRead,[goal(goalId(1),'Wedding ring',true),goal(goalId(2),'Trip')])
+  assert.equal(parameter(),'savings;two-tone','A removed or archived choice returns to First active goal')
+  assert(!tree.root.findByProps({'aria-label':'Widget savings goal'}).findAllByType('option').some(option=>text(option)==='Late goal'),'A canceled response cannot replace the current catalog')
+  await change('Widget type','budget');await change('Widget type','savings')
+  const hiddenRead=requests.at(-1)
+  await click('Customize')
+  assert.equal(hiddenRead.options.signal.aborted,true,'Collapsing Customize cancels its account read')
+  await respondGoals(hiddenRead,[goal(goalId(5),'Hidden result')])
+  await click('Customize')
+  await respondGoals(requests.at(-1),[])
+  assert.match(text(themeGuide),/No active goals yet/)
+  assert.equal(parameter(),'savings;two-tone')
+
+  const invalidIds=['ring-id','bad;id','a'.repeat(31),'a'.repeat(33),'A'.repeat(32),'g'.repeat(32),'12345678-1234-1234-1234-123456789abc']
+  for(const invalid of [...invalidIds.map(id=>[goal(id,'Invalid ID')]),[goal(goalId(8),'One'),goal(goalId(8),'Duplicate')],[{id:goalId(9),name:'Bad'}],Array.from({length:201},(_,i)=>goal(goalId(i),'Too many'))]) {
+    await change('Widget type','budget');await change('Widget type','savings')
+    await respondGoals(requests.at(-1),invalid)
+    assert.match(text(themeGuide),/Goals couldn’t load/)
+    assert.equal(parameter(),'savings;two-tone')
+    assert.equal(tree.root.findByProps({'aria-label':'Widget savings goal'}).findAllByType('option').length,1)
+  }
+  await click('Retry goals')
+  await respondGoals(requests.at(-1),[],401)
+  assert.match(text(themeGuide),/Your sign-in expired/)
+  await click('Retry goals')
+  const lateGoals=requests.at(-1)
+  await act(async()=>[...timers.values()][0]())
+  assert.equal(lateGoals.options.signal.aborted,true)
+  assert.equal(tree.root.findByProps({'aria-label':'Widget savings goal'}).props.disabled,false,'A fetch ignoring abort cannot leave the chooser spinning')
+  await respondGoals(lateGoals,[goal(goalId(6),'Too late')])
+  assert.match(text(themeGuide),/Goals couldn’t load/)
+  assert(!tree.root.findByProps({'aria-label':'Widget savings goal'}).findAllByType('option').some(option=>text(option)==='Too late'))
+  await click('Retry goals')
+  const leavingGoals=requests.at(-1)
   await act(async()=>tree.unmount())
+  assert.equal(leavingGoals.options.signal.aborted,true)
+  await respondGoals(leavingGoals,[goal(goalId(7),'Unmounted')])
+  assert.equal(timers.size,0)
+  assert(requests.every(request=>request.options.body===undefined),'The entire configuration flow is read-only')
   await createGuide()
   const stalled=requests.at(-1)
   await act(async()=>[...timers.values()][0]())

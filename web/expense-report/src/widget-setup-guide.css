@@ -11,11 +11,7 @@
 .bb-widget-guide .bb-widget-error { color: hsl(var(--destructive)); font-size: 13px; }
 .bb-widget-guide button:disabled { opacity: .5; cursor: default; }
 .bb-widget-guide .bb-toolbar-button { min-height: 44px; }
-.bb-widget-theme-parameters { display: flex; flex-wrap: wrap; gap: 12px 32px; margin: 16px 0; }
-.bb-widget-theme-parameters > div { display: grid; gap: 4px; }
-.bb-widget-theme-parameters dt { font-size: 14px; font-weight: 600; }
-.bb-widget-theme-parameters dd { margin: 0; font-size: 14px; color: hsl(var(--muted-foreground)); }
-.bb-widget-guide button:focus-visible, .bb-widget-guide a:focus-visible, .bb-widget-script-label textarea:focus-visible { outline: 2px solid hsl(var(--primary)); outline-offset: 3px; }
+.bb-widget-guide button:focus-visible, .bb-widget-guide a:focus-visible, .bb-widget-script-label textarea:focus-visible, .bb-widget-guide :is(select,input):focus-visible { outline: 2px solid hsl(var(--primary)); outline-offset: 3px; }
 .bb-widget-guide-extras { display: grid; gap: 4px; min-width: 0; }
 .bb-widget-guide-disclosure { display: flex; align-items: center; justify-content: space-between; gap: 16px; width: 100%; min-height: 48px; padding: 8px 0; background: none; border: 0; color: hsl(var(--foreground)); font: inherit; font-size: 16px; font-weight: 600; text-align: left; cursor: pointer; }
 .bb-widget-guide-disclosure svg { flex-shrink: 0; width: 18px; height: 18px; color: hsl(var(--muted-foreground)); transition: transform var(--bb-motion-duration) var(--bb-motion-ease); }
@@ -24,3 +20,13 @@
 .bb-widget-guide-help { display: grid; gap: 16px; }
 .bb-widget-guide-help h3 { font-size: 14px; font-weight: 600; line-height: 1.5; margin: 0; }
 .bb-widget-guide-help p { margin: 4px 0 0; }
+.bb-widget-customize-fields { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; margin: 18px 0; }
+.bb-widget-customize-fields label, .bb-widget-parameter-copy label { display: grid; min-width: 0; gap: 8px; font-size: 13px; color: hsl(var(--muted-foreground)); }
+.bb-widget-goal-choice { grid-column: 1 / -1; }
+.bb-widget-customize-fields select, .bb-widget-parameter-copy input { box-sizing: border-box; width: 100%; min-width: 0; max-width: 100%; min-height: 44px; padding: 9px 10px; color: hsl(var(--foreground)); background: hsl(var(--background)); border: 1px solid hsl(var(--border)); border-radius: 6px; font: inherit; font-size: 16px; }
+.bb-widget-customize-fields select { appearance: none; height: 44px; background-image: linear-gradient(45deg, transparent 50%, hsl(var(--muted-foreground)) 50%), linear-gradient(135deg, hsl(var(--muted-foreground)) 50%, transparent 50%); background-position: calc(100% - 16px) 18px, calc(100% - 11px) 18px; background-size: 5px 5px; background-repeat: no-repeat; padding-right: 32px; text-overflow: ellipsis; }
+.bb-widget-parameter-copy { display: flex; align-items: end; gap: 12px; flex-wrap: wrap; margin: 16px 0 8px; }
+.bb-widget-parameter-copy label { flex: 1 1 250px; }
+.bb-widget-parameter-copy input { font-family: ui-monospace, monospace; }
+.bb-widget-parameter-copy button { flex: 0 0 auto; }
+@media (max-width: 420px) { .bb-widget-customize-fields { grid-template-columns: minmax(0, 1fr); gap: 12px; } }

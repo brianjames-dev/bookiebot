@@ -18,6 +18,7 @@ from bookiebot.reports.app_access import AppSession
 from bookiebot.reports.widget_store import (
     WidgetGrant, WidgetLimitError, WidgetNotFoundError, WidgetValidationError, build_widget_store,
 )
+from bookiebot.reports.widget_summaries import WIDGET_TYPES, GOAL_ID, database_snapshot, report_content, select_goal
 from bookiebot.sheets.routing import PACIFIC_TZ, now_pacific
 
 logger = logging.getLogger(__name__)
@@ -168,10 +169,19 @@ def _snapshot(report: dict[str, Any], payload: dict[str, Any], day: str) -> dict
         views[mode] = {"budgetRemaining": _money(view["metrics"]["incomeAfterExpenses"]),
                        "availableToday": -difference if difference is not None else None,
                        "todayState": state}
+    summaries = {}
+    for kind in ("categories", "upcoming"):
+        try:
+            summaries[kind] = {mode: report_content(report, kind, mode, day) for mode in ("current", "projected")}
+        except (ValueError, KeyError, TypeError):
+            # Optional sections cannot break a valid existing budget widget.
+            # Missing/invalid sections are unavailable, never a confirmed zero.
+            summaries[kind] = None
     return {"schemaVersion": 1, "ownerName": report["ownerName"],
             "month": f"{payload['year']:04d}-{payload['month']:02d}", "asOfDate": day,
             "timezone": "America/Los_Angeles", "updatedAt": updated.astimezone(timezone.utc).isoformat(),
-            "staleAfterSeconds": 1800, "refreshAfterSeconds": 900, "status": "fresh", "views": views}
+            "staleAfterSeconds": 1800, "refreshAfterSeconds": 900, "status": "fresh", "views": views,
+            "summaries": summaries}
 
 
 class _WidgetSnapshots:
@@ -216,14 +226,37 @@ class _WidgetSnapshots:
 _WIDGET_SNAPSHOTS = web.AppKey("bookiebot_widget_snapshots", _WidgetSnapshots)
 
 
+class _WidgetDatabaseSnapshots(_WidgetSnapshots):
+    """Same bounded read lifecycle; one cache per database summary type."""
+    def __init__(self, kind: str) -> None:
+        super().__init__()
+        self.kind = kind
+
+    async def _build(self, app: web.Application, payload: dict[str, Any], day: str) -> dict[str, Any]:
+        return await asyncio.to_thread(database_snapshot, self.kind, payload, day)
+
+
+_WIDGET_DATABASE_SNAPSHOTS = web.AppKey("bookiebot_widget_database_snapshots", dict[str, _WidgetDatabaseSnapshots])
+
+
 async def _data(request: web.Request) -> web.Response:
     from bookiebot.reports.phone_app import _json
     from bookiebot.reports.phone_history import parse_phone_report_month, phone_report_payload
     unauthorized = {"error": "Reconnect this widget from BookieBot Settings → Widgets."}
     authorization = request.headers.get("Authorization", "")
     # Never accept cookies, query credentials, owner overrides or arbitrary dates.
-    if request.query_string or not authorization.startswith("Bearer bbw_read_") or len(authorization) > 100:
+    if not authorization.startswith("Bearer bbw_read_") or len(authorization) > 100:
         return _json(unauthorized, status=401)
+    kind = request.match_info.get("kind", "budget")
+    if kind != "budget" and kind not in WIDGET_TYPES:
+        return _json({"error": "Choose a supported widget type."}, status=400)
+    goal_id = None
+    if request.query_string:
+        if kind != "savings" or list(request.query.keys()) != ["goalId"] or len(request.query.getall("goalId")) != 1:
+            return _json(unauthorized, status=401)
+        goal_id = request.query["goalId"]
+        if not GOAL_ID.fullmatch(goal_id):
+            return _json({"error": "Choose a savings goal from BookieBot."}, status=400)
     token = authorization[7:]
     try:
         origin = _origin()
@@ -238,7 +271,11 @@ async def _data(request: web.Request) -> web.Response:
         now = now_pacific()
         month = parse_phone_report_month(None, current=now)
         payload = phone_report_payload(grant, month)
-        snapshot = await request.app[_WIDGET_SNAPSHOTS].read(request.app, payload, now.date().isoformat())
+        if kind in {"savings", "shared"}:
+            snapshot = await request.app[_WIDGET_DATABASE_SNAPSHOTS][kind].read(
+                request.app, {**payload, "owner_key": grant.owner_key}, now.date().isoformat())
+        else:
+            snapshot = await request.app[_WIDGET_SNAPSHOTS].read(request.app, payload, now.date().isoformat())
         current = await asyncio.to_thread(store.get_grant, token)
         if current is None or (current.actor_key, current.owner_key) != (grant.actor_key, grant.owner_key):
             return _json(unauthorized, status=401)
@@ -251,10 +288,18 @@ async def _data(request: web.Request) -> web.Response:
         if now_pacific().date() != now.date():
             raise ValueError("Widget read crossed a Pacific budget day")
         # Mode is read again so a settings change during the source read wins.
+        result = {key: value for key, value in snapshot.items() if key not in {"views", "summaries"}}
+        if kind == "budget":
+            result.update(snapshot["views"][current.mode])
+        elif kind in {"categories", "upcoming"}:
+            section = snapshot["summaries"].get(kind)
+            if section is None:
+                raise ValueError("Widget section unavailable")
+            result.update(schemaVersion=2, type=kind, content=section[current.mode])
+        elif kind == "savings":
+            result["content"] = select_goal(snapshot["content"], goal_id)
         if not await asyncio.to_thread(store.touch_grant, token):
             return _json(unauthorized, status=401)
-        result = {key: value for key, value in snapshot.items() if key != "views"}
-        result.update(snapshot["views"][current.mode])
         result.update(connectionId=current.id, mode=current.mode, appUrl=f"{origin}/app/expenses",
                       avatarUrl=f"{origin}/app/avatar.png?day={snapshot['asOfDate']}")
         return _json(result)
@@ -282,10 +327,10 @@ async def _help(_request: web.Request) -> web.Response:
 <style>body{{font:16px/1.6 system-ui;background:#17201c;color:#edeae2;max-width:640px;margin:32px auto;padding:0 24px}}h1{{font:32px Georgia}}h2{{font-size:18px;margin:0 0 6px}}h3{{font-size:16px;margin:28px 0 6px}}a{{color:#9bc9b5}}ol{{padding-left:24px}}li{{margin:24px 0}}p{{margin:6px 0}}code{{overflow-wrap:anywhere}}.note{{font-size:14px;color:#b4b9af}}nav a{{display:inline-flex;align-items:center;min-height:44px}}nav:last-child{{margin:28px 0}}</style>
 <nav aria-label="Return to BookieBot"><a href="/app/expenses#settings">← Back to Settings</a></nav>
 <h1>Widget setup</h1><ol>
-<li><h2>Copy to Scriptable</h2><p>Install <a href="https://apps.apple.com/app/scriptable/id1405459188" target="_blank" rel="noreferrer">Scriptable</a>. In <a href="/app/expenses#settings">Settings → Widgets → Setup &amp; themes</a>, tap <strong>Copy script</strong>. In Scriptable, tap +, paste and name it BookieBot.</p><p class="note">Already installed? Replace the code in the same script and keep its name. Current version: 1.3.</p></li>
+<li><h2>Copy to Scriptable</h2><p>Install <a href="https://apps.apple.com/app/scriptable/id1405459188" target="_blank" rel="noreferrer">Scriptable</a>. In <a href="/app/expenses#settings">Settings → Widgets → Setup &amp; widgets</a>, tap <strong>Copy script</strong>. In Scriptable, tap +, paste and name it BookieBot.</p><p class="note">Already installed? Replace the code in the same script and keep its name. Current version: 1.4.</p></li>
 <li><h2>Pair your account</h2><p>In Settings → Widgets, tap <strong>Pair a widget</strong> and copy your setup code. Run BookieBot inside the Scriptable app, paste it when asked and choose <strong>Pair this phone</strong>.</p><p class="note">Use your own account. Keep the code private; it expires in 10 minutes. Opening a link here does not pair the widget.</p></li>
 <li><h2>Add the widget</h2><p>Hold your Home Screen → <strong>Edit → Add Widget → Scriptable</strong>. Choose Small or Medium, then <strong>Edit Widget → Script → BookieBot</strong>.</p><p class="note">Both sizes can use the same script. Leave When Interacting at Open App.</p></li></ol>
-<h3>Themes</h3><p>Run the script → <strong>Theme &amp; preview</strong> → Editorial or Two-tone → choose a size. For different themes per widget, set Edit Widget → Parameter to <code>editorial</code> or <code>two-tone</code>. An empty Parameter uses your saved theme. Never paste a setup code into Parameter.</p>
+<h3>Customize</h3><p>In <strong>Setup &amp; widgets → Customize</strong>, choose Budget, Upcoming payments, Savings goal, Category budgets or Shared balance, then Editorial or Two-tone. Copy the parameter into <strong>Edit Widget → Parameter</strong>. Savings can select a specific goal.</p><p>Preview in Scriptable → <strong>Widget &amp; preview</strong>. All types and sizes can share one pairing. Empty or theme-only parameters keep showing Budget; never paste a setup code into Parameter.</p>
 <h3>Help</h3><p>Already paired? No new pairing is needed after an update. If “Pair this phone” remains, run the updated script and enter a fresh code only if asked. Check your name and figures, then select that exact script in Edit Widget.</p>
 <p>iOS chooses refresh timing; check the timestamp. Tapping figures opens <a href="{origin}/app/expenses">BookieBot in your browser</a>, which may need its own sign-in.</p>
 <p class="note">Read-only amounts are visible on your Home Screen. Manage access in Settings → Widgets → the connection’s ⋯ menu → Remove. Remove the Home Screen widget to hide its figures immediately.</p>
@@ -295,15 +340,18 @@ async def _help(_request: web.Request) -> web.Response:
 
 async def _close_widgets(app: web.Application) -> None:
     await app[_WIDGET_SNAPSHOTS].close()
+    await asyncio.gather(*(cache.close() for cache in app[_WIDGET_DATABASE_SNAPSHOTS].values()))
 
 
 def register_phone_widget_routes(app: web.Application) -> None:
     app[_WIDGET_SNAPSHOTS] = _WidgetSnapshots()
+    app[_WIDGET_DATABASE_SNAPSHOTS] = {kind: _WidgetDatabaseSnapshots(kind) for kind in ("savings", "shared")}
     app.on_cleanup.append(_close_widgets)
     app.router.add_get("/app/widgets/settings", _settings)
     app.router.add_post("/app/widgets/settings", _settings)
     app.router.add_post("/app/widgets/pair", _pair)
     app.router.add_get("/app/widgets/data", _data)
+    app.router.add_get("/app/widgets/data/{kind}", _data)
     app.router.add_get("/app/widgets/script", _script)
     app.router.add_get("/app/widgets/help", _help)
     # Opening a setup link only shows instructions; fragments stay on the phone.

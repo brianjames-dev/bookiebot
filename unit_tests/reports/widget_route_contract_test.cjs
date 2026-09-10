@@ -11,12 +11,14 @@ async function main() {
   const cache = new Map();
   const requests = [];
   const alerts = [];
+  let offline = false;
   class Request {
     constructor(url) { this.url = url; this._headers = {}; }
     // Scriptable's native dictionary property returns a copy, not a live JS object.
     get headers() { return { ...this._headers }; }
     set headers(value) { this._headers = { ...value }; }
     async loadJSON() {
+      if (offline) throw new Error('Synthetic offline phone');
       assert(this.url.startsWith(input.origin + '/app/widgets/'));
       assert.equal(this.allowInsecureRequest, false);
       assert.equal(this.onRedirect({ url: 'https://untrusted.test/' }), null);
@@ -41,6 +43,7 @@ async function main() {
   const local = {
     cacheDirectory: () => '/local/cache', joinPath: (...parts) => parts.join('/'),
     createDirectory: () => {},
+    listContents: key => [...cache.keys()].filter(path => path.startsWith(key + '/')).map(path => path.slice(key.length + 1)),
     fileExists: (key) => cache.has(key) || [...cache.keys()].some(path => path.startsWith(key + '/')),
     remove: (key) => { for (const path of cache.keys()) if (path === key || path.startsWith(key + '/')) cache.delete(path); },
     readString: key => { if (!cache.has(key)) throw Error('Missing cache'); return cache.get(key); },
@@ -81,13 +84,70 @@ async function main() {
   assert.equal(next.data.ownerName, input.ownerName);
   assert.equal(next.data.mode, input.mode);
   assert.equal(next.data.updatedAt, first.data.updatedAt, 'server cache reuse must retain the source timestamp');
-  assert.equal(requests.length, 3);
+  const cachedSelections = [{ selection: { type: 'budget', goalId: null }, data: next.data }];
+  const plain = value => JSON.parse(JSON.stringify(value));
+  async function typedSnapshot(type, goalId = null) {
+    const selection = { type, goalId };
+    const result = await home.snapshot(recovered, selection);
+    assert.equal(result.state, 'loaded', type + ' must accept the real Python response');
+    assert.equal(result.data.schemaVersion, 2);
+    assert.equal(result.data.type, type);
+    assert.equal(result.data.ownerName, input.ownerName);
+    assert.equal(result.data.mode, input.mode);
+    assert.equal(result.data.connectionId, paired.connectionId);
+    assert.equal(result.data.appUrl, input.origin + '/app/expenses');
+    const repeated = await scriptContext().snapshot(paired, selection);
+    assert.equal(repeated.state, 'loaded');
+    assert.equal(repeated.data.updatedAt, result.data.updatedAt, 'typed cache reuse must retain the source time');
+    assert.deepEqual(plain(repeated.data.content), plain(result.data.content));
+    cachedSelections.push({ selection, data: result.data });
+    return result.data.content;
+  }
+
+  const categories = await typedSnapshot('categories');
+  assert.deepEqual(plain(categories), input.typed.categories, 'preserve original budgets and post-cascade remaining values');
+  const upcoming = await typedSnapshot('upcoming');
+  assert.equal(upcoming.totalCount, input.typed.upcoming.totalCount);
+  assert.equal(upcoming.windowEnd, input.typed.upcoming.windowEnd);
+  assert.equal(upcoming.payments.length, 2);
+  for (const entry of upcoming.payments) {
+    assert(input.typed.upcoming.labels.includes(entry.label), 'past payments and income must stay out of Upcoming');
+    assert(['bill', 'subscription'].includes(entry.kind));
+    assert.equal(entry.date, input.typed.upcoming.today);
+  }
+  const shared = await typedSnapshot('shared');
+  assert.deepEqual(plain(shared), input.typed.shared, 'unconfirmed sender payments must not reduce either outstanding balance');
+  const automaticSavings = await typedSnapshot('savings');
+  assert.deepEqual(plain(automaticSavings.goal), input.typed.goals.find(goal => goal.id === automaticSavings.goal.id));
+  for (const expected of input.typed.goals) {
+    const savings = await typedSnapshot('savings', expected.id);
+    assert.deepEqual(plain(savings.goal), expected);
+    assert.equal(savings.emptyReason, null);
+    assert.deepEqual(plain(savings.goals).map(goal => goal.id).sort(), input.typed.goals.map(goal => goal.id).sort());
+    assert(!JSON.stringify(savings).includes('Private partner goal'));
+    assert(!JSON.stringify(savings).includes('Archived goal'));
+  }
+  for (const unavailableId of input.typed.unavailableGoals) {
+    const savings = await typedSnapshot('savings', unavailableId);
+    assert.equal(savings.goal, null);
+    assert.equal(savings.emptyReason, 'goal_unavailable');
+    assert.equal(keychain.size, 1, 'an unavailable selection must not discard the shared pairing');
+    assert(!JSON.stringify(savings).includes('Private partner goal'));
+  }
+
+  // Each type and chosen goal must retain its own snapshot when the phone is offline.
+  offline = true;
+  for (const { selection, data } of cachedSelections) {
+    const saved = await scriptContext().snapshot(paired, selection);
+    assert.equal(saved.state, 'stale');
+    assert.deepEqual(plain(saved.data), plain(data), 'offline fallback must never borrow a different type or goal');
+  }
   assert(requests.every(request => request.status === 200));
   assert.equal(requests[0].headers['Content-Type'], 'application/json');
   assert.equal(requests[0].headers.Authorization, undefined);
   assert(requests.slice(1).every(request => request.headers.Authorization === 'Bearer ' + paired.token));
   assert(![...cache.values()].some(value => value.includes(paired.token)), 'financial cache must never contain the read credential');
-  console.log('Actual route/script pairing, authorization, financial response, and subsequent profile recovery passed.');
+  console.log('Actual route/script pairing, five widget types, owner scope, native authorization and isolated offline caches passed.');
 }
 
 main().catch(error => { console.error(error.message); process.exitCode = 1; });

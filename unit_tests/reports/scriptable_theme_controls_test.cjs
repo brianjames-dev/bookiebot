@@ -11,6 +11,7 @@ const paired = { origin, token, connectionId: 'brian-widget', ownerName: 'Brian'
 const keyFor = (kind, script = 'BookieBot', server = origin) => `bookiebot.widget.${kind}${encodeURIComponent(server)}.${encodeURIComponent(script)}`;
 const profileKey = keyFor('v1.');
 const themeKey = keyFor('theme.v1.');
+const selectionKey = keyFor('selection.v1.');
 const stored = () => new Map([[profileKey, JSON.stringify(paired)]]);
 
 // Test the real menu, preference and request paths with a renderer boundary.
@@ -19,8 +20,8 @@ const renderingStart = source.indexOf('async function render(');
 const mainStart = source.indexOf('\nasync function main()');
 assert(renderingStart > 0 && mainStart > renderingStart);
 const controlSource = source.slice(0, renderingStart) + `
-async function render(current, result, theme, family) {
-  const widget = { current, result, theme, family,
+async function render(current, result, theme, family, type) {
+  const widget = { current, result, theme, family, type,
     async presentSmall() { this.preview = 'small'; },
     async presentMedium() { this.preview = 'medium'; } };
   return widget;
@@ -114,12 +115,13 @@ async function contracts() {
     assert.equal(check.writes.length, 0);
   }
 
-  check = await run({ app: true, choices: [3, 1, 0] });
-  assert.deepEqual(check.alerts[0].actions, ['Refresh & preview', 'Pair again', 'Forget this phone', 'Theme & preview']);
+  check = await run({ app: true, choices: [3, 0, 1, 0] });
+  assert.deepEqual(check.alerts[0].actions, ['Refresh & preview', 'Pair again', 'Forget this phone', 'Widget & preview']);
   assert.equal(check.widgets[0].theme, 'two-tone');
   assert.equal(check.widgets[0].family, 'small');
   assert.equal(check.widgets[0].preview, 'small', 'small preview must use the small render layout too');
-  assert.deepEqual(check.writes, [[themeKey, 'two-tone']]);
+  assert.deepEqual(check.writes, [[selectionKey, JSON.stringify({connectionId:paired.connectionId,type:'budget',goalId:null,theme:'two-tone',family:'small'})], [themeKey, 'two-tone']]);
+  assert.equal(check.widgets[0].type,'budget');
   const shared = check.keychain;
   assert.equal(shared.get(profileKey), JSON.stringify(paired), 'theme changes must leave the connection byte-for-byte intact');
   check = await run({ keychain: shared });
@@ -127,21 +129,21 @@ async function contracts() {
   check = await run({ keychain: shared, parameter: 'editorial' });
   assert.equal(check.widgets[0].theme, 'editorial');
   assert.equal(shared.get(themeKey), 'two-tone', 'one instance may differ without changing another');
-  check = await run({ keychain: shared, app: true, parameter: 'two-tone', choices: [3, 0, 1] });
+  check = await run({ keychain: shared, app: true, parameter: 'two-tone', choices: [3, 0, 0, 1] });
   assert.equal(check.widgets[0].theme, 'editorial', 'an explicit theme preview wins over this run’s old widget parameter');
   assert.equal(check.widgets[0].family, 'medium');
   assert.equal(check.widgets[0].preview, 'medium');
 
-  for (const choices of [[-1], [3, -1], [3, 1, -1]]) {
+  for (const choices of [[-1], [3, -1], [3, 0, -1], [3, 0, 1, -1]]) {
     check = await run({ app: true, choices });
     assert.equal(check.widgets.length, 0);
-    assert.equal(check.writes.length, 0, 'canceling either chooser must not change the default');
+    assert.equal(check.writes.length, 0, 'canceling a chooser must not change the default');
     assert.equal(check.requests.length, 0, 'canceling does not refresh or re-pair');
     assert.equal(check.keychain.get(profileKey), JSON.stringify(paired));
   }
 
   for (const failure of [{ failThemeWrite: true }, { lockTheme: true }]) {
-    check = await run({ app: true, choices: [3, 1, 1, 0], ...failure });
+    check = await run({ app: true, choices: [3, 0, 1, 1, 0], ...failure });
     assert.equal(check.alerts.at(-1).title, 'Preview only');
     assert.equal(check.widgets[0].theme, 'two-tone', 'a nonsecret preference failure still allows a preview');
     assert.equal(check.keychain.get(profileKey), JSON.stringify(paired));
@@ -173,6 +175,17 @@ async function contracts() {
   assert.equal(check.alerts[1].title, 'Forget widget access?', 'forget stays at menu index two');
   assert(!check.keychain.has(profileKey));
   assert.equal(check.widgets[0].result.state, 'unpaired');
-  console.log('Scriptable theme selection contracts passed');
+  check=await run({app:true,choices:[3,4,0,1]});
+  assert.equal(check.widgets[0].type,'shared');
+  assert.equal(check.requests[0].url,origin+'/app/widgets/data/shared');
+  const chosen=check.keychain;
+  check=await run({keychain:chosen});
+  assert.equal(check.widgets[0].type,'budget','blank Home Screen parameters keep their Budget meaning');
+  check=await run({keychain:chosen,app:true,choices:[0]});
+  assert.equal(check.widgets[0].type,'shared','in-app Refresh restores its separate last preview choice');
+  check=await run({keychain:chosen,parameter:'categories;two-tone'});
+  assert.equal(check.widgets[0].type,'categories');
+  assert.equal(check.widgets[0].theme,'two-tone');
+  console.log('Scriptable widget/type/theme selection contracts passed');
 }
 contracts().catch((error) => { console.error(error); process.exitCode = 1; });
