@@ -4,19 +4,21 @@ Audited September 9, 2026 in Chrome: [Brian Budget 2026](https://docs.google.com
 
 ## Loan configuration
 
-- Brian's September and internal Template have `Student Loan` in B14. September C14 contains **$119.92**, preserved pending confirmation that it is an actual payment. Template C14 stays **0** so a new month never begins falsely marked paid.
-- September D14 already correctly uses `=IF(C14 <> 0, "✅", "⭐")`. The missing **Template D14** formula was restored to the same expression and verified saved. This was the only live edit in this task.
-- Brian's existing bill-schedule row 3 says monthly, day **12**, Checking, Student Loan. The day was preserved; the user specified **$59/month**, but has not yet confirmed the existing day or September's actual.
-- Activation is pending approval to append column **J**, header **`expected_amount`**, and put **59 in J3** of `_BookieBot Bill Schedule`. The populated sheet currently ends at I; the code deliberately does not resize populated legacy schedules. Automatic approval review rejected the structural insertion, and it has not been performed through another channel.
+- Brian's September and internal Template have `Student Loan` in B14. September C14 contains **$119.92**, preserved and verified again after activation. Template C14 stays **0** so a new month never begins falsely marked paid.
+- September D14 already correctly uses `=IF(C14 <> 0, "✅", "⭐")`. The missing **Template D14** formula was restored to the same expression during the original audit and verified saved.
+- The user confirmed **$59.96 monthly on the 12th** and approved activation. Brian’s existing row 3 remains monthly, day **12**, Checking, Student Loan.
+- Activation completed in Chrome: appended column **J**, set **J1=`expected_amount`** and **J3=59.96** in `_BookieBot Bill Schedule`. Verified the saved header/value, recurrence and exact source label, plus September’s unchanged $119.92 and Template’s zero actual. The original automatic approval rejection was resolved by the user’s subsequent approval; populated schedules are still never resized by background reads.
 - Brian has no duplicate student-loan subscription in the inspected subscription tabs. The former global subscription-only rule remains the default unless a particular owner explicitly opts into a standalone bill. Hannah's existing subscription behavior is preserved by regression tests; her personal workbook was not part of these supplied links.
 
 ## Behavior
 
-With explicit configuration, Projected reserves $59 for an unrecorded current/future month. Current stays at $0 until an actual is entered. Recording $59 results in $59 actual, not $118; recording $119.92 uses $119.92, not $178.92. An overdue expectation remains an estimate, and closed months do not acquire invented payments. Calendar, Needs/bills totals, budget remaining, daily availability and widgets use the same canonical calculation. Bill history remains actual-only.
+Projected reserves **$59.96** for an unrecorded current/future month. Current stays at $0 until an actual is entered. A recorded $59.96 replaces the estimate; September’s $119.92 also replaces it without an extra $59.96. An overdue expectation remains an estimate, and closed months do not acquire invented payments. The loan remains a Needs bill but joins **Static Bills & Subscriptions**, outside the variable Bills & Utilities history chart. Calendar details and category drilldowns retain Bill identity and distinguish Scheduled amounts from Recorded amounts. Fixed bills and Xfinity/subscription totals are added once without overwriting either source.
 
-`Log student loan $59` sets the current month's recorded loan payment total to $59; it is not an additional $59 transaction or a bank transfer. Only use it for an actual payment. `Did I pay my student loan?` reads the recorded amount. Commands scope to the authenticated author and require one configured schedule and one exact budget row. Stable source/amount named ranges protect the write from row insertion; exact source metadata protects later recent-action edits. An uncertain write is never automatically retried. A matching active subscription blocks standalone commands and suppresses duplicate forecast amounts, without erasing actual financial rows.
+Burn Rate spending is Food, Shopping and Wants subscriptions. Needs bills affect the effective Wants allowance only through existing category coverage: with $500 Needs budget and $400 other Needs, the $59.96 loan leaves Wants unchanged; with $500 other Needs it creates a $59.96 shortfall that draws from available Wants. It never enters the actual Wants-spending curve. Budget/category/upcoming widgets reuse those canonical modes and schedule values.
 
-Monthly tabs copy the internal Template and use the same annual bill schedule, so the row and expectation recur within 2026 once activated. Annual rollover copies **separate master template files**; the annual masters must also contain the new row and expected-amount configuration before 2027. No third workbook or annual master was changed in this audit.
+`Log student loan $59.96` sets the current month's recorded loan payment total to $59.96; it is not an additional $59.96 transaction or a bank transfer. Only use it for an actual payment. `Did I pay my student loan?` reads the recorded amount. Commands scope to the authenticated author and require one configured schedule and one exact budget row. Stable source/amount named ranges protect the write from row insertion; exact source metadata protects later recent-action edits. An uncertain write is never automatically retried. A matching active subscription blocks standalone commands and suppresses duplicate forecast amounts, without erasing actual financial rows.
+
+Monthly tabs copy the internal Template and use the same annual bill schedule, so the row and expectation now recur within 2026. Annual rollover copies **separate master template files**; the annual masters must also contain the new row and expected-amount configuration before 2027. No third workbook or annual master was changed in this audit.
 
 ## Formula and row-insertion audit
 
@@ -30,11 +32,11 @@ Monthly tabs copy the internal Template and use the same annual bill schedule, s
 
 ## Acceptance
 
-After approving configuration and confirming the existing actual/day:
+After the updated report is deployed:
 
-1. Refresh Brian's September report. If $119.92 is a real recorded payment, both modes must use it with no extra $59.
-2. In a disposable next-month fixture with zero actual, compare Current (no loan actual) with Projected ($59); check day 12 and widget/report agreement. Confirm the monthly Template status begins unpaid.
+1. Refresh Brian’s September report. Verify $119.92 under Static Bills & Subscriptions and in Calendar’s Fixed bills details, with no extra $59.96 and no Student Loan series in Bills & Utilities.
+2. In a disposable next-month fixture with zero actual, compare Current (no loan actual) with Projected ($59.96); check day 12 and widget/report agreement. Confirm the monthly Template status begins unpaid.
 3. In that disposable fixture, record a test payment via the explicit command, verify the exact loan row and normal recent-action undo, including after inserting an unrelated or similarly named row above it. Never add synthetic payments to the live budget.
 4. Verify Hannah retains subscription-only behavior. Before annual rollover, update/review the separate annual master templates and confirm the January row and schedule.
 
-Final local verification: **1,698 tests passed / 213 optional PostgreSQL skipped**, Pyright and frontend typecheck clean, Apps Script migration/rollover and diff checks passed. Regressions cover amount/source/owner guards, stable writes and later undo/update, duplicates across subscriptions/reports/reminders, both modes and widget parity. Release evidence belongs in `.agent/STATUS.md` and the task completion response. No live payment or notification was created.
+Final verification: **1,718 passed / 213 optional PostgreSQL skipped**, clean Python/frontend/build/Apps Script checks. Production WebKit passed 14 layout/source cases in both modes and six final focus/navigation cases; details are recorded in `.agent/STATUS.md`. Regressions cover exact cents, Current/Projected/category/widget parity, actual-vs-scheduled provenance, subscription coexistence and unchanged Wants spending. No live payment or notification was created.

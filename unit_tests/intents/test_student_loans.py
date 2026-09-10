@@ -82,13 +82,13 @@ def test_configured_payment_uses_exact_row_and_preserves_undo(monkeypatch):
     monkeypatch.setattr(loans, "record_undo_action", record)
     with repo.patched(), sheet_user_context(BRIAN):
         assert loans.student_loan_status()["amount"] == 12
-        assert loans.log_standalone_student_loan(59, return_action_id=True) == (True, "loan-action")
-        assert loans.student_loan_status()["amount"] == 59
-    assert repo.income.get_all_values() == [["", "Student Loan Extra", "999"], ["", "Student Loan", 59.0]]
+        assert loans.log_standalone_student_loan(59.96, return_action_id=True) == (True, "loan-action")
+        assert loans.student_loan_status()["amount"] == 59.96
+    assert repo.income.get_all_values() == [["", "Student Loan Extra", "999"], ["", "Student Loan", 59.96]]
     actor, action = record.call_args.args
     assert actor == BRIAN
     assert action.row == 2 and action.columns == [3]
-    assert action.previous_values == ["12.00"] and action.new_values == ["59.00"]
+    assert action.previous_values == ["12.00"] and action.new_values == ["59.96"]
     assert action.metadata == {"type": "payment", "category": "Student Loan", "exact_source_label": "Student Loan"}
 
 
@@ -146,10 +146,10 @@ async def test_author_scope_and_literal_amount_over_model_amount(monkeypatch):
         logged.append((get_current_discord_user_id(), amount))
         return True, "action"
     monkeypatch.setattr(handlers, "log_standalone_student_loan", log)
-    message = message_for("Log student loan $59")
+    message = message_for("Log student loan $59.96")
     await handlers.handle_intent(LOG_STUDENT_LOAN, {"amount": 9000}, message)
-    assert logged == [(BRIAN, 59)]
-    assert "$59.00" in message.channel.send.call_args.args[0]
+    assert logged == [(BRIAN, 59.96)]
+    assert "$59.96" in message.channel.send.call_args.args[0]
 
 
 @pytest.mark.parametrize("entities,mentions", [

@@ -85,6 +85,7 @@ export interface CalendarEvent {
   day: number
   group: string
   projectedOnly: boolean
+  amountEstimated?: boolean
 }
 
 export interface IncomeProjection {

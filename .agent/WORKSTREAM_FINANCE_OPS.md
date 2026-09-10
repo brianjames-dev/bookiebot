@@ -36,6 +36,8 @@ Make BookieBot's finance operations reliable, auditable, and easy to reason abou
 
 ## Priority Source
 
+Fixed-loan activation follow-up (2026-09-09): user-approved J-column configuration is now saved as $59.96 monthly on day12; September’s $119.92 actual and Template zero were verified unchanged. Fixed-cost presentation and exact-cent report/widget/intent tests are complete, with Wants-only Burn Rate preserved. Full local 1,718 passed / 213 optional PostgreSQL skipped; Python/frontend/Apps Script and production WebKit checks passed. Earlier activation approval block is resolved. Remaining separate shared-total, Template-import and annual-master findings are documented in the student-loan audit; no bank/reconciliation or repayment mutations were added.
+
 Standalone student-loan work log (2026-09-09): completed explicit owner-scoped current-month payment/status commands with unique source validation and stable named write targets. Exact source metadata guards their later recent-action edits/undo; matching subscriptions prevent duplicate estimates/reminders and standalone writes. Full local **1,698 passed / 213 optional PostgreSQL skipped**, Pyright/frontend typecheck and Apps Script checks passed. Existing subscription-only loans and bank/reconciliation behavior remain unchanged. Sheet configuration activation is pending approval; source audit and manual steps are in `docs/STUDENT_LOAN_INTEGRATION.md`. This does not close the deferred general recent-action persistence or canonical reimbursement correction backlog.
 
 Current task priority lives in `.agent/STATUS.md`. This file is the centralized backlog and reference for the full finance operations workstream.

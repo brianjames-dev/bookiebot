@@ -199,7 +199,7 @@ class ExpenseReportPage:
 CATEGORY_LABELS = {
     "rent": "Rent",
     "bills_utilities": "Bills & Utilities",
-    "static_bills_subscriptions_needs": "Subs (Needs)",
+    "static_bills_subscriptions_needs": "Static Bills & Subscriptions",
     "need_expenses": "Need",
     "subscriptions_wants": "Subs (Wants)",
     "grocery": "Grocery",
@@ -229,8 +229,8 @@ PAYMENT_GROUPS = {
     "garbage": ("bills_utilities", "Garbage"),
     "waste": ("bills_utilities", "Waste"),
     "water": ("bills_utilities", "Water"),
-    "student loan payment": ("bills_utilities", "Student Loan Payment"),
-    "student loan": ("bills_utilities", "Student Loan"),
+    "student loan payment": ("static_bills_subscriptions_needs", "Student Loan Payment"),
+    "student loan": ("static_bills_subscriptions_needs", "Student Loan"),
 }
 
 BUDGET_SHARED_CATEGORY_LABELS = {
@@ -546,7 +546,8 @@ def build_expense_breakdown_report(
     breakdown_amounts = _ordered_breakdown_amounts()
     breakdown_amounts["rent"] = payment_totals["rent"]
     breakdown_amounts["bills_utilities"] = payment_totals["bills_utilities"]
-    breakdown_amounts["static_bills_subscriptions_needs"] = static_needs_total
+    fixed_needs_payments = payment_totals["static_bills_subscriptions_needs"]
+    breakdown_amounts["static_bills_subscriptions_needs"] = round(static_needs_total + fixed_needs_payments, 2)
     breakdown_amounts["need_expenses"] = round(sum(item.amount for item in need_expenses), 2)
     breakdown_amounts["subscriptions_wants"] = wants_total
     for category in BUDGET_SHARED_CATEGORY_LABELS:
@@ -556,7 +557,7 @@ def build_expense_breakdown_report(
             breakdown_amounts[category] = itemized_shared_totals[category]
 
     budget_breakdown_amounts = dict(breakdown_amounts)
-    budget_breakdown_amounts["static_bills_subscriptions_needs"] = budget_static_needs_total
+    budget_breakdown_amounts["static_bills_subscriptions_needs"] = round(budget_static_needs_total + fixed_needs_payments, 2)
     budget_breakdown_amounts["subscriptions_wants"] = budget_wants_total
     for event in calendar_events:
         if event.kind == "bill" and event.amount_estimated:
@@ -1454,7 +1455,7 @@ def _projected_biweekly_pay_days(
 
 
 def _payment_totals_by_group(payments: list[PaymentItem]) -> dict[str, float]:
-    totals = {"rent": 0.0, "bills_utilities": 0.0}
+    totals = {"rent": 0.0, "bills_utilities": 0.0, "static_bills_subscriptions_needs": 0.0}
     for payment in payments:
         if payment.group not in totals:
             continue
@@ -2645,10 +2646,6 @@ def _report_mode_view_from_payload(
 
 
 def _projected_breakdown_from_payload(payload: dict[str, Any]) -> list[dict[str, Any]]:
-    subscription_needs = round(
-        sum(float(item.get("amount") or 0.0) for item in payload["subscriptionsNeeds"]),
-        2,
-    )
     subscription_wants = round(
         sum(float(item.get("amount") or 0.0) for item in payload["subscriptionsWants"]),
         2,
@@ -2662,12 +2659,12 @@ def _projected_breakdown_from_payload(payload: dict[str, Any]) -> list[dict[str,
         2,
     )
     replacements = {
-        "static_bills_subscriptions_needs": subscription_needs,
         "subscriptions_wants": subscription_wants,
         "rent": rent,
     }
-    # budgetBreakdown already contains every actual bill plus explicit unentered
-    # expectations. Payment history is actual-only and can cover fewer rows.
+    # budgetBreakdown includes scheduled Needs subscriptions, actual fixed bills
+    # and unentered bill expectations. Subscription totals or actual-only utility
+    # history must not replace that complete category amount.
     source_rows = payload.get("budgetBreakdown") or payload["breakdown"]
     rows: list[dict[str, Any]] = []
     for source in source_rows:

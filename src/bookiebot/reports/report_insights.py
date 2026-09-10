@@ -85,7 +85,28 @@ def metric_explanations(report: ExpenseBreakdownReport, payload: dict[str, Any])
         spent = []
         for item in view["breakdown"]:
             amount = _money(item["amount"])
-            if "subscriptions" in item["key"]:
+            if item["key"] == "static_bills_subscriptions_needs":
+                # This category also contains real fixed bills. Keep their
+                # payment records distinct from schedule-based subscriptions.
+                fixed = [
+                    {"label": payment.label, "amount": _money(payment.amount), "source": "recorded",
+                     "date": _date(payment.date, report.month.year, report.month.month)}
+                    for payment in report.payments if payment.group == item["key"]
+                ]
+                if mode == "projected":
+                    fixed.extend(
+                        {"label": f"{event.label} · expected", "amount": _money(event.amount),
+                         "source": "scheduled", "date": None}
+                        for event in report.calendar_events
+                        if event.kind == "bill" and event.group == item["key"] and event.amount_estimated
+                    )
+                spent.extend(fixed)
+                subscription_amount = _money(amount - _total(part["amount"] for part in fixed))
+                if subscription_amount:
+                    spent.append({"label": "Subscriptions (Needs)", "amount": subscription_amount,
+                                  "source": "scheduled", "date": None})
+                continue
+            if item["key"] == "subscriptions_wants":
                 spent.append({"label": item["label"], "amount": amount, "source": "scheduled", "date": None})
                 continue
             extra = max(_money(amount - current_amounts.get(item["key"], 0)), 0) if mode == "projected" else 0

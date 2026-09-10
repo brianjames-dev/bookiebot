@@ -262,7 +262,7 @@ def test_daily_spending_includes_bills_and_compresses_strong_outliers():
     styles = (Path(__file__).resolve().parents[2] / "web/expense-report/src/styles.css").read_text()
 
     assert '(event.kind !== "subscription" && event.kind !== "bill")' in source
-    assert 'event.group === "rent" ? "Rent" : "Bills & Utilities"' in source
+    assert "category: calendarActivityCategory(event)" in source
     assert 'event.kind === "subscription" && event.group === "subscriptions_wants" ? "wants" : "needs"' in source
     assert "peak >= 500 && referencePeak > 0 && peak >= referencePeak * 2.5" in source
     assert 'data-bb-daily-spending-axis-mode="compressed"' not in source
@@ -292,9 +292,7 @@ def test_scheduled_daily_entries_use_pie_category_names_without_bucket_color_ove
     source = (Path(__file__).resolve().parents[2] / "web/expense-report/src/report-app.tsx").read_text()
     scheduled_entries = source.split("function dailyEntriesWithCalendarEvents", 1)[1].split("function dailyTotalsForEntries", 1)[0]
 
-    for key in ("rent", "bills_utilities", "static_bills_subscriptions_needs", "subscriptions_wants"):
-        assert json.dumps(expense_breakdown.CATEGORY_LABELS[key]) in scheduled_entries
-    assert 'bucket === "wants" ? "Subs (Wants)" : "Subs (Needs)"' in scheduled_entries
+    assert "category: calendarActivityCategory(event)" in scheduled_entries
     assert '"Subscription"' not in scheduled_entries
     assert "categoryColor:" not in scheduled_entries
     assert "NEEDS_BAR_COLOR" not in scheduled_entries
@@ -490,7 +488,7 @@ def test_build_expense_breakdown_report_aggregates_shared_and_personal_data():
     assert [item["label"] for item in payload["breakdown"]][:3] == [
         "Rent",
         "Bills & Utilities",
-        "Subs (Needs)",
+        "Static Bills & Subscriptions",
     ]
     assert payload["year"] == 2026
     assert payload["month"] == 5
@@ -1202,7 +1200,7 @@ def test_current_month_calendar_events_include_projected_income_subscriptions_an
         "wants": 1770.0,
         "savings": 1200.0,
     }
-    assert payload["breakdown"][2]["label"] == "Subs (Needs)"
+    assert payload["breakdown"][2]["label"] == "Static Bills & Subscriptions"
     assert payload["breakdown"][2]["amount"] == 15.0
     assert events[("income", "Paycheck")] == {
         "kind": "income",

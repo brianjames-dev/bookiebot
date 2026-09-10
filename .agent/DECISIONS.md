@@ -1,5 +1,11 @@
 # Agent Decisions
 
+## 2026-09-09 - Fixed Needs Bills Share Static-Cost Presentation
+
+The user confirmed Brian’s Student Loan at **$59.96 monthly on the 12th** and approved schedule activation. Chrome added J `expected_amount` and set J3=59.96 on the existing bill schedule; saved readback also verified September’s $119.92 and Template’s zero actual. This resolves the earlier structural-change approval block.
+
+Keep the dedicated payment row and bill identity, but group Student Loan aliases under Static Bills & Subscriptions and exclude them from variable utility history. No subscription row or automatic actual payment is created. Static totals combine recorded fixed bills with subscription amounts; Projected also includes explicit unrecorded expectations. Canonical totals must not be replaced by partial subscription/history lists. Calendar and drilldowns use explicit amount provenance so a scheduled date alone does not make an actual payment an estimate, or an estimate a recorded payment. Burn Rate continues counting only Food, Shopping and Wants subscriptions; Needs affects the Wants allowance solely through existing cross-category coverage. Annual master-template maintenance remains a separate documented follow-up.
+
 ## 2026-09-09 - Explicit Standalone Loans And Expected Bill Amounts
 
 Keep legacy student-loan schedules retired by default, preserving the July subscription-autopay decision. An owner may opt into a dedicated budget-row loan with a valid schedule and positive `expected_amount` in optional column J. Existing populated nine-column schedules remain untouched. Expected amounts affect current/future Projected totals only while a unique exact source amount is unrecorded; actuals replace estimates, and historical charts remain actual-only. Canonical report data feeds both app and widgets. A matching active subscription suppresses duplicate estimates and blocks standalone commands, without erasing actuals.

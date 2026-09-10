@@ -84,7 +84,7 @@ INTENT_DETAILS = {
     ),
     "log_standalone_student_loan": (
         "Record your actual monthly student-loan payment only when a standalone loan is configured in your budget.",
-        ["Log student loan $59", "I paid $59 for my student loan"]
+        ["Log student loan $59.96", "I paid $59.96 for my student loan"]
     ),
     "query_standalone_student_loan": (
         "Check your recorded standalone loan payment; subscription autopay remains in Subscriptions.",

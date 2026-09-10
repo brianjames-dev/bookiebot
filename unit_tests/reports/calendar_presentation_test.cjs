@@ -25,7 +25,9 @@ const declarations = file.statements.filter((statement) => {
 assert.equal(declarations.length, names.size)
 const activitySource = fs.readFileSync("web/expense-report/src/report-activity.ts", "utf8")
 const activityFile = ts.createSourceFile("report-activity.ts", activitySource, ts.ScriptTarget.Latest, true)
-const activityDeclaration = activityFile.statements.find(node => ts.isFunctionDeclaration(node) && node.name?.text === "activityDay").getText(activityFile).replace("export ", "")
+const activityDeclaration = activityFile.statements
+  .filter(node => ts.isFunctionDeclaration(node) && ["activityDay", "calendarActivityStatus"].includes(node.name?.text))
+  .map(node => node.getText(activityFile).replace("export ", "")).join("\n")
 const compiled = ts.transpileModule(activityDeclaration + "\n" + declarations.map((node) => node.getText(file)).join("\n"), {
   compilerOptions: { target: ts.ScriptTarget.ES2020, module: ts.ModuleKind.CommonJS, jsx: ts.JsxEmit.ReactJSX },
 }).outputText

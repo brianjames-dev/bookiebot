@@ -1820,7 +1820,7 @@ async def standalone_student_loan_handler(entities, message, *, logging_payment:
     decision = student_loan_intent(message.content)
     expected_intent = LOG_STUDENT_LOAN if logging_payment else QUERY_STUDENT_LOAN
     if decision is None or decision[0] != expected_intent:
-        await message.channel.send("To record your actual payment, say `Log student loan $59`. To check it, say `Did I pay my student loan?` No payment was changed.")
+        await message.channel.send("To record your actual payment, say `Log student loan $59.96`. To check it, say `Did I pay my student loan?` No payment was changed.")
         return
     if not logging_payment:
         status = await asyncio.to_thread(student_loan_status)

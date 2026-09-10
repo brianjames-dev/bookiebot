@@ -38,7 +38,7 @@ import { PhoneNotifications } from "./phone-notifications"
 import { ReportQuestions } from "./report-questions"
 import { SharedReimbursementsCard } from "./shared-reimbursements"
 import { ReimbursementLedger } from "./reimbursement-ledger"
-import { reportActivity, activitySummary, activityDay, calendarActivityStatus, type ReportActivity } from "./report-activity"
+import { reportActivity, activitySummary, activityDay, activityMatchesCategory, calendarActivityCategory, calendarActivityStatus, type ReportActivity } from "./report-activity"
 import type { MetricExplanation } from "./types"
 import { useReportViewPreferences, type PreferredChart } from "./report-view-preferences"
 import { ChartContainer, ChartTooltip, ChartTooltipContent, ChartTooltipDismissProvider } from "./components/ui/chart"
@@ -296,19 +296,23 @@ function buildReportView(report: ExpenseReportData, projected: boolean): ReportV
 }
 
 function projectedBreakdown(report: ExpenseReportData) {
+  // The server's projected breakdown includes both fixed bills and subscriptions.
+  // Optional history/detail lists cannot replace those complete category totals.
+  if (report.budgetBreakdown?.length) {
+    return report.budgetBreakdown
+  }
   const subscriptionTotals = projectedSubscriptionTotals(report)
   const billTotals = projectedBillTotals(report)
-  const sourceRows = report.budgetBreakdown?.length ? report.budgetBreakdown : report.breakdown
-  const rows = sourceRows.map((item) => {
+  const rows = report.breakdown.map((item) => {
     let amount = item.amount
     if (item.key === "static_bills_subscriptions_needs") {
-      amount = subscriptionTotals.needs || amount
+      amount = Math.max(amount, subscriptionTotals.needs + billTotals.staticNeeds)
     } else if (item.key === "subscriptions_wants") {
-      amount = subscriptionTotals.wants || amount
+      amount = Math.max(amount, subscriptionTotals.wants)
     } else if (item.key === "rent") {
-      amount = billTotals.rent || amount
+      amount = Math.max(amount, billTotals.rent)
     } else if (item.key === "bills_utilities") {
-      amount = billTotals.billsUtilities || amount
+      amount = Math.max(amount, billTotals.billsUtilities)
     }
     return { ...item, amount: roundCurrency(amount) }
   })
@@ -438,15 +442,16 @@ function projectedSubscriptionTotals(report: ExpenseReportData) {
 }
 
 function projectedBillTotals(report: ExpenseReportData) {
-  const billsUtilities = roundCurrency(
-    report.utilityHistory.reduce((sum, item) => sum + item.currentAmount, 0),
-  )
-  const rent = report.calendarEvents
-    .filter((item) => item.kind === "bill" && item.group === "rent")
+  const totalFor = (group: string) => report.calendarEvents
+    .filter((item) => item.kind === "bill" && item.group === group)
     .reduce((sum, item) => sum + item.amount, 0)
   return {
-    rent: roundCurrency(rent),
-    billsUtilities,
+    rent: roundCurrency(totalFor("rent")),
+    staticNeeds: roundCurrency(totalFor("static_bills_subscriptions_needs")),
+    billsUtilities: roundCurrency(Math.max(
+      totalFor("bills_utilities"),
+      report.utilityHistory.reduce((sum, item) => sum + item.currentAmount, 0),
+    )),
   }
 }
 
@@ -590,7 +595,7 @@ export function ExpenseReportApp({ report, appControls, appAvatarUrl, appSession
   const inspectCategory = useCallback((item: BreakdownItem) => {
     setChartTooltipDismissRevision(current => current + 1)
     setChartCollapseKey(current => current + 1)
-    const entries = activityRef.current.filter(entry => entry.category === item.label)
+    const entries = activityRef.current.filter(entry => activityMatchesCategory(entry, item))
     setInspection({key:`category-${item.key}`, title:item.label, entries, total:item.amount,
       note:item.key === "left" ? "Available budget after spending and savings; this is a balance, not a transaction." : item.key === "savings" ? "Monthly savings deposits are summarized in Saved." : undefined})
   }, [])
@@ -978,7 +983,7 @@ function ActivityDetails({entries, total, note, colors}: {entries:ReportActivity
         <span style={{color:colors[entry.category]}}>{entry.category} · {entry.person}</span></div>
       <div><strong>{formatMoney(entry.amount)}</strong><small className={`bb-activity-status bb-activity-${entry.status}`}>{entry.status === "recorded" ? "Recorded" : "Scheduled"}</small></div>
     </li>)}</ol> : !note && <p className="bb-empty">No itemized transactions in this selection.</p>}
-    {summary.scheduled !== 0 && <p className="bb-activity-footnote">Scheduled subscriptions and future payments are estimates. A scheduled date does not confirm that a payment has posted.</p>}
+    {summary.scheduled !== 0 && <p className="bb-activity-footnote">Amounts marked Scheduled are estimates. A scheduled date does not confirm that a payment has posted.</p>}
   </div>
 }
 
@@ -3310,13 +3315,10 @@ function dailyEntriesWithCalendarEvents(
     ...entries.map(entry => ({...entry, status: "recorded" as const})),
     ...calendarEvents.map((event) => {
       const bucket = dailyCalendarEventBucket(event)
-      const category = event.kind === "bill"
-        ? event.group === "rent" ? "Rent" : "Bills & Utilities"
-        : bucket === "wants" ? "Subs (Wants)" : "Subs (Needs)"
       return {
         date: `${month}/${event.day}`,
         status: calendarActivityStatus(event),
-        category,
+        category: calendarActivityCategory(event),
         amount: event.amount,
         person: event.kind === "bill" ? "Need bill" : bucket === "wants" ? "Want sub" : "Need sub",
         item: event.label,
@@ -3493,6 +3495,7 @@ function CalendarAnalyticsPanel({
     .filter((item) => item.kind !== "income")
     .reduce((sum, item) => sum + item.amount, 0)
   const subscriptionItems = [...needs, ...wants]
+  const fixedBills = visibleEvents.filter((item) => item.kind === "bill" && item.group === "static_bills_subscriptions_needs")
 
   return (
     <div className="bb-subscription-analytics">
@@ -3528,10 +3531,11 @@ function CalendarAnalyticsPanel({
             />
           </div>
           <div className="bb-chart-page-footer">
-            {subscriptionItems.length ? (
+            {subscriptionItems.length || fixedBills.length ? (
               <ModalDetails summary="Details" title="Calendar details" collapseKey={collapseKey}>
                 <p className="bb-activity-footnote">Recurring schedules · these dates and amounts do not confirm bank posting.</p>
-                <SubscriptionAllItemsGrid items={subscriptionItems} showAll />
+                {fixedBills.length > 0 && <FixedBillItemsTable items={fixedBills} month={month} />}
+                {subscriptionItems.length > 0 && <SubscriptionAllItemsGrid items={subscriptionItems} showAll />}
               </ModalDetails>
             ) : null}
           </div>
@@ -3745,14 +3749,14 @@ function calendarEventsStyle(events: CalendarEvent[]) {
 }
 
 function calendarEventLabel(event: CalendarEvent) {
-  return `${event.label} - ${calendarEventKindLabel(event)} - ${formatMoney(event.amount)} - ${event.kind === "subscription" || (event.kind === "income" && event.projectedOnly) ? "Scheduled" : "Recorded"}`
+  return `${event.label} - ${calendarEventKindLabel(event)} - ${formatMoney(event.amount)} - ${calendarActivityStatus(event) === "scheduled" ? "Scheduled" : "Recorded"}`
 }
 
 function CalendarEventTooltip({ event }: { event: CalendarEvent }) {
   return (
     <span className="bb-subscription-tooltip" role="tooltip">
       <strong className="bb-calendar-tooltip-category" style={{ color: calendarEventStyle(event).color }}>{event.label}</strong>
-      <span>{calendarEventKindLabel(event)} · {event.kind === "subscription" || (event.kind === "income" && event.projectedOnly) ? "Scheduled" : "Recorded"}</span>
+      <span>{calendarEventKindLabel(event)} · {calendarActivityStatus(event) === "scheduled" ? "Scheduled" : "Recorded"}</span>
       <span className="bb-subscription-tooltip-amount">{formatMoney(event.amount)}</span>
     </span>
   )
@@ -4272,6 +4276,27 @@ function SubscriptionAllItemsGrid({ items, showAll = false }: { items: Subscript
       <SubscriptionCompactTable title="Needs" items={needs} tone="needs" showAll={showAll} />
       <SubscriptionCompactTable title="Wants" items={wants} tone="wants" showAll={showAll} />
     </div>
+  )
+}
+
+function FixedBillItemsTable({ items, month }: { items: CalendarEvent[]; month: number }) {
+  return (
+    <section className="bb-subscription-compact-group" aria-label="Fixed bills">
+      <div className="bb-subscription-compact-heading">
+        <span style={{ color: CATEGORY_CHART_COLORS.static_bills_subscriptions_needs }}>Fixed bills</span>
+        <strong>{formatMoney(items.reduce((sum, item) => sum + item.amount, 0))}</strong>
+      </div>
+      <ol className="bb-activity-list">
+        {items.map((item, index) => <li key={calendarEventKey(item, index)}>
+          <div><strong>{item.label}</strong><span>{month}/{item.day} · scheduled date</span></div>
+          <div><strong>{formatMoney(item.amount)}</strong>
+            <small className={`bb-activity-status bb-activity-${calendarActivityStatus(item)}`}>
+              {calendarActivityStatus(item) === "scheduled" ? "Scheduled" : "Recorded"}
+            </small>
+          </div>
+        </li>)}
+      </ol>
+    </section>
   )
 }
 

@@ -135,7 +135,7 @@ async def parse_message_llm(user_message: str, *, llm_client: Optional[LLMClient
     - "split" with no method → "prompt"
 
     Some student loan payments are tracked as subscription autopay; others have an explicitly configured standalone budget row.
-    Only affirmative commands such as "Log student loan $59" or "I paid $59 for my student loan" may use "log_standalone_student_loan", with amount only.
+    Only affirmative commands such as "Log student loan $59.96" or "I paid $59.96 for my student loan" may use "log_standalone_student_loan", with amount only.
     "Did I pay my student loan?" or "Check student loan status" may use "query_standalone_student_loan". These guarded handlers verify the current user's standalone configuration; never infer it or supply an owner/person entity.
     For other student-loan wording, questions about another person's loan, negations, future payment plans, or subscription autopay, return the fallback intent instead of treating it as a generic expense or another payment type.
 
