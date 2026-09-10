@@ -13,6 +13,8 @@ os.environ.setdefault("DISCORD_AUDIO_DISABLE", "1")
 
 from bookiebot.sheets.writer import write_to_sheet
 import bookiebot.sheets.utils as su
+from bookiebot.sheets.student_loans import log_standalone_student_loan, student_loan_status
+from bookiebot.intents.student_loans import LOG_STUDENT_LOAN, QUERY_STUDENT_LOAN, student_loan_intent
 from bookiebot.charts import (
     ChartRenderError,
     build_daily_spending_figure,
@@ -173,6 +175,8 @@ INTENT_HANDLERS: dict[str, IntentHandler] = {
     "log_pge_paid":                         lambda e, m: log_pge_paid_handler(e, m),
     "log_recology_paid":                    lambda e, m: log_recology_paid_handler(e, m),
     "log_water_paid":                       lambda e, m: log_water_paid_handler(e, m),
+    LOG_STUDENT_LOAN:                        lambda e, m: standalone_student_loan_handler(e, m, logging_payment=True),
+    QUERY_STUDENT_LOAN:                      lambda e, m: standalone_student_loan_handler(e, m, logging_payment=False),
     "log_savings":                          lambda e, m: log_savings_handler(e, m),
     "log_need_expense":                     lambda e, m: log_need_expense_handler(e, m),
     "undo_last_transaction":                lambda e, m: undo_last_transaction_handler(m),
@@ -247,7 +251,12 @@ async def handle_intent(intent: str, entities: IntentEntities, message: Any, las
         return
 
     async with _maybe_typing(message, intent):
-        actor_user_id = _message_actor_key(message)
+        # A personal standalone loan is always scoped to the authenticated author,
+        # even when a mention or model-generated entity names another person.
+        actor_user_id = (
+            resolve_actor_key(getattr(message.author, "id", None), getattr(message.author, "name", None))
+            if intent in {LOG_STUDENT_LOAN, QUERY_STUDENT_LOAN} else _message_actor_key(message)
+        )
         try:
             get_user_config(actor_user_id)
         except UnknownDiscordUserError as e:
@@ -260,7 +269,7 @@ async def handle_intent(intent: str, entities: IntentEntities, message: Any, las
                 entities["person"] = None
 
             # For query intents, resolve to actual list of person(s)
-            if intent.startswith("query_"):
+            if intent.startswith("query_") and intent != QUERY_STUDENT_LOAN:
                 discord_user = getattr(message.author, "name", "").lower()
                 person = entities.get("person")
                 persons_to_query = resolve_query_persons(discord_user, person, actor_user_id)
@@ -1800,6 +1809,34 @@ async def query_subscriptions_handler(message):
 
     response = "\n".join(response_lines)
     await message.channel.send(response)
+
+
+async def standalone_student_loan_handler(entities, message, *, logging_payment: bool):
+    if any(entities.get(key) for key in ("person", "persons", "owner", "owner_key", "budget_owner_key", "actor_key")) or any(
+        not getattr(mention, "bot", False) for mention in (getattr(message, "mentions", []) or [])
+    ):
+        await message.channel.send("Student-loan commands apply only to your own budget. No payment was changed.")
+        return
+    decision = student_loan_intent(message.content)
+    expected_intent = LOG_STUDENT_LOAN if logging_payment else QUERY_STUDENT_LOAN
+    if decision is None or decision[0] != expected_intent:
+        await message.channel.send("To record your actual payment, say `Log student loan $59`. To check it, say `Did I pay my student loan?` No payment was changed.")
+        return
+    if not logging_payment:
+        status = await asyncio.to_thread(student_loan_status)
+        if not status["configured"]:
+            await message.channel.send(status["note"])
+        elif status["paid"]:
+            await message.channel.send(f"✅ Student loan recorded this month: ${status['amount']:.2f}.")
+        else:
+            await message.channel.send(f"No student-loan payment recorded this month. Scheduled amount: ${status['expectedAmount']:.2f}.")
+        return
+    # The amount comes from the affirmative original message, never model entities
+    # or the expected recurring amount in the schedule.
+    amount = decision[1]["amount"]
+    success, _action_id = await _log_payment_with_retry(log_standalone_student_loan, amount)
+    if success:
+        await message.channel.send(f"✅ Student loan recorded this month: ${amount:.2f}.")
 
 
 async def log_rent_paid_handler(entities, message):

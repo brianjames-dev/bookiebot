@@ -118,7 +118,7 @@ Upcoming:
 
 The current block layout is supported. The hidden sheet uses one normalized row per subscription with columns for owner, kind, cadence, amount, pull day/month, reminder offsets, source range, and sync timestamp. BookieBot refreshes this hidden sheet in the background even before the daily notification window, so sheet changes can be normalized automatically before reminders are due. If BookieBot finds malformed visible subscription rows it cannot safely normalize, it sends a concise parse-warning digest and skips those rows until fixed.
 
-For scheduled rows that look like manually tracked bills, such as Rent, PG&E, Recology, or Water, BookieBot checks the existing payment fields and annotates the reminder if no payment has been logged yet. Student Loan is tracked only as subscription autopay, without dedicated log-payment or paid-status commands:
+For scheduled rows that look like manually tracked bills, such as Rent, PG&E, Recology, or Water, BookieBot checks the existing payment fields and annotates the reminder if no payment has been logged yet. Legacy Student Loan entries remain subscription autopay unless the owner explicitly configures a standalone loan:
 
 ```text
 Tomorrow:
@@ -139,6 +139,12 @@ Per-user send-hour overrides are also supported:
 BRIAN_SUBSCRIPTION_REMINDER_SEND_HOUR=10
 HANNAH_SUBSCRIPTION_REMINDER_SEND_HOUR=8
 ```
+
+## Standalone Student Loans And Expected Bills
+
+An optional `expected_amount` column in `_BookieBot Bill Schedule` supplies a recurring estimate without recording a payment. A valid schedule and one exact source row are required. Projected includes the estimate only while that current/future month's actual cell is blank or zero; Current and historical payment charts use recorded amounts. A recorded payment replaces the estimate regardless of its amount. Calendar and canonical widget/report calculations share that rule.
+
+A standalone Student Loan additionally requires explicit positive `expected_amount` configuration. `Log student loan $59` records the authenticated author's actual current-month payment total; `Did I pay my student loan?` reads it. The guarded writer uses named ranges that move with row insertions, verifies the result and retains payment undo metadata with an exact source label. It never infers payment from a due date or changes another person's subscription autopay. A matching active subscription prevents standalone logging and suppresses a duplicate estimated bill. Monthly tabs use the annual schedule and internal Template; new annual workbooks come from separate master templates and must carry the row/configuration too. See the [student-loan audit and activation checklist](docs/STUDENT_LOAN_INTEGRATION.md).
 
 ## Bank Integration And Confirmed Imports
 

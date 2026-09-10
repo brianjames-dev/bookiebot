@@ -1,6 +1,6 @@
 # Finance Operations Workstream
 
-Last updated: 2026-09-08
+Last updated: 2026-09-09
 
 ## Goal
 
@@ -35,6 +35,8 @@ Phone-app milestone (2026-09-06): implemented stable authenticated Home Screen a
 Make BookieBot's finance operations reliable, auditable, and easy to reason about. This includes bank reconciliation, transaction inbox behavior, event logging, and the recent transactions flow for update, move, delete, and undo.
 
 ## Priority Source
+
+Standalone student-loan work log (2026-09-09): completed explicit owner-scoped current-month payment/status commands with unique source validation and stable named write targets. Exact source metadata guards their later recent-action edits/undo; matching subscriptions prevent duplicate estimates/reminders and standalone writes. Full local **1,698 passed / 213 optional PostgreSQL skipped**, Pyright/frontend typecheck and Apps Script checks passed. Existing subscription-only loans and bank/reconciliation behavior remain unchanged. Sheet configuration activation is pending approval; source audit and manual steps are in `docs/STUDENT_LOAN_INTEGRATION.md`. This does not close the deferred general recent-action persistence or canonical reimbursement correction backlog.
 
 Current task priority lives in `.agent/STATUS.md`. This file is the centralized backlog and reference for the full finance operations workstream.
 

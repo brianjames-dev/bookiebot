@@ -1407,6 +1407,10 @@ def _fixed_budget_target_matches(ws: Any, action: UndoAction) -> bool:
     values = rows[action.row - 1] if 0 < action.row <= len(rows) else []
     amount_column = _field_columns_for_action(action).get("amount")
     if source_type == "payment":
+        if "exact_source_label" in action.metadata:
+            expected = action.metadata["exact_source_label"].strip().casefold()
+            actual = str(values[1]).strip().casefold() if len(values) > 1 else ""
+            return bool(expected) and amount_column == 3 and actual == expected
         category = _normalized_sheet_label(action.metadata.get("category"))
         label = _normalized_sheet_label(values[1]) if len(values) > 1 else ""
         return bool(category) and amount_column == 3 and (label == category or label.startswith(category + " "))

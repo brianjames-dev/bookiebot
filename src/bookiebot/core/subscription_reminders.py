@@ -6,6 +6,7 @@ from dataclasses import dataclass
 from datetime import date, datetime
 import logging
 import os
+import re
 import time
 from collections.abc import Awaitable, Callable
 from typing import Any, cast
@@ -18,6 +19,7 @@ from bookiebot.sheets.routing import (
     sheet_user_context,
 )
 from bookiebot.sheets.subscriptions import (
+    Subscription,
     SubscriptionParseWarning,
     SubscriptionReminder,
     debug_subscription_sync,
@@ -471,6 +473,7 @@ def _prepare_due_reminder_messages(actor_key: str, mention: str, current: date) 
     messages: list[str] = []
     post_send_events: list[PendingSystemEvent] = []
     sent = 0
+    subscriptions: list[Subscription] | None = None
     try:
         with sheet_user_context(actor_key):
             subscriptions, warnings = debug_subscription_sync()
@@ -487,6 +490,8 @@ def _prepare_due_reminder_messages(actor_key: str, mention: str, current: date) 
         try:
             with sheet_user_context(actor_key):
                 reminders = due_subscription_reminders(current)
+                if subscriptions is None:
+                    subscriptions = [reminder.subscription for reminder in reminders]
                 warnings = []
                 bill_reminders, bill_warnings = due_bill_reminders(current)
         except Exception as fallback_exc:
@@ -498,6 +503,25 @@ def _prepare_due_reminder_messages(actor_key: str, mention: str, current: date) 
             else:
                 logger.exception("Failed fallback subscription reminder evaluation", extra={"actor_key": actor_key})
             return _prepared(messages=[], sent_count=0, evaluation_succeeded=False)
+
+    # A newly configured expected bill must not duplicate the same autopay.
+    # Reuse the already-read source, including subscriptions outside today's
+    # reminder window, so a matching bill cannot become a false overdue notice.
+    def subscription_identity(value: str) -> str:
+        normalized = re.sub(r"[^a-z0-9]+", "_", value.lower()).strip("_")
+        return "student_loan" if normalized == "student_loan_payment" else normalized
+
+    active_subscription_names = {
+        subscription_identity(subscription.name)
+        for subscription in subscriptions or [] if subscription.active
+    }
+    bill_reminders = [
+        reminder for reminder in bill_reminders
+        if reminder.bill.expected_amount is None or not {
+            subscription_identity(reminder.bill.source_label),
+            subscription_identity(reminder.bill.display_name),
+        } & active_subscription_names
+    ]
 
     unsent_warnings: list[SubscriptionParseWarning] = []
     for warning in warnings:

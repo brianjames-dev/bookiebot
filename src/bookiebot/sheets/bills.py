@@ -3,6 +3,7 @@ from __future__ import annotations
 from calendar import monthrange
 from dataclasses import dataclass
 from datetime import date
+from decimal import Decimal, InvalidOperation
 import re
 from typing import Any, Literal, Protocol
 
@@ -10,7 +11,6 @@ from openpyxl.utils import get_column_letter
 
 from bookiebot.sheets.repo import get_sheets_repo
 from bookiebot.sheets.routing import now_pacific
-from bookiebot.sheets.utils import clean_money
 
 BillRecurrence = Literal["monthly", "quarterly"]
 
@@ -29,6 +29,7 @@ BILL_SCHEDULE_HEADERS = [
     "account",
     "notes",
     "updated_at",
+    "expected_amount",
 ]
 
 DEFAULT_BILL_TEMPLATE_ROWS = [
@@ -53,6 +54,7 @@ class BillSchedule:
     notes: str = ""
     source_range: str = ""
     updated_at: str = ""
+    expected_amount: float | None = None
 
 
 @dataclass(frozen=True)
@@ -121,8 +123,26 @@ def _parse_recurrence(value: str) -> BillRecurrence | None:
     return None
 
 
-def _source_range(row_index: int) -> str:
-    return f"_BookieBot Bill Schedule!A{row_index}:I{row_index}"
+def _source_range(row_index: int, column_count: int) -> str:
+    return f"_BookieBot Bill Schedule!A{row_index}:{get_column_letter(column_count)}{row_index}"
+
+
+def _parse_bill_amount(value: str, *, allow_zero: bool = False) -> float | None:
+    text = value.strip()
+    if not text:
+        return None
+    if not re.fullmatch(r"\$?\s*(?:\d+|\d{1,3}(?:,\d{3})+)(?:\.\d+)?", text):
+        raise ValueError("invalid expected amount")
+    try:
+        amount = Decimal(text.replace("$", "").replace(",", "").strip())
+        if not amount.is_finite() or amount < 0 or amount > Decimal("1000000000000") or (amount == 0 and not allow_zero):
+            raise ValueError("invalid expected amount")
+        cents = amount * 100
+        if cents != cents.to_integral_value():
+            raise ValueError("invalid expected amount")
+        return float(amount)
+    except InvalidOperation as exc:
+        raise ValueError("invalid expected amount") from exc
 
 
 def _row_is_empty(row: list[str]) -> bool:
@@ -136,7 +156,13 @@ def _row_is_blank_template(fields: dict[str, str]) -> bool:
 def _bill_from_fields(fields: dict[str, str], source_range: str) -> tuple[BillSchedule | None, BillScheduleWarning | None]:
     if not any(value.strip() for value in fields.values()):
         return None, None
-    if _row_is_blank_template(fields):
+    try:
+        expected_amount = _parse_bill_amount(fields.get("expected_amount", ""))
+    except ValueError:
+        return None, BillScheduleWarning(
+            source_range, "invalid expected amount", (fields.get("display_name", ""), fields.get("expected_amount", "")),
+        )
+    if expected_amount is None and _row_is_blank_template(fields):
         return None, None
 
     display_name = fields.get("display_name", "")
@@ -167,6 +193,7 @@ def _bill_from_fields(fields: dict[str, str], source_range: str) -> tuple[BillSc
             notes=fields.get("notes", ""),
             source_range=source_range,
             updated_at=fields.get("updated_at", ""),
+            expected_amount=expected_amount,
         ),
         None,
     )
@@ -186,7 +213,7 @@ def _update_range(ws: _WorksheetWithUpdate, start_row: int, start_col: int, valu
 
 def _template_rows() -> list[list[str]]:
     updated_at = now_pacific().isoformat(timespec="seconds")
-    return [list(row) + [updated_at] for row in DEFAULT_BILL_TEMPLATE_ROWS]
+    return [list(row) + [updated_at, ""] for row in DEFAULT_BILL_TEMPLATE_ROWS]
 
 
 def ensure_bill_schedule_sheet() -> None:
@@ -194,6 +221,9 @@ def ensure_bill_schedule_sheet() -> None:
     rows = ws.get_all_values()
     if rows and any(any(str(value).strip() for value in row) for row in rows):
         return
+    column_count = getattr(ws, "col_count", len(BILL_SCHEDULE_HEADERS))
+    if isinstance(column_count, int) and column_count < len(BILL_SCHEDULE_HEADERS):
+        ws.resize(cols=len(BILL_SCHEDULE_HEADERS))
     _update_range(ws, 1, 1, [BILL_SCHEDULE_HEADERS] + _template_rows())
 
 
@@ -229,9 +259,9 @@ def parse_bill_schedules_with_warnings(rows: list[list[str]] | None = None) -> t
             _slug(fields.get("display_name", "")),
             _slug(fields.get("source_label", "")),
         }
-        if legacy_keys & RETIRED_BILL_KEYS:
+        if legacy_keys & RETIRED_BILL_KEYS and not fields.get("expected_amount", "").strip():
             continue
-        bill, warning = _bill_from_fields(fields, _source_range(row_index))
+        bill, warning = _bill_from_fields(fields, _source_range(row_index, len(header)))
         if bill:
             bills.append(bill)
         if warning:
@@ -244,15 +274,31 @@ def list_bill_schedules(rows: list[list[str]] | None = None) -> list[BillSchedul
     return bills
 
 
-def bill_amount_for_source_label(source_label: str) -> tuple[bool, float]:
-    ws = get_sheets_repo().income_sheet()
+def bill_source_amount(rows: list[list[str]], source_label: str) -> float | None:
+    """Read one exact bill row; zero is unrecorded, None is unverified."""
+    target = _slug(source_label)
+    if not target:
+        return None
+    matches = [
+        _cell(row, index + 1)
+        for row in rows
+        for index, value in enumerate(row)
+        if _slug(str(value)) == target
+    ]
+    if len(matches) != 1:
+        return None
     try:
-        cell = ws.find(source_label)
-        amount_cell = ws.cell(cell.row, cell.col + 1).value
+        return _parse_bill_amount(matches[0], allow_zero=True) or 0.0
+    except ValueError:
+        return None
+
+
+def bill_amount_for_source_label(source_label: str) -> tuple[bool, float]:
+    try:
+        amount = bill_source_amount(get_sheets_repo().income_sheet().get_all_values(), source_label)
     except Exception:
         return False, 0.0
-    amount = clean_money(amount_cell or "")
-    return amount > 0, amount
+    return (True, amount) if amount is not None and amount > 0 else (False, 0.0)
 
 
 def _clamped_date(year: int, month: int, day: int) -> date:
@@ -307,15 +353,16 @@ def due_bill_reminders_for_bills(bills: list[BillSchedule], today: date) -> list
     reminders: list[BillReminder] = []
     for bill in bills:
         amount_entered, amount = bill_amount_for_source_label(bill.source_label)
+        reminder_amount = amount if amount_entered else bill.expected_amount
         pull_date = next_bill_pull_date(bill, today)
         if pull_date is not None:
             days_until = (pull_date - today).days
             if 0 <= days_until <= 7:
-                reminders.append(BillReminder(bill, pull_date, days_until, amount if amount_entered else None, amount_entered))
+                reminders.append(BillReminder(bill, pull_date, days_until, reminder_amount, amount_entered))
 
         overdue_date = overdue_bill_pull_date(bill, today)
         if overdue_date is not None and not amount_entered:
-            reminders.append(BillReminder(bill, overdue_date, (overdue_date - today).days, None, False, overdue=True))
+            reminders.append(BillReminder(bill, overdue_date, (overdue_date - today).days, reminder_amount, False, overdue=True))
 
     return sorted(reminders, key=lambda reminder: (reminder.overdue, reminder.pull_date, reminder.bill.display_name.lower()))
 

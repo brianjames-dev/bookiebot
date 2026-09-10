@@ -9,6 +9,8 @@ FRIENDLY_NAMES = {
     "log_pge_paid": "Log PG&E Paid",
     "log_recology_paid": "Log Recology Paid",
     "log_water_paid": "Log Water Paid",
+    "log_standalone_student_loan": "Log Configured Student Loan",
+    "query_standalone_student_loan": "Check Configured Student Loan",
     "log_savings": "Log Monthly Savings",
     "log_need_expense": "Log NEED Expense",
     "undo_last_transaction": "Undo Last Transaction",
@@ -79,6 +81,14 @@ INTENT_DETAILS = {
     "log_water_paid": (
         "Log your water bill payment.",
         ["paid water bill $90", "Santa Rosa Water 100"]
+    ),
+    "log_standalone_student_loan": (
+        "Record your actual monthly student-loan payment only when a standalone loan is configured in your budget.",
+        ["Log student loan $59", "I paid $59 for my student loan"]
+    ),
+    "query_standalone_student_loan": (
+        "Check your recorded standalone loan payment; subscription autopay remains in Subscriptions.",
+        ["Did I pay my student loan?", "Check student loan status"]
     ),
     "log_savings": (
         "Set the total amount contributed to savings this month.",

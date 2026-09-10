@@ -153,7 +153,7 @@ def get_bill_schedule_worksheet():
         _BILL_SCHEDULE_WORKSHEET_BY_KEY[cache_key] = worksheet
         return worksheet
     except Exception:
-        worksheet = spreadsheet.add_worksheet(title=BILL_SCHEDULE_WORKSHEET_TITLE, rows=100, cols=9)
+        worksheet = spreadsheet.add_worksheet(title=BILL_SCHEDULE_WORKSHEET_TITLE, rows=100, cols=10)
         try:
             spreadsheet.batch_update(
                 {

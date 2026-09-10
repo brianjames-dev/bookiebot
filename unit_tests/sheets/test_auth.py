@@ -1,5 +1,6 @@
 import asyncio
 import threading
+from types import SimpleNamespace
 
 import gspread
 from google.auth.credentials import AnonymousCredentials
@@ -44,6 +45,29 @@ def test_month_worksheet_is_cached_by_spreadsheet_and_month(monkeypatch):
     assert second is worksheet
     assert gc.open_calls == 1
     assert spreadsheet.worksheet_calls == 1
+
+
+def test_new_bill_schedule_has_room_for_expected_amount_column(monkeypatch):
+    created = []
+
+    class ScheduleBook:
+        def worksheet(self, _name):
+            raise gspread.WorksheetNotFound("Missing schedule")
+
+        def add_worksheet(self, **kwargs):
+            created.append(kwargs)
+            return SimpleNamespace(id=27, col_count=kwargs["cols"])
+
+        def batch_update(self, _body):
+            pass
+
+    monkeypatch.setattr(auth, "_BILL_SCHEDULE_WORKSHEET_BY_KEY", {})
+    monkeypatch.setattr(auth, "_get_gc", lambda: _GC(ScheduleBook()))
+    monkeypatch.setattr(auth, "get_budget_spreadsheet_id_for_user", lambda *_args: "synthetic-budget")
+    first = auth.get_bill_schedule_worksheet()
+    assert first.col_count == 10
+    assert auth.get_bill_schedule_worksheet() is first
+    assert created == [{"title": "_BookieBot Bill Schedule", "rows": 100, "cols": 10}]
 
 
 def _authorized_client(monkeypatch):

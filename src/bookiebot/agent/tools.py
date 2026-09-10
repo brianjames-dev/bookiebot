@@ -14,6 +14,7 @@ from bookiebot.reports.expense_breakdown import (
     parse_budget_month,
 )
 import bookiebot.sheets.utils as su
+from bookiebot.sheets.student_loans import student_loan_status
 from bookiebot.sheets.routing import (
     DiscordUserConfig,
     UnknownDiscordUserError,
@@ -150,6 +151,7 @@ async def load_bill_status(context: ConversationContext) -> dict[str, Any]:
         pge = await su.check_pge_paid()
         recology = await su.check_recology_paid()
         water = await su.check_water_paid()
+        loan = await asyncio.to_thread(student_loan_status)
     return {
         "owner": profile.name,
         "period": "current month",
@@ -158,6 +160,7 @@ async def load_bill_status(context: ConversationContext) -> dict[str, Any]:
             "pge": {"paid": pge[0], "amount": pge[1]},
             "recology": {"paid": recology[0], "amount": recology[1]},
             "water": {"paid": water[0], "amount": water[1]},
+            "student_loan": loan,
         },
     }
 
@@ -528,7 +531,7 @@ async def get_subscriptions(runtime: ToolRuntime[ConversationContext]) -> dict[s
 
 @tool
 async def get_bill_status(runtime: ToolRuntime[ConversationContext]) -> dict[str, Any]:
-    """Read whether Rent, PG&E, Recology, and Water are logged as paid this month."""
+    """Read this user's recorded Rent, utilities and optional standalone student-loan payments. Unconfigured student loans remain subscription autopay."""
     return await _safe_read_tool(
         "get_bill_status",
         lambda: load_bill_status(runtime.context),

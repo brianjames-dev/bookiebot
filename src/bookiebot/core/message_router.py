@@ -399,6 +399,11 @@ def _recent_query_intent(content: str) -> tuple[str, dict] | None:
 
 def _bill_payment_intent(content: str) -> tuple[str, dict] | None:
     """Keep bill writes within affirmative grammar; route other bill talk read-only."""
+    from bookiebot.intents.student_loans import student_loan_intent
+
+    loan_intent = student_loan_intent(content)
+    if loan_intent is not None:
+        return loan_intent
     text = " ".join(content.lower().replace("’", "'").split())
     aliases = {
         "pge": r"p\s*g\s*(?:&|and)?\s*e|pge|gas and electric",

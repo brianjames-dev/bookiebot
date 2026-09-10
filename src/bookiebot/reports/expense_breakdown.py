@@ -114,6 +114,7 @@ class CalendarEvent:
     day: int
     group: str
     projected_only: bool = False
+    amount_estimated: bool = False
 
 
 @dataclass(frozen=True)
@@ -537,6 +538,7 @@ def build_expense_breakdown_report(
         income_projection_receipts=income_projection_receipts,
         utility_history=utility_history,
         bill_schedule_rows=bill_schedule_rows,
+        personal_rows=personal_rows,
     )
     budget_shared_totals = _budget_shared_category_totals(personal_rows)
     itemized_shared_totals = _entry_totals_by_category(entries)
@@ -556,6 +558,11 @@ def build_expense_breakdown_report(
     budget_breakdown_amounts = dict(breakdown_amounts)
     budget_breakdown_amounts["static_bills_subscriptions_needs"] = budget_static_needs_total
     budget_breakdown_amounts["subscriptions_wants"] = budget_wants_total
+    for event in calendar_events:
+        if event.kind == "bill" and event.amount_estimated:
+            budget_breakdown_amounts[event.group] = round(
+                budget_breakdown_amounts[event.group] + event.amount, 2,
+            )
 
     grand_total = round(sum(breakdown_amounts.values()), 2)
     breakdown = _breakdown_from_amounts(breakdown_amounts)
@@ -822,9 +829,16 @@ def _entries_for_category(entries: list[ExpenseEntry], category: str) -> list[Ex
 
 
 def _payment_items(rows: list[list[str]], bill_schedule_rows: list[list[str]], month: BudgetMonth) -> list[PaymentItem]:
+    from bookiebot.sheets.bills import bill_source_amount, list_bill_schedules
+
     items_by_label: dict[str, PaymentItem] = {}
     labels = dict(PAYMENT_GROUPS)
     labels.update(_bill_schedule_labels(bill_schedule_rows, month))
+    configured_amounts = {
+        _normalize_label(bill.source_label): bill_source_amount(rows, bill.source_label)
+        for bill in list_bill_schedules(bill_schedule_rows)
+        if bill.expected_amount is not None
+    }
 
     for row in rows:
         for index, value in enumerate(row):
@@ -835,7 +849,12 @@ def _payment_items(rows: list[list[str]], bill_schedule_rows: list[list[str]], m
             if matched is None:
                 continue
             group, display_label = matched
-            amount = _next_money(row, index + 1)
+            # A zero payment must not skip ahead into a neighboring budget cell.
+            amount = (
+                configured_amounts[label_text]
+                if label_text in configured_amounts
+                else _next_money_value(row, index + 1)
+            ) or 0.0
             if amount <= 0:
                 continue
             key = _normalize_label(display_label)
@@ -970,11 +989,18 @@ def _calendar_events(
     income_projection_receipts: list[PaymentItem],
     utility_history: list[UtilityHistoryItem],
     bill_schedule_rows: list[list[str]],
+    personal_rows: list[list[str]],
 ) -> list[CalendarEvent]:
     elapsed_days = _elapsed_days_for_month(month)
     events: list[CalendarEvent] = []
     events.extend(_subscription_calendar_events(subscriptions, month, elapsed_days))
-    events.extend(_bill_calendar_events(payments, utility_history, bill_schedule_rows, month, elapsed_days))
+    active_subscription_labels = {
+        _bill_subscription_identity(event.label) for event in events if event.amount > 0
+    }
+    events.extend(_bill_calendar_events(
+        payments, utility_history, bill_schedule_rows, month, elapsed_days, personal_rows,
+        active_subscription_labels,
+    ))
     events.extend(
         _income_calendar_events(
             income_entries,
@@ -1017,6 +1043,8 @@ def _bill_calendar_events(
     bill_schedule_rows: list[list[str]],
     month: BudgetMonth,
     elapsed_days: int,
+    personal_rows: list[list[str]],
+    active_subscription_labels: set[str],
 ) -> list[CalendarEvent]:
     if not bill_schedule_rows:
         return []
@@ -1032,7 +1060,11 @@ def _bill_calendar_events(
         if item.current_amount > 0
     }
     events: list[CalendarEvent] = []
-    for bill in list_bill_schedules(bill_schedule_rows):
+    bills = list_bill_schedules(bill_schedule_rows)
+    source_counts: dict[str, int] = defaultdict(int)
+    for bill in bills:
+        source_counts[_normalize_label(bill.source_label)] += 1
+    for bill in bills:
         day = _bill_day_in_month(bill, month)
         if day is None:
             continue
@@ -1040,6 +1072,20 @@ def _bill_calendar_events(
         amount = next((payment_amounts[_normalize_label(label)] for label in labels if _normalize_label(label) in payment_amounts), 0.0)
         if amount <= 0:
             amount = next((known_utility_amounts[_normalize_label(label)] for label in labels if _normalize_label(label) in known_utility_amounts), 0.0)
+        amount_estimated = False
+        if (
+            amount <= 0
+            and bill.expected_amount is not None
+            and not _is_completed_month(month)
+            and source_counts[_normalize_label(bill.source_label)] == 1
+            and not {
+                _bill_subscription_identity(bill.source_label),
+                _bill_subscription_identity(bill.display_name),
+            } & active_subscription_labels
+            and _unentered_bill_source_present(personal_rows, bill.source_label)
+        ):
+            amount = bill.expected_amount
+            amount_estimated = True
         if amount <= 0:
             continue
         normalized_label = _normalize_label(bill.source_label or bill.display_name)
@@ -1051,10 +1097,23 @@ def _bill_calendar_events(
                 amount=round(amount, 2),
                 day=day,
                 group=group,
-                projected_only=day > elapsed_days,
+                projected_only=amount_estimated or day > elapsed_days,
+                amount_estimated=amount_estimated,
             )
         )
     return events
+
+
+def _bill_subscription_identity(label: str) -> str:
+    normalized = _normalize_label(label)
+    return "student loan" if normalized == "student loan payment" else normalized
+
+
+def _unentered_bill_source_present(rows: list[list[str]], source_label: str) -> bool:
+    """Only forecast a unique, dedicated source row with a blank or zero actual."""
+    from bookiebot.sheets.bills import bill_source_amount
+
+    return bill_source_amount(rows, source_label) == 0
 
 
 def _bill_day_in_month(bill: Any, month: BudgetMonth) -> int | None:
@@ -2190,6 +2249,9 @@ def _looks_like_income_label(label: str) -> bool:
 
 
 def _matched_payment_label(label_text: str, labels: dict[str, tuple[str, str]]) -> tuple[str, str] | None:
+    # Prefer Student Loan over the broader historical Student Loan Payment alias.
+    if label_text in labels:
+        return labels[label_text]
     for label, value in labels.items():
         if _labels_match(label_text, label):
             return value
@@ -2591,10 +2653,6 @@ def _projected_breakdown_from_payload(payload: dict[str, Any]) -> list[dict[str,
         sum(float(item.get("amount") or 0.0) for item in payload["subscriptionsWants"]),
         2,
     )
-    bills_utilities = round(
-        sum(float(item.get("currentAmount") or 0.0) for item in payload["utilityHistory"]),
-        2,
-    )
     rent = round(
         sum(
             float(item.get("amount") or 0.0)
@@ -2607,8 +2665,9 @@ def _projected_breakdown_from_payload(payload: dict[str, Any]) -> list[dict[str,
         "static_bills_subscriptions_needs": subscription_needs,
         "subscriptions_wants": subscription_wants,
         "rent": rent,
-        "bills_utilities": bills_utilities,
     }
+    # budgetBreakdown already contains every actual bill plus explicit unentered
+    # expectations. Payment history is actual-only and can cover fewer rows.
     source_rows = payload.get("budgetBreakdown") or payload["breakdown"]
     rows: list[dict[str, Any]] = []
     for source in source_rows:
@@ -2818,7 +2877,7 @@ def _payment_payload(item: PaymentItem) -> dict[str, Any]:
 
 
 def _calendar_event_payload(item: CalendarEvent) -> dict[str, Any]:
-    return {
+    payload = {
         "kind": item.kind,
         "label": item.label,
         "amount": round(item.amount, 2),
@@ -2826,6 +2885,9 @@ def _calendar_event_payload(item: CalendarEvent) -> dict[str, Any]:
         "group": item.group,
         "projectedOnly": item.projected_only,
     }
+    if item.amount_estimated:
+        payload["amountEstimated"] = True
+    return payload
 
 
 def _utility_history_payload(item: UtilityHistoryItem) -> dict[str, Any]:

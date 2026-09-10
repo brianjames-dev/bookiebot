@@ -119,6 +119,58 @@ def test_prepare_due_reminder_messages_stops_on_sheets_quota_error(monkeypatch, 
     assert "Google Sheets read quota was exceeded" in caplog.text
 
 
+@pytest.mark.parametrize("fallback", [False, True])
+@pytest.mark.parametrize("recorded", [False, True])
+def test_expected_loan_duplicate_is_not_sent_or_audited_twice(monkeypatch, fallback, recorded):
+    current = date(2026, 9, 9)
+    subscription = Subscription(name="Student Loan Payment", amount=59, cadence="monthly", pull_day=12)
+    loan = BillSchedule("student_loan", "Student Loan", "monthly", 12, source_label="Student Loan", expected_amount=59)
+    utility = BillSchedule("pge", "PG&E", "monthly", 10, source_label="PG&E")
+    reads = []
+
+    def subscriptions():
+        reads.append("visible")
+        if fallback:
+            raise RuntimeError("Synthetic visible sync failure")
+        return [subscription], []
+
+    def fallback_subscriptions(_current):
+        reads.append("fallback")
+        return [SubscriptionReminder(subscription, date(2026, 9, 12), 3)]
+
+    monkeypatch.setattr(subscription_reminders, "debug_subscription_sync", subscriptions)
+    monkeypatch.setattr(subscription_reminders, "due_subscription_reminders", fallback_subscriptions)
+    monkeypatch.setattr(subscription_reminders, "due_bill_reminders", lambda _current: ([
+        BillReminder(loan, date(2026, 9, 12), 3, 119.92 if recorded else 59, recorded),
+        BillReminder(utility, date(2026, 9, 10), 1, 100, True),
+    ], []))
+    monkeypatch.setattr(subscription_reminders, "has_system_event", lambda *_args: False)
+    prepared = subscription_reminders._prepare_due_reminder_messages("676638528590970917", "Brian", current)
+
+    assert reads == (["visible", "fallback"] if fallback else ["visible"])
+    assert len(prepared.messages) == 1
+    assert prepared.messages[0].count("Student Loan") == 1
+    assert "$159.00" in prepared.messages[0]
+    assert "PG&E" in prepared.messages[0]
+    events = prepared.post_send_events or []
+    assert sum(event.event_type == "subscription_reminder_sent" for event in events) == 1
+    assert [event.metadata["bill_key"] for event in events if event.event_type == "bill_reminder_sent"] == ["pge"]
+
+
+def test_active_autopay_outside_window_suppresses_false_overdue_expected_loan(monkeypatch):
+    subscription = Subscription(name="Student Loan", amount=59, cadence="monthly", pull_day=12)
+    loan = BillSchedule("student_loan", "Student Loan", "monthly", 12, source_label="Student Loan", expected_amount=59)
+    monkeypatch.setattr(subscription_reminders, "debug_subscription_sync", lambda: ([subscription], []))
+    monkeypatch.setattr(subscription_reminders, "due_bill_reminders", lambda _current: ([
+        BillReminder(loan, date(2026, 9, 12), -6, 59, False, overdue=True),
+    ], []))
+    monkeypatch.setattr(subscription_reminders, "has_system_event", lambda *_args: False)
+    prepared = subscription_reminders._prepare_due_reminder_messages("676638528590970917", "Brian", date(2026, 9, 18))
+    assert prepared.messages == []
+    assert prepared.post_send_events == []
+    assert prepared.sent_count == 0
+
+
 def test_format_subscription_reminder_digest_groups_by_window():
     reminders = [
         SubscriptionReminder(

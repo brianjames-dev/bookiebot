@@ -1,5 +1,13 @@
 # Agent Decisions
 
+## 2026-09-09 - Explicit Standalone Loans And Expected Bill Amounts
+
+Keep legacy student-loan schedules retired by default, preserving the July subscription-autopay decision. An owner may opt into a dedicated budget-row loan with a valid schedule and positive `expected_amount` in optional column J. Existing populated nine-column schedules remain untouched. Expected amounts affect current/future Projected totals only while a unique exact source amount is unrecorded; actuals replace estimates, and historical charts remain actual-only. Canonical report data feeds both app and widgets. A matching active subscription suppresses duplicate estimates and blocks standalone commands, without erasing actuals.
+
+Standalone payment commands reparse affirmative original text, bind to the authenticated author, require one configured loan and one exact source row, and set the monthly recorded total. Stable named ranges protect writes through row insertions; exact source metadata guards later edits/undo. No schedule records a payment automatically, no amount comes from model-supplied owner/amount entities, and uncertain writes are not automatically retried. This adds no bank import, transfer, repayment or reconciliation automation.
+
+The September Chrome audit's proposed J-column activation remains pending explicit approval after automatic approval review rejected the structural change. Preserve the existing $119.92 actual and day 12 pending confirmation; only the internal Template's missing status formula was repaired. Monthly recurrence uses the annual schedule; separately maintained annual masters still need the row/configuration before year rollover. Audit evidence and follow-up are in `docs/STUDENT_LOAN_INTEGRATION.md`.
+
 ## 2026-09-09 - One Read-Only Pairing For The Approved Widget Collection
 
 Ship Scriptable v1.4 with Budget plus Upcoming payments, Savings goal, Category budgets and Shared balance, each Small/Medium in Editorial/Two-tone. Apply the approved centered larger Medium savings ring and equal centered Shared columns. Settings → Setup & widgets → Customize generates a per-instance `type;theme;goal=<id>` parameter. Blank and legacy theme-only parameters continue showing Budget; native Widget & preview remembers only its own last preview, so exploring another type cannot replace existing Home Screen widgets. Preserve credential/key/grant formats and refresh/revocation semantics.

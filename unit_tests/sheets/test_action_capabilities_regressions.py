@@ -141,3 +141,48 @@ def test_undo_income_insertion_rejects_stale_target_at_summary(budget):
     before = budget.income.get_all_values()
     assert not undo.undo_last_action(ACTOR)[0]
     assert budget.income.get_all_values() == before
+
+
+@pytest.mark.parametrize("neighbor", ["Student Loan Extra", "Student Loan Payment"])
+@pytest.mark.parametrize("update_count", [0, 2])
+def test_exact_loan_update_and_undo_refuse_inserted_prefix_neighbor(monkeypatch, neighbor, update_count):
+    actor = "676638528590970917"
+    repo = SheetsRepoStub(income_rows=[["", "Student Loan", "59.00"]])
+    monkeypatch.setattr(undo, "_sync_reconciliation_after_action_mutation", lambda *args, **kwargs: None)
+    with repo.patched(), sheet_user_context(actor):
+        undo.record_undo_action(actor, undo.UndoAction(
+            worksheet="income", kind="restore_cells", row=1, columns=[3],
+            previous_values=[""], new_values=["59.00"], description="Student Loan payment $59.00",
+            metadata={"type": "payment", "category": "Student Loan", "exact_source_label": "Student Loan"},
+        ))
+        for index in range(update_count):
+            success, detail = undo.update_recent_action(actor, index=1, updates={"amount": 60 + index})
+            assert success, detail
+            action = undo.recent_actions(actor)[0].action
+            assert action.metadata["exact_source_label"] == "Student Loan"
+            assert action.metadata["source_type"] == "payment"
+            assert undo.action_capabilities(action).editable_fields == ["amount"]
+        if update_count:
+            # A valid undo still works, and the surviving update retains its
+            # exact identity before testing a stale/prefix neighbor below.
+            success, detail = undo.undo_last_action(actor)
+            assert success, detail
+            assert repo.income.cell(1, 3).value == "$60.00"
+            assert undo.recent_actions(actor)[0].action.metadata["exact_source_label"] == "Student Loan"
+        repo.income.insert_row(["", neighbor, "777"], index=1)
+        before = repo.income.get_all_values()
+        before_log = repo.action_log.get_all_values()
+        success, detail = undo.update_recent_action(actor, index=1, updates={"amount": 100})
+        assert not success and "expected budget label" in detail
+        success, detail = undo.undo_last_action(actor)
+        assert not success and "expected budget label" in detail
+        assert repo.income.get_all_values() == before
+        assert repo.action_log.get_all_values() == before_log
+
+
+def test_legacy_payment_prefix_label_guard_remains_compatible():
+    repo = SheetsRepoStub(income_rows=[["", "Rent payment", "59"]])
+    action = undo.UndoAction(worksheet="income", kind="restore_cells", row=1, columns=[3],
+                             previous_values=[""], new_values=["59"], description="Rent payment",
+                             metadata={"type": "payment", "category": "Rent"})
+    assert undo._fixed_budget_target_matches(repo.income, action)
