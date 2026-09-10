@@ -488,6 +488,11 @@ def test_recent_transactions_are_owner_scoped_ordered_and_limited(tmp_path):
                 "amount": 7.0,
                 "pending": False,
             },
+        ],
+        owner_key="brian",
+    )
+    store.upsert_transactions(
+        [
             {
                 "transaction_id": "txn-hannah",
                 "account_id": "account-hannah",
@@ -497,12 +502,8 @@ def test_recent_transactions_are_owner_scoped_ordered_and_limited(tmp_path):
                 "pending": False,
             },
         ],
-        owner_key="brian",
+        owner_key="hannah",
     )
-
-    # Correct the intentionally mixed owner insert to mimic Plaid rows arriving per owner.
-    with store.connect() as conn:
-        conn.execute("UPDATE bank_transactions SET owner_key = 'hannah' WHERE provider_transaction_id = 'txn-hannah'")
 
     transactions = store.recent_transactions("brian", limit=1)
 

@@ -100,7 +100,7 @@ If the command is missing, verify deployment and restart. If setup is unavailabl
 
 ## Acceptance checks
 
-Verify Brian/Hannah identity and default scope, cold/foreground/manual refresh, remembered mode/chart, and all four navigation tabs. Scroll down/up to check the compact navigation; switch tabs and return to confirm scroll positions and open forms remain. Use the gear and Back to check Settings and its appearance, notification, account and update controls.
+Verify Brian/Hannah identity and default scope, cold/foreground/manual refresh, remembered mode/chart, and the four main navigation tabs, plus Reconcile for watched connected bank accounts. Scroll down/up to check the compact navigation; switch tabs and return to confirm scroll positions and open forms remain. Use the gear and Back to check Settings and its appearance, notification, account and update controls.
 
 Check both month popovers: selected-month highlight, year arrows, unavailable months, outside/Escape dismissal, and return to the current month. Verify matching-day comparisons, offline/stale status, chart/day details and all four metric explanations. Open Ask from each screen, close/reopen during a question, follow a source link, and confirm changing month/mode clears its old context. Create/contribute/reverse/archive/restore a test goal and confirm monthly Saved and the other account are unchanged.
 
@@ -117,3 +117,7 @@ References: [Apple Home Screen setup](https://support.apple.com/guide/iphone/ope
 Once the canonical ledger is enabled, **Shared** shows **Owed to you** and **You owe** across months. An empty direction has a simple message, with settled history still available when present. Expand a row to record a full or partial amount: the recipient's **Record received** confirms money already received; the debtor's **Record sent payment** waits for the other person to **Confirm received**. Pending sent reports must be resolved before another direct receipt or offset for that expense.
 
 Only confirmed amounts change expense rows. The payer's original purchase is reduced by the confirmed repayment, and the debtor gets a linked expense dated when they paid, including when that falls in a later month. **Offset balances** previews equal allocations in both directions before confirming. This records settlement without transferring money or creating income. History retains payments and reviewed reversals; imported historical received splits remain read-only. A syncing notice means the payment is saved and expense-sheet updates are pending; use Refresh to retry. See [full workflow, accounting and safeguards](REIMBURSEMENTS.md).
+
+## Bank review
+
+With a watched connected bank account, open **Reconcile** to review **Needs review**, **Pending**, and **Checked** transactions. **Check** refreshes the bank comparison; **Confirm match** links an exact recorded payment. Pending charges remain read-only and mismatches stay visible for correction in BookieBot. No expenses are automatically logged. See [reconciliation details and acceptance checks](RECONCILIATION.md).

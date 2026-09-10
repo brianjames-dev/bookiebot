@@ -5,7 +5,7 @@ from datetime import date, datetime, timedelta, timezone
 import json
 from pathlib import Path
 import sqlite3
-from typing import Any, Iterator, Protocol
+from typing import Any, Iterator, Literal, Protocol
 from uuid import uuid4
 
 from bookiebot.banking.crypto import TokenCipher
@@ -28,6 +28,32 @@ WEBHOOK_LEASE_SECONDS = 300
 
 def utc_now_iso() -> str:
     return datetime.now(timezone.utc).isoformat()
+
+
+def _sheet_reference_conflicts(left: str, right: str, left_month: str, right_month: str) -> bool:
+    """Compare one row/occurrence, including older refs without period metadata."""
+    def scoped(reference: str) -> tuple[str, str, str]:
+        for marker in ('#month=', '#pull='):
+            base, found, period = reference.partition(marker)
+            if found:
+                return base, marker, period
+        return reference, '', ''
+
+    left_base, left_kind, left_period = scoped(left)
+    right_base, right_kind, right_period = scoped(right)
+    if left_base != right_base:
+        return False
+    if left_kind and right_kind:
+        return (left_period == right_period if left_kind == right_kind
+                else left_period[:7] == right_period[:7])
+    if left_kind:
+        return not right_month or left_period[:7] == right_month
+    if right_kind:
+        return not left_month or right_period[:7] == left_month
+    if '!row ' in left_base:
+        # Old expense/income aliases repeat row numbers in every monthly tab.
+        return not left_month or not right_month or left_month == right_month
+    return True
 
 
 class BankStoreConnection(Protocol):
@@ -698,6 +724,7 @@ class BankStore:
     def set_account_watched(self, owner_key: str, account_db_id: int, watched: bool) -> BankAccount | None:
         self.initialize()
         with self.connect() as conn:
+            self._lock_reconciliation_owner(conn, owner_key)
             row = conn.execute(
                 "SELECT * FROM bank_accounts WHERE id = ? AND owner_key = ?",
                 (int(account_db_id), owner_key),
@@ -731,10 +758,14 @@ class BankStore:
                     'SELECT * FROM bank_transactions WHERE provider_transaction_id = ?',
                     (txn['transaction_id'],),
                 ).fetchone()
+                if previous is not None and previous['owner_key'] != owner_key:
+                    raise ValueError('Bank transaction does not belong to this person.')
                 account_row = conn.execute(
-                    "SELECT id FROM bank_accounts WHERE provider_account_id = ?",
+                    "SELECT id, owner_key FROM bank_accounts WHERE provider_account_id = ?",
                     (txn.get("account_id"),),
                 ).fetchone()
+                if account_row is not None and account_row['owner_key'] != owner_key:
+                    raise ValueError('Bank account does not belong to this person.')
                 account_id = int(account_row["id"]) if account_row else None
                 category = txn.get("personal_finance_category") or txn.get("category")
                 conn.execute(
@@ -1020,7 +1051,7 @@ class BankStore:
         *,
         start_date: str | None = None,
     ) -> list[BankTransaction]:
-        safe_limit = max(1, min(int(limit), 25))
+        safe_limit = max(1, min(int(limit), 200))
         date_filter = ""
         params: tuple[Any, ...]
         if start_date:
@@ -1054,13 +1085,91 @@ class BankStore:
                 WHERE t.owner_key = ?
                   AND t.removed_at IS NULL
                   {date_filter}
-                  AND (t.account_id IS NULL OR COALESCE(a.watched, 1) = 1)
+                  AND (t.pending = 0 OR NOT EXISTS (
+                      SELECT 1 FROM bank_transactions posted
+                      WHERE posted.owner_key = t.owner_key AND posted.pending = 0
+                        AND posted.removed_at IS NULL
+                        AND posted.pending_transaction_id = t.provider_transaction_id
+                  ))
+                  AND (t.account_id IS NULL OR (a.watched = 1 AND a.owner_key = t.owner_key
+                      AND EXISTS (SELECT 1 FROM bank_items i WHERE i.id = a.item_id
+                                  AND i.owner_key = t.owner_key AND i.status = 'active')))
                 ORDER BY COALESCE(t.date, t.authorized_date, '') DESC, t.updated_at DESC, t.id DESC
                 LIMIT ?
                 """,
                 params,
             ).fetchall()
         return [_bank_transaction_from_row(row) for row in rows]
+
+    def _review_rows(
+        self, owner_key: str, *, start_date: str, limit: int, reconciled: bool,
+    ) -> list[Any]:
+        """Phone review uses only a person's connected, watched, recent accounts.
+
+        A posted replacement supersedes its authorization immediately, even if
+        Plaid delivers the authorization's removal on a later sync page.
+        """
+        self.initialize()
+        reconciliation_join = (
+            "JOIN bank_reconciliation_items r ON r.bank_transaction_id = t.id AND r.owner_key = t.owner_key"
+            if reconciled else ""
+        )
+        with self.connect() as conn:
+            return conn.execute(
+                f"""SELECT {'r.*' if reconciled else 't.*'},
+                        t.provider_transaction_id, t.date, t.authorized_date,
+                        t.name, t.merchant_name, t.amount, t.pending,
+                        t.payment_channel, t.pending_transaction_id, t.updated_at,
+                        a.name AS account_name, a.mask AS account_mask,
+                        a.type AS account_type, a.subtype AS account_subtype
+                    FROM bank_transactions t
+                    JOIN bank_accounts a ON a.id = t.account_id AND a.owner_key = t.owner_key
+                    JOIN bank_items i ON i.id = a.item_id AND i.owner_key = t.owner_key
+                    {reconciliation_join}
+                    WHERE t.owner_key = ? AND t.removed_at IS NULL
+                      AND a.watched = 1 AND i.status = 'active'
+                      AND COALESCE(t.date, t.authorized_date, '') >= ?
+                      AND (t.pending = 0 OR NOT EXISTS (
+                          SELECT 1 FROM bank_transactions posted
+                          WHERE posted.owner_key = t.owner_key AND posted.pending = 0
+                            AND posted.removed_at IS NULL
+                            AND posted.pending_transaction_id = t.provider_transaction_id
+                      ))
+                    ORDER BY COALESCE(t.date, t.authorized_date, '') DESC, t.id DESC
+                    LIMIT ?""",
+                (owner_key, start_date, max(1, min(int(limit), 200))),
+            ).fetchall()
+
+    def review_transactions(
+        self, owner_key: str, *, start_date: str, limit: int = 100,
+    ) -> list[BankTransaction]:
+        return [_bank_transaction_from_row(row) for row in self._review_rows(
+            owner_key, start_date=start_date, limit=limit, reconciled=False,
+        )]
+
+    def review_reconciliation_items(
+        self, owner_key: str, *, start_date: str, limit: int = 100,
+    ) -> list[ReconciliationItem]:
+        return [_reconciliation_item_from_row(row) for row in self._review_rows(
+            owner_key, start_date=start_date, limit=limit, reconciled=True,
+        )]
+
+    def review_sync_status(self, owner_key: str) -> dict[str, Any]:
+        self.initialize()
+        with self.connect() as conn:
+            rows = conn.execute(
+                """SELECT s.last_success_at, s.last_error
+                   FROM bank_items i LEFT JOIN bank_sync_state s ON s.item_id = i.id
+                   WHERE i.owner_key = ? AND i.status = 'active'
+                     AND EXISTS (SELECT 1 FROM bank_accounts a
+                                 WHERE a.item_id = i.id AND a.owner_key = i.owner_key AND a.watched = 1)""",
+                (owner_key,),
+            ).fetchall()
+        successful = [str(row['last_success_at']) for row in rows if row['last_success_at']]
+        return {
+            'checkedAt': min(successful) if rows and len(successful) == len(rows) else None,
+            'syncFailed': any(bool(row['last_error']) for row in rows),
+        }
 
     def transaction_count(self, owner_key: str) -> int:
         self.initialize()
@@ -1137,7 +1246,7 @@ class BankStore:
         start_date: str | None = None,
     ) -> list[BankTransaction]:
         if force:
-            return self.recent_transactions(owner_key=owner_key, limit=min(max(1, int(limit)), 25), start_date=start_date)
+            return self.recent_transactions(owner_key=owner_key, limit=min(max(1, int(limit)), 200), start_date=start_date)
         return self.unreconciled_transactions(owner_key=owner_key, limit=limit, start_date=start_date)
 
     def unreconciled_transactions(
@@ -1183,7 +1292,9 @@ class BankStore:
                   AND t.removed_at IS NULL
                   AND t.pending = 0
                   {date_filter}
-                  AND (t.account_id IS NULL OR COALESCE(a.watched, 1) = 1)
+                  AND (t.account_id IS NULL OR (a.watched = 1 AND a.owner_key = t.owner_key
+                      AND EXISTS (SELECT 1 FROM bank_items i WHERE i.id = a.item_id
+                                  AND i.owner_key = t.owner_key AND i.status = 'active')))
                   AND (
                     r.id IS NULL
                     OR r.status IN ('needs_review', 'pending_user', 'conflict')
@@ -1209,6 +1320,32 @@ class BankStore:
     ) -> ReconciliationItem:
         now = utc_now_iso()
         with self.connect() as conn:
+            self._lock_reconciliation_owner(conn, owner_key)
+            conn.execute('UPDATE bank_transactions SET id = id WHERE id = ?', (transaction.id,))
+            current = conn.execute(
+                """SELECT t.*, a.watched, a.owner_key AS account_owner, i.status AS item_status
+                   FROM bank_transactions t LEFT JOIN bank_accounts a ON a.id = t.account_id
+                   LEFT JOIN bank_items i ON i.id = a.item_id
+                   WHERE t.id = ? AND t.owner_key = ?""",
+                (transaction.id, owner_key),
+            ).fetchone()
+            if current is None or transaction.owner_key != owner_key:
+                raise ValueError('Bank transaction does not belong to this person.')
+            if status == 'matched' and (
+                current['removed_at'] is not None or current['pending']
+                or current['updated_at'] != transaction.updated_at
+                or (current['account_id'] is not None and (
+                    not current['watched'] or current['item_status'] != 'active'
+                    or current['account_owner'] != owner_key
+                ))
+                or self._reconciliation_match_taken(
+                    conn, owner_key, transaction.id, matched_action_log_id, matched_sheet_ref,
+                )
+            ):
+                status = 'needs_review'
+                confidence = 0
+                matched_action_log_id = matched_sheet_ref = None
+                notes = 'Match changed or is already used; review again.'
             conn.execute(
                 """
                 INSERT INTO bank_reconciliation_items (
@@ -1219,16 +1356,13 @@ class BankStore:
                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 ON CONFLICT(bank_transaction_id) DO UPDATE SET
                     classification = excluded.classification,
-                    status = CASE
-                        WHEN bank_reconciliation_items.status IN ('confirmed', 'ignored', 'import_requested')
-                        THEN bank_reconciliation_items.status
-                        ELSE excluded.status
-                    END,
+                    status = excluded.status,
                     matched_action_log_id = excluded.matched_action_log_id,
                     matched_sheet_ref = excluded.matched_sheet_ref,
                     confidence = excluded.confidence,
                     last_seen_at = excluded.last_seen_at,
                     notes = excluded.notes
+                WHERE bank_reconciliation_items.status NOT IN ('confirmed', 'ignored', 'import_requested')
                 """,
                 (
                     owner_key,
@@ -1271,6 +1405,49 @@ class BankStore:
         if row is None:
             raise RuntimeError("Failed to load stored reconciliation item")
         return _reconciliation_item_from_row(row)
+
+    @staticmethod
+    def _lock_reconciliation_owner(conn: BankStoreConnection, owner_key: str) -> None:
+        # A stable owner lock serializes competing claims for the same sheet
+        # entry on SQLite and Postgres without another persistence table.
+        rows = conn.execute(
+            'SELECT id FROM bank_items WHERE owner_key = ? ORDER BY id', (owner_key,),
+        ).fetchall()
+        for row in rows:
+            conn.execute('UPDATE bank_items SET id = id WHERE id = ?', (row['id'],))
+
+    @staticmethod
+    def _reconciliation_match_taken(
+        conn: BankStoreConnection, owner_key: str, bank_transaction_id: int,
+        action_ids: str | None, sheet_refs: str | None,
+    ) -> bool:
+        wanted_ids = {part.strip() for part in (action_ids or '').split('+') if part.strip()}
+        wanted_refs = {part.strip() for part in (sheet_refs or '').split(' + ') if part.strip()}
+        if not wanted_ids and not wanted_refs:
+            return False
+        rows = conn.execute(
+            """SELECT r.matched_action_log_id, r.matched_sheet_ref,
+                      COALESCE(t.date, t.authorized_date, '') AS bank_date
+               FROM bank_reconciliation_items r
+               JOIN bank_transactions t ON t.id = r.bank_transaction_id AND t.owner_key = r.owner_key
+               WHERE r.owner_key = ? AND r.bank_transaction_id != ?
+                 AND r.status IN ('matched', 'confirmed', 'import_requested')
+                 AND t.removed_at IS NULL AND t.pending = 0""",
+            (owner_key, bank_transaction_id),
+        ).fetchall()
+        transaction = conn.execute(
+            "SELECT COALESCE(date, authorized_date, '') AS bank_date FROM bank_transactions WHERE id = ? AND owner_key = ?",
+            (bank_transaction_id, owner_key),
+        ).fetchone()
+        month = str(transaction['bank_date'])[:7] if transaction else ''
+        for row in rows:
+            if wanted_ids.intersection(part.strip() for part in (row['matched_action_log_id'] or '').split('+')):
+                return True
+            existing_refs = {part.strip() for part in (row['matched_sheet_ref'] or '').split(' + ') if part.strip()}
+            if any(_sheet_reference_conflicts(wanted, existing, month, str(row['bank_date'])[:7])
+                   for wanted in wanted_refs for existing in existing_refs):
+                return True
+        return False
 
     def unresolved_reconciliation_items(
         self,
@@ -1319,7 +1496,9 @@ class BankStore:
                 WHERE r.owner_key = ?
                   AND t.removed_at IS NULL
                   AND t.pending = 0
-                  AND (t.account_id IS NULL OR COALESCE(a.watched, 1) = 1)
+                  AND (t.account_id IS NULL OR (a.watched = 1 AND a.owner_key = t.owner_key
+                      AND EXISTS (SELECT 1 FROM bank_items i WHERE i.id = a.item_id
+                                  AND i.owner_key = t.owner_key AND i.status = 'active')))
                   AND r.status IN ('needs_review', 'pending_user', 'conflict', 'import_requested')
                   {date_filter}
                 ORDER BY COALESCE(t.date, t.authorized_date, '') DESC, r.id DESC
@@ -1376,7 +1555,9 @@ class BankStore:
                 WHERE r.owner_key = ?
                   AND t.removed_at IS NULL
                   AND t.pending = 0
-                  AND (t.account_id IS NULL OR COALESCE(a.watched, 1) = 1)
+                  AND (t.account_id IS NULL OR (a.watched = 1 AND a.owner_key = t.owner_key
+                      AND EXISTS (SELECT 1 FROM bank_items i WHERE i.id = a.item_id
+                                  AND i.owner_key = t.owner_key AND i.status = 'active')))
                   AND r.status = 'matched'
                   {date_filter}
                 ORDER BY COALESCE(t.date, t.authorized_date, '') DESC, r.last_seen_at DESC, r.id DESC
@@ -1425,6 +1606,7 @@ class BankStore:
         now = utc_now_iso()
         self.initialize()
         with self.connect() as conn:
+            self._lock_reconciliation_owner(conn, owner_key)
             row = conn.execute(
                 """
                 SELECT
@@ -1528,17 +1710,29 @@ class BankStore:
             ).fetchone()
         return _reconciliation_item_from_row(row) if row else None
 
+    def get_reconciliation_item_for_transaction(
+        self, owner_key: str, bank_transaction_id: int,
+    ) -> ReconciliationItem | None:
+        self.initialize()
+        with self.connect() as conn:
+            row = conn.execute(
+                'SELECT id FROM bank_reconciliation_items WHERE owner_key = ? AND bank_transaction_id = ?',
+                (owner_key, int(bank_transaction_id)),
+            ).fetchone()
+        return self.get_reconciliation_item(owner_key, int(row['id'])) if row is not None else None
+
     def matched_action_log_ids(self, owner_key: str) -> set[str]:
         self.initialize()
         with self.connect() as conn:
             rows = conn.execute(
                 """
-                SELECT matched_action_log_id
-                FROM bank_reconciliation_items
-                WHERE owner_key = ?
+                SELECT r.matched_action_log_id
+                FROM bank_reconciliation_items r
+                JOIN bank_transactions t ON t.id = r.bank_transaction_id AND t.owner_key = r.owner_key
+                WHERE r.owner_key = ? AND t.removed_at IS NULL AND t.pending = 0
                   AND matched_action_log_id IS NOT NULL
                   AND matched_action_log_id != ''
-                  AND status IN ('matched', 'confirmed', 'import_requested')
+                  AND r.status IN ('matched', 'confirmed', 'import_requested')
                 """,
                 (owner_key,),
             ).fetchall()
@@ -1553,12 +1747,13 @@ class BankStore:
         with self.connect() as conn:
             rows = conn.execute(
                 """
-                SELECT matched_sheet_ref
-                FROM bank_reconciliation_items
-                WHERE owner_key = ?
+                SELECT r.matched_sheet_ref
+                FROM bank_reconciliation_items r
+                JOIN bank_transactions t ON t.id = r.bank_transaction_id AND t.owner_key = r.owner_key
+                WHERE r.owner_key = ? AND t.removed_at IS NULL AND t.pending = 0
                   AND matched_sheet_ref IS NOT NULL
                   AND matched_sheet_ref != ''
-                  AND status IN ('matched', 'confirmed', 'import_requested')
+                  AND r.status IN ('matched', 'confirmed', 'import_requested')
                 """,
                 (owner_key,),
             ).fetchall()
@@ -1567,6 +1762,85 @@ class BankStore:
             raw_ref = str(row["matched_sheet_ref"])
             matched_refs.update(part.strip() for part in raw_ref.split(" + ") if part.strip())
         return matched_refs
+
+    def apply_reconciliation_review(
+        self, owner_key: str, reconciliation_id: int, *,
+        action: Literal['confirm', 'ignore', 'reopen'],
+        expected_status: str, expected_updated_at: str, expected_last_seen_at: str,
+        matched_action_log_id: str | None = None, matched_sheet_ref: str | None = None,
+    ) -> ReconciliationItem | None:
+        """Apply a reviewed metadata decision, or return None for a stale view.
+
+        This never logs an expense or changes a sheet amount. Pending charges
+        and imports in progress cannot be decided from the phone review screen.
+        """
+        allowed = {
+            'confirm': {'needs_review', 'pending_user', 'conflict', 'matched'},
+            'ignore': {'needs_review', 'pending_user', 'conflict', 'matched'},
+            'reopen': {'matched', 'confirmed', 'ignored'},
+        }
+        if action not in allowed or expected_status not in allowed[action]:
+            return None
+        if action == 'confirm' and not (matched_action_log_id or matched_sheet_ref):
+            return None
+        self.initialize()
+        now = utc_now_iso()
+        with self.connect() as conn:
+            self._lock_reconciliation_owner(conn, owner_key)
+            identity = conn.execute(
+                'SELECT bank_transaction_id FROM bank_reconciliation_items WHERE id = ? AND owner_key = ?',
+                (int(reconciliation_id), owner_key),
+            ).fetchone()
+            if identity is None:
+                return None
+            conn.execute('UPDATE bank_transactions SET id = id WHERE id = ?', (identity['bank_transaction_id'],))
+            conn.execute('UPDATE bank_reconciliation_items SET id = id WHERE id = ?', (int(reconciliation_id),))
+            row = conn.execute(
+                """SELECT r.*, t.updated_at AS bank_updated_at
+                   FROM bank_reconciliation_items r
+                   JOIN bank_transactions t ON t.id = r.bank_transaction_id AND t.owner_key = r.owner_key
+                   JOIN bank_accounts a ON a.id = t.account_id AND a.owner_key = r.owner_key
+                   JOIN bank_items i ON i.id = a.item_id AND i.owner_key = r.owner_key
+                   WHERE r.id = ? AND r.owner_key = ? AND t.removed_at IS NULL AND t.pending = 0
+                     AND a.watched = 1 AND i.status = 'active'""",
+                (int(reconciliation_id), owner_key),
+            ).fetchone()
+            if row is None or (
+                row['status'] != expected_status or row['bank_updated_at'] != expected_updated_at
+                or row['last_seen_at'] != expected_last_seen_at
+            ):
+                return None
+            if action == 'confirm' and self._reconciliation_match_taken(
+                conn, owner_key, row['bank_transaction_id'], matched_action_log_id, matched_sheet_ref,
+            ):
+                return None
+            status = {'confirm': 'confirmed', 'ignore': 'ignored', 'reopen': 'needs_review'}[action]
+            conn.execute(
+                """UPDATE bank_reconciliation_items
+                   SET status = ?, matched_action_log_id = ?, matched_sheet_ref = ?,
+                       resolved_at = ?, ignored_at = ?, last_seen_at = ?, notes = ?
+                   WHERE id = ? AND owner_key = ?""",
+                (status, matched_action_log_id if action == 'confirm' else None,
+                 matched_sheet_ref if action == 'confirm' else None,
+                 now if action == 'confirm' else None, now if action == 'ignore' else None,
+                 now, f'{action} from phone review', int(reconciliation_id), owner_key),
+            )
+            payload = {
+                'previous_status': row['status'], 'status': status,
+                'previous_action_log_id': row['matched_action_log_id'],
+                'previous_sheet_ref': row['matched_sheet_ref'],
+                'matched_action_log_id': matched_action_log_id if action == 'confirm' else None,
+                'matched_sheet_ref': matched_sheet_ref if action == 'confirm' else None,
+                'bank_updated_at': expected_updated_at,
+            }
+            conn.execute(
+                """INSERT INTO bank_reconciliation_events (
+                       event_id, reconciliation_id, owner_key, event_type, occurred_at, payload_json
+                   ) VALUES (?, ?, ?, ?, ?, ?)""",
+                (uuid4().hex, int(reconciliation_id), owner_key, f'phone_review_{action}',
+                 now, json.dumps(payload, sort_keys=True)),
+            )
+        return self.get_reconciliation_item(owner_key, reconciliation_id)
 
     def confirm_reconciliation_item(
         self,
@@ -1580,6 +1854,31 @@ class BankStore:
         now = utc_now_iso()
         self.initialize()
         with self.connect() as conn:
+            self._lock_reconciliation_owner(conn, owner_key)
+            identity = conn.execute(
+                'SELECT bank_transaction_id FROM bank_reconciliation_items WHERE id = ? AND owner_key = ?',
+                (int(reconciliation_id), owner_key),
+            ).fetchone()
+            if identity is None:
+                return None
+            conn.execute('UPDATE bank_transactions SET id = id WHERE id = ?', (identity['bank_transaction_id'],))
+            row = conn.execute(
+                """SELECT r.bank_transaction_id, r.matched_action_log_id, r.matched_sheet_ref
+                   FROM bank_reconciliation_items r JOIN bank_transactions t ON t.id = r.bank_transaction_id
+                   LEFT JOIN bank_accounts a ON a.id = t.account_id
+                   LEFT JOIN bank_items i ON i.id = a.item_id
+                   WHERE r.id = ? AND r.owner_key = ? AND t.owner_key = ?
+                     AND t.removed_at IS NULL AND t.pending = 0
+                     AND (t.account_id IS NULL OR (a.watched = 1 AND a.owner_key = t.owner_key
+                         AND i.status = 'active' AND i.owner_key = t.owner_key))""",
+                (int(reconciliation_id), owner_key, owner_key),
+            ).fetchone()
+            if row is None or self._reconciliation_match_taken(
+                conn, owner_key, row['bank_transaction_id'],
+                matched_action_log_id or row['matched_action_log_id'],
+                matched_sheet_ref or row['matched_sheet_ref'],
+            ):
+                return None
             conn.execute(
                 """
                 UPDATE bank_reconciliation_items
@@ -1609,6 +1908,7 @@ class BankStore:
         now = utc_now_iso()
         self.initialize()
         with self.connect() as conn:
+            self._lock_reconciliation_owner(conn, owner_key)
             row = conn.execute(
                 """
                 SELECT r.id

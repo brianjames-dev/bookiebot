@@ -1,6 +1,6 @@
 # Finance Operations Workstream
 
-Last updated: 2026-09-09
+Last updated: 2026-09-10
 
 ## Goal
 
@@ -270,6 +270,8 @@ Status: Complete in code and automated verification as of 2026-08-11; production
 
 ## Bank Reconciliation - Known Problems
 
+2026-09-10 reliability/web pass: matching now requires exact cents, meaningful name evidence and an unambiguous candidate; common bill aliases and occurrence-scoped references replace fragile recurring matches. Pending authorizations are visible read-only, duplicate pending/posting records collapse, and protected review/import lineage survives force rescoring. Owner-scoped phone review uses existing stores and matching without sheet imports or amount adjustments. Full verification/release is tracked in STATUS; `docs/RECONCILIATION.md` documents the scope and acceptance checks.
+
 1. Reconciliation reminders do not always send at the expected time.
 2. Snoozed reminders and daily digests use different lifecycle behavior.
 3. The transaction inbox can surface very old unresolved bank transactions.
@@ -281,7 +283,7 @@ Status: Complete in code and automated verification as of 2026-08-11; production
 
 ## Bank Reconciliation - Target Invariants
 
-- Normal reconciliation inbox only shows eligible, fresh, posted, watched transactions.
+- Normal actionable reconciliation only shows eligible, fresh, posted, watched transactions. Phone Pending may show fresh watched authorizations read-only until posted.
 - Historical transactions require an explicit debug/admin/historical review mode.
 - A digest is sent once per actor per day unless explicitly forced by an admin/debug path.
 - Normal daily digest sends only during the configured morning send window.
@@ -321,6 +323,8 @@ Status: Complete first pass as of 2026-06-20. Normal unresolved views use a 60-d
 - Make store methods enforce transitions instead of ad hoc status updates.
 - Add timestamps for `presented_at`, `last_prompted_at`, `resolved_at`, `ignored_at`, and `stale_at`.
 - Add tests for invalid transitions and idempotent confirmations.
+
+2026-09-10: implemented atomic version-checked phone confirm/ignore/reopen with transition, active-account, pending, import, ownership and duplicate-evidence guards plus durable prior-state events. Force preview preserves terminal/import lineage; removed transactions release claims, hidden accounts retain them. Existing lifecycle mechanisms are reused; this does not introduce new global statuses or a new sheet mutation engine.
 
 ### Slice 5 - Safer Match Confirmation
 
@@ -854,3 +858,7 @@ Completed configurable matching-period comparisons with a bounded single-request
 ### Dashboard refresh/comparison recovery — 2026-09-07
 
 Completed refresh coordination, independently bounded browser aborts, and comparison-only 10-second successful-report handoff with full identity scoping/fresh-read invalidation. Added finite gspread socket timeouts without mutation retries or early worker-slot release. Regression fixtures reproduced duplicate source reads and stalled transport recovery; phone QA recovered both error banners without app restart. Full local 1,051 passed / 60 optional PostgreSQL skipped; typecheck/build/Pyright passed. Reconciliation/recent-action backlog is unchanged; STATUS 94 records acceptance.
+
+### 2026-09-10 Reconciliation Matching And Phone Review
+
+Implemented exact-cent/merchant/ambiguity guards, bank authorization/posting date handling, recurring occurrence reservations and shared action/schedule evidence. Batched bill actual reads and avoided caching partial source failures. Phone review reuses those candidates with lazy reads, fresh confirmation, per-owner check coalescing, active-account eligibility and atomic versioned metadata commands. No automatic import or sheet amount update was added. Store contracts cover pending replacement, stale and duplicate decisions, ownership, terminal/import lineage, removed transactions, hidden-account reservations and the same 200-row check/list boundary. Frontend contracts cover optional navigation, exact inflows, pending/mismatch/recovery rows, transport/auth/conflict handling and preserved drafts. Full-suite, browser and release evidence is tracked in STATUS; manual acceptance is checklist 123. Existing historical-import and broader recent-action lifecycle backlog remains separate.

@@ -26,6 +26,14 @@ from bookiebot.sheets.subscriptions import Subscription
 from bookiebot.sheets.undo import LoggedAction, UndoAction
 
 
+@pytest.fixture(autouse=True)
+def current_writer_log_snapshot(monkeypatch):
+    # Existing writer tests supply their current-tab action snapshot through the
+    # same mocked source; production uses the original current-only reader.
+    monkeypatch.setattr(banking_service, "_read_current_logged_actions",
+                        lambda actor: banking_service.read_active_logged_actions(actor))
+
+
 def _transaction(name: str, amount: float, pending: bool = False) -> BankTransaction:
     return BankTransaction(
         id=1,
@@ -128,7 +136,7 @@ def test_reconcile_matches_logged_expense_by_amount_and_date():
     assert decision.status == "matched"
     assert decision.classification == "expense"
     assert decision.matched_action_log_id == "abc123"
-    assert decision.matched_sheet_ref == "expense!row 12"
+    assert decision.matched_sheet_ref == "expense!row 12#month=2026-05"
     assert decision.notes == "matched expense action"
 
 
@@ -231,7 +239,7 @@ def test_find_action_log_candidates_allows_fuzzy_amount_and_seven_day_window():
 
     assert len(candidates) == 1
     assert candidates[0].action_id == "abc123"
-    assert candidates[0].sheet_ref == "expense!row 12"
+    assert candidates[0].sheet_ref == "expense!row 12#month=2026-05"
     assert "date Δ 6d" in candidates[0].notes
 
 
@@ -462,13 +470,14 @@ def test_reconcile_matches_subscription_schedule_without_action_log():
 
     assert decision.status == "matched"
     assert decision.classification == "subscription_or_bill"
-    assert decision.matched_sheet_ref == "Subscriptions!B10:D10"
+    assert decision.matched_sheet_ref == "Subscriptions!B10:D10#pull=2026-05-17"
     assert decision.notes == "matched subscription schedule"
 
 
 def test_reconcile_matches_bill_schedule_within_date_window():
     scheduled = ScheduledPullCandidate(
         source_type="bill",
+                amount_recorded=True,
         name="PG&E",
         amount=132.36,
         pull_date=date(2026, 5, 16),
@@ -479,7 +488,7 @@ def test_reconcile_matches_bill_schedule_within_date_window():
 
     assert decision.status == "matched"
     assert decision.classification == "subscription_or_bill"
-    assert decision.matched_sheet_ref == "_BookieBot Bill Schedule!A3:I3"
+    assert decision.matched_sheet_ref == "_BookieBot Bill Schedule!A3:I3#pull=2026-05"
     assert decision.notes == "matched bill schedule within 1d"
 
 
@@ -514,7 +523,7 @@ def test_find_scheduled_pull_candidates_includes_near_matches():
     )
 
     assert len(candidates) == 1
-    assert candidates[0].action_id == "schedule:subscription:Subscriptions!J8:L8"
+    assert candidates[0].action_id == "schedule:subscription:Subscriptions!J8:L8#pull=2026-05-18"
     assert candidates[0].action_type == "schedule"
     assert candidates[0].label == "Apple iCloud Storage (subscription)"
 
@@ -796,7 +805,7 @@ def test_reconciliation_preview_does_not_reuse_action_log_match(monkeypatch, tmp
                 "transaction_id": "txn-chads-soup",
                 "account_id": "account-1",
                 "date": "2026-05-13",
-                "name": "Chad's Soup Shack",
+                "name": "Biscuits and Gravy",
                 "amount": 17.0,
                 "pending": False,
             },
@@ -804,7 +813,7 @@ def test_reconciliation_preview_does_not_reuse_action_log_match(monkeypatch, tmp
                 "transaction_id": "txn-russian-river",
                 "account_id": "account-1",
                 "date": "2026-05-13",
-                "name": "Russian River Brewing",
+                "name": "Biscuits and Gravy",
                 "amount": 17.0,
                 "pending": False,
             },
@@ -1070,6 +1079,7 @@ async def test_seed_sandbox_resets_cursor_when_cache_is_empty(tmp_path):
 
 
 def test_seed_cached_transactions_from_action_log_then_matches(monkeypatch, tmp_path):
+    monkeypatch.setattr(banking_service, "_scheduled_pulls_for_transactions", lambda *_a, **_k: [])
     action = LoggedAction(
         id="abc123",
         created_at="2026-05-17T12:00:00",
@@ -1120,7 +1130,9 @@ def test_seed_cached_transactions_from_action_log_then_matches(monkeypatch, tmp_
     assert preview.items[0].matched_action_log_id == "abc123"
 
 
-def test_seed_unmatched_debug_transaction_then_needs_review(tmp_path):
+def test_seed_unmatched_debug_transaction_then_needs_review(monkeypatch, tmp_path):
+    monkeypatch.setattr(banking_service, "read_active_logged_actions", lambda *_a: [])
+    monkeypatch.setattr(banking_service, "_scheduled_pulls_for_transactions", lambda *_a, **_k: [])
     store = BankStore(tmp_path / "banking.sqlite3", TokenCipher("test-secret-key"))
     service = BankingService(
         config=BankingConfig(
@@ -1233,7 +1245,7 @@ def test_reconciliation_match_candidates_excludes_already_matched_actions(monkey
         status="matched",
         confidence=0.96,
         matched_action_log_id="matched123",
-        matched_sheet_ref="expense!row 12",
+        matched_sheet_ref="expense!row 12#month=2026-05",
     )
 
     item, candidates, groups = service.reconciliation_match_candidates(
@@ -1292,16 +1304,18 @@ def test_reconciliation_match_candidates_includes_schedule_matches(monkeypatch, 
     )
 
     assert [candidate.action_type for candidate in candidates] == ["schedule"]
-    assert candidates[0].sheet_ref == "Subscriptions!B10:D10"
+    assert candidates[0].sheet_ref == "Subscriptions!B10:D10#pull=2026-05-17"
 
 
 def test_confirm_reconciliation_schedule_match_marks_schedule_row(monkeypatch, tmp_path):
+    monkeypatch.setattr(banking_service, "read_active_logged_actions", lambda _actor: [])
     monkeypatch.setattr(
         banking_service,
         "_scheduled_pulls_for_transactions",
         lambda _transactions, actor_key: [
             ScheduledPullCandidate(
                 source_type="bill",
+                amount_recorded=True,
                 name="PG&E",
                 amount=132.36,
                 pull_date=date(2026, 5, 17),
@@ -1336,7 +1350,7 @@ def test_confirm_reconciliation_schedule_match_marks_schedule_row(monkeypatch, t
         "brian",
         item.id,
         actor_key="676638528590970917",
-        schedule_ref="_BookieBot Bill Schedule!A3:I3",
+        schedule_ref="_BookieBot Bill Schedule!A3:I3#pull=2026-05",
     )
 
     assert status == "matched"
@@ -1344,13 +1358,13 @@ def test_confirm_reconciliation_schedule_match_marks_schedule_row(monkeypatch, t
     assert confirmed is not None
     assert confirmed.status == "confirmed"
     assert confirmed.matched_action_log_id is None
-    assert confirmed.matched_sheet_ref == "_BookieBot Bill Schedule!A3:I3"
+    assert confirmed.matched_sheet_ref == "_BookieBot Bill Schedule!A3:I3#pull=2026-05"
 
 
 def test_scheduled_pulls_falls_back_to_visible_subscriptions(monkeypatch):
     banking_service._SCHEDULE_SOURCE_CACHE.clear()
     monkeypatch.setattr(banking_service, "sheet_user_context", lambda _actor_key: nullcontext())
-    monkeypatch.setattr(banking_service, "list_normalized_subscription_schedules", lambda: [])
+    monkeypatch.setattr(banking_service, "_read_subscription_schedules", lambda: [])
     monkeypatch.setattr(
         banking_service,
         "parse_visible_subscription_schedules",
@@ -1364,7 +1378,7 @@ def test_scheduled_pulls_falls_back_to_visible_subscriptions(monkeypatch):
             )
         ],
     )
-    monkeypatch.setattr(banking_service, "list_bill_schedules", lambda: [])
+    monkeypatch.setattr(banking_service, "_read_bill_schedules", lambda: [])
     transaction = BankTransaction(
         **{
             **_transaction("Apple", 2.99).__dict__,
@@ -1380,12 +1394,13 @@ def test_scheduled_pulls_falls_back_to_visible_subscriptions(monkeypatch):
     assert candidates[0].source_ref == "Subscriptions!J8:L8"
 
 
-def test_scheduled_pulls_still_loads_bills_when_subscriptions_fail(monkeypatch):
+def test_scheduled_pulls_fail_closed_when_subscriptions_fail(monkeypatch):
+    monkeypatch.setattr(banking_service, "_current_month_start", lambda: "2026-05-01")
     banking_service._SCHEDULE_SOURCE_CACHE.clear()
     monkeypatch.setattr(banking_service, "sheet_user_context", lambda _actor_key: nullcontext())
     monkeypatch.setattr(
         banking_service,
-        "list_normalized_subscription_schedules",
+        "_read_subscription_schedules",
         lambda: (_ for _ in ()).throw(RuntimeError("subscription sheet unavailable")),
     )
     monkeypatch.setattr(
@@ -1395,7 +1410,7 @@ def test_scheduled_pulls_still_loads_bills_when_subscriptions_fail(monkeypatch):
     )
     monkeypatch.setattr(
         banking_service,
-        "list_bill_schedules",
+        "_read_bill_schedules",
         lambda: [
             BillSchedule(
                 bill_key="recology",
@@ -1408,7 +1423,7 @@ def test_scheduled_pulls_still_loads_bills_when_subscriptions_fail(monkeypatch):
             )
         ],
     )
-    monkeypatch.setattr(banking_service, "bill_amount_for_source_label", lambda _source_label: (True, 145.36))
+    monkeypatch.setattr(banking_service, "_bill_amounts_for_schedules", lambda bills: [(bill, True, 145.36) for bill in bills])
     transaction = BankTransaction(
         **{
             **_transaction("Recology Sonoma", 145.36).__dict__,
@@ -1416,22 +1431,19 @@ def test_scheduled_pulls_still_loads_bills_when_subscriptions_fail(monkeypatch):
         }
     )
 
-    candidates = banking_service._scheduled_pulls_for_transactions([transaction], actor_key="brian")
-
-    assert [(candidate.source_type, candidate.name, candidate.amount, candidate.pull_date) for candidate in candidates] == [
-        ("bill", "Recology", 145.36, date(2026, 5, 20))
-    ]
-    assert candidates[0].source_ref == "_BookieBot Bill Schedule!A3:I3"
+    with pytest.raises(RuntimeError, match="source data is temporarily unavailable"):
+        banking_service._scheduled_pulls_for_transactions([transaction], actor_key="brian")
+    assert "brian" not in banking_service._SCHEDULE_SOURCE_CACHE
 
 
 def test_scheduled_pulls_include_entered_bill_amount_on_transaction_date(monkeypatch):
     banking_service._SCHEDULE_SOURCE_CACHE.clear()
     monkeypatch.setattr(banking_service, "sheet_user_context", lambda _actor_key: nullcontext())
-    monkeypatch.setattr(banking_service, "list_normalized_subscription_schedules", lambda: [])
+    monkeypatch.setattr(banking_service, "_read_subscription_schedules", lambda: [])
     monkeypatch.setattr(banking_service, "parse_visible_subscription_schedules", lambda: [])
     monkeypatch.setattr(
         banking_service,
-        "list_bill_schedules",
+        "_read_bill_schedules",
         lambda: [
             BillSchedule(
                 bill_key="recology",
@@ -1444,7 +1456,7 @@ def test_scheduled_pulls_include_entered_bill_amount_on_transaction_date(monkeyp
             )
         ],
     )
-    monkeypatch.setattr(banking_service, "bill_amount_for_source_label", lambda _source_label: (True, 145.36))
+    monkeypatch.setattr(banking_service, "_bill_amounts_for_schedules", lambda bills: [(bill, True, 145.36) for bill in bills])
     transaction = BankTransaction(
         **{
             **_transaction("Recology Sonoma", 145.36).__dict__,
@@ -1466,11 +1478,11 @@ def test_scheduled_pulls_include_entered_bill_amount_on_transaction_date(monkeyp
 def test_scheduled_pulls_include_name_matched_bill_without_amount(monkeypatch):
     banking_service._SCHEDULE_SOURCE_CACHE.clear()
     monkeypatch.setattr(banking_service, "sheet_user_context", lambda _actor_key: nullcontext())
-    monkeypatch.setattr(banking_service, "list_normalized_subscription_schedules", lambda: [])
+    monkeypatch.setattr(banking_service, "_read_subscription_schedules", lambda: [])
     monkeypatch.setattr(banking_service, "parse_visible_subscription_schedules", lambda: [])
     monkeypatch.setattr(
         banking_service,
-        "list_bill_schedules",
+        "_read_bill_schedules",
         lambda: [
             BillSchedule(
                 bill_key="recology",
@@ -1483,7 +1495,7 @@ def test_scheduled_pulls_include_name_matched_bill_without_amount(monkeypatch):
             )
         ],
     )
-    monkeypatch.setattr(banking_service, "bill_amount_for_source_label", lambda _source_label: (False, 0.0))
+    monkeypatch.setattr(banking_service, "_bill_amounts_for_schedules", lambda bills: [(bill, False, 0.0) for bill in bills])
     transaction = BankTransaction(
         **{
             **_transaction("Recology Sonoma", 145.36).__dict__,
@@ -1505,11 +1517,11 @@ def test_scheduled_pulls_include_name_matched_bill_without_amount(monkeypatch):
 def test_reconciliation_schedule_debug_shows_loaded_bills(monkeypatch, tmp_path):
     banking_service._SCHEDULE_SOURCE_CACHE.clear()
     monkeypatch.setattr(banking_service, "sheet_user_context", lambda _actor_key: nullcontext())
-    monkeypatch.setattr(banking_service, "list_normalized_subscription_schedules", lambda: [])
+    monkeypatch.setattr(banking_service, "_read_subscription_schedules", lambda: [])
     monkeypatch.setattr(banking_service, "parse_visible_subscription_schedules", lambda: [])
     monkeypatch.setattr(
         banking_service,
-        "list_bill_schedules",
+        "_read_bill_schedules",
         lambda: [
             BillSchedule(
                 bill_key="recology",
@@ -1522,7 +1534,7 @@ def test_reconciliation_schedule_debug_shows_loaded_bills(monkeypatch, tmp_path)
             )
         ],
     )
-    monkeypatch.setattr(banking_service, "bill_amount_for_source_label", lambda _source_label: (False, 0.0))
+    monkeypatch.setattr(banking_service, "_bill_amounts_for_schedules", lambda bills: [(bill, False, 0.0) for bill in bills])
     store = BankStore(tmp_path / "banking.sqlite3", TokenCipher("test-secret-key"))
     service = BankingService(
         config=BankingConfig(
@@ -1613,7 +1625,7 @@ def test_confirm_reconciliation_action_match_marks_existing_row(monkeypatch, tmp
     assert confirmed is not None
     assert confirmed.status == "confirmed"
     assert confirmed.matched_action_log_id == "abc123"
-    assert confirmed.matched_sheet_ref == "expense!row 12"
+    assert confirmed.matched_sheet_ref == "expense!row 12#month=2026-05"
 
 
 def test_confirm_reconciliation_action_match_updates_sheet_amount_after_user_match(monkeypatch, tmp_path):
@@ -1724,7 +1736,7 @@ def test_resolved_reconciliation_items_lists_confirmed_items(tmp_path):
         "brian",
         item.id,
         matched_action_log_id="abc123",
-        matched_sheet_ref="expense!row 12",
+        matched_sheet_ref="expense!row 12#month=2026-05",
     )
 
     resolved = service.resolved_reconciliation_items("brian", limit=10)
@@ -1802,7 +1814,7 @@ def test_revert_reconciliation_item_can_undo_bank_amount_update(monkeypatch, tmp
         "brian",
         item.id,
         matched_action_log_id="abc123",
-        matched_sheet_ref="expense!row 12",
+        matched_sheet_ref="expense!row 12#month=2026-05",
     )
 
     reopened, details, status = service.revert_reconciliation_item(
@@ -1874,7 +1886,7 @@ def test_revert_reconciliation_item_can_delete_bank_logged_row(monkeypatch, tmp_
         "brian",
         item.id,
         matched_action_log_id="new123",
-        matched_sheet_ref="expense!row 12",
+        matched_sheet_ref="expense!row 12#month=2026-05",
         notes="logged as expense from bank reconciliation",
     )
 
@@ -1961,7 +1973,7 @@ def test_confirm_reconciliation_action_group_match_requires_exact_total(monkeypa
     assert confirmed is not None
     assert confirmed.status == "confirmed"
     assert confirmed.matched_action_log_id == "minted123+zazzle123"
-    assert confirmed.matched_sheet_ref == "expense!row 12 + expense!row 13"
+    assert confirmed.matched_sheet_ref == "expense!row 12#month=2026-05 + expense!row 13#month=2026-05"
 
 
 def test_confirm_reconciliation_action_group_match_rejects_total_mismatch(monkeypatch, tmp_path):

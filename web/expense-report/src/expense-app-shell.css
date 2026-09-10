@@ -29,6 +29,7 @@
 .bb-app-shell .bb-navigation-link svg { flex-shrink: 0; width: 23px; height: 23px; transition: width var(--bb-motion-duration) var(--bb-motion-ease), height var(--bb-motion-duration) var(--bb-motion-ease); }
 /* Four 55px-wide targets keep the compact glass capsule comfortably tappable. */
 .bb-app-shell .bb-bottom-navigation[data-compact="true"] { width: min(244px, 100%); }
+.bb-app-shell .bb-bottom-navigation[data-compact="true"][data-tab-count="5"] { width: min(299px, 100%); }
 .bb-app-shell .bb-bottom-navigation[data-compact="true"] > div:last-child { height: 44px; }
 .bb-app-shell .bb-bottom-navigation[data-compact="true"] .bb-navigation-link { padding-top: 0; padding-bottom: 0; }
 .bb-app-shell .bb-bottom-navigation[data-compact="true"] .bb-navigation-link > span { gap: 0; }

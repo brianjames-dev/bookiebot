@@ -1,10 +1,10 @@
 import { createContext, useContext, type ReactNode } from "react"
 import type { useReportViewPreferences } from "./report-view-preferences"
 
-export type AppScreen = "overview" | "spending" | "shared" | "savings" | "settings"
+export type AppScreen = "overview" | "spending" | "shared" | "savings" | "reconcile" | "settings"
 export type MainScreen = Exclude<AppScreen, "settings">
 export const screenTitles: Record<AppScreen, string> = {
-  overview: "Overview", spending: "Spending", shared: "Shared", savings: "Savings", settings: "Settings",
+  overview: "Overview", spending: "Spending", shared: "Shared", savings: "Savings", reconcile: "Reconcile", settings: "Settings",
 }
 export function screenForReportSource(source: string): MainScreen {
   return source === "reimbursements" ? "shared" : source === "activity" ? "spending" : "overview"

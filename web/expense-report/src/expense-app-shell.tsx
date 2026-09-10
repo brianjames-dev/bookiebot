@@ -1,6 +1,6 @@
 import { useEffect, useLayoutEffect, useRef, useState, type ComponentProps, type ReactNode } from "react"
 import { Tabbar, TabbarLink, Toolbar, ToolbarPane } from "konsta/react"
-import { ArrowLeft, House, MessageCircle, PiggyBank, ReceiptText, Settings, Users } from "lucide-react"
+import { ArrowLeft, House, ListChecks, MessageCircle, PiggyBank, ReceiptText, Settings, Users } from "lucide-react"
 import { AppNavigationContext, nextScrollNavigation, screenForReportSource, screenTitles, type AppScreen, type MainScreen, type ScrollNavigationState } from "./app-navigation"
 import { ExpenseReportApp, useExpenseReportTheme } from "./report-app"
 import { useReportViewPreferences } from "./report-view-preferences"
@@ -14,6 +14,7 @@ import { WidgetSetupGuide } from "./widget-setup-guide"
 import { AskBookieBotPanel } from "./ask-bookiebot-panel"
 import { AppUpdatePrompt } from "./app-update-prompt"
 import { useAppWorkGuard } from "./app-work-guard"
+import { ReconciliationScreen, useReconciliation } from "./reconciliation-screen"
 import type { ExpenseReportData } from "./types"
 
 const mainScreens = [
@@ -33,6 +34,10 @@ export function ExpenseAppShell({ report, controls, monthControl, comparison, av
   monthlyReady?: boolean; questionMonth?: string
 }) {
   const { theme, toggleTheme } = useExpenseReportTheme()
+  const reconciliation = useReconciliation()
+  const reconciliationEnabled = reconciliation.snapshot?.enabled === true
+  const enabledRef = useRef(reconciliationEnabled)
+  enabledRef.current = reconciliationEnabled
   const preferences = useReportViewPreferences(report.ownerName, Boolean(report.burnRate))
   const [screen, setScreen] = useState<AppScreen>(() => window.location.hash === "#settings" ? "settings" : "overview")
   const [lastMain, setLastMain] = useState<MainScreen>("overview")
@@ -51,6 +56,7 @@ export function ExpenseAppShell({ report, controls, monthControl, comparison, av
   const scrollState = useRef<ScrollNavigationState>({ lastY: 0, travel: 0, compact: false })
   const guard = useAppWorkGuard()
   const selectScreen = (next: AppScreen) => {
+    if (next === "reconcile" && !enabledRef.current) return
     if (next === screenRef.current) {
       if (next === "settings" && widgetGuideRef.current) {
         widgetGuideRef.current = false
@@ -81,6 +87,12 @@ export function ExpenseAppShell({ report, controls, monthControl, comparison, av
     widgetFocusRequested.current = true
     selectScreen("settings")
   }
+
+  useEffect(() => {
+    if (reconciliationEnabled) return
+    if (screenRef.current === "reconcile") selectScreen("overview")
+    if (lastMain === "reconcile") setLastMain("overview")
+  }, [reconciliationEnabled, lastMain])
 
   useEffect(() => {
     // Public setup pages may return here without browser Back controls. Only
@@ -187,6 +199,9 @@ export function ExpenseAppShell({ report, controls, monthControl, comparison, av
       <main className="bb-shell-savings bb-main" aria-label="Savings" hidden={screen !== "savings"}>
         <SavingsGoals />
       </main>
+      <main className="bb-shell-reconcile bb-main" aria-label="Reconcile" hidden={screen !== "reconcile" || !reconciliationEnabled}>
+        <ReconciliationScreen controller={reconciliation} />
+      </main>
       <main className="bb-shell-settings bb-main" aria-label="Settings" hidden={screen !== "settings" || widgetGuideOpen}>
         <div className="bb-settings-heading"><button type="button" className="bb-settings-back" onClick={() => selectScreen(lastMain)}><ArrowLeft aria-hidden="true" />Back</button><h1>Settings</h1></div>
         <section className="bb-settings-section" aria-labelledby="bb-appearance-title"><h2 id="bb-appearance-title">Appearance</h2>
@@ -196,6 +211,7 @@ export function ExpenseAppShell({ report, controls, monthControl, comparison, av
         <WidgetSettings ownerName={report.ownerName} defaultMode={preferences.mode} onOpenGuide={openWidgetGuide} />
         <section className="bb-settings-section" aria-labelledby="bb-account-title"><h2 id="bb-account-title">Account</h2>
           <div className="bb-setting-row"><span>Signed in as</span><strong>{report.ownerName}</strong></div>
+          {!reconciliationEnabled && reconciliation.error && <div className="bb-settings-note" role="status"><p>{reconciliation.error}</p><button type="button" className="bb-settings-action" disabled={reconciliation.busy} onClick={() => void reconciliation.load()}>Check bank connection</button></div>}
           <button type="button" className="bb-settings-action" disabled={signingOut} onClick={() => guard.requestAction({ kind: "signout", onProceed: signOut })}>{signingOut ? "Signing out…" : "Sign out"}</button>
         </section>
         <section className="bb-settings-section" aria-labelledby="bb-updates-title"><h2 id="bb-updates-title">About &amp; updates</h2>
@@ -208,9 +224,9 @@ export function ExpenseAppShell({ report, controls, monthControl, comparison, av
         <WidgetSetupGuide onBack={() => selectScreen("settings")} onPair={returnToWidgets} />
       </main>}
 
-      <Tabbar component="nav" icons labels className="bb-bottom-navigation" aria-label="Main navigation" data-compact={compact && !askOpen} hidden={keyboardOpen}>
+      <Tabbar component="nav" icons labels className="bb-bottom-navigation" aria-label="Main navigation" data-compact={compact && !askOpen} data-tab-count={reconciliationEnabled ? 5 : 4} hidden={keyboardOpen}>
         <ToolbarPane className="bb-navigation-pane">
-          {mainScreens.map(({ id, Icon }) => <TabbarLink key={id} component={NavigationButton} linkProps={{ type: "button" }} className="bb-navigation-link"
+          {[...mainScreens, ...(reconciliationEnabled ? [{ id: "reconcile" as const, Icon: ListChecks }] : [])].map(({ id, Icon }) => <TabbarLink key={id} component={NavigationButton} linkProps={{ type: "button" }} className="bb-navigation-link"
             active={screen === id || (screen === "settings" && lastMain === id)} aria-label={screenTitles[id]} aria-current={screen === id ? "page" : undefined}
             label={screenTitles[id]} icon={<Icon size={23} strokeWidth={1.7} aria-hidden="true" />} onClick={() => selectScreen(id)} />)}
         </ToolbarPane>

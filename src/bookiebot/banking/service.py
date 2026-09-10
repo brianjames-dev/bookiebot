@@ -5,8 +5,11 @@ import logging
 import os
 import time
 from datetime import date as local_date, timedelta
+from dataclasses import replace
 from typing import Any
 from uuid import uuid4
+
+from gspread.exceptions import WorksheetNotFound
 
 from bookiebot.banking.config import BankingConfig, load_banking_config
 from bookiebot.banking.crypto import TokenCipher
@@ -31,25 +34,40 @@ from bookiebot.banking.reconciliation import (
     _scheduled_name_score,
     action_log_bank_transaction,
     action_log_candidate_by_id,
+    claimed_schedule_action_ids,
+    action_sheet_ref,
     find_action_log_candidates,
     find_action_log_candidate_groups,
     find_scheduled_pull_candidates,
     recent_action_log_candidates,
     reconcile_transaction,
+    transaction_match_dates,
 )
-from bookiebot.sheets.bills import bill_amount_for_source_label, list_bill_schedules, next_bill_pull_date
-from bookiebot.sheets.routing import sheet_user_context
+from bookiebot.sheets.auth import (
+    BILL_SCHEDULE_WORKSHEET_TITLE, SUBSCRIPTION_SCHEDULE_WORKSHEET_TITLE,
+    get_existing_personal_worksheet, get_gspread_client,
+)
+from bookiebot.sheets.bills import bill_source_amount, list_bill_schedules, next_bill_pull_date
+from bookiebot.sheets.routing import (
+    now_pacific, sheet_user_context, actor_key_aliases, get_current_month_name,
+    get_shared_expenses_spreadsheet_id, MissingYearConfigError,
+)
+from bookiebot.reports.worksheet_reads import read_workbook_tabs
 from bookiebot.sheets.subscriptions import (
-    list_normalized_subscription_schedules,
+    list_subscription_schedules,
     next_pull_date,
     parse_visible_subscription_schedules,
 )
 from bookiebot.banking.store import BankStore, WEBHOOK_LEASE_SECONDS
-from bookiebot.sheets.undo import delete_recent_action, read_active_logged_actions, undo_logged_action, update_recent_action
+from bookiebot.sheets.undo import (
+    LoggedAction, _LOG_HEADERS, _logged_action_from_row,
+    delete_recent_action, read_active_logged_actions as _read_current_logged_actions,
+    undo_logged_action, update_recent_action,
+)
 
 
 logger = logging.getLogger(__name__)
-_SCHEDULE_SOURCE_CACHE: dict[str, tuple[float, list[Any], list[tuple[Any, bool, float]]]] = {}
+_SCHEDULE_SOURCE_CACHE: dict[str, tuple[float, list[Any], list[tuple[Any, bool, float]], str]] = {}
 
 
 def _schedule_cache_ttl_seconds() -> int:
@@ -69,23 +87,92 @@ def _reconciliation_max_age_days() -> int:
 
 
 def _current_month_start() -> str:
-    return local_date.today().replace(day=1).isoformat()
+    return now_pacific().date().replace(day=1).isoformat()
+
+
+def read_active_logged_actions(actor_key: str) -> list[LoggedAction]:
+    """Read recent owner history without creating sheets or repairing headers.
+
+    Include authorization/posting and matching-window headroom across month/year
+    boundaries. Existing sheet writers remain restricted to their current log.
+    """
+    today = now_pacific().date()
+    earliest = today - timedelta(days=_reconciliation_max_age_days() + 21)
+    month = earliest.replace(day=1)
+    by_year: dict[int, list[str]] = {}
+    while month <= today:
+        by_year.setdefault(month.year, []).append(f"_BookieBot Action Log - {month:%Y-%m}")
+        month = (month.replace(day=28) + timedelta(days=4)).replace(day=1)
+    aliases = actor_key_aliases(actor_key)
+    client = get_gspread_client()
+    actions: dict[str, LoggedAction] = {}
+    for year, titles in by_year.items():
+        try:
+            workbook_id = get_shared_expenses_spreadsheet_id(year)
+        except MissingYearConfigError:
+            if year == today.year:
+                raise
+            continue
+        for rows in read_workbook_tabs(client, workbook_id, titles).values():
+            if not rows:
+                continue
+            if rows[0][:len(_LOG_HEADERS)] != _LOG_HEADERS:
+                raise ValueError("Action history headers are incomplete.")
+            for row in rows[1:]:
+                if not row or not row[0] or len(row) < 3 or row[2] not in aliases:
+                    continue
+                logged = _logged_action_from_row(row)
+                if logged.status != "active" or logged.action.metadata.get("type") == "system_state":
+                    continue
+                if logged.id in actions and actions[logged.id] != logged:
+                    raise ValueError("Action history has conflicting identifiers.")
+                actions[logged.id] = logged
+    return list(actions.values())
+
+
+def _existing_schedule_rows(title: str) -> list[list[str]]:
+    try:
+        worksheet = get_existing_personal_worksheet(title)
+    except WorksheetNotFound:
+        return []
+    return worksheet.get_all_values()
+
+
+def _read_subscription_schedules() -> list[Any]:
+    return list_subscription_schedules(_existing_schedule_rows(SUBSCRIPTION_SCHEDULE_WORKSHEET_TITLE))
+
+
+def _read_bill_schedules() -> list[Any]:
+    return list_bill_schedules(_existing_schedule_rows(BILL_SCHEDULE_WORKSHEET_TITLE))
+
+
+def _bill_amounts_for_schedules(bills: list[Any]) -> list[tuple[Any, bool, float]]:
+    if not bills:
+        return []
+    rows = _existing_schedule_rows(get_current_month_name())
+    amounts = []
+    for bill in bills:
+        amount = bill_source_amount(rows, bill.source_label)
+        amounts.append((bill, amount is not None and amount > 0, amount or 0.0))
+    return amounts
 
 
 def _schedule_sources_for_actor(actor_key: str) -> tuple[list[Any], list[tuple[Any, bool, float]]]:
     cached = _SCHEDULE_SOURCE_CACHE.get(actor_key)
     now = time.monotonic()
-    if cached and now - cached[0] <= _schedule_cache_ttl_seconds():
+    if cached and cached[3] == _current_month_start() and now - cached[0] <= _schedule_cache_ttl_seconds():
         return list(cached[1]), list(cached[2])
 
     subscriptions: list[Any] = []
     bills_with_amounts: list[tuple[Any, bool, float]] = []
+    load_failed = False
     with sheet_user_context(actor_key):
         subscription_load_failed = False
         try:
-            subscriptions = list_normalized_subscription_schedules()
+            subscriptions = _read_subscription_schedules()
         except Exception:
             subscription_load_failed = True
+            load_failed = True
             logger.warning(
                 "Failed to load normalized subscription schedules for bank reconciliation",
                 extra={"actor_key": actor_key},
@@ -94,7 +181,11 @@ def _schedule_sources_for_actor(actor_key: str) -> tuple[list[Any], list[tuple[A
         if not subscriptions and not subscription_load_failed:
             try:
                 subscriptions = parse_visible_subscription_schedules()
+            except WorksheetNotFound:
+                # Both optional schedule formats may be absent in a new budget.
+                subscriptions = []
             except Exception:
+                load_failed = True
                 logger.warning(
                     "Failed to load visible subscription schedules for bank reconciliation",
                     extra={"actor_key": actor_key},
@@ -103,8 +194,9 @@ def _schedule_sources_for_actor(actor_key: str) -> tuple[list[Any], list[tuple[A
                 subscriptions = []
 
         try:
-            bills = list_bill_schedules()
+            bills = _read_bill_schedules()
         except Exception:
+            load_failed = True
             logger.warning(
                 "Failed to load bill schedules for bank reconciliation",
                 extra={"actor_key": actor_key},
@@ -112,20 +204,19 @@ def _schedule_sources_for_actor(actor_key: str) -> tuple[list[Any], list[tuple[A
             )
             bills = []
 
-        for bill in bills:
-            try:
-                amount_entered, amount = bill_amount_for_source_label(bill.source_label)
-            except Exception:
-                logger.warning(
-                    "Failed to load bill amount for bank reconciliation",
-                    extra={"actor_key": actor_key, "bill_key": bill.bill_key},
-                    exc_info=True,
-                )
-                amount_entered = False
-                amount = 0.0
-            bills_with_amounts.append((bill, amount_entered, amount))
+        try:
+            bills_with_amounts = _bill_amounts_for_schedules(bills)
+        except Exception:
+            load_failed = True
+            logger.warning(
+                "Failed to load bill amounts for bank reconciliation",
+                extra={"actor_key": actor_key}, exc_info=True,
+            )
+            bills_with_amounts = [(bill, False, 0.0) for bill in bills]
 
-    _SCHEDULE_SOURCE_CACHE[actor_key] = (now, list(subscriptions), list(bills_with_amounts))
+    if load_failed:
+        raise RuntimeError("Reconciliation source data is temporarily unavailable.")
+    _SCHEDULE_SOURCE_CACHE[actor_key] = (now, list(subscriptions), list(bills_with_amounts), _current_month_start())
     return subscriptions, bills_with_amounts
 
 
@@ -146,33 +237,34 @@ def _clean_debug_text(value: str | None) -> str:
 def _find_action_for_sheet_ref(action_log: list, sheet_ref: str | None):
     if not sheet_ref or "!row " not in sheet_ref:
         return None
-    worksheet, row_text = sheet_ref.split("!row ", 1)
+    physical_refs = [ref for ref in sheet_ref.split(" + ") if "!row " in ref]
+    if len(physical_refs) != 1:
+        return None
+    worksheet, row_text = physical_refs[0].split("!row ", 1)
+    row_text, _, source_month = row_text.partition("#month=")
     try:
         row = int(row_text.strip())
     except ValueError:
         return None
     for logged in reversed(action_log):
         if logged.action.worksheet == worksheet and logged.action.row == row:
+            candidate = action_log_candidate_by_id(logged)
+            if source_month and (candidate is None or candidate.date.strftime("%Y-%m") != source_month):
+                continue
             return logged
     return None
 
 
 def _bill_name_matches_transaction(bill_name: str, transaction: BankTransaction) -> bool:
-    bill_text = " ".join(token for token in _simple_match_tokens(bill_name) if len(token) >= 3)
-    transaction_text = " ".join(
-        token
-        for token in _simple_match_tokens(" ".join(filter(None, [transaction.name, transaction.merchant_name])))
-        if len(token) >= 3
-    )
-    if not bill_text or not transaction_text:
-        return False
-    return bill_text in transaction_text or any(token in bill_text for token in transaction_text.split())
+    return _scheduled_name_score(transaction, bill_name) >= 0.5
 
 
-def _simple_match_tokens(value: str | None) -> list[str]:
-    import re
-
-    return re.sub(r"[^a-z0-9]+", " ", (value or "").lower()).split()
+def _bill_pull_amount(bill: Any, entered: bool, amount: float, pull_date: local_date) -> tuple[float, bool]:
+    # The source amount comes from the open personal budget tab. It cannot prove
+    # that a previous/future month's bill was logged.
+    recorded = entered and amount > 0 and pull_date.strftime("%Y-%m") == _current_month_start()[:7]
+    expected = float(getattr(bill, "expected_amount", None) or 0)
+    return (amount, True) if recorded else (max(0.0, expected), False)
 
 
 def _scheduled_pull_debug_rows(transaction: BankTransaction, pulls: list[ScheduledPullCandidate], window_days: int) -> list[str]:
@@ -220,8 +312,7 @@ def _scheduled_pulls_for_transactions(
     if not actor_key or not transactions:
         return []
 
-    transaction_dates = [_transaction_local_date(transaction) for transaction in transactions]
-    transaction_dates = [value for value in transaction_dates if value is not None]
+    transaction_dates = [value for transaction in transactions for value in transaction_match_dates(transaction)]
     if not transaction_dates:
         return []
 
@@ -257,14 +348,16 @@ def _scheduled_pulls_for_transactions(
         expected = next_bill_pull_date(bill, start_date)
         while expected is not None and expected <= end_date:
             seen_pull_dates.add(expected)
+            pull_amount, recorded = _bill_pull_amount(bill, amount_entered, amount, expected)
             candidates.append(
                 ScheduledPullCandidate(
                     source_type="bill",
                     name=bill.display_name,
-                    amount=amount if amount_entered and amount > 0 else 0.0,
+                    amount=pull_amount,
                     pull_date=expected,
                     source_ref=bill.source_range or f"bill:{bill.bill_key}",
                     account=bill.account,
+                    amount_recorded=recorded,
                 )
             )
             expected = next_bill_pull_date(bill, expected + timedelta(days=1))
@@ -273,16 +366,18 @@ def _scheduled_pulls_for_transactions(
                 continue
             date_transactions = transactions_by_date.get(transaction_date, [])
             name_matches = any(_bill_name_matches_transaction(bill.display_name, transaction) for transaction in date_transactions)
-            if not ((amount_entered and amount > 0) or name_matches):
+            if not name_matches:
                 continue
+            pull_amount, recorded = _bill_pull_amount(bill, amount_entered, amount, transaction_date)
             candidates.append(
                 ScheduledPullCandidate(
                     source_type="bill",
                     name=bill.display_name,
-                    amount=amount if amount_entered and amount > 0 else 0.0,
+                    amount=pull_amount,
                     pull_date=transaction_date,
                     source_ref=bill.source_range or f"bill:{bill.bill_key}",
                     account=bill.account,
+                    amount_recorded=recorded,
                 )
             )
     return candidates
@@ -679,9 +774,15 @@ class BankingService:
             return item, [], []
         action_log = read_active_logged_actions(actor_key)
         excluded = self.store.matched_action_log_ids(owner_key)
+        pulls = _scheduled_pulls_for_transactions([item.transaction], actor_key=actor_key)
+        claimed_refs = self.store.matched_sheet_refs(owner_key) - {
+            part.strip() for part in (item.matched_sheet_ref or "").split(" + ") if part.strip()
+        }
+        excluded |= claimed_schedule_action_ids(pulls, action_log, claimed_refs)
         schedule_candidates = find_scheduled_pull_candidates(
             item.transaction,
-            _scheduled_pulls_for_transactions([item.transaction], actor_key=actor_key),
+            pulls,
+            action_log=action_log,
             window_days=14 if fallback else 7,
             limit=limit,
         )
@@ -693,7 +794,7 @@ class BankingService:
                 days_back=30,
                 limit=limit,
             )
-            candidates = [*schedule_candidates, *action_candidates][: max(1, limit)]
+            candidates = sorted([*action_candidates, *schedule_candidates], key=lambda candidate: (-candidate.confidence, not candidate.amount_recorded))[: max(1, limit)]
             groups: list[ActionLogCandidateGroup] = []
         else:
             action_candidates = find_action_log_candidates(
@@ -704,7 +805,7 @@ class BankingService:
                 window_days=7,
                 limit=limit,
             )
-            candidates = [*schedule_candidates, *action_candidates][: max(1, limit)]
+            candidates = sorted([*action_candidates, *schedule_candidates], key=lambda candidate: (-candidate.confidence, not candidate.amount_recorded))[: max(1, limit)]
             groups = find_action_log_candidate_groups(
                 item.transaction,
                 action_log,
@@ -714,6 +815,12 @@ class BankingService:
                 max_group_size=4,
                 limit=5,
             )
+        action_by_id = {logged.id: logged for logged in action_log}
+        candidates = [
+            replace(candidate, sheet_ref=action_sheet_ref(action_by_id[candidate.action_id], pulls))
+            if candidate.action_id in action_by_id else candidate
+            for candidate in candidates
+        ]
         return item, candidates, groups
 
     def reconciliation_schedule_debug(
@@ -887,12 +994,15 @@ class BankingService:
         candidates = find_scheduled_pull_candidates(
             item.transaction,
             _scheduled_pulls_for_transactions([item.transaction], actor_key=actor_key),
+            action_log=read_active_logged_actions(actor_key),
             window_days=14,
             limit=25,
         )
         candidate = next((candidate for candidate in candidates if candidate.sheet_ref == schedule_ref), None)
         if candidate is None:
             return item, None, "schedule_not_found"
+        if not candidate.amount_recorded:
+            return item, candidate, "bill_not_recorded"
         if round(candidate.amount * 100) != round(abs(item.transaction.amount) * 100):
             return item, candidate, "amount_mismatch"
 
@@ -924,11 +1034,20 @@ class BankingService:
         if action_id in excluded and item.matched_action_log_id != action_id:
             return item, None, "already_matched"
 
-        action_by_id = {logged.id: logged for logged in read_active_logged_actions(actor_key)}
+        action_by_id = {logged.id: logged for logged in _read_current_logged_actions(actor_key)}
+        claimed_refs = self.store.matched_sheet_refs(owner_key) - {
+            part.strip() for part in (item.matched_sheet_ref or "").split(" + ") if part.strip()
+        }
+        pulls = _scheduled_pulls_for_transactions([item.transaction], actor_key=actor_key)
+        if action_id in claimed_schedule_action_ids(
+            pulls,
+            action_by_id.values(), claimed_refs,
+        ):
+            return item, None, "already_matched"
         logged = action_by_id.get(action_id)
         if logged is None:
             return item, None, "action_not_found"
-        candidate = action_log_candidate_by_id(logged)
+        candidate = action_log_candidate_by_id(logged, scheduled_pulls=pulls)
         if candidate is None:
             return item, None, "action_not_reconcilable"
 
@@ -945,8 +1064,8 @@ class BankingService:
             )
             if not success:
                 return item, candidate, f"amount_update_failed: {detail}"
-            updated_logged = {entry.id: entry for entry in read_active_logged_actions(actor_key)}.get(action_id)
-            updated_candidate = action_log_candidate_by_id(updated_logged) if updated_logged else None
+            updated_logged = {entry.id: entry for entry in _read_current_logged_actions(actor_key)}.get(action_id)
+            updated_candidate = action_log_candidate_by_id(updated_logged, scheduled_pulls=pulls) if updated_logged else None
             if updated_candidate is not None:
                 candidate = updated_candidate
             update_status = "matched_updated"
@@ -982,7 +1101,7 @@ class BankingService:
         return reopened, details, "reopened"
 
     def _undo_reconciliation_sheet_actions(self, item: ReconciliationItem, *, actor_key: str) -> list[str]:
-        action_log = read_active_logged_actions(actor_key)
+        action_log = _read_current_logged_actions(actor_key)
         action_by_id = {logged.id: logged for logged in action_log}
         details: list[str] = []
 
@@ -1056,7 +1175,7 @@ class BankingService:
         if already_matched:
             return item, [], "already_matched"
 
-        action_by_id = {logged.id: logged for logged in read_active_logged_actions(actor_key)}
+        action_by_id = {logged.id: logged for logged in _read_current_logged_actions(actor_key)}
         candidates: list[ActionLogCandidate] = []
         for action_id in cleaned_ids:
             logged = action_by_id.get(action_id)
@@ -1093,7 +1212,7 @@ class BankingService:
             if not success:
                 return item, candidates, f"amount_update_failed: {detail}"
 
-            action_by_id = {logged.id: logged for logged in read_active_logged_actions(actor_key)}
+            action_by_id = {logged.id: logged for logged in _read_current_logged_actions(actor_key)}
             adjusted_candidates: list[ActionLogCandidate] = []
             for action_id in cleaned_ids:
                 logged = action_by_id.get(action_id)
@@ -1142,10 +1261,23 @@ class BankingService:
         )
         action_log = read_active_logged_actions(actor_key) if actor_key else []
         scheduled_pulls = _scheduled_pulls_for_transactions(transactions, actor_key=actor_key)
-        used_action_ids = set() if force else set(self.store.matched_action_log_ids(owner_key))
-        used_sheet_refs = set() if force else set(self.store.matched_sheet_refs(owner_key))
+        used_action_ids = set(self.store.matched_action_log_ids(owner_key))
+        used_sheet_refs = set(self.store.matched_sheet_refs(owner_key))
         items = []
         for transaction in transactions:
+            existing = self.store.get_reconciliation_item_for_transaction(owner_key, transaction.id)
+            if existing and existing.status in {"confirmed", "ignored", "import_requested"}:
+                items.append(existing)
+                continue
+            # Forced rescoring may reconsider this automatic match, but it must
+            # not borrow a row already reserved by another transaction.
+            if existing and existing.status == "matched":
+                used_action_ids.difference_update(
+                    part.strip() for part in (existing.matched_action_log_id or "").split("+") if part.strip()
+                )
+                used_sheet_refs.difference_update(
+                    part.strip() for part in (existing.matched_sheet_ref or "").split(" + ") if part.strip()
+                )
             decision = reconcile_transaction(
                 transaction,
                 action_log,
@@ -1165,16 +1297,17 @@ class BankingService:
                     matched_sheet_ref=decision.matched_sheet_ref,
                 )
             )
-            if decision.matched_action_log_id:
+            saved = items[-1]
+            if saved.matched_action_log_id:
                 used_action_ids.update(
                     part.strip()
-                    for part in decision.matched_action_log_id.split("+")
+                    for part in saved.matched_action_log_id.split("+")
                     if part.strip()
                 )
-            if decision.matched_sheet_ref:
+            if saved.matched_sheet_ref:
                 used_sheet_refs.update(
                     part.strip()
-                    for part in decision.matched_sheet_ref.split(" + ")
+                    for part in saved.matched_sheet_ref.split(" + ")
                     if part.strip()
                 )
         return ReconciliationPreview(

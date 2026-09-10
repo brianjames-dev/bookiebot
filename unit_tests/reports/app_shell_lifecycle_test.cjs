@@ -92,8 +92,9 @@ const rawReport = tree => tree.root.findAll(node => node.type === 'div' && node.
 const dialogs = []
 const create = content => Renderer.create(content, { createNodeMock: el => el.type === 'dialog' ? (() => { const dialog = { dataset: {}, open: false, showModal() { this.open = true }, close() { this.open = false } }; dialogs.push(dialog); return dialog })() : null })
 const allocation = { id: 'power', payerOwner: 'brian', partnerOwner: 'hannah', payerPerson: 'Brian', item: 'Power', location: '', expenseDate: '2026-09-03', category: 'need', grossCents: 20000, payerShareCents: 10000, partnerShareCents: 10000, settledCents: 0, outstandingCents: 10000, method: 'equal', version: 1, projectedVersion: 1, accounting: 'cash_v1', status: 'outstanding' }
-let owner = 'brian', pending, writes = [], reads = { goals: 0, reimbursements: 0 }, widgetReads = 0, widgetWrites = [], widgetConnections = []
+let owner = 'brian', pending, writes = [], reads = { goals: 0, reimbursements: 0 }, widgetReads = 0, widgetWrites = [], widgetConnections = [], bankEnabled = false, bankRequest = null
 request = async (url, options = {}) => {
+  if (url === '/app/reconciliation') return options.body && bankRequest ? bankRequest.promise : response({ enabled: bankEnabled, checkedAt: null, items: [] })
   if (url === '/app/version') return response({ version: 'shell-version-2' })
   if (url === '/app/widgets/script') return { ok: true, text: async () => '// BookieBot Home Screen widget\nconst BOOKIEBOT_ORIGIN = "https://bookiebot.example";' }
   if (url === '/app/widgets/settings') {
@@ -243,6 +244,32 @@ async function main() {
   assert.equal(win.location.hash, '#bbw_pair_private', 'App navigation does not rewrite browser history or fragments')
   await run(() => tree.unmount())
   win.location.hash = ''; widgetConnections = []
+
+  // Connected, watched bank accounts add one optional screen without replacing
+  // any existing tab or remounting the other financial controllers.
+  bankEnabled = true
+  await run(() => { tree = create(shell(report)) })
+  const optionalNav = tree.root.findByProps({ 'aria-label': 'Main navigation' })
+  assert.equal(optionalNav.props['data-tab-count'], 5)
+  for (const label of ['Overview', 'Spending', 'Shared', 'Savings', 'Reconcile']) assert.ok(button(tree, label))
+  const beforeReviewReads = { ...reads }, beforeReviewReport = rawReport(tree).props['data-report-instance']
+  win.scrollY = 340; await tap(tree, 'Reconcile'); assert.equal(screen(tree), 'reconcile'); assert.equal(win.scrollY, 0)
+  win.scrollY = 220; await tap(tree, 'Settings'); await tap(tree, 'Back')
+  assert.equal(screen(tree), 'reconcile'); assert.equal(win.scrollY, 220)
+  await tap(tree, 'Overview'); assert.equal(win.scrollY, 340)
+  assert.deepEqual(reads, beforeReviewReads); assert.equal(rawReport(tree).props['data-report-instance'], beforeReviewReport)
+  await tap(tree, 'Reconcile'); bankRequest = deferred(); await tap(tree, 'Check')
+  assert.equal(guard.pending, true, 'Bank checks participate in the real update/signout work guard')
+  await tap(tree, 'Settings'); assert.equal(button(tree, 'Update available · Update now').props.disabled, true)
+  await run(() => bankRequest.resolve(response({ enabled: true, checkedAt: '2026-09-09T20:00:00Z', items: [] })))
+  bankRequest = null; assert.equal(guard.pending, false)
+  await tap(tree, 'Back'); assert.equal(screen(tree), 'reconcile'); assert.equal(win.scrollY, 220)
+  bankEnabled = false
+  await run(() => win.dispatchEvent(new Event('focus')))
+  assert.equal(screen(tree), 'overview'); assert.equal(button(tree, 'Reconcile'), undefined)
+  assert.equal(optionalNav.props['data-tab-count'], 4)
+  await tap(tree, 'Settings'); await tap(tree, 'Back'); assert.equal(screen(tree), 'overview', 'Disconnected accounts cannot leave Settings pointing at an unavailable tab')
+  await run(() => tree.unmount())
 
   // Exercise the real FreshExpenseApp ownership boundary, with only its network/catalog transport replaced.
   let session

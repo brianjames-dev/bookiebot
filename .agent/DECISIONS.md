@@ -1,5 +1,13 @@
 # Agent Decisions
 
+## 2026-09-10 - Manual Logging With Shared Bank Review In The Phone App
+
+Decision: Add owner-scoped Reconcile navigation only for watched connected bank accounts. Keep the default list a persisted read, fetch candidate details on demand and sync/rescore only on explicit Check. Pending bank authorizations are visible but read-only. Phone confirmation links exact recorded evidence through optimistic, atomic metadata updates; it never imports an expense or adjusts a sheet amount. Mismatches remain visible for manual correction; existing Discord import/adjustment workflows remain separate.
+
+Require exact cents, meaningful merchant identity and an unambiguous candidate for automatic matches. Scope recurring reservations to their occurrence, distinguish unrecorded bill expectations, preserve terminal/import lineage and retain claims when accounts are merely hidden. Reopening phone review changes metadata only. Reuse existing financial calculations, schedules, storage and audit events.
+
+Rationale: The app can double-check manual logs without widening financial write authority or creating a second sheet-mutation workflow. Fresh versions, explicit pending state and occurrence identity address missed bills, false positives and repeated-review races with existing primitives.
+
 ## 2026-09-09 - Budget Widgets Lead With Available Today
 
 Scriptable v1.5 swaps only the Budget presentation: canonical Available today is primary; canonical budgetRemaining is labeled Money left, shortened to Left when the Small inline strip needs room. Both sizes/themes use conservative phone bounds, fitted full currency strings and balanced primary spacing. Other widget types, account scope, caches, source timestamps and financial calculations retain their existing behavior. Upgrade the existing script contents without renaming or re-pairing; website deployment cannot replace installed Scriptable source.

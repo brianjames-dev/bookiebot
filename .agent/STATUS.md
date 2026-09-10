@@ -1,8 +1,10 @@
 # Agent Status
 
-Last updated: 2026-09-09
+Last updated: 2026-09-10
 
 ## Active Focus
+
+Reconciliation reliability and web review implemented (2026-09-10): owner-scoped Reconcile tab for watched connected accounts; compact Needs review/Pending/Checked lists, lazy suggestions, exact Confirm match and metadata-only Ignore/reopen. Bill aliases, exact/unique evidence, occurrence/month reservations, shared action/schedule identity and fresh source checks protect matches. Batched read-only action history crosses month/year boundaries without provisioning sheets; unavailable sources cannot erase prior matching. Pending/posting deduplication, terminal/import lineage and atomic review versions preserve manual logging. Full local suite **1,828 passed / 249 optional PostgreSQL skipped**, clean Pyright/typecheck/build; production-build WebKit passed **12** width/theme/motion cases with full review/retry flows. Frontend fingerprint **6426f2fdb7733dd1d9407bb1**. Release verification is recorded in the completion response; checklist 123 covers phone acceptance.
 
 Compact navigation refinement completed (2026-09-09): the scroll-down glass bar contracts horizontally to 220px and vertically to 44px, with 21px icons and four 55×44px targets. Width/height/padding/labels use the shared motion timing; reduced motion includes the outer width transition. Nine navigation/shell/motion tests and frontend typecheck/build pass. Production WebKit passed 12 width/theme/motion cases and 45 pointer/Enter/Space activations, including highlight alignment and real scroll reversal. Manual acceptance is checklist 122; frontend fingerprint a862db5c40b45638b8fa2e5d.
 
@@ -76,6 +78,8 @@ All eight September 6 audit batches are implemented and verified locally. Each b
 
 
 ## On Deck
+
+Reconciliation implementation and local verification are complete; phone acceptance is checklist 123 and docs/RECONCILIATION.md. No live financial test writes are authorized or needed.
 
 Compact tab-bar implementation and browser verification are complete; phone acceptance is checklist 122.
 
@@ -1503,3 +1507,5 @@ python -m pyright
 121. Budget widget v1.5: Settings → Widgets → Setup & widgets → Copy script; replace the existing Scriptable source without changing its name and confirm v1.5 on line 1. Run Widget & preview → Budget → theme/size. Available today must be the large value and Money left the secondary one; compare both against the same owner/mode report. Confirm short values grow, long/negative values keep cents, the Small strip switches to Left when needed, and stale timestamp/name remain readable in Small/Medium both themes. Existing Home Screen parameters and pairing must keep working. iOS controls when Home Screen widgets redraw.
 
 122. Compact tab bar: on Overview or Spending, scroll down far enough to hide labels. Confirm the centered glass bar narrows to 220px and becomes 44px tall, with four 55×44px tap targets and 21px icons. Scroll up to restore the full width, 66px height and labels. Try each tab with tap/Enter/Space, reverse scroll during the animation, check the selected highlight follows its icon, and repeat at 320/390/1280px in dark/light and reduced motion. Keep the bottom safe-area gap and existing screen scroll/draft restoration.
+
+123. Reconciliation: after updating the app, confirm Reconcile appears only for a watched connected bank account and is scoped separately to Brian/Hannah. Check Needs review/Pending/Checked; expand a suggestion, confirm only an exact recorded amount, then verify refresh preserves the decision. Pending authorizations stay read-only and their posted replacements appear once. Mismatches show both amounts and require correcting the logged expense in BookieBot; Check never logs a purchase. Verify Ignore/reopen change only the review state, stale/outdated reviews require reload, and failed requests recover through Check status. At 320/390/1280px, dark/light and reduced motion, all five tab targets remain usable; compact navigation is 275×44px with five 55×44px targets. Existing four-tab accounts remain 220×44px. Use Sandbox/synthetic data for financial-action tests; see docs/RECONCILIATION.md.
