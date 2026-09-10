@@ -1,4 +1,4 @@
-// BookieBot Home Screen widget · v1.4
+// BookieBot Home Screen widget · v1.5
 // Download this script from your own BookieBot Settings → Widgets.
 // Credentials belong in Scriptable Keychain, never in this file or a widget parameter.
 const BOOKIEBOT_ORIGIN = "__BOOKIEBOT_ORIGIN__";
@@ -347,6 +347,24 @@ function amount(parent, value, size, color, editorial = false) {
   item.minimumScaleFactor = 0.35;
   return item;
 }
+// Conservative glyph estimate sets the starting font; native fitting handles
+// device font differences without abbreviating the signed amount or its cents.
+function moneyWidth(value, size) {
+  return [...money(value)].reduce((width, character) => width +
+    (character === "," || character === "." ? 0.28 : character === "—" ? 1 : 0.64), 0) * size;
+}
+function fittedAmount(parent, value, width, maximumSize, color, editorial = false) {
+  return amount(parent, value, Math.min(maximumSize, width / moneyWidth(value, 1)), color, editorial);
+}
+function moneyLeftLabel(value, width, labelSize, amountSize, gap) {
+  return moneyWidth(value, amountSize) + labelSize * 4.8 + gap <= width ? "Money left" : "Left";
+}
+function todayFigure(parent, data, width, scale, editorial, maximumSize) {
+  text(parent, "Available today", 10 * scale, BB.muted);
+  parent.addSpacer(1 * scale);
+  fittedAmount(parent, data.availableToday, width, maximumSize * scale,
+    data.availableToday < 0 ? BB.warning : BB.sage, editorial);
+}
 function stamp(date) {
   const format = new DateFormatter();
   format.locale = "en_US";
@@ -361,32 +379,32 @@ function background(parent, light = false) {
   gradient.endPoint = new Point(1, 1);
   parent.backgroundGradient = gradient;
 }
-function identityHeader(parent, imageValue, name, mode, small, inlineMode = false) {
+function identityHeader(parent, imageValue, name, mode, small, inlineMode = false, scale = 1) {
   const header = parent.addStack();
   header.centerAlignContent();
   const image = header.addImage(imageValue);
-  const size = small ? 24 : 28;
+  const size = (small ? 24 : 28) * scale;
   image.imageSize = new Size(size, size);
   image.cornerRadius = size / 2;
-  header.addSpacer(small ? 6 : 8);
+  header.addSpacer((small ? 6 : 8) * scale);
   const identity = header.addStack();
   identity.layoutVertically();
-  text(identity, name, small ? 11 : 13, BB.text, true);
-  if (!inlineMode) text(identity, mode, small ? 9 : 10, BB.muted);
+  text(identity, name, (small ? 11 : 13) * scale, BB.text, true);
+  if (!inlineMode) text(identity, mode, (small ? 9 : 10) * scale, BB.muted);
   header.addSpacer();
-  if (inlineMode) text(header, mode, 10, BB.muted);
+  if (inlineMode) text(header, mode, 10 * scale, BB.muted);
 }
-function freshness(parent, data, stale, small) {
+function freshness(parent, data, stale, small, scale = 1) {
   // One absolute source timestamp stays truthful even if iOS delays execution.
   // The Stale flag is evaluated at each run; never render a frozen relative age.
   const row = parent.addStack();
   row.centerAlignContent();
   const color = stale ? BB.warning : BB.muted;
   const clock = row.addImage(SFSymbol.named("clock").image);
-  clock.imageSize = new Size(small ? 9 : 11, small ? 9 : 11);
+  clock.imageSize = new Size((small ? 9 : 11) * scale, (small ? 9 : 11) * scale);
   clock.tintColor = color;
-  row.addSpacer(4);
-  text(row, (stale ? "Stale · " : "") + stamp(new Date(data.updatedAt)), small ? 8.5 : 9, color);
+  row.addSpacer(4 * scale);
+  text(row, (stale ? "Stale · " : "") + stamp(new Date(data.updatedAt)), (small ? 8.5 : 9) * scale, color);
   row.addSpacer();
 }
 // WidgetKit owns the actual container. These supported phone bounds keep explicit
@@ -611,7 +629,6 @@ async function render(current, result, theme = "editorial", family = "medium", t
   background(widget);
   const small = family === "small";
   const twoTone = theme === "two-tone";
-  widget.setPadding(twoTone ? 0 : 11, twoTone ? 0 : 12, twoTone ? 0 : 10, twoTone ? 0 : 12);
   const data = result.data;
   // ListWidget.url overrides On Tap; styles and parameters never control authority.
   if (trustedOrigin()) widget.url = data ? BOOKIEBOT_ORIGIN + "/app/expenses" : URLScheme.forRunningScript();
@@ -630,61 +647,53 @@ async function render(current, result, theme = "editorial", family = "medium", t
   const stale = staleResult(result);
   widget.refreshAfterDate = new Date(Date.now() + data.refreshAfterSeconds * 1000);
   const mode = data.mode === "current" ? "Current" : "Projected";
-  const budgetColor = data.budgetRemaining < 0 ? BB.warning : BB.sage;
-  const todayColor = data.availableToday < 0 ? BB.warning : BB.text;
-  if (!twoTone) {
-    identityHeader(widget, picture, data.ownerName, mode, small, !small);
-    widget.addSpacer(small ? 5 : 12);
-    const metrics = widget.addStack();
-    if (small) metrics.layoutVertically();
-    const budget = metrics.addStack(); budget.layoutVertically();
-    text(budget, "Budget remaining", small ? 10 : 11, BB.muted);
-    amount(budget, data.budgetRemaining, small ? 30 : 35, budgetColor, true);
-    metrics.addSpacer(small ? 4 : 16);
-    const today = metrics.addStack();
-    if (small) {
-      today.centerAlignContent();
-      text(today, "Available today", 9, BB.muted);
-      today.addSpacer(4); today.addSpacer();
-    } else {
-      today.layoutVertically();
-      text(today, "Available today", 11, BB.muted);
-      today.addSpacer(3);
-    }
-    amount(today, data.availableToday, small ? 14 : 27, todayColor);
-    widget.addSpacer();
-    freshness(widget, data, stale, small);
-  } else if (small) {
-    const top = widget.addStack(); top.layoutVertically(); top.setPadding(10, 12, 6, 12);
-    identityHeader(top, picture, data.ownerName, mode, true);
-    top.addSpacer(4);
-    text(top, "Budget remaining", 10, BB.muted);
-    amount(top, data.budgetRemaining, 27, budgetColor);
+  const bounds = widgetBounds(family), scale = bounds.scale, padding = 12 * scale;
+  const editorial = !twoTone;
+  widget.setPadding(0, 0, 0, 0);
+  if (small) {
+    const top = widget.addStack(); top.layoutVertically();
+    top.size = new Size(bounds.width, bounds.height - 56 * scale);
+    top.setPadding(10 * scale, padding, 4 * scale, padding);
+    identityHeader(top, picture, data.ownerName, mode, true, false, scale);
+    // Give the label/number equal breathing room above and below, instead of
+    // accumulating unused height between the amount and the secondary strip.
     top.addSpacer();
-    const today = widget.addStack();
-    background(today, true); today.centerAlignContent(); today.setPadding(6, 12, 6, 12);
-    text(today, "Available today", 9, BB.ink);
-    today.addSpacer(4); today.addSpacer();
-    amount(today, data.availableToday, 14, data.availableToday < 0 ? BB.negativeInk : BB.ink);
-    const footer = widget.addStack(); footer.setPadding(6, 12, 8, 12);
-    freshness(footer, data, stale, true);
+    const primary = top.addStack(); primary.layoutVertically();
+    todayFigure(primary, data, bounds.width - padding * 2, scale, editorial, 48);
+    top.addSpacer();
+    const remaining = widget.addStack(); remaining.centerAlignContent();
+    remaining.size = new Size(bounds.width, 31 * scale);
+    remaining.setPadding(6 * scale, padding, 6 * scale, padding);
+    if (twoTone) background(remaining, true);
+    const contentWidth = bounds.width - padding * 2, gap = 6 * scale;
+    const label = moneyLeftLabel(data.budgetRemaining, contentWidth, 9 * scale, 14 * scale, gap);
+    text(remaining, label, 9 * scale, twoTone ? BB.ink : BB.muted);
+    remaining.addSpacer(gap); remaining.addSpacer();
+    const amountWidth = contentWidth - (label === "Left" ? 1.9 : 4.8) * 9 * scale - gap;
+    fittedAmount(remaining, data.budgetRemaining, amountWidth, 14 * scale,
+      data.budgetRemaining < 0 ? twoTone ? BB.negativeInk : BB.warning : twoTone ? BB.ink : BB.text);
+    const footer = widget.addStack(); footer.size = new Size(bounds.width, 25 * scale);
+    footer.setPadding(6 * scale, padding, 8 * scale, padding);
+    freshness(footer, data, stale, true, scale);
   } else {
-    const columns = widget.addStack();
-    const left = columns.addStack(); left.layoutVertically(); left.setPadding(12, 12, 11, 12);
-    identityHeader(left, picture, data.ownerName, mode, false);
+    const columns = widget.addStack(); columns.size = new Size(bounds.width, bounds.height);
+    const leftWidth = bounds.width * 0.56, rightWidth = bounds.width - leftWidth;
+    const left = columns.addStack(); left.layoutVertically(); left.size = new Size(leftWidth, bounds.height);
+    left.setPadding(12 * scale, padding, 11 * scale, padding);
+    identityHeader(left, picture, data.ownerName, mode, false, false, scale);
     left.addSpacer();
-    left.addSpacer(6);
-    text(left, "Budget remaining", 11, BB.muted);
-    amount(left, data.budgetRemaining, 32, budgetColor);
-    left.addSpacer(); left.addSpacer(6);
-    freshness(left, data, stale, false);
-    columns.addSpacer();
-    const right = columns.addStack(); right.layoutVertically(); right.setPadding(12, 12, 12, 12);
-    background(right, true);
+    const primary = left.addStack(); primary.layoutVertically();
+    todayFigure(primary, data, leftWidth - padding * 2, scale, editorial, 52);
+    left.addSpacer();
+    freshness(left, data, stale, false, scale);
+    const right = columns.addStack(); right.layoutVertically(); right.size = new Size(rightWidth, bounds.height);
+    right.setPadding(padding, padding, padding, padding);
+    if (twoTone) background(right, true);
     right.addSpacer();
-    text(right, "Available today", 11, BB.ink);
-    right.addSpacer(4);
-    amount(right, data.availableToday, 28, data.availableToday < 0 ? BB.negativeInk : BB.ink);
+    text(right, "Money left", 11 * scale, twoTone ? BB.ink : BB.muted);
+    right.addSpacer(4 * scale);
+    fittedAmount(right, data.budgetRemaining, rightWidth - padding * 2, 30 * scale,
+      data.budgetRemaining < 0 ? twoTone ? BB.negativeInk : BB.warning : twoTone ? BB.ink : BB.text);
     right.addSpacer();
   }
   return widget;

@@ -6,20 +6,22 @@ Five widget types are available in **Small** and **Medium**, with **Editorial** 
 
 | Widget | Shows |
 | --- | --- |
-| Budget | Budget remaining and available today |
+| Budget | Available today, with monthly Money left below/beside it |
 | Upcoming payments | The next two scheduled payments from today through this month's end |
 | Savings goal | One active goal's recorded balance, target and progress |
 | Category budgets | Needs and Wants remaining, with their monthly budgets |
 | Shared balance | Owed to you and You owe, including older expenses |
 
-## Already connected? Add the new widgets
+## Already connected? Update or add widgets
 
-1. In **BookieBot → Settings → Widgets → Setup & widgets**, tap **Copy script**. Replace the code in your existing Scriptable script **without renaming it**. Its first line should end in **v1.4**. No new pairing is needed.
+1. In **BookieBot → Settings → Widgets → Setup & widgets**, tap **Copy script**. Replace the code in your existing Scriptable script **without renaming it**. Its first line should end in **v1.5**. No new pairing is needed.
 2. Open **Customize** in that same setup guide. Choose the widget type and theme; for Savings, choose a goal. Tap **Copy parameter**.
 3. Add a Small or Medium Scriptable Home Screen widget. In **Edit Widget**, select your existing BookieBot script and paste into **Parameter**. Repeat with different choices for each widget.
 4. To preview before adding, run the script → **Widget & preview** → type, optional goal, theme and size. **Refresh & preview** remembers that preview choice.
 
 Existing blank or theme-only parameters still show **Budget**. Blank uses the saved theme; `editorial` / `two-tone` explicitly choose the Budget theme. Previewing another type never changes those Home Screen widgets. New parameters look like `shared;two-tone` or `categories;editorial`. The guide supplies the stable goal identifier for a selected Savings goal; never put a private setup code in Parameter.
+
+Budget puts **Available today** first in both themes and sizes. Shorter amounts grow larger; longer amounts retain every digit and cent. The secondary **Money left** label shortens to **Left** when its inline row needs space.
 
 Themes change appearance only. Brian and Hannah choose independently. iOS controls when an existing Home Screen widget redraws; a successful preview does not force an immediate Home Screen update.
 
@@ -43,9 +45,9 @@ If the setup link expires or pairing fails, create a new one in BookieBot. Reusi
 
 ## If you see “Pair this phone”
 
-The script is installed, but that copy cannot find a saved pairing. Versions 1.0–1.1 contained a native request-header assignment bug: pairing could succeed, then the first read could lose its authorization and clear the local connection. Install the latest script, **version 1.4**, before pairing again; it retains the authorization fix from version 1.2. A Home Screen preview does not complete setup, and opening the private setup link in a browser only shows instructions.
+The script is installed, but that copy cannot find a saved pairing. Versions 1.0–1.1 contained a native request-header assignment bug: pairing could succeed, then the first read could lose its authorization and clear the local connection. Install the latest script, **version 1.5**, before pairing again; it retains the authorization fix from version 1.2. A Home Screen preview does not complete setup, and opening the private setup link in a browser only shows instructions.
 
-1. In **Settings → Widgets → Setup & widgets**, tap **Copy script**. Replace all the code in your existing Scriptable **BookieBot** script without changing its name. The first line should end in **v1.4**. Website updates do not replace installed scripts.
+1. In **Settings → Widgets → Setup & widgets**, tap **Copy script**. Replace all the code in your existing Scriptable **BookieBot** script without changing its name. The first line should end in **v1.5**. Website updates do not replace installed scripts.
 2. Run that script inside the **Scriptable app itself**. If it asks to pair, create and copy one fresh setup code under **Settings → Widgets → Pair a widget**, then paste it into the script's prompt. Codes already used cannot recover a lost credential. If you have reached five connections, open an unused connection’s **⋯ → Remove** first.
 3. Confirm your name and figures in the preview. Run the same script again: it should offer **Refresh & preview**, not ask to pair. Refresh the Widgets list in BookieBot and confirm **Connected**; its **⋯** options show **Last checked**. If pairing or secure storage reports an error, keep the exact error text; don't repeatedly create new codes.
 4. Hold each Home Screen widget → **Edit Widget** and choose that exact script. Both sizes can share it. Leave Parameter empty for the saved theme (or enter `editorial` / `two-tone`), and keep When Interacting at Open App. If you renamed or imported a duplicate, choose the original paired script or pair the new copy with a fresh code. Remove obsolete connections with **⋯ → Remove** once the working one is identified.
@@ -88,7 +90,7 @@ To remove it fully, use the connection’s **⋯ → Remove** in BookieBot and c
 ## Quick acceptance check
 
 - Compare the two numbers with **Overview → Budget remaining** and **Burn Rate → Available today** for the same person, current month and mode. Check both Current and Projected after changing the widget connection's mode.
-- Preview Small and Medium in both Editorial and Two-tone; confirm the name, avatar, full amounts and source timestamp fit. Set two Home Screen widgets to `editorial` and `two-tone`; both should keep the same pairing and figures. Clear Parameter to return to Budget in the saved theme.
+- Preview Small and Medium in both Editorial and Two-tone; confirm Available today is the large primary amount and Money left is secondary. Check that short amounts grow and remain centered above the Small strip; long/negative amounts retain cents and the inline label shortens to Left as needed. Confirm the name, avatar and source timestamp fit. Set two Home Screen widgets to `editorial` and `two-tone`; both should keep the same pairing and figures. Clear Parameter to return to Budget in the saved theme.
 - In Customize, choose each new type and paste its parameter into a separate widget. Compare Upcoming with this month's Calendar, Category budgets with the same-mode category balances, Savings with the selected goal, and Shared with both direction totals. Verify the Medium Savings ring and Shared columns are centered. Selecting another preview must not change existing blank-Parameter Budget widgets.
 - Tap the Home Screen widget: record whether your default browser opens, which account it shows, and whether it needs its own sign-in. The installed BookieBot icon should continue to work independently.
 - After one successful in-app preview, enable Airplane Mode and run **Refresh & preview**: the saved numbers should be marked **Stale**, with the original timestamp. To check the Home Screen widget's offline behavior, first let that widget itself fetch successfully online; a preview may use a different cache, and iOS may purge either cache. Restore connectivity and repeat.

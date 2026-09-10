@@ -220,7 +220,7 @@ async function typedContracts() {
     const result=await run({parameter}); assert.equal(result.requests.length,0); assert(result.texts.includes('Check widget parameter'));
   }
   for(const parameter of [undefined,'editorial','a','two-tone','c','budget;editorial']) {
-    const result=await run({parameter}); assert(result.texts.includes('Budget remaining')); assert.equal(result.requests[0].url,origin+'/app/widgets/data');
+    const result=await run({parameter}); assert(result.texts.includes('Available today')); assert.equal(result.requests[0].url,origin+'/app/widgets/data');
   }
   const sharedState=storage();
   await run({state:sharedState});
@@ -228,7 +228,7 @@ async function typedContracts() {
   assert.equal([...sharedState.files.keys()].filter(p=>p.endsWith('.json')).length,5,'each type caches separately under the same read-only grant');
   for(const type of parameters) {
     const result=await run({state:sharedState,parameter:type+';two-tone',status:503,reply:typedPayload(type)});
-    assert(result.texts.some(v=>v.startsWith('Stale ·'))); assert(!result.texts.includes('Budget remaining'));
+    assert(result.texts.some(v=>v.startsWith('Stale ·'))); assert(!result.texts.includes('Money left'));
   }
   const selected=storage();
   await run({state:selected,parameter:'savings;editorial;goal='+goalA,reply:typedPayload('savings')});
@@ -275,7 +275,7 @@ async function typedContracts() {
   assert(result.widgets[0].preview==='medium'&&result.texts.includes('Owed to you'));
   assert.equal(JSON.parse(savedPreview.keychain.get(keyFor())).token,readToken);
   result=await run({state:savedPreview,app:true,choices:[0],reply:typedPayload('shared')}); assert.equal(result.requests[0].url,origin+'/app/widgets/data/shared');
-  result=await run({state:savedPreview}); assert(result.texts.includes('Budget remaining'),'saving a preview never replaces blank-parameter Home Screen Budget widgets');
+  result=await run({state:savedPreview}); assert(result.texts.includes('Available today'),'saving a preview never replaces blank-parameter Home Screen Budget widgets');
   const savingsPreview=storage();
   result=await run({state:savingsPreview,app:true,choices:[3,2,0,0,1],replyForRequest:()=>typedPayload('savings')});
   assert(result.requests.some(r=>r.url.endsWith('/data/savings?goalId='+goalA)));
@@ -294,7 +294,7 @@ async function contracts() {
     for (const extra of [{}, {budgetRemaining:-4016.04,availableToday:-139.90}, {budgetRemaining:null,availableToday:null}]) {
       const result = await run({theme,family,reply:payload(extra)});
       const nodes=flatten(result.widgets[0]);
-      assert.equal(result.texts.filter(value=>value==='Budget remaining').length,1);
+      assert.equal(result.texts.filter(value=>value==='Money left' || value==='Left').length,1);
       assert.equal(result.texts.filter(value=>value==='Available today').length,1);
       assert.equal(result.texts.filter(value=>value==='Brian').length,1);
       assert.equal(result.texts.filter(value=>value==='Projected').length,1);
@@ -302,11 +302,11 @@ async function contracts() {
       assert(!result.texts.includes('Age'));
       assert.equal(result.widgets[0].url,origin+'/app/expenses');
       assert.equal(JSON.parse(result.state.keychain.get(keyFor())).token,readToken);
-      assert.equal(nodes.filter(node=>node.backgroundGradient?.colors?.[1]?.value==='AECABA').length,theme==='two-tone'?1:0,'only Two-tone paints the daily allowance panel');
-      const budget=result.textItems.find(item=>item.font.name==='Georgia');
-      assert.equal(Boolean(budget),theme==='editorial','Editorial uses the approved serif budget typography');
+      assert.equal(nodes.filter(node=>node.backgroundGradient?.colors?.[1]?.value==='AECABA').length,theme==='two-tone'?1:0,'only Two-tone paints the money-left panel');
+      const primary=result.textItems.find(item=>item.font.name==='Georgia');
+      assert.equal(Boolean(primary),theme==='editorial','Editorial uses serif typography for the primary daily amount');
       if(extra.availableToday===-139.90) {
-        assert.equal(result.textItems.find(item=>item.value==='−$139.90').textColor.value,theme==='two-tone'?'78351F':'DAA383','negative daily values remain readable on their surface');
+        assert.equal(result.textItems.find(item=>item.value==='−$139.90').textColor.value,'DAA383','negative daily values remain readable on the dark primary surface');
       }
     }
     const stale=await run({theme,family,reply:payload({updatedAt:'2026-09-09T16:00:00Z'})});
@@ -315,6 +315,35 @@ async function contracts() {
     assert(recovery.texts.includes('Pair this phone'));
     assert.equal(recovery.widgets[0].url,runUrl());
     assert.equal(recovery.requests.length,0,'theme selection cannot bypass missing credentials');
+  }
+  // The actual distributed renderer must keep labels attached to the correct
+  // metric, preserve cents, and size the hero to its formatted value.
+  for (const theme of ['editorial','two-tone']) for (const family of ['small','medium']) for (const deviceWidth of [320,375,390,430]) {
+    let previousSize = Infinity;
+    for (const availableToday of [9.99,139.90,9999.99,999999999999.99]) {
+      const result=await run({theme,family,deviceWidth,reply:payload({budgetRemaining:3896.12,availableToday})});
+      const primaryLabel=result.textItems.findIndex(item=>item.value==='Available today');
+      const primary=result.textItems[primaryLabel+1];
+      const expected='$'+availableToday.toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2});
+      assert.equal(primary.value,expected,'Available today remains paired with the daily amount');
+      assert(primary.font.size<=previousSize,'longer amounts shrink rather than truncate');
+      if(availableToday===139.90) assert(primary.font.size>29,'normal daily values grow beyond the old 27pt primary size even on the smallest phone');
+      assert.equal(primary.lineLimit,1); assert(primary.minimumScaleFactor<1);
+      previousSize=primary.font.size;
+      const secondary=result.textItems.findIndex(item=>item.value==='Money left' || item.value==='Left');
+      assert.equal(result.textItems[secondary+1].value,'$3,896.12','the secondary label remains paired with full monthly money left');
+      if(theme==='two-tone') {
+        const band=flatten(result.widgets[0]).find(node=>node.backgroundGradient?.colors?.[1]?.value==='AECABA');
+        const bandText=flatten(band).filter(node=>typeof node.value==='string').map(node=>node.value);
+        assert(bandText.includes('$3,896.12')); assert(!bandText.includes('Available today'));
+      }
+    }
+    const long=await run({theme,family,deviceWidth,reply:payload({budgetRemaining:-999999999999.99,availableToday:0})});
+    assert(long.texts.includes(family==='small'?'Left':'Money left'),'shorten the inline label before squeezing large money-left values');
+    const secondary=long.textItems.find(item=>item.value==='−$999,999,999,999.99');
+    assert(secondary && secondary.font.size>0);
+    assert.equal(secondary.textColor.value,theme==='two-tone'?'78351F':'DAA383');
+    assert(long.texts.includes('$0.00'),'zero daily availability is not missing');
   }
   let check = await run({ state: storage(null) });
   assert.equal(check.requests.length, 0);

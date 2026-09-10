@@ -1,5 +1,9 @@
 # Agent Decisions
 
+## 2026-09-09 - Budget Widgets Lead With Available Today
+
+Scriptable v1.5 swaps only the Budget presentation: canonical Available today is primary; canonical budgetRemaining is labeled Money left, shortened to Left when the Small inline strip needs room. Both sizes/themes use conservative phone bounds, fitted full currency strings and balanced primary spacing. Other widget types, account scope, caches, source timestamps and financial calculations retain their existing behavior. Upgrade the existing script contents without renaming or re-pairing; website deployment cannot replace installed Scriptable source.
+
 ## 2026-09-09 - Fixed Needs Bills Share Static-Cost Presentation
 
 The user confirmed Brian’s Student Loan at **$59.96 monthly on the 12th** and approved schedule activation. Chrome added J `expected_amount` and set J3=59.96 on the existing bill schedule; saved readback also verified September’s $119.92 and Template’s zero actual. This resolves the earlier structural-change approval block.

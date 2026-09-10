@@ -411,7 +411,7 @@ async def test_widget_setup_pages_return_to_settings_without_pairing_or_exposing
     assert 'href="https://apps.apple.com/app/scriptable/id1405459188" target="_blank" rel="noreferrer"' in page
     assert "Copy script" in page
     assert "Widget &amp; preview" in page
-    assert "Customize" in page and "Current version: 1.4" in page
+    assert "Customize" in page and "Current version: 1.5" in page
     assert "No new pairing is needed" in page
     assert "Setup &amp; widgets" in page
     assert page.count("<li>") == 3

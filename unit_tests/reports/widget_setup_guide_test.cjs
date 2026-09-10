@@ -26,7 +26,7 @@ const click=async label=>act(async()=>{const node=button(label);assert.ok(node,l
 const change=async(label,value)=>act(async()=>tree.root.findByProps({'aria-label':label}).props.onChange({target:{value}}))
 const parameter=()=>tree.root.findByProps({'aria-label':'Widget parameter'}).props.value
 const createGuide=()=>act(async()=>{tree=create(React.createElement(runtime.exports.WidgetSetupGuide,{onBack:()=>back++,onPair:()=>pair++}))})
-const code='// BookieBot Home Screen widget · v1.4\nconst BOOKIEBOT_ORIGIN = "https://bookiebot.example";'
+const code='// BookieBot Home Screen widget · v1.5\nconst BOOKIEBOT_ORIGIN = "https://bookiebot.example";'
 const respond=(request,value=code,status=200)=>act(async()=>request.resolve({ok:status===200,text:async()=>value}))
 const goalId=number=>number.toString(16).padStart(32,'0')
 const goal=(id,name,archived=false)=>({id,name,archived,targetCents:600000,balanceCents:360000})
