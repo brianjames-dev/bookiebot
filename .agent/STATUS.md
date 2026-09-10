@@ -4,6 +4,8 @@ Last updated: 2026-09-09
 
 ## Active Focus
 
+Compact navigation refinement completed (2026-09-09): the scroll-down glass bar contracts horizontally to 220px and vertically to 44px, with 21px icons and four 55×44px targets. Width/height/padding/labels use the shared motion timing; reduced motion includes the outer width transition. Nine navigation/shell/motion tests and frontend typecheck/build pass. Production WebKit passed 12 width/theme/motion cases and 45 pointer/Enter/Space activations, including highlight alignment and real scroll reversal. Manual acceptance is checklist 122; frontend fingerprint a862db5c40b45638b8fa2e5d.
+
 Budget widget hierarchy completed (2026-09-09): Scriptable v1.5 leads with Available today and shows Money left second (Left when the Small inline strip needs room). Short values grow and the primary block is centered; exact cents/signs remain visible for long values. Both sizes/themes use conservative phone bounds. Full local 1,718 passed / 213 optional PostgreSQL skipped, focused widget integration 56 passed, Pyright clean. Executed-renderer WebKit approximation passed 144 layouts; 64 other-widget trees are unchanged. Install by replacing the existing script contents without renaming; checklist 121 covers native phone acceptance.
 
 Fixed recurring student loan (2026-09-09): user approved **$59.96 monthly on the 12th**. Activated Brian’s existing schedule in Chrome with J1 `expected_amount` / J3 `59.96`, verified saved values, and preserved September C14=$119.92 / Template C14=0. The Needs loan now joins Static Bills & Subscriptions while remaining a bill with explicit actual logging; it is excluded from variable utility history. Current/Projected totals, fixed-bill Calendar details and drilldowns preserve exact amounts/provenance. Burn Rate still measures Wants; only existing category coverage changes its allowance. Final local verification: **1,718 passed / 213 optional PostgreSQL skipped**, clean Pyright/typecheck/build and Apps Script checks. Production WebKit passed 14 layout/source cases in both modes, plus six final chart-focus/navigation cases. Checklist 120 and `docs/STUDENT_LOAN_INTEGRATION.md` record acceptance; frontend fingerprint **8a8ecfb5623ef3a648fb5e07**.
@@ -75,6 +77,8 @@ All eight September 6 audit batches are implemented and verified locally. Each b
 
 ## On Deck
 
+Compact tab-bar implementation and browser verification are complete; phone acceptance is checklist 122.
+
 Budget widget v1.5 is ready for phone acceptance (checklist 121). The source/guide upgrade preserves existing pairing; native iPhone rendering and Home Screen redraw timing remain device checks.
 
 Student-loan activation is complete. Verify the deployed fixed-bill display and amounts with checklist 120. Separate audit follow-ups remain: shared grand totals omit Needs; internal Template imports and the annual master templates need the documented review before 2027. No unrelated workbook repair was made during this activation.
@@ -109,6 +113,8 @@ Student-loan activation is complete. Verify the deployed fixed-bill display and 
 27. Explore clarifying questions before logging when BookieBot is uncertain instead of guessing or silently failing.
 
 ## Completed 2026-09-09
+
+- 2026-09-09 — Reduced the collapsed Konsta navigation glass to 220×44px, keeping four 55×44px targets and shrinking icons to 21px. Synchronized horizontal/vertical/label spacing transitions; reduced motion disables the outer transition too. Existing navigation/lifecycle/motion regressions: 9 passed; frontend typecheck/build clean. Production WebKit passed 12 size/theme/motion cases, 45 pointer/Enter/Space activations, selected-slot tracking and real scroll reversal without page errors or overflow. README and checklist 122 document behavior. No financial, persistence or Finance Ops changes.
 
 - 2026-09-09 — Published Budget widget v1.5 hierarchy: Available today primary, Money left secondary, dynamic Left inline label, fitted signed/full-cent amounts, and balanced primary spacing in Small/Medium Editorial/Two-tone. Added executed regressions for metric placement, font sizing, long/negative/null values, stale data and unchanged pairing; 144 WebKit approximation layouts fit and 64 other-widget trees match. Full local 1,718 passed / 213 optional PostgreSQL skipped; focused integration 56 passed and Pyright clean. Updated script/help version, README, widget guide, decisions and checklist 121. No financial/storage/Finance Ops changes.
 
@@ -1495,3 +1501,5 @@ python -m pyright
 120. Fixed recurring loan: refresh Brian’s September report. Student Loan $119.92 belongs under Static Bills & Subscriptions, appears as a recorded Bill in Calendar’s Fixed bills details, and is absent from Bills & Utilities. In a disposable month with zero actual, Current has no loan payment and Projected includes $59.96 due12 with Scheduled amount provenance. Confirm Xfinity/subscriptions are still included once, static category drilldowns show both kinds, and Budget/Category/Upcoming widgets agree. Needs within budget must not change Wants spending/allowance; Needs overflow may reduce the allowance through existing coverage. Explicitly log a test payment only in a disposable workbook and verify cents/status/undo. Actual phone acceptance should cover 320/390px dark/light details without clipping. Annual masters still require the row/schedule before January.
 
 121. Budget widget v1.5: Settings → Widgets → Setup & widgets → Copy script; replace the existing Scriptable source without changing its name and confirm v1.5 on line 1. Run Widget & preview → Budget → theme/size. Available today must be the large value and Money left the secondary one; compare both against the same owner/mode report. Confirm short values grow, long/negative values keep cents, the Small strip switches to Left when needed, and stale timestamp/name remain readable in Small/Medium both themes. Existing Home Screen parameters and pairing must keep working. iOS controls when Home Screen widgets redraw.
+
+122. Compact tab bar: on Overview or Spending, scroll down far enough to hide labels. Confirm the centered glass bar narrows to 220px and becomes 44px tall, with four 55×44px tap targets and 21px icons. Scroll up to restore the full width, 66px height and labels. Try each tab with tap/Enter/Space, reverse scroll during the animation, check the selected highlight follows its icon, and repeat at 320/390/1280px in dark/light and reduced motion. Keep the bottom safe-area gap and existing screen scroll/draft restoration.
