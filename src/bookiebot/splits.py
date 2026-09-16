@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import re
+from collections.abc import Awaitable, Callable
 from typing import Any, Literal
 
 from bookiebot.sheets.collaboration import normalize_split_method
@@ -87,7 +88,12 @@ def split_method_view(actor_key: str | None, action_id: str) -> SplitMethodView:
     return SplitMethodView(handle_split)
 
 
-def change_split_method_view(actor_key: str | None, action_id: str) -> ChangeSplitMethodView:
+def change_split_method_view(
+    actor_key: str | None,
+    action_id: str,
+    *,
+    on_cancel_split: Callable[[Any], Awaitable[None]] | None = None,
+) -> ChangeSplitMethodView:
     async def handle_change(interaction: Any, method: str) -> None:
         interaction_user = getattr(interaction, "user", None)
         interaction_actor = resolve_actor_key(
@@ -96,6 +102,9 @@ def change_split_method_view(actor_key: str | None, action_id: str) -> ChangeSpl
         )
         if actor_key and interaction_actor and interaction_actor not in actor_key_aliases(str(actor_key)):
             await interaction.response.send_message("This split workflow belongs to another user.", ephemeral=True)
+            return
+        if method == "cancel_split" and on_cancel_split is not None:
+            await on_cancel_split(interaction)
             return
         if method == "cancel":
             await interaction.response.send_message(
@@ -116,7 +125,7 @@ def change_split_method_view(actor_key: str | None, action_id: str) -> ChangeSpl
         prefix = "✅" if success else "❌"
         await interaction.followup.send(f"{prefix} {detail}", ephemeral=True)
 
-    return ChangeSplitMethodView(handle_change)
+    return ChangeSplitMethodView(handle_change, can_cancel_split=on_cancel_split is not None)
 
 
 async def continue_split_after_log(

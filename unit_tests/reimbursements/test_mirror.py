@@ -239,9 +239,10 @@ def test_sync_pending_waits_for_mirror_then_retries_without_duplicate_expenses(s
     pending = [value(settledCents=5000, events=[event()])]
     marked = []
 
-    def mark(identity, version):
+    def mark(identity, version, *, source_row):
         # Completion must follow both financial projection and generated view.
         assert source.read(2, 31, 32) == [414.72]
+        assert source_row == 3
         assert mirrored(ledger)[20] == "50.00"
         assert shared.values_get(_name("receipt", "receipt-1"))["values"][0][2] == 50
         marked.append((identity, version))
@@ -269,7 +270,7 @@ def test_sync_pending_mirrors_legacy_without_rewriting_historical_expenses(setup
     record = value(accounting="legacy_net", settledCents=16391, legacyReceivedAt="2026-09-08")
     marked = []
     store = SimpleNamespace(access=object(), pending_projections=lambda: [record],
-                            mark_projected=lambda identity, version: marked.append((identity, version)) or True)
+                            mark_projected=lambda identity, version, **kwargs: marked.append((identity, version)) or True)
     assert sync_pending(store, SheetsProjection(client)) is True
     assert source.rows == before and not shared.batch_calls and not shared.value_calls
     assert mirrored(books["brian-2026"])[19:22] == ["reimbursed", "163.91", "2026-09-08"]

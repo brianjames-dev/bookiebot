@@ -232,15 +232,19 @@ Status: Complete in code and automated/browser verification as of 2026-08-03; pr
 
 ### Slice H - Split Lifecycle Completion
 
-Status: Partial as of 2026-09-08. Legacy method changes/cancellation remain available only for unmigrated records. Canonical partial receipts, sender confirmation, offsets and payment reversals are implemented; gross/method/cancel and direct source correction workflows remain deferred behind mutation guards.
+Status: Canonical recent-action corrections completed 2026-09-16: gross/details, method, category move, cancellation/re-split and deletion use durable revisions and verified source projections. Pending/confirmed repayments require resolution/reversal first. Historical net-accounting corrections and direct canonical Undo remain deferred.
 
 1. Complete 2026-08-03: change the split method and recalculate both shares without losing the original gross or settlement history.
 2. Complete 2026-08-03: remove an outstanding split by restoring the gross visible expense and voiding the receivable.
-3. Correct the actual gross amount after splitting and recalculate the active responsibility and reimbursement amounts.
+3. Complete 2026-09-16: correct gross and transaction details while retaining the method and recalculating both shares.
 4. Complete 2026-09-08: partial/full confirmed receipts, pending sender reports and equal reviewed offsets maintain both owners' balances with durable replay and expense projections.
 5. Partial 2026-09-08: reviewed payment reversals (whole-group for offsets) restore both expense projections. Removing a paid split or recording an actual refund remains a separate linked correction workflow.
-6. Make update, move, delete, and undo fully split-aware, including ledger row references and reconciliation lineage synchronization.
+6. Partial 2026-09-16: canonical update/move/delete, method/cancel and re-split are ledger-aware with source anchors and reconciliation lineage synchronization. Direct canonical Undo remains blocked; explicit correction actions and payment reversals preserve audit history.
 7. Partial 2026-09-08: allocation/payment events and request recovery are durable across deploys. Pre-registration Discord split selections still use the existing short-lived interaction lifecycle.
+
+### 2026-09-16 Work Log - Restore Split Expense Actions
+
+Fixed the Cancel-only recent menu for canonical split expenses. Split now opens allocation edits/cancellation; Update keeps amount/location/item/account fields. Added versioned database correction audit, payment/version/ownership guards, retryable named-range source changes, atomic category relocation and void/deleted lifecycle handling. Recent and bank reads overlay current details without rewriting original logs; ancestor matches reopen and deleted purchases stop matching. Fully reversed receipts retain old category/labels. Fixed bill labels remain exact. Focused UI, ledger, source-fault and lineage regressions cover these paths; final counts are in STATUS. Manual checklist 124 and `docs/REIMBURSEMENTS.md` cover isolated acceptance. Remaining scope: direct canonical correction Undo, historical net-accounting edits and actual refund workflows.
 
 ### Slice I - Fronted Shared Expenses
 

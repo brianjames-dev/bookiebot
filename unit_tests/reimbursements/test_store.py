@@ -1,6 +1,7 @@
 from concurrent.futures import ThreadPoolExecutor
 from datetime import timedelta
 import os
+import json
 from threading import Barrier
 from uuid import uuid4
 
@@ -492,3 +493,115 @@ def test_settlement_date_cannot_precede_any_selected_expense(store, operation):
     with pytest.raises(ReimbursementValidationError, match="before the expense"):
         store.command("hannah" if operation == "report_payment" else "brian", body)
     assert store.snapshot("brian")["events"] == []
+
+
+def ready_allocation(store, **changes):
+    allocation = store.register_allocation(payload(**changes))
+    assert store.mark_projected(allocation["id"], allocation["version"])
+    return store.get_allocation(allocation["id"])
+
+
+def test_correction_persists_before_after_audit_and_requires_projection_before_payment(store):
+    original = ready_allocation(store)
+    changes = {"method": "equal", "payerShareCents": 5000, "partnerShareCents": 5000, "lifecycle": "active"}
+    revised = store.revise_allocation("brian", original["id"], original["version"], changes, operation="split")
+    assert revised["grossCents"] == original["grossCents"]
+    assert revised["partnerShareCents"] == revised["outstandingCents"] == 5000
+    assert revised["version"] == 2 and revised["projectedVersion"] == 1
+    assert revised["sourceRevision"]["before"]["method"] == "income"
+    assert revised["sourceRevision"]["version"] == revised["version"]
+    with store.access.connect() as db:
+        audit = db.execute("SELECT * FROM app_reimbursement_revisions WHERE allocation_id = ?", (original["id"],)).fetchone()
+    assert audit["operation"] == "split" and audit["actor_owner"] == "brian"
+    assert json.loads(audit["before_json"])["partnerShareCents"] == 4000
+    assert json.loads(audit["after_json"])["partnerShareCents"] == 5000
+    with pytest.raises(ReimbursementConflictError, match="still syncing"):
+        store.command("brian", payment(revised))
+    with pytest.raises(ReimbursementConflictError, match="still syncing"):
+        store.revise_allocation("brian", revised["id"], revised["version"], {"location": "Elsewhere"}, operation="update")
+    assert store.mark_projected(revised["id"], revised["version"], source_row=22)
+    current = store.get_allocation(revised["id"])
+    assert current["sourceRow"] == 22 and current["version"] == 2
+    assert store.command("brian", payment(current))["allocations"][0]["settledCents"] == 1000
+
+
+@pytest.mark.parametrize("invalid,owner,version,error", [
+    ({"location": "Different"}, "hannah", 1, "original payer"),
+    ({"location": "Different"}, "brian", 0, "Refresh"),
+    ({"payerPerson": "Hannah"}, "brian", 1, "mapped account"),
+    ({"sourceActionId": "new-source"}, "brian", 1, "Unexpected"),
+    ({"grossCents": 10001}, "brian", 1, "equal the gross"),
+    ({"category": "food"}, "brian", 1, "Only Move"),
+    ({"lifecycle": "void"}, "brian", 1, "lifecycle transition"),
+])
+def test_correction_rejects_stale_unauthorized_and_incoherent_changes(store, invalid, owner, version, error):
+    original = ready_allocation(store)
+    with pytest.raises((ReimbursementConflictError, ReimbursementValidationError), match=error):
+        store.revise_allocation(owner, original["id"], version, invalid, operation="update")
+    assert store.get_allocation(original["id"]) == original
+
+
+@pytest.mark.parametrize("operation", ["receive", "report_payment"])
+def test_corrections_require_receipts_reversed_and_projection_caught_up(store, operation):
+    original = ready_allocation(store)
+    actor = "hannah" if operation == "report_payment" else "brian"
+    result = store.command(actor, payment(original, operation=operation))
+    current = store.get_allocation(original["id"])
+    store.mark_projected(current["id"], current["version"])
+    with pytest.raises(ReimbursementConflictError, match="pending|confirmed repayments"):
+        store.revise_allocation("brian", current["id"], current["version"], {"location": "New"}, operation="update")
+    store.command("brian", command("reverse", eventId=result["events"][0]["id"]))
+    current = store.get_allocation(original["id"])
+    store.mark_projected(current["id"], current["version"])
+    assert store.revise_allocation("brian", current["id"], current["version"], {"location": "New"}, operation="update")["location"] == "New"
+
+
+@pytest.mark.parametrize("operation,lifecycle", [("cancel", "void"), ("delete", "deleted")])
+def test_cancel_delete_remove_debt_preserve_audit_and_refuse_payments(store, operation, lifecycle):
+    original = ready_allocation(store)
+    revised = store.revise_allocation("brian", original["id"], original["version"], {"lifecycle": lifecycle}, operation=operation)
+    assert revised["outstandingCents"] == 0 and revised["status"] == lifecycle
+    assert store.snapshot("brian")["allocations"] == store.snapshot("hannah")["allocations"] == []
+    assert len(store.pending_projections()) == 1
+    assert revised["grossCents"] == 10000 and revised["partnerShareCents"] == 4000
+    store.mark_projected(revised["id"], revised["version"])
+    with pytest.raises(ReimbursementConflictError, match="no longer"):
+        store.command("brian", payment(revised))
+    if operation == "cancel":
+        active = store.revise_allocation("brian", revised["id"], revised["version"], {"lifecycle": "active"}, operation="split")
+        assert active["outstandingCents"] == 4000 and len(store.snapshot("hannah")["allocations"]) == 1
+    else:
+        with pytest.raises(ReimbursementConflictError, match="deleted"):
+            store.revise_allocation("brian", revised["id"], revised["version"], {"location": "New"}, operation="update")
+
+
+def test_correction_rejects_legacy_received_history(store):
+    original = ready_allocation(store, accounting="legacy_net", settledCents=4000)
+    with pytest.raises(ReimbursementConflictError, match="read-only"):
+        store.revise_allocation("brian", original["id"], original["version"], {"location": "New"}, operation="update")
+
+
+def test_receipt_and_source_correction_cannot_both_commit_from_the_same_version(store):
+    original = ready_allocation(store)
+    barrier = Barrier(2)
+
+    def change(kind):
+        barrier.wait(timeout=10)
+        try:
+            if kind == "receipt":
+                store.command("brian", payment(original))
+            else:
+                store.revise_allocation("brian", original["id"], original["version"], {"location": "New"}, operation="update")
+            return kind
+        except ReimbursementConflictError:
+            return None
+
+    with ThreadPoolExecutor(max_workers=2) as executor:
+        results = list(executor.map(change, ["receipt", "correction"]))
+    assert sum(result is not None for result in results) == 1
+    current = store.get_allocation(original["id"])
+    assert current["version"] == 2
+    if "receipt" in results:
+        assert current["settledCents"] == 1000 and current["location"] == original["location"]
+    else:
+        assert current["settledCents"] == 0 and current["location"] == "New"

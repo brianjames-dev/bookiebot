@@ -122,12 +122,15 @@ def read_active_logged_actions(actor_key: str) -> list[LoggedAction]:
                 if not row or not row[0] or len(row) < 3 or row[2] not in aliases:
                     continue
                 logged = _logged_action_from_row(row)
-                if logged.status != "active" or logged.action.metadata.get("type") == "system_state":
+                if logged.action.metadata.get("type") == "system_state":
                     continue
                 if logged.id in actions and actions[logged.id] != logged:
                     raise ValueError("Action history has conflicting identifiers.")
                 actions[logged.id] = logged
-    return list(actions.values())
+    from bookiebot.sheets.undo import canonical_logged_actions
+    history = list(actions.values())
+    return canonical_logged_actions([logged for logged in history if logged.status == "active"],
+                                    for_reconciliation=True, history=history)
 
 
 def _existing_schedule_rows(title: str) -> list[list[str]]:

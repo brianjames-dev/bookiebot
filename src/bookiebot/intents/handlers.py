@@ -55,6 +55,7 @@ from bookiebot.sheets.reimbursement_history import ReimbursementHistoryUnavailab
 from bookiebot.splits import change_split_method_view, continue_split_after_log, split_method_view
 from bookiebot.sheets.undo import (
     cancel_split_recent_action,
+    change_split_recent_action,
     clear_pending_action_selection,
     delete_recent_action,
     editable_fields_for_action,
@@ -376,17 +377,29 @@ async def split_recent_action_handler(entities: IntentEntities, message: Any) ->
         await query_recent_actions_handler({"n": 5}, message)
         return
     capabilities = action_capabilities(logged.action)
-    if not capabilities.can_split:
+    if not capabilities.can_split and not capabilities.can_change_split:
         await _send_action_result(message, False, capabilities.split_reason)
         return
     if method is None:
+        changing_split = capabilities.can_change_split
         await _send_recent_private_message(
             message,
-            _with_component_spacer("How do you want to split this expense?", True),
-            view=split_method_view(actor_key, logged.id),
+            _with_component_spacer(
+                "How do you want to update this split?" if changing_split else "How do you want to split this expense?",
+                True,
+            ),
+            view=(
+                change_split_method_view(
+                    actor_key,
+                    logged.id,
+                    on_cancel_split=lambda interaction: _prompt_cancel_recent_split(interaction, actor_key, logged.id),
+                )
+                if changing_split else split_method_view(actor_key, logged.id)
+            ),
         )
         return
-    success, detail = split_recent_action(
+    split_operation = change_split_recent_action if capabilities.can_change_split else split_recent_action
+    success, detail = split_operation(
         actor_key,
         split_method=method,
         action_id=logged.id,
@@ -776,6 +789,47 @@ async def _reject_unowned_recent_interaction(interaction: Any, actor_key: str | 
     return True
 
 
+async def _prompt_cancel_recent_split(interaction: Any, actor_key: str | None, action_id: str) -> None:
+    if await _reject_unowned_recent_interaction(interaction, actor_key):
+        return
+    selected = select_recent_action(actor_key, action_id=action_id)
+    if selected is None:
+        await interaction.response.send_message("That transaction is no longer available. Please select it again.", ephemeral=True)
+        return
+    capabilities = action_capabilities(selected.action)
+    if not capabilities.can_cancel_split:
+        await interaction.response.send_message(capabilities.cancel_split_reason, ephemeral=True)
+        return
+
+    async def handle_cancel_split(confirm_interaction: Any, confirmation: str) -> None:
+        if await _reject_unowned_recent_interaction(confirm_interaction, actor_key):
+            return
+        if confirmation == "keep_split":
+            await confirm_interaction.response.send_message(
+                "Canceled. The existing split remains unchanged.",
+                ephemeral=True,
+            )
+            return
+        if confirmation != "confirm_cancel_split":
+            return
+        try:
+            await confirm_interaction.response.defer(ephemeral=True)
+        except Exception:
+            pass
+        with sheet_user_context(actor_key):
+            success, detail = cancel_split_recent_action(actor_key, action_id=action_id)
+        await _send_interaction_action_result(confirm_interaction, success, detail)
+
+    await interaction.response.send_message(
+        _with_component_spacer(
+            "Cancel this split? The original gross amount will be restored and the reimbursement will be voided.",
+            True,
+        ),
+        view=CancelSplitConfirmView(handle_cancel_split),
+        ephemeral=True,
+    )
+
+
 def _recent_action_select_view(actor_key: str | None, actions: list[Any], *, destination_category: str | None = None, updates: dict[str, Any] | None = None):
     async def handle_select(interaction: Any, action_id: str) -> None:
         if await _reject_unowned_recent_interaction(interaction, actor_key):
@@ -838,6 +892,20 @@ def _recent_action_select_view(actor_key: str | None, actions: list[Any], *, des
                     ephemeral=True,
                 )
                 return
+            if decision == "change_split" or (decision == "split" and capabilities and capabilities.can_change_split):
+                if capabilities and not capabilities.can_change_split:
+                    await decision_interaction.response.send_message(capabilities.change_split_reason, ephemeral=True)
+                    return
+                await decision_interaction.response.send_message(
+                    _with_component_spacer("How do you want to update this split?", True),
+                    view=change_split_method_view(
+                        actor_key,
+                        action_id,
+                        on_cancel_split=lambda split_interaction: _prompt_cancel_recent_split(split_interaction, actor_key, action_id),
+                    ),
+                    ephemeral=True,
+                )
+                return
             if decision == "split":
                 if capabilities and not capabilities.can_split:
                     await decision_interaction.response.send_message(capabilities.split_reason, ephemeral=True)
@@ -848,46 +916,8 @@ def _recent_action_select_view(actor_key: str | None, actions: list[Any], *, des
                     ephemeral=True,
                 )
                 return
-            if decision == "change_split":
-                if capabilities and not capabilities.can_change_split:
-                    await decision_interaction.response.send_message(capabilities.change_split_reason, ephemeral=True)
-                    return
-                await decision_interaction.response.send_message(
-                    _with_component_spacer("How do you want to update this split?", True),
-                    view=change_split_method_view(actor_key, action_id),
-                    ephemeral=True,
-                )
-                return
             if decision == "cancel_split":
-                if capabilities and not capabilities.can_cancel_split:
-                    await decision_interaction.response.send_message(capabilities.cancel_split_reason, ephemeral=True)
-                    return
-
-                async def handle_cancel_split(confirm_interaction: Any, confirmation: str) -> None:
-                    if await _reject_unowned_recent_interaction(confirm_interaction, actor_key):
-                        return
-                    if confirmation == "keep_split":
-                        await confirm_interaction.response.send_message(
-                            "Canceled. The existing split remains unchanged.",
-                            ephemeral=True,
-                        )
-                        return
-                    try:
-                        await confirm_interaction.response.defer(ephemeral=True)
-                    except Exception:
-                        pass
-                    with sheet_user_context(actor_key):
-                        success, detail = cancel_split_recent_action(actor_key, action_id=action_id)
-                    await _send_interaction_action_result(confirm_interaction, success, detail)
-
-                await decision_interaction.response.send_message(
-                    _with_component_spacer(
-                        "Cancel this split? The original gross amount will be restored and the reimbursement will be voided.",
-                        True,
-                    ),
-                    view=CancelSplitConfirmView(handle_cancel_split),
-                    ephemeral=True,
-                )
+                await _prompt_cancel_recent_split(decision_interaction, actor_key, action_id)
                 return
             clear_pending_action_selection(actor_key)
             await decision_interaction.response.send_message("Canceled.", ephemeral=True)

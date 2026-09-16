@@ -1,8 +1,10 @@
 # Agent Status
 
-Last updated: 2026-09-10
+Last updated: 2026-09-16
 
 ## Active Focus
+
+Split expense actions restored (2026-09-16): canonical split groceries now expose Update/Move/Split/Delete/Cancel. Split edits the allocation and contains confirmed Cancel split; Update retains transaction fields and recalculates shares for gross corrections. Durable revisions, verified source anchors, same-owner account validation and repayment guards preserve ledger/sheet/reconciliation consistency. Fully reversed receipts permit later corrections. Full local suite **1,890 passed / 299 skipped (optional PostgreSQL and unavailable frontend test dependencies)**; Pyright clean. Acceptance is checklist 124 and `docs/REIMBURSEMENTS.md`. No live financial test writes or deployment performed.
 
 Reconciliation reliability and web review implemented (2026-09-10): owner-scoped Reconcile tab for watched connected accounts; compact Needs review/Pending/Checked lists, lazy suggestions, exact Confirm match and metadata-only Ignore/reopen. Bill aliases, exact/unique evidence, occurrence/month reservations, shared action/schedule identity and fresh source checks protect matches. Batched read-only action history crosses month/year boundaries without provisioning sheets; unavailable sources cannot erase prior matching. Pending/posting deduplication, terminal/import lineage and atomic review versions preserve manual logging. Full local suite **1,828 passed / 249 optional PostgreSQL skipped**, clean Pyright/typecheck/build; production-build WebKit passed **12** width/theme/motion cases with full review/retry flows. Frontend fingerprint **6426f2fdb7733dd1d9407bb1**. Release verification is recorded in the completion response; checklist 123 covers phone acceptance.
 
@@ -79,6 +81,8 @@ All eight September 6 audit batches are implemented and verified locally. Each b
 
 ## On Deck
 
+Verify split expense corrections in Discord using checklist 124. Implementation and automated verification are complete; use isolated workbook/database fixtures for mutation acceptance.
+
 Reconciliation implementation and local verification are complete; phone acceptance is checklist 123 and docs/RECONCILIATION.md. No live financial test writes are authorized or needed.
 
 Compact tab-bar implementation and browser verification are complete; phone acceptance is checklist 122.
@@ -100,7 +104,7 @@ Student-loan activation is complete. Verify the deployed fixed-bill display and 
 10. Deploy and manually verify quarterly utility history in checklist item 77.
 11. Deploy and manually verify parser and bill-payment reliability in checklist item 76.
 12. Deploy and manually verify split creation/settlement in checklist item 74 and recent split changes/cancellation in checklist item 75.
-13. Continue the deferred canonical split correction lifecycle: gross/method changes, cancellation and linked update/move/delete. Partial repayments, receipt reversals and offsets are implemented; legacy direct-row mutations remain blocked for canonical allocations.
+13. Canonical gross/details/method changes, cancellation/re-split and linked update/move/delete are implemented (2026-09-16); verify checklist 124. Remaining separate work: direct canonical correction Undo, historical net-accounting corrections and actual refunds. Pending/confirmed repayments must be resolved/reversed before correcting a purchase.
 14. Deploy and manually verify prior-month paycheck carry-forward in Projected mode in checklist item 73.
 15. Deploy and manually verify Wants subscriptions in Burn Rate in checklist item 72.
 16. Deploy and manually verify selected-month subscription scoping in checklist item 71.
@@ -115,6 +119,10 @@ Student-loan activation is complete. Verify the deployed fixed-bill display and 
 25. Harden recent-action pending state across restarts/deploys, since selections currently live only in process memory.
 26. Improve targeted recent-action search so commands can find older matches, not only the latest 10 recent actions.
 27. Explore clarifying questions before logging when BookieBot is uncertain instead of guessing or silently failing.
+
+## Completed 2026-09-16
+
+- Restored canonical split transaction actions and consolidated method editing under Split. Added database revision audit, owner/version/payment guards, retryable corrections, atomic category moves and void/deleted lifecycle handling. Current recent-action/bank overlays retain original logs, hide deleted lineages, trace inactive update/move ancestors and expose one corrected gross candidate. Reconciliation links reopen on source changes. Regression coverage includes owner isolation, stale writes, exact cents, field/method separation, repeated moves, fixed bill label preservation, reversed receipts and lost-response recovery. Updated README, reimbursement workflow/recovery docs, Finance Ops backlog and durable decisions. Full suite **1,890 passed / 299 skipped (optional PostgreSQL and unavailable frontend test dependencies)**; Pyright **0 errors**, diff check clean. Manual checks below remain device/integration acceptance.
 
 ## Completed 2026-09-09
 
@@ -953,6 +961,8 @@ Use a test row or low-risk real row in Discord:
 
 ## Verification Baseline
 
+2026-09-16 split corrections: `python -m pytest unit_tests` **1,890 passed / 299 skipped (optional PostgreSQL and unavailable frontend test dependencies)**, one existing Kaleido deprecation warning; `python -m pyright` **0 errors, 0 warnings**. Used the existing project Python 3.12 environment. The full suite requires loopback test servers and the chart subprocess, so its final run used the approved unsandboxed runner. Focused finance, Discord routing, projection failure/retry, concurrency and canonical lineage regressions passed. No live financial mutations were used.
+
 2026-09-09 Budget widget v1.5: 1,718 local tests passed / 213 optional PostgreSQL skipped; 56 focused widget integration tests passed and Pyright clean. Executed Scriptable trees rendered in WebKit passed 144 device/family/theme/value cases; 64 non-Budget widget trees remain byte-equivalent. This validates a browser approximation, not native WidgetKit font/layout or refresh timing.
 
 2026-09-09 fixed recurring loan: full local **1,718 passed / 213 optional PostgreSQL skipped**, existing Kaleido deprecation only; Pyright **0 errors**, frontend typecheck/build, Apps Script migration/rollover and diff checks passed. Final saved-report compatibility/presentation recheck: **68 passed**, including both old and new static-category labels. Real WebKit production assets: 14 actual/estimate/canonical/fallback layouts in both modes plus six width/theme carousel navigation/focus/modal/swipe cases. Verified $119.92 + $65.99 = $185.91, and unrecorded loan $65.99 Current / $125.95 Projected, exact Bill identity and no utility-series entry. Live Chrome readback verified the approved configuration and preserved actuals. Frontend fingerprint **8a8ecfb5623ef3a648fb5e07**; deployment/CI evidence is reported in the completion response.
@@ -1509,3 +1519,5 @@ python -m pyright
 122. Compact tab bar: on Overview or Spending, scroll down far enough to hide labels. Confirm the centered glass bar narrows to 220px and becomes 44px tall, with four 55×44px tap targets and 21px icons. Scroll up to restore the full width, 66px height and labels. Try each tab with tap/Enter/Space, reverse scroll during the animation, check the selected highlight follows its icon, and repeat at 320/390/1280px in dark/light and reduced motion. Keep the bottom safe-area gap and existing screen scroll/draft restoration.
 
 123. Reconciliation: after updating the app, confirm Reconcile appears only for a watched connected bank account and is scoped separately to Brian/Hannah. Check Needs review/Pending/Checked; expand a suggestion, confirm only an exact recorded amount, then verify refresh preserves the decision. Pending authorizations stay read-only and their posted replacements appear once. Mismatches show both amounts and require correcting the logged expense in BookieBot; Check never logs a purchase. Verify Ignore/reopen change only the review state, stale/outdated reviews require reload, and failed requests recover through Check status. At 320/390/1280px, dark/light and reduced motion, all five tab targets remain usable; compact navigation is 275×44px with five 55×44px targets. Existing four-tab accounts remain 220×44px. Use Sandbox/synthetic data for financial-action tests; see docs/RECONCILIATION.md.
+
+124. Split expense actions (isolated workbook/database for changes): select a split grocery expense in Discord and verify Update, Move, Split, Delete and Cancel. Update must show Amount/Location/Person and retain the current split method; an amount edit recalculates both shares. Split must offer By income/50/50/Fronted and confirmed Cancel split. Try Keep split and ordinary Cancel without changes. Move to Food/Shopping, supply Item if prompted, then move back; verify source/destination, current detail display and one gross bank candidate. Cancel split and verify the full expense remains, then re-split and delete; deleted source/receivable/ancestor matches must disappear. Check account edits cannot change payer ownership and fixed bill amounts never rename/remove the bill row. A pending or confirmed repayment must block source edits; dismiss/reverse it, then verify the correction works and historical repayment rows remain zeroed in their original category. Simulate a lost projection response and repeat: one durable revision and one destination only, with actionable Shared-refresh recovery. Check linked reconciliations reopen after Update/Move/Delete. Production menu inspection is read-only; do not create synthetic production payments.

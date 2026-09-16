@@ -90,7 +90,7 @@ def _allocation_details(payload: Any) -> dict[str, Any]:
                 "sourceWorksheet", "sourceRow", "sourceActionId", "sourceYear", "grossCents", "payerShareCents",
                 "partnerShareCents", "method", "accounting"}
     optional = {"splitActionId", "sourceSpreadsheetId", "settledCents", "sourceValues", "sourceColumnMap", "actorKey",
-                "ledgerSpreadsheetId", "ledgerYear", "originalPerson", "legacyReceivedAt", "sourceSheetTitle", "baselineSettledCents"}
+                "ledgerSpreadsheetId", "ledgerYear", "originalPerson", "legacyReceivedAt", "sourceSheetTitle", "baselineSettledCents", "lifecycle"}
     if not isinstance(payload, dict) or set(payload) - required - optional or required - set(payload):
         raise ReimbursementValidationError("Allocation fields are missing or unexpected.")
     result: dict[str, Any] = {}
@@ -122,6 +122,10 @@ def _allocation_details(payload: Any) -> dict[str, Any]:
     if payload["method"] not in ("income", "equal", "fronted") or payload["accounting"] not in ("cash_v1", "legacy_net"):
         raise ReimbursementValidationError("Unknown split or accounting method.")
     result["method"], result["accounting"] = payload["method"], payload["accounting"]
+    if "lifecycle" in payload:
+        if payload["lifecycle"] not in {"active", "void", "deleted"}:
+            raise ReimbursementValidationError("Unknown reimbursement lifecycle.")
+        result["lifecycle"] = payload["lifecycle"]
     if result["method"] == "fronted" and result["payerShareCents"] != 0:
         raise ReimbursementValidationError("A fronted expense belongs entirely to the partner.")
     if result["method"] == "equal" and abs(result["payerShareCents"] - result["partnerShareCents"]) > 1:
@@ -192,6 +196,12 @@ class ReimbursementStore:
                 request_id TEXT PRIMARY KEY, owner_key TEXT NOT NULL, fingerprint TEXT NOT NULL,
                 result_json TEXT NOT NULL, created_at TEXT NOT NULL
             )""")
+            db.execute("""CREATE TABLE IF NOT EXISTS app_reimbursement_revisions (
+                id TEXT PRIMARY KEY, allocation_id TEXT NOT NULL REFERENCES app_reimbursement_allocations(id),
+                version BIGINT NOT NULL, actor_owner TEXT NOT NULL, operation TEXT NOT NULL,
+                before_json TEXT NOT NULL, after_json TEXT NOT NULL, created_at TEXT NOT NULL,
+                UNIQUE(allocation_id, version)
+            )""")
 
     def _lock(self, db: Any) -> None:
         # Also take this lock for multi-query reads: PG's default READ COMMITTED
@@ -208,9 +218,10 @@ class ReimbursementStore:
     @staticmethod
     def _payload(row: Any) -> dict[str, Any]:
         value = json.loads(row["payload_json"])
-        outstanding = int(row["partner_share_cents"]) - int(row["settled_cents"])
+        lifecycle = value.get("lifecycle", "active")
+        outstanding = int(row["partner_share_cents"]) - int(row["settled_cents"]) if lifecycle == "active" else 0
         return {**value, "settledCents": int(row["settled_cents"]), "outstandingCents": outstanding,
-                "status": "outstanding" if outstanding else "settled", "version": int(row["version"]),
+                "status": lifecycle if lifecycle != "active" else "outstanding" if outstanding else "settled", "version": int(row["version"]),
                 "projectedVersion": int(row["projected_version"]), "createdAt": row["created_at"], "updatedAt": row["updated_at"]}
 
     @staticmethod
@@ -281,16 +292,83 @@ class ReimbursementStore:
                        (_json(value), _now(), allocation_id))
             return self._payload(self._row(db, allocation_id))
 
-    def snapshot(self, owner: str) -> dict[str, Any]:
+    def snapshot(self, owner: str, *, include_inactive: bool = False) -> dict[str, Any]:
         owner = _owner(owner)
         with self.access.connect(write=True) as db:
             self._lock(db)
             rows = db.execute("SELECT * FROM app_reimbursement_allocations WHERE payer_owner = ? OR partner_owner = ? ORDER BY created_at, id", (owner, owner)).fetchall()
+            if not include_inactive:
+                rows = [row for row in rows if json.loads(row["payload_json"]).get("lifecycle", "active") == "active"]
             allocations = {row["id"]: row for row in rows}
             events = db.execute("""SELECT e.* FROM app_reimbursement_events e JOIN app_reimbursement_allocations a ON a.id = e.allocation_id
                                 WHERE a.payer_owner = ? OR a.partner_owner = ? ORDER BY e.created_at, e.id""", (owner, owner)).fetchall()
             return {"allocations": [self._payload(row) for row in rows],
-                    "events": [self._event_payload(event, allocations[event["allocation_id"]]) for event in events], "currency": "USD"}
+                    "events": [self._event_payload(event, allocations[event["allocation_id"]]) for event in events
+                               if event["allocation_id"] in allocations], "currency": "USD"}
+
+    def revise_allocation(self, owner: str, allocation_id: str, expected_version: int,
+                          updates: dict[str, Any], *, operation: str) -> dict[str, Any]:
+        """Save a source correction before replayable Sheets projection.
+
+        Historical purchase/action identity and every before/after value remain
+        in the audit table. No remote sheet write occurs inside this transaction.
+        """
+        owner = _owner(owner)
+        allocation_id = _text(allocation_id, "Allocation identifier", 200, required=True)
+        if operation not in {"split", "update", "move", "cancel", "delete"}:
+            raise ReimbursementValidationError("Unknown expense correction.")
+        allowed = {"grossCents", "payerShareCents", "partnerShareCents", "method", "payerPerson", "item",
+                   "location", "category", "sourceColumnMap", "sourceValues", "lifecycle"}
+        if not isinstance(updates, dict) or not updates or set(updates) - allowed:
+            raise ReimbursementValidationError("Unexpected expense correction fields.")
+        with self.access.connect(write=True) as db:
+            self._lock(db)
+            row = self._row(db, allocation_id)
+            before = json.loads(row["payload_json"])
+            if before["accounting"] != "cash_v1":
+                raise ReimbursementConflictError("Historical net-accounting reimbursements are read-only.")
+            if owner != row["payer_owner"]:
+                raise ReimbursementValidationError("Only the original payer can edit this expense.")
+            self._version(row, expected_version)
+            if before.get("lifecycle") == "deleted":
+                raise ReimbursementConflictError("This expense has already been deleted.")
+            if int(row["projected_version"]) != int(row["version"]):
+                raise ReimbursementConflictError("The previous expense change is still syncing. Retry it before editing again.")
+            self._no_pending(db, allocation_id)
+            paid = db.execute("SELECT id FROM app_reimbursement_events WHERE allocation_id = ? AND status = 'confirmed' LIMIT 1",
+                              (allocation_id,)).fetchone()
+            if int(row["settled_cents"]) or paid is not None:
+                raise ReimbursementConflictError("This expense has confirmed repayments. Reverse its settlement before changing the original expense.")
+            before.pop("sourceRevision", None)
+            value = _allocation_details({**before, **updates, "settledCents": 0})
+            lifecycle = value.get("lifecycle", "active")
+            expected_lifecycle = {"cancel": "void", "delete": "deleted", "split": "active"}.get(operation, before.get("lifecycle", "active"))
+            if lifecycle != expected_lifecycle:
+                raise ReimbursementValidationError("The expense correction has an invalid lifecycle transition.")
+            if operation in {"split", "cancel", "delete"}:
+                allowed_changes = {"method", "payerShareCents", "partnerShareCents", "lifecycle"} if operation == "split" else {"lifecycle"}
+                if any(before.get(key) != new for key, new in value.items() if key not in allowed_changes):
+                    raise ReimbursementValidationError("This action cannot change transaction details.")
+            if operation != "move" and any(before.get(key) != value.get(key) for key in ("category", "sourceColumnMap")):
+                raise ReimbursementValidationError("Only Move can change this expense's category.")
+            # Every later projection starts from this revision's actual source,
+            # including allocations migrated from the earlier net-share model.
+            source_values, fields = value.get("sourceValues", {}), value.get("sourceColumnMap", {})
+            if "amount" in fields:
+                source_values["amount"] = f"{value['grossCents'] / 100:.2f}"
+            for field, key in (("person", "payerPerson"), ("location", "location"), ("item", "item")):
+                if field in fields and (field != "item" or value["sourceWorksheet"] == "expense"):
+                    source_values[field] = value[key]
+            version, now, revision_id = int(row["version"]) + 1, _now(), uuid4().hex
+            db.execute("""INSERT INTO app_reimbursement_revisions(id,allocation_id,version,actor_owner,operation,before_json,after_json,created_at)
+                          VALUES (?,?,?,?,?,?,?,?)""",
+                       (revision_id, allocation_id, version, owner, operation, _json(before), _json(value), now))
+            value["sourceRevision"] = {"id": revision_id, "operation": operation, "version": version,
+                                       "before": before, "actorOwner": owner, "createdAt": now}
+            db.execute("""UPDATE app_reimbursement_allocations SET payload_json = ?, gross_cents = ?, payer_share_cents = ?,
+                          partner_share_cents = ?, version = ?, updated_at = ? WHERE id = ?""",
+                       (_json(value), value["grossCents"], value["payerShareCents"], value["partnerShareCents"], version, now, allocation_id))
+            return self._payload(self._row(db, allocation_id))
 
     def pending_projections(self) -> list[dict[str, Any]]:
         with self.access.connect(write=True) as db:
@@ -302,21 +380,31 @@ class ReimbursementStore:
                 result.append({**self._payload(row), "events": [self._event_payload(event, row) for event in events]})
             return result
 
-    def mark_projected(self, allocation_id: str, version: int) -> bool:
+    def mark_projected(self, allocation_id: str, version: int, *, source_row: int | None = None) -> bool:
         allocation_id = _text(allocation_id, "Allocation identifier", 200, required=True)
         version = _integer(version, "Version", 1, 2**53 - 1)
         with self.access.connect(write=True) as db:
             self._lock(db)
-            row = db.execute("SELECT version FROM app_reimbursement_allocations WHERE id = ?", (allocation_id,)).fetchone()
+            row = db.execute("SELECT version,payload_json FROM app_reimbursement_allocations WHERE id = ?", (allocation_id,)).fetchone()
             if row is None or int(row["version"]) != version:
                 return False
-            db.execute("UPDATE app_reimbursement_allocations SET projected_version = ? WHERE id = ?", (version, allocation_id))
+            payload = json.loads(row["payload_json"])
+            if source_row is not None:
+                payload["sourceRow"] = _integer(source_row, "Source row", 1, 1_000_000)
+            db.execute("UPDATE app_reimbursement_allocations SET projected_version = ?, payload_json = ? WHERE id = ?",
+                       (version, _json(payload), allocation_id))
             return True
 
     @staticmethod
     def _writable(row: Any) -> None:
-        if json.loads(row["payload_json"])["accounting"] != "cash_v1":
+        payload = json.loads(row["payload_json"])
+        if payload["accounting"] != "cash_v1":
             raise ReimbursementConflictError("Historical net-accounting reimbursements are read-only.")
+        if payload.get("lifecycle", "active") != "active":
+            raise ReimbursementConflictError("This expense no longer has an active reimbursement.")
+        revision = payload.get("sourceRevision", {})
+        if int(row["projected_version"]) < int(revision.get("version", 0)):
+            raise ReimbursementConflictError("The expense correction is still syncing. Wait before recording a payment.")
 
     @staticmethod
     def _version(row: Any, value: Any) -> None:

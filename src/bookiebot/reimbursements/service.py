@@ -139,6 +139,137 @@ def record_split(user_key: str, logged: Any, ws: Any, fields: dict[str, int], va
     return True, message
 
 
+def _current_source_values(value: dict[str, Any]) -> dict[str, str]:
+    result = dict(value.get("sourceValues", {}))
+    result["amount"] = f"{(value['grossCents'] - value['settledCents']) / 100:.2f}"
+    for field, key in (("item", "item"), ("location", "location"), ("person", "payerPerson")):
+        if field in value.get("sourceColumnMap", {}) and (field != "item" or value["sourceWorksheet"] == "expense"):
+            result[field] = value[key]
+    return result
+
+
+def mutate_recent_action(user_key: str, logged: Any, operation: str, *,
+                         updates: dict[str, Any] | None = None, destination_category: str | None = None,
+                         split_method: str | None = None) -> tuple[bool, str]:
+    """Correct one canonical expense and replay its desired sheet state.
+
+    Recent-action records keep their stable IDs. The ledger's durable revisions
+    are the correction audit trail; recent-action readers overlay the current
+    source details instead of introducing a second independently written log.
+    """
+    from gspread.utils import a1_to_rowcol
+    from bookiebot.sheets.collaboration import normalize_split_method, split_amounts, split_method_label
+    from bookiebot.sheets.config import expense_category_label, get_category_columns, normalize_expense_category
+    from bookiebot.sheets import undo
+    from bookiebot.reimbursements.projection import sync_pending
+
+    try:
+        owner = get_user_config(user_key).budget_owner_key
+        store = build_reimbursement_store()
+        allocation_id = logged.action.metadata.get("allocation_id", "")
+        value = (store.get_allocation(allocation_id) if allocation_id
+                 else store.find_by_source(logged.id, now_pacific().year))
+        if value is None:
+            return False, "I could not find the linked reimbursement for that expense."
+        if value["payerOwner"] != owner:
+            raise ReimbursementValidationError("Only the original payer can edit this expense.")
+        if value["accounting"] != "cash_v1":
+            raise ReimbursementConflictError("Historical net-accounting reimbursements are read-only.")
+
+        def finish(message: str) -> tuple[bool, str]:
+            try:
+                synced = sync_pending(store)
+            except Exception:
+                logger.exception("Saved expense correction awaits projection", extra={"allocation_id": value["id"]})
+                synced = False
+            return True, message + ("" if synced else
+                " The change is saved; expense sheets are still syncing. Open Shared in the app and refresh to retry syncing.")
+
+        if value.get("lifecycle") == "deleted":
+            if operation == "delete":
+                return finish("Deleted the expense and canceled its split.")
+            raise ReimbursementConflictError("This expense has already been deleted.")
+        original_version = logged.action.metadata.get("canonical_version")
+        expected_version = int(original_version) if original_version else value["version"]
+        changes: dict[str, Any] = {}
+        category = value["category"]
+        updates = {str(key).strip().lower(): item for key, item in (updates or {}).items() if item not in (None, "")}
+        fields = value.get("sourceColumnMap", {})
+        source_values = _current_source_values(value)
+        if operation == "split":
+            method = normalize_split_method(split_method)
+            if method is None:
+                raise ReimbursementValidationError("Choose By income, 50/50, or Fronted for this split.")
+            if method == "fronted" and value["sourceWorksheet"] != "expense":
+                raise ReimbursementValidationError("Fronted is currently available only for shared expense rows.")
+            payer, partner = split_amounts(value["grossCents"] / 100, method, owner)
+            changes = {"method": method, "payerShareCents": money_cents(payer),
+                       "partnerShareCents": money_cents(partner), "lifecycle": "active"}
+            message = f"Updated split to {split_method_label(method)}. {value['partnerOwner'].title()} owes ${partner:.2f}."
+        elif operation in {"update", "move"}:
+            allowed = set(fields) - {"date"}
+            if value["sourceWorksheet"] != "expense":
+                allowed = {"amount"}
+            if operation == "move":
+                if value["sourceWorksheet"] != "expense":
+                    raise ReimbursementValidationError("Only shared expense rows can be moved to another category.")
+                category = normalize_expense_category(destination_category)
+                if category not in get_category_columns:
+                    raise ReimbursementValidationError("Choose a valid expense category.")
+                if category == value["category"] and value.get("sourceRevision", {}).get("operation") != "move":
+                    return False, f"That expense is already in {expense_category_label(category)}."
+                fields = {field: a1_to_rowcol(column + "1")[1]
+                          for field, column in get_category_columns[category]["columns"].items()}
+                allowed = set(fields) - {"date"}
+            if set(updates) - allowed:
+                raise ReimbursementValidationError("I can update " + ", ".join(sorted(allowed)) + " for this expense.")
+            if operation == "update" and not updates:
+                raise ReimbursementValidationError("Choose the transaction detail and its new value.")
+            if "amount" in updates:
+                gross = money_cents(updates["amount"])
+                if not gross:
+                    raise ReimbursementValidationError("The expense amount must be greater than zero.")
+                payer, partner = split_amounts(gross / 100, value["method"], owner)
+                changes.update(grossCents=gross, payerShareCents=money_cents(payer), partnerShareCents=money_cents(partner))
+                updates["amount"] = f"{gross / 100:.2f}"
+            source_values.update({key: str(item).strip() for key, item in updates.items()})
+            if operation == "move":
+                source_values = {field: source_values.get(field, "") for field in fields}
+                missing = undo._missing_required_move_fields(source_values, category)
+                if missing:
+                    if missing == ["item"]:
+                        undo.set_pending_move_item(user_key, logged.id, category)
+                        return False, undo._move_item_prompt(value["category"], category)
+                    return False, undo._missing_move_fields_message(missing, value["category"], category)
+                changes.update(category=category, sourceColumnMap=fields)
+            changes["sourceValues"] = source_values
+            for field, key in (("item", "item"), ("location", "location"), ("person", "payerPerson")):
+                if field in source_values and (field != "item" or value["sourceWorksheet"] == "expense"):
+                    changes[key] = source_values[field]
+            message = (f"Moved expense to {expense_category_label(category)}. The split is preserved."
+                       if operation == "move" else "Updated the transaction details. The split method is preserved.")
+        elif operation in {"cancel", "delete"}:
+            if operation == "delete" and value["sourceWorksheet"] != "expense":
+                raise ReimbursementValidationError("Fixed bill rows cannot be deleted.")
+            changes = {"lifecycle": "void" if operation == "cancel" else "deleted"}
+            message = "Canceled the split. The full expense remains recorded." if operation == "cancel" else "Deleted the expense and canceled its split."
+        else:
+            raise ReimbursementValidationError("Unknown expense correction.")
+
+        if all(value.get(key, "active" if key == "lifecycle" else None) == target for key, target in changes.items()):
+            # Lost responses and repeated confirmations can only replay the same
+            # canonical target; they do not add another financial revision.
+            if value["projectedVersion"] != value["version"]:
+                return finish(message)
+            return True, message
+        if operation == "move" and category == value["category"]:
+            return False, f"That expense is already in {expense_category_label(category)}."
+        store.revise_allocation(owner, value["id"], expected_version, changes, operation=operation)
+        return finish(message)
+    except (ReimbursementValidationError, ReimbursementConflictError, ReimbursementNotFoundError) as exc:
+        return False, str(exc)
+
+
 def allocation_as_legacy(value: dict[str, Any]) -> Any:
     from bookiebot.sheets.collaboration import SharedAllocation
     return SharedAllocation(
@@ -148,7 +279,8 @@ def allocation_as_legacy(value: dict[str, Any]) -> Any:
         source_worksheet=value["sourceWorksheet"], source_category=value["category"], source_row=value["sourceRow"],
         expense_date=value["expenseDate"], item=value["item"], location=value["location"],
         gross_amount=value["grossCents"] / 100, split_method=value["method"], payer_share=value["payerShareCents"] / 100,
-        partner_share=value["partnerShareCents"] / 100, status="reimbursed" if not value["outstandingCents"] else "outstanding",
+        partner_share=value["partnerShareCents"] / 100,
+        status="void" if value.get("lifecycle", "active") != "active" else "reimbursed" if not value["outstandingCents"] else "outstanding",
         received_amount=value["settledCents"] / 100, responsible_owner_key=value["payerOwner"],
         original_person=value["payerPerson"], responsible_person=value["payerPerson"])
 

@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import copy
-from dataclasses import asdict, dataclass, field
+from dataclasses import asdict, dataclass, field, replace
 from datetime import datetime
 import json
 import logging
@@ -589,13 +589,14 @@ def _read_log() -> list[LoggedAction]:
 
 def read_active_logged_actions(user_key: str | None = None) -> list[LoggedAction]:
     keys = actor_key_aliases(str(user_key)) if user_key else set()
-    return [
+    history = _read_log()
+    return canonical_logged_actions([
         logged
-        for logged in _read_log()
+        for logged in history
         if logged.status == "active"
         and logged.action.metadata.get("type") != "system_state"
         and (not keys or logged.user_key in keys)
-    ]
+    ], for_reconciliation=True, history=history)
 
 
 def _append_logged_action(user_key: str | None, action: UndoAction) -> str:
@@ -747,7 +748,7 @@ def recent_actions(user_key: str | None, limit: int = 5, offset: int = 0) -> lis
         and action.action.metadata.get("type") not in {"delete", "system_state"}
         and (not keys or action.user_key in keys)
     ]
-    matches = _dedupe_actions_by_lineage(matches, all_actions)
+    matches = _dedupe_actions_by_lineage(canonical_logged_actions(matches, history=all_actions), all_actions)
     start = max(offset, 0)
     end = start + max(limit, 1)
     return matches[start:end]
@@ -911,6 +912,83 @@ def _action_search_text(logged: LoggedAction) -> str:
     return " ".join(str(part).lower() for part in parts if part is not None)
 
 
+def _allocation_action(logged: LoggedAction, value: dict[str, Any], *, for_reconciliation: bool = False) -> LoggedAction | None:
+    """Read current canonical state without rewriting the original audit record."""
+    if value.get("lifecycle", "active") == "deleted":
+        return None
+    action = logged.action
+    metadata = {**action.metadata, "accounting": value["accounting"], "allocation_id": value["id"],
+                "canonical_reimbursement": "true", "canonical_version": str(value["version"]),
+                "canonical_lifecycle": value.get("lifecycle", "active"),
+                "reimbursement_source_action_id": value["sourceActionId"]}
+    # Historical net allocations remain read-only and retain their saved display.
+    if value["accounting"] != "cash_v1":
+        return replace(logged, action=replace(action, metadata=metadata))
+    fields = value.get("sourceColumnMap", {})
+    values = dict(value.get("sourceValues", {}))
+    values.update(amount=f"{value['grossCents'] / 100:.2f}", person=value["payerPerson"],
+                  item=value["item"], location=value["location"])
+    active_split = value.get("lifecycle", "active") == "active"
+    source_type = "expense" if value["sourceWorksheet"] == "expense" else "payment"
+    metadata.update(category=value["category"], person=value["payerPerson"], source_type=source_type,
+                    split_method=value["method"], gross_amount=values["amount"],
+                    payer_share=f"{value['payerShareCents'] / 100:.2f}",
+                    partner_share=f"{value['partnerShareCents'] / 100:.2f}")
+    # Only the original source remains bank-matchable; split leaves are audit
+    # records. Bank matching always uses gross, including after repayments.
+    metadata["type"] = (source_type if logged.id == value["sourceActionId"] else "split") if for_reconciliation else ("split" if active_split else source_type)
+    display_fields = list(fields)
+    if for_reconciliation and source_type == "payment":
+        display_fields = ["amount"]
+    elif for_reconciliation:
+        display_fields = ["date", "item", "amount", "location", "person"]
+    metadata["display_fields"] = json.dumps(display_fields)
+    description = f"{value['item']} ${value['grossCents'] / 100:.2f}"
+    if value["location"]:
+        description += f" at {value['location']}"
+    return replace(logged, action=replace(action, worksheet=value["sourceWorksheet"],
+        row=value["sourceRow"], columns=list(fields.values()), new_values=[str(values.get(key, "")) for key in display_fields],
+        metadata=metadata, description=description))
+
+
+def canonical_logged_actions(actions: list[LoggedAction], *, for_reconciliation: bool = False,
+                             history: list[LoggedAction] | None = None) -> list[LoggedAction]:
+    """Overlay canonical corrections in one owner-scoped database read per owner."""
+    from bookiebot.reimbursements import service
+    if not service.enabled() or not actions:
+        return actions
+    from bookiebot.reimbursements.store import build_reimbursement_store
+    store = build_reimbursement_store()
+    by_owner: dict[str, dict[str, dict[str, Any]]] = {}
+    actions_by_id = {logged.id: logged for logged in (history if history is not None else actions)}
+    result = []
+    for logged in actions:
+        owner = get_user_config(logged.user_key).budget_owner_key
+        if owner not in by_owner:
+            rows = store.snapshot(owner, include_inactive=True)["allocations"]
+            by_owner[owner] = {str(key): value for value in rows if value["payerOwner"] == owner
+                               for key in (value["id"], value["sourceActionId"], value.get("splitActionId", "")) if key}
+            # A split may have been created after several updates/moves. Every
+            # ancestor belongs to that managed source, including old buttons.
+            for value in rows:
+                if value["payerOwner"] != owner:
+                    continue
+                current_id = value["sourceActionId"]
+                visited: set[str] = set()
+                while current_id and current_id not in visited:
+                    visited.add(current_id)
+                    ancestor = actions_by_id.get(current_id)
+                    if ancestor is None or ancestor.user_key not in actor_key_aliases(str(logged.user_key)):
+                        break
+                    by_owner[owner][current_id] = value
+                    current_id = _lineage_parent_id(ancestor.action)
+        value = by_owner[owner].get(logged.action.metadata.get("allocation_id", "")) or by_owner[owner].get(logged.id)
+        current = _allocation_action(logged, value, for_reconciliation=for_reconciliation) if value else logged
+        if current is not None:
+            result.append(current)
+    return result
+
+
 def _canonical_action(logged: LoggedAction | None) -> LoggedAction | None:
     if logged is None:
         return None
@@ -918,7 +996,6 @@ def _canonical_action(logged: LoggedAction | None) -> LoggedAction | None:
     if not service.enabled():
         return logged
     from bookiebot.reimbursements.store import build_reimbursement_store, ReimbursementNotFoundError
-    from dataclasses import replace
     store = build_reimbursement_store()
     allocation_id = logged.action.metadata.get("allocation_id", "")
     try:
@@ -926,9 +1003,15 @@ def _canonical_action(logged: LoggedAction | None) -> LoggedAction | None:
     except ReimbursementNotFoundError:
         value = None
     if value is None:
-        return logged
-    return replace(logged, action=replace(logged.action, metadata={**logged.action.metadata,
-        "accounting": value["accounting"], "allocation_id": value["id"], "canonical_reimbursement": "true"}))
+        aliases = actor_key_aliases(str(logged.user_key)) if logged.user_key else {None}
+        history = [entry for entry in _read_log() if entry.user_key in aliases]
+        # Include the selected record even when a reduced test/adapter history
+        # omits it. Deleted canonical lineages deliberately return no action.
+        history = [entry for entry in history if entry.id != logged.id] + [logged]
+        return next((entry for entry in canonical_logged_actions(history) if entry.id == logged.id), None)
+    if value["payerOwner"] != get_user_config(logged.user_key).budget_owner_key:
+        return None
+    return _allocation_action(logged, value)
 
 
 def select_recent_action(
@@ -1214,9 +1297,16 @@ def _allowed_update_fields(action: UndoAction, metadata_extra: dict[str, str] | 
 
 def action_capabilities(action: UndoAction) -> ActionCapabilities:
     if action.metadata.get("canonical_reimbursement") == "true" or action.metadata.get("accounting") == "cash_v1":
-        reason = "Manage repayments for this linked expense in the app's Shared Reimbursements section."
-        return ActionCapabilities(False, False, False, False, False, False, False, [],
-                                  reason, reason, reason, reason, reason, reason)
+        if action.metadata.get("accounting") != "cash_v1" or action.metadata.get("canonical_lifecycle") == "deleted":
+            reason = "Historical or deleted reimbursement expenses cannot be edited from recent transactions."
+            return ActionCapabilities(False, False, False, False, False, False, False, [],
+                                      reason, reason, reason, reason, reason, reason)
+        fields = editable_fields_for_action(action)
+        shared = action.worksheet == "expense" and bool(action.metadata.get("category"))
+        active_split = action.metadata.get("canonical_lifecycle", "active") == "active"
+        reason = "Only shared expense rows can be moved or deleted; bill payments support amount updates."
+        return ActionCapabilities(bool(fields), shared, not active_split, active_split, active_split, shared, False, fields,
+                                  move_reason="" if shared else reason, delete_reason="" if shared else reason)
     action_type = action.metadata.get("type")
     transaction_type = _transaction_type(action)
     editable_fields = editable_fields_for_action(action)
@@ -1313,6 +1403,36 @@ def _sync_action_ids_for_undo_action(action: UndoAction, logged_id: str) -> set[
         action_ids.add(source_action_id)
     action_ids.update(_deleted_action_ids(action))
     return {action_id for action_id in action_ids if action_id}
+
+
+def _is_canonical_reimbursement(action: UndoAction) -> bool:
+    return action.metadata.get("canonical_reimbursement") == "true" or action.metadata.get("accounting") == "cash_v1"
+
+
+def _mutate_canonical_action(user_key: str | None, logged: LoggedAction, operation: str, **kwargs: Any) -> tuple[bool, str]:
+    from bookiebot.reimbursements.service import mutate_recent_action
+    from bookiebot.reimbursements.store import (
+        ReimbursementConflictError, ReimbursementNotFoundError, ReimbursementValidationError,
+    )
+    if not user_key:
+        return False, "Choose this expense from the payer's recent transactions."
+    try:
+        success, detail = mutate_recent_action(user_key, logged, operation, **kwargs)
+    except (ReimbursementConflictError, ReimbursementNotFoundError, ReimbursementValidationError) as exc:
+        return False, str(exc)
+    if success:
+        clear_pending_action_selection(user_key)
+        if operation in {"update", "move", "delete"}:
+            ids = _sync_action_ids_for_undo_action(logged.action, logged.id)
+            source = logged.action.metadata.get("reimbursement_source_action_id")
+            if source:
+                ids.add(source)
+            # Existing matches may still point to a pre-split update ancestor.
+            ids.update(_active_lineage_ids(logged))
+            _sync_reconciliation_after_action_mutation(user_key, ids, reason={
+                "update": "updated", "move": "moved", "delete": "deleted",
+            }[operation])
+    return success, detail
 
 
 def _field_values_for_action(action: UndoAction, values: list[str] | None = None) -> dict[str, str]:
@@ -1815,6 +1935,16 @@ def move_recent_action(
         return False, capabilities.move_reason
 
     source_category = action.metadata.get("category", "")
+    if _is_canonical_reimbursement(action):
+        destination_values = _values_for_category(_field_values_for_action(action), destination_category, updates)
+        missing = _missing_required_move_fields(destination_values, destination_category)
+        if missing:
+            if missing == ["item"]:
+                set_pending_move_item(user_key, logged.id, destination_category)
+                return False, _move_item_prompt(source_category, destination_category)
+            return False, _missing_move_fields_message(missing, source_category, destination_category)
+        return _mutate_canonical_action(user_key, logged, "move", updates=updates, destination_category=destination_category)
+
     if source_category == destination_category:
         return False, f"That expense is already in {destination_category}."
 
@@ -1976,6 +2106,8 @@ def split_recent_action(
     capabilities = action_capabilities(logged.action)
     if not capabilities.can_split:
         return False, capabilities.split_reason
+    if _is_canonical_reimbursement(logged.action):
+        return _mutate_canonical_action(user_key, logged, "split", split_method=method)
     if allocation_for_source_action(logged.id, user_key) is not None:
         return False, "That transaction already has an active split."
 
@@ -2162,6 +2294,8 @@ def change_split_recent_action(
         return False, "I could not find that active split."
 
     action = logged.action
+    if _is_canonical_reimbursement(action):
+        return _mutate_canonical_action(user_key, logged, "split", split_method=method)
     allocation_id = action.metadata.get("allocation_id", "")
     from bookiebot.reimbursements.service import is_managed
     if is_managed(allocation_id):
@@ -2330,6 +2464,8 @@ def cancel_split_recent_action(user_key: str | None, *, action_id: str) -> tuple
     if logged is None or logged.action.metadata.get("type") != "split":
         return False, "I could not find that active split."
     action = logged.action
+    if _is_canonical_reimbursement(action):
+        return _mutate_canonical_action(user_key, logged, "cancel")
     allocation_id = action.metadata.get("allocation_id", "")
     from bookiebot.reimbursements.service import is_managed
     if is_managed(allocation_id):
@@ -2488,6 +2624,9 @@ def update_recent_action(
 
     if not normalized_updates:
         return False, f"I found {_format_action_snapshot(logged.action)}. Please specify the new value."
+
+    if _is_canonical_reimbursement(logged.action):
+        return _mutate_canonical_action(user_key, logged, "update", updates=normalized_updates)
 
     display_fields = list(field_columns.keys())
     ws = _worksheet(logged.action.worksheet)
@@ -2903,6 +3042,9 @@ def delete_recent_action(
     capabilities = action_capabilities(logged.action)
     if not capabilities.can_delete:
         return False, capabilities.delete_reason
+
+    if _is_canonical_reimbursement(logged.action):
+        return _mutate_canonical_action(user_key, logged, "delete")
 
     if logged.action.worksheet == "expense":
         success, detail = _delete_expense_action_with_compaction(user_key, logged)

@@ -1,5 +1,13 @@
 # Agent Decisions
 
+## 2026-09-16 - Correct Split Expenses Through Canonical Revisions
+
+Decision: Recent split expenses expose the ordinary Update/Move/Split/Delete menu. Split edits allocation method and contains confirmed Cancel split; Update edits purchase details, with gross changes recalculating shares under the retained method. Cancel retains the managed purchase and permits re-splitting; Delete clears its source and voids the allocation. Fixed bills remain amount-only, and payer account edits cannot change ownership.
+
+Save each correction's before/after state in the reimbursement database before replaying a verified named-range projection. Require an unchanged version, completed prior projection and no pending/confirmed repayments; fully reversed receipts retain their historical zeroed projections. Category moves relocate source anchors atomically without compacting other category rows. Stable action IDs receive current-state read overlays; immutable source logs and durable revisions preserve the audit. Reconciliation sees one corrected gross purchase across update/move ancestors, and source mutations reopen linked matches. Direct canonical Undo and historical net-accounting corrections remain guarded.
+
+Rationale: Disabling every operation prevented ordinary corrections, but exposing legacy row writers would desynchronize repayments and source anchors. Ledger revisions provide the requested actions with resumable sheet writes and explicit settlement boundaries.
+
 ## 2026-09-10 - Manual Logging With Shared Bank Review In The Phone App
 
 Decision: Add owner-scoped Reconcile navigation only for watched connected bank accounts. Keep the default list a persisted read, fetch candidate details on demand and sync/rescore only on explicit Check. Pending bank authorizations are visible but read-only. Phone confirmation links exact recorded evidence through optimistic, atomic metadata updates; it never imports an expense or adjusts a sheet amount. Mismatches remain visible for manual correction; existing Discord import/adjustment workflows remain separate.

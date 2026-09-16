@@ -114,7 +114,18 @@ class Book:
                 self.by_id(region["sheetId"]).insert(region["startRowIndex"], region["startColumnIndex"], region["endColumnIndex"])
             elif "addNamedRange" in entry:
                 named = deepcopy(entry["addNamedRange"]["namedRange"])
+                named.setdefault("namedRangeId", named["name"])
                 self.names[named["name"]] = named
+            elif "updateNamedRange" in entry:
+                request = entry["updateNamedRange"]
+                assert request["fields"] == "range"
+                named = request["namedRange"]
+                target = next(value for value in self.names.values() if value["namedRangeId"] == named["namedRangeId"])
+                target["range"] = deepcopy(named["range"])
+            elif "deleteNamedRange" in entry:
+                identity = entry["deleteNamedRange"]["namedRangeId"]
+                name = next(name for name, value in self.names.items() if value["namedRangeId"] == identity)
+                del self.names[name]
             elif "updateCells" in entry:
                 request = entry["updateCells"]
                 assert request["fields"] in {"userEnteredValue,note", "userEnteredValue"}
@@ -483,3 +494,218 @@ def test_sync_pending_does_not_mark_stale_or_failed_projection_complete():
             raise TimeoutError("Still pending")
     assert sync_pending(store, SimpleNamespace(project=project)) is False
     assert marked == [("stale", 1), ("complete", 1)]
+
+
+def correction(before, operation="update", **updates):
+    value = {**deepcopy(before), "version": 2, "projectedVersion": 1, **updates}
+    value["sourceValues"] = {**value["sourceValues"], "item": value["item"], "location": value["location"],
+                             "person": value["payerPerson"], "amount": str(value["grossCents"] / 100)}
+    value["sourceRevision"] = {"id": "correction-1", "version": 2, "operation": operation,
+                              "before": deepcopy(before), "createdAt": "2026-09-09T10:00:00Z", "actorOwner": "brian"}
+    return value
+
+
+@pytest.mark.parametrize("lost_response", [False, True])
+def test_correction_updates_exact_gross_description_location_and_payment_method(setup, lost_response):
+    projector, books, source = setup
+    original = allocation()
+    projector.project(original)
+    value = correction(original, grossCents=50000, payerShareCents=33609, item="New item", location="Other store", payerPerson="Brian (Amex)")
+    book = books["shared-2026"]
+    book.timeout_after_values = lost_response
+    if lost_response:
+        with pytest.raises(TimeoutError):
+            projector.project(value)
+    projector.project(value)
+    writes = len(book.value_calls)
+    projector.project(value)
+    assert len(book.value_calls) == writes
+    assert source.read(2, 29, 34) == ["9/8/2026", "New item", 500, "Other store", "Brian (Amex)"]
+
+
+@pytest.mark.parametrize("drift", ["description", "amount", "mixed_revision", "missing_anchor"])
+def test_correction_fails_closed_on_external_edits_and_partial_revision_rows(setup, drift):
+    projector, books, source = setup
+    original = allocation()
+    projector.project(original)
+    value = correction(original, grossCents=50000, item="Corrected item")
+    book = books["shared-2026"]
+    if drift == "missing_anchor":
+        del book.names[projection._name("source", original["id"])]
+    else:
+        source.write(2, 30 if drift != "amount" else 31,
+                     ["External change" if drift == "description" else "Corrected item" if drift == "mixed_revision" else 99])
+    writes = len(book.value_calls), len(book.batch_calls)
+    with pytest.raises(ProjectionConflictError):
+        projector.project(value)
+    assert (len(book.value_calls), len(book.batch_calls)) == writes
+
+
+def test_source_detail_correction_follows_row_inserted_after_validation(setup):
+    projector, books, source = setup
+    original = allocation()
+    projector.project(original)
+    value = correction(original, location="New location")
+    books["shared-2026"].after_read = lambda sheet, _name: sheet.insert(2)
+    projector.project(value)
+    assert source.read(2, 29, 34) == [""] * 5
+    assert source.read(3, 29, 34) == ["9/8/2026", "Hannah's T", 464.72, "New location", "Brian (BofA)"]
+    assert value["sourceRow"] == 4
+
+
+@pytest.mark.parametrize("lost_response", [False, True])
+def test_category_move_is_one_atomic_replayable_batch_and_keeps_neighbor_anchors(setup, lost_response):
+    projector, books, source = setup
+    original = allocation()
+    projector.project(original)
+    neighbor = allocation(id="neighbor", item="Parking", location="Garage", grossCents=10000,
+                          sourceRow=4, sourceValues={"date": "9/8/2026", "item": "Parking", "amount": "100", "location": "Garage", "person": "Brian (BofA)"})
+    source.write(3, 29, ["9/8/2026", "Parking", 100, "Garage", "Brian (BofA)"])
+    projector.source(neighbor)
+    source.write(2, 0, ["9/8/2026", 12, "Existing grocery", "Hannah"])
+    value = correction(original, "move", category="grocery", sourceColumnMap={"date": 1, "amount": 2, "location": 3, "person": 4})
+    book = books["shared-2026"]
+    book.timeout_after_batch = lost_response
+    previous = len(book.batch_calls)
+    if lost_response:
+        with pytest.raises(TimeoutError):
+            projector.project(value)
+    projector.project(value)
+    projector.project(value)
+    assert len(book.batch_calls) == previous + 1
+    assert source.read(2, 29, 34) == [""] * 5
+    assert source.read(3, 29, 34) == ["9/8/2026", "Parking", 100, "Garage", "Brian (BofA)"]
+    assert source.read(2, 0, 4) == ["9/8/2026", 12, "Existing grocery", "Hannah"]
+    assert source.read(3, 0, 4) == ["9/8/2026", 464.72, "Gameday", "Brian (BofA)"]
+    assert value["sourceRow"] == 4
+    assert book.names[projection._name("source", "neighbor")]["range"]["startRowIndex"] == 3
+    assert projection._name("item", original["id"]) not in book.names
+
+
+def test_move_reservation_preserves_concurrent_destination_append_and_source_insertion(setup):
+    projector, books, source = setup
+    original = allocation()
+    projector.project(original)
+    book = books["shared-2026"]
+    value = correction(original, "move", category="food", sourceColumnMap={"date": 14, "item": 15, "amount": 16, "location": 17, "person": 18})
+    book.after_scan = lambda sheet: sheet.write(2, 13, ["9/8/2026", "Lunch", 20, "Cafe", "Hannah"])
+    book.after_read = lambda sheet, _name: sheet.insert(2, 29, 34)
+    projector.project(value)
+    assert source.read(2, 13, 18) == ["9/8/2026", "Hannah's T", 464.72, "Gameday", "Brian (BofA)"]
+    assert source.read(3, 13, 18) == ["9/8/2026", "Lunch", 20, "Cafe", "Hannah"]
+    assert source.read(3, 29, 34) == [""] * 5
+
+
+def test_move_adds_item_anchor_when_original_category_has_no_item(setup):
+    projector, books, source = setup
+    original = allocation(category="grocery", sourceColumnMap={"date": 1, "amount": 2, "location": 3, "person": 4},
+                          sourceValues={"date": "9/8/2026", "amount": "464.72", "location": "Gameday", "person": "Brian (BofA)"})
+    source.write(2, 0, ["9/8/2026", 464.72, "Gameday", "Brian (BofA)"])
+    projector.project(original)
+    value = correction(original, "move", category="shopping", sourceColumnMap={"date": 22, "item": 23, "amount": 24, "location": 25, "person": 26})
+    projector.project(value)
+    assert source.read(2, 0, 4) == [""] * 4
+    assert source.read(2, 21, 26) == ["9/8/2026", "Hannah's T", 464.72, "Gameday", "Brian (BofA)"]
+    assert projection._name("item", original["id"]) in books["shared-2026"].names
+
+
+@pytest.mark.parametrize("operation", ["cancel", "delete"])
+def test_cancel_retains_gross_and_delete_only_clears_anchored_source(setup, operation):
+    projector, books, source = setup
+    original = allocation()
+    projector.project(original)
+    source.write(3, 29, ["9/9/2026", "Later item", 12, "Later store", "Hannah"])
+    value = correction(original, operation, lifecycle="void" if operation == "cancel" else "deleted")
+    if operation == "delete":
+        books["shared-2026"].timeout_after_values = True
+        with pytest.raises(TimeoutError):
+            projector.project(value)
+    projector.project(value)
+    projector.project(value)
+    assert source.read(2, 29, 34) == ([""] * 5 if operation == "delete" else ["9/8/2026", "Hannah's T", 464.72, "Gameday", "Brian (BofA)"])
+    assert source.read(3, 29, 34) == ["9/9/2026", "Later item", 12, "Later store", "Hannah"]
+
+
+@pytest.mark.parametrize("operation", ["split", "update", "move", "cancel", "delete"])
+@pytest.mark.parametrize("status", ["pending", "confirmed"])
+def test_corrections_require_reversing_outstanding_payment_events(setup, operation, status):
+    projector, books, _source = setup
+    original = allocation()
+    projector.project(original)
+    value = correction(original, operation, events=[event(status=status)])
+    calls = len(books["shared-2026"].batch_calls), len(books["shared-2026"].value_calls)
+    with pytest.raises(ProjectionConflictError, match="Reverse"):
+        projector.project(value)
+    assert (len(books["shared-2026"].batch_calls), len(books["shared-2026"].value_calls)) == calls
+
+
+def test_reversed_receipts_keep_original_category_and_identity_after_move_and_new_payment(setup):
+    projector, books, source = setup
+    original = allocation(events=[event()], settledCents=5000)
+    projector.project(original)
+    original["events"][0].update(status="reversed", reversedAt="2026-09-08T15:00:00Z")
+    original["settledCents"] = 0
+    projector.project(original)
+    old_receipt = receipt_row(books["shared-2026"])
+    old_region = deepcopy(books["shared-2026"].names[projection._name("receipt", "receipt-1")]["range"])
+    value = correction(original, "move", item="Moved", category="grocery", partnerShareCents=1000,
+                       sourceColumnMap={"date": 1, "amount": 2, "location": 3, "person": 4})
+    projector.project(value)
+    value.update(projectedVersion=2, version=3, settledCents=500)
+    value["events"].append(event("new-receipt", amount=500, confirmedAt="2026-09-10T10:00:00Z"))
+    projector.project(value)
+    assert source.read(2, 0, 4) == ["9/8/2026", 459.72, "Gameday", "Brian (BofA)"]
+    assert receipt_row(books["shared-2026"]) == old_receipt
+    assert books["shared-2026"].names[projection._name("receipt", "receipt-1")]["range"] == old_region
+    assert receipt_row(books["shared-2026"], "new-receipt") == ["2026-09-08", 5, "Reimbursement to Brian · Gameday", "Hannah"]
+
+
+def test_bill_split_correction_preserves_label_and_amount_only_source(setup):
+    projector, books, _source = setup
+    sheet = books["shared-2026"].add_sheet("Historical Budget")
+    sheet.write(7, 1, ["Rent payment (due 1st)", 120])
+    original = allocation(sourceWorksheet="income", sourceSheetTitle="Historical Budget", sourceRow=8,
+                          category="rent", item="rent", grossCents=20000, payerShareCents=12000,
+                          partnerShareCents=8000, sourceColumnMap={"item": 2, "amount": 3},
+                          sourceValues={"item": "Rent payment (due 1st)", "amount": "120"})
+    projector.source(original)
+    value = correction(original, grossCents=30000, payerShareCents=18000, partnerShareCents=12000)
+    value["sourceValues"]["item"] = "Rent payment (due 1st)"
+    projector.project(value)
+    assert sheet.read(7, 1, 3) == ["Rent payment (due 1st)", 300]
+
+
+def test_move_checks_old_and_new_budget_links_before_any_mutation(setup, monkeypatch):
+    from bookiebot.reimbursements import migration
+    projector, books, _source = setup
+    original = allocation()
+    projector.project(original)
+    value = correction(original, "move", category="grocery", sourceColumnMap={"date": 1, "amount": 2, "location": 3, "person": 4})
+    calls = []
+    def guard(_client, owner, _when, category, **_kwargs):
+        calls.append((owner, category))
+        if category == "grocery":
+            raise ValueError("Frozen destination")
+    monkeypatch.setattr(migration, "verify_budget_links", guard)
+    book = books["shared-2026"]
+    writes = len(book.batch_calls), len(book.value_calls)
+    with pytest.raises(ValueError, match="Frozen"):
+        projector.project(value)
+    assert calls == [("brian", "need_expenses"), ("hannah", "need_expenses"), ("brian", "grocery")]
+    assert (len(book.batch_calls), len(book.value_calls)) == writes
+
+
+def test_sync_persists_corrected_source_position_after_verified_move(setup, monkeypatch):
+    from bookiebot.reimbursements import mirror
+    projector, _books, source = setup
+    original = allocation()
+    projector.project(original)
+    source.write(2, 0, ["9/8/2026", 12, "Existing grocery", "Hannah"])
+    value = correction(original, "move", category="grocery", sourceColumnMap={"date": 1, "amount": 2, "location": 3, "person": 4})
+    marked, mirrored = [], []
+    store = SimpleNamespace(access=object(), pending_projections=lambda: [value],
+                            mark_projected=lambda identity, version, **kwargs: marked.append((identity, version, kwargs)) or True)
+    monkeypatch.setattr(mirror, "mirror_allocation", lambda _client, current: mirrored.append(current["sourceRow"]))
+    assert sync_pending(store, projector)
+    assert mirrored == [4]
+    assert marked == [("allocation-1", 2, {"source_row": 4})]

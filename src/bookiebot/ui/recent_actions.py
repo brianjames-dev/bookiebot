@@ -58,12 +58,8 @@ class RecentActionDecisionView(ViewBase):  # type: ignore[misc]
             self.add_item(RecentActionButton("Update", "update", callback_func))
         if capabilities is None or capabilities.can_move:
             self.add_item(RecentActionButton("Move", "move", callback_func))
-        if capabilities is None or capabilities.can_split:
+        if capabilities is None or capabilities.can_split or capabilities.can_change_split:
             self.add_item(RecentActionButton("Split", "split", callback_func))
-        if capabilities is not None and capabilities.can_change_split:
-            self.add_item(RecentActionButton("Change split", "change_split", callback_func))
-        if capabilities is not None and capabilities.can_cancel_split:
-            self.add_item(RecentActionButton("Cancel split", "cancel_split", callback_func))
         if capabilities is None or capabilities.can_delete:
             self.add_item(RecentActionButton("Delete", "delete", callback_func))
         self.add_item(RecentActionButton("Cancel", "cancel", callback_func))
@@ -79,11 +75,13 @@ class SplitMethodView(ViewBase):  # type: ignore[misc]
 
 
 class ChangeSplitMethodView(ViewBase):  # type: ignore[misc]
-    def __init__(self, callback_func: Callable):
+    def __init__(self, callback_func: Callable, *, can_cancel_split: bool = False):
         super().__init__(timeout=300)
         self.add_item(RecentActionButton("By income", "income", callback_func))
         self.add_item(RecentActionButton("50/50", "equal", callback_func))
         self.add_item(RecentActionButton("Fronted", "fronted", callback_func))
+        if can_cancel_split:
+            self.add_item(RecentActionButton("Cancel split", "cancel_split", callback_func))
         self.add_item(RecentActionButton("Cancel", "cancel", callback_func))
 
 

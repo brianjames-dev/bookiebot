@@ -977,7 +977,168 @@ async def test_recent_action_capabilities_make_unsupported_operations_explicit()
         getattr(child, "label", "")
         for child in getattr(RecentActionDecisionView(lambda *_args: None, split_capabilities), "children", [])
     ]
-    assert split_labels == ["Change split", "Cancel split", "Cancel"]
+    assert split_labels == ["Split", "Cancel"]
+
+
+@pytest.fixture
+def canonical_grocery_split(message):
+    from bookiebot.sheets.undo import LoggedAction, UndoAction
+
+    return LoggedAction(
+        id="canonical-split",
+        created_at="2026-09-16T08:15:00",
+        user_key=str(message.author.id),
+        action=UndoAction(
+            worksheet="expense",
+            kind="restore_cells",
+            row=3,
+            columns=[1, 2, 3, 4],
+            previous_values=["9/16/2026", "Costco Wholesale", "$92.34", "Hannah"],
+            new_values=["9/16/2026", "Costco Wholesale", "$92.34", "Hannah"],
+            metadata={
+                "type": "split",
+                "source_type": "expense",
+                "category": "grocery",
+                "canonical_reimbursement": "true",
+                "accounting": "cash_v1",
+                "allocation_id": "allocation-1",
+                "gross_amount": "92.34",
+                "split_method": "equal",
+            },
+            description="split grocery $92.34",
+        ),
+    )
+
+
+def _recent_test_interaction(user):
+    return SimpleNamespace(
+        user=user,
+        response=SimpleNamespace(send_message=AsyncMock(), defer=AsyncMock()),
+        followup=SimpleNamespace(send=AsyncMock()),
+    )
+
+
+async def _open_split_decision(monkeypatch, message, logged):
+    monkeypatch.setattr(ih, "select_recent_action", lambda *_args, **_kwargs: logged)
+    selection = ih._recent_action_select_view(str(message.author.id), [logged]).children[0]
+    selection._values = [logged.id]
+    interaction = _recent_test_interaction(message.author)
+    await selection.callback(interaction)
+    return interaction.response.send_message.call_args.kwargs["view"]
+
+
+@pytest.mark.asyncio
+async def test_existing_canonical_split_keeps_transaction_update_and_split_menus_separate(monkeypatch, message, canonical_grocery_split):
+    decision_view = await _open_split_decision(monkeypatch, message, canonical_grocery_split)
+    assert [child.label for child in decision_view.children] == ["Update", "Move", "Split", "Delete", "Cancel"]
+
+    update_interaction = _recent_test_interaction(message.author)
+    await next(child for child in decision_view.children if child.label == "Update").callback(update_interaction)
+    update_call = update_interaction.response.send_message.call_args
+    assert "Which field would you like to update?" in update_call.args[0]
+    assert [child.label for child in update_call.kwargs["view"].children] == ["Amount", "Location", "Person"]
+    assert update_call.kwargs["ephemeral"] is True
+
+    split_interaction = _recent_test_interaction(message.author)
+    await next(child for child in decision_view.children if child.label == "Split").callback(split_interaction)
+    split_call = split_interaction.response.send_message.call_args
+    assert "How do you want to update this split?" in split_call.args[0]
+    assert [child.label for child in split_call.kwargs["view"].children] == ["By income", "50/50", "Fronted", "Cancel split", "Cancel"]
+    assert split_call.kwargs["ephemeral"] is True
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("decision", ["split", "change_split"])
+async def test_split_and_legacy_change_callback_open_existing_split_editor(monkeypatch, message, canonical_grocery_split, decision):
+    decision_view = await _open_split_decision(monkeypatch, message, canonical_grocery_split)
+    interaction = _recent_test_interaction(message.author)
+    await decision_view.children[0].callback_func(interaction, decision)
+
+    call = interaction.response.send_message.call_args
+    assert "How do you want to update this split?" in call.args[0]
+    assert [child.custom_id for child in call.kwargs["view"].children] == ["income", "equal", "fronted", "cancel_split", "cancel"]
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("decision", ["update", "move", "split", "delete", "change_split", "cancel_split"])
+async def test_existing_split_decisions_reject_another_owner_before_selecting(monkeypatch, message, canonical_grocery_split, decision):
+    decision_view = await _open_split_decision(monkeypatch, message, canonical_grocery_split)
+    select = MagicMock(return_value=canonical_grocery_split)
+    monkeypatch.setattr(ih, "select_recent_action", select)
+    interaction = _recent_test_interaction(SimpleNamespace(id=676638528590970917, name=".deebers"))
+
+    await decision_view.children[0].callback_func(interaction, decision)
+
+    select.assert_not_called()
+    assert "belongs to another user" in interaction.response.send_message.call_args.args[0]
+
+
+@pytest.mark.asyncio
+async def test_unsplit_expense_still_opens_new_split_choices(monkeypatch, message, canonical_grocery_split):
+    canonical_grocery_split.action.metadata = {"type": "expense", "category": "grocery"}
+    decision_view = await _open_split_decision(monkeypatch, message, canonical_grocery_split)
+    interaction = _recent_test_interaction(message.author)
+
+    await next(child for child in decision_view.children if child.label == "Split").callback(interaction)
+
+    call = interaction.response.send_message.call_args
+    assert "How do you want to split this expense?" in call.args[0]
+    assert [child.custom_id for child in call.kwargs["view"].children] == ["income", "equal", "fronted", "no_split"]
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("confirmation", ["confirm_cancel_split", "keep_split"])
+async def test_cancel_existing_split_from_submenu_requires_confirmation(monkeypatch, message, canonical_grocery_split, confirmation):
+    cancel = MagicMock(return_value=(True, "Split canceled."))
+    monkeypatch.setattr(ih, "cancel_split_recent_action", cancel)
+    decision_view = await _open_split_decision(monkeypatch, message, canonical_grocery_split)
+    split_interaction = _recent_test_interaction(message.author)
+    await next(child for child in decision_view.children if child.label == "Split").callback(split_interaction)
+    split_view = split_interaction.response.send_message.call_args.kwargs["view"]
+    cancel_interaction = _recent_test_interaction(message.author)
+    await next(child for child in split_view.children if child.custom_id == "cancel_split").callback(cancel_interaction)
+
+    cancel.assert_not_called()
+    cancel_call = cancel_interaction.response.send_message.call_args
+    assert "Cancel this split?" in cancel_call.args[0]
+    assert cancel_call.kwargs["ephemeral"] is True
+    confirm_view = cancel_call.kwargs["view"]
+
+    intruder = _recent_test_interaction(SimpleNamespace(id=676638528590970917, name=".deebers"))
+    confirm_button = next(child for child in confirm_view.children if child.custom_id == confirmation)
+    await confirm_button.callback(intruder)
+    assert "belongs to another user" in intruder.response.send_message.call_args.args[0]
+    cancel.assert_not_called()
+
+    owner = _recent_test_interaction(message.author)
+    await confirm_button.callback(owner)
+    if confirmation == "confirm_cancel_split":
+        cancel.assert_called_once_with(str(message.author.id), action_id=canonical_grocery_split.id)
+    else:
+        cancel.assert_not_called()
+        assert "existing split remains unchanged" in owner.response.send_message.call_args.args[0]
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("method", [None, "equal"])
+async def test_split_command_edits_existing_split(monkeypatch, message, canonical_grocery_split, method):
+    monkeypatch.setattr(ih, "select_recent_action", lambda *_args, **_kwargs: canonical_grocery_split)
+    send_private = AsyncMock()
+    monkeypatch.setattr(ih, "_send_recent_private_message", send_private)
+    change = MagicMock(return_value=(True, "Changed split."))
+    create = MagicMock()
+    monkeypatch.setattr(ih, "change_split_recent_action", change)
+    monkeypatch.setattr(ih, "split_recent_action", create)
+
+    await ih.split_recent_action_handler({"action_id": canonical_grocery_split.id, "split_method": method}, message)
+
+    create.assert_not_called()
+    if method:
+        change.assert_called_once_with(str(message.author.id), split_method=method, action_id=canonical_grocery_split.id)
+    else:
+        change.assert_not_called()
+        assert "How do you want to update this split?" in send_private.call_args.args[1]
+        assert "Cancel split" in [child.label for child in send_private.call_args.kwargs["view"].children]
 
 
 @pytest.mark.asyncio

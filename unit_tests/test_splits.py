@@ -1,7 +1,10 @@
 from __future__ import annotations
 
 import pytest
+from types import SimpleNamespace
+from unittest.mock import AsyncMock, MagicMock
 
+import bookiebot.splits as splits
 from bookiebot.splits import requested_split_directive, should_auto_prompt_for_split
 from bookiebot.ui.recent_actions import CancelSplitConfirmView, ChangeSplitMethodView, SplitMethodView
 
@@ -54,11 +57,51 @@ async def test_split_method_buttons_use_approved_labels_and_no_split_is_secondar
 
 @pytest.mark.asyncio
 async def test_split_change_and_cancel_confirmation_buttons_are_explicit():
-    change_view = ChangeSplitMethodView(lambda *_args: None)
+    change_view = ChangeSplitMethodView(lambda *_args: None, can_cancel_split=True)
     cancel_view = CancelSplitConfirmView(lambda *_args: None)
 
-    assert [child.label for child in change_view.children] == ["By income", "50/50", "Fronted", "Cancel"]
+    assert [child.label for child in change_view.children] == ["By income", "50/50", "Fronted", "Cancel split", "Cancel"]
+    assert change_view.children[-2].style.name == "danger"
     assert change_view.children[-1].style.name == "secondary"
     assert [child.label for child in cancel_view.children] == ["Confirm cancel split", "Keep split"]
     assert cancel_view.children[0].style.name == "danger"
     assert cancel_view.children[1].style.name == "secondary"
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("method", ["income", "equal", "fronted", "cancel", "cancel_split"])
+async def test_existing_split_submenu_routes_methods_and_rejects_other_owners(monkeypatch, method):
+    change = MagicMock(return_value=(True, "Changed split."))
+    create = MagicMock()
+    cancel = AsyncMock()
+    monkeypatch.setattr(splits, "change_split_recent_action", change)
+    monkeypatch.setattr(splits, "split_recent_action", create)
+    actor_key = "830984827904851969"
+    view = splits.change_split_method_view(actor_key, "existing-split", on_cancel_split=cancel)
+    button = next(child for child in view.children if child.custom_id == method)
+    interaction = SimpleNamespace(
+        user=SimpleNamespace(id=676638528590970917, name=".deebers"),
+        response=SimpleNamespace(send_message=AsyncMock(), defer=AsyncMock()),
+        followup=SimpleNamespace(send=AsyncMock()),
+    )
+
+    await button.callback(interaction)
+
+    assert "belongs to another user" in interaction.response.send_message.call_args.args[0]
+    change.assert_not_called()
+    cancel.assert_not_called()
+    interaction.user = SimpleNamespace(id=int(actor_key), name="hannerish")
+
+    await button.callback(interaction)
+
+    create.assert_not_called()
+    if method == "cancel_split":
+        cancel.assert_awaited_once_with(interaction)
+        change.assert_not_called()
+    elif method == "cancel":
+        change.assert_not_called()
+        cancel.assert_not_called()
+        assert "existing split remains unchanged" in interaction.response.send_message.call_args.args[0]
+    else:
+        change.assert_called_once_with(actor_key, split_method=method, action_id="existing-split")
+        cancel.assert_not_called()

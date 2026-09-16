@@ -10,7 +10,7 @@ from bookiebot.reimbursements import migration, projection, service, store as st
 from bookiebot.reimbursements.store import MAX_CENTS, ReimbursementConflictError, ReimbursementStore, ReimbursementValidationError
 from bookiebot.sheets import auth, routing, undo
 from unit_tests.reimbursements.test_projection import Book, receipt_row
-from unit_tests.reimbursements.test_store import access, command, payment  # noqa: F401
+from unit_tests.reimbursements.test_store import access, command, payment, payload  # noqa: F401
 
 BRIAN = "676638528590970917"
 FIELDS = {"date": 30, "item": 31, "amount": 32, "location": 33, "person": 34}
@@ -133,6 +133,34 @@ def test_fixed_bill_captures_verified_label_identity_without_mutating_callers(se
     assert fields == {"amount": 3} and values == {"amount": "464.72"}
 
 
+def test_fixed_bill_amount_correction_preserves_literal_source_label_and_canonical_item(setup):
+    label = "Rent payment (due 1st)"
+    setup.sheet.write(2, 1, [label, 464.72])
+    value = setup.store.register_allocation(payload(
+        sourceActionId=setup.logged.id, sourceWorksheet="income", sourceSheetTitle="January",
+        sourceSpreadsheetId="budget", sourceYear=routing.now_pacific().year, sourceRow=3,
+        item="rent", category="rent", sourceColumnMap={"item": 2, "amount": 3},
+        sourceValues={"item": label, "amount": "464.72"},
+        grossCents=46472, payerShareCents=30081, partnerShareCents=16391,
+    ))
+    assert projection.sync_pending(setup.store)
+    logged = SimpleNamespace(id=value["splitActionId"], action=undo.UndoAction(
+        worksheet="income", kind="restore_cells", row=3, columns=[3], previous_values=[],
+        new_values=["464.72"], description="split rent", metadata={
+            "allocation_id": value["id"], "accounting": "cash_v1", "canonical_version": str(value["version"]),
+        }))
+    ok, message = service.mutate_recent_action(BRIAN, logged, "update", updates={"amount": "500"})
+    assert ok and "syncing" not in message
+    current = setup.store.get_allocation(value["id"])
+    assert current["item"] == "rent"
+    assert current["sourceValues"] == {"item": label, "amount": "500.00"}
+    assert setup.sheet.read(2, 1, 3) == [label, 500]
+    # Future settlement projection must still bind the original literal label.
+    result = service.command("brian", payment(current, 1000))
+    assert not result["projectionPending"]
+    assert setup.sheet.read(2, 1, 3) == [label, 490]
+
+
 def test_canonical_lookup_outage_fails_closed_and_undo_never_touches_sheet(setup, monkeypatch):
     split(setup)
     allocation = setup.store.snapshot("brian")["allocations"][0]
@@ -141,8 +169,9 @@ def test_canonical_lookup_outage_fails_closed_and_undo_never_touches_sheet(setup
     guarded = undo._canonical_action(logged)
     assert guarded is not None and guarded.action.metadata["allocation_id"] == allocation["id"]
     capabilities = undo.action_capabilities(guarded.action)
-    assert not any((capabilities.can_update, capabilities.can_move, capabilities.can_split, capabilities.can_change_split,
-                    capabilities.can_cancel_split, capabilities.can_delete, capabilities.can_undo))
+    assert all((capabilities.can_update, capabilities.can_move, capabilities.can_change_split,
+                capabilities.can_cancel_split, capabilities.can_delete))
+    assert not capabilities.can_undo
     monkeypatch.setattr(undo, "get_sheets_repo", lambda: pytest.fail("Must guard before requesting a worksheet"))
     ok, message = undo._apply_undo_action(setup.logged.action, action_id=setup.logged.id)
     assert not ok and "reimbursement" in message.lower()
@@ -196,3 +225,160 @@ def test_bank_matching_keeps_one_original_gross_candidate_after_cash_settlement_
     assert undo.read_active_logged_actions("830984827904851969") == []
     assert len(actions) == 2 and len(setup.history) == 1, "Projection creates no duplicate bank-matchable action-log expense"
     assert setup.sheet.read(2, 31, 32) == [(46472 - received) / 100]
+
+
+def selected(setup):
+    value = setup.store.find_by_source(setup.logged.id, routing.now_pacific().year)
+    return SimpleNamespace(id=value["splitActionId"], action=replace(setup.history[0], metadata={
+        **setup.history[0].metadata, "canonical_version": str(value["version"])}))
+
+
+def test_edit_split_changes_allocation_only_then_update_preserves_method(setup):
+    split(setup)
+    ok, message = service.mutate_recent_action(BRIAN, selected(setup), "split", split_method="equal")
+    assert ok and "50/50" in message and "syncing" not in message
+    value = setup.store.snapshot("brian")["allocations"][0]
+    assert value["method"] == "equal" and value["partnerShareCents"] == 23236
+    assert setup.sheet.read(2, 31, 32) == [464.72]
+    assert len(setup.history) == 1
+    ok, message = service.mutate_recent_action(BRIAN, selected(setup), "update", updates={"amount": "500.01", "location": "Costco"})
+    assert ok and "syncing" not in message
+    value = setup.store.snapshot("brian")["allocations"][0]
+    assert value["method"] == "equal" and value["grossCents"] == 50001
+    assert value["payerShareCents"] == 25001 and value["partnerShareCents"] == 25000
+    assert setup.sheet.read(2, 29, 34) == ["1/3/2026", "Hannah's T", 500.01, "Costco", "Brian (BofA)"]
+    response = service.command("brian", payment(value, 1000))
+    assert not response["projectionPending"]
+    assert setup.sheet.read(2, 31, 32) == [490.01]
+
+
+def test_split_move_preserves_obligation_and_repeated_move_prompts_for_missing_item(setup, monkeypatch):
+    split(setup)
+    ok, message = service.mutate_recent_action(BRIAN, selected(setup), "move", destination_category="grocery")
+    assert ok and "syncing" not in message
+    value = setup.store.snapshot("brian")["allocations"][0]
+    assert value["category"] == "grocery" and value["sourceColumnMap"] == {"date": 1, "amount": 2, "location": 3, "person": 4}
+    assert value["partnerShareCents"] == 16391 and value["sourceRow"] == 3
+    assert setup.sheet.read(2, 0, 4) == ["1/3/2026", 464.72, "Gameday", "Brian (BofA)"]
+    assert setup.sheet.read(2, 29, 34) == [""] * 5
+    pending = []
+    monkeypatch.setattr(undo, "set_pending_move_item", lambda *args: pending.append(args))
+    ok, message = service.mutate_recent_action(BRIAN, selected(setup), "move", destination_category="food")
+    assert not ok and "item name" in message and pending
+    ok, message = service.mutate_recent_action(BRIAN, selected(setup), "move", destination_category="food", updates={"item": "Dinner"})
+    assert ok and "syncing" not in message
+    assert setup.sheet.read(2, 13, 18) == ["1/3/2026", "Dinner", 464.72, "Gameday", "Brian (BofA)"]
+    assert setup.sheet.read(2, 0, 4) == [""] * 4
+
+
+def test_cancel_update_reactivate_then_delete_split_preserves_original_history(setup):
+    split(setup)
+    original = setup.store.snapshot("brian")["allocations"][0]
+    ok, message = service.mutate_recent_action(BRIAN, selected(setup), "cancel")
+    assert ok and "syncing" not in message
+    assert setup.store.snapshot("hannah")["allocations"] == []
+    assert setup.sheet.read(2, 31, 32) == [464.72]
+    mirror = setup.book.worksheet("Shared Reimbursements").get_all_values()
+    assert "void" in mirror[1]
+    ok, message = service.mutate_recent_action(BRIAN, selected(setup), "update", updates={"amount": "600"})
+    assert ok and "syncing" not in message
+    assert setup.store.snapshot("brian")["allocations"] == []
+    assert setup.sheet.read(2, 31, 32) == [600]
+    ok, message = service.mutate_recent_action(BRIAN, selected(setup), "split", split_method="equal")
+    assert ok and "syncing" not in message
+    value = setup.store.snapshot("hannah")["allocations"][0]
+    assert value["id"] == original["id"] and value["outstandingCents"] == 30000
+    ok, message = service.mutate_recent_action(BRIAN, selected(setup), "delete")
+    assert ok and "syncing" not in message
+    assert setup.store.snapshot("brian")["allocations"] == []
+    assert setup.sheet.read(2, 29, 34) == [""] * 5
+    assert len(setup.history) == 1
+    assert setup.store.get_allocation(value["id"])["lifecycle"] == "deleted"
+
+
+def test_correction_replay_recovers_lost_projection_response_without_duplicate_revision(setup):
+    split(setup)
+    stale = selected(setup)
+    setup.book.timeout_after_values = True
+    params = dict(user_key=BRIAN, logged=stale, operation="update", updates={"amount": "500", "location": "Costco"})
+    ok, message = service.mutate_recent_action(**params)
+    assert ok and "syncing" in message
+    first = setup.store.snapshot("brian")["allocations"][0]
+    assert first["version"] != first["projectedVersion"]
+    assert setup.sheet.read(2, 31, 33) == [500, "Costco"]
+    ok, message = service.mutate_recent_action(**params)
+    assert ok and "syncing" not in message
+    current = setup.store.get_allocation(first["id"])
+    assert current["version"] == current["projectedVersion"] == first["version"]
+    with setup.store.access.connect() as db:
+        assert db.execute("SELECT COUNT(*) AS n FROM app_reimbursement_revisions").fetchone()["n"] == 1
+
+
+def test_correction_stale_owner_and_unsupported_fields_cannot_change_source(setup):
+    split(setup)
+    stale = selected(setup)
+    assert service.mutate_recent_action(BRIAN, stale, "update", updates={"location": "Costco"})[0]
+    assert not service.mutate_recent_action(BRIAN, stale, "update", updates={"amount": "200"})[0]
+    for updates in ({"person": "Hannah"}, {"date": "9/15/2026"}, {"amount": "100.001"}, {"amount": "0"}):
+        ok, _ = service.mutate_recent_action(BRIAN, selected(setup), "update", updates=updates)
+        assert not ok
+    assert setup.sheet.read(2, 29, 34) == ["1/3/2026", "Hannah's T", 464.72, "Costco", "Brian (BofA)"]
+
+
+def test_correction_after_reversed_receipt_keeps_old_receipt_zero_and_new_receipt_current(setup):
+    split(setup)
+    value = setup.store.snapshot("brian")["allocations"][0]
+    paid = service.command("brian", payment(value, 5000))
+    assert not service.mutate_recent_action(BRIAN, selected(setup), "update", updates={"amount": "500"})[0]
+    event = paid["events"][0]
+    service.command("brian", command("reverse", eventId=event["id"]))
+    ok, message = service.mutate_recent_action(BRIAN, selected(setup), "move", destination_category="grocery")
+    assert ok and "syncing" not in message
+    assert receipt_row(setup.book, event["id"])[2] == 0
+    value = setup.store.snapshot("brian")["allocations"][0]
+    paid = service.command("brian", payment(value, 2000))
+    assert not paid["projectionPending"]
+    assert setup.sheet.read(value["sourceRow"] - 1, 1, 2) == [444.72]
+    assert receipt_row(setup.book, event["id"])[2] == 0
+
+
+@pytest.mark.parametrize("operation", ["move", "delete"])
+def test_move_delete_retry_finishes_saved_correction_without_repeating_write(setup, operation):
+    split(setup)
+    stale = selected(setup)
+    if operation == "move":
+        setup.book.timeout_after_batch = True
+    else:
+        setup.book.timeout_after_values = True
+    params = dict(user_key=BRIAN, logged=stale, operation=operation)
+    if operation == "move":
+        params["destination_category"] = "grocery"
+    ok, message = service.mutate_recent_action(**params)
+    assert ok and "syncing" in message
+    first = setup.store.get_allocation(stale.action.metadata["allocation_id"])
+    ok, message = service.mutate_recent_action(**params)
+    assert ok and "syncing" not in message
+    current = setup.store.get_allocation(first["id"])
+    assert current["version"] == current["projectedVersion"] == first["version"]
+
+
+@pytest.mark.parametrize("operation", ["update", "delete"])
+def test_saved_correction_and_no_change_retry_survive_projection_setup_failure(setup, monkeypatch, operation):
+    split(setup)
+    stale = selected(setup)
+    original = auth.get_gspread_client
+    monkeypatch.setattr(auth, "get_gspread_client", lambda: (_ for _ in ()).throw(ConnectionError("offline")))
+    params = dict(user_key=BRIAN, logged=stale, operation=operation)
+    if operation == "update":
+        params["updates"] = {"amount": "500"}
+    for _ in range(2):
+        ok, message = service.mutate_recent_action(**params)
+        assert ok and "change is saved" in message
+        assert "Open Shared in the app and refresh to retry syncing." in message
+    pending = setup.store.get_allocation(stale.action.metadata["allocation_id"])
+    assert pending["version"] == int(stale.action.metadata["canonical_version"]) + 1
+    monkeypatch.setattr(auth, "get_gspread_client", original)
+    ok, message = service.mutate_recent_action(**params)
+    assert ok and "syncing" not in message
+    current = setup.store.get_allocation(pending["id"])
+    assert current["version"] == current["projectedVersion"] == pending["version"]
