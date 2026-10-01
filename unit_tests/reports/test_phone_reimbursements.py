@@ -262,3 +262,90 @@ async def test_revoked_session_during_read_drops_personal_data(client, monkeypat
     result = await client.http.get("/app/reimbursements")
     assert result.status == 401
     assert "Private shared expense" not in await result.text()
+
+
+def sync_fixture(store):
+    for allocation in store.pending_projections():
+        store.mark_projected(allocation["id"], allocation["version"])
+    return True
+
+
+@pytest.mark.asyncio
+async def test_reset_and_grouped_undo_redo_reach_both_authenticated_phones(client, monkeypatch):
+    monkeypatch.setattr(projection, "sync_pending", sync_fixture)
+    connect(client)
+    before = await (await client.http.get("/app/reimbursements")).json()
+    body = {"operation": "reset", "requestId": uuid4().hex, "expectedState": before["resetState"],
+            "note": "Settled together outside BookieBot"}
+    saved = await client.http.post("/app/reimbursements", json=body, headers=HEADERS)
+    assert saved.status == 200
+    cleared = await saved.json()
+    assert cleared["projectionPending"] is False
+    assert cleared["allocations"][0]["outstandingCents"] == 0
+    assert cleared["allocations"][0]["clearedCents"] == 4000
+    assert cleared["allocations"][0]["settledCents"] == 0
+    assert cleared["events"] == []
+    reset = cleared["resets"][0]
+    assert reset["actorOwner"] == "brian" and reset["canUndo"]
+    retry = await client.http.post("/app/reimbursements", json=body, headers=HEADERS)
+    assert retry.status == 200
+    assert len((await retry.json())["resets"]) == 1
+
+    connect(client, HANNAH, "hannah")
+    partner = await (await client.http.get("/app/reimbursements")).json()
+    assert partner["ownerKey"] == "hannah" and partner["resets"] == cleared["resets"]
+    undone = await client.http.post("/app/reimbursements", json={
+        "operation": "undo_reset", "requestId": uuid4().hex, "resetId": reset["id"], "version": reset["version"],
+    }, headers=HEADERS)
+    assert undone.status == 200
+    reopened = await undone.json()
+    assert reopened["allocations"][0]["outstandingCents"] == 4000
+    assert reopened["resets"][0]["status"] == "undone"
+    assert reopened["resets"][0]["canRedo"]
+    redone = await client.http.post("/app/reimbursements", json={
+        "operation": "redo_reset", "requestId": uuid4().hex,
+        "resetId": reset["id"], "version": reopened["resets"][0]["version"],
+    }, headers=HEADERS)
+    assert redone.status == 200
+    result = await redone.json()
+    assert result["allocations"][0]["outstandingCents"] == 0
+    assert result["allocations"][0]["settledCents"] == 0 and result["events"] == []
+
+
+@pytest.mark.asyncio
+async def test_reset_stale_preview_and_spoofed_actor_are_rejected(client, monkeypatch):
+    monkeypatch.setattr(projection, "sync_pending", sync_fixture)
+    connect(client)
+    before = await (await client.http.get("/app/reimbursements")).json()
+    body = {"operation": "reset", "requestId": uuid4().hex, "expectedState": before["resetState"]}
+    spoofed = await client.http.post("/app/reimbursements", json={**body, "actorOwner": "hannah"}, headers=HEADERS)
+    assert spoofed.status == 400
+    assert client.store.snapshot("brian")["resets"] == []
+    assert (await client.http.post("/app/reimbursements", json=payment(client), headers=HEADERS)).status == 200
+    stale = await client.http.post("/app/reimbursements", json=body, headers=HEADERS)
+    assert stale.status == 409
+    assert client.store.snapshot("brian")["resets"] == []
+    assert client.store.get_allocation(client.allocation["id"])["outstandingCents"] == 2975
+
+
+@pytest.mark.asyncio
+async def test_reset_lost_projection_response_reuses_committed_request(client, monkeypatch):
+    connect(client)
+    sync_fixture(client.store)
+    before = client.store.snapshot("brian")
+    body = {"operation": "reset", "requestId": uuid4().hex, "expectedState": before["resetState"]}
+
+    def lost_response(store):
+        assert len(store.snapshot("brian")["resets"]) == 1
+        raise RuntimeError("Lost projection response")
+
+    monkeypatch.setattr(projection, "sync_pending", lost_response)
+    result = await client.http.post("/app/reimbursements", json=body, headers=HEADERS)
+    assert result.status == 503
+    assert client.store.get_allocation(client.allocation["id"])["outstandingCents"] == 0
+    monkeypatch.setattr(projection, "sync_pending", sync_fixture)
+    retry = await client.http.post("/app/reimbursements", json=body, headers=HEADERS)
+    assert retry.status == 200
+    state = await retry.json()
+    assert len(state["resets"]) == 1 and state["projectionPending"] is False
+    assert state["allocations"][0]["version"] == 2

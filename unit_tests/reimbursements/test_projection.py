@@ -168,6 +168,22 @@ def event(identity="receipt-1", amount=5000, **updates):
             "confirmedAt": "2026-09-08T10:00:00Z", "reversedAt": "", **updates}
 
 
+@pytest.mark.parametrize("cleared", [16391, 0])
+def test_balance_reset_projection_never_reads_or_rewrites_purchase_and_receipt_sheets(cleared):
+    def unexpected_access(*_args, **_kwargs):
+        raise AssertionError("Reset, undo and redo update only the reimbursement mirror")
+    projector = SheetsProjection(SimpleNamespace(open_by_key=unexpected_access))
+    projector.project(allocation(version=4, projectedVersion=3, mirrorOnlyVersion=4, clearedCents=cleared))
+
+
+def test_old_reset_marker_cannot_skip_later_financial_projection():
+    def unavailable(*_args, **_kwargs):
+        raise ConnectionError("Source must be checked for a later financial change")
+    projector = SheetsProjection(SimpleNamespace(open_by_key=unavailable))
+    with pytest.raises(ConnectionError, match="later financial change"):
+        projector.project(allocation(version=5, projectedVersion=4, mirrorOnlyVersion=4, sourceWorksheet="income"))
+
+
 @pytest.fixture
 def setup(monkeypatch):
     from bookiebot.reimbursements import migration

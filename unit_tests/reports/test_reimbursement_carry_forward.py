@@ -59,6 +59,24 @@ def test_monthly_history_keeps_received_items_while_outstanding_uses_latest_life
     assert payload["metrics"]["monthlyIncome"] == 5000
 
 
+def test_reset_sheet_history_and_report_keep_cleared_amount_separate_from_receipts(monkeypatch):
+    monkeypatch.setattr(reports, "now_pacific", lambda: NOW)
+    cleared = allocation("cleared", status="cleared", received_amount=25,
+                         updated_at="2027-01-06T10:00:00-08:00")
+    snapshot = history.reimbursement_history_from_ledgers(BRIAN, [ledger(2026, cleared)], as_of=NOW)
+    assert snapshot.status == "complete" and not snapshot.outstanding_records
+    assert snapshot.received_records[0].allocation.cleared_amount == 75
+    payload = reports.expense_breakdown_client_payload(build(BudgetMonth(2026, 12), snapshot))
+    record = payload["sharedReimbursements"][0]
+    assert record["status"] == "cleared" and record["outstandingAmount"] == 0
+    assert record["receivedAmount"] == 25 and record["clearedAmount"] == 75
+    assert payload["openSharedReimbursements"] == []
+    assert payload["receivedSharedReimbursements"] == [record]
+    baseline = reports.expense_breakdown_client_payload(build(BudgetMonth(2026, 12),
+        history.reimbursement_history_from_ledgers(BRIAN, [ledger(2026, allocation("cleared", received_amount=25))], as_of=NOW)))
+    assert payload["metrics"] == baseline["metrics"] and payload["modeViews"] == baseline["modeViews"]
+
+
 def test_cross_owner_rows_never_escape_in_any_reimbursement_field(monkeypatch):
     monkeypatch.setattr(reports, "now_pacific", lambda: NOW)
     snapshot = history.reimbursement_history_from_ledgers(BRIAN, [ledger(2026,

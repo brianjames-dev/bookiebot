@@ -2858,6 +2858,7 @@ def _shared_reimbursement_payload(item: SharedAllocation) -> dict[str, Any]:
         "personalShare": round(item.payer_share, 2),
         "partnerShare": round(item.partner_share, 2),
         "receivedAmount": round(item.received_amount, 2),
+        "clearedAmount": round(item.cleared_amount, 2),
         "outstandingAmount": round(item.outstanding_amount, 2),
         "splitMethod": split_method_label(item.split_method),
         "status": item.status,

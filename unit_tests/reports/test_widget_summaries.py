@@ -182,3 +182,22 @@ def test_unavailable_shared_feature_is_not_an_empty_balance(monkeypatch):
     monkeypatch.setattr(widget_summaries.reimbursements, "enabled", lambda: False)
     with pytest.raises(ValueError):
         widget_summaries._shared_content("brian")
+
+
+@pytest.mark.parametrize("owner", ["brian", "hannah"])
+def test_shared_summary_accepts_cleared_balances_without_counting_them_as_receipts(monkeypatch, owner):
+    monkeypatch.setattr(widget_summaries.reimbursements, "enabled", lambda: True)
+    rows = [{"id": "old", "payerOwner": "brian", "partnerOwner": "hannah", "partnerShareCents": 5000,
+             "settledCents": 1000, "clearedCents": 4000, "outstandingCents": 0},
+            {"id": "new", "payerOwner": "hannah", "partnerOwner": "brian", "partnerShareCents": 2300,
+             "settledCents": 0, "outstandingCents": 2300}]
+    def snapshot(request_owner, *, retry_projection):
+        assert request_owner == owner and retry_projection is False
+        return {"ownerKey": owner, "currency": "USD", "allocations": rows, "projectionPending": False, "events": []}
+    monkeypatch.setattr(widget_summaries.reimbursements, "snapshot", snapshot)
+    result = widget_summaries._shared_content(owner)
+    assert result["owedToYou"] == (23 if owner == "hannah" else 0)
+    assert result["youOwe"] == (23 if owner == "brian" else 0)
+    rows[0]["clearedCents"] = 4001
+    with pytest.raises(ValueError, match="Invalid widget shared amount"):
+        widget_summaries._shared_content(owner)

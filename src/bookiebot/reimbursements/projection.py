@@ -430,6 +430,11 @@ class SheetsProjection:
             raise ProjectionConflictError("The reimbursement expense could not be verified.")
 
     def project(self, allocation: dict[str, Any]) -> None:
+        if allocation.get("mirrorOnlyVersion", 0) == allocation.get("version", -1):
+            # A reset changes the obligation, not recorded spending. Its store
+            # command requires the previous financial projection to be synced.
+            # Old frozen budgets must not prevent updating the ledger view.
+            return
         if allocation["accounting"] == "legacy_net":
             return  # Preserved history; no invented historical cash entries.
         revision = allocation.get("sourceRevision", {})

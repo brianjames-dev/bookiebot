@@ -1,5 +1,13 @@
 # Agent Decisions
 
+## 2026-09-30 - Clear Shared Debt Separately From Recorded Repayments
+
+Decision: Reset balances clears the complete current outstanding household balance in both directions, across all months, after an explicit reviewed confirmation. Keep `clearedCents` separate from confirmed `settledCents`; preserve purchase amounts, payment rows and income. Store reset groups plus an append-only reset/undo/redo audit in additive tables in the existing phone database. Reuse the household transaction lock and durable request IDs. Validate the full preview fingerprint, pending reports, supported accounting and completed prior projections before commit.
+
+Undo/redo applies the original group only, using current group/allocation versions and payment history. New purchases remain separate; corrections or payment changes after undo invalidate that old redo. Require Undo reset before correcting a cleared expense or reversing its repayment. The reset projection is mirror-only after a verified preceding version, preserving historical frozen expense tabs. Mirror status `cleared` represents the full remaining partner share; received amounts remain actual, existing columns/anchors survive, and reports/widgets distinguish the cleared amount.
+
+Rationale: Settling outside the app does not establish a new payment amount or expense allocation. Separate clearing avoids inventing financial activity while retaining a recoverable audit trail and preventing later edits from silently recreating old debt.
+
 ## 2026-09-16 - Correct Split Expenses Through Canonical Revisions
 
 Decision: Recent split expenses expose the ordinary Update/Move/Split/Delete menu. Split edits allocation method and contains confirmed Cancel split; Update edits purchase details, with gross changes recalculating shares under the retained method. Cancel retains the managed purchase and permits re-splitting; Delete clears its source and voids the allocation. Fixed bills remain amount-only, and payer account edits cannot change ownership.

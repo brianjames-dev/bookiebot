@@ -1,8 +1,10 @@
 # Agent Status
 
-Last updated: 2026-09-16
+Last updated: 2026-09-30
 
 ## Active Focus
+
+Shared balance reset completed (2026-09-30): reviewed Reset balances clears both directions across all months while preserving recorded expenses and repayments. Durable reset history offers guarded grouped Undo/Redo; sheet mirrors, reports, Ask summaries and Shared widgets distinguish clearing from received money. Source correction guards prevent cleared debts from reappearing. Full local suite **1,968 passed / 311 optional PostgreSQL skipped**; Pyright and frontend typecheck/build clean. WebKit passed 12 width/theme/motion cases with real local API reset/undo/redo. Checklist 125 and `docs/REIMBURSEMENTS.md` cover isolated acceptance. No live balance reset or deployment performed.
 
 Split expense actions restored (2026-09-16): canonical split groceries now expose Update/Move/Split/Delete/Cancel. Split edits the allocation and contains confirmed Cancel split; Update retains transaction fields and recalculates shares for gross corrections. Durable revisions, verified source anchors, same-owner account validation and repayment guards preserve ledger/sheet/reconciliation consistency. Fully reversed receipts permit later corrections. Full local suite **1,890 passed / 299 skipped (optional PostgreSQL and unavailable frontend test dependencies)**; Pyright clean. Acceptance is checklist 124 and `docs/REIMBURSEMENTS.md`. No live financial test writes or deployment performed.
 
@@ -81,6 +83,8 @@ All eight September 6 audit batches are implemented and verified locally. Each b
 
 ## On Deck
 
+Shared balance reset implementation is complete. Release and phone acceptance are checklist 125; review the feature branch before deployment. The user's actual balances have not been reset during testing.
+
 Verify split expense corrections in Discord using checklist 124. Implementation and automated verification are complete; use isolated workbook/database fixtures for mutation acceptance.
 
 Reconciliation implementation and local verification are complete; phone acceptance is checklist 123 and docs/RECONCILIATION.md. No live financial test writes are authorized or needed.
@@ -119,6 +123,10 @@ Student-loan activation is complete. Verify the deployed fixed-bill display and 
 25. Harden recent-action pending state across restarts/deploys, since selections currently live only in process memory.
 26. Improve targeted recent-action search so commands can find older matches, not only the latest 10 recent actions.
 27. Explore clarifying questions before logging when BookieBot is uncertain instead of guessing or silently failing.
+
+## Completed 2026-09-30
+
+- Added atomic complete-household debt clearing, durable group/action audit, preview fingerprints and idempotent reset/undo/redo. Keep received and cleared amounts separate, preserve new purchases, reject pending/stale/unsupported state and protect source edits/payment reversal. Mirror-only projections preserve frozen historical budgets, existing sheet columns/anchors and actual receipt totals. Added web review/history, accurate cleared labels, report/widget/Ask parity and same-value correction safeguards. Updated README, reimbursement guide, workstream and durable decisions. Full local suite **1,968 passed / 311 optional PostgreSQL skipped**, Pyright **0 errors / 0 warnings**, frontend typecheck/build and diff checks pass. WebKit exercised reset/undo/redo at 320/390/1280px in both themes and both motion settings, with no overflow or page errors. Used the existing Python 3.12 project environment and disposable local API data; no production financial writes.
 
 ## Completed 2026-09-16
 
@@ -961,6 +969,8 @@ Use a test row or low-risk real row in Discord:
 
 ## Verification Baseline
 
+2026-09-30 balance reset: existing project Python 3.12 environment, `python -m pytest unit_tests` **1,968 passed / 311 optional PostgreSQL skipped** (one existing Kaleido warning); `python -m pyright --pythonpath /Users/brianjames/Dev/bookiebot/venv/bin/python` **0 errors / 0 warnings**. Frontend typecheck/build and executed reimbursement UI contracts pass. Local WebKit tested 12 width/theme/motion combinations against disposable real SQLite/API commands; source/mirror projections use isolated sheet fixtures. The default shell Python lacked project dependencies, so final checks use the existing project environment. CI supplies PostgreSQL contracts.
+
 2026-09-16 split corrections: `python -m pytest unit_tests` **1,890 passed / 299 skipped (optional PostgreSQL and unavailable frontend test dependencies)**, one existing Kaleido deprecation warning; `python -m pyright` **0 errors, 0 warnings**. Used the existing project Python 3.12 environment. The full suite requires loopback test servers and the chart subprocess, so its final run used the approved unsandboxed runner. Focused finance, Discord routing, projection failure/retry, concurrency and canonical lineage regressions passed. No live financial mutations were used.
 
 2026-09-09 Budget widget v1.5: 1,718 local tests passed / 213 optional PostgreSQL skipped; 56 focused widget integration tests passed and Pyright clean. Executed Scriptable trees rendered in WebKit passed 144 device/family/theme/value cases; 64 non-Budget widget trees remain byte-equivalent. This validates a browser approximation, not native WidgetKit font/layout or refresh timing.
@@ -1521,3 +1531,5 @@ python -m pyright
 123. Reconciliation: after updating the app, confirm Reconcile appears only for a watched connected bank account and is scoped separately to Brian/Hannah. Check Needs review/Pending/Checked; expand a suggestion, confirm only an exact recorded amount, then verify refresh preserves the decision. Pending authorizations stay read-only and their posted replacements appear once. Mismatches show both amounts and require correcting the logged expense in BookieBot; Check never logs a purchase. Verify Ignore/reopen change only the review state, stale/outdated reviews require reload, and failed requests recover through Check status. At 320/390/1280px, dark/light and reduced motion, all five tab targets remain usable; compact navigation is 275×44px with five 55×44px targets. Existing four-tab accounts remain 220×44px. Use Sandbox/synthetic data for financial-action tests; see docs/RECONCILIATION.md.
 
 124. Split expense actions (isolated workbook/database for changes): select a split grocery expense in Discord and verify Update, Move, Split, Delete and Cancel. Update must show Amount/Location/Person and retain the current split method; an amount edit recalculates both shares. Split must offer By income/50/50/Fronted and confirmed Cancel split. Try Keep split and ordinary Cancel without changes. Move to Food/Shopping, supply Item if prompted, then move back; verify source/destination, current detail display and one gross bank candidate. Cancel split and verify the full expense remains, then re-split and delete; deleted source/receivable/ancestor matches must disappear. Check account edits cannot change payer ownership and fixed bill amounts never rename/remove the bill row. A pending or confirmed repayment must block source edits; dismiss/reverse it, then verify the correction works and historical repayment rows remain zeroed in their original category. Simulate a lost projection response and repeat: one durable revision and one destination only, with actionable Shared-refresh recovery. Check linked reconciliations reopen after Update/Move/Delete. Production menu inspection is read-only; do not create synthetic production payments.
+
+125. Shared balance reset (isolated workbooks/database): seed debts in both directions across different months/years and a partial received payment. Open Shared → Reset balances, review both totals and confirm. Both owners' phone balances, reports and Shared widgets must show zero; source purchase/payment rows remain identical, and mirrored rows say `cleared` with actual Received Amount unchanged. Expand a cleared receipt to inspect received versus cleared amounts. Add a new split and verify it alone accrues debt. Reset history → Undo reset restores the original group; Redo reset clears that same group while retaining newer debt. Undo then edit/move/change split/cancel/delete an affected expense and verify the old redo is unavailable; active resets give undo-first guidance for all those actions, including same-value corrections and prior payment reversal. Pending reports and stale previews block new resets; unrelated new pending work must not block an otherwise eligible earlier reset undo. Interrupt mirror projection and retry the same request/refresh to confirm one durable reset and eventual convergence. Inspect 320/390/1280px, light/dark and reduced motion; reset history remains available when both balances are zero. Never use production test payments or automatically reset the user's real balance during acceptance.

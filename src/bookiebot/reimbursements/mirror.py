@@ -57,7 +57,7 @@ def _headers(book: Any, sheet: Any, rows: list[list[Any]]) -> None:
 
 
 def _source_row(client: Any, allocation: dict[str, Any], ledger_book: Any, ledger_key: str) -> int:
-    if allocation["accounting"] == "legacy_net":
+    if allocation["accounting"] == "legacy_net" or allocation.get("mirrorOnlyVersion", 0) == allocation.get("version", -1):
         return int(allocation["sourceRow"])  # Historical source access is not required to mirror its record.
     key = str(allocation.get("sourceSpreadsheetId", ""))
     if not key:
@@ -81,7 +81,7 @@ def _values(client: Any, allocation: dict[str, Any], book: Any, key: str) -> lis
     if allocation["settledCents"]:
         received_at = (max(confirmed, key=lambda event: (event["date"], event.get("confirmedAt", ""), event["id"]))["date"]
                        if confirmed else str(allocation.get("legacyReceivedAt", "")))
-    value = {**allocation, "outstandingCents": allocation["partnerShareCents"] - allocation["settledCents"]}
+    value = {**allocation, "outstandingCents": allocation["partnerShareCents"] - allocation["settledCents"] - allocation.get("clearedCents", 0)}
     legacy = replace(allocation_as_legacy(value), payer=allocation["payerPerson"],
                      source_row=_source_row(client, allocation, book, key), received_at=received_at,
                      original_person=allocation["payerPerson"], responsible_person=allocation["payerPerson"])

@@ -20,7 +20,7 @@ def _context(actor_key: str = "676638528590970917") -> ConversationContext:
 
 def test_reimbursement_tool_summarizes_all_records_before_truncation():
     payload = {
-        "sharedReimbursements": [{"id": "old", "receivedAmount": 35}, {"id": "new", "receivedAmount": 20}],
+        "sharedReimbursements": [{"id": "old", "receivedAmount": 35, "clearedAmount": 65}, {"id": "new", "receivedAmount": 20}],
         "openSharedReimbursements": [{"id": str(index), "outstandingAmount": 10} for index in range(60)],
         "reimbursementCoverage": {"status": "partial", "years": [2026], "unavailableYears": [2025]},
     }
@@ -30,6 +30,8 @@ def test_reimbursement_tool_summarizes_all_records_before_truncation():
     assert summary["outstandingAmount"] == 600
     assert summary["outstandingCount"] == 60
     assert summary["receivedForSelectedMonthExpenses"] == 55
+    assert summary["clearedForSelectedMonthExpenses"] == 65
+    assert "no payment, income or spending change" in summary["clearedScope"]
     assert summary["itemsTruncated"] is True
     assert "not cash received during that month" in summary["receivedScope"]
     assert result["reimbursementCoverage"] == payload["reimbursementCoverage"]

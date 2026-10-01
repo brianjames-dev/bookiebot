@@ -14,7 +14,9 @@
 .bb-ledger-message p { margin: 0 0 8px; }
 .bb-ledger-message button, .bb-ledger-actions button, .bb-ledger-incoming-row > button, .bb-ledger-history-row > button { appearance: none; background: transparent; border: 1px solid hsl(var(--border)); border-radius: var(--radius); padding: 9px 12px; font-size: 12px; }
 .bb-ledger-message button:hover, .bb-ledger-actions button:hover, .bb-ledger-incoming-row > button:hover, .bb-ledger-history-row > button:hover { background: hsl(var(--foreground) / .06); }
-.bb-ledger-offset-toggle { display: block; padding: 5px 0; margin-top: 12px; border: 0; background: transparent; color: hsl(var(--primary)); font-size: 12px; }
+.bb-ledger-offset-toggle, .bb-ledger-reset-toggle { display: block; padding: 5px 0; margin-top: 12px; border: 0; background: transparent; color: hsl(var(--primary)); font-size: 12px; }
+.bb-ledger-reset-history { margin-top: 12px; }
+.bb-reimbursement-visual-segments [data-portion="cleared"], .bb-reimbursement-visual-key[data-portion="cleared"] { background: #526b65; }
 .bb-ledger-list-toggle { width: 100%; display: flex; justify-content: space-between; align-items: center; gap: 12px; margin-top: 16px; padding: 10px 0; border: 0; background: transparent; text-align: left; font-size: 14px; }
 .bb-ledger-list-toggle .bb-disclosure-mark { flex-shrink: 0; }
 .bb-ledger-list-toggle[aria-expanded="true"] .bb-disclosure-mark::after { transform: rotate(0deg); }

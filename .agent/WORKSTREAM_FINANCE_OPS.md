@@ -1,8 +1,14 @@
 # Finance Operations Workstream
 
-Last updated: 2026-09-10
+Last updated: 2026-09-30
 
 ## Goal
+
+### Shared balance reset work log — 2026-09-30
+
+Complete (user-requested slice): reviewed all-month/all-year clearing in both directions, separate from repayments and spending. Durable reset groups/action audit, full-preview fingerprints, idempotency and guarded Undo/Redo preserve new debt and reject stale/pending state. Reset projections update the existing reimbursement mirror only, retaining actual receipts, columns/anchors and frozen historical expense sheets. Reports, Ask and Shared widgets distinguish cleared amounts. Source corrections and repayment reversals require undoing an affected reset; unrelated new pending work does not block a valid older group's undo.
+
+Verification: **1,968 passed / 311 optional PostgreSQL skipped**, Pyright and frontend typecheck/build clean; executed UI contracts and 12 WebKit width/theme/motion reset/undo/redo cases passed. Manual acceptance: STATUS checklist 125 and `docs/REIMBURSEMENTS.md`. No live financial writes. General canonical source-correction Undo, historical net-accounting corrections and actual refunds remain separate backlog items; reset Undo/Redo is complete.
 
 Reimbursement compact receipts/accordion (2026-09-08): compact payer/split metadata and aligned amount rows, smaller headings with month pills, and one open receipt per month. Payer/budget distinctions and fronted semantics remain; all amounts, source reads and settlement behavior are unchanged. Focused reimbursement/motion 76 and full 1,116 tests passed / 61 optional PostgreSQL skipped, Python/frontend checks clean; WebKit passed six layouts and sixteen edge states with unchanged overview pixels. STATUS checklist 104 covers acceptance. No finance-operations backlog or mutation semantics changed.
 

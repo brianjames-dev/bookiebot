@@ -130,6 +130,33 @@ def test_preserves_historical_received_date_without_invented_events(setup):
     assert mirrored(books["brian-2026"])[21] == "2026-09-01T08:00:00-07:00"
 
 
+def test_reset_mirror_preserves_received_money_custom_columns_and_existing_anchors(setup):
+    from bookiebot.sheets.collaboration import allocations_from_rows
+    client, books = setup
+    book = books["brian-2026"]
+    sheet = book.add_sheet("Shared Reimbursements", [HEADERS + ["Private note"], old_row() + ["Keep this note"]])
+    mirror.mirror_allocation(client, value(settledCents=5000, events=[event()]))
+    original_anchor = deepcopy(book.names[_name("ledger", "allocation-1")])
+    def ledger_only(key):
+        assert key == "brian-2026", "A reset must not access old source sheets"
+        return book
+    reset_client = SimpleNamespace(open_by_key=ledger_only)
+    mirror.mirror_allocation(reset_client, value(version=2, mirrorOnlyVersion=2, settledCents=5000,
+        clearedCents=11391, events=[event()]))
+    result = dict(zip(HEADERS, mirrored(book)))
+    assert result["status"] == "cleared" and result["received_amount"] == "50.00"
+    assert result["received_at"] == "2026-09-08"
+    assert sheet.rows[0][25] == "Private note" and sheet.rows[1][25] == "Keep this note"
+    assert book.names[_name("ledger", "allocation-1")] == original_anchor
+    parsed = allocations_from_rows(sheet.rows)[0]
+    assert parsed.outstanding_amount == 0 and parsed.received_amount == 50 and parsed.cleared_amount == 113.91
+    mirror.mirror_allocation(reset_client, value(version=3, mirrorOnlyVersion=3, settledCents=5000,
+        clearedCents=0, events=[event()]))
+    restored = allocations_from_rows(sheet.rows)[0]
+    assert restored.status == "outstanding" and restored.outstanding_amount == 113.91
+    assert restored.received_amount == 50 and restored.cleared_amount == 0
+
+
 @pytest.mark.parametrize("phase", ["insert", "anchor", "values"])
 def test_lost_response_retries_do_not_duplicate_or_add_received_money(setup, phase):
     client, books = setup
