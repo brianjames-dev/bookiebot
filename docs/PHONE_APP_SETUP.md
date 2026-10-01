@@ -116,6 +116,8 @@ References: [Apple Home Screen setup](https://support.apple.com/guide/iphone/ope
 
 Once the canonical ledger is enabled, **Shared** shows **Owed to you** and **You owe** across months. An empty direction has a simple message, with settled history still available when present. Expand a row to record a full or partial amount: the recipient's **Record received** confirms money already received; the debtor's **Record sent payment** waits for the other person to **Confirm received**. Pending sent reports must be resolved before another direct receipt or offset for that expense.
 
+If you have settled outside BookieBot, choose **Shared → Reset balances**, review both totals and confirm to zero both directions across all months. Recorded expenses and receipts stay unchanged. **Reset history** offers reviewed **Undo reset** and **Redo reset** for the original group; newer shared expenses retain their balances. Undo an affected reset before correcting its original expenses. Load the app's **Update** first if the control is missing; ordinary data Refresh does not load new code.
+
 Only confirmed amounts change expense rows. The payer's original purchase is reduced by the confirmed repayment, and the debtor gets a linked expense dated when they paid, including when that falls in a later month. **Offset balances** previews equal allocations in both directions before confirming. This records settlement without transferring money or creating income. History retains payments and reviewed reversals; imported historical received splits remain read-only. A syncing notice means the payment is saved and expense-sheet updates are pending; use Refresh to retry. See [full workflow, accounting and safeguards](REIMBURSEMENTS.md).
 
 ## Bank review
