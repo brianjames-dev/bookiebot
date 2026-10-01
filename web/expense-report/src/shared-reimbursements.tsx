@@ -96,16 +96,16 @@ export function reimbursementLedger(items: SharedReimbursementItem[], openItems:
 }
 
 export function reimbursementVisual(item: SharedReimbursementItem) {
-  const amounts = [item.grossAmount, item.personalShare, item.partnerShare, item.receivedAmount, item.outstandingAmount]
+  const amounts = [item.grossAmount, item.personalShare, item.partnerShare, item.receivedAmount, item.outstandingAmount, item.clearedAmount ?? 0]
   // Only chart an exact allocation of the recorded gross. Older snapshots may
   // contain inconsistent values; preserve those labels instead of normalizing.
   if (amounts.some((amount) => !Number.isFinite(amount) || amount < 0
     || !Number.isSafeInteger(Math.round(amount * 100))
     || Math.abs(amount * 100 - Math.round(amount * 100)) > 1e-6)) return null
-  const [gross, personal, partner, received, outstanding] = amounts.map((amount) => Math.round(amount * 100))
-  if (gross <= 0 || personal + partner !== gross || received + outstanding !== partner
-    || item.status === "void" || (item.status === "reimbursed" && outstanding > 0)) return null
-  return { personal: personal / gross * 100, received: received / gross * 100, outstanding: outstanding / gross * 100 }
+  const [gross, personal, partner, received, outstanding, cleared] = amounts.map((amount) => Math.round(amount * 100))
+  if (gross <= 0 || personal + partner !== gross || received + cleared + outstanding !== partner
+    || item.status === "void" || (["reimbursed", "cleared"].includes(item.status) && outstanding > 0)) return null
+  return { personal: personal / gross * 100, received: received / gross * 100, outstanding: outstanding / gross * 100, cleared: cleared / gross * 100 }
 }
 
 function compactExpenseDate(date: string) {
@@ -117,6 +117,7 @@ function compactExpenseDate(date: string) {
 
 function ReimbursementEntry({ item, open, onOpenChange }: { item: SharedReimbursementItem; open: boolean; onOpenChange: (open: boolean) => void }) {
   const received = item.status === "reimbursed" || item.outstandingAmount <= 0
+  const cleared = item.clearedAmount ?? 0
   const payer = item.payer.trim()
   const partner = item.partner.trim() || "Partner"
   const responsible = item.responsiblePerson.trim()
@@ -134,7 +135,7 @@ function ReimbursementEntry({ item, open, onOpenChange }: { item: SharedReimburs
           <strong title={item.item}>{item.item}</strong>
         </span>
         <div className="bb-reimbursement-status" data-settled={received}>
-          {received ? "Received" : <>
+          {received ? cleared > 0 || item.status === "cleared" ? "Cleared" : "Received" : <>
             <FittedAmount className="bb-reimbursement-due">{formatMoney(item.outstandingAmount)}</FittedAmount>
             {visual && <i className="bb-reimbursement-due-key" aria-hidden="true" />}<small>due</small>
           </>}
@@ -153,10 +154,11 @@ function ReimbursementEntry({ item, open, onOpenChange }: { item: SharedReimburs
           {item.location.trim() && <p className="bb-reimbursement-location">{item.location.trim()}</p>}
         </div>
         {visual ? <>
-          <div className="bb-reimbursement-visual" role="img" aria-label={`${paidLabel} ${formatMoney(item.grossAmount)}. Your share ${formatMoney(item.personalShare)}. ${partner}’s share ${formatMoney(item.partnerShare)}: ${formatMoney(item.receivedAmount)} received${payer ? ` by ${payer}` : ""} from ${partner}; ${formatMoney(item.outstandingAmount)} still owed.`}>
+          <div className="bb-reimbursement-visual" role="img" aria-label={`${paidLabel} ${formatMoney(item.grossAmount)}. Your share ${formatMoney(item.personalShare)}. ${partner}’s share ${formatMoney(item.partnerShare)}: ${formatMoney(item.receivedAmount)} received${payer ? ` by ${payer}` : ""} from ${partner}; ${cleared ? `${formatMoney(cleared)} cleared without payment; ` : ""}${formatMoney(item.outstandingAmount)} still owed.`}>
             <div className="bb-reimbursement-visual-segments" aria-hidden="true">
               <span data-portion="personal" style={{ width: `${visual.personal}%` }} />
               <span data-portion="received" style={{ width: `${visual.received}%` }} />
+              {cleared > 0 && <span data-portion="cleared" style={{ width: `${visual.cleared}%` }} />}
               <span data-portion="outstanding" style={{ width: `${visual.outstanding}%` }} />
             </div>
             <span className="bb-reimbursement-visual-total" aria-hidden="true">{paidLabel} · <span>{formatMoney(item.grossAmount)}</span></span>
@@ -164,12 +166,14 @@ function ReimbursementEntry({ item, open, onOpenChange }: { item: SharedReimburs
           <dl className="bb-reimbursement-visual-legend">
             <div><dt><i className="bb-reimbursement-visual-key" data-portion="personal" aria-hidden="true" /><span>Yours</span></dt><dd>{formatMoney(item.personalShare)}</dd></div>
             <div><dt><i className="bb-reimbursement-visual-key" data-portion="received" aria-hidden="true" /><span>{partner} paid</span></dt><dd>{formatMoney(item.receivedAmount)}</dd></div>
+            {cleared > 0 && <div><dt><i className="bb-reimbursement-visual-key" data-portion="cleared" aria-hidden="true" /><span>Cleared without payment</span></dt><dd>{formatMoney(cleared)}</dd></div>}
           </dl>
         </> : <dl className="bb-reimbursement-split">
           <div className="bb-reimbursement-gross"><dt>Gross paid</dt><dd><FittedAmount className="bb-reimbursement-receipt-amount">{formatMoney(item.grossAmount)}</FittedAmount></dd></div>
           <div className="bb-reimbursement-share"><dt>Your share</dt><dd><FittedAmount className="bb-reimbursement-receipt-amount">{formatMoney(item.personalShare)}</FittedAmount></dd></div>
           <div className="bb-reimbursement-share"><dt>Partner share</dt><dd><FittedAmount className="bb-reimbursement-receipt-amount">{formatMoney(item.partnerShare)}</FittedAmount></dd></div>
           <div className="bb-reimbursement-received" data-received={item.receivedAmount > 0}><dt>Received</dt><dd><FittedAmount className="bb-reimbursement-receipt-amount">{formatMoney(item.receivedAmount)}</FittedAmount></dd></div>
+          {cleared > 0 && <div><dt>Cleared without payment</dt><dd><FittedAmount className="bb-reimbursement-receipt-amount">{formatMoney(cleared)}</FittedAmount></dd></div>}
           <div><dt>Outstanding</dt><dd><FittedAmount className="bb-reimbursement-receipt-amount">{formatMoney(item.outstandingAmount)}</FittedAmount></dd></div>
         </dl>}
       </div>

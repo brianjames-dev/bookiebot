@@ -110,7 +110,7 @@ def _shared_content(owner: str) -> dict[str, Any]:
             raise ValueError("Invalid widget allocation scope")
         ids.add(row["id"])
         outstanding = _cents(row["outstandingCents"])
-        if _cents(row["partnerShareCents"]) != _cents(row["settledCents"]) + outstanding:
+        if _cents(row["partnerShareCents"]) != _cents(row["settledCents"]) + _cents(row.get("clearedCents", 0)) + outstanding:
             raise ValueError("Invalid widget shared amount")
         if row["payerOwner"] == owner:
             owed_to += outstanding

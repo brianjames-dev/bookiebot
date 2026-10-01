@@ -605,3 +605,235 @@ def test_receipt_and_source_correction_cannot_both_commit_from_the_same_version(
         assert current["settledCents"] == 1000 and current["location"] == original["location"]
     else:
         assert current["settledCents"] == 0 and current["location"] == "New"
+
+
+def reset_command(store, **changes):
+    return command("reset", expectedState=store.snapshot("brian")["resetState"], note="Settled outside BookieBot", **changes)
+
+
+def sync_allocations(store):
+    for allocation in store.pending_projections():
+        assert store.mark_projected(allocation["id"], allocation["version"])
+
+
+def toggle_reset(store, reset, operation, owner="brian"):
+    return store.command(owner, command(operation, resetId=reset["id"], version=reset["version"]))
+
+
+def test_reset_clears_both_directions_across_years_without_fabricating_cash(store):
+    first = ready_allocation(store, sourceYear=2025, sourceWorksheet="DEC25", expenseDate="2025-12-31", settledCents=500)
+    first = store.command("brian", payment(first, 1500))["allocations"][0]
+    second = ready_allocation(store, payerOwner="hannah", partnerOwner="brian", payerPerson="Hannah", partnerShareCents=7000, payerShareCents=3000)
+    settled = ready_allocation(store, settledCents=4000)
+    legacy = ready_allocation(store, accounting="legacy_net", settledCents=4000)
+    sync_allocations(store)
+    before = store.snapshot("hannah")
+    body = reset_command(store)
+    result = store.command("hannah", body)
+    assert store.command("hannah", body) == result
+    assert ReimbursementStore(store.access).get_command_result("hannah", body["requestId"]) == result
+    assert {a["id"]: a["clearedCents"] for a in result["allocations"]} == {first["id"]: 2000, second["id"]: 7000}
+    assert all(a["outstandingCents"] == 0 and a["status"] == "cleared" for a in result["allocations"])
+    assert all(a["mirrorOnlyVersion"] == a["version"] and a["projectedVersion"] == a["version"] - 1 for a in result["allocations"])
+    assert result["events"] == [] and not result["reset"]["canUndo"]
+    snapshot = store.snapshot("brian")
+    assert snapshot["events"] == before["events"]
+    assert snapshot == store.snapshot("hannah")
+    assert store.get_allocation(first["id"])["settledCents"] == 2000
+    assert store.get_allocation(first["id"])["grossCents"] == 10000
+    assert store.get_allocation(settled["id"]) == settled
+    assert store.get_allocation(legacy["id"]) == legacy
+    assert snapshot["resetState"] != before["resetState"]
+    assert result["reset"]["actorOwner"] == "hannah" and result["reset"]["note"] == body["note"]
+    sync_allocations(store)
+    assert store.snapshot("brian")["resets"][0]["canUndo"]
+    with pytest.raises(ReimbursementConflictError, match="identifier"):
+        store.command("brian", body)
+
+
+@pytest.mark.parametrize("change", ["new_allocation", "amount", "payment", "report", "projection"])
+def test_reset_rejects_stale_complete_preview(store, change):
+    allocation = ready_allocation(store)
+    if change == "projection":
+        allocation = store.attach_source(allocation["id"], {"sourceRow": 55})
+    body = reset_command(store)
+    if change == "new_allocation":
+        ready_allocation(store, payerOwner="hannah", partnerOwner="brian", payerPerson="Hannah")
+    elif change == "amount":
+        store.revise_allocation("brian", allocation["id"], allocation["version"], {"grossCents": 12000, "payerShareCents": 7200, "partnerShareCents": 4800}, operation="update")
+    elif change == "payment":
+        store.command("brian", payment(allocation))
+    elif change == "report":
+        store.command("hannah", payment(allocation, operation="report_payment"))
+    else:
+        sync_allocations(store)
+    before = store.snapshot("brian")
+    with pytest.raises(ReimbursementConflictError, match="Shared balances changed"):
+        store.command("brian", body)
+    assert store.snapshot("brian") == before
+    assert store.get_command_result("brian", body["requestId"]) is None
+
+
+@pytest.mark.parametrize("obstacle,error", [("empty", "already zero"), ("pending", "pending"), ("sync", "syncing"), ("legacy", "read-only")])
+def test_reset_refuses_incomplete_or_unsupported_zeroing(store, obstacle, error):
+    if obstacle != "empty":
+        allocation = ready_allocation(store)
+        if obstacle == "pending":
+            store.command("hannah", payment(allocation, operation="report_payment"))
+        elif obstacle == "sync":
+            store.attach_source(allocation["id"], {"sourceRow": 55})
+        else:
+            ready_allocation(store, accounting="legacy_net")
+    before = store.snapshot("brian")
+    body = reset_command(store)
+    with pytest.raises(ReimbursementConflictError, match=error):
+        store.command("hannah", body)
+    assert store.snapshot("brian") == before
+    assert store.get_command_result("hannah", body["requestId"]) is None
+
+
+def test_reset_failure_rolls_back_group_claim_and_allocation_changes(store, monkeypatch):
+    ready_allocation(store)
+    ready_allocation(store, payerOwner="hannah", partnerOwner="brian", payerPerson="Hannah")
+    before = store.snapshot("brian")
+    body, original, calls = reset_command(store), store._clear, 0
+    def fail_second(db, row, amount, now):
+        nonlocal calls
+        calls += 1
+        original(db, row, amount, now)
+        if calls == 2:
+            raise RuntimeError("Synthetic reset failure")
+    monkeypatch.setattr(store, "_clear", fail_second)
+    with pytest.raises(RuntimeError, match="Synthetic reset"):
+        store.command("brian", body)
+    assert store.snapshot("brian") == before
+    assert store.get_command_result("brian", body["requestId"]) is None
+    with store.access.connect() as db:
+        assert db.execute("SELECT COUNT(*) AS count FROM app_reimbursement_reset_actions").fetchone()["count"] == 0
+    monkeypatch.setattr(store, "_clear", original)
+    assert len(store.command("brian", body)["allocations"]) == 2
+
+
+def test_concurrent_duplicate_reset_applies_once(store):
+    ready_allocation(store)
+    body = reset_command(store)
+    with ThreadPoolExecutor(max_workers=4) as executor:
+        results = list(executor.map(lambda _: store.command("brian", body), range(4)))
+    assert results == [results[0]] * 4
+    snapshot = store.snapshot("brian")
+    assert len(snapshot["resets"]) == 1 and snapshot["allocations"][0]["clearedCents"] == 4000
+
+
+def test_concurrent_reset_and_receipt_serialize_complete_balance_review(store):
+    allocation = ready_allocation(store)
+    body, barrier = reset_command(store), Barrier(2)
+    def mutate(kind):
+        barrier.wait(timeout=10)
+        try:
+            store.command("brian", body if kind == "reset" else payment(allocation))
+            return kind
+        except ReimbursementConflictError:
+            return None
+    with ThreadPoolExecutor(max_workers=2) as executor:
+        results = list(executor.map(mutate, ["reset", "receive"]))
+    assert sum(result is not None for result in results) == 1
+    current = store.get_allocation(allocation["id"])
+    assert (current["clearedCents"], current["settledCents"]) == ((4000, 0) if "reset" in results else (0, 1000))
+
+
+def test_reset_undo_redo_cycles_preserve_exact_original_group_and_all_actors(store):
+    first = ready_allocation(store)
+    second = ready_allocation(store, payerOwner="hannah", partnerOwner="brian", payerPerson="Hannah")
+    reset = store.command("brian", reset_command(store))["reset"]
+    newer = ready_allocation(store, sourceYear=2027, sourceWorksheet="JAN27")
+    with pytest.raises(ReimbursementConflictError, match="syncing"):
+        toggle_reset(store, reset, "undo_reset")
+    sync_allocations(store)
+    original_id = reset["id"]
+    for operation, owner, amount in [("undo_reset", "hannah", 4000), ("redo_reset", "brian", 0), ("undo_reset", "brian", 4000), ("redo_reset", "hannah", 0)]:
+        old = reset
+        result = toggle_reset(store, reset, operation, owner)
+        reset = result["reset"]
+        assert reset["id"] == original_id and reset["version"] == old["version"] + 1
+        assert {a["id"] for a in result["allocations"]} == {first["id"], second["id"]}
+        assert all(a["outstandingCents"] == amount and a["settledCents"] == 0 for a in result["allocations"])
+        assert store.get_allocation(newer["id"]) == newer
+        with pytest.raises(ReimbursementConflictError, match="Refresh"):
+            toggle_reset(store, old, operation, owner)
+        sync_allocations(store)
+        saved = store.snapshot("brian")["resets"][0]
+        assert saved["canUndo"] is (operation == "redo_reset")
+        assert saved["canRedo"] is (operation == "undo_reset")
+    with store.access.connect() as db:
+        actions = db.execute("SELECT operation,actor_owner,version FROM app_reimbursement_reset_actions ORDER BY version").fetchall()
+    assert [(a["operation"], a["actor_owner"], a["version"]) for a in actions] == [
+        ("reset", "brian", 1), ("undo_reset", "hannah", 2), ("redo_reset", "brian", 3), ("undo_reset", "brian", 4), ("redo_reset", "hannah", 5)]
+
+
+@pytest.mark.parametrize("operation", ["split", "update", "move", "cancel", "delete"])
+def test_cleared_allocations_require_undo_before_any_source_revision(store, operation):
+    allocation = ready_allocation(store)
+    store.command("brian", reset_command(store))
+    sync_allocations(store)
+    allocation = store.get_allocation(allocation["id"])
+    with pytest.raises(ReimbursementConflictError, match="Undo the balance reset first"):
+        store.revise_allocation("brian", allocation["id"], allocation["version"], {"location": "Different"}, operation=operation)
+
+
+def test_cleared_allocations_refuse_receipts_reports_offsets_and_prior_payment_reverse(store):
+    allocation = ready_allocation(store)
+    receipt = store.command("brian", payment(allocation))
+    opposite_allocation = ready_allocation(store, payerOwner="hannah", partnerOwner="brian", payerPerson="Hannah")
+    sync_allocations(store)
+    reset = store.command("hannah", reset_command(store))["reset"]
+    sync_allocations(store)
+    allocation = store.get_allocation(allocation["id"])
+    opposite_allocation = store.get_allocation(opposite_allocation["id"])
+    for owner, body in [("brian", payment(allocation)), ("hannah", payment(allocation, operation="report_payment")), ("brian", offset(allocation, opposite_allocation))]:
+        with pytest.raises(ReimbursementConflictError, match="exceeds"):
+            store.command(owner, body)
+    with pytest.raises(ReimbursementConflictError, match="Undo the balance reset first"):
+        store.command("brian", command("reverse", eventId=receipt["events"][0]["id"]))
+    toggle_reset(store, reset, "undo_reset")
+    sync_allocations(store)
+    assert store.command("brian", command("reverse", eventId=receipt["events"][0]["id"]))["allocations"][0]["settledCents"] == 0
+
+
+@pytest.mark.parametrize("change", ["edit", "receipt", "pending", "canceled_report", "new_reset"])
+def test_redo_never_reopens_or_reclears_changed_expenses(store, change):
+    allocation = ready_allocation(store)
+    reset = store.command("brian", reset_command(store))["reset"]
+    sync_allocations(store)
+    reset = toggle_reset(store, reset, "undo_reset")["reset"]
+    sync_allocations(store)
+    allocation = store.get_allocation(allocation["id"])
+    if change == "edit":
+        edited = store.revise_allocation("brian", allocation["id"], allocation["version"], {"location": "Corrected"}, operation="update")
+        assert edited["clearedCents"] == 0 and edited["outstandingCents"] == 4000
+        assert "mirrorOnlyVersion" not in edited
+    elif change == "receipt":
+        store.command("brian", payment(allocation))
+    elif change in {"pending", "canceled_report"}:
+        report = store.command("hannah", payment(allocation, operation="report_payment"))
+        if change == "canceled_report":
+            store.command("hannah", command("reverse", eventId=report["events"][0]["id"]))
+    else:
+        store.command("brian", reset_command(store))
+    sync_allocations(store)
+    before = store.snapshot("hannah")
+    assert not next(r for r in before["resets"] if r["id"] == reset["id"])["canRedo"]
+    with pytest.raises(ReimbursementConflictError, match="expenses changed"):
+        toggle_reset(store, reset, "redo_reset", "hannah")
+    assert store.snapshot("hannah") == before
+
+
+def test_cleared_source_attachment_retries_are_safe_and_changes_preserve_undo(store):
+    allocation = ready_allocation(store)
+    reset = store.command("brian", reset_command(store))["reset"]
+    sync_allocations(store)
+    allocation = store.get_allocation(allocation["id"])
+    assert store.attach_source(allocation["id"], {"sourceRow": allocation["sourceRow"], "splitActionId": allocation["splitActionId"]}) == allocation
+    with pytest.raises(ReimbursementConflictError, match="Undo the balance reset first"):
+        store.attach_source(allocation["id"], {"sourceRow": allocation["sourceRow"] + 1})
+    assert store.snapshot("brian")["resets"][0]["canUndo"]
+    assert toggle_reset(store, reset, "undo_reset")["allocations"][0]["outstandingCents"] == 4000

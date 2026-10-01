@@ -759,6 +759,7 @@ def test_report_uses_personal_share_for_totals_and_exposes_gross_reimbursement_a
             "personalShare": 129.46,
             "partnerShare": 70.54,
             "receivedAmount": 0.0,
+            "clearedAmount": 0.0,
             "outstandingAmount": 70.54,
             "splitMethod": "By income",
             "status": "outstanding",

@@ -232,7 +232,7 @@ def reimbursement_history_from_ledgers(
 
 
 def _validated_allocation(row: list[str]) -> SharedAllocation | None:
-    if not row[0].strip() or row[19] not in {"outstanding", "reimbursed", "void"}:
+    if not row[0].strip() or row[19] not in {"outstanding", "reimbursed", "cleared", "void"}:
         return None
     if _expense_date(row[12]) is None or _timestamp(row[1]) is None or _timestamp(row[2]) is None:
         return None

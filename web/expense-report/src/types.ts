@@ -35,9 +35,10 @@ export interface SharedReimbursementItem {
   personalShare: number
   partnerShare: number
   receivedAmount: number
+  clearedAmount?: number
   outstandingAmount: number
   splitMethod: string
-  status: "outstanding" | "reimbursed" | "void"
+  status: "outstanding" | "reimbursed" | "cleared" | "void"
 }
 
 export interface ReimbursementCoverage {

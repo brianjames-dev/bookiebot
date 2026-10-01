@@ -2303,6 +2303,8 @@ def change_split_recent_action(
     allocation = allocation_by_id(allocation_id, user_key) if allocation_id else None
     if allocation is None or allocation.status == "void":
         return False, "I could not find an active reimbursement record for that split."
+    if allocation.status == "cleared":
+        return False, "Undo this expense's balance reset from Shared before changing its split."
     if allocation.status == "reimbursed" or allocation.received_amount > 0:
         return (
             False,
@@ -2473,6 +2475,8 @@ def cancel_split_recent_action(user_key: str | None, *, action_id: str) -> tuple
     allocation = allocation_by_id(allocation_id, user_key) if allocation_id else None
     if allocation is None or allocation.status == "void":
         return False, "That split is no longer active."
+    if allocation.status == "cleared":
+        return False, "Undo this expense's balance reset from Shared before canceling its split."
     if allocation.status == "reimbursed" or allocation.received_amount > 0:
         return (
             False,
@@ -2774,7 +2778,12 @@ def _apply_undo_action(
     if service.enabled():
         from bookiebot.reimbursements.store import build_reimbursement_store
         allocation_id = action.metadata.get("allocation_id", "")
-        if service.is_managed(allocation_id) or (action_id and build_reimbursement_store().find_by_source(action_id, now_pacific().year)):
+        store = build_reimbursement_store()
+        allocation = (store.get_allocation(allocation_id) if service.is_managed(allocation_id)
+                      else store.find_by_source(action_id, now_pacific().year) if action_id else None)
+        if allocation:
+            if allocation.get("clearedCents", 0):
+                return False, "Undo this expense's balance reset from Shared before changing it."
             return False, "This is a linked reimbursement expense. Reverse its payment from Shared Reimbursements instead."
     ws = _worksheet(action.worksheet)
     if not _fixed_budget_target_matches(ws, action):
@@ -2847,6 +2856,8 @@ def _apply_undo_action(
                     False,
                     "I could not verify an active reimbursement record for that split, so I did not undo it.",
                 )
+            if allocation.status == "cleared":
+                return False, "Undo this expense's balance reset from Shared before undoing its split."
             if allocation.status == "reimbursed" or allocation.received_amount > 0:
                 return (
                     False,

@@ -381,9 +381,11 @@ def _financial_report_section(
                 "outstandingAmount": round(sum(item["outstandingAmount"] for item in outstanding), 2),
                 "outstandingCount": len(outstanding),
                 "receivedForSelectedMonthExpenses": round(sum(item["receivedAmount"] for item in monthly), 2),
+                "clearedForSelectedMonthExpenses": round(sum(item.get("clearedAmount", 0) for item in monthly), 2),
                 "selectedMonthExpenseCount": len(monthly),
                 "openScope": "Current outstanding across all configured annual payer ledgers, independent of selected report month.",
                 "receivedScope": "Lifetime receipts for expenses dated in the selected report month; not cash received during that month.",
+                "clearedScope": "Balances cleared outside BookieBot for selected-month expenses; no payment, income or spending change was recorded.",
                 "itemsTruncated": len(outstanding) > limit or len(monthly) > limit,
             },
         })

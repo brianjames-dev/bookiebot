@@ -9,8 +9,8 @@ export interface LedgerAllocation {
   id: string; payerOwner: string; partnerOwner: string; payerPerson: string
   item: string; location: string; expenseDate: string; category: string
   grossCents: number; payerShareCents: number; partnerShareCents: number
-  settledCents: number; outstandingCents: number; method: string; version: number
-  status: "outstanding" | "settled"; projectedVersion: number; accounting: string
+  settledCents: number; clearedCents?: number; outstandingCents: number; method: string; version: number
+  status: "outstanding" | "settled" | "cleared"; projectedVersion: number; accounting: string
 }
 export interface LedgerEvent {
   id: string; operationId: string; allocationId: string; kind: "receive" | "report_payment" | "offset"
@@ -20,7 +20,12 @@ export interface LedgerEvent {
 }
 interface LedgerSnapshot {
   enabled: true; ownerKey: string; allocations: LedgerAllocation[]; events: LedgerEvent[]
-  currency: "USD"; projectionPending?: boolean; error?: string
+  currency: "USD"; projectionPending?: boolean; error?: string; resetState?: string; resets?: LedgerReset[]
+}
+interface LedgerReset {
+  id: string; version: number; status: "active" | "undone"; actorOwner: string
+  createdAt: string; updatedAt: string; note: string; canUndo: boolean; canRedo: boolean
+  entries: { allocationId: string; amountCents: number; payerOwner: string; partnerOwner: string }[]
 }
 type LedgerResponse = LedgerSnapshot | { enabled: false }
 type Command = Record<string, unknown>
@@ -87,7 +92,8 @@ export function defaultOffsetEntries(allocations: LedgerAllocation[], owner: str
 }
 export function canReverseLedgerEvent(event: LedgerEvent, owner: string, allocations: LedgerAllocation[], events: LedgerEvent[]) {
   return event.status !== "reversed" && (event.actorOwner === owner || event.payeeOwner === owner)
-    && events.filter(item => item.operationId === event.operationId).every(item => allocations.some(allocation => allocation.id === item.allocationId && writable(allocation)))
+    && events.filter(item => item.operationId === event.operationId).every(item => allocations.some(allocation => allocation.id === item.allocationId && writable(allocation)
+      && (event.status === "pending" || !(allocation.clearedCents ?? 0))))
 }
 
 class LedgerRequestError extends Error {
@@ -122,10 +128,19 @@ async function request<T>(body?: Command, signal?: AbortSignal): Promise<T> {
 function validate(snapshot: LedgerResponse) {
   if (!snapshot || snapshot.enabled !== true || !snapshot.ownerKey || !Array.isArray(snapshot.allocations) || !Array.isArray(snapshot.events) || snapshot.currency !== "USD") throw new Error("Incomplete reimbursement data")
   for (const item of snapshot.allocations) {
-    if (!item.id || ![item.grossCents, item.payerShareCents, item.partnerShareCents, item.settledCents, item.outstandingCents, item.version]
+    if (!item.id || ![item.grossCents, item.payerShareCents, item.partnerShareCents, item.settledCents, item.clearedCents ?? 0, item.outstandingCents, item.version]
       .every(value => Number.isSafeInteger(value) && value >= 0)
       || item.grossCents !== item.payerShareCents + item.partnerShareCents
-      || item.partnerShareCents !== item.settledCents + item.outstandingCents) throw new Error("Incomplete reimbursement amounts")
+      || item.partnerShareCents !== item.settledCents + (item.clearedCents ?? 0) + item.outstandingCents) throw new Error("Incomplete reimbursement amounts")
+  }
+  if (snapshot.resets !== undefined) {
+    if (!Array.isArray(snapshot.resets)) throw new Error("Incomplete reset history")
+    for (const reset of snapshot.resets) {
+      if (!reset.id || !Number.isSafeInteger(reset.version) || reset.version < 1
+        || !["active", "undone"].includes(reset.status) || !Array.isArray(reset.entries)
+        || reset.entries.some(entry => !entry.allocationId || !entry.payerOwner || !entry.partnerOwner
+          || !Number.isSafeInteger(entry.amountCents) || entry.amountCents <= 0)) throw new Error("Incomplete reset history")
+    }
   }
   return snapshot
 }
@@ -235,7 +250,9 @@ function LedgerContents({ snapshot, disabled, run, refresh, refreshing }: {
   const [direction, setDirection] = useState<Direction>("to")
   const [listOpen, setListOpen] = useState(false)
   const [offsetOpen, setOffsetOpen] = useState(false)
-  const listId = useId(), offsetId = useId()
+  const [resetOpen, setResetOpen] = useState(false)
+  const [resetReview, setResetReview] = useState(0)
+  const listId = useId(), offsetId = useId(), resetId = useId()
   const totals = ledgerTotals(allocations, ownerKey)
   const shown = allocations.filter(item => (direction === "to" ? item.payerOwner : item.partnerOwner) === ownerKey)
   const timeline = months(shown).filter(group => group.cents > 0).reverse()
@@ -248,6 +265,9 @@ function LedgerContents({ snapshot, disabled, run, refresh, refreshing }: {
   const incoming = events.filter(event => event.status === "pending" && event.kind === "report_payment" && event.payeeOwner === ownerKey
     && allocations.some(item => item.id === event.allocationId && writable(item)))
   const reversibleIds = new Set(events.filter(event => canReverseLedgerEvent(event, ownerKey, allocations, events)).map(event => event.id))
+  const resetBlocked = events.some(event => event.status === "pending")
+    ? "Confirm or reverse pending payment reports before resetting balances."
+    : snapshot.projectionPending ? "Wait for expense sheets to finish syncing before resetting balances." : ""
   return <>
     <SlidingSelection value={direction} className="bb-ledger-directions" role="group" aria-label="Reimbursement direction">
       <button type="button" aria-pressed={direction === "to"} onClick={() => setDirection("to")}>Owed to you<FittedAmount className="bb-ledger-direction-amount">{money(totals.to)}</FittedAmount></button>
@@ -265,6 +285,11 @@ function LedgerContents({ snapshot, disabled, run, refresh, refreshing }: {
     {pendingOffset && <p className="bb-ledger-note">Confirm pending payments before offsetting those expenses.</p>}
     {eligible.to > 0 && eligible.from > 0 && <><button className="bb-ledger-offset-toggle" type="button" disabled={disabled} aria-expanded={offsetOpen} aria-controls={offsetId} onClick={() => setOffsetOpen(!offsetOpen)}>Offset balances</button>
       <RetainedPanel id={offsetId} open={offsetOpen}><OffsetEditor allocations={allocations} events={events} owner={ownerKey} disabled={disabled} run={run} close={() => setOffsetOpen(false)} /></RetainedPanel></>}
+    {snapshot.resetState && (totals.to > 0 || totals.from > 0 || resetOpen) && <>
+      <button className="bb-ledger-reset-toggle" type="button" disabled={disabled || Boolean(resetBlocked)} aria-expanded={resetOpen} aria-controls={resetId} onClick={() => { if (!resetOpen) setResetReview(value => value + 1); setResetOpen(!resetOpen) }}>Reset balances</button>
+      <RetainedPanel id={resetId} open={resetOpen}><ResetEditor key={resetReview} snapshot={snapshot} disabled={disabled || Boolean(resetBlocked)} run={run} close={() => setResetOpen(false)} /></RetainedPanel>
+    </>}
+    {resetBlocked && snapshot.resetState && <p className="bb-ledger-note" role="status">{resetBlocked}</p>}
     {incoming.length > 0 && <section className="bb-ledger-incoming" aria-label="Payments awaiting your confirmation"><h3>Awaiting your confirmation</h3>
       {incoming.map(event => <IncomingPayment key={event.id} event={event} allocation={allocations.find(item => item.id === event.allocationId)!} disabled={disabled} run={run} />)}</section>}
     {shown.length > 0 && <>
@@ -273,6 +298,7 @@ function LedgerContents({ snapshot, disabled, run, refresh, refreshing }: {
       </button>
       <CollapsibleContent id={listId} open={listOpen}><div className="bb-reimbursement-groups">{months(shown).map(group => <LedgerMonth key={`${direction}:${group.key}`} group={group} events={events} reversibleIds={reversibleIds} owner={ownerKey} disabled={disabled} run={run} />)}</div></CollapsibleContent>
     </>}
+    {Boolean(snapshot.resets?.length) && <ResetHistory resets={snapshot.resets!} owner={ownerKey} disabled={disabled} run={run} />}
   </>
 }
 
@@ -303,10 +329,11 @@ function LedgerRow({ allocation: item, events, reversibleIds, owner, open, onOpe
   const payer = item.payerPerson || person(item.payerOwner), partner = person(item.partnerOwner)
   const isPayer = owner === item.payerOwner
   const settled = item.outstandingCents === 0
-  const shares = item.grossCents > 0 ? [item.payerShareCents, item.settledCents, item.outstandingCents].map(value => value / item.grossCents * 100) : [0, 0, 0]
+  const cleared = item.clearedCents ?? 0
+  const shares = item.grossCents > 0 ? [item.payerShareCents, item.settledCents, cleared, item.outstandingCents].map(value => value / item.grossCents * 100) : [0, 0, 0, 0]
   const pendingSent = events.some(event => event.status === "pending")
   const canWrite = writable(item)
-  const settledLabel = events.some(event => event.kind === "offset" && event.status === "confirmed") ? "Settled" : isPayer ? "Received" : "Paid"
+  const settledLabel = cleared > 0 ? "Cleared" : events.some(event => event.kind === "offset" && event.status === "confirmed") ? "Settled" : isPayer ? "Received" : "Paid"
   return <AnimatedDisclosure open={open} onOpenChange={onOpenChange} summary={<>
     <span className="bb-reimbursement-item"><strong title={item.item || item.category}>{item.item || item.category || "Shared expense"}</strong></span>
     <div className="bb-reimbursement-status" data-settled={settled}>{settled ? settledLabel : <><FittedAmount className="bb-reimbursement-due">{money(item.outstandingCents)}</FittedAmount><i className="bb-reimbursement-due-key" aria-hidden="true" /><small>due</small></>}</div>
@@ -316,14 +343,16 @@ function LedgerRow({ allocation: item, events, reversibleIds, owner, open, onOpe
       <div className="bb-reimbursement-receipt-meta"><p><time dateTime={isoDate(item.expenseDate) || undefined} title={item.expenseDate}>{dateLabel(item.expenseDate)}</time></p>
         <p>{item.method === "fronted" ? `Fronted for ${partner}` : item.method === "income" ? "By income" : item.method === "equal" ? "Split 50/50" : item.method}</p>
         {item.location && <p>{item.location}</p>}</div>
-      <div className="bb-reimbursement-visual" role="img" aria-label={`${payer} paid ${money(item.grossCents)}. ${person(item.payerOwner)}’s share ${money(item.payerShareCents)}. ${partner}’s share ${money(item.partnerShareCents)}: ${money(item.settledCents)} settled; ${money(item.outstandingCents)} still owed.`}>
-        <div className="bb-reimbursement-visual-segments" aria-hidden="true">{["personal", "received", "outstanding"].map((portion, index) => <span key={portion} data-portion={portion} style={{ width: `${shares[index]}%` }} />)}</div>
+      <div className="bb-reimbursement-visual" role="img" aria-label={`${payer} paid ${money(item.grossCents)}. ${person(item.payerOwner)}’s share ${money(item.payerShareCents)}. ${partner}’s share ${money(item.partnerShareCents)}: ${money(item.settledCents)} settled; ${cleared ? `${money(cleared)} cleared without payment; ` : ""}${money(item.outstandingCents)} still owed.`}>
+        <div className="bb-reimbursement-visual-segments" aria-hidden="true">{["personal", "received", "cleared", "outstanding"].map((portion, index) => <span key={portion} data-portion={portion} style={{ width: `${shares[index]}%` }} />)}</div>
         <span className="bb-reimbursement-visual-total" aria-hidden="true">{payer} paid · <span>{money(item.grossCents)}</span></span>
       </div>
       <dl className="bb-reimbursement-visual-legend"><div><dt><i className="bb-reimbursement-visual-key" data-portion="personal" aria-hidden="true" /><span>{isPayer ? "Yours" : `${person(item.payerOwner)}’s share`}</span></dt><dd>{money(item.payerShareCents)}</dd></div>
-        <div><dt><i className="bb-reimbursement-visual-key" data-portion="received" aria-hidden="true" /><span>{isPayer ? partner : "You"} {events.some(event => event.kind === "offset" && event.status === "confirmed") ? "settled" : "paid"}</span></dt><dd>{money(item.settledCents)}</dd></div></dl>
+        <div><dt><i className="bb-reimbursement-visual-key" data-portion="received" aria-hidden="true" /><span>{isPayer ? partner : "You"} {events.some(event => event.kind === "offset" && event.status === "confirmed") ? "settled" : "paid"}</span></dt><dd>{money(item.settledCents)}</dd></div>
+        {cleared > 0 && <div><dt><i className="bb-reimbursement-visual-key" data-portion="cleared" aria-hidden="true" /><span>Cleared without payment</span></dt><dd>{money(cleared)}</dd></div>}</dl>
       {!canWrite && <p className="bb-ledger-note">Historical split · read only</p>}
       {pendingSent && <p className="bb-ledger-note">{isPayer ? "Review the pending payment above before recording another receipt." : "Sent payment awaiting confirmation. The balance changes when received."}</p>}
+      {cleared > 0 && <p className="bb-ledger-note">Undo the balance reset before changing this expense or reversing its payments.</p>}
       <div className="bb-ledger-actions">
         {canWrite && !settled && <button type="button" disabled={disabled || pendingSent} aria-expanded={mode === "payment"} aria-controls={paymentId} onClick={() => setMode(mode === "payment" ? "" : "payment")}>{isPayer ? "Record received" : "Record sent payment"}</button>}
         <button type="button" aria-expanded={mode === "history"} aria-controls={historyId} onClick={() => setMode(mode === "history" ? "" : "history")}>History ({events.length})</button>
@@ -332,6 +361,63 @@ function LedgerRow({ allocation: item, events, reversibleIds, owner, open, onOpe
       <RetainedPanel id={historyId} open={open && mode === "history"}><PaymentHistory allocation={item} events={events} reversibleIds={reversibleIds} disabled={disabled} run={run} /></RetainedPanel>
     </div>
   </AnimatedDisclosure>
+}
+
+function ResetAmounts({ to, from }: { to: number; from: number }) {
+  return <div className="bb-ledger-offset-totals"><span>Owed to you <strong>{money(to)}</strong></span><span>You owe <strong>{money(from)}</strong></span></div>
+}
+function ResetEditor({ snapshot, disabled, run, close }: { snapshot: LedgerSnapshot; disabled: boolean; run: Run; close: () => void }) {
+  const [review] = useState(() => ({ expectedState: snapshot.resetState, totals: ledgerTotals(snapshot.allocations, snapshot.ownerKey),
+    count: snapshot.allocations.filter(item => item.outstandingCents > 0).length }))
+  const [note, setNote] = useState("")
+  const stale = snapshot.resetState !== review.expectedState
+  useAppWorkStatus({ label: "Reimbursement reset", dirty: Boolean(note), onDiscard: () => { setNote(""); close() } })
+  return <form className="bb-ledger-form bb-ledger-reset-form" onSubmit={event => {
+    event.preventDefault()
+    if (disabled || stale || !review.expectedState || !review.count) return
+    run({ operation: "reset", expectedState: review.expectedState, note }, close)
+  }}><fieldset disabled={disabled}><legend>Review balance reset</legend>
+    <ResetAmounts {...review.totals} />
+    <p className="bb-ledger-note">Clear the remaining balances on {review.count} shared expense{review.count === 1 ? "" : "s"} across all months. Both directions will be $0.00.</p>
+    <p className="bb-ledger-note">Recorded expenses and receipts stay unchanged. No payment or transfer is recorded. New shared expenses start a new balance. You can undo this reset from Reset history.</p>
+    <label>Note (optional)<input maxLength={200} value={note} onChange={event => setNote(event.target.value)} placeholder="Settled outside BookieBot" /></label>
+    {stale && <p className="bb-ledger-note" role="status">Reimbursements changed while this review was open. Cancel and open Reset balances again to review the latest amounts.</p>}
+    <div className="bb-ledger-actions"><button type="submit" disabled={stale || !review.count}>Confirm reset to $0.00</button><button type="button" onClick={close}>Cancel</button></div>
+  </fieldset></form>
+}
+function ResetHistory({ resets, owner, disabled, run }: { resets: LedgerReset[]; owner: string; disabled: boolean; run: Run }) {
+  const [open, setOpen] = useState(false)
+  const [selected, setSelected] = useState<LedgerReset | null>(null)
+  const id = useId(), confirmationPrefix = useId()
+  return <section className="bb-ledger-reset-history" aria-label="Reset history">
+    <button className="bb-ledger-list-toggle" type="button" aria-expanded={open} aria-controls={id} onClick={() => setOpen(!open)}><span>Reset history ({resets.length})</span><span className="bb-disclosure-mark" aria-hidden="true" /></button>
+    <CollapsibleContent id={id} open={open}><div className="bb-ledger-history">{[...resets].sort((a, b) => b.createdAt.localeCompare(a.createdAt) || b.id.localeCompare(a.id)).map(reset => {
+      const totals = { to: reset.entries.filter(entry => entry.payerOwner === owner).reduce((sum, entry) => sum + entry.amountCents, 0),
+        from: reset.entries.filter(entry => entry.partnerOwner === owner).reduce((sum, entry) => sum + entry.amountCents, 0) }
+      const undo = reset.status === "active", canChange = undo ? reset.canUndo : reset.canRedo
+      const reviewing = selected?.id === reset.id
+      const stale = reviewing && (selected.version !== reset.version || selected.status !== reset.status)
+      const confirmationId = `${confirmationPrefix}-${reset.id}`
+      const parsedDate = new Date(reset.createdAt)
+      const createdLabel = Number.isFinite(parsedDate.getTime()) ? new Intl.DateTimeFormat("en-US", { month: "short", day: "numeric", year: "numeric", hour: "numeric", minute: "2-digit", timeZone: "America/Los_Angeles" }).format(parsedDate) : "Date unavailable"
+      return <div key={reset.id} className="bb-ledger-history-row"><div><strong>{undo ? "Balances reset" : "Reset undone"}</strong>
+        <span>Originally reset by {person(reset.actorOwner)} · <time dateTime={reset.createdAt}>{createdLabel}</time></span>
+        <span>{reset.entries.length} shared expense{reset.entries.length === 1 ? "" : "s"} · Owed to you {money(totals.to)} · You owe {money(totals.from)}</span>
+        {reset.note && <span>{reset.note}</span>}<span>No payment recorded.</span>
+        {!canChange && <span>{undo ? "Undo is unavailable for the current expenses." : "Redo is unavailable for the current expenses."}</span>}</div>
+        {canChange && <button type="button" disabled={disabled} aria-expanded={reviewing} aria-controls={confirmationId} onClick={() => setSelected(reviewing ? null : reset)}>{undo ? "Undo reset" : "Redo reset"}</button>}
+        <RetainedPanel id={confirmationId} open={reviewing}><div className="bb-ledger-confirm">
+          <p>{selected?.status === "active" ? "Restore the balances cleared by this reset?" : "Clear the same balances again? Shared expenses added after the reset keep their balances."} Recorded expenses and receipts stay unchanged.</p>
+          {selected && <ResetAmounts to={selected.entries.filter(entry => entry.payerOwner === owner).reduce((sum, entry) => sum + entry.amountCents, 0)} from={selected.entries.filter(entry => entry.partnerOwner === owner).reduce((sum, entry) => sum + entry.amountCents, 0)} />}
+          {stale && <p className="bb-ledger-note" role="status">This reset changed. Cancel and review its current status again.</p>}
+          <div className="bb-ledger-actions"><button type="button" disabled={disabled || stale || !canChange} onClick={() => {
+            if (disabled || stale || !canChange || !selected) return
+            run({ operation: selected.status === "active" ? "undo_reset" : "redo_reset", resetId: selected.id, version: selected.version }, () => setSelected(null))
+          }}>{selected?.status === "active" ? "Confirm undo reset" : "Confirm redo reset"}</button><button type="button" disabled={disabled} onClick={() => setSelected(null)}>Cancel</button></div>
+        </div></RetainedPanel>
+      </div>
+    })}</div></CollapsibleContent>
+  </section>
 }
 
 function DateField({ value, onChange, min = "1900-01-01" }: { value: string; onChange: (value: string) => void; min?: string }) {

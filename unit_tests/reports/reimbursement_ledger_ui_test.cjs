@@ -63,7 +63,7 @@ const sample = { enabled: true, ownerKey: "brian", currency: "USD", allocations:
   allocation({ id: "b", item: "August groceries", expenseDate: "2026-08-09", grossCents: 5000, payerShareCents: 2500, partnerShareCents: 2500, settledCents: 0, outstandingCents: 2500, version: 1, projectedVersion: 1 }),
   allocation({ id: "c", item: "Hannah groceries", payerOwner: "hannah", partnerOwner: "brian", payerPerson: "Hannah", grossCents: 12000, payerShareCents: 6000, partnerShareCents: 6000, settledCents: 0, outstandingCents: 6000, version: 1, projectedVersion: 1 }),
   allocation({ id: "old", item: "Historical rent", accounting: "legacy_net", grossCents: 10000, payerShareCents: 8000, partnerShareCents: 2000, settledCents: 2000, outstandingCents: 0, status: "settled" }),
-], events: [receipt()] }
+], events: [receipt()], resets: [], resetState: "review-state-one" }
 assert.deepEqual(clone(ledgerTotals(sample.allocations, "brian")), { to: 10500, from: 6000, net: 4500 })
 assert.deepEqual(clone(ledgerTotals(sample.allocations, "hannah")), { to: 6000, from: 10500, net: -4500 })
 assert.deepEqual(clone(defaultOffsetEntries(sample.allocations, "brian")), [
@@ -75,6 +75,8 @@ assert.deepEqual(clone(defaultOffsetEntries(sample.allocations, "brian", [receip
 assert.equal(canReverseLedgerEvent(receipt(), "brian", sample.allocations, sample.events), true)
 assert.equal(canReverseLedgerEvent(receipt(), "hannah", sample.allocations, sample.events), false)
 assert.equal(canReverseLedgerEvent(receipt(), "brian", sample.allocations, [receipt(), receipt({ id: "legacy-entry", allocationId: "old" })]), false, "A mixed legacy offset group cannot be reversed through a writable sibling")
+assert.equal(canReverseLedgerEvent(receipt(), "brian", [allocation({ clearedCents:8000,outstandingCents:0 })], sample.events), false, "Undo reset before reversing a receipt for a cleared expense")
+assert.equal(canReverseLedgerEvent(receipt(), "brian", [allocation(), allocation({id:"sibling",clearedCents:8000,outstandingCents:0})], [receipt(),receipt({id:"offset-sibling",allocationId:"sibling"})]), false, "An entire offset reversal is blocked when one member has a reset")
 
 const flush = async () => { for (let i = 0; i < 24; i++) await Promise.resolve() }
 const response = (body, status = 200) => ({ ok: status >= 200 && status < 300, status, json: async () => body })
@@ -439,6 +441,186 @@ async function inFlightContracts() {
   await unmount(tree)
 }
 
+function applyReset(body, state) {
+  let reset
+  if (body.operation === "reset") {
+    assert.equal(body.expectedState, state.snapshot.resetState)
+    reset = { id: "reset-one", version: 1, status: "active", actorOwner: state.snapshot.ownerKey,
+      createdAt: "2026-09-30T18:00:00Z", updatedAt: "2026-09-30T18:00:00Z", note: body.note, canUndo: true, canRedo: false,
+      entries: state.snapshot.allocations.filter(item => item.outstandingCents > 0).map(item => ({ allocationId: item.id,
+        amountCents: item.outstandingCents, payerOwner: item.payerOwner, partnerOwner: item.partnerOwner })) }
+    state.snapshot.resets.push(reset)
+  } else {
+    reset = state.snapshot.resets.find(item => item.id === body.resetId)
+    assert.equal(body.version, reset.version)
+    reset.version++
+    reset.status = body.operation === "undo_reset" ? "undone" : "active"
+    reset.canUndo = reset.status === "active"; reset.canRedo = !reset.canUndo
+  }
+  for (const entry of reset.entries) {
+    const item = state.snapshot.allocations.find(item => item.id === entry.allocationId)
+    const change = body.operation === "undo_reset" ? -entry.amountCents : entry.amountCents
+    item.clearedCents = (item.clearedCents || 0) + change; item.outstandingCents -= change
+    item.status = item.outstandingCents ? "outstanding" : "cleared"; item.version++
+  }
+  state.snapshot.resetState += "-changed"
+  return response(clone(state.snapshot))
+}
+
+async function resetLifecycleContracts() {
+  const state = fixture({ post: applyReset })
+  const tree = await mount()
+  await tap(button(tree.root, "Reset balances"))
+  assert.equal(writes(state).length, 0, "Reset opens an explicit review before writing")
+  assert.ok(text(form(tree)).includes("Owed to you $105.00"))
+  assert.ok(text(form(tree)).includes("You owe $60.00"))
+  assert.ok(text(form(tree)).includes("3 shared expenses across all months"))
+  assert.ok(text(form(tree)).includes("Both directions will be $0.00"))
+  assert.ok(text(form(tree)).includes("Recorded expenses and receipts stay unchanged"))
+  assert.ok(text(form(tree)).includes("No payment or transfer is recorded"))
+  await fill(tree, "Note", "Settled separately with Hannah")
+  await submit(tree)
+  assert.deepEqual({ ...writes(state)[0].body, requestId: undefined }, {
+    operation: "reset", expectedState: "review-state-one", note: "Settled separately with Hannah", requestId: undefined,
+  })
+  assert.ok(text(tree.root).includes("Owed to you$0.00") && text(tree.root).includes("You owe$0.00"))
+  assert.equal(button(tree.root, "Reset balances"), undefined)
+  assert.ok(button(tree.root, "Reset history (1)"), "Reset recovery survives the zero-balance screen")
+  assert.deepEqual(state.snapshot.events, sample.events, "Reset does not invent a receipt")
+  await expand(tree, "PG&E")
+  const cleared = row(tree, "PG&E")
+  assert.ok(text(rowToggle(cleared)).includes("Cleared"))
+  assert.ok(!text(rowToggle(cleared)).includes("Received"))
+  assert.ok(text(cleared).includes("Hannah paid$20.00"))
+  assert.ok(text(cleared).includes("Cleared without payment$80.00"))
+  assert.ok(cleared.find(node => node.props.role === "img").props["aria-label"].includes("$80.00 cleared without payment"))
+  const portions = cleared.findAll(node => typeof node.type === "string" && node.props["data-portion"] && node.props.style)
+  assert.deepEqual(portions.map(node => node.props.style.width), ["50%", "10%", "40%", "0%"])
+  assert.equal(button(cleared, "Record received"), undefined)
+  await tap(button(tree.root, "Reset history (1)"))
+  assert.ok(text(tree.root).includes("Brian · Sep 30, 2026"))
+  assert.ok(text(tree.root).includes("Settled separately with Hannah"))
+  await tap(button(tree.root, "Undo reset"))
+  assert.equal(writes(state).length, 1, "Undo also requires review")
+  await tap(button(tree.root, "Confirm undo reset"))
+  assert.equal(writes(state)[1].body.operation, "undo_reset")
+  assert.equal(writes(state)[1].body.version, 1)
+  assert.ok(text(tree.root).includes("Owed to you$105.00") && text(tree.root).includes("You owe$60.00"))
+  assert.ok(text(tree.root).includes("Reset undone"))
+  // Later expenses accrue normally and redo affects only the reviewed reset.
+  state.snapshot.allocations.push(allocation({ id: "new", item: "New dinner", grossCents: 1000, payerShareCents: 500,
+    partnerShareCents: 500, settledCents: 0, outstandingCents: 500, expenseDate: "2026-09-30" }))
+  state.snapshot.resetState += "-new-expense"
+  await act(async () => { for (const callback of listeners.window.get("focus")) callback(); await flush() })
+  await tap(button(tree.root, "Redo reset"))
+  assert.ok(text(tree.root).includes("Shared expenses added after the reset keep their balances"))
+  assert.equal(writes(state).length, 2)
+  await tap(button(tree.root, "Confirm redo reset"))
+  assert.equal(writes(state)[2].body.operation, "redo_reset")
+  assert.equal(writes(state)[2].body.version, 2)
+  assert.ok(text(tree.root).includes("Owed to you$5.00") && text(tree.root).includes("You owe$0.00"))
+  assert.equal(state.snapshot.allocations.find(item => item.id === "new").clearedCents, undefined)
+  assert.deepEqual(dispatched, Array(3).fill("bookiebot:reimbursements-changed"))
+  await tap(button(tree.root, "You owe", true)); await expand(tree, "Hannah groceries")
+  assert.ok(text(rowToggle(row(tree, "Hannah groceries"))).includes("Cleared"), "Both owner directions distinguish cleared from paid")
+  await unmount(tree)
+}
+
+async function resetSafetyAndRecoveryContracts() {
+  for (const blocker of ["payment", "projection"]) {
+    const state = fixture()
+    if (blocker === "payment") state.snapshot.events.push(receipt({ status: "pending", kind: "report_payment" }))
+    else state.snapshot.projectionPending = true
+    const tree = await mount()
+    assert.ok(button(tree.root, "Reset balances").props.disabled)
+    assert.ok(text(tree.root).includes(blocker === "payment" ? "Confirm or reverse pending payment reports" : "Wait for expense sheets to finish syncing"))
+    assert.equal(writes(state).length, 0)
+    await unmount(tree)
+  }
+  for (const blocker of ["unrelated payment", "unrelated projection"]) {
+    const state = fixture({post:applyReset})
+    applyReset({operation:"reset",expectedState:state.snapshot.resetState,note:"Earlier reset"},state)
+    state.snapshot.allocations.push(allocation({id:"later",item:"Later shared expense"}))
+    if (blocker === "unrelated payment") state.snapshot.events.push(receipt({id:"later-report",allocationId:"later",status:"pending",kind:"report_payment"}))
+    else state.snapshot.projectionPending = true
+    const tree = await mount()
+    assert.ok(button(tree.root,"Reset balances").props.disabled,"New resets wait for the household's pending work")
+    await tap(button(tree.root,"Reset history (1)"))
+    await tap(button(tree.root,"Undo reset"))
+    await tap(button(tree.root,"Confirm undo reset"))
+    assert.equal(writes(state)[0].body.operation,"undo_reset","Server readiness permits undo despite unrelated later pending work")
+    await unmount(tree)
+  }
+  let state = fixture(), tree = await mount()
+  await tap(button(tree.root, "Reset balances"))
+  await fill(tree, "Note", "Keep this draft")
+  state.snapshot.resetState = "changed-on-another-device"
+  state.snapshot.allocations[0].settledCents += 100; state.snapshot.allocations[0].outstandingCents -= 100
+  await act(async () => { for (const callback of listeners.window.get("focus")) callback(); await flush() })
+  assert.ok(button(tree.root, "Confirm reset to $0.00").props.disabled)
+  assert.ok(text(form(tree)).includes("Owed to you $105.00"), "The reviewed values do not silently change under a confirmation")
+  assert.ok(text(form(tree)).includes("Reimbursements changed while this review was open"))
+  assert.equal(form(tree).findByType("input").props.value, "Keep this draft")
+  await submit(tree); assert.equal(writes(state).length, 0)
+  await tap(button(tree.root, "Cancel")); await tap(button(tree.root, "Reset balances"))
+  assert.ok(text(form(tree)).includes("Owed to you $104.00"))
+  assert.ok(!button(tree.root, "Confirm reset to $0.00").props.disabled)
+  state.snapshot.events.push(receipt({ status: "pending", kind: "report_payment" }))
+  await act(async () => { for (const callback of listeners.window.get("focus")) callback(); await flush() })
+  assert.ok(form(tree).findByType("fieldset").props.disabled, "Late pending reports disable an already open reset review")
+  await submit(tree); assert.equal(writes(state).length, 0)
+  await unmount(tree)
+
+  state = fixture({ post: (_body, state) => {
+    state.snapshot.resetState = "new-state"
+    state.snapshot.allocations[0].outstandingCents -= 100; state.snapshot.allocations[0].settledCents += 100
+    return response({ error: "Reimbursements changed. Review the new balances." }, 409)
+  } })
+  tree = await mount(); await tap(button(tree.root, "Reset balances")); await submit(tree)
+  assert.equal(form(tree), undefined)
+  assert.ok(text(tree.root).includes("Reimbursements changed. Review the new balances."))
+  assert.ok(text(tree.root).includes("Owed to you$104.00"))
+  assert.equal(button(tree.root, "Retry this record"), undefined)
+  await unmount(tree)
+
+  let attempts = 0
+  state = fixture({ post: (body, state) => {
+    if (++attempts === 1) { applyReset(body, state); throw Error("Response lost after reset") }
+    return response(clone(state.snapshot))
+  } })
+  tree = await mount(); await tap(button(tree.root, "Reset balances")); await submit(tree)
+  assert.ok(text(tree.root).includes("This record may have saved"))
+  assert.ok(form(tree).findByType("fieldset").props.disabled)
+  const beforeFocus = state.calls.length
+  await act(async () => { for (const callback of listeners.window.get("focus")) callback(); await flush() })
+  assert.equal(state.calls.length, beforeFocus)
+  await tap(button(tree.root, "Retry this record"))
+  assert.deepEqual(writes(state)[0].body, writes(state)[1].body, "Uncertain reset retries keep exactly the same request and reviewed state")
+  assert.equal(state.snapshot.resets.length, 1)
+  assert.ok(text(tree.root).includes("Owed to you$0.00"))
+  await tap(button(tree.root, "Reset history (1)")); await tap(button(tree.root, "Undo reset"))
+  state.snapshot.resets[0].version++
+  await act(async () => { for (const callback of listeners.window.get("focus")) callback(); await flush() })
+  assert.ok(button(tree.root, "Confirm undo reset").props.disabled)
+  assert.ok(text(tree.root).includes("This reset changed"))
+  await tap(button(tree.root, "Cancel"))
+  state.snapshot.resets[0].status = "undone"; state.snapshot.resets[0].canUndo = false; state.snapshot.resets[0].canRedo = false
+  await act(async () => { for (const callback of listeners.window.get("focus")) callback(); await flush() })
+  assert.equal(button(tree.root, "Redo reset"), undefined)
+  assert.ok(text(tree.root).includes("Redo is unavailable for the current expenses"))
+  await unmount(tree)
+
+  state = fixture(); state.snapshot.ownerKey = "hannah"
+  tree = await mount(); await tap(button(tree.root, "Reset balances"))
+  assert.ok(text(form(tree)).includes("Owed to you $60.00") && text(form(tree)).includes("You owe $105.00"))
+  await unmount(tree)
+  state = fixture(); state.snapshot.allocations[0].clearedCents = 100
+  tree = await mount()
+  assert.ok(text(tree.root).includes("Couldn’t refresh reimbursements"), "Cleared plus paid plus due must equal the partner share")
+  assert.equal(button(tree.root, "Reset balances"), undefined)
+  await unmount(tree)
+}
+
 ;(async () => {
   await compactAndSentContracts()
   await emptyDirectionsAndMarkerContracts()
@@ -447,5 +629,7 @@ async function inFlightContracts() {
   await pendingAndDateContracts()
   await recoveryContracts()
   await inFlightContracts()
-  console.log("Canonical reimbursements: directions, compact receipts, partial/full commands, confirmations, offsets, read-only history and safe retry lifecycle passed")
+  await resetLifecycleContracts()
+  await resetSafetyAndRecoveryContracts()
+  console.log("Canonical reimbursements: directions, receipts, confirmations, offsets, reset/undo/redo, cleared amounts and safe retry lifecycle passed")
 })().catch(error => { console.error(error); process.exitCode = 1 })

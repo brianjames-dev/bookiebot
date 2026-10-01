@@ -36,6 +36,7 @@ const older = item("Last year's groceries", {date:"12/20/2025", outstandingAmoun
 const newer = item("This month's dinner")
 const settled = item("Received dinner", {status:"reimbursed", outstandingAmount:0, receivedAmount:40})
 const oldReceipt = {...older,status:"reimbursed",outstandingAmount:0,receivedAmount:40}
+const clearedReceipt = item("Cleared groceries", { status:"cleared",receivedAmount:10,clearedAmount:30,outstandingAmount:0 })
 const complete = {status:"complete", asOf:"2026-09-07", years:[2025,2026], unavailableYears:[], excludedRecords:0}
 
 // The receipt bar partitions the original gross payment. Only the partner's
@@ -73,6 +74,7 @@ const invalidVisualChanges = [
   {grossAmount:NaN}, {personalShare:Infinity}, {partnerShare:-Infinity}, {receivedAmount:NaN}, {outstandingAmount:Infinity},
   {grossAmount:Number.MAX_SAFE_INTEGER,personalShare:Number.MAX_SAFE_INTEGER,partnerShare:0,receivedAmount:0,outstandingAmount:0},
   {status:"reimbursed"},
+  {clearedAmount:-1}, {clearedAmount:0.001}, {clearedAmount:Infinity}, {clearedAmount:10}, {status:"cleared"},
 ]
 assert.equal(reimbursementVisual(item("Voided source",{status:"void"})),null)
 for (const changes of invalidVisualChanges) {
@@ -157,6 +159,9 @@ assert.ok(!receivedLedgerItems.some(entry => entry.id === voided.id), "Monthly v
 assert.equal(reimbursementLedger([partialCurrent],[],"2026-09",[
   {...newer,status:"reimbursed",receivedAmount:40,outstandingAmount:0},
 ])[0].items[0].receivedAmount,15, "A complete monthly record wins over a repeated history record")
+assert.equal(reimbursementLedger([],[],"2026-09",[clearedReceipt])[0].items[0].status,"cleared",
+  "Cleared expenses remain available in history after they leave outstanding")
+assert.deepEqual(Array.from(reimbursementTimeline([clearedReceipt])),[],"Cleared balances do not appear in the outstanding chart")
 
 // The graph has one scope: outstanding amounts, organized by expense month.
 // Partial receipts affect the remaining debt, not a separate monthly denominator.
@@ -418,8 +423,29 @@ for (const changes of invalidVisualChanges) {
   assert.deepEqual(definitionPairs(invalidDetails),[
     ["Gross paid",currency(invalid.grossAmount)],["Your share",currency(invalid.personalShare)],
     ["Partner share",currency(invalid.partnerShare)],["Received",currency(invalid.receivedAmount)],
+    ...(invalid.clearedAmount > 0 ? [["Cleared without payment",currency(invalid.clearedAmount)]] : []),
     ["Outstanding",currency(invalid.outstandingAmount)],
   ],"The legacy fallback preserves each reported amount, including the outstanding balance")
+  renderer.act(() => tree.unmount())
+}
+for (const cleared of [clearedReceipt, {...clearedReceipt,id:"Partially cleared",status:"outstanding",clearedAmount:20,outstandingAmount:10}]) {
+  const currency = value => new Intl.NumberFormat("en-US",{style:"currency",currency:"USD"}).format(value)
+  renderer.act(() => { tree = renderer.create(React.createElement(SharedReimbursementsCard,propsFor({items:[cleared],openItems:[],receivedItems:[cleared]}))) })
+  const clearedExpense = tree.root.findAllByProps({className:"bb-reimbursement-entry"})[1]
+  const clearedDisclosure = disclosure(clearedExpense)
+  const expectedLabel = cleared.outstandingAmount > 0 ? "$10.00" : "Cleared"
+  assert.ok(renderedText(clearedDisclosure.button).includes(expectedLabel))
+  assert.ok(!renderedText(clearedDisclosure.button).includes("Received"),"Reset is never presented as a receipt")
+  const visual = reimbursementVisual(cleared)
+  assert.ok(visual)
+  assert.equal(visual.cleared,cleared.clearedAmount)
+  const chart = clearedDisclosure.content.findByProps({role:"img"})
+  assert.ok(chart.props["aria-label"].includes(`${currency(cleared.clearedAmount)} cleared without payment`))
+  assert.deepEqual(chart.findByProps({className:"bb-reimbursement-visual-segments"}).findAllByType("span").map(node=>node.props["data-portion"]),["personal","received","cleared","outstanding"])
+  assert.deepEqual(definitionPairs(clearedDisclosure.content.findByProps({className:"bb-reimbursement-visual-legend"})),[
+    ["Yours","$60.00"],["Hannah paid","$10.00"],["Cleared without payment",currency(cleared.clearedAmount)],
+  ])
+  assert.ok(renderedText(tree.root.findByProps({className:"bb-reimbursement-summary"})).includes("Received$10.00"),"Monthly received totals exclude cleared balances")
   renderer.act(() => tree.unmount())
 }
 renderer.act(() => { tree = renderer.create(React.createElement(SharedReimbursementsCard, propsFor({

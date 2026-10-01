@@ -202,6 +202,20 @@ class ReimbursementStore:
                 before_json TEXT NOT NULL, after_json TEXT NOT NULL, created_at TEXT NOT NULL,
                 UNIQUE(allocation_id, version)
             )""")
+            db.execute("""CREATE TABLE IF NOT EXISTS app_reimbursement_resets (
+                id TEXT PRIMARY KEY, version BIGINT NOT NULL, status TEXT NOT NULL,
+                actor_owner TEXT NOT NULL, note TEXT NOT NULL, entries_json TEXT NOT NULL,
+                created_at TEXT NOT NULL, updated_at TEXT NOT NULL,
+                CHECK(version > 0), CHECK(status IN ('active','undone')),
+                CHECK(actor_owner IN ('brian','hannah'))
+            )""")
+            db.execute("""CREATE TABLE IF NOT EXISTS app_reimbursement_reset_actions (
+                id TEXT PRIMARY KEY, reset_id TEXT NOT NULL REFERENCES app_reimbursement_resets(id),
+                version BIGINT NOT NULL, operation_id TEXT NOT NULL, operation TEXT NOT NULL,
+                actor_owner TEXT NOT NULL, created_at TEXT NOT NULL,
+                UNIQUE(reset_id,version), CHECK(operation IN ('reset','undo_reset','redo_reset')),
+                CHECK(actor_owner IN ('brian','hannah'))
+            )""")
 
     def _lock(self, db: Any) -> None:
         # Also take this lock for multi-query reads: PG's default READ COMMITTED
@@ -219,9 +233,10 @@ class ReimbursementStore:
     def _payload(row: Any) -> dict[str, Any]:
         value = json.loads(row["payload_json"])
         lifecycle = value.get("lifecycle", "active")
-        outstanding = int(row["partner_share_cents"]) - int(row["settled_cents"]) if lifecycle == "active" else 0
-        return {**value, "settledCents": int(row["settled_cents"]), "outstandingCents": outstanding,
-                "status": lifecycle if lifecycle != "active" else "outstanding" if outstanding else "settled", "version": int(row["version"]),
+        cleared = int(value.get("clearedCents", 0))
+        outstanding = int(row["partner_share_cents"]) - int(row["settled_cents"]) - cleared if lifecycle == "active" else 0
+        return {**value, "settledCents": int(row["settled_cents"]), "clearedCents": cleared, "outstandingCents": outstanding,
+                "status": lifecycle if lifecycle != "active" else "outstanding" if outstanding else "cleared" if cleared else "settled", "version": int(row["version"]),
                 "projectedVersion": int(row["projected_version"]), "createdAt": row["created_at"], "updatedAt": row["updated_at"]}
 
     @staticmethod
@@ -285,6 +300,7 @@ class ReimbursementStore:
             value = json.loads(row["payload_json"])
             if all(value.get(key) == new for key, new in checked.items()):
                 return self._payload(row)
+            self._not_cleared(row)
             if "splitActionId" in checked and value.get("splitActionId") and value["splitActionId"] != checked["splitActionId"]:
                 raise ReimbursementConflictError("The allocation is already attached to a different split action.")
             value.update(checked)
@@ -304,7 +320,8 @@ class ReimbursementStore:
                                 WHERE a.payer_owner = ? OR a.partner_owner = ? ORDER BY e.created_at, e.id""", (owner, owner)).fetchall()
             return {"allocations": [self._payload(row) for row in rows],
                     "events": [self._event_payload(event, allocations[event["allocation_id"]]) for event in events
-                               if event["allocation_id"] in allocations], "currency": "USD"}
+                               if event["allocation_id"] in allocations], "currency": "USD",
+                    "resetState": self._reset_state(db), "resets": self._resets(db)}
 
     def revise_allocation(self, owner: str, allocation_id: str, expected_version: int,
                           updates: dict[str, Any], *, operation: str) -> dict[str, Any]:
@@ -330,6 +347,7 @@ class ReimbursementStore:
             if owner != row["payer_owner"]:
                 raise ReimbursementValidationError("Only the original payer can edit this expense.")
             self._version(row, expected_version)
+            self._not_cleared(row)
             if before.get("lifecycle") == "deleted":
                 raise ReimbursementConflictError("This expense has already been deleted.")
             if int(row["projected_version"]) != int(row["version"]):
@@ -340,7 +358,10 @@ class ReimbursementStore:
             if int(row["settled_cents"]) or paid is not None:
                 raise ReimbursementConflictError("This expense has confirmed repayments. Reverse its settlement before changing the original expense.")
             before.pop("sourceRevision", None)
-            value = _allocation_details({**before, **updates, "settledCents": 0})
+            # Reset metadata is internal and must not become source input on a
+            # later edit after Undo. The revision audit still retains it.
+            source = {key: value for key, value in before.items() if key not in {"clearedCents", "mirrorOnlyVersion"}}
+            value = _allocation_details({**source, **updates, "settledCents": 0})
             lifecycle = value.get("lifecycle", "active")
             expected_lifecycle = {"cancel": "void", "delete": "deleted", "split": "active"}.get(operation, before.get("lifecycle", "active"))
             if lifecycle != expected_lifecycle:
@@ -424,8 +445,120 @@ class ReimbursementStore:
 
     @staticmethod
     def _available(row: Any, amount: int) -> None:
-        if amount > int(row["partner_share_cents"]) - int(row["settled_cents"]):
+        if amount > ReimbursementStore._payload(row)["outstandingCents"]:
             raise ReimbursementConflictError("The amount exceeds what is still owed on this reimbursement.")
+
+    @staticmethod
+    def _not_cleared(row: Any) -> None:
+        if json.loads(row["payload_json"]).get("clearedCents", 0):
+            raise ReimbursementConflictError("Undo the balance reset first before changing this expense or its repayments.")
+
+    def _reset_state(self, db: Any) -> str:
+        """Fingerprint the complete household preview while holding its lock."""
+        rows = db.execute("SELECT * FROM app_reimbursement_allocations ORDER BY id").fetchall()
+        allocations = []
+        for row in rows:
+            value = self._payload(row)
+            allocations.append({key: value[key] for key in (
+                "id", "version", "projectedVersion", "status", "accounting", "outstandingCents", "clearedCents")})
+        pending = db.execute("SELECT id,allocation_id,amount_cents FROM app_reimbursement_events WHERE status = 'pending' ORDER BY id").fetchall()
+        value = {"allocations": allocations,
+                 "pending": [[row["id"], row["allocation_id"], int(row["amount_cents"])] for row in pending]}
+        return hashlib.sha256(_json(value, maximum=20_000_000).encode()).hexdigest()
+
+    @staticmethod
+    def _reset_event_state(db: Any, allocation_id: str) -> str:
+        # Pending reports do not increment allocation versions. Remember their
+        # history too, so a new or canceled payment cannot silently allow Redo.
+        events = db.execute("SELECT id,status FROM app_reimbursement_events WHERE allocation_id = ? ORDER BY id", (allocation_id,)).fetchall()
+        return hashlib.sha256(_json([[row["id"], row["status"]] for row in events], maximum=20_000_000).encode()).hexdigest()
+
+    def _reset_ready(self, db: Any, reset: Any) -> bool:
+        active = reset["status"] == "active"
+        for entry in json.loads(reset["entries_json"]):
+            row = self._row(db, entry["allocationId"])
+            value = self._payload(row)
+            if (value["version"] != entry["version"] or value["projectedVersion"] != value["version"]
+                    or value.get("lifecycle", "active") != "active" or value["accounting"] != "cash_v1"
+                    or value["clearedCents"] != (entry["amountCents"] if active else 0)
+                    or value["outstandingCents"] != (0 if active else entry["amountCents"])
+                    or self._reset_event_state(db, row["id"]) != entry["eventState"]):
+                return False
+            pending = db.execute("SELECT id FROM app_reimbursement_events WHERE allocation_id = ? AND status = 'pending' LIMIT 1", (row["id"],)).fetchone()
+            if pending is not None:
+                return False
+        return True
+
+    def _reset_payload(self, db: Any, reset: Any) -> dict[str, Any]:
+        ready = self._reset_ready(db, reset)
+        return {"id": reset["id"], "version": int(reset["version"]), "status": reset["status"],
+                "actorOwner": reset["actor_owner"], "note": reset["note"],
+                "createdAt": reset["created_at"], "updatedAt": reset["updated_at"],
+                "entries": [{key: entry[key] for key in ("allocationId", "amountCents", "payerOwner", "partnerOwner")}
+                            for entry in json.loads(reset["entries_json"])],
+                "canUndo": ready and reset["status"] == "active", "canRedo": ready and reset["status"] == "undone"}
+
+    def _resets(self, db: Any) -> list[dict[str, Any]]:
+        return [self._reset_payload(db, row) for row in
+                db.execute("SELECT * FROM app_reimbursement_resets ORDER BY created_at,id").fetchall()]
+
+    @staticmethod
+    def _clear(db: Any, row: Any, amount: int, now: str) -> None:
+        value = json.loads(row["payload_json"])
+        value["clearedCents"] = int(value.get("clearedCents", 0)) + amount
+        # The preceding source version was verified. A reset changes only the
+        # debt mirror, including for frozen monthly sheets from earlier years.
+        value["mirrorOnlyVersion"] = int(row["version"]) + 1
+        db.execute("UPDATE app_reimbursement_allocations SET payload_json = ?, version = version + 1, updated_at = ? WHERE id = ?",
+                   (_json(value), now, row["id"]))
+
+    def _change_reset(self, db: Any, owner: str, body: dict[str, Any], operation_id: str,
+                      now: str) -> tuple[list[str], str]:
+        operation = body["operation"]
+        if operation == "reset":
+            expected = _text(body.get("expectedState"), "Balance preview", 64, required=True)
+            if expected != self._reset_state(db):
+                raise ReimbursementConflictError("Shared balances changed. Refresh and review both balances before resetting.")
+            note = _text(body.get("note", ""), "Note", 500)
+            if db.execute("SELECT id FROM app_reimbursement_events WHERE status = 'pending' LIMIT 1").fetchone() is not None:
+                raise ReimbursementConflictError("Confirm or dismiss pending reported payments before resetting shared balances.")
+            rows = [row for row in db.execute("SELECT * FROM app_reimbursement_allocations ORDER BY id").fetchall()
+                    if self._payload(row)["outstandingCents"] > 0]
+            if not rows:
+                raise ReimbursementConflictError("Both shared balances are already zero.")
+            # Validate the entire selection before writing either direction.
+            for row in rows:
+                self._writable(row)
+                if int(row["projected_version"]) != int(row["version"]):
+                    raise ReimbursementConflictError("An expense is still syncing. Retry its sheet update before resetting shared balances.")
+            entries = [{"allocationId": row["id"], "amountCents": self._payload(row)["outstandingCents"],
+                        "payerOwner": row["payer_owner"], "partnerOwner": row["partner_owner"],
+                        "version": int(row["version"]) + 1, "eventState": self._reset_event_state(db, row["id"])} for row in rows]
+            reset_id, version, status = uuid4().hex, 1, "active"
+            db.execute("""INSERT INTO app_reimbursement_resets(id,version,status,actor_owner,note,entries_json,created_at,updated_at)
+                          VALUES (?,?,?,?,?,?,?,?)""", (reset_id, version, status, owner, note, _json(entries, maximum=20_000_000), now, now))
+        else:
+            reset_id = _text(body.get("resetId"), "Reset identifier", 200, required=True)
+            reset = db.execute("SELECT * FROM app_reimbursement_resets WHERE id = ?", (reset_id,)).fetchone()
+            if reset is None:
+                raise ReimbursementNotFoundError("This balance reset is unavailable.")
+            self._version(reset, body.get("version"))
+            expected_status = "active" if operation == "undo_reset" else "undone"
+            if reset["status"] != expected_status or not self._reset_ready(db, reset):
+                raise ReimbursementConflictError("This balance reset changed, its expenses changed, or its sheet update is still syncing. Refresh before continuing.")
+            entries = json.loads(reset["entries_json"])
+            rows = [self._row(db, entry["allocationId"]) for entry in entries]
+            for entry, row in zip(entries, rows):
+                entry["version"] = int(row["version"]) + 1
+            version = int(reset["version"]) + 1
+            status = "undone" if operation == "undo_reset" else "active"
+            db.execute("UPDATE app_reimbursement_resets SET version = ?, status = ?, entries_json = ?, updated_at = ? WHERE id = ?",
+                       (version, status, _json(entries, maximum=20_000_000), now, reset_id))
+        for entry, row in zip(entries, rows):
+            self._clear(db, row, entry["amountCents"] * (-1 if operation == "undo_reset" else 1), now)
+        db.execute("""INSERT INTO app_reimbursement_reset_actions(id,reset_id,version,operation_id,operation,actor_owner,created_at)
+                      VALUES (?,?,?,?,?,?,?)""", (uuid4().hex, reset_id, version, operation_id, operation, owner, now))
+        return [entry["allocationId"] for entry in entries], reset_id
 
     def _add_event(self, db: Any, row: Any, operation_id: str, kind: str, owner: str,
                    amount: int, when: str, note: str, now: str, *, confirmed: bool) -> str:
@@ -482,12 +615,17 @@ class ReimbursementStore:
             allowed = {"receive": {"allocationId", "version", "amountCents", "date", "note"},
                        "report_payment": {"allocationId", "version", "amountCents", "date", "note"},
                        "confirm_payment": {"allocationId", "version", "eventId"},
-                       "offset": {"entries", "date", "note"}, "reverse": {"eventId"}}
+                       "offset": {"entries", "date", "note"}, "reverse": {"eventId"},
+                       "reset": {"expectedState", "note"},
+                       "undo_reset": {"resetId", "version"}, "redo_reset": {"resetId", "version"}}
             if not isinstance(operation, str) or operation not in allowed or set(body) - common - allowed[operation]:
                 raise ReimbursementValidationError("Unknown action or unexpected reimbursement fields.")
             changed: list[str] = []
             event_ids: list[str] = []
-            if operation in {"receive", "report_payment", "confirm_payment"}:
+            reset_id = ""
+            if operation in {"reset", "undo_reset", "redo_reset"}:
+                changed, reset_id = self._change_reset(db, owner, body, operation_id, now)
+            elif operation in {"receive", "report_payment", "confirm_payment"}:
                 allocation_id = _text(body.get("allocationId"), "Allocation identifier", 200, required=True)
                 row = self._row(db, allocation_id)
                 self._writable(row)
@@ -516,7 +654,7 @@ class ReimbursementStore:
                     self._available(row, amount)
                     if operation == "report_payment":
                         pending = db.execute("SELECT COALESCE(SUM(amount_cents),0) AS amount FROM app_reimbursement_events WHERE allocation_id = ? AND status = 'pending'", (allocation_id,)).fetchone()
-                        if amount + int(pending["amount"]) > int(row["partner_share_cents"]) - int(row["settled_cents"]):
+                        if amount + int(pending["amount"]) > self._payload(row)["outstandingCents"]:
                             raise ReimbursementConflictError("Pending reported payments already cover this amount.")
                     event_id = self._add_event(db, row, operation_id, operation, owner, amount, when, note, now, confirmed=operation == "receive")
                 event_ids.append(event_id)
@@ -567,6 +705,7 @@ class ReimbursementStore:
                 for item in events:
                     if item["status"] == "confirmed":
                         row = rows[item["allocation_id"]]
+                        self._not_cleared(row)
                         if int(row["settled_cents"]) < int(item["amount_cents"]):
                             raise ReimbursementConflictError("This settlement cannot be reversed from the current balance.")
                         self._settle(db, row["id"], -int(item["amount_cents"]), now)
@@ -580,6 +719,9 @@ class ReimbursementStore:
                 result_events.append(self._event_payload(event, self._row(db, event["allocation_id"])))
             result = {"allocations": [self._payload(self._row(db, allocation_id)) for allocation_id in changed],
                       "events": result_events, "operationId": operation_id}
+            if reset_id:
+                reset = db.execute("SELECT * FROM app_reimbursement_resets WHERE id = ?", (reset_id,)).fetchone()
+                result["reset"] = self._reset_payload(db, reset)
             db.execute("UPDATE app_reimbursement_commands SET result_json = ? WHERE request_id = ?", (_json(result, maximum=20_000_000), request_id))
             return result
 

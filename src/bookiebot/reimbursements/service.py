@@ -175,6 +175,10 @@ def mutate_recent_action(user_key: str, logged: Any, operation: str, *,
             raise ReimbursementValidationError("Only the original payer can edit this expense.")
         if value["accounting"] != "cash_v1":
             raise ReimbursementConflictError("Historical net-accounting reimbursements are read-only.")
+        if value.get("clearedCents", 0):
+            # Even an unchanged split selection must not claim a new amount is
+            # owed or bypass the reset guard through the no-op retry path.
+            raise ReimbursementConflictError("Undo the balance reset first before changing this expense or its repayments.")
 
         def finish(message: str) -> tuple[bool, str]:
             try:
@@ -280,7 +284,8 @@ def allocation_as_legacy(value: dict[str, Any]) -> Any:
         expense_date=value["expenseDate"], item=value["item"], location=value["location"],
         gross_amount=value["grossCents"] / 100, split_method=value["method"], payer_share=value["payerShareCents"] / 100,
         partner_share=value["partnerShareCents"] / 100,
-        status="void" if value.get("lifecycle", "active") != "active" else "reimbursed" if not value["outstandingCents"] else "outstanding",
+        status=("void" if value.get("lifecycle", "active") != "active" else "cleared" if value.get("clearedCents", 0)
+                else "reimbursed" if not value["outstandingCents"] else "outstanding"),
         received_amount=value["settledCents"] / 100, responsible_owner_key=value["payerOwner"],
         original_person=value["payerPerson"], responsible_person=value["payerPerson"])
 

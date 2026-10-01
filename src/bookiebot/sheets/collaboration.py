@@ -21,7 +21,7 @@ from bookiebot.sheets.utils import clean_money
 logger = logging.getLogger(__name__)
 
 SplitMethod = Literal["income", "equal", "fronted"]
-AllocationStatus = Literal["outstanding", "reimbursed", "void"]
+AllocationStatus = Literal["outstanding", "reimbursed", "cleared", "void"]
 
 BRIAN_ANNUAL_INCOME = Decimal("156000")
 HANNAH_ANNUAL_INCOME = Decimal("85000")
@@ -89,9 +89,14 @@ class SharedAllocation:
 
     @property
     def outstanding_amount(self) -> float:
-        if self.status == "void":
+        if self.status in {"void", "cleared"}:
             return 0.0
         return round(max(self.partner_share - self.received_amount, 0.0), 2)
+
+    @property
+    def cleared_amount(self) -> float:
+        """A reset clears the full remainder without recording money received."""
+        return round(max(self.partner_share - self.received_amount, 0.0), 2) if self.status == "cleared" else 0.0
 
 
 def normalize_split_method(value: Any) -> SplitMethod | None:
@@ -298,7 +303,7 @@ def _parse_allocation(row: list[str]) -> SharedAllocation | None:
         if not padded[0] or method is None:
             return None
         raw_status = padded[19].strip().lower()
-        status: AllocationStatus = raw_status if raw_status in {"outstanding", "reimbursed", "void"} else "outstanding"  # type: ignore[assignment]
+        status: AllocationStatus = raw_status if raw_status in {"outstanding", "reimbursed", "cleared", "void"} else "outstanding"  # type: ignore[assignment]
         return SharedAllocation(
             allocation_id=padded[0],
             created_at=padded[1],
