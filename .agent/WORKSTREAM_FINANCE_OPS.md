@@ -1,6 +1,6 @@
 # Finance Operations Workstream
 
-Last updated: 2026-09-30
+Last updated: 2026-10-02
 
 ## Goal
 
@@ -240,7 +240,7 @@ Status: Complete in code and automated/browser verification as of 2026-08-03; pr
 
 ### Slice H - Split Lifecycle Completion
 
-2026-10-02 personal-bill follow-up: confirmed repayments for split Rent, PG&E, Recology and Water now target the partner's exact bill row in the original expense month, with cumulative named-range replay and reversal guards. The payer source and generated ledger remain part of the same pending projection. The October rent case is verified in production DB as saved but unsynced; deployment and live three-cell readback remain on deck in STATUS.
+2026-10-02 personal-bill follow-up complete: confirmed repayments for split Rent, PG&E, Recology and Water target the partner's exact bill row in the original expense month, with cumulative named-range replay and reversal guards. The payer source and generated ledger remain part of the same pending projection. PR #62 passed CI, merged to main and deployed on Railway. The saved October rent receipt was replayed once: production allocation version/projected version read 3/3, Brian/Hannah October Rent read $2,103.73/$1,146.27, and Brian reimbursement row 19 read `reimbursed` with $1,146.27 received. Native iOS display acceptance remains STATUS checklist 126.
 
 Status: Canonical recent-action corrections completed 2026-09-16: gross/details, method, category move, cancellation/re-split and deletion use durable revisions and verified source projections. Pending/confirmed repayments require resolution/reversal first. Historical net-accounting corrections and direct canonical Undo remain deferred.
 
