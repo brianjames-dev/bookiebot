@@ -200,6 +200,8 @@ async function emptyDirectionsAndMarkerContracts() {
   await tap(button(tree.root, "Owed to you", true))
   assert.ok(button(tree.root, "View 3 expenses"))
   assert.ok(text(tree.root).includes("Net owed to you$95.00"))
+  await expand(tree, "PG&E")
+  assert.ok(text(tree.root).includes("Payment recorded; budget and reimbursement sheets still need to update."), "A recorded payment cannot appear fully synced while its sheet projection is pending")
   await unmount(tree)
 
   state = fixture()
@@ -461,7 +463,7 @@ function applyReset(body, state) {
     const item = state.snapshot.allocations.find(item => item.id === entry.allocationId)
     const change = body.operation === "undo_reset" ? -entry.amountCents : entry.amountCents
     item.clearedCents = (item.clearedCents || 0) + change; item.outstandingCents -= change
-    item.status = item.outstandingCents ? "outstanding" : "cleared"; item.version++
+    item.status = item.outstandingCents ? "outstanding" : "cleared"; item.version++; item.projectedVersion = item.version
   }
   state.snapshot.resetState += "-changed"
   return response(clone(state.snapshot))

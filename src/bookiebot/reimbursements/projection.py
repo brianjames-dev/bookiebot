@@ -18,7 +18,9 @@ from gspread.utils import a1_to_rowcol
 
 from bookiebot.reports.app_access import PostgresAppAccessStore
 from bookiebot.sheets.config import get_category_columns
-from bookiebot.sheets.routing import get_shared_expenses_spreadsheet_id
+from bookiebot.sheets.routing import (
+    get_budget_spreadsheet_id_for_user, get_shared_expenses_spreadsheet_id,
+)
 
 
 class ProjectionConflictError(RuntimeError):
@@ -26,6 +28,7 @@ class ProjectionConflictError(RuntimeError):
 
 
 _LOCK = threading.Lock()
+_PERSONAL_BILL_LABELS = {"rent": "Rent", "pge": "PG&E", "recology": "Recology", "water": "Water"}
 
 
 @contextmanager
@@ -429,6 +432,75 @@ class SheetsProjection:
                 or not _identity_matches(verified, fields, expected)):
             raise ProjectionConflictError("The reimbursement expense could not be verified.")
 
+    def _personal_bill_destination(self, allocation: dict[str, Any]) -> tuple[Any, Any, str, str, int]:
+        """Find the partner's bill cell in the original expense month, without writing."""
+        label = _PERSONAL_BILL_LABELS.get(allocation["category"])
+        if not label:
+            raise ProjectionConflictError("This personal bill has no supported partner budget row.")
+        spent_on = date.fromisoformat(allocation["expenseDate"])
+        from bookiebot.sheets.collaboration import actor_key_for_owner
+        actor = actor_key_for_owner(allocation["partnerOwner"])
+        if not actor:
+            raise ProjectionConflictError("The partner budget owner is not configured.")
+        book = self._book(get_budget_spreadsheet_id_for_user(actor, allocation.get("sourceYear", spent_on.year)))
+        sheet = book.worksheet(allocation.get("sourceSheetTitle") or spent_on.strftime("%B"))
+        full = _name("partner_bill", allocation["id"])
+        amount = _name("partner_bill_amount", allocation["id"])
+        names = self._ranges(book)
+        if full in names:
+            self._validate_anchors(book, sheet.id, full, {"item": 2, "amount": 3}, {"amount": amount})
+            row = names[full]["range"]["startRowIndex"] + 1
+            values = self._read(book, full)
+            if str(values[0] if values else "").strip() != label:
+                raise ProjectionConflictError("The linked partner bill label was edited outside BookieBot.")
+            current = values[1] if len(values) > 1 else 0
+        else:
+            if amount in names:
+                raise ProjectionConflictError("The partner bill anchor is incomplete. Review it before syncing.")
+            rows = sheet.get_all_values()
+            matches = [index for index, values in enumerate(rows, start=1)
+                       if len(values) > 1 and str(values[1]).strip() == label]
+            if len(matches) != 1:
+                raise ProjectionConflictError("The partner bill row does not match uniquely. Review it before syncing.")
+            row = matches[0]
+            if any(name.startswith("BB_partner_bill_") and name != full
+                   and region.get("range", {}).get("sheetId") == sheet.id
+                   and region["range"].get("startRowIndex") == row - 1
+                   for name, region in names.items()):
+                raise ProjectionConflictError("Another reimbursement already owns this partner bill row.")
+            current = rows[row - 1][2] if len(rows[row - 1]) > 2 else 0
+            if _cents(current or 0) != 0:
+                raise ProjectionConflictError("The partner bill already has an amount. Review it before syncing.")
+        valid = {allocation["grossCents"] - value for value in _source_targets(allocation)}
+        if _cents(current or 0) not in valid:
+            raise ProjectionConflictError("The partner bill amount was edited outside this settlement.")
+        return book, sheet, full, amount, row
+
+    def personal_bill_receipt(self, allocation: dict[str, Any]) -> None:
+        """Project cumulative confirmed repayment into one partner bill cell."""
+        book, sheet, full, amount, row = self._personal_bill_destination(allocation)
+        names = self._ranges(book)
+        if full not in names:
+            if not allocation["settledCents"]:
+                return
+            book.batch_update({"requests": [
+                self._range_request(full, sheet.id, row, 2, 3),
+                self._range_request(amount, sheet.id, row, 3, 3),
+            ]})
+        self._validate_anchors(book, sheet.id, full, {"item": 2, "amount": 3}, {"amount": amount})
+        before = self._read(book, full)
+        valid = {allocation["grossCents"] - value for value in _source_targets(allocation)}
+        if (str(before[0] if before else "").strip() != _PERSONAL_BILL_LABELS[allocation["category"]]
+                or _cents(before[1] if len(before) > 1 and before[1] else 0) not in valid):
+            raise ProjectionConflictError("The partner bill changed before its settlement update.")
+        book.values_batch_update({"valueInputOption": "RAW", "data": [
+            {"range": amount, "values": [[allocation["settledCents"] / 100]]},
+        ]})
+        values = self._read(book, full)
+        if (str(values[0] if values else "").strip() != _PERSONAL_BILL_LABELS[allocation["category"]]
+                or _cents(values[1] if len(values) > 1 else 0) != allocation["settledCents"]):
+            raise ProjectionConflictError("The partner bill update could not be verified.")
+
     def project(self, allocation: dict[str, Any]) -> None:
         if allocation.get("mirrorOnlyVersion", 0) == allocation.get("version", -1):
             # A reset changes the obligation, not recorded spending. Its store
@@ -455,12 +527,18 @@ class SheetsProjection:
                 verify_budget_links(self.client, source["partnerOwner"], when, source["category"], cache=self.budget_formula_cache)
         # Validate every destination before the first sheet write, including
         # reversals and backdated receipts into a potentially frozen month.
+        personal_bill = allocation.get("sourceWorksheet") == "income"
         category = allocation["category"] if allocation["category"] in get_category_columns else "need_expenses"
+        has_receipt = False
         for event in _projection_events(allocation):
             if event["status"] == "pending" or (event["status"] == "reversed" and not event.get("confirmedAt")):
                 continue
-            verify_budget_links(self.client, allocation["partnerOwner"], date.fromisoformat(event["date"]), category,
-                                cache=self.budget_formula_cache)
+            has_receipt = True
+            if not personal_bill:
+                verify_budget_links(self.client, allocation["partnerOwner"], date.fromisoformat(event["date"]), category,
+                                    cache=self.budget_formula_cache)
+        if personal_bill and has_receipt:
+            self._personal_bill_destination(allocation)
         if correcting:
             # A revision starts only after all previous projections and reversals
             # completed. Its own guard runs before any possible receipt writes.
@@ -468,8 +546,12 @@ class SheetsProjection:
             return
         # Recipient entries first keep a failed cross-workbook write visible as
         # pending; the operation is never represented as an atomic Sheets write.
-        for event in _projection_events(allocation):
-            self.receipt(allocation, event)
+        if personal_bill:
+            if has_receipt:
+                self.personal_bill_receipt(allocation)
+        else:
+            for event in _projection_events(allocation):
+                self.receipt(allocation, event)
         self.source(allocation)
 
 

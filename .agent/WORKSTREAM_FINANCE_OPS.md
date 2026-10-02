@@ -240,6 +240,8 @@ Status: Complete in code and automated/browser verification as of 2026-08-03; pr
 
 ### Slice H - Split Lifecycle Completion
 
+2026-10-02 personal-bill follow-up: confirmed repayments for split Rent, PG&E, Recology and Water now target the partner's exact bill row in the original expense month, with cumulative named-range replay and reversal guards. The payer source and generated ledger remain part of the same pending projection. The October rent case is verified in production DB as saved but unsynced; deployment and live three-cell readback remain on deck in STATUS.
+
 Status: Canonical recent-action corrections completed 2026-09-16: gross/details, method, category move, cancellation/re-split and deletion use durable revisions and verified source projections. Pending/confirmed repayments require resolution/reversal first. Historical net-accounting corrections and direct canonical Undo remain deferred.
 
 1. Complete 2026-08-03: change the split method and recalculate both shares without losing the original gross or settlement history.

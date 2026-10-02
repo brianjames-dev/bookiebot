@@ -4,6 +4,8 @@ Last updated: 2026-09-30
 
 ## Active Focus
 
+Personal-bill reimbursement repair (2026-10-02): production PostgreSQL confirms the October $3,250 By income rent allocation has a confirmed $1,146.27 receipt on October 2, with version 3 saved and only version 2 projected. The live sheets still show Brian Rent $3,250, Hannah Rent $0, and Brian Shared Reimbursements row 19 outstanding. A read-only production preflight verified Brian/Hannah October C13, the unique empty partner Rent row and Brian's source anchor. The projector now routes confirmed personal bill receipts to the partner's matching source-month bill row, retains guarded payer updates, and labels incomplete web rows **Sheet update pending**. Targeted reimbursement/API/UI checks: 364 passed / 178 optional PostgreSQL skipped; full suite **1,974 passed / 311 optional PostgreSQL skipped**; Pyright and frontend typecheck/build clean. Deployment verification is in progress. After deployment, refresh Shared on the phone and verify Brian October Rent $2,103.73, Hannah October Rent $1,146.27, and row 19 `reimbursed`.
+
 Shared balance reset released (2026-09-30): reviewed Reset balances clears both directions across all months while preserving recorded expenses and repayments. Durable reset history offers guarded grouped Undo/Redo; sheet mirrors, reports, Ask summaries and Shared widgets distinguish clearing from received money. Source correction guards prevent cleared debts from reappearing. Full local suite **1,968 passed / 311 optional PostgreSQL skipped**; Pyright and frontend typecheck/build clean. WebKit passed 12 width/theme/motion cases with real local API reset/undo/redo. PR #61 passed CI including PostgreSQL, merged into main as `fedb100`, and Railway production deployment succeeded. The live `/app/version` matches **4f6090f26bb0443df0885cc2**. Both remote and local main were synchronized. Checklist 125 and `docs/REIMBURSEMENTS.md` cover iOS acceptance; update/reopen the existing app. No live balance reset was performed.
 
 Split expense actions restored (2026-09-16): canonical split groceries now expose Update/Move/Split/Delete/Cancel. Split edits the allocation and contains confirmed Cancel split; Update retains transaction fields and recalculates shares for gross corrections. Durable revisions, verified source anchors, same-owner account validation and repayment guards preserve ledger/sheet/reconciliation consistency. Fully reversed receipts permit later corrections. Full local suite **1,890 passed / 299 skipped (optional PostgreSQL and unavailable frontend test dependencies)**; Pyright clean. Acceptance is checklist 124 and `docs/REIMBURSEMENTS.md`. No live financial test writes or deployment performed.
@@ -82,6 +84,8 @@ All eight September 6 audit batches are implemented and verified locally. Each b
 
 
 ## On Deck
+
+Release the personal-bill reimbursement repair, retry the saved October rent projection, and verify the three live sheet cells plus production database projected version. Then confirm on iOS that the rent entry no longer shows Sheet update pending.
 
 Shared balance reset is deployed from main. User iOS acceptance is checklist 125: load the app update, then Shared → Reset balances; inspect Reset history for Undo/Redo. The user's actual balances have not been reset during testing.
 
