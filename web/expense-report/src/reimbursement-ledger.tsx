@@ -333,7 +333,8 @@ function LedgerRow({ allocation: item, events, reversibleIds, owner, open, onOpe
   const shares = item.grossCents > 0 ? [item.payerShareCents, item.settledCents, cleared, item.outstandingCents].map(value => value / item.grossCents * 100) : [0, 0, 0, 0]
   const pendingSent = events.some(event => event.status === "pending")
   const canWrite = writable(item)
-  const settledLabel = cleared > 0 ? "Cleared" : events.some(event => event.kind === "offset" && event.status === "confirmed") ? "Settled" : isPayer ? "Received" : "Paid"
+  const sheetPending = item.version !== item.projectedVersion
+  const settledLabel = sheetPending ? "Sheet update pending" : cleared > 0 ? "Cleared" : events.some(event => event.kind === "offset" && event.status === "confirmed") ? "Settled" : isPayer ? "Received" : "Paid"
   return <AnimatedDisclosure open={open} onOpenChange={onOpenChange} summary={<>
     <span className="bb-reimbursement-item"><strong title={item.item || item.category}>{item.item || item.category || "Shared expense"}</strong></span>
     <div className="bb-reimbursement-status" data-settled={settled}>{settled ? settledLabel : <><FittedAmount className="bb-reimbursement-due">{money(item.outstandingCents)}</FittedAmount><i className="bb-reimbursement-due-key" aria-hidden="true" /><small>due</small></>}</div>
@@ -351,6 +352,7 @@ function LedgerRow({ allocation: item, events, reversibleIds, owner, open, onOpe
         <div><dt><i className="bb-reimbursement-visual-key" data-portion="received" aria-hidden="true" /><span>{isPayer ? partner : "You"} {events.some(event => event.kind === "offset" && event.status === "confirmed") ? "settled" : "paid"}</span></dt><dd>{money(item.settledCents)}</dd></div>
         {cleared > 0 && <div><dt><i className="bb-reimbursement-visual-key" data-portion="cleared" aria-hidden="true" /><span>Cleared without payment</span></dt><dd>{money(cleared)}</dd></div>}</dl>
       {!canWrite && <p className="bb-ledger-note">Historical split · read only</p>}
+      {sheetPending && <p className="bb-ledger-note" role="status">Payment recorded; budget and reimbursement sheets still need to update. Refresh Shared to retry.</p>}
       {pendingSent && <p className="bb-ledger-note">{isPayer ? "Review the pending payment above before recording another receipt." : "Sent payment awaiting confirmation. The balance changes when received."}</p>}
       {cleared > 0 && <p className="bb-ledger-note">Undo the balance reset before changing this expense or reversing its payments.</p>}
       <div className="bb-ledger-actions">

@@ -29,7 +29,8 @@ def setup(access, monkeypatch):
     book = Book()
     sheet = book.add_sheet("January")
     sheet.write(2, 29, ["1/3/2026", "T", "300.81", "Gameday", "Brian (BofA)"])
-    book.add_sheet("September")
+    for month in ("February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"):
+        book.add_sheet(month)
     client = SimpleNamespace(open_by_key=lambda key: book)
     histories = {}
     def set_history(owner, *items, raw_only=False):

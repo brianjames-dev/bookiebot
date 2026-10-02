@@ -133,7 +133,7 @@ def test_fixed_bill_captures_verified_label_identity_without_mutating_callers(se
     assert fields == {"amount": 3} and values == {"amount": "464.72"}
 
 
-def test_fixed_bill_amount_correction_preserves_literal_source_label_and_canonical_item(setup):
+def test_fixed_bill_amount_correction_preserves_literal_source_label_and_canonical_item(setup, monkeypatch):
     label = "Rent payment (due 1st)"
     setup.sheet.write(2, 1, [label, 464.72])
     value = setup.store.register_allocation(payload(
@@ -156,9 +156,15 @@ def test_fixed_bill_amount_correction_preserves_literal_source_label_and_canonic
     assert current["sourceValues"] == {"item": label, "amount": "500.00"}
     assert setup.sheet.read(2, 1, 3) == [label, 500]
     # Future settlement projection must still bind the original literal label.
+    partner = Book()
+    partner.add_sheet("January").write(2, 1, ["Rent", 0])
+    monkeypatch.setattr(projection, "get_budget_spreadsheet_id_for_user", lambda _actor, _year: "partner")
+    monkeypatch.setattr(auth, "get_gspread_client", lambda: SimpleNamespace(
+        open_by_key=lambda key: partner if key == "partner" else setup.book))
     result = service.command("brian", payment(current, 1000))
     assert not result["projectionPending"]
     assert setup.sheet.read(2, 1, 3) == [label, 490]
+    assert partner.worksheet("January").read(2, 1, 3) == ["Rent", 10]
 
 
 def test_canonical_lookup_outage_fails_closed_and_undo_never_touches_sheet(setup, monkeypatch):

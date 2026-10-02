@@ -468,6 +468,77 @@ def test_cross_year_receipt_uses_payment_month_and_partner_expense_not_income(se
     assert receipt_row(books["shared-2027"])[4] == "Hannah"
 
 
+@pytest.fixture
+def personal_rent(monkeypatch):
+    from bookiebot.reimbursements import migration
+    monkeypatch.setattr(migration, "verify_budget_links", lambda *_args, **_kwargs: pytest.fail("Personal bills do not import shared categories"))
+    monkeypatch.setattr(projection, "get_budget_spreadsheet_id_for_user",
+                        lambda actor, year: f"{'hannah' if actor == '830984827904851969' else 'brian'}-{year}")
+    books = {name: Book() for name in ("brian-2026", "hannah-2026", "shared-2026")}
+    brian = books["brian-2026"].add_sheet("October")
+    hannah = books["hannah-2026"].add_sheet("October")
+    brian.write(12, 1, ["Rent", 3250])
+    hannah.write(12, 1, ["Rent", 0])
+    value = allocation(id="rent-1", sourceWorksheet="income", category="rent", item="Rent",
+                       expenseDate="2026-10-01", sourceSpreadsheetId="brian-2026", sourceSheetTitle="October",
+                       sourceYear=2026, sourceRow=13, sourceColumnMap={"item": 2, "amount": 3},
+                       sourceValues={"item": "Rent", "amount": "3250"}, grossCents=325000,
+                       payerShareCents=210373, partnerShareCents=114627, settledCents=114627,
+                       events=[event("rent-payment", 114627, date="2026-10-02")])
+    projector = SheetsProjection(SimpleNamespace(open_by_key=lambda key: books[key]))
+    return projector, books, brian, hannah, value
+
+
+def test_confirmed_personal_rent_updates_both_budget_rows_without_shared_receipt(personal_rent):
+    projector, books, brian, hannah, value = personal_rent
+    projector.project(value)
+    assert brian.read(12, 1, 3) == ["Rent", 2103.73]
+    assert hannah.read(12, 1, 3) == ["Rent", 1146.27]
+    assert not books["shared-2026"].batch_calls
+    projector.project(value)
+    assert hannah.read(12, 1, 3) == ["Rent", 1146.27]
+    assert len(books["hannah-2026"].batch_calls) == 1
+
+
+def test_personal_rent_reversal_restores_both_budget_rows(personal_rent):
+    projector, _books, brian, hannah, value = personal_rent
+    projector.project(value)
+    value["settledCents"] = 0
+    value["events"][0].update(status="reversed", reversedAt="2026-10-03T10:00:00Z")
+    projector.project(value)
+    assert brian.read(12, 1, 3) == ["Rent", 3250]
+    assert hannah.read(12, 1, 3) == ["Rent", 0]
+
+
+@pytest.mark.parametrize("change", ["occupied", "duplicate", "missing"])
+def test_personal_rent_destination_conflict_prevents_either_budget_write(personal_rent, change):
+    projector, books, brian, hannah, value = personal_rent
+    if change == "occupied":
+        hannah.write(12, 2, [1150])
+    elif change == "duplicate":
+        hannah.write(14, 1, ["Rent", 0])
+    else:
+        hannah.write(12, 1, ["Other bill"])
+    with pytest.raises(ProjectionConflictError):
+        projector.project(value)
+    assert brian.read(12, 1, 3) == ["Rent", 3250]
+    assert not books["brian-2026"].batch_calls
+    assert not books["hannah-2026"].batch_calls
+
+
+def test_personal_rent_lost_write_response_replays_without_double_counting(personal_rent):
+    projector, books, brian, hannah, value = personal_rent
+    books["hannah-2026"].timeout_after_values = True
+    with pytest.raises(TimeoutError):
+        projector.project(value)
+    assert hannah.read(12, 1, 3) == ["Rent", 1146.27]
+    assert brian.read(12, 1, 3) == ["Rent", 3250]
+    projector.project(value)
+    assert hannah.read(12, 1, 3) == ["Rent", 1146.27]
+    assert brian.read(12, 1, 3) == ["Rent", 2103.73]
+    assert len(books["hannah-2026"].batch_calls) == 1
+
+
 def test_equal_opposite_offsets_project_each_debt_once_and_reverse_together(setup):
     projector, books, source = setup
     source.write(4, 29, ["9/8/2026", "Parking", 100, "Garage", "Hannah"])

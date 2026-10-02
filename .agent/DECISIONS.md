@@ -1,5 +1,11 @@
 # Agent Decisions
 
+## 2026-10-02 - Project Personal Bill Repayments Into The Original Month
+
+Confirmed reimbursements for split Rent, PG&E, Recology and Water payments use the partner's matching personal bill row in the source expense month. The payer's row remains gross until confirmation, then falls by cumulative confirmed receipts; the partner's row rises by the same amount. Reversal restores both amounts. Do not create a second Shared Expenses receipt for these bills or book the repayment as income. Bind the partner's exact bill label and amount with allocation-specific named ranges, accept only zero or a verified settlement-history amount, and leave the version pending if the destination is occupied or ambiguous. The generated Shared Reimbursements status advances only after both budget rows verify.
+
+Rationale: A rent repayment completed in the app had no valid shared-category import path, so the projector stopped before updating either budget or the reimbursement sheet. Routing to the existing personal bill cells records each person's responsibility once and makes retries safe after a partial sheet write.
+
 ## 2026-09-30 - Clear Shared Debt Separately From Recorded Repayments
 
 Decision: Reset balances clears the complete current outstanding household balance in both directions, across all months, after an explicit reviewed confirmation. Keep `clearedCents` separate from confirmed `settledCents`; preserve purchase amounts, payment rows and income. Store reset groups plus an append-only reset/undo/redo audit in additive tables in the existing phone database. Reuse the household transaction lock and durable request IDs. Validate the full preview fingerprint, pending reports, supported accounting and completed prior projections before commit.
