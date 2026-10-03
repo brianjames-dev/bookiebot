@@ -1,5 +1,11 @@
 # Agent Decisions
 
+## 2026-10-03 - Flush Income Inheritance Before Restoring Input Validation
+
+Decision: New-month B5:E5 inheritance captures the existing validation matrix, clears and flushes it, writes and flushes the existing formulas, then restores and flushes the exact matrix in `finally`. Keep the native dropdown, nonnegative-number and date rules, including help text and null rules. Preserve the original write error if restoration also fails, while logging the restoration failure. Existing-month daily runs still never overwrite explicit settings.
+
+Rationale: Native Google Sheets testing reproduced partial B/C writes followed by D5 formula rejection under numeric validation for numeric, blank and zero settings. Committing formulas while validation is absent fixes all cases, including employer changes, without relaxing the rules. Previously interrupted October settings were repaired only after comparing them with saved snapshots and September; changed values or unexpected formulas abort repair. No general auto-repair of existing tabs is introduced because copied values cannot reliably be distinguished from intentional overrides.
+
 ## 2026-10-02 - Project Personal Bill Repayments Into The Original Month
 
 Confirmed reimbursements for split Rent, PG&E, Recology and Water payments use the partner's matching personal bill row in the source expense month. The payer's row remains gross until confirmation, then falls by cumulative confirmed receipts; the partner's row rises by the same amount. Reversal restores both amounts. Do not create a second Shared Expenses receipt for these bills or book the repayment as income. Bind the partner's exact bill label and amount with allocation-specific named ranges, accept only zero or a verified settlement-history amount, and leave the version pending if the destination is occupied or ambiguous. The generated Shared Reimbursements status advances only after both budget rows verify.

@@ -1,8 +1,10 @@
 # Agent Status
 
-Last updated: 2026-10-02
+Last updated: 2026-10-03
 
 ## Active Focus
+
+Monthly income rollover repaired (2026-10-03): live Apps Script now flushes inherited formulas while validation is absent and restores the exact rules in `finally`. Native synthetic checks reproduced the original D5 rejection and verified the fixed helper for numeric/blank/zero/source-change cases. Guarded October D5/E5 repair completed for Brian/Hannah; effective amounts/anchors and all other September/October/Template entered values, formulas, validations, notes and formatting were verified unchanged. Focused script checks pass; full suite **1,974 passed / 311 optional PostgreSQL skipped**, Pyright clean. Next natural-run acceptance is checklist 127; unrelated snapshot/template warnings remain separate.
 
 Personal-bill reimbursement repair released (2026-10-02): PR #62 passed CI and merged into main as `cb4b11c`; Railway deployed the repair. The confirmed October $3,250 By income rent receipt was replayed once, and production allocation version/projected version both read 3. Independent live sheet readback found Brian October Rent **$2,103.73**, Hannah October Rent **$1,146.27**, and Brian Shared Reimbursements row 19 **`reimbursed`** with $1,146.27 received. Confirmed Rent, PG&E, Recology and Water receipts now use the partner's matching bill row in the original expense month; incomplete web rows show **Sheet update pending**. Targeted reimbursement/API/UI checks: 364 passed / 178 optional PostgreSQL skipped; full suite **1,974 passed / 311 optional PostgreSQL skipped**; Pyright and frontend typecheck/build clean. Native iOS acceptance remains checklist 126.
 
@@ -85,6 +87,8 @@ All eight September 6 audit batches are implemented and verified locally. Each b
 
 ## On Deck
 
+Verify the next scheduled Apps Script run and November's inherited settings using checklist 127. The fix is saved live and October's partial settings have been repaired and read back.
+
 Confirm on iOS that the deployed October rent entry shows Received after refresh, with no Sheet update pending (checklist 126). The production database and three live sheet locations have already been verified.
 
 Shared balance reset is deployed from main. User iOS acceptance is checklist 125: load the app update, then Shared → Reset balances; inspect Reset history for Undo/Redo. The user's actual balances have not been reset during testing.
@@ -103,7 +107,7 @@ Student-loan activation is complete. Verify the deployed fixed-bill display and 
 
 2. Review the deployed expense-report design and motion/responsive polish against checklist items 86–87.
 3. Verify the deployed audit fixes in a test workbook/Sandbox using `.agent/AUDIT_REMEDIATION_2026-09-06.md`; complete the live acceptance checks without creating test transactions in real financial data.
-4. Verify deployed expected-income projections and the next monthly rollover against checklist item 85.
+4. Expected-income rollover repair is deployed and October settings verified; use checklist 127 for the next natural run (supersedes the rollover portion of checklist 85).
 5. Deploy and manually verify canonical Current/Projected report tools in checklist item 82.
 6. Deploy and manually verify the LangGraph conversational/read response layer and bank-transfer refusal in checklist item 81.
 7. Deploy and manually verify Brian's BofA expense default in checklist item 80.
@@ -127,6 +131,12 @@ Student-loan activation is complete. Verify the deployed fixed-bill display and 
 25. Harden recent-action pending state across restarts/deploys, since selections currently live only in process memory.
 26. Improve targeted recent-action search so commands can find older matches, not only the latest 10 recent actions.
 27. Explore clarifying questions before logging when BookieBot is uncertain instead of guessing or silently failing.
+
+## Completed 2026-10-03
+
+- Fixed deferred numeric/date validation errors in new-month income inheritance without changing validators or existing-month overrides. Added regression coverage for partial B/C writes, flush ordering, exact restoration, values/blanks/zero, employer changes and failures; revised tests fail against the original script.
+- Patched the live Apps Script and verified the same helper in a synthetic Google workbook. Original direct formula writes fail at D5; all four fixed cases pass. Repaired only both owners' October D5/E5 reference formulas with stale-state/override guards and complete three-tab readback. No transaction, amount, date or ledger values changed.
+- Verification: Node suite, focused pytest **4 passed**, full pytest **1,974 passed / 311 optional PostgreSQL skipped**, Pyright **0 errors / 0 warnings**, diff check clean. Default shell Python lacks project dependencies; final Python checks used `/Users/brianjames/Dev/bookiebot/venv/bin/python`. README, workstream and durable decision updated. Manual check: checklist 127.
 
 ## Completed 2026-10-02
 
@@ -977,6 +987,8 @@ Use a test row or low-risk real row in Discord:
 
 ## Verification Baseline
 
+2026-10-03 rollover validation: existing project Python 3.12, `python -m pytest unit_tests` **1,974 passed / 311 optional PostgreSQL skipped**, existing Kaleido deprecation only; `python -m pyright --pythonpath /Users/brianjames/Dev/bookiebot/venv/bin/python` **0 errors / 0 warnings**. Node Apps Script regression suite and four focused Python script checks pass; original script fails the revised regression. Native synthetic testing reproduces the original failure and verifies all four fixed inheritance cases, rule preservation, overrides and transaction preservation. October repair readback proves only D5/E5 formulas changed in each budget. No frontend source change.
+
 2026-09-30 balance reset: existing project Python 3.12 environment, `python -m pytest unit_tests` **1,968 passed / 311 optional PostgreSQL skipped** (one existing Kaleido warning); `python -m pyright --pythonpath /Users/brianjames/Dev/bookiebot/venv/bin/python` **0 errors / 0 warnings**. Frontend typecheck/build and executed reimbursement UI contracts pass. Local WebKit tested 12 width/theme/motion combinations against disposable real SQLite/API commands; source/mirror projections use isolated sheet fixtures. The default shell Python lacked project dependencies, so final checks use the existing project environment. CI supplies PostgreSQL contracts.
 
 2026-09-16 split corrections: `python -m pytest unit_tests` **1,890 passed / 299 skipped (optional PostgreSQL and unavailable frontend test dependencies)**, one existing Kaleido deprecation warning; `python -m pyright` **0 errors, 0 warnings**. Used the existing project Python 3.12 environment. The full suite requires loopback test servers and the chart subprocess, so its final run used the approved unsandboxed runner. Focused finance, Discord routing, projection failure/retry, concurrency and canonical lineage regressions passed. No live financial mutations were used.
@@ -1543,3 +1555,5 @@ python -m pyright
 125. Shared balance reset (isolated workbooks/database): seed debts in both directions across different months/years and a partial received payment. Open Shared → Reset balances, review both totals and confirm. Both owners' phone balances, reports and Shared widgets must show zero; source purchase/payment rows remain identical, and mirrored rows say `cleared` with actual Received Amount unchanged. Expand a cleared receipt to inspect received versus cleared amounts. Add a new split and verify it alone accrues debt. Reset history → Undo reset restores the original group; Redo reset clears that same group while retaining newer debt. Undo then edit/move/change split/cancel/delete an affected expense and verify the old redo is unavailable; active resets give undo-first guidance for all those actions, including same-value corrections and prior payment reversal. Pending reports and stale previews block new resets; unrelated new pending work must not block an otherwise eligible earlier reset undo. Interrupt mirror projection and retry the same request/refresh to confirm one durable reset and eventual convergence. Inspect 320/390/1280px, light/dark and reduced motion; reset history remains available when both balances are zero. Never use production test payments or automatically reset the user's real balance during acceptance.
 
 126. October Rent receipt (iOS, read-only): update or reopen the installed app, select Brian and refresh Shared. The $1,146.27 October Rent repayment should show Received without Sheet update pending. Brian Budget 2026 → October Rent should read $2,103.73; Hannah Budget 2026 → October Rent should read $1,146.27; Brian Shared Reimbursements row 19 should read `reimbursed` with $1,146.27 received. These live sheet values and production projection version 3/3 were verified on 2026-10-02; do not create another payment to test them.
+
+127. Monthly income rollover (read-only production acceptance): after the next daily time-based run, confirm `budgetSystemRollover` completed in Apps Script Executions. Both October D5/E5 cells should still reference September with the existing effective amount/date and native input rules; these were verified on 2026-10-03. After November is naturally created, inspect both owners' B5:E5 inheritance, strict validation and shared-budget imports. Test changed-source, blank/zero and monthly override behavior only in an isolated workbook. Do not delete/recreate October, run a broad migration or add dummy production transactions to test this repair. Track the separate snapshot/month-label warnings independently.

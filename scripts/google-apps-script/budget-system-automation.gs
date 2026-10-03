@@ -814,11 +814,33 @@ function inheritPersonalBudgetIncomeSettings(ss, sheet, monthName) {
   const tab = previous.getName().replace(/'/g, "''");
   // References keep already-created future tabs in sync. Replacing a formula
   // with a value is an explicit override that later rollovers leave alone.
-  sheet.getRange("B5:E5").setFormulas([["B", "C", "D", "E"].map(column => {
+  const formulas = [["B", "C", "D", "E"].map(column => {
     const ref = `'${tab}'!${column}5`;
     const inherited = `IF(${ref}="","",${ref})`;
     return column === "D" || column === "E" ? `=IF($B$5='${tab}'!B5,${inherited},"")` : `=${inherited}`;
-  })]);
+  })];
+  // Sheets can defer validation errors until a later read. Commit inheritance
+  // without input validators, then restore them after the formulas calculate.
+  const range = sheet.getRange("B5:E5");
+  const validations = range.getDataValidations();
+  let writeError;
+  try {
+    range.clearDataValidations();
+    SpreadsheetApp.flush();
+    range.setFormulas(formulas);
+    SpreadsheetApp.flush();
+  } catch (error) {
+    writeError = error;
+    throw error;
+  } finally {
+    try {
+      range.setDataValidations(validations);
+      SpreadsheetApp.flush();
+    } catch (validationError) {
+      if (!writeError) throw validationError;
+      Logger.log(`Could not restore income settings validation on ${sheet.getName()}: ${validationError}`);
+    }
+  }
 }
 
 function shiftedPersonalBudgetAction(action, rowsAdded) {

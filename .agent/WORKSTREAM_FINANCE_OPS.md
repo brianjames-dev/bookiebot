@@ -1,6 +1,14 @@
 # Finance Operations Workstream
 
-Last updated: 2026-10-02
+Last updated: 2026-10-03
+
+### Monthly income rollover validation repair — 2026-10-03
+
+Complete: fixed the first natural rollover of the September income-grid release. New-month inheritance now saves, clears and flushes input validators, commits the formula references, and restores the exact rules in `finally`. Regression tests model the delayed D5 failure after B/C partial writes and cover numeric/blank/zero/off, dates, employer changes, manual overrides, exact-rule restoration and write/restoration failures. Existing-month behavior and financial transaction flows are unchanged.
+
+Live Apps Script was patched in place. An isolated native workbook reproduced the original D5 failure in all four cases; both the protected write and deployed helper passed all four, preserved the synthetic transaction and retained native rules. A separate parity check confirmed that Apps Script's numeric `setValue(-1)` is accepted under both untouched and restored nonnegative rules; this preexisting platform behavior was not introduced by the patch, and direct user entry was not tested. Guarded API repair restored only October D5/E5 links for Brian/Hannah, preserving effective amounts/anchors. Full readback of September, October and Template confirmed no other entered values/formulas, validations, notes or formatting changed. Local snapshots and native harnesses are in `/tmp/bookiebot-rollover-20261003`.
+
+Verification: focused Node suite and four pytest script checks passed; full project suite **1,974 passed / 311 optional PostgreSQL skipped**, Pyright clean using the existing project Python 3.12 environment. Manual acceptance is STATUS checklist 127. Earlier natural-rollover checks 84–85 now have direct failure/recovery evidence. Missing snapshot-label/month-label warnings and the separate annual-template backlog remain outside this repair.
 
 ## Goal
 
