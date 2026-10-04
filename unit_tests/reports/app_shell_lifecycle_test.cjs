@@ -92,9 +92,9 @@ const rawReport = tree => tree.root.findAll(node => node.type === 'div' && node.
 const dialogs = []
 const create = content => Renderer.create(content, { createNodeMock: el => el.type === 'dialog' ? (() => { const dialog = { dataset: {}, open: false, showModal() { this.open = true }, close() { this.open = false } }; dialogs.push(dialog); return dialog })() : null })
 const allocation = { id: 'power', payerOwner: 'brian', partnerOwner: 'hannah', payerPerson: 'Brian', item: 'Power', location: '', expenseDate: '2026-09-03', category: 'need', grossCents: 20000, payerShareCents: 10000, partnerShareCents: 10000, settledCents: 0, outstandingCents: 10000, method: 'equal', version: 1, projectedVersion: 1, accounting: 'cash_v1', status: 'outstanding' }
-let owner = 'brian', pending, writes = [], reads = { goals: 0, reimbursements: 0 }, widgetReads = 0, widgetWrites = [], widgetConnections = [], bankEnabled = false, bankRequest = null
+let owner = 'brian', pending, writes = [], reads = { goals: 0, reimbursements: 0 }, widgetReads = 0, widgetWrites = [], widgetConnections = [], bankEnabled = false, bankRequest = null, bankReadRequest = null
 request = async (url, options = {}) => {
-  if (url === '/app/reconciliation') return options.body && bankRequest ? bankRequest.promise : response({ enabled: bankEnabled, checkedAt: null, items: [] })
+  if (url === '/app/reconciliation') return options.body && bankRequest ? bankRequest.promise : !options.body && bankReadRequest ? bankReadRequest.promise : response({ enabled: bankEnabled, checkedAt: null, items: [] })
   if (url === '/app/version') return response({ version: 'shell-version-2' })
   if (url === '/app/widgets/script') return { ok: true, text: async () => '// BookieBot Home Screen widget\nconst BOOKIEBOT_ORIGIN = "https://bookiebot.example";' }
   if (url === '/app/widgets/settings') {
@@ -117,7 +117,11 @@ async function main() {
   assert.equal(screen(tree), 'overview'); assert.equal(reads.goals, 1); assert.equal(reads.reimbursements, 1)
   const tools = tree.root.findAll(node => node.type === 'div' && node.props.role === 'group' && node.props['aria-label'] === 'BookieBot tools')[0]
   assert.ok(tools.props.className.includes('k-toolbar'), 'Persistent actions use the installed Konsta top Toolbar')
-  assert.ok(tools.findAll(node => node.type === 'div' && node.props.className?.includes('k-toolbar-pane')).length, 'Toolbar actions share the Konsta glass pane')
+  const toolPanes = tools.findAll(node => node.type === 'div' && node.props.className?.includes('k-toolbar-pane'))
+  assert.equal(toolPanes.length, 2, 'Chat and Settings have separate glass surfaces')
+  assert.deepEqual(toolPanes.map(pane => pane.findAllByType('button').map(node => node.props['aria-label'])), [['Ask BookieBot'], ['Settings']])
+  const navigationBar = tree.root.findByType('nav')
+  assert.equal(navigationBar.children.length, 1, 'Floating navigation renders only its pane container, without an under-bar blur or gradient')
   const askTrigger = button(tree, 'Ask BookieBot')
   assert.equal(askTrigger.props['aria-haspopup'], 'dialog')
   assert.equal(askTrigger.props['aria-expanded'], false)
@@ -138,6 +142,8 @@ async function main() {
   await tap(tree, 'Savings'); await tap(tree, '＋ Goal'); await fill(tree, 'Goal name', 'Trip draft'); await fill(tree, 'Target ($)', '1000')
   assert.equal(guard.dirty, true)
   await tap(tree, 'Shared'); await tap(tree, 'View 1 expense')
+  const sharedMonth = tree.root.findAllByType('button').filter(visible).find(node => node.props.className === 'bb-reimbursement-month-toggle')
+  if (!sharedMonth.props['aria-expanded']) await run(() => sharedMonth.props.onClick())
   const disclosure = tree.root.findAllByType('button').filter(visible).find(node => node.props.className === 'bb-reimbursement-toggle')
   await run(() => disclosure.props.onClick()); await tap(tree, 'Record received'); await fill(tree, 'Amount ($)', '37.25'); await fill(tree, 'Note', 'Payment draft')
   await tap(tree, 'Settings'); await tap(tree, 'Notification fixture')
@@ -245,15 +251,28 @@ async function main() {
   await run(() => tree.unmount())
   win.location.hash = ''; widgetConnections = []
 
-  // Connected, watched bank accounts add one optional screen without replacing
-  // any existing tab or remounting the other financial controllers.
-  bankEnabled = true
+  // Reserve bank navigation before discovery finishes, including slow/error
+  // responses, without replacing tabs or remounting financial controllers.
+  bankEnabled = true; bankReadRequest = deferred()
   await run(() => { tree = create(shell(report)) })
   const optionalNav = tree.root.findByProps({ 'aria-label': 'Main navigation' })
   assert.equal(optionalNav.props['data-tab-count'], 5)
   for (const label of ['Overview', 'Spending', 'Shared', 'Savings', 'Reconcile']) assert.ok(button(tree, label))
   const beforeReviewReads = { ...reads }, beforeReviewReport = rawReport(tree).props['data-report-instance']
   win.scrollY = 340; await tap(tree, 'Reconcile'); assert.equal(screen(tree), 'reconcile'); assert.equal(win.scrollY, 0)
+  const visibleReviewText = () => text(tree.root.findAll(node => node.type === 'main' && node.props['aria-label'] === 'Reconcile')[0])
+  assert.match(visibleReviewText(), /Loading bank transactions/)
+  assert.doesNotMatch(visibleReviewText(), /Nothing needs review/)
+  assert.ok(button(tree, 'Checking…').props.disabled)
+  await run(() => bankReadRequest.reject(Error('Offline')))
+  assert.equal(screen(tree), 'reconcile'); assert.ok(button(tree, 'Try again')); assert.ok(button(tree, 'Check').props.disabled)
+  assert.equal(optionalNav.props['data-tab-count'], 5)
+  bankReadRequest = deferred(); await tap(tree, 'Try again')
+  assert.match(visibleReviewText(), /Loading bank transactions/)
+  await run(() => bankReadRequest.resolve(response({ enabled: true, checkedAt: null, items: [] })))
+  bankReadRequest = null
+  assert.equal(screen(tree), 'reconcile'); assert.match(visibleReviewText(), /Nothing needs review/)
+  assert.equal(optionalNav.props['data-tab-count'], 5)
   win.scrollY = 220; await tap(tree, 'Settings'); await tap(tree, 'Back')
   assert.equal(screen(tree), 'reconcile'); assert.equal(win.scrollY, 220)
   await tap(tree, 'Overview'); assert.equal(win.scrollY, 340)
@@ -269,6 +288,17 @@ async function main() {
   assert.equal(screen(tree), 'overview'); assert.equal(button(tree, 'Reconcile'), undefined)
   assert.equal(optionalNav.props['data-tab-count'], 4)
   await tap(tree, 'Settings'); await tap(tree, 'Back'); assert.equal(screen(tree), 'overview', 'Disconnected accounts cannot leave Settings pointing at an unavailable tab')
+  await run(() => tree.unmount())
+
+  // A known-disabled result also safely redirects a tab opened during the
+  // initial discovery; no empty bank review or stale Settings destination stays.
+  bankReadRequest = deferred()
+  await run(() => { tree = create(shell(report)) })
+  await tap(tree, 'Reconcile')
+  await run(() => bankReadRequest.resolve(response({ enabled: false, checkedAt: null, items: [] })))
+  bankReadRequest = null
+  assert.equal(screen(tree), 'overview'); assert.equal(button(tree, 'Reconcile'), undefined)
+  await tap(tree, 'Settings'); await tap(tree, 'Back'); assert.equal(screen(tree), 'overview')
   await run(() => tree.unmount())
 
   // Exercise the real FreshExpenseApp ownership boundary, with only its network/catalog transport replaced.
@@ -290,6 +320,8 @@ async function main() {
   await tap(tree, 'Savings'); await tap(tree, '＋ Goal'); await fill(tree, 'Goal name', 'Private Brian draft')
   await fill(tree, 'Target ($)', '1000')
   await tap(tree, 'Shared'); await tap(tree, 'View 1 expense')
+  const freshMonth = tree.root.findAllByType('button').filter(visible).find(node => node.props.className === 'bb-reimbursement-month-toggle')
+  if (!freshMonth.props['aria-expanded']) await run(() => freshMonth.props.onClick())
   const freshDisclosure = tree.root.findAllByType('button').filter(visible).find(node => node.props.className === 'bb-reimbursement-toggle')
   await run(() => freshDisclosure.props.onClick()); await tap(tree, 'Record received')
   await fill(tree, 'Amount ($)', '16.25'); await fill(tree, 'Note', 'Private receipt draft')

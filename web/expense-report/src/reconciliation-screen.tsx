@@ -154,16 +154,17 @@ export function ReconciliationScreen({ controller }: { controller: Controller })
   }
   return <section className="bb-reconcile" aria-labelledby="bb-reconcile-title">
     <div className="bb-reconcile-heading"><div><h1 id="bb-reconcile-title">Reconcile</h1><p className="bb-reconcile-muted">{snapshot?.checkedAt
-      ? `Checked ${new Date(snapshot.checkedAt).toLocaleString(undefined, { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" })}` : "Ready to check your logged expenses"}</p></div>
-      <button type="button" className="bb-reconcile-check" disabled={busy || needsRefresh} onClick={() => void load({ operation: "check" })}><RefreshCw size={17} aria-hidden="true" />{busy ? "Checking…" : "Check"}</button></div>
-    <SlidingSelection value={filter} className="bb-reconcile-filters" role="group" aria-label="Transaction status">
+      ? `Checked ${new Date(snapshot.checkedAt).toLocaleString(undefined, { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" })}` : "Review your logged expenses"}</p></div>
+      <button type="button" className="bb-reconcile-check" disabled={!snapshot?.enabled || busy || needsRefresh} onClick={() => void load({ operation: "check" })}><RefreshCw size={17} aria-hidden="true" />{busy ? "Checking…" : "Check"}</button></div>
+    {snapshot?.enabled && <SlidingSelection value={filter} className="bb-reconcile-filters" role="group" aria-label="Transaction status">
       {(Object.keys(filterLabels) as Filter[]).map(value => <button type="button" key={value} aria-pressed={filter === value} onClick={() => { setFilter(value); setOpenId(null) }}>
         {filterLabels[value]}<span>{rows.filter(item => value === "checked" ? ["checked", "ignored"].includes(item.status) : item.status === value).length}</span></button>)}
-    </SlidingSelection>
+    </SlidingSelection>}
+    {!snapshot && !error && <p className="bb-reconcile-muted" role="status">Loading bank transactions…</p>}
     {error && <div className="bb-reconcile-message" role="alert"><p>{error}</p><button type="button" disabled={busy} onClick={() => void load()}>{needsRefresh ? "Check status" : "Try again"}</button></div>}
     {snapshot?.notice && <p className="bb-reconcile-muted" role="status">{snapshot.notice}</p>}
     {filter === "pending" && visibleRows.length > 0 && <p className="bb-reconcile-muted">Bank amounts may change. Matches stay tentative until posted.</p>}
-    {!visibleRows.length && <div className="bb-reconcile-empty"><Check size={22} aria-hidden="true" /><p>{filter === "needs_review" ? "Nothing needs review." : filter === "pending" ? "No pending transactions." : "No checked transactions yet."}</p></div>}
+    {snapshot?.enabled && !visibleRows.length && <div className="bb-reconcile-empty"><Check size={22} aria-hidden="true" /><p>{filter === "needs_review" ? "Nothing needs review." : filter === "pending" ? "No pending transactions." : "No checked transactions yet."}</p></div>}
     <div className="bb-reconcile-list">{visibleRows.map(item => { const detail = details[item.id]; return <TransactionRow key={item.id} item={item} open={openId === item.id}
       onToggle={() => setOpenId(value => value === item.id ? null : item.id)}>
       {openId === item.id && loadingDetail && <p className="bb-reconcile-muted" role="status">Finding logged expenses…</p>}

@@ -1,5 +1,7 @@
 # Shared reimbursements
 
+In Shared, **View expenses** opens the five newest expense months. Month headings collapse/expand independently; only the current Pacific month starts expanded. Each expanded month begins with its five newest transactions. **Load more expenses** adds five rows, and **Load more months** adds five older collapsed month headings, until all are displayed. Collapsing a month preserves loaded rows and open payment drafts during that view. All balances, offsets and reset previews continue to cover the complete ledger. The historical fallback uses the same paging controls.
+
 The payer keeps the full purchase in their expenses until repayment is confirmed. A confirmed partial repayment reduces that original expense and adds one linked expense for the person repaying, dated when they paid. For a split personal bill (Rent, PG&E, Recology or Water), the confirmed amount instead accumulates in the partner's matching bill row for the original expense month. The original purchase amount stays available for bank matching. Repayments are not income, and BookieBot never transfers money.
 
 For a $200 purchase split equally, the payer initially records $200 and is owed $100. Confirming $40 changes the original expense to $160, records a $40 reimbursement expense for the other person, and leaves $60 owed. Confirming the remaining $60 leaves each person with $100 of expenses.

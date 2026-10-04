@@ -1,5 +1,11 @@
 # Agent Decisions
 
+## 2026-10-03 - Stable Phone Navigation And Progressive Shared History
+
+Render Reconcile alongside the initial navigation while watched-account discovery is unknown; an explicit disabled response removes it, while failures keep an actionable retry screen. Do not expose bank mutation controls or empty review counts until an enabled snapshot arrives.
+
+Shared history renders the newest five expense months, initially expanding only the current Pacific month, and reveals transactions newest-first in batches of five. Month and expense load-more controls append without automatic scrolling; full canonical/legacy totals and mutation scopes remain unpaginated. Collapsed months defer row mounting until first expanded, then retain mounted forms and counts. This is a presentation limit over the existing complete response, with no API, storage or accounting changes.
+
 ## 2026-10-02 - Project Personal Bill Repayments Into The Original Month
 
 Confirmed reimbursements for split Rent, PG&E, Recology and Water payments use the partner's matching personal bill row in the source expense month. The payer's row remains gross until confirmation, then falls by cumulative confirmed receipts; the partner's row rises by the same amount. Reversal restores both amounts. Do not create a second Shared Expenses receipt for these bills or book the repayment as income. Bind the partner's exact bill label and amount with allocation-specific named ranges, accept only zero or a verified settlement-history amount, and leave the version pending if the destination is occupied or ambiguous. The generated Shared Reimbursements status advances only after both budget rows verify.

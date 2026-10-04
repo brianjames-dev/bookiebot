@@ -3,6 +3,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "./components/ui/card"
 import { AnimatedDisclosure, CollapsibleContent, SlidingSelection } from "./components/ui/motion"
 import { FittedAmount } from "./components/ui/fitted-amount"
 import { useAppWorkStatus } from "./app-work-guard"
+import { useReimbursementPage } from "./reimbursement-pagination"
 import "./reimbursement-ledger.css"
 
 export interface LedgerAllocation {
@@ -69,7 +70,7 @@ function months(allocations: LedgerAllocation[]) {
     groups.set(key, [...(groups.get(key) ?? []), item])
   }
   return [...groups].sort(([a], [b]) => a === "undated" ? 1 : b === "undated" ? -1 : b.localeCompare(a))
-    .map(([key, items]) => ({ key, label: monthLabel(key), items: items.sort((a, b) => (isoDate(a.expenseDate) || "9999").localeCompare(isoDate(b.expenseDate) || "9999") || a.id.localeCompare(b.id)),
+    .map(([key, items]) => ({ key, label: monthLabel(key), items: items.sort((a, b) => isoDate(b.expenseDate).localeCompare(isoDate(a.expenseDate)) || a.id.localeCompare(b.id)),
       cents: items.reduce((sum, item) => sum + item.outstandingCents, 0) }))
 }
 const pendingAllocationIds = (events: LedgerEvent[]) => new Set(events.filter(event => event.status === "pending").map(event => event.allocationId))
@@ -255,7 +256,11 @@ function LedgerContents({ snapshot, disabled, run, refresh, refreshing }: {
   const listId = useId(), offsetId = useId(), resetId = useId()
   const totals = ledgerTotals(allocations, ownerKey)
   const shown = allocations.filter(item => (direction === "to" ? item.payerOwner : item.partnerOwner) === ownerKey)
-  const timeline = months(shown).filter(group => group.cents > 0).reverse()
+  const directionGroups = {
+    to: months(allocations.filter(item => item.payerOwner === ownerKey)),
+    from: months(allocations.filter(item => item.partnerOwner === ownerKey)),
+  }
+  const timeline = directionGroups[direction].filter(group => group.cents > 0).reverse()
   const rows = timeline.length <= 4 ? timeline : [{ key: "earlier", label: "Earlier expenses", items: [], cents: timeline.slice(0, -3).reduce((sum, group) => sum + group.cents, 0) }, ...timeline.slice(-3)]
   const pendingAllocs = pendingAllocationIds(events)
   const writableTotals = ledgerTotals(allocations.filter(writable), ownerKey)
@@ -296,8 +301,10 @@ function LedgerContents({ snapshot, disabled, run, refresh, refreshing }: {
       <button className="bb-ledger-list-toggle" type="button" aria-expanded={listOpen} aria-controls={listId} onClick={() => setListOpen(!listOpen)}>
         <span>{`View ${shown.length} expense${shown.length === 1 ? "" : "s"}`}</span><span className="bb-disclosure-mark" aria-hidden="true" />
       </button>
-      <CollapsibleContent id={listId} open={listOpen}><div className="bb-reimbursement-groups">{months(shown).map(group => <LedgerMonth key={`${direction}:${group.key}`} group={group} events={events} reversibleIds={reversibleIds} owner={ownerKey} disabled={disabled} run={run} />)}</div></CollapsibleContent>
     </>}
+    <CollapsibleContent id={listId} open={listOpen && shown.length > 0}>{(["to", "from"] as const).map(side => <div key={side} hidden={side !== direction} aria-hidden={side !== direction} inert={side !== direction}>
+      <LedgerMonths groups={directionGroups[side]} visible={listOpen && side === direction} events={events} reversibleIds={reversibleIds} owner={ownerKey} disabled={disabled} run={run} />
+    </div>)}</CollapsibleContent>
     {Boolean(snapshot.resets?.length) && <ResetHistory resets={snapshot.resets!} owner={ownerKey} disabled={disabled} run={run} />}
   </>
 }
@@ -311,14 +318,32 @@ function RetainedPanel({ open, id, children }: { open: boolean; id?: string; chi
   }, [open])
   return <CollapsibleContent id={id} open={open}>{(open || retained) && children}</CollapsibleContent>
 }
-function LedgerMonth({ group, events, reversibleIds, owner, disabled, run }: {
-  group: ReturnType<typeof months>[number]; events: LedgerEvent[]; reversibleIds: Set<string>; owner: string; disabled: boolean; run: Run
+function LedgerMonths({ groups, visible, ...props }: { groups: ReturnType<typeof months>; visible: boolean; events: LedgerEvent[]; reversibleIds: Set<string>; owner: string; disabled: boolean; run: Run }) {
+  const page = useReimbursementPage(groups, group => group.key, visible)
+  return <div className="bb-reimbursement-groups">
+    {page.visible.map(group => <LedgerMonth key={group.key} group={group} visible={visible} {...props} />)}
+    {page.hasMore && <button className="bb-reimbursement-load-more" type="button" onClick={page.loadMore}>Load more months</button>}
+  </div>
+}
+function LedgerMonth({ group, visible, events, reversibleIds, owner, disabled, run }: {
+  group: ReturnType<typeof months>[number]; visible: boolean; events: LedgerEvent[]; reversibleIds: Set<string>; owner: string; disabled: boolean; run: Run
 }) {
   const [opened, setOpened] = useState("")
+  const currentMonth = group.key === today().slice(0, 7)
+  const [expanded, setExpanded] = useState(currentMonth)
+  const [loaded, setLoaded] = useState(currentMonth)
+  const page = useReimbursementPage(group.items, item => item.id, visible && expanded)
+  const contentId = useId()
   return <section className="bb-reimbursement-group" aria-label={group.label}>
-    <div className="bb-reimbursement-month-heading"><h3>{group.label}{group.key === today().slice(0, 7) && <span className="bb-reimbursement-month-tag">This month</span>}</h3></div>
-    {group.items.map(item => <LedgerRow key={item.id} allocation={item} events={events.filter(event => event.allocationId === item.id)} reversibleIds={reversibleIds} owner={owner}
-      open={opened === item.id} onOpenChange={open => setOpened(open ? item.id : "")} disabled={disabled} run={run} />)}
+    <div className="bb-reimbursement-month-heading"><h3><button type="button" className="bb-reimbursement-month-toggle" aria-expanded={expanded} aria-controls={contentId}
+      onClick={() => { setLoaded(true); setExpanded(value => !value) }}>
+      <span>{group.label}{currentMonth && <span className="bb-reimbursement-month-tag">This month</span>}</span><span className="bb-disclosure-mark" aria-hidden="true" />
+    </button></h3></div>
+    <CollapsibleContent id={contentId} open={expanded}><div className="bb-reimbursement-month-entries">
+      {loaded && page.visible.map(item => <LedgerRow key={item.id} allocation={item} events={events.filter(event => event.allocationId === item.id)} reversibleIds={reversibleIds} owner={owner}
+        open={opened === item.id} onOpenChange={open => setOpened(open ? item.id : "")} disabled={disabled} run={run} />)}
+      {loaded && page.hasMore && <button className="bb-reimbursement-load-more" type="button" onClick={page.loadMore}>Load more expenses</button>}
+    </div></CollapsibleContent>
   </section>
 }
 function LedgerRow({ allocation: item, events, reversibleIds, owner, open, onOpenChange, disabled, run }: {

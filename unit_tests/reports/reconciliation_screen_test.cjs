@@ -24,7 +24,7 @@ function load(file) {
   return exports
 }
 const { useReconciliation, ReconciliationScreen } = load(path.resolve('web/expense-report/src/reconciliation-screen.tsx'))
-function App() { controller = useReconciliation(); return controller.snapshot?.enabled ? React.createElement(ReconciliationScreen, { controller }) : React.createElement('p', null, 'Bank review unavailable') }
+function App() { controller = useReconciliation(); return controller.snapshot?.enabled !== false ? React.createElement(ReconciliationScreen, { controller }) : React.createElement('p', null, 'Bank review unavailable') }
 const fixture = () => React.createElement(App, { key: owner })
 const flush = async () => { for (let i = 0; i < 24; i++) await Promise.resolve() }
 const run = async fn => act(async () => { fn(); await flush() })
@@ -48,8 +48,16 @@ const snapshot = (items = rows, enabled = true) => ({ enabled, checkedAt: '2026-
 ;(async () => {
   await run(() => { tree = Renderer.create(fixture()) })
   assert.equal(requests.length, 1); assert.equal(latest().url, '/app/reconciliation'); assert.equal(latest().options.method, 'GET')
+  assert.match(rendered(), /Loading bank transactions/)
+  assert.doesNotMatch(rendered(), /Nothing needs review|No pending transactions|No checked transactions/)
+  assert.ok(button('Checking…').props.disabled, 'Sync is unavailable until connection discovery completes')
   for (const [key, value] of Object.entries({ credentials: 'same-origin', mode: 'same-origin', referrerPolicy: 'same-origin', cache: 'no-store', redirect: 'error' })) assert.equal(latest().options[key], value)
   assert.equal(latest().options.headers['X-BookieBot-App'], '1')
+  await reject()
+  assert.ok(button('Try again')); assert.ok(button('Check').props.disabled)
+  assert.doesNotMatch(rendered(), /Loading bank transactions|Nothing needs review/)
+  await click('Try again'); assert.equal(latest().options.method, 'GET')
+  assert.match(rendered(), /Loading bank transactions/)
   await respond(snapshot([], false)); assert.match(rendered(), /unavailable/)
   await run(() => listeners.get('focus').forEach(fn => fn())); await respond(snapshot())
   assert.match(rendered(), /Coffee/); assert.equal(work.pending, false)
@@ -111,6 +119,7 @@ const snapshot = (items = rows, enabled = true) => ({ enabled, checkedAt: '2026-
   // Detail authorization failure clears the whole private review, not just its message.
   await click('Try suggestions again'); await respond({ error: 'Expired' }, 401)
   assert.equal(controller.snapshot, null); assert.doesNotMatch(rendered(), /Coffee|Checking · 1234/)
+  assert.ok(button('Try again')); assert.ok(button('Check').props.disabled)
   // Malformed payload does not replace a good snapshot; owner change disposes all reads/state.
   await run(() => controller.load()); await respond(snapshot())
   await run(() => controller.load()); await respond({ ...snapshot(), items: [{ ...rows[0], amountCents: 1.25 }] })

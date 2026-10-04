@@ -36,8 +36,11 @@ export function ExpenseAppShell({ report, controls, monthControl, comparison, av
   const { theme, toggleTheme } = useExpenseReportTheme()
   const reconciliation = useReconciliation()
   const reconciliationEnabled = reconciliation.snapshot?.enabled === true
-  const enabledRef = useRef(reconciliationEnabled)
-  enabledRef.current = reconciliationEnabled
+  // Reserve the tab immediately; only a completed connection check can prove
+  // it is unavailable. Slow or failed reads stay reachable through the tab.
+  const reconciliationVisible = reconciliation.snapshot?.enabled !== false
+  const visibleRef = useRef(reconciliationVisible)
+  visibleRef.current = reconciliationVisible
   const preferences = useReportViewPreferences(report.ownerName, Boolean(report.burnRate))
   const [screen, setScreen] = useState<AppScreen>(() => window.location.hash === "#settings" ? "settings" : "overview")
   const [lastMain, setLastMain] = useState<MainScreen>("overview")
@@ -56,7 +59,7 @@ export function ExpenseAppShell({ report, controls, monthControl, comparison, av
   const scrollState = useRef<ScrollNavigationState>({ lastY: 0, travel: 0, compact: false })
   const guard = useAppWorkGuard()
   const selectScreen = (next: AppScreen) => {
-    if (next === "reconcile" && !enabledRef.current) return
+    if (next === "reconcile" && !visibleRef.current) return
     if (next === screenRef.current) {
       if (next === "settings" && widgetGuideRef.current) {
         widgetGuideRef.current = false
@@ -89,10 +92,10 @@ export function ExpenseAppShell({ report, controls, monthControl, comparison, av
   }
 
   useEffect(() => {
-    if (reconciliationEnabled) return
+    if (reconciliationVisible) return
     if (screenRef.current === "reconcile") selectScreen("overview")
     if (lastMain === "reconcile") setLastMain("overview")
-  }, [reconciliationEnabled, lastMain])
+  }, [reconciliationVisible, lastMain])
 
   useEffect(() => {
     // Public setup pages may return here without browser Back controls. Only
@@ -180,6 +183,8 @@ export function ExpenseAppShell({ report, controls, monthControl, comparison, av
         <Toolbar top className="bb-shell-header-actions" role="group" aria-label="BookieBot tools" innerClassName="bb-shell-toolbar-inner">
           <ToolbarPane className="bb-shell-toolbar-pane">
             <button ref={askTriggerRef} type="button" className="bb-shell-icon" aria-label="Ask BookieBot" aria-haspopup="dialog" aria-expanded={askOpen && monthlyReady} disabled={!monthlyReady} onClick={() => setAskOpen(true)}><MessageCircle aria-hidden="true" /></button>
+          </ToolbarPane>
+          <ToolbarPane className="bb-shell-toolbar-pane">
             <button type="button" className="bb-shell-icon" aria-label="Settings" aria-current={screen === "settings" ? "page" : undefined} onClick={() => selectScreen(screen === "settings" && !widgetGuideOpen ? lastMain : "settings")}><Settings aria-hidden="true" /></button>
           </ToolbarPane>
         </Toolbar>
@@ -199,7 +204,7 @@ export function ExpenseAppShell({ report, controls, monthControl, comparison, av
       <main className="bb-shell-savings bb-main" aria-label="Savings" hidden={screen !== "savings"}>
         <SavingsGoals />
       </main>
-      <main className="bb-shell-reconcile bb-main" aria-label="Reconcile" hidden={screen !== "reconcile" || !reconciliationEnabled}>
+      <main className="bb-shell-reconcile bb-main" aria-label="Reconcile" hidden={screen !== "reconcile" || !reconciliationVisible}>
         <ReconciliationScreen controller={reconciliation} />
       </main>
       <main className="bb-shell-settings bb-main" aria-label="Settings" hidden={screen !== "settings" || widgetGuideOpen}>
@@ -224,9 +229,10 @@ export function ExpenseAppShell({ report, controls, monthControl, comparison, av
         <WidgetSetupGuide onBack={() => selectScreen("settings")} onPair={returnToWidgets} />
       </main>}
 
-      <Tabbar component="nav" icons labels className="bb-bottom-navigation" aria-label="Main navigation" data-compact={compact && !askOpen} data-tab-count={reconciliationEnabled ? 5 : 4} hidden={keyboardOpen}>
+      {/* top omits Konsta’s under-bar blur/gradient; CSS anchors this floating bar at the bottom. */}
+      <Tabbar top component="nav" icons labels className="bb-bottom-navigation" aria-label="Main navigation" data-compact={compact && !askOpen} data-tab-count={reconciliationVisible ? 5 : 4} hidden={keyboardOpen}>
         <ToolbarPane className="bb-navigation-pane">
-          {[...mainScreens, ...(reconciliationEnabled ? [{ id: "reconcile" as const, Icon: ListChecks }] : [])].map(({ id, Icon }) => <TabbarLink key={id} component={NavigationButton} linkProps={{ type: "button" }} className="bb-navigation-link"
+          {[...mainScreens, ...(reconciliationVisible ? [{ id: "reconcile" as const, Icon: ListChecks }] : [])].map(({ id, Icon }) => <TabbarLink key={id} component={NavigationButton} linkProps={{ type: "button" }} className="bb-navigation-link"
             active={screen === id || (screen === "settings" && lastMain === id)} aria-label={screenTitles[id]} aria-current={screen === id ? "page" : undefined}
             label={screenTitles[id]} icon={<Icon size={23} strokeWidth={1.7} aria-hidden="true" />} onClick={() => selectScreen(id)} />)}
         </ToolbarPane>

@@ -1,8 +1,12 @@
 # Finance Operations Workstream
 
-Last updated: 2026-10-02
+Last updated: 2026-10-03
 
 ## Goal
+
+### Mobile Shared history and navigation work log — 2026-10-03
+
+Implemented the requested WebKit presentation slice: independent header glass controls, removed under-bar blur/gradient, 60px expanded navigation, immediate Reconcile tab with loading/retry until bank discovery resolves, and Category Mix selection without a square outline. Shared canonical and historical views offer collapsible newest-first months and explicit five-at-a-time month/expense loading; only the current Pacific month starts expanded. Full totals, settlement/offset/reset scopes and bank mutation guards remain unchanged. Full local suite **1,975 passed / 311 optional PostgreSQL skipped**, clean Pyright/frontend checks, and 12 production-build WebKit width/theme/motion cases passed. Inserted records cannot evict revealed rows/months or their drafts. Device acceptance is STATUS checklist 128.
 
 ### Shared balance reset work log — 2026-09-30
 

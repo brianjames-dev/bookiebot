@@ -2,6 +2,7 @@ import { useId, useState } from "react"
 import { Card, CardContent, CardHeader, CardTitle } from "./components/ui/card"
 import { AnimatedDisclosure, CollapsibleContent } from "./components/ui/motion"
 import { FittedAmount } from "./components/ui/fitted-amount"
+import { useReimbursementPage } from "./reimbursement-pagination"
 import type { ReimbursementCoverage, SharedReimbursementItem } from "./types"
 
 const money = new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" })
@@ -69,7 +70,7 @@ export function reimbursementTimeline(items: SharedReimbursementItem[]) {
   }, ...rows.slice(-3)]
 }
 
-export function reimbursementLedger(items: SharedReimbursementItem[], openItems: SharedReimbursementItem[], selectedMonth: string, receivedItems: SharedReimbursementItem[] = []) {
+export function reimbursementLedger(items: SharedReimbursementItem[], openItems: SharedReimbursementItem[], _selectedMonth: string, receivedItems: SharedReimbursementItem[] = []) {
   // Both lists come from one history snapshot. A complete monthly record wins
   // if a legacy snapshot repeats an id, including a received or void record.
   const allocations = new Map(openItems.filter((item) => item.status === "outstanding" && item.outstandingAmount > 0).map((item) => [item.id, item]))
@@ -84,14 +85,12 @@ export function reimbursementLedger(items: SharedReimbursementItem[], openItems:
     months.set(key, [...(months.get(key) ?? []), item])
   }
   return [...months.entries()].sort(([a], [b]) => {
-    if (a === selectedMonth) return -1
-    if (b === selectedMonth) return 1
     if (a === "undated") return 1
     if (b === "undated") return -1
     return b.localeCompare(a)
   }).map(([key, entries]) => ({
     key, label: expenseMonthLabel(key),
-    items: entries.sort((a, b) => expenseDateOrder(a.date) - expenseDateOrder(b.date) || a.id.localeCompare(b.id)),
+    items: entries.sort((a, b) => expenseDateOrder(b.date) - expenseDateOrder(a.date) || a.id.localeCompare(b.id)),
   }))
 }
 
@@ -190,6 +189,8 @@ export function SharedReimbursementsCard({ items, openItems, receivedItems, cove
   year: number
   month: number
 }) {
+  const [listOpen, setListOpen] = useState(false)
+  const currentMonth = new Date().toLocaleDateString("en-CA", { timeZone: "America/Los_Angeles" }).slice(0, 7)
   const monthly = items.filter((item) => item.status !== "void")
   const outstandingItems = openItems ?? monthly
   const groups = reimbursementGroups(outstandingItems)
@@ -198,6 +199,7 @@ export function SharedReimbursementsCard({ items, openItems, receivedItems, cove
   const count = groups.reduce((sum, group) => sum + group.items.length, 0)
   const selectedMonth = `${year}-${String(month).padStart(2, "0")}`
   const ledger = reimbursementLedger(items, openItems ?? [], selectedMonth, receivedItems)
+  const page = useReimbursementPage(ledger, group => group.key, listOpen)
   const expenseCount = ledger.reduce((sum, group) => sum + group.items.length, 0)
   if (!expenseCount && !count && !incomplete) return null
   const outstanding = groups.reduce((sum, group) => sum + Math.round(group.amount * 100), 0) / 100
@@ -227,15 +229,16 @@ export function SharedReimbursementsCard({ items, openItems, receivedItems, cove
         {incomplete && <p className="bb-reimbursement-warning" role="status">Some reimbursement records couldn’t be checked. This balance may be incomplete.</p>}
         <div className="bb-reimbursement-ledger" aria-label="Shared expenses">
           {expenseCount > 0 && <div className="bb-reimbursement-open-list">
-            <AnimatedDisclosure summary={<>
+            <AnimatedDisclosure open={listOpen} onOpenChange={setListOpen} summary={<>
               <span className="bb-reimbursement-item"><strong>View {expenseCount} {expenseCount === 1 ? "expense" : "expenses"}</strong></span>
               <span className="bb-disclosure-mark" aria-hidden="true" />
             </>}>
               <div className="bb-reimbursement-groups">
                 {monthly.length > 0 && !ledger.some((group) => group.key === selectedMonth) && <MonthHeading label={monthLabel} items={monthly} />}
-                {ledger.map((group) => <ReimbursementMonth key={group.key} group={group}
-                  tag={group.key === coverage?.asOf.slice(0, 7) ? "This month" : group.key === selectedMonth ? "Selected month" : undefined}
+                {page.visible.map((group) => <ReimbursementMonth key={group.key} group={group} visible={listOpen}
+                  tag={group.key === currentMonth ? "This month" : group.key === selectedMonth ? "Selected month" : undefined}
                   monthlyItems={group.key === selectedMonth && monthly.length > 0 ? monthly : undefined} />)}
+                {page.hasMore && <button className="bb-reimbursement-load-more" type="button" onClick={page.loadMore}>Load more months</button>}
               </div>
             </AnimatedDisclosure>
           </div>}
@@ -245,24 +248,34 @@ export function SharedReimbursementsCard({ items, openItems, receivedItems, cove
   )
 }
 
-function ReimbursementMonth({ group, tag, monthlyItems }: {
+function ReimbursementMonth({ group, tag, monthlyItems, visible }: {
   group: ReturnType<typeof reimbursementLedger>[number]
+  visible: boolean
   tag?: string
   monthlyItems?: SharedReimbursementItem[]
 }) {
   const [openId, setOpenId] = useState<string | null>(null)
+  const [expanded, setExpanded] = useState(tag === "This month")
+  const [loaded, setLoaded] = useState(tag === "This month")
+  const page = useReimbursementPage(group.items, item => item.id, visible && expanded)
+  const contentId = useId()
   return <section className="bb-reimbursement-group" aria-label={`${group.label} expenses`}>
-    <MonthHeading label={group.label} tag={tag} items={monthlyItems} />
-    {group.items.map((item) => <ReimbursementEntry key={item.id} item={item} open={openId === item.id}
-      onOpenChange={(open) => setOpenId(open ? item.id : null)} />)}
+    <MonthHeading label={group.label} tag={tag} items={monthlyItems} disclosure={{ expanded, contentId, toggle: () => { setLoaded(true); setExpanded(value => !value) } }} />
+    <CollapsibleContent id={contentId} open={expanded}><div className="bb-reimbursement-month-entries">
+      {loaded && page.visible.map((item) => <ReimbursementEntry key={item.id} item={item} open={openId === item.id}
+        onOpenChange={(open) => setOpenId(open ? item.id : null)} />)}
+      {loaded && page.hasMore && <button className="bb-reimbursement-load-more" type="button" onClick={page.loadMore}>Load more expenses</button>}
+    </div></CollapsibleContent>
   </section>
 }
 
-function MonthHeading({ label, tag, items }: { label: string; tag?: string; items?: SharedReimbursementItem[] }) {
+function MonthHeading({ label, tag, items, disclosure }: { label: string; tag?: string; items?: SharedReimbursementItem[]; disclosure?: { expanded: boolean; contentId: string; toggle: () => void } }) {
   const [open, setOpen] = useState(false)
   const id = useId()
   return <div className="bb-reimbursement-month-heading">
-    <h3><span>{label}</span>{tag && <span className="bb-reimbursement-month-tag">{tag}</span>}</h3>
+    <h3>{disclosure ? <button type="button" className="bb-reimbursement-month-toggle" aria-expanded={disclosure.expanded} aria-controls={disclosure.contentId} onClick={disclosure.toggle}>
+      <span>{label}{tag && <span className="bb-reimbursement-month-tag">{tag}</span>}</span><span className="bb-disclosure-mark" aria-hidden="true" />
+    </button> : <><span>{label}</span>{tag && <span className="bb-reimbursement-month-tag">{tag}</span>}</>}</h3>
     {items && <>
       <button type="button" className="bb-reimbursement-month-totals-toggle" aria-label={`${label} reimbursement totals`}
         aria-expanded={open} aria-controls={id} onClick={() => setOpen((current) => !current)}>

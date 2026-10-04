@@ -1,8 +1,10 @@
 # Agent Status
 
-Last updated: 2026-10-02
+Last updated: 2026-10-03
 
 ## Active Focus
+
+Mobile WebKit refinement implemented (2026-10-03): independent 44px header glass buttons, no under-bar blur/gradient, 60px expanded navigation, immediate Reconcile with loading/retry, and Category Mix focus without a square outline. Shared canonical/fallback history shows five newest months with only the current Pacific month expanded and five newest expenses per month; Load more appends five. Revealed history and drafts survive collapse, tab/direction switches and inserted records on refresh. Full local suite **1,975 passed / 311 optional PostgreSQL skipped**, Pyright and frontend typecheck/build clean; production-build WebKit passed 12 width/theme/motion cases. Main release results are in the completion response; device acceptance is checklist 128. Financial totals and mutation semantics remain unchanged.
 
 Personal-bill reimbursement repair released (2026-10-02): PR #62 passed CI and merged into main as `cb4b11c`; Railway deployed the repair. The confirmed October $3,250 By income rent receipt was replayed once, and production allocation version/projected version both read 3. Independent live sheet readback found Brian October Rent **$2,103.73**, Hannah October Rent **$1,146.27**, and Brian Shared Reimbursements row 19 **`reimbursed`** with $1,146.27 received. Confirmed Rent, PG&E, Recology and Water receipts now use the partner's matching bill row in the original expense month; incomplete web rows show **Sheet update pending**. Targeted reimbursement/API/UI checks: 364 passed / 178 optional PostgreSQL skipped; full suite **1,974 passed / 311 optional PostgreSQL skipped**; Pyright and frontend typecheck/build clean. Native iOS acceptance remains checklist 126.
 
@@ -85,6 +87,8 @@ All eight September 6 audit batches are implemented and verified locally. Each b
 
 ## On Deck
 
+Verify the mobile WebKit refinements on iPhone using checklist 128 after loading the app Update. Implementation and automated/browser verification are complete.
+
 Confirm on iOS that the deployed October rent entry shows Received after refresh, with no Sheet update pending (checklist 126). The production database and three live sheet locations have already been verified.
 
 Shared balance reset is deployed from main. User iOS acceptance is checklist 125: load the app update, then Shared → Reset balances; inspect Reset history for Undo/Redo. The user's actual balances have not been reset during testing.
@@ -127,6 +131,12 @@ Student-loan activation is complete. Verify the deployed fixed-bill display and 
 25. Harden recent-action pending state across restarts/deploys, since selections currently live only in process memory.
 26. Improve targeted recent-action search so commands can find older matches, not only the latest 10 recent actions.
 27. Explore clarifying questions before logging when BookieBot is uncertain instead of guessing or silently failing.
+
+## Completed 2026-10-03
+
+- Implemented all six requested mobile UI changes: separate glass header buttons, removal of the navigation scrim, 66→60px expanded bar, initial Reconcile loading/retry, category selection outline removal, and newest-first collapsible Shared month/expense paging in batches of five. Preserved 44px targets, keyboard slice activation, full financial totals and payment guards.
+- Added executed UI regressions for deferred bank discovery/failure/disabled response, independent glass panes, Pacific month defaults, paging exhaustion, hidden controls, and refresh/direction/collapse draft retention; adapted prior historical-month fixtures.
+- Verification: full pytest **1,975 passed / 311 optional PostgreSQL skipped**, existing Kaleido deprecation only; Pyright **0 errors / 0 warnings**; frontend typecheck/build and diff checks clean. Production-build WebKit verified **320/390/1280px × light/dark × normal/reduced motion**, including initial Reconcile loading, 44px header targets, no under-bar layers, 60px expanded bar, retained history and no overflow/errors. Category touch/keyboard checks retain curved focus without a square outline. README, reimbursement guide, Finance Ops work log and durable decisions updated. Manual acceptance: checklist 128.
 
 ## Completed 2026-10-02
 
@@ -977,6 +987,8 @@ Use a test row or low-risk real row in Discord:
 
 ## Verification Baseline
 
+2026-10-03 mobile WebKit refinement: **1,975 passed / 311 optional PostgreSQL skipped**, existing Kaleido warning only; Pyright **0 errors / 0 warnings**; frontend typecheck/build and diff checks clean. Checks use the existing project Python 3.12 environment. Production-build WebKit passed 12 viewport/theme/motion combinations with synthetic data; separate touch/mouse category checks preserve keyboard access. No live financial test writes.
+
 2026-09-30 balance reset: existing project Python 3.12 environment, `python -m pytest unit_tests` **1,968 passed / 311 optional PostgreSQL skipped** (one existing Kaleido warning); `python -m pyright --pythonpath /Users/brianjames/Dev/bookiebot/venv/bin/python` **0 errors / 0 warnings**. Frontend typecheck/build and executed reimbursement UI contracts pass. Local WebKit tested 12 width/theme/motion combinations against disposable real SQLite/API commands; source/mirror projections use isolated sheet fixtures. The default shell Python lacked project dependencies, so final checks use the existing project environment. CI supplies PostgreSQL contracts.
 
 2026-09-16 split corrections: `python -m pytest unit_tests` **1,890 passed / 299 skipped (optional PostgreSQL and unavailable frontend test dependencies)**, one existing Kaleido deprecation warning; `python -m pyright` **0 errors, 0 warnings**. Used the existing project Python 3.12 environment. The full suite requires loopback test servers and the chart subprocess, so its final run used the approved unsandboxed runner. Focused finance, Discord routing, projection failure/retry, concurrency and canonical lineage regressions passed. No live financial mutations were used.
@@ -1543,3 +1555,6 @@ python -m pyright
 125. Shared balance reset (isolated workbooks/database): seed debts in both directions across different months/years and a partial received payment. Open Shared → Reset balances, review both totals and confirm. Both owners' phone balances, reports and Shared widgets must show zero; source purchase/payment rows remain identical, and mirrored rows say `cleared` with actual Received Amount unchanged. Expand a cleared receipt to inspect received versus cleared amounts. Add a new split and verify it alone accrues debt. Reset history → Undo reset restores the original group; Redo reset clears that same group while retaining newer debt. Undo then edit/move/change split/cancel/delete an affected expense and verify the old redo is unavailable; active resets give undo-first guidance for all those actions, including same-value corrections and prior payment reversal. Pending reports and stale previews block new resets; unrelated new pending work must not block an otherwise eligible earlier reset undo. Interrupt mirror projection and retry the same request/refresh to confirm one durable reset and eventual convergence. Inspect 320/390/1280px, light/dark and reduced motion; reset history remains available when both balances are zero. Never use production test payments or automatically reset the user's real balance during acceptance.
 
 126. October Rent receipt (iOS, read-only): update or reopen the installed app, select Brian and refresh Shared. The $1,146.27 October Rent repayment should show Received without Sheet update pending. Brian Budget 2026 → October Rent should read $2,103.73; Hannah Budget 2026 → October Rent should read $1,146.27; Brian Shared Reimbursements row 19 should read `reimbursed` with $1,146.27 received. These live sheet values and production projection version 3/3 were verified on 2026-10-02; do not create another payment to test them.
+
+
+128. Mobile WebKit refinement: install the offered app Update or fully reopen after deployment. Verify separate circular Ask/Settings controls and correct destinations; the expanded bottom bar is slightly shorter, with no extra blur beneath it, and still contracts/restores while scrolling. With a slow bank response, Reconcile appears with the other tabs and shows loading when tapped; an initial error offers retry, and an explicitly unwatched/disconnected account removes the tab. Tap Category Mix slices and dismiss details without a square selector; keyboard Tab/Enter/Space remains usable. In Shared → View expenses, verify five newest months with only the current Pacific month expanded, five newest rows initially, and repeated Load more expenses/months adds five until exhausted and removes each finished control. Collapse/reopen months and switch tabs to confirm loaded history and payment drafts persist; refresh with newer entries must not evict a visible draft. Check both directions, historical fallback, narrow widths, both themes, and reduced motion. Balances and settlement/reset previews continue to cover all months. Use synthetic records for mutation checks; no production payments are needed.

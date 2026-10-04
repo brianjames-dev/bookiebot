@@ -21,7 +21,7 @@
 .bb-ledger-list-toggle .bb-disclosure-mark { flex-shrink: 0; }
 .bb-ledger-list-toggle[aria-expanded="true"] .bb-disclosure-mark::after { transform: rotate(0deg); }
 .bb-ledger-actions { display: flex; flex-wrap: wrap; gap: 8px; margin: 14px 0 4px; }
-.bb-canonical-reimbursements .bb-reimbursement-group > .bb-reimbursement-entry { border-bottom: 0; }
+.bb-canonical-reimbursements .bb-reimbursement-month-entries > .bb-reimbursement-entry { border-bottom: 0; }
 .bb-ledger-form { margin: 18px 0 8px; }
 .bb-ledger-form fieldset { min-width: 0; border: 0; padding: 0; margin: 0; }
 .bb-ledger-form legend { font-size: 14px; font-weight: 500; margin: 0 0 14px; padding: 0; }

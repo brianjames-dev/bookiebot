@@ -2651,7 +2651,7 @@ tr:last-child td {
 .bb-reimbursement-ledger > div > .bb-reimbursement-entry > .bb-reimbursement-toggle { grid-template-columns: minmax(0, 1fr) 14px; padding: 16px 0; }
 .bb-reimbursement-ledger > div > .bb-reimbursement-entry > .bb-reimbursement-toggle .bb-reimbursement-item strong { font-size: 14px; }
 .bb-reimbursement-groups { padding: 8px 0 16px; }
-.bb-reimbursement-group > .bb-reimbursement-entry:last-child { border-bottom: 0; }
+.bb-reimbursement-month-entries > .bb-reimbursement-entry:last-child { border-bottom: 0; }
 .bb-reimbursement-note {
   margin: 8px 0 0;
   color: hsl(var(--muted-foreground));
@@ -2678,15 +2678,22 @@ tr:last-child td {
   letter-spacing: -0.025em;
 }
 .bb-reimbursement-month-tag { padding: 2px 6px; border-radius: 4px; background: hsl(var(--primary) / 0.12); color: hsl(var(--primary)); font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; font-size: 9px; font-weight: 500; letter-spacing: 0; white-space: nowrap; }
+.bb-reimbursement-month-heading h3:has(.bb-reimbursement-month-toggle) { padding: 0; }
+.bb-reimbursement-month-toggle { appearance: none; display: flex; width: 100%; min-width: 0; min-height: 44px; align-items: center; justify-content: space-between; gap: 12px; padding: 8px 0; border: 0; background: transparent; color: inherit; font: inherit; text-align: left; cursor: pointer; }
+.bb-reimbursement-month-toggle > span:first-child { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 8px; }
+.bb-reimbursement-month-toggle .bb-disclosure-mark { flex-shrink: 0; }
+.bb-reimbursement-month-toggle[aria-expanded="true"] .bb-disclosure-mark::after { transform: rotate(0deg); }
+.bb-reimbursement-load-more { appearance: none; display: block; width: 100%; min-height: 44px; margin-top: 8px; padding: 10px 0; border: 0; background: transparent; color: hsl(var(--primary)); font: inherit; font-size: 12px; text-align: center; cursor: pointer; }
+.bb-reimbursement-month-toggle:focus-visible, .bb-reimbursement-load-more:focus-visible { outline: 2px solid hsl(var(--primary)); outline-offset: 2px; }
 .bb-reimbursement-month-totals-toggle { display: flex; align-items: center; justify-content: flex-end; gap: 6px; min-width: 44px; min-height: 44px; padding: 0; border: 0; background: transparent; color: hsl(var(--muted-foreground)); font: inherit; font-size: 11px; cursor: pointer; transition: color var(--bb-motion-duration) var(--bb-motion-ease); }
 .bb-reimbursement-month-totals-toggle svg { width: 12px; height: 12px; transition: transform var(--bb-motion-duration) var(--bb-motion-ease); }
 .bb-reimbursement-month-totals-toggle[aria-expanded="true"] svg { transform: rotate(180deg); }
 .bb-reimbursement-month-totals-toggle:hover, .bb-reimbursement-month-totals-toggle[aria-expanded="true"] { color: hsl(var(--primary)); }
 .bb-reimbursement-month-heading > .bb-details-content { grid-column: 1 / -1; }
-.bb-reimbursement-group > .bb-reimbursement-entry { border-top: 0; border-bottom: 1px solid hsl(var(--border) / 0.65); }
-.bb-reimbursement-group > .bb-reimbursement-entry > .bb-reimbursement-toggle { grid-template-columns: minmax(0, 1fr) minmax(90px, 35%) 12px; gap: 10px; min-height: 44px; padding: 11px 0; }
+.bb-reimbursement-month-entries > .bb-reimbursement-entry { border-top: 0; border-bottom: 1px solid hsl(var(--border) / 0.65); }
+.bb-reimbursement-month-entries > .bb-reimbursement-entry > .bb-reimbursement-toggle { grid-template-columns: minmax(0, 1fr) minmax(90px, 35%) 12px; gap: 10px; min-height: 44px; padding: 11px 0; }
 .bb-reimbursement-group .bb-reimbursement-item strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 14px; }
-.bb-reimbursement-group > .bb-reimbursement-entry[data-state="open"] > .bb-reimbursement-toggle .bb-reimbursement-item strong { white-space: normal; }
+.bb-reimbursement-month-entries > .bb-reimbursement-entry[data-state="open"] > .bb-reimbursement-toggle .bb-reimbursement-item strong { white-space: normal; }
 .bb-reimbursement-group .bb-reimbursement-status { min-width: 0; text-align: right; font-size: 13px; }
 .bb-reimbursement-group .bb-reimbursement-status[data-settled="false"] { display: flex; justify-content: flex-end; align-items: center; }
 .bb-reimbursement-group .bb-reimbursement-status .bb-reimbursement-due { flex: 1 1 0; }
@@ -3184,6 +3191,10 @@ button:focus-visible, summary:focus-visible {
 
 .bb-chart-box svg [role="button"] { cursor:pointer; }
 .bb-chart-box svg [role="button"]:focus-visible { outline:2px solid hsl(var(--foreground)) !important; outline-offset:3px; stroke:hsl(var(--foreground)); stroke-width:3px; }
+/* WebKit can preserve focus-visible after a slice tap or dialog dismissal.
+   Keep the keyboard indicator on the slice's curved stroke, without an SVG
+   bounding-box outline appearing around the selected category. */
+.bb-category-chart-box svg [role="button"]:focus-visible { outline: none !important; }
 
 /* Shared phone settings and update actions. */
 .bb-toolbar-button {

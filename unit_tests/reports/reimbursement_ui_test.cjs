@@ -11,6 +11,9 @@ const React = frontendRequire("react")
 globalThis.IS_REACT_ACT_ENVIRONMENT = true
 const { renderToStaticMarkup } = frontendRequire("react-dom/server")
 const modules = new Map()
+class FixtureDate extends Date {
+  constructor(...args) { super(...(args.length ? args : ["2026-10-01T06:30:00Z"])) }
+}
 function load(file) {
   if (modules.has(file)) return modules.get(file)
   const exports = {}
@@ -23,7 +26,7 @@ function load(file) {
   const { outputText } = ts.transpileModule(fs.readFileSync(file, "utf8"), {
     compilerOptions: { target: ts.ScriptTarget.ES2020, module: ts.ModuleKind.CommonJS, jsx: ts.JsxEmit.ReactJSX, esModuleInterop: true },
   })
-  vm.runInNewContext(outputText, { exports, require: localRequire })
+  vm.runInNewContext(outputText, { exports, require: localRequire, Date: FixtureDate })
   return exports
 }
 const { SharedReimbursementsCard, reimbursementGroups, reimbursementTimeline, reimbursementLedger, reimbursementVisual } = load(path.join(frontend, "src/shared-reimbursements.tsx"))
@@ -100,15 +103,15 @@ const render = (props = {}) => renderToStaticMarkup(React.createElement(SharedRe
 const html = render()
 assert.ok(html.includes("$65.00"))
 assert.ok(html.includes('aria-label="September 2026 expenses"') && html.includes('aria-label="December 2025 expenses"'))
-assert.ok(html.indexOf("This month&#x27;s dinner") < html.indexOf("Last year&#x27;s groceries"), "The selected expense month comes first")
-assert.ok(html.includes("12/20/2025"), "Carried items retain their original date")
+assert.ok(html.indexOf('aria-label="September 2026 expenses"') < html.indexOf('aria-label="December 2025 expenses"'), "Newest expense months come first")
+assert.ok(!html.includes("12/20/2025"), "Collapsed historical months wait to mount their transactions")
 const summary = /<dl class="bb-reimbursement-summary"[\s\S]*?<\/dl>/.exec(html)[0]
 assert.ok(summary.includes("$100.00") && summary.includes("$60.00") && summary.includes("$40.00"))
 assert.ok(!summary.includes("$300.00"), "Old debt must not enter the selected expense-month statement")
 assert.ok(!html.includes('class="bb-reimbursement-history"'), "Received and due expenses share one ledger")
 assert.ok(html.includes("Received dinner") && html.includes("This month"))
 assert.ok(html.includes('aria-expanded="false"') && html.includes('inert=""'), "The unified ledger starts collapsed")
-assert.ok(render({items:[],openItems:[older]}).includes("Last year&#x27;s groceries"), "Old debt remains visible in a month without new shared purchases")
+assert.ok(render({items:[],openItems:[older]}).includes('aria-label="December 2025 expenses"'), "Old debt remains accessible in a month without new shared purchases")
 assert.equal(render({items:[],openItems:[]}), "")
 const partial = render({items:[],openItems:[],coverage:{...complete,status:"partial",unavailableYears:[2025]}})
 assert.ok(partial.includes("Known outstanding") && partial.includes("balance may be incomplete"))
@@ -141,8 +144,8 @@ assert.ok(!unifiedItems.some(entry => entry.id === voided.id), "A monthly void m
 assert.deepEqual(Array.from(reimbursementLedger([], [
   item("Old",{date:"7/2/2026"}),item("Current",{date:"9/2/2026"}),item("Selected",{date:"8/2/2026"}),
   item("Unknown",{date:"2026-02-30"}),
-], "2026-08"),group => group.key),["2026-08","2026-09","2026-07","undated"],
-  "Selected month comes first, then newest months, with uncertain dates last")
+], "2026-08"),group => group.key),["2026-09","2026-08","2026-07","undated"],
+  "Newest months come first even when a historical report month is selected, with uncertain dates last")
 assert.equal(reimbursementLedger([
   item("First purchase",{item:"Same description"}),item("Second purchase",{item:"Same description"}),
 ],[],"2026-09")[0].items.length,2, "Matching names, dates and amounts cannot identify duplicate expenses")
@@ -204,7 +207,7 @@ const partialReceiptSummary = /<dl class="bb-reimbursement-summary"[\s\S]*?<\/dl
 assert.ok(partialReceiptSummary.includes("$15.00"), "The monthly statement includes partial receipts, even before full settlement")
 assert.ok(!partialReceipt.includes("$125.00"), "Gross amounts are not combined with outstanding amounts for a chart total")
 const receivedOnly = render({items:[],openItems:[],receivedItems:[oldReceipt]})
-assert.ok(receivedOnly.includes("Last year&#x27;s groceries") && receivedOnly.includes("Received"))
+assert.ok(receivedOnly.includes('aria-label="December 2025 expenses"'), "Settled history remains accessible through its collapsed month")
 assert.ok(receivedOnly.includes("View 1") && receivedOnly.includes("No outstanding reimbursements"))
 assert.ok(!receivedOnly.includes('aria-label="Outstanding by expense month"'))
 assert.ok(!receivedOnly.includes('class="bb-reimbursement-summary"'), "Past receipts do not invent totals for an empty selected expense month")
@@ -362,6 +365,7 @@ assert.equal(renderedText(auditExpense).split(auditItem.item).length-1,1)
 renderer.act(() => tree.unmount())
 const minimalItem = item("Receipt with missing optional metadata",{date:" ",location:" ",payer:" ",partner:" ",splitMethod:" \t",responsiblePerson:" \n"})
 renderer.act(() => { tree = renderer.create(React.createElement(SharedReimbursementsCard,propsFor({items:[minimalItem],openItems:[minimalItem]}))) })
+renderer.act(() => tree.root.findByProps({className:"bb-reimbursement-month-toggle"}).props.onClick())
 const minimalExpense = tree.root.findAllByProps({className:"bb-reimbursement-entry"})[1]
 const minimalDetails = disclosure(minimalExpense).content
 assert.equal(renderedText(minimalDetails.findByProps({className:"bb-reimbursement-date"})),"Undated")
@@ -460,11 +464,11 @@ renderer.act(() => { tree = renderer.create(React.createElement(SharedReimbursem
   items:[{...settled,date:"8/3/2026"}],month:8,monthLabel:"August 2026",
 }))) })
 const historicalGroups = tree.root.findAllByProps({className:"bb-reimbursement-group"})
-assert.equal(historicalGroups[0].props["aria-label"],"August 2026 expenses")
-assert.equal(historicalGroups[0].findByProps({className:"bb-reimbursement-month-tag"}).children.join(""),"Selected month")
-assert.equal(historicalGroups[1].props["aria-label"],"September 2026 expenses")
-assert.equal(historicalGroups[1].findByProps({className:"bb-reimbursement-month-tag"}).children.join(""),"This month",
-  "Current-month labels follow the report's Pacific as-of date, not the browser's clock")
+assert.equal(historicalGroups[0].props["aria-label"],"September 2026 expenses")
+assert.equal(historicalGroups[0].findByProps({className:"bb-reimbursement-month-tag"}).children.join(""),"This month",
+  "Current-month labels follow today's Pacific date independently of the selected report")
+assert.equal(historicalGroups[1].props["aria-label"],"August 2026 expenses")
+assert.equal(historicalGroups[1].findByProps({className:"bb-reimbursement-month-tag"}).children.join(""),"Selected month")
 renderer.act(() => tree.unmount())
 renderer.act(() => { tree = renderer.create(React.createElement(SharedReimbursementsCard, propsFor({
   coverage:{...complete,status:"partial",unavailableYears:[2025]},
@@ -531,6 +535,7 @@ renderer.act(() => receiptRow(receiptB.item).button.props.onClick())
 assert.equal(receiptRow(receiptA.item).button.props["aria-expanded"],false,"Opening another expense closes the previous expense in that month")
 assert.equal(receiptRow(receiptA.item).content.props.inert,true)
 assert.equal(receiptRow(receiptB.item).button.props["aria-expanded"],true)
+renderer.act(() => tree.root.findByProps({"aria-label":"December 2025 expenses"}).findByProps({className:"bb-reimbursement-month-toggle"}).props.onClick())
 renderer.act(() => receiptRow(older.item).button.props.onClick())
 assert.equal(receiptRow(receiptB.item).button.props["aria-expanded"],true,"Different months keep independent open expenses")
 renderer.act(() => receiptRow(receiptB.item).button.props.onClick())
@@ -546,5 +551,48 @@ assert.match(renderedText(receiptRow(receiptB.item).button),/Received/)
 const activeByMonth = tree.root.findAllByProps({className:"bb-reimbursement-group"}).map(group =>
   group.findAllByProps({className:"bb-reimbursement-toggle"}).filter(button=>button.props["aria-expanded"]).length)
 assert.deepEqual(activeByMonth,[1,1])
+renderer.act(() => tree.unmount())
+// Saved/legacy reports use the same five-at-a-time history controls.
+const pageItems = [
+  ...Array.from({length:12}, (_,index) => item(`Paged ${index+1}`,{date:`9/${index+1}/2026`})),
+  ...Array.from({length:6}, (_,index) => item(`Old page ${index}`,{date:`${8-index}/4/2026`})),
+  item("Undated page",{date:""}),
+]
+renderer.act(() => { tree = renderer.create(React.createElement(SharedReimbursementsCard,propsFor({items:pageItems.slice(0,12),openItems:pageItems}))) })
+renderer.act(() => disclosure(tree.root.findByProps({className:"bb-reimbursement-open-list"})).button.props.onClick())
+const pagedGroups = () => tree.root.findAllByProps({className:"bb-reimbursement-group"})
+const monthToggle = group => group.findByProps({className:"bb-reimbursement-month-toggle"})
+const pageButton = (scope,label) => scope.findAllByType("button").find(node => renderedText(node) === label)
+assert.equal(pagedGroups().length,5)
+assert.deepEqual(pagedGroups().map(group=>monthToggle(group).props["aria-expanded"]),[true,false,false,false,false])
+const pageMonth = pagedGroups()[0]
+const pageRows = () => pageMonth.findAllByProps({className:"bb-reimbursement-entry"})
+assert.deepEqual(pageRows().map(row=>row.findByType("strong").props.title),[12,11,10,9,8].map(number=>`Paged ${number}`))
+assert.equal(tree.root.findByProps({className:"bb-reimbursement-total"}).props.children,"$760.00","The complete balance includes every hidden page")
+renderer.act(() => pageButton(pageMonth,"Load more expenses").props.onClick())
+assert.equal(pageRows().length,10)
+renderer.act(() => pageButton(pageMonth,"Load more expenses").props.onClick())
+assert.equal(pageRows().length,12)
+assert.equal(pageButton(pageMonth,"Load more expenses"),undefined)
+renderer.act(() => monthToggle(pageMonth).props.onClick())
+assert.equal(disclosure(pageMonth).content.props.inert,true)
+renderer.act(() => monthToggle(pageMonth).props.onClick())
+assert.equal(pageRows().length,12)
+renderer.act(() => pageButton(tree.root,"Load more months").props.onClick())
+assert.equal(pagedGroups().length,8)
+assert.equal(pageButton(tree.root,"Load more months"),undefined)
+assert.ok(pagedGroups().slice(5).every(group=>!monthToggle(group).props["aria-expanded"]))
+renderer.act(() => tree.update(React.createElement(SharedReimbursementsCard,propsFor({items:pageItems.slice(0,12),openItems:pageItems}))))
+assert.equal(pagedGroups().length,8)
+assert.equal(pageRows().length,12)
+renderer.act(() => tree.unmount())
+renderer.act(() => { tree = renderer.create(React.createElement(SharedReimbursementsCard,propsFor({items:pageItems.slice(0,12),openItems:pageItems}))) })
+const unseenNewRows = [item("New current page",{date:"9/30/2026"}),item("New month page",{date:"10/1/2026"}),...pageItems]
+renderer.act(() => tree.update(React.createElement(SharedReimbursementsCard,propsFor({items:unseenNewRows.filter(entry=>entry.date.startsWith("9/")),openItems:unseenNewRows}))))
+renderer.act(() => disclosure(tree.root.findByProps({className:"bb-reimbursement-open-list"})).button.props.onClick())
+assert.equal(pagedGroups().length,5,"First revealing fallback history after insertion still starts with five months")
+const unseenCurrentMonth = tree.root.findByProps({"aria-label":"September 2026 expenses"})
+assert.equal(unseenCurrentMonth.findAllByProps({className:"bb-reimbursement-entry"}).length,5,"Unseen current-month rows also start with five after refresh")
+assert.equal(unseenCurrentMonth.findAllByProps({className:"bb-reimbursement-entry"})[0].findByType("strong").props.title,"New current page")
 renderer.act(() => tree.unmount())
 console.log("Reimbursement carry-forward, timeline and disclosure checks passed")

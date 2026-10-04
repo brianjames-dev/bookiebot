@@ -23,6 +23,9 @@ const browserWindow = { ...events("window"),
   dispatchEvent(event) { dispatched.push(event.type) },
 }
 const browserDocument = { ...events("document"), visibilityState: "visible" }
+class FixtureDate extends Date {
+  constructor(...args) { super(...(args.length ? args : ["2026-10-01T06:30:00Z"])) }
+}
 let fetchRequest = () => { throw Error("No HTTP fixture") }
 const modules = new Map()
 function load(file) {
@@ -37,7 +40,7 @@ function load(file) {
   const { outputText } = ts.transpileModule(fs.readFileSync(file, "utf8"), { compilerOptions: {
     target: ts.ScriptTarget.ES2020, module: ts.ModuleKind.CommonJS, jsx: ts.JsxEmit.ReactJSX, esModuleInterop: true,
   } })
-  vm.runInNewContext(outputText, { exports, require: localRequire, AbortController, Error,
+  vm.runInNewContext(outputText, { exports, require: localRequire, AbortController, Error, Date: FixtureDate,
     window: browserWindow, document: browserDocument, fetch: (...args) => fetchRequest(...args),
     crypto: { randomUUID: () => `record-${++requestId}` }, CustomEvent: class { constructor(type) { this.type = type } },
   })
@@ -90,7 +93,7 @@ const rawText = node => typeof node === "string" || typeof node === "number" ? S
 const buttons = scope => scope.findAllByType("button").filter(visible)
 const button = (scope, label, prefix = false) => buttons(scope).find(node => node.props["aria-label"] === label || (prefix ? text(node).startsWith(label) : text(node) === label))
 const hasClass = (node, name) => typeof node.type === "string" && node.props.className?.split(" ").includes(name)
-const row = (tree, name) => tree.root.findAll(node => hasClass(node, "bb-reimbursement-entry")).find(node => text(buttons(node)[0]).startsWith(name))
+const row = (tree, name) => tree.root.findAll(node => hasClass(node, "bb-reimbursement-entry")).filter(visible).find(node => text(buttons(node)[0]).startsWith(name))
 const rowToggle = row => buttons(row).find(node => hasClass(node, "bb-reimbursement-toggle"))
 const form = tree => tree.root.findAllByType("form").find(visible)
 async function tap(node) {
@@ -132,6 +135,134 @@ async function unmount(tree) {
   assert.ok([...listeners.window.values(), ...listeners.document.values()].every(set => !set.size), "Unmount cleans up refresh listeners")
 }
 
+async function monthPaginationContracts() {
+  const state = fixture()
+  state.snapshot.events = []
+  state.snapshot.allocations = [
+    ...Array.from({ length: 12 }, (_, index) => allocation({ id: `sept-${index + 1}`, item: `September expense ${index + 1}`, expenseDate: `2026-09-${String(index + 1).padStart(2, "0")}` })),
+    ...Array.from({ length: 11 }, (_, index) => allocation({ id: `past-${index}`, item: `Older expense ${index}`, expenseDate: new Date(Date.UTC(2026, 7 - index, 4)).toISOString().slice(0, 10) })),
+    allocation({ id: "undated", item: "Undated expense", expenseDate: "" }),
+  ]
+  const tree = await mount()
+  await tap(button(tree.root, "View 24 expenses"))
+  const monthGroups = () => tree.root.findAll(node => hasClass(node, "bb-reimbursement-group")).filter(visible)
+  const monthToggle = group => group.find(node => hasClass(node, "bb-reimbursement-month-toggle"))
+  const displayed = group => group.findAll(node => hasClass(node, "bb-reimbursement-entry")).filter(visible)
+  assert.deepEqual(monthGroups().map(group => group.props["aria-label"]), ["September 2026", "August 2026", "July 2026", "June 2026", "May 2026"])
+  assert.deepEqual(monthGroups().map(group => monthToggle(group).props["aria-expanded"]), [true, false, false, false, false], "Only the actual Pacific current month starts expanded, even when UTC has rolled over")
+  let september = monthGroups()[0]
+  assert.deepEqual(displayed(september).map(entry => text(rowToggle(entry)).match(/September expense \d+/)[0]), [12, 11, 10, 9, 8].map(number => `September expense ${number}`))
+  assert.equal(tree.root.findAll(node => hasClass(node, "bb-reimbursement-entry")).length, 5, "Collapsed months do not mount their expense histories")
+  assert.ok(text(tree.root).includes("Owed to you$1,920.00"), "Pagination never limits the complete balance")
+  await tap(button(september, "Load more expenses"))
+  assert.equal(displayed(september).length, 10)
+  await tap(button(september, "Load more expenses"))
+  assert.equal(displayed(september).length, 12)
+  assert.equal(button(september, "Load more expenses"), undefined)
+  await tap(rowToggle(displayed(september)[0]))
+  await tap(button(september, "Record received"))
+  await fill(tree, "Amount", "12.34")
+  await tap(monthToggle(september))
+  assert.equal(displayed(september).length, 0)
+  assert.equal(form(tree), undefined, "Collapsed month controls are inaccessible")
+  await tap(monthToggle(september))
+  assert.equal(displayed(september).length, 12, "Reopening keeps previously loaded expenses")
+  assert.equal(form(tree).findAllByType("input")[0].props.value, "12.34", "Month collapse retains payment drafts")
+  await tap(button(tree.root, "Load more months"))
+  assert.equal(monthGroups().length, 10)
+  assert.ok(monthGroups().slice(5).every(group => !monthToggle(group).props["aria-expanded"]))
+  await tap(button(tree.root, "Load more months"))
+  assert.equal(monthGroups().length, 13)
+  assert.equal(button(tree.root, "Load more months"), undefined)
+  assert.equal(monthGroups().at(-1).props["aria-label"], "Undated")
+  const august = monthGroups()[1]
+  await tap(monthToggle(august))
+  assert.equal(displayed(august).length, 1)
+  assert.equal(button(august, "Load more expenses"), undefined)
+  await act(async () => { for (const callback of listeners.window.get("focus")) callback(); await flush() })
+  assert.equal(monthGroups().length, 13, "Refreshing data preserves loaded month pages")
+  assert.equal(displayed(september).length, 12)
+  assert.equal(monthToggle(august).props["aria-expanded"], true)
+  await tap(button(tree.root, "You owe", true))
+  await tap(button(tree.root, "Owed to you", true))
+  assert.equal(monthGroups().length, 13, "Switching directions preserves each direction's pagination")
+  assert.equal(displayed(september).length, 12)
+  assert.equal(form(tree).findAllByType("input")[0].props.value, "12.34", "Switching directions preserves loaded month and payment draft state")
+  assert.equal(writes(state).length, 0, "Disclosures and pagination never write financial data")
+  await unmount(tree)
+}
+
+async function refreshedPageRetentionContracts() {
+  const state = fixture()
+  state.snapshot.events = []
+  state.snapshot.allocations = [
+    ...Array.from({ length: 12 }, (_, index) => allocation({ id: `sept-${index + 1}`, item: `September expense ${index + 1}`, expenseDate: `2026-09-${String(index + 1).padStart(2, "0")}` })),
+    ...Array.from({ length: 6 }, (_, index) => allocation({ id: `past-${index}`, item: `Older expense ${index}`, expenseDate: `2026-${String(8 - index).padStart(2, "0")}-04` })),
+  ]
+  const tree = await mount()
+  await expand(tree, "September expense 8")
+  await tap(button(tree.root, "Record received")); await fill(tree, "Amount", "12.34")
+  const refresh = async () => act(async () => { for (const callback of listeners.window.get("focus")) callback(); await flush() })
+  state.snapshot.allocations.push(allocation({ id: "new-row", item: "Newest expense", expenseDate: "2026-09-30" }))
+  state.snapshot.allocations.push(...Array.from({ length: 5 }, (_, index) => allocation({ id: `new-august-${index}`, item: `New August expense ${index}`, expenseDate: `2026-08-${15 + index}` })))
+  await refresh()
+  assert.equal(form(tree).findAllByType("input")[0].props.value, "12.34", "A newly arriving expense cannot evict the fifth visible row and its draft")
+  const september = tree.root.find(node => hasClass(node, "bb-reimbursement-group") && node.props["aria-label"] === "September 2026")
+  assert.equal(september.findAll(node => hasClass(node, "bb-reimbursement-entry")).length, 6)
+  await tap(button(september, "Load more expenses"))
+  assert.equal(september.findAll(node => hasClass(node, "bb-reimbursement-entry")).length, 11, "Load more still appends five after a retained cutoff expands")
+  await tap(button(tree.root, "September 2026", true))
+  await tap(button(tree.root, "August 2026"))
+  const august = tree.root.find(node => hasClass(node, "bb-reimbursement-group") && node.props["aria-label"] === "August 2026")
+  assert.equal(august.findAll(node => hasClass(node, "bb-reimbursement-entry")).length, 5, "First opening an untouched historical month still shows only five after background updates")
+  await tap(button(tree.root, "August 2026"))
+  await tap(button(tree.root, "May 2026")); await expand(tree, "Older expense 3")
+  await tap(button(tree.root, "Record received")); await fill(tree, "Amount", "23.45")
+  state.snapshot.allocations.push(allocation({ id: "new-month", item: "Newer month expense", expenseDate: "2026-10-01" }))
+  await refresh()
+  assert.equal(form(tree).findAllByType("input")[0].props.value, "23.45", "A newer month cannot unmount the fifth visible month and its draft")
+  assert.equal(tree.root.findAll(node => hasClass(node, "bb-reimbursement-group")).filter(visible).length, 6)
+  assert.equal(button(tree.root, "October 2026").props["aria-expanded"], false, "New noncurrent months stay collapsed")
+  assert.equal(writes(state).length, 0)
+  await unmount(tree)
+}
+
+async function unseenMonthPageContracts() {
+  const state = fixture()
+  state.snapshot.events = []
+  state.snapshot.allocations = ["brian", "hannah"].flatMap((payer, side) => Array.from({ length: 6 }, (_, index) => allocation({
+    id: `${payer}-${index}`, item: `${payer} historical expense ${index}`, payerOwner: payer, partnerOwner: side ? "brian" : "hannah",
+    expenseDate: `2026-${String(8 - index).padStart(2, "0")}-04`,
+  })))
+  const tree = await mount()
+  const refresh = async () => act(async () => { for (const callback of listeners.window.get("focus")) callback(); await flush() })
+  state.snapshot.allocations.push(...["brian", "hannah"].map((payer, side) => allocation({ id: `${payer}-new-month`, payerOwner: payer, partnerOwner: side ? "brian" : "hannah", expenseDate: "2026-09-30" })))
+  await refresh()
+  await tap(button(tree.root, "View 7 expenses"))
+  const shownMonths = () => tree.root.findAll(node => hasClass(node, "bb-reimbursement-group")).filter(visible)
+  assert.equal(shownMonths().length, 5, "First opening history stays at five months after a refresh inserted a newer month")
+  await tap(button(tree.root, "You owe", true))
+  assert.equal(shownMonths().length, 5, "The untouched direction also starts with five months")
+  await tap(button(tree.root, "Load more months"))
+  await tap(button(tree.root, "Owed to you", true))
+  state.snapshot.allocations.push(allocation({ id: "hannah-newest-month", payerOwner: "hannah", partnerOwner: "brian", expenseDate: "2026-10-01" }))
+  await refresh()
+  await tap(button(tree.root, "You owe", true))
+  assert.equal(shownMonths().length, 8, "Previously revealed months remain retained while their direction is hidden")
+  await unmount(tree)
+
+  const currentState = fixture()
+  currentState.snapshot.events = []
+  currentState.snapshot.allocations = Array.from({ length: 12 }, (_, index) => allocation({ id: `current-${index}`, item: `Current ${index}`, expenseDate: `2026-09-${String(index + 1).padStart(2, "0")}` }))
+  const currentTree = await mount()
+  currentState.snapshot.allocations.push(allocation({ id: "new-current", item: "New current expense", expenseDate: "2026-09-30" }))
+  await refresh()
+  await tap(button(currentTree.root, "View 13 expenses"))
+  assert.equal(currentTree.root.findAll(node => hasClass(node, "bb-reimbursement-entry")).filter(visible).length, 5, "First revealing the default-expanded current month still starts with five after a hidden refresh")
+  assert.ok(row(currentTree, "New current expense"))
+  await unmount(currentTree)
+}
+
 async function compactAndSentContracts() {
   const state = fixture({ post: (body, state) => {
     assert.equal(body.operation, "report_payment")
@@ -149,6 +280,7 @@ async function compactAndSentContracts() {
   assert.equal(rowToggle(row(tree, "PG&E")).props["aria-expanded"], false)
   assert.ok(text(row(tree, "Historical rent")).includes("Historical split · read only"))
   assert.equal(button(row(tree, "Historical rent"), "Record received"), undefined)
+  await tap(button(tree.root, "August 2026"))
   await tap(rowToggle(row(tree, "August groceries")))
   assert.equal(rowToggle(row(tree, "Historical rent")).props["aria-expanded"], true, "Different expense months retain independent expansion")
   await tap(button(tree.root, "You owe", true))
@@ -624,6 +756,9 @@ async function resetSafetyAndRecoveryContracts() {
 }
 
 ;(async () => {
+  await monthPaginationContracts()
+  await refreshedPageRetentionContracts()
+  await unseenMonthPageContracts()
   await compactAndSentContracts()
   await emptyDirectionsAndMarkerContracts()
   await receiptAndReversalContracts()

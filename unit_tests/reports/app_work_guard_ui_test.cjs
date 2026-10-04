@@ -151,6 +151,8 @@ async function main() {
   request = async (_url, options) => options.body ? (posts.push(JSON.parse(options.body)), pending.promise) : respond(snapshot)
   tree = await mount(React.createElement(ReimbursementLedger, { fallback: null }))
   await tap(tree, 'View 1 expense')
+  const month = tree.root.findAllByType('button').find(node => node.props.className === 'bb-reimbursement-month-toggle')
+  if (!month.props['aria-expanded']) await run(() => month.props.onClick())
   const row = tree.root.findAllByType('button').find(node => node.props.className === 'bb-reimbursement-toggle')
   await run(() => row.props.onClick()); await tap(tree, 'Record received')
   await fill(tree, 'Amount ($)', '20'); await submit(tree); assert.equal(guard.pending, true)
