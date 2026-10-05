@@ -431,13 +431,16 @@ def _bill_payment_intent(content: str) -> tuple[str, dict] | None:
 
     bill = r"(?:my |the )?(?:" + aliases[bill_key] + r")(?: bill| payment)?"
     amount = r"\$?\s*(?P<amount>(?:\d{1,3}(?:,\d{3})+|\d+)(?:\.\d{1,2})?)"
-    command = r"(?:please )?(?:(?:can|could|would|will) you )?(?:please )?(?:log|record|add) "
+    command = (
+        r"(?:please )?(?:(?:can|could|would|will) you )?(?:please )?(?:log|record|add) "
+        r"(?:(?:an? )?(?:expense|payment) )?"
+    )
     if text.endswith("?") and not re.match(command, text):
         return "fallback", {}
     suffix = r"(?: today| yesterday)?(?: (?:and )?split(?: (?:by income|evenly|equally|50/50))?)?[.!?]?"
     patterns = (
         rf"(?:{command})?{bill}(?: (?:was|is|paid))? {amount}{suffix}",
-        rf"{command}{amount}(?: for)? {bill}{suffix}",
+        rf"(?:{command})?{amount}(?: for)? {bill}{suffix}",
         rf"(?:i (?:have )?|i've )?paid {amount}(?: for)? {bill}{suffix}",
         rf"(?:i (?:have )?|i've )?paid {bill}(?: for)? {amount}{suffix}",
     )

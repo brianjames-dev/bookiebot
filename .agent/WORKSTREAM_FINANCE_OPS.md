@@ -1,8 +1,14 @@
 # Finance Operations Workstream
 
-Last updated: 2026-10-03
+Last updated: 2026-10-05
 
 ## Goal
+
+### Utility command routing work log — 2026-10-05
+
+Complete (user-reported bug): amount-first shorthand and Log/Record/Add with an optional expense/payment noun now use the deterministic bill grammar. `124.46 PG&E` and `Log expense 124.46 PG&E` previously fell into the read-only conversation; equivalent Recology and Water forms had the same gap. Existing dedicated bill writers, action metadata and automatic split prompts remain in use. No split preserves the full payment; explicit split directives retain their existing behavior. Questions, negation, plans, invalid amounts, multi-expense messages and bottled-water ambiguity stay guarded.
+
+Added 57 routing/workflow/safety cases. Focused **341 passed**; full local **2,007 passed / 336 skipped** (optional PostgreSQL and unavailable frontend dependencies); Pyright clean. Tests use in-memory sheets and loopback HTTP fixtures, with no production financial writes. Release/manual acceptance: STATUS checklist 129. Split lifecycle backlog remains as previously scoped.
 
 ### Mobile Shared history and navigation work log — 2026-10-03
 
@@ -234,6 +240,8 @@ Implementation adds durable household transactions, idempotency/version checks, 
 ### Slice G - Initial Split And Settlement Workflow
 
 Status: Complete in code and automated/browser verification as of 2026-08-03; production confirmation remains in `.agent/STATUS.md` checklist item 74.
+
+2026-10-05 follow-up complete: repaired utility shorthand/expense routing into the existing bill writers and split prompts; exact PG&E incident and Recology/Water equivalents have in-memory end-to-end coverage. Release acceptance is STATUS checklist 129.
 
 - Added income-weighted splitting from Brian `$156,000` and Hannah `$85,000` annual incomes, plus 50/50 splitting with penny-safe allocation.
 - Added the post-log split prompt and explicit command directives. Grocery, Rent, PG&E, Water, Recology, and Gameday prompt automatically; internet is deliberately excluded.
