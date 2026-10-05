@@ -1,8 +1,10 @@
 # Agent Status
 
-Last updated: 2026-10-03
+Last updated: 2026-10-05
 
 ## Active Focus
+
+Utility logging regression repaired (2026-10-05): amount-first shorthand (`124.46 PG&E`) and `Log expense`/`Record payment` wording now reach dedicated bill writers. PG&E, Recology and Water write exactly one bill cell and open the existing split dialog; No split preserves gross and 50/50 targets the saved action. Added 57 routing/workflow/safety cases. Focused **341 passed**; full local **2,007 passed / 336 skipped** (optional PostgreSQL and missing frontend test dependencies); Pyright clean. Release/manual acceptance is checklist 129. No production financial writes were used. Existing mobile/device acceptance remains queued below.
 
 Mobile WebKit refinement implemented (2026-10-03): independent 44px header glass buttons, no under-bar blur/gradient, 60px expanded navigation, immediate Reconcile with loading/retry, and Category Mix focus without a square outline. Shared canonical/fallback history shows five newest months with only the current Pacific month expanded and five newest expenses per month; Load more appends five. Revealed history and drafts survive collapse, tab/direction switches and inserted records on refresh. Full local suite **1,975 passed / 311 optional PostgreSQL skipped**, Pyright and frontend typecheck/build clean; production-build WebKit passed 12 width/theme/motion cases. Main release results are in the completion response; device acceptance is checklist 128. Financial totals and mutation semantics remain unchanged.
 
@@ -87,6 +89,8 @@ All eight September 6 audit batches are implemented and verified locally. Each b
 
 ## On Deck
 
+Deploy and manually verify utility shorthand/expense commands and their split dialogs using checklist 129. Implementation and local verification are complete.
+
 Verify the mobile WebKit refinements on iPhone using checklist 128 after loading the app Update. Implementation and automated/browser verification are complete.
 
 Confirm on iOS that the deployed October rent entry shows Received after refresh, with no Sheet update pending (checklist 126). The production database and three live sheet locations have already been verified.
@@ -131,6 +135,12 @@ Student-loan activation is complete. Verify the deployed fixed-bill display and 
 25. Harden recent-action pending state across restarts/deploys, since selections currently live only in process memory.
 26. Improve targeted recent-action search so commands can find older matches, not only the latest 10 recent actions.
 27. Explore clarifying questions before logging when BookieBot is uncertain instead of guessing or silently failing.
+
+## Completed 2026-10-05
+
+- Fixed utility bill commands falling into read-only conversation: amount-first shorthand and optional expense/payment nouns now match the affirmative grammar. Existing dedicated writers and split behavior remain authoritative; explicit split methods still apply directly.
+- Added 57 regression cases, including the exact screenshot wording for PG&E and equivalent Recology/Water forms, real in-memory bill-cell writes, actor/action metadata, split-dialog buttons and callback targets, No split, and read-only diversion for questions, negation, future plans, invalid amounts and multi-expense requests.
+- Verification: focused routing/handlers/splits/sheets **341 passed**; full suite **2,007 passed / 336 skipped** (optional PostgreSQL and unavailable frontend dependencies), existing Kaleido warning only; Pyright **0 errors / 0 warnings**. Full suite reran successfully with loopback test-server permission after sandbox fixture failures. README, Finance Ops, durable decision and manual checklist 129 updated. No live financial test writes.
 
 ## Completed 2026-10-03
 
@@ -987,6 +997,8 @@ Use a test row or low-risk real row in Discord:
 
 ## Verification Baseline
 
+2026-10-05 utility command routing: focused **341 passed**; full `python -m pytest unit_tests` **2,007 passed / 336 skipped** (optional PostgreSQL and missing frontend dependencies), existing Kaleido warning only; Pyright **0 errors / 0 warnings** using the existing project Python 3.12 environment. Full suite used loopback-enabled isolated fixtures. Exact reported commands and Recology/Water equivalents exercise real bill-cell writes and split dialogs in memory. No production financial writes; manual acceptance is checklist 129.
+
 2026-10-03 mobile WebKit refinement: **1,975 passed / 311 optional PostgreSQL skipped**, existing Kaleido warning only; Pyright **0 errors / 0 warnings**; frontend typecheck/build and diff checks clean. Checks use the existing project Python 3.12 environment. Production-build WebKit passed 12 viewport/theme/motion combinations with synthetic data; separate touch/mouse category checks preserve keyboard access. No live financial test writes.
 
 2026-09-30 balance reset: existing project Python 3.12 environment, `python -m pytest unit_tests` **1,968 passed / 311 optional PostgreSQL skipped** (one existing Kaleido warning); `python -m pyright --pythonpath /Users/brianjames/Dev/bookiebot/venv/bin/python` **0 errors / 0 warnings**. Frontend typecheck/build and executed reimbursement UI contracts pass. Local WebKit tested 12 width/theme/motion combinations against disposable real SQLite/API commands; source/mirror projections use isolated sheet fixtures. The default shell Python lacked project dependencies, so final checks use the existing project environment. CI supplies PostgreSQL contracts.
@@ -1558,3 +1570,5 @@ python -m pyright
 
 
 128. Mobile WebKit refinement: install the offered app Update or fully reopen after deployment. Verify separate circular Ask/Settings controls and correct destinations; the expanded bottom bar is slightly shorter, with no extra blur beneath it, and still contracts/restores while scrolling. With a slow bank response, Reconcile appears with the other tabs and shows loading when tapped; an initial error offers retry, and an explicitly unwatched/disconnected account removes the tab. Tap Category Mix slices and dismiss details without a square selector; keyboard Tab/Enter/Space remains usable. In Shared → View expenses, verify five newest months with only the current Pacific month expanded, five newest rows initially, and repeated Load more expenses/months adds five until exhausted and removes each finished control. Collapse/reopen months and switch tabs to confirm loaded history and payment drafts persist; refresh with newer entries must not evict a visible draft. Check both directions, historical fallback, narrow widths, both themes, and reduced motion. Balances and settlement/reset previews continue to cover all months. Use synthetic records for mutation checks; no production payments are needed.
+
+129. Utility logging and split dialogs (after deployment; disposable workbook for test writes): send `124.46 PG&E` and `Log expense 124.46 PG&E`, then equivalent Recology and Water commands with appropriate test amounts. Each must confirm the authenticated user’s bill payment, update only that bill cell and show By income/50/50/Fronted/No split. Choose No split and confirm the full amount remains; in a separate test choose 50/50 or By income and confirm the allocation links to that logged bill. An explicit `and split evenly` command should apply directly. Ask `Can I afford $124.46 PG&E?`, send `Do not log expense 124.46 PG&E` and a future-payment plan, and confirm no writes or split prompts. Repeat a question while a recent amount edit is pending. Only log actual production bills intentionally; do not replay both incident messages into real finances as tests.

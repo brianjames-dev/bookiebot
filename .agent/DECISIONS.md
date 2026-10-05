@@ -1,5 +1,11 @@
 # Agent Decisions
 
+## 2026-10-05 - Accept Amount-First Utility Logging Commands
+
+Extend the affirmative deterministic bill grammar to accept amount-first shorthand and an optional expense/payment noun after Log/Record/Add. PG&E, Recology and Water continue using their dedicated personal-bill writers and existing post-log split dialog; explicit split directives retain their current meaning. Full-message matching, question/negation/planning diversion and bottled-water ambiguity remain guarded.
+
+Rationale: `124.46 PG&E` and `Log expense 124.46 PG&E` were sent to the read-only conversation instead of logging. Supporting those precise forms restores the intended workflow without granting the conversational agent mutation tools.
+
 ## 2026-10-03 - Stable Phone Navigation And Progressive Shared History
 
 Render Reconcile alongside the initial navigation while watched-account discovery is unknown; an explicit disabled response removes it, while failures keep an actionable retry screen. Do not expose bank mutation controls or empty review counts until an enabled snapshot arrives.

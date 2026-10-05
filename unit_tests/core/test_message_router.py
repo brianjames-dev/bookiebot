@@ -1,6 +1,6 @@
 import pytest
 from types import SimpleNamespace
-from unittest.mock import AsyncMock
+from unittest.mock import AsyncMock, MagicMock
 
 from bookiebot.core.message_router import _action_management_intent
 from bookiebot.core.message_router import _bill_payment_intent
@@ -191,6 +191,104 @@ def test_bill_payments_route_without_llm(content, expected):
 
 
 @pytest.mark.parametrize(
+    ("bill", "intent"),
+    [("PG&E", "log_pge_paid"), ("Recology", "log_recology_paid"), ("Water", "log_water_paid")],
+)
+@pytest.mark.parametrize("statement", [
+    "124.46 {bill}",
+    "$124.46 {bill}",
+    "Log expense 124.46 {bill}",
+    "Log an expense $124.46 for {bill}",
+    "Record payment {bill} 124.46",
+    "Can you log expense $124.46 for my {bill} bill?",
+])
+def test_utility_amount_first_and_expense_commands_route_without_llm(bill, intent, statement):
+    assert _bill_payment_intent(statement.format(bill=bill)) == (intent, {"amount": 124.46})
+
+
+@pytest.mark.parametrize(
+    ("bill", "intent"),
+    [("PG&E", "log_pge_paid"), ("Recology", "log_recology_paid"), ("Water", "log_water_paid")],
+)
+@pytest.mark.parametrize(
+    ("suffix", "method"),
+    [("split", "prompt"), ("and split by income", "income"), ("split evenly", "equal")],
+)
+def test_amount_first_utilities_retain_explicit_split_directives(bill, intent, suffix, method):
+    assert _bill_payment_intent(f"Log expense $124.46 {bill} {suffix}") == (
+        intent, {"amount": 124.46, "split_method": method},
+    )
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("bill", ["PG&E", "Recology", "Water"])
+@pytest.mark.parametrize("statement", ["124.46 {bill}", "Log expense 124.46 {bill}"])
+async def test_utility_message_writes_bill_cell_and_opens_working_split_dialog(monkeypatch, bill, statement):
+    from bookiebot.core import message_router as router
+    from bookiebot.intents import handlers
+    import bookiebot.splits as splits
+    from unit_tests.support.sheets_repo_stub import InMemoryWorksheet
+
+    class Client:
+        user = SimpleNamespace(id=1)
+
+        def event(self, fn):
+            setattr(self, fn.__name__, fn)
+            return fn
+
+    client = Client()
+    router.register_events(client, SimpleNamespace())
+    actor_id = 676638528590970917
+    author = SimpleNamespace(id=actor_id, name="deebers")
+    channel = SimpleNamespace(guild=None, id=123, name="bookiebot", send=AsyncMock())
+    message = SimpleNamespace(content=statement.format(bill=bill), author=author, channel=channel)
+    original_rows = [["", "PG&E", "0"], ["", "Recology", "0"], ["", "Water", "0"]]
+    worksheet = InMemoryWorksheet(original_rows, title="October")
+    record_action = MagicMock(return_value="utility-action")
+    parser = AsyncMock(side_effect=AssertionError("Utility logging must not use the LLM"))
+    conversation = AsyncMock(side_effect=AssertionError("Utility logging must not use fallback"))
+    split_action = MagicMock(return_value=(True, "Applied split."))
+    monkeypatch.setattr(router, "parse_message_llm", parser)
+    monkeypatch.setattr(handlers, "fallback_handler", conversation)
+    monkeypatch.setattr(handlers.su, "_income_ws", lambda: worksheet)
+    monkeypatch.setattr(handlers.su, "record_undo_action", record_action)
+    monkeypatch.setattr(splits, "split_recent_action", split_action)
+
+    await client.on_message(message)
+
+    parser.assert_not_awaited()
+    conversation.assert_not_awaited()
+    row = ["PG&E", "Recology", "Water"].index(bill)
+    expected_rows = [values.copy() for values in original_rows]
+    expected_rows[row][2] = "124.46"
+    assert worksheet.get_all_values() == expected_rows
+    assert worksheet.update_cell_calls == 1
+    record_action.assert_called_once()
+    saved_actor, action = record_action.call_args.args
+    assert saved_actor == str(actor_id)
+    assert action.row == row + 1
+    assert action.metadata == {"type": "payment", "category": bill.lower()}
+    assert action.new_values == ["124.46"]
+    replies = channel.send.await_args_list
+    assert len(replies) == 2
+    assert "Logged" in replies[0].args[0] and "$124.46" in replies[0].args[0]
+    assert replies[1].args == (splits.SPLIT_PROMPT,)
+    view = replies[1].kwargs["view"]
+    assert [button.label for button in view.children] == ["By income", "50/50", "Fronted", "No split"]
+    split_action.assert_not_called()
+    interaction = SimpleNamespace(
+        user=author,
+        response=SimpleNamespace(send_message=AsyncMock(), defer=AsyncMock()),
+        followup=SimpleNamespace(send=AsyncMock()),
+    )
+    await view.children[-1].callback(interaction)
+    split_action.assert_not_called()
+    assert worksheet.get_all_values() == expected_rows
+    await view.children[1].callback(interaction)
+    split_action.assert_called_once_with(str(actor_id), split_method="equal", action_id="utility-action")
+
+
+@pytest.mark.parametrize(
     ("content", "expected_intent"),
     [
         ("Did I pay the water bill?", "query_water_paid"),
@@ -216,6 +314,12 @@ def test_ambiguous_water_purchase_still_uses_llm():
     "Should I update my {bill} amount to $2100?",
     "2026-09-06 {bill} $2100",
     "{bill} $2100?",
+    "$2100 {bill}?",
+    "Don't log expense $2100 {bill}",
+    "Log expense $2100 {bill} tomorrow",
+    "Log expense -$2100 {bill}",
+    "Log expense $2100.123 {bill}",
+    "Log expense $2100 {bill} and $50 groceries",
 ])
 @pytest.mark.asyncio
 async def test_bill_non_commands_never_reach_mutations_or_parser(monkeypatch, bill, statement):
