@@ -89,7 +89,7 @@ All eight September 6 audit batches are implemented and verified locally. Each b
 
 ## On Deck
 
-Deploy and manually verify utility shorthand/expense commands and their split dialogs using checklist 129. Implementation and local verification are complete.
+Utility fix PR #63 passed both CI runs and merged into main as `b1f2284`; Railway rollout was triggered. Manually verify utility shorthand/expense commands and their split dialogs using checklist 129 after rollout. CI ran all **2,343 tests** with no skips, plus clean Pyright, Apps Script and frontend checks.
 
 Verify the mobile WebKit refinements on iPhone using checklist 128 after loading the app Update. Implementation and automated/browser verification are complete.
 
@@ -141,6 +141,7 @@ Student-loan activation is complete. Verify the deployed fixed-bill display and 
 - Fixed utility bill commands falling into read-only conversation: amount-first shorthand and optional expense/payment nouns now match the affirmative grammar. Existing dedicated writers and split behavior remain authoritative; explicit split methods still apply directly.
 - Added 57 regression cases, including the exact screenshot wording for PG&E and equivalent Recology/Water forms, real in-memory bill-cell writes, actor/action metadata, split-dialog buttons and callback targets, No split, and read-only diversion for questions, negation, future plans, invalid amounts and multi-expense requests.
 - Verification: focused routing/handlers/splits/sheets **341 passed**; full suite **2,007 passed / 336 skipped** (optional PostgreSQL and unavailable frontend dependencies), existing Kaleido warning only; Pyright **0 errors / 0 warnings**. Full suite reran successfully with loopback test-server permission after sandbox fixture failures. README, Finance Ops, durable decision and manual checklist 129 updated. No live financial test writes.
+- Release: PR [#63](https://github.com/brianjames-dev/bookiebot/pull/63) passed push and PR CI and merged to main as `b1f2284`, triggering Railway deployment. PR CI [37343878302](https://github.com/brianjames-dev/bookiebot/actions/runs/37343878302) passed **2,343 tests** including real PostgreSQL/frontend contracts, Pyright, Apps Script and frontend typecheck/build/asset parity. Deployment outcome is recorded in the task completion response; device acceptance remains checklist 129.
 
 ## Completed 2026-10-03
 
