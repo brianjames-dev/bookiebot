@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import logging
 from typing import Any
 
 import discord
@@ -18,6 +19,17 @@ from bookiebot.ui.bank_reconciliation import (
 )
 
 
+logger = logging.getLogger(__name__)
+
+
+async def _review_actor_allowed(interaction: Any, actor_key: str) -> bool:
+    user = getattr(interaction, "user", None)
+    if user is not None and str(user.id) != str(actor_key):
+        await interaction.response.send_message("This reconciliation review belongs to another user.", ephemeral=True)
+        return False
+    return True
+
+
 def _default_expense_person(owner_key: str) -> str:
     if owner_key == "hannah":
         return "Hannah"
@@ -32,15 +44,20 @@ async def send_next_bank_reconciliation_item(
     actor_key: str,
     skipped_ids: set[int] | None = None,
     session_item_ids: set[int] | None = None,
+    processed_ids: set[int] | None = None,
 ) -> None:
     skipped = set(skipped_ids or set())
+    processed = set(processed_ids or set())
     service = build_banking_service()
-    unresolved = await asyncio.to_thread(service.unresolved_reconciliation_items, owner_key, 100)
+    unresolved = await asyncio.to_thread(
+        service.unresolved_reconciliation_items, owner_key, 100, reconciliation_ids=session_item_ids,
+    )
     if session_item_ids is None:
         session_item_ids = {item.id for item in unresolved}
     else:
         unresolved = [item for item in unresolved if item.id in session_item_ids]
-    remaining = [item for item in unresolved if item.id not in skipped]
+    skipped.intersection_update(item.id for item in unresolved)
+    remaining = [item for item in unresolved if item.id not in skipped and item.id not in processed]
     if not remaining:
         if skipped:
             await interaction.followup.send(
@@ -49,7 +66,8 @@ async def send_next_bank_reconciliation_item(
             )
             return
         await interaction.followup.send(
-            content="Bank reconciliation is all caught up. No unresolved items remain.",
+            content=("This reconciliation session is complete. Start a new session to review any newly queued transactions."
+                     if session_item_ids else "Bank reconciliation is all caught up. No unresolved items remain."),
             ephemeral=True,
         )
         return
@@ -65,6 +83,7 @@ async def send_next_bank_reconciliation_item(
         skipped_ids=skipped,
         session_item_ids=session_item_ids,
         remaining_count=len(remaining),
+        processed_ids=processed,
     )
 
 
@@ -79,10 +98,12 @@ async def send_bank_reconciliation_detail(
     session: bool = False,
     skipped_ids: set[int] | None = None,
     session_item_ids: set[int] | None = None,
+    processed_ids: set[int] | None = None,
     remaining_count: int | None = None,
 ) -> None:
     skipped = set(skipped_ids or set())
     session_scope = set(session_item_ids or {reconciliation_id})
+    processed = set(processed_ids or set())
     service = build_banking_service()
     item, candidates, groups = await asyncio.to_thread(
         service.reconciliation_match_candidates,
@@ -92,15 +113,9 @@ async def send_bank_reconciliation_detail(
         fallback=fallback,
         limit=15 if fallback else 5,
     )
-    if item is None:
-        await interaction.followup.send(
-            content=f"No bank reconciliation item `{reconciliation_id}` was found for {owner_name}.",
-            ephemeral=True,
-        )
-        return
-
     async def continue_session(action_interaction: Any) -> None:
         if session:
+            processed.add(reconciliation_id)
             await send_next_bank_reconciliation_item(
                 action_interaction,
                 owner_key=owner_key,
@@ -108,7 +123,34 @@ async def send_bank_reconciliation_detail(
                 actor_key=actor_key,
                 skipped_ids=skipped,
                 session_item_ids=session_scope,
+                processed_ids=processed,
             )
+
+    async def stale_review(action_interaction: Any, current: Any) -> None:
+        if current is None:
+            message = "This bank transaction is no longer available for review. The review queue has been refreshed."
+        elif current.status in {"confirmed", "matched"}:
+            message = "This transaction is already reconciled. The app and Discord share the same review status."
+        elif current.status == "ignored":
+            message = "This transaction has already been ignored. The app and Discord share the same review status."
+        elif current.status == "import_requested":
+            message = "An import is already in progress for this transaction. Check its recovery status before trying again."
+        else:
+            message = "This transaction changed since this review was opened. Review its current details before continuing."
+        await action_interaction.followup.send(content=message, ephemeral=True)
+        if current is None or current.status in {"confirmed", "matched", "ignored", "import_requested"}:
+            await continue_session(action_interaction)
+        else:
+            await send_bank_reconciliation_detail(
+                action_interaction, owner_key=owner_key, owner_name=owner_name,
+                reconciliation_id=reconciliation_id, actor_key=actor_key, session=session,
+                skipped_ids=skipped, session_item_ids=session_scope,
+                processed_ids=processed, remaining_count=remaining_count,
+            )
+
+    if item is None or item.status in {"confirmed", "matched", "ignored"}:
+        await stale_review(interaction, item)
+        return
 
     if item.status == 'import_requested':
         result = await asyncio.to_thread(
@@ -120,8 +162,17 @@ async def send_bank_reconciliation_detail(
         return
 
     async def handle_action(action_interaction: Any, action: str) -> None:
-        await action_interaction.response.defer(ephemeral=True)
+        if not await _review_actor_allowed(action_interaction, actor_key):
+            return
+        await action_interaction.response.defer(ephemeral=True, thinking=True)
         try:
+            if action == "cancel":
+                await action_interaction.followup.send("Canceled.", ephemeral=True)
+                return
+            current = await asyncio.to_thread(service.get_reconciliation_item, owner_key, reconciliation_id)
+            if current != item:
+                await stale_review(action_interaction, current)
+                return
             if action.startswith("group_adjust:"):
                 _prefix, group_index_text, adjust_action_id = action.split(":", 2)
                 group_index = int(group_index_text)
@@ -136,13 +187,11 @@ async def send_bank_reconciliation_detail(
                     reconciliation_id,
                     actor_key=actor_key,
                     action_ids=action_ids,
+                    expected_item=item,
                     adjust_action_id=adjust_action_id,
                 )
-                if matched_item is None:
-                    await action_interaction.followup.send(
-                        f"No bank reconciliation item `{reconciliation_id}` was found for {owner_name}.",
-                        ephemeral=True,
-                    )
+                if matched_item is None or status in {"changed", "not_unresolved"}:
+                    await stale_review(action_interaction, matched_item)
                     return
                 if status != "matched_adjusted":
                     await action_interaction.followup.send(
@@ -181,12 +230,10 @@ async def send_bank_reconciliation_detail(
                     reconciliation_id,
                     actor_key=actor_key,
                     action_ids=action_ids,
+                    expected_item=item,
                 )
-                if matched_item is None:
-                    await action_interaction.followup.send(
-                        f"No bank reconciliation item `{reconciliation_id}` was found for {owner_name}.",
-                        ephemeral=True,
-                    )
+                if matched_item is None or status in {"changed", "not_unresolved"}:
+                    await stale_review(action_interaction, matched_item)
                     return
                 if status == "amount_mismatch":
                     await action_interaction.followup.send(
@@ -236,12 +283,10 @@ async def send_bank_reconciliation_detail(
                         reconciliation_id,
                         actor_key=actor_key,
                         schedule_ref=candidate.sheet_ref,
+                        expected_item=item,
                     )
-                    if matched_item is None:
-                        await action_interaction.followup.send(
-                            f"No bank reconciliation item `{reconciliation_id}` was found for {owner_name}.",
-                            ephemeral=True,
-                        )
+                    if matched_item is None or status in {"changed", "not_unresolved"}:
+                        await stale_review(action_interaction, matched_item)
                         return
                     if status != "matched" or matched_candidate is None:
                         await action_interaction.followup.send(
@@ -265,12 +310,10 @@ async def send_bank_reconciliation_detail(
                     reconciliation_id,
                     actor_key=actor_key,
                     action_id=candidate.action_id,
+                    expected_item=item,
                 )
-                if matched_item is None:
-                    await action_interaction.followup.send(
-                        f"No bank reconciliation item `{reconciliation_id}` was found for {owner_name}.",
-                        ephemeral=True,
-                    )
+                if matched_item is None or status in {"changed", "not_unresolved"}:
+                    await stale_review(action_interaction, matched_item)
                     return
                 if status not in {"matched", "matched_updated"} or matched_candidate is None:
                     await action_interaction.followup.send(
@@ -305,6 +348,7 @@ async def send_bank_reconciliation_detail(
                     skipped_ids=skipped,
                     session_item_ids=session_scope,
                     remaining_count=remaining_count,
+                    processed_ids=processed,
                 )
                 return
 
@@ -321,10 +365,6 @@ async def send_bank_reconciliation_detail(
                 )
                 return
 
-            if action == "cancel":
-                await action_interaction.followup.send("Canceled.", ephemeral=True)
-                return
-
             if action == "skip":
                 skipped.add(reconciliation_id)
                 await action_interaction.followup.send(
@@ -335,21 +375,21 @@ async def send_bank_reconciliation_detail(
                 return
 
             if action == "ignore":
-                ignored = await asyncio.to_thread(service.ignore_reconciliation_item, owner_key, reconciliation_id)
+                ignored = await asyncio.to_thread(service.ignore_reconciliation_item, owner_key, reconciliation_id, expected_item=item)
                 if ignored is None:
-                    await action_interaction.followup.send(
-                        f"No bank reconciliation item `{reconciliation_id}` was found for {owner_name}.",
-                        ephemeral=True,
-                    )
+                    await stale_review(action_interaction, await asyncio.to_thread(
+                        service.get_reconciliation_item, owner_key, reconciliation_id,
+                    ))
                     return
                 await action_interaction.followup.send(
                     f"Ignored `{ignored.transaction.name}` for `${abs(ignored.transaction.amount):.2f}`.",
                     ephemeral=True,
                 )
                 await continue_session(action_interaction)
-        except Exception as exc:
+        except Exception:
+            logger.exception("Discord reconciliation action failed", extra={"reconciliation_id": reconciliation_id})
             await action_interaction.followup.send(
-                content=f"Could not complete that reconciliation action: {type(exc).__name__}: {exc}",
+                content="Could not finish this review. Check the current status in the app or View Inbox before trying again.",
                 ephemeral=True,
             )
 
@@ -363,7 +403,7 @@ async def send_bank_reconciliation_detail(
     )
     header = ""
     if session and remaining_count is not None:
-        header = f"Reconciling item 1 of `{remaining_count}` currently queued.\n\n"
+        header = f"Reconciling item `{len(session_scope) - remaining_count + 1}` of `{len(session_scope)}` in this session.\n\n"
     await interaction.followup.send(
         content=(
             header
@@ -382,6 +422,8 @@ async def send_bank_reconciliation_detail(
 
 def _log_choice_view(*, item: Any, owner_key: str, actor_key: str, continue_session: Any) -> BankReconciliationLogChoiceView:
     async def handle_log_choice(interaction: Any, action: str) -> None:
+        if not await _review_actor_allowed(interaction, actor_key):
+            return
         if action == "log:expense":
             await interaction.response.send_message(
                 content="Choose the fixed fields for this expense.",
@@ -419,6 +461,8 @@ def _expense_fixed_fields_view(
     fixed_view: BankExpenseFixedFieldsView | None = None
 
     async def handle_field(interaction: Any, field: str, value: str, view: Any) -> None:
+        if not await _review_actor_allowed(interaction, actor_key):
+            return
         target_view = view or fixed_view
         if target_view is None:
             await interaction.response.defer(ephemeral=True)
@@ -430,6 +474,8 @@ def _expense_fixed_fields_view(
         await interaction.response.defer(ephemeral=True)
 
     async def handle_continue(interaction: Any, action: str) -> None:
+        if not await _review_actor_allowed(interaction, actor_key):
+            return
         target_view = fixed_view
         category = getattr(target_view, "selected_category", default_category)
         person = getattr(target_view, "selected_person", default_person)
@@ -517,6 +563,8 @@ async def _submit_bank_import(
     interaction: Any, *, item: Any, owner_key: str, actor_key: str,
     kind: str, fields: dict[str, str], continue_session: Any,
 ) -> None:
+    if not await _review_actor_allowed(interaction, actor_key):
+        return
     await interaction.response.defer(ephemeral=True, thinking=True)
     try:
         service = build_banking_service()
@@ -524,6 +572,7 @@ async def _submit_bank_import(
             service.import_reconciliation_item, owner_key, item.id, actor_key=actor_key,
             kind=kind, fields=fields, expected_amount=item.transaction.amount,
             expected_date=item.transaction.date or item.transaction.authorized_date,
+            expected_item=item,
         )
     except Exception:
         await interaction.edit_original_response(
@@ -531,5 +580,9 @@ async def _submit_bank_import(
         )
         return
     await interaction.edit_original_response(content=result.message)
+    if result.status == "rejected":
+        current = await asyncio.to_thread(service.get_reconciliation_item, owner_key, item.id)
+        if current is None or current.status in {"confirmed", "matched", "ignored"}:
+            await continue_session(interaction)
     if result.status == "completed":
         await continue_session(interaction)

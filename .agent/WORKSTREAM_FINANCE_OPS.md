@@ -1,8 +1,38 @@
 # Finance Operations Workstream
 
-Last updated: 2026-10-05
+Last updated: 2026-10-07
 
 ## Goal
+
+### Main integration — 2026-10-07
+
+Merged the six verified expense-move, split responsiveness and shared reconciliation commits through `9370abb` into main at the user's request. [Verification #109](https://github.com/brianjames-dev/bookiebot/actions/runs/37658952466) passed **2,477 tests / zero skips** plus types, Apps Script, frontend build and asset checks. The merge changes release tracking only beyond that tested feature tree. Implementation is complete; confirm automatic main verification/rollout and perform STATUS manual checklists 130–132. No production financial test writes or extra application changes during integration.
+
+### Verification #107 PostgreSQL follow-up — 2026-10-07
+
+CI found ten import-claim failures: PostgreSQL cannot infer a parameter's type when it appears only in `IS NULL`, including supplied string values sent with unknown parameter types. SQLite accepted the query, so the previous local PostgreSQL skips missed this regression. Explicit `CAST(? AS TEXT)` on both nullable version guards preserves eligibility/optimistic checks without schema or workflow changes. Added four bank/review optional-version combinations across SQLite and real PostgreSQL 16; targeted storage contracts **130 passed / zero skips**. Full PostgreSQL-enabled suite **2,452 passed / 25 optional frontend skips**, Pyright clean. [Verification #108](https://github.com/brianjames-dev/bookiebot/actions/runs/37658383166) on `4d5d2ac` passed **2,477 tests / zero skips**, clean types, Apps Script, frontend build and asset checks. Existing manual checklist 132 applies; no production data changes.
+
+### Shared Discord/phone reconciliation work log — 2026-10-07
+
+Complete implementation; release acceptance pending (STATUS checklist 132). Phone decisions already checked versions, but Discord used stale closures, unguarded terminal Ignore/Confirm/Reopen, and two admin imports bypassed durable claims. Consolidated metadata decisions on the same compare-and-apply store path with prior-state/source events; explicit sheet amount correction runs after eligibility/version/claim checks while the owner/transaction locks exclude another review decision. Import forms include bank/review versions and active linked-account eligibility, with admin imports using the same durable service. Canonical amount updates preserve the bank-reconciliation origin instead of recursively reopening the review being confirmed. Cached inbox Ignore/Unmatch carries its original snapshots. Old controls explain current shared state; app conflicts retain Check status recovery. Fixed coded progress uses the original session total, filters membership before the query limit, clears externally resolved skips and leaves new arrivals for a new session. Added 57 passing regressions plus 16 optional PostgreSQL variants; full **2,107 passed / 362 skipped**, Pyright clean. No live financial writes or deployment. Broader historical-import and canonical correction Undo backlog remains separate.
+
+### Split responsiveness work log — 2026-10-07
+
+Complete in code/automated verification; release and Discord timing acceptance remain STATUS checklist 131. Production traces confirmed split callbacks blocked the event loop in reimbursement mirror metadata reads. Split/create/edit/cancel UI now uses immediate private thinking acknowledgments, worker-thread I/O with actor context, and completed error follow-ups. Typed/post-log explicit splits also run in workers. Source fields load in one range request, ledger lookup reuses its header snapshot, and projector/mirror share workbook/worksheet handles within a sync. Named anchors, current values and budget formulas remain freshly verified.
+
+Recent-action mutations project only the selected allocation, retaining structural-move neighbor repair. Full Shared refresh/settlement/reset still retries the complete pending queue and metadata recovery. Same-expense workers serialize log/ledger writes under an in-process guard with bounded lock lifetime; different expenses remain independent until the existing projection lock. A saved split whose projection lock or Sheets transport fails reports saved/pending rather than inviting a duplicate; source/action/allocation/payment semantics remain unchanged. Split and sync duration logs enable deployed timing review.
+
+Added 29 passing cases plus four optional PostgreSQL variants for acknowledgment ordering, blocked I/O responsiveness, owner context, failures, one source/ledger read, live anchors with reused handles, selected-work isolation and recovery. Full local **2,050 passed / 346 optional PostgreSQL/frontend skips**, Pyright clean. Existing move/settlement/reversal/reset Undo/Redo regressions pass. No production financial writes or deployment during implementation.
+
+### Expense move compaction and reimbursement audit work log — 2026-10-07
+
+Complete (user-reported Shopping gap): the canonical move intentionally cleared its source without compacting (September 16 decision). It now shifts that category's lower cells/anchors upward, with destination relocation and neighboring active/inactive action coordinates in one Sheets batch. Lost responses cannot repeat the structural edit. Ordinary native removal/restoration carries canonical anchors; move Undo compacts its destination; partial drafts are preserved. Neighbor database/mirror coordinates recover absolutely from anchors without changing financial versions or repeating a move.
+
+Regression fixtures confirm Shopping → Needs retains the split/current recent action; a full $163.91 receipt for $464.72 T reduces the Needs source to $300.81, writes the partner receipt under Needs and mirrors Needs/reimbursed. Reversal and separate reset Undo/Redo preserve category/event history. Reversed receipts retain their categories/identities while anchors follow compaction. Added 20 cases; focused **386 passed / 184 optional PostgreSQL skipped**, full **2,021 passed / 342 optional skips**, Pyright clean. Direct canonical correction Undo remains deferred. No live inspection/repair/receipt; existing gaps are not automatically backfilled. Acceptance is checklist 130.
+
+Authorized live follow-up complete: production T already pointed to Needs row 3 with income shares $300.81/$163.91, version/projected version 3/3 and no events. Privately backed up all affected sheet/history/anchor data, then compacted empty Shopping V15:Z15 once with atomic neighboring action-coordinate updates and a unique repair-name reservation. Mirror-tap/curtains now occupy rows 15/16; the fourth shifted record is an undone Parking import's redo position. All curtains anchors followed natively; its canonical source row and reimbursement mirror now say 16, retaining version/projected version 2/2. Historical T Shopping actions and move revision remain intact.
+
+Exact live before/after checks preserve all other purchase values, neighboring formats/dropdowns, both budget formulas, T's allocation and all 18 payment events. Both live October Needs budget import chains verified. An isolated copy of the actual T allocation, canonical command path and saved sheet formulas passed full receipt, replay and reversal: $300.81 source in Needs and a $163.91 Hannah Needs reimbursement row. No live receipt was recorded. Prevention code is pushed on `codex/move-expense-compaction`; release/future-move acceptance and eventual real payment/device acceptance remain checklist 130. Operational snapshots/scripts stay private outside the repository; no new architecture decision or application-code change was needed.
 
 ### Utility command routing work log — 2026-10-05
 
@@ -258,6 +288,8 @@ Status: Complete in code and automated/browser verification as of 2026-08-03; pr
 
 Status: Canonical recent-action corrections completed 2026-09-16: gross/details, method, category move, cancellation/re-split and deletion use durable revisions and verified source projections. Pending/confirmed repayments require resolution/reversal first. Historical net-accounting corrections and direct canonical Undo remain deferred.
 
+2026-10-07 move follow-up complete: atomic source compaction and neighboring active/inactive history repair; absolute row/mirror recovery; verified Needs reimbursement/reversal and reset Undo/Redo. Ordinary move Undo closes its destination gap. Canonical deletion compaction and direct correction Undo remain separate follow-ups; this move audit does not expand them.
+
 1. Complete 2026-08-03: change the split method and recalculate both shares without losing the original gross or settlement history.
 2. Complete 2026-08-03: remove an outstanding split by restoring the gross visible expense and voiding the receivable.
 3. Complete 2026-09-16: correct gross and transaction details while retaining the method and recalculating both shares.
@@ -346,6 +378,8 @@ Status: Complete first pass as of 2026-06-20. Normal unresolved views use a 60-d
 - Add debug command support to inspect recent reconciliation events.
 
 ### Slice 4 - Reconciliation State Machine
+
+2026-10-07: shared phone/Discord transition checks and lifecycle events are complete for manual confirm/ignore/reopen; stale controls, batch inbox actions, explicit amount correction races and import eligibility now use reviewed versions. Fixed session progress and cross-medium acceptance remain queued for release in STATUS checklist 132. No new persisted statuses or storage schema.
 
 - Define allowed statuses and transitions in one place.
 - Make store methods enforce transitions instead of ad hoc status updates.

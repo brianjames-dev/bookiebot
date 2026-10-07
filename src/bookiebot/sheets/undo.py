@@ -1409,7 +1409,8 @@ def _is_canonical_reimbursement(action: UndoAction) -> bool:
     return action.metadata.get("canonical_reimbursement") == "true" or action.metadata.get("accounting") == "cash_v1"
 
 
-def _mutate_canonical_action(user_key: str | None, logged: LoggedAction, operation: str, **kwargs: Any) -> tuple[bool, str]:
+def _mutate_canonical_action(user_key: str | None, logged: LoggedAction, operation: str, *,
+                             metadata_extra: dict[str, str] | None = None, **kwargs: Any) -> tuple[bool, str]:
     from bookiebot.reimbursements.service import mutate_recent_action
     from bookiebot.reimbursements.store import (
         ReimbursementConflictError, ReimbursementNotFoundError, ReimbursementValidationError,
@@ -1431,7 +1432,7 @@ def _mutate_canonical_action(user_key: str | None, logged: LoggedAction, operati
             ids.update(_active_lineage_ids(logged))
             _sync_reconciliation_after_action_mutation(user_key, ids, reason={
                 "update": "updated", "move": "moved", "delete": "deleted",
-            }[operation])
+            }[operation], metadata_extra=metadata_extra)
     return success, detail
 
 
@@ -1624,14 +1625,12 @@ def _first_empty_category_row(ws: Any, category: str) -> int:
 
     config = get_category_columns[category]
     row_start = config["start_row"]
-    columns = config["columns"]
-    ref_col_letter = columns.get("amount") or list(columns.values())[0]
-    ref_col_index = _category_columns(category)[next(field for field, col in columns.items() if col == ref_col_letter)]
-    col_values = ws.col_values(ref_col_index)[row_start - 1:]
-    for offset, value in enumerate(col_values):
-        if not str(value).strip():
-            return row_start + offset
-    return len(col_values) + row_start
+    columns = list(_category_columns(category).values())
+    rows = ws.get_all_values()
+    for row in range(row_start, len(rows) + 1):
+        if not any(column <= len(rows[row - 1]) and str(rows[row - 1][column - 1]).strip() for column in columns):
+            return row
+    return max(row_start, len(rows) + 1)
 
 
 def _last_occupied_category_row(ws: Any, category: str) -> int:
@@ -1639,13 +1638,11 @@ def _last_occupied_category_row(ws: Any, category: str) -> int:
 
     config = get_category_columns[category]
     row_start = int(config["start_row"])
-    columns = config["columns"]
-    ref_col_letter = columns.get("amount") or list(columns.values())[0]
-    ref_col_index = _category_columns(category)[next(field for field, col in columns.items() if col == ref_col_letter)]
-    col_values = ws.col_values(ref_col_index)
-    for row_index in range(len(col_values), row_start - 1, -1):
-        if str(col_values[row_index - 1]).strip():
-            return row_index
+    columns = list(_category_columns(category).values())
+    rows = ws.get_all_values()
+    for row in range(len(rows), row_start - 1, -1):
+        if any(column <= len(rows[row - 1]) and str(rows[row - 1][column - 1]).strip() for column in columns):
+            return row
     return row_start - 1
 
 
@@ -1665,6 +1662,15 @@ def _restore_category_snapshot(ws: Any, start_row: int, columns: list[int], snap
 def _shift_category_cells_up(ws: Any, *, start_row: int, end_row: int, columns: list[int]) -> None:
     if not columns:
         return
+    if hasattr(ws, "spreadsheet"):
+        # Shift category cells, including named repayment/source anchors, rather
+        # than copying values over anchors that still point to the old rows.
+        _mutate_category_structure(ws, [{"deleteRange": {
+            "range": {"sheetId": ws.id, "startRowIndex": start_row - 1, "endRowIndex": start_row,
+                      "startColumnIndex": min(columns) - 1, "endColumnIndex": max(columns)},
+            "shiftDimension": "ROWS",
+        }}])
+        return
     start_col = min(columns)
     if end_row < start_row:
         _update_range(ws, start_row, start_col, [[""] * len(columns)])
@@ -1673,6 +1679,31 @@ def _shift_category_cells_up(ws: Any, *, start_row: int, end_row: int, columns: 
     shifted_values = _category_snapshot(ws, range(start_row + 1, end_row + 1), columns)
     shifted_values.append([""] * len(columns))
     _update_range(ws, start_row, start_col, shifted_values)
+
+
+def _mutate_category_structure(ws: Any, requests: list[dict[str, Any]]) -> None:
+    from bookiebot.reimbursements import service
+    if not service.enabled():
+        ws.spreadsheet.batch_update({"requests": requests})
+        return
+    from bookiebot.reimbursements.projection import SheetsProjection, projection_lock, refresh_source_positions
+    from bookiebot.reimbursements.store import build_reimbursement_store
+    store = build_reimbursement_store()
+    with projection_lock(store):
+        ws.spreadsheet.batch_update({"requests": requests})
+        try:
+            # The structural write already succeeded. Metadata/mirror failures
+            # must not turn it into a failed move that a caller might repeat.
+            # Every canonical sync repairs positions from the durable anchors.
+            from bookiebot.sheets.auth import get_gspread_client
+            projector = SheetsProjection(get_gspread_client())
+            projector.books[ws.spreadsheet.id] = ws.spreadsheet
+            refresh_source_positions(store, projector, {
+                "id": "", "payerOwner": get_user_config(get_current_discord_user_id()).budget_owner_key,
+                "sourceSpreadsheetId": ws.spreadsheet.id, "sourceSheetTitle": ws.title,
+            })
+        except Exception:
+            logger.exception("Shared expense row metadata awaits anchor-based synchronization")
 
 
 def _action_category(action: UndoAction) -> str | None:
@@ -1735,27 +1766,25 @@ def _shift_logged_action_rows(
         if record.logged.id in exclude_ids:
             continue
         logged = record.logged
-        if logged.status != "active":
-            continue
-
-        changed = False
-        if _action_category(logged.action) == category and lower_row <= logged.action.row <= upper_row:
-            logged.action.row += delta
-            changed = True
-
-        source_category = logged.action.metadata.get("source_category")
-        source_row = logged.action.metadata.get("source_row")
-        if source_category == category and source_row:
-            try:
-                parsed_source_row = int(source_row)
-            except ValueError:
-                parsed_source_row = 0
-            if lower_row <= parsed_source_row <= upper_row:
-                logged.action.metadata["source_row"] = str(parsed_source_row + delta)
-                changed = True
-
-        if changed:
+        # Inactive update ancestors can become active again after Undo.
+        if _shift_category_action_rows(logged.action, category, lower_row, upper_row, delta):
             _write_logged_action(data.ws, record.row_index, logged)
+
+
+def _shift_category_action_rows(action: UndoAction, category: str, lower_row: int, upper_row: int, delta: int) -> bool:
+    changed = False
+    if _action_category(action) == category and lower_row <= action.row <= upper_row:
+        action.row += delta
+        changed = True
+    if action.worksheet == "expense" and action.metadata.get("source_category") == category:
+        try:
+            source_row = int(action.metadata.get("source_row", "0"))
+        except ValueError:
+            source_row = 0
+        if lower_row <= source_row <= upper_row:
+            action.metadata["source_row"] = str(source_row + delta)
+            changed = True
+    return changed
 
 
 def _shift_income_logged_action_rows(
@@ -2126,7 +2155,19 @@ def split_recent_action(
     ws = _worksheet(action.worksheet)
     if not _fixed_budget_target_matches(ws, action):
         return False, _STALE_BUDGET_TARGET_MESSAGE
-    gross_value = _sheet_value(ws.cell(action.row, amount_column).value)
+    # Read the source once so amount and identity come from the same snapshot.
+    first, last = min(field_columns.values()), max(field_columns.values())
+    if callable(getattr(ws, "get", None)):
+        rows = ws.get(f"{get_column_letter(first)}{action.row}:{get_column_letter(last)}{action.row}")
+        row_values = list(rows[0]) if rows else []
+    else:
+        rows = ws.get_all_values()
+        row_values = list(rows[action.row - 1][first - 1:last]) if 0 < action.row <= len(rows) else []
+    row_values += [""] * max(0, last - first + 1 - len(row_values))
+    fields = list(field_columns)
+    current_values = [_sheet_value(row_values[field_columns[field] - first]) for field in fields]
+    field_values = dict(zip(fields, current_values, strict=False))
+    gross_value = field_values["amount"]
     try:
         gross_amount = float(gross_value.replace("$", "").replace(",", "").strip())
     except (TypeError, ValueError):
@@ -2134,9 +2175,6 @@ def split_recent_action(
     if gross_amount <= 0:
         return False, "Only expenses greater than $0 can be split."
 
-    fields = list(field_columns)
-    current_values = [_sheet_value(ws.cell(action.row, field_columns[field]).value) for field in fields]
-    field_values = dict(zip(fields, current_values, strict=False))
     payer = field_values.get("person") or action.metadata.get("person") or get_user_config(user_key).name
     payer_owner = payer_owner_from_person(payer, user_key)
     if payer_owner != get_user_config(user_key).budget_owner_key:
@@ -2630,7 +2668,8 @@ def update_recent_action(
         return False, f"I found {_format_action_snapshot(logged.action)}. Please specify the new value."
 
     if _is_canonical_reimbursement(logged.action):
-        return _mutate_canonical_action(user_key, logged, "update", updates=normalized_updates)
+        return _mutate_canonical_action(user_key, logged, "update", updates=normalized_updates,
+                                        metadata_extra=metadata_extra)
 
     display_fields = list(field_columns.keys())
     ws = _worksheet(logged.action.worksheet)
@@ -2754,7 +2793,16 @@ def _restore_removed_category_row(
         if record.logged.id in restored_ids and _action_category(record.logged.action) == category:
             record.logged.action.row = start_row
             _write_logged_action(data.ws, record.row_index, record.logged)
-    _restore_category_snapshot(ws, start_row, columns, [values, *current])
+    if hasattr(ws, "spreadsheet"):
+        _mutate_category_structure(ws, [
+            {"appendDimension": {"sheetId": ws.id, "dimension": "ROWS", "length": 1}},
+            {"insertRange": {"range": {"sheetId": ws.id, "startRowIndex": start_row - 1, "endRowIndex": start_row,
+                                        "startColumnIndex": min(columns) - 1, "endColumnIndex": max(columns)},
+                             "shiftDimension": "ROWS"}},
+        ])
+        _update_contiguous_row(ws, start_row, columns, values)
+    else:
+        _restore_category_snapshot(ws, start_row, columns, [values, *current])
 
 
 def _moved_destination_is_unchanged(ws: Any, action: UndoAction) -> bool:
@@ -2808,7 +2856,14 @@ def _apply_undo_action(
             if any(_sheet_value(ws.cell(source_row, column).value).strip() for column in source_columns):
                 return False, "The original position changed, so I did not undo this older move."
             _update_contiguous_row(ws, source_row, source_columns, source_values)
-        _update_contiguous_row(ws, action.row, action.columns, action.previous_values)
+        if not any(str(value).strip() for value in action.previous_values):
+            category = action.metadata["category"]
+            end_row = max(action.row, _last_occupied_category_row(ws, category))
+            _shift_category_cells_up(ws, start_row=action.row, end_row=end_row, columns=action.columns)
+            _shift_logged_action_rows(category=category, lower_row=action.row + 1, upper_row=end_row,
+                                      delta=-1, exclude_ids={action_id}, log_data=log_data)
+        else:
+            _update_contiguous_row(ws, action.row, action.columns, action.previous_values)
     elif action.kind == "compact_category_cells":
         snapshot = json.loads(action.metadata["category_snapshot"])
         _restore_removed_category_row(

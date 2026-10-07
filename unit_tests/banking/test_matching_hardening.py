@@ -459,3 +459,40 @@ def test_transient_source_failure_preserves_previous_automatic_match(monkeypatch
 
 def test_source_row_fallback_does_not_resolve_same_row_in_wrong_month():
     assert banking_service._find_action_for_sheet_ref([action()], "expense!row 12#month=2026-08") is None
+
+
+@pytest.mark.parametrize('choice', ['single', 'group', 'schedule'])
+def test_phone_decision_during_discord_source_reads_prevents_sheet_correction(monkeypatch, tmp_path, choice):
+    from unit_tests.banking.test_storage_contract import _seed, _phone_review
+    bank_service = service(tmp_path)
+    bank_service.store.initialize()
+    _, _, review = _seed(bank_service.store)
+    logged = [action(amount=10), action(amount=1, action_id='second')]
+    applied = []
+    def source(_actor):
+        if not applied:
+            applied.append(_phone_review(bank_service.store, review, matched_action_log_id='phone-winner'))
+        return logged
+    monkeypatch.setattr(banking_service, 'read_active_logged_actions', source)
+    monkeypatch.setattr(banking_service, '_scheduled_pulls_for_transactions', lambda *_a, **_k: [pull(amount=12.50)])
+    monkeypatch.setattr(banking_service, 'update_recent_action', lambda *_a, **_k: pytest.fail('stale sheet correction'))
+    if choice == 'single':
+        result, _, status = bank_service.confirm_reconciliation_action_match('brian', review.id, actor_key='brian', action_id='logged-1', expected_item=review)
+    elif choice == 'group':
+        result, _, status = bank_service.confirm_reconciliation_action_group_match('brian', review.id, actor_key='brian', action_ids=['logged-1', 'second'], adjust_action_id='logged-1', expected_item=review)
+    else:
+        result, _, status = bank_service.confirm_reconciliation_schedule_match('brian', review.id, actor_key='brian', schedule_ref=pull().occurrence_ref, expected_item=review)
+    assert applied[0] is not None
+    assert status == 'changed'
+    assert result.status == 'confirmed' and result.matched_action_log_id == 'phone-winner'
+
+
+@pytest.mark.parametrize('status', ['confirmed', 'ignored', 'import_requested'])
+def test_finished_review_never_fetches_sheet_candidates(monkeypatch, tmp_path, status):
+    bank_service = service(tmp_path)
+    bank = bank_service.seed_unmatched_debug_transaction('brian', name='Coffee', amount=20, date='2026-10-07')
+    review = bank_service.store.upsert_reconciliation_item(owner_key='brian', transaction=bank,
+        classification='expense', status=status, confidence=0)
+    monkeypatch.setattr(banking_service, 'read_active_logged_actions', lambda *_a: pytest.fail('unnecessary sheet I/O'))
+    current, candidates, groups = bank_service.reconciliation_match_candidates('brian', review.id, actor_key='brian')
+    assert current == review and candidates == groups == []

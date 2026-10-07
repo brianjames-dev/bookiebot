@@ -12,7 +12,7 @@ from typing import Any, AsyncContextManager, Awaitable, cast
 import discord
 
 from bookiebot.banking.formatting import format_reconciliation_match_report_chunks, format_reconciliation_review_chunks
-from bookiebot.banking.models import ReconciliationPreview, ReconciliationReportMatch
+from bookiebot.banking.models import ReconciliationItem, ReconciliationPreview, ReconciliationReportMatch
 from bookiebot.banking.service import build_banking_service
 from bookiebot.core.bank_reconciliation_flow import send_next_bank_reconciliation_item
 from bookiebot.sheets.routing import (
@@ -42,6 +42,7 @@ class PreparedBankReconciliationDigest:
     item_ids: tuple[int, ...] = ()
     owner_key: str = ""
     owner_name: str = ""
+    reviewed_items: tuple[ReconciliationItem, ...] = ()
 
 
 def _bank_reconciliation_enabled() -> bool:
@@ -321,8 +322,14 @@ async def _send_bank_reconciliation_inbox(interaction: Any, actor_key: str) -> N
             if action == "ignore_all":
                 service = build_banking_service()
                 ignored_count = 0
+                snapshots = {item.id: item for item in digest.reviewed_items}
                 for item_id in digest.item_ids:
-                    ignored = await asyncio.to_thread(service.ignore_reconciliation_item, digest.owner_key, item_id)
+                    expected = snapshots.get(item_id)
+                    if expected is None:
+                        continue
+                    ignored = await asyncio.to_thread(
+                        service.ignore_reconciliation_item, digest.owner_key, item_id, expected_item=expected,
+                    )
                     if ignored is not None:
                         ignored_count += 1
                 await action_interaction.followup.send(
@@ -340,15 +347,19 @@ async def _send_bank_reconciliation_inbox(interaction: Any, actor_key: str) -> N
                     )
                     return
                 service = build_banking_service()
+                expected = next((item for item in digest.reviewed_items if item.id == reconciliation_id), None)
+                if expected is None:
+                    await action_interaction.followup.send("This inbox changed. Open View Inbox again.", ephemeral=True)
+                    return
                 reopened = await asyncio.to_thread(
                     service.reopen_reconciliation_item,
                     digest.owner_key,
                     reconciliation_id,
-                    notes="unmatched from reconciliation report",
+                    notes="unmatched from reconciliation report", expected_item=expected,
                 )
                 if reopened is None:
                     await action_interaction.followup.send(
-                        content=f"No bank reconciliation item `{reconciliation_id}` was found.",
+                        content="This transaction was already changed in the app or Discord. Open View Inbox to see its current status.",
                         ephemeral=True,
                     )
                     return
@@ -588,6 +599,7 @@ def prepare_bank_reconciliation_digest_messages(
         ),
         report_matches=tuple(report_matches),
         item_ids=tuple(int(item.id) for item in unresolved),
+        reviewed_items=tuple({item.id: item for item in [*unresolved, *matched_items]}.values()),
         owner_key=owner.budget_owner_key,
         owner_name=getattr(owner, "name", str(actor_key)),
     )
@@ -662,6 +674,7 @@ def prepare_bank_reconciliation_inbox_messages(
         ),
         report_matches=tuple(report_matches),
         item_ids=tuple(int(item.id) for item in unresolved),
+        reviewed_items=tuple({item.id: item for item in [*unresolved, *matched_items]}.values()),
         owner_key=owner.budget_owner_key,
         owner_name=getattr(owner, "name", str(actor_key)),
     )

@@ -1041,7 +1041,7 @@ async def test_existing_canonical_split_keeps_transaction_update_and_split_menus
 
     split_interaction = _recent_test_interaction(message.author)
     await next(child for child in decision_view.children if child.label == "Split").callback(split_interaction)
-    split_call = split_interaction.response.send_message.call_args
+    split_call = split_interaction.followup.send.call_args
     assert "How do you want to update this split?" in split_call.args[0]
     assert [child.label for child in split_call.kwargs["view"].children] == ["By income", "50/50", "Fronted", "Cancel split", "Cancel"]
     assert split_call.kwargs["ephemeral"] is True
@@ -1054,9 +1054,33 @@ async def test_split_and_legacy_change_callback_open_existing_split_editor(monke
     interaction = _recent_test_interaction(message.author)
     await decision_view.children[0].callback_func(interaction, decision)
 
-    call = interaction.response.send_message.call_args
+    call = interaction.followup.send.call_args
+    interaction.response.defer.assert_awaited_once_with(ephemeral=True, thinking=True)
     assert "How do you want to update this split?" in call.args[0]
     assert [child.custom_id for child in call.kwargs["view"].children] == ["income", "equal", "fronted", "cancel_split", "cancel"]
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("failure", [None, "missing", "error"])
+async def test_split_menu_load_runs_off_loop_after_thinking_ack_and_finishes_response(monkeypatch, message, canonical_grocery_split, failure):
+    import threading
+    decision_view = await _open_split_decision(monkeypatch, message, canonical_grocery_split)
+    interaction = _recent_test_interaction(message.author)
+    loop_thread = threading.get_ident()
+    def select(*_args, **_kwargs):
+        interaction.response.defer.assert_awaited_once_with(ephemeral=True, thinking=True)
+        assert threading.get_ident() != loop_thread
+        if failure == "error":
+            raise TimeoutError("private transport detail")
+        return None if failure == "missing" else canonical_grocery_split
+    monkeypatch.setattr(ih, "select_recent_action", select)
+    await decision_view.children[0].callback_func(interaction, "split")
+    interaction.response.send_message.assert_not_awaited()
+    interaction.followup.send.assert_awaited_once()
+    assert interaction.followup.send.call_args.kwargs["ephemeral"] is True
+    assert "private transport detail" not in interaction.followup.send.call_args.args[0]
+    if failure:
+        assert "view" not in interaction.followup.send.call_args.kwargs
 
 
 @pytest.mark.asyncio
@@ -1081,7 +1105,7 @@ async def test_unsplit_expense_still_opens_new_split_choices(monkeypatch, messag
 
     await next(child for child in decision_view.children if child.label == "Split").callback(interaction)
 
-    call = interaction.response.send_message.call_args
+    call = interaction.followup.send.call_args
     assert "How do you want to split this expense?" in call.args[0]
     assert [child.custom_id for child in call.kwargs["view"].children] == ["income", "equal", "fronted", "no_split"]
 
@@ -1094,12 +1118,13 @@ async def test_cancel_existing_split_from_submenu_requires_confirmation(monkeypa
     decision_view = await _open_split_decision(monkeypatch, message, canonical_grocery_split)
     split_interaction = _recent_test_interaction(message.author)
     await next(child for child in decision_view.children if child.label == "Split").callback(split_interaction)
-    split_view = split_interaction.response.send_message.call_args.kwargs["view"]
+    split_view = split_interaction.followup.send.call_args.kwargs["view"]
     cancel_interaction = _recent_test_interaction(message.author)
     await next(child for child in split_view.children if child.custom_id == "cancel_split").callback(cancel_interaction)
 
     cancel.assert_not_called()
-    cancel_call = cancel_interaction.response.send_message.call_args
+    cancel_call = cancel_interaction.followup.send.call_args
+    cancel_interaction.response.defer.assert_awaited_once_with(ephemeral=True, thinking=True)
     assert "Cancel this split?" in cancel_call.args[0]
     assert cancel_call.kwargs["ephemeral"] is True
     confirm_view = cancel_call.kwargs["view"]
@@ -1117,6 +1142,46 @@ async def test_cancel_existing_split_from_submenu_requires_confirmation(monkeypa
     else:
         cancel.assert_not_called()
         assert "existing split remains unchanged" in owner.response.send_message.call_args.args[0]
+
+
+@pytest.mark.asyncio
+async def test_confirmed_split_cancel_runs_in_worker_after_thinking_ack(monkeypatch, message, canonical_grocery_split):
+    import threading
+    decision_view = await _open_split_decision(monkeypatch, message, canonical_grocery_split)
+    prompt = _recent_test_interaction(message.author)
+    await decision_view.children[0].callback_func(prompt, "cancel_split")
+    confirmation = _recent_test_interaction(message.author)
+    loop_thread = threading.get_ident()
+    def cancel(*_args, **_kw):
+        confirmation.response.defer.assert_awaited_once_with(ephemeral=True, thinking=True)
+        assert threading.get_ident() != loop_thread
+        return True, "Split canceled."
+    monkeypatch.setattr(ih, "cancel_split_recent_action", cancel)
+    view = prompt.followup.send.call_args.kwargs["view"]
+    await next(child for child in view.children if child.custom_id == "confirm_cancel_split").callback(confirmation)
+    assert "Split canceled." in confirmation.followup.send.call_args.args[0]
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("failure", ["load", "cancel"])
+async def test_cancel_split_failure_finishes_thinking_without_repeating_mutation(monkeypatch, message, canonical_grocery_split, failure):
+    await _open_split_decision(monkeypatch, message, canonical_grocery_split)
+    interaction = _recent_test_interaction(message.author)
+    cancel = MagicMock(side_effect=TimeoutError("private cancel detail"))
+    monkeypatch.setattr(ih, "cancel_split_recent_action", cancel)
+    if failure == "load":
+        monkeypatch.setattr(ih, "select_recent_action", MagicMock(side_effect=TimeoutError("private load detail")))
+    await ih._prompt_cancel_recent_split(interaction, str(message.author.id), canonical_grocery_split.id)
+    interaction.response.defer.assert_awaited_once_with(ephemeral=True, thinking=True)
+    if failure == "load":
+        assert "could not load" in interaction.followup.send.call_args.args[0]
+        cancel.assert_not_called()
+    else:
+        confirmation = _recent_test_interaction(message.author)
+        view = interaction.followup.send.call_args.kwargs["view"]
+        await view.children[0].callback(confirmation)
+        cancel.assert_called_once()
+        assert "Check Recent transactions and Shared" in confirmation.followup.send.call_args.args[0]
 
 
 @pytest.mark.asyncio

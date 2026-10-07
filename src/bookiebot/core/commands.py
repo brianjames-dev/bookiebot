@@ -42,7 +42,6 @@ from bookiebot.sheets.routing import (
 from bookiebot.sheets.config import get_category_columns
 from bookiebot.sheets.repo import get_sheets_repo
 from bookiebot.sheets.undo import update_recent_action
-from bookiebot.sheets.writer import log_category_row, log_income_row, record_expense_undo
 from bookiebot.sheets.bills import bill_amount_for_source_label, next_bill_pull_date, parse_bill_schedules_with_warnings
 from bookiebot.sheets.subscriptions import debug_subscription_sync
 
@@ -60,18 +59,6 @@ def _phone_command_actor_key(user: discord.abc.User) -> str:
         raise UnknownDiscordUserError("Phone access requires a mapped personal Discord account")
     get_user_config(actor_key)
     return actor_key
-
-
-def _bank_date_to_sheet_date(value: str | None) -> str:
-    if not value:
-        current = datetime.now()
-        return f"{current.month}/{current.day}/{current.year}"
-    try:
-        parsed = datetime.strptime(value[:10], "%Y-%m-%d")
-    except ValueError:
-        current = datetime.now()
-        return f"{current.month}/{current.day}/{current.year}"
-    return f"{parsed.month}/{parsed.day}/{parsed.year}"
 
 
 def _clean_command_text(value: str | None) -> str:
@@ -102,35 +89,16 @@ def _log_bank_reconciliation_expense(
 
     transaction = item.transaction
     source_name = _clean_command_text(transaction.merchant_name or transaction.name)
-    clean_person = _clean_command_text(person)
-    values = {
-        "date": _bank_date_to_sheet_date(transaction.date or transaction.authorized_date),
-        "amount": abs(transaction.amount),
-        "item": _clean_command_text(item_name) or source_name,
-        "location": _clean_command_text(location) or source_name,
-        "person": clean_person,
-    }
-    with sheet_user_context(actor_key):
-        worksheet = get_sheets_repo().expense_sheet()
-        row = log_category_row(values, worksheet, category)
-        action_id = record_expense_undo(
-            category,
-            row,
-            values,
-            clean_person,
-            actor_key,
-            {
-                "origin": "bank_reconciliation",
-                "bank_reconciliation_id": str(reconciliation_id),
-            },
-        )
-    confirmed = service.confirm_reconciliation_item(
-        owner_key,
-        reconciliation_id,
-        matched_action_log_id=action_id,
-        matched_sheet_ref=f"expense!row {row}",
+    result = service.import_reconciliation_item(
+        owner_key, reconciliation_id, actor_key=actor_key, kind="expense",
+        fields={"category": category, "person": _clean_command_text(person),
+                "item": _clean_command_text(item_name) or source_name,
+                "location": _clean_command_text(location) or source_name},
+        expected_amount=transaction.amount, expected_date=transaction.date or transaction.authorized_date,
+        expected_item=item,
     )
-    return confirmed, "logged"
+    current = service.get_reconciliation_item(owner_key, reconciliation_id)
+    return current or item, "logged" if result.status == "completed" else f"import_{result.status}: {result.message}"
 
 
 def _log_bank_reconciliation_income(
@@ -151,35 +119,15 @@ def _log_bank_reconciliation_income(
         return item, "not_income"
 
     transaction = item.transaction
-    source_name = _clean_command_text(source) or _clean_command_text(transaction.merchant_name or transaction.name)
-    values = {
-        "type": "income",
-        "amount": abs(transaction.amount),
-        "source": source_name,
-        "label": _clean_command_text(label),
-        "date": transaction.date or transaction.authorized_date,
-    }
-    with sheet_user_context(actor_key):
-        worksheet = get_sheets_repo().income_sheet()
-        row, _description, _amount, action_id = cast(
-            tuple[int, str, Any, str | None],
-            log_income_row(
-                values,
-                worksheet,
-                return_action_id=True,
-                metadata_extra={
-                    "origin": "bank_reconciliation",
-                    "bank_reconciliation_id": str(reconciliation_id),
-                },
-            ),
-        )
-    confirmed = service.confirm_reconciliation_item(
-        owner_key,
-        reconciliation_id,
-        matched_action_log_id=action_id,
-        matched_sheet_ref=f"income!row {row}",
+    result = service.import_reconciliation_item(
+        owner_key, reconciliation_id, actor_key=actor_key, kind="income",
+        fields={"source": _clean_command_text(source) or _clean_command_text(transaction.merchant_name or transaction.name),
+                "label": _clean_command_text(label)},
+        expected_amount=transaction.amount, expected_date=transaction.date or transaction.authorized_date,
+        expected_item=item,
     )
-    return confirmed, "logged"
+    current = service.get_reconciliation_item(owner_key, reconciliation_id)
+    return current or item, "logged" if result.status == "completed" else f"import_{result.status}: {result.message}"
 
 
 def register_commands(tree: app_commands.CommandTree):
@@ -1185,6 +1133,12 @@ def register_commands(tree: app_commands.CommandTree):
                 ephemeral=True,
             )
             return
+        if status == "changed":
+            await interaction.followup.send(
+                content="This transaction changed in the app or Discord. Open its current review before continuing.",
+                ephemeral=True,
+            )
+            return
         if status == "not_unresolved":
             await interaction.followup.send(
                 content=f"Bank reconciliation item `{reconciliation_id}` is already `{item.status}`.",
@@ -1265,6 +1219,12 @@ def register_commands(tree: app_commands.CommandTree):
         if status == "not_found" or item is None:
             await interaction.followup.send(
                 content=f"No bank reconciliation item `{reconciliation_id}` was found for {owner.name}.",
+                ephemeral=True,
+            )
+            return
+        if status == "changed":
+            await interaction.followup.send(
+                content="This transaction changed in the app or Discord. Open its current review before continuing.",
                 ephemeral=True,
             )
             return
@@ -1392,7 +1352,7 @@ def register_commands(tree: app_commands.CommandTree):
             await interaction.response.send_message("❌ Not authorized.", ephemeral=True)
             return
 
-        await interaction.response.defer(ephemeral=True)
+        await interaction.response.defer(ephemeral=True, thinking=True)
         normalized_category = _clean_command_text(category).lower()
         if normalized_category not in get_category_columns:
             available = ", ".join(sorted(get_category_columns))
@@ -1431,6 +1391,12 @@ def register_commands(tree: app_commands.CommandTree):
                 ephemeral=True,
             )
             return
+        if status == "changed":
+            await interaction.followup.send(
+                content="This transaction changed in the app or Discord. Open its current review before continuing.",
+                ephemeral=True,
+            )
+            return
         if status == "not_unresolved":
             await interaction.followup.send(
                 content=f"Bank reconciliation item `{reconciliation_id}` is already `{confirmed.status}`.",
@@ -1444,6 +1410,9 @@ def register_commands(tree: app_commands.CommandTree):
             )
             return
 
+        if status != "logged":
+            await interaction.followup.send(content=status.partition(": ")[2] or status, ephemeral=True)
+            return
         transaction = confirmed.transaction
         await interaction.followup.send(
             content=(
@@ -1469,7 +1438,7 @@ def register_commands(tree: app_commands.CommandTree):
             await interaction.response.send_message("❌ Not authorized.", ephemeral=True)
             return
 
-        await interaction.response.defer(ephemeral=True)
+        await interaction.response.defer(ephemeral=True, thinking=True)
         try:
             owner = get_user_config(interaction.user.id)
             confirmed, status = await asyncio.to_thread(
@@ -1493,6 +1462,12 @@ def register_commands(tree: app_commands.CommandTree):
                 ephemeral=True,
             )
             return
+        if status == "changed":
+            await interaction.followup.send(
+                content="This transaction changed in the app or Discord. Open its current review before continuing.",
+                ephemeral=True,
+            )
+            return
         if status == "not_unresolved":
             await interaction.followup.send(
                 content=f"Bank reconciliation item `{reconciliation_id}` is already `{confirmed.status}`.",
@@ -1506,6 +1481,9 @@ def register_commands(tree: app_commands.CommandTree):
             )
             return
 
+        if status != "logged":
+            await interaction.followup.send(content=status.partition(": ")[2] or status, ephemeral=True)
+            return
         transaction = confirmed.transaction
         await interaction.followup.send(
             content=(

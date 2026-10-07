@@ -629,7 +629,7 @@ async def test_bank_reconciliation_inbox_ignore_all_ignores_displayed_batch(monk
         def reconciliation_report_matches(self, _owner_key, _items, *, actor_key, limit):
             return []
 
-        def ignore_reconciliation_item(self, owner_key, reconciliation_id):
+        def ignore_reconciliation_item(self, owner_key, reconciliation_id, *, expected_item):
             item = next((item for item in items if item.id == reconciliation_id), None)
             if item is None or reconciliation_id in ignored_ids:
                 return None

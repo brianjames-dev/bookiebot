@@ -18,6 +18,14 @@ Unmatched purchases remain for manual logging. Phone review does not provide the
 
 After a failed request, **Check status** reloads saved state before another action. Switching tabs preserves review state. Normal review covers the configured recent window (60 days by default), up to the latest 200 watched transactions; older history remains outside the normal inbox.
 
+## In Discord
+
+Discord and the app use the same saved review status. If a transaction is reviewed in the app while a Discord card or import form remains open, its old controls explain the current decision and safely continue the session. Changed/reopened transactions require a fresh review. The reverse order also produces an app conflict; **Check status** displays the saved decision.
+
+The session retains its original batch: **Reconciling item `2` of `4`** follows the first decision. Both numbers use inline code. Skipped items can be reviewed later, items resolved in the app stop counting as skipped, and newly queued transactions wait for a new session. A completion message describes that batch rather than claiming no new transactions exist.
+
+Discord's explicitly selected single/group amount corrections retain their existing behavior and validate the current bank/review state before changing Sheets. Normal forms and admin imports share one durable import operation; retries recover a recorded row or require inspection rather than writing another row. Pending, hidden, disconnected and changed transactions cannot be imported from an old form. An import in progress cannot be ignored/reopened by another review.
+
 ## Matching safeguards
 
 - Automatic expense matches require exact cents, meaningful name evidence, a nearby transaction/authorization date and a clear winner. Similar amounts, unrelated merchants and ambiguous repeats stay in review.
@@ -26,7 +34,7 @@ After a failed request, **Check status** reloads saved state before another acti
 - Logged history is read across the relevant recent month/year boundaries in batches. Monthly rows retain their expense-month identity, and a logged bill plus its schedule share one claim. Reads never create a missing worksheet; source failures keep prior matching intact.
 - Pending charges cannot finalize a match. A material bank change reopens prior matching; removed transactions stop reserving their old matches.
 - Confirmed, ignored and in-progress import records survive rescoring with their lineage intact. Hiding an account does not release an existing claim on a logged expense.
-- Phone decisions validate the reviewed bank version and fresh candidate values. Database checks prevent two bank transactions from claiming the same expense. Review events retain the previous state for auditing.
+- Both surfaces validate the reviewed bank/reconciliation version; phone confirmation also compares fresh candidate values. Database checks prevent two bank transactions from claiming the same expense. Review events retain the previous state for auditing.
 
 ## Verification checklist
 
@@ -39,4 +47,5 @@ Use synthetic fixtures or Plaid Sandbox for financial-action testing; do not cre
 - Leave a row open, change its bank/logged amount, then confirm: require fresh review.
 - Ignore/reopen a row, run Check and verify confirmed/ignored/import lineage remains intact.
 - Simulate sync failure and lost responses; keep saved data visible and recover with Check status.
+- Review the same transaction in both surfaces, submit stale controls in each order, and race a Discord amount correction against an app decision. Preserve the winning decision and one claim; verify fixed session progress through skips and new arrivals.
 - On iPhone, verify all five tab targets, the compact bar, readable expanded comparisons and smooth disclosure motion in light/dark mode.

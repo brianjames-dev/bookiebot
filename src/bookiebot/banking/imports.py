@@ -14,7 +14,7 @@ import math
 from typing import Any
 from uuid import uuid4
 
-from bookiebot.banking.models import BankImportOperation, BankImportResult
+from bookiebot.banking.models import BankImportOperation, BankImportResult, ReconciliationItem
 from bookiebot.banking.store import BankStore
 from bookiebot.sheets.config import get_category_columns
 from bookiebot.sheets.repo import get_sheets_repo
@@ -95,6 +95,7 @@ def recover_reconciliation_import(
 def import_reconciliation_item(
     store: BankStore, owner_key: str, reconciliation_id: int, *, actor_key: str,
     kind: str, fields: dict[str, str], expected_amount: float, expected_date: str | None,
+    expected_item: ReconciliationItem | None = None,
 ) -> BankImportResult:
     """Validate the current item, claim once, write once, then persist its linkage."""
     if get_user_config(actor_key).budget_owner_key != owner_key:
@@ -107,6 +108,8 @@ def import_reconciliation_item(
     item = store.get_reconciliation_item(owner_key, reconciliation_id)
     if item is None or item.status not in {'needs_review', 'pending_user', 'conflict'}:
         return BankImportResult('rejected', 'That bank item is no longer awaiting import. Open the current review again.')
+    if expected_item is not None and item != expected_item:
+        return BankImportResult('rejected', 'This bank item changed. Open the current review before importing it.')
     transaction = item.transaction
     bank_date_text = transaction.date or transaction.authorized_date
     if transaction.pending:
@@ -134,6 +137,8 @@ def import_reconciliation_item(
         'fields': fields, 'bank_amount': transaction.amount,
         'bank_date': bank_date.isoformat(), 'target_month': bank_date.strftime('%B'),
         'target_year': bank_date.year,
+        'expected_status': item.status, 'expected_last_seen_at': item.last_seen_at,
+        'expected_updated_at': transaction.updated_at,
     }
     operation, claimed = store.claim_reconciliation_import(
         owner_key, reconciliation_id, operation_id=uuid4().hex,

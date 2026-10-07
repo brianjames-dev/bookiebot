@@ -1,5 +1,35 @@
 # Agent Decisions
 
+## 2026-10-07 - Share Reconciliation Decisions Across Phone And Discord
+
+Use the existing compare-and-apply database path for both surfaces' confirm/ignore/reopen. Validate owner, bank/review version, posted active-account eligibility and exclusive action/schedule evidence; log source and prior lineage. Confirmed/ignored decisions require an intentional fresh Reopen before a different decision. Inbox batch actions retain the displayed snapshots, and a stale Discord detail explains the shared decision instead of treating a resolved item as missing.
+
+Keep phone review metadata-only and exact-amount. Discord still supports explicitly selected amount corrections; reserve the owner and bank/review rows during the correction and final confirmation so another review cannot interleave. Candidate discovery happens before this lock. Preserve the reconciliation origin through canonical split-backed updates so they do not recursively reopen the review being confirmed. This intentionally holds the existing database locks across an explicit Sheets correction; it does not make Sheets and database rollback atomic. On a transport failure, require checking live status before another change. Durable import claims/recovery remain the separate mechanism for new rows; all normal/admin import paths reuse them and compare the reviewed bank/item version plus active account eligibility.
+
+Freeze each Discord session's item membership and total. Filter that membership before query limits, track visited/skipped items, include external resolutions in progress and render both numbers as inline code. Later arrivals wait for a new session. These choices preserve explicit financial authority and eliminate stale cross-surface writes without a second reconciliation state machine or schema migration.
+
+## 2026-10-07 - Acknowledge Splits Before I/O And Scope Interactive Projection
+
+Decision: Split selection, creation, method editing and confirmed cancellation acknowledge Discord components with `ephemeral=True, thinking=True` before loading or mutating state. Run synchronous Sheets/database work in `asyncio.to_thread`, carrying the trusted owner context. Finish the deferred private response on success or failure; failed acknowledgment must not begin a financial mutation. Explicit typed/post-log splits also use worker threads.
+
+Serialize split workers for the same actor/action in process, removing each lock after its last queued caller. Different expenses can proceed independently until the existing projection lock. This preserves the previously serialized action-log/ledger boundary during repeated clicks; database versions and idempotency remain authoritative across processes.
+
+Read each source's fields once and reuse the reimbursement header snapshot. Cache only workbook/worksheet discovery within the current sync, sharing handles with the generated ledger mirror; continue fresh named-anchor, source-value and budget-formula verification. Clear discovery handles before later sync runs. Do not shorten financial verification or abandon a running write to meet an arbitrary UI timeout.
+
+Recent-action commands request projection of their allocation only. Preserve that move's neighboring coordinate/mirror repair, but leave unrelated pending financial versions and historical coordinate scans for the unscoped Shared refresh/settlement/reset recovery path. Report durable splits as saved/pending if projection cannot complete; preserve idempotency and existing action/revision/payment history. Log elapsed split/sync time for production diagnosis.
+
+Rationale: Production split traces blocked Discord while waiting for Google metadata. Silent defers concealed that work, repeated reads amplified remote latency, and a global recovery sweep coupled one action's confirmation to unrelated workbook failures. Worker I/O and narrow interactive projection improve responsiveness without weakening settlement guards.
+
+## 2026-10-07 - Compact Moved Expense Categories With Their Anchors
+
+Supersede the September 16 choice to leave a canonical move's source gap. Use category-only cell deletion/shift after relocating the moved source anchors; destination reservation/write, source compaction and neighboring monthly action coordinates commit in one Sheets batch. Preserve adjacent categories/totals, the moved purchase's historical lineage and its durable before/after revision. Current canonical overlays supply its new category. Repair inactive neighboring action coordinates because Undo can reactivate update ancestors.
+
+Ordinary structural moves/deletes/restorations carry source/receipt anchors; move Undo closes its destination gap. Repair canonical source-row metadata/mirrors absolutely from anchors without changing financial versions. Explicit sync retries metadata/mirror failures even when financial versions were already projected and reports failures as pending. A metadata failure after a successful ordinary structural write must not invite repeating that write.
+
+Reimbursements use the allocation's current category. Preserve reversed receipts' historical category/identity while their anchors follow compaction. Reset Undo/Redo stays balance-only; direct canonical correction Undo stays guarded. Existing production gaps require separately inspected/authorized repair, never automatic replay of an already completed move.
+
+Rationale: A blank Shopping row violates requested move behavior, while copying values alone leaves anchors/history on the wrong expenses. Native category shifts and atomic action-coordinate repair preserve identity and safe retries.
+
 ## 2026-10-05 - Accept Amount-First Utility Logging Commands
 
 Extend the affirmative deterministic bill grammar to accept amount-first shorthand and an optional expense/payment noun after Log/Record/Add. PG&E, Recology and Water continue using their dedicated personal-bill writers and existing post-log split dialog; explicit split directives retain their current meaning. Full-message matching, question/negation/planning diversion and bottled-water ambiguity remain guarded.

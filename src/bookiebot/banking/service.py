@@ -6,7 +6,7 @@ import os
 import time
 from datetime import date as local_date, timedelta
 from dataclasses import replace
-from typing import Any
+from typing import Any, Callable
 from uuid import uuid4
 
 from gspread.exceptions import WorksheetNotFound
@@ -76,6 +76,10 @@ def _schedule_cache_ttl_seconds() -> int:
         return max(int(raw), 60)
     except ValueError:
         return 900
+
+
+class _MatchCorrectionFailed(ValueError):
+    pass
 
 
 def _reconciliation_max_age_days() -> int:
@@ -670,6 +674,7 @@ class BankingService:
         *,
         max_age_days: int | None = None,
         start_date: str | None = None,
+        reconciliation_ids: set[int] | None = None,
     ) -> list:
         if max_age_days is None and start_date is None:
             max_age_days = _reconciliation_max_age_days()
@@ -677,7 +682,7 @@ class BankingService:
             owner_key,
             limit=limit,
             max_age_days=max_age_days,
-            start_date=start_date,
+            start_date=start_date, reconciliation_ids=reconciliation_ids,
         )
 
     def reconciliation_cache_buckets(
@@ -708,11 +713,13 @@ class BankingService:
     def resolved_reconciliation_items(self, owner_key: str, limit: int = 25) -> list:
         return self.store.resolved_reconciliation_items(owner_key, limit=limit)
 
-    def ignore_reconciliation_item(self, owner_key: str, reconciliation_id: int):
-        return self.store.ignore_reconciliation_item(owner_key, reconciliation_id)
+    def ignore_reconciliation_item(self, owner_key: str, reconciliation_id: int,
+                                   *, expected_item: ReconciliationItem | None = None):
+        return self.store.ignore_reconciliation_item(owner_key, reconciliation_id, expected_item=expected_item)
 
-    def reopen_reconciliation_item(self, owner_key: str, reconciliation_id: int, *, notes: str = "reopened for review"):
-        return self.store.reopen_reconciliation_item(owner_key, reconciliation_id, notes=notes)
+    def reopen_reconciliation_item(self, owner_key: str, reconciliation_id: int, *, notes: str = "reopened for review",
+                                   expected_item: ReconciliationItem | None = None):
+        return self.store.reopen_reconciliation_item(owner_key, reconciliation_id, notes=notes, expected_item=expected_item)
 
     def reopen_reconciliation_items_for_action_ids(
         self,
@@ -729,12 +736,14 @@ class BankingService:
     def import_reconciliation_item(
         self, owner_key: str, reconciliation_id: int, *, actor_key: str,
         kind: str, fields: dict[str, str], expected_amount: float, expected_date: str | None,
+        expected_item: ReconciliationItem | None = None,
     ) -> BankImportResult:
         from bookiebot.banking.imports import import_reconciliation_item
 
         return import_reconciliation_item(
             self.store, owner_key, reconciliation_id, actor_key=actor_key, kind=kind,
             fields=fields, expected_amount=expected_amount, expected_date=expected_date,
+            expected_item=expected_item,
         )
 
     def recover_reconciliation_import(
@@ -752,13 +761,15 @@ class BankingService:
         matched_action_log_id: str | None = None,
         matched_sheet_ref: str | None = None,
         notes: str = "logged from bank review",
+        expected_item: ReconciliationItem | None = None,
+        before_confirm: Callable[[], None] | None = None,
     ):
         return self.store.confirm_reconciliation_item(
             owner_key,
             reconciliation_id,
             matched_action_log_id=matched_action_log_id,
             matched_sheet_ref=matched_sheet_ref,
-            notes=notes,
+            notes=notes, expected_item=expected_item, before_confirm=before_confirm,
         )
 
     def reconciliation_match_candidates(
@@ -773,7 +784,7 @@ class BankingService:
         item = self.get_reconciliation_item(owner_key, reconciliation_id)
         if item is None:
             return None, [], []
-        if item.status == 'import_requested':
+        if item.status not in {'needs_review', 'pending_user', 'conflict', 'matched'}:
             return item, [], []
         action_log = read_active_logged_actions(actor_key)
         excluded = self.store.matched_action_log_ids(owner_key)
@@ -985,15 +996,19 @@ class BankingService:
         *,
         actor_key: str,
         schedule_ref: str,
+        expected_item: ReconciliationItem | None = None,
     ) -> tuple[ReconciliationItem | None, ActionLogCandidate | None, str]:
         item = self.get_reconciliation_item(owner_key, reconciliation_id)
         if item is None:
             return None, None, "not_found"
         if item.status not in {"needs_review", "pending_user", "conflict", "matched"}:
             return item, None, "not_unresolved"
+        if expected_item is not None and item != expected_item:
+            return item, None, "changed"
         if item.transaction.pending:
             return item, None, "pending_transaction"
 
+        clear_schedule_source_cache(actor_key)
         candidates = find_scheduled_pull_candidates(
             item.transaction,
             _scheduled_pulls_for_transactions([item.transaction], actor_key=actor_key),
@@ -1013,9 +1028,9 @@ class BankingService:
             owner_key,
             reconciliation_id,
             matched_sheet_ref=candidate.sheet_ref,
-            notes=f"matched {candidate.label}",
+            notes=f"matched {candidate.label}", expected_item=item,
         )
-        return confirmed, candidate, "matched"
+        return confirmed or self.get_reconciliation_item(owner_key, reconciliation_id), candidate, "matched" if confirmed else "changed"
 
     def confirm_reconciliation_action_match(
         self,
@@ -1024,12 +1039,15 @@ class BankingService:
         *,
         actor_key: str,
         action_id: str,
+        expected_item: ReconciliationItem | None = None,
     ) -> tuple[ReconciliationItem | None, ActionLogCandidate | None, str]:
         item = self.get_reconciliation_item(owner_key, reconciliation_id)
         if item is None:
             return None, None, "not_found"
         if item.status not in {"needs_review", "pending_user", "conflict", "matched"}:
             return item, None, "not_unresolved"
+        if expected_item is not None and item != expected_item:
+            return item, None, "changed"
         if item.transaction.pending:
             return item, None, "pending_transaction"
 
@@ -1055,34 +1073,41 @@ class BankingService:
             return item, None, "action_not_reconcilable"
 
         bank_amount = abs(item.transaction.amount)
-        if round(candidate.amount * 100) != round(bank_amount * 100):
-            success, detail = update_recent_action(
-                actor_key,
-                updates={"amount": f"{bank_amount:.2f}"},
-                action_id=candidate.action_id,
-                metadata_extra={
-                    "origin": "bank_reconciliation",
-                    "bank_reconciliation_id": str(reconciliation_id),
-                },
-            )
-            if not success:
-                return item, candidate, f"amount_update_failed: {detail}"
-            updated_logged = {entry.id: entry for entry in _read_current_logged_actions(actor_key)}.get(action_id)
-            updated_candidate = action_log_candidate_by_id(updated_logged, scheduled_pulls=pulls) if updated_logged else None
-            if updated_candidate is not None:
-                candidate = updated_candidate
-            update_status = "matched_updated"
-        else:
-            update_status = "matched"
+        update_status = "matched"
+        def correct_amount() -> None:
+            nonlocal candidate, update_status
+            assert candidate is not None
+            if round(candidate.amount * 100) != round(bank_amount * 100):
+                success, detail = update_recent_action(
+                    actor_key,
+                    updates={"amount": f"{bank_amount:.2f}"},
+                    action_id=candidate.action_id,
+                    metadata_extra={
+                        "origin": "bank_reconciliation",
+                        "bank_reconciliation_id": str(reconciliation_id),
+                    },
+                )
+                if not success:
+                    raise _MatchCorrectionFailed(f"amount_update_failed: {detail}")
+                updated_logged = {entry.id: entry for entry in _read_current_logged_actions(actor_key)}.get(action_id)
+                updated_candidate = action_log_candidate_by_id(updated_logged, scheduled_pulls=pulls) if updated_logged else None
+                if updated_candidate is not None:
+                    candidate = updated_candidate
+                update_status = "matched_updated"
+            else:
+                update_status = "matched"
 
-        confirmed = self.confirm_reconciliation_item(
-            owner_key,
-            reconciliation_id,
-            matched_action_log_id=candidate.action_id,
-            matched_sheet_ref=candidate.sheet_ref,
-            notes="matched existing sheet/action-log row",
-        )
-        return confirmed, candidate, update_status
+        try:
+            confirmed = self.confirm_reconciliation_item(
+                owner_key,
+                reconciliation_id,
+                matched_action_log_id=candidate.action_id,
+                matched_sheet_ref=candidate.sheet_ref,
+                notes="matched existing sheet/action-log row", expected_item=item, before_confirm=correct_amount,
+            )
+        except _MatchCorrectionFailed as exc:
+            return item, candidate, str(exc)
+        return confirmed or self.get_reconciliation_item(owner_key, reconciliation_id), candidate, update_status if confirmed else "changed"
 
     def revert_reconciliation_item(
         self,
@@ -1158,12 +1183,15 @@ class BankingService:
         actor_key: str,
         action_ids: list[str],
         adjust_action_id: str | None = None,
+        expected_item: ReconciliationItem | None = None,
     ) -> tuple[ReconciliationItem | None, list[ActionLogCandidate], str]:
         item = self.get_reconciliation_item(owner_key, reconciliation_id)
         if item is None:
             return None, [], "not_found"
         if item.status not in {"needs_review", "pending_user", "conflict", "matched"}:
             return item, [], "not_unresolved"
+        if expected_item is not None and item != expected_item:
+            return item, [], "changed"
         if item.transaction.pending:
             return item, [], "pending_transaction"
 
@@ -1190,59 +1218,66 @@ class BankingService:
             candidates.append(candidate)
 
         total_cents = sum(round(candidate.amount * 100) for candidate in candidates)
-        bank_cents = round(abs(item.transaction.amount) * 100)
-        if abs(total_cents - bank_cents) > 1:
-            adjust_id = (adjust_action_id or "").strip()
-            if not adjust_id:
-                return item, candidates, "amount_mismatch"
-            adjust_candidate = next((candidate for candidate in candidates if candidate.action_id == adjust_id), None)
-            if adjust_candidate is None:
-                return item, candidates, "adjust_action_not_in_group"
-            suggested_cents = round(adjust_candidate.amount * 100) + (bank_cents - total_cents)
-            if suggested_cents < 0:
-                return item, candidates, "adjustment_negative"
-            suggested_amount = suggested_cents / 100
-            success, detail = update_recent_action(
-                actor_key,
-                updates={"amount": f"{suggested_amount:.2f}"},
-                action_id=adjust_candidate.action_id,
-                metadata_extra={
-                    "origin": "bank_reconciliation",
-                    "bank_reconciliation_id": str(reconciliation_id),
-                    "bank_reconciliation_group_adjustment": "true",
-                },
-            )
-            if not success:
-                return item, candidates, f"amount_update_failed: {detail}"
-
-            action_by_id = {logged.id: logged for logged in _read_current_logged_actions(actor_key)}
-            adjusted_candidates: list[ActionLogCandidate] = []
-            for action_id in cleaned_ids:
-                logged = action_by_id.get(action_id)
-                if logged is None:
-                    return item, candidates, "action_not_found_after_adjustment"
-                candidate = action_log_candidate_by_id(logged)
-                if candidate is None:
-                    return item, candidates, "action_not_reconcilable_after_adjustment"
-                adjusted_candidates.append(candidate)
-            candidates = adjusted_candidates
+        status = "matched"
+        def correct_group() -> None:
+            nonlocal candidates, total_cents, status
             total_cents = sum(round(candidate.amount * 100) for candidate in candidates)
+            bank_cents = round(abs(item.transaction.amount) * 100)
             if abs(total_cents - bank_cents) > 1:
-                return item, candidates, "amount_mismatch_after_adjustment"
-            status = "matched_adjusted"
-        else:
-            status = "matched"
+                adjust_id = (adjust_action_id or "").strip()
+                if not adjust_id:
+                    raise _MatchCorrectionFailed("amount_mismatch")
+                adjust_candidate = next((candidate for candidate in candidates if candidate.action_id == adjust_id), None)
+                if adjust_candidate is None:
+                    raise _MatchCorrectionFailed("adjust_action_not_in_group")
+                suggested_cents = round(adjust_candidate.amount * 100) + (bank_cents - total_cents)
+                if suggested_cents < 0:
+                    raise _MatchCorrectionFailed("adjustment_negative")
+                suggested_amount = suggested_cents / 100
+                success, detail = update_recent_action(
+                    actor_key,
+                    updates={"amount": f"{suggested_amount:.2f}"},
+                    action_id=adjust_candidate.action_id,
+                    metadata_extra={
+                        "origin": "bank_reconciliation",
+                        "bank_reconciliation_id": str(reconciliation_id),
+                        "bank_reconciliation_group_adjustment": "true",
+                    },
+                )
+                if not success:
+                    raise _MatchCorrectionFailed(f"amount_update_failed: {detail}")
+
+                action_by_id = {logged.id: logged for logged in _read_current_logged_actions(actor_key)}
+                adjusted_candidates: list[ActionLogCandidate] = []
+                for action_id in cleaned_ids:
+                    logged = action_by_id.get(action_id)
+                    if logged is None:
+                        raise _MatchCorrectionFailed("action_not_found_after_adjustment")
+                    candidate = action_log_candidate_by_id(logged)
+                    if candidate is None:
+                        raise _MatchCorrectionFailed("action_not_reconcilable_after_adjustment")
+                    adjusted_candidates.append(candidate)
+                candidates = adjusted_candidates
+                total_cents = sum(round(candidate.amount * 100) for candidate in candidates)
+                if abs(total_cents - bank_cents) > 1:
+                    raise _MatchCorrectionFailed("amount_mismatch_after_adjustment")
+                status = "matched_adjusted"
+            else:
+                status = "matched"
 
         match_id = "+".join(candidate.action_id for candidate in candidates)
         sheet_ref = " + ".join(candidate.sheet_ref for candidate in candidates)
-        confirmed = self.confirm_reconciliation_item(
-            owner_key,
-            reconciliation_id,
-            matched_action_log_id=match_id,
-            matched_sheet_ref=sheet_ref,
-            notes=f"matched existing grouped rows totaling ${total_cents / 100:.2f}",
-        )
-        return confirmed, candidates, status
+        try:
+            confirmed = self.confirm_reconciliation_item(
+                owner_key,
+                reconciliation_id,
+                matched_action_log_id=match_id,
+                matched_sheet_ref=sheet_ref,
+                notes="matched existing grouped rows", expected_item=item, before_confirm=correct_group,
+            )
+        except _MatchCorrectionFailed as exc:
+            return item, candidates, str(exc)
+        return confirmed or self.get_reconciliation_item(owner_key, reconciliation_id), candidates, status if confirmed else "changed"
 
     def reconciliation_preview(
         self,

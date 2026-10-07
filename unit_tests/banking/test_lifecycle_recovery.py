@@ -27,7 +27,8 @@ def test_material_bank_change_reopens_and_preserves_previous_match_event(store, 
     assert reopened.matched_action_log_id is None
     assert reopened.matched_sheet_ref is None
     assert reopened.resolved_at is None
-    events = store.reconciliation_events('brian', item.id)
+    events = [event for event in store.reconciliation_events('brian', item.id)
+              if event['event_type'] == 'bank_transaction_modified']
     assert len(events) == 1
     assert events[0]['event_type'] == 'bank_transaction_modified'
     assert events[0]['payload']['previous_match']['matched_action_log_id'] == 'action-a'
@@ -37,7 +38,8 @@ def test_material_bank_change_reopens_and_preserves_previous_match_event(store, 
     assert set(change) == set(events[0]['payload']['changed_fields'])
     assert store.reconciliation_events('hannah', item.id) == []
     store.upsert_transactions([{**raw, **change}], 'brian')
-    assert len(store.reconciliation_events('brian', item.id)) == 1
+    assert len([event for event in store.reconciliation_events('brian', item.id)
+                if event['event_type'] == 'bank_transaction_modified']) == 1
 
 
 def test_ignored_policy_and_identical_confirmed_replays_stay_unchanged(store):
@@ -46,11 +48,14 @@ def test_ignored_policy_and_identical_confirmed_replays_stay_unchanged(store):
     raw = {'transaction_id': 'txn-1', 'date': '2026-09-05', 'name': 'Renamed merchant', 'amount': 20, 'pending': False}
     store.upsert_transactions([raw], 'brian')
     assert store.get_reconciliation_item('brian', item.id).status == 'confirmed'
-    assert store.reconciliation_events('brian', item.id) == []
+    assert not any(event['event_type'] == 'bank_transaction_modified'
+                   for event in store.reconciliation_events('brian', item.id))
+    store.reopen_reconciliation_item('brian', item.id)
     store.ignore_reconciliation_item('brian', item.id)
     store.upsert_transactions([{**raw, 'amount': 27}], 'brian')
     assert store.get_reconciliation_item('brian', item.id).status == 'ignored'
-    assert store.reconciliation_events('brian', item.id) == []
+    assert not any(event['event_type'] == 'bank_transaction_modified'
+                   for event in store.reconciliation_events('brian', item.id))
 
 
 def test_event_persistence_failure_rolls_back_bank_change_and_reopening(store):
@@ -64,7 +69,8 @@ def test_event_persistence_failure_rolls_back_bank_change_and_reopening(store):
     assert saved.status == 'confirmed'
     assert saved.transaction.amount == 20
     assert saved.matched_action_log_id == 'action-a'
-    assert store.reconciliation_events('brian', item.id) == []
+    assert not any(event['event_type'] == 'bank_transaction_modified'
+                   for event in store.reconciliation_events('brian', item.id))
 
 
 @pytest.fixture

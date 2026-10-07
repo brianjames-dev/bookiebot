@@ -49,12 +49,13 @@ def is_managed(allocation_id: str) -> bool:
 
 def snapshot(owner: str, *, retry_projection: bool = False) -> dict[str, Any]:
     store = build_reimbursement_store()
+    synced = True
     if retry_projection:
         from bookiebot.reimbursements.projection import sync_pending
-        sync_pending(store)
+        synced = sync_pending(store)
     result = store.snapshot(owner)
     return {**result, "enabled": True, "ownerKey": owner,
-            "projectionPending": any(row["version"] != row["projectedVersion"] for row in result["allocations"])}
+            "projectionPending": not synced or any(row["version"] != row["projectedVersion"] for row in result["allocations"])}
 
 
 def command(owner: str, body: dict[str, Any]) -> dict[str, Any]:
@@ -130,7 +131,11 @@ def record_split(user_key: str, logged: Any, ws: Any, fields: dict[str, int], va
             return True, "The split is recorded. Action history still needs syncing; no payment has been marked received."
         store.attach_source(identity, {"splitActionId": split_id})
     from bookiebot.reimbursements.projection import sync_pending
-    synced = sync_pending(store)
+    try:
+        synced = sync_pending(store, allocation_ids={identity})
+    except Exception:
+        logger.exception("Saved split awaits projection", extra={"allocation_id": identity})
+        synced = False
     partner = partner_owner_key(owner).title()
     message = (f"{owner.title()} paid ${gross:.2f}. {partner} owes {owner.title()} ${partner_share:.2f}. "
                "The full purchase stays in the payer's expenses until repayment is confirmed.")
@@ -182,7 +187,7 @@ def mutate_recent_action(user_key: str, logged: Any, operation: str, *,
 
         def finish(message: str) -> tuple[bool, str]:
             try:
-                synced = sync_pending(store)
+                synced = sync_pending(store, allocation_ids={value["id"]})
             except Exception:
                 logger.exception("Saved expense correction awaits projection", extra={"allocation_id": value["id"]})
                 synced = False

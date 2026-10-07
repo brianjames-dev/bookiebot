@@ -170,6 +170,8 @@ def command(service: BankingService, owner: str, actor: str, body: dict) -> dict
     transaction, item = _find(service, owner, review_id)
     if item is None or transaction.pending or item.status == "import_requested":
         raise ReviewConflict("This transaction cannot be changed yet. Check again.")
+    if operation != "reopen" and item.status in {"confirmed", "ignored"}:
+        raise ReviewConflict("This transaction was already reviewed in the app or Discord. Check status to see the current decision.")
     action_id = sheet_ref = None
     if operation == "confirm":
         # A bill/subscription may have been edited since the row was opened.

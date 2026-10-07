@@ -1,6 +1,10 @@
 from __future__ import annotations
 
+import asyncio
+import logging
 import re
+import threading
+import time
 from collections.abc import Awaitable, Callable
 from typing import Any, Literal
 
@@ -12,6 +16,45 @@ from bookiebot.ui.recent_actions import ChangeSplitMethodView, SplitMethodView
 
 SplitDirective = Literal["income", "equal", "fronted", "prompt", "none"]
 SPLIT_PROMPT = "How do you want to split this expense?"
+logger = logging.getLogger(__name__)
+_SPLIT_LOCKS_GUARD = threading.Lock()
+_SPLIT_LOCKS: dict[tuple[str | None, str], tuple[Any, int]] = {}
+
+
+def run_split_operation(operation: Callable[..., tuple[bool, str]], actor_key: str | None, *,
+                        action_id: str, **kwargs: Any) -> tuple[bool, str]:
+    # Worker callbacks can overlap. Serialize this expense's log/ledger writes
+    # without holding a global mutation lock or retaining unused locks forever.
+    key = (actor_key, action_id)
+    with _SPLIT_LOCKS_GUARD:
+        lock, users = _SPLIT_LOCKS.get(key, (threading.Lock(), 0))
+        _SPLIT_LOCKS[key] = (lock, users + 1)
+    try:
+        with lock, sheet_user_context(actor_key):
+            return operation(actor_key, action_id=action_id, **kwargs)
+    finally:
+        with _SPLIT_LOCKS_GUARD:
+            lock, users = _SPLIT_LOCKS[key]
+            if users == 1:
+                del _SPLIT_LOCKS[key]
+            else:
+                _SPLIT_LOCKS[key] = (lock, users - 1)
+
+
+async def _apply_split(interaction: Any, actor_key: str | None, action_id: str, method: str,
+                       operation: Callable[..., tuple[bool, str]]) -> None:
+    # A component's default defer is silent. Acknowledge before starting any
+    # blocking I/O, and let Discord's event loop keep serving other callbacks.
+    await interaction.response.defer(ephemeral=True, thinking=True)
+    started = time.perf_counter()
+    try:
+        success, detail = await asyncio.to_thread(run_split_operation, operation, actor_key, split_method=method, action_id=action_id)
+    except Exception:
+        logger.exception("Split workflow failed", extra={"action_id": action_id})
+        success, detail = False, "The split could not finish. Check Recent transactions and Shared before trying again."
+    prefix = "✅" if success else "❌"
+    logger.info("Split workflow finished in %.2fs (action=%s; success=%s)", time.perf_counter() - started, action_id, success)
+    await interaction.followup.send(f"{prefix} {detail}", ephemeral=True)
 
 
 def requested_split_directive(data: dict[str, Any], content: str = "") -> SplitDirective | None:
@@ -72,18 +115,7 @@ def split_method_view(actor_key: str | None, action_id: str) -> SplitMethodView:
                 ephemeral=True,
             )
             return
-        try:
-            await interaction.response.defer(ephemeral=True)
-        except Exception:
-            pass
-        with sheet_user_context(actor_key):
-            success, detail = split_recent_action(
-                actor_key,
-                split_method=method,
-                action_id=action_id,
-            )
-        prefix = "✅" if success else "❌"
-        await interaction.followup.send(f"{prefix} {detail}", ephemeral=True)
+        await _apply_split(interaction, actor_key, action_id, method, split_recent_action)
 
     return SplitMethodView(handle_split)
 
@@ -112,18 +144,7 @@ def change_split_method_view(
                 ephemeral=True,
             )
             return
-        try:
-            await interaction.response.defer(ephemeral=True)
-        except Exception:
-            pass
-        with sheet_user_context(actor_key):
-            success, detail = change_split_recent_action(
-                actor_key,
-                split_method=method,
-                action_id=action_id,
-            )
-        prefix = "✅" if success else "❌"
-        await interaction.followup.send(f"{prefix} {detail}", ephemeral=True)
+        await _apply_split(interaction, actor_key, action_id, method, change_split_recent_action)
 
     return ChangeSplitMethodView(handle_change, can_cancel_split=on_cancel_split is not None)
 
@@ -143,12 +164,11 @@ async def continue_split_after_log(
     if directive == "none":
         return
     if directive in {"income", "equal", "fronted"}:
-        with sheet_user_context(actor_key):
-            success, detail = split_recent_action(
-                actor_key,
-                split_method=directive,
-                action_id=action_id,
-            )
+        success, detail = await asyncio.to_thread(run_split_operation, split_recent_action,
+            actor_key,
+            split_method=directive,
+            action_id=action_id,
+        )
         prefix = "✅" if success else "❌"
         await message.channel.send(f"{prefix} {detail}")
         return

@@ -109,6 +109,49 @@ def test_split_replay_does_not_duplicate_history_or_reset_confirmed_cash(setup):
         split(setup, payer_share=300, partner_share=164.72)
 
 
+def test_split_does_not_project_unrelated_unavailable_allocation(setup, monkeypatch):
+    unrelated = setup.store.register_allocation(payload(sourceSpreadsheetId="unavailable", sourceActionId="unrelated"))
+    opened = []
+    def open_book(key):
+        opened.append(key)
+        assert key != "unavailable", "A split must not wait for another allocation's workbook"
+        return setup.book
+    monkeypatch.setattr(auth, "get_gspread_client", lambda: SimpleNamespace(open_by_key=open_book))
+    ok, message = split(setup)
+    assert ok and "syncing" not in message
+    current = setup.store.find_by_source(setup.logged.id, 2026)
+    assert current["version"] == current["projectedVersion"]
+    assert setup.store.get_allocation(unrelated["id"])["projectedVersion"] == 0
+    assert opened.count("shared") == 1
+    assert len(setup.history) == 1
+
+
+def test_concurrent_split_workers_record_one_allocation_and_history_action(setup):
+    from concurrent.futures import ThreadPoolExecutor
+    from bookiebot.splits import run_split_operation
+    def apply(_actor, **_kwargs):
+        return split(setup)
+    with ThreadPoolExecutor(max_workers=2) as pool:
+        pending = [pool.submit(run_split_operation, apply, BRIAN, action_id=setup.logged.id) for _ in range(2)]
+        assert all(task.result()[0] for task in pending)
+    assert len(setup.history) == 1
+    values = setup.store.snapshot("brian")["allocations"]
+    assert len(values) == 1 and values[0]["version"] == values[0]["projectedVersion"]
+
+
+@pytest.mark.parametrize("phase", ["lock", "sheet"])
+def test_saved_split_projection_failure_returns_recoverable_success(setup, monkeypatch, phase):
+    if phase == "lock":
+        monkeypatch.setattr(projection, "sync_pending", lambda *_a, **_kw: (_ for _ in ()).throw(TimeoutError("Lock unavailable")))
+    else:
+        monkeypatch.setattr(auth, "get_gspread_client", lambda: SimpleNamespace(open_by_key=lambda _key: (_ for _ in ()).throw(TimeoutError("Sheet unavailable"))))
+    ok, message = split(setup)
+    assert ok and "The split is saved; expense sheets are still syncing" in message
+    current = setup.store.find_by_source(setup.logged.id, 2026)
+    assert current["version"] > current["projectedVersion"]
+    assert len(setup.history) == 1
+
+
 @pytest.mark.parametrize("changes", [{"payer": "Hannah"}, {"values": VALUES | {"person": "Hannah"}},
                                      {"values": VALUES | {"amount": "463.72"}}, {"values": VALUES | {"amount": "bad"}}])
 def test_source_payer_and_amount_guard_precedes_registration(setup, changes):
@@ -275,6 +318,147 @@ def test_split_move_preserves_obligation_and_repeated_move_prompts_for_missing_i
     assert ok and "syncing" not in message
     assert setup.sheet.read(2, 13, 18) == ["1/3/2026", "Dinner", 464.72, "Gameday", "Brian (BofA)"]
     assert setup.sheet.read(2, 0, 4) == [""] * 4
+
+
+@pytest.mark.parametrize("failure", ["none", "lost_batch", "neighbor_mirror"])
+def test_shopping_to_needs_repairs_neighbor_and_books_full_reimbursement_under_needs(setup, monkeypatch, failure):
+    from copy import deepcopy
+    from bookiebot.reimbursements import mirror
+    from bookiebot.sheets.collaboration import allocations_from_rows
+    assert split(setup)[0]
+    assert service.mutate_recent_action(BRIAN, selected(setup), "move", destination_category="shopping")[0]
+    shopping = {"date": 22, "item": 23, "amount": 24, "location": 25, "person": 26}
+    neighbor_values = {"date": "1/4/2026", "item": "Mirror-tap", "amount": "50.59", "location": "Amazon", "person": "Hannah"}
+    setup.sheet.write(3, 21, list(neighbor_values.values()))
+    neighbor = setup.store.register_allocation(payload(
+        payerOwner="hannah", partnerOwner="brian", payerPerson="Hannah", category="shopping",
+        item="Mirror-tap", location="Amazon", expenseDate="2026-01-04", sourceYear=2026,
+        sourceWorksheet="expense", sourceSpreadsheetId="shared", sourceSheetTitle="January", sourceRow=4,
+        sourceColumnMap=shopping, sourceValues=neighbor_values, grossCents=5059,
+        payerShareCents=3000, partnerShareCents=2059))
+    assert projection.sync_pending(setup.store)
+    neighbor = setup.store.get_allocation(neighbor["id"])
+    setup.sheet.write(4, 21, ["", "Curtains draft", "", "Amazon", ""])
+    if failure == "lost_batch":
+        setup.book.timeout_after_batch = True
+    elif failure == "neighbor_mirror":
+        original_mirror = mirror.mirror_allocation
+        failed = False
+        def fail_once(client, allocation, **kwargs):
+            nonlocal failed
+            if allocation["id"] == neighbor["id"] and not failed:
+                failed = True
+                raise TimeoutError("Neighbor mirror unavailable after compaction")
+            return original_mirror(client, allocation, **kwargs)
+        monkeypatch.setattr(mirror, "mirror_allocation", fail_once)
+    stale = selected(setup)
+    ok, message = service.mutate_recent_action(BRIAN, stale, "move", destination_category="needs")
+    assert ok and ("syncing" in message) == (failure != "none")
+    ok, message = service.mutate_recent_action(BRIAN, stale, "move", destination_category="needs")
+    assert ok and "syncing" not in message
+    current = setup.store.find_by_source(setup.logged.id, 2026)
+    repaired = setup.store.get_allocation(neighbor["id"])
+    assert repaired["sourceRow"] == 3 and repaired["version"] == repaired["projectedVersion"] == neighbor["version"]
+    assert setup.sheet.read(2, 21, 26) == ["1/4/2026", "Mirror-tap", 50.59, "Amazon", "Hannah"]
+    assert setup.sheet.read(3, 21, 26) == ["", "Curtains draft", "", "Amazon", ""]
+    assert setup.sheet.read(4, 21, 26) == [""] * 5
+    mapped = {row.allocation_id: row for row in allocations_from_rows(setup.book.worksheet("Shared Reimbursements").rows)}
+    assert mapped[current["id"]].source_category == "need_expenses"
+    assert mapped[neighbor["id"]].source_row == 3
+    # Stable event/action identities expose current Needs details, never a second
+    # Shopping purchase. Direct canonical Undo still cannot bypass the ledger.
+    logged = undo.LoggedAction(current["splitActionId"], "2026-01-03", BRIAN, setup.history[0])
+    active = undo.canonical_logged_actions([logged])[0]
+    assert active.action.metadata["category"] == "need_expenses"
+    assert not undo.action_capabilities(active.action).can_undo
+    response = service.command("brian", payment(current, 16391))
+    assert not response["projectionPending"]
+    receipt = response["events"][0]
+    full = setup.book.names[projection._name("receipt", receipt["id"])]["range"]
+    assert (full["startColumnIndex"], full["endColumnIndex"]) == (29, 34)
+    assert receipt_row(setup.book, receipt["id"])[1:] == ["Reimbursement · Hannah's T", 163.91, "Reimbursement to Brian · Gameday", "Hannah"]
+    assert setup.sheet.read(current["sourceRow"] - 1, 31, 32) == [300.81]
+    assert setup.sheet.read(2, 23, 24) == [50.59]
+    mapped = {row.allocation_id: row for row in allocations_from_rows(setup.book.worksheet("Shared Reimbursements").rows)}
+    assert mapped[current["id"]].source_category == "need_expenses"
+    assert mapped[current["id"]].status == "reimbursed" and mapped[current["id"]].received_amount == 163.91
+    # A reversed receipt retains its Needs event anchor and exactly one row.
+    service.command("brian", command("reverse", eventId=receipt["id"]))
+    assert receipt_row(setup.book, receipt["id"])[2] == 0
+    assert setup.sheet.read(current["sourceRow"] - 1, 31, 32) == [464.72]
+    # Reset Undo/Redo has its own event history and never changes the moved
+    # purchase's category, source cells or recorded repayment/reversal events.
+    before_rows = {name: deepcopy(sheet.rows) for name, sheet in setup.book.sheets.items() if name != "Shared Reimbursements"}
+    before_events = setup.store.snapshot("brian")["events"]
+    result = service.command("brian", command("reset", expectedState=setup.store.snapshot("brian")["resetState"]))
+    for operation in ("undo_reset", "redo_reset"):
+        record = result["resets"][0]
+        result = service.command("brian", command(operation, resetId=record["id"], version=record["version"]))
+        assert not result["projectionPending"]
+        assert result["events"] == before_events
+        assert {name: sheet.rows for name, sheet in setup.book.sheets.items() if name != "Shared Reimbursements"} == before_rows
+        assert setup.store.get_allocation(current["id"])["category"] == "need_expenses"
+
+
+@pytest.mark.parametrize("mirror_failure", [False, True])
+def test_ordinary_move_and_undo_keep_canonical_neighbor_positions_and_settlements_aligned(setup, monkeypatch, mirror_failure):
+    from copy import deepcopy
+    from bookiebot.reimbursements import mirror
+    from bookiebot.sheets.collaboration import allocations_from_rows
+    from bookiebot.sheets.routing import sheet_user_context
+    assert split(setup)[0]
+    current = setup.store.find_by_source(setup.logged.id, 2026)
+    # Add a plain purchase above the canonical T, as a native insert does.
+    setup.sheet.insert(2, 29, 34)
+    setup.sheet.write(2, 29, ["1/2/2026", "Plain purchase", 10, "Store", "Hannah"])
+    setup.sheet.spreadsheet = setup.book
+    setup.book.id = "shared"
+    columns = list(FIELDS.values())
+    with sheet_user_context(BRIAN):
+        undo._shift_category_cells_up(setup.sheet, start_row=3, end_row=4, columns=columns)
+    # T returns to row 3. Insert for Undo moves it to row 4 again, preserving its
+    # named anchors and both ledger copies before the later reimbursement.
+    monkeypatch.setattr(undo, "_update_contiguous_row", lambda ws, row, cols, vals: ws.write(row - 1, min(cols) - 1, vals))
+    if mirror_failure:
+        original_mirror = mirror.mirror_allocation
+        def fail_once(client, allocation, **_kwargs):
+            monkeypatch.setattr(mirror, "mirror_allocation", original_mirror)
+            raise TimeoutError("Mirror unavailable after a successful legacy Undo")
+        monkeypatch.setattr(mirror, "mirror_allocation", fail_once)
+    with sheet_user_context(BRIAN):
+        undo._restore_removed_category_row(setup.sheet, category="need_expenses", row=3, columns=columns,
+            values=["1/2/2026", "Plain purchase", "10", "Store", "Hannah"], restored_ids=set(),
+            log_data=undo._ActionLogData(ws=SimpleNamespace(), records=[]))
+    if mirror_failure:
+        assert setup.store.get_allocation(current["id"])["sourceRow"] == 3
+        before = deepcopy(setup.sheet.rows)
+        assert not service.snapshot("brian", retry_projection=True)["projectionPending"]
+        assert setup.sheet.rows == before, "Metadata recovery must never repeat the structural operation"
+    current = setup.store.get_allocation(current["id"])
+    assert current["sourceRow"] == 4
+    mirrored = allocations_from_rows(setup.book.worksheet("Shared Reimbursements").rows)[0]
+    assert mirrored.source_row == 4
+    response = service.command("brian", payment(current, 5000))
+    assert not response["projectionPending"]
+    assert setup.sheet.read(2, 31, 32) == ["10"]
+    assert setup.sheet.read(3, 31, 32) == [414.72]
+
+
+def test_row_metadata_recovery_failure_stays_visible_without_pending_financial_version(setup, monkeypatch):
+    from copy import deepcopy
+    from bookiebot.reimbursements import mirror
+    assert split(setup)[0]
+    setup.sheet.insert(2, 29, 34)
+    before = deepcopy(setup.sheet.rows)
+    original_mirror = mirror.mirror_allocation
+    monkeypatch.setattr(mirror, "mirror_allocation", lambda *_args, **_kw: (_ for _ in ()).throw(TimeoutError("Mirror unavailable")))
+    snapshot = service.snapshot("brian", retry_projection=True)
+    assert snapshot["projectionPending"]
+    assert all(value["version"] == value["projectedVersion"] for value in snapshot["allocations"])
+    monkeypatch.setattr(mirror, "mirror_allocation", original_mirror)
+    snapshot = service.snapshot("brian", retry_projection=True)
+    assert not snapshot["projectionPending"] and snapshot["allocations"][0]["sourceRow"] == 4
+    assert setup.sheet.rows == before
 
 
 def test_cancel_update_reactivate_then_delete_split_preserves_original_history(setup):

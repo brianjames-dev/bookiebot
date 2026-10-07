@@ -9,6 +9,7 @@ from bookiebot.sheets import undo
 
 
 ACTOR = "676638528590970917"
+_REAL_RECONCILIATION_SYNC = undo._sync_reconciliation_after_action_mutation
 
 
 @pytest.fixture
@@ -184,3 +185,19 @@ def test_bank_overlay_traces_through_inactive_update_before_move_and_split(canon
     active = [original, moved, canonical.logged]
     actions = undo.canonical_logged_actions(active, for_reconciliation=True, history=[original, updated, moved, canonical.logged])
     assert [entry.id for entry in actions if _action_candidate(entry)] == ["source"]
+
+
+@pytest.mark.parametrize("origin", ["bank_reconciliation", "manual"])
+def test_canonical_amount_update_preserves_reconciliation_origin(canonical, monkeypatch, origin):
+    from bookiebot.banking import service as banking
+    reopened = []
+    monkeypatch.setattr(service, "mutate_recent_action", lambda *_args, **kwargs: (True, "Saved"))
+    monkeypatch.setattr(undo, "_sync_reconciliation_after_action_mutation", _REAL_RECONCILIATION_SYNC)
+    def bank_service():
+        if origin == "bank_reconciliation":
+            pytest.fail("An in-progress confirmation must not recursively reopen its own locked bank review")
+        return SimpleNamespace(reopen_reconciliation_items_for_action_ids=lambda owner, ids, **kw: reopened.append(ids))
+    monkeypatch.setattr(banking, "build_banking_service", bank_service)
+    assert undo.update_recent_action(ACTOR, action_id="split", updates={"amount": "100.00"},
+                                    metadata_extra={"origin": origin}) == (True, "Saved")
+    assert reopened == ([] if origin == "bank_reconciliation" else [{"source", "split"}])

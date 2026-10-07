@@ -24,6 +24,9 @@ from bookiebot.sheets.writer import log_category_row, record_expense_undo
 from bookiebot.sheets.routing import sheet_user_context
 import bookiebot.sheets.utils as sheet_utils
 from unit_tests.support.sheets_repo_stub import SheetsRepoStub
+from types import SimpleNamespace
+from unittest.mock import MagicMock
+import pytest
 
 
 def test_income_split_uses_exact_household_income_ratio_and_penny_safe_remainder():
@@ -54,6 +57,45 @@ def test_fronted_split_assigns_full_responsibility_to_partner():
 def test_fronted_is_the_only_canonical_full_reimbursement_method_value():
     assert normalize_split_method("fronted") == "fronted"
     assert normalize_split_method("covered") is None
+
+
+def test_allocation_lookup_reads_ledger_once(monkeypatch):
+    repo = SheetsRepoStub(shared_reimbursements_rows=[SHARED_REIMBURSEMENT_HEADERS])
+    read = MagicMock(wraps=repo.shared_reimbursements.get_all_values)
+    monkeypatch.setattr(repo.shared_reimbursements, "get_all_values", read)
+    with repo.patched():
+        assert list_allocations("676638528590970917") == []
+    read.assert_called_once_with()
+
+
+@pytest.mark.parametrize("rows,valid", [
+    ([["10/6/2026", "T", "$464.72", "Gameday", "Brian (BofA)"]], True),
+    ([["10/6/2026", "T", "$464.72", "Gameday"]], True),
+    ([], False), ([["10/6/2026", "T", "bad", "Gameday", "Brian (BofA)"]], False),
+])
+def test_split_reads_source_fields_as_one_range_before_registration(monkeypatch, rows, valid):
+    from bookiebot.sheets import undo, collaboration
+    from bookiebot.reimbursements import service
+    actor = "676638528590970917"
+    action = undo.UndoAction(worksheet="expense", kind="clear_cells", row=3, columns=[22, 23, 24, 25, 26],
+        previous_values=[], description="shopping T", metadata={"type": "expense", "category": "shopping"})
+    logged = undo.LoggedAction("source", "2026-10-06", actor, action)
+    sheet = SimpleNamespace(get=MagicMock(return_value=rows), cell=MagicMock(side_effect=AssertionError("No per-cell reads")))
+    register = MagicMock(return_value=(True, "Saved"))
+    monkeypatch.setattr(undo, "select_recent_action", lambda *_a, **_kw: logged)
+    monkeypatch.setattr(undo, "_worksheet", lambda _kind: sheet)
+    monkeypatch.setattr(collaboration, "allocation_for_source_action", lambda *_a: None)
+    monkeypatch.setattr(service, "enabled", lambda: True)
+    monkeypatch.setattr(service, "record_split", register)
+    ok, _detail = undo.split_recent_action(actor, split_method="income", action_id="source")
+    assert ok is valid
+    sheet.get.assert_called_once_with("V3:Z3")
+    sheet.cell.assert_not_called()
+    if valid:
+        assert register.call_args.args[4]["amount"] == "$464.72"
+        assert register.call_args.args[-3:] == (464.72, 300.81, 163.91)
+    else:
+        register.assert_not_called()
 
 
 def test_legacy_reimbursement_header_is_extended_without_losing_existing_rows():
