@@ -4,6 +4,14 @@ Last updated: 2026-10-07
 
 ## Goal
 
+### Split responsiveness work log — 2026-10-07
+
+Complete in code/automated verification; release and Discord timing acceptance remain STATUS checklist 131. Production traces confirmed split callbacks blocked the event loop in reimbursement mirror metadata reads. Split/create/edit/cancel UI now uses immediate private thinking acknowledgments, worker-thread I/O with actor context, and completed error follow-ups. Typed/post-log explicit splits also run in workers. Source fields load in one range request, ledger lookup reuses its header snapshot, and projector/mirror share workbook/worksheet handles within a sync. Named anchors, current values and budget formulas remain freshly verified.
+
+Recent-action mutations project only the selected allocation, retaining structural-move neighbor repair. Full Shared refresh/settlement/reset still retries the complete pending queue and metadata recovery. Same-expense workers serialize log/ledger writes under an in-process guard with bounded lock lifetime; different expenses remain independent until the existing projection lock. A saved split whose projection lock or Sheets transport fails reports saved/pending rather than inviting a duplicate; source/action/allocation/payment semantics remain unchanged. Split and sync duration logs enable deployed timing review.
+
+Added 29 passing cases plus four optional PostgreSQL variants for acknowledgment ordering, blocked I/O responsiveness, owner context, failures, one source/ledger read, live anchors with reused handles, selected-work isolation and recovery. Full local **2,050 passed / 346 optional PostgreSQL/frontend skips**, Pyright clean. Existing move/settlement/reversal/reset Undo/Redo regressions pass. No production financial writes or deployment during implementation.
+
 ### Expense move compaction and reimbursement audit work log — 2026-10-07
 
 Complete (user-reported Shopping gap): the canonical move intentionally cleared its source without compacting (September 16 decision). It now shifts that category's lower cells/anchors upward, with destination relocation and neighboring active/inactive action coordinates in one Sheets batch. Lost responses cannot repeat the structural edit. Ordinary native removal/restoration carries canonical anchors; move Undo compacts its destination; partial drafts are preserved. Neighbor database/mirror coordinates recover absolutely from anchors without changing financial versions or repeating a move.

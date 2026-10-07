@@ -237,8 +237,8 @@ def _worksheet() -> Any:
     return get_sheets_repo().shared_reimbursements_sheet()
 
 
-def _ensure_headers(ws: Any) -> None:
-    rows = ws.get_all_values()
+def _ensure_headers(ws: Any, rows: list[list[str]] | None = None) -> None:
+    rows = ws.get_all_values() if rows is None else rows
     current = rows[0] if rows else []
     if current[: len(SHARED_REIMBURSEMENT_HEADERS)] == SHARED_REIMBURSEMENT_HEADERS:
         return
@@ -352,8 +352,9 @@ def allocations_from_rows(rows: list[list[str]], *, include_void: bool = False) 
 def list_allocations(actor_key: str | None = None, *, include_void: bool = False) -> list[SharedAllocation]:
     try:
         ws = _worksheet()
-        _ensure_headers(ws)
-        rows = ws.get_all_values()[1:]
+        rows = ws.get_all_values()
+        _ensure_headers(ws, rows)
+        rows = rows[1:]
     except Exception:
         logger.exception("Failed to read shared reimbursements")
         return []

@@ -56,13 +56,14 @@ def _headers(book: Any, sheet: Any, rows: list[list[Any]]) -> None:
         raise ProjectionConflictError("The reimbursement worksheet headers could not be verified.")
 
 
-def _source_row(client: Any, allocation: dict[str, Any], ledger_book: Any, ledger_key: str) -> int:
+def _source_row(client: Any, allocation: dict[str, Any], ledger_book: Any, ledger_key: str,
+                projector: SheetsProjection | None = None) -> int:
     if allocation["accounting"] == "legacy_net" or allocation.get("mirrorOnlyVersion", 0) == allocation.get("version", -1):
         return int(allocation["sourceRow"])  # Historical source access is not required to mirror its record.
     key = str(allocation.get("sourceSpreadsheetId", ""))
     if not key:
         return int(allocation["sourceRow"])
-    book = ledger_book if key == ledger_key else client.open_by_key(key)
+    book = ledger_book if key == ledger_key else (projector._book(key) if projector else client.open_by_key(key))
     linked = SheetsProjection._ranges(book).get(_name("source", allocation["id"]))
     if linked is None:
         return int(allocation["sourceRow"])
@@ -73,7 +74,8 @@ def _source_row(client: Any, allocation: dict[str, Any], ledger_book: Any, ledge
     return start + 1
 
 
-def _values(client: Any, allocation: dict[str, Any], book: Any, key: str) -> list[str]:
+def _values(client: Any, allocation: dict[str, Any], book: Any, key: str,
+            projector: SheetsProjection | None = None) -> list[str]:
     from bookiebot.reimbursements.service import allocation_as_legacy
 
     confirmed = [event for event in allocation.get("events", []) if event["status"] == "confirmed"]
@@ -83,7 +85,7 @@ def _values(client: Any, allocation: dict[str, Any], book: Any, key: str) -> lis
                        if confirmed else str(allocation.get("legacyReceivedAt", "")))
     value = {**allocation, "outstandingCents": allocation["partnerShareCents"] - allocation["settledCents"] - allocation.get("clearedCents", 0)}
     legacy = replace(allocation_as_legacy(value), payer=allocation["payerPerson"],
-                     source_row=_source_row(client, allocation, book, key), received_at=received_at,
+                     source_row=_source_row(client, allocation, book, key, projector), received_at=received_at,
                      original_person=allocation["payerPerson"], responsible_person=allocation["payerPerson"])
     return _allocation_row(legacy)
 
@@ -100,20 +102,22 @@ def _validate_anchor(book: Any, sheet: Any, name: str, allocation_id: str) -> li
     return values
 
 
-def mirror_allocation(client: Any, allocation: dict[str, Any]) -> None:
+def mirror_allocation(client: Any, allocation: dict[str, Any], *, projector: SheetsProjection | None = None) -> None:
     """Mirror one allocation without deleting unrelated records or history."""
     year = int(allocation.get("ledgerYear") or allocation["sourceYear"])
     key = str(allocation.get("ledgerSpreadsheetId") or get_budget_spreadsheet_id_for_user(
         actor_key_for_owner(allocation["payerOwner"]) or "shortcut:" + allocation["payerOwner"], year))
-    book = client.open_by_key(key)
+    book = projector._book(key) if projector else client.open_by_key(key)
     try:
-        sheet = book.worksheet(_TITLE)
+        sheet = projector._sheet(key, _TITLE) if projector else book.worksheet(_TITLE)
     except WorksheetNotFound:
         # A lost creation response is safe: retry finds the existing title.
         sheet = book.add_worksheet(title=_TITLE, rows=1000, cols=_WIDTH)
+        if projector:
+            projector.worksheets[(key, _TITLE)] = sheet
     rows = sheet.get_all_values()
     _headers(book, sheet, rows)
-    values = _values(client, allocation, book, key)
+    values = _values(client, allocation, book, key, projector)
     matches = [index for index, row in enumerate(rows, 1) if index > 1 and row and str(row[0]) == allocation["id"]]
     if len(matches) > 1:
         raise ProjectionConflictError("The reimbursement worksheet contains duplicate allocation IDs.")

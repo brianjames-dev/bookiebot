@@ -602,6 +602,30 @@ def test_sync_pending_does_not_mark_stale_or_failed_projection_complete():
     assert marked == [("stale", 1), ("complete", 1)]
 
 
+def test_scoped_sync_leaves_unrelated_pending_work_for_full_recovery():
+    values = [allocation(id="selected"), allocation(id="unrelated")]
+    marked, projected = [], []
+    store = SimpleNamespace(access=object(), pending_projections=lambda: values,
+        mark_projected=lambda identity, version: marked.append((identity, version)) or True)
+    def project(value):
+        projected.append(value["id"])
+        if value["id"] == "unrelated":
+            raise TimeoutError("Unrelated sheet unavailable")
+    projector = SimpleNamespace(project=project)
+    assert sync_pending(store, projector, allocation_ids={"selected"})
+    assert projected == ["selected"] and marked == [("selected", 1)]
+    projected.clear()
+    assert not sync_pending(store, projector)
+    assert projected == ["selected", "unrelated"]
+
+
+def test_scoped_sync_skips_full_household_coordinate_scan(monkeypatch):
+    projector = SheetsProjection(SimpleNamespace(open_by_key=lambda _key: pytest.fail("No unrelated sheet opens")))
+    store = SimpleNamespace(access=object(), pending_projections=lambda: [],
+        snapshot=lambda *_a, **_kw: pytest.fail("No full household scan for an interactive split"))
+    assert sync_pending(store, projector, allocation_ids={"already-synced"})
+
+
 def correction(before, operation="update", **updates):
     value = {**deepcopy(before), "version": 2, "projectedVersion": 1, **updates}
     value["sourceValues"] = {**value["sourceValues"], "item": value["item"], "location": value["location"],
@@ -888,7 +912,7 @@ def test_sync_persists_corrected_source_position_after_verified_move(setup, monk
     marked, mirrored = [], []
     store = SimpleNamespace(access=object(), pending_projections=lambda: [value], snapshot=lambda *_args, **_kw: {"allocations": []},
                             mark_projected=lambda identity, version, **kwargs: marked.append((identity, version, kwargs)) or True)
-    monkeypatch.setattr(mirror, "mirror_allocation", lambda _client, current: mirrored.append(current["sourceRow"]))
+    monkeypatch.setattr(mirror, "mirror_allocation", lambda _client, current, **_kw: mirrored.append(current["sourceRow"]))
     assert sync_pending(store, projector)
     assert mirrored == [4]
     assert marked == [("allocation-1", 2, {"source_row": 4})]

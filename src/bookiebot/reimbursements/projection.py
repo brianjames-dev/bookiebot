@@ -14,6 +14,7 @@ from decimal import Decimal, InvalidOperation
 import hashlib
 import json
 import threading
+import time
 from typing import Any, Iterator
 
 from gspread import WorksheetNotFound
@@ -137,6 +138,7 @@ class SheetsProjection:
     def __init__(self, client: Any):
         self.client = client
         self.books: dict[str, Any] = {}
+        self.worksheets: dict[tuple[str, str], Any] = {}
         self.budget_formula_cache: dict[Any, Any] = {}
 
     def _book(self, key: str) -> Any:
@@ -145,6 +147,14 @@ class SheetsProjection:
         if key not in self.books:
             self.books[key] = self.client.open_by_key(key)
         return self.books[key]
+
+    def _sheet(self, key: str, title: str) -> Any:
+        # Workbook/worksheet discovery is itself a metadata HTTP request.
+        # Reuse handles only within this sync; anchor validation stays fresh.
+        identity = (key, title)
+        if identity not in self.worksheets:
+            self.worksheets[identity] = self._book(key).worksheet(title)
+        return self.worksheets[identity]
 
     @staticmethod
     def _ranges(book: Any) -> dict[str, Any]:
@@ -204,7 +214,7 @@ class SheetsProjection:
                 event["status"] in {"confirmed", "pending"} for event in allocation.get("events", [])):
             raise ProjectionConflictError("Reverse recorded and pending payments before changing this split.")
         book = self._book(allocation["sourceSpreadsheetId"])
-        sheet = book.worksheet(allocation.get("sourceSheetTitle") or date.fromisoformat(allocation["expenseDate"]).strftime("%B"))
+        sheet = self._sheet(allocation["sourceSpreadsheetId"], allocation.get("sourceSheetTitle") or date.fromisoformat(allocation["expenseDate"]).strftime("%B"))
         full = _name("source", allocation["id"])
         old_fields, fields = before["sourceColumnMap"], allocation["sourceColumnMap"]
         old_expected, expected = _source_identity(before), _source_identity(allocation)
@@ -353,7 +363,7 @@ class SheetsProjection:
         if not fields or "amount" not in fields or not (set(fields) - {"amount"}) or not expected:
             raise ProjectionConflictError("This expense needs a verified source row before settlement can sync.")
         book = self._book(allocation["sourceSpreadsheetId"])
-        sheet = book.worksheet(allocation.get("sourceSheetTitle") or date.fromisoformat(allocation["expenseDate"]).strftime("%B"))
+        sheet = self._sheet(allocation["sourceSpreadsheetId"], allocation.get("sourceSheetTitle") or date.fromisoformat(allocation["expenseDate"]).strftime("%B"))
         full = _name("source", allocation["id"])
         amount = _name("amount", allocation["id"])
         person = _name("person", allocation["id"])
@@ -420,7 +430,7 @@ class SheetsProjection:
             return
         paid_on = date.fromisoformat(event["date"])
         book = self._book(get_shared_expenses_spreadsheet_id(paid_on.year))
-        sheet = book.worksheet(paid_on.strftime("%B"))
+        sheet = self._sheet(get_shared_expenses_spreadsheet_id(paid_on.year), paid_on.strftime("%B"))
         category = allocation["category"] if allocation["category"] in get_category_columns else "need_expenses"
         config = get_category_columns[category]
         fields = {field: a1_to_rowcol(column + "1")[1] for field, column in config["columns"].items()}
@@ -486,8 +496,9 @@ class SheetsProjection:
         actor = actor_key_for_owner(allocation["partnerOwner"])
         if not actor:
             raise ProjectionConflictError("The partner budget owner is not configured.")
-        book = self._book(get_budget_spreadsheet_id_for_user(actor, allocation.get("sourceYear", spent_on.year)))
-        sheet = book.worksheet(allocation.get("sourceSheetTitle") or spent_on.strftime("%B"))
+        key = get_budget_spreadsheet_id_for_user(actor, allocation.get("sourceYear", spent_on.year))
+        book = self._book(key)
+        sheet = self._sheet(key, allocation.get("sourceSheetTitle") or spent_on.strftime("%B"))
         full = _name("partner_bill", allocation["id"])
         amount = _name("partner_bill_amount", allocation["id"])
         names = self._ranges(book)
@@ -599,22 +610,26 @@ class SheetsProjection:
         self.source(allocation)
 
 
-def sync_pending(store: Any, projector: Any | None = None) -> bool:
-    """Return True only when every current canonical version is verified."""
+def sync_pending(store: Any, projector: Any | None = None, *, allocation_ids: set[str] | None = None) -> bool:
+    """Verify selected allocations, or perform a full recovery when unscoped."""
     import logging
+    started = time.perf_counter()
     if projector is None:
         from bookiebot.sheets.auth import get_gspread_client
         projector = SheetsProjection(get_gspread_client())
     success = True
+    attempted = 0
     with projection_lock(store):
         if isinstance(projector, SheetsProjection):
+            projector.books.clear()
+            projector.worksheets.clear()
             projector.budget_formula_cache.clear()
             try:
                 # A legacy move/Undo may have shifted a canonical neighbor even
                 # when that neighbor has no pending financial version. Repair
                 # its coordinates before processing receipts or declaring sync
                 # complete, including recovery from a failed mirror write.
-                sources = store.snapshot("brian", include_inactive=True)["allocations"]
+                sources = store.snapshot("brian", include_inactive=True)["allocations"] if allocation_ids is None else []
                 seen: set[tuple[str, str]] = set()
                 for source in sources:
                     if (source["accounting"] != "cash_v1" or source["sourceWorksheet"] != "expense"
@@ -629,6 +644,9 @@ def sync_pending(store: Any, projector: Any | None = None) -> bool:
                 logging.getLogger(__name__).exception("Shared expense source positions remain pending")
                 success = False
         for allocation in store.pending_projections():
+            if allocation_ids is not None and allocation["id"] not in allocation_ids:
+                continue
+            attempted += 1
             try:
                 projector.project(allocation)
                 if isinstance(projector, SheetsProjection):
@@ -636,13 +654,17 @@ def sync_pending(store: Any, projector: Any | None = None) -> bool:
                     revision = allocation.get("sourceRevision", {})
                     if revision.get("operation") == "move" and allocation.get("projectedVersion", 0) < revision.get("version", 0):
                         refresh_source_positions(store, projector, allocation)
-                    mirror_allocation(projector.client, allocation)
+                    mirror_allocation(projector.client, allocation, projector=projector)
                 source = {"source_row": allocation["sourceRow"]} if isinstance(projector, SheetsProjection) else {}
                 if not store.mark_projected(allocation["id"], allocation["version"], **source):
                     success = False
             except Exception:
                 logging.getLogger(__name__).exception("Reimbursement sheet projection remains pending", extra={"allocation_id": allocation["id"]})
                 success = False
+    logging.getLogger(__name__).info(
+        "Reimbursement sync finished in %.2fs (%d allocations; scoped=%s; success=%s)",
+        time.perf_counter() - started, attempted, allocation_ids is not None, success,
+    )
     return success
 
 
@@ -655,7 +677,7 @@ def refresh_source_positions(store: Any, projector: SheetsProjection, moved: dic
     from bookiebot.reimbursements.mirror import mirror_allocation
     snapshot = store.snapshot(moved["payerOwner"], include_inactive=True)
     book = projector._book(moved["sourceSpreadsheetId"])
-    sheet = book.worksheet(moved.get("sourceSheetTitle") or date.fromisoformat(moved["expenseDate"]).strftime("%B"))
+    sheet = projector._sheet(moved["sourceSpreadsheetId"], moved.get("sourceSheetTitle") or date.fromisoformat(moved["expenseDate"]).strftime("%B"))
     names = projector._ranges(book)
     for value in snapshot["allocations"]:
         if (value["id"] == moved["id"] or value["accounting"] != "cash_v1"
@@ -673,6 +695,6 @@ def refresh_source_positions(store: Any, projector: SheetsProjection, moved: dic
         projector._validate_anchors(book, sheet.id, full, value["sourceColumnMap"], projector._source_anchors(value))
         current = {**value, "sourceRow": row,
                    "events": [event for event in snapshot["events"] if event["allocationId"] == value["id"]]}
-        mirror_allocation(projector.client, current)
+        mirror_allocation(projector.client, current, projector=projector)
         if not store.mark_projected(value["id"], value["version"], source_row=row):
             raise ProjectionConflictError("A neighboring expense changed while its row was being synchronized. Retry syncing.")

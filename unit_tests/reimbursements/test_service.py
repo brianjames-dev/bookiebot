@@ -109,6 +109,49 @@ def test_split_replay_does_not_duplicate_history_or_reset_confirmed_cash(setup):
         split(setup, payer_share=300, partner_share=164.72)
 
 
+def test_split_does_not_project_unrelated_unavailable_allocation(setup, monkeypatch):
+    unrelated = setup.store.register_allocation(payload(sourceSpreadsheetId="unavailable", sourceActionId="unrelated"))
+    opened = []
+    def open_book(key):
+        opened.append(key)
+        assert key != "unavailable", "A split must not wait for another allocation's workbook"
+        return setup.book
+    monkeypatch.setattr(auth, "get_gspread_client", lambda: SimpleNamespace(open_by_key=open_book))
+    ok, message = split(setup)
+    assert ok and "syncing" not in message
+    current = setup.store.find_by_source(setup.logged.id, 2026)
+    assert current["version"] == current["projectedVersion"]
+    assert setup.store.get_allocation(unrelated["id"])["projectedVersion"] == 0
+    assert opened.count("shared") == 1
+    assert len(setup.history) == 1
+
+
+def test_concurrent_split_workers_record_one_allocation_and_history_action(setup):
+    from concurrent.futures import ThreadPoolExecutor
+    from bookiebot.splits import run_split_operation
+    def apply(_actor, **_kwargs):
+        return split(setup)
+    with ThreadPoolExecutor(max_workers=2) as pool:
+        pending = [pool.submit(run_split_operation, apply, BRIAN, action_id=setup.logged.id) for _ in range(2)]
+        assert all(task.result()[0] for task in pending)
+    assert len(setup.history) == 1
+    values = setup.store.snapshot("brian")["allocations"]
+    assert len(values) == 1 and values[0]["version"] == values[0]["projectedVersion"]
+
+
+@pytest.mark.parametrize("phase", ["lock", "sheet"])
+def test_saved_split_projection_failure_returns_recoverable_success(setup, monkeypatch, phase):
+    if phase == "lock":
+        monkeypatch.setattr(projection, "sync_pending", lambda *_a, **_kw: (_ for _ in ()).throw(TimeoutError("Lock unavailable")))
+    else:
+        monkeypatch.setattr(auth, "get_gspread_client", lambda: SimpleNamespace(open_by_key=lambda _key: (_ for _ in ()).throw(TimeoutError("Sheet unavailable"))))
+    ok, message = split(setup)
+    assert ok and "The split is saved; expense sheets are still syncing" in message
+    current = setup.store.find_by_source(setup.logged.id, 2026)
+    assert current["version"] > current["projectedVersion"]
+    assert len(setup.history) == 1
+
+
 @pytest.mark.parametrize("changes", [{"payer": "Hannah"}, {"values": VALUES | {"person": "Hannah"}},
                                      {"values": VALUES | {"amount": "463.72"}}, {"values": VALUES | {"amount": "bad"}}])
 def test_source_payer_and_amount_guard_precedes_registration(setup, changes):
@@ -301,12 +344,12 @@ def test_shopping_to_needs_repairs_neighbor_and_books_full_reimbursement_under_n
     elif failure == "neighbor_mirror":
         original_mirror = mirror.mirror_allocation
         failed = False
-        def fail_once(client, allocation):
+        def fail_once(client, allocation, **kwargs):
             nonlocal failed
             if allocation["id"] == neighbor["id"] and not failed:
                 failed = True
                 raise TimeoutError("Neighbor mirror unavailable after compaction")
-            return original_mirror(client, allocation)
+            return original_mirror(client, allocation, **kwargs)
         monkeypatch.setattr(mirror, "mirror_allocation", fail_once)
     stale = selected(setup)
     ok, message = service.mutate_recent_action(BRIAN, stale, "move", destination_category="needs")
@@ -378,7 +421,7 @@ def test_ordinary_move_and_undo_keep_canonical_neighbor_positions_and_settlement
     monkeypatch.setattr(undo, "_update_contiguous_row", lambda ws, row, cols, vals: ws.write(row - 1, min(cols) - 1, vals))
     if mirror_failure:
         original_mirror = mirror.mirror_allocation
-        def fail_once(client, allocation):
+        def fail_once(client, allocation, **_kwargs):
             monkeypatch.setattr(mirror, "mirror_allocation", original_mirror)
             raise TimeoutError("Mirror unavailable after a successful legacy Undo")
         monkeypatch.setattr(mirror, "mirror_allocation", fail_once)
@@ -408,7 +451,7 @@ def test_row_metadata_recovery_failure_stays_visible_without_pending_financial_v
     setup.sheet.insert(2, 29, 34)
     before = deepcopy(setup.sheet.rows)
     original_mirror = mirror.mirror_allocation
-    monkeypatch.setattr(mirror, "mirror_allocation", lambda *_args: (_ for _ in ()).throw(TimeoutError("Mirror unavailable")))
+    monkeypatch.setattr(mirror, "mirror_allocation", lambda *_args, **_kw: (_ for _ in ()).throw(TimeoutError("Mirror unavailable")))
     snapshot = service.snapshot("brian", retry_projection=True)
     assert snapshot["projectionPending"]
     assert all(value["version"] == value["projectedVersion"] for value in snapshot["allocations"])

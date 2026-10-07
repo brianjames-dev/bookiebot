@@ -2154,7 +2154,19 @@ def split_recent_action(
     ws = _worksheet(action.worksheet)
     if not _fixed_budget_target_matches(ws, action):
         return False, _STALE_BUDGET_TARGET_MESSAGE
-    gross_value = _sheet_value(ws.cell(action.row, amount_column).value)
+    # Read the source once so amount and identity come from the same snapshot.
+    first, last = min(field_columns.values()), max(field_columns.values())
+    if callable(getattr(ws, "get", None)):
+        rows = ws.get(f"{get_column_letter(first)}{action.row}:{get_column_letter(last)}{action.row}")
+        row_values = list(rows[0]) if rows else []
+    else:
+        rows = ws.get_all_values()
+        row_values = list(rows[action.row - 1][first - 1:last]) if 0 < action.row <= len(rows) else []
+    row_values += [""] * max(0, last - first + 1 - len(row_values))
+    fields = list(field_columns)
+    current_values = [_sheet_value(row_values[field_columns[field] - first]) for field in fields]
+    field_values = dict(zip(fields, current_values, strict=False))
+    gross_value = field_values["amount"]
     try:
         gross_amount = float(gross_value.replace("$", "").replace(",", "").strip())
     except (TypeError, ValueError):
@@ -2162,9 +2174,6 @@ def split_recent_action(
     if gross_amount <= 0:
         return False, "Only expenses greater than $0 can be split."
 
-    fields = list(field_columns)
-    current_values = [_sheet_value(ws.cell(action.row, field_columns[field]).value) for field in fields]
-    field_values = dict(zip(fields, current_values, strict=False))
     payer = field_values.get("person") or action.metadata.get("person") or get_user_config(user_key).name
     payer_owner = payer_owner_from_person(payer, user_key)
     if payer_owner != get_user_config(user_key).budget_owner_key:

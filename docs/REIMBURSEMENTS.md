@@ -47,6 +47,8 @@ Generated repayment rows are not ordinary purchase action-log entries, so they d
 
 Recent actions overlay the current canonical details on stable action IDs; the original action log and correction audit remain intact. Bank matching uses exactly one current gross purchase candidate, including when splitting followed earlier updates/moves. Update, Move and Delete reopen linked matches, and deleted lineages disappear from both recent actions and bank candidates. Canceled allocations remain internally managed so later edits or re-splitting continue using the same verified source.
 
+Discord split menus and creation/edit/confirmed cancellation show a private responding indicator before reading or writing sheets. Blocking I/O runs in workers, and source fields load together. Each recent-action mutation waits only for its allocation's verified projection, including neighboring repairs for a category move. If the split is saved but sheets are still syncing, open Shared in the app and refresh; that full recovery also retries unrelated pending allocations. Payments, offsets and resets retain full recovery. Source/value/anchor checks, income ratios and confirmed-repayment accounting are unchanged.
+
 ## Controlled rollout
 
 `BOOKIEBOT_REIMBURSEMENTS_ENABLED` defaults to `false` until the existing ledgers have been inspected and migrated. The frontend then retains the existing reimbursement section. Keep the feature disabled during the first migration.
@@ -68,6 +70,8 @@ Reusing that plan resumes its existing registrations/projections. Do not generat
 After migration, disabling the feature is not a financial rollback: the source rows now follow the confirmed-repayment model. Keep canonical mutations enabled or suspend writes for maintenance while repairing a failed deployment; do not resume legacy split/receipt writes against migrated records.
 
 ## Acceptance checks
+
+After deployment, inspect the split menu on Discord, then use isolated workbooks/database to create, change and cancel a split. The responding indicator should appear immediately and end with a private result; another Discord action must remain responsive during an injected slow Sheets read. Repeated clicks on the same expense must retain one allocation/action, and workers for different expenses must remain independent. Shopping/Needs source fields should use one range read. Seed an unrelated failed allocation and verify this split succeeds while that allocation remains pending; Shared refresh should retry it. Inject lock/Sheets failure after registration and verify saved/pending state and one allocation/action on retry. Check deployed split/sync duration logs; avoid synthetic production repayments.
 
 In isolated workbooks/database, test both payer directions, partner names inside item descriptions, both active Brian accounts, income/equal/fronted splits, partial/full/sent-confirmed payments, pending-payment rejection, equal offsets, whole-group reversal, payment dates across months/years, stale views and repeat requests. Check gross bank matching and that each linked expense appears once. Inject failures after database commit, after anchor/row creation and after Sheets value updates; verify retry converges without duplicate expenses. Confirm both phone themes and narrow date-input layout. Use a disposable PostgreSQL database for concurrent-process contracts; never point `BOOKIEBOT_TEST_POSTGRES_URL` at production.
 

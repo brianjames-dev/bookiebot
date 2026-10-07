@@ -52,7 +52,7 @@ from bookiebot.sheets.collaboration import (
     obligation_label,
 )
 from bookiebot.sheets.reimbursement_history import ReimbursementHistoryUnavailableError
-from bookiebot.splits import change_split_method_view, continue_split_after_log, split_method_view
+from bookiebot.splits import change_split_method_view, continue_split_after_log, run_split_operation, split_method_view
 from bookiebot.sheets.undo import (
     cancel_split_recent_action,
     change_split_recent_action,
@@ -355,14 +355,14 @@ async def split_recent_action_handler(entities: IntentEntities, message: Any) ->
     action_id = entities.get("action_id")
     match_text = entities.get("match_text") or entities.get("description") or entities.get("location") or entities.get("item")
     method = normalize_split_method(entities.get("split_method"))
-    logged = select_recent_action(
+    logged = await asyncio.to_thread(select_recent_action,
         actor_key,
         index=index,
         action_id=action_id,
         match_text=str(match_text) if match_text else None,
     )
     if logged is None and match_text:
-        matches = matching_recent_actions(actor_key, str(match_text), 10)
+        matches = await asyncio.to_thread(matching_recent_actions, actor_key, str(match_text), 10)
         if len(matches) == 1:
             logged = matches[0]
         elif matches:
@@ -399,7 +399,7 @@ async def split_recent_action_handler(entities: IntentEntities, message: Any) ->
         )
         return
     split_operation = change_split_recent_action if capabilities.can_change_split else split_recent_action
-    success, detail = split_operation(
+    success, detail = await asyncio.to_thread(run_split_operation, split_operation,
         actor_key,
         split_method=method,
         action_id=logged.id,
@@ -792,13 +792,20 @@ async def _reject_unowned_recent_interaction(interaction: Any, actor_key: str | 
 async def _prompt_cancel_recent_split(interaction: Any, actor_key: str | None, action_id: str) -> None:
     if await _reject_unowned_recent_interaction(interaction, actor_key):
         return
-    selected = select_recent_action(actor_key, action_id=action_id)
+    await interaction.response.defer(ephemeral=True, thinking=True)
+    try:
+        with sheet_user_context(actor_key):
+            selected = await asyncio.to_thread(select_recent_action, actor_key, action_id=action_id)
+    except Exception:
+        logger.exception("Split cancellation selection failed", extra={"action_id": action_id})
+        await interaction.followup.send("I could not load that expense. Try opening Recent transactions again.", ephemeral=True)
+        return
     if selected is None:
-        await interaction.response.send_message("That transaction is no longer available. Please select it again.", ephemeral=True)
+        await interaction.followup.send("That transaction is no longer available. Please select it again.", ephemeral=True)
         return
     capabilities = action_capabilities(selected.action)
     if not capabilities.can_cancel_split:
-        await interaction.response.send_message(capabilities.cancel_split_reason, ephemeral=True)
+        await interaction.followup.send(capabilities.cancel_split_reason, ephemeral=True)
         return
 
     async def handle_cancel_split(confirm_interaction: Any, confirmation: str) -> None:
@@ -812,15 +819,15 @@ async def _prompt_cancel_recent_split(interaction: Any, actor_key: str | None, a
             return
         if confirmation != "confirm_cancel_split":
             return
+        await confirm_interaction.response.defer(ephemeral=True, thinking=True)
         try:
-            await confirm_interaction.response.defer(ephemeral=True)
+            success, detail = await asyncio.to_thread(run_split_operation, cancel_split_recent_action, actor_key, action_id=action_id)
         except Exception:
-            pass
-        with sheet_user_context(actor_key):
-            success, detail = cancel_split_recent_action(actor_key, action_id=action_id)
+            logger.exception("Split cancellation failed", extra={"action_id": action_id})
+            success, detail = False, "The cancellation could not finish. Check Recent transactions and Shared before trying again."
         await _send_interaction_action_result(confirm_interaction, success, detail)
 
-    await interaction.response.send_message(
+    await interaction.followup.send(
         _with_component_spacer(
             "Cancel this split? The original gross amount will be restored and the reimbursement will be voided.",
             True,
@@ -851,7 +858,24 @@ def _recent_action_select_view(actor_key: str | None, actions: list[Any], *, des
         async def handle_decision(decision_interaction: Any, decision: str) -> None:
             if await _reject_unowned_recent_interaction(decision_interaction, actor_key):
                 return
-            selected = select_recent_action(actor_key, action_id=action_id)
+            if decision == "cancel_split":
+                await _prompt_cancel_recent_split(decision_interaction, actor_key, action_id)
+                return
+            splitting = decision in {"split", "change_split"}
+            if splitting:
+                await decision_interaction.response.defer(ephemeral=True, thinking=True)
+                try:
+                    with sheet_user_context(actor_key):
+                        selected = await asyncio.to_thread(select_recent_action, actor_key, action_id=action_id)
+                except Exception:
+                    logger.exception("Split selection failed", extra={"action_id": action_id})
+                    await decision_interaction.followup.send("I could not load that expense. Try opening Recent transactions again.", ephemeral=True)
+                    return
+                if selected is None:
+                    await decision_interaction.followup.send("That expense is no longer available. Open Recent transactions again.", ephemeral=True)
+                    return
+            else:
+                selected = select_recent_action(actor_key, action_id=action_id)
             capabilities = action_capabilities(selected.action) if selected else None
             if decision == "update":
                 if capabilities and not capabilities.can_update:
@@ -894,9 +918,9 @@ def _recent_action_select_view(actor_key: str | None, actions: list[Any], *, des
                 return
             if decision == "change_split" or (decision == "split" and capabilities and capabilities.can_change_split):
                 if capabilities and not capabilities.can_change_split:
-                    await decision_interaction.response.send_message(capabilities.change_split_reason, ephemeral=True)
+                    await decision_interaction.followup.send(capabilities.change_split_reason, ephemeral=True)
                     return
-                await decision_interaction.response.send_message(
+                await decision_interaction.followup.send(
                     _with_component_spacer("How do you want to update this split?", True),
                     view=change_split_method_view(
                         actor_key,
@@ -908,16 +932,13 @@ def _recent_action_select_view(actor_key: str | None, actions: list[Any], *, des
                 return
             if decision == "split":
                 if capabilities and not capabilities.can_split:
-                    await decision_interaction.response.send_message(capabilities.split_reason, ephemeral=True)
+                    await decision_interaction.followup.send(capabilities.split_reason, ephemeral=True)
                     return
-                await decision_interaction.response.send_message(
+                await decision_interaction.followup.send(
                     _with_component_spacer("How do you want to split this expense?", True),
                     view=split_method_view(actor_key, action_id),
                     ephemeral=True,
                 )
-                return
-            if decision == "cancel_split":
-                await _prompt_cancel_recent_split(decision_interaction, actor_key, action_id)
                 return
             clear_pending_action_selection(actor_key)
             await decision_interaction.response.send_message("Canceled.", ephemeral=True)

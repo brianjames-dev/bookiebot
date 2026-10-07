@@ -2,12 +2,13 @@ from __future__ import annotations
 
 from copy import deepcopy
 from types import SimpleNamespace
+from unittest.mock import MagicMock
 
 from gspread import WorksheetNotFound
 import pytest
 
 from bookiebot.reimbursements import mirror
-from bookiebot.reimbursements.projection import ProjectionConflictError, _name
+from bookiebot.reimbursements.projection import ProjectionConflictError, SheetsProjection, _name
 from bookiebot.sheets.collaboration import SHARED_REIMBURSEMENT_HEADERS as HEADERS
 from unit_tests.reimbursements.test_projection import Book, allocation, event
 
@@ -81,6 +82,30 @@ def setup(monkeypatch):
 
 def mirrored(book, identity="allocation-1"):
     return book.values_get(_name("ledger", identity))["values"][0]
+
+
+def test_mirror_reuses_workbook_handles_but_reads_live_source_anchor(setup, monkeypatch):
+    client, books = setup
+    opened = MagicMock(wraps=client.open_by_key)
+    monkeypatch.setattr(client, "open_by_key", opened)
+    source, ledger = books["shared-2026"], books["brian-2026"]
+    ledger.add_sheet("Shared Reimbursements", [HEADERS])
+    source_lookup = MagicMock(wraps=source.worksheet)
+    ledger_lookup = MagicMock(wraps=ledger.worksheet)
+    monkeypatch.setattr(source, "worksheet", source_lookup)
+    monkeypatch.setattr(ledger, "worksheet", ledger_lookup)
+    projector = SheetsProjection(client)
+    projector._sheet("shared-2026", "September")
+    name = _name("source", "allocation-1")
+    source.names[name] = {"name": name, "range": {"sheetId": 1, "startRowIndex": 2, "endRowIndex": 3}}
+    mirror.mirror_allocation(client, value(), projector=projector)
+    assert mirrored(ledger)[11] == "3"
+    source.names[name]["range"].update(startRowIndex=5, endRowIndex=6)
+    mirror.mirror_allocation(client, value(), projector=projector)
+    assert mirrored(ledger)[11] == "6"
+    assert opened.call_count == 2
+    source_lookup.assert_called_once_with("September")
+    ledger_lookup.assert_called_once_with("Shared Reimbursements")
 
 
 def test_creates_missing_sheet_once_and_retries_lost_creation(setup):
