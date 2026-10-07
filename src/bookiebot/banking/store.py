@@ -267,7 +267,7 @@ class BankStore:
                 SET status = 'import_requested', last_seen_at = ?
                 WHERE id = ? AND owner_key = ?
                   AND status IN ('needs_review', 'pending_user', 'conflict')
-                  AND (? IS NULL OR (status = ? AND last_seen_at = ?))
+                  AND (CAST(? AS TEXT) IS NULL OR (status = ? AND last_seen_at = ?))
                   AND NOT EXISTS (
                     SELECT 1 FROM bank_import_operations o
                     WHERE o.reconciliation_id = bank_reconciliation_items.id
@@ -280,7 +280,7 @@ class BankStore:
                       AND (t.account_id IS NULL OR (a.watched = 1 AND a.owner_key = t.owner_key
                            AND EXISTS (SELECT 1 FROM bank_items i WHERE i.id = a.item_id
                                        AND i.owner_key = t.owner_key AND i.status = 'active')))
-                      AND (? IS NULL OR t.updated_at = ?)
+                      AND (CAST(? AS TEXT) IS NULL OR t.updated_at = ?)
                       AND t.amount = ? AND COALESCE(t.date, t.authorized_date, '') = ?
                   )
                 """,

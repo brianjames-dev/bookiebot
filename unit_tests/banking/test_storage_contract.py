@@ -65,6 +65,27 @@ def _claim(store, review, *, owner="brian", operation_id=None):
         actor_key="discord-actor", kind="expense", request={"bank_amount": review.transaction.amount, "bank_date": review.transaction.date})
 
 
+@pytest.mark.parametrize('review_versioned', [False, True])
+@pytest.mark.parametrize('bank_versioned', [False, True])
+def test_import_claim_accepts_optional_versions_on_both_backends(contract_store, review_versioned, bank_versioned):
+    store = contract_store
+    _, _, review = _seed(store)
+    request = {'bank_amount': review.transaction.amount, 'bank_date': review.transaction.date}
+    if review_versioned:
+        request.update(expected_status=review.status, expected_last_seen_at=review.last_seen_at)
+    if bank_versioned:
+        request['expected_updated_at'] = review.transaction.updated_at
+    operation, claimed = store.claim_reconciliation_import(
+        'brian', review.id, operation_id=uuid.uuid4().hex, actor_key='actor', kind='expense', request=request,
+    )
+    assert claimed and operation is not None
+    assert store.get_reconciliation_item('brian', review.id).status == 'import_requested'
+    retry, claimed = store.claim_reconciliation_import(
+        'brian', review.id, operation_id=uuid.uuid4().hex, actor_key='actor', kind='expense', request=request,
+    )
+    assert not claimed and retry.operation_id == operation.operation_id
+
+
 def test_storage_roundtrip_encryption_upsert_and_owner_isolation(contract_store):
     store = contract_store
     item, transaction, review = _seed(store)
