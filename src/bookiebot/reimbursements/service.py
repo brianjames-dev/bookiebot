@@ -49,12 +49,13 @@ def is_managed(allocation_id: str) -> bool:
 
 def snapshot(owner: str, *, retry_projection: bool = False) -> dict[str, Any]:
     store = build_reimbursement_store()
+    synced = True
     if retry_projection:
         from bookiebot.reimbursements.projection import sync_pending
-        sync_pending(store)
+        synced = sync_pending(store)
     result = store.snapshot(owner)
     return {**result, "enabled": True, "ownerKey": owner,
-            "projectionPending": any(row["version"] != row["projectedVersion"] for row in result["allocations"])}
+            "projectionPending": not synced or any(row["version"] != row["projectedVersion"] for row in result["allocations"])}
 
 
 def command(owner: str, body: dict[str, Any]) -> dict[str, Any]:

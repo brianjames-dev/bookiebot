@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 from copy import deepcopy
+from dataclasses import asdict
+import json
 from types import SimpleNamespace
 
 from gspread import WorksheetNotFound
@@ -46,6 +48,17 @@ class Sheet:
                     and region["endColumnIndex"] <= last and region["startRowIndex"] >= row):
                 region["startRowIndex"] += 1
                 region["endRowIndex"] += 1
+
+    def delete(self, row, first, last):
+        for index in range(row, len(self.rows) - 1):
+            self.write(index, first, self.read(index + 1, first, last))
+        self.write(len(self.rows) - 1, first, [""] * (last - first))
+        for named in self.book.names.values():
+            region = named["range"]
+            if (region["sheetId"] == self.id and region["startColumnIndex"] >= first
+                    and region["endColumnIndex"] <= last and region["startRowIndex"] > row):
+                region["startRowIndex"] -= 1
+                region["endRowIndex"] -= 1
 
 
 class Book:
@@ -112,6 +125,12 @@ class Book:
                 region = request["range"]
                 assert region["endRowIndex"] == region["startRowIndex"] + 1
                 self.by_id(region["sheetId"]).insert(region["startRowIndex"], region["startColumnIndex"], region["endColumnIndex"])
+            elif "deleteRange" in entry:
+                request = entry["deleteRange"]
+                assert request["shiftDimension"] == "ROWS"
+                region = request["range"]
+                assert region["endRowIndex"] == region["startRowIndex"] + 1
+                self.by_id(region["sheetId"]).delete(region["startRowIndex"], region["startColumnIndex"], region["endColumnIndex"])
             elif "addNamedRange" in entry:
                 named = deepcopy(entry["addNamedRange"]["namedRange"])
                 named.setdefault("namedRangeId", named["name"])
@@ -660,12 +679,16 @@ def test_category_move_is_one_atomic_replayable_batch_and_keeps_neighbor_anchors
     projector.project(value)
     projector.project(value)
     assert len(book.batch_calls) == previous + 1
-    assert source.read(2, 29, 34) == [""] * 5
-    assert source.read(3, 29, 34) == ["9/8/2026", "Parking", 100, "Garage", "Brian (BofA)"]
+    assert source.read(2, 29, 34) == ["9/8/2026", "Parking", 100, "Garage", "Brian (BofA)"]
+    assert source.read(3, 29, 34) == [""] * 5
     assert source.read(2, 0, 4) == ["9/8/2026", 12, "Existing grocery", "Hannah"]
     assert source.read(3, 0, 4) == ["9/8/2026", 464.72, "Gameday", "Brian (BofA)"]
     assert value["sourceRow"] == 4
-    assert book.names[projection._name("source", "neighbor")]["range"]["startRowIndex"] == 3
+    assert book.names[projection._name("source", "neighbor")]["range"]["startRowIndex"] == 2
+    # Settling the shifted neighbor must still reach Parking, never the moved T.
+    projector.project({**neighbor, "events": [event("neighbor-receipt", amount=1000)], "settledCents": 1000})
+    assert source.read(2, 29, 34)[2] == 90
+    assert source.read(3, 0, 4)[1] == 464.72
     assert projection._name("item", original["id"]) not in book.names
 
 
@@ -681,6 +704,77 @@ def test_move_reservation_preserves_concurrent_destination_append_and_source_ins
     assert source.read(2, 13, 18) == ["9/8/2026", "Hannah's T", 464.72, "Gameday", "Brian (BofA)"]
     assert source.read(3, 13, 18) == ["9/8/2026", "Lunch", 20, "Cafe", "Hannah"]
     assert source.read(3, 29, 34) == [""] * 5
+
+
+@pytest.mark.parametrize("lost_response", [False, True])
+def test_shopping_move_compacts_drafts_and_repairs_active_inactive_and_restore_action_positions(setup, lost_response):
+    from bookiebot.sheets import undo
+    projector, books, source = setup
+    book = books["shared-2026"]
+    fields = {"date": 22, "item": 23, "amount": 24, "location": 25, "person": 26}
+    values = {"date": "9/8/2026", "item": "T", "amount": "464.72", "location": "Gameday", "person": "Brian (BofA)"}
+    original = allocation(category="shopping", sourceColumnMap=fields, sourceValues=values, sourceActionId="purchase", splitActionId="split")
+    source.write(2, 21, list(values.values()))
+    projector.project(original)
+    lower = ["9/9/2026", "Mirror-tap", 50.59, "Amazon", "Brian (BofA)"]
+    draft = ["", "Curtains draft", "", "Amazon", ""]
+    source.write(3, 21, lower)
+    source.write(4, 21, draft)
+    source.write(3, 26, ["Shopping total", "=SUM(X3:X1000)"])
+    source.write(3, 13, ["Adjacent food", "untouched"])
+    log = book.add_sheet("_BookieBot Action Log - 2026-09", [undo._LOG_HEADERS])
+    def record(identity, category, row, status="active", **metadata):
+        action = undo.UndoAction(worksheet="expense", kind="restore_cells", row=row, columns=list(fields.values()),
+                                previous_values=[], description=identity, metadata={"category": category, **metadata})
+        log.write(len(log.rows), 0, [identity, "2026-09-08", "brian", status, "", json.dumps(asdict(action))])
+    record("purchase", "shopping", 3, "undone")
+    record("split", "shopping", 3, allocation_id=original["id"])
+    record("old-update", "shopping", 4, "undone")
+    record("updated", "shopping", 4, updated_action_id="old-update")
+    record("moved-other", "food", 8, source_category="shopping", source_row="5")
+    record("other-category", "food", 4)
+    record("bill", "rent", 4)
+    value = correction(original, "move", category="need_expenses",
+                       sourceColumnMap={"date": 30, "item": 31, "amount": 32, "location": 33, "person": 34})
+    # Existing Needs T from the setup is left intact; the moved row is appended.
+    previous = len(book.batch_calls)
+    book.timeout_after_batch = lost_response
+    if lost_response:
+        with pytest.raises(TimeoutError):
+            projector.project(value)
+    projector.project(value)
+    projector.project(value)
+    assert len(book.batch_calls) == previous + 1
+    assert source.read(2, 21, 26) == lower
+    assert source.read(3, 21, 26) == draft
+    assert source.read(4, 21, 26) == [""] * 5
+    assert source.read(3, 26, 28) == ["Shopping total", "=SUM(X3:X1000)"]
+    assert source.read(3, 13, 15) == ["Adjacent food", "untouched"]
+    actions = {row[0]: undo._logged_action_from_row(row) for row in log.rows[1:]}
+    assert actions["purchase"].action.row == actions["split"].action.row == 3
+    assert actions["old-update"].action.row == actions["updated"].action.row == 3
+    assert actions["old-update"].status == "undone" and actions["updated"].status == "active"
+    assert actions["moved-other"].action.row == 8 and actions["moved-other"].action.metadata["source_row"] == "4"
+    assert actions["other-category"].action.row == actions["bill"].action.row == 4
+
+
+@pytest.mark.parametrize("failure", ["read", "header", "json"])
+def test_move_refuses_unreadable_action_history_before_any_sheet_write(setup, monkeypatch, failure):
+    from bookiebot.sheets import undo
+    projector, books, source = setup
+    original = allocation()
+    projector.project(original)
+    book = books["shared-2026"]
+    log = book.add_sheet("_BookieBot Action Log - 2026-09", [undo._LOG_HEADERS, ["broken", "", "", "active", "", "{"]])
+    if failure == "read":
+        monkeypatch.setattr(log, "get_all_values", lambda: (_ for _ in ()).throw(TimeoutError("Log unavailable")))
+    elif failure == "header":
+        log.rows[0] = ["Unexpected header"]
+    before = deepcopy(source.rows), len(book.batch_calls)
+    value = correction(original, "move", category="grocery", sourceColumnMap={"date": 1, "amount": 2, "location": 3, "person": 4})
+    with pytest.raises((TimeoutError, ProjectionConflictError, json.JSONDecodeError)):
+        projector.project(value)
+    assert (source.rows, len(book.batch_calls)) == before
 
 
 def test_move_adds_item_anchor_when_original_category_has_no_item(setup):
@@ -743,6 +837,8 @@ def test_reversed_receipts_keep_original_category_and_identity_after_move_and_ne
     projector.project(value)
     assert source.read(2, 0, 4) == ["9/8/2026", 459.72, "Gameday", "Brian (BofA)"]
     assert receipt_row(books["shared-2026"]) == old_receipt
+    old_region["startRowIndex"] -= 1
+    old_region["endRowIndex"] -= 1
     assert books["shared-2026"].names[projection._name("receipt", "receipt-1")]["range"] == old_region
     assert receipt_row(books["shared-2026"], "new-receipt") == ["2026-09-08", 5, "Reimbursement to Brian · Gameday", "Hannah"]
 
@@ -790,7 +886,7 @@ def test_sync_persists_corrected_source_position_after_verified_move(setup, monk
     source.write(2, 0, ["9/8/2026", 12, "Existing grocery", "Hannah"])
     value = correction(original, "move", category="grocery", sourceColumnMap={"date": 1, "amount": 2, "location": 3, "person": 4})
     marked, mirrored = [], []
-    store = SimpleNamespace(access=object(), pending_projections=lambda: [value],
+    store = SimpleNamespace(access=object(), pending_projections=lambda: [value], snapshot=lambda *_args, **_kw: {"allocations": []},
                             mark_projected=lambda identity, version, **kwargs: marked.append((identity, version, kwargs)) or True)
     monkeypatch.setattr(mirror, "mirror_allocation", lambda _client, current: mirrored.append(current["sourceRow"]))
     assert sync_pending(store, projector)

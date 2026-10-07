@@ -1,8 +1,14 @@
 # Finance Operations Workstream
 
-Last updated: 2026-10-05
+Last updated: 2026-10-07
 
 ## Goal
+
+### Expense move compaction and reimbursement audit work log — 2026-10-07
+
+Complete (user-reported Shopping gap): the canonical move intentionally cleared its source without compacting (September 16 decision). It now shifts that category's lower cells/anchors upward, with destination relocation and neighboring active/inactive action coordinates in one Sheets batch. Lost responses cannot repeat the structural edit. Ordinary native removal/restoration carries canonical anchors; move Undo compacts its destination; partial drafts are preserved. Neighbor database/mirror coordinates recover absolutely from anchors without changing financial versions or repeating a move.
+
+Regression fixtures confirm Shopping → Needs retains the split/current recent action; a full $163.91 receipt for $464.72 T reduces the Needs source to $300.81, writes the partner receipt under Needs and mirrors Needs/reimbursed. Reversal and separate reset Undo/Redo preserve category/event history. Reversed receipts retain their categories/identities while anchors follow compaction. Added 20 cases; focused **386 passed / 184 optional PostgreSQL skipped**, full **2,021 passed / 342 optional skips**, Pyright clean. Direct canonical correction Undo remains deferred. No live inspection/repair/receipt; existing gaps are not automatically backfilled. Acceptance is checklist 130.
 
 ### Utility command routing work log — 2026-10-05
 
@@ -257,6 +263,8 @@ Status: Complete in code and automated/browser verification as of 2026-08-03; pr
 2026-10-02 personal-bill follow-up complete: confirmed repayments for split Rent, PG&E, Recology and Water target the partner's exact bill row in the original expense month, with cumulative named-range replay and reversal guards. The payer source and generated ledger remain part of the same pending projection. PR #62 passed CI, merged to main and deployed on Railway. The saved October rent receipt was replayed once: production allocation version/projected version read 3/3, Brian/Hannah October Rent read $2,103.73/$1,146.27, and Brian reimbursement row 19 read `reimbursed` with $1,146.27 received. Native iOS display acceptance remains STATUS checklist 126.
 
 Status: Canonical recent-action corrections completed 2026-09-16: gross/details, method, category move, cancellation/re-split and deletion use durable revisions and verified source projections. Pending/confirmed repayments require resolution/reversal first. Historical net-accounting corrections and direct canonical Undo remain deferred.
+
+2026-10-07 move follow-up complete: atomic source compaction and neighboring active/inactive history repair; absolute row/mirror recovery; verified Needs reimbursement/reversal and reset Undo/Redo. Ordinary move Undo closes its destination gap. Canonical deletion compaction and direct correction Undo remain separate follow-ups; this move audit does not expand them.
 
 1. Complete 2026-08-03: change the split method and recalculate both shares without losing the original gross or settlement history.
 2. Complete 2026-08-03: remove an outstanding split by restoring the gross visible expense and voiding the receivable.

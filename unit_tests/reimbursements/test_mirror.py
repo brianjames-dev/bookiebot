@@ -276,7 +276,8 @@ def test_sync_pending_waits_for_mirror_then_retries_without_duplicate_expenses(s
         pending.clear()
         return True
 
-    store = SimpleNamespace(access=object(), pending_projections=lambda: list(pending), mark_projected=mark)
+    store = SimpleNamespace(access=object(), pending_projections=lambda: list(pending), mark_projected=mark,
+                            snapshot=lambda *_args, **_kwargs: {"allocations": []})
     projector = projection.SheetsProjection(client)
     assert projection.sync_pending(store, projector) is False
     assert not marked and len(pending) == 1
@@ -297,6 +298,7 @@ def test_sync_pending_mirrors_legacy_without_rewriting_historical_expenses(setup
     record = value(accounting="legacy_net", settledCents=16391, legacyReceivedAt="2026-09-08")
     marked = []
     store = SimpleNamespace(access=object(), pending_projections=lambda: [record],
+                            snapshot=lambda *_args, **_kwargs: {"allocations": []},
                             mark_projected=lambda identity, version, **kwargs: marked.append((identity, version)) or True)
     assert sync_pending(store, SheetsProjection(client)) is True
     assert source.rows == before and not shared.batch_calls and not shared.value_calls

@@ -8,12 +8,15 @@ from __future__ import annotations
 
 from contextlib import contextmanager
 import calendar
+from dataclasses import asdict
 from datetime import date
 from decimal import Decimal, InvalidOperation
 import hashlib
+import json
 import threading
 from typing import Any, Iterator
 
+from gspread import WorksheetNotFound
 from gspread.utils import a1_to_rowcol
 
 from bookiebot.reports.app_access import PostgresAppAccessStore
@@ -295,14 +298,54 @@ class SheetsProjection:
         values: list[Any] = [""] * (last - first + 1)
         for field, column in fields.items():
             values[column - first] = expected.get(field, "")
-        for target_row, target_first, cells in ((row - 1, first - 1, values), (old_row, old_first - 1, [""] * (old_last - old_first + 1))):
-            requests.append({"updateCells": {"start": {"sheetId": sheet.id, "rowIndex": target_row, "columnIndex": target_first},
-                "rows": [{"values": [{"userEnteredValue": {"numberValue": value} if isinstance(value, (int, float))
-                                      else {"stringValue": str(value)}} for value in cells]}], "fields": "userEnteredValue"}})
-        # Destination reservation, all source anchors, and the source clearing
-        # commit together. A lost response is recovered by the moved anchor.
-        # Do not compact source values: other allocations own their row anchors.
+        requests.append({"updateCells": {"start": {"sheetId": sheet.id, "rowIndex": row - 1, "columnIndex": first - 1},
+            "rows": [{"values": [{"userEnteredValue": {"numberValue": value} if isinstance(value, (int, float))
+                                  else {"stringValue": str(value)}} for value in values]}], "fields": "userEnteredValue"}})
+        requests.append({"deleteRange": {"range": {
+            "sheetId": sheet.id, "startRowIndex": old_row, "endRowIndex": old_row + 1,
+            "startColumnIndex": old_first - 1, "endColumnIndex": old_last,
+        }, "shiftDimension": "ROWS"}})
+        requests.extend(self._compacted_action_requests(book, sheet, before, old_row + 1))
+        # Destination, moved anchors, source compaction and action coordinates
+        # commit together. Category-only deletion moves all lower cells and their
+        # anchors (including partial drafts/receipts), preserving adjacent totals.
+        # A lost response is recovered by the destination anchor, without another
+        # deletion or another action-history shift.
         book.batch_update({"requests": requests})
+
+    @staticmethod
+    def _compacted_action_requests(book: Any, sheet: Any, before: dict[str, Any], row: int) -> list[dict[str, Any]]:
+        from bookiebot.sheets import undo
+        spent_on = date.fromisoformat(before["expenseDate"])
+        month = list(calendar.month_name).index(sheet.title) if sheet.title in calendar.month_name else spent_on.month
+        title = f"_BookieBot Action Log - {before.get('sourceYear', spent_on.year):04d}-{month:02d}"
+        try:
+            log = book.worksheet(title)
+        except WorksheetNotFound:
+            return []
+        rows = log.get_all_values()
+        if not rows or rows[0][:6] != undo._LOG_HEADERS:
+            raise ProjectionConflictError("The expense action history could not be verified before moving its rows.")
+        records = [(index, undo._logged_action_from_row(cells)) for index, cells in enumerate(rows[1:], 2) if cells and cells[0]]
+        by_id = {logged.id: logged for _, logged in records}
+        # Preserve the moved purchase's historical lineage; current canonical
+        # details are overlaid separately. Only neighboring coordinates change.
+        excluded = {before.get("sourceActionId", ""), before.get("splitActionId", "")}
+        for identity in list(excluded):
+            while identity in by_id:
+                identity = undo._lineage_parent_id(by_id[identity].action) or ""
+                if not identity or identity in excluded:
+                    break
+                excluded.add(identity)
+        requests = []
+        for index, logged in records:
+            if logged.id in excluded:
+                continue
+            if undo._shift_category_action_rows(logged.action, before["category"], row + 1, 1_000_000, -1):
+                requests.append({"updateCells": {"start": {"sheetId": log.id, "rowIndex": index - 1, "columnIndex": 5},
+                    "rows": [{"values": [{"userEnteredValue": {"stringValue": json.dumps(asdict(logged.action), separators=(",", ":"))}}]}],
+                    "fields": "userEnteredValue"}})
+        return requests
 
     def source(self, allocation: dict[str, Any]) -> None:
         fields = allocation.get("sourceColumnMap", {})
@@ -370,6 +413,7 @@ class SheetsProjection:
         if (_cents(verified[amount_offset] if len(verified) > amount_offset else "") != target
                 or not _identity_matches(verified, fields, expected_now)):
             raise ProjectionConflictError("The expense update could not be verified; syncing will retry safely.")
+        allocation["sourceRow"] = self._ranges(book)[full]["range"]["startRowIndex"] + 1
 
     def receipt(self, allocation: dict[str, Any], event: dict[str, Any]) -> None:
         if event["status"] == "pending" or (event["status"] == "reversed" and not event.get("confirmedAt")):
@@ -565,11 +609,33 @@ def sync_pending(store: Any, projector: Any | None = None) -> bool:
     with projection_lock(store):
         if isinstance(projector, SheetsProjection):
             projector.budget_formula_cache.clear()
+            try:
+                # A legacy move/Undo may have shifted a canonical neighbor even
+                # when that neighbor has no pending financial version. Repair
+                # its coordinates before processing receipts or declaring sync
+                # complete, including recovery from a failed mirror write.
+                sources = store.snapshot("brian", include_inactive=True)["allocations"]
+                seen: set[tuple[str, str]] = set()
+                for source in sources:
+                    if (source["accounting"] != "cash_v1" or source["sourceWorksheet"] != "expense"
+                            or source.get("lifecycle") == "deleted" or not source["sourceSpreadsheetId"]):
+                        continue
+                    title = source.get("sourceSheetTitle") or date.fromisoformat(source["expenseDate"]).strftime("%B")
+                    key = (source["sourceSpreadsheetId"], title)
+                    if key not in seen:
+                        seen.add(key)
+                        refresh_source_positions(store, projector, {**source, "id": ""})
+            except Exception:
+                logging.getLogger(__name__).exception("Shared expense source positions remain pending")
+                success = False
         for allocation in store.pending_projections():
             try:
                 projector.project(allocation)
                 if isinstance(projector, SheetsProjection):
                     from bookiebot.reimbursements.mirror import mirror_allocation
+                    revision = allocation.get("sourceRevision", {})
+                    if revision.get("operation") == "move" and allocation.get("projectedVersion", 0) < revision.get("version", 0):
+                        refresh_source_positions(store, projector, allocation)
                     mirror_allocation(projector.client, allocation)
                 source = {"source_row": allocation["sourceRow"]} if isinstance(projector, SheetsProjection) else {}
                 if not store.mark_projected(allocation["id"], allocation["version"], **source):
@@ -578,3 +644,35 @@ def sync_pending(store: Any, projector: Any | None = None) -> bool:
                 logging.getLogger(__name__).exception("Reimbursement sheet projection remains pending", extra={"allocation_id": allocation["id"]})
                 success = False
     return success
+
+
+def refresh_source_positions(store: Any, projector: SheetsProjection, moved: dict[str, Any]) -> None:
+    """Repair absolute neighbor coordinates after a committed structural move.
+
+    This is replayable even after losing the batch/DB/mirror response. It changes
+    neither financial versions nor receipts, and never marks pending work done.
+    """
+    from bookiebot.reimbursements.mirror import mirror_allocation
+    snapshot = store.snapshot(moved["payerOwner"], include_inactive=True)
+    book = projector._book(moved["sourceSpreadsheetId"])
+    sheet = book.worksheet(moved.get("sourceSheetTitle") or date.fromisoformat(moved["expenseDate"]).strftime("%B"))
+    names = projector._ranges(book)
+    for value in snapshot["allocations"]:
+        if (value["id"] == moved["id"] or value["accounting"] != "cash_v1"
+                or value["sourceWorksheet"] != "expense" or value.get("lifecycle") == "deleted"
+                or value["sourceSpreadsheetId"] != moved["sourceSpreadsheetId"]
+                or (value.get("sourceSheetTitle") or date.fromisoformat(value["expenseDate"]).strftime("%B")) != sheet.title
+                or value["projectedVersion"] != value["version"]):
+            continue
+        full = _name("source", value["id"])
+        if full not in names:
+            continue
+        row = names[full]["range"]["startRowIndex"] + 1
+        if row == value["sourceRow"]:
+            continue
+        projector._validate_anchors(book, sheet.id, full, value["sourceColumnMap"], projector._source_anchors(value))
+        current = {**value, "sourceRow": row,
+                   "events": [event for event in snapshot["events"] if event["allocationId"] == value["id"]]}
+        mirror_allocation(projector.client, current)
+        if not store.mark_projected(value["id"], value["version"], source_row=row):
+            raise ProjectionConflictError("A neighboring expense changed while its row was being synchronized. Retry syncing.")

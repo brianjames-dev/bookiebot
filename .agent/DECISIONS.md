@@ -1,5 +1,15 @@
 # Agent Decisions
 
+## 2026-10-07 - Compact Moved Expense Categories With Their Anchors
+
+Supersede the September 16 choice to leave a canonical move's source gap. Use category-only cell deletion/shift after relocating the moved source anchors; destination reservation/write, source compaction and neighboring monthly action coordinates commit in one Sheets batch. Preserve adjacent categories/totals, the moved purchase's historical lineage and its durable before/after revision. Current canonical overlays supply its new category. Repair inactive neighboring action coordinates because Undo can reactivate update ancestors.
+
+Ordinary structural moves/deletes/restorations carry source/receipt anchors; move Undo closes its destination gap. Repair canonical source-row metadata/mirrors absolutely from anchors without changing financial versions. Explicit sync retries metadata/mirror failures even when financial versions were already projected and reports failures as pending. A metadata failure after a successful ordinary structural write must not invite repeating that write.
+
+Reimbursements use the allocation's current category. Preserve reversed receipts' historical category/identity while their anchors follow compaction. Reset Undo/Redo stays balance-only; direct canonical correction Undo stays guarded. Existing production gaps require separately inspected/authorized repair, never automatic replay of an already completed move.
+
+Rationale: A blank Shopping row violates requested move behavior, while copying values alone leaves anchors/history on the wrong expenses. Native category shifts and atomic action-coordinate repair preserve identity and safe retries.
+
 ## 2026-10-05 - Accept Amount-First Utility Logging Commands
 
 Extend the affirmative deterministic bill grammar to accept amount-first shorthand and an optional expense/payment noun after Log/Record/Add. PG&E, Recology and Water continue using their dedicated personal-bill writers and existing post-log split dialog; explicit split directives retain their current meaning. Full-message matching, question/negation/planning diversion and bottled-water ambiguity remain guarded.

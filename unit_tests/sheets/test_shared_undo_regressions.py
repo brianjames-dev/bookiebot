@@ -85,6 +85,20 @@ def test_undo_move_refuses_a_changed_destination_without_restoring_source(repo):
     assert repo.expense.get_all_values() == before
 
 
+def test_undo_move_compacts_destination_and_keeps_later_expense_action_current(repo):
+    first = log(repo, B, "First", 10)
+    remove(B, first, "move")
+    later = log(repo, H, "Later shopping", 5, category="shopping")
+    with sheet_user_context(B):
+        assert undo.undo_last_action(B)[0]
+    assert repo.expense.cell(3, 23).value == "Later shopping"
+    assert not repo.expense.cell(4, 23).value
+    with sheet_user_context(H):
+        assert undo.update_recent_action(H, action_id=later, updates={"amount": 8})[0]
+    assert repo.expense.cell(3, 24).value == "$8.00"
+    assert food(repo) == {"First": "$10.00"}
+
+
 def test_undo_preserves_an_intervening_manual_draft_row(repo):
     action = log(repo, B, "Burger", 10)
     remove(B, action, "delete")
@@ -93,6 +107,30 @@ def test_undo_preserves_an_intervening_manual_draft_row(repo):
         assert undo.undo_last_action(B)[0]
     assert repo.expense.cell(3, 15).value == "Burger"
     assert repo.expense.cell(4, 15).value == "Draft coffee"
+
+
+def test_move_repairs_inactive_update_parent_before_undo_reactivates_it(repo):
+    first = log(repo, B, "First", 10)
+    neighbor = log(repo, H, "Neighbor", 5)
+    with sheet_user_context(H):
+        assert undo.update_recent_action(H, action_id=neighbor, updates={"amount": 6})[0]
+    remove(B, first, "move")
+    with sheet_user_context(H):
+        assert undo.undo_last_action(H)[0]
+        assert undo.select_recent_action(H, action_id=neighbor).action.row == 3
+        assert undo.update_recent_action(H, action_id=neighbor, updates={"amount": 8})[0]
+    assert food(repo) == {"Neighbor": "$8.00"}
+
+
+def test_move_shifts_last_draft_and_does_not_overwrite_destination_draft(repo):
+    first = log(repo, B, "First", 10)
+    repo.expense.update_cell(4, 15, "Source draft")
+    repo.expense.update_cell(3, 23, "Destination draft")
+    remove(B, first, "move")
+    assert repo.expense.cell(3, 15).value == "Source draft"
+    assert not repo.expense.cell(4, 15).value
+    assert repo.expense.cell(3, 23).value == "Destination draft"
+    assert repo.expense.cell(4, 23).value == "First"
 
 
 def shared_split(repo, operation):

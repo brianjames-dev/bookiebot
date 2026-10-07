@@ -1,8 +1,10 @@
 # Agent Status
 
-Last updated: 2026-10-05
+Last updated: 2026-10-07
 
 ## Active Focus
+
+Expense move audit repaired (2026-10-07): canonical split moves compact the source category and shift neighboring action coordinates in the same Sheets batch as destination/anchor relocation. Ordinary moves/deletes and move Undo preserve canonical source/receipt anchors; inactive update ancestors, restore positions and partial drafts stay aligned. Neighbor coordinates and reimbursement mirrors recover from anchors without changing financial versions. Shopping → Needs → full receipt/reversal and reset Undo/Redo are covered with isolated fixtures. Direct canonical correction Undo remains deferred. Final verification is below; manual acceptance is checklist 130. No production financial data was read or changed.
 
 Utility logging regression repaired (2026-10-05): amount-first shorthand (`124.46 PG&E`) and `Log expense`/`Record payment` wording now reach dedicated bill writers. PG&E, Recology and Water write exactly one bill cell and open the existing split dialog; No split preserves gross and 50/50 targets the saved action. Added 57 routing/workflow/safety cases. Focused **341 passed**; full local **2,007 passed / 336 skipped** (optional PostgreSQL and missing frontend test dependencies); Pyright clean. Release/manual acceptance is checklist 129. No production financial writes were used. Existing mobile/device acceptance remains queued below.
 
@@ -89,6 +91,8 @@ All eight September 6 audit batches are implemented and verified locally. Each b
 
 ## On Deck
 
+Verify move compaction and reimbursement routing using checklist 130 after release. The existing Gameday T gap is not automatically repaired by this change; inspect live anchors/action history before any separately authorized repair. Direct canonical correction Undo remains a separate backlog item; reset Undo/Redo is supported.
+
 Utility fix PR #63 passed both CI runs and merged into main as `b1f2284`; Railway rollout was triggered. Manually verify utility shorthand/expense commands and their split dialogs using checklist 129 after rollout. CI ran all **2,343 tests** with no skips, plus clean Pyright, Apps Script and frontend checks.
 
 Verify the mobile WebKit refinements on iPhone using checklist 128 after loading the app Update. Implementation and automated/browser verification are complete.
@@ -135,6 +139,12 @@ Student-loan activation is complete. Verify the deployed fixed-bill display and 
 25. Harden recent-action pending state across restarts/deploys, since selections currently live only in process memory.
 26. Improve targeted recent-action search so commands can find older matches, not only the latest 10 recent actions.
 27. Explore clarifying questions before logging when BookieBot is uncertain instead of guessing or silently failing.
+
+## Completed 2026-10-07
+
+- Audited canonical/ordinary move, action lineage/Undo, reset Undo/Redo and reimbursement projection. Canonical destination/anchor relocation, source compaction and neighboring monthly action coordinates commit together. Ordinary structural removal/restoration preserves anchors, move Undo compacts its destination, and inactive update ancestors stay aligned. Partial drafts shift and cannot be overwritten as empty destinations.
+- Regression fixtures reproduce $464.72 Gameday T moving Shopping → Needs, a $163.91 confirmed receipt reducing its Needs source to $300.81, a Needs partner receipt, reversal, and separate reset Undo/Redo. Neighbor mirrors/metadata recover from lost responses; previously synced financial versions cannot hide failed metadata sync.
+- Added 20 regression cases (six PostgreSQL parity cases skipped locally). Focused **386 passed / 184 optional PostgreSQL skipped**; full **2,021 passed / 342 skipped** (optional PostgreSQL and missing frontend test dependencies), existing Kaleido warning only; Pyright **0 errors / 0 warnings**. Updated `.agent/WORKSTREAM_FINANCE_OPS.md`, `.agent/DECISIONS.md` and `docs/REIMBURSEMENTS.md`. No live sheet repair, receipt or deployment.
 
 ## Completed 2026-10-05
 
@@ -762,6 +772,14 @@ Student-loan activation is complete. Verify the deployed fixed-bill display and 
 
 ## Manual Test Checklist
 
+130. Expense move compaction and reimbursement category (2026-10-07; isolated workbook/database fixtures):
+    - Put a split $464.72 Gameday T in Shopping above Mirror-tap, curtains and an amount-less draft. Move T to Needs. Lower Shopping cells shift up one row, trailing transaction cells clear, Needs receives T once, and adjacent categories/totals stay in place. Source/amount/person/item and receipt named ranges follow their transactions.
+    - Inspect Recent actions and active/inactive neighboring records. Undo a neighbor's prior update, then update it again; the same expense must change. For an ordinary move, add a later destination expense, then Undo the move; its destination gap closes and that later expense remains editable. Source restoration preserves other users' edits/drafts.
+    - Confirm a full $163.91 reimbursement: payer T becomes $300.81 in Needs; the partner receipt logs under Needs in the payment month; the generated ledger says Needs/reimbursed/$163.91. Shopping neighbors stay unchanged. Reverse it: T returns to $464.72 with the same zeroed Needs receipt/history. Partial receipts use the same category rule.
+    - Lose the response after the atomic move, or fail a neighbor mirror write. Retry/refresh: no second move/compaction/receipt, and row metadata/mirrors converge to the anchors. Metadata-only failures stay visible as syncing on explicit refresh.
+    - Reset → Undo reset → Redo reset changes balances only, preserving Needs, source cells and receipt/reversal events. Direct canonical correction Undo remains unavailable; use Move/Update/Split/Cancel or reverse a receipt.
+    - This task did not inspect/change the live Gameday T allocation or existing gap. Verify that allocation's current category/anchors before any separately authorized production repair.
+
 Use a test row or low-risk real row in Discord:
 
 1. Log a food expense, then update its amount, then move it to shopping.
@@ -997,6 +1015,8 @@ Use a test row or low-risk real row in Discord:
 89. Compact phone UI: fully close/reopen both installed apps after deployment. Verify compact month/person header, Current/Projected, refresh icon/time and three-dot theme/signout controls. Open/close Calendar and Category Mix dialogs via close/backdrop; confirm no final flash or page jump. Toggle Bills/Burn Rate Details and confirm lines resize with the layout. Compare calendar dots and tooltip labels to Category Mix (mixed days show multiple colors); verify today's existing Daily Spending row is highlighted, including near Pacific midnight, and reimbursements use the chart-band background in both themes. Offline/manual refresh must clearly label older data; reconnect and confirm fresh values without resetting Projected.
 
 ## Verification Baseline
+
+2026-10-07 expense move audit: focused reimbursement/shared-history suite **386 passed / 184 optional PostgreSQL skipped**; full `python -m pytest unit_tests` **2,021 passed / 342 skipped** (optional PostgreSQL and missing frontend dependencies), existing Kaleido warning only. `python -m pyright --pythonpath /Users/brianjames/Dev/bookiebot/venv/bin/python` **0 errors / 0 warnings**; `git diff --check` clean. Uses the existing project Python 3.12 environment, isolated financial fixtures and the existing loopback/Kaleido sandbox exception. The shell-default Python lacked project dependencies; no code/dependency changes were made for it. PostgreSQL parity runs in CI with its configured test database. No production financial inspection/mutations; manual checklist 130 remains.
 
 2026-10-05 utility command routing: focused **341 passed**; full `python -m pytest unit_tests` **2,007 passed / 336 skipped** (optional PostgreSQL and missing frontend dependencies), existing Kaleido warning only; Pyright **0 errors / 0 warnings** using the existing project Python 3.12 environment. Full suite used loopback-enabled isolated fixtures. Exact reported commands and Recology/Water equivalents exercise real bill-cell writes and split dialogs in memory. No production financial writes; manual acceptance is checklist 129.
 
