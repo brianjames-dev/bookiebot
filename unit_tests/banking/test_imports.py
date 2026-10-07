@@ -230,7 +230,11 @@ def test_ambiguous_recovery_does_not_guess_or_write(store, writers):
 def test_ignored_during_write_is_not_overwritten_by_confirmation(store, writers):
     item = seed(store)
     def write(*args):
-        store.ignore_reconciliation_item('brian', item.id)
+        # Normal review now rejects inflight imports. Simulate an operator's
+        # external correction to retain the uncertain-completion recovery test.
+        assert store.ignore_reconciliation_item('brian', item.id) is None
+        with store.connect() as conn:
+            conn.execute("UPDATE bank_reconciliation_items SET status = 'ignored' WHERE id = ?", (item.id,))
         return 12
     writers.expense.side_effect = write
     result = submit(store, item)

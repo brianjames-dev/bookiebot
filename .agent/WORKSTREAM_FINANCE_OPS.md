@@ -4,6 +4,10 @@ Last updated: 2026-10-07
 
 ## Goal
 
+### Shared Discord/phone reconciliation work log — 2026-10-07
+
+Complete implementation; release acceptance pending (STATUS checklist 132). Phone decisions already checked versions, but Discord used stale closures, unguarded terminal Ignore/Confirm/Reopen, and two admin imports bypassed durable claims. Consolidated metadata decisions on the same compare-and-apply store path with prior-state/source events; explicit sheet amount correction runs after eligibility/version/claim checks while the owner/transaction locks exclude another review decision. Import forms include bank/review versions and active linked-account eligibility, with admin imports using the same durable service. Canonical amount updates preserve the bank-reconciliation origin instead of recursively reopening the review being confirmed. Cached inbox Ignore/Unmatch carries its original snapshots. Old controls explain current shared state; app conflicts retain Check status recovery. Fixed coded progress uses the original session total, filters membership before the query limit, clears externally resolved skips and leaves new arrivals for a new session. Added 57 passing regressions plus 16 optional PostgreSQL variants; full **2,107 passed / 362 skipped**, Pyright clean. No live financial writes or deployment. Broader historical-import and canonical correction Undo backlog remains separate.
+
 ### Split responsiveness work log — 2026-10-07
 
 Complete in code/automated verification; release and Discord timing acceptance remain STATUS checklist 131. Production traces confirmed split callbacks blocked the event loop in reimbursement mirror metadata reads. Split/create/edit/cancel UI now uses immediate private thinking acknowledgments, worker-thread I/O with actor context, and completed error follow-ups. Typed/post-log explicit splits also run in workers. Source fields load in one range request, ledger lookup reuses its header snapshot, and projector/mirror share workbook/worksheet handles within a sync. Named anchors, current values and budget formulas remain freshly verified.
@@ -366,6 +370,8 @@ Status: Complete first pass as of 2026-06-20. Normal unresolved views use a 60-d
 - Add debug command support to inspect recent reconciliation events.
 
 ### Slice 4 - Reconciliation State Machine
+
+2026-10-07: shared phone/Discord transition checks and lifecycle events are complete for manual confirm/ignore/reopen; stale controls, batch inbox actions, explicit amount correction races and import eligibility now use reviewed versions. Fixed session progress and cross-medium acceptance remain queued for release in STATUS checklist 132. No new persisted statuses or storage schema.
 
 - Define allowed statuses and transitions in one place.
 - Make store methods enforce transitions instead of ad hoc status updates.

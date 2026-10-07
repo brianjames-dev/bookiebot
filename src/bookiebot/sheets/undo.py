@@ -1409,7 +1409,8 @@ def _is_canonical_reimbursement(action: UndoAction) -> bool:
     return action.metadata.get("canonical_reimbursement") == "true" or action.metadata.get("accounting") == "cash_v1"
 
 
-def _mutate_canonical_action(user_key: str | None, logged: LoggedAction, operation: str, **kwargs: Any) -> tuple[bool, str]:
+def _mutate_canonical_action(user_key: str | None, logged: LoggedAction, operation: str, *,
+                             metadata_extra: dict[str, str] | None = None, **kwargs: Any) -> tuple[bool, str]:
     from bookiebot.reimbursements.service import mutate_recent_action
     from bookiebot.reimbursements.store import (
         ReimbursementConflictError, ReimbursementNotFoundError, ReimbursementValidationError,
@@ -1431,7 +1432,7 @@ def _mutate_canonical_action(user_key: str | None, logged: LoggedAction, operati
             ids.update(_active_lineage_ids(logged))
             _sync_reconciliation_after_action_mutation(user_key, ids, reason={
                 "update": "updated", "move": "moved", "delete": "deleted",
-            }[operation])
+            }[operation], metadata_extra=metadata_extra)
     return success, detail
 
 
@@ -2667,7 +2668,8 @@ def update_recent_action(
         return False, f"I found {_format_action_snapshot(logged.action)}. Please specify the new value."
 
     if _is_canonical_reimbursement(logged.action):
-        return _mutate_canonical_action(user_key, logged, "update", updates=normalized_updates)
+        return _mutate_canonical_action(user_key, logged, "update", updates=normalized_updates,
+                                        metadata_extra=metadata_extra)
 
     display_fields = list(field_columns.keys())
     ws = _worksheet(logged.action.worksheet)

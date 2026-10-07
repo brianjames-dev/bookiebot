@@ -5,7 +5,7 @@ from datetime import date, datetime, timedelta, timezone
 import json
 from pathlib import Path
 import sqlite3
-from typing import Any, Iterator, Literal, Protocol
+from typing import Any, Callable, Iterator, Literal, Protocol
 from uuid import uuid4
 
 from bookiebot.banking.crypto import TokenCipher
@@ -254,12 +254,20 @@ class BankStore:
         self.initialize()
         now = utc_now_iso()
         with self.connect() as conn:
+            self._lock_reconciliation_owner(conn, owner_key)
+            identity = conn.execute(
+                'SELECT bank_transaction_id FROM bank_reconciliation_items WHERE id = ? AND owner_key = ?',
+                (int(reconciliation_id), owner_key),
+            ).fetchone()
+            if identity is not None:
+                conn.execute('UPDATE bank_transactions SET id = id WHERE id = ?', (identity['bank_transaction_id'],))
             claimed = conn.execute(
                 """
                 UPDATE bank_reconciliation_items
                 SET status = 'import_requested', last_seen_at = ?
                 WHERE id = ? AND owner_key = ?
                   AND status IN ('needs_review', 'pending_user', 'conflict')
+                  AND (? IS NULL OR (status = ? AND last_seen_at = ?))
                   AND NOT EXISTS (
                     SELECT 1 FROM bank_import_operations o
                     WHERE o.reconciliation_id = bank_reconciliation_items.id
@@ -269,11 +277,17 @@ class BankStore:
                     LEFT JOIN bank_accounts a ON a.id = t.account_id
                     WHERE t.id = bank_reconciliation_items.bank_transaction_id
                       AND t.owner_key = ? AND t.removed_at IS NULL AND t.pending = 0
-                      AND COALESCE(a.watched, 1) = 1
+                      AND (t.account_id IS NULL OR (a.watched = 1 AND a.owner_key = t.owner_key
+                           AND EXISTS (SELECT 1 FROM bank_items i WHERE i.id = a.item_id
+                                       AND i.owner_key = t.owner_key AND i.status = 'active')))
+                      AND (? IS NULL OR t.updated_at = ?)
                       AND t.amount = ? AND COALESCE(t.date, t.authorized_date, '') = ?
                   )
                 """,
-                (now, int(reconciliation_id), owner_key, owner_key, request['bank_amount'], request['bank_date']),
+                (now, int(reconciliation_id), owner_key,
+                 request.get('expected_status'), request.get('expected_status'), request.get('expected_last_seen_at'),
+                 owner_key, request.get('expected_updated_at'), request.get('expected_updated_at'),
+                 request['bank_amount'], request['bank_date']),
             ).rowcount == 1
             if claimed:
                 conn.execute(
@@ -1456,6 +1470,7 @@ class BankStore:
         *,
         max_age_days: int | None = None,
         start_date: str | None = None,
+        reconciliation_ids: set[int] | None = None,
     ) -> list[ReconciliationItem]:
         safe_limit = max(1, min(int(limit), 100))
         cutoff_date = None
@@ -1470,6 +1485,13 @@ class BankStore:
             params = (owner_key, cutoff_date, safe_limit)
         else:
             params = (owner_key, safe_limit)
+        scope_filter = ""
+        if reconciliation_ids is not None:
+            if not reconciliation_ids:
+                return []
+            ids = tuple(sorted(reconciliation_ids))
+            scope_filter = f" AND r.id IN ({','.join('?' for _ in ids)})"
+            params = (*params[:-1], *ids, safe_limit)
         self.initialize()
         with self.connect() as conn:
             rows = conn.execute(
@@ -1501,6 +1523,7 @@ class BankStore:
                                   AND i.owner_key = t.owner_key AND i.status = 'active')))
                   AND r.status IN ('needs_review', 'pending_user', 'conflict', 'import_requested')
                   {date_filter}
+                  {scope_filter}
                 ORDER BY COALESCE(t.date, t.authorized_date, '') DESC, r.id DESC
                 LIMIT ?
                 """,
@@ -1602,81 +1625,16 @@ class BankStore:
             ).fetchall()
         return [_reconciliation_item_from_row(row) for row in rows]
 
-    def ignore_reconciliation_item(self, owner_key: str, reconciliation_id: int) -> ReconciliationItem | None:
-        now = utc_now_iso()
-        self.initialize()
-        with self.connect() as conn:
-            self._lock_reconciliation_owner(conn, owner_key)
-            row = conn.execute(
-                """
-                SELECT
-                    r.*,
-                    t.provider_transaction_id,
-                    t.date,
-                    t.authorized_date,
-                    t.name,
-                    t.merchant_name,
-                    t.amount,
-                    t.pending,
-                    t.payment_channel,
-                    t.pending_transaction_id,
-                    t.updated_at,
-                    a.name AS account_name,
-                    a.mask AS account_mask,
-                    a.type AS account_type,
-                    a.subtype AS account_subtype
-                FROM bank_reconciliation_items r
-                JOIN bank_transactions t ON t.id = r.bank_transaction_id
-                LEFT JOIN bank_accounts a ON a.id = t.account_id
-                WHERE r.id = ?
-                  AND r.owner_key = ?
-                  AND t.removed_at IS NULL
-                """,
-                (int(reconciliation_id), owner_key),
-            ).fetchone()
-            if row is None:
-                return None
-            conn.execute(
-                """
-                UPDATE bank_reconciliation_items
-                SET status = 'ignored',
-                    ignored_at = ?,
-                    last_seen_at = ?,
-                    notes = CASE
-                        WHEN notes IS NULL OR notes = '' THEN 'ignored by user'
-                        ELSE notes || '; ignored by user'
-                    END
-                WHERE id = ?
-                  AND owner_key = ?
-                """,
-                (now, now, int(reconciliation_id), owner_key),
-            )
-            updated = conn.execute(
-                """
-                SELECT
-                    r.*,
-                    t.provider_transaction_id,
-                    t.date,
-                    t.authorized_date,
-                    t.name,
-                    t.merchant_name,
-                    t.amount,
-                    t.pending,
-                    t.payment_channel,
-                    t.pending_transaction_id,
-                    t.updated_at,
-                    a.name AS account_name,
-                    a.mask AS account_mask,
-                    a.type AS account_type,
-                    a.subtype AS account_subtype
-                FROM bank_reconciliation_items r
-                JOIN bank_transactions t ON t.id = r.bank_transaction_id
-                LEFT JOIN bank_accounts a ON a.id = t.account_id
-                WHERE r.id = ?
-                """,
-                (int(reconciliation_id),),
-            ).fetchone()
-        return _reconciliation_item_from_row(updated) if updated else None
+    def ignore_reconciliation_item(self, owner_key: str, reconciliation_id: int,
+                                   *, expected_item: ReconciliationItem | None = None) -> ReconciliationItem | None:
+        item = self.get_reconciliation_item(owner_key, reconciliation_id)
+        if item is None or (expected_item is not None and item != expected_item):
+            return None
+        return self.apply_reconciliation_review(
+            owner_key, reconciliation_id, action='ignore', expected_status=item.status,
+            expected_updated_at=item.transaction.updated_at, expected_last_seen_at=item.last_seen_at,
+            source='discord',
+        )
 
     def get_reconciliation_item(self, owner_key: str, reconciliation_id: int) -> ReconciliationItem | None:
         self.initialize()
@@ -1768,11 +1726,14 @@ class BankStore:
         action: Literal['confirm', 'ignore', 'reopen'],
         expected_status: str, expected_updated_at: str, expected_last_seen_at: str,
         matched_action_log_id: str | None = None, matched_sheet_ref: str | None = None,
+        source: Literal['phone', 'discord'] = 'phone', notes: str | None = None,
+        before_confirm: Callable[[], None] | None = None,
     ) -> ReconciliationItem | None:
         """Apply a reviewed metadata decision, or return None for a stale view.
 
-        This never logs an expense or changes a sheet amount. Pending charges
-        and imports in progress cannot be decided from the phone review screen.
+        Both surfaces compare the same persisted version and reserve evidence.
+        Discord's explicit amount correction runs only after these checks, under
+        the owner/transaction locks, so a competing decision cannot interleave.
         """
         allowed = {
             'confirm': {'needs_review', 'pending_user', 'conflict', 'matched'},
@@ -1799,11 +1760,12 @@ class BankStore:
                 """SELECT r.*, t.updated_at AS bank_updated_at
                    FROM bank_reconciliation_items r
                    JOIN bank_transactions t ON t.id = r.bank_transaction_id AND t.owner_key = r.owner_key
-                   JOIN bank_accounts a ON a.id = t.account_id AND a.owner_key = r.owner_key
-                   JOIN bank_items i ON i.id = a.item_id AND i.owner_key = r.owner_key
+                   LEFT JOIN bank_accounts a ON a.id = t.account_id AND a.owner_key = r.owner_key
+                   LEFT JOIN bank_items i ON i.id = a.item_id AND i.owner_key = r.owner_key
                    WHERE r.id = ? AND r.owner_key = ? AND t.removed_at IS NULL AND t.pending = 0
-                     AND a.watched = 1 AND i.status = 'active'""",
-                (int(reconciliation_id), owner_key),
+                     AND ((a.watched = 1 AND i.status = 'active')
+                          OR (? = 'discord' AND t.account_id IS NULL))""",
+                (int(reconciliation_id), owner_key, source),
             ).fetchone()
             if row is None or (
                 row['status'] != expected_status or row['bank_updated_at'] != expected_updated_at
@@ -1814,6 +1776,9 @@ class BankStore:
                 conn, owner_key, row['bank_transaction_id'], matched_action_log_id, matched_sheet_ref,
             ):
                 return None
+            if action == 'confirm' and before_confirm is not None:
+                before_confirm()
+            now = utc_now_iso()
             status = {'confirm': 'confirmed', 'ignore': 'ignored', 'reopen': 'needs_review'}[action]
             conn.execute(
                 """UPDATE bank_reconciliation_items
@@ -1823,7 +1788,7 @@ class BankStore:
                 (status, matched_action_log_id if action == 'confirm' else None,
                  matched_sheet_ref if action == 'confirm' else None,
                  now if action == 'confirm' else None, now if action == 'ignore' else None,
-                 now, f'{action} from phone review', int(reconciliation_id), owner_key),
+                 now, notes or f'{action} from {source} review', int(reconciliation_id), owner_key),
             )
             payload = {
                 'previous_status': row['status'], 'status': status,
@@ -1837,110 +1802,42 @@ class BankStore:
                 """INSERT INTO bank_reconciliation_events (
                        event_id, reconciliation_id, owner_key, event_type, occurred_at, payload_json
                    ) VALUES (?, ?, ?, ?, ?, ?)""",
-                (uuid4().hex, int(reconciliation_id), owner_key, f'phone_review_{action}',
+                (uuid4().hex, int(reconciliation_id), owner_key, f'{source}_review_{action}',
                  now, json.dumps(payload, sort_keys=True)),
             )
         return self.get_reconciliation_item(owner_key, reconciliation_id)
 
     def confirm_reconciliation_item(
-        self,
-        owner_key: str,
-        reconciliation_id: int,
-        *,
-        matched_action_log_id: str | None = None,
-        matched_sheet_ref: str | None = None,
-        notes: str = "logged from bank review",
+        self, owner_key: str, reconciliation_id: int, *,
+        matched_action_log_id: str | None = None, matched_sheet_ref: str | None = None,
+        notes: str = "logged from bank review", expected_item: ReconciliationItem | None = None,
+        before_confirm: Callable[[], None] | None = None,
     ) -> ReconciliationItem | None:
-        now = utc_now_iso()
-        self.initialize()
-        with self.connect() as conn:
-            self._lock_reconciliation_owner(conn, owner_key)
-            identity = conn.execute(
-                'SELECT bank_transaction_id FROM bank_reconciliation_items WHERE id = ? AND owner_key = ?',
-                (int(reconciliation_id), owner_key),
-            ).fetchone()
-            if identity is None:
-                return None
-            conn.execute('UPDATE bank_transactions SET id = id WHERE id = ?', (identity['bank_transaction_id'],))
-            row = conn.execute(
-                """SELECT r.bank_transaction_id, r.matched_action_log_id, r.matched_sheet_ref
-                   FROM bank_reconciliation_items r JOIN bank_transactions t ON t.id = r.bank_transaction_id
-                   LEFT JOIN bank_accounts a ON a.id = t.account_id
-                   LEFT JOIN bank_items i ON i.id = a.item_id
-                   WHERE r.id = ? AND r.owner_key = ? AND t.owner_key = ?
-                     AND t.removed_at IS NULL AND t.pending = 0
-                     AND (t.account_id IS NULL OR (a.watched = 1 AND a.owner_key = t.owner_key
-                         AND i.status = 'active' AND i.owner_key = t.owner_key))""",
-                (int(reconciliation_id), owner_key, owner_key),
-            ).fetchone()
-            if row is None or self._reconciliation_match_taken(
-                conn, owner_key, row['bank_transaction_id'],
-                matched_action_log_id or row['matched_action_log_id'],
-                matched_sheet_ref or row['matched_sheet_ref'],
-            ):
-                return None
-            conn.execute(
-                """
-                UPDATE bank_reconciliation_items
-                SET status = 'confirmed',
-                    resolved_at = ?,
-                    last_seen_at = ?,
-                    matched_action_log_id = COALESCE(?, matched_action_log_id),
-                    matched_sheet_ref = COALESCE(?, matched_sheet_ref),
-                    notes = CASE
-                        WHEN notes IS NULL OR notes = '' THEN ?
-                        ELSE notes || '; ' || ?
-                    END
-                WHERE id = ?
-                  AND owner_key = ?
-                """,
-                (now, now, matched_action_log_id, matched_sheet_ref, notes, notes, int(reconciliation_id), owner_key),
-            )
-        return self.get_reconciliation_item(owner_key, reconciliation_id)
+        item = self.get_reconciliation_item(owner_key, reconciliation_id)
+        if item is None or (expected_item is not None and item != expected_item):
+            return None
+        return self.apply_reconciliation_review(
+            owner_key, reconciliation_id, action='confirm', expected_status=item.status,
+            expected_updated_at=item.transaction.updated_at, expected_last_seen_at=item.last_seen_at,
+            matched_action_log_id=matched_action_log_id or item.matched_action_log_id,
+            matched_sheet_ref=matched_sheet_ref or item.matched_sheet_ref,
+            source='discord', notes=notes, before_confirm=before_confirm,
+        )
 
     def reopen_reconciliation_item(
-        self,
-        owner_key: str,
-        reconciliation_id: int,
-        *,
-        notes: str = "reopened for review",
+        self, owner_key: str, reconciliation_id: int, *, notes: str = "reopened for review",
+        expected_item: ReconciliationItem | None = None,
     ) -> ReconciliationItem | None:
-        now = utc_now_iso()
-        self.initialize()
-        with self.connect() as conn:
-            self._lock_reconciliation_owner(conn, owner_key)
-            row = conn.execute(
-                """
-                SELECT r.id
-                FROM bank_reconciliation_items r
-                JOIN bank_transactions t ON t.id = r.bank_transaction_id
-                WHERE r.id = ?
-                  AND r.owner_key = ?
-                  AND t.removed_at IS NULL
-                """,
-                (int(reconciliation_id), owner_key),
-            ).fetchone()
-            if row is None:
-                return None
-            conn.execute(
-                """
-                UPDATE bank_reconciliation_items
-                SET status = 'needs_review',
-                    matched_action_log_id = NULL,
-                    matched_sheet_ref = NULL,
-                    resolved_at = NULL,
-                    ignored_at = NULL,
-                    last_seen_at = ?,
-                    notes = CASE
-                        WHEN notes IS NULL OR notes = '' THEN ?
-                        ELSE notes || '; ' || ?
-                    END
-                WHERE id = ?
-                  AND owner_key = ?
-                """,
-                (now, notes, notes, int(reconciliation_id), owner_key),
-            )
-        return self.get_reconciliation_item(owner_key, reconciliation_id)
+        item = self.get_reconciliation_item(owner_key, reconciliation_id)
+        if item is None or (expected_item is not None and item != expected_item):
+            return None
+        if item.status in {'needs_review', 'pending_user', 'conflict'}:
+            return item  # Already open; no duplicate transition or event.
+        return self.apply_reconciliation_review(
+            owner_key, reconciliation_id, action='reopen', expected_status=item.status,
+            expected_updated_at=item.transaction.updated_at, expected_last_seen_at=item.last_seen_at,
+            source='discord', notes=notes,
+        )
 
     def reopen_reconciliation_items_for_action_ids(
         self,

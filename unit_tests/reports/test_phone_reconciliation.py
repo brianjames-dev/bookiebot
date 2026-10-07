@@ -360,3 +360,25 @@ async def test_bad_source_is_retryable_not_an_invalid_user_request(client, monke
     assert result.status == 503 and "Private source" not in await result.text()
     assert (await client.http.get("/app/reconciliation/not-an-id")).status == 400
     assert client.store.get_reconciliation_item("brian", item.id).status == "needs_review"
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize('decision', ['confirm', 'ignore'])
+@pytest.mark.parametrize('old_operation', ['confirm', 'ignore'])
+async def test_phone_open_before_discord_decision_refreshes_without_overwriting(client, decision, old_operation):
+    item = seed(client)
+    connect(client)
+    row = await details(client, item.id)
+    if decision == 'confirm':
+        assert client.service.confirm_reconciliation_item('brian', item.id,
+            expected_item=item, matched_action_log_id='coffee')
+    else:
+        assert client.service.ignore_reconciliation_item('brian', item.id, expected_item=item)
+    result = await client.http.post('/app/reconciliation', headers=HEADERS, json={
+        'operation': old_operation, 'id': item.id, 'version': row['version'], 'suggestionId': 'coffee',
+    })
+    assert result.status == 409
+    refreshed = await list_rows(client)
+    assert refreshed['items'][0]['status'] == ('checked' if decision == 'confirm' else 'ignored')
+    events = client.store.reconciliation_events('brian', item.id)
+    assert [event['event_type'] for event in events] == [f'discord_review_{decision}']

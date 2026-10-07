@@ -1,5 +1,13 @@
 # Agent Decisions
 
+## 2026-10-07 - Share Reconciliation Decisions Across Phone And Discord
+
+Use the existing compare-and-apply database path for both surfaces' confirm/ignore/reopen. Validate owner, bank/review version, posted active-account eligibility and exclusive action/schedule evidence; log source and prior lineage. Confirmed/ignored decisions require an intentional fresh Reopen before a different decision. Inbox batch actions retain the displayed snapshots, and a stale Discord detail explains the shared decision instead of treating a resolved item as missing.
+
+Keep phone review metadata-only and exact-amount. Discord still supports explicitly selected amount corrections; reserve the owner and bank/review rows during the correction and final confirmation so another review cannot interleave. Candidate discovery happens before this lock. Preserve the reconciliation origin through canonical split-backed updates so they do not recursively reopen the review being confirmed. This intentionally holds the existing database locks across an explicit Sheets correction; it does not make Sheets and database rollback atomic. On a transport failure, require checking live status before another change. Durable import claims/recovery remain the separate mechanism for new rows; all normal/admin import paths reuse them and compare the reviewed bank/item version plus active account eligibility.
+
+Freeze each Discord session's item membership and total. Filter that membership before query limits, track visited/skipped items, include external resolutions in progress and render both numbers as inline code. Later arrivals wait for a new session. These choices preserve explicit financial authority and eliminate stale cross-surface writes without a second reconciliation state machine or schema migration.
+
 ## 2026-10-07 - Acknowledge Splits Before I/O And Scope Interactive Projection
 
 Decision: Split selection, creation, method editing and confirmed cancellation acknowledge Discord components with `ephemeral=True, thinking=True` before loading or mutating state. Run synchronous Sheets/database work in `asyncio.to_thread`, carrying the trusted owner context. Finish the deferred private response on success or failure; failed acknowledgment must not begin a financial mutation. Explicit typed/post-log splits also use worker threads.

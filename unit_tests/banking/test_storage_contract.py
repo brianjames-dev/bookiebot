@@ -177,7 +177,7 @@ def test_storage_modified_match_reopens_once_and_retains_auditable_lineage(contr
     renamed = {**transaction, "merchant_name": "Updated display name"}
     store.upsert_transactions([renamed], owner_key="brian")
     assert store.get_reconciliation_item("brian", review.id).status == "confirmed"
-    assert store.reconciliation_events("brian", review.id) == []
+    assert [event["event_type"] for event in store.reconciliation_events("brian", review.id)] == ["discord_review_confirm"]
     changed = {**renamed, "amount": -15.75, "date": "2026-09-07", "pending": True}
     store.upsert_transactions([changed], owner_key="brian")
     reopened = store.get_reconciliation_item("brian", review.id)
@@ -185,7 +185,7 @@ def test_storage_modified_match_reopens_once_and_retains_auditable_lineage(contr
     assert reopened.matched_action_log_id is None and reopened.resolved_at is None
     assert reopened.transaction.amount == -15.75
     events = store.reconciliation_events("brian", review.id)
-    assert len(events) == 1
+    assert len(events) == 2
     assert events[0]["event_type"] == "bank_transaction_modified"
     assert set(events[0]["payload"]["changed_fields"]) == {"amount", "date", "pending"}
     assert events[0]["payload"]["before"]["amount"] == 12.50
@@ -193,12 +193,12 @@ def test_storage_modified_match_reopens_once_and_retains_auditable_lineage(contr
     assert events[0]["payload"]["previous_match"]["matched_action_log_id"] == "original-action"
     assert store.reconciliation_events("hannah", review.id) == []
     store.upsert_transactions([changed], owner_key="brian")
-    assert len(store.reconciliation_events("brian", review.id)) == 1
+    assert len(store.reconciliation_events("brian", review.id)) == 2
     _, ignored_transaction, ignored = _seed(store, suffix="ignored")
     store.ignore_reconciliation_item("brian", ignored.id)
     store.upsert_transactions([{**ignored_transaction, "amount": 20}], owner_key="brian")
     assert store.get_reconciliation_item("brian", ignored.id).status == "ignored"
-    assert store.reconciliation_events("brian", ignored.id) == []
+    assert [event["event_type"] for event in store.reconciliation_events("brian", ignored.id)] == ["discord_review_ignore"]
 
 
 def test_storage_webhook_leases_recover_and_reject_stale_workers(contract_store):
@@ -490,7 +490,11 @@ def test_grouped_action_and_schedule_aliases_share_one_claim_in_either_order(con
     first_ref, second_ref = (grouped, schedule) if group_first else (schedule, grouped)
     assert _phone_review(store, first, matched_action_log_id=None, matched_sheet_ref=first_ref)
     assert _phone_review(store, second, matched_action_log_id='another-action', matched_sheet_ref=second_ref) is None
-    # Adding an alias to the same transaction is not a second allocation.
+    # A stale Discord action cannot repoint a confirmed phone decision. An
+    # intentional reopen allows selecting the grouped alias for the same item.
+    assert store.confirm_reconciliation_item('brian', first.id,
+        matched_action_log_id='same-purchase-action', matched_sheet_ref=grouped) is None
+    assert store.reopen_reconciliation_item('brian', first.id)
     repointed = store.confirm_reconciliation_item('brian', first.id,
         matched_action_log_id='same-purchase-action', matched_sheet_ref=grouped)
     assert repointed is not None and repointed.matched_sheet_ref == grouped
@@ -593,3 +597,118 @@ def test_storage_simultaneous_webhooks_for_one_item_have_one_active_lease(contra
     blocked, _ = next((event, token) for event, token in results if not token)
     assert store.mark_plaid_webhook_processed(winner.id, item.item_id, claim_token=token)
     assert store.claim_plaid_webhook_event(blocked.id)
+
+
+@pytest.mark.parametrize('first_source', ['phone', 'discord'])
+@pytest.mark.parametrize('second_action', ['confirm', 'ignore'])
+def test_cross_surface_stale_decision_cannot_overwrite_review(contract_store, first_source, second_action):
+    store = contract_store
+    _, _, review = _seed(store)
+    def apply(source, action, **kwargs):
+        return store.apply_reconciliation_review('brian', review.id, action=action,
+            expected_status=review.status, expected_updated_at=review.transaction.updated_at,
+            expected_last_seen_at=review.last_seen_at, source=source, **kwargs)
+    assert apply(first_source, 'confirm', matched_action_log_id='winner')
+    corrected = []
+    other = 'discord' if first_source == 'phone' else 'phone'
+    assert apply(other, second_action, matched_action_log_id='loser',
+                 before_confirm=lambda: corrected.append('unsafe sheet write')) is None
+    assert corrected == []
+    assert store.get_reconciliation_item('brian', review.id).matched_action_log_id == 'winner'
+    events = store.reconciliation_events('brian', review.id)
+    assert [event['event_type'] for event in events] == [f'{first_source}_review_confirm']
+    assert events[0]['payload']['previous_status'] == 'needs_review'
+    assert store.ignore_reconciliation_item('brian', review.id) is None
+    assert store.confirm_reconciliation_item('brian', review.id, matched_action_log_id='loser') is None
+
+
+@pytest.mark.parametrize('change', ['reopened', 'bank_changed', 'hidden', 'disconnected', 'removed', 'import'])
+def test_discord_correction_checks_current_eligibility_before_sheet_write(contract_store, change):
+    store = contract_store
+    linked, raw, review = _seed(store)
+    if change == 'reopened':
+        assert _phone_review(store, review)
+        assert store.apply_reconciliation_review('brian', review.id, action='reopen',
+            expected_status='confirmed', expected_updated_at=review.transaction.updated_at,
+            expected_last_seen_at=store.get_reconciliation_item('brian', review.id).last_seen_at)
+    elif change == 'bank_changed':
+        store.upsert_transactions([{**raw, 'amount': 25}], 'brian')
+    elif change == 'hidden':
+        store.set_account_watched('brian', store.list_accounts('brian')[0].id, False)
+    elif change == 'disconnected':
+        store.disconnect_item('brian', linked.id)
+    elif change == 'removed':
+        store.mark_transactions_removed([raw['transaction_id']])
+    else:
+        assert _claim(store, review)[1]
+    corrected = []
+    assert store.confirm_reconciliation_item('brian', review.id, expected_item=review,
+        matched_action_log_id='unsafe', before_confirm=lambda: corrected.append(True)) is None
+    assert corrected == []
+
+
+def test_sheet_correction_and_competing_phone_review_are_serialized(contract_store):
+    from concurrent.futures import ThreadPoolExecutor
+    from threading import Event
+    store = contract_store
+    _, _, review = _seed(store)
+    writing, release, phone_started = Event(), Event(), Event()
+    def correction():
+        writing.set()
+        assert release.wait(5)
+    def discord():
+        return store.confirm_reconciliation_item('brian', review.id, expected_item=review,
+            matched_action_log_id='discord-winner', before_confirm=correction)
+    def phone():
+        phone_started.set()
+        return _phone_review(store, review)
+    with ThreadPoolExecutor(max_workers=2) as workers:
+        first = workers.submit(discord)
+        assert writing.wait(5)
+        second = workers.submit(phone)
+        assert phone_started.wait(5)
+        release.set()
+        assert first.result(timeout=10).matched_action_log_id == 'discord-winner'
+        assert second.result(timeout=10) is None
+    assert [event['event_type'] for event in store.reconciliation_events('brian', review.id)] == ['discord_review_confirm']
+
+
+@pytest.mark.parametrize('change', ['reopened', 'disconnected', 'bank_changed'])
+def test_old_import_form_cannot_claim_changed_or_disconnected_review(contract_store, change):
+    store = contract_store
+    linked, raw, review = _seed(store)
+    if change == 'reopened':
+        assert _phone_review(store, review)
+        assert store.reopen_reconciliation_item('brian', review.id)
+    elif change == 'disconnected':
+        store.disconnect_item('brian', linked.id)
+    else:
+        store.upsert_transactions([{**raw, 'authorized_date': '2026-09-04'}], 'brian')
+    result, claimed = store.claim_reconciliation_import('brian', review.id,
+        operation_id=uuid.uuid4().hex, actor_key='actor', kind='expense', request={
+            'bank_amount': review.transaction.amount, 'bank_date': review.transaction.date,
+            'expected_status': review.status, 'expected_last_seen_at': review.last_seen_at,
+            'expected_updated_at': review.transaction.updated_at,
+        })
+    assert result is None and not claimed
+
+
+def test_session_scope_is_filtered_before_query_limit(contract_store):
+    store = contract_store
+    store.initialize()
+    _, _, first = _seed(store)
+    _, _, second = _seed(store, suffix='second')
+    _, _, new_arrival = _seed(store, suffix='new')
+    assert store.unresolved_reconciliation_items('brian', limit=2) == [new_arrival, second]
+    assert store.unresolved_reconciliation_items('brian', limit=2,
+        reconciliation_ids={first.id, second.id}) == [second, first]
+    assert store.unresolved_reconciliation_items('hannah', reconciliation_ids={first.id}) == []
+
+
+def test_inflight_import_cannot_be_reopened_or_ignored_by_stale_discord_controls(contract_store):
+    store = contract_store
+    _, _, review = _seed(store)
+    assert _claim(store, review)[1]
+    assert store.reopen_reconciliation_item('brian', review.id) is None
+    assert store.ignore_reconciliation_item('brian', review.id) is None
+    assert store.get_reconciliation_item('brian', review.id).status == 'import_requested'
