@@ -280,7 +280,7 @@ def test_duplicate_charge_cannot_use_schedule_after_its_logged_action(source_typ
     logged = action()
     first = reconcile_transaction(transaction(), [logged], [scheduled])
     assert first.matched_action_log_id == logged.id
-    assert first.matched_sheet_ref == f"expense!row 12#month=2026-09 + {scheduled.occurrence_ref}"
+    assert first.matched_sheet_ref == f"expense!row 12#cols=30,31,32,33,34#month=2026-09 + {scheduled.occurrence_ref}"
     duplicate = reconcile_transaction(transaction(), [logged], [scheduled], excluded_action_ids={logged.id})
     assert duplicate.status == "needs_review"
     assert duplicate.matched_sheet_ref is None
@@ -351,7 +351,7 @@ def test_action_candidates_keep_physical_row_and_schedule_claim_together(monkeyp
     _, candidates, _ = bank_service.reconciliation_match_candidates("brian", item.id, actor_key="brian")
     assert len(candidates) == 1
     ref = candidates[0].sheet_ref
-    assert ref == f"expense!row 12#month=2026-09 + {pull().occurrence_ref}"
+    assert ref == f"expense!row 12#cols=30,31,32,33,34#month=2026-09 + {pull().occurrence_ref}"
     assert banking_service._find_action_for_sheet_ref([logged], ref) == logged
     confirmed, candidate, status = bank_service.confirm_reconciliation_action_match(
         "brian", item.id, actor_key="brian", action_id=logged.id,
@@ -426,7 +426,7 @@ def test_action_history_crosses_month_and_year_without_provisioning(monkeypatch)
     bank = transaction("PG&E", date="2027-01-03", authorized_date="2026-12-31")
     matched = reconcile_transaction(bank, result)
     assert matched.matched_action_log_id == "december"
-    assert matched.matched_sheet_ref == "expense!row 12#month=2026-12"
+    assert matched.matched_sheet_ref == "expense!row 12#cols=30,31,32,33,34#month=2026-12"
 
 
 @pytest.mark.parametrize("failure", ["quota", "malformed"])

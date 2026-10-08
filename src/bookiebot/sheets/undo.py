@@ -599,6 +599,15 @@ def read_active_logged_actions(user_key: str | None = None) -> list[LoggedAction
     ], for_reconciliation=True, history=history)
 
 
+def read_logged_action_history(user_key: str) -> list[LoggedAction]:
+    """Read current-month raw lifecycle evidence, including successful Undo."""
+    data = _read_log_data()
+    if data is None:
+        raise RuntimeError('The action history is unavailable.')
+    keys = actor_key_aliases(str(user_key))
+    return [record.logged for record in data.records if record.logged.user_key in keys]
+
+
 def _append_logged_action(user_key: str | None, action: UndoAction) -> str:
     ws = _log_sheet()
     _ensure_log_header(ws)

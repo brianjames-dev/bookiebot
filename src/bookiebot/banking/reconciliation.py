@@ -3,6 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass, replace
 from datetime import date, datetime
 import re
+import json
 from math import isfinite
 from typing import Iterable
 
@@ -12,6 +13,8 @@ from bookiebot.banking.models import (
     ReconciliationStatus,
 )
 from bookiebot.sheets.undo import LoggedAction
+from bookiebot.sheets.config import get_category_columns, normalize_expense_category
+from openpyxl.utils import column_index_from_string
 
 
 TRANSFER_PATTERNS = (
@@ -300,7 +303,14 @@ def action_sheet_ref(logged: LoggedAction, scheduled_pulls: Iterable[ScheduledPu
     """Reserve physical row and equivalent recurring occurrence in one store CAS."""
     candidate = _action_candidate(logged)
     month_suffix = f"#month={candidate['date']:%Y-%m}" if candidate is not None else ""
-    refs = [f"{logged.action.worksheet}!row {logged.action.row}{month_suffix}"]
+    columns = logged.action.columns
+    category = normalize_expense_category(logged.action.metadata.get('category'))
+    if logged.action.worksheet == 'expense' and category in get_category_columns:
+        # An update may list only its changed cells; reserve the whole purchase
+        # block. Categories share row numbers in the same monthly worksheet.
+        columns = [column_index_from_string(col) for col in get_category_columns[category]['columns'].values()]
+    column_suffix = f"#cols={','.join(str(col) for col in sorted(set(columns)))}" if columns else ''
+    refs = [f"{logged.action.worksheet}!row {logged.action.row}{column_suffix}{month_suffix}"]
     if candidate is not None:
         refs.extend(pull.occurrence_ref for pull in scheduled_pulls if _schedule_represents_action(pull, candidate))
     return " + ".join(dict.fromkeys(refs))
@@ -652,7 +662,17 @@ def _action_candidate(logged: LoggedAction) -> dict | None:
     if action_type not in {"expense", "income", "payment"}:
         return None
 
-    amount = _action_amount(action_type, action.new_values, action.description)
+    category = normalize_expense_category(action.metadata.get('category'))
+    fields = list(get_category_columns[category]['columns']) if category in get_category_columns else []
+    try:
+        fields = json.loads(action.metadata.get('display_fields', '')) or fields
+    except (ValueError, TypeError):
+        pass
+    if (action_type == 'expense' and isinstance(fields, list) and 'amount' in fields
+            and len(fields) == len(action.new_values)):
+        amount = _money_value(action.new_values[fields.index('amount')])
+    else:
+        amount = _action_amount(action_type, action.new_values, action.description)
     action_date = _action_date(action.new_values, logged.created_at)
     if amount is None or action_date is None or amount <= 0:
         return None

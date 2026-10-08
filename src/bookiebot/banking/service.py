@@ -249,17 +249,25 @@ def _find_action_for_sheet_ref(action_log: list, sheet_ref: str | None):
         return None
     worksheet, row_text = physical_refs[0].split("!row ", 1)
     row_text, _, source_month = row_text.partition("#month=")
+    row_text, _, source_columns = row_text.partition('#cols=')
     try:
         row = int(row_text.strip())
     except ValueError:
         return None
+    matches = []
     for logged in reversed(action_log):
         if logged.action.worksheet == worksheet and logged.action.row == row:
             candidate = action_log_candidate_by_id(logged)
-            if source_month and (candidate is None or candidate.date.strftime("%Y-%m") != source_month):
+            if candidate is None or (source_month and candidate.date.strftime("%Y-%m") != source_month):
                 continue
-            return logged
-    return None
+            if source_columns:
+                _, _, candidate_columns = candidate.sheet_ref.partition('#cols=')
+                candidate_columns = candidate_columns.partition('#month=')[0]
+                if set(source_columns.split(',')) != set(candidate_columns.split(',')):
+                    continue
+            matches.append(logged)
+    # Old row-only refs cannot select between side-by-side category purchases.
+    return matches[0] if len(matches) == 1 else None
 
 
 def _bill_name_matches_transaction(bill_name: str, transaction: BankTransaction) -> bool:
@@ -1030,7 +1038,8 @@ class BankingService:
             matched_sheet_ref=candidate.sheet_ref,
             notes=f"matched {candidate.label}", expected_item=item,
         )
-        return confirmed or self.get_reconciliation_item(owner_key, reconciliation_id), candidate, "matched" if confirmed else "changed"
+        current = confirmed or self.get_reconciliation_item(owner_key, reconciliation_id)
+        return current, candidate, "matched" if confirmed else ("changed" if current != item else "match_unavailable")
 
     def confirm_reconciliation_action_match(
         self,
@@ -1107,7 +1116,8 @@ class BankingService:
             )
         except _MatchCorrectionFailed as exc:
             return item, candidate, str(exc)
-        return confirmed or self.get_reconciliation_item(owner_key, reconciliation_id), candidate, update_status if confirmed else "changed"
+        current = confirmed or self.get_reconciliation_item(owner_key, reconciliation_id)
+        return current, candidate, update_status if confirmed else ("changed" if current != item else "match_unavailable")
 
     def revert_reconciliation_item(
         self,
@@ -1277,7 +1287,8 @@ class BankingService:
             )
         except _MatchCorrectionFailed as exc:
             return item, candidates, str(exc)
-        return confirmed or self.get_reconciliation_item(owner_key, reconciliation_id), candidates, status if confirmed else "changed"
+        current = confirmed or self.get_reconciliation_item(owner_key, reconciliation_id)
+        return current, candidates, status if confirmed else ("changed" if current != item else "match_unavailable")
 
     def reconciliation_preview(
         self,

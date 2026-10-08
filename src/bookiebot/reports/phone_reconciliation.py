@@ -201,6 +201,9 @@ def command(service: BankingService, owner: str, actor: str, body: dict) -> dict
         matched_action_log_id=action_id, matched_sheet_ref=sheet_ref,
     )
     if applied is None:
+        current = service.get_reconciliation_item(owner, item.id)
+        if operation == 'confirm' and current == item:
+            raise ReviewConflict("That row is already linked or no longer eligible. Check status or choose another suggestion.")
         raise ReviewConflict("This transaction was already changed. Check again.")
     return snapshot(service, owner)
 
