@@ -1,8 +1,16 @@
 # Finance Operations Workstream
 
-Last updated: 2026-10-07
+Last updated: 2026-10-08
 
 ## Goal
+
+### Reconciliation regressions work log — 2026-10-08
+
+Complete implementation; local verification passed, GitHub CI/release acceptance pending (STATUS checklist 133). Read-only production evidence confirmed Oliver's Market Grocery row 4 collided with Taco Bell's Food row-4 reservation. Parking's import completed, then was undone; the completed claim incorrectly blocked a new Log. Item 3391 is now intentionally ignored; 3376 remains open. Neither was mutated during diagnosis.
+
+New references reserve column sets and expense period, so side-by-side categories do not collide while overlapping cells still cannot double-match. Legacy ambiguous expense aliases retain action-ID claims rather than guessing category ownership; ambiguous row-only reversion fails closed. Category/display layouts fix Grocery/Gas amount parsing. Discord/phone distinguish unchanged unavailable evidence from an actual changed review.
+
+A fresh explicit expense Log may replace a completed import only after owner-scoped successful Undo/Delete evidence and absence of surviving imported descendants. The atomic owner/transaction claim retains the full prior operation in an event, issues a new operation ID and preserves bank/review eligibility/version guards. Recovery never writes; old forms, Reopen alone, unavailable history and uncertain/inflight writes cannot release claims. Added 45 regression cases, including real writer→Undo/Delete→reimport, concurrent submission, Discord/web response and SQLite/PostgreSQL reservation/replacement checks. Full PostgreSQL-enabled suite **2,497 passed / 25 optional frontend skips**, Pyright clean; CI supplies frontend contracts. Historical imports, direct canonical correction Undo and manual device acceptance remain separate.
 
 ### Main integration — 2026-10-07
 
@@ -378,6 +386,8 @@ Status: Complete first pass as of 2026-06-20. Normal unresolved views use a 60-d
 - Add debug command support to inspect recent reconciliation events.
 
 ### Slice 4 - Reconciliation State Machine
+
+2026-10-08: category identity, unchanged-conflict feedback and completed expense-import replacement after verified removal are implemented using existing claim/event tables, with no schema migration. Fresh explicit review authority is required. STATUS checklist 133 tracks release acceptance.
 
 2026-10-07: shared phone/Discord transition checks and lifecycle events are complete for manual confirm/ignore/reopen; stale controls, batch inbox actions, explicit amount correction races and import eligibility now use reviewed versions. Fixed session progress and cross-medium acceptance remain queued for release in STATUS checklist 132. No new persisted statuses or storage schema.
 

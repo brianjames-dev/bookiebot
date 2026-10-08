@@ -34,10 +34,12 @@ def seed(store, *, amount=20.0, bank_date='2026-09-05', pending=False):
 @pytest.fixture
 def writers(monkeypatch):
     actions = []
+    history = []
     monkeypatch.setattr(imports, 'get_user_config', lambda _: SimpleNamespace(budget_owner_key='brian'))
     monkeypatch.setattr(imports, 'sheet_user_context', lambda _: nullcontext())
     monkeypatch.setattr(imports, 'now_pacific', lambda: datetime(2026, 9, 6, 10))
     monkeypatch.setattr(imports, 'read_active_logged_actions', lambda _: actions)
+    monkeypatch.setattr(imports, 'read_logged_action_history', lambda _: history)
     repo = SimpleNamespace(
         expense_sheet=Mock(return_value=SimpleNamespace(title='September')),
         income_sheet=Mock(return_value=SimpleNamespace(title='September')),
@@ -49,7 +51,7 @@ def writers(monkeypatch):
     monkeypatch.setattr(imports, 'log_category_row', expense)
     monkeypatch.setattr(imports, 'record_expense_undo', record)
     monkeypatch.setattr(imports, 'log_income_row', income)
-    return SimpleNamespace(expense=expense, income=income, record=record, repo=repo, actions=actions)
+    return SimpleNamespace(expense=expense, income=income, record=record, repo=repo, actions=actions, history=history)
 
 
 def submit(store, item, kind='expense'):
@@ -257,8 +259,125 @@ def test_completed_import_cannot_recreate_row_after_intentional_reopen(store, wr
     item = seed(store)
     assert submit(store, item).status == 'completed'
     store.reopen_reconciliation_item('brian', item.id)
-    assert submit(store, item).status == 'needs_recovery'
+    assert submit(store, item).status == 'rejected'
     assert writers.expense.call_count == 1
+
+
+def test_fresh_explicit_log_after_verified_undo_creates_one_new_attempt(store, writers):
+    item = seed(store)
+    first = submit(store, item)
+    removed = action_for(first.operation_id, item.id, action_id=first.action_id)
+    removed.status, removed.undone_at = 'undone', '2026-09-06T10:00:00'
+    removed.action.kind = 'clear_cells'
+    writers.history.append(removed)
+    fresh = store.reopen_reconciliation_item('brian', item.id)
+    def log(expected):
+        return imports.import_reconciliation_item(
+            store, 'brian', item.id, actor_key='actor', kind='expense',
+            fields={'category': 'shopping', 'person': 'Brian (BofA)'},
+            expected_amount=item.transaction.amount, expected_date=item.transaction.date,
+            expected_item=expected,
+        )
+    assert log(item).status == 'rejected'  # The form before Undo is not new authority.
+    second = log(fresh)
+    assert second.status == 'completed' and second.operation_id != first.operation_id
+    assert writers.expense.call_count == 2
+    assert log(fresh).status == 'completed'
+    assert writers.expense.call_count == 2
+
+
+@pytest.mark.parametrize('problem', ['missing', 'active', 'wrong_operation', 'wrong_id', 'no_undo_time', 'active_descendant'])
+def test_reopened_completed_import_cannot_retry_without_verified_removal(store, writers, problem):
+    item = seed(store)
+    first = submit(store, item)
+    removed = action_for(first.operation_id, item.id, action_id=first.action_id)
+    removed.status, removed.undone_at = 'undone', '2026-09-06T10:00:00'
+    removed.action.kind = 'clear_cells'
+    if problem != 'missing':
+        writers.history.append(removed)
+    if problem == 'active':
+        removed.status = 'active'
+    elif problem == 'wrong_operation':
+        removed.action.metadata['bank_import_operation_id'] = 'other'
+    elif problem == 'wrong_id':
+        removed.id = 'other'
+    elif problem == 'no_undo_time':
+        removed.undone_at = None
+    elif problem == 'active_descendant':
+        writers.actions.append(action_for(first.operation_id, item.id, action_id='moved-action'))
+    fresh = store.reopen_reconciliation_item('brian', item.id)
+    result = imports.import_reconciliation_item(
+        store, 'brian', item.id, actor_key='actor', kind='expense', fields={'category': 'shopping'},
+        expected_amount=item.transaction.amount, expected_date=item.transaction.date, expected_item=fresh,
+    )
+    assert result.status == 'rejected'
+    assert writers.expense.call_count == 1
+    assert store.get_import_operation('brian', item.id).operation_id == first.operation_id
+
+
+@pytest.mark.parametrize('removal', ['undo', 'delete'])
+def test_real_expense_writer_removal_and_reimport_preserve_history(store, monkeypatch, removal):
+    from bookiebot.banking import service as banking
+    from bookiebot.sheets import undo
+    from bookiebot.sheets.routing import sheet_user_context
+    from unit_tests.support.sheets_repo_stub import SheetsRepoStub
+    actor = '676638528590970917'
+    repo = SheetsRepoStub(expense_rows=[[], []])
+    repo.expense.title = 'September'
+    monkeypatch.setattr(imports, 'now_pacific', lambda: datetime(2026, 9, 6))
+    monkeypatch.setattr(banking, 'build_banking_service', lambda: SimpleNamespace(
+        reopen_reconciliation_items_for_action_ids=store.reopen_reconciliation_items_for_action_ids))
+    item = seed(store, amount=1)
+    def log(expected):
+        return imports.import_reconciliation_item(
+            store, 'brian', item.id, actor_key=actor, kind='expense',
+            fields={'category': 'shopping', 'item': 'Parking', 'location': 'City', 'person': 'Brian (BofA)'},
+            expected_amount=1, expected_date=item.transaction.date, expected_item=expected,
+        )
+    with repo.patched():
+        first = log(item)
+        assert first.status == 'completed'
+        with sheet_user_context(actor):
+            remove = undo.undo_logged_action if removal == 'undo' else undo.delete_recent_action
+            assert remove(actor, action_id=first.action_id)[0]
+        fresh = store.get_reconciliation_item('brian', item.id)
+        assert fresh.status == 'needs_review'
+        second = log(fresh)
+        assert second.status == 'completed' and second.operation_id != first.operation_id
+        with sheet_user_context(actor):
+            history = undo.read_logged_action_history(actor)
+            active = undo.read_active_logged_actions(actor)
+        assert next(record for record in history if record.id == first.action_id).status == 'undone'
+        assert [record.id for record in active if record.action.metadata.get('type') == 'expense'] == [second.action_id]
+        assert sum(row.count('Parking') for row in repo.expense.get_all_values()) == 1
+
+
+def test_concurrent_fresh_logs_after_undo_still_have_one_writer(store, writers):
+    item = seed(store)
+    first = submit(store, item)
+    removed = action_for(first.operation_id, item.id, action_id=first.action_id)
+    removed.status, removed.undone_at, removed.action.kind = 'undone', 'verified-undo', 'clear_cells'
+    writers.history.append(removed)
+    fresh = store.reopen_reconciliation_item('brian', item.id)
+    entered, release = Event(), Event()
+    def write(*args):
+        entered.set()
+        assert release.wait(5)
+        return 12
+    writers.expense.side_effect = write
+    def log():
+        return imports.import_reconciliation_item(
+            store, 'brian', item.id, actor_key='actor', kind='expense', fields={'category': 'shopping'},
+            expected_amount=item.transaction.amount, expected_date=item.transaction.date, expected_item=fresh)
+    with ThreadPoolExecutor(max_workers=2) as pool:
+        winner = pool.submit(log)
+        assert entered.wait(5)
+        try:
+            assert pool.submit(log).result(timeout=5).status == 'needs_recovery'
+        finally:
+            release.set()
+        assert winner.result(timeout=5).status == 'completed'
+    assert writers.expense.call_count == 2  # Original import plus its single replacement.
 
 
 def test_claim_rechecks_bank_transaction_inside_atomic_update(store, writers, monkeypatch):

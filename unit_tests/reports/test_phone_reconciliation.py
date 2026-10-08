@@ -110,6 +110,44 @@ async def details(client, row_id):
 
 
 @pytest.mark.asyncio
+@pytest.mark.parametrize('first_ref,category,expected_status', [
+    ('expense!row 12#month={month}', 'shopping', 200),
+    ('expense!row 12#cols=14,15,16,17,18#month={month}', 'shopping', 200),
+    ('expense!row 12#cols=14,15,16,17,18#month={month}', 'food', 409),
+])
+async def test_phone_category_reservations_and_unchanged_conflict(client, first_ref, category, expected_status):
+    first = seed(client)
+    month = now_pacific().strftime('%Y-%m')
+    assert client.store.confirm_reconciliation_item('brian', first.id,
+        matched_action_log_id='coffee', matched_sheet_ref=first_ref.format(month=month))
+    client.store.upsert_transactions([{
+        'transaction_id': 'second-purchase', 'account_id': 'account-brian',
+        'date': now_pacific().date().isoformat(), 'name': 'Starbucks', 'amount': 12.34, 'pending': False,
+    }], 'brian')
+    transaction = next(tx for tx in client.store.recent_transactions('brian') if tx.provider_transaction_id == 'second-purchase')
+    second = client.store.upsert_reconciliation_item(owner_key='brian', transaction=transaction,
+        classification='expense', status='needs_review', confidence=0)
+    purchase = logged(action_id='second-action')
+    purchase.action.metadata['category'] = category
+    purchase.action.columns = [22, 23, 24, 25, 26] if category == 'shopping' else [14, 15, 16, 17, 18]
+    client.actions[:] = [purchase]
+    connect(client)
+    current = await details(client, second.id)
+    response = await client.http.post('/app/reconciliation', headers=HEADERS, json={
+        'operation': 'confirm', 'id': second.id, 'version': current['version'], 'suggestionId': 'second-action',
+    })
+    assert response.status == expected_status, await response.text()
+    if expected_status == 409:
+        assert 'already linked' in (await response.json())['error']
+        assert client.store.get_reconciliation_item('brian', second.id).status == 'needs_review'
+    else:
+        confirmed = client.store.get_reconciliation_item('brian', second.id)
+        assert confirmed.status == 'confirmed'
+        assert '#cols=22,23,24,25,26' in confirmed.matched_sheet_ref
+    assert client.store.get_reconciliation_item('brian', first.id).status == 'confirmed'
+
+
+@pytest.mark.asyncio
 async def test_auth_owner_scope_and_fast_list_never_reads_sheets(client):
     seed(client)
     seed(client, owner="hannah")

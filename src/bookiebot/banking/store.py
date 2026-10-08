@@ -32,16 +32,29 @@ def utc_now_iso() -> str:
 
 def _sheet_reference_conflicts(left: str, right: str, left_month: str, right_month: str) -> bool:
     """Compare one row/occurrence, including older refs without period metadata."""
-    def scoped(reference: str) -> tuple[str, str, str]:
+    def scoped(reference: str) -> tuple[str, str, str, set[str]]:
+        columns: set[str] = set()
         for marker in ('#month=', '#pull='):
             base, found, period = reference.partition(marker)
             if found:
-                return base, marker, period
-        return reference, '', ''
+                break
+        else:
+            base, marker, period = reference, '', ''
+        base, found, raw_columns = base.partition('#cols=')
+        if found:
+            columns = set(raw_columns.split(','))
+        return base, marker, period, columns
 
-    left_base, left_kind, left_period = scoped(left)
-    right_base, right_kind, right_period = scoped(right)
+    left_base, left_kind, left_period, left_columns = scoped(left)
+    right_base, right_kind, right_period, right_columns = scoped(right)
     if left_base != right_base:
+        return False
+    if left_columns and right_columns:
+        if not left_columns.intersection(right_columns):
+            return False
+    elif bool(left_columns) != bool(right_columns) and left_base.startswith('expense!row '):
+        # Legacy row-only expense refs cannot identify a side-by-side category.
+        # Their action IDs still reserve the recorded purchase below.
         return False
     if left_kind and right_kind:
         return (left_period == right_period if left_kind == right_kind
@@ -249,6 +262,7 @@ class BankStore:
     def claim_reconciliation_import(
         self, owner_key: str, reconciliation_id: int, *, operation_id: str,
         actor_key: str, kind: str, request: dict[str, Any],
+        replaces_completed_operation_id: str | None = None,
     ) -> tuple[BankImportOperation | None, bool]:
         """Atomically claim an eligible, unchanged transaction before touching Sheets."""
         self.initialize()
@@ -261,6 +275,20 @@ class BankStore:
             ).fetchone()
             if identity is not None:
                 conn.execute('UPDATE bank_transactions SET id = id WHERE id = ?', (identity['bank_transaction_id'],))
+            previous = conn.execute(
+                'SELECT * FROM bank_import_operations WHERE owner_key = ? AND reconciliation_id = ?',
+                (owner_key, int(reconciliation_id)),
+            ).fetchone()
+            if previous is not None and not (
+                previous['operation_id'] == replaces_completed_operation_id
+                and previous['status'] == 'completed'
+                and previous['matched_action_log_id']
+                and previous['matched_action_log_id'] == request.get('undone_action_id')
+                and request.get('undone_at')
+                and request.get('expected_status') in {'needs_review', 'pending_user', 'conflict'}
+                and request.get('expected_last_seen_at') and request.get('expected_updated_at')
+            ):
+                return BankImportOperation(**dict(previous)), False
             claimed = conn.execute(
                 """
                 UPDATE bank_reconciliation_items
@@ -268,10 +296,6 @@ class BankStore:
                 WHERE id = ? AND owner_key = ?
                   AND status IN ('needs_review', 'pending_user', 'conflict')
                   AND (CAST(? AS TEXT) IS NULL OR (status = ? AND last_seen_at = ?))
-                  AND NOT EXISTS (
-                    SELECT 1 FROM bank_import_operations o
-                    WHERE o.reconciliation_id = bank_reconciliation_items.id
-                  )
                   AND EXISTS (
                     SELECT 1 FROM bank_transactions t
                     LEFT JOIN bank_accounts a ON a.id = t.account_id
@@ -290,16 +314,35 @@ class BankStore:
                  request['bank_amount'], request['bank_date']),
             ).rowcount == 1
             if claimed:
-                conn.execute(
-                    """
-                    INSERT INTO bank_import_operations (
-                        operation_id, reconciliation_id, owner_key, actor_key, kind,
-                        status, request_json, created_at, updated_at
-                    ) VALUES (?, ?, ?, ?, ?, 'claimed', ?, ?, ?)
-                    """,
-                    (operation_id, int(reconciliation_id), owner_key, actor_key, kind,
-                     json.dumps(request, sort_keys=True), now, now),
-                )
+                if previous is not None:
+                    conn.execute(
+                        """INSERT INTO bank_reconciliation_events
+                           (event_id, reconciliation_id, owner_key, event_type, occurred_at, payload_json)
+                           VALUES (?, ?, ?, 'bank_import_replaced_after_undo', ?, ?)""",
+                        (uuid4().hex, int(reconciliation_id), owner_key, now, json.dumps({
+                            'previous_operation': dict(previous), 'operation_id': operation_id,
+                            'undone_action_id': request['undone_action_id'], 'undone_at': request['undone_at'],
+                        }, sort_keys=True)),
+                    )
+                    conn.execute(
+                        """UPDATE bank_import_operations SET operation_id = ?, actor_key = ?, kind = ?,
+                           status = 'claimed', request_json = ?, created_at = ?, updated_at = ?,
+                           matched_action_log_id = NULL, matched_sheet_ref = NULL, error = NULL
+                           WHERE operation_id = ? AND owner_key = ? AND status = 'completed'""",
+                        (operation_id, actor_key, kind, json.dumps(request, sort_keys=True), now, now,
+                         previous['operation_id'], owner_key),
+                    )
+                else:
+                    conn.execute(
+                        """
+                        INSERT INTO bank_import_operations (
+                            operation_id, reconciliation_id, owner_key, actor_key, kind,
+                            status, request_json, created_at, updated_at
+                        ) VALUES (?, ?, ?, ?, ?, 'claimed', ?, ?, ?)
+                        """,
+                        (operation_id, int(reconciliation_id), owner_key, actor_key, kind,
+                         json.dumps(request, sort_keys=True), now, now),
+                    )
             row = conn.execute(
                 "SELECT * FROM bank_import_operations WHERE owner_key = ? AND reconciliation_id = ?",
                 (owner_key, int(reconciliation_id)),

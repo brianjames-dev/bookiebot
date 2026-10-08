@@ -4,6 +4,8 @@ One durable operation owns each bank item. A writer is called only by the proces
 that obtained the claim. After a write may have started, a retry may recover the
 recorded action but never calls the writer again. An unrecorded or ambiguous
 write needs manual inspection; elapsed time alone never releases its claim.
+An explicitly submitted fresh review may replace a completed expense import
+after its recorded removal is verified; the prior operation remains in events.
 """
 from __future__ import annotations
 
@@ -19,7 +21,7 @@ from bookiebot.banking.store import BankStore
 from bookiebot.sheets.config import get_category_columns
 from bookiebot.sheets.repo import get_sheets_repo
 from bookiebot.sheets.routing import get_user_config, now_pacific, sheet_user_context
-from bookiebot.sheets.undo import read_active_logged_actions
+from bookiebot.sheets.undo import read_active_logged_actions, read_logged_action_history
 from bookiebot.sheets.writer import log_category_row, log_income_row, record_expense_undo
 
 
@@ -49,8 +51,12 @@ def _recover_import(store: BankStore, operation: BankImportOperation) -> BankImp
         if (item is not None and item.status == 'confirmed'
                 and item.matched_action_log_id == operation.matched_action_log_id):
             return _completed_result(operation)
-        # An intentional undo/reopen must not turn an old form into a new import.
-        return _recovery_result(operation)
+        # Recovery never writes again, including after an intentional Undo.
+        return BankImportResult(
+            'rejected', 'This bank item was already imported, then reopened for review. '
+            'Match its existing row. If the expense import was undone or deleted, open a fresh review and choose Log again.',
+            operation.operation_id, operation.matched_action_log_id,
+        )
     try:
         request = json.loads(operation.request_json)
         bank_date = date.fromisoformat(request['bank_date'])
@@ -92,6 +98,31 @@ def recover_reconciliation_import(
     return _recover_import(store, operation)
 
 
+def _verified_import_undo(operation: BankImportOperation) -> str | None:
+    """A missing active action alone never proves that a financial write was undone."""
+    request = json.loads(operation.request_json)
+    with sheet_user_context(operation.actor_key):
+        history = read_logged_action_history(operation.actor_key)
+        original = next((logged for logged in history if logged.id == operation.matched_action_log_id), None)
+        if original is None or original.status != 'undone' or not original.undone_at:
+            return None
+        metadata = original.action.metadata
+        if (original.action.kind != 'clear_cells' or original.action.worksheet != operation.kind
+                or metadata.get('type') != operation.kind
+                or metadata.get('bank_import_operation_id') != operation.operation_id
+                or metadata.get('bank_reconciliation_id') != str(operation.reconciliation_id)
+                or metadata.get('bank_import_target_year') != str(request['target_year'])
+                or metadata.get('bank_import_target_month') != str(date.fromisoformat(request['bank_date']).month)):
+            return None
+        # Move/update/split descendants can outlive the original action. Their
+        # preserved import lineage means the purchase still exists.
+        if any(logged.action.metadata.get('bank_import_operation_id') == operation.operation_id
+               and logged.action.metadata.get('type') not in {'delete', 'system_state'}
+               for logged in read_active_logged_actions(operation.actor_key)):
+            return None
+        return original.undone_at
+
+
 def import_reconciliation_item(
     store: BankStore, owner_key: str, reconciliation_id: int, *, actor_key: str,
     kind: str, fields: dict[str, str], expected_amount: float, expected_date: str | None,
@@ -102,14 +133,26 @@ def import_reconciliation_item(
         return BankImportResult('rejected', 'That bank item is not available for this user.')
 
     existing = store.get_import_operation(owner_key, reconciliation_id)
-    if existing is not None:
+    if existing is not None and existing.status != 'completed':
         return _recover_import(store, existing)
 
     item = store.get_reconciliation_item(owner_key, reconciliation_id)
+    if existing is not None and (item is None or item.status not in {'needs_review', 'pending_user', 'conflict'}):
+        return _recover_import(store, existing)
     if item is None or item.status not in {'needs_review', 'pending_user', 'conflict'}:
         return BankImportResult('rejected', 'That bank item is no longer awaiting import. Open the current review again.')
     if expected_item is not None and item != expected_item:
         return BankImportResult('rejected', 'This bank item changed. Open the current review before importing it.')
+    undone_at = None
+    if existing is not None:
+        if expected_item is None:
+            return _recover_import(store, existing)
+        try:
+            undone_at = _verified_import_undo(existing)
+        except Exception:
+            logger.exception('Could not verify Undo of completed bank import', extra={'operation_id': existing.operation_id})
+        if not undone_at:
+            return _recover_import(store, existing)
     transaction = item.transaction
     bank_date_text = transaction.date or transaction.authorized_date
     if transaction.pending:
@@ -140,9 +183,12 @@ def import_reconciliation_item(
         'expected_status': item.status, 'expected_last_seen_at': item.last_seen_at,
         'expected_updated_at': transaction.updated_at,
     }
+    if existing is not None:
+        request.update(undone_action_id=existing.matched_action_log_id, undone_at=undone_at)
     operation, claimed = store.claim_reconciliation_import(
         owner_key, reconciliation_id, operation_id=uuid4().hex,
         actor_key=actor_key, kind=kind, request=request,
+        replaces_completed_operation_id=existing.operation_id if existing is not None else None,
     )
     if operation is None:
         return BankImportResult('rejected', 'That bank item changed or is no longer eligible. Open its current review.')

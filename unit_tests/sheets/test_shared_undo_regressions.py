@@ -40,6 +40,23 @@ def food(repo):
             if len(row) > 15 and row[14]}
 
 
+def test_raw_action_history_retains_undo_evidence_and_filters_other_actor(repo):
+    own = log(repo, B, 'Parking', 1, 'shopping')
+    other = log(repo, H, 'Coffee', 5)
+    with sheet_user_context(B):
+        assert undo.undo_logged_action(B, own)[0]
+        history = undo.read_logged_action_history(B)
+    assert [record.id for record in history] == [own]
+    assert history[0].status == 'undone' and history[0].undone_at
+    assert other not in {record.id for record in history}
+
+
+def test_raw_action_history_fails_closed_when_source_is_unavailable(monkeypatch):
+    monkeypatch.setattr(undo, '_read_log_data', lambda: None)
+    with pytest.raises(RuntimeError, match='unavailable'):
+        undo.read_logged_action_history(B)
+
+
 @pytest.mark.parametrize("operation", ["delete", "move"])
 def test_undo_preserves_other_user_correction_and_new_expense(repo, operation):
     burger = log(repo, B, "Burger", 10)

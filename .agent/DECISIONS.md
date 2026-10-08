@@ -1,5 +1,13 @@
 # Agent Decisions
 
+## 2026-10-08 - Reserve Expense Cells And Replace Verified Undone Imports
+
+Action references include their column set and expense month. Categories occupy side-by-side blocks, so row number alone cannot reserve a purchase. Overlapping qualified cells, action IDs and recurring occurrences retain exclusive claims. When comparing a qualified expense row with an old ambiguous row-only alias, rely on the old action ID rather than infer category ownership. Ambiguous row-only reversion fails closed. Distinguish unchanged unavailable evidence from actual bank/review version conflicts in both interfaces.
+
+Supersede the blanket completed-import retry prohibition only for a new explicit current-month expense Log from a fresh reviewed snapshot. Require the original action's owner-scoped successful Undo/Delete status, timestamp and operation/reconciliation/period metadata, plus no surviving imported descendant. Missing/ambiguous history, Reopen alone and unfinished/uncertain claims remain blocked. Under existing owner/transaction locks and eligibility/version checks, retain the full prior operation in `bank_import_replaced_after_undo`, then replace the single current operation with a new ID and claim. No schema migration or time-based automatic release; recovery never writes. Existing history/events preserve both attempts.
+
+Rationale: the reported match failure involved two categories at row 4; the reported import failure was a successful import followed by intentional Undo. Correct identity and verified fresh authority solve those cases without duplicating uncertain writes or erasing prior attempts.
+
 ## 2026-10-07 - Share Reconciliation Decisions Across Phone And Discord
 
 Use the existing compare-and-apply database path for both surfaces' confirm/ignore/reopen. Validate owner, bank/review version, posted active-account eligibility and exclusive action/schedule evidence; log source and prior lineage. Confirmed/ignored decisions require an intentional fresh Reopen before a different decision. Inbox batch actions retain the displayed snapshots, and a stale Discord detail explains the shared decision instead of treating a resolved item as missing.

@@ -521,6 +521,87 @@ def test_grouped_action_and_schedule_aliases_share_one_claim_in_either_order(con
     assert repointed is not None and repointed.matched_sheet_ref == grouped
 
 
+@pytest.mark.parametrize('first_ref,second_ref,conflicts', [
+    ('expense!row 4#cols=14,15,16,17,18#month=2026-09', 'expense!row 4#cols=1,2,3,4#month=2026-09', False),
+    ('expense!row 4#cols=1,2,3,4#month=2026-09', 'expense!row 4#cols=1,2,3,4#month=2026-09', True),
+    ('expense!row 4#month=2026-09', 'expense!row 4#cols=1,2,3,4#month=2026-09', False),
+    ('expense!row 4#cols=1,2,3,4#month=2026-09', 'expense!row 4#cols=2#month=2026-09', True),
+])
+def test_category_cell_reservations_do_not_collide_across_columns(contract_store, first_ref, second_ref, conflicts):
+    store = contract_store
+    _, _, first = _seed(store)
+    _, _, second = _seed(store, suffix='second')
+    assert _phone_review(store, first, matched_action_log_id='food-action', matched_sheet_ref=first_ref)
+    accepted = _phone_review(store, second, matched_action_log_id='grocery-action', matched_sheet_ref=second_ref)
+    assert (accepted is None) == conflicts
+    if accepted is not None:
+        _, _, duplicate = _seed(store, suffix='duplicate')
+        assert _phone_review(store, duplicate, matched_action_log_id='grocery-action', matched_sheet_ref=second_ref) is None
+
+
+def test_completed_import_replacement_is_atomic_and_audits_the_previous_attempt(contract_store):
+    store = contract_store
+    _, _, review = _seed(store)
+    first, claimed = _claim(store, review, operation_id='original-import')
+    assert claimed
+    first = store.complete_reconciliation_import(first, action_id='original-action', sheet_ref='expense!row 4')
+    reopened = store.reopen_reconciliation_item('brian', review.id)
+    request = {'bank_amount': reopened.transaction.amount, 'bank_date': reopened.transaction.date,
+               'expected_status': reopened.status, 'expected_last_seen_at': reopened.last_seen_at,
+               'expected_updated_at': reopened.transaction.updated_at,
+               'undone_action_id': first.matched_action_log_id, 'undone_at': 'verified-undo'}
+    replacement, claimed = store.claim_reconciliation_import(
+        'brian', review.id, operation_id='replacement-import', actor_key='actor', kind='expense',
+        request=request, replaces_completed_operation_id=first.operation_id,
+    )
+    assert claimed and replacement.operation_id == 'replacement-import'
+    second, claimed = store.claim_reconciliation_import(
+        'brian', review.id, operation_id='loser-import', actor_key='actor', kind='expense',
+        request=request, replaces_completed_operation_id=first.operation_id,
+    )
+    assert not claimed and second.operation_id == replacement.operation_id
+    with store.connect() as conn:
+        events = conn.execute("SELECT payload_json FROM bank_reconciliation_events WHERE event_type = 'bank_import_replaced_after_undo'").fetchall()
+    assert len(events) == 1
+    previous = json.loads(events[0]['payload_json'])['previous_operation']
+    assert previous['operation_id'] == first.operation_id
+    assert previous['matched_action_log_id'] == 'original-action'
+
+
+@pytest.mark.parametrize('problem', ['writing', 'unproven_undo', 'wrong_action', 'missing_version', 'stale_version', 'ignored'])
+def test_import_replacement_never_releases_uncertain_or_stale_claims(contract_store, problem):
+    store = contract_store
+    _, _, review = _seed(store)
+    first, claimed = _claim(store, review, operation_id='original-import')
+    assert claimed
+    first = store.complete_reconciliation_import(first, action_id='original-action', sheet_ref='expense!row 4')
+    reopened = store.reopen_reconciliation_item('brian', review.id)
+    request = {'bank_amount': reopened.transaction.amount, 'bank_date': reopened.transaction.date,
+               'expected_status': reopened.status, 'expected_last_seen_at': reopened.last_seen_at,
+               'expected_updated_at': reopened.transaction.updated_at,
+               'undone_action_id': first.matched_action_log_id, 'undone_at': 'verified-undo'}
+    if problem == 'writing':
+        with store.connect() as conn:
+            conn.execute("UPDATE bank_import_operations SET status = 'writing' WHERE operation_id = ?", (first.operation_id,))
+    elif problem == 'unproven_undo':
+        request.pop('undone_at')
+    elif problem == 'wrong_action':
+        request['undone_action_id'] = 'other-action'
+    elif problem == 'missing_version':
+        request.pop('expected_last_seen_at')
+    elif problem == 'stale_version':
+        request['expected_last_seen_at'] = 'old-review'
+    elif problem == 'ignored':
+        assert store.ignore_reconciliation_item('brian', reopened.id)
+    operation, claimed = store.claim_reconciliation_import(
+        'brian', review.id, operation_id='replacement-import', actor_key='actor', kind='expense',
+        request=request, replaces_completed_operation_id=first.operation_id,
+    )
+    assert not claimed and operation.operation_id == first.operation_id
+    with store.connect() as conn:
+        assert conn.execute("SELECT COUNT(*) AS count FROM bank_reconciliation_events WHERE event_type = 'bank_import_replaced_after_undo'").fetchone()['count'] == 0
+
+
 def test_preview_rejects_foreign_transaction_owner(contract_store):
     store = contract_store
     _, _, review = _seed(store)

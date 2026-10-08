@@ -317,7 +317,10 @@ async def send_bank_reconciliation_detail(
                     return
                 if status not in {"matched", "matched_updated"} or matched_candidate is None:
                     await action_interaction.followup.send(
-                        content=f"Could not match that row yet: `{status}`.",
+                        content=("That row is already linked to another transaction or is no longer eligible. "
+                                 "Choose another row, or open a fresh review to check its status."
+                                 if status in {'already_matched', 'match_unavailable'} else
+                                 f"Could not match that row yet: `{status}`."),
                         ephemeral=True,
                     )
                     return

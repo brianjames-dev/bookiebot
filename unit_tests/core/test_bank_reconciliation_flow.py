@@ -7,6 +7,8 @@ import pytest
 
 from bookiebot.banking.models import BankTransaction, ReconciliationItem
 from bookiebot.core import bank_reconciliation_flow as flow
+from bookiebot.banking.reconciliation import ActionLogCandidate
+from datetime import date
 
 
 def item(identity):
@@ -146,3 +148,20 @@ async def test_review_owner_checked_before_work_and_response_defer(monkeypatch):
     clicked.response.defer.assert_not_awaited()
     clicked.followup.send.assert_not_awaited()
     assert service.ignored == []
+
+
+@pytest.mark.asyncio
+async def test_unavailable_match_explains_conflict_without_repeating_unchanged_card(monkeypatch):
+    service = Service(1)
+    candidate = ActionLogCandidate('action', 'expense!row 4#cols=1,2,3,4#month=2026-10',
+        'expense', date(2026, 10, 7), 20, 'grocery', .98, 'exact')
+    service.reconciliation_match_candidates = lambda *args, **kwargs: (service.items[1], [candidate], [])
+    service.confirm_reconciliation_action_match = lambda *args, **kwargs: (service.items[1], candidate, 'match_unavailable')
+    reply = await start(monkeypatch, service)
+    clicked = interaction()
+    await button(reply, 'candidate:0').callback(clicked)
+    clicked.response.defer.assert_awaited_once_with(ephemeral=True, thinking=True)
+    clicked.followup.send.assert_awaited_once()
+    message = clicked.followup.send.call_args.kwargs['content']
+    assert 'already linked' in message and 'changed since' not in message
+    assert 'view' not in clicked.followup.send.call_args.kwargs

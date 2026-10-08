@@ -136,7 +136,7 @@ def test_reconcile_matches_logged_expense_by_amount_and_date():
     assert decision.status == "matched"
     assert decision.classification == "expense"
     assert decision.matched_action_log_id == "abc123"
-    assert decision.matched_sheet_ref == "expense!row 12#month=2026-05"
+    assert decision.matched_sheet_ref == "expense!row 12#cols=14,15,16,17,18#month=2026-05"
     assert decision.notes == "matched expense action"
 
 
@@ -239,7 +239,7 @@ def test_find_action_log_candidates_allows_fuzzy_amount_and_seven_day_window():
 
     assert len(candidates) == 1
     assert candidates[0].action_id == "abc123"
-    assert candidates[0].sheet_ref == "expense!row 12#month=2026-05"
+    assert candidates[0].sheet_ref == "expense!row 12#cols=14,15,16,17,18#month=2026-05"
     assert "date Δ 6d" in candidates[0].notes
 
 
@@ -1625,7 +1625,7 @@ def test_confirm_reconciliation_action_match_marks_existing_row(monkeypatch, tmp
     assert confirmed is not None
     assert confirmed.status == "confirmed"
     assert confirmed.matched_action_log_id == "abc123"
-    assert confirmed.matched_sheet_ref == "expense!row 12#month=2026-05"
+    assert confirmed.matched_sheet_ref == "expense!row 12#cols=14,15,16,17,18#month=2026-05"
 
 
 def test_confirm_reconciliation_action_match_updates_sheet_amount_after_user_match(monkeypatch, tmp_path):
@@ -1973,7 +1973,7 @@ def test_confirm_reconciliation_action_group_match_requires_exact_total(monkeypa
     assert confirmed is not None
     assert confirmed.status == "confirmed"
     assert confirmed.matched_action_log_id == "minted123+zazzle123"
-    assert confirmed.matched_sheet_ref == "expense!row 12#month=2026-05 + expense!row 13#month=2026-05"
+    assert confirmed.matched_sheet_ref == "expense!row 12#cols=22,23,24,25,26#month=2026-05 + expense!row 13#cols=22,23,24,25,26#month=2026-05"
 
 
 def test_confirm_reconciliation_action_group_match_rejects_total_mismatch(monkeypatch, tmp_path):
