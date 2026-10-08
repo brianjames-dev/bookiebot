@@ -101,7 +101,7 @@ All eight September 6 audit batches are implemented and verified locally. Each b
 
 ## On Deck
 
-Release the October 8 reconciliation fixes after final branch verification, then perform checklist 133. Existing main verification #110 passed; these regressions occurred after rollout. Do not automatically reopen ignored item 3391 or replay item 3376; use fresh intentional controls after deployment. Then verify remaining cross-surface controls/progress/recovery using checklist 132.
+Merge/deploy the October 8 reconciliation fixes after passing Verification #111, then perform checklist 133. Existing main verification #110 passed; these regressions occurred after rollout. Do not automatically reopen ignored item 3391 or replay item 3376; use fresh intentional controls after deployment. Then verify remaining cross-surface controls/progress/recovery using checklist 132.
 
 After the main rollout, check split Discord indication/timing using checklist 131. Automated event-loop, batching, selected-allocation isolation and recovery checks pass; actual production timings require deployment.
 
@@ -1066,7 +1066,7 @@ Use a test row or low-risk real row in Discord:
 
 ## Verification Baseline
 
-2026-10-08 reconciliation regressions: full `python -m pytest unit_tests` with isolated PostgreSQL 16 **2,497 passed / 25 optional frontend skips**, existing Kaleido warning only. Project Python 3.12; Pyright **0 errors / 0 warnings** and `git diff --check` clean. Added **45 regression cases**, including SQLite/PostgreSQL category reservations, replacement eligibility, concurrent reimports, real writer→Undo/Delete→reimport, and Discord/web conflict feedback. GitHub CI will run the frontend contracts; release/device acceptance is checklist 133. Production inspection was read-only.
+2026-10-08 reconciliation regressions: full `python -m pytest unit_tests` with isolated PostgreSQL 16 **2,497 passed / 25 optional frontend skips**, existing Kaleido warning only. Project Python 3.12; Pyright **0 errors / 0 warnings** and `git diff --check` clean. Added **45 regression cases**, including SQLite/PostgreSQL category reservations, replacement eligibility, concurrent reimports, real writer→Undo/Delete→reimport, and Discord/web conflict feedback. [Verification #111](https://github.com/brianjames-dev/bookiebot/actions/runs/37821413108) on `1476a0b` passed **2,522 tests / zero skips**, Python types, Apps Script, frontend typecheck/build and asset consistency. Implementation is pushed on `codex/move-expense-compaction`; merge/deployment and device acceptance remain (checklist 133). Production inspection was read-only.
 
 2026-10-07 verification #107 repair: CI originally reported **10 PostgreSQL failures / 2,459 passed**. After explicit typing of the nullable SQL guards, targeted SQLite/PostgreSQL storage contracts **130 passed / zero skipped**; full suite with isolated PostgreSQL 16 enabled **2,452 passed / 25 optional frontend skips**, existing Kaleido warning only. Project Python 3.12 and Pyright **0 errors / 0 warnings**. Four new combinations run on both backends. [Verification #108](https://github.com/brianjames-dev/bookiebot/actions/runs/37658383166) on `4d5d2ac` passed **2,477 tests / zero skips**, Python types, Apps Script, frontend typecheck/build and asset consistency. Manual checklist 132 and deployment acceptance remain unchanged.
 
