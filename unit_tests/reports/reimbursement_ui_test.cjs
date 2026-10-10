@@ -552,7 +552,7 @@ const activeByMonth = tree.root.findAllByProps({className:"bb-reimbursement-grou
   group.findAllByProps({className:"bb-reimbursement-toggle"}).filter(button=>button.props["aria-expanded"]).length)
 assert.deepEqual(activeByMonth,[1,1])
 renderer.act(() => tree.unmount())
-// Saved/legacy reports use the same five-at-a-time history controls.
+// Saved/legacy reports start with five items, then reveal all in one click.
 const pageItems = [
   ...Array.from({length:12}, (_,index) => item(`Paged ${index+1}`,{date:`9/${index+1}/2026`})),
   ...Array.from({length:6}, (_,index) => item(`Old page ${index}`,{date:`${8-index}/4/2026`})),
@@ -569,18 +569,16 @@ const pageMonth = pagedGroups()[0]
 const pageRows = () => pageMonth.findAllByProps({className:"bb-reimbursement-entry"})
 assert.deepEqual(pageRows().map(row=>row.findByType("strong").props.title),[12,11,10,9,8].map(number=>`Paged ${number}`))
 assert.equal(tree.root.findByProps({className:"bb-reimbursement-total"}).props.children,"$760.00","The complete balance includes every hidden page")
-renderer.act(() => pageButton(pageMonth,"Load more expenses").props.onClick())
-assert.equal(pageRows().length,10)
-renderer.act(() => pageButton(pageMonth,"Load more expenses").props.onClick())
+renderer.act(() => pageButton(pageMonth,"Load all expenses").props.onClick())
 assert.equal(pageRows().length,12)
-assert.equal(pageButton(pageMonth,"Load more expenses"),undefined)
+assert.equal(pageButton(pageMonth,"Load all expenses"),undefined)
 renderer.act(() => monthToggle(pageMonth).props.onClick())
 assert.equal(disclosure(pageMonth).content.props.inert,true)
 renderer.act(() => monthToggle(pageMonth).props.onClick())
 assert.equal(pageRows().length,12)
-renderer.act(() => pageButton(tree.root,"Load more months").props.onClick())
+renderer.act(() => pageButton(tree.root,"Load all months").props.onClick())
 assert.equal(pagedGroups().length,8)
-assert.equal(pageButton(tree.root,"Load more months"),undefined)
+assert.equal(pageButton(tree.root,"Load all months"),undefined)
 assert.ok(pagedGroups().slice(5).every(group=>!monthToggle(group).props["aria-expanded"]))
 renderer.act(() => tree.update(React.createElement(SharedReimbursementsCard,propsFor({items:pageItems.slice(0,12),openItems:pageItems}))))
 assert.equal(pagedGroups().length,8)

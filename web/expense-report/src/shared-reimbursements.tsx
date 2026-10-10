@@ -238,7 +238,7 @@ export function SharedReimbursementsCard({ items, openItems, receivedItems, cove
                 {page.visible.map((group) => <ReimbursementMonth key={group.key} group={group} visible={listOpen}
                   tag={group.key === currentMonth ? "This month" : group.key === selectedMonth ? "Selected month" : undefined}
                   monthlyItems={group.key === selectedMonth && monthly.length > 0 ? monthly : undefined} />)}
-                {page.hasMore && <button className="bb-reimbursement-load-more" type="button" onClick={page.loadMore}>Load more months</button>}
+                {page.hasMore && <button className="bb-reimbursement-load-more" type="button" onClick={page.loadAll}>Load all months</button>}
               </div>
             </AnimatedDisclosure>
           </div>}
@@ -264,7 +264,7 @@ function ReimbursementMonth({ group, tag, monthlyItems, visible }: {
     <CollapsibleContent id={contentId} open={expanded}><div className="bb-reimbursement-month-entries">
       {loaded && page.visible.map((item) => <ReimbursementEntry key={item.id} item={item} open={openId === item.id}
         onOpenChange={(open) => setOpenId(open ? item.id : null)} />)}
-      {loaded && page.hasMore && <button className="bb-reimbursement-load-more" type="button" onClick={page.loadMore}>Load more expenses</button>}
+      {loaded && page.hasMore && <button className="bb-reimbursement-load-more" type="button" onClick={page.loadAll}>Load all expenses</button>}
     </div></CollapsibleContent>
   </section>
 }

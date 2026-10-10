@@ -255,6 +255,7 @@ type ChartTouchState = {
 }
 
 type ReportView = ReportModeView
+type MetricInspection = MetricExplanation & { key: "income" | "spent" | "left" | "saved"; view: ReportView }
 
 function buildReportView(report: ExpenseReportData, projected: boolean): ReportView {
   const serverView = projected ? report.modeViews?.projected : report.modeViews?.current
@@ -536,7 +537,7 @@ export function ExpenseReportApp({ report, appControls, appAvatarUrl, appSession
 }) {
   const navigation = useAppNavigation()
   const { theme, toggleTheme } = useExpenseReportTheme(!navigation)
-  const [metricInspection, setMetricInspection] = useState<MetricExplanation | null>(null)
+  const [metricInspection, setMetricInspection] = useState<MetricInspection | null>(null)
   useViewportScrollbarWidth()
   const [inspection, setInspection] = useState<{key:string; title:string; entries:ReportActivity[]; total:number; note?:string} | null>(null)
   const dailySpendingDetailsOpen = useMediaQuery("(min-width: 861px)")
@@ -833,19 +834,18 @@ export function ExpenseReportApp({ report, appControls, appAvatarUrl, appSession
         <section className="bb-metrics-grid" aria-label="Budget metrics">
           <MetricCard
             label="Income"
-            onExplain={metricDetails ? () => setMetricInspection(metricDetails.income) : undefined}
+            onExplain={metricDetails ? () => setMetricInspection({...metricDetails.income, key: "income", view: activeReport}) : undefined}
             value={activeReport.metrics.monthlyIncome}
           />
-          <MetricCard label="Spent" value={spentTotal} onExplain={metricDetails ? () => setMetricInspection(metricDetails.spent) : undefined} />
+          <MetricCard label="Spent" value={spentTotal} onExplain={metricDetails ? () => setMetricInspection({...metricDetails.spent, key: "spent", view: activeReport}) : undefined} />
           <MetricCard
             label="Left"
-            onExplain={metricDetails ? () => setMetricInspection(metricDetails.left) : undefined}
+            onExplain={metricDetails ? () => setMetricInspection({...metricDetails.left, key: "left", view: activeReport}) : undefined}
             value={activeReport.metrics.incomeAfterExpenses}
-            description="Budget remaining"
             accent
           />
           <SavingsMetricCard
-            onExplain={metricDetails ? () => setMetricInspection(metricDetails.saved) : undefined}
+            onExplain={metricDetails ? () => setMetricInspection({...metricDetails.saved, key: "saved", view: activeReport}) : undefined}
             value={activeReport.metrics.amountSaved}
             minimum={activeReport.metrics.savingsMinimum}
             ideal={activeReport.metrics.savingsIdeal}
@@ -958,14 +958,38 @@ export function ExpenseReportApp({ report, appControls, appAvatarUrl, appSession
   )
 }
 
-function MetricExplanationDetails({detail}: {detail:MetricExplanation}) {
+function MetricExplanationDetails({detail}: {detail:MetricInspection}) {
+  const {key, view} = detail
+  if (key === "saved") {
+    const {savingsMinimum: minimum, savingsIdeal: ideal} = view.metrics
+    return <div className="bb-metric-explanation">
+      <div className="bb-chart-total">{formatMoney(detail.value)}</div>
+      <SavingsProgress value={detail.value} minimum={minimum} ideal={ideal} showTargets={false} />
+      <p className="bb-activity-footnote">Minimum target: {formatMoney(minimum)}. Ideal target: {formatMoney(ideal)}.</p>
+    </div>
+  }
+  let components = detail.components
+  if (key === "spent") {
+    // Savings deposits are not expense outflows. Use only expense breakdown
+    // entries here, preserving the existing Spent total and legacy adjustments.
+    components = [
+      {label: "Needs", amount: view.categorySpending.needs},
+      {label: "Wants", amount: view.categorySpending.wants},
+      {label: "Savings", amount: amountRowsTotal(view.breakdown.filter(item => item.key === "savings"))},
+    ]
+    const difference = roundCurrency(detail.value - amountRowsTotal(components))
+    if (difference) components.push({label: "Sheet adjustment", amount: difference})
+  }
   return <div className="bb-metric-explanation">
     <div className="bb-chart-total">{formatMoney(detail.value)}</div>
-    <p>{detail.equation}</p>
-    <dl>{detail.components.map((component,index) => <div key={index}><dt>{component.label}
+    {key === "income" && <p>{detail.equation}</p>}
+    <dl>{components.map((component,index) => <div key={index}><dt>{component.label}
+      {key === "left" && index < 3 && view.metrics.monthlyIncome > 0 && <small>
+        {(100 * view.categoryBudgets[(["needs", "wants", "savings"] as const)[index]] / view.metrics.monthlyIncome).toLocaleString("en-US", {maximumFractionDigits: 1})}% of income
+      </small>}
       {component.date && <small>{component.date}</small>}{component.source === "scheduled" && <small>Scheduled estimate</small>}</dt>
       <dd>{formatMoney(component.amount)}</dd></div>)}</dl>
-    {detail.notes.map((note,index)=><p className="bb-activity-footnote" key={index}>{note}</p>)}
+    {key === "income" && detail.notes.map((note,index)=><p className="bb-activity-footnote" key={index}>{note}</p>)}
   </div>
 }
 
@@ -1454,13 +1478,21 @@ function SavingsMetricCard({
   minimum: number
   ideal: number
 }) {
-  const progressPercent = ideal > 0 ? clamp((value / ideal) * 100, 0, 100) : 0
-  const minimumPercent = ideal > 0 ? clamp((minimum / ideal) * 100, 0, 100) : 0
   const tone = value <= 0 ? "empty" : value < minimum ? "low" : isSavingsNearGoal(value, ideal) ? "ideal" : "minimum"
   return (
     <div className="bb-metric-card bb-savings-metric-card">
       <div className="bb-metric-label">{onExplain ? <button type="button" className="bb-metric-explain" aria-label="Explain Saved" onClick={onExplain}>Saved<span aria-hidden="true">ⓘ</span></button> : "Saved"}</div>
       <FittedAmount className={`bb-metric-value bb-savings-value bb-savings-value-${tone}`}>{formatMoney(value)}</FittedAmount>
+      <SavingsProgress value={value} minimum={minimum} ideal={ideal} />
+    </div>
+  )
+}
+
+function SavingsProgress({value, minimum, ideal, showTargets = true}: {value:number; minimum:number; ideal:number; showTargets?:boolean}) {
+  const progressPercent = ideal > 0 ? clamp((value / ideal) * 100, 0, 100) : 0
+  const minimumPercent = ideal > 0 ? clamp((minimum / ideal) * 100, 0, 100) : 0
+  const tone = value <= 0 ? "empty" : value < minimum ? "low" : isSavingsNearGoal(value, ideal) ? "ideal" : "minimum"
+  return (
       <div
         className={`bb-savings-progress bb-savings-progress-${tone}`}
         role="img"
@@ -1472,12 +1504,11 @@ function SavingsMetricCard({
             <span className="bb-savings-progress-minimum-marker" style={{ left: `${minimumPercent}%` }} />
           ) : null}
         </div>
-        <div className="bb-savings-progress-labels">
+        {showTargets && <div className="bb-savings-progress-labels">
           <span>Minimum {formatMoney(minimum)}</span>
           <span>Ideal {formatMoney(ideal)}</span>
-        </div>
+        </div>}
       </div>
-    </div>
   )
 }
 

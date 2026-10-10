@@ -555,7 +555,7 @@ def test_build_expense_breakdown_report_aggregates_shared_and_personal_data():
     assert "Remaining Needs Budget" not in html
     assert "Remaining Wants Budget" not in html
     assert "Income After Expenses" not in html
-    assert "Budget remaining" in html
+    assert "Budget remaining" not in html
     assert "Wants Left" not in html
     assert "View all" in html
     assert "Expense Highlights" in html
@@ -1979,7 +1979,7 @@ def test_report_frontend_keeps_saved_amount_actual_and_out_of_spending():
     assert "budgetData={activeReport.budgetBreakdown}" not in source
     assert "categoryMixRows(data, selectedRollover, filter, amountSaved, transferRows)" in source
     assert "categoryBudgets={activeReport.categoryBudgets}" in source
-    assert "Budget remaining" in source
+    assert "Budget remaining" not in source
     assert "usedPercent.toFixed(2)" in source
     assert "<SavingsMetricCard" in source
     assert "savingsMetricDescription" not in source

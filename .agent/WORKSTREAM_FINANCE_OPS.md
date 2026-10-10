@@ -1,8 +1,14 @@
 # Finance Operations Workstream
 
-Last updated: 2026-10-08
+Last updated: 2026-10-10
 
 ## Goal
+
+### Dashboard details and Shared history work log — 2026-10-10
+
+Complete implementation; branch release/device acceptance pending (STATUS checklist 134). Shared canonical/fallback history retains the five-month/five-expense initial view, but Load all months/expenses reveals the entire remaining history in one click. This supersedes the October 3 incremental-five controls. The choice stays active across refresh/new arrivals and hidden directions; lazy collapsed months, stable disclosure IDs/payment drafts, full balances and mutation scope remain intact. No API/storage/accounting changes.
+
+Left details retain allocation percentages without verbose notes, Spent shows expense bucket totals, and Saved shows one savings total with shared progress and dynamic targets. Runtime contracts verify display semantics and both history implementations. Report suite **635 passed / 88 optional PostgreSQL skipped**; full suite **2,171 passed / 352 optional PostgreSQL skipped**, clean Python/frontend types and build. Production-build WebKit/Chromium passed **72 modal checks** across phone/desktop widths, both themes and modes. No live financial writes. Prior reconciliation/move/Undo backlog remains separate.
 
 ### Main integration — 2026-10-08
 
