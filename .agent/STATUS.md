@@ -1,8 +1,12 @@
 # Agent Status
 
-Last updated: 2026-10-08
+Last updated: 2026-10-10
 
 ## Active Focus
+
+Main integration (2026-10-10): merged both commits through `e5e97ea` from `codex/web-metric-details` at the user's request. Compact Left/Spent/Saved details and complete reimbursement history are integrated without conflicts. [Verification #116](https://github.com/brianjames-dev/bookiebot/actions/runs/38068125685) passed the exact source tip: **2,523 tests / zero skips**, Python/frontend types, Apps Script, build and asset consistency. This merge adds release tracking only beyond that tested tree. Automatic main verification/Railway rollout and checklist 134 remain the release acceptance steps. No production financial mutations.
+
+Dashboard modal/history refinements (2026-10-10): Left keeps remaining amounts and mode/month allocation percentages with no bottom notes or card subtitle. Spent summarizes Needs/Wants/Savings expense outflows; savings deposits stay in Saved, and legacy sheet differences remain explicit. Saved shows one total, the shared progress bar and dynamic minimum/ideal targets only. Canonical and fallback reimbursement histories start at five months/five expenses per month; Load all reveals the rest once and stays active across refresh, preserving disclosures/drafts. [Verification #115](https://github.com/brianjames-dev/bookiebot/actions/runs/38067837038) passed the implementation commit `ba4d517`: **2,523 tests / zero skips**, Python/frontend types, build, Apps Script and asset consistency. Integrated into main at the user's request; rollout and device acceptance use checklist 134. No production financial changes.
 
 Main integration (2026-10-08): merged the three new commits through `4fbfe39` from `codex/move-expense-compaction` at the user's request, including category-aware reconciliation reservations, verified reimport after Undo/Delete, conflict feedback, amount parsing and the authorized Parking restore tracking. [Verification #113](https://github.com/brianjames-dev/bookiebot/actions/runs/37825811309) passed the exact branch commit with **2,522 tests / zero skips**, Python types, Apps Script, frontend typecheck/build and asset consistency. Integration adds release tracking only beyond that tested tree. Automatic main verification/rollout and manual checklist 133 are the release acceptance steps; no additional financial mutations during integration.
 
@@ -103,6 +107,8 @@ All eight September 6 audit batches are implemented and verified locally. Each b
 
 ## On Deck
 
+Confirm automatic main verification/Railway rollout for the merged dashboard modal/history refinements, then perform checklist 134. Both commits through `e5e97ea` are integrated; [Verification #116](https://github.com/brianjames-dev/bookiebot/actions/runs/38068125685) passed the exact source tip with **2,523 tests / zero skips** and all type/build/asset checks. Main integration `0b5f5a0` passed [Verification #114](https://github.com/brianjames-dev/bookiebot/actions/runs/37835563238) with **2,522 tests / zero skips** and all type/build/asset checks; remaining rollout/device acceptance for the earlier reconciliation work is below.
+
 Confirm the automatic main verification/Railway rollout for the merged October 8 reconciliation fixes, then perform checklist 133. The exact source branch passed Verification #113. Keep item 3391 ignored unless the user chooses Reopen. Parking item 3376 was restored and confirmed at the user's explicit request; do not replay it. Then verify remaining cross-surface controls/progress/recovery using checklist 132.
 
 After the main rollout, check split Discord indication/timing using checklist 131. Automated event-loop, batching, selected-allocation isolation and recovery checks pass; actual production timings require deployment.
@@ -155,6 +161,15 @@ Student-loan activation is complete. Verify the deployed fixed-bill display and 
 25. Harden recent-action pending state across restarts/deploys, since selections currently live only in process memory.
 26. Improve targeted recent-action search so commands can find older matches, not only the latest 10 recent actions.
 27. Explore clarifying questions before logging when BookieBot is uncertain instead of guessing or silently failing.
+
+## Completed 2026-10-10
+
+- Merged both dashboard refinement commits through `e5e97ea` into `main` at the user's request. [Verification #116](https://github.com/brianjames-dev/bookiebot/actions/runs/38068125685) passed the exact source tip with **2,523 tests / zero skips** and all type/build/asset checks. The conflict-free merge adds release tracking only; checklist 134 covers rollout/device acceptance.
+- Simplified Left and Spent details; Left percentages derive from the inspected mode/month budgets and income, and Spent preserves expense accounting and any legacy residual. Removed the Left card subtitle.
+- Saved details use one savings total, the card's shared progress renderer and dynamic targets without numbered deposits or additional notes. Income details keep their estimate context. Open details retain a consistent mode/month snapshot during background refresh.
+- Replaced incremental history controls with Load all months/expenses in canonical and fallback views. Initial five, lazy month mounting, current-Pacific expansion, complete balances and draft/disclosure retention remain covered, including new arrivals after Load all.
+- Updated UI regression contracts and added runtime metric rendering checks; targeted UI **3 passed**, report suite **635 passed / 88 optional PostgreSQL skipped**, full suite **2,171 passed / 352 optional PostgreSQL skipped**. Pyright, frontend typecheck/build, Apps Script and whitespace checks pass. PostgreSQL was unavailable locally; [Verification #115](https://github.com/brianjames-dev/bookiebot/actions/runs/38067837038) on `ba4d517` passed **2,523 tests / zero skips** using its isolated database, plus all type/build/asset checks. Production-build WebKit/Chromium passed **72 modal checks** across 320/390/1280px, both themes and Current/Projected, with no page errors or horizontal overflow. Device acceptance is checklist 134.
+- Updated STATUS, finance workstream and DECISIONS; rebuilt committed frontend assets. No API, persistence, sheet mutation or production financial changes.
 
 ## Completed 2026-10-08
 
@@ -807,6 +822,12 @@ Student-loan activation is complete. Verify the deployed fixed-bill display and 
 
 ## Manual Test Checklist
 
+134. Compact metric details and complete reimbursement history (after deployment):
+    - Open Left in Current and Projected: only the total, remaining bucket amounts and allocation percentages appear. Projected uses 50/30/20; Current uses the selected month's allocations. The Left card has no Budget remaining subtitle. Zero income must not show invalid percentages.
+    - Open Spent: Needs/Wants/Savings expense totals replace category/schedule details and bottom notes. Saved deposits are not duplicated as expenses; any legacy mismatch stays an explicit Sheet adjustment. Change mode/month and check the matching totals.
+    - Open Saved: one total, savings progress/minimum marker and only the dynamic Minimum target / Ideal target sentence. Projected changes targets while retaining recorded savings; zero/over-goal values keep the bar bounded. Income retains its existing estimate details.
+    - Shared, both directions: start with five newest months and five expenses in each newly opened month. Load all expenses/months reveals every remaining item in one click and disappears. Open a payment draft, collapse/reopen and switch tabs/directions; retain it. Refresh with newly arriving rows/months after Load all: show them while preserving the draft. Check a saved/legacy report too. Pagination must not submit payments or change full balances.
+
 133. October 8 reconciliation regressions (after deployment; isolated workbook/database for synthetic writes):
     - Match Grocery and Food purchases sharing row 4, including an older row-only Food reservation. Each must confirm independently without amount changes. Reuse an action/cell/occurrence for another transaction: reject with a linked/unavailable explanation without repeatedly replacing the unchanged Discord card. Repeat through the webapp; Check status shows the shared decision.
     - Log a current-month Shopping expense, Undo or Delete its action, then open a fresh bank review and explicitly Log again. Exactly one replacement purchase exists; the old action remains undone and its import is retained in `bank_import_replaced_after_undo`. Double-submit: one writer/attempt. Old pre-Undo forms, Reopen alone, surviving imported descendants, missing history and uncertain writes must not release claims.
@@ -1069,6 +1090,8 @@ Use a test row or low-risk real row in Discord:
 89. Compact phone UI: fully close/reopen both installed apps after deployment. Verify compact month/person header, Current/Projected, refresh icon/time and three-dot theme/signout controls. Open/close Calendar and Category Mix dialogs via close/backdrop; confirm no final flash or page jump. Toggle Bills/Burn Rate Details and confirm lines resize with the layout. Compare calendar dots and tooltip labels to Category Mix (mixed days show multiple colors); verify today's existing Daily Spending row is highlighted, including near Pacific midnight, and reimbursements use the chart-band background in both themes. Offline/manual refresh must clearly label older data; reconnect and confirm fresh values without resetting Projected.
 
 ## Verification Baseline
+
+2026-10-10 dashboard modal/history refinements: targeted UI **3 passed**, report suite **635 passed / 88 skipped**, full `python -m pytest unit_tests` **2,171 passed / 352 skipped** (optional PostgreSQL; Docker stopped), existing Kaleido warning only. Initial sandboxed report run could not start loopback HTTP servers; rerunning with test-server access passed. Project Python 3.12, Pyright **0 errors / 0 warnings**, frontend typecheck/build, Apps Script and `git diff --check` clean. Runtime regressions cover both history implementations, refresh/draft retention, current/projected totals, custom/zero-income percentages, legacy adjustments and zero/negative/over-goal savings progress. Production-build WebKit/Chromium passed **72 modal checks** (24 viewport/theme/mode cases), with fully opened dialog geometry, no overflow/page errors and inspected phone screenshots. Used the installed Playwright package matching cached browser revisions after the bundled driver proved incompatible. [Verification #115](https://github.com/brianjames-dev/bookiebot/actions/runs/38067837038) on `ba4d517` subsequently passed **2,523 tests / zero skips** with PostgreSQL, clean Python/frontend types, Apps Script, build and committed-asset consistency. The follow-up commit records this result only and passed [Verification #116](https://github.com/brianjames-dev/bookiebot/actions/runs/38068125685) with the same complete stack. Both commits are now integrated into main; this merge adds release tracking only. Manual rollout acceptance is checklist 134.
 
 2026-10-08 reconciliation regressions: full `python -m pytest unit_tests` with isolated PostgreSQL 16 **2,497 passed / 25 optional frontend skips**, existing Kaleido warning only. Project Python 3.12; Pyright **0 errors / 0 warnings** and `git diff --check` clean. Added **45 regression cases**, including SQLite/PostgreSQL category reservations, replacement eligibility, concurrent reimports, real writer→Undo/Delete→reimport, and Discord/web conflict feedback. [Verification #111](https://github.com/brianjames-dev/bookiebot/actions/runs/37821413108) on `1476a0b` passed **2,522 tests / zero skips**, Python types, Apps Script, frontend typecheck/build and asset consistency. [Verification #113](https://github.com/brianjames-dev/bookiebot/actions/runs/37825811309) on `4fbfe39` also passed the complete stack. The three new commits are integrated into `main`; automatic main verification/rollout and device acceptance use checklist 133. Production inspection was read-only.
 

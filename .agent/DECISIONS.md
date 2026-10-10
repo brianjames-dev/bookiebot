@@ -1,5 +1,11 @@
 # Agent Decisions
 
+## 2026-10-10 - Compact Metric Details And Reveal Complete Shared History
+
+Show bucket summaries in Left/Spent and one savings total/progress/target sentence in Saved. Derive Left percentages from the inspected mode/month budgets and income; omit undefined zero-income percentages. Keep Spent's existing expense-only accounting: savings deposits belong to Saved, while explicit savings expense rows and legacy sheet differences retain their amounts. Income retains recorded/scheduled context. Snapshot the detail and active view together when opened, so background refresh cannot mix amounts and targets. Preserve the detailed backend explanation payload for other consumers.
+
+Supersede October 3's incremental history controls: keep the initial five months/five expenses, then reveal all in one click. Retain that choice across refresh and new arrivals, independently per month/direction, along with existing stable disclosures/drafts and lazy collapsed history. Complete balance/mutation scopes remain unpaginated. Rationale: the user requested concise metric dialogs and a single action to inspect the full history, without changes to financial calculations or persistence.
+
 ## 2026-10-08 - Reserve Expense Cells And Replace Verified Undone Imports
 
 Action references include their column set and expense month. Categories occupy side-by-side blocks, so row number alone cannot reserve a purchase. Overlapping qualified cells, action IDs and recurring occurrences retain exclusive claims. When comparing a qualified expense row with an old ambiguous row-only alias, rely on the old action ID rather than infer category ownership. Ambiguous row-only reversion fails closed. Distinguish unchanged unavailable evidence from actual bank/review version conflicts in both interfaces.

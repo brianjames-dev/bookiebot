@@ -1,8 +1,18 @@
 # Finance Operations Workstream
 
-Last updated: 2026-10-08
+Last updated: 2026-10-10
 
 ## Goal
+
+### Main integration — 2026-10-10
+
+Merged both commits through `e5e97ea` from `codex/web-metric-details` into `main` at the user's request, without conflicts. [Verification #116](https://github.com/brianjames-dev/bookiebot/actions/runs/38068125685) passed the exact source tip: **2,523 tests / zero skips** including PostgreSQL, Python/frontend types, Apps Script, build and asset consistency. Changes beyond that tested tree are release documentation only. Confirm automatic main verification/Railway rollout and perform STATUS checklist 134. No production financial changes.
+
+### Dashboard details and Shared history work log — 2026-10-10
+
+Complete implementation, integrated into main; release verification/rollout and device acceptance pending (STATUS checklist 134). Shared canonical/fallback history retains the five-month/five-expense initial view, but Load all months/expenses reveals the entire remaining history in one click. This supersedes the October 3 incremental-five controls. The choice stays active across refresh/new arrivals and hidden directions; lazy collapsed months, stable disclosure IDs/payment drafts, full balances and mutation scope remain intact. No API/storage/accounting changes.
+
+Left details retain allocation percentages without verbose notes, Spent shows expense bucket totals, and Saved shows one savings total with shared progress and dynamic targets. Runtime contracts verify display semantics and both history implementations. Report suite **635 passed / 88 optional PostgreSQL skipped**; full suite **2,171 passed / 352 optional PostgreSQL skipped**, clean Python/frontend types and build. Production-build WebKit/Chromium passed **72 modal checks** across phone/desktop widths, both themes and modes. [Verification #115](https://github.com/brianjames-dev/bookiebot/actions/runs/38067837038) on `ba4d517` passed **2,523 tests / zero skips** including PostgreSQL, plus Python/frontend types, Apps Script, build and asset consistency. No live financial writes. Prior reconciliation/move/Undo backlog remains separate.
 
 ### Main integration — 2026-10-08
 

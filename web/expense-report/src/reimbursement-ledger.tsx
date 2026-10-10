@@ -322,7 +322,7 @@ function LedgerMonths({ groups, visible, ...props }: { groups: ReturnType<typeof
   const page = useReimbursementPage(groups, group => group.key, visible)
   return <div className="bb-reimbursement-groups">
     {page.visible.map(group => <LedgerMonth key={group.key} group={group} visible={visible} {...props} />)}
-    {page.hasMore && <button className="bb-reimbursement-load-more" type="button" onClick={page.loadMore}>Load more months</button>}
+    {page.hasMore && <button className="bb-reimbursement-load-more" type="button" onClick={page.loadAll}>Load all months</button>}
   </div>
 }
 function LedgerMonth({ group, visible, events, reversibleIds, owner, disabled, run }: {
@@ -342,7 +342,7 @@ function LedgerMonth({ group, visible, events, reversibleIds, owner, disabled, r
     <CollapsibleContent id={contentId} open={expanded}><div className="bb-reimbursement-month-entries">
       {loaded && page.visible.map(item => <LedgerRow key={item.id} allocation={item} events={events.filter(event => event.allocationId === item.id)} reversibleIds={reversibleIds} owner={owner}
         open={opened === item.id} onOpenChange={open => setOpened(open ? item.id : "")} disabled={disabled} run={run} />)}
-      {loaded && page.hasMore && <button className="bb-reimbursement-load-more" type="button" onClick={page.loadMore}>Load more expenses</button>}
+      {loaded && page.hasMore && <button className="bb-reimbursement-load-more" type="button" onClick={page.loadAll}>Load all expenses</button>}
     </div></CollapsibleContent>
   </section>
 }
