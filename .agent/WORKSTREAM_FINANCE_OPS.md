@@ -10,7 +10,7 @@ Complete live layout/app implementation; merge/release/device acceptance remain 
 
 - Each monthly snapshot owns its dated timeline; rollover copies the full schedule. App/Discord use the same per-paycheck math and visible settings warnings. No separate ESPP transaction is written.
 - Structural migration backs up both workbooks and shifts income/cash-savings Undo and shared-income ledger references through each insertion. Native calculations, original-row Delete/restore, rate versions, invalid settings and live report parity are verified; October/Template visual QA passes. No synthetic production financial transactions.
-- Final local verification: **2,221 passed / 352 optional PostgreSQL skipped**, clean Python/frontend types; CI/PostgreSQL and release acceptance are tracked in STATUS. No bank reconciliation backlog or lifecycle change; outstanding work is release acceptance and the first actual enrolled paycheck.
+- Final local verification: **2,221 passed / 352 optional PostgreSQL skipped**, clean Python/frontend types; [CI on `e72f203`](https://github.com/brianjames-dev/bookiebot/actions/runs/38318404569) passed **2,573 tests / zero skips**, PostgreSQL contracts, Python/frontend types, Apps Script, build and committed-asset parity. The follow-up commit changes tracking docs only. Release acceptance remains in STATUS. No bank reconciliation backlog or lifecycle change; outstanding work is release acceptance and the first actual enrolled paycheck.
 
 ### ESPP and monthly cash savings work log — 2026-10-12
 
