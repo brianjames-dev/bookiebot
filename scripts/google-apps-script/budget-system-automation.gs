@@ -791,6 +791,8 @@ function writePersonalBudgetSavingsPlan(sheet, plan, explicitYear) {
   const summaryRow = budget.getRow();
   if (summary && summary.getRow() !== summaryRow) {
     sheet.getRange(summary.getRow(), 7, 14, 2).moveTo(sheet.getRange(summaryRow, 7, 14, 2));
+    const clearedRow = summaryRow > summary.getRow() ? summary.getRow() : summaryRow+14;
+    sheet.getRange(clearedRow, 7, Math.min(14, Math.abs(summaryRow-summary.getRow())), 2).setBackground("#434343");
   }
   if (!summary) sheet.getRange(summaryRow, 7, 14, 2).setValues([["Savings & investing", ""], ...SAVINGS_SUMMARY_LABELS.map(label => [label, ""])]);
   sheet.getRange(summaryRow, 7, 1, 2).setBackground("#274e13").setFontColor("#ffffff").setFontWeight("bold");
