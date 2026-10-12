@@ -8,6 +8,7 @@ import { expenseReportIdentity } from "./expense-app-session"
 import { ReimbursementLedger } from "./reimbursement-ledger"
 import { SharedReimbursementsCard } from "./shared-reimbursements"
 import { SavingsGoals } from "./savings-goals"
+import { MonthlySavings } from "./monthly-savings"
 import { PhoneNotifications } from "./phone-notifications"
 import { WidgetSettings } from "./widget-settings"
 import { WidgetSetupGuide } from "./widget-setup-guide"
@@ -202,6 +203,7 @@ export function ExpenseAppShell({ report, controls, monthControl, comparison, av
         <ReimbursementLedger fallback={fallback} refreshKey={report.generatedAt} />
       </main>
       <main className="bb-shell-savings bb-main" aria-label="Savings" hidden={screen !== "savings"}>
+        <MonthlySavings report={report} mode={preferences.mode} ready={monthlyReady} monthControl={monthControl} controls={controls} />
         <SavingsGoals />
       </main>
       <main className="bb-shell-reconcile bb-main" aria-label="Reconcile" hidden={screen !== "reconcile" || !reconciliationVisible}>

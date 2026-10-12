@@ -1982,6 +1982,8 @@ async def query_savings_handler(entities, message):
             "❌ No monthly savings contribution logged.\n"
             f"💡 Ideal: ${result['ideal']:.2f} | Minimum: ${result['minimum']:.2f}"
         )
+    if "espp" in result:
+        response += f"\n📈 ESPP calculated from payroll: ${result['espp']:.2f}"
     await message.channel.send(response)
 
 

@@ -1579,12 +1579,23 @@ async def check_savings_deposited():
         if minimum_amount <= 0:
             minimum_amount = _labeled_savings_target(ws, row + 1, col, "minimum")
 
-        return {
+        result = {
             "deposited": actual_amount > 0,
             "actual": actual_amount,
             "ideal": ideal_amount,
             "minimum": minimum_amount,
         }
+        from bookiebot.sheets.savings_plan import read_savings_plan
+        rows = ws.get_all_values()
+        plan = read_savings_plan(rows)
+        if plan.present:
+            from bookiebot.reports.expense_breakdown import BudgetMonth, _calculate_month_savings, _income_entries
+            from bookiebot.sheets.routing import now_pacific
+            current = now_pacific()
+            entries, income = _income_entries(rows)
+            values = _calculate_month_savings(plan, income, entries, BudgetMonth(current.year, current.month))
+            result.update(ideal=values["cashIdeal"], minimum=values["cashMinimum"], espp=values["esppContribution"])
+        return result
 
     except Exception as e:
         print(f"[ERROR] Failed to check monthly savings contribution: {e}")

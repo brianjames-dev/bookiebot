@@ -251,7 +251,7 @@ async def load_financial_report(
         "interpretation_note": (
             "Current contains logged/elapsed-month values. Projected uses the same calculations "
             "as the web report's Projected button, including full expected income, scheduled "
-            "commitments, 50/30/20 budgets, cascade coverage, and savings targets."
+            "commitments, configured category budgets, cascade coverage, and savings targets."
         ),
     }
     mode_views = payload["modeViews"]
@@ -304,6 +304,8 @@ def _financial_report_section(
         return {
             "metrics": view["metrics"],
             "incomeProjectionSettings": payload.get("incomeProjectionSettings"),
+            "savingsPlan": payload.get("savingsPlan"),
+            "savingsInvesting": view.get("savingsInvesting"),
             "categoryBudgets": view["categoryBudgets"],
             "categorySpending": view["categorySpending"],
             "categoryBalances": view["categoryBalances"],
@@ -336,6 +338,8 @@ def _financial_report_section(
             "incomeProjection": payload["incomeProjection"],
             "incomeProjectionSettings": payload.get("incomeProjectionSettings"),
             "savingsProjection": payload["savingsProjection"],
+            "savingsPlan": payload.get("savingsPlan"),
+            "savingsInvesting": view.get("savingsInvesting"),
             "calendarEvents": events,
             "dailyTotals": payload["dailyTotals"],
         }

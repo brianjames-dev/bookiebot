@@ -34,6 +34,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "./components/ui/card"
 import { FittedAmount } from "./components/ui/fitted-amount"
 import { ReportMenu } from "./components/ui/report-menu"
 import { SavingsGoals } from "./savings-goals"
+import { MonthlySavings } from "./monthly-savings"
 import { PhoneNotifications } from "./phone-notifications"
 import { ReportQuestions } from "./report-questions"
 import { SharedReimbursementsCard } from "./shared-reimbursements"
@@ -267,7 +268,8 @@ function buildReportView(report: ExpenseReportData, projected: boolean): ReportV
   const savings = savingsForMode(report, projected)
   const totalExpenses = projected ? amountRowsTotal(breakdown) : report.metrics.totalExpenses
   const currentBudgets = currentCategoryBudgets(report)
-  const categoryBudgets = projected ? projectedCategoryBudgets(monthlyIncome) : currentBudgets
+  const savingsInvesting = report.savingsInvesting?.[projected ? "projected" : "current"]
+  const categoryBudgets = savingsInvesting?.categoryBudgets ?? (projected ? projectedCategoryBudgets(monthlyIncome) : currentBudgets)
   const categorySpending = categorySpendingForBreakdown(
     breakdown,
     savings.amount,
@@ -276,6 +278,7 @@ function buildReportView(report: ExpenseReportData, projected: boolean): ReportV
   const categoryBalances = projectedCategoryBalances(categoryBudgets, categorySpending)
   const budgetRemaining = categoryBalanceTotal(categoryBalances)
   return {
+    savingsInvesting,
     metrics: {
       totalExpenses,
       monthlyIncome,
@@ -845,6 +848,7 @@ export function ExpenseReportApp({ report, appControls, appAvatarUrl, appSession
             accent
           />
           <SavingsMetricCard
+            cashOnly={Boolean(report.savingsPlan)}
             onExplain={metricDetails ? () => setMetricInspection({...metricDetails.saved, key: "saved", view: activeReport}) : undefined}
             value={activeReport.metrics.amountSaved}
             minimum={activeReport.metrics.savingsMinimum}
@@ -937,6 +941,7 @@ export function ExpenseReportApp({ report, appControls, appAvatarUrl, appSession
           onViewChange={dismissChartTooltips}
         />}
 
+        {!navigation && <MonthlySavings report={report} mode={projectionActive ? "projected" : "current"} />}
         {!navigation && appSession && <SavingsGoals />}
 
         {!navigation && appSession && <ReportQuestions month={`${report.year}-${String(report.month).padStart(2, "0")}`}
@@ -966,6 +971,14 @@ function MetricExplanationDetails({detail}: {detail:MetricInspection}) {
       <div className="bb-chart-total">{formatMoney(detail.value)}</div>
       <SavingsProgress value={detail.value} minimum={minimum} ideal={ideal} showTargets={false} />
       <p className="bb-activity-footnote">Minimum target: {formatMoney(minimum)}. Ideal target: {formatMoney(ideal)}.</p>
+      {view.savingsInvesting && <>
+        <dl>
+          <div><dt>Take-home before ESPP</dt><dd>{formatMoney(view.savingsInvesting.takeHomeBeforeEspp)}</dd></div>
+          <div><dt>ESPP{view.savingsInvesting.estimatedEsppContribution ? " · includes estimate" : " · calculated from payroll"}</dt><dd>{formatMoney(view.savingsInvesting.esppContribution)}</dd></div>
+          <div><dt>Cash saved + ESPP</dt><dd>{formatMoney(view.savingsInvesting.combinedContributions)}</dd></div>
+        </dl>
+        <p className="bb-activity-footnote">ESPP is already withheld before deposit. The progress bar measures cash savings.</p>
+      </>}
     </div>
   }
   let components = detail.components
@@ -1468,11 +1481,13 @@ function isSavingsNearGoal(value: number | null | undefined, goal: number | null
 }
 
 function SavingsMetricCard({
+  cashOnly = false,
   onExplain,
   value,
   minimum,
   ideal,
 }: {
+  cashOnly?: boolean
   onExplain?: () => void
   value: number
   minimum: number
@@ -1481,7 +1496,7 @@ function SavingsMetricCard({
   const tone = value <= 0 ? "empty" : value < minimum ? "low" : isSavingsNearGoal(value, ideal) ? "ideal" : "minimum"
   return (
     <div className="bb-metric-card bb-savings-metric-card">
-      <div className="bb-metric-label">{onExplain ? <button type="button" className="bb-metric-explain" aria-label="Explain Saved" onClick={onExplain}>Saved<span aria-hidden="true">ⓘ</span></button> : "Saved"}</div>
+      <div className="bb-metric-label">{onExplain ? <button type="button" className="bb-metric-explain" aria-label={cashOnly ? "Explain Cash saved" : "Explain Saved"} onClick={onExplain}>{cashOnly ? "Cash saved" : "Saved"}<span aria-hidden="true">ⓘ</span></button> : cashOnly ? "Cash saved" : "Saved"}</div>
       <FittedAmount className={`bb-metric-value bb-savings-value bb-savings-value-${tone}`}>{formatMoney(value)}</FittedAmount>
       <SavingsProgress value={value} minimum={minimum} ideal={ideal} />
     </div>

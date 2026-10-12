@@ -9,6 +9,10 @@ def test_income_settings_migration_and_rollover_runtime():
     subprocess.run(["node", "unit_tests/scripts/income_settings_test.cjs"], check=True, capture_output=True, text=True)
 
 
+def test_espp_settings_formulas_and_safe_migration_runtime():
+    subprocess.run(["node", "unit_tests/scripts/espp_settings_test.cjs"], check=True, capture_output=True, text=True)
+
+
 def test_personal_budget_income_date_stamping_is_wired_into_setup():
     source = SCRIPT_PATH.read_text(encoding="utf-8")
 

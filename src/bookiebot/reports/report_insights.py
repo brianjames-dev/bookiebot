@@ -129,6 +129,8 @@ def metric_explanations(report: ExpenseBreakdownReport, payload: dict[str, Any])
                           "source": "sheet", "date": None})
         left_notes = [
             "Remaining category funds already account for recorded savings contributions.",
+            "ESPP is calculated from enrolled payroll; category budgets contain only deposited cash."
+            if view.get("savingsInvesting") else
             "Projected category budgets use 50% Needs, 30% Wants and 20% Savings of projected income."
             if mode == "projected" else "Current category budgets come from the selected month's sheet settings.",
         ]
@@ -166,6 +168,14 @@ def metric_explanations(report: ExpenseBreakdownReport, payload: dict[str, Any])
                 "Projected adjusts the targets with projected income; it does not invent future savings deposits.",
             ]),
         }
+        if view.get("savingsInvesting"):
+            values = view["savingsInvesting"]
+            explanations[mode]["saved"]["notes"].extend([
+                "Cash targets use enrolled take-home before ESPP at 15% ideal / 7.5% minimum; other income uses 20% / 10%.",
+                f"ESPP: ${values['esppContribution']:,.2f}, calculated from payroll; already withheld before deposit.",
+                f"Cash savings plus ESPP: ${values['combinedContributions']:,.2f}.",
+                *values["warnings"],
+            ])
     return explanations
 
 

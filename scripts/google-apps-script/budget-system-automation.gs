@@ -526,6 +526,10 @@ function initializeNewYearFiles(config) {
       ? resolvePersonalBudgetIncomeSettings(SpreadsheetApp.openById(previousConfig[key]), "December", true)
       : readPersonalBudgetIncomeSettings(getMonthlyTemplateSheet(ss));
     writePersonalBudgetIncomeSettings(getMonthlyTemplateSheet(ss), settings);
+    const priorSavings = previousConfig
+      ? resolvePersonalBudgetSavingsPlan(SpreadsheetApp.openById(previousConfig[key]), "December", true)
+      : readPersonalBudgetSavingsPlan(getMonthlyTemplateSheet(ss));
+    if (priorSavings) writePersonalBudgetSavingsPlan(getMonthlyTemplateSheet(ss), priorSavings, config.year);
   }
   ensureMonthExistsInSharedExpenses(config.sharedExpensesId, "January");
 
@@ -639,6 +643,8 @@ function ensureMonthExistsInPersonalBudget(
   sheet = createMonthSheet(ss, monthName);
   writePersonalBudgetIncomeSettings(sheet, incomeSettings);
   inheritPersonalBudgetIncomeSettings(ss, sheet, monthName);
+  const savingsPlan = resolvePersonalBudgetSavingsPlan(ss, monthName, false);
+  if (savingsPlan) writePersonalBudgetSavingsPlan(sheet, savingsPlan);
 
   updatePersonalBudgetImportRanges(
     sheet,
@@ -711,6 +717,141 @@ function createMonthSheet(ss, monthName) {
 
 function normalizeIncomeSettingLabel(value) {
   return String(value || "").trim().replace(/:\s*$/, "").trim().toLowerCase();
+}
+
+const SAVINGS_PLAN_HEADERS = ["ESPP Income Source", "ESPP Rate", "ESPP First Paycheck Date", "ESPP Cash Ideal Rate", "ESPP Cash Minimum Rate", "ESPP Last Paycheck Date"];
+const SAVINGS_SUMMARY_LABELS = ["Deposited income", "Eligible payroll deposits", "ESPP contribution", "Take-home before ESPP", "Other income", "Ideal cash savings", "Minimum cash savings", "Cash savings contributed", "Combined savings + ESPP", "Needs allocation", "Wants allocation", "Cash savings allocation", "ESPP status"];
+
+function readPersonalBudgetSavingsPlan(sheet) {
+  if (sheet.getMaxColumns() < 12) return null;
+  if (!sheet.getRange("G4:L4").getValues()[0].every((value, index) => value === SAVINGS_PLAN_HEADERS[index])) return null;
+  return sheet.getRange("G5:L5").getValues()[0];
+}
+
+function resolvePersonalBudgetSavingsPlan(ss, monthName, includeSelected) {
+  let plan = readPersonalBudgetSavingsPlan(getMonthlyTemplateSheet(ss));
+  const end = MONTH_NAMES.indexOf(monthName) + (includeSelected ? 1 : 0);
+  for (const name of MONTH_NAMES.slice(0, end)) {
+    const sheet = ss.getSheetByName(name);
+    const current = sheet && readPersonalBudgetSavingsPlan(sheet);
+    if (current) plan = current;
+  }
+  return plan;
+}
+
+function savingsPlanDate(value) {
+  if (value === "" || value === null || value === undefined) return "";
+  if (value instanceof Date && !isNaN(value)) return value;
+  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(String(value));
+  if (!match) throw new Error("Use YYYY-MM-DD for the first affected paycheck date.");
+  const result = new Date(Number(match[1]), Number(match[2])-1, Number(match[3]));
+  if (result.getFullYear() !== Number(match[1]) || result.getMonth()+1 !== Number(match[2]) || result.getDate() !== Number(match[3])) throw new Error("Invalid ESPP paycheck date.");
+  return result;
+}
+
+function preflightPersonalBudgetSavingsPlan(sheet) {
+  const existing = readPersonalBudgetSavingsPlan(sheet);
+  const occupied = (row, height, width) => sheet.getMaxColumns() >= 7 && sheet.getRange(row, 7, height, Math.min(width, sheet.getMaxColumns()-6)).getValues().some(values => values.some(value => value !== ""));
+  if (!existing && occupied(4, 2, 6)) throw new Error(`Occupied ESPP settings area on ${sheet.getName()}; no migration performed.`);
+  const summary = findCellByExactText(sheet, "Savings & investing");
+  if (summary && (summary.getColumn() !== 7 || SAVINGS_SUMMARY_LABELS.some(label => !findCellByExactText(sheet, label)))) throw new Error("Incomplete savings summary; inspect before upgrading.");
+  const income = findPersonalBudgetIncomeLayout(sheet);
+  const total = findCellByExactText(sheet, "Monthly Income:");
+  const savings = findCellContainingText(sheet, "Enter Monthly Savings Contribution");
+  const budget = findCellContainingText(sheet, "BUDGET:");
+  if (!income || !income.dateColumn || !total || !savings || !budget) throw new Error(`Missing dated income, monthly savings, or Budget row on ${sheet.getName()}.`);
+  // Income deletes remove entire rows. Keep the summary below that table.
+  if (sheet.getMaxColumns() >= 7) {
+    const destination = sheet.getRange(budget.getRow(), 7, 14, Math.min(2, sheet.getMaxColumns()-6)).getValues();
+    if (destination.some((row,index) => row.some(value => value !== "") && (!summary || budget.getRow()+index < summary.getRow() || budget.getRow()+index > summary.getRow()+13))) throw new Error(`Occupied savings summary area on ${sheet.getName()}; no migration performed.`);
+  }
+  return {income, total, savings, budget, summary};
+}
+
+function writePersonalBudgetSavingsPlan(sheet, plan, explicitYear) {
+  const {income, total, savings, budget, summary} = preflightPersonalBudgetSavingsPlan(sheet);
+  const year = Number(explicitYear || /\b(20\d{2})\b/.exec(sheet.getParent().getName())?.[1]);
+  if (!year) throw new Error("Cannot determine the budget year.");
+  const values = [plan[0] || "", Number(plan[1] || 0), savingsPlanDate(plan[2]), Number(plan[3] ?? .15), Number(plan[4] ?? .075), savingsPlanDate(plan[5])];
+  if (!Number.isFinite(values[1]) || values[1] < 0 || values[1] >= 1 || !Number.isFinite(values[3]) || !Number.isFinite(values[4]) || values[4] < 0 || values[4] > values[3] || (values[1] > 0 && Math.abs(values[1]+values[3]-.2) > 1e-9) || (values[2] && values[5] && values[5] < values[2])) throw new Error("Invalid savings plan rates or date range.");
+  if (sheet.getMaxColumns() < 12) sheet.insertColumnsAfter(sheet.getMaxColumns(), 12-sheet.getMaxColumns());
+  sheet.setColumnWidth(7, 230);
+  sheet.setColumnWidth(8, 160);
+  sheet.setColumnWidths(9, 4, 150);
+  sheet.setRowHeight(4, 46);
+  const grid = sheet.getRange("G4:L5");
+  grid.setValues([SAVINGS_PLAN_HEADERS, values]);
+  grid.setFontFamily("Arial").setFontSize(10).setWrap(true).setVerticalAlignment("middle");
+  sheet.getRange("G4:L4").setBackground("#274e13").setFontColor("#ffffff").setFontWeight("bold");
+  sheet.getRange("G5:L5").setBackground("#b6d7a8").setFontColor("#000000");
+  const percentage = SpreadsheetApp.newDataValidation().requireNumberBetween(0, .2).setAllowInvalid(false).build();
+  for (const cell of ["H5", "J5", "K5"]) sheet.getRange(cell).setNumberFormat("0.0#%").setDataValidation(percentage);
+  for (const cell of ["I5", "L5"]) sheet.getRange(cell).setNumberFormat("M/d/yyyy").setDataValidation(SpreadsheetApp.newDataValidation().requireDate().setAllowInvalid(false).build());
+  sheet.getRange("I5").setNote("First paycheck whose deposited amount already excludes ESPP. Blank leaves enrollment pending. Last paycheck is optional and inclusive.");
+  const summaryRow = budget.getRow();
+  if (summary && summary.getRow() !== summaryRow) {
+    sheet.getRange(summary.getRow(), 7, 14, 2).moveTo(sheet.getRange(summaryRow, 7, 14, 2));
+  }
+  if (!summary) sheet.getRange(summaryRow, 7, 14, 2).setValues([["Savings & investing", ""], ...SAVINGS_SUMMARY_LABELS.map(label => [label, ""])]);
+  sheet.getRange(summaryRow, 7, 1, 2).setBackground("#274e13").setFontColor("#ffffff").setFontWeight("bold");
+  sheet.getRange(summaryRow, 7, 14, 2).setFontFamily("Arial").setFontSize(10).setWrap(true).setVerticalAlignment("middle");
+  const cells = Object.fromEntries(SAVINGS_SUMMARY_LABELS.map(label => [label, findCellByExactText(sheet, label).offset(0, 1)]));
+  const ref = label => cells[label].getA1Notation();
+  const totalRef = sheet.getRange(total.getRow(), income.amountColumn).getA1Notation();
+  const headerRef = sheet.getRange(income.headerRow, income.amountColumn).getA1Notation();
+  const empty = `ROW(${totalRef})<=ROW(${headerRef})+1`;
+  // INDEX/ROW includes appended income rows even when the previous table was empty.
+  const range = column => {
+    const letter = sheet.getRange(1, column).getA1Notation().replace(/\d+$/, "");
+    return `INDEX(${letter}:${letter},ROW(${headerRef})+1):INDEX(${letter}:${letter},ROW(${totalRef})-1)`;
+  };
+  const amounts = range(income.amountColumn), sources = range(income.sourceColumn), dates = range(income.dateColumn);
+  const month = Math.max(0, MONTH_NAMES.indexOf(sheet.getName())) + 1;
+  const start = `DATE(${year},${month},1)`, end = `EOMONTH(${start},0)`;
+  const received = `IFERROR(IF(ISNUMBER(${dates}),${dates},DATEVALUE(${dates})),0)`;
+  const normalize = value => `LOWER(TRIM(REGEXREPLACE(${value},"[^A-Za-z0-9]+"," ")))`;
+  const sourceMatches = `REGEXMATCH(${normalize(sources)},"^"&${normalize("$G$5")}&"( (income|paycheck|payroll|salary|wages))?$")`;
+  const mask = `(${sourceMatches})*(${received}>=MAX($I$5,${start}))*(${received}<=MIN(IF($L$5="",${end},$L$5),${end}))*(${amounts}>0)`;
+  const status = `IF($H$5=0,"Off",IF(OR($G$5="",$I$5=""),"Pending",IF(OR(NOT(ISNUMBER($I$5)),$H$5<0,$H$5>=1,ABS($H$5+$J$5-0.2)>0.000000001,$K$5<0,$K$5>$J$5,AND($L$5<>"",OR(NOT(ISNUMBER($L$5)),$L$5<$I$5))),"Invalid","Active")))`;
+  const formulas = {
+    "Deposited income": `=${sheet.getRange(total.getRow(), income.amountColumn).getA1Notation()}`,
+    "Eligible payroll deposits": `=IF(OR(${empty},${ref("ESPP status")}<>"Active"),0,IFNA(SUM(FILTER(${amounts},${mask})),0))`,
+    "ESPP contribution": `=IF(OR(${empty},${ref("ESPP status")}<>"Active"),0,IFNA(SUM(ARRAYFORMULA(ROUND(FILTER(${amounts},${mask})*$H$5/(1-$H$5),2))),0))`,
+    "Take-home before ESPP": `=${ref("Deposited income")}+${ref("ESPP contribution")}`,
+    "Other income": `=${ref("Deposited income")}-${ref("Eligible payroll deposits")}`,
+    "Ideal cash savings": `=ROUND((${ref("Eligible payroll deposits")}+${ref("ESPP contribution")})*$J$5+${ref("Other income")}*20%,2)`,
+    "Minimum cash savings": `=ROUND((${ref("Eligible payroll deposits")}+${ref("ESPP contribution")})*$K$5+${ref("Other income")}*10%,2)`,
+    "Cash savings contributed": `=${savings.offset(0,3).getA1Notation()}`,
+    "Combined savings + ESPP": `=${ref("Cash savings contributed")}+${ref("ESPP contribution")}`,
+    "Needs allocation": `=ROUND(${ref("Take-home before ESPP")}*50%,2)`,
+    "Wants allocation": `=${ref("Deposited income")}-${ref("Needs allocation")}-${ref("Ideal cash savings")}`,
+    "Cash savings allocation": `=${ref("Ideal cash savings")}`,
+    "ESPP status": `=${status}`,
+  };
+  for (const label of SAVINGS_SUMMARY_LABELS) {
+    cells[label].setFormula(formulas[label]);
+    cells[label].setBackground("#d9ead3").setFontColor("#000000");
+    cells[label].offset(0,-1).setBackground("#d9ead3").setFontColor("#000000");
+    if (label !== "ESPP status") cells[label].setNumberFormat("$#,##0.00");
+  }
+  // Existing workbook burn-rate/margin formulas extract currency text here.
+  for (const [offset,label] of [[1,"Needs allocation"],[2,"Wants allocation"],[3,"Cash savings allocation"]]) budget.offset(0,offset).setFormula(`=TEXT(${ref(label)},"$#,##0.00")`);
+  budget.offset(1,3).setValues([["Cash savings"]]).setNote("15% of enrolled take-home before ESPP, plus 20% of unrelated income. ESPP is already withheld from deposited income.");
+  savings.offset(0,1).setFormula(`="IDEAL = "&TEXT(${ref("Ideal cash savings")},"$#,##0.00")`);
+  savings.offset(0,2).setFormula(`="MINIMUM = "&TEXT(${ref("Minimum cash savings")},"$#,##0.00")`);
+}
+
+/** Explicit owner-scoped setup. Blank date prepares Brian's plan without enrolling any paycheck. */
+function configureBrianESPP(firstPaycheckDate = "2026-10-23") {
+  const first = savingsPlanDate(firstPaycheckDate);
+  seedKnown2026ConfigIfMissing();
+  const today = new Date(), config = getYearConfig(getYear(today));
+  if (!config) throw new Error("No configured annual budget.");
+  const ss = SpreadsheetApp.openById(config.brianBudgetId);
+  const sheets = [ss.getSheetByName(getMonthName(today)), getMonthlyTemplateSheet(ss)];
+  if (sheets.some(sheet => !sheet)) throw new Error("Current month or Template is missing.");
+  sheets.forEach(preflightPersonalBudgetSavingsPlan);
+  sheets.forEach(sheet => writePersonalBudgetSavingsPlan(sheet, ["xAI", .05, first, .15, .075, ""], config.year));
 }
 
 function readPersonalBudgetIncomeSettings(sheet) {

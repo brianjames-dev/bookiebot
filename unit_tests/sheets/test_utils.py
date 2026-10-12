@@ -137,6 +137,28 @@ async def test_monthly_savings_check_reads_legacy_first_row_targets():
     }
 
 
+@pytest.mark.asyncio
+async def test_monthly_savings_command_uses_espp_targets_and_overwrites_cash_only(monkeypatch):
+    from bookiebot.sheets import routing
+    from bookiebot.sheets.savings_plan import PLAN_LABELS
+    monkeypatch.setattr(routing, "now_pacific", lambda: datetime(2026, 10, 24))
+    repo = SheetsRepoStub(income_rows=[
+        ["Date:", "Source:", "Amount:"],
+        ["10/23/2026", "xAI", "7600"],
+        ["10/24/2026", "Rewards", "1000"],
+        ["Monthly Income:", "", "8600"],
+        list(PLAN_LABELS), ["xAI", "5%", "2026-10-23", "15%", "7.5%", ""],
+        ["", "Enter Monthly Savings Contribution", "IDEAL = $1720", "MINIMUM = $860", "900"],
+    ])
+    with repo.patched():
+        before = await su.check_savings_deposited()
+        assert su.log_savings(1200)
+        after = await su.check_savings_deposited()
+    assert before == {"deposited": True, "actual":900, "ideal":1400, "minimum":700, "espp":400}
+    assert after == {**before, "actual":1200}
+    assert repo.income.get_all_values()[1] == ["10/23/2026", "xAI", "7600"]
+
+
 @pytest.fixture
 def mock_ws():
     ws = MagicMock()

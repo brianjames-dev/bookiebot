@@ -1,8 +1,10 @@
 # Agent Status
 
-Last updated: 2026-10-10
+Last updated: 2026-10-12
 
 ## Active Focus
+
+ESPP tracking (2026-10-12): implemented on `codex/automatic-espp` at the user's request. Only Brian's dated enrolled xAI paychecks beginning **2026-10-23** derive 5% ESPP; enrolled cash savings use 15% ideal / 7.5% minimum, unrelated income retains 20% / 10%. Current/Projected report, Savings display, Ask and Discord use the same calculation; actual cash stays unchanged. Brian October/Template and live rollover script are configured. Application release and device acceptance remain checklist 135; no deployment/merge requested in this task.
 
 Main integration (2026-10-10): merged both commits through `e5e97ea` from `codex/web-metric-details` at the user's request. Compact Left/Spent/Saved details and complete reimbursement history are integrated without conflicts. [Verification #116](https://github.com/brianjames-dev/bookiebot/actions/runs/38068125685) passed the exact source tip: **2,523 tests / zero skips**, Python/frontend types, Apps Script, build and asset consistency. This merge adds release tracking only beyond that tested tree. Automatic main verification/Railway rollout and checklist 134 remain the release acceptance steps. No production financial mutations.
 
@@ -107,6 +109,8 @@ All eight September 6 audit batches are implemented and verified locally. Each b
 
 ## On Deck
 
+Release `codex/automatic-espp` after branch verification and the user's merge direction, then perform checklist 135. Live Brian October/Template and Apps Script are already configured; do not rerun setup or log synthetic paychecks into production. Check the actual first enrolled deposit on 10/23 and update Expected Income Amount if its expected bank-deposit amount changes. Prior release/device acceptance items remain below.
+
 Confirm automatic main verification/Railway rollout for the merged dashboard modal/history refinements, then perform checklist 134. Both commits through `e5e97ea` are integrated; [Verification #116](https://github.com/brianjames-dev/bookiebot/actions/runs/38068125685) passed the exact source tip with **2,523 tests / zero skips** and all type/build/asset checks. Main integration `0b5f5a0` passed [Verification #114](https://github.com/brianjames-dev/bookiebot/actions/runs/37835563238) with **2,522 tests / zero skips** and all type/build/asset checks; remaining rollout/device acceptance for the earlier reconciliation work is below.
 
 Confirm the automatic main verification/Railway rollout for the merged October 8 reconciliation fixes, then perform checklist 133. The exact source branch passed Verification #113. Keep item 3391 ignored unless the user chooses Reopen. Parking item 3376 was restored and confirmed at the user's explicit request; do not replay it. Then verify remaining cross-surface controls/progress/recovery using checklist 132.
@@ -161,6 +165,14 @@ Student-loan activation is complete. Verify the deployed fixed-bill display and 
 25. Harden recent-action pending state across restarts/deploys, since selections currently live only in process memory.
 26. Improve targeted recent-action search so commands can find older matches, not only the latest 10 recent actions.
 27. Explore clarifying questions before logging when BookieBot is uncertain instead of guessing or silently failing.
+
+## Completed 2026-10-12
+
+- Added sheet-configured automatic ESPP, dated source eligibility, per-paycheck rounding, mixed-income cash targets, deposit-conserving category budgets and optional stop date. Cash savings remains the existing monthly actual; corrections/delete/restore derive ESPP again.
+- Added monthly Savings & investing, clear projected contribution estimates, combined contributions/rate and cumulative available-history coverage; retained old-owner/month behavior and personal savings goals.
+- Configured live Brian October and Template with preserved input values/formulas outside the requested allocation/target/header changes. Patched and saved the live Apps Script while retaining its pre-existing income-validation fix. Private setup/script backups are in `/private/tmp`; no synthetic production income/savings entries.
+- Verification: focused regressions pass, full local **2,205 passed / 352 optional PostgreSQL skipped**; Python/frontend types/build passed. Final layout regressions passed again after moving the summary below income. Google calculation-engine verification covered original-row Delete/restore and legacy burn-rate dependencies; 390px dark-mode preview passed. Live October has no formula errors; existing Template import errors remain outside scope. Final branch/CI results follow in the completion response.
+- README, workstream and durable decisions updated. Manual acceptance is checklist 135.
 
 ## Completed 2026-10-10
 
@@ -821,6 +833,8 @@ Student-loan activation is complete. Verify the deployed fixed-bill display and 
   - undoing update/delete/move
 
 ## Manual Test Checklist
+
+135. ESPP (after app release): open Brian's Savings screen for October and check 5% ESPP / 15% ideal / 7.5% minimum, with ordinary income at 20% / 10%. Before 10/23 actual ESPP remains zero. Log only the real 10/23 xAI checking deposit with its date/source, then compare calculated ESPP and cash targets with the sheet's Savings & investing summary. For an isolated $3,800 enrolled deposit, expect $200 ESPP, $600 ideal cash and $300 minimum; adding $100 rewards adds $20/$10 cash and no ESPP. Record the month's actual cash savings total once through the existing savings command/cell; changing it must not alter ESPP. Projected may show future ESPP estimates but must retain actual cash saved. Verify October versus November and Hannah/history isolation, paycheck edit/delete/Undo recalculation, pending/off/invalid settings and optional last-date behavior in disposable fixtures. Confirm Left/Spent do not subtract payroll ESPP twice, the legacy sheet burn-rate cells calculate, and new monthly/year tabs retain source/date/rates. Update Expected Income Amount to the expected bank deposit when the new amount is known. Check narrow/light/dark layouts and incomplete historical coverage. Do not add test paychecks or savings to production.
 
 134. Compact metric details and complete reimbursement history (after deployment):
     - Open Left in Current and Projected: only the total, remaining bucket amounts and allocation percentages appear. Projected uses 50/30/20; Current uses the selected month's allocations. The Left card has no Budget remaining subtitle. Zero income must not show invalid percentages.
