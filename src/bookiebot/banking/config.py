@@ -31,6 +31,10 @@ class BankingConfig:
     def configured(self) -> bool:
         return bool(self.plaid_client_id and self.plaid_secret and self.token_encryption_key)
 
+    @property
+    def credentials_present(self) -> bool:
+        return bool(self.plaid_client_id and self.plaid_secret)
+
 
 def load_banking_config() -> BankingConfig:
     sqlite_path = Path(os.getenv("BANK_SQLITE_PATH", "data/banking.sqlite3")).expanduser()
