@@ -14,6 +14,9 @@ PLAN_LABELS = (
 )
 PAYROLL_SUFFIXES = ("income", "paycheck", "payroll", "salary", "wages")
 CENT = Decimal("0.01")
+SETTINGS_TAB = "ESPP Settings"
+SETTINGS_HEADERS = ("First eligible paycheck", "Last eligible paycheck", "Payroll source", "ESPP rate")
+ESPP_LABEL = "SpaceX ESPP this month"
 
 
 def normalized_source(value: Any) -> str:
@@ -67,6 +70,20 @@ class SavingsPlan:
     cash_ideal_rate: Decimal = Decimal("0.15")
     cash_minimum_rate: Decimal = Decimal("0.075")
     status: str = "off"
+    periods: tuple[SavingsPlan, ...] = ()
+
+    def for_paycheck(self, label: str, received: date | None) -> SavingsPlan | None:
+        if self.periods:
+            if self.status != "active" or not received:
+                return None
+            # A new dated row supersedes the earlier version from that date onward.
+            applicable = [plan for plan in self.periods if plan.first_paycheck and plan.first_paycheck <= received]
+            plan = applicable[-1] if applicable else None
+            return plan if plan and plan.includes(label, received) else None
+        return self if self.includes(label, received) else None
+
+    def matches_source(self, label: str) -> bool:
+        return any(matches_payroll(label, plan.source) for plan in self.periods or (self,))
 
     def includes(self, label: str, received: date | None) -> bool:
         return bool(self.status == "active" and received and self.first_paycheck
@@ -82,7 +99,23 @@ class SavingsPlan:
                 "otherCashIdealRate": .2, "otherCashMinimumRate": .1}
 
 
-def read_savings_plan(rows: list[list[Any]]) -> SavingsPlan:
+def inline_enrollment_rows(rows: list[list[Any]]) -> list[list[Any]] | None:
+    for index, row in enumerate(rows):
+        for column in range(max(0, len(row) - 3)):
+            if tuple(row[column:column + 4]) == SETTINGS_HEADERS:
+                end = next((i for i in range(index + 1, len(rows))
+                            if normalized_source(rows[i][column] if len(rows[i]) > column else "") == "date"), len(rows))
+                return [r[column:column + 4] for r in rows[index:end]]
+    return None
+
+
+def read_savings_plan(rows: list[list[Any]], settings_rows: list[list[Any]] | None = None,
+                      *, as_of: date | None = None) -> SavingsPlan:
+    # Monthly snapshots win over the transitional separate-tab layout and old
+    # labels, which also contain the four-column header's "ESPP Rate" label.
+    inline = inline_enrollment_rows(rows)
+    if inline is not None:
+        return read_enrollment_settings(inline, as_of=as_of)
     values: dict[str, Any] = {}
     labels = {normalized_source(label): label for label in PLAN_LABELS}
     for row_index, row in enumerate(rows):
@@ -94,6 +127,8 @@ def read_savings_plan(rows: list[list[Any]]) -> SavingsPlan:
                 index = column if horizontal else column + 1
                 values[key] = source[index] if index < len(source) else ""
     if not values:
+        if any(str(cell).startswith(ESPP_LABEL) for row in rows for cell in row):
+            return read_enrollment_settings(settings_rows, as_of=as_of)
         return SavingsPlan()
     rate = _rate(values.get("ESPP Rate", "0"))
     ideal = _rate(values.get("ESPP Cash Ideal Rate", ".15"))
@@ -115,6 +150,33 @@ def read_savings_plan(rows: list[list[Any]]) -> SavingsPlan:
                        minimum if minimum is not None else Decimal(".075"), status)
 
 
+def read_enrollment_settings(rows: list[list[Any]] | None, *, as_of: date | None = None) -> SavingsPlan:
+    if not rows or tuple(rows[0][:4]) != SETTINGS_HEADERS:
+        return SavingsPlan(present=True, status="invalid")
+    periods = []
+    for row in rows[1:]:
+        if not any(str(value).strip() for value in row[:4]):
+            continue
+        first_raw, last_raw, source, rate_raw = (list(row[:4]) + [""] * 4)[:4]
+        first, last, rate = parse_date(first_raw), parse_date(last_raw), _rate(rate_raw)
+        if (not first or not str(source).strip() or rate is None or rate > Decimal(".2")
+                or bool(last_raw and not last) or bool(last and last < first)):
+            return SavingsPlan(present=True, status="invalid")
+        ideal = Decimal(".2") - rate
+        periods.append(SavingsPlan(True, str(source).strip(), rate, first, last, ideal, ideal / 2,
+                                   "active" if rate else "off"))
+    periods.sort(key=lambda plan: plan.first_paycheck or date.min)
+    if len({plan.first_paycheck for plan in periods}) != len(periods):
+        return SavingsPlan(present=True, status="invalid")
+    if not periods:
+        return SavingsPlan(present=True, status="invalid")
+    applicable = [plan for plan in periods if not as_of or (plan.first_paycheck and plan.first_paycheck <= as_of)]
+    selected = applicable[-1] if applicable else periods[0]
+    return SavingsPlan(True, selected.source, selected.rate, periods[0].first_paycheck,
+                       selected.last_paycheck, selected.cash_ideal_rate, selected.cash_minimum_rate,
+                       "active", tuple(periods))
+
+
 def calculate_savings(
     plan: SavingsPlan, income_total: float, entries: Iterable[tuple[str, float, Any]],
     period_start: date, period_end: date,
@@ -123,28 +185,34 @@ def calculate_savings(
     deposited = money(income_total)
     eligible = Decimal(0)
     espp = Decimal(0)
+    enrolled_ideal = enrolled_minimum = Decimal(0)
     undated = 0
     for label, amount, raw_date in entries:
         received = parse_date(raw_date)
         value = money(amount)
         if value <= 0:
             continue
-        if not received and plan.status == "active" and matches_payroll(label, plan.source):
+        if not received and plan.status == "active" and plan.matches_source(label):
             undated += 1
-        if received and period_start <= received <= period_end and plan.includes(label, received):
+        enrolled = plan.for_paycheck(label, received)
+        if received and period_start <= received <= period_end and enrolled:
             eligible += value
-            espp += (value * plan.rate / (1 - plan.rate)).quantize(CENT, rounding=ROUND_HALF_UP)
+            deduction = (value * enrolled.rate / (1 - enrolled.rate)).quantize(CENT, rounding=ROUND_HALF_UP)
+            espp += deduction
+            enrolled_ideal += (value + deduction) * enrolled.cash_ideal_rate
+            enrolled_minimum += (value + deduction) * enrolled.cash_minimum_rate
     warnings = []
+    if plan.status in {"invalid", "pending"}:
+        warnings.append("Check ESPP enrollment settings before relying on savings targets.")
     if undated:
         warnings.append(f"{undated} payroll entries need dates before ESPP can be calculated.")
     if eligible > deposited:
         warnings.append("Income total is smaller than eligible paycheck entries; check the sheet total.")
-        eligible = espp = Decimal(0)
+        eligible = espp = enrolled_ideal = enrolled_minimum = Decimal(0)
     other = deposited - eligible
-    enrolled_base = eligible + espp
     base = deposited + espp
-    ideal = (enrolled_base * plan.cash_ideal_rate + other * Decimal(".2")).quantize(CENT, rounding=ROUND_HALF_UP)
-    minimum = (enrolled_base * plan.cash_minimum_rate + other * Decimal(".1")).quantize(CENT, rounding=ROUND_HALF_UP)
+    ideal = (enrolled_ideal + other * Decimal(".2")).quantize(CENT, rounding=ROUND_HALF_UP)
+    minimum = (enrolled_minimum + other * Decimal(".1")).quantize(CENT, rounding=ROUND_HALF_UP)
     needs = (base * Decimal(".5")).quantize(CENT, rounding=ROUND_HALF_UP)
     wants = deposited - needs - ideal
     return {"depositedIncome": float(deposited), "eligibleDeposits": float(eligible),

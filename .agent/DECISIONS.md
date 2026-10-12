@@ -1,5 +1,13 @@
 # Agent Decisions
 
+## 2026-10-12 - Keep ESPP Settings Inline And Monthly History Independent
+
+Supersede the side summary and transitional separate settings tab: put four dated enrollment fields below Main Income Source, one ESPP total inside the B:D income table, and retain the existing cash target/actual cells. One dark blank row separates each of the four tables. Use native formulas with dynamically bounded income/settings ranges, including per-paycheck rounding and visible invalid-settings guards. Preserve text-currency allocation types required by existing burn-rate formulas.
+
+Each month owns its enrollment snapshot; monthly/year rollover copies the full dated timeline. The latest effective first date supersedes earlier versions, while prior-month snapshots remain independent. Shared Python calculation reads inline settings first, retaining the old panel and separate-tab formats for compatibility. No new financial ledger or stock valuation is introduced.
+
+Structural migrations preflight both current Brian month and Template, back up inputs/formulas/styles and saved action JSON, and shift all affected income, cash-savings Undo and reimbursement coordinates through each insertion. Personal sheet/ledger mutations are one atomic batch; shared action references are backed up and restored if the personal batch is proven unapplied. Live Apps Script updates preserve unrelated source, including its existing validation-restoration fix. Historical/Hannah tabs and real financial inputs remain untouched.
+
 ## 2026-10-12 - Derive ESPP From Enrolled Payroll Deposits
 
 Store an optional owner/month enrollment snapshot beside the existing income settings, in G4:L5, and carry the latest effective snapshot into that owner's new months/year Template. Brian's xAI payroll starts 2026-10-23 at 5%; no assumed end date. Complete normalized employer labels and standard payroll suffixes qualify only within the inclusive dates. Unconfigured owners/months, unrelated income and pre-enrollment pay retain 20% ideal / 10% minimum cash. Invalid, pending and disabled settings never infer deductions.

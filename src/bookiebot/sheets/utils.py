@@ -1585,9 +1585,15 @@ async def check_savings_deposited():
             "ideal": ideal_amount,
             "minimum": minimum_amount,
         }
-        from bookiebot.sheets.savings_plan import read_savings_plan
+        from bookiebot.sheets.savings_plan import ESPP_LABEL, SETTINGS_TAB, inline_enrollment_rows, read_savings_plan
         rows = ws.get_all_values()
-        plan = read_savings_plan(rows)
+        settings_rows = None
+        if inline_enrollment_rows(rows) is None and any(str(value).startswith(ESPP_LABEL) for values in rows for value in values):
+            try:
+                settings_rows = ws.spreadsheet.worksheet(SETTINGS_TAB).get_all_values()
+            except gspread.exceptions.WorksheetNotFound:
+                settings_rows = []
+        plan = read_savings_plan(rows, settings_rows)
         if plan.present:
             from bookiebot.reports.expense_breakdown import BudgetMonth, _calculate_month_savings, _income_entries
             from bookiebot.sheets.routing import now_pacific
@@ -1595,6 +1601,8 @@ async def check_savings_deposited():
             entries, income = _income_entries(rows)
             values = _calculate_month_savings(plan, income, entries, BudgetMonth(current.year, current.month))
             result.update(ideal=values["cashIdeal"], minimum=values["cashMinimum"], espp=values["esppContribution"])
+            if values["warnings"]:
+                result["warnings"] = values["warnings"]
         return result
 
     except Exception as e:

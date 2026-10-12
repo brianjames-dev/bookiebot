@@ -7,7 +7,8 @@ class Sheet {
   getName() { return this.name; }
   getMaxRows() { return Math.max(20, this.rows.length); }
   getMaxColumns() { return 12; }
-  getParent() { return {getName: () => 'Budget 2026'}; }
+  getParent() { return this.book || {getName: () => 'Budget 2026'}; }
+  setFrozenRows() {}
   setColumnWidth() {}
   setColumnWidths() {}
   setRowHeight() {}
@@ -48,7 +49,8 @@ class Sheet {
   }
 }
 const book = sheets => {
-  const result = { getSheetByName: name => sheets[name] ?? null };
+  const result = { getName: () => 'Budget 2026', getSheetByName: name => sheets[name] ?? null,
+    insertSheet: name => { const sheet = new Sheet(name, []); sheet.book = result; sheets[name] = sheet; return sheet; } };
   Object.values(sheets).forEach(sheet => sheet.book = result);
   return result;
 };
@@ -180,14 +182,14 @@ ctx.findCellContainingText = (sheet,text) => {
   return null;
 };
 const planTemplate = budgetSheet('Template'), enrolledOctober = budgetSheet('October');
-ctx.writePersonalBudgetSavingsPlan(enrolledOctober,['xAI',.05,'2026-10-23',.15,.075,''],2026);
 const planBook = book({Template:planTemplate,October:enrolledOctober});
+ctx.writePersonalBudgetSavingsPlan(enrolledOctober,['xAI',.05,'2026-10-23',.15,.075,''],2026);
 ctx.ensureMonthExistsInPersonalBudget = ensurePersonalMonth;
 ctx.SpreadsheetApp.openById = () => planBook;
 ctx.createMonthSheet = (_ss,name) => { const sheet = budgetSheet(name); sheet.book=planBook; return sheet; };
 const november = ctx.ensureMonthExistsInPersonalBudget('personal','shared','November','brian');
-assert.equal(ctx.readPersonalBudgetSavingsPlan(november.sheet)[0],'xAI');
-assert.equal(ctx.readPersonalBudgetSavingsPlan(november.sheet)[1],.05);
+assert.equal(ctx.readPersonalBudgetSavingsPlan(november.sheet).enrollments[0][2],'xAI');
+assert.equal(ctx.readPersonalBudgetSavingsPlan(november.sheet).enrollments[0][3],.05);
 assert.ok(november.sheet.rows.flat().some(value => typeof value === 'string' && value.includes('DATE(2026,11,1)')));
 assert.equal(ctx.readPersonalBudgetSavingsPlan(planTemplate),null);
 assert.equal(ctx.readPersonalBudgetSavingsPlan(hannahNew.getSheetByName('Template')),null);
@@ -196,6 +198,14 @@ ctx.getYearConfig = () => ({brianBudgetId:'prior',hannahBudgetId:'hannahOld'});
 ctx.SpreadsheetApp.openById = id => ({prior:planBook,new:planAnnual,hannahOld,hannahNew})[id];
 ctx.ensureMonthExistsInPersonalBudget = () => {};
 ctx.initializeNewYearFiles({year:2027,brianBudgetId:'new',hannahBudgetId:'hannahNew',sharedExpensesId:'shared'});
-assert.equal(ctx.readPersonalBudgetSavingsPlan(planAnnual.getSheetByName('Template'))[1],.05);
+assert.equal(ctx.readPersonalBudgetSavingsPlan(planAnnual.getSheetByName('Template')).enrollments[0][3],.05);
 assert.equal(ctx.readPersonalBudgetSavingsPlan(hannahNew.getSheetByName('Template')),null);
 console.log('Owner-scoped ESPP monthly and annual rollover passed.');
+const modern={worksheet:'income',row:12,kind:'restore_row',previous_values:['','10/9/2026','xAI','4555.68'],metadata:{source_row:'12',income_header_row:'7',income_summary_row:'13',income_row_properties:'{"cells":[{},{},{}]}'}};
+const shifted=ctx.shiftedPersonalBudgetAction(modern,1,7);
+assert.equal(shifted.row,13);
+assert.equal(shifted.metadata.source_row,'13');
+assert.equal(shifted.metadata.income_header_row,'8');
+assert.equal(shifted.metadata.income_row_properties,modern.metadata.income_row_properties);
+assert.deepEqual(plain(shifted.previous_values),modern.previous_values);
+assert.equal(ctx.shiftedPersonalBudgetAction({worksheet:'income',row:5},1,7),null);

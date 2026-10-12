@@ -6,6 +6,7 @@ from dataclasses import dataclass
 from typing import Any, TYPE_CHECKING
 
 from bookiebot.reports.worksheet_reads import read_workbook_tabs
+from bookiebot.sheets.savings_plan import SETTINGS_TAB
 from bookiebot.sheets.reimbursement_history import (
     ReimbursementLedger, configured_reimbursement_workbooks, reimbursement_history_from_ledgers,
 )
@@ -43,7 +44,7 @@ def batched_report_worksheets(actor_key: str, month: BudgetMonth, gc: Any) -> Re
     selected_months = range(1, min(month.month + 1, 12) + 1)
     requested: dict[str, list[str]] = {
         personal_id: [*(calendar.month_name[number] for number in selected_months),
-                      "Subscriptions", "_BookieBot Bill Schedule", "Shared Reimbursements"],
+                      "Subscriptions", "_BookieBot Bill Schedule", "Shared Reimbursements", SETTINGS_TAB],
     }
     requested.setdefault(shared_id, []).append(month.name)
     history_books = {month.year: personal_id}
@@ -56,6 +57,7 @@ def batched_report_worksheets(actor_key: str, month: BudgetMonth, gc: Any) -> Re
         requested.setdefault(spreadsheet_id, []).extend(
             ["January"] if year > month.year else list(calendar.month_name)[1:]
         )
+        requested[spreadsheet_id].append(SETTINGS_TAB)
     for spreadsheet_id in reimbursement_books.values():
         if spreadsheet_id:
             requested.setdefault(spreadsheet_id, []).append("Shared Reimbursements")
@@ -78,7 +80,7 @@ def batched_report_worksheets(actor_key: str, month: BudgetMonth, gc: Any) -> Re
     for year, spreadsheet_id in sorted(history_books.items()):
         numbers = range(1, 13) if year < month.year else [1] if year > month.year else selected_months
         tabs = loaded.get(spreadsheet_id, {})
-        history.extend(BudgetHistoryRows(BudgetMonth(year, number), tabs[calendar.month_name[number]])
+        history.extend(BudgetHistoryRows(BudgetMonth(year, number), tabs[calendar.month_name[number]], tabs.get(SETTINGS_TAB))
                        for number in numbers if calendar.month_name[number] in tabs)
 
     ledgers = []
@@ -104,6 +106,7 @@ def batched_report_worksheets(actor_key: str, month: BudgetMonth, gc: Any) -> Re
         bill_schedule=optional("_BookieBot Bill Schedule"),
         shared_reimbursements=optional("Shared Reimbursements"),
         budget_history=tuple(history),
+        savings_settings_rows=personal.get(SETTINGS_TAB),
         reimbursement_history=reimbursement_history_from_ledgers(
             actor_key, ledgers, as_of=current, years=checked_years, unavailable_years=unavailable_years,
         ),

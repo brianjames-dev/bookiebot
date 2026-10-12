@@ -4,6 +4,14 @@ Last updated: 2026-10-12
 
 ## Goal
 
+### ESPP layout simplification — 2026-10-12
+
+Complete live layout/app implementation; merge/release/device acceptance remain STATUS checklist 135. Four-column dated settings now sit below Main Income Source, and one bordered ESPP total stays within the income table. Dark buffer rows separate all four tables; the side panel and separate settings tab are removed. Existing cash targets/actual input and historical/Hannah behavior remain intact.
+
+- Each monthly snapshot owns its dated timeline; rollover copies the full schedule. App/Discord use the same per-paycheck math and visible settings warnings. No separate ESPP transaction is written.
+- Structural migration backs up both workbooks and shifts income/cash-savings Undo and shared-income ledger references through each insertion. Native calculations, original-row Delete/restore, rate versions, invalid settings and live report parity are verified; October/Template visual QA passes. No synthetic production financial transactions.
+- Final local verification: **2,221 passed / 352 optional PostgreSQL skipped**, clean Python/frontend types; CI/PostgreSQL and release acceptance are tracked in STATUS. No bank reconciliation backlog or lifecycle change; outstanding work is release acceptance and the first actual enrolled paycheck.
+
 ### ESPP and monthly cash savings work log — 2026-10-12
 
 Status: implementation complete; application release/device acceptance pending (STATUS checklist 135). The user authorized 5% automatic ESPP for Brian's enrolled xAI paychecks beginning 2026-10-23, 15% ideal / 7.5% minimum enrolled cash savings, and continued 20% ideal cash for unrelated income (10% minimum retained). No inferred end date.

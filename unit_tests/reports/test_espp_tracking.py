@@ -6,7 +6,7 @@ import subprocess
 import pytest
 
 from bookiebot.reports import expense_breakdown as report
-from bookiebot.sheets.savings_plan import PLAN_LABELS
+from bookiebot.sheets.savings_plan import ESPP_LABEL, SETTINGS_HEADERS, PLAN_LABELS
 from bookiebot.sheets.routing import PACIFIC_TZ
 from unit_tests.reports.test_income_projection import build, income_rows
 
@@ -98,3 +98,48 @@ def test_paycheck_correction_delete_and_restore_recompute_without_a_separate_esp
         payload = report.expense_breakdown_client_payload(build(plan_rows(("9/11/2026", "xAI", str(amount)), saved=0)))
         assert payload["savingsInvesting"]["current"]["esppContribution"] == espp
         assert payload["savingsProjection"]["currentIdeal"] == target
+
+
+@pytest.mark.parametrize("inline", [False, True])
+def test_compact_sheet_uses_annual_settings_in_current_projected_and_history(monkeypatch, inline):
+    from unit_tests.support.sheets_repo_stub import InMemoryWorksheet
+    monkeypatch.setattr(report, "now_pacific", lambda: datetime(2026,10,24,tzinfo=PACIFIC_TZ))
+    settings = [list(SETTINGS_HEADERS), ["10/23/2026", "", "xAI", "5%"],
+                ["11/1/2026", "", "New employer", "4%"]]
+    rows = income_rows(("10/9/2026","xAI","3800"), ("10/23/2026","xAI","3800"),
+        ("10/24/2026","Rewards","100"), settings=(
+            (ESPP_LABEL,"200"), ("Main Income Source","xAI"), ("Income Projection Mode","biweekly"),
+            ("Expected Income Amount","3800"), ("Paycheck Anchor Date","10/9/2026"),
+            ("Enter Monthly Savings Contribution","IDEAL = $1380","MINIMUM = $690","300")))
+    if inline:
+        rows=settings+rows
+        settings=None
+    result = report.build_expense_breakdown_report(actor_key="brian",owner_name="Brian",persons=["Brian"],
+        month=report.BudgetMonth(2026,10), worksheets=report.ReportWorksheets(
+            shared_expenses=InMemoryWorksheet([]), personal_budget=InMemoryWorksheet(rows),
+            savings_settings_rows=settings))
+    payload=report.expense_breakdown_client_payload(result)
+    for mode in ("current","projected"):
+        view=payload["modeViews"][mode]
+        assert view["savingsInvesting"]["esppContribution"]==200
+        assert view["metrics"]["savingsIdeal"]==1380
+        assert view["metrics"]["savingsMinimum"]==690
+        assert view["metrics"]["amountSaved"]==300
+    assert payload["savingsInvesting"]["history"]["totalContributed"]==200
+    assert payload["savingsPlan"]["source"]=="xAI"  # Future employer does not change October's basis.
+
+
+@pytest.mark.parametrize("inline", [False, True])
+def test_compact_historical_months_keep_their_own_annual_schedule(inline):
+    prior_settings=[list(SETTINGS_HEADERS), ["8/1/2026","","xAI","5%"]]
+    future_settings=[list(SETTINGS_HEADERS), ["8/1/2026","","xAI","4%"]]
+    august=report.BudgetHistoryRows(report.BudgetMonth(2026,8),
+        income_rows(("8/28/2026","xAI","3800"),settings=((ESPP_LABEL,"200"),)),prior_settings)
+    september=income_rows(("9/11/2026","xAI","3840"),settings=((ESPP_LABEL,"160"),))
+    if inline:
+        august=report.BudgetHistoryRows(august.month,prior_settings+august.rows)
+        september=future_settings+september
+        future_settings=None
+    selected=report.BudgetHistoryRows(report.BudgetMonth(2026,9),september,future_settings)
+    payload=report.expense_breakdown_client_payload(build(september,[august,selected]))
+    assert payload["savingsInvesting"]["history"]["totalContributed"]==360
