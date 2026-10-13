@@ -103,6 +103,21 @@ def test_current_report_batches_four_reads_and_refreshes_values(monkeypatch):
     assert second.reimbursement_history.status == "complete"
 
 
+def test_enrollment_settings_share_the_months_batched_snapshot(monkeypatch):
+    from bookiebot.sheets.savings_plan import SETTINGS_HEADERS, SETTINGS_TAB, ESPP_LABEL, read_savings_plan
+    configure(monkeypatch,years=(2025,2026))
+    prior=[list(SETTINGS_HEADERS),['8/1/2025','','Old employer','5%']]
+    current=[list(SETTINGS_HEADERS),['9/1/2026','','xAI','5%']]
+    tabs={'personal-2025':{'December':[[ESPP_LABEL,'200']],SETTINGS_TAB:prior},
+          'personal-2026':{'September':[[ESPP_LABEL,'400']],SETTINGS_TAB:current},
+          'shared-2026':{'September':[]}}
+    client,calls=client_for(tabs)
+    selected=batch.batched_report_worksheets(ACTOR,reports.BudgetMonth(2026,9),client)
+    assert len(calls)==6
+    assert selected.savings_settings_rows==current
+    assert [read_savings_plan(item.rows,item.savings_settings_rows).source for item in selected.budget_history]==['Old employer','xAI']
+
+
 @pytest.mark.parametrize("month_number", [1, 2, 5, 8, 9, 12])
 def test_batched_report_has_canonical_payload_parity_across_months(monkeypatch, month_number):
     configure(monkeypatch, years=(2025, 2026, 2027))

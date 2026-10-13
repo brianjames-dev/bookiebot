@@ -6,7 +6,11 @@ class Sheet {
   constructor(name, rows = [[], [], [], ['', 'Date:', 'Source:', 'Amount:']]) { this.name = name; this.rows = rows; this.validations = {}; this.formulas = {}; this.writes = 0; this.insertions = 0; }
   getName() { return this.name; }
   getMaxRows() { return Math.max(20, this.rows.length); }
-  getMaxColumns() { return 10; }
+  getMaxColumns() { return 12; }
+  getParent() { return this.book || {getName: () => 'Budget 2026'}; }
+  setFrozenRows() {}
+  setColumnWidth() {}
+  setColumnWidths() {}
   setRowHeight() {}
   insertRowsBefore(row, count) { this.rows.splice(row-1, 0, ...Array.from({length:count}, () => [])); this.insertions += count; }
   value(r,c) {
@@ -29,10 +33,14 @@ class Sheet {
     const width = match[3] ? col(match[3]) - c + 1 : 1;
     const height = match[4] ? Number(match[4]) - r : 1;
     const range = {
+      getRow: () => r+1, getColumn: () => c+1,
+      getA1Notation: () => a1.includes(':') && width===1 && height===1 ? a1.split(':')[0] : a1,
+      offset: (dy,dx) => this.getRange(r+1+dy,c+1+dx),
       getValues: () => Array.from({ length: height }, (_, y) => Array.from({ length: width }, (_, x) => this.value(r+y,c+x))),
       setValues: values => { this.writes++; values.forEach((row,y) => row.forEach((v,x) => { this.rows[r+y] ??= []; this.rows[r+y][c+x] = v; })); return range; },
       setFormulas: values => { this.formulas[a1] = values; return range.setValues(values); },
       setValue: value => range.setValues([[value]]),
+      setFormula: value => range.setValue(value),
       clear: () => range.setValues(Array.from({length:height}, () => Array(width).fill(''))),
       setDataValidation: rule => { this.validations[a1] = rule; return range; },
     };
@@ -41,7 +49,8 @@ class Sheet {
   }
 }
 const book = sheets => {
-  const result = { getSheetByName: name => sheets[name] ?? null };
+  const result = { getName: () => 'Budget 2026', getSheetByName: name => sheets[name] ?? null,
+    insertSheet: name => { const sheet = new Sheet(name, []); sheet.book = result; sheets[name] = sheet; return sheet; } };
   Object.values(sheets).forEach(sheet => sheet.book = result);
   return result;
 };
@@ -50,7 +59,7 @@ const ctx = vm.createContext({ console, SpreadsheetApp: {
   newDataValidation() {
     const rule = {};
     const builder = { build: () => rule };
-    for (const name of ['requireValueInList','requireNumberGreaterThanOrEqualTo','requireDate','setAllowInvalid','setHelpText']) {
+    for (const name of ['requireValueInList','requireNumberGreaterThanOrEqualTo','requireNumberBetween','requireDate','setAllowInvalid','setHelpText']) {
       builder[name] = (...args) => { rule[name] = args; return builder; };
     }
     return builder;
@@ -117,6 +126,7 @@ const books = {brianOld:ss, hannahOld, brianNew, hannahNew};
 ctx.getYearConfig = () => ({brianBudgetId:'brianOld',hannahBudgetId:'hannahOld'});
 ctx.SpreadsheetApp.openById = id => books[id];
 ctx.ensureMonthExistsInSharedExpenses = () => {};
+const ensurePersonalMonth = ctx.ensureMonthExistsInPersonalBudget;
 ctx.ensureMonthExistsInPersonalBudget = () => {};
 ctx.relinkAllPersonalBudgetSheetsForYear = () => {};
 ctx.initializeNewYearFiles({year:2027,brianBudgetId:'brianNew',hannahBudgetId:'hannahNew',sharedExpensesId:'shared'});
@@ -150,3 +160,52 @@ const restored = ctx.shiftedPersonalBudgetAction({worksheet:'income',kind:'resto
 assert.equal(restored.previous_values.length,4);
 assert.equal(JSON.parse(restored.metadata.income_row_properties).cells.length,3);
 assert.equal(restored.metadata.income_anchor_values,undefined);
+
+// ESPP settings copy only from this owner's prior effective month. Rollover
+// rebuilds monthly formulas without applying the source's enrollment to others.
+function budgetSheet(name) {
+  const rows = Array.from({length:32}, () => []);
+  rows[3] = ['', 'Main Income Source:', 'Income Projection Mode:', 'Expected Income Amount:', 'Paycheck Anchor Date:'];
+  rows[4] = ['', 'xAI', 'biweekly', 3800, '10/9/2026'];
+  rows[6] = ['', 'Date:', 'Source:', 'Amount:'];
+  rows[8] = ['', 'Monthly Income:', '', 0];
+  rows[10] = ['', 'BUDGET: $0', 0, 0, 0];
+  rows[27] = ['', 'Enter Monthly Savings Contribution ➡️', '', '', 0];
+  return new Sheet(name, rows);
+}
+ctx.findCellByExactText = (sheet,text) => {
+  for (let r=0;r<sheet.rows.length;r++) for (let c=0;c<sheet.rows[r].length;c++) if (sheet.rows[r][c] === text) return sheet.getRange(r+1,c+1);
+  return null;
+};
+ctx.findCellContainingText = (sheet,text) => {
+  for (let r=0;r<sheet.rows.length;r++) for (let c=0;c<sheet.rows[r].length;c++) if (String(sheet.rows[r][c]).toLowerCase().includes(text.toLowerCase())) return sheet.getRange(r+1,c+1);
+  return null;
+};
+const planTemplate = budgetSheet('Template'), enrolledOctober = budgetSheet('October');
+const planBook = book({Template:planTemplate,October:enrolledOctober});
+ctx.writePersonalBudgetSavingsPlan(enrolledOctober,['xAI',.05,'2026-10-23',.15,.075,''],2026);
+ctx.ensureMonthExistsInPersonalBudget = ensurePersonalMonth;
+ctx.SpreadsheetApp.openById = () => planBook;
+ctx.createMonthSheet = (_ss,name) => { const sheet = budgetSheet(name); sheet.book=planBook; return sheet; };
+const november = ctx.ensureMonthExistsInPersonalBudget('personal','shared','November','brian');
+assert.equal(ctx.readPersonalBudgetSavingsPlan(november.sheet).enrollments[0][2],'xAI');
+assert.equal(ctx.readPersonalBudgetSavingsPlan(november.sheet).enrollments[0][3],.05);
+assert.ok(november.sheet.rows.flat().some(value => typeof value === 'string' && value.includes('DATE(2026,11,1)')));
+assert.equal(ctx.readPersonalBudgetSavingsPlan(planTemplate),null);
+assert.equal(ctx.readPersonalBudgetSavingsPlan(hannahNew.getSheetByName('Template')),null);
+const planAnnual = book({Template:budgetSheet('Template')});
+ctx.getYearConfig = () => ({brianBudgetId:'prior',hannahBudgetId:'hannahOld'});
+ctx.SpreadsheetApp.openById = id => ({prior:planBook,new:planAnnual,hannahOld,hannahNew})[id];
+ctx.ensureMonthExistsInPersonalBudget = () => {};
+ctx.initializeNewYearFiles({year:2027,brianBudgetId:'new',hannahBudgetId:'hannahNew',sharedExpensesId:'shared'});
+assert.equal(ctx.readPersonalBudgetSavingsPlan(planAnnual.getSheetByName('Template')).enrollments[0][3],.05);
+assert.equal(ctx.readPersonalBudgetSavingsPlan(hannahNew.getSheetByName('Template')),null);
+console.log('Owner-scoped ESPP monthly and annual rollover passed.');
+const modern={worksheet:'income',row:12,kind:'restore_row',previous_values:['','10/9/2026','xAI','4555.68'],metadata:{source_row:'12',income_header_row:'7',income_summary_row:'13',income_row_properties:'{"cells":[{},{},{}]}'}};
+const shifted=ctx.shiftedPersonalBudgetAction(modern,1,7);
+assert.equal(shifted.row,13);
+assert.equal(shifted.metadata.source_row,'13');
+assert.equal(shifted.metadata.income_header_row,'8');
+assert.equal(shifted.metadata.income_row_properties,modern.metadata.income_row_properties);
+assert.deepEqual(plain(shifted.previous_values),modern.previous_values);
+assert.equal(ctx.shiftedPersonalBudgetAction({worksheet:'income',row:5},1,7),null);

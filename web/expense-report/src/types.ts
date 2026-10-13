@@ -173,6 +173,7 @@ export interface ReportModeMetrics {
 }
 
 export interface ReportModeView {
+  savingsInvesting?: SavingsInvesting
   metrics: ReportModeMetrics
   categoryBalances: CategoryBalances
   categoryBudgets: CategoryBalanceAmounts
@@ -183,7 +184,40 @@ export interface ReportModeView {
   utilityHistory: UtilityHistoryItem[]
 }
 
+export interface SavingsInvesting {
+  depositedIncome: number
+  eligibleDeposits: number
+  otherIncome: number
+  takeHomeBeforeEspp: number
+  esppContribution: number
+  estimatedEsppContribution?: number
+  cashIdeal: number
+  cashMinimum: number
+  cashSaved: number
+  combinedContributions: number
+  combinedRate: number
+  categoryBudgets: CategoryBalanceAmounts
+  warnings: string[]
+  source: string
+}
+
 export interface ExpenseReportData {
+  savingsPlan?: {
+    status: "active" | "pending" | "invalid" | "off"
+    source: string
+    rate: number
+    firstPaycheckDate: string | null
+    lastPaycheckDate: string | null
+    cashIdealRate: number
+    cashMinimumRate: number
+    otherCashIdealRate: number
+    otherCashMinimumRate: number
+  }
+  savingsInvesting?: {
+    current: SavingsInvesting
+    projected: SavingsInvesting
+    history: { totalContributed: number; throughMonth: string; coverage: "complete" | "partial"; unavailableMonths: string[] } | null
+  }
   metricExplanations?: Record<"current" | "projected", Record<"income" | "spent" | "left" | "saved", MetricExplanation>>
   ownerName: string
   monthLabel: string

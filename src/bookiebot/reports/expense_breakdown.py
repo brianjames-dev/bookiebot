@@ -31,6 +31,7 @@ from bookiebot.sheets.reimbursement_history import (
 )
 from bookiebot.sheets.routing import PACIFIC_TZ, now_pacific, resolve_sheet_context
 from bookiebot.sheets.utils import clean_money
+from bookiebot.sheets.savings_plan import SETTINGS_TAB, SavingsPlan, calculate_savings, read_savings_plan
 
 
 @dataclass(frozen=True)
@@ -59,12 +60,14 @@ class ReportWorksheets:
     bill_schedule: Any | None = None
     budget_history: tuple[BudgetHistoryRows, ...] = ()
     reimbursement_history: ReimbursementHistory | None = None
+    savings_settings_rows: list[list[str]] | None = None
 
 
 @dataclass(frozen=True)
 class BudgetHistoryRows:
     month: BudgetMonth
     rows: list[list[str]]
+    savings_settings_rows: list[list[str]] | None = None
 
 
 @dataclass(frozen=True)
@@ -188,6 +191,8 @@ class ExpenseBreakdownReport:
     reimbursement_coverage: dict[str, Any] | None = None
     raw_sheets: list[RawSheet] = field(default_factory=list)
     received_shared_reimbursements: list[SharedAllocation] | None = None
+    savings_plan: SavingsPlan = field(default_factory=SavingsPlan)
+    espp_history: dict[str, Any] | None = None
 
 
 @dataclass(frozen=True)
@@ -480,6 +485,11 @@ def build_expense_breakdown_report(
     current_month_subscriptions = _current_month_subscription_items(subscriptions, month)
     income_entries, income_total = _income_entries(personal_rows)
     budget_history = selected.budget_history or (BudgetHistoryRows(month, personal_rows),)
+    savings_settings = selected.savings_settings_rows
+    if savings_settings is None:
+        savings_settings = next((item.savings_settings_rows for item in budget_history if item.month == month), None)
+    savings_plan = read_savings_plan(personal_rows, savings_settings,
+                                    as_of=datetime(month.year, month.month, calendar.monthrange(month.year, month.month)[1]).date())
     income_projection_config = _income_projection_config_with_history(
         _income_projection_config(personal_rows),
         budget_history,
@@ -573,6 +583,10 @@ def build_expense_breakdown_report(
     personal_expense_total = _personal_expense_subtotal_total(personal_rows)
     personal_total = grand_total if grand_total > 0 else (personal_expense_total or 0.0)
     category_budgets = _category_budget_amounts(personal_rows, income_total)
+    if savings_plan.present:
+        savings_values = _calculate_month_savings(savings_plan, income_total, income_entries, month)
+        category_budgets = savings_values["categoryBudgets"]
+        savings_goal = savings_values["cashIdeal"]
     category_spending = _category_spending_amounts(
         personal_rows,
         breakdown,
@@ -625,6 +639,8 @@ def build_expense_breakdown_report(
         shared_reimbursements=shared_reimbursements,
         open_shared_reimbursements=open_reimbursements,
         received_shared_reimbursements=received_reimbursements,
+        savings_plan=savings_plan,
+        espp_history=_espp_history(savings_plan, personal_rows, budget_history, month, savings_settings),
         reimbursement_coverage=reimbursement_coverage,
         raw_sheets=[
             RawSheet("Shared Expenses", _compact_rows(shared_rows)),
@@ -770,9 +786,16 @@ def _optional_next_year_income_history(actor_key: str, month: BudgetMonth) -> tu
 
 
 def _budget_history_from_spreadsheet(spreadsheet: Any, month: BudgetMonth) -> tuple[BudgetHistoryRows, ...]:
+    monthly = monthly_worksheet_rows(spreadsheet, range(1, min(month.month + 1, 12) + 1))
+    from bookiebot.sheets.savings_plan import ESPP_LABEL, inline_enrollment_rows
+    settings = None
+    if any(inline_enrollment_rows(rows) is None and any(str(cell).startswith(ESPP_LABEL) for row in rows for cell in row)
+           for _, rows in monthly):
+        worksheet = _worksheet_by_name(spreadsheet, SETTINGS_TAB)
+        settings = _rows(worksheet) if worksheet is not None else []
     return tuple(
-        BudgetHistoryRows(BudgetMonth(month.year, number), rows)
-        for number, rows in monthly_worksheet_rows(spreadsheet, range(1, min(month.month + 1, 12) + 1))
+        BudgetHistoryRows(BudgetMonth(month.year, number), rows, settings)
+        for number, rows in monthly
     )
 
 
@@ -2538,6 +2561,33 @@ def _report_client_payload(
             )
         ],
     }
+    if report.savings_plan.present:
+        current_savings = _calculate_month_savings(report.savings_plan, report.income_total, report.income_entries, report.month)
+        projected_entries = list(report.income_entries)
+        if report.savings_plan.matches_source(report.income_projection_config.source_label or ""):
+            projected_entries.extend(PaymentItem(
+                report.income_projection_config.source_label or report.savings_plan.source, event.amount, "income",
+                date=f"{report.month.year}-{report.month.month:02d}-{event.day:02d}",
+            ) for event in report.calendar_events if event.kind == "income" and event.projected_only)
+        projected_savings = _calculate_month_savings(
+            report.savings_plan, payload["incomeProjection"]["projectedAmount"], projected_entries, report.month,
+        )
+        for values in (current_savings, projected_savings):
+            values["estimatedEsppContribution"] = round(max(0, values["esppContribution"] - current_savings["esppContribution"]), 2)
+            values["cashSaved"] = round(report.amount_saved or 0, 2)
+            values["combinedContributions"] = round(values["cashSaved"] + values["esppContribution"], 2)
+            values["combinedRate"] = (round(values["combinedContributions"] / values["takeHomeBeforeEspp"], 6)
+                                      if values["takeHomeBeforeEspp"] else 0)
+        payload["savingsPlan"] = report.savings_plan.payload()
+        payload["savingsInvesting"] = {"current": current_savings, "projected": projected_savings,
+                                      "history": report.espp_history}
+        payload["savingsProjection"].update({
+            "currentIdeal": current_savings["cashIdeal"], "currentMinimum": current_savings["cashMinimum"],
+            "projectedIdeal": projected_savings["cashIdeal"], "projectedMinimum": projected_savings["cashMinimum"],
+        })
+        payload["incomeProjection"]["savingsGoal"] = projected_savings["cashIdeal"]
+        payload["metrics"].update(monthlyIncome=current_savings["takeHomeBeforeEspp"],
+                                  amountSaved=current_savings["combinedContributions"])
     payload["modeViews"] = {
         "current": _report_mode_view_from_payload(payload, projected=False),
         "projected": _report_mode_view_from_payload(payload, projected=True),
@@ -2607,6 +2657,9 @@ def _report_mode_view_from_payload(
         if projected
         else dict(payload.get("categoryBudgets") or _category_budgets_for_income(monthly_income))
     )
+    savings_investing = payload.get("savingsInvesting", {}).get("projected" if projected else "current")
+    if savings_investing:
+        category_budgets = savings_investing["categoryBudgets"]
     category_spending = _category_spending_for_breakdown(
         breakdown,
         amount_saved,
@@ -2618,11 +2671,16 @@ def _report_mode_view_from_payload(
         round(category_budgets["savings"] - category_spending["savings"], 2),
     )
     income_after_expenses = round(sum(category_balances["remaining"].values()), 2)
+    # Cash category balances already exclude payroll ESPP. Present the full
+    # take-home and combined Saved amounts without charging withholding twice.
+    if savings_investing:
+        monthly_income = savings_investing["takeHomeBeforeEspp"]
+        amount_saved = savings_investing["combinedContributions"]
     burn_rate = payload.get("burnRate")
     if projected:
         burn_rate = _projected_burn_rate_from_payload(burn_rate, category_balances)
 
-    return {
+    view = {
         "metrics": {
             "totalExpenses": (
                 round(sum(float(item.get("amount") or 0.0) for item in breakdown), 2)
@@ -2643,6 +2701,40 @@ def _report_mode_view_from_payload(
         "calendarEvents": list(payload["calendarEvents"]),
         "utilityHistory": list(payload["utilityHistory"]),
     }
+    if savings_investing:
+        view["savingsInvesting"] = savings_investing
+    return view
+
+
+def _calculate_month_savings(plan: SavingsPlan, income: float, entries: list[PaymentItem], month: BudgetMonth) -> dict[str, Any]:
+    return calculate_savings(plan, income, ((entry.label, entry.amount, entry.date) for entry in entries),
+                             month.as_datetime().date(),
+                             datetime(month.year, month.month, calendar.monthrange(month.year, month.month)[1]).date())
+
+
+def _espp_history(plan: SavingsPlan, rows: list[list[str]], history: tuple[BudgetHistoryRows, ...], month: BudgetMonth,
+                  settings_rows: list[list[str]] | None = None) -> dict[str, Any] | None:
+    if not plan.present:
+        return None
+    available = {(item.month.year, item.month.month): item for item in history
+                 if (item.month.year, item.month.month) <= (month.year, month.month)}
+    available[(month.year, month.month)] = BudgetHistoryRows(month, rows, settings_rows)
+    amounts = []
+    missing = []
+    if plan.first_paycheck:
+        year, number = plan.first_paycheck.year, plan.first_paycheck.month
+        while (year, number) <= (month.year, month.month):
+            item = available.get((year, number))
+            item_plan = read_savings_plan(item.rows, item.savings_settings_rows) if item else SavingsPlan()
+            if item and item_plan.present:
+                entries, income = _income_entries(item.rows)
+                amounts.append(_calculate_month_savings(item_plan, income, entries, item.month)["esppContribution"])
+            else:
+                missing.append(f"{year}-{number:02d}")
+            year, number = (year + 1, 1) if number == 12 else (year, number + 1)
+    return {"totalContributed": round(sum(amounts), 2), "throughMonth": f"{month.year}-{month.month:02d}",
+            "coverage": "partial" if missing else "complete", "unavailableMonths": missing,
+            "source": "Calculated from available monthly payroll records"}
 
 
 def _projected_breakdown_from_payload(payload: dict[str, Any]) -> list[dict[str, Any]]:

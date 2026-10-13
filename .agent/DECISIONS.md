@@ -1,5 +1,29 @@
 # Agent Decisions
 
+## 2026-10-13 - Present Full Take-Home And Separate Cash/ESPP Savings
+
+At the user's request, Income includes deposited pay plus derived monthly ESPP and Saved includes recorded cash plus that ESPP (including clearly labeled projected ESPP in Projected). Retain deposited-income/paycheck records and raw cash-savings fields; cash category budgets and Left already exclude withholding, so never deduct it twice or add ESPP to Spent. Canonical mode metrics, headline explanations and read-only report consumers share this presentation. Cash progress continues using actual cash and the cash minimum/ideal targets.
+
+Replace the verbose monthly Savings & investing panel with a single darker Investments section below existing personal Savings goals, displaying SpaceX stock/ESPP cumulative recorded contributions. Preserve invalid/loading/partial history feedback. Category Mix All and Savings show distinct cash/ESPP slices and include ESPP in the displayed budget, while Needs/Wants/cash coverage and legacy unconfigured months retain existing behavior. Keep projected estimates out of the cumulative investment bucket. No new ledger, financial write or valuation.
+
+## 2026-10-12 - Keep ESPP Settings Inline And Monthly History Independent
+
+Supersede the side summary and transitional separate settings tab: put four dated enrollment fields below Main Income Source, one ESPP total inside the B:D income table, and retain the existing cash target/actual cells. One dark blank row separates each of the four tables. Use native formulas with dynamically bounded income/settings ranges, including per-paycheck rounding and visible invalid-settings guards. Preserve text-currency allocation types required by existing burn-rate formulas.
+
+Each month owns its enrollment snapshot; monthly/year rollover copies the full dated timeline. The latest effective first date supersedes earlier versions, while prior-month snapshots remain independent. Shared Python calculation reads inline settings first, retaining the old panel and separate-tab formats for compatibility. No new financial ledger or stock valuation is introduced.
+
+Structural migrations preflight both current Brian month and Template, back up inputs/formulas/styles and saved action JSON, and shift all affected income, cash-savings Undo and reimbursement coordinates through each insertion. Personal sheet/ledger mutations are one atomic batch; shared action references are backed up and restored if the personal batch is proven unapplied. Live Apps Script updates preserve unrelated source, including its existing validation-restoration fix. Historical/Hannah tabs and real financial inputs remain untouched.
+
+## 2026-10-12 - Derive ESPP From Enrolled Payroll Deposits
+
+Store an optional owner/month enrollment snapshot beside the existing income settings, in G4:L5, and carry the latest effective snapshot into that owner's new months/year Template. Brian's xAI payroll starts 2026-10-23 at 5%; no assumed end date. Complete normalized employer labels and standard payroll suffixes qualify only within the inclusive dates. Unconfigured owners/months, unrelated income and pre-enrollment pay retain 20% ideal / 10% minimum cash. Invalid, pending and disabled settings never infer deductions.
+
+Derive ESPP per paycheck as deposit × rate / (1-rate), rounded to cents; pre-ESPP take-home is deposit plus that deduction. Enrolled cash targets are 15% ideal / 7.5% minimum of reconstructed pay. Needs/Wants use 50%/30% of reconstructed income; cash budgets conserve deposited money and ESPP is never charged again to Left or Spent. Preserve the workbook's text-currency allocation cells because existing margin/burn-rate formulas use REGEXEXTRACT. Shared Python math supplies reports and Discord savings queries; Sheets formulas use the same dated source/rounding rules.
+
+Keep actual monthly cash savings as the existing overwrite-only input. ESPP has no independent transaction or persistence ledger: corrections and Undo recalculate from payroll. Current/cumulative figures use recorded pay only; Projected adds explicitly labeled scheduled estimates and never estimates cash saved. Partial historical coverage stays visible. Personal savings goals and stock valuation remain separate. This preserves one source of payroll truth without double counting or changing bank/reimbursement lifecycles.
+
+Place the formula summary alongside the Budget row, below the mutable income table. Income Delete removes entire rows; a summary beside those rows would lose formulas/labels. Its complete block now shifts with the budget during insert/delete/restore, while the settings above income stay fixed. Live setup is explicitly authorized: current Brian month and Template only, with collision preflight, a private backup and an atomic Sheets batch. Patch only ESPP additions into the live Apps Script, preserving its pre-existing validation-restoration fix. Do not run unrelated rollover/financial mutations as a deployment test.
+
 ## 2026-10-10 - Compact Metric Details And Reveal Complete Shared History
 
 Show bucket summaries in Left/Spent and one savings total/progress/target sentence in Saved. Derive Left percentages from the inspected mode/month budgets and income; omit undefined zero-income percentages. Keep Spent's existing expense-only accounting: savings deposits belong to Saved, while explicit savings expense rows and legacy sheet differences retain their amounts. Income retains recorded/scheduled context. Snapshot the detail and active view together when opened, so background refresh cannot mix amounts and targets. Preserve the detailed backend explanation payload for other consumers.

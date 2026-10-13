@@ -251,7 +251,7 @@ def test_category_mix_counts_donor_transfers_as_effective_category_usage():
     transfer_source = source.split("function categoryMixTransferRows", 1)[1].split("function categoryMixPressure", 1)[0]
 
     assert "const transferRows = categoryMixTransferRows(categoryBalances, filter)" in category_source
-    assert "categoryMixRows(data, selectedRollover, filter, amountSaved, transferRows)" in category_source
+    assert "categoryMixRows(data, selectedRollover, filter, amountSaved, transferRows, espp, estimatedEspp)" in category_source
     assert "transfer.from === filter" in transfer_source
     assert 'label: `${CATEGORY_BALANCE_LABELS[transfer.to]} overspend coverage`' in transfer_source
     assert "spentTotal / selectedBudget" in category_source
@@ -1969,7 +1969,7 @@ def test_report_frontend_keeps_saved_amount_actual_and_out_of_spending():
     assert "amount: savings.projectedAmount" not in source
     assert "amountRowsTotal(breakdown) + amountSaved" not in source
     assert 'return filter === "all" && item.key !== "savings"' in source
-    assert "amountSaved={activeReport.metrics.amountSaved}" in source
+    assert "amountSaved={activeReport.savingsInvesting?.cashSaved ?? activeReport.metrics.amountSaved}" in source
     assert "value={activeReport.metrics.amountSaved}" in source
     assert "incomeAfterExpenses: roundCurrency(budgetRemaining)" in source
     assert "const budgetRemaining = categoryBalanceTotal(categoryBalances)" in source
@@ -1977,7 +1977,7 @@ def test_report_frontend_keeps_saved_amount_actual_and_out_of_spending():
     assert "projectedCategoryBalances(categoryBudgets, categorySpending)" in source
     assert "report.modeViews?.projected" in source
     assert "budgetData={activeReport.budgetBreakdown}" not in source
-    assert "categoryMixRows(data, selectedRollover, filter, amountSaved, transferRows)" in source
+    assert "categoryMixRows(data, selectedRollover, filter, amountSaved, transferRows, espp, estimatedEspp)" in source
     assert "categoryBudgets={activeReport.categoryBudgets}" in source
     assert "Budget remaining" not in source
     assert "usedPercent.toFixed(2)" in source
