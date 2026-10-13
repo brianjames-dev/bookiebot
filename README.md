@@ -65,7 +65,7 @@ BOOKIEBOT_AGENT_MAX_TOOL_CALLS=8
 
 ## Income Projection Settings
 
-Personal monthly budget sheets use a horizontal green settings grid in **B4:E5**. Labels are in row 4, editable values in row 5; row 6 is blank, and **Date / Source / Amount** starts at **B7:D7**. Income rows can grow or shrink underneath the settings.
+Personal monthly budget sheets use a horizontal green settings grid in **B4:E5**. Labels are in row 4 and editable values in row 5. Without ESPP, row 6 is blank and **Date / Source / Amount** starts at **B7:D7**. Enrolled months place the dated ESPP table between income settings and the income table, with one dark buffer row between sections. Income rows can grow or shrink underneath the settings.
 
 | Cell | Setting | Meaning |
 | --- | --- | --- |

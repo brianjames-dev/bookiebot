@@ -8,7 +8,7 @@ Last updated: 2026-10-13
 
 Implemented requested presentation refinements; preview review and application merge/release remain pending (STATUS checklist 136). Income now includes payroll ESPP before withholding, Saved includes monthly cash + ESPP, and Left/Spent retain cash accounting. Existing Saved label and cash-progress targets remain; details omit take-home. Category Mix separates cash/ESPP. Savings goals precede one darker Investments section with the recorded SpaceX ESPP contribution total. Current/Projected labels and incomplete-history safeguards remain.
 
-Local full **2,222 passed / 352 optional PostgreSQL skipped**, focused **88 passed**, Python/frontend type/build checks clean. Rebuilt production assets and reviewed sample-data browser layouts; corrected fitted amount sizing. No reconciliation lifecycle, persistent financial data or live sheet changes. Remaining: user preview review, exact-commit CI, merge/deployment by user direction, and real-payroll acceptance.
+Local full **2,222 passed / 352 optional PostgreSQL skipped**, focused **88 passed**, Python/frontend type/build checks clean. Rebuilt production assets and reviewed sample-data browser layouts; corrected fitted amount sizing. No reconciliation lifecycle, persistent financial data or live sheet changes. [CI on `32212f2`](https://github.com/brianjames-dev/bookiebot/actions/runs/38432458210) passed **2,574 tests / zero skips**, PostgreSQL, Python/frontend types, Apps Script, production build and committed-asset parity. The follow-up commit changes documentation only. Remaining: user preview review, merge/deployment by user direction, and real-payroll acceptance.
 
 ### ESPP layout simplification — 2026-10-12
 
