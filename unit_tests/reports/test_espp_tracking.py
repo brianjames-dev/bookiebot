@@ -11,10 +11,10 @@ from bookiebot.sheets.routing import PACIFIC_TZ
 from unit_tests.reports.test_income_projection import build, income_rows
 
 
-def test_monthly_savings_ui_runtime():
+def test_investments_ui_runtime():
     if not shutil.which("node") or not Path("web/expense-report/node_modules/typescript").exists():
         pytest.skip("Frontend test dependencies unavailable")
-    subprocess.run(["node", "unit_tests/reports/monthly_savings_ui_test.cjs"], check=True, capture_output=True, text=True)
+    subprocess.run(["node", "unit_tests/reports/investments_ui_test.cjs"], check=True, capture_output=True, text=True)
 
 
 def plan_rows(*entries, first="2026-09-11", source="xAI", saved=1200, projection="off", expected="3800"):
@@ -36,16 +36,28 @@ def test_app_sheet_targets_agent_details_and_money_left_share_cash_basis():
     payload = report.expense_breakdown_client_payload(result)
     for mode in ("current", "projected"):
         view = payload["modeViews"][mode]
-        assert view["metrics"]["monthlyIncome"] == 8600
-        assert view["metrics"]["amountSaved"] == 1200
+        assert view["metrics"]["monthlyIncome"] == 9000
+        assert view["metrics"]["amountSaved"] == 1600
         assert view["metrics"]["savingsIdeal"] == 1400
         assert view["metrics"]["savingsMinimum"] == 700
         assert view["metrics"]["incomeAfterExpenses"] == 7400
         assert view["savingsInvesting"]["esppContribution"] == 400
         assert view["savingsInvesting"]["combinedContributions"] == 1600
         assert view["categoryBudgets"] == {"needs": 4500, "wants": 2700, "savings": 1400}
+    assert payload["metrics"]["monthlyIncome"] == 9000
+    assert payload["metrics"]["amountSaved"] == 1600
+    assert payload["incomeProjection"]["currentAmount"] == 8600  # payroll logs remain bank deposits
+    assert payload["savingsProjection"]["currentAmount"] == 1200  # cash input remains cash
     assert payload["incomeProjection"]["savingsGoal"] == 1400
-    assert payload["metricExplanations"]["current"]["saved"]["value"] == 1200
+    for mode in ("current", "projected"):
+        view=payload["modeViews"][mode]
+        assert view["metrics"]["monthlyIncome"]-view["metrics"]["totalExpenses"]-view["metrics"]["amountSaved"]==view["metrics"]["incomeAfterExpenses"]
+        details=payload["metricExplanations"][mode]
+        for key,metric in (("income","monthlyIncome"),("saved","amountSaved")):
+            assert sum(part["amount"] for part in details[key]["components"])==view["metrics"][metric]
+            assert not any("Additional balance" in part["label"] or "Other saved amount" in part["label"] for part in details[key]["components"])
+        assert any(part["label"]=="SpaceX ESPP" and part["amount"]==400 for part in details["saved"]["components"])
+    assert payload["metricExplanations"]["current"]["saved"]["value"] == 1600
 
 
 def test_projection_estimates_only_remaining_enrolled_paychecks_and_keeps_cash_saved_actual():
@@ -53,13 +65,18 @@ def test_projection_estimates_only_remaining_enrolled_paychecks_and_keeps_cash_s
     payload = report.expense_breakdown_client_payload(result)
     current, projected = (payload["modeViews"][mode] for mode in ("current", "projected"))
     assert current["savingsInvesting"]["esppContribution"] == 200
+    assert current["metrics"]["monthlyIncome"] == 4100
+    assert current["metrics"]["amountSaved"] == 500
     assert projected["savingsInvesting"]["esppContribution"] == 400
-    assert projected["metrics"]["monthlyIncome"] == 7700
+    assert projected["metrics"]["monthlyIncome"] == 8100
     assert projected["metrics"]["savingsIdeal"] == 1220
     assert projected["metrics"]["savingsMinimum"] == 610
-    assert projected["metrics"]["amountSaved"] == 300
+    assert projected["metrics"]["amountSaved"] == 700
     assert projected["metrics"]["incomeAfterExpenses"] == 7400
     assert payload["savingsInvesting"]["history"]["totalContributed"] == 200
+    income=payload["metricExplanations"]["projected"]["income"]["components"]
+    assert sum(row["amount"] for row in income)==8100
+    assert any(row["source"]=="scheduled" and row["amount"]==200 and "ESPP" in row["label"] for row in income)
 
 
 def test_future_start_and_pending_start_do_not_reclassify_paychecks():
@@ -124,7 +141,7 @@ def test_compact_sheet_uses_annual_settings_in_current_projected_and_history(mon
         assert view["savingsInvesting"]["esppContribution"]==200
         assert view["metrics"]["savingsIdeal"]==1380
         assert view["metrics"]["savingsMinimum"]==690
-        assert view["metrics"]["amountSaved"]==300
+        assert view["metrics"]["amountSaved"]==500
     assert payload["savingsInvesting"]["history"]["totalContributed"]==200
     assert payload["savingsPlan"]["source"]=="xAI"  # Future employer does not change October's basis.
 
@@ -143,3 +160,9 @@ def test_compact_historical_months_keep_their_own_annual_schedule(inline):
     selected=report.BudgetHistoryRows(report.BudgetMonth(2026,9),september,future_settings)
     payload=report.expense_breakdown_client_payload(build(september,[august,selected]))
     assert payload["savingsInvesting"]["history"]["totalContributed"]==360
+
+
+def test_espp_category_mix_runtime():
+    if not shutil.which("node") or not Path("web/expense-report/node_modules/typescript").exists():
+        pytest.skip("Frontend test dependencies unavailable")
+    subprocess.run(["node", "unit_tests/reports/espp_category_mix_test.cjs"], check=True, capture_output=True, text=True)

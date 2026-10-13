@@ -90,3 +90,12 @@ for (const [value, minimum, ideal, percent, tone] of [
 const income = render("income", {components: [{label: "Paycheck", amount: 1000, date: "2026-10-10", source: "scheduled"}]})
 for (const retained of ["Old calculation equation", "Old verbose note", "2026-10-10", "Scheduled estimate"]) assert.ok(income.includes(retained), "Income retains its estimate context")
 console.log("Metric details preserve totals, mode allocations and dynamic savings progress with compact content")
+const investing={cashSaved:1200,esppContribution:400,combinedContributions:1600,takeHomeBeforeEspp:9000,estimatedEsppContribution:0}
+const esppView={...view,savingsInvesting:investing,metrics:{...view.metrics,monthlyIncome:9000,amountSaved:1600,savingsMinimum:700,savingsIdeal:1400}}
+const esppDetails=render('saved',{value:1600,view:esppView})
+assert.deepEqual(rows(esppDetails),[['Cash saved','$1,200.00'],['SpaceX ESPP · calculated from payroll','$400.00'],['Cash saved + ESPP','$1,600.00']])
+assert.ok(!esppDetails.includes('Take-home before ESPP'))
+const esppCard=renderToStaticMarkup(React.createElement(Card,{value:1600,progressValue:1200,minimum:700,ideal:1400,onExplain:()=>{}}))
+assert.ok(esppCard.includes('Explain Saved')&&!esppCard.includes('Explain Cash saved'))
+for(const surface of [esppCard,esppDetails])assert.ok(surface.includes(`width:${1200/1400*100}%`),'The progress bar uses recorded cash while the headline includes ESPP')
+console.log('Saved separates cash progress and monthly ESPP while income owns reconstructed take-home.')

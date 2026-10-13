@@ -2586,6 +2586,8 @@ def _report_client_payload(
             "projectedIdeal": projected_savings["cashIdeal"], "projectedMinimum": projected_savings["cashMinimum"],
         })
         payload["incomeProjection"]["savingsGoal"] = projected_savings["cashIdeal"]
+        payload["metrics"].update(monthlyIncome=current_savings["takeHomeBeforeEspp"],
+                                  amountSaved=current_savings["combinedContributions"])
     payload["modeViews"] = {
         "current": _report_mode_view_from_payload(payload, projected=False),
         "projected": _report_mode_view_from_payload(payload, projected=True),
@@ -2669,6 +2671,11 @@ def _report_mode_view_from_payload(
         round(category_budgets["savings"] - category_spending["savings"], 2),
     )
     income_after_expenses = round(sum(category_balances["remaining"].values()), 2)
+    # Cash category balances already exclude payroll ESPP. Present the full
+    # take-home and combined Saved amounts without charging withholding twice.
+    if savings_investing:
+        monthly_income = savings_investing["takeHomeBeforeEspp"]
+        amount_saved = savings_investing["combinedContributions"]
     burn_rate = payload.get("burnRate")
     if projected:
         burn_rate = _projected_burn_rate_from_payload(burn_rate, category_balances)

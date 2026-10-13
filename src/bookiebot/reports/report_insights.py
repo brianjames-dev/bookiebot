@@ -70,7 +70,10 @@ def metric_explanations(report: ExpenseBreakdownReport, payload: dict[str, Any])
         if income_remainder:
             incomes.append({"label": "Other recorded income from the sheet", "amount": income_remainder,
                             "source": "sheet", "date": None})
-        projected_remainder = _money(metrics["monthlyIncome"] - report.income_total)
+        investing = view.get("savingsInvesting")
+        espp = investing["esppContribution"] if investing else 0
+        estimated_espp = investing.get("estimatedEsppContribution", 0) if investing else 0
+        projected_remainder = _money(metrics["monthlyIncome"] - report.income_total - espp)
         if projected_remainder:
             expected = [{"label": item.label, "amount": _money(item.amount), "source": "scheduled",
                          "date": _date(f"{report.month.year}-{report.month.month:02d}-{item.day:02d}", report.month.year, report.month.month)}
@@ -80,6 +83,11 @@ def metric_explanations(report: ExpenseBreakdownReport, payload: dict[str, Any])
             else:
                 incomes.append({"label": "Expected income still to arrive", "amount": projected_remainder,
                                 "source": "scheduled", "date": None})
+
+        if espp - estimated_espp:
+            incomes.append({"label": "ESPP withheld from payroll", "amount": _money(espp - estimated_espp), "source": "calculated", "date": None})
+        if estimated_espp:
+            incomes.append({"label": "Expected payroll ESPP", "amount": _money(estimated_espp), "source": "scheduled", "date": None})
 
         current_amounts = {item["key"]: _money(item["amount"]) for item in payload["modeViews"]["current"]["breakdown"]}
         spent = []
@@ -123,6 +131,10 @@ def metric_explanations(report: ExpenseBreakdownReport, payload: dict[str, Any])
                  "source": "sheet", "date": None} for category in ("needs", "wants", "savings")]
         saved = [{"label": f"Savings contribution {item.number}", "amount": _money(item.actual),
                   "source": "recorded", "date": None} for item in report.savings_deposits if item.actual]
+        if espp - estimated_espp:
+            saved.append({"label": "SpaceX ESPP", "amount": _money(espp - estimated_espp), "source": "calculated", "date": None})
+        if estimated_espp:
+            saved.append({"label": "SpaceX ESPP · expected", "amount": _money(estimated_espp), "source": "scheduled", "date": None})
         saved_remainder = _money(metrics["amountSaved"] - _total(item["amount"] for item in saved))
         if saved_remainder:
             saved.append({"label": "Other saved amount from the sheet", "amount": saved_remainder,
@@ -168,8 +180,12 @@ def metric_explanations(report: ExpenseBreakdownReport, payload: dict[str, Any])
                 "Projected adjusts the targets with projected income; it does not invent future savings deposits.",
             ]),
         }
-        if view.get("savingsInvesting"):
-            values = view["savingsInvesting"]
+        if investing:
+            values = investing
+            explanations[mode]["income"]["equation"] = "Deposited income + payroll ESPP" + (" + expected pay and ESPP" if mode == "projected" else "")
+            explanations[mode]["income"]["notes"].append("Income includes payroll ESPP before withholding; Saved includes the same contribution once.")
+            explanations[mode]["saved"]["equation"] = "Recorded cash savings + payroll ESPP" + (" (includes expected ESPP)" if estimated_espp else "")
+            explanations[mode]["saved"]["notes"][-1] = "Projected retains recorded cash savings and separately labels ESPP from expected paychecks."
             explanations[mode]["saved"]["notes"].extend([
                 "Cash targets use enrolled take-home before ESPP at 15% ideal / 7.5% minimum; other income uses 20% / 10%.",
                 f"ESPP: ${values['esppContribution']:,.2f}, calculated from payroll; already withheld before deposit.",

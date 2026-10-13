@@ -1,5 +1,11 @@
 # Agent Decisions
 
+## 2026-10-13 - Present Full Take-Home And Separate Cash/ESPP Savings
+
+At the user's request, Income includes deposited pay plus derived monthly ESPP and Saved includes recorded cash plus that ESPP (including clearly labeled projected ESPP in Projected). Retain deposited-income/paycheck records and raw cash-savings fields; cash category budgets and Left already exclude withholding, so never deduct it twice or add ESPP to Spent. Canonical mode metrics, headline explanations and read-only report consumers share this presentation. Cash progress continues using actual cash and the cash minimum/ideal targets.
+
+Replace the verbose monthly Savings & investing panel with a single darker Investments section below existing personal Savings goals, displaying SpaceX stock/ESPP cumulative recorded contributions. Preserve invalid/loading/partial history feedback. Category Mix All and Savings show distinct cash/ESPP slices and include ESPP in the displayed budget, while Needs/Wants/cash coverage and legacy unconfigured months retain existing behavior. Keep projected estimates out of the cumulative investment bucket. No new ledger, financial write or valuation.
+
 ## 2026-10-12 - Keep ESPP Settings Inline And Monthly History Independent
 
 Supersede the side summary and transitional separate settings tab: put four dated enrollment fields below Main Income Source, one ESPP total inside the B:D income table, and retain the existing cash target/actual cells. One dark blank row separates each of the four tables. Use native formulas with dynamically bounded income/settings ranges, including per-paycheck rounding and visible invalid-settings guards. Preserve text-currency allocation types required by existing burn-rate formulas.

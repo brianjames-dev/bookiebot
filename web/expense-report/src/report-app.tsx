@@ -34,7 +34,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "./components/ui/card"
 import { FittedAmount } from "./components/ui/fitted-amount"
 import { ReportMenu } from "./components/ui/report-menu"
 import { SavingsGoals } from "./savings-goals"
-import { MonthlySavings } from "./monthly-savings"
+import { Investments } from "./investments"
 import { PhoneNotifications } from "./phone-notifications"
 import { ReportQuestions } from "./report-questions"
 import { SharedReimbursementsCard } from "./shared-reimbursements"
@@ -264,12 +264,13 @@ function buildReportView(report: ExpenseReportData, projected: boolean): ReportV
     return serverView
   }
   const breakdown = projected ? projectedBreakdown(report) : report.breakdown
-  const monthlyIncome = projected ? report.incomeProjection.projectedAmount : report.incomeProjection.currentAmount
+  const depositedIncome = projected ? report.incomeProjection.projectedAmount : report.incomeProjection.currentAmount
   const savings = savingsForMode(report, projected)
   const totalExpenses = projected ? amountRowsTotal(breakdown) : report.metrics.totalExpenses
   const currentBudgets = currentCategoryBudgets(report)
   const savingsInvesting = report.savingsInvesting?.[projected ? "projected" : "current"]
-  const categoryBudgets = savingsInvesting?.categoryBudgets ?? (projected ? projectedCategoryBudgets(monthlyIncome) : currentBudgets)
+  const monthlyIncome = savingsInvesting?.takeHomeBeforeEspp ?? depositedIncome
+  const categoryBudgets = savingsInvesting?.categoryBudgets ?? (projected ? projectedCategoryBudgets(depositedIncome) : currentBudgets)
   const categorySpending = categorySpendingForBreakdown(
     breakdown,
     savings.amount,
@@ -283,7 +284,7 @@ function buildReportView(report: ExpenseReportData, projected: boolean): ReportV
       totalExpenses,
       monthlyIncome,
       incomeAfterExpenses: roundCurrency(budgetRemaining),
-      amountSaved: savings.amount,
+      amountSaved: savingsInvesting?.combinedContributions ?? savings.amount,
       savingsIdeal: savings.ideal,
       savingsMinimum: savings.minimum,
     },
@@ -601,7 +602,7 @@ export function ExpenseReportApp({ report, appControls, appAvatarUrl, appSession
     setChartCollapseKey(current => current + 1)
     const entries = activityRef.current.filter(entry => activityMatchesCategory(entry, item))
     setInspection({key:`category-${item.key}`, title:item.label, entries, total:item.amount,
-      note:item.key === "left" ? "Available budget after spending and savings; this is a balance, not a transaction." : item.key === "savings" ? "Monthly savings deposits are summarized in Saved." : undefined})
+      note:item.key === "left" ? "Available budget after spending and savings; this is a balance, not a transaction." : item.key === "savings" ? "Monthly cash savings are summarized in Saved." : item.key === "espp" ? "Calculated from enrolled payroll and already withheld before deposit. Projected mode includes explicitly estimated contributions." : undefined})
   }, [])
   const inspectDay = (day: string) => {
     dismissChartTooltips()
@@ -619,7 +620,9 @@ export function ExpenseReportApp({ report, appControls, appAvatarUrl, appSession
           onInspect={inspectCategory}
           categoryBalances={activeReport.categoryBalances}
           categoryBudgets={activeReport.categoryBudgets}
-          amountSaved={activeReport.metrics.amountSaved}
+          amountSaved={activeReport.savingsInvesting?.cashSaved ?? activeReport.metrics.amountSaved}
+          espp={activeReport.savingsInvesting?.esppContribution}
+          estimatedEspp={activeReport.savingsInvesting?.estimatedEsppContribution}
           filter={categoryMixFilter}
           onFilterChange={switchCategoryMixFilter}
           projected={projectionActive}
@@ -848,7 +851,7 @@ export function ExpenseReportApp({ report, appControls, appAvatarUrl, appSession
             accent
           />
           <SavingsMetricCard
-            cashOnly={Boolean(report.savingsPlan)}
+            progressValue={activeReport.savingsInvesting?.cashSaved}
             onExplain={metricDetails ? () => setMetricInspection({...metricDetails.saved, key: "saved", view: activeReport}) : undefined}
             value={activeReport.metrics.amountSaved}
             minimum={activeReport.metrics.savingsMinimum}
@@ -941,8 +944,8 @@ export function ExpenseReportApp({ report, appControls, appAvatarUrl, appSession
           onViewChange={dismissChartTooltips}
         />}
 
-        {!navigation && <MonthlySavings report={report} mode={projectionActive ? "projected" : "current"} />}
         {!navigation && appSession && <SavingsGoals />}
+        {!navigation && <Investments report={report} />}
 
         {!navigation && appSession && <ReportQuestions month={`${report.year}-${String(report.month).padStart(2, "0")}`}
           mode={projectionActive ? "projected" : "current"} onShowSource={showQuestionSource} />}
@@ -969,15 +972,16 @@ function MetricExplanationDetails({detail}: {detail:MetricInspection}) {
     const {savingsMinimum: minimum, savingsIdeal: ideal} = view.metrics
     return <div className="bb-metric-explanation">
       <div className="bb-chart-total">{formatMoney(detail.value)}</div>
-      <SavingsProgress value={detail.value} minimum={minimum} ideal={ideal} showTargets={false} />
+      <SavingsProgress value={view.savingsInvesting?.cashSaved ?? detail.value} minimum={minimum} ideal={ideal} showTargets={false} />
       <p className="bb-activity-footnote">Minimum target: {formatMoney(minimum)}. Ideal target: {formatMoney(ideal)}.</p>
       {view.savingsInvesting && <>
         <dl>
-          <div><dt>Take-home before ESPP</dt><dd>{formatMoney(view.savingsInvesting.takeHomeBeforeEspp)}</dd></div>
-          <div><dt>ESPP{view.savingsInvesting.estimatedEsppContribution ? " · includes estimate" : " · calculated from payroll"}</dt><dd>{formatMoney(view.savingsInvesting.esppContribution)}</dd></div>
+          <div><dt>Cash saved</dt><dd>{formatMoney(view.savingsInvesting.cashSaved)}</dd></div>
+          <div><dt>SpaceX ESPP{view.savingsInvesting.estimatedEsppContribution ? " · includes estimate" : " · calculated from payroll"}</dt><dd>{formatMoney(view.savingsInvesting.esppContribution)}</dd></div>
           <div><dt>Cash saved + ESPP</dt><dd>{formatMoney(view.savingsInvesting.combinedContributions)}</dd></div>
         </dl>
         <p className="bb-activity-footnote">ESPP is already withheld before deposit. The progress bar measures cash savings.</p>
+        {(view.savingsInvesting.warnings ?? []).map(warning => <p key={warning} role="status" className="bb-activity-footnote">{warning}</p>)}
       </>}
     </div>
   }
@@ -1481,24 +1485,25 @@ function isSavingsNearGoal(value: number | null | undefined, goal: number | null
 }
 
 function SavingsMetricCard({
-  cashOnly = false,
+  progressValue,
   onExplain,
   value,
   minimum,
   ideal,
 }: {
-  cashOnly?: boolean
+  progressValue?: number
   onExplain?: () => void
   value: number
   minimum: number
   ideal: number
 }) {
-  const tone = value <= 0 ? "empty" : value < minimum ? "low" : isSavingsNearGoal(value, ideal) ? "ideal" : "minimum"
+  const cash = progressValue ?? value
+  const tone = cash <= 0 ? "empty" : cash < minimum ? "low" : isSavingsNearGoal(cash, ideal) ? "ideal" : "minimum"
   return (
     <div className="bb-metric-card bb-savings-metric-card">
-      <div className="bb-metric-label">{onExplain ? <button type="button" className="bb-metric-explain" aria-label={cashOnly ? "Explain Cash saved" : "Explain Saved"} onClick={onExplain}>{cashOnly ? "Cash saved" : "Saved"}<span aria-hidden="true">ⓘ</span></button> : cashOnly ? "Cash saved" : "Saved"}</div>
+      <div className="bb-metric-label">{onExplain ? <button type="button" className="bb-metric-explain" aria-label="Explain Saved" onClick={onExplain}>Saved<span aria-hidden="true">ⓘ</span></button> : "Saved"}</div>
       <FittedAmount className={`bb-metric-value bb-savings-value bb-savings-value-${tone}`}>{formatMoney(value)}</FittedAmount>
-      <SavingsProgress value={value} minimum={minimum} ideal={ideal} />
+      <SavingsProgress value={cash} minimum={minimum} ideal={ideal} />
     </div>
   )
 }
@@ -1533,6 +1538,8 @@ type CategoryMixChartProps = {
   categoryBalances: CategoryBalances
   categoryBudgets: CategoryBalanceAmounts
   amountSaved: number
+  espp?: number
+  estimatedEspp?: number
   filter: CategoryMixFilter
   onFilterChange: (filter: CategoryMixFilter) => void
   projected: boolean
@@ -1545,6 +1552,8 @@ const CategoryMixChart = memo(function CategoryMixChart({
   categoryBalances,
   categoryBudgets,
   amountSaved,
+  espp,
+  estimatedEspp,
   filter,
   onFilterChange,
   projected,
@@ -1552,12 +1561,12 @@ const CategoryMixChart = memo(function CategoryMixChart({
 }: CategoryMixChartProps) {
   const selectedRollover = categoryMixRollover(categoryBalances, filter)
   const transferRows = categoryMixTransferRows(categoryBalances, filter)
-  const chartData = categoryMixRows(data, selectedRollover, filter, amountSaved, transferRows)
+  const chartData = categoryMixRows(data, selectedRollover, filter, amountSaved, transferRows, espp, estimatedEspp)
   const [pieHostRef, pieHostSize] = useElementSize<HTMLDivElement>()
   const pieLayout = useExpensePieLayout(chartData, pieHostSize)
-  const spentTotal = amountRowsTotal(chartData.filter((item) => item.key !== "left"))
+  const spentTotal = amountRowsTotal(chartData.filter((item) => item.key !== "left" && (filter === "savings" || espp === undefined || (item.key !== "savings" && item.key !== "espp"))))
   const pressure = categoryMixPressure(filter, categoryBalances, spentTotal)
-  const selectedBudget = filter === "all" ? categoryBudgetTotal(categoryBudgets) : categoryBudgets[filter]
+  const selectedBudget = (filter === "all" ? categoryBudgetTotal(categoryBudgets) : categoryBudgets[filter]) + ((filter === "all" || filter === "savings") ? espp ?? 0 : 0)
   const usedPercent = selectedBudget > 0 ? (spentTotal / selectedBudget) * 100 : 0
 
   return (
@@ -1696,6 +1705,7 @@ function areCategoryMixChartPropsEqual(previous: CategoryMixChartProps, next: Ca
   return (
     previous.onInspect === next.onInspect &&
     previous.amountSaved === next.amountSaved &&
+    previous.espp === next.espp && previous.estimatedEspp === next.estimatedEspp &&
     previous.categoryBudgets.needs === next.categoryBudgets.needs &&
     previous.categoryBudgets.wants === next.categoryBudgets.wants &&
     previous.categoryBudgets.savings === next.categoryBudgets.savings &&
@@ -1850,22 +1860,25 @@ function categoryMixRows(
   filter: CategoryMixFilter,
   amountSaved: number,
   transferRows: BreakdownItem[] = [],
+  espp?: number,
+  estimatedEspp = 0,
 ) {
   let filtered = data.filter((item) => {
     if (filter === "needs") return CATEGORY_NEEDS_KEYS.has(item.key)
     if (filter === "wants") return CATEGORY_WANTS_KEYS.has(item.key)
     return filter === "all" && item.key !== "savings"
   })
-  if (filter === "savings") {
-    filtered = amountSaved > 0
+  if (filter === "savings" || (filter === "all" && espp !== undefined)) {
+    filtered = [...filtered, ...(amountSaved > 0
       ? [{
           key: "savings",
-          label: "Saved",
+          label: espp === undefined ? "Saved" : "Cash saved",
           amount: roundCurrency(amountSaved),
           percentage: 0,
           color: SAVINGS_CATEGORY_COLOR,
         }]
-      : []
+      : [])]
+    if ((espp ?? 0) > 0) filtered.push({key:"espp", label:estimatedEspp ? "SpaceX ESPP · includes estimate" : "SpaceX ESPP", amount:roundCurrency(espp ?? 0), percentage:0, color:"hsl(var(--chart-4))"})
   }
   filtered = [...filtered, ...transferRows]
   const positiveLeftAmount = Math.max(roundCurrency(rolloverAmount), 0)
