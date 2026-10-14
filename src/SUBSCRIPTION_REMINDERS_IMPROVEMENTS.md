@@ -222,10 +222,10 @@ Use this list when changing reminder behavior:
 - Subscription pulling in 2-7 days appears in `Upcoming`.
 - Empty timing sections are omitted.
 - Monthly bill with entered amount appears with amount.
-- Monthly bill without entered amount appears as `amount missing`.
+- Monthly bill without entered amount uses its configured `expected_amount`, or `amount missing` if none exists.
 - Quarterly bill only appears in configured pull months.
 - Quarterly bill without `pull_months` produces a warning.
-- Overdue missing bill repeats daily until amount is entered.
+- Overdue unrecorded bill repeats daily with its expected amount (or `amount missing`) until an actual amount is entered. It does not inflate the next-seven-day headline total or missing-amount count.
 - Daily digest does not repeat unless the action-log event is deleted.
 - `/debug_subscriptions` reports parsed subscriptions, bill schedules, and warnings.
 

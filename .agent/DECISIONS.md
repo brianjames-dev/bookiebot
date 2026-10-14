@@ -818,3 +818,11 @@ Rationale: Persisted lineage proves a match exists but does not store its date, 
 Decision: Build expense report descriptions from named saved Item and Location fields, honoring canonical split `display_fields` before physical category layouts. Show Item at Location, either available field alone, or the category when both are absent. Gas uses Gas and any recorded Location. Show Person separately and deduplicate it across complete groups. Keep this transformation local to report hydration; matching/scoring candidate labels, source dates/amounts, bank merchant labels, persistence and mutation flows do not change.
 
 Rationale: The first-text heuristic omitted useful merchant context and exposed the Person/payment method as a gas description. Named fields give consistent comparisons without altering reconciliation decisions or inferring sheet data from bank data. The user explicitly authorized this display behavior and release.
+
+## 2026-10-14 - Known Bill Amounts Do Not Imply Recorded Payments
+
+Decision: Daily cash-pull digests use a bill's existing resolved amount (actual first, configured expectation second) independently of `amount_entered`. Unrecorded overdue bills show their known amount under Overdue (payment not recorded); only genuinely unknown amounts say amount missing. Overdue rows are excluded from the next-seven-day headline total and missing-amount count. Actual payment entry retains its existing behavior and stops overdue notices. Duplicate subscription suppression, daily send claims and post-send audit events are unchanged.
+
+The user set Brian's fixed Student Loan expectation to $60.23 monthly; retain the existing day 12. This supersedes the September $59.96 setting. Updating the owner-scoped schedule never marks a payment recorded, creates a subscription, transfers funds or changes another owner's loan.
+
+Rationale: The sheet reader already resolved fixed expectations, but the Discord adapter discarded them whenever no payment was logged. Known amount and recorded-payment status answer different questions; separating them restores reminders without inventing financial activity or counting past due dates as future pulls.

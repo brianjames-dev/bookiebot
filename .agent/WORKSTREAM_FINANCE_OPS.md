@@ -4,6 +4,12 @@ Last updated: 2026-10-14
 
 ## Goal
 
+### Fixed Student Loan reminders — 2026-10-14
+
+Implementation and live setting complete; CI/release pending. The user corrected the recurring loan to **$60.23 monthly**. Saved only Brian's existing `_BookieBot Bill Schedule!J3` (previously 59.96), retaining monthly/day 12 and owner/source identity. Chrome saved readback and a read-only API check passed; October/Template actuals remain zero, with no duplicate active loan subscription. No payment or notification was created.
+
+The sheet reader already supplied expected amounts, but Discord incorrectly used the actual-recorded flag as amount availability and hardcoded overdue rows to amount missing. The adapter now preserves known amounts; overdue rows appear under **Overdue (payment not recorded)** and stay outside next-seven-day totals/missing counts. Existing actual replacement, duplicate suppression, send claims and post-send audit semantics remain. Eight new regressions; focused **158 passed**, full local **2,237 passed / 380 skipped**, Pyright clean. Manual acceptance is STATUS checklist 140; the prior annual-master follow-up remains separate. User accepted the preceding Sheet-label release.
+
 ### Reconciliation Sheet labels — 2026-10-14
 
 Released: [PR #66](https://github.com/brianjames-dev/bookiebot/pull/66) passed both feature CI runs and merged as `89dd203` at the user's request. [Main CI](https://github.com/brianjames-dev/bookiebot/actions/runs/38592171163) passed **2,609 tests / zero skips** and the complete type/build/asset stack. Railway deployment `ba00b71a-4d59-40e3-aca4-24e8ed5819cb` is successful/active; verified Discord login, command sync, web startup, health 200 and private report 401. This follow-up changes tracking docs only; existing-digest device acceptance remains STATUS checklist 139.

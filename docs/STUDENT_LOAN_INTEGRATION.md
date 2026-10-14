@@ -1,5 +1,13 @@
 # Student loan integration and sheet audit
 
+## Fixed-amount reminder update — October 14, 2026
+
+The user corrected Brian's recurring amount to **$60.23 monthly**. Updated only `_BookieBot Bill Schedule!J3` from 59.96 to 60.23 in the existing personal workbook; monthly recurrence/day 12, source identity and account remain unchanged. Saved readback and a separate read-only API check verified the value. October and Template actuals remain zero, and no active duplicate loan subscription was found. The September audit below remains historical evidence.
+
+The Discord adapter previously treated an unrecorded payment as an unknown amount, hiding the already-configured expectation. It now shows $60.23 before a payment is logged, including overdue reminders under **Overdue (payment not recorded)**. Overdue entries do not count toward the next-seven-day headline. Actuals replace expectations and remove overdue notices; no payment or notification is created by configuration/acceptance. Isolated tests cover today/tomorrow/seven-day/overdue windows, next-month recurrence, actual replacement, variable missing amounts and duplicate subscription suppression. Release/device acceptance is tracked in STATUS checklist 140. The earlier annual-master follow-up remains separate.
+
+## Original September audit
+
 Audited September 9, 2026 in Chrome: [Brian Budget 2026](https://docs.google.com/spreadsheets/d/1ArI4qapaj-LGg7v5OC47WdfYijjLdu3QPRPgKLbgD3U/edit) and [Shared Expenses 2026](https://docs.google.com/spreadsheets/d/1t2Nm5luEjm-RKiiMyuIFvJBhdI0ubufWkrdjRzBsTgU/edit). The second supplied link is the shared workbook, not Hannah's personal budget. Read-only exports supported the audit; formulas with shared-formula encoding were verified in the live formula bar before deciding whether a repair was necessary.
 
 ## Loan configuration

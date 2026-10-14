@@ -3,7 +3,7 @@ from datetime import date, datetime
 import pytest
 
 from bookiebot.core import subscription_reminders
-from bookiebot.sheets.bills import BillReminder, BillSchedule
+from bookiebot.sheets.bills import BILL_SCHEDULE_HEADERS, BillReminder, BillSchedule
 from bookiebot.sheets.routing import sheet_user_context
 from bookiebot.sheets.subscriptions import Subscription, SubscriptionParseWarning, SubscriptionReminder
 from unit_tests.support.sheets_repo_stub import SheetsRepoStub
@@ -298,11 +298,65 @@ def test_format_cash_pull_digest_includes_overdue_missing_section():
     )
 
     assert text == (
-        "<@123> `$0.00` known + `1 missing amount` will be pulled by bills and subscriptions in the next 7 days.\n"
+        "<@123> `$0.00` will be pulled by bills and subscriptions in the next 7 days.\n"
         "\n"
-        "Missing overdue:\n"
+        "Overdue (payment not recorded):\n"
         "`PG&E - amount missing - May 14`"
     )
+
+
+@pytest.mark.parametrize("current,actual,shown_amount,overdue,total", [
+    (date(2026, 10, 5), "0", "60.23", False, "70.23"),
+    (date(2026, 10, 11), "", "60.23", False, "70.23"),
+    (date(2026, 10, 12), "0", "60.23", False, "70.23"),
+    (date(2026, 10, 14), "0", "60.23", True, "10.00"),
+    (date(2026, 10, 14), "60.23", None, False, "10.00"),
+    (date(2026, 10, 5), "119.92", "119.92", False, "129.92"),
+    (date(2026, 11, 5), "0", "60.23", False, "70.23"),
+])
+def test_fixed_loan_amount_reaches_daily_digest_without_recording_payment(
+    monkeypatch, current, actual, shown_amount, overdue, total,
+):
+    repo = SheetsRepoStub(
+        income_rows=[["", "Student Loan", actual]],
+        bill_schedule_rows=[BILL_SCHEDULE_HEADERS,
+            ["student loan", "Student Loan", "monthly", "12", "", "Student Loan", "Checking", "", "", "60.23"]],
+    )
+    subscription = Subscription("Example Subscription", 10, "monthly", current.day + 1)
+    monkeypatch.setattr(subscription_reminders, "debug_subscription_sync", lambda: ([subscription], []))
+    monkeypatch.setattr(subscription_reminders, "has_system_event", lambda *_args: False)
+    before = repo.income.get_all_values()
+    with repo.patched():
+        prepared = subscription_reminders._prepare_due_reminder_messages("676638528590970917", "Brian", current)
+
+    assert prepared.evaluation_succeeded
+    assert len(prepared.messages) == 1
+    text = prepared.messages[0]
+    assert text.startswith(f"Brian `${total}` will be pulled")
+    assert "missing amount" not in text
+    if shown_amount:
+        assert f"Student Loan - ${shown_amount} - {current:%b} 12" in text
+        assert text.count("Student Loan") == 1
+    else:
+        assert "Student Loan" not in text
+    assert ("Overdue (payment not recorded):" in text) is overdue
+    assert repo.income.get_all_values() == before
+    assert repo.income.update_calls == repo.income.update_cell_calls == 0
+    assert repo.bill_schedule.update_calls == repo.bill_schedule.update_cell_calls == 0
+
+
+def test_overdue_amounts_do_not_change_upcoming_total_or_missing_count():
+    cash = subscription_reminders.CashPullReminder
+    text = subscription_reminders.format_cash_pull_digest("Brian", [
+        cash("Fixed Loan", date(2026, 10, 12), -2, "loan", "bill", 60.23, overdue=True),
+        cash("Unknown Overdue Bill", date(2026, 10, 12), -2, "old", "bill", amount_missing=True, overdue=True),
+        cash("Upcoming Bill", date(2026, 10, 18), 4, "new", "bill", amount_missing=True),
+        cash("Upcoming Subscription", date(2026, 10, 15), 1, "sub", "subscription", 10),
+    ])
+    assert text.startswith("Brian `$10.00` known + `1 missing amount`")
+    assert "Fixed Loan - $60.23 - Oct 12" in text
+    assert "Unknown Overdue Bill - amount missing - Oct 12" in text
+    assert "Upcoming Bill - amount missing - Oct 18" in text
 
 
 def test_format_subscription_parse_warning_digest():
