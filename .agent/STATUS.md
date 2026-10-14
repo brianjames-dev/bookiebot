@@ -1,8 +1,10 @@
 # Agent Status
 
-Last updated: 2026-10-13
+Last updated: 2026-10-14
 
 ## Active Focus
+
+Digest View Inbox response repair (2026-10-14): reproduced Discord's `TypeError` when multi-page inbox reports send `view=None`. Pages without controls now omit that argument. Eight real Discord webhook regressions cover automatic matches, unresolved items, one/multiple pages and buttons restored after restart; focused reconciliation suite **51 passed**. Full local suite **2,202 passed / 380 skipped** (optional PostgreSQL and unavailable frontend test dependencies); Pyright **0 errors / 0 warnings**. Deployment/manual acceptance remains checklist 137. No financial records were changed.
 
 ESPP released (2026-10-13): the user approved the final preview; all seven commits through `94b339c` merged into main as `c81d2ac`, without conflicts or source changes beyond the verified feature tree. [Main Verification](https://github.com/brianjames-dev/bookiebot/actions/runs/38443718146) passed **2,574 tests / zero skips**, Python/frontend types, Apps Script, production build and asset parity. Railway production deployment succeeded; `/app/version` is **98861c66ccd2e70b58d508d3**, all three frontend assets match the local build byte-for-byte, and unauthenticated personal report access remains 401. This release follow-up changes tracking docs only. Device acceptance and the first actual 10/23 enrolled paycheck remain checklists 136 and 135.
 
@@ -114,6 +116,8 @@ All eight September 6 audit batches are implemented and verified locally. Each b
 
 ## On Deck
 
+Release the verified View Inbox response repair, then perform checklist 137. Implementation and automated checks are complete; the existing device acceptance queue remains below.
+
 ESPP is deployed and main verification/production asset parity passed. Load the app Update and perform device checklist 136, then real-payroll checklist 135. Live Brian October/Template and Apps Script are already configured; do not rerun setup or log synthetic paychecks into production. Check the actual first enrolled deposit on 10/23 and update Expected Income Amount if its expected bank-deposit amount changes. Prior release/device acceptance items remain below.
 
 Confirm automatic main verification/Railway rollout for the merged dashboard modal/history refinements, then perform checklist 134. Both commits through `e5e97ea` are integrated; [Verification #116](https://github.com/brianjames-dev/bookiebot/actions/runs/38068125685) passed the exact source tip with **2,523 tests / zero skips** and all type/build/asset checks. Main integration `0b5f5a0` passed [Verification #114](https://github.com/brianjames-dev/bookiebot/actions/runs/37835563238) with **2,522 tests / zero skips** and all type/build/asset checks; remaining rollout/device acceptance for the earlier reconciliation work is below.
@@ -170,6 +174,12 @@ Student-loan activation is complete. Verify the deployed fixed-bill display and 
 25. Harden recent-action pending state across restarts/deploys, since selections currently live only in process memory.
 26. Improve targeted recent-action search so commands can find older matches, not only the latest 10 recent actions.
 27. Explore clarifying questions before logging when BookieBot is uncertain instead of guessing or silently failing.
+
+## Completed 2026-10-14
+
+- Fixed View Inbox silently stopping on automatic-match reports with multiple pages: omit the optional Discord `view` argument on pages without controls, preserving private results and existing first/final-page control placement.
+- Added eight regression cases using Discord 2.3.2's real webhook validation/serialization with HTTP mocked. Before the fix all four multi-page cases failed with `NoneType` view errors; after the fix all eight pass. Covers newly sent and restart-restored digest buttons, automatic matches and unresolved items.
+- Focused reconciliation **51 passed**; full local **2,202 passed / 380 optional PostgreSQL or unavailable frontend-dependency skips**, existing Kaleido warning only; Pyright **0 errors / 0 warnings**. Updated STATUS and finance-ops backlog/work log; manual acceptance is checklist 137. No persistence, matching or lifecycle decision changed, so DECISIONS remains unchanged.
 
 ## Completed 2026-10-13
 
@@ -852,6 +862,8 @@ Student-loan activation is complete. Verify the deployed fixed-bill display and 
 
 ## Manual Test Checklist
 
+137. After deploying the View Inbox repair, click **View Inbox** on an existing 7 AM digest containing automatic matches. Confirm typing ends and the private reconciliation report appears, including every page of the current-month match history; Unmatch belongs to the final page when no unresolved items remain. Repeat after a bot restart to exercise persistent buttons. With unresolved items, confirm the first page has Reconcile Now/Ignore All and later match-history pages arrive. Opening the inbox alone must not change any bank/sheet records. Use isolated fixtures for mutation testing.
+
 135. ESPP after application deployment: inspect October Main Income Source → dark buffer → four-column ESPP settings → dark buffer → Income with bordered ESPP total → dark buffer → Budget. Cash target/actual cells stay in place. Confirm 10/23/2026, xAI and 5%; before enrollment October ESPP is $0. On the first real enrolled paycheck, log the deposited amount/date/source normally and verify deposit × 5/95 rounded per paycheck, 15% ideal / 7.5% minimum of reconstructed pay, and 20% / 10% for unrelated income. Current uses recorded contributions; Projected labels scheduled estimates and keeps actual cash unchanged. In an isolated workbook, correct/Delete/Undo an enrolled paycheck and a cash-savings action; verify saved coordinates, formulas and totals. Verify later dated rate versions/monthly and annual rollover preserve earlier calculations and Hannah. Never log synthetic production transactions or rerun setup to test rollout.
 
 134. Compact metric details and complete reimbursement history (after deployment):
@@ -1122,6 +1134,8 @@ Use a test row or low-risk real row in Discord:
 89. Compact phone UI: fully close/reopen both installed apps after deployment. Verify compact month/person header, Current/Projected, refresh icon/time and three-dot theme/signout controls. Open/close Calendar and Category Mix dialogs via close/backdrop; confirm no final flash or page jump. Toggle Bills/Burn Rate Details and confirm lines resize with the layout. Compare calendar dots and tooltip labels to Category Mix (mixed days show multiple colors); verify today's existing Daily Spending row is highlighted, including near Pacific midnight, and reimbursements use the chart-band background in both themes. Offline/manual refresh must clearly label older data; reconnect and confirm fresh values without resetting Projected.
 
 ## Verification Baseline
+
+2026-10-14 View Inbox response repair: focused `python -m pytest unit_tests/core/test_bank_reconciliation.py unit_tests/core/test_bank_reconciliation_flow.py -q --tb=short` **51 passed**; full `python -m pytest unit_tests -q --tb=short` **2,202 passed / 380 skipped** (optional PostgreSQL and missing frontend test dependencies), existing Kaleido warning only. `python -m pyright --pythonpath /Users/brianjames/Dev/bookiebot/venv/bin/python` **0 errors / 0 warnings**. Used the existing project Python 3.12 environment; full suite used loopback-enabled isolated fixtures. Real Discord send validation is covered without network calls or production financial writes. Release/manual acceptance remains checklist 137.
 
 2026-10-10 dashboard modal/history refinements: targeted UI **3 passed**, report suite **635 passed / 88 skipped**, full `python -m pytest unit_tests` **2,171 passed / 352 skipped** (optional PostgreSQL; Docker stopped), existing Kaleido warning only. Initial sandboxed report run could not start loopback HTTP servers; rerunning with test-server access passed. Project Python 3.12, Pyright **0 errors / 0 warnings**, frontend typecheck/build, Apps Script and `git diff --check` clean. Runtime regressions cover both history implementations, refresh/draft retention, current/projected totals, custom/zero-income percentages, legacy adjustments and zero/negative/over-goal savings progress. Production-build WebKit/Chromium passed **72 modal checks** (24 viewport/theme/mode cases), with fully opened dialog geometry, no overflow/page errors and inspected phone screenshots. Used the installed Playwright package matching cached browser revisions after the bundled driver proved incompatible. [Verification #115](https://github.com/brianjames-dev/bookiebot/actions/runs/38067837038) on `ba4d517` subsequently passed **2,523 tests / zero skips** with PostgreSQL, clean Python/frontend types, Apps Script, build and committed-asset consistency. The follow-up commit records this result only and passed [Verification #116](https://github.com/brianjames-dev/bookiebot/actions/runs/38068125685) with the same complete stack. Both commits are now integrated into main; this merge adds release tracking only. Manual rollout acceptance is checklist 134.
 

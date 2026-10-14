@@ -2,7 +2,9 @@ import asyncio
 from dataclasses import replace
 from datetime import date, datetime
 from types import SimpleNamespace
-from unittest.mock import AsyncMock
+from unittest.mock import AsyncMock, Mock
+import discord
+from discord.webhook.async_ import async_context
 import pytest
 
 from bookiebot.banking.models import (
@@ -116,6 +118,28 @@ class FakeReviewInteraction:
 
     async def edit_original_response(self, **kwargs):
         self.original_response_edits.append(kwargs)
+
+
+@pytest.fixture
+def discord_followup(monkeypatch):
+    """Exercise Discord's real validation/serialization without making HTTP calls."""
+    adapter = SimpleNamespace(execute_webhook=AsyncMock(return_value={"id": "789"}))
+    state = SimpleNamespace(store_view=Mock())
+    webhook = discord.Webhook(
+        {"id": "123", "type": 3, "token": "test-token"},
+        session=SimpleNamespace(),
+        state=state,
+    )
+    monkeypatch.setattr(
+        discord.Webhook,
+        "_create_message",
+        lambda _self, data, **_kwargs: SimpleNamespace(id=int(data["id"])),
+    )
+    token = async_context.set(adapter)
+    try:
+        yield webhook, adapter, state
+    finally:
+        async_context.reset(token)
 
 
 def _reconciliation_item(item_id: int, *, name: str) -> ReconciliationItem:
@@ -832,7 +856,83 @@ async def test_bank_reconciliation_inbox_sends_all_chunks_as_private_followups(m
         for child in interaction.followup.messages[0][1]["view"].children
     ] == ["Reconcile Now", "Ignore All"]
     assert interaction.followup.messages[0][1]["ephemeral"] is True
-    assert interaction.followup.messages[1] == ("second chunk", {"view": None, "ephemeral": True})
+    assert interaction.followup.messages[1] == ("second chunk", {"ephemeral": True})
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("persistent", [False, True], ids=["new-digest", "after-restart"])
+@pytest.mark.parametrize("has_unresolved", [False, True], ids=["auto-matches-only", "needs-review"])
+@pytest.mark.parametrize("match_count", [2, 12], ids=["one-page", "multiple-pages"])
+async def test_digest_view_inbox_delivers_report_through_discord_webhook(
+    monkeypatch, discord_followup, persistent, has_unresolved, match_count,
+):
+    items = [
+        _matched_reconciliation_item(index, name=f"CREDIT CARD {index:04} PAYMENT")
+        for index in range(1, match_count + 1)
+    ]
+    matches = [
+        ReconciliationReportMatch(
+            reconciliation_id=item.id,
+            bank_date=item.transaction.date,
+            bank_name=item.transaction.name,
+            bank_amount=item.transaction.amount,
+            matched_date=None,
+            matched_name=None,
+            matched_amount=None,
+            source_type="automatic rule",
+            reason="automatic rule",
+            confidence=item.confidence,
+        )
+        for item in items
+    ]
+    unresolved = [_reconciliation_item(42, name="Coffee")] if has_unresolved else []
+    messages = tuple(format_bank_reconciliation_digest_chunks(
+        "<@123>",
+        ReconciliationPreview(
+            owner_key="brian", items=[*unresolved, *items],
+            cached_transaction_count=len(items) + len(unresolved),
+            candidate_transaction_count=len(items) + len(unresolved),
+            cache_buckets=ReconciliationCacheBuckets(
+                stored=len(items) + len(unresolved), matched=len(items), needs_review=len(unresolved),
+            ),
+        ),
+        unresolved,
+        report_matches=matches,
+    ))
+    assert (len(messages) > 1) == (match_count == 12)
+    digest = bank_reconciliation.PreparedBankReconciliationDigest(
+        public_message="public", detail_message=messages[0], detail_messages=messages,
+        report_matches=tuple(matches), item_ids=tuple(item.id for item in unresolved),
+        reviewed_items=tuple([*unresolved, *items]), owner_key="brian", owner_name="Brian",
+    )
+    monkeypatch.setattr(bank_reconciliation, "prepare_bank_reconciliation_inbox_messages", lambda *_args: digest)
+    view_factory = (
+        bank_reconciliation.persistent_bank_reconciliation_digest_view
+        if persistent else bank_reconciliation.bank_reconciliation_digest_view
+    )
+    button = next(child for child in view_factory("123").children if child.action == "inbox")
+    interaction = FakeReviewInteraction()
+    interaction.user = SimpleNamespace(id="123")
+    interaction.followup, adapter, state = discord_followup
+
+    await button.callback(interaction)
+
+    payloads = [call.kwargs["payload"] for call in adapter.execute_webhook.await_args_list]
+    assert [payload["content"] for payload in payloads] == list(messages)
+    assert all(payload["flags"] & 64 for payload in payloads)
+    controls_index = 0 if has_unresolved else len(messages) - 1
+    assert [bool(payload.get("components")) for payload in payloads] == [
+        index == controls_index for index in range(len(messages))
+    ]
+    state.store_view.assert_called_once()
+    controls = state.store_view.call_args.args[0]
+    assert [child.label for child in controls.children if hasattr(child, "label")] == (
+        ["Reconcile Now", "Ignore All"] if has_unresolved else []
+    )
+    assert controls.children[-1].placeholder == "Unmatch a confirmed transaction"
+    assert len(controls.children[-1].options) == match_count
+    assert interaction.response.defer_kwargs == {"ephemeral": True, "thinking": False}
+    assert interaction.channel.enters == interaction.channel.exits == 1
 
 
 @pytest.mark.asyncio

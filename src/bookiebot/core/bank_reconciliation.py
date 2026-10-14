@@ -383,10 +383,12 @@ async def _send_bank_reconciliation_inbox(interaction: Any, actor_key: str) -> N
             if index == view_message_index and (digest.item_ids or digest.report_matches)
             else None
         )
+        # Webhook.send rejects view=None; omit it on pages without controls.
+        view_kwargs = {"view": view} if view is not None else {}
         await interaction.followup.send(
             content=message,
-            view=view,
             ephemeral=True,
+            **view_kwargs,
         )
 
 
