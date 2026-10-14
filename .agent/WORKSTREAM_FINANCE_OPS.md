@@ -4,6 +4,10 @@ Last updated: 2026-10-14
 
 ## Goal
 
+### Reconciliation Sheet details — 2026-10-14
+
+Implementation and automated verification complete; release/manual acceptance is STATUS checklist 138. The user confirmed PR #64's existing-digest delivery fix, then reported `no spreadsheet row (spreadsheet row)`. The persisted inbox deliberately skipped source hydration, losing date/amount/label despite retaining match lineage. It now carries saved references into the report and optionally reads owner-scoped batched action history or referenced schedule sources. Five-second timeout/failure falls back to readable cell/month references instead of withholding the report or claiming no match. Source values are never inferred from the bank row; grouped totals require every linked action. Added 16 regressions; focused **116 passed**, full local **2,218 passed / 380 skipped** (optional PostgreSQL and unavailable frontend test dependencies), Pyright **0 errors / 0 warnings**. No schema, matching decision, bank state or sheet mutation changes.
+
 ### Digest View Inbox response repair — 2026-10-14
 
 Released: [PR #64](https://github.com/brianjames-dev/bookiebot/pull/64) passed both feature CI runs and merged into main as `a304eda` at the user's request. [Main CI](https://github.com/brianjames-dev/bookiebot/actions/runs/38584069503) passed **2,582 tests / zero skips** and all Python/frontend type, Apps Script, build and asset checks. Railway deployment `530322e8-c616-4708-a349-f28519c4b4ef` is successful/active; Discord login, command sync, web startup, public health and private report 401 are verified. Existing-digest device acceptance remains STATUS checklist 137. This follow-up changes tracking docs only.
@@ -418,6 +422,8 @@ Status: Complete in code and automated verification as of 2026-08-11; production
 Status: Complete first pass as of 2026-06-20. Normal unresolved views use a 60-day max age cutoff by default. Old records are hidden from normal review but are not yet marked with an explicit stale status.
 
 ### Slice 2 - Digest Lifecycle
+
+2026-10-14 Sheet-detail follow-up: implementation complete; bounded optional source enrichment and persisted-reference fallback restore useful match comparisons. Release/manual acceptance is STATUS checklist 138; the user's screenshot confirms prior report delivery. Durable digest claim work remains separate.
 
 2026-10-14: completed, CI-verified and deployed the View Inbox multi-page delivery repair through PR #64. Manual existing-digest acceptance is STATUS checklist 137. Durable claimed/sent/failed lifecycle remains separate and pending.
 

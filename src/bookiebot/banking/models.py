@@ -148,6 +148,7 @@ class ReconciliationReportMatch:
     source_type: str
     reason: str
     confidence: float
+    matched_sheet_ref: str | None = None
 
 
 @dataclass(frozen=True)
