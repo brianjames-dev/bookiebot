@@ -522,6 +522,8 @@ Rationale: A savings row is a contribution slot, not an additional monthly alloc
 
 ## 2026-07-24 - Render View Inbox From Persisted Reconciliation State
 
+Updated 2026-10-14: optional display-only match hydration is now permitted after the persisted report is prepared; see the bounded Sheet-detail decision below. Sync/rescoring and mutations remain excluded.
+
 Decision: The reconciliation digest's `View Inbox` action reads current-month unresolved and matched items already persisted in the banking store. It does not run Plaid sync, reconciliation rescoring, action-log reads, or schedule-sheet hydration. Inbox preparation must have a bounded timeout and return a private failure message without mutating reconciliation state when it cannot complete.
 
 Rationale: The scheduled digest has already synchronized and persisted the state the user is asking to inspect. Repeating external network and sheet work after Discord defers the component made a read-only button slow and capable of leaving an indefinite thinking response. Persisted reads make the interaction deterministic while `Reconcile Now` remains the explicit path for active review work.
@@ -804,3 +806,9 @@ Use a push-only service worker without a fetch cache. Turn off removes server el
 Decision: Persist owner-scoped goals and contribution history in the phone database, using integer cents, owner transaction locks, optimistic versions and durable request IDs/fingerprints. Targets, optional dates, starting balances and contributions are explicit user entries. Reversals preserve history; archival preserves balances/history and supports restore. Serialize first-time PostgreSQL schema creation.
 
 Goal progress is separate from the selected expense month and monthly Saved metric. It does not infer bank balances, transfer money or write budget sheets. Start with personal ownership; shared goals require an explicit household membership model, which current phone identity does not provide.
+
+## 2026-10-14 - Bound Optional Reconciliation Sheet Details
+
+Decision: Keep View Inbox's persisted current-month preparation and existing load timeout. Once that report exists, allow one optional worker-thread pass to resolve saved match IDs using owner-scoped batched action history and only the referenced schedule sources. Wait at most five additional seconds; source errors or timeout return the persisted report with readable saved cell/month references marked details unavailable. Rule-only matches need no external reads. Preserve the original reviewed snapshots and control placement; do not sync, rescore, mutate or infer sheet values from bank values. Require every linked action before displaying a grouped total.
+
+Rationale: Persisted lineage proves a match exists but does not store its date, amount or description. Skipping all source reads produced misleading `no spreadsheet row (spreadsheet row)` output. Optional bounded hydration restores the comparison while retaining a usable inbox when Sheets is slow or unavailable. This updates the July 24 read boundary without changing storage schema or reconciliation lifecycle semantics.

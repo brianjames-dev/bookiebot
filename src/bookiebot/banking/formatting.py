@@ -1,6 +1,9 @@
 from __future__ import annotations
 
 from collections import defaultdict
+import re
+
+from gspread.utils import rowcol_to_a1
 
 from bookiebot.banking.models import (
     BankTransaction,
@@ -509,6 +512,27 @@ def _format_reconciliation_review_row(item: ReconciliationItem) -> str:
     )
 
 
+def _report_sheet_reference(reference: str) -> str:
+    locations = []
+    for part in reference.split(" + "):
+        location, *attributes = part.split("#")
+        metadata = dict(value.split("=", 1) for value in attributes if "=" in value)
+        row = re.fullmatch(r"(.+)!row (\d+)", location)
+        if row and metadata.get("cols"):
+            try:
+                columns = [int(column) for column in metadata["cols"].split(",")]
+                if int(row[2]) < 1 or min(columns) < 1:
+                    raise ValueError("Invalid saved cell coordinates")
+                first = rowcol_to_a1(int(row[2]), min(columns))
+                last = rowcol_to_a1(int(row[2]), max(columns))
+                location = f"{row[1]}!{first}" + (f":{last}" if last != first else "")
+            except ValueError:
+                pass
+        period = metadata.get("month") or metadata.get("pull")
+        locations.append(location + (f" ({period})" if period else ""))
+    return _clip(" + ".join(locations), 120)
+
+
 def _format_reconciliation_match_report_entry(match: ReconciliationReportMatch) -> list[str]:
     bank = f"{_short_date(match.bank_date)}  {_short_money(match.bank_amount):>8}  {_clip(match.bank_name, 46)}"
     if match.matched_name and match.matched_date and match.matched_amount is not None:
@@ -517,6 +541,10 @@ def _format_reconciliation_match_report_entry(match: ReconciliationReportMatch) 
             f"{_short_money(match.matched_amount):>8}  "
             f"{_clip(match.matched_name, 46)}"
         )
+    elif match.matched_sheet_ref:
+        sheet = f"{_report_sheet_reference(match.matched_sheet_ref)}; details unavailable"
+    elif match.source_type != "automatic rule":
+        sheet = f"matched {match.source_type}; details unavailable"
     else:
         sheet = f"no spreadsheet row ({match.source_type})"
     return [

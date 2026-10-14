@@ -929,17 +929,21 @@ class BankingService:
             return []
 
         action_candidates: dict[str, ActionLogCandidate] = {}
-        if actor_key:
+        if actor_key and any(item.matched_action_log_id for item in matched_items):
             for logged in read_active_logged_actions(actor_key):
                 candidate = action_log_candidate_by_id(logged)
                 if candidate is not None:
                     action_candidates[logged.id] = candidate
 
+        schedule_transactions = [
+            item.transaction for item in matched_items
+            if item.matched_sheet_ref and not item.matched_action_log_id
+        ]
         scheduled_pulls = _scheduled_pulls_for_transactions(
-            [item.transaction for item in matched_items],
+            schedule_transactions,
             actor_key=actor_key,
             window_days=14,
-        )
+        ) if actor_key and schedule_transactions else []
 
         report: list[ReconciliationReportMatch] = []
         for item in matched_items:
@@ -957,6 +961,7 @@ class BankingService:
                     source_type=_report_source_type(item, matched),
                     reason=item.notes or "automatic reconciliation rule",
                     confidence=item.confidence,
+                    matched_sheet_ref=item.matched_sheet_ref,
                 )
             )
         return report
@@ -969,6 +974,8 @@ class BankingService:
     ) -> ActionLogCandidate | None:
         if item.matched_action_log_id:
             action_ids = [part.strip() for part in item.matched_action_log_id.split("+") if part.strip()]
+            if not action_ids or any(action_id not in action_candidates for action_id in action_ids):
+                return None
             candidates = [action_candidates[action_id] for action_id in action_ids if action_id in action_candidates]
             if len(candidates) == 1:
                 return candidates[0]

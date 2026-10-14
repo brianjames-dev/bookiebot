@@ -31,6 +31,7 @@ logger = logging.getLogger(__name__)
 
 _BANK_RECONCILIATION_TASK: asyncio.Task | None = None
 _PERSISTENT_DIGEST_VIEW_REGISTERED = False
+_INBOX_MATCH_DETAILS_TIMEOUT_SECONDS = 5.0
 
 
 @dataclass(frozen=True)
@@ -43,6 +44,7 @@ class PreparedBankReconciliationDigest:
     owner_key: str = ""
     owner_name: str = ""
     reviewed_items: tuple[ReconciliationItem, ...] = ()
+    preview: ReconciliationPreview | None = None
 
 
 def _bank_reconciliation_enabled() -> bool:
@@ -274,6 +276,38 @@ async def _start_bank_reconciliation_from_prompt(interaction: Any, actor_key: st
     )
 
 
+async def _with_inbox_match_details(
+    digest: PreparedBankReconciliationDigest, actor_key: str,
+) -> PreparedBankReconciliationDigest:
+    """Optionally resolve saved match details without withholding the persisted inbox."""
+    if digest.preview is None or not any(
+        match.source_type != "automatic rule" and match.matched_name is None
+        for match in digest.report_matches
+    ):
+        return digest
+    matched_items = [item for item in digest.reviewed_items if item.status == "matched"]
+    try:
+        service = build_banking_service()
+        matches = await asyncio.wait_for(
+            asyncio.to_thread(
+                service.reconciliation_report_matches, digest.owner_key, matched_items,
+                actor_key=actor_key, limit=100,
+            ),
+            timeout=_INBOX_MATCH_DETAILS_TIMEOUT_SECONDS,
+        )
+    except TimeoutError:
+        logger.warning("Inbox sheet details timed out; using persisted match references", extra={"actor_key": actor_key})
+        return digest
+    except Exception:
+        logger.exception("Inbox sheet details unavailable; using persisted match references", extra={"actor_key": actor_key})
+        return digest
+    unresolved = [item for item in digest.reviewed_items if item.id in digest.item_ids]
+    messages = tuple(format_bank_reconciliation_digest_chunks(
+        f"<@{actor_key}>", digest.preview, unresolved, report_matches=matches,
+    ))
+    return replace(digest, report_matches=tuple(matches), detail_messages=messages, detail_message="\n\n".join(messages))
+
+
 async def _send_bank_reconciliation_inbox(interaction: Any, actor_key: str) -> None:
     try:
         digest = await asyncio.wait_for(
@@ -305,6 +339,8 @@ async def _send_bank_reconciliation_inbox(interaction: Any, actor_key: str) -> N
             ephemeral=True,
         )
         return
+
+    digest = await _with_inbox_match_details(digest, actor_key)
 
     async def handle_inbox_action(action_interaction: Any, action: str) -> None:
         interaction_actor_key = _interaction_actor_key(action_interaction)
@@ -643,8 +679,8 @@ def prepare_bank_reconciliation_inbox_messages(
         candidate_transaction_count=len(items_by_id),
         cache_buckets=cache_buckets,
     )
-    # actor_key=None intentionally avoids rereading action logs and schedule
-    # sheets. The persisted match lineage is enough for the inbox report.
+    # Build a usable report without external reads first. Optional sheet detail
+    # hydration happens separately with a short timeout before delivery.
     report_matches = service.reconciliation_report_matches(
         owner.budget_owner_key,
         matched_items,
@@ -679,6 +715,7 @@ def prepare_bank_reconciliation_inbox_messages(
         reviewed_items=tuple({item.id: item for item in [*unresolved, *matched_items]}.values()),
         owner_key=owner.budget_owner_key,
         owner_name=getattr(owner, "name", str(actor_key)),
+        preview=preview,
     )
 
 

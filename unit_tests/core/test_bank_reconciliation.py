@@ -794,6 +794,64 @@ async def test_bank_reconciliation_inbox_failure_returns_private_followup(monkey
 
 
 @pytest.mark.asyncio
+@pytest.mark.parametrize("lookup", ["success", "failure", "timeout", "service-failure"])
+async def test_inbox_optional_sheet_details_preserve_report_and_review_snapshot(monkeypatch, lookup):
+    item = replace(_matched_reconciliation_item(51, name="Chipotle"),
+        matched_action_log_id="purchase", matched_sheet_ref="expense!row 12#cols=14,15,16,17,18#month=2026-05")
+    preview = ReconciliationPreview(owner_key="brian", items=[item])
+    persisted = ReconciliationReportMatch(
+        reconciliation_id=51, bank_date="2026-05-18", bank_name="Chipotle", bank_amount=12.34,
+        matched_date=None, matched_name=None, matched_amount=None, source_type="spreadsheet row",
+        reason="matched expense action", confidence=.98, matched_sheet_ref=item.matched_sheet_ref,
+    )
+    messages = tuple(format_bank_reconciliation_digest_chunks("<@123>", preview, [], report_matches=[persisted]))
+    digest = bank_reconciliation.PreparedBankReconciliationDigest(
+        public_message="public", detail_message=messages[0], detail_messages=messages,
+        report_matches=(persisted,), reviewed_items=(item,), owner_key="brian", owner_name="Brian", preview=preview,
+    )
+    monkeypatch.setattr(bank_reconciliation, "prepare_bank_reconciliation_inbox_messages", lambda *_args: digest)
+    hydrated = replace(persisted, matched_date="2026-05-17", matched_name="Dinner at Chipotle", matched_amount=12.34)
+    reader = AsyncMock(return_value=[hydrated])
+    if lookup == "failure":
+        reader.side_effect = RuntimeError("Sheets unavailable")
+    elif lookup == "timeout":
+        async def slow_read(*args, **kwargs):
+            await asyncio.sleep(.1)
+            return [hydrated]
+        reader.side_effect = slow_read
+    service = SimpleNamespace(reconciliation_report_matches=lambda *args, **kwargs: None)
+    def make_service():
+        if lookup == "service-failure":
+            raise RuntimeError("Service unavailable")
+        return service
+    monkeypatch.setattr(bank_reconciliation, "build_banking_service", make_service)
+    monkeypatch.setattr(bank_reconciliation, "_INBOX_MATCH_DETAILS_TIMEOUT_SECONDS", .01)
+    original_to_thread = asyncio.to_thread
+    async def run_worker(func, *args, **kwargs):
+        if func == service.reconciliation_report_matches:
+            return await reader(*args, **kwargs)
+        return await original_to_thread(func, *args, **kwargs)
+    monkeypatch.setattr(bank_reconciliation.asyncio, "to_thread", run_worker)
+    interaction = FakeReviewInteraction()
+
+    await bank_reconciliation._send_bank_reconciliation_inbox(interaction, "123")
+
+    text = "\n".join(content for content, _kwargs in interaction.followup.messages)
+    if lookup == "success":
+        assert "Sheet:  05-17    $12.34  Dinner at Chipotle" in text
+    else:
+        assert "Sheet:  expense!N12:R12 (2026-05); details unavailable" in text
+    assert "no spreadsheet row" not in text
+    assert all(kwargs["ephemeral"] for _content, kwargs in interaction.followup.messages)
+    assert len(interaction.followup.messages[-1][1]["view"].children) == 1
+    if lookup == "service-failure":
+        reader.assert_not_awaited()
+    else:
+        reader.assert_awaited_once_with("brian", [item], actor_key="123", limit=100)
+    assert digest.reviewed_items == (item,)
+
+
+@pytest.mark.asyncio
 async def test_bank_reconciliation_inbox_timeout_returns_private_followup(monkeypatch):
     async def stall_inbox_load(*_args, **_kwargs):
         await asyncio.sleep(1)
