@@ -829,6 +829,8 @@ Rationale: The sheet reader already resolved fixed expectations, but the Discord
 
 ## 2026-10-14 - Explicit Automatic Monthly Need Expense
 
+Display follow-up: at the user's request, restore the original checkmark/star formula in the current month and Template instead of Auto text. This supersedes only the label choice below. The indicator reflects whether the budget amount is nonzero; automation is controlled by `tracking_mode`, and it does not verify bank payment. Monthly rollover preserves both the schedule-linked amount and existing indicator formula.
+
 Decision: The user chose Student Loan as an automatic $60.23 monthly Need budget expense. Keep its existing dedicated Needs row and static-bill report category; link current/Template amount cells to the owner schedule and label their status Auto. Add optional `tracking_mode` (`manual` default, `automatic` opt-in) requiring a positive expected amount. Do not add a duplicate subscription, move budget rows, rewrite historical payments, or infer bank-payment confirmation. Manual loan logging must refuse automatic mode before mutation, and status queries explain it without a paid claim. Monthly Template copies preserve the formula.
 
 Automatic reminders use the configured fixed amount within the normal upcoming window and do not demand manual payment logging after the due day. Manual bill expectations, other owners, send claims/audit events and reconciliation lifecycle remain unchanged. Do not send a synthetic reminder to verify rollout; a user-requested read-only heartbeat checks the next real daily Discord digest.
