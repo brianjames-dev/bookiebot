@@ -6,7 +6,9 @@ Last updated: 2026-10-14
 
 ### Reconciliation Sheet details — 2026-10-14
 
-Implementation and automated verification complete; release/manual acceptance is STATUS checklist 138. The user confirmed PR #64's existing-digest delivery fix, then reported `no spreadsheet row (spreadsheet row)`. The persisted inbox deliberately skipped source hydration, losing date/amount/label despite retaining match lineage. It now carries saved references into the report and optionally reads owner-scoped batched action history or referenced schedule sources. Five-second timeout/failure falls back to readable cell/month references instead of withholding the report or claiming no match. Source values are never inferred from the bank row; grouped totals require every linked action. Added 16 regressions; focused **116 passed**, full local **2,218 passed / 380 skipped** (optional PostgreSQL and unavailable frontend test dependencies), Pyright **0 errors / 0 warnings**. No schema, matching decision, bank state or sheet mutation changes.
+Released: [PR #65](https://github.com/brianjames-dev/bookiebot/pull/65) passed both feature CI runs and merged into main as `1d47fc6` at the user's request. [Main verification](https://github.com/brianjames-dev/bookiebot/actions/runs/38587455968) passed **2,598 tests / zero skips** and the complete Python/frontend type, Apps Script, build and asset stack. Railway deployment `6a959359-5795-4cdb-9f87-9b958919a0e7` is successful/active; Discord login, command sync, web startup, public health and private report 401 are verified. Device acceptance remains STATUS checklist 138. This follow-up changes tracking docs only.
+
+Implementation released; manual device acceptance is STATUS checklist 138. The user confirmed PR #64's existing-digest delivery fix, then reported `no spreadsheet row (spreadsheet row)`. The persisted inbox deliberately skipped source hydration, losing date/amount/label despite retaining match lineage. It now carries saved references into the report and optionally reads owner-scoped batched action history or referenced schedule sources. Five-second timeout/failure falls back to readable cell/month references instead of withholding the report or claiming no match. Source values are never inferred from the bank row; grouped totals require every linked action. Added 16 regressions; focused **116 passed**, full local **2,218 passed / 380 skipped** (optional PostgreSQL and unavailable frontend test dependencies), Pyright **0 errors / 0 warnings**. No schema, matching decision, bank state or sheet mutation changes.
 
 ### Digest View Inbox response repair — 2026-10-14
 
@@ -423,7 +425,7 @@ Status: Complete first pass as of 2026-06-20. Normal unresolved views use a 60-d
 
 ### Slice 2 - Digest Lifecycle
 
-2026-10-14 Sheet-detail follow-up: implementation complete; bounded optional source enrichment and persisted-reference fallback restore useful match comparisons. Release/manual acceptance is STATUS checklist 138; the user's screenshot confirms prior report delivery. Durable digest claim work remains separate.
+2026-10-14 Sheet-detail follow-up: CI-verified and deployed through PR #65; bounded optional source enrichment and persisted-reference fallback restore useful match comparisons. Manual device acceptance is STATUS checklist 138; the user's screenshot confirms prior report delivery. Durable digest claim work remains separate.
 
 2026-10-14: completed, CI-verified and deployed the View Inbox multi-page delivery repair through PR #64. Manual existing-digest acceptance is STATUS checklist 137. Durable claimed/sent/failed lifecycle remains separate and pending.
 
