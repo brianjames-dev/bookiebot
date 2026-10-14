@@ -6,6 +6,8 @@ Last updated: 2026-10-14
 
 ### Automatic Student Loan Need expense — 2026-10-14
 
+Main integration follow-up: included indicator restoration `4a2f70e` at the user's request after [exact-commit CI](https://github.com/brianjames-dev/bookiebot/actions/runs/38614833010) passed all checks. Integration adds tracking docs only; live sheet checks already passed and next-digest acceptance remains checklist 141.
+
 User-requested display follow-up: restored the original checkmark/star formulas in October D23 and Template D18. Read-only comparison confirms exactly these two cells changed, preserving $60.23 formulas, automatic mode, totals, history and named ranges; native views show checkmarks. Rollover regression now preserves both formulas; Apps Script checks pass. Updated checklist 141 and the existing read-only heartbeat, whose actual next-digest verification remains pending.
 
 Released/activated: [PR #68](https://github.com/brianjames-dev/bookiebot/pull/68) passed both feature CI runs and merged as `d8bd0d4`; [main CI](https://github.com/brianjames-dev/bookiebot/actions/runs/38612309723) passed **2,632 tests / zero skips** and all type/build/asset checks. Railway `9daf37f3-29b3-4edc-a529-4816760ecf45` is successful/active; startup, health and authorization verified. Native/read-only acceptance confirms the six authorized cells plus one optional schedule column, $60.23/Auto in October and Template, Needs +$60.23, unchanged Wants spending/history/named ranges, and one Needs report item. September remains $119.92. No manual payment or synthetic Discord message; next actual DM check remains STATUS checklist 141.
