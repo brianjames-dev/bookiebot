@@ -13,6 +13,7 @@ from bookiebot.sheets.repo import get_sheets_repo
 from bookiebot.sheets.routing import now_pacific
 
 BillRecurrence = Literal["monthly", "quarterly"]
+BillTrackingMode = Literal["manual", "automatic"]
 
 
 class _WorksheetWithUpdate(Protocol):
@@ -55,6 +56,7 @@ class BillSchedule:
     source_range: str = ""
     updated_at: str = ""
     expected_amount: float | None = None
+    tracking_mode: BillTrackingMode = "manual"
 
 
 @dataclass(frozen=True)
@@ -162,6 +164,11 @@ def _bill_from_fields(fields: dict[str, str], source_range: str) -> tuple[BillSc
         return None, BillScheduleWarning(
             source_range, "invalid expected amount", (fields.get("display_name", ""), fields.get("expected_amount", "")),
         )
+    mode = fields.get("tracking_mode", "").strip().lower() or "manual"
+    if mode not in {"manual", "automatic"}:
+        return None, BillScheduleWarning(source_range, "invalid tracking mode", (fields.get("display_name", ""), mode))
+    if mode == "automatic" and expected_amount is None:
+        return None, BillScheduleWarning(source_range, "automatic bill requires expected amount", (fields.get("display_name", ""),))
     if expected_amount is None and _row_is_blank_template(fields):
         return None, None
 
@@ -194,6 +201,7 @@ def _bill_from_fields(fields: dict[str, str], source_range: str) -> tuple[BillSc
             source_range=source_range,
             updated_at=fields.get("updated_at", ""),
             expected_amount=expected_amount,
+            tracking_mode="automatic" if mode == "automatic" else "manual",
         ),
         None,
     )
@@ -259,7 +267,8 @@ def parse_bill_schedules_with_warnings(rows: list[list[str]] | None = None) -> t
             _slug(fields.get("display_name", "")),
             _slug(fields.get("source_label", "")),
         }
-        if legacy_keys & RETIRED_BILL_KEYS and not fields.get("expected_amount", "").strip():
+        if (legacy_keys & RETIRED_BILL_KEYS and not fields.get("expected_amount", "").strip()
+                and fields.get("tracking_mode", "").strip().lower() in {"", "manual"}):
             continue
         bill, warning = _bill_from_fields(fields, _source_range(row_index, len(header)))
         if bill:
@@ -353,7 +362,8 @@ def due_bill_reminders_for_bills(bills: list[BillSchedule], today: date) -> list
     reminders: list[BillReminder] = []
     for bill in bills:
         amount_entered, amount = bill_amount_for_source_label(bill.source_label)
-        reminder_amount = amount if amount_entered else bill.expected_amount
+        automatic = bill.tracking_mode == "automatic"
+        reminder_amount = bill.expected_amount if automatic else amount if amount_entered else bill.expected_amount
         pull_date = next_bill_pull_date(bill, today)
         if pull_date is not None:
             days_until = (pull_date - today).days
@@ -361,7 +371,7 @@ def due_bill_reminders_for_bills(bills: list[BillSchedule], today: date) -> list
                 reminders.append(BillReminder(bill, pull_date, days_until, reminder_amount, amount_entered))
 
         overdue_date = overdue_bill_pull_date(bill, today)
-        if overdue_date is not None and not amount_entered:
+        if overdue_date is not None and not amount_entered and not automatic:
             reminders.append(BillReminder(bill, overdue_date, (overdue_date - today).days, reminder_amount, False, overdue=True))
 
     return sorted(reminders, key=lambda reminder: (reminder.overdue, reminder.pull_date, reminder.bill.display_name.lower()))

@@ -4,6 +4,12 @@ Last updated: 2026-10-14
 
 ## Goal
 
+### Automatic Student Loan Need expense — 2026-10-14
+
+Implemented after explicit user confirmation: $60.23 monthly counts as an automatic Need expense, without payment logs. Reuse the existing dedicated Needs row/static-bill category and owner schedule; optional `tracking_mode=automatic` requires a positive expectation, while blank/manual retains existing behavior. Loan commands cannot overwrite automatic formulas and status does not claim verified bank payment. Reminders use the fixed amount in the normal seven-day window, with no false overdue notice. No duplicate subscription or historical rewrite.
+
+Fifteen new Python regressions and monthly Template-copy assertions; focused **222 passed**, full local **2,252 passed / 380 skipped**, clean Pyright and Apps Script checks. Before snapshot: October C23/D23, Template C18/D18; September C17=$119.92 must stay unchanged. CI/release/live activation pending; STATUS checklist 141. A user-requested daily 10:15 AM Pacific read-only heartbeat will inspect the next actual Discord DM and pause after verification; October 15 should omit the already-past automatic loan, while November 5–12 should show $60.23. Existing annual-master maintenance remains a separate backlog item.
+
 ### Fixed Student Loan reminders — 2026-10-14
 
 Released: [PR #67](https://github.com/brianjames-dev/bookiebot/pull/67) passed both feature CI runs and merged as `e2bd168`; [main CI](https://github.com/brianjames-dev/bookiebot/actions/runs/38606607805) passed **2,617 tests / zero skips** and all type/build/asset checks. Railway deployment `c17798ec-cd01-43b2-ac96-f37b6a587b9e` is successful/active. Verified Discord login, command sync, web startup, health 200 and private report 401. This follow-up changes tracking docs only; next normal digest acceptance remains STATUS checklist 140. Today's already-sent message was not reset or resent.
