@@ -297,7 +297,7 @@ def _bill_cash_pull(reminder: BillReminder) -> CashPullReminder:
         key=reminder.key,
         source="bill",
         amount=reminder.amount,
-        amount_missing=not reminder.amount_entered,
+        amount_missing=reminder.amount is None,
         overdue=reminder.overdue,
     )
 
@@ -324,8 +324,9 @@ def format_cash_pull_digest(
         else:
             grouped["upcoming"].append(reminder)
 
-    total = _cash_pull_total(reminders)
-    missing_count = _missing_amount_count(reminders)
+    upcoming = [reminder for reminder in reminders if not reminder.overdue]
+    total = _cash_pull_total(upcoming)
+    missing_count = _missing_amount_count(upcoming)
     if missing_count:
         missing_label = "missing amount" if missing_count == 1 else "missing amounts"
         headline = (
@@ -353,9 +354,11 @@ def format_cash_pull_digest(
     if overdue:
         if lines[-1] != "":
             lines.append("")
-        lines.append("Missing overdue:")
+        lines.append("Overdue (payment not recorded):")
         for reminder in overdue:
-            lines.append(f"`{reminder.name} - amount missing - {_format_pull_date(reminder)}`")
+            lines.append(
+                f"`{reminder.name} - {_format_reminder_amount(reminder)} - {_format_pull_date(reminder)}`"
+            )
     return "\n".join(lines)
 
 
