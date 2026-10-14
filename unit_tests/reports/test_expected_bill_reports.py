@@ -82,6 +82,26 @@ def test_recorded_student_loan_supersedes_expectation_and_is_not_variable_utilit
         assert payload["modeViews"][mode]["categorySpending"]["needs"] == amount
 
 
+def test_automatic_loan_budget_row_counts_once_as_need_and_preserves_historical_actuals(monkeypatch):
+    schedule = [BILL_SCHEDULE_HEADERS + ["tracking_mode"],
+        ["student_loan", "Student Loan", "monthly", "12", "", "Student Loan", "", "", "", "60.23", "automatic"]]
+    subscriptions = [["Needs", "", "(Monthly)"], [], ["Recurring:", "Name:", "Amount:"],
+        ["3rd", "Example Internet", "$61.50"]]
+    report, payload = _report(monkeypatch, [["Student Loan", "$60.23"]], schedule=schedule,
+        subscriptions=subscriptions, today=18)
+    assert [(item.label, item.amount, item.group) for item in report.payments] == [
+        ("Student Loan", 60.23, "static_bills_subscriptions_needs")]
+    for mode in ("current", "projected"):
+        view = payload["modeViews"][mode]
+        assert view["categorySpending"]["needs"] == 121.73
+        assert view["categorySpending"]["wants"] == 0
+        assert view["metrics"]["totalExpenses"] == 121.73
+    assert report.utility_history == []
+    assert len([event for event in _outflows(payload) if event["label"] == "Student Loan"]) == 1
+    historical, _ = _report(monkeypatch, [["Student Loan", "$119.92"]], month=8, schedule=schedule)
+    assert historical.payments[0].amount == 119.92
+
+
 def test_expected_bill_does_not_rewrite_closed_month_or_actual_history(monkeypatch):
     history = (
         reports.BudgetHistoryRows(reports.BudgetMonth(2026, 7), [["Student Loan", "$119.92"]]),

@@ -139,6 +139,44 @@ def test_schedule_does_not_fill_actual_on_read():
     assert repo.income.get_all_values()[0][2] == ""
 
 
+def automatic_repo():
+    repo = repo_for(rows=[["", "Student Loan", "60.23"]])
+    repo.bill_schedule.update([BILL_SCHEDULE_HEADERS + ["tracking_mode"],
+        ["student_loan", "Student Loan", "monthly", "12", "", "Student Loan", "", "", "", "60.23", "automatic"]])
+    return repo
+
+
+def test_automatic_loan_status_does_not_claim_a_verified_payment():
+    repo = automatic_repo()
+    with repo.patched(), sheet_user_context(BRIAN):
+        status = loans.student_loan_status()
+    assert status["automatic"] is True
+    assert status["amount"] == status["expectedAmount"] == 60.23
+    assert status["paid"] is None
+    assert repo.income.get_all_values() == [["", "Student Loan", "60.23"]]
+
+
+def test_manual_loan_logging_cannot_overwrite_an_automatic_budget_expense(monkeypatch):
+    repo = automatic_repo()
+    writer = MagicMock(wraps=repo.income.spreadsheet.values_batch_update)
+    monkeypatch.setattr(repo.income.spreadsheet, "values_batch_update", writer)
+    with repo.patched(), sheet_user_context(BRIAN), pytest.raises(SheetRoutingError, match="automatic monthly Need expense"):
+        loans.log_standalone_student_loan(120)
+    assert repo.income.get_all_values() == [["", "Student Loan", "60.23"]]
+    writer.assert_not_called()
+
+
+@pytest.mark.asyncio
+async def test_automatic_loan_query_explains_the_monthly_need_expense():
+    repo = automatic_repo()
+    message = message_for("Did I pay my student loan?")
+    with repo.patched(), sheet_user_context(BRIAN):
+        await handlers.standalone_student_loan_handler({}, message, logging_payment=False)
+    reply = message.channel.send.await_args.args[0]
+    assert "$60.23" in reply and "Need" in reply and "automatic" in reply.lower()
+    assert "recorded this month" not in reply
+
+
 @pytest.mark.asyncio
 async def test_author_scope_and_literal_amount_over_model_amount(monkeypatch):
     logged = []

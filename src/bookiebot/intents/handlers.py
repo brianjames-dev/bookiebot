@@ -1877,6 +1877,11 @@ async def standalone_student_loan_handler(entities, message, *, logging_payment:
         status = await asyncio.to_thread(student_loan_status)
         if not status["configured"]:
             await message.channel.send(status["note"])
+        elif status.get("automatic"):
+            await message.channel.send(
+                f"Student Loan is an automatic monthly Need expense: ${status['amount']:.2f}, "
+                f"scheduled on day {status['pullDay']}. No monthly payment log is required."
+            )
         elif status["paid"]:
             await message.channel.send(f"✅ Student loan recorded this month: ${status['amount']:.2f}.")
         else:

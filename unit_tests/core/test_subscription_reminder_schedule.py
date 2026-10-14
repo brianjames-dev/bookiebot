@@ -359,6 +359,25 @@ def test_overdue_amounts_do_not_change_upcoming_total_or_missing_count():
     assert "Upcoming Bill - amount missing - Oct 18" in text
 
 
+@pytest.mark.parametrize("current,listed,total", [
+    (date(2026, 11, 5), True, "70.23"), (date(2026, 10, 15), False, "10.00"),
+])
+def test_automatic_need_loan_in_daily_digest_has_known_amount_and_no_false_overdue(monkeypatch, current, listed, total):
+    repo = SheetsRepoStub(income_rows=[["", "Student Loan", "60.23"]],
+        bill_schedule_rows=[BILL_SCHEDULE_HEADERS + ["tracking_mode"],
+            ["student loan", "Student Loan", "monthly", "12", "", "Student Loan", "", "", "", "60.23", "automatic"]])
+    subscription = Subscription("Example Subscription", 10, "monthly", current.day + 1)
+    monkeypatch.setattr(subscription_reminders, "debug_subscription_sync", lambda: ([subscription], []))
+    monkeypatch.setattr(subscription_reminders, "has_system_event", lambda *_args: False)
+    with repo.patched():
+        prepared = subscription_reminders._prepare_due_reminder_messages("676638528590970917", "Brian", current)
+    text = prepared.messages[0]
+    assert text.startswith(f"Brian `${total}` will be pulled")
+    assert ("Student Loan - $60.23" in text) is listed
+    assert "amount missing" not in text and "Overdue" not in text
+    assert repo.income.get_all_values() == [["", "Student Loan", "60.23"]]
+
+
 def test_format_subscription_parse_warning_digest():
     warnings = [
         SubscriptionParseWarning(

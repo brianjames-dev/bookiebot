@@ -1,5 +1,11 @@
 # Student loan integration and sheet audit
 
+## Automatic Need expense — October 14, 2026
+
+The user explicitly chose **$60.23 as an automatic monthly Need expense**, without monthly payment entry. Implementation adds optional `tracking_mode=automatic` while keeping other owners/manual bills unchanged. Activation uses Brian's existing schedule and dedicated Student Loan row: K1 `tracking_mode`, K3 `automatic`, October C23 and Template C18 linked to the positive fixed expectation with `SUMIF`, and D23/D18 labeled Auto. No extra subscription or row is added, and September's recorded $119.92 is preserved. Activation and read-only before/after comparisons are pending release; STATUS checklist 141 records acceptance.
+
+The existing static-bill category already belongs to Needs and counts the amount once alongside Needs subscriptions, excluding it from Wants spending and variable utility history. Monthly rollover copies the Template formula and Auto marker. Queries identify an automatic budget expense without claiming a verified bank payment; manual loan logging is blocked before any write. Reminders use $60.23 only in the next-seven-day window, with no false overdue notice after day 12. Thus the next October 15 digest should omit the already-past automatic loan; its next reminder window begins November 5 for November 12. A read-only heartbeat will inspect the next normal Discord digest at 10:15 AM Pacific and report actual evidence.
+
 ## Fixed-amount reminder update — October 14, 2026
 
 The user corrected Brian's recurring amount to **$60.23 monthly**. Updated only `_BookieBot Bill Schedule!J3` from 59.96 to 60.23 in the existing personal workbook; monthly recurrence/day 12, source identity and account remain unchanged. Saved readback and a separate read-only API check verified the value. October and Template actuals remain zero, and no active duplicate loan subscription was found. The September audit below remains historical evidence.

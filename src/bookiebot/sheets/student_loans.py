@@ -90,6 +90,11 @@ def student_loan_status() -> dict[str, Any]:
     loan = configured_student_loan()
     if loan is None:
         return {"configured": False, "note": SUBSCRIPTION_ONLY_MESSAGE}
+    if loan.tracking_mode == "automatic":
+        return {"configured": True, "automatic": True, "label": loan.display_name,
+                "amount": loan.expected_amount, "paid": None,
+                "expectedAmount": loan.expected_amount, "pullDay": loan.pull_day,
+                "note": "Automatic monthly Need expense; no monthly payment log is required."}
     _row, value = _loan_row(get_sheets_repo().income_sheet(), loan)
     actual = _amount(value, allow_empty=True)
     return {"configured": True, "label": loan.display_name, "amount": float(actual),
@@ -106,6 +111,8 @@ def log_standalone_student_loan(amount: Any, *, return_action_id: bool = False):
         loan = configured_student_loan()
         if loan is None:
             raise SheetRoutingError(SUBSCRIPTION_ONLY_MESSAGE)
+        if loan.tracking_mode == "automatic":
+            raise SheetRoutingError("Student Loan is an automatic monthly Need expense. Update its fixed schedule amount instead of logging a separate payment.")
         ws = get_sheets_repo().income_sheet()
         row, previous = _loan_row(ws, loan)
         # Reuse the established source+amount anchors. Row insertion after this

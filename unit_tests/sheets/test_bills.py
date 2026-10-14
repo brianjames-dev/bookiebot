@@ -263,6 +263,36 @@ def test_overdue_expected_loan_is_not_marked_paid_and_actual_payment_stops_overd
         assert due_bill_reminders_for_bills([bill], date(2026, 9, 13)) == []
 
 
+@pytest.mark.parametrize("mode,expected,valid", [
+    ("", "60.23", True), ("automatic", "60.23", True),
+    ("manual", "60.23", True), ("automatic", "", False), ("unknown", "60.23", False),
+])
+def test_explicit_automatic_bill_tracking_requires_a_fixed_amount(mode, expected, valid):
+    rows = [BILL_SCHEDULE_HEADERS + ["tracking_mode"],
+        ["student_loan", "Student Loan", "monthly", "12", "", "Student Loan", "", "", "", expected, mode]]
+    bills, warnings = parse_bill_schedules_with_warnings(rows)
+    assert bool(bills) is valid
+    assert bool(warnings) is not valid
+    if valid:
+        assert bills[0].tracking_mode == (mode or "manual")
+
+
+@pytest.mark.parametrize("current,expected_count", [
+    (date(2026, 10, 5), 1), (date(2026, 10, 12), 1),
+    (date(2026, 10, 15), 0), (date(2026, 11, 5), 1),
+])
+def test_automatic_loan_reminds_only_in_upcoming_window_without_manual_payment(current, expected_count):
+    rows = [BILL_SCHEDULE_HEADERS + ["tracking_mode"],
+        ["student_loan", "Student Loan", "monthly", "12", "", "Student Loan", "", "", "", "60.23", "automatic"]]
+    bills = list_bill_schedules(rows)
+    repo = SheetsRepoStub(income_rows=[["", "Student Loan", "0"]])
+    with repo.patched():
+        reminders = due_bill_reminders_for_bills(bills, current)
+    assert len(reminders) == expected_count
+    assert all(reminder.amount == 60.23 and not reminder.overdue for reminder in reminders)
+    assert repo.income.get_all_values() == [["", "Student Loan", "0"]]
+
+
 def test_bill_amount_lookup_requires_a_unique_full_label_not_a_prefix_neighbor():
     repo = SheetsRepoStub(income_rows=[
         ["", "Student Loan Payment", "$242.29"],

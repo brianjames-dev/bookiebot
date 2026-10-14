@@ -826,3 +826,11 @@ Decision: Daily cash-pull digests use a bill's existing resolved amount (actual 
 The user set Brian's fixed Student Loan expectation to $60.23 monthly; retain the existing day 12. This supersedes the September $59.96 setting. Updating the owner-scoped schedule never marks a payment recorded, creates a subscription, transfers funds or changes another owner's loan.
 
 Rationale: The sheet reader already resolved fixed expectations, but the Discord adapter discarded them whenever no payment was logged. Known amount and recorded-payment status answer different questions; separating them restores reminders without inventing financial activity or counting past due dates as future pulls.
+
+## 2026-10-14 - Explicit Automatic Monthly Need Expense
+
+Decision: The user chose Student Loan as an automatic $60.23 monthly Need budget expense. Keep its existing dedicated Needs row and static-bill report category; link current/Template amount cells to the owner schedule and label their status Auto. Add optional `tracking_mode` (`manual` default, `automatic` opt-in) requiring a positive expected amount. Do not add a duplicate subscription, move budget rows, rewrite historical payments, or infer bank-payment confirmation. Manual loan logging must refuse automatic mode before mutation, and status queries explain it without a paid claim. Monthly Template copies preserve the formula.
+
+Automatic reminders use the configured fixed amount within the normal upcoming window and do not demand manual payment logging after the due day. Manual bill expectations, other owners, send claims/audit events and reconciliation lifecycle remain unchanged. Do not send a synthetic reminder to verify rollout; a user-requested read-only heartbeat checks the next real daily Discord digest.
+
+Rationale: The prior expectation restored reminders but intentionally left October at zero until a manual payment was recorded. The user explicitly requested and confirmed an automatic expense instead. Reusing the existing row avoids retroactively adding a global subscription to past months or counting the loan twice, while an explicit mode protects the automatic formula from standalone payment writes.
