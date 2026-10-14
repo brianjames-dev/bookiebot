@@ -6,7 +6,9 @@ Last updated: 2026-10-14
 
 ### Digest View Inbox response repair — 2026-10-14
 
-Implementation and automated verification complete; deployment/manual acceptance pending (STATUS checklist 137). Real Discord webhook tests reproduced `TypeError: expected view parameter to be of type View not NoneType`: multi-page automatic-match reports failed on the first page without controls, and unresolved reports stopped at subsequent pages. Pages without controls now omit `view`; private delivery, typing, current-month persisted reads and control placement retain their existing behavior. Eight regression cases cover one/multiple pages, automatic matches/unresolved items and new/persistent digest callbacks. Focused reconciliation suite: **51 passed**; full local **2,202 passed / 380 skipped** (optional PostgreSQL and unavailable frontend test dependencies), Pyright **0 errors / 0 warnings**. No matching, storage, lifecycle or sheet-mutation changes; the broader digest lifecycle backlog remains pending.
+Released: [PR #64](https://github.com/brianjames-dev/bookiebot/pull/64) passed both feature CI runs and merged into main as `a304eda` at the user's request. [Main CI](https://github.com/brianjames-dev/bookiebot/actions/runs/38584069503) passed **2,582 tests / zero skips** and all Python/frontend type, Apps Script, build and asset checks. Railway deployment `530322e8-c616-4708-a349-f28519c4b4ef` is successful/active; Discord login, command sync, web startup, public health and private report 401 are verified. Existing-digest device acceptance remains STATUS checklist 137. This follow-up changes tracking docs only.
+
+Real Discord webhook tests reproduced `TypeError: expected view parameter to be of type View not NoneType`: multi-page automatic-match reports failed on the first page without controls, and unresolved reports stopped at subsequent pages. Pages without controls now omit `view`; private delivery, typing, current-month persisted reads and control placement retain their existing behavior. Eight regression cases cover one/multiple pages, automatic matches/unresolved items and new/persistent digest callbacks. Focused reconciliation suite: **51 passed**; full local **2,202 passed / 380 skipped** (optional PostgreSQL and unavailable frontend test dependencies), Pyright **0 errors / 0 warnings**. No matching, storage, lifecycle or sheet-mutation changes; the broader digest lifecycle backlog remains pending.
 
 ### ESPP web preview revision — 2026-10-13
 
@@ -417,7 +419,7 @@ Status: Complete first pass as of 2026-06-20. Normal unresolved views use a 60-d
 
 ### Slice 2 - Digest Lifecycle
 
-2026-10-14: completed the View Inbox multi-page delivery repair; release/manual acceptance is STATUS checklist 137. Durable claimed/sent/failed lifecycle remains separate and pending.
+2026-10-14: completed, CI-verified and deployed the View Inbox multi-page delivery repair through PR #64. Manual existing-digest acceptance is STATUS checklist 137. Durable claimed/sent/failed lifecycle remains separate and pending.
 
 - Introduce an explicit digest lifecycle: `claimed`, `sent`, `failed`.
 - Ensure daily sends use consistent event semantics.
