@@ -6,7 +6,9 @@ Last updated: 2026-10-14
 
 ### Fixed Student Loan reminders — 2026-10-14
 
-Implementation and live setting complete; CI/release pending. The user corrected the recurring loan to **$60.23 monthly**. Saved only Brian's existing `_BookieBot Bill Schedule!J3` (previously 59.96), retaining monthly/day 12 and owner/source identity. Chrome saved readback and a read-only API check passed; October/Template actuals remain zero, with no duplicate active loan subscription. No payment or notification was created.
+Released: [PR #67](https://github.com/brianjames-dev/bookiebot/pull/67) passed both feature CI runs and merged as `e2bd168`; [main CI](https://github.com/brianjames-dev/bookiebot/actions/runs/38606607805) passed **2,617 tests / zero skips** and all type/build/asset checks. Railway deployment `c17798ec-cd01-43b2-ac96-f37b6a587b9e` is successful/active. Verified Discord login, command sync, web startup, health 200 and private report 401. This follow-up changes tracking docs only; next normal digest acceptance remains STATUS checklist 140. Today's already-sent message was not reset or resent.
+
+The user corrected the recurring loan to **$60.23 monthly**. Saved only Brian's existing `_BookieBot Bill Schedule!J3` (previously 59.96), retaining monthly/day 12 and owner/source identity. Chrome saved readback and a read-only API check passed; October/Template actuals remain zero, with no duplicate active loan subscription. No payment or manual notification was created.
 
 The sheet reader already supplied expected amounts, but Discord incorrectly used the actual-recorded flag as amount availability and hardcoded overdue rows to amount missing. The adapter now preserves known amounts; overdue rows appear under **Overdue (payment not recorded)** and stay outside next-seven-day totals/missing counts. Existing actual replacement, duplicate suppression, send claims and post-send audit semantics remain. Eight new regressions; focused **158 passed**, full local **2,237 passed / 380 skipped**, Pyright clean. Manual acceptance is STATUS checklist 140; the prior annual-master follow-up remains separate. User accepted the preceding Sheet-label release.
 
