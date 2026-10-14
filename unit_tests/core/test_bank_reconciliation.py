@@ -380,6 +380,7 @@ def test_format_bank_reconciliation_digest_compares_bank_and_sheet_match():
                 bank_amount=76.90,
                 matched_date="2026-05-17",
                 matched_name="Baby registry stuff at Amazon",
+                matched_person="Brian (BofA)",
                 matched_amount=76.90,
                 source_type="spreadsheet row",
                 reason="matched expense action within 1d",
@@ -391,6 +392,7 @@ def test_format_bank_reconciliation_digest_compares_bank_and_sheet_match():
     assert "```text\nBank:" in output
     assert "Bank:   05-18    $76.90  Amazon" in output
     assert "Sheet:  05-17    $76.90  Baby registry stuff at Amazon" in output
+    assert "Person: Brian (BofA)" in output
     assert "Reason: matched expense action within 1d" in output
     assert "Conf:   92%" in output
 
@@ -410,7 +412,8 @@ def test_format_bank_reconciliation_digest_chunks_long_match_report():
             bank_name=f"Bank Merchant {index}",
             bank_amount=10.0 + index,
             matched_date="2026-07-12",
-            matched_name=f"Sheet Item {index}",
+            matched_name=f"Sheet Item {index} at " + "Long merchant location " * 8,
+            matched_person="A long person and payment-method label " * 8,
             matched_amount=10.0 + index,
             source_type="spreadsheet row",
             reason="matched expense action within 1d",

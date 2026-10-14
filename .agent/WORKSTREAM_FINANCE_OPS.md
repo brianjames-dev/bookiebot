@@ -4,6 +4,10 @@ Last updated: 2026-10-14
 
 ## Goal
 
+### Reconciliation Sheet labels — 2026-10-14
+
+Implementation complete; the user authorized merge/deployment after CI. Reports reuse the existing named-field reader, including canonical split `display_fields`, to show Item at Location (or the available field), Gas with any recorded Location, and a separate Person line. Missing descriptions fall back to the category; complete groups deduplicate Person, while incomplete groups retain the persisted-reference fallback. This changes report presentation only, preserving matching/scoring labels, bank merchant labels, source dates/amounts and the bounded hydration lifecycle. Added 11 regressions and expanded existing formatting, grouping and end-to-end private delivery checks. Focused **127 passed**, full local **2,229 passed / 380 skipped**, Pyright clean. CI/release pending; manual acceptance is STATUS checklist 139. No financial writes.
+
 ### Reconciliation Sheet details — 2026-10-14
 
 Read-only acceptance: all seven cards in the user's current screenshot have dates/amounts matching active saved actions and the live October cells. Food descriptions match Item; the split grocery description matches its canonical Item in the existing reimbursement mirror. Gas has no Item/Location fields, so the current first-text heuristic displays Person. Record a pending display improvement for consistent category-aware labels with Item/Location and separate Person. The user requested verification/explanation only; no source or financial data changes were made. STATUS checklist 138 records acceptance.

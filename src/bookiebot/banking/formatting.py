@@ -539,7 +539,7 @@ def _format_reconciliation_match_report_entry(match: ReconciliationReportMatch) 
         sheet = (
             f"{_short_date(match.matched_date)}  "
             f"{_short_money(match.matched_amount):>8}  "
-            f"{_clip(match.matched_name, 46)}"
+            f"{_clip(match.matched_name, 96)}"
         )
     elif match.matched_sheet_ref:
         sheet = f"{_report_sheet_reference(match.matched_sheet_ref)}; details unavailable"
@@ -547,9 +547,13 @@ def _format_reconciliation_match_report_entry(match: ReconciliationReportMatch) 
         sheet = f"matched {match.source_type}; details unavailable"
     else:
         sheet = f"no spreadsheet row ({match.source_type})"
-    return [
+    lines = [
         f"Bank:   {bank}",
         f"Sheet:  {sheet}",
+    ]
+    if match.matched_person:
+        lines.append(f"Person: {_clip(match.matched_person, 80)}")
+    return lines + [
         f"Reason: {_clip(match.reason, 54)}",
         f"Conf:   {match.confidence:.0%}",
     ]

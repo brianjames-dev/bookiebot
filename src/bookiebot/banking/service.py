@@ -48,6 +48,7 @@ from bookiebot.sheets.auth import (
     get_existing_personal_worksheet, get_gspread_client,
 )
 from bookiebot.sheets.bills import bill_source_amount, list_bill_schedules, next_bill_pull_date
+from bookiebot.sheets.config import expense_category_label, normalize_expense_category
 from bookiebot.sheets.routing import (
     now_pacific, sheet_user_context, actor_key_aliases, get_current_month_name,
     get_shared_expenses_spreadsheet_id, MissingYearConfigError,
@@ -60,7 +61,7 @@ from bookiebot.sheets.subscriptions import (
 )
 from bookiebot.banking.store import BankStore, WEBHOOK_LEASE_SECONDS
 from bookiebot.sheets.undo import (
-    LoggedAction, _LOG_HEADERS, _logged_action_from_row,
+    LoggedAction, _LOG_HEADERS, _field_values_for_action, _logged_action_from_row,
     delete_recent_action, read_active_logged_actions as _read_current_logged_actions,
     undo_logged_action, update_recent_action,
 )
@@ -420,6 +421,18 @@ def _report_source_type(item: ReconciliationItem, matched: ActionLogCandidate | 
     if item.matched_sheet_ref:
         return "schedule"
     return "automatic rule"
+
+
+def _report_action_details(logged: LoggedAction, candidate: ActionLogCandidate) -> tuple[str, str | None]:
+    """Use named sheet fields for display without changing matching/scoring labels."""
+    if candidate.action_type != "expense":
+        return candidate.label, None
+    fields = _field_values_for_action(logged.action)
+    category = normalize_expense_category(logged.action.metadata.get("category"))
+    item = "Gas" if category == "gas" else fields.get("item", "").strip()
+    location = fields.get("location", "").strip()
+    label = f"{item} at {location}" if item and location else item or location
+    return label or expense_category_label(category) or "Expense", fields.get("person", "").strip() or None
 
 
 class BankingService:
@@ -929,11 +942,15 @@ class BankingService:
             return []
 
         action_candidates: dict[str, ActionLogCandidate] = {}
+        action_people: dict[str, str] = {}
         if actor_key and any(item.matched_action_log_id for item in matched_items):
             for logged in read_active_logged_actions(actor_key):
                 candidate = action_log_candidate_by_id(logged)
                 if candidate is not None:
-                    action_candidates[logged.id] = candidate
+                    label, person = _report_action_details(logged, candidate)
+                    action_candidates[logged.id] = replace(candidate, label=label)
+                    if person:
+                        action_people[logged.id] = person
 
         schedule_transactions = [
             item.transaction for item in matched_items
@@ -948,6 +965,10 @@ class BankingService:
         report: list[ReconciliationReportMatch] = []
         for item in matched_items:
             matched = self._matched_report_candidate(item, action_candidates, scheduled_pulls)
+            people = dict.fromkeys(
+                action_people[action_id] for action_id in matched.action_id.split("+")
+                if action_id in action_people
+            ) if matched else {}
             transaction = item.transaction
             report.append(
                 ReconciliationReportMatch(
@@ -962,6 +983,7 @@ class BankingService:
                     reason=item.notes or "automatic reconciliation rule",
                     confidence=item.confidence,
                     matched_sheet_ref=item.matched_sheet_ref,
+                    matched_person=" + ".join(people) or None,
                 )
             )
         return report
