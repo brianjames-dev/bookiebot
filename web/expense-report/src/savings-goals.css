@@ -1,4 +1,5 @@
-.bb-goals-section.bb-card { position: relative; isolation: isolate; overflow: visible; background: hsl(var(--card)); color: hsl(var(--card-foreground)); }
+/* Keep overflowing goal menus above the following Investments band. */
+.bb-goals-section.bb-card { position: relative; z-index: 1; isolation: isolate; overflow: visible; background: hsl(var(--card)); color: hsl(var(--card-foreground)); }
 /* Paint the full-width band without clipping the goal options menus. */
 .bb-goals-section::before { content: ""; position: absolute; inset: 0; z-index: -1; pointer-events: none; background: hsl(var(--card)); box-shadow: 0 0 0 100vmax hsl(var(--card)); clip-path: inset(0 -100vmax); }
 .bb-savings-summary { margin-top: 12px; max-width: 480px; min-width: 0; }

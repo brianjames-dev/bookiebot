@@ -4,6 +4,10 @@ Last updated: 2026-10-14
 
 ## Goal
 
+### Savings menu overflow — 2026-10-14
+
+Complete: raised the isolated Savings card above Investments while retaining visible overflow and the existing full-width backgrounds. The last active or archived goal's menu can cross the section boundary and receive taps. Added a regression that failed before the CSS fix and rebuilt the shipped stylesheet. Focused **15 passed**, full local **2,281 passed / 352 optional PostgreSQL skipped**, clean Python/frontend types and build. Production-build WebKit/Chromium passed 12 width/theme cases for overlap, actions and dismissal; the old layer order reproduced the obstruction in all 12. Device acceptance after deployment is STATUS checklist 142. This is presentation-only; savings allocation and ESPP behavior are unchanged.
+
 ### Automatic Student Loan Need expense — 2026-10-14
 
 Main integration follow-up: included indicator restoration `4a2f70e` at the user's request after [exact-commit CI](https://github.com/brianjames-dev/bookiebot/actions/runs/38614833010) passed all checks. Integration adds tracking docs only; live sheet checks already passed and next-digest acceptance remains checklist 141.
