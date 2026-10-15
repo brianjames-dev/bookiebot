@@ -1,8 +1,10 @@
 # Agent Status
 
-Last updated: 2026-10-14
+Last updated: 2026-10-15
 
 ## Active Focus
+
+Savings menu overflow released (2026-10-15): [PR #69](https://github.com/brianjames-dev/bookiebot/pull/69) merged as `e5232d1` after both feature CI runs passed. [Main CI](https://github.com/brianjames-dev/bookiebot/actions/runs/38754120365) passed **2,633 tests / zero skips** and Python/frontend types, Apps Script, build and asset parity; the merged tree exactly matches tested feature head `351ed8c`. Railway deployment `6c261567-92c3-493c-9e1e-42a7bbdf2584` is successful/active with verified Discord login, command sync and web startup. Public health returns 200/`ok: true`; frontend version **417c9dda336f1e9eef08193d** and all three public assets match the tested build byte-for-byte; private report access remains 401. This follow-up records release evidence only. iPhone acceptance remains checklist 142.
 
 Savings menu overflow (2026-10-14): raised the isolated Savings card above the following Investments band so goal options remain visible and clickable across the section boundary. Rebuilt the shipped CSS and added a regression that fails without the fix. Focused **15 passed**, full local **2,281 passed / 352 optional PostgreSQL skipped**, clean Pyright/frontend typecheck/build. Production-build WebKit/Chromium passed 12 width/theme cases for active and archived menus, action selection, Escape/outside dismissal and no horizontal overflow; restoring the original layer order reproduced the obstruction in all 12. Device acceptance after deployment is checklist 142.
 
@@ -132,7 +134,7 @@ All eight September 6 audit batches are implemented and verified locally. Each b
 
 ## On Deck
 
-After deploying the Savings menu overflow fix, perform checklist 142 on iPhone. Implementation, regression coverage and local browser verification are complete.
+Savings menu overflow is deployed and main CI/production asset parity passed. Load the app Update and perform checklist 142 on iPhone; active and archived goal menus should remain visible and tappable above Investments.
 
 Await the scheduled read-only check of the next normal Discord digest (checklist 141). Automatic Student Loan Need budgeting is deployed and active; current/Template amounts, totals and preserved history are verified. October 12 has passed, so October 15 should omit a false overdue loan; November 5–12 reminders should show $60.23. Heartbeat `verify-student-loan-daily-reminder` runs at 10:15 AM Pacific, reports actual evidence and pauses after success. Prior manual-reminder checklist 140 is superseded; do not force a Discord send or reset delivery audits.
 
@@ -192,6 +194,10 @@ Student-loan activation is complete. Verify the deployed fixed-bill display and 
 25. Harden recent-action pending state across restarts/deploys, since selections currently live only in process memory.
 26. Improve targeted recent-action search so commands can find older matches, not only the latest 10 recent actions.
 27. Explore clarifying questions before logging when BookieBot is uncertain instead of guessing or silently failing.
+
+## Completed 2026-10-15
+
+- Merged Savings menu overflow PR #69 as `e5232d1` after both feature CI runs passed; main CI passed **2,633 tests / zero skips** and the complete type/build/asset stack. Railway `6c261567-92c3-493c-9e1e-42a7bbdf2584` is successful/active with verified Discord/web startup, health 200 and private report 401. All three public frontend assets match the tested build exactly; version **417c9dda336f1e9eef08193d**. Updated release/on-deck tracking; phone acceptance remains checklist 142. No additional runtime changes or financial test writes.
 
 ## Completed 2026-10-14
 
@@ -1177,6 +1183,8 @@ Use a test row or low-risk real row in Discord:
 142. Savings menu overflow: after deployment, choose Update, open Savings and tap the last active goal's ⋯. All four actions must remain visible and tappable over the darker Investments section. Open Archive goal and cancel; verify Escape and tapping outside dismiss the menu. Expand Archived goals and inspect the final goal's History/Restore menu across the same boundary. Check both themes and narrow/desktop widths; dismiss without submitting changes to real goals.
 
 ## Verification Baseline
+
+2026-10-15 Savings menu release: feature push [CI](https://github.com/brianjames-dev/bookiebot/actions/runs/38686967791), PR [CI](https://github.com/brianjames-dev/bookiebot/actions/runs/38753600716), and [main CI](https://github.com/brianjames-dev/bookiebot/actions/runs/38754120365) passed all checks, including **2,633 tests / zero skips**, PostgreSQL, Python/frontend types, Apps Script, production build and committed-asset parity. Merge `e5232d1` exactly matches feature `351ed8c`. Railway Details confirms deployment `6c261567-92c3-493c-9e1e-42a7bbdf2584` is successful/active for that merge; deploy logs confirm Discord login, command sync and web startup. Read-only public probes verify health 200/`ok: true`, version **417c9dda336f1e9eef08193d**, exact JS/CSS/setup asset bytes, no-store version response and unauthenticated report 401. This follow-up changes tracking docs only; device checklist 142 remains pending.
 
 2026-10-14 Savings menu overflow: focused Savings/ESPP **15 passed**; full `python -m pytest unit_tests` **2,281 passed / 352 optional PostgreSQL skipped**, existing Kaleido warning only. Python 3.12/Pyright **0 errors / 0 warnings**; frontend typecheck/build and `git diff --check` clean. Initial sandboxed report tests could not bind local servers; the full suite passed with test-server access. Production-build WebKit/Chromium covered 320/390/1280px in light/dark (12 cases), active/archived menus above Investments, action selection/cancellation, Escape/outside dismissal and no horizontal overflow/page errors. The original CSS layer order reproduced the covered menu in every case. Sample-data QA made no financial writes; manual acceptance after deployment is checklist 142.
 

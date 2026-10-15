@@ -1,10 +1,12 @@
 # Finance Operations Workstream
 
-Last updated: 2026-10-14
+Last updated: 2026-10-15
 
 ## Goal
 
 ### Savings menu overflow — 2026-10-14
+
+Released 2026-10-15: [PR #69](https://github.com/brianjames-dev/bookiebot/pull/69) merged as `e5232d1` after both feature CI runs passed. [Main CI](https://github.com/brianjames-dev/bookiebot/actions/runs/38754120365) passed **2,633 tests / zero skips** and all type/build/asset checks; merged source matches tested feature `351ed8c`. Railway `6c261567-92c3-493c-9e1e-42a7bbdf2584` is successful/active with verified Discord/web startup, health 200 and private report 401. Version **417c9dda336f1e9eef08193d** and all three public frontend assets match the tested build exactly. This follow-up records release evidence only; phone acceptance remains STATUS checklist 142. No financial test writes.
 
 Complete: raised the isolated Savings card above Investments while retaining visible overflow and the existing full-width backgrounds. The last active or archived goal's menu can cross the section boundary and receive taps. Added a regression that failed before the CSS fix and rebuilt the shipped stylesheet. Focused **15 passed**, full local **2,281 passed / 352 optional PostgreSQL skipped**, clean Python/frontend types and build. Production-build WebKit/Chromium passed 12 width/theme cases for overlap, actions and dismissal; the old layer order reproduced the obstruction in all 12. Device acceptance after deployment is STATUS checklist 142. This is presentation-only; savings allocation and ESPP behavior are unchanged.
 
