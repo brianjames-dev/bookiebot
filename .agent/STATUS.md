@@ -4,6 +4,8 @@ Last updated: 2026-10-14
 
 ## Active Focus
 
+Savings menu overflow (2026-10-14): raised the isolated Savings card above the following Investments band so goal options remain visible and clickable across the section boundary. Rebuilt the shipped CSS and added a regression that fails without the fix. Focused **15 passed**, full local **2,281 passed / 352 optional PostgreSQL skipped**, clean Pyright/frontend typecheck/build. Production-build WebKit/Chromium passed 12 width/theme cases for active and archived menus, action selection, Escape/outside dismissal and no horizontal overflow; restoring the original layer order reproduced the obstruction in all 12. Device acceptance after deployment is checklist 142.
+
 Student Loan indicator main integration (2026-10-14): includes `4a2f70e` at the user's request. [Verification](https://github.com/brianjames-dev/bookiebot/actions/runs/38614833010) passed for that exact commit, including Python/database tests, types, Apps Script rollover, frontend build and asset parity. Integration tracking changes docs only beyond that tested tree; no runtime source changes. The live October/Template indicators are already restored and verified. Next real digest acceptance remains checklist 141.
 
 Student Loan indicator follow-up (2026-10-14): restored the original checkmark/star formulas in October D23 and Template D18 at the user's request. Only these two live cells changed; automatic $60.23 Need budgeting, schedule, totals and history remain intact. The rollover regression now preserves both the amount and indicator formulas. Checklist 141 and the existing next-digest heartbeat remain active with updated wording.
@@ -130,6 +132,8 @@ All eight September 6 audit batches are implemented and verified locally. Each b
 
 ## On Deck
 
+After deploying the Savings menu overflow fix, perform checklist 142 on iPhone. Implementation, regression coverage and local browser verification are complete.
+
 Await the scheduled read-only check of the next normal Discord digest (checklist 141). Automatic Student Loan Need budgeting is deployed and active; current/Template amounts, totals and preserved history are verified. October 12 has passed, so October 15 should omit a false overdue loan; November 5–12 reminders should show $60.23. Heartbeat `verify-student-loan-daily-reminder` runs at 10:15 AM Pacific, reports actual evidence and pauses after success. Prior manual-reminder checklist 140 is superseded; do not force a Discord send or reset delivery audits.
 
 ESPP is deployed and main verification/production asset parity passed. Load the app Update and perform device checklist 136, then real-payroll checklist 135. Live Brian October/Template and Apps Script are already configured; do not rerun setup or log synthetic paychecks into production. Check the actual first enrolled deposit on 10/23 and update Expected Income Amount if its expected bank-deposit amount changes. Prior release/device acceptance items remain below.
@@ -190,6 +194,8 @@ Student-loan activation is complete. Verify the deployed fixed-bill display and 
 27. Explore clarifying questions before logging when BookieBot is uncertain instead of guessing or silently failing.
 
 ## Completed 2026-10-14
+
+- Fixed Savings goal options being covered by the next Investments section with a scoped section z-index and retained visible overflow. Added a failing-before/passing-after CSS regression and rebuilt the embedded stylesheet. Focused **15 passed**, full local **2,281 passed / 352 optional PostgreSQL skipped**, Python/frontend types and build clean; WebKit/Chromium passed 12 viewport/theme cases, including archived menus and dismissals. Updated STATUS and the finance work log; manual acceptance is checklist 142.
 
 - Integrated the Student Loan indicator follow-up `4a2f70e` into main after exact-commit CI passed all checks. Kept the already-verified live checkmark/star restoration, $60.23 automatic Need expense and existing next-digest heartbeat unchanged. This integration adds tracking documentation only; manual acceptance remains checklist 141.
 - Restored October D23 and Template D18 from Auto to their original `IF(Crow <> 0, "✅", "⭐")` formulas. Native visual checks and read-only snapshots confirm exactly two changed cells, unchanged $60.23 amount formulas/schedule/totals/history/named ranges, and checkmarks in both tabs. Updated the rollover fixture, README, loan integration notes, workstream and decision; updated the existing digest heartbeat wording. Apps Script income/rollover checks pass. Manual check: open the Student Loan row in October/Template and confirm $60.23 plus a checkmark; automatic mode remains in schedule K3.
@@ -1168,7 +1174,11 @@ Use a test row or low-risk real row in Discord:
 
 89. Compact phone UI: fully close/reopen both installed apps after deployment. Verify compact month/person header, Current/Projected, refresh icon/time and three-dot theme/signout controls. Open/close Calendar and Category Mix dialogs via close/backdrop; confirm no final flash or page jump. Toggle Bills/Burn Rate Details and confirm lines resize with the layout. Compare calendar dots and tooltip labels to Category Mix (mixed days show multiple colors); verify today's existing Daily Spending row is highlighted, including near Pacific midnight, and reimbursements use the chart-band background in both themes. Offline/manual refresh must clearly label older data; reconnect and confirm fresh values without resetting Projected.
 
+142. Savings menu overflow: after deployment, choose Update, open Savings and tap the last active goal's ⋯. All four actions must remain visible and tappable over the darker Investments section. Open Archive goal and cancel; verify Escape and tapping outside dismiss the menu. Expand Archived goals and inspect the final goal's History/Restore menu across the same boundary. Check both themes and narrow/desktop widths; dismiss without submitting changes to real goals.
+
 ## Verification Baseline
+
+2026-10-14 Savings menu overflow: focused Savings/ESPP **15 passed**; full `python -m pytest unit_tests` **2,281 passed / 352 optional PostgreSQL skipped**, existing Kaleido warning only. Python 3.12/Pyright **0 errors / 0 warnings**; frontend typecheck/build and `git diff --check` clean. Initial sandboxed report tests could not bind local servers; the full suite passed with test-server access. Production-build WebKit/Chromium covered 320/390/1280px in light/dark (12 cases), active/archived menus above Investments, action selection/cancellation, Escape/outside dismissal and no horizontal overflow/page errors. The original CSS layer order reproduced the covered menu in every case. Sample-data QA made no financial writes; manual acceptance after deployment is checklist 142.
 
 2026-10-14 Student Loan indicator restoration: native checks and read-only snapshot comparison passed, proving only October D23/Template D18 changed and exactly match their original formulas. $60.23, automatic schedule, all other checked values/formulas, totals, history, named ranges and sheet properties are preserved. `node unit_tests/scripts/income_settings_test.cjs` and `git diff --check` passed; no runtime source changes.
 
