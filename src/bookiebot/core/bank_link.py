@@ -154,11 +154,14 @@ async def _bank_exchange_public_token(request: web.Request) -> web.Response:
 async def _bank_plaid_webhook(request: web.Request) -> web.Response:
     try:
         secret = _plaid_webhook_secret()
-        if secret:
-            supplied = request.headers.get("X-BookieBot-Webhook-Secret", "").strip()
-            supplied = supplied or request.query.get("secret", "").strip()
-            if not hmac.compare_digest(supplied, secret):
-                return _json_error("Invalid webhook secret", status=401)
+        if not secret:
+            # Fail closed: an open webhook on a public HTTP server would allow anyone
+            # to enqueue events and drive bank sync against real Items.
+            return _json_error("Webhook secret is not configured", status=503)
+        supplied = request.headers.get("X-BookieBot-Webhook-Secret", "").strip()
+        supplied = supplied or request.query.get("secret", "").strip()
+        if not supplied or not hmac.compare_digest(supplied, secret):
+            return _json_error("Invalid webhook secret", status=401)
         body = await _request_json(request)
         service = build_banking_service()
         event = service.receive_plaid_webhook(body)
