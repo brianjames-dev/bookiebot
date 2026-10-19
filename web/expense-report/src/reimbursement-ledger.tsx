@@ -277,6 +277,8 @@ function LedgerContents({ snapshot, disabled, run, refresh, refreshing }: {
     : snapshot.projectionPending ? "Wait for expense sheets to finish syncing before resetting balances." : ""
   const receivable = allocations.filter(item => item.payerOwner === ownerKey && item.outstandingCents > 0)
   const receiveAllBlocked = receivable.some(item => !writable(item) || item.version !== item.projectedVersion || Boolean(item.clearedCents))
+  const showReceiveAll = Boolean(direction === "to" && snapshot.resetState && (receivable.length > 0 || receiveAllOpen))
+  const showReset = Boolean(snapshot.resetState && (totals.to > 0 || totals.from > 0 || resetOpen))
   return <>
     <SlidingSelection value={direction} className="bb-ledger-directions" role="group" aria-label="Reimbursement direction">
       <button type="button" aria-pressed={direction === "to"} onClick={() => setDirection("to")}>Owed to you<FittedAmount className="bb-ledger-direction-amount">{money(totals.to)}</FittedAmount></button>
@@ -292,18 +294,20 @@ function LedgerContents({ snapshot, disabled, run, refresh, refreshing }: {
       <ol>{rows.map((group, index) => <li key={group.key} data-segment={index}><div className="bb-reimbursement-bar-label"><span><i className="bb-reimbursement-swatch" aria-hidden="true" />{group.label}</span><FittedAmount className="bb-reimbursement-bar-amount">{money(group.cents)}</FittedAmount></div></li>)}</ol>
     </figure>}
     {pendingOffset && <p className="bb-ledger-note">Confirm pending payments before offsetting those expenses.</p>}
-    {direction === "to" && snapshot.resetState && (receivable.length > 0 || receiveAllOpen) && <>
-      <button className="bb-ledger-receive-all-toggle" type="button" disabled={disabled || receiveAllBlocked}
+    {(showReceiveAll || showReset) && <div className="bb-ledger-bulk-actions" role="group" aria-label="Shared balance actions">
+      {showReceiveAll && <button className="bb-ledger-receive-all-toggle" type="button" disabled={disabled || receiveAllBlocked}
         aria-expanded={receiveAllOpen} aria-controls={receiveAllId}
-        onClick={() => { if (!receiveAllOpen) setReceiveAllReview(value => value + 1); setReceiveAllOpen(!receiveAllOpen) }}>Mark all received</button>
+        onClick={() => { if (!receiveAllOpen) setReceiveAllReview(value => value + 1); setReceiveAllOpen(!receiveAllOpen) }}>Mark all received</button>}
+      {showReset && <button className="bb-ledger-reset-toggle" type="button" disabled={disabled || Boolean(resetBlocked)} aria-expanded={resetOpen} aria-controls={resetId} onClick={() => { if (!resetOpen) setResetReview(value => value + 1); setResetOpen(!resetOpen) }}>Reset balances</button>}
+    </div>}
+    {showReceiveAll && <>
       <RetainedPanel id={receiveAllId} open={receiveAllOpen}><ReceiveAllEditor key={receiveAllReview} snapshot={snapshot}
         disabled={disabled || receiveAllBlocked} run={run} close={() => setReceiveAllOpen(false)} /></RetainedPanel>
       {receiveAllBlocked && <p className="bb-ledger-note" role="status">Finish syncing or review historical expenses before marking all received.</p>}
     </>}
     {eligible.to > 0 && eligible.from > 0 && <><button className="bb-ledger-offset-toggle" type="button" disabled={disabled} aria-expanded={offsetOpen} aria-controls={offsetId} onClick={() => setOffsetOpen(!offsetOpen)}>Offset balances</button>
       <RetainedPanel id={offsetId} open={offsetOpen}><OffsetEditor allocations={allocations} events={events} owner={ownerKey} disabled={disabled} run={run} close={() => setOffsetOpen(false)} /></RetainedPanel></>}
-    {snapshot.resetState && (totals.to > 0 || totals.from > 0 || resetOpen) && <>
-      <button className="bb-ledger-reset-toggle" type="button" disabled={disabled || Boolean(resetBlocked)} aria-expanded={resetOpen} aria-controls={resetId} onClick={() => { if (!resetOpen) setResetReview(value => value + 1); setResetOpen(!resetOpen) }}>Reset balances</button>
+    {showReset && <>
       <RetainedPanel id={resetId} open={resetOpen}><ResetEditor key={resetReview} snapshot={snapshot} disabled={disabled || Boolean(resetBlocked)} run={run} close={() => setResetOpen(false)} /></RetainedPanel>
     </>}
     {resetBlocked && snapshot.resetState && <p className="bb-ledger-note" role="status">{resetBlocked}</p>}

@@ -4,6 +4,8 @@ Last updated: 2026-10-18
 
 ## Active Focus
 
+Shared balance action buttons (2026-10-18): Mark all received and Reset balances now share one two-column row. Received uses the filled primary theme color; Reset uses a subdued outline. Existing visibility, disabled states and separate review/confirmation forms remain intact. Rebuilt committed assets; both reimbursement UI suites (**2 passed**), frontend typecheck/build and diff check passed. Sample-data browser review passed 320/390/1280px in light/dark themes with 44px targets, no overflow and both correct review forms. Release/iPhone acceptance is checklist 144. No production financial changes.
+
 PG&E/bulk receipts released (2026-10-18): [PR #71](https://github.com/brianjames-dev/bookiebot/pull/71) merged as `8b74895` after both CI runs passed latest head `c855cb6`; the merged tree matches that tested head exactly. [Main CI](https://github.com/brianjames-dev/bookiebot/actions/runs/39185468510) passed **2,672 tests / zero skips** and Python/frontend types, Apps Script, build and asset parity. Railway `89924ba7-4272-47c7-9a34-6ccd4e5203c6` is successful/active with verified Discord login, command sync and web startup. Health is 200, private report is 401, frontend **ec25e87aac4e2da540e648ed** and all three public assets match the tested build. The normal authenticated Shared read replayed the one pending existing receipt in 6.30s successfully: live October PG&E is **$80.56 Brian / $43.90 Hannah**, the mirror is `reimbursed` with $43.90 received on October 17, and the app shows Received without a pending notice. Gross remains $124.46 and saved action IDs are unchanged. The live bulk review correctly previews **5 expenses / $213.70**, with date/note and confirmation; canceled without submitting. No new repayment or synthetic production payment. Remaining native-device/isolated mutation acceptance is checklist 143.
 
 PG&E receipt sync and bulk received (2026-10-18): fixed saved `pg&e` bill-category recognition and added Shared → Mark all received with count/total/date review across the complete payee ledger. One durable household transaction confirms pending reports once and records only the remainder; opposite debts, cleared/received history and income stay unchanged. A workbook-batched projector verifies sources/recipients before updating generated mirrors, retains pending state on failure and recovers with the same request after restart. The pre-release read-only production audit confirmed PG&E $43.90 was already received (version 7 / projected 4), while October sheets showed $124.46/$0.00; the verified release replay above used that existing receipt. Local full verification and release/manual steps are below.
@@ -138,6 +140,8 @@ All eight September 6 audit batches are implemented and verified locally. Each b
 
 ## On Deck
 
+Review/merge and deploy the verified Shared action button styling after CI, then perform checklist 144. Both actions share one row; Mark all received is primary and Reset balances secondary. Existing financial review/confirmation behavior is preserved.
+
 PG&E receipt/bulk received is deployed and production acceptance passed: existing receipt synced, October $80.56 Brian / $43.90 Hannah, Received, unchanged $124.46 gross. Native iPhone acceptance remains checklist 143: load Update if offered, open Shared → Owed to you → Mark all received and inspect count/total/date. Confirm only actual money received; use isolated data for retry/concurrency/mutation tests. Live review was canceled without creating payments.
 
 Savings menu overflow is deployed and main CI/production asset parity passed. Load the app Update and perform checklist 142 on iPhone; active and archived goal menus should remain visible and tappable above Investments.
@@ -202,6 +206,8 @@ Student-loan activation is complete. Verify the deployed fixed-bill display and 
 27. Explore clarifying questions before logging when BookieBot is uncertain instead of guessing or silently failing.
 
 ## Completed 2026-10-18
+
+- Styled the two Shared balance actions as adjacent buttons, with primary filled Mark all received and secondary outlined Reset balances. Kept eligibility, disabled states and existing reviews. Rebuilt assets; focused reimbursement UI **2 passed**, frontend typecheck/build and diff check passed. Browser sample checks passed six width/theme cases and both review/cancel flows; 44px targets, no overflow. Updated STATUS/workstream and manual checklist 144.
 
 - Merged/released PR #71 after both latest feature checks passed; main CI passed **2,672 tests / zero skips** and the full type/build/asset stack. Railway deployment `89924ba7-4272-47c7-9a34-6ccd4e5203c6` is successful/active and production assets match the tested source. Normal Shared recovery successfully replayed the existing PG&E receipt; independent live Sheet readback confirms $80.56 Brian / $43.90 Hannah and reimbursed $43.90. Live bulk review previews 5 expenses / $213.70 and was canceled. Updated STATUS/workstream release evidence and manual checklist; no new receipt or production test payment.
 
@@ -913,6 +919,8 @@ Student-loan activation is complete. Verify the deployed fixed-bill display and 
   - undoing update/delete/move
 
 ## Manual Test Checklist
+
+144. Shared action buttons: after deployment, load Update if offered and open Shared → Owed to you on iPhone. Mark all received and Reset balances should appear side by side, with a filled primary received button and subdued outlined reset. Check light/dark themes, readable labels, keyboard focus and disabled states. Each opens its existing distinct review; Cancel each without changing balances. Use isolated data for financial confirmation testing.
 
 143. PG&E and bulk receipts: production web/Sheet acceptance passed 2026-10-18 (existing receipt replay; $80.56/$43.90 and Received; live 5/$213.70 bulk review canceled). Remaining iPhone acceptance: load Update if offered, refresh Shared and confirm the already-recorded October PG&E receipt finishes syncing without a new payment: Brian $80.56, Hannah $43.90, Received, with unchanged $124.46 gross/bank lineage. In isolated data, open Owed to you → Mark all received; review complete count/total across collapsed/paginated months, choose actual receipt date and confirm once. All payee balances become received, pending sent reports are confirmed once, partially received entries add only their remainder, and You owe/cleared/history/income stay unchanged. Check stale review, two concurrent phones, opposite-owner spoofing, date limits, timeout/retry/restart, edited source/anchors and failed mirror readback. Verify bounded API calls for many rows; no duplicate payments/receipt rows on retry. Inspect narrow screens and both themes without creating synthetic production payments.
 
