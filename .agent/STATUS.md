@@ -1,8 +1,12 @@
 # Agent Status
 
-Last updated: 2026-10-15
+Last updated: 2026-10-18
 
 ## Active Focus
+
+PG&E/bulk receipt verification (2026-10-18): [PR #71](https://github.com/brianjames-dev/bookiebot/pull/71) is ready for review; both feature CI runs passed on implementation `84273ce`, including [2,672 tests / zero skips](https://github.com/brianjames-dev/bookiebot/actions/runs/39184850952), PostgreSQL contracts, Python/frontend types, Apps Script, build and asset parity. This follow-up changes tracking docs only. Production receipt replay and new-button acceptance await merge/deployment, checklist 143; no new PG&E receipt is needed.
+
+PG&E receipt sync and bulk received (2026-10-18): fixed saved `pg&e` bill-category recognition and added Shared → Mark all received with count/total/date review across the complete payee ledger. One durable household transaction confirms pending reports once and records only the remainder; opposite debts, cleared/received history and income stay unchanged. A workbook-batched projector verifies sources/recipients before updating generated mirrors, retains pending state on failure and recovers with the same request after restart. Read-only production audit confirms PG&E $43.90 is already received (version 7 / projected 4), while October sheets still show $124.46/$0.00; rollout must replay the existing receipt, never record another one. Local full verification and release/manual steps are below.
 
 Savings menu overflow released (2026-10-15): [PR #69](https://github.com/brianjames-dev/bookiebot/pull/69) merged as `e5232d1` after both feature CI runs passed. [Main CI](https://github.com/brianjames-dev/bookiebot/actions/runs/38754120365) passed **2,633 tests / zero skips** and Python/frontend types, Apps Script, build and asset parity; the merged tree exactly matches tested feature head `351ed8c`. Railway deployment `6c261567-92c3-493c-9e1e-42a7bbdf2584` is successful/active with verified Discord login, command sync and web startup. Public health returns 200/`ok: true`; frontend version **417c9dda336f1e9eef08193d** and all three public assets match the tested build byte-for-byte; private report access remains 401. This follow-up records release evidence only. iPhone acceptance remains checklist 142.
 
@@ -134,6 +138,8 @@ All eight September 6 audit batches are implemented and verified locally. Each b
 
 ## On Deck
 
+Review/merge and deploy the PG&E receipt/bulk-received change after CI, then perform checklist 143. Production receipt is already confirmed; refresh Shared after rollout and verify PG&E becomes $80.56 Brian / $43.90 Hannah and Received. No live payment or direct database/sheet repair was made during implementation.
+
 Savings menu overflow is deployed and main CI/production asset parity passed. Load the app Update and perform checklist 142 on iPhone; active and archived goal menus should remain visible and tappable above Investments.
 
 Await the scheduled read-only check of the next normal Discord digest (checklist 141). Automatic Student Loan Need budgeting is deployed and active; current/Template amounts, totals and preserved history are verified. October 12 has passed, so October 15 should omit a false overdue loan; November 5–12 reminders should show $60.23. Heartbeat `verify-student-loan-daily-reminder` runs at 10:15 AM Pacific, reports actual evidence and pauses after success. Prior manual-reminder checklist 140 is superseded; do not force a Discord send or reset delivery audits.
@@ -194,6 +200,11 @@ Student-loan activation is complete. Verify the deployed fixed-bill display and 
 25. Harden recent-action pending state across restarts/deploys, since selections currently live only in process memory.
 26. Improve targeted recent-action search so commands can find older matches, not only the latest 10 recent actions.
 27. Explore clarifying questions before logging when BookieBot is uncertain instead of guessing or silently failing.
+
+## Completed 2026-10-18
+
+- Both PR #71 CI runs passed the exact implementation head `84273ce`: **2,672 passed / zero skips**, PostgreSQL contracts, types, Apps Script, frontend build and committed-asset parity. Native 390px sample-data checks passed in light/dark themes. Published/attached the PR and recorded the existing production PG&E receipt for replay after rollout; no production financial writes.
+- Reproduced PG&E's category-alias failure with the exact $124.46 / $80.56 / $43.90 split, fixed projection and verified idempotent replay/reversal. Read-only database and Sheet audit confirmed an existing $43.90 receipt with three unsynced versions; preserve it during rollout. Implemented reviewed, idempotent receive-all with ownership/date/staleness/concurrency guards and a single database transaction. Batch projection preflights every source/recipient/mirror, groups structural/value updates and readback by workbook, and retains durable recovery metadata without a schema migration. Tests show identical Sheet call counts for 1 and 80 expenses in the same workbooks: four metadata calls, four values batch reads, one structural batch and two values batches, plus existing per-month formula verification. UI issues one command and consumes its fresh response without an extra ledger GET. Updated README, reimbursement guide, workstream and durable decision; manual rollout acceptance is checklist 143.
 
 ## Completed 2026-10-15
 
@@ -901,6 +912,8 @@ Student-loan activation is complete. Verify the deployed fixed-bill display and 
 
 ## Manual Test Checklist
 
+143. PG&E and bulk receipts: after deployment, refresh Shared and confirm the already-recorded October PG&E receipt finishes syncing without a new payment: Brian $80.56, Hannah $43.90, Received, with unchanged $124.46 gross/bank lineage. In isolated data, open Owed to you → Mark all received; review complete count/total across collapsed/paginated months, choose actual receipt date and confirm once. All payee balances become received, pending sent reports are confirmed once, partially received entries add only their remainder, and You owe/cleared/history/income stay unchanged. Check stale review, two concurrent phones, opposite-owner spoofing, date limits, timeout/retry/restart, edited source/anchors and failed mirror readback. Verify bounded API calls for many rows; no duplicate payments/receipt rows on retry. Inspect narrow screens and both themes without creating synthetic production payments.
+
 141. Automatic Student Loan Need expense: after release/activation, October C23 and Template C18 show $60.23 from the saved schedule, with the original checkmark/star formulas in D23/D18 (currently checkmarks); schedule K3 is automatic. Confirm Needs totals increase once, Wants spending is unchanged, and September C17 remains $119.92. In isolated fixtures, change the fixed schedule amount and copy Template into a new month: both formulas follow the setting without payment logs. Query status must explain automatic Need expense; a manual loan Log must refuse without overwriting the formula. Verify normal-window $60.23 reminders (next November 5–12) and no false overdue loan on October 15. The read-only 10:15 AM Pacific heartbeat checks the next actual daily DM, reports evidence and pauses after success; do not force a send or reset delivery audits.
 
 140. Fixed Student Loan reminder: after deployment, inspect the next normal daily Discord bill/subscription digest. An unrecorded current-month loan due on day 12 shows **$60.23** under **Overdue (payment not recorded)**; it does not create a missing-amount warning or enter the next-seven-day total. Within the seven days before the next monthly day 12 it appears once with $60.23 and enters that upcoming total. In isolated fixtures only, record an actual: it replaces the estimate and removes the overdue reminder. Variable bills without an actual/expectation still say amount missing, and a matching active loan subscription suppresses the duplicate bill. Keep production payment cells unchanged; do not delete send audit rows or resend today's digest just to test.
@@ -1183,6 +1196,8 @@ Use a test row or low-risk real row in Discord:
 142. Savings menu overflow: after deployment, choose Update, open Savings and tap the last active goal's ⋯. All four actions must remain visible and tappable over the darker Investments section. Open Archive goal and cancel; verify Escape and tapping outside dismiss the menu. Expand Archived goals and inspect the final goal's History/Restore menu across the same boundary. Check both themes and narrow/desktop widths; dismiss without submitting changes to real goals.
 
 ## Verification Baseline
+
+2026-10-18 PG&E/bulk receipts: full local **2,300 passed / 368 optional PostgreSQL skipped**; targeted reimbursement/API/UI **398 passed / 201 optional PostgreSQL skipped**, with final readback/recovery coverage **107 passed / 44 optional PostgreSQL skipped** and the exact PG&E receipt/reversal/reset-version regression passing. Both PR #71 CI runs passed implementation `84273ce`: **2,672 passed / zero skips**, including PostgreSQL and the full stack. Pyright clean; frontend typecheck/build, Apps Script rollover and diff checks passed. Sample-data native browser review verified count/total/date/confirmation at 390px in light/dark themes without horizontal overflow. Production acceptance awaits rollout; no production financial mutations.
 
 2026-10-15 Savings menu release: feature push [CI](https://github.com/brianjames-dev/bookiebot/actions/runs/38686967791), PR [CI](https://github.com/brianjames-dev/bookiebot/actions/runs/38753600716), and [main CI](https://github.com/brianjames-dev/bookiebot/actions/runs/38754120365) passed all checks, including **2,633 tests / zero skips**, PostgreSQL, Python/frontend types, Apps Script, production build and committed-asset parity. Merge `e5232d1` exactly matches feature `351ed8c`. Railway Details confirms deployment `6c261567-92c3-493c-9e1e-42a7bbdf2584` is successful/active for that merge; deploy logs confirm Discord login, command sync and web startup. Read-only public probes verify health 200/`ok: true`, version **417c9dda336f1e9eef08193d**, exact JS/CSS/setup asset bytes, no-store version response and unauthenticated report 401. This follow-up changes tracking docs only; device checklist 142 remains pending.
 

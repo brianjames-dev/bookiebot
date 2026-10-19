@@ -416,6 +416,19 @@ class ReimbursementStore:
                        (version, _json(payload), allocation_id))
             return True
 
+    def pending_bulk_projection_ids(self) -> set[str]:
+        """Recover only the unchanged versions saved by an all-received command."""
+        with self.access.connect(write=True) as db:
+            self._lock(db)
+            pending = {row["id"]: int(row["version"]) for row in db.execute(
+                "SELECT id,version FROM app_reimbursement_allocations WHERE projected_version < version").fetchall()}
+            if not pending:
+                return set()
+            commands = db.execute("SELECT result_json FROM app_reimbursement_commands WHERE result_json LIKE ?",
+                                  ('%"receiptBatch":true%',)).fetchall()
+            return {a["id"] for row in commands for a in json.loads(row["result_json"])["allocations"]
+                    if pending.get(a["id"]) == a["version"]}
+
     @staticmethod
     def _writable(row: Any) -> None:
         payload = json.loads(row["payload_json"])
@@ -616,6 +629,7 @@ class ReimbursementStore:
                        "report_payment": {"allocationId", "version", "amountCents", "date", "note"},
                        "confirm_payment": {"allocationId", "version", "eventId"},
                        "offset": {"entries", "date", "note"}, "reverse": {"eventId"},
+                       "receive_all": {"expectedState", "date", "note"},
                        "reset": {"expectedState", "note"},
                        "undo_reset": {"resetId", "version"}, "redo_reset": {"resetId", "version"}}
             if not isinstance(operation, str) or operation not in allowed or set(body) - common - allowed[operation]:
@@ -625,6 +639,38 @@ class ReimbursementStore:
             reset_id = ""
             if operation in {"reset", "undo_reset", "redo_reset"}:
                 changed, reset_id = self._change_reset(db, owner, body, operation_id, now)
+            elif operation == "receive_all":
+                if body.get("expectedState") != self._reset_state(db):
+                    raise ReimbursementConflictError("Reimbursements changed. Review the current total before recording all received.")
+                when = _date(body.get("date"), "Payment date", past=True)
+                note = _text(body.get("note", ""), "Note", 500)
+                rows = db.execute("SELECT * FROM app_reimbursement_allocations WHERE payer_owner = ? ORDER BY id", (owner,)).fetchall()
+                rows = [row for row in rows if self._payload(row).get("lifecycle", "active") == "active"
+                        and self._payload(row)["outstandingCents"] > 0]
+                if not rows:
+                    raise ReimbursementConflictError("There are no outstanding expenses owed to you.")
+                if len(rows) > 500:
+                    raise ReimbursementValidationError("This ledger is too large for one receipt batch. Contact support before recording payments.")
+                for row in rows:
+                    self._writable(row)
+                    self._not_cleared(row)
+                    self._after_expense(row, when)
+                    if int(row["projected_version"]) != int(row["version"]):
+                        raise ReimbursementConflictError("An expense is still syncing. Refresh Shared before recording all received.")
+                    amount = self._payload(row)["outstandingCents"]
+                    pending = db.execute("SELECT * FROM app_reimbursement_events WHERE allocation_id = ? AND status = 'pending' ORDER BY id", (row["id"],)).fetchall()
+                    for event in pending:
+                        reported = int(event["amount_cents"])
+                        if reported > amount:
+                            raise ReimbursementConflictError("Pending payments exceed the remaining balance. Review this expense.")
+                        db.execute("UPDATE app_reimbursement_events SET status = 'confirmed', confirmed_at = ?, confirmed_by = ?, confirmation_operation_id = ? WHERE id = ?",
+                                   (now, owner, operation_id, event["id"]))
+                        event_ids.append(event["id"])
+                        amount -= reported
+                    if amount:
+                        event_ids.append(self._add_event(db, row, operation_id, "receive", owner, amount, when, note, now, confirmed=True))
+                    self._settle(db, row["id"], self._payload(row)["outstandingCents"], now)
+                    changed.append(row["id"])
             elif operation in {"receive", "report_payment", "confirm_payment"}:
                 allocation_id = _text(body.get("allocationId"), "Allocation identifier", 200, required=True)
                 row = self._row(db, allocation_id)
@@ -719,6 +765,8 @@ class ReimbursementStore:
                 result_events.append(self._event_payload(event, self._row(db, event["allocation_id"])))
             result = {"allocations": [self._payload(self._row(db, allocation_id)) for allocation_id in changed],
                       "events": result_events, "operationId": operation_id}
+            if operation == "receive_all":
+                result["receiptBatch"] = True
             if reset_id:
                 reset = db.execute("SELECT * FROM app_reimbursement_resets WHERE id = ?", (reset_id,)).fetchone()
                 result["reset"] = self._reset_payload(db, reset)

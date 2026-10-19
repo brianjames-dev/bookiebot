@@ -211,7 +211,7 @@ export function ReimbursementLedger({ fallback, refreshKey }: { fallback: ReactN
       pending.current = null; setUncertain(false); change.done()
       setSnapshot(result); setLegacy(false)
       window.dispatchEvent(new CustomEvent("bookiebot:reimbursements-changed"))
-      await load()
+      if (change.body.operation !== "receive_all") await load()
     } catch (failure) {
       if (!mounted.current) return
       if (failure instanceof LedgerRequestError && failure.status < 500) {
@@ -253,7 +253,9 @@ function LedgerContents({ snapshot, disabled, run, refresh, refreshing }: {
   const [offsetOpen, setOffsetOpen] = useState(false)
   const [resetOpen, setResetOpen] = useState(false)
   const [resetReview, setResetReview] = useState(0)
-  const listId = useId(), offsetId = useId(), resetId = useId()
+  const [receiveAllOpen, setReceiveAllOpen] = useState(false)
+  const [receiveAllReview, setReceiveAllReview] = useState(0)
+  const listId = useId(), offsetId = useId(), resetId = useId(), receiveAllId = useId()
   const totals = ledgerTotals(allocations, ownerKey)
   const shown = allocations.filter(item => (direction === "to" ? item.payerOwner : item.partnerOwner) === ownerKey)
   const directionGroups = {
@@ -273,6 +275,8 @@ function LedgerContents({ snapshot, disabled, run, refresh, refreshing }: {
   const resetBlocked = events.some(event => event.status === "pending")
     ? "Confirm or reverse pending payment reports before resetting balances."
     : snapshot.projectionPending ? "Wait for expense sheets to finish syncing before resetting balances." : ""
+  const receivable = allocations.filter(item => item.payerOwner === ownerKey && item.outstandingCents > 0)
+  const receiveAllBlocked = receivable.some(item => !writable(item) || item.version !== item.projectedVersion || Boolean(item.clearedCents))
   return <>
     <SlidingSelection value={direction} className="bb-ledger-directions" role="group" aria-label="Reimbursement direction">
       <button type="button" aria-pressed={direction === "to"} onClick={() => setDirection("to")}>Owed to you<FittedAmount className="bb-ledger-direction-amount">{money(totals.to)}</FittedAmount></button>
@@ -288,6 +292,14 @@ function LedgerContents({ snapshot, disabled, run, refresh, refreshing }: {
       <ol>{rows.map((group, index) => <li key={group.key} data-segment={index}><div className="bb-reimbursement-bar-label"><span><i className="bb-reimbursement-swatch" aria-hidden="true" />{group.label}</span><FittedAmount className="bb-reimbursement-bar-amount">{money(group.cents)}</FittedAmount></div></li>)}</ol>
     </figure>}
     {pendingOffset && <p className="bb-ledger-note">Confirm pending payments before offsetting those expenses.</p>}
+    {direction === "to" && snapshot.resetState && (receivable.length > 0 || receiveAllOpen) && <>
+      <button className="bb-ledger-receive-all-toggle" type="button" disabled={disabled || receiveAllBlocked}
+        aria-expanded={receiveAllOpen} aria-controls={receiveAllId}
+        onClick={() => { if (!receiveAllOpen) setReceiveAllReview(value => value + 1); setReceiveAllOpen(!receiveAllOpen) }}>Mark all received</button>
+      <RetainedPanel id={receiveAllId} open={receiveAllOpen}><ReceiveAllEditor key={receiveAllReview} snapshot={snapshot}
+        disabled={disabled || receiveAllBlocked} run={run} close={() => setReceiveAllOpen(false)} /></RetainedPanel>
+      {receiveAllBlocked && <p className="bb-ledger-note" role="status">Finish syncing or review historical expenses before marking all received.</p>}
+    </>}
     {eligible.to > 0 && eligible.from > 0 && <><button className="bb-ledger-offset-toggle" type="button" disabled={disabled} aria-expanded={offsetOpen} aria-controls={offsetId} onClick={() => setOffsetOpen(!offsetOpen)}>Offset balances</button>
       <RetainedPanel id={offsetId} open={offsetOpen}><OffsetEditor allocations={allocations} events={events} owner={ownerKey} disabled={disabled} run={run} close={() => setOffsetOpen(false)} /></RetainedPanel></>}
     {snapshot.resetState && (totals.to > 0 || totals.from > 0 || resetOpen) && <>
@@ -392,6 +404,29 @@ function LedgerRow({ allocation: item, events, reversibleIds, owner, open, onOpe
 
 function ResetAmounts({ to, from }: { to: number; from: number }) {
   return <div className="bb-ledger-offset-totals"><span>Owed to you <strong>{money(to)}</strong></span><span>You owe <strong>{money(from)}</strong></span></div>
+}
+function ReceiveAllEditor({ snapshot, disabled, run, close }: { snapshot: LedgerSnapshot; disabled: boolean; run: Run; close: () => void }) {
+  const [review] = useState(() => ({ state: snapshot.resetState,
+    items: snapshot.allocations.filter(item => item.payerOwner === snapshot.ownerKey && item.outstandingCents > 0) }))
+  const [date, setDate] = useState(today)
+  const [note, setNote] = useState("")
+  const stale = snapshot.resetState !== review.state
+  const total = review.items.reduce((sum, item) => sum + item.outstandingCents, 0)
+  const minDate = review.items.reduce((latest, item) => isoDate(item.expenseDate) > latest ? isoDate(item.expenseDate) : latest, "1900-01-01")
+  useAppWorkStatus({ label: "All reimbursements received", dirty: Boolean(note) || date !== today(),
+    onDiscard: () => { setNote(""); close() } })
+  return <form className="bb-ledger-form" onSubmit={event => {
+    event.preventDefault()
+    if (disabled || stale || !review.state || !total || !isoDate(date) || date < minDate || date > today()) return
+    run({ operation: "receive_all", expectedState: review.state, date, note }, close)
+  }}><fieldset disabled={disabled}><legend>Review all money received</legend>
+    <p className="bb-ledger-note">Record {money(total)} received across {review.items.length} outstanding expense{review.items.length === 1 ? "" : "s"} owed to you, across all months.</p>
+    <p className="bb-ledger-note">Confirm only money you already received. Pending sent payments are included once. Money you owe stays unchanged.</p>
+    <DateField value={date} onChange={setDate} min={minDate} />
+    <label>Note (optional)<input maxLength={200} value={note} onChange={event => setNote(event.target.value)} /></label>
+    {stale && <p className="bb-ledger-note" role="status">Reimbursements changed. Cancel and review the latest total.</p>}
+    <div className="bb-ledger-actions"><button type="submit" disabled={stale || !total}>Confirm all received</button><button type="button" onClick={close}>Cancel</button></div>
+  </fieldset></form>
 }
 function ResetEditor({ snapshot, disabled, run, close }: { snapshot: LedgerSnapshot; disabled: boolean; run: Run; close: () => void }) {
   const [review] = useState(() => ({ expectedState: snapshot.resetState, totals: ledgerTotals(snapshot.allocations, snapshot.ownerKey),

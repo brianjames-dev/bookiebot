@@ -519,6 +519,29 @@ def test_confirmed_personal_rent_updates_both_budget_rows_without_shared_receipt
     assert len(books["hannah-2026"].batch_calls) == 1
 
 
+def test_recorded_pge_category_projects_received_share_and_reversal(personal_rent):
+    projector, books, brian, hannah, value = personal_rent
+    value.update(id="pge-received", category="pg&e", item="PG&E", grossCents=12446,
+                 version=7, projectedVersion=4, mirrorOnlyVersion=4,
+                 payerShareCents=8056, partnerShareCents=4390, settledCents=4390,
+                 sourceValues={"item": "PG&E", "amount": "124.46"},
+                 events=[event("pge-first", 4390, date="2026-10-16", status="reversed",
+                               confirmedAt="2026-10-16T18:15:45Z", reversedAt="2026-10-18T03:12:12Z"),
+                         event("pge-payment", 4390, date="2026-10-17", confirmedAt="2026-10-18T03:12:19Z")])
+    brian.write(12, 1, ["PG&E", 124.46])
+    hannah.write(12, 1, ["PG&E", 0])
+    projector.project(value)
+    projector.project(value)
+    assert brian.read(12, 1, 3) == ["PG&E", 80.56]
+    assert hannah.read(12, 1, 3) == ["PG&E", 43.90]
+    assert not books["shared-2026"].batch_calls
+    value["settledCents"] = 0
+    value["events"][-1].update(status="reversed", reversedAt="2026-10-19T10:00:00Z")
+    projector.project(value)
+    assert brian.read(12, 1, 3) == ["PG&E", 124.46]
+    assert hannah.read(12, 1, 3) == ["PG&E", 0]
+
+
 def test_personal_rent_reversal_restores_both_budget_rows(personal_rent):
     projector, _books, brian, hannah, value = personal_rent
     projector.project(value)

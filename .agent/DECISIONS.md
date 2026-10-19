@@ -1,5 +1,11 @@
 # Agent Decisions
 
+## 2026-10-18 - Record All Received As One Reviewed Receipt Batch
+
+Add Mark all received under Owed to you, covering the full current outstanding payee ledger across all months, independently of pagination. Review count, amount and actual receipt date before submission. Validate a fresh household fingerprint and every eligible allocation in one locked transaction; confirm pending sender reports once and add only each remaining amount as a confirmed receipt. Preserve opposite-direction obligations, cleared amounts, prior receipts, purchase gross and income. Repeated or concurrent requests cannot duplicate settlement.
+
+Project a receipt batch by workbook using fresh metadata and grouped row snapshots. Reuse exact source-anchor/history checks, validate live budget formulas and all recipient/mirror destinations before any write, reserve each new receipt and its ID anchors atomically, then write absolute financial targets in batches. Verify every financial row before advancing generated mirrors; mark database projections complete only after fresh row/anchor readback. Cross-workbook writes remain recoverable rather than falsely atomic. Retain a receiptBatch marker in the existing durable command result so refresh/restart reuses the batch path; no new schema. Reject oversized/ambiguous batches and retain saved/pending state after uncertainty. Do not add a duplicate PG&E receipt to repair its saved `pg&e` category alias.
+
 ## 2026-10-13 - Present Full Take-Home And Separate Cash/ESPP Savings
 
 At the user's request, Income includes deposited pay plus derived monthly ESPP and Saved includes recorded cash plus that ESPP (including clearly labeled projected ESPP in Projected). Retain deposited-income/paycheck records and raw cash-savings fields; cash category budgets and Left already exclude withholding, so never deduct it twice or add ESPP to Spent. Canonical mode metrics, headline explanations and read-only report consumers share this presentation. Cash progress continues using actual cash and the cash minimum/ideal targets.

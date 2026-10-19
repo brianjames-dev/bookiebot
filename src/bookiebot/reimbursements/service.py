@@ -51,8 +51,13 @@ def snapshot(owner: str, *, retry_projection: bool = False) -> dict[str, Any]:
     store = build_reimbursement_store()
     synced = True
     if retry_projection:
-        from bookiebot.reimbursements.projection import sync_pending
-        synced = sync_pending(store)
+        bulk_ids = store.pending_bulk_projection_ids()
+        if bulk_ids:
+            from bookiebot.reimbursements.batch_projection import sync_received
+            synced = sync_received(store, bulk_ids)
+        else:
+            from bookiebot.reimbursements.projection import sync_pending
+            synced = sync_pending(store)
     result = store.snapshot(owner)
     return {**result, "enabled": True, "ownerKey": owner,
             "projectionPending": not synced or any(row["version"] != row["projectedVersion"] for row in result["allocations"])}
@@ -61,9 +66,14 @@ def snapshot(owner: str, *, retry_projection: bool = False) -> dict[str, Any]:
 def command(owner: str, body: dict[str, Any]) -> dict[str, Any]:
     store = build_reimbursement_store()
     result = store.command(owner, body)
-    from bookiebot.reimbursements.projection import sync_pending
-    synced = sync_pending(store)
-    return {**result, **snapshot(owner), "projectionPending": not synced}
+    if body.get("operation") == "receive_all":
+        from bookiebot.reimbursements.batch_projection import sync_received
+        synced = sync_received(store, {a["id"] for a in result["allocations"]})
+    else:
+        from bookiebot.reimbursements.projection import sync_pending
+        synced = sync_pending(store)
+    current = snapshot(owner)
+    return {**result, **current, "projectionPending": not synced or current["projectionPending"]}
 
 
 def record_split(user_key: str, logged: Any, ws: Any, fields: dict[str, int], values: dict[str, str],
