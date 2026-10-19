@@ -1,8 +1,14 @@
 # Finance Operations Workstream
 
-Last updated: 2026-10-15
+Last updated: 2026-10-18
 
 ## Goal
+
+### PG&E receipt sync and bulk received — 2026-10-18
+
+Implemented; rollout pending (STATUS checklist 143). Production read-only audit found the saved `pg&e` category rejected by the `pge`-only bill projector. The $43.90 receipt already exists; version 7 is settled but projected version remains 4, and October rows still show $124.46 Brian / $0 Hannah. Added the alias without changing financial history; replay should produce $80.56/$43.90.
+
+Shared now offers Mark all received for the full outstanding payee ledger, with count/total/date review. A single version-fingerprinted, idempotent database transaction confirms pending reports once and fills remaining balances; no opposite-direction or cleared debt is reinterpreted. Batched Sheet projection reuses fresh workbook metadata/row snapshots, reserves receipt rows and ID anchors together, writes grouped absolute targets, verifies all financial rows before mirrors, and marks versions complete only after readback. Durable command-result metadata routes refresh/restart recovery through the same batch path. No new schema or production financial writes. Regression/API/UI coverage, including 1/80-expense request-count parity, is recorded in STATUS.
 
 ### Savings menu overflow — 2026-10-14
 

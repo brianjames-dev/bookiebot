@@ -758,7 +758,52 @@ async function resetSafetyAndRecoveryContracts() {
   await unmount(tree)
 }
 
+async function bulkReceiveContracts() {
+  let state = fixture({ post: (body, state) => {
+    assert.equal(body.operation, "receive_all")
+    for (const item of state.snapshot.allocations.filter(item => item.payerOwner === state.snapshot.ownerKey && item.outstandingCents > 0)) {
+      item.settledCents += item.outstandingCents; item.outstandingCents = 0; item.status = "settled"; item.version++; item.projectedVersion++
+    }
+    state.snapshot.resetState = "after-bulk-receipt"
+    return response(clone(state.snapshot))
+  } })
+  let tree = await mount()
+  await tap(button(tree.root, "Mark all received"))
+  assert.ok(text(form(tree)).includes("$105.00 received across 2 outstanding expenses"))
+  assert.ok(text(form(tree)).includes("across all months"))
+  assert.ok(text(form(tree)).includes("Money you owe stays unchanged"))
+  await submit(tree)
+  assert.equal(writes(state).length, 1, "One command records the complete balance, not one request per row")
+  assert.equal(writes(state)[0].body.expectedState, "review-state-one")
+  assert.equal(state.calls.filter(call => !call.body).length, 1, "The command response already contains fresh balances; no duplicate GET after bulk save")
+  assert.ok(text(tree.root).includes("Owed to you$0.00"))
+  assert.ok(text(tree.root).includes("You owe$60.00"))
+  await tap(button(tree.root, "You owe", true))
+  assert.equal(button(tree.root, "Mark all received"), undefined)
+  await unmount(tree)
+
+  state = fixture(); tree = await mount(); await tap(button(tree.root, "Mark all received"))
+  state.snapshot.resetState = "changed-preview"
+  await act(async () => { for (const callback of listeners.window.get("focus")) callback(); await flush() })
+  assert.ok(button(tree.root, "Confirm all received").props.disabled)
+  await submit(tree); assert.equal(writes(state).length, 0)
+  await unmount(tree)
+
+  state = fixture(); state.snapshot.allocations[0].projectedVersion = 2
+  tree = await mount()
+  assert.ok(button(tree.root, "Mark all received").props.disabled)
+  await unmount(tree)
+
+  let attempts = 0
+  state = fixture({ post: () => { if (++attempts === 1) throw Error("Lost bulk response"); return response(clone(state.snapshot)) } })
+  tree = await mount(); await tap(button(tree.root, "Mark all received")); await submit(tree)
+  await tap(button(tree.root, "Retry this record"))
+  assert.deepEqual(writes(state)[0].body, writes(state)[1].body, "Bulk retries reuse the reviewed state and durable request ID")
+  await unmount(tree)
+}
+
 ;(async () => {
+  await bulkReceiveContracts()
   await monthPaginationContracts()
   await refreshedPageRetentionContracts()
   await unseenMonthPageContracts()

@@ -65,6 +65,78 @@ def opposite(store):
     return store.register_allocation(payload(payerOwner="hannah", partnerOwner="brian", payerPerson="Hannah"))
 
 
+def bulk_payment(store, owner="brian", **changes):
+    return command("receive_all", expectedState=store.snapshot(owner)["resetState"],
+                   date=now_pacific().date().isoformat(), note="All funds received", **changes)
+
+
+def test_receive_all_records_only_payees_complete_unpaginated_balance_once(store):
+    values = [store.register_allocation(payload()) for _ in range(12)]
+    for value in values:
+        store.mark_projected(value["id"], value["version"])
+    debtor = opposite(store)
+    receipt = store.command("brian", payment(values[0], 1000))
+    first = store.get_allocation(values[0]["id"])
+    store.mark_projected(first["id"], first["version"])
+    body = bulk_payment(store)
+    result = store.command("brian", body)
+    assert len(result["allocations"]) == 12
+    assert sum(event["amountCents"] for event in result["events"]) == 47000
+    assert all(row["outstandingCents"] == 0 and row["settledCents"] == 4000 for row in result["allocations"])
+    assert store.get_allocation(debtor["id"])["outstandingCents"] == 4000
+    assert store.command("brian", body) == result
+    assert len(store.snapshot("brian")["events"]) == 13
+    assert receipt["events"][0]["status"] == "confirmed"
+
+
+def test_receive_all_confirms_pending_report_without_duplicate_payment(store):
+    value = store.register_allocation(payload())
+    store.mark_projected(value["id"], value["version"])
+    sent = store.command("hannah", payment(value, 2500, operation="report_payment"))
+    result = store.command("brian", bulk_payment(store))
+    assert sorted(event["amountCents"] for event in result["events"]) == [1500, 2500]
+    assert result["allocations"][0]["settledCents"] == 4000
+    assert any(event["id"] == sent["events"][0]["id"] and event["status"] == "confirmed" for event in result["events"])
+
+
+@pytest.mark.parametrize("problem", ["stale", "pending_projection", "historical", "future", "before_expense"])
+def test_receive_all_rolls_back_entire_group_before_any_partial_receipts(store, problem):
+    first = store.register_allocation(payload())
+    second = store.register_allocation(payload(accounting="legacy_net" if problem == "historical" else "cash_v1"))
+    for value in (first, second):
+        if problem != "pending_projection" or value != second:
+            store.mark_projected(value["id"], value["version"])
+    body = bulk_payment(store)
+    if problem == "stale":
+        store.register_allocation(payload())
+    if problem == "future":
+        body["date"] = "2099-01-01"
+    if problem == "before_expense":
+        body["date"] = "2025-12-01"
+    with pytest.raises((ReimbursementConflictError, ReimbursementValidationError)):
+        store.command("brian", body)
+    assert not store.snapshot("brian")["events"]
+    assert all(row["settledCents"] == 0 for row in store.snapshot("brian")["allocations"])
+
+
+def test_concurrent_bulk_receipts_cannot_settle_the_same_expenses_twice(store):
+    values = [store.register_allocation(payload()) for _ in range(3)]
+    for value in values:
+        store.mark_projected(value["id"], value["version"])
+    bodies = [bulk_payment(store), bulk_payment(store)]
+    barrier = Barrier(2)
+    def record(body):
+        barrier.wait(timeout=10)
+        try:
+            store.command("brian", body)
+            return "saved"
+        except ReimbursementConflictError:
+            return "changed"
+    with ThreadPoolExecutor(max_workers=2) as executor:
+        assert sorted(executor.map(record, bodies)) == ["changed", "saved"]
+    assert len(store.snapshot("brian")["events"]) == 3
+
+
 def offset(first, second, amount=1000):
     return command("offset", entries=[{"allocationId": a["id"], "version": a["version"], "amountCents": amount}
                                        for a in (first, second)], date=now_pacific().date().isoformat(), note="Agreed offset")

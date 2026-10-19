@@ -6,7 +6,7 @@ from aiohttp.test_utils import TestClient, TestServer
 import pytest
 import pytest_asyncio
 
-from bookiebot.reimbursements import projection, service
+from bookiebot.reimbursements import batch_projection, projection, service
 from bookiebot.reimbursements.store import ReimbursementStore
 from bookiebot.reports import app_access, phone_app, phone_reimbursements
 from bookiebot.reports.app_access import AppAccessStore
@@ -38,6 +38,7 @@ async def client(tmp_path, monkeypatch):
     monkeypatch.setattr(service, "build_reimbursement_store", lambda: store)
     # Exercise real durable commands, but never access Google Sheets in API tests.
     monkeypatch.setattr(projection, "sync_pending", lambda _store: False)
+    monkeypatch.setattr(batch_projection, "sync_received", lambda _store, _ids: False)
     app = web.Application()
     phone_reimbursements.register_phone_reimbursement_routes(app)
     async with TestClient(TestServer(app), cookie_jar=CookieJar(unsafe=True)) as http:
@@ -61,6 +62,33 @@ def payment(client, **changes):
 def assert_unchanged(client):
     assert client.store.get_allocation(client.allocation["id"])["settledCents"] == 0
     assert client.store.snapshot("brian")["events"] == []
+
+
+@pytest.mark.asyncio
+async def test_bulk_received_uses_authenticated_payee_and_safe_repeat_request(client):
+    connect(client)
+    client.store.mark_projected(client.allocation["id"], client.allocation["version"])
+    body = {"operation": "receive_all", "requestId": uuid4().hex,
+            "expectedState": client.store.snapshot("brian")["resetState"],
+            "date": now_pacific().date().isoformat(), "note": "Already received"}
+    response = await client.http.post("/app/reimbursements", json=body, headers=HEADERS)
+    assert response.status == 200
+    result = await response.json()
+    assert result["allocations"][0]["settledCents"] == 4000
+    assert result["projectionPending"] is True
+    assert (await client.http.post("/app/reimbursements", json=body, headers=HEADERS)).status == 200
+    assert len(client.store.snapshot("brian")["events"]) == 1
+
+
+@pytest.mark.asyncio
+async def test_bulk_received_cannot_record_money_for_the_other_payee(client):
+    connect(client, HANNAH, "hannah")
+    client.store.mark_projected(client.allocation["id"], client.allocation["version"])
+    body = {"operation": "receive_all", "requestId": uuid4().hex,
+            "expectedState": client.store.snapshot("hannah")["resetState"],
+            "date": now_pacific().date().isoformat()}
+    assert (await client.http.post("/app/reimbursements?owner=brian", json=body, headers=HEADERS)).status == 409
+    assert_unchanged(client)
 
 
 @pytest.mark.asyncio

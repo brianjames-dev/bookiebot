@@ -32,7 +32,7 @@ class ProjectionConflictError(RuntimeError):
 
 
 _LOCK = threading.Lock()
-_PERSONAL_BILL_LABELS = {"rent": "Rent", "pge": "PG&E", "recology": "Recology", "water": "Water"}
+_PERSONAL_BILL_LABELS = {"rent": "Rent", "pge": "PG&E", "pg&e": "PG&E", "recology": "Recology", "water": "Water"}
 
 
 @contextmanager
@@ -134,6 +134,23 @@ def _source_identity(allocation: dict[str, Any]) -> dict[str, Any]:
     return expected
 
 
+def validate_named_anchors(names: dict[str, Any], sheet_id: int, full: str,
+                           fields: dict[str, int], anchors: dict[str, str]) -> None:
+    linked = names.get(full, {}).get("range", {})
+    first, last = min(fields.values()), max(fields.values())
+    start = linked.get("startRowIndex", 0)
+    if (linked.get("sheetId") != sheet_id or linked.get("endRowIndex") != start + 1
+            or linked.get("startColumnIndex", 0) != first - 1 or linked.get("endColumnIndex") != last):
+        raise ProjectionConflictError("A linked expense range was moved or resized. Review it before syncing.")
+    for field, name in anchors.items():
+        cell = names.get(name, {}).get("range", {})
+        if (cell.get("sheetId") != sheet_id or cell.get("startRowIndex", 0) != start
+                or cell.get("endRowIndex") != start + 1
+                or cell.get("startColumnIndex", 0) != fields[field] - 1
+                or cell.get("endColumnIndex") != fields[field]):
+            raise ProjectionConflictError("An expense cell is no longer attached to its linked row. Review it before syncing.")
+
+
 class SheetsProjection:
     def __init__(self, client: Any):
         self.client = client
@@ -176,20 +193,7 @@ class SheetsProjection:
         }}}}
 
     def _validate_anchors(self, book: Any, sheet_id: int, full: str, fields: dict[str, int], anchors: dict[str, str]) -> None:
-        names = self._ranges(book)
-        linked = names.get(full, {}).get("range", {})
-        first, last = min(fields.values()), max(fields.values())
-        start = linked.get("startRowIndex", 0)
-        if (linked.get("sheetId") != sheet_id or linked.get("endRowIndex") != start + 1
-                or linked.get("startColumnIndex", 0) != first - 1 or linked.get("endColumnIndex") != last):
-            raise ProjectionConflictError("A linked expense range was moved or resized. Review it before syncing.")
-        for field, name in anchors.items():
-            cell = names.get(name, {}).get("range", {})
-            if (cell.get("sheetId") != sheet_id or cell.get("startRowIndex", 0) != start
-                    or cell.get("endRowIndex") != start + 1
-                    or cell.get("startColumnIndex", 0) != fields[field] - 1
-                    or cell.get("endColumnIndex") != fields[field]):
-                raise ProjectionConflictError("An expense cell is no longer attached to its linked row. Review it before syncing.")
+        validate_named_anchors(self._ranges(book), sheet_id, full, fields, anchors)
 
     @staticmethod
     def _source_anchors(allocation: dict[str, Any]) -> dict[str, str]:
