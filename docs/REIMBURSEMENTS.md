@@ -64,6 +64,23 @@ The complete operation, including budget-formula verification, used **11 reads a
 
 Google’s default per-user/project quota is **60 reads and 60 writes per minute**, shared across service-account activity; the project-wide defaults are 300 of each. [Google Sheets API limits](https://developers.google.com/workspace/sheets/api/limits). This batch is below those limits by itself. Other bot work shares the quota, and more distinct workbooks/months require extra reads, so batching cannot promise that a 429 never occurs. The verified failure path preserves receipts and defers projection safely rather than retrying in a tight loop. Local targeted checks: **233 passed / 150 optional PostgreSQL skipped**, authenticated bulk API **2 passed**, changed multi-month store slice **7 passed / 7 optional PostgreSQL skipped**, Pyright clean. Both PR #73 CI runs passed test head `4bb2ba2`: **2,698 passed / zero skips**, including PostgreSQL and the complete type/build/asset stack ([CI](https://github.com/brianjames-dev/bookiebot/actions/runs/39188026928)).
 
+### Live receipt acceptance — October 18, 19:18 PDT
+
+At the user’s explicit request, confirmed Mark all received once against the live displayed **6 expenses / $244.48**, dated October 18. The earlier copied five-expense audit had gained a sixth $30.78 clothing expense; a fresh read-only source/formula baseline matched the live six-expense review before submission.
+
+The single POST returned 200 and saved operation `69f54efe004347dcb73e324a36188d09`: six unique confirmed events with exact reviewed IDs/amounts. All six database allocations are fully settled and projected (five version 3/projected 3, campground version 5/projected 5). Both app directions remain $0.00 after reload, with Received status and no Sheet update pending.
+
+Actual Google-calculated results were read back and visually checked in each native October sheet:
+
+| Budget | Category | Before | After | Change |
+| --- | --- | ---: | ---: | ---: |
+| Brian | Groceries | $310.97 | $223.67 | −$87.30 |
+| Brian | Shopping | $1,371.68 | $1,214.50 | −$157.18 |
+| Hannah | Groceries | $40.81 | $128.11 | +$87.30 |
+| Hannah | Shopping | $799.37 | $956.55 | +$157.18 |
+
+The six source amounts equal their payer shares; exactly six new repayment rows and twelve new event anchors carry the correct counterpart amounts/date. Each mirror ID still occurs once and is reimbursed. Original gross amounts, existing source anchors, unrelated reimbursement history and ledger row counts are preserved. No rate-limit error, failed projection or duplicate receipt was observed in this operation. Budget error positions are unchanged: zero in Brian’s October sheet and eight pre-existing zero-income summary errors in Hannah’s. This is actual live Google recalculation evidence, beyond the earlier isolated-copy verification. No repeat submission is needed for this completed batch.
+
 PG&E category compatibility (October 18): existing allocations store `pg&e`; bill projection also recognizes schedule-style `pge`. PR #71 replayed the already-confirmed $43.90 October receipt without adding a payment. Production readback verified the $124.46 original bill as $80.56 in Brian’s budget and $43.90 in Hannah’s, with a reimbursed mirror.
 
 
