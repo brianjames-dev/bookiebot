@@ -842,3 +842,9 @@ Decision: The user chose Student Loan as an automatic $60.23 monthly Need budget
 Automatic reminders use the configured fixed amount within the normal upcoming window and do not demand manual payment logging after the due day. Manual bill expectations, other owners, send claims/audit events and reconciliation lifecycle remain unchanged. Do not send a synthetic reminder to verify rollout; a user-requested read-only heartbeat checks the next real daily Discord digest.
 
 Rationale: The prior expectation restored reminders but intentionally left October at zero until a manual payment was recorded. The user explicitly requested and confirmed an automatic expense instead. Reusing the existing row avoids retroactively adding a global subscription to past months or counting the loan twice, while an explicit mode protects the automatic formula from standalone payment writes.
+
+## 2026-10-18 - Verification Must Preserve Real Payment Status
+
+Decision: A request to test or verify the live reimbursement flow does not authorize recording outstanding debts as received. Use read-only production inspection and isolated copies/workbooks for financial mutation tests. Only record a real receipt when the user specifically asks to record received funds. User-requested rollback reverses the exact mistaken events through the canonical ledger and verifies both budget sheets; preserve the event audit and unrelated legitimate receipts.
+
+Rationale: The agent incorrectly interpreted live verification as permission to receive six unpaid expenses ($244.48). The user clarified that those funds have not arrived and requested restoration. This supersedes the earlier tracking claim that the test receipts were user-authorized financial records.
