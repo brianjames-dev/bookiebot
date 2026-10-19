@@ -71,7 +71,8 @@ def bulk_payment(store, owner="brian", **changes):
 
 
 def test_receive_all_records_only_payees_complete_unpaginated_balance_once(store):
-    values = [store.register_allocation(payload()) for _ in range(12)]
+    values = [store.register_allocation(payload(expenseDate=f"2026-{index % 3 + 1:02d}-03"))
+              for index in range(12)]
     for value in values:
         store.mark_projected(value["id"], value["version"])
     debtor = opposite(store)
