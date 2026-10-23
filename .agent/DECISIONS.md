@@ -1,5 +1,11 @@
 # Agent Decisions
 
+## 2026-10-23 - Keep Matched-Bank Review And Shared Receipts Separate
+
+Expose a read-only shortcut from a posted saved bank match to exactly one canonical cash-v1 allocation owned by the payee, with matching gross and stable source action/month or physical row/column/month evidence. Schedule-only bill links additionally resolve the exact schedule source and occurrence. Never guess by merchant or amount alone; missing, changed, opposite-payer, historical, inactive or ambiguous evidence offers no receipt action. An unavailable optional shortcut cannot invalidate a successful bank match.
+
+After matching, offer an optional receipt review; existing matches expose it in Checked. Reuse the existing Shared controller, dated/partial receipt editor, pending-payment confirmation, version checks, durable command request IDs and verified projection. A bank match never sends a receipt command. Separate confirmation records only money already received and leaves bank match identity/status unchanged. Settled/cleared/syncing/pending cases retain existing guards. Freeze the receipt review version and entered amount through refresh; changed balances require a fresh review. Retain uncertain commands with the same ID and block closing/navigation until safe retry completes. Shared receipt events refresh both the displayed link and Overview. No new financial endpoint, schema or repayment protocol.
+
 ## 2026-10-23 - Match Shared Bills At Gross And Preserve Confirmed-Repayment Accounting
 
 Bank bill debits are the full household payment. Reconciliation must not reinterpret a net personal budget cell as the original full bill. Resolve current-month bill allocations independently of action-log availability; require exact payer, workbook, row, label and source lineage. Preserve an existing split method and saved shares for unchanged gross amounts. Gross corrections recalculate shares through the existing income/equal rules and versioned canonical reimbursement revision/projection; confirmed/pending repayments, cleared debts, historical accounting and incomplete projections retain their existing guards. An unchanged gross bill may match while retaining its confirmed receipts and reduced budget cell.

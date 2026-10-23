@@ -146,7 +146,10 @@ function validate(snapshot: LedgerResponse) {
   return snapshot
 }
 
-export function ReimbursementLedger({ fallback, refreshKey }: { fallback: ReactNode; refreshKey?: string }) {
+export interface MatchedReceiptScope { allocationId: string; bankAmountCents: number; review?: boolean }
+export function ReimbursementLedger({ fallback, refreshKey, matchedReceipt, onClose, onRejectAccess }: {
+  fallback: ReactNode; refreshKey?: string; matchedReceipt?: MatchedReceiptScope; onClose?: () => void; onRejectAccess?: (message: string) => void
+}) {
   const [snapshot, setSnapshot] = useState<LedgerSnapshot | null>(null)
   const [legacy, setLegacy] = useState(false)
   const [error, setError] = useState("")
@@ -178,11 +181,12 @@ export function ReimbursementLedger({ fallback, refreshKey }: { fallback: ReactN
       if (!mounted.current || id !== readId.current || controller.signal.aborted) return false
       if (failure instanceof LedgerRequestError && [401, 403].includes(failure.status)) {
         setSnapshot(null); setLegacy(false); setSignedOut(failure.status === 401)
+        if (matchedReceipt) onRejectAccess?.(failure.message)
       }
       setError(failure instanceof LedgerRequestError ? failure.message : "Couldn’t refresh reimbursements. Previously loaded balances may be out of date.")
       return false
     } finally { if (mounted.current && id === readId.current) setRefreshing(false) }
-  }, [])
+  }, [matchedReceipt, onRejectAccess])
   useEffect(() => {
     mounted.current = true
     const refresh = () => { if (!pending.current && document.visibilityState === "visible") void load() }
@@ -216,6 +220,7 @@ export function ReimbursementLedger({ fallback, refreshKey }: { fallback: ReactN
       if (!mounted.current) return
       if (failure instanceof LedgerRequestError && failure.status < 500) {
         pending.current = null; setUncertain(false)
+        if (matchedReceipt && [401, 403].includes(failure.status)) { setSnapshot(null); onRejectAccess?.(failure.message) }
         if (failure.status === 401) { setSnapshot(null); setSignedOut(true); change.done() }
         if (failure.status === 409) { change.done(); await load() }
         setError(failure.message)
@@ -230,7 +235,16 @@ export function ReimbursementLedger({ fallback, refreshKey }: { fallback: ReactN
     pending.current = { body: { ...body, requestId: crypto.randomUUID() }, done }
     void execute()
   }
-  if (legacy && !uncertain) return <>{fallback}</>
+  if (legacy && !uncertain) return <>{fallback}{matchedReceipt && <button type="button" className="bb-reconcile-action" onClick={onClose}>Back to reconciliation</button>}</>
+  if (matchedReceipt) return <section className="bb-canonical-reimbursements bb-reconcile-receipt" aria-label="Receive shared payment">
+    {error && <div className="bb-ledger-message" role="alert"><p>{error}</p>
+      {uncertain ? <button type="button" disabled={busy || signedOut} onClick={() => void execute()}>Retry this record</button>
+        : <button type="button" disabled={busy || refreshing} onClick={() => void load()}>Refresh payment</button>}</div>}
+    {!snapshot && !error && <p role="status">Loading the matched shared payment…</p>}
+    {snapshot && <MatchedReceiptContents snapshot={snapshot} scope={matchedReceipt} disabled={busy || uncertain || refreshing}
+      run={run} refresh={() => void load()} />}
+    <button type="button" className="bb-reconcile-action" disabled={busy || uncertain} onClick={onClose}>Back to reconciliation</button>
+  </section>
   return <Card className="bb-report-section bb-reimbursement-section bb-canonical-reimbursements">
     <CardHeader><CardTitle>Shared Reimbursements</CardTitle></CardHeader>
     <CardContent>
@@ -242,6 +256,38 @@ export function ReimbursementLedger({ fallback, refreshKey }: { fallback: ReactN
         refresh={() => void load()} refreshing={refreshing} />}
     </CardContent>
   </Card>
+}
+
+function MatchedReceiptContents({ snapshot, scope, disabled, run, refresh }: {
+  snapshot: LedgerSnapshot; scope: MatchedReceiptScope; disabled: boolean; run: Run; refresh: () => void
+}) {
+  const item = snapshot.allocations.find(item => item.id === scope.allocationId && item.payerOwner === snapshot.ownerKey
+    && writable(item) && item.grossCents === scope.bankAmountCents)
+  const [editing, setEditing] = useState(Boolean(scope.review))
+  const [reviewVersion, setReviewVersion] = useState(scope.review ? item?.version : undefined)
+  useAppWorkStatus({ label: "Matched payment review", dirty: editing, onDiscard: () => setEditing(false) })
+  if (!item) return <p role="status">This shared payment changed. Review its current details in Shared.</p>
+  const incoming = snapshot.events.filter(event => event.allocationId === item.id && event.status === "pending")
+  const pendingSheet = item.projectedVersion !== item.version
+  const stale = editing && reviewVersion !== item.version
+  const blocked = disabled || pendingSheet || Boolean(item.clearedCents) || incoming.length > 0
+  const partner = person(item.partnerOwner)
+  return <>
+    <h2>{partner}’s share · {item.item || item.category}</h2>
+    <p className="bb-ledger-note">The bank match is saved separately. Confirm only money you already received; no transfer is made.</p>
+    <dl className="bb-reconcile-receipt-amounts"><div><dt>Full bank payment</dt><dd>{money(item.grossCents)}</dd></div>
+      <div><dt>{partner}’s share</dt><dd>{money(item.partnerShareCents)}</dd></div>
+      <div><dt>Already received / settled</dt><dd>{money(item.settledCents)}</dd></div>
+      <div><dt>Still owed</dt><dd>{money(item.outstandingCents)}</dd></div></dl>
+    {pendingSheet && <div role="status"><p className="bb-ledger-note">Payment recorded; sheet update pending.</p><button type="button" className="bb-reconcile-action" disabled={disabled} onClick={refresh}>Refresh payment</button></div>}
+    {Boolean(item.clearedCents) && <p className="bb-ledger-note">Undo the balance reset in Shared before recording a receipt.</p>}
+    {incoming.map(event => <IncomingPayment key={event.id} event={event} allocation={item} disabled={disabled || pendingSheet || Boolean(item.clearedCents)} run={run} />)}
+    {!item.outstandingCents && !pendingSheet && !item.clearedCents && <p role="status">{partner}’s share is settled.</p>}
+    {stale && <p role="status">This payment changed. Go back and reopen it before confirming.</p>}
+    {item.outstandingCents > 0 && !editing && <button type="button" className="bb-reconcile-action bb-reconcile-primary" disabled={blocked} onClick={() => { setReviewVersion(item.version); setEditing(true) }}>Mark {partner}’s share received</button>}
+    {editing && item.outstandingCents > 0 && !pendingSheet && !item.clearedCents && !incoming.length
+      && <PaymentEditor allocation={item} isPayer disabled={blocked || stale} run={run} close={() => setEditing(false)} />}
+  </>
 }
 
 function LedgerContents({ snapshot, disabled, run, refresh, refreshing }: {

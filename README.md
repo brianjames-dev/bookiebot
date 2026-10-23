@@ -48,6 +48,8 @@ For planning questions, the agent uses `get_financial_report` with one focused s
 
 Bill logging accepts affirmative requests such as `Log rent $2100`, `I paid $2100 for rent`, `Water bill 148.82`, `124.46 PG&E`, and `Log expense 124.46 PG&E`. PG&E, Recology, and Water accept the amount before or after the bill name and automatically offer the split dialog after a successful log; an explicit split method uses that choice directly. Bill questions, negation, and planning statements use the read-only conversational path, including while a recent-action amount edit is pending. Updated bill and savings entries retain amount-only editing and cannot delete their budget rows.
 
+Web reconciliation keeps bank matching separate from shared repayment. After matching a shared bill, review the partner’s share, actual receipt amount/date and a separate received confirmation, or reopen the matched entry under Checked. Matching never marks a repayment received. See [Shared reimbursements](docs/REIMBURSEMENTS.md).
+
 Existing command routing remains authoritative for every mutation. The conversational agent cannot log, update, move, split, delete, reconcile, or pay anything. Tool identity comes from the trusted Discord message context rather than model-generated owner arguments, and conversation threads are isolated by guild, channel, and Discord user.
 
 Imperative bank-transfer requests are rejected before intent parsing so wording such as `Transfer $50 from checking to savings` cannot be misread as setting the monthly savings contribution. A completed transfer can still be recorded when the user explicitly asks BookieBot to log it.

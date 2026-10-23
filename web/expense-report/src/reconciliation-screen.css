@@ -69,3 +69,9 @@
 .bb-reconcile-future { display: flex; align-items: center; gap: 9px; min-height: 44px; margin: 12px 0; }
 .bb-reconcile-future input { width: 18px; height: 18px; accent-color: hsl(var(--primary)); flex-shrink: 0; }
 .bb-reconcile-split { display: grid; gap: 7px; margin: 12px 0; }
+.bb-reconcile-receipt { border: 1px solid hsl(var(--border)); border-radius: 14px; padding: 16px; margin: 16px 0; scroll-margin-top: 24px; }
+.bb-reconcile-receipt h2 { margin: 0 0 8px; font-size: 17px; }
+.bb-reconcile-receipt-amounts { margin: 16px 0; font-size: 13px; }
+.bb-reconcile-receipt-amounts > div { display: flex; justify-content: space-between; gap: 16px; margin: 8px 0; }
+.bb-reconcile-receipt-amounts dd { margin: 0; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.bb-reconcile-receipt .bb-reconcile-primary { color: hsl(var(--primary-foreground)); }
