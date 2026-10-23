@@ -16,6 +16,11 @@ async def test_scoped_reconnect_routes_never_exchange_or_accept_item_override(mo
         complete_reconnect=AsyncMock(return_value=SimpleNamespace(added=2, modified=1, removed=1)),
         link_public_token=AsyncMock(side_effect=AssertionError('Never create another Item')))
     monkeypatch.setattr(bank_link, 'build_banking_service', lambda: service)
+    refresh = AsyncMock()
+    monkeypatch.setattr(bank_link, 'refresh_reconciliation_review', refresh)
+    from bookiebot.core import bank_reconciliation
+    notify = AsyncMock()
+    monkeypatch.setattr(bank_reconciliation, 'notify_bank_reconciliation_refreshed', notify)
     token = bank_link.create_bank_link_setup_token(actor_key='123', owner_key='brian', item_db_id=3)
     assert bank_link.verify_bank_link_setup_token(token)['item_db_id'] == '3'
     async with TestClient(TestServer(bank_link.create_bank_link_app())) as client:
@@ -32,6 +37,8 @@ async def test_scoped_reconnect_routes_never_exchange_or_accept_item_override(mo
         response = await client.post('/bank/reconnect-complete', json={'setup_token': token, 'item_db_id': 999})
         assert response.status == 200
         service.complete_reconnect.assert_awaited_once_with('brian', 3)
+        refresh.assert_awaited_once_with(service, 'brian', '123')
+        notify.assert_awaited_once_with('123')
         new_token = bank_link.create_bank_link_setup_token(actor_key='123', owner_key='brian')
         response = await client.post('/bank/reconnect-complete', json={'setup_token': new_token})
         assert response.status == 400
@@ -45,9 +52,27 @@ async def test_reconnect_completion_cannot_claim_success_before_real_sync(monkey
     monkeypatch.setenv('BANK_LINK_SIGNING_SECRET', 'test-reconnect-secret')
     service = SimpleNamespace(complete_reconnect=AsyncMock(side_effect=RuntimeError('provider unavailable')))
     monkeypatch.setattr(bank_link, 'build_banking_service', lambda: service)
+    refresh = AsyncMock()
+    monkeypatch.setattr(bank_link, 'refresh_reconciliation_review', refresh)
     token = bank_link.create_bank_link_setup_token(actor_key='123', owner_key='brian', item_db_id=3)
     async with TestClient(TestServer(bank_link.create_bank_link_app())) as client:
         response = await client.post('/bank/reconnect-complete', json={'setup_token': token})
         assert response.status == 502
         assert 'ok' not in await response.json()
+    refresh.assert_not_awaited()
+
+
+@pytest.mark.asyncio
+async def test_failed_matching_does_not_request_a_refreshed_digest(monkeypatch):
+    from bookiebot.core import bank_reconciliation
+    monkeypatch.setenv('BANK_LINK_SIGNING_SECRET', 'test-reconnect-secret')
+    service = SimpleNamespace(complete_reconnect=AsyncMock(return_value=SimpleNamespace(added=1, modified=0, removed=0)))
+    monkeypatch.setattr(bank_link, 'build_banking_service', lambda: service)
+    monkeypatch.setattr(bank_link, 'refresh_reconciliation_review', AsyncMock(side_effect=RuntimeError('Sheets unavailable')))
+    notify = AsyncMock()
+    monkeypatch.setattr(bank_reconciliation, 'notify_bank_reconciliation_refreshed', notify)
+    token = bank_link.create_bank_link_setup_token(actor_key='123', owner_key='brian', item_db_id=3)
+    async with TestClient(TestServer(bank_link.create_bank_link_app())) as client:
+        assert (await client.post('/bank/reconnect-complete', json={'setup_token': token})).status == 502
+    notify.assert_not_awaited()
 

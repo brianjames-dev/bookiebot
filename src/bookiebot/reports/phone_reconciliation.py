@@ -20,6 +20,7 @@ from bookiebot.banking.reconciliation import (
 from bookiebot.banking.service import (
     BankingService, _reconciliation_max_age_days, _scheduled_pulls_for_transactions,
     build_banking_service, clear_schedule_source_cache, read_active_logged_actions,
+    refresh_reconciliation_review,
 )
 from bookiebot.sheets.routing import now_pacific
 
@@ -221,9 +222,9 @@ async def _check(service: BankingService, owner: str, actor: str) -> None:
     # One phone check per owner shares work across taps/devices. Sync and matching
     # operate on bank/reconciliation metadata only; neither logs an expense.
     await service.sync_owner(owner)
-    clear_schedule_source_cache(actor)
-    await asyncio.to_thread(service.reconciliation_preview, owner, limit=_LIMIT,
-                            force=True, actor_key=actor, start_date=_cutoff())
+    await refresh_reconciliation_review(service, owner, actor)
+    from bookiebot.core.bank_reconciliation import notify_bank_reconciliation_refreshed
+    await notify_bank_reconciliation_refreshed(actor)
 
 
 async def _review(request: web.Request) -> web.Response:

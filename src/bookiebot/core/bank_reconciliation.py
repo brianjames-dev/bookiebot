@@ -13,7 +13,7 @@ import discord
 
 from bookiebot.banking.formatting import format_reconciliation_match_report_chunks, format_reconciliation_review_chunks
 from bookiebot.banking.models import ReconciliationItem, ReconciliationPreview, ReconciliationReportMatch
-from bookiebot.banking.service import build_banking_service
+from bookiebot.banking.service import build_banking_service, refresh_reconciliation_review
 from bookiebot.core.bank_reconciliation_flow import send_next_bank_reconciliation_item
 from bookiebot.core.bank_link import bank_reconnect_url
 from bookiebot.sheets.routing import (
@@ -23,7 +23,7 @@ from bookiebot.sheets.routing import (
     now_pacific,
     PACIFIC_TZ,
 )
-from bookiebot.sheets.undo import has_system_event, record_system_event
+from bookiebot.sheets.undo import has_system_event, record_system_event, read_logged_action_history
 from bookiebot.ui.bank_reconciliation import (
     BankReconciliationDigestView,
     BankReconciliationInboxView,
@@ -32,6 +32,7 @@ from bookiebot.ui.bank_reconciliation import (
 logger = logging.getLogger(__name__)
 
 _BANK_RECONCILIATION_TASK: asyncio.Task | None = None
+_BANK_RECONCILIATION_WAKE: asyncio.Event | None = None
 _PERSISTENT_DIGEST_VIEW_REGISTERED = False
 _INBOX_MATCH_DETAILS_TIMEOUT_SECONDS = 5.0
 
@@ -213,6 +214,62 @@ def _digest_metadata(current: date) -> dict[str, str]:
     return {"digest_date": current.isoformat()}
 
 
+def _digest_events(actor_key: str, current: date) -> set[str]:
+    # Read the owner-scoped audit once rather than fetch Sheets for every flag.
+    return {logged.action.metadata.get('event_type', '') for logged in read_logged_action_history(actor_key)
+        if logged.status == 'active' and logged.action.metadata.get('type') == 'system_state'
+        and logged.action.metadata.get('digest_date') == current.isoformat()}
+
+
+async def notify_bank_reconciliation_refreshed(actor_key: str) -> None:
+    """Persist one morning refresh request, then wake the single delivery loop."""
+    current = now_pacific()
+    if not _bank_reconciliation_enabled() or not _is_eligible(current):
+        return
+    try:
+        events = await asyncio.to_thread(_digest_events, actor_key, current.date())
+        if 'bank_reconciliation_resync_completed' not in events:
+            await asyncio.to_thread(record_system_event, actor_key, 'bank_reconciliation_resync_completed',
+                _digest_metadata(current.date()), 'Bank resync and reconciliation refresh completed')
+    except Exception:
+        logger.exception('Could not record morning bank refresh request', extra={'actor_key': actor_key})
+    if _BANK_RECONCILIATION_WAKE is not None:
+        _BANK_RECONCILIATION_WAKE.set()
+
+
+def bank_connection_alert_view(actor_key: str, links: tuple[tuple[str, str], ...] = ()) -> BankReconciliationDigestView:
+    view = bank_reconciliation_digest_view(actor_key)
+    for child in list(view.children):
+        if getattr(child, 'action', '') != 'resync':
+            view.remove_item(child)
+    for label, url in links[:5]:
+        view.add_item(discord.ui.Button(label=label[:80], url=url))
+    return view
+
+
+async def _resync_bank_information(interaction: Any, actor_key: str) -> None:
+    owner = get_user_config(actor_key)
+    service = build_banking_service()
+    try:
+        await asyncio.wait_for(service.sync_owner(owner.budget_owner_key), timeout=60)
+        await asyncio.wait_for(refresh_reconciliation_review(service, owner.budget_owner_key, actor_key), timeout=60)
+    except Exception:
+        logger.exception('Bank resync from Discord failed', extra={'actor_key': actor_key})
+        issues = await asyncio.to_thread(service.connection_issues, owner.budget_owner_key)
+        base_url = (service.config.public_base_url or '').rstrip('/')
+        links = tuple((f"Reconnect {issue['institution']}", bank_reconnect_url(
+            actor_key, owner.budget_owner_key, issue['id'], base_url))
+            for issue in issues if issue['needsReconnect']) if base_url else ()
+        await interaction.followup.send('Bank sync could not finish. Use Reconnect below if sign-in is needed, '
+            'or try Resync bank again. Saved review history is preserved.', ephemeral=True,
+            view=bank_connection_alert_view(actor_key, links))
+        return
+    await notify_bank_reconciliation_refreshed(actor_key)
+    await interaction.followup.send('Bank information and reconciliation refreshed. Open Reconcile in the web app '
+        'or View Inbox here. During the 10 AM Pacific morning window, the digest refreshes automatically.',
+        ephemeral=True, view=bank_reconciliation_digest_view(actor_key))
+
+
 async def send_due_bank_reconciliation_digest(client: Any, today: date | None = None) -> int:
     if not _bank_reconciliation_enabled():
         return 0
@@ -236,9 +293,7 @@ async def send_due_bank_reconciliation_digest(client: Any, today: date | None = 
         if not digest:
             continue
         if digest.event_type == 'bank_connection_alert_sent':
-            view = discord.ui.View(timeout=None)
-            for label, url in digest.reconnect_links[:5]:
-                view.add_item(discord.ui.Button(label=label[:80], url=url))
+            view = bank_connection_alert_view(actor_key, digest.reconnect_links)
         else:
             view = bank_reconciliation_digest_view(actor_key)
         delivered = await _send_user_dm(
@@ -454,6 +509,8 @@ def bank_reconciliation_digest_view(actor_key: str) -> BankReconciliationDigestV
                 return
             if action == "inbox":
                 await _send_bank_reconciliation_inbox(interaction, actor_key)
+            if action == 'resync':
+                await _resync_bank_information(interaction, actor_key)
 
     return BankReconciliationDigestView(handle_action, actor_key=str(actor_key))
 
@@ -474,6 +531,8 @@ def persistent_bank_reconciliation_digest_view(actor_key: str) -> BankReconcilia
                 return
             if action == "inbox":
                 await _send_bank_reconciliation_inbox(interaction, actor_key)
+            if action == 'resync':
+                await _resync_bank_information(interaction, actor_key)
 
     return BankReconciliationDigestView(handle_action, actor_key=str(actor_key))
 
@@ -553,11 +612,15 @@ def prepare_bank_reconciliation_digest_messages(
     force: bool = False,
 ) -> PreparedBankReconciliationDigest | None:
     metadata = _digest_metadata(current)
-    if not force and has_system_event(actor_key, "bank_reconciliation_digest_sent", metadata):
-        return None
-
     owner = get_user_config(actor_key)
     service = build_banking_service()
+    events = _digest_events(actor_key, current)
+    normal_sent = 'bank_reconciliation_digest_sent' in events
+    recovery_sent = 'bank_reconciliation_recovery_digest_sent' in events
+    recovering = bool(events & {'bank_connection_alert_sent', 'bank_reconciliation_resync_completed'})
+    # Health alerts remain independent even when a normal digest was delivered.
+    if not force and (recovery_sent or (normal_sent and not recovering)) and not service.connection_issues(owner.budget_owner_key):
+        return None
     sync_error: str | None = None
     month_start = current.replace(day=1).isoformat()
     if service.config.configured:
@@ -573,7 +636,7 @@ def prepare_bank_reconciliation_digest_messages(
     issues = service.connection_issues(owner.budget_owner_key)
     if sync_error or issues:
         event_type = 'bank_connection_alert_sent'
-        if not force and has_system_event(actor_key, event_type, metadata):
+        if not force and event_type in events:
             return None
         reconnect = [issue for issue in issues if issue['needsReconnect']]
         names = ', '.join(str(issue['institution'])[:100] for issue in reconnect)
@@ -588,13 +651,16 @@ def prepare_bank_reconciliation_digest_messages(
         links = tuple((f"Reconnect {issue['institution']}", bank_reconnect_url(
             actor_key, owner.budget_owner_key, issue['id'], base_url)) for issue in reconnect) if base_url else ()
         text += ('\nUse Reconnect below, open Reconcile in the app, or run `/bank_reconnect` for a fresh link. Links expire after 15 minutes.'
-                 if reconnect else '\nOpen Reconcile in the app and try Check again later.')
+                 if reconnect else '\nUse Resync bank below or Resync bank information in the app. The morning digest refreshes after recovery.')
         if mark_sent and not record_system_event(actor_key, event_type, metadata,
                 f'Bank connection alert sent for {current.isoformat()}'):
             return None
         return PreparedBankReconciliationDigest(public_message=text, detail_message=text,
             owner_key=owner.budget_owner_key, event_type=event_type, reconnect_links=links)
 
+    event_type = 'bank_reconciliation_recovery_digest_sent' if recovering else 'bank_reconciliation_digest_sent'
+    if not force and event_type in events:
+        return None
     try:
         preview = service.reconciliation_preview(
             owner.budget_owner_key,
@@ -608,7 +674,7 @@ def prepare_bank_reconciliation_digest_messages(
             start_date=month_start,
         )
         matched_items = [item for item in preview.items if item.status == "matched"]
-        if force:
+        if force or recovering:
             matched_by_id = {item.id: item for item in matched_items}
             for item in service.matched_reconciliation_items(
                 owner.budget_owner_key,
@@ -629,7 +695,7 @@ def prepare_bank_reconciliation_digest_messages(
 
     unresolved_count = len(unresolved)
     matched_count = len(matched_items)
-    if not unresolved_count and not matched_count:
+    if not unresolved_count and not matched_count and not recovering:
         return None
     report_preview_items = {item.id: item for item in preview.items}
     for item in matched_items:
@@ -639,7 +705,7 @@ def prepare_bank_reconciliation_digest_messages(
     if mark_sent:
         if not record_system_event(
             actor_key,
-            "bank_reconciliation_digest_sent",
+            event_type,
             {
                 **metadata,
                 "unresolved_count": str(len(unresolved)),
@@ -649,13 +715,15 @@ def prepare_bank_reconciliation_digest_messages(
         ):
             return None
 
+    public_message = format_bank_reconciliation_public_prompt(
+        mention, unresolved_count, matched_count=matched_count, sync_error=sync_error)
+    if recovering:
+        public_message = ('Bank information resynced; reconciliation refreshed.\n' + public_message
+            if unresolved_count or matched_count else
+            f'{mention} bank information resynced; no posted transactions need review. '
+            'Pending charges remain tentative. Use View Inbox to check the current bank cache.')
     return PreparedBankReconciliationDigest(
-        public_message=format_bank_reconciliation_public_prompt(
-            mention,
-            unresolved_count,
-            matched_count=matched_count,
-            sync_error=sync_error,
-        ),
+        public_message=public_message,
         detail_messages=tuple(format_bank_reconciliation_digest_chunks(
             mention,
             report_preview,
@@ -675,6 +743,7 @@ def prepare_bank_reconciliation_digest_messages(
         reviewed_items=tuple({item.id: item for item in [*unresolved, *matched_items]}.values()),
         owner_key=owner.budget_owner_key,
         owner_name=getattr(owner, "name", str(actor_key)),
+        event_type=event_type,
     )
 
 
@@ -859,14 +928,25 @@ def _append_digest_chunk(chunks: list[str], section: str, *, max_chars: int) -> 
 
 
 async def run_bank_reconciliation_loop(client: Any) -> None:
-    while True:
-        try:
-            await send_due_bank_reconciliation_digest(client)
-        except asyncio.CancelledError:
-            raise
-        except Exception:
-            logger.exception("Bank reconciliation loop failed")
-        await asyncio.sleep(_check_interval_seconds())
+    global _BANK_RECONCILIATION_WAKE
+    wake = asyncio.Event()
+    _BANK_RECONCILIATION_WAKE = wake
+    try:
+        while True:
+            wake.clear()
+            try:
+                await send_due_bank_reconciliation_digest(client)
+            except asyncio.CancelledError:
+                raise
+            except Exception:
+                logger.exception("Bank reconciliation loop failed")
+            try:
+                await asyncio.wait_for(wake.wait(), timeout=_check_interval_seconds())
+            except TimeoutError:
+                pass
+    finally:
+        if _BANK_RECONCILIATION_WAKE is wake:
+            _BANK_RECONCILIATION_WAKE = None
 
 
 def ensure_bank_reconciliation_loop(client: Any) -> asyncio.Task | None:

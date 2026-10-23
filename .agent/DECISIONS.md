@@ -1,5 +1,11 @@
 # Agent Decisions
 
+## 2026-10-23 - Refresh Shared Review State Before A Morning Recovery Digest
+
+Bank reconnect completion and explicit phone/Discord resync must finish a real sync and force the same owner-scoped recent reconciliation preview before claiming review is refreshed. Reuse the 200-row/age boundary and preserve confirmed/ignored/import lineage. Refresh on app foreground so returning from bank OAuth exposes the new state.
+
+During the existing 10–11 AM Pacific window, persist `bank_reconciliation_resync_completed` after review refresh and wake the single existing digest loop. A previous connection alert also makes recovery eligible. Deliver at most one `bank_reconciliation_recovery_digest_sent` per owner/day, independently of a previously delivered normal digest; record it only after Discord succeeds and include saved matches even when the resync already scored them. The normal daily guard recognizes the recovery delivery. Preserve normal/alert audit history and retry failures; do not reset sent markers or send outside the morning window. Existing persistent owner-scoped component IDs handle Resync after restart and provide fresh login links when old URLs expire. No schema migration or second notification dispatcher.
+
 ## 2026-10-23 - Repair Existing Bank Connections And Report Sync Failures
 
 Use short-lived signed owner/Item-scoped repair links and Plaid Hosted Link update mode to renew the existing connection from the phone app or Discord. Request no new products/accounts and never exchange another public token, reset cursors or replace review/import history. A return URL is not proof of repair: only a successful real sync clears the stored failure. Hosted Link handles the bank OAuth navigation for these external-browser entry points without an application OAuth-resume session.

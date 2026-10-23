@@ -34,6 +34,8 @@
 .bb-reconcile-suggestion-title strong { min-width: 0; overflow-wrap: anywhere; }
 .bb-reconcile-suggestion-title > span { flex-shrink: 0; font-variant-numeric: tabular-nums; }
 .bb-reconcile-action { border: 0; min-height: 44px; padding: 8px 0; color: hsl(var(--primary)); background: transparent; font: inherit; font-size: 14px; }
+.bb-reconcile-recovery-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 16px; }
+.bb-reconcile-recovery-actions .bb-reconcile-action { display: inline-flex; align-items: center; text-align: left; }
 .bb-reconcile-secondary { color: hsl(var(--muted-foreground)); }
 .bb-reconcile-mismatch { margin: 12px 0 0; font-size: 12px; line-height: 1.5; }
 .bb-reconcile-mismatch p:first-child { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; font-variant-numeric: tabular-nums; }

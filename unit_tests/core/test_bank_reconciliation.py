@@ -468,6 +468,7 @@ async def test_bank_reconciliation_digest_view_is_persistent():
     assert [child.custom_id for child in view.children] == [
         "bank_reconcile:start:123",
         "bank_reconcile:inbox:123",
+        "bank_reconcile:resync:123",
     ]
 
 
@@ -608,7 +609,7 @@ def test_prepare_bank_reconciliation_digest_reports_sync_failure_instead_of_stal
         lambda _actor_key: SimpleNamespace(budget_owner_key="brian"),
     )
     monkeypatch.setattr(bank_reconciliation, "build_banking_service", lambda: FakeService())
-    monkeypatch.setattr(bank_reconciliation, "has_system_event", lambda *_args: False)
+    monkeypatch.setattr(bank_reconciliation, "_digest_events", lambda *_args: set())
 
     output = bank_reconciliation.prepare_bank_reconciliation_digest(
         "123",
@@ -673,7 +674,7 @@ async def test_bank_reconciliation_inbox_ignore_all_ignores_displayed_batch(monk
     )
     monkeypatch.setattr(bank_reconciliation, "now_pacific", lambda: datetime(2026, 7, 25))
     monkeypatch.setattr(bank_reconciliation, "build_banking_service", lambda: FakeService())
-    monkeypatch.setattr(bank_reconciliation, "has_system_event", lambda *_args: False)
+    monkeypatch.setattr(bank_reconciliation, "_digest_events", lambda *_args: set())
     interaction = FakeReviewInteraction()
 
     await bank_reconciliation._send_bank_reconciliation_inbox(interaction, "123")
@@ -758,7 +759,7 @@ async def test_bank_reconciliation_inbox_shows_recent_auto_matches_without_actio
     )
     monkeypatch.setattr(bank_reconciliation, "now_pacific", lambda: datetime(2026, 7, 25))
     monkeypatch.setattr(bank_reconciliation, "build_banking_service", lambda: FakeService())
-    monkeypatch.setattr(bank_reconciliation, "has_system_event", lambda *_args: False)
+    monkeypatch.setattr(bank_reconciliation, "_digest_events", lambda *_args: set())
     interaction = FakeReviewInteraction()
 
     await bank_reconciliation._send_bank_reconciliation_inbox(interaction, "123")

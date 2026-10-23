@@ -15,7 +15,7 @@ function load(file) {
   const exports = {}; cache.set(file, exports)
   const code = ts.transpileModule(fs.readFileSync(file, 'utf8'), { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2020, jsx: ts.JsxEmit.ReactJSX } }).outputText
   vm.runInNewContext(code, { exports, AbortController, Error, Intl, Date, Set,
-    window: win, document: { visibilityState: 'visible' },
+    window: win, document: { visibilityState: 'visible', addEventListener: win.addEventListener, removeEventListener: win.removeEventListener },
     fetch: (url, options) => new Promise((resolve, reject) => requests.push({ url, options, resolve, reject })),
     require: name => name.endsWith('.css') ? {} : name === './app-work-guard' ? {
       useAppWorkStatus(value) { work = value; return React.useCallback(value => { work = value }, []) },
@@ -131,6 +131,13 @@ const snapshot = (items = rows, enabled = true) => ({ enabled, checkedAt: '2026-
   const reconnect = tree.root.findAllByType('a').find(node => text(node) === 'Reconnect Example Bank')
   assert.equal(reconnect.props.href, '/bank/link?token=signed.token')
   assert.equal(latest().options.method, 'GET', 'Showing a reconnect alert does not start Link')
+  await click('Resync bank information'); assert.deepEqual(body(), { operation: 'check' })
+  await respond({ ...snapshot([]), notice: 'Bank sync failed.', connections: [{ ...issue, needsReconnect: false, reconnectUrl: undefined }] })
+  assert.ok(button('Resync bank information'), 'Temporary failures offer a retry without requiring bank login')
+  assert.equal(tree.root.findAllByType('a').length, 0)
+  await run(() => { for (const fn of listeners.get('visibilitychange') || []) fn() })
+  assert.equal(latest().options.method, 'GET', 'Returning from secure bank login reloads saved reconciliation')
+  await respond(snapshot())
   await run(() => controller.load())
   await respond({ ...snapshot([]), connections: [{ ...issue, reconnectUrl: 'https://untrusted.example/link' }] })
   assert.match(rendered(), /Couldn’t read/)

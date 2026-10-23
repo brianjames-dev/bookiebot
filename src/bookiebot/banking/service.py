@@ -1447,6 +1447,14 @@ class BankingService:
         return [_account_from_plaid(item, raw) for raw in raw_accounts]
 
 
+async def refresh_reconciliation_review(service: BankingService, owner_key: str, actor_key: str) -> ReconciliationPreview:
+    """Refresh shared review metadata after a verified sync; never write expenses."""
+    clear_schedule_source_cache(actor_key)
+    return await asyncio.to_thread(service.reconciliation_preview, owner_key, limit=200,
+        force=True, actor_key=actor_key,
+        start_date=(now_pacific().date() - timedelta(days=_reconciliation_max_age_days())).isoformat())
+
+
 def build_banking_service() -> BankingService:
     config = load_banking_config()
     cipher = TokenCipher(config.token_encryption_key or "missing-dev-key")

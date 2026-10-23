@@ -18,7 +18,7 @@ def failed_bank(monkeypatch):
         reconciliation_preview=lambda *a, **kw: pytest.fail('Broken connection must not read Sheets or preview'))
     monkeypatch.setattr(digest, 'build_banking_service', lambda: service)
     monkeypatch.setattr(digest, 'get_user_config', lambda actor: SimpleNamespace(budget_owner_key='brian'))
-    monkeypatch.setattr(digest, 'has_system_event', lambda *a: False)
+    monkeypatch.setattr(digest, '_digest_events', lambda *a: set())
     return service
 
 
@@ -37,7 +37,7 @@ def test_alert_deduplication_does_not_consume_normal_digest(failed_bank, monkeyp
     monkeypatch.setattr(digest, 'record_system_event', lambda actor, event, *a: events.append(event) or True)
     result = digest.prepare_bank_reconciliation_digest_messages('123', '<@123>', date(2026, 10, 23), mark_sent=True)
     assert result and events == ['bank_connection_alert_sent']
-    monkeypatch.setattr(digest, 'has_system_event', lambda actor, event, meta: event in events)
+    monkeypatch.setattr(digest, '_digest_events', lambda *a: set(events))
     assert digest.prepare_bank_reconciliation_digest_messages('123', '<@123>', date(2026, 10, 23), mark_sent=False) is None
 
     from bookiebot.banking.models import ReconciliationPreview
@@ -48,9 +48,10 @@ def test_alert_deduplication_does_not_consume_normal_digest(failed_bank, monkeyp
     failed_bank.reconciliation_preview = lambda *a, **kw: ReconciliationPreview(owner_key='brian',
         items=[review], cached_transaction_count=1, candidate_transaction_count=1)
     failed_bank.unresolved_reconciliation_items = lambda *a, **kw: [review]
+    failed_bank.matched_reconciliation_items = lambda *a, **kw: []
     failed_bank.reconciliation_report_matches = lambda *a, **kw: []
     result = digest.prepare_bank_reconciliation_digest_messages('123', '<@123>', date(2026, 10, 23), mark_sent=False)
-    assert result and result.event_type == 'bank_reconciliation_digest_sent'
+    assert result and result.event_type == 'bank_reconciliation_recovery_digest_sent'
     assert 'Fresh purchase' in result.detail_message
 
 
@@ -64,7 +65,9 @@ async def test_alert_records_separate_event_only_after_successful_dm(failed_bank
     assert await digest.send_due_bank_reconciliation_digest(SimpleNamespace(), today=date(2026, 10, 23)) == int(delivered)
     assert events == (['bank_connection_alert_sent'] if delivered else [])
     view = digest._send_user_dm.call_args.kwargs['view']
-    assert len(view.children) == 1 and view.children[0].url.startswith('https://bookie.test/bank/link?token=')
+    assert len(view.children) == 2
+    assert view.children[0].custom_id == 'bank_reconcile:resync:123'
+    assert view.children[1].url.startswith('https://bookie.test/bank/link?token=')
 
 
 def test_default_morning_window_is_ten_am_pacific_including_dst(monkeypatch):
