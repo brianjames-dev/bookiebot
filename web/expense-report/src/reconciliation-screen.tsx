@@ -102,8 +102,10 @@ export function useReconciliation() {
     mounted.current = true; void load()
     const refresh = () => { if (document.visibilityState === "visible" && !blocked.current) void load() }
     window.addEventListener("focus", refresh); window.addEventListener("online", refresh)
+    document.addEventListener("visibilitychange", refresh)
     return () => { mounted.current = false; current.current?.abort(); current.current = null
-      window.removeEventListener("focus", refresh); window.removeEventListener("online", refresh) }
+      window.removeEventListener("focus", refresh); window.removeEventListener("online", refresh)
+      document.removeEventListener("visibilitychange", refresh) }
   }, [load])
   const rejectAccess = useCallback((message: string) => {
     current.current?.abort(); current.current = null
@@ -169,8 +171,11 @@ export function ReconciliationScreen({ controller }: { controller: Controller })
     {!snapshot && !error && <p className="bb-reconcile-muted" role="status">Loading bank transactions…</p>}
     {error && <div className="bb-reconcile-message" role="alert"><p>{error}</p><button type="button" disabled={busy} onClick={() => void load()}>{needsRefresh ? "Check status" : "Try again"}</button></div>}
     {snapshot?.notice && <div className="bb-reconcile-message" role={snapshot.connections?.length ? 'alert' : 'status'}><p>{snapshot.notice}</p>
+      <div className="bb-reconcile-recovery-actions">
       {snapshot.connections?.filter(connection => connection.needsReconnect).map(connection => <a key={connection.id}
-        className="bb-reconcile-action" href={connection.reconnectUrl}>Reconnect {connection.institution}</a>)}</div>}
+        className="bb-reconcile-action" href={connection.reconnectUrl}>Reconnect {connection.institution}</a>)}
+      {!!snapshot.connections?.length && <button type="button" className="bb-reconcile-action" disabled={busy || needsRefresh}
+        onClick={() => void load({ operation: "check" })}>Resync bank information</button>}</div></div>}
     {filter === "pending" && visibleRows.length > 0 && <p className="bb-reconcile-muted">Bank amounts may change. Matches stay tentative until posted.</p>}
     {snapshot?.enabled && !visibleRows.length && <div className="bb-reconcile-empty"><Check size={22} aria-hidden="true" /><p>{filter === "needs_review" ? snapshot.connections?.length ? "No saved transactions need review." : "Nothing needs review." : filter === "pending" ? "No pending transactions." : "No checked transactions yet."}</p></div>}
     <div className="bb-reconcile-list">{visibleRows.map(item => { const detail = details[item.id]; return <TransactionRow key={item.id} item={item} open={openId === item.id}

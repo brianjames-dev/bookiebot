@@ -48,6 +48,7 @@ async def test_failed_sync_exposes_owner_scoped_reconnect_with_empty_inbox(clien
     response = await client.http.post('/app/reconciliation', headers=HEADERS, json={'operation': 'check'})
     assert response.status == 200
     assert (await response.json())['connections'][0]['needsReconnect']
+    client.notify.assert_not_awaited()
     connect(client, HANNAH, 'hannah')
     data = await (await client.http.get('/app/reconciliation')).json()
     assert 'connections' not in data
@@ -65,6 +66,9 @@ def logged(amount="12.34", label="Coffee", action_id="coffee", row=12):
 
 @pytest_asyncio.fixture
 async def client(tmp_path, monkeypatch):
+    from bookiebot.core import bank_reconciliation
+    notify = AsyncMock()
+    monkeypatch.setattr(bank_reconciliation, 'notify_bank_reconciliation_refreshed', notify)
     monkeypatch.setenv("BOOKIEBOT_PUBLIC_BASE_URL", "http://127.0.0.1")
     access = AppAccessStore(tmp_path / "phone.sqlite3")
     access.initialize()
@@ -93,7 +97,7 @@ async def client(tmp_path, monkeypatch):
     review.register_phone_reconciliation_routes(app)
     async with TestClient(TestServer(app), cookie_jar=CookieJar(unsafe=True)) as http:
         yield SimpleNamespace(http=http, access=access, store=store, service=service,
-                              actions=actions, actors=actors)
+                              actions=actions, actors=actors, notify=notify)
     for task in list(review._checks.values()):
         task.cancel()
     review._checks.clear()
@@ -305,6 +309,7 @@ async def test_old_items_hidden_and_unreviewed_items_need_check(client):
     result = await client.http.post("/app/reconciliation", headers=HEADERS, json={"operation": "check"})
     assert result.status == 200, await result.text()
     client.service.sync_owner.assert_awaited_once_with("brian")
+    client.notify.assert_awaited_once_with(BRIAN)
     row = (await result.json())["items"][0]
     assert row["id"] > 0 and row["status"] == "checked"
 

@@ -142,6 +142,8 @@ class BankReconciliationDigestView(ViewBase):  # type: ignore[misc]
                 custom_id=f"bank_reconcile:inbox:{actor_key}",
             )
         )
+        self.add_item(BankReconciliationButton("Resync bank", "resync", callback_func,
+            custom_id=f"bank_reconcile:resync:{actor_key}"))
 
 
 class BankReconciliationInboxView(ViewBase):  # type: ignore[misc]

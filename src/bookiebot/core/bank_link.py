@@ -13,7 +13,7 @@ from urllib.parse import urlencode
 from aiohttp import web
 
 from bookiebot.banking.plaid_client import PlaidApiError
-from bookiebot.banking.service import build_banking_service
+from bookiebot.banking.service import build_banking_service, refresh_reconciliation_review
 
 
 class BankLinkTokenError(ValueError):
@@ -191,7 +191,13 @@ async def _bank_reconnect_complete(request: web.Request) -> web.Response:
         if 'item_db_id' not in data:
             return _json_error('Use an existing bank reconnect link.', status=400)
         service = build_banking_service()
-        result = await asyncio.wait_for(service.complete_reconnect(data['owner_key'], int(data['item_db_id'])), timeout=60)
+        async def reconnect_and_review():
+            result = await service.complete_reconnect(data['owner_key'], int(data['item_db_id']))
+            await refresh_reconciliation_review(service, data['owner_key'], data['actor_key'])
+            return result
+        result = await asyncio.wait_for(reconnect_and_review(), timeout=60)
+        from bookiebot.core.bank_reconciliation import notify_bank_reconciliation_refreshed
+        await notify_bank_reconciliation_refreshed(data['actor_key'])
         return web.json_response({'ok': True, 'added': result.added, 'modified': result.modified,
                                  'removed': result.removed}, headers={'Cache-Control': 'no-store'})
     except web.HTTPException as exc:
@@ -226,7 +232,7 @@ async function run() {
   try {
     if (complete) {
       await post('/bank/reconnect-complete');
-      status.textContent = 'Bank reconnected. Transaction sync succeeded. New bank activity may take a few minutes to arrive. Return to Reconcile and tap Check for matches.';
+      status.textContent = 'Bank reconnected. Transactions and reconciliation have been refreshed. During the 10 AM Pacific morning window, your Discord digest refreshes automatically. Return to Reconcile to review. New bank activity may take a few minutes to arrive.';
       button.hidden = true;
     } else {
       const result = await post('/bank/link-token');
