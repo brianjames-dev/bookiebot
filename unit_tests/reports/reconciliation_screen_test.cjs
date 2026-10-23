@@ -4,7 +4,11 @@ const React = req('react'), Renderer = req('react-test-renderer'), ts = req('typ
 global.IS_REACT_ACT_ENVIRONMENT = true
 const requests = [], timers = new Map(), listeners = new Map()
 let serial = 0, work, controller, tree, owner = 'Brian'
+const statuses = new Map()
+const updateWork = () => { const entries = [...statuses.values()]; work = { pending: entries.some(entry => entry.pending), uncertain: entries.some(entry => entry.uncertain), dirty: entries.some(entry => entry.dirty) } }
+const events = []
 const win = {
+  dispatchEvent(event) { events.push(event.type) },
   setTimeout(fn, ms) { timers.set(++serial, { fn, ms }); return serial }, clearTimeout(id) { timers.delete(id) },
   addEventListener(type, fn) { const set = listeners.get(type) || new Set(); set.add(fn); listeners.set(type, set) },
   removeEventListener(type, fn) { listeners.get(type)?.delete(fn) },
@@ -15,10 +19,15 @@ function load(file) {
   const exports = {}; cache.set(file, exports)
   const code = ts.transpileModule(fs.readFileSync(file, 'utf8'), { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2020, jsx: ts.JsxEmit.ReactJSX } }).outputText
   vm.runInNewContext(code, { exports, AbortController, Error, Intl, Date, Set,
-    window: win, document: { visibilityState: 'visible', addEventListener: win.addEventListener, removeEventListener: win.removeEventListener },
+    Event: class { constructor(type) { this.type = type } }, window: win, document: { visibilityState: 'visible', addEventListener: win.addEventListener, removeEventListener: win.removeEventListener },
     fetch: (url, options) => new Promise((resolve, reject) => requests.push({ url, options, resolve, reject })),
     require: name => name.endsWith('.css') ? {} : name === './app-work-guard' ? {
-      useAppWorkStatus(value) { work = value; return React.useCallback(value => { work = value }, []) },
+      useAppWorkStatus(value) {
+        const id = React.useId()
+        statuses.set(id, value); updateWork()
+        React.useEffect(() => () => { statuses.delete(id); updateWork() }, [id])
+        return React.useCallback(next => { statuses.set(id, next); updateWork() }, [id])
+      },
     } : name.startsWith('.') ? load(path.resolve(path.dirname(file), name) + '.tsx') : req(name),
   })
   return exports
@@ -78,14 +87,21 @@ const snapshot = (items = rows, enabled = true) => ({ enabled, checkedAt: '2026-
   await click('Reopen review'); assert.deepEqual(body(), { operation: 'reopen', id: 1, version: 'detail-version-1' })
   await respond(snapshot()); await filter('Needs review')
   await expand('Restaurant'); await respond(detail(rows[1], [suggestion({ amountCents: 1800, amountMismatch: true })]))
-  assert.match(rendered(), /\$18\.00/); assert.match(rendered(), /\$15\.99/); assert.match(rendered(), /Update the logged amount in BookieBot/)
+  assert.match(rendered(), /\$18\.00/); assert.match(rendered(), /\$15\.99/); assert.ok(button("Review amount change"))
   assert.equal(button('Confirm match'), undefined)
+  const beforeAmount = requests.length
+  await click('Review amount change'); assert.match(rendered(), /from \$18.00 to \$15.99/)
+  assert.equal(requests.length, beforeAmount, 'Reviewing an amount is not a sheet write')
+  await click('Cancel amount change'); assert.equal(requests.length, beforeAmount)
+  await click('Review amount change'); await click('Update amount & match')
+  assert.deepEqual(body(), { operation: 'update_match', id: 2, version: 'detail-version-2', suggestionId: 'expense-a' })
+  await respond(snapshot()); assert.ok(events.includes('bookiebot:transactions-changed'))
   await filter('Pending'); await expand('Pending charge'); await respond(detail(rows[2]))
   assert.match(rendered(), /Tentative match/); assert.equal(button('Confirm match'), undefined); assert.equal(button('Ignore transaction'), undefined); assert.equal(button('Check for matches'), undefined)
   await expand('Pending charge'); await expand('Pending charge'); await respond(detail(rows[2], [suggestion({ amountCents: 1700, amountMismatch: true })]))
   assert.match(rendered(), /Wait for the payment to post/); assert.doesNotMatch(rendered(), /Update the logged amount in BookieBot/)
   await filter('Needs review'); await expand('Upcoming bill'); await respond(detail(rows[3], [suggestion({ kind: 'schedule', recorded: false, confirmable: false })]))
-  assert.match(rendered(), /Not logged yet/); assert.equal(button('Confirm match'), undefined)
+  assert.match(rendered(), /Scheduled · not recorded in sheet/); assert.equal(button('Confirm match'), undefined)
   await expand('Upcoming bill'); await expand('Upcoming bill'); await respond(detail(rows[3], [suggestion({ kind: 'schedule', recorded: true, confirmable: true })]))
   assert.match(rendered(), /Scheduled payment/); assert.ok(button('Confirm match'))
   await expand('Recover import'); await respond(detail(rows[4], []))
@@ -93,7 +109,7 @@ const snapshot = (items = rows, enabled = true) => ({ enabled, checkedAt: '2026-
   await expand('Paycheck'); await respond(detail(rows[5]))
   assert.match(rendered(), /\+\$15\.99/); assert.ok(button('Confirm match'), 'Exact income compares absolute bank cents, while displaying money-in direction')
   await expand('New posted'); await respond(detail(rows[6], [])); assert.equal(button('Ignore transaction'), undefined)
-  assert.match(rendered(), /Log it in BookieBot, then check again/); await click('Check for matches')
+  assert.match(rendered(), /No close match found in your budget sheet/); await click('Check for matches')
   assert.deepEqual(body(), { operation: 'check' }); assert.ok([...timers.values()].some(timer => timer.ms === 60000))
   await respond(snapshot()); await expand('Coffee'); await respond(detail(rows[0]))
   await click('Ignore transaction'); assert.deepEqual(body(), { operation: 'ignore', id: 1, version: 'detail-version-1' })
@@ -143,6 +159,25 @@ const snapshot = (items = rows, enabled = true) => ({ enabled, checkedAt: '2026-
   assert.match(rendered(), /Couldn’t read/)
   await run(() => controller.load()); await respond(snapshot())
   assert.equal(tree.root.findAllByType('a').length, 0, 'Successful recovery removes the reconnect link')
+  const logRow = item(20, 'Donut shop', { stateVersion: 'base-20', version: 'base-20' })
+  await run(() => controller.load()); await respond(snapshot([logRow]))
+  await expand('Donut shop'); await respond({ item: { ...logRow, version: 'detail-20', suggestions: [],
+    logging: { allowed: true, kind: 'expense', categories: ['food', 'shopping'], paymentMethods: ['Brian (BofA)'], reason: '' } } })
+  const beforeCached = requests.length
+  await expand('Donut shop'); await expand('Donut shop')
+  assert.equal(requests.length, beforeCached, 'Reopening an unchanged row uses its preview cache')
+  await click('Add expense to budget sheet'); assert.equal(work.dirty, true, 'New entry drafts participate in the app update/sign-out guard')
+  const category = tree.root.findAllByType('select')[0]
+  await run(() => category.props.onChange({ target: { value: 'food' } }))
+  const form = () => tree.root.findByType('form')
+  await run(() => form().props.onSubmit({ preventDefault() {} }))
+  assert.match(rendered(), /Review new sheet entry/)
+  assert.equal(requests.length, beforeCached, 'Entering and reviewing a new entry never writes')
+  await run(() => form().props.onSubmit({ preventDefault() {} }))
+  assert.deepEqual(body(), { operation: 'log', id: 20, version: 'base-20', fields: { category: 'food', item: 'Donut shop', location: 'Donut shop', person: 'Brian (BofA)' } })
+  await respond(snapshot([{ ...logRow, status: 'checked', version: 'checked-20', stateVersion: 'checked-20' }]))
+  assert.ok(events.filter(event => event === 'bookiebot:transactions-changed').length >= 2)
+  await run(() => controller.load()); await respond(snapshot())
   await run(() => controller.load()); await respond({ ...snapshot(), items: [{ ...rows[0], amountCents: 1.25 }] })
   assert.match(rendered(), /Coffee/); assert.match(rendered(), /Couldn’t read/)
   await expand('Coffee'); const brianDetail = latest()
@@ -152,6 +187,6 @@ const snapshot = (items = rows, enabled = true) => ({ enabled, checkedAt: '2026-
   assert.doesNotMatch(rendered(), /Coffee/)
   await run(() => tree.unmount()); assert.equal(timers.size, 0)
   assert.ok([...listeners.values()].every(set => !set.size))
-  assert.ok(requests.filter(row => row.options.body).every(row => ['check', 'confirm', 'ignore', 'reopen'].includes(JSON.parse(row.options.body).operation)), 'No import or amount-adjustment request exists')
+  assert.ok(requests.filter(row => row.options.body).every(row => ['check', 'confirm', 'ignore', 'reopen', 'update_match', 'log'].includes(JSON.parse(row.options.body).operation)), 'Only explicit supported operations are sent')
   console.log('Reconciliation optional access, lazy detail, exact confirmation, pending/mismatch safety, CAS recovery, deadlines and owner isolation passed')
 })().catch(error => { console.error(error); process.exitCode = 1 })

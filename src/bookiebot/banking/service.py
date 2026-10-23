@@ -6,6 +6,8 @@ import os
 import time
 from datetime import date as local_date, timedelta
 from dataclasses import replace
+from functools import lru_cache
+from threading import Lock
 from typing import Any, Callable
 from uuid import uuid4
 
@@ -69,6 +71,7 @@ from bookiebot.sheets.undo import (
 
 logger = logging.getLogger(__name__)
 _SCHEDULE_SOURCE_CACHE: dict[str, tuple[float, list[Any], list[tuple[Any, bool, float]], str]] = {}
+_SERVICE_LOCK = Lock()
 
 
 def _schedule_cache_ttl_seconds() -> int:
@@ -325,6 +328,7 @@ def _scheduled_pulls_for_transactions(
     actor_key: str | None,
     window_days: int = 7,
 ) -> list[ScheduledPullCandidate]:
+    transactions = [transaction for transaction in transactions if transaction.amount > 0]
     if not actor_key or not transactions:
         return []
 
@@ -840,13 +844,16 @@ class BankingService:
         actor_key: str,
         fallback: bool = False,
         limit: int = 10,
+        action_log: list[LoggedAction] | None = None,
+        include_groups: bool = True,
     ) -> tuple[ReconciliationItem | None, list[ActionLogCandidate], list[ActionLogCandidateGroup]]:
         item = self.get_reconciliation_item(owner_key, reconciliation_id)
         if item is None:
             return None, [], []
         if item.status not in {'needs_review', 'pending_user', 'conflict', 'matched'}:
             return item, [], []
-        action_log = read_active_logged_actions(actor_key)
+        if action_log is None:
+            action_log = read_active_logged_actions(actor_key)
         excluded = self.store.matched_action_log_ids(owner_key)
         pulls = _scheduled_pulls_for_transactions([item.transaction], actor_key=actor_key)
         claimed_refs = self.store.matched_sheet_refs(owner_key) - {
@@ -888,7 +895,7 @@ class BankingService:
                 window_days=7,
                 max_group_size=4,
                 limit=5,
-            )
+            ) if include_groups else []
         action_by_id = {logged.id: logged for logged in action_log}
         candidates = [
             replace(candidate, sheet_ref=action_sheet_ref(action_by_id[candidate.action_id], pulls))
@@ -1117,6 +1124,7 @@ class BankingService:
         actor_key: str,
         action_id: str,
         expected_item: ReconciliationItem | None = None,
+        expected_candidate: ActionLogCandidate | None = None,
     ) -> tuple[ReconciliationItem | None, ActionLogCandidate | None, str]:
         item = self.get_reconciliation_item(owner_key, reconciliation_id)
         if item is None:
@@ -1148,6 +1156,11 @@ class BankingService:
         candidate = action_log_candidate_by_id(logged, scheduled_pulls=pulls)
         if candidate is None:
             return item, None, "action_not_reconcilable"
+        if expected_candidate is not None and any(
+            getattr(candidate, field) != getattr(expected_candidate, field)
+            for field in ('action_id', 'sheet_ref', 'action_type', 'date', 'amount', 'label', 'amount_recorded')
+        ):
+            return item, candidate, "candidate_changed"
 
         bank_amount = abs(item.transaction.amount)
         update_status = "matched"
@@ -1457,6 +1470,12 @@ async def refresh_reconciliation_review(service: BankingService, owner_key: str,
 
 def build_banking_service() -> BankingService:
     config = load_banking_config()
+    with _SERVICE_LOCK:
+        return _banking_service_for_config(config)
+
+
+@lru_cache(maxsize=8)
+def _banking_service_for_config(config: BankingConfig) -> BankingService:
     cipher = TokenCipher(config.token_encryption_key or "missing-dev-key")
     if config.database_url:
         from bookiebot.banking.postgres_store import PostgresBankStore

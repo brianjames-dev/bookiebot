@@ -12,7 +12,7 @@ from bookiebot.banking.models import (
     ReconciliationClassification,
     ReconciliationStatus,
 )
-from bookiebot.sheets.undo import LoggedAction
+from bookiebot.sheets.undo import LoggedAction, _field_values_for_action
 from bookiebot.sheets.config import get_category_columns, normalize_expense_category
 from openpyxl.utils import column_index_from_string
 
@@ -695,7 +695,8 @@ def _action_transaction_name(logged: LoggedAction) -> str:
     action = logged.action
     action_type = action.metadata.get("type", "")
     if action_type == "income":
-        return action.metadata.get("source") or action.description or "BookieBot Income"
+        return (_field_values_for_action(action).get('source') or action.metadata.get("source")
+                or "Income entry")
     if action_type == "payment":
         return action.metadata.get("category") or action.description or "BookieBot Payment"
     if action_type == "expense":

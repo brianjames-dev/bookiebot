@@ -452,3 +452,127 @@ async def test_phone_open_before_discord_decision_refreshes_without_overwriting(
     assert refreshed['items'][0]['status'] == ('checked' if decision == 'confirm' else 'ignored')
     events = client.store.reconciliation_events('brian', item.id)
     assert [event['event_type'] for event in events] == [f'discord_review_{decision}']
+
+
+@pytest.mark.asyncio
+async def test_browse_reuses_sources_but_confirmation_reads_fresh(client):
+    item = seed(client)
+    connect(client)
+    row = await details(client, item.id)
+    await details(client, item.id)
+    assert client.actors == [BRIAN], 'Opening unchanged reviews shares one action-history read'
+    result = await client.http.post('/app/reconciliation', headers=HEADERS, json={
+        'operation': 'confirm', 'id': item.id, 'version': row['version'], 'suggestionId': 'coffee',
+    })
+    assert result.status == 200
+    assert client.actors == [BRIAN, BRIAN], 'Confirmation bypasses the browsing cache'
+
+
+@pytest.mark.asyncio
+async def test_ignore_state_version_never_reads_sheets(client, monkeypatch):
+    item = seed(client)
+    connect(client)
+    row = await details(client, item.id)
+    def unavailable(*args, **kwargs):
+        raise AssertionError('Ignore must not wait for Google Sheets')
+    monkeypatch.setattr(review, 'detail', unavailable)
+    response = await client.http.post('/app/reconciliation', headers=HEADERS, json={
+        'operation': 'ignore', 'id': item.id, 'version': row['stateVersion'],
+    })
+    assert response.status == 200
+    assert client.actors == [BRIAN]
+
+
+@pytest.mark.asyncio
+async def test_amount_update_requires_explicit_operation_and_current_candidate(client, monkeypatch):
+    item = seed(client, amount=14)
+    connect(client)
+    row = await details(client, item.id)
+    calls = []
+    def update(owner, review_id, **kwargs):
+        calls.append((owner, review_id, kwargs))
+        assert kwargs['expected_item'] == item
+        assert kwargs['expected_candidate'].amount == 12.34
+        client.store.confirm_reconciliation_item(owner, review_id, matched_action_log_id='coffee',
+                                                expected_item=item)
+        return item, kwargs['expected_candidate'], 'matched_updated'
+    monkeypatch.setattr(client.service, 'confirm_reconciliation_action_match', update)
+    response = await client.http.post('/app/reconciliation', headers=HEADERS, json={
+        'operation': 'update_match', 'id': item.id, 'version': row['version'], 'suggestionId': 'coffee',
+    })
+    assert response.status == 200 and len(calls) == 1
+    assert (await response.json())['items'][0]['status'] == 'checked'
+    assert (await client.http.post('/app/reconciliation', headers=HEADERS, json={
+        'operation': 'update_match', 'id': item.id, 'version': row['version'], 'suggestionId': 'coffee',
+    })).status == 409
+    assert len(calls) == 1
+
+
+@pytest.mark.asyncio
+async def test_amount_update_rejects_stale_sheet_preview(client, monkeypatch):
+    item = seed(client, amount=14)
+    connect(client)
+    row = await details(client, item.id)
+    client.actions[:] = [logged(amount='13.34')]
+    def no_update(*args, **kwargs):
+        raise AssertionError('Stale review must not write')
+    monkeypatch.setattr(client.service, 'confirm_reconciliation_action_match', no_update)
+    response = await client.http.post('/app/reconciliation', headers=HEADERS, json={
+        'operation': 'update_match', 'id': item.id, 'version': row['version'], 'suggestionId': 'coffee',
+    })
+    assert response.status == 409
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize('amount,fields', [
+    (14, {'category': 'food', 'item': 'Donut', 'location': 'Donut shop', 'person': 'Brian (BofA)'}),
+    (-50, {'source': 'Employer', 'label': 'Paycheck'}),
+])
+async def test_log_uses_owner_scoped_durable_import_and_bank_values(client, monkeypatch, amount, fields):
+    from bookiebot.banking.models import BankImportResult
+    item = seed(client, amount=amount)
+    connect(client)
+    row = await details(client, item.id)
+    assert row['logging']['allowed'] and row['logging']['kind'] == ('income' if amount < 0 else 'expense')
+    calls = []
+    def save(owner, review_id, **kwargs):
+        calls.append(kwargs)
+        assert owner == 'brian' and review_id == item.id
+        assert kwargs['actor_key'] == BRIAN and kwargs['expected_item'] == item
+        assert kwargs['expected_amount'] == amount and kwargs['expected_date'] == item.transaction.date
+        assert kwargs['fields'] == fields
+        client.store.confirm_reconciliation_item(owner, review_id, matched_action_log_id='imported', expected_item=item)
+        return BankImportResult('completed', 'Recorded', 'operation', 'imported')
+    monkeypatch.setattr(client.service, 'import_reconciliation_item', save)
+    body = {'operation': 'log', 'id': item.id, 'version': row['stateVersion'], 'fields': fields, 'amount': 0}
+    response = await client.http.post('/app/reconciliation', headers=HEADERS, json=body)
+    assert response.status == 200 and len(calls) == 1
+    assert (await client.http.post('/app/reconciliation', headers=HEADERS, json=body)).status == 409
+    assert len(calls) == 1
+
+
+@pytest.mark.asyncio
+async def test_log_rejects_cross_owner_payment_method_and_stale_bank(client):
+    item = seed(client)
+    connect(client)
+    row = await details(client, item.id)
+    body = {'operation': 'log', 'id': item.id, 'version': row['stateVersion'],
+            'fields': {'category': 'food', 'item': 'Donut', 'location': '', 'person': 'Hannah'}}
+    assert (await client.http.post('/app/reconciliation', headers=HEADERS, json=body)).status == 400
+    body['fields']['person'] = 'Brian (BofA)'
+    seed(client, amount=99)
+    assert (await client.http.post('/app/reconciliation', headers=HEADERS, json=body)).status == 409
+
+
+def test_failed_fresh_source_does_not_reenable_an_old_preview(client, monkeypatch):
+    review._review_actions(client.service, 'brian', BRIAN)
+    calls = []
+    def unavailable(actor):
+        calls.append(actor)
+        raise RuntimeError('source offline')
+    monkeypatch.setattr(review, 'read_active_logged_actions', unavailable)
+    with pytest.raises(RuntimeError):
+        review._review_actions(client.service, 'brian', BRIAN, fresh=True)
+    with pytest.raises(RuntimeError):
+        review._review_actions(client.service, 'brian', BRIAN)
+    assert calls == [BRIAN, BRIAN]

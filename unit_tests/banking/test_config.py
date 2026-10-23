@@ -1,4 +1,4 @@
-from bookiebot.banking.config import load_banking_config
+from bookiebot.banking.config import BankingConfig, load_banking_config
 from bookiebot.banking.postgres_store import _postgres_sql
 
 
@@ -24,3 +24,14 @@ def test_postgres_sql_translates_sqlite_placeholders():
     assert _postgres_sql("SELECT * FROM bank_items WHERE id = ? AND owner_key = ?") == (
         "SELECT * FROM bank_items WHERE id = %s AND owner_key = %s"
     )
+
+
+def test_service_reuses_the_initialized_store_only_for_the_same_configuration(tmp_path, monkeypatch):
+    from dataclasses import replace
+    from bookiebot.banking import service
+    config = BankingConfig('client', 'secret', 'sandbox', 'test', tmp_path / 'cache.sqlite3')
+    monkeypatch.setattr(service, 'load_banking_config', lambda: config)
+    first = service.build_banking_service()
+    assert first is service.build_banking_service()
+    config = replace(config, sqlite_path=tmp_path / 'changed.sqlite3')
+    assert service.build_banking_service().store is not first.store

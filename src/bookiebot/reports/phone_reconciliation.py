@@ -1,4 +1,4 @@
-"""Phone review of existing bank/log records. Never imports or edits sheet amounts."""
+"""Owner-scoped bank review with explicit, recoverable sheet-write confirmation."""
 from __future__ import annotations
 
 import asyncio
@@ -7,6 +7,9 @@ from datetime import timedelta
 import hashlib
 import json
 import logging
+import time
+from threading import Lock
+from weakref import WeakKeyDictionary
 from typing import Any, Literal, cast
 
 from aiohttp import web
@@ -22,11 +25,43 @@ from bookiebot.banking.service import (
     build_banking_service, clear_schedule_source_cache, read_active_logged_actions,
     refresh_reconciliation_review,
 )
-from bookiebot.sheets.routing import now_pacific
+from bookiebot.sheets.routing import get_user_config, now_pacific
+from bookiebot.sheets.config import get_category_columns
 
 logger = logging.getLogger(__name__)
 _LIMIT = 200
 _checks: dict[str, asyncio.Task] = {}
+_action_sources: WeakKeyDictionary = WeakKeyDictionary()
+_action_sources_lock = Lock()
+
+
+class _ActionSource:
+    def __init__(self):
+        self.lock = Lock()
+        self.saved_at = 0.0
+        self.actions: list[Any] = []
+
+
+def _action_source(service: BankingService, owner: str, actor: str) -> _ActionSource:
+    with _action_sources_lock:
+        sources = _action_sources.setdefault(service.store, {})
+        return sources.setdefault((owner, actor), _ActionSource())
+
+
+def _review_actions(service: BankingService, owner: str, actor: str, *, fresh: bool = False):
+    source = _action_source(service, owner, actor)
+    with source.lock:
+        if fresh or not source.saved_at or time.monotonic() - source.saved_at >= 30:
+            source.saved_at = 0  # A failed refresh must not re-enable an older cached preview.
+            source.actions = read_active_logged_actions(actor)
+            source.saved_at = time.monotonic()
+        return source.actions
+
+
+def _invalidate_review_actions(service: BankingService, owner: str, actor: str) -> None:
+    source = _action_source(service, owner, actor)
+    with source.lock:
+        source.saved_at = 0
 
 
 class ReviewConflict(ValueError):
@@ -69,7 +104,7 @@ def _row(transaction: BankTransaction, item: ReconciliationItem | None) -> dict[
         account += f" · {transaction.account_mask}"
     recovering = bool(item and item.status == "import_requested")
     return {
-        "id": item.id if item else -transaction.id,
+        "id": item.id if item else -transaction.id, "stateVersion": _version(transaction, item),
         "version": _version(transaction, item), "status": status,
         "date": transaction.date or transaction.authorized_date or "",
         "merchant": transaction.merchant_name or transaction.name,
@@ -136,18 +171,20 @@ def _suggestion(candidate: ActionLogCandidate, transaction: BankTransaction) -> 
         "kind": "schedule" if candidate.action_type == "schedule" else "recorded",
         "recorded": recorded,
         "confirmable": recorded and not transaction.pending and amount == round(abs(transaction.amount) * 100),
+        "confidence": candidate.confidence,
     }
 
 
-def detail(service: BankingService, owner: str, actor: str, review_id: int):
+def detail(service: BankingService, owner: str, actor: str, review_id: int, *, fresh: bool = False):
     transaction, item = _find(service, owner, review_id)
     row = _row(transaction, item)
     candidates: list[ActionLogCandidate] = []
     if row["status"] in {"needs_review", "pending"} and not row["readOnly"]:
+        actions = _review_actions(service, owner, actor, fresh=fresh)
         if item is not None:
-            _, candidates, _ = service.reconciliation_match_candidates(owner, item.id, actor_key=actor, limit=12)
+            _, candidates, _ = service.reconciliation_match_candidates(owner, item.id, actor_key=actor,
+                limit=12, action_log=actions, include_groups=False)
         else:
-            actions = read_active_logged_actions(actor)
             pulls = _scheduled_pulls_for_transactions([transaction], actor_key=actor)
             excluded = service.store.matched_action_log_ids(owner) | claimed_schedule_action_ids(
                 pulls, actions, service.store.matched_sheet_refs(owner),
@@ -160,6 +197,18 @@ def detail(service: BankingService, owner: str, actor: str, review_id: int):
                 transaction, pulls, limit=4, action_log=actions,
             )
     row["suggestions"] = [_suggestion(candidate, transaction) for candidate in candidates]
+    row["suggestions"].sort(key=lambda entry: entry["confidence"], reverse=True)
+    if row["status"] == "needs_review" and not row["readOnly"] and item is not None:
+        current_month = now_pacific().strftime('%Y-%m')
+        bank_month = (transaction.date or transaction.authorized_date or '')[:7]
+        row['logging'] = {
+            'allowed': current_month == bank_month,
+            'kind': 'income' if transaction.amount < 0 else 'expense',
+            'categories': list(get_category_columns),
+            'paymentMethods': list(get_user_config(actor).expense_payment_methods),
+            'reason': '' if current_month == bank_month else
+                'Adding bank transactions is supported for the current month. You can still match an existing sheet entry.',
+        }
     row["version"] = _version(transaction, item, row["suggestions"])
     # The source reads may be slow; don't display a bank version that changed
     # while they ran (including a pending transaction that has since posted).
@@ -171,7 +220,7 @@ def detail(service: BankingService, owner: str, actor: str, review_id: int):
 
 def command(service: BankingService, owner: str, actor: str, body: dict) -> dict:
     operation = body.get("operation")
-    if not isinstance(operation, str) or operation not in {"confirm", "ignore", "reopen"}:
+    if not isinstance(operation, str) or operation not in {"confirm", "update_match", "log", "ignore", "reopen"}:
         raise ReviewValidation("Invalid review action.")
     review_id = body.get("id")
     expected = body.get("version")
@@ -183,19 +232,57 @@ def command(service: BankingService, owner: str, actor: str, body: dict) -> dict
     if operation != "reopen" and item.status in {"confirmed", "ignored"}:
         raise ReviewConflict("This transaction was already reviewed in the app or Discord. Check status to see the current decision.")
     action_id = sheet_ref = None
-    if operation == "confirm":
+    if operation == 'log':
+        if (transaction.date or transaction.authorized_date or '')[:7] != now_pacific().strftime('%Y-%m'):
+            raise ReviewConflict('Adding bank transactions is supported for the current month. Match an existing sheet entry instead.')
+        if expected != _version(transaction, item):
+            raise ReviewConflict('This transaction changed. Review it again.')
+        fields = body.get('fields')
+        kind = 'income' if transaction.amount < 0 else 'expense'
+        allowed = {'source', 'label'} if kind == 'income' else {'category', 'item', 'location', 'person'}
+        if not isinstance(fields, dict) or set(fields) != allowed or any(
+            not isinstance(value, str) or len(value) > 200 for value in fields.values()
+        ):
+            raise ReviewValidation('Choose the sheet entry details.')
+        fields = {key: value.strip() for key, value in fields.items()}
+        if kind == 'expense' and (fields['category'] not in get_category_columns
+                or fields['person'] not in get_user_config(actor).expense_payment_methods or not fields['item']):
+            raise ReviewValidation('Choose an expense category, payment method, and item.')
+        if kind == 'income' and not fields['source']:
+            raise ReviewValidation('Enter the income source.')
+        result = service.import_reconciliation_item(owner, item.id, actor_key=actor, kind=kind, fields=fields,
+            expected_amount=transaction.amount, expected_date=transaction.date or transaction.authorized_date,
+            expected_item=item)
+        _invalidate_review_actions(service, owner, actor)
+        clear_schedule_source_cache(actor)
+        if result.status != 'completed':
+            raise ReviewConflict('The entry needs review before another attempt. Check status; an entry may already exist.'
+                if result.status == 'needs_recovery' else result.message)
+        return snapshot(service, owner)
+    if operation in {"confirm", "update_match"}:
         # A bill/subscription may have been edited since the row was opened.
         # Explicit confirmation must compare current source evidence, not the
         # schedule cache used to keep ordinary browsing inexpensive.
         clear_schedule_source_cache(actor)
-        row, candidates, transaction, item = detail(service, owner, actor, review_id)
+        row, candidates, transaction, item = detail(service, owner, actor, review_id, fresh=True)
         if item is None or expected != row["version"] or row["status"] != "needs_review":
             raise ReviewConflict("This transaction or its suggestion changed. Review it again.")
         candidate = next((entry for entry in candidates if entry.action_id == body.get("suggestionId")), None)
         if candidate is None:
             raise ReviewConflict("That suggestion is no longer available. Check again.")
-        if not candidate.amount_recorded or round(candidate.amount * 100) != round(abs(transaction.amount) * 100):
-            raise ReviewConflict("Update the logged amount in BookieBot, then check again.")
+        mismatch = round(candidate.amount * 100) != round(abs(transaction.amount) * 100)
+        if not candidate.amount_recorded or (mismatch and operation != 'update_match'):
+            raise ReviewConflict("Review the amount change before matching this entry.")
+        if operation == 'update_match':
+            if candidate.action_type == 'schedule' or not mismatch:
+                raise ReviewConflict('Choose a recorded expense or income with a different amount.')
+            _, _, status = service.confirm_reconciliation_action_match(owner, item.id, actor_key=actor,
+                action_id=candidate.action_id, expected_item=item, expected_candidate=candidate)
+            _invalidate_review_actions(service, owner, actor)
+            clear_schedule_source_cache(actor)
+            if status != 'matched_updated':
+                raise ReviewConflict('Could not safely update this entry. Check status and review it again.')
+            return snapshot(service, owner)
         sheet_ref = candidate.sheet_ref
         action_id = candidate.action_id if candidate.action_type != "schedule" else None
     elif expected != _version(transaction, item):
@@ -222,6 +309,7 @@ async def _check(service: BankingService, owner: str, actor: str) -> None:
     # One phone check per owner shares work across taps/devices. Sync and matching
     # operate on bank/reconciliation metadata only; neither logs an expense.
     await service.sync_owner(owner)
+    _invalidate_review_actions(service, owner, actor)
     await refresh_reconciliation_review(service, owner, actor)
     from bookiebot.core.bank_reconciliation import notify_bank_reconciliation_refreshed
     await notify_bank_reconciliation_refreshed(actor)
@@ -229,6 +317,8 @@ async def _check(service: BankingService, owner: str, actor: str) -> None:
 
 async def _review(request: web.Request) -> web.Response:
     from bookiebot.reports.phone_app import _json, _same_origin_action, _session
+    started = time.monotonic()
+    operation = 'detail' if 'review_id' in request.match_info else 'snapshot'
     if request.method != "GET" and not _same_origin_action(request):
         return _json({"error": "Review transactions from BookieBot."}, status=403)
     try:
@@ -251,6 +341,10 @@ async def _review(request: web.Request) -> web.Response:
                 raise ReviewValidation("Invalid review request.") from exc
             if not isinstance(body, dict):
                 raise ReviewValidation("Invalid review request.")
+            requested_operation = body.get('operation')
+            operation = requested_operation if isinstance(requested_operation, str) and requested_operation in {
+                'check', 'confirm', 'update_match', 'log', 'ignore', 'reopen',
+            } else 'invalid'
             if body.get("operation") == "check":
                 task = _checks.get(session.owner_key)
                 if task is None or task.done():
@@ -297,6 +391,9 @@ async def _review(request: web.Request) -> web.Response:
     except Exception:
         logger.exception("Phone reconciliation is temporarily unavailable")
         return _json({"error": "Couldn't finish checking. Check status before trying again."}, status=503)
+
+    finally:
+        logger.info('Phone reconciliation %s completed in %.3fs', operation, time.monotonic() - started)
 
 
 def register_phone_reconciliation_routes(app: web.Application) -> None:

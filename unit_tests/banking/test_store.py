@@ -1296,3 +1296,24 @@ def test_matched_action_log_ids_splits_group_matches(tmp_path):
     )
 
     assert store.matched_action_log_ids("brian") == {"minted123", "zazzle123"}
+
+
+def test_schema_initialization_is_shared_and_failed_initialization_retries(tmp_path, monkeypatch):
+    from concurrent.futures import ThreadPoolExecutor
+    store = BankStore(tmp_path / 'one-init.sqlite3', TokenCipher('test'))
+    initialize = store._initialize_schema
+    calls = []
+    def tracked():
+        calls.append(True)
+        if len(calls) == 1:
+            raise RuntimeError('temporary initialization failure')
+        initialize()
+    monkeypatch.setattr(store, '_initialize_schema', tracked)
+    import pytest
+    with pytest.raises(RuntimeError):
+        store.initialize()
+    with ThreadPoolExecutor(max_workers=4) as pool:
+        list(pool.map(lambda _: store.initialize(), range(12)))
+    store.review_transactions('brian', start_date='2026-10-01', limit=200)
+    store.review_sync_status('brian')
+    assert len(calls) == 2
