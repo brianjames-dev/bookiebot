@@ -18,8 +18,8 @@ function load(file) {
   if (cache.has(file)) return cache.get(file)
   const exports = {}; cache.set(file, exports)
   const code = ts.transpileModule(fs.readFileSync(file, 'utf8'), { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2020, jsx: ts.JsxEmit.ReactJSX } }).outputText
-  vm.runInNewContext(code, { exports, AbortController, Error, Intl, Date, Set,
-    Event: class { constructor(type) { this.type = type } }, window: win, document: { visibilityState: 'visible', addEventListener: win.addEventListener, removeEventListener: win.removeEventListener },
+  vm.runInNewContext(code, { exports, AbortController, Error, Intl, Date, Set, crypto: { randomUUID: () => `receipt-${++serial}-request` },
+    Event: class { constructor(type) { this.type = type } }, CustomEvent: class { constructor(type) { this.type = type } }, window: win, document: { visibilityState: 'visible', addEventListener: win.addEventListener, removeEventListener: win.removeEventListener },
     fetch: (url, options) => new Promise((resolve, reject) => requests.push({ url, options, resolve, reject })),
     require: name => name.endsWith('.css') ? {} : name === './app-work-guard' ? {
       useAppWorkStatus(value) {
@@ -28,7 +28,7 @@ function load(file) {
         React.useEffect(() => () => { statuses.delete(id); updateWork() }, [id])
         return React.useCallback(next => { statuses.set(id, next); updateWork() }, [id])
       },
-    } : name.startsWith('.') ? load(path.resolve(path.dirname(file), name) + '.tsx') : req(name),
+    } : name.startsWith('.') ? load(['.tsx', '.ts'].map(ext => path.resolve(path.dirname(file), name) + ext).find(fs.existsSync)) : req(name),
   })
   return exports
 }
@@ -217,6 +217,26 @@ const snapshot = (items = rows, enabled = true) => ({ enabled, checkedAt: '2026-
   assert.deepEqual(body(), { operation: 'log', id: 20, version: 'base-20', fields: { category: 'food', item: 'Donut shop', location: 'Donut shop', person: 'Brian (BofA)' } })
   await respond(snapshot([{ ...logRow, status: 'checked', version: 'checked-20', stateVersion: 'checked-20' }]))
   assert.ok(events.filter(event => event === 'bookiebot:transactions-changed').length >= 2)
+  const sharedBill = item(40, 'Water paid', { amountCents: 12500, date: '2026-10-23' })
+  const receiptLink = { allocationId: 'shared-water', partner: 'Hannah', bankAmountCents: 12500, outstandingCents: 4409 }
+  await run(() => controller.load()); await respond(snapshot([sharedBill]))
+  await expand('Water paid'); await respond(detail(sharedBill, [suggestion({ id: 'water-source', item: 'Water', amountCents: 12500, category: 'Payment' })]))
+  await click('Confirm match')
+  const matchRequestCount = requests.length
+  const checkedBill = { ...sharedBill, status: 'checked' }
+  await respond({ ...snapshot([checkedBill]), receiptFollowup: { id: 40, receipt: receiptLink } })
+  assert.equal(requests.length, matchRequestCount, 'Bank confirmation never sends a repayment request')
+  assert.ok(button('Review Hannah’s share'))
+  await click('Review Hannah’s share')
+  assert.equal(latest().url, '/app/reimbursements'); assert.equal(latest().options.method, 'GET')
+  await respond({ enabled: true, ownerKey: 'brian', currency: 'USD', events: [], allocations: [{ id: 'shared-water', payerOwner: 'brian', partnerOwner: 'hannah', payerPerson: 'Brian', item: 'Water', expenseDate: '2026-10-01', grossCents: 12500, payerShareCents: 8091, partnerShareCents: 4409, settledCents: 0, outstandingCents: 4409, accounting: 'cash_v1', method: 'income', version: 1, projectedVersion: 1, status: 'outstanding' }] })
+  assert.ok(button('Check').props.disabled)
+  assert.ok(button('Confirm received record'))
+  assert.equal(requests.length, matchRequestCount + 1, 'The separate receipt review still performs no write')
+  await click('Cancel'); await click('Back to reconciliation')
+  await filter('Checked'); await expand('Water paid'); await respond({ item: { ...checkedBill, receipt: receiptLink } })
+  assert.ok(button('Mark Hannah’s share received'), 'Previously matched entries expose the same separate receipt review')
+  await filter('Needs review')
   await run(() => controller.load()); await respond(snapshot())
   await run(() => controller.load()); await respond({ ...snapshot(), items: [{ ...rows[0], amountCents: 1.25 }] })
   assert.match(rendered(), /Coffee/); assert.match(rendered(), /Couldn’t read/)

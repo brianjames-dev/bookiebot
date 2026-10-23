@@ -28,6 +28,8 @@ Before resetting, resolve pending sent-payment reports and let sheet updates fin
 
 A bank debit is the full bill, including Hannah’s portion. **Review payment change** shows that full amount, both shares and the amount that will remain in your budget. New Rent, PG&E, Recology and Water payments default to **By income**; you can review **50/50** or **No split** instead. Existing shared bills keep their split method. Changing the future full-bill estimate is a separate optional choice.
 
+After matching, **Review Hannah’s share** offers a separate receipt review. You can also open **Reconcile → Checked**, expand the matched shared bill, and choose **Mark Hannah’s share received**. Check the remaining balance, enter the amount actually received (partial payments are supported), its actual date and optional note, then select **Confirm received record**. Cancel or Back records nothing. Existing reported payments use their own Review → Confirm received action so they are not duplicated. Already settled, cleared, syncing or changed payments retain the same protections as Shared. An uncertain response offers **Retry this record** with the original request ID; keep the review open until it finishes.
+
 Matching does not record a repayment. The payer budget retains the full cash payment until a receipt is confirmed in Shared. Already received money and the reduced budget cell stay unchanged when the full bill matches the bank. Reverse confirmed repayments or resolve pending payment reports in Shared before correcting the full bill amount. If a saved correction is still syncing, refresh Shared, then use **Verify saved payment change** in Reconcile; that verification never repeats the financial writer.
 
 ## Editing a split in Discord

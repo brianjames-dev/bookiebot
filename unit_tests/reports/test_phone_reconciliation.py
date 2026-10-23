@@ -17,7 +17,7 @@ from bookiebot.banking.reconciliation import ActionLogCandidate
 from bookiebot.banking.service import BankingService
 from bookiebot.banking.store import BankStore
 from bookiebot.banking import service as banking
-from bookiebot.reports import phone_app, phone_reconciliation as review
+from bookiebot.reports import phone_app, phone_reconciliation as review, phone_reimbursements
 from bookiebot.reports.app_access import AppAccessStore
 from bookiebot.sheets.routing import now_pacific
 from bookiebot.sheets.undo import LoggedAction, UndoAction
@@ -95,6 +95,7 @@ async def client(tmp_path, monkeypatch):
     monkeypatch.setattr(service, "sync_owner", AsyncMock(return_value=[]))
     app = web.Application()
     review.register_phone_reconciliation_routes(app)
+    phone_reimbursements.register_phone_reimbursement_routes(app)
     async with TestClient(TestServer(app), cookie_jar=CookieJar(unsafe=True)) as http:
         yield SimpleNamespace(http=http, access=access, store=store, service=service,
                               actions=actions, actors=actors, notify=notify)
@@ -655,3 +656,101 @@ async def test_saved_schedule_change_can_be_verified_in_web_without_a_writer(cli
         'operation': 'recover_schedule', 'id': item.id, 'version': row['stateVersion']})
     assert response.status == 200 and calls == ['schedule-recovery']
     assert (await response.json())['items'][0]['status'] == 'checked'
+
+
+def shared_receipt(client, monkeypatch):
+    from bookiebot.reimbursements import service, projection
+    from bookiebot.reimbursements.store import ReimbursementStore
+    from unit_tests.reimbursements.test_store import payload
+    ledger = ReimbursementStore(client.access)
+    ledger.initialize()
+    today = now_pacific().date()
+    value = ledger.register_allocation(payload(id='matched-coffee', sourceActionId='coffee', sourceWorksheet='expense',
+        sourceYear=today.year, sourceSheetTitle=today.strftime('%B'), sourceRow=12,
+        sourceColumnMap={'date': 14, 'item': 15, 'amount': 16, 'location': 17, 'person': 18},
+        expenseDate=today.isoformat(), grossCents=1234, payerShareCents=800, partnerShareCents=434))
+    ledger.mark_projected(value['id'], value['version'])
+    monkeypatch.setenv('BOOKIEBOT_REIMBURSEMENTS_ENABLED', 'true')
+    monkeypatch.setattr(service, 'build_reimbursement_store', lambda: ledger)
+    monkeypatch.setattr(projection, 'sync_pending', lambda *_args, **kwargs: False)
+    return ledger, value
+
+
+@pytest.mark.asyncio
+async def test_bank_match_offers_separate_receipt_review_without_marking_received(client, monkeypatch):
+    from uuid import uuid4
+    ledger, value = shared_receipt(client, monkeypatch)
+    item = seed(client)
+    connect(client)
+    before = await details(client, item.id)
+    assert 'receipt' not in before
+    response = await client.http.post('/app/reconciliation', headers=HEADERS, json={
+        'operation': 'confirm', 'id': item.id, 'version': before['version'], 'suggestionId': 'coffee'})
+    assert response.status == 200
+    followup = (await response.json())['receiptFollowup']
+    assert followup['id'] == item.id and followup['receipt']['allocationId'] == value['id']
+    assert ledger.get_allocation(value['id'])['settledCents'] == 0 and not ledger.snapshot('brian')['events']
+    matched = client.store.get_reconciliation_item('brian', item.id)
+    row = await details(client, item.id)
+    assert row['status'] == 'checked' and row['receipt']['partner'] == 'Hannah'
+    assert 'receiptFollowup' not in await list_rows(client)
+    # Even viewing the actual receipt form's data never records money received.
+    assert (await client.http.get('/app/reimbursements')).status == 200
+    assert not ledger.snapshot('brian')['events']
+    body = dict(operation='receive', requestId=uuid4().hex, allocationId=value['id'], version=value['version'],
+                amountCents=100, date=now_pacific().date().isoformat(), note='Actually received')
+    assert (await client.http.post('/app/reimbursements', headers=HEADERS, json=body)).status == 200
+    assert ledger.get_allocation(value['id'])['settledCents'] == 100
+    assert client.store.get_reconciliation_item('brian', item.id) == matched
+    assert len(ledger.snapshot('brian')['events']) == 1
+    assert (await client.http.post('/app/reimbursements', headers=HEADERS, json=body)).status == 200
+    assert len(ledger.snapshot('brian')['events']) == 1
+    assert (await client.http.post('/app/reimbursements', headers=HEADERS, json={**body, 'requestId': uuid4().hex})).status == 409
+    assert (await details(client, item.id))['receipt']['outstandingCents'] == 334
+    seed(client, owner='hannah')
+    connect(client, HANNAH, 'hannah')
+    assert (await client.http.get(f'/app/reconciliation/{item.id}')).status == 404
+    assert (await client.http.post('/app/reimbursements', headers=HEADERS, json={**body, 'requestId': uuid4().hex, 'version': 2})).status == 400
+    assert ledger.get_allocation(value['id'])['settledCents'] == 100
+
+
+@pytest.mark.asyncio
+async def test_receipt_response_loss_uses_existing_idempotency_without_altering_bank_match(client, monkeypatch):
+    from uuid import uuid4
+    from bookiebot.reimbursements import service
+    ledger, value = shared_receipt(client, monkeypatch)
+    item = seed(client)
+    connect(client)
+    client.store.confirm_reconciliation_item('brian', item.id, matched_action_log_id='coffee', expected_item=item)
+    matched = client.store.get_reconciliation_item('brian', item.id)
+    original = service.command
+    first = True
+    def lose_response(owner, body):
+        nonlocal first
+        result = original(owner, body)
+        if first:
+            first = False
+            raise TimeoutError('Response lost after durable receipt')
+        return result
+    monkeypatch.setattr(service, 'command', lose_response)
+    body = dict(operation='receive', requestId=uuid4().hex, allocationId=value['id'], version=value['version'],
+        amountCents=100, date=now_pacific().date().isoformat())
+    assert (await client.http.post('/app/reimbursements', headers=HEADERS, json=body)).status == 503
+    assert (await client.http.post('/app/reimbursements', headers=HEADERS, json=body)).status == 200
+    assert len(ledger.snapshot('brian')['events']) == 1 and ledger.get_allocation(value['id'])['settledCents'] == 100
+    assert client.store.get_reconciliation_item('brian', item.id) == matched
+
+
+@pytest.mark.asyncio
+async def test_unavailable_optional_receipt_link_does_not_invalidate_successful_match(client, monkeypatch):
+    item = seed(client)
+    connect(client)
+    row = await details(client, item.id)
+    def unavailable(*args):
+        raise RuntimeError('Shared store unavailable')
+    monkeypatch.setattr(review, 'matched_receipt_link', unavailable)
+    result = await client.http.post('/app/reconciliation', headers=HEADERS, json={
+        'operation': 'confirm', 'id': item.id, 'version': row['version'], 'suggestionId': 'coffee'})
+    assert result.status == 200
+    assert 'receiptFollowup' not in await result.json()
+    assert client.store.get_reconciliation_item('brian', item.id).status == 'confirmed'

@@ -129,7 +129,7 @@ function fixture({ get, post } = {}) {
   return state
 }
 const writes = state => state.calls.filter(call => call.body)
-async function mount() { let tree; await act(async () => { tree = Renderer.create(React.createElement(ReimbursementLedger, { fallback, refreshKey: "one" })); await flush() }); return tree }
+async function mount(props = {}) { let tree; await act(async () => { tree = Renderer.create(React.createElement(ReimbursementLedger, { fallback, refreshKey: "one", ...props })); await flush() }); return tree }
 async function unmount(tree) {
   await act(async () => { tree.unmount(); await flush() })
   assert.ok([...listeners.window.values(), ...listeners.document.values()].every(set => !set.size), "Unmount cleans up refresh listeners")
@@ -802,7 +802,87 @@ async function bulkReceiveContracts() {
   await unmount(tree)
 }
 
+async function matchedReceiptContracts() {
+  const matchedReceipt = { allocationId: "a", bankAmountCents: 20000 }
+  let state = fixture({ post: (body, state) => {
+    const item = state.snapshot.allocations[0]
+    item.settledCents += body.amountCents; item.outstandingCents -= body.amountCents; item.version++
+    state.snapshot.projectionPending = true
+    return response(clone(state.snapshot))
+  } })
+  let tree = await mount({ matchedReceipt })
+  assert.equal(writes(state).length, 0)
+  assert.ok(text(tree.root).includes("The bank match is saved separately"))
+  assert.equal(button(tree.root, "Mark all received"), undefined)
+  assert.equal(button(tree.root, "Reset balances"), undefined)
+  await tap(button(tree.root, "Mark Hannah’s share received"))
+  assert.equal(writes(state).length, 0, "Opening the separate confirmation never records a receipt")
+  await fill(tree, "Amount", "12.34")
+  await tap(button(tree.root, "Cancel")); assert.equal(writes(state).length, 0)
+  await tap(button(tree.root, "Mark Hannah’s share received")); await fill(tree, "Amount", "12.34")
+  await submit(tree)
+  assert.equal(writes(state).length, 1)
+  assert.equal(writes(state)[0].body.operation, "receive")
+  assert.equal(writes(state)[0].body.allocationId, "a")
+  assert.equal(writes(state)[0].body.amountCents, 1234)
+  assert.equal(writes(state)[0].body.version, 3)
+  assert.ok(text(tree.root).includes("sheet update pending"))
+  assert.ok(button(tree.root, "Mark Hannah’s share received").props.disabled)
+  assert.ok(dispatched.includes("bookiebot:reimbursements-changed"))
+  await unmount(tree)
+
+  for (const guard of ["gross", "payee", "cleared", "settled", "pending"]) {
+    state = fixture()
+    if (guard === "gross") state.snapshot.allocations[0].grossCents = 21000, state.snapshot.allocations[0].payerShareCents = 11000
+    if (guard === "payee") state.snapshot.ownerKey = "hannah"
+    if (guard === "cleared") state.snapshot.allocations[0].clearedCents = 8000, state.snapshot.allocations[0].outstandingCents = 0
+    if (guard === "settled") state.snapshot.allocations[0].settledCents = 10000, state.snapshot.allocations[0].outstandingCents = 0
+    if (guard === "pending") state.snapshot.events.push(receipt({ id: "sent", status: "pending", kind: "report_payment" }))
+    tree = await mount({ matchedReceipt })
+    const mark = button(tree.root, "Mark Hannah’s share received")
+    assert.ok(!mark || mark.props.disabled, `${guard} cannot create an unreviewed receipt`)
+    if (guard === "pending") {
+      await tap(button(tree.root, "Review")); assert.equal(writes(state).length, 0)
+      await tap(button(tree.root, "Confirm received"))
+      assert.equal(writes(state)[0].body.operation, "confirm_payment")
+      assert.equal(writes(state)[0].body.eventId, "sent")
+    }
+    await unmount(tree)
+  }
+
+  state = fixture(); tree = await mount({ matchedReceipt })
+  await tap(button(tree.root, "Mark Hannah’s share received")); await fill(tree, "Amount", "12.34")
+  state.snapshot.allocations[0].version++
+  state.snapshot.allocations[0].projectedVersion++
+  state.snapshot.allocations[0].settledCents += 100
+  state.snapshot.allocations[0].outstandingCents -= 100
+  await act(async () => { for (const callback of listeners.window.get("focus")) callback(); await flush() })
+  assert.equal(form(tree).findAllByType("input")[0].props.value, "12.34", "An external receipt cannot replace the reviewed amount with the new remainder")
+  assert.ok(form(tree).findByType("fieldset").props.disabled)
+  await submit(tree); assert.equal(writes(state).length, 0)
+  assert.ok(text(tree.root).includes("This payment changed"))
+  await unmount(tree)
+
+  let attempts = 0
+  state = fixture({ post: () => { if (++attempts === 1) throw Error("Saved response lost"); return response(clone(state.snapshot)) } })
+  tree = await mount({ matchedReceipt })
+  await tap(button(tree.root, "Mark Hannah’s share received")); await submit(tree)
+  assert.ok(button(tree.root, "Back to reconciliation").props.disabled, "An uncertain receipt stays mounted for its safe retry")
+  await tap(button(tree.root, "Retry this record"))
+  assert.deepEqual(writes(state)[0].body, writes(state)[1].body)
+  assert.ok(!button(tree.root, "Back to reconciliation").props.disabled)
+  await unmount(tree)
+
+  let rejected = ""
+  state = fixture({ get: () => response({ error: "Session revoked" }, 401) })
+  tree = await mount({ matchedReceipt, onRejectAccess: message => { rejected = message } })
+  assert.equal(rejected, "Session revoked")
+  assert.ok(!text(tree.root).includes("PG&E"))
+  await unmount(tree)
+}
+
 ;(async () => {
+  await matchedReceiptContracts()
   await bulkReceiveContracts()
   await monthPaginationContracts()
   await refreshedPageRetentionContracts()

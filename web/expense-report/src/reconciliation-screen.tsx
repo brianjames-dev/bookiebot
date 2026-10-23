@@ -2,9 +2,11 @@ import { useCallback, useEffect, useId, useRef, useState } from "react"
 import { ArrowDownLeft, ArrowUpRight, Check, ChevronDown, RefreshCw } from "lucide-react"
 import { CollapsibleContent, SlidingSelection } from "./components/ui/motion"
 import { useAppWorkStatus } from "./app-work-guard"
+import { ReimbursementLedger } from "./reimbursement-ledger"
 import "./reconciliation-screen.css"
 
 type ReviewStatus = "needs_review" | "pending" | "checked" | "ignored"
+interface ReceiptLink { allocationId: string; partner: string; bankAmountCents: number; outstandingCents: number }
 interface Suggestion {
   id: string; item: string; date: string; amountCents: number; category: string
   amountMismatch: boolean; kind: "recorded" | "schedule"; confirmable: boolean; recorded?: boolean; confidence?: number
@@ -12,15 +14,19 @@ interface Suggestion {
 export interface ReconciliationItem {
   id: number; version: string; stateVersion?: string; loadedAt?: number; status: ReviewStatus; date: string; merchant: string
   amountCents: number; currency: "USD"; accountLabel: string; suggestions: Suggestion[]
+  receipt?: ReceiptLink
   logging?: { allowed: boolean; kind: "expense" | "income"; categories: string[]; paymentMethods: string[]; reason: string }; matchedSuggestionId?: string | null; needsCheck?: boolean; readOnly?: boolean; scheduleRecovery?: boolean; matchLabel?: string | null
 }
 interface ConnectionIssue { id: number; institution: string; needsReconnect: boolean; reconnectUrl?: string }
-interface Snapshot { enabled: boolean; checkedAt: string | null; items: ReconciliationItem[]; notice?: string; connections?: ConnectionIssue[] }
+interface Snapshot { enabled: boolean; checkedAt: string | null; items: ReconciliationItem[]; notice?: string; connections?: ConnectionIssue[]; receiptFollowup?: { id: number; receipt: ReceiptLink } }
 type Command = { operation: "check" } | { operation: "confirm" | "update_match" | "update_schedule" | "recover_schedule" | "log" | "ignore" | "reopen"; id: number; version: string; suggestionId?: string; fields?: Record<string, string>; scheduleVersion?: string; updateFuture?: boolean; splitMethod?: string }
 const endpoint = "/app/reconciliation"
 const isText = (value: unknown, max = 300): value is string => typeof value === "string" && value.length <= max
 const isDate = (value: unknown): value is string => isText(value) && Number.isFinite(Date.parse(value))
 const isAmount = (value: unknown): value is number => typeof value === "number" && Number.isSafeInteger(value)
+const validReceipt = (value: ReceiptLink) => value && isText(value.allocationId, 200) && Boolean(value.allocationId)
+  && isText(value.partner) && Boolean(value.partner) && isAmount(value.bankAmountCents) && value.bankAmountCents > 0
+  && isAmount(value.outstandingCents) && value.outstandingCents >= 0 && value.outstandingCents <= value.bankAmountCents
 function validItem(value: unknown): value is ReconciliationItem {
   const item = value as ReconciliationItem | null
   return Boolean(item && Number.isSafeInteger(item.id) && item.id !== 0 && isText(item.version) && item.version
@@ -32,6 +38,7 @@ function validItem(value: unknown): value is ReconciliationItem {
     && isText(item.merchant, 500) && isAmount(item.amountCents) && item.currency === "USD" && isText(item.accountLabel)
     && (item.needsCheck === undefined || typeof item.needsCheck === "boolean")
     && (item.scheduleRecovery === undefined || typeof item.scheduleRecovery === "boolean")
+    && (item.receipt === undefined || (item.status === "checked" && validReceipt(item.receipt) && item.receipt.bankAmountCents === item.amountCents))
     && (item.readOnly === undefined || typeof item.readOnly === "boolean")
     && (item.matchLabel === undefined || item.matchLabel === null || isText(item.matchLabel))
     && Array.isArray(item.suggestions) && item.suggestions.length <= 25 && item.suggestions.every(suggestion =>
@@ -46,6 +53,8 @@ function checkedSnapshot(value: unknown): Snapshot {
   if (!data || typeof data.enabled !== "boolean" || (data.checkedAt !== null && !isDate(data.checkedAt))
     || !Array.isArray(data.items) || data.items.length > 300 || !data.items.every(validItem)
     || new Set(data.items.map(item => item.id)).size !== data.items.length
+    || (data.receiptFollowup !== undefined && (!validReceipt(data.receiptFollowup.receipt)
+      || !data.items.some(item => item.id === data.receiptFollowup?.id && item.status === "checked" && item.amountCents === data.receiptFollowup.receipt.bankAmountCents)))
     || (data.notice !== undefined && !isText(data.notice, 500))
     || (data.connections !== undefined && (!Array.isArray(data.connections) || data.connections.length > 50
       || !data.connections.every(connection => connection && Number.isSafeInteger(connection.id) && connection.id > 0
@@ -137,6 +146,16 @@ export function ReconciliationScreen({ controller }: { controller: Controller })
   const [detailError, setDetailError] = useState("")
   const [loadingDetail, setLoadingDetail] = useState(false)
   const [detailRetry, setDetailRetry] = useState(0)
+  const [receiptTarget, setReceiptTarget] = useState<(ReceiptLink & { review?: boolean }) | null>(null)
+  const receiptPanel = useRef<HTMLDivElement>(null)
+  const rejectReceiptAccess = useCallback((message: string) => { setReceiptTarget(null); setDetails({}); rejectAccess(message) }, [rejectAccess])
+  useEffect(() => { if (receiptTarget) receiptPanel.current?.scrollIntoView({ block: "start" }) }, [receiptTarget])
+  useEffect(() => {
+    const refresh = () => { setDetails({}); setDetailRetry(value => value + 1) }
+    window.addEventListener("bookiebot:reimbursements-changed", refresh)
+    return () => window.removeEventListener("bookiebot:reimbursements-changed", refresh)
+  }, [])
+  const locked = busy || needsRefresh || Boolean(receiptTarget)
   const rows = snapshot?.items ?? []
   const matchesFilter = (item: ReconciliationItem) => filter === "checked" ? ["checked", "ignored"].includes(item.status) : item.status === filter
   const openRow = rows.find(item => item.id === openId && matchesFilter(item))
@@ -176,9 +195,13 @@ export function ReconciliationScreen({ controller }: { controller: Controller })
   return <section className="bb-reconcile" aria-labelledby="bb-reconcile-title">
     <div className="bb-reconcile-heading"><div><h1 id="bb-reconcile-title">Reconcile</h1><p className="bb-reconcile-muted">{snapshot?.checkedAt
       ? `Checked ${new Date(snapshot.checkedAt).toLocaleString(undefined, { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" })}` : "Review your logged expenses"}</p></div>
-      <button type="button" className="bb-reconcile-check" disabled={!snapshot?.enabled || busy || needsRefresh} onClick={() => void load({ operation: "check" })}><RefreshCw size={17} aria-hidden="true" />{busy ? "Checking…" : "Check"}</button></div>
+      <button type="button" className="bb-reconcile-check" disabled={!snapshot?.enabled || locked} onClick={() => void load({ operation: "check" })}><RefreshCw size={17} aria-hidden="true" />{busy ? "Checking…" : "Check"}</button></div>
+    {receiptTarget && <div ref={receiptPanel}><ReimbursementLedger key={receiptTarget.allocationId} fallback={<p>Shared payments are currently unavailable.</p>}
+      matchedReceipt={receiptTarget} onClose={() => setReceiptTarget(null)} onRejectAccess={rejectReceiptAccess} /></div>}
+    {!receiptTarget && snapshot?.receiptFollowup && <div className="bb-reconcile-message" role="status"><p>Bank match saved. Receiving your partner’s share is a separate step.</p>
+      <button type="button" className="bb-reconcile-action bb-reconcile-outline" disabled={locked} onClick={() => setReceiptTarget({ ...snapshot.receiptFollowup!.receipt, review: true })}>Review {snapshot.receiptFollowup.receipt.partner}’s share</button></div>}
     {snapshot?.enabled && <SlidingSelection value={filter} className="bb-reconcile-filters" role="group" aria-label="Transaction status">
-      {(Object.keys(filterLabels) as Filter[]).map(value => <button type="button" key={value} aria-pressed={filter === value} onClick={() => { setFilter(value); setOpenId(null) }}>
+      {(Object.keys(filterLabels) as Filter[]).map(value => <button type="button" key={value} disabled={Boolean(receiptTarget)} aria-pressed={filter === value} onClick={() => { setFilter(value); setOpenId(null) }}>
         {filterLabels[value]}<span>{rows.filter(item => value === "checked" ? ["checked", "ignored"].includes(item.status) : item.status === value).length}</span></button>)}
     </SlidingSelection>}
     {!snapshot && !error && <p className="bb-reconcile-muted" role="status">Loading bank transactions…</p>}
@@ -192,18 +215,20 @@ export function ReconciliationScreen({ controller }: { controller: Controller })
         onClick={() => void load({ operation: "check" })}>Resync bank information</button>}</div></div>}
     {filter === "pending" && visibleRows.length > 0 && <p className="bb-reconcile-muted">Bank amounts may change. Matches stay tentative until posted.</p>}
     {snapshot?.enabled && !visibleRows.length && <div className="bb-reconcile-empty"><Check size={22} aria-hidden="true" /><p>{filter === "needs_review" ? snapshot.connections?.length ? "No saved transactions need review." : "Nothing needs review." : filter === "pending" ? "No pending transactions." : "No checked transactions yet."}</p></div>}
-    <div className="bb-reconcile-list">{visibleRows.map(item => { const detail = details[item.id]; return <TransactionRow key={item.id} item={item} open={openId === item.id}
+    <div className="bb-reconcile-list">{visibleRows.map(item => { const detail = details[item.id]; return <TransactionRow key={item.id} item={item} open={openId === item.id} disabled={Boolean(receiptTarget)}
       onToggle={() => setOpenId(value => value === item.id ? null : item.id)}>
       {openId === item.id && loadingDetail && <p className="bb-reconcile-muted" role="status">Finding sheet entries…</p>}
       {openId === item.id && detailError && <div className="bb-reconcile-message" role="alert"><p>{detailError}</p><button type="button" onClick={() => { setDetails({}); setDetailRetry(value => value + 1) }}>Try suggestions again</button></div>}
       {detail?.id === item.id && <>
         {detail.matchLabel && <p className="bb-reconcile-matched"><Check size={15} aria-hidden="true" />{detail.matchLabel}</p>}
+        {detail.receipt && <button type="button" className="bb-reconcile-action bb-reconcile-outline" disabled={locked}
+          onClick={() => setReceiptTarget({ ...detail.receipt!, review: detail.receipt!.outstandingCents > 0 })}>{detail.receipt.outstandingCents > 0 ? "Mark" : "View"} {detail.receipt.partner}’s share{detail.receipt.outstandingCents > 0 ? " received" : ""}</button>}
         {detail.scheduleRecovery && <button type="button" className="bb-reconcile-action bb-reconcile-outline" disabled={busy || needsRefresh}
           onClick={() => void load({ operation: "recover_schedule", id: detail.id, version: detail.stateVersion ?? detail.version })}>Verify saved payment change</button>}
         {detail.readOnly && <p className="bb-reconcile-muted">{detail.scheduleRecovery ? "A sheet change may have finished. Verify the saved amounts without writing them again." : "Finish this transaction in BookieBot before checking again."}</p>}
-        <ReviewChoices key={detail.version} item={detail} disabled={busy || needsRefresh || loadingDetail || Boolean(detailError)} onCommand={command => void load(command)} onRejectAccess={rejectAccess} onRefresh={() => { setDetails({}); setDetailRetry(value => value + 1) }} />
+        <ReviewChoices key={detail.version} item={detail} disabled={locked || loadingDetail || Boolean(detailError)} onCommand={command => void load(command)} onRejectAccess={rejectAccess} onRefresh={() => { setDetails({}); setDetailRetry(value => value + 1) }} />
         {(detail.needsCheck || detail.id < 0) && detail.status !== "pending" && !detail.readOnly && <button type="button" className="bb-reconcile-action" disabled={busy || needsRefresh} onClick={() => void load({ operation: "check" })}>Check for matches</button>}
-        {detail.id > 0 && !detail.needsCheck && !detail.readOnly && detail.status !== "pending" && <button type="button" className="bb-reconcile-action bb-reconcile-secondary" disabled={busy || needsRefresh || loadingDetail || Boolean(detailError)}
+        {detail.id > 0 && !detail.needsCheck && !detail.readOnly && detail.status !== "pending" && <button type="button" className="bb-reconcile-action bb-reconcile-secondary" disabled={locked || loadingDetail || Boolean(detailError)}
           onClick={() => void load({ operation: detail.status === "needs_review" ? "ignore" : "reopen", id: detail.id, version: detail.stateVersion ?? detail.version })}>{detail.status === "needs_review" ? "Ignore transaction" : "Reopen review"}</button>}
       </>}
     </TransactionRow> })}</div>
@@ -340,10 +365,10 @@ function ScheduleAmountReview({ item, suggestion, disabled, onCommand, onCancel,
     <button type="button" className="bb-reconcile-action" disabled={disabled} onClick={onCancel}>Cancel payment change</button>
   </div>
 }
-function TransactionRow({ item, open, onToggle, children }: { item: ReconciliationItem; open: boolean; onToggle: () => void; children: React.ReactNode }) {
+function TransactionRow({ item, open, onToggle, children, disabled }: { item: ReconciliationItem; open: boolean; onToggle: () => void; children: React.ReactNode; disabled?: boolean }) {
   const id = useId(), Direction = item.amountCents < 0 ? ArrowDownLeft : ArrowUpRight
   return <article className="bb-reconcile-row" data-open={open}>
-    <button type="button" className="bb-reconcile-row-toggle" aria-expanded={open} aria-controls={id} onClick={onToggle}>
+    <button type="button" className="bb-reconcile-row-toggle" disabled={disabled} aria-expanded={open} aria-controls={id} onClick={onToggle}>
       <Direction className="bb-reconcile-direction" size={18} aria-hidden="true" /><span className="bb-reconcile-row-label"><strong>{item.merchant || "Bank transaction"}</strong><small>{dateLabel(item.date)} · {item.accountLabel}</small></span>
       <span className="bb-reconcile-row-amount"><strong>{money(item.amountCents)}</strong><small>{statusLabel(item.status)}</small></span><ChevronDown className="bb-reconcile-chevron" size={16} aria-hidden="true" />
     </button><CollapsibleContent open={open} id={id}><div className="bb-reconcile-row-details">{children}</div></CollapsibleContent>

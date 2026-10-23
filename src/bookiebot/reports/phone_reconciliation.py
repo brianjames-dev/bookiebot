@@ -15,6 +15,7 @@ from typing import Any, Literal, cast
 from aiohttp import web
 
 from bookiebot.banking.models import BankTransaction, ReconciliationItem
+from bookiebot.banking.receipt_links import matched_receipt_link
 from bookiebot.banking.plaid_client import PlaidApiError
 from bookiebot.banking.schedule_changes import (
     ScheduleChangeConflict, prepare_schedule_change, public_schedule_change, apply_schedule_change, recover_schedule_change,
@@ -208,6 +209,9 @@ def detail(service: BankingService, owner: str, actor: str, review_id: int, *, f
             )
     row["suggestions"] = [_suggestion(candidate, transaction) for candidate in candidates]
     row["suggestions"].sort(key=lambda entry: entry["confidence"], reverse=True)
+    receipt = _receipt_link(owner, actor, item)
+    if receipt:
+        row['receipt'] = receipt
     if row["status"] == "needs_review" and not row["readOnly"] and item is not None:
         current_month = now_pacific().strftime('%Y-%m')
         bank_month = (transaction.date or transaction.authorized_date or '')[:7]
@@ -226,6 +230,26 @@ def detail(service: BankingService, owner: str, actor: str, review_id: int, *, f
     if _version(current_transaction, current_item) != _version(transaction, item):
         raise ReviewConflict("This transaction changed. Check again.")
     return row, candidates, transaction, item
+
+
+def _receipt_link(owner, actor, item):
+    try:
+        return matched_receipt_link(owner, actor, item)
+    except Exception:
+        # An optional shared-payment shortcut cannot invalidate a saved match.
+        logger.exception('Shared payment shortcut unavailable')
+        return None
+
+
+def _command_snapshot(service, owner, actor, review_id):
+    result = snapshot(service, owner)
+    if not any(row['id'] == review_id and row['status'] == 'checked' for row in result['items']):
+        return result
+    item = service.store.get_reconciliation_item(owner, review_id)
+    receipt = _receipt_link(owner, actor, item)
+    if receipt and receipt['outstandingCents'] > 0:
+        result['receiptFollowup'] = dict(id=review_id, receipt=receipt)
+    return result
 
 
 def command(service: BankingService, owner: str, actor: str, body: dict) -> dict:
@@ -248,7 +272,7 @@ def command(service: BankingService, owner: str, actor: str, body: dict) -> dict
         clear_schedule_source_cache(actor)
         if result.status != 'completed':
             raise ReviewConflict('The saved amounts or payment history need inspection. No write was retried.')
-        return snapshot(service, owner)
+        return _command_snapshot(service, owner, actor, review_id)
     if item is None or transaction.pending or item.status == "import_requested":
         raise ReviewConflict("This transaction cannot be changed yet. Check again.")
     if operation != "reopen" and item.status in {"confirmed", "ignored"}:
@@ -280,7 +304,7 @@ def command(service: BankingService, owner: str, actor: str, body: dict) -> dict
         if result.status != 'completed':
             raise ReviewConflict('The entry needs review before another attempt. Check status; an entry may already exist.'
                 if result.status == 'needs_recovery' else result.message)
-        return snapshot(service, owner)
+        return _command_snapshot(service, owner, actor, review_id)
     if operation in {"confirm", "update_match", "update_schedule"}:
         # A bill/subscription may have been edited since the row was opened.
         # Explicit confirmation must compare current source evidence, not the
@@ -306,7 +330,7 @@ def command(service: BankingService, owner: str, actor: str, body: dict) -> dict
             clear_schedule_source_cache(actor)
             if result.status != 'completed':
                 raise ReviewConflict(result.message)
-            return snapshot(service, owner)
+            return _command_snapshot(service, owner, actor, review_id)
         mismatch = round(candidate.amount * 100) != round(abs(transaction.amount) * 100)
         if not candidate.amount_recorded or (mismatch and operation != 'update_match'):
             raise ReviewConflict("Review the amount change before matching this entry.")
@@ -319,7 +343,7 @@ def command(service: BankingService, owner: str, actor: str, body: dict) -> dict
             clear_schedule_source_cache(actor)
             if status != 'matched_updated':
                 raise ReviewConflict('Could not safely update this entry. Check status and review it again.')
-            return snapshot(service, owner)
+            return _command_snapshot(service, owner, actor, review_id)
         sheet_ref = candidate.sheet_ref
         action_id = candidate.action_id if candidate.action_type != "schedule" else None
     elif expected != _version(transaction, item):
@@ -339,7 +363,7 @@ def command(service: BankingService, owner: str, actor: str, body: dict) -> dict
         if operation == 'confirm' and current == item:
             raise ReviewConflict("That row is already linked or no longer eligible. Check status or choose another suggestion.")
         raise ReviewConflict("This transaction was already changed. Check again.")
-    return snapshot(service, owner)
+    return _command_snapshot(service, owner, actor, review_id)
 
 
 def schedule_preview(service: BankingService, owner: str, actor: str, review_id: int, query):
