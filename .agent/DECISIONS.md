@@ -1,5 +1,13 @@
 # Agent Decisions
 
+## 2026-10-23 - Repair Existing Bank Connections And Report Sync Failures
+
+Use short-lived signed owner/Item-scoped repair links and Plaid Hosted Link update mode to renew the existing connection from the phone app or Discord. Request no new products/accounts and never exchange another public token, reset cursors or replace review/import history. A return URL is not proof of repair: only a successful real sync clears the stored failure. Hosted Link handles the bank OAuth navigation for these external-browser entry points without an application OAuth-resume session.
+
+Reuse owner-scoped `bank_sync_state.last_error`/`last_success_at` for the current health signal; ITEM ERROR records it and LOGIN_REPAIRED verifies a sync. An older queued error may not override a newer successful repair. No schema migration is needed. Show stale-data/reconnect feedback independently of review counts. Connection DMs have their own once-daily `bank_connection_alert_sent` event, recorded only after successful Discord delivery; they do not consume `bank_reconciliation_digest_sent`, permitting a normal digest after same-morning recovery. Reconciliation's requested/default window is **10–11 AM Pacific**, using the existing timezone/window logic and an explicit production override update.
+
+Rationale: the October outage left seven cached pending authorizations and no actionable items, hiding Plaid's login-required failure. Existing-Item repair preserves lineage while explicit health feedback prevents a quiet stale cache from appearing current. Bank reauthentication remains a user action; syncing/matching metadata never implies permission to import an expense or change Sheets.
+
 ## 2026-10-23 - Record ESPP With Each Paycheck And Fill A Combined Savings Goal
 
 The confirmed first payroll deduction differs from the earlier net-pay percentage inference; actual withholding is authoritative. On upgraded months, an `ESPP withheld` income header selects explicit per-paycheck withholding as the source of actual ESPP. Blank/invalid amounts are incomplete; a confirmed 0 is valid. Source/date eligibility still excludes earlier pay and unrelated income. Keep older month layouts readable without rewriting history.

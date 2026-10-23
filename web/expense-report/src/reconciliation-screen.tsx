@@ -14,7 +14,8 @@ export interface ReconciliationItem {
   amountCents: number; currency: "USD"; accountLabel: string; suggestions: Suggestion[]
   matchedSuggestionId?: string | null; needsCheck?: boolean; readOnly?: boolean; matchLabel?: string | null
 }
-interface Snapshot { enabled: boolean; checkedAt: string | null; items: ReconciliationItem[]; notice?: string }
+interface ConnectionIssue { id: number; institution: string; needsReconnect: boolean; reconnectUrl?: string }
+interface Snapshot { enabled: boolean; checkedAt: string | null; items: ReconciliationItem[]; notice?: string; connections?: ConnectionIssue[] }
 type Command = { operation: "check" } | { operation: "confirm" | "ignore" | "reopen"; id: number; version: string; suggestionId?: string }
 const endpoint = "/app/reconciliation"
 const isText = (value: unknown, max = 300): value is string => typeof value === "string" && value.length <= max
@@ -39,7 +40,12 @@ function checkedSnapshot(value: unknown): Snapshot {
   if (!data || typeof data.enabled !== "boolean" || (data.checkedAt !== null && !isDate(data.checkedAt))
     || !Array.isArray(data.items) || data.items.length > 300 || !data.items.every(validItem)
     || new Set(data.items.map(item => item.id)).size !== data.items.length
-    || (data.notice !== undefined && !isText(data.notice, 500))) throw new Error("Couldn’t read the latest bank review.")
+    || (data.notice !== undefined && !isText(data.notice, 500))
+    || (data.connections !== undefined && (!Array.isArray(data.connections) || data.connections.length > 50
+      || !data.connections.every(connection => connection && Number.isSafeInteger(connection.id) && connection.id > 0
+        && isText(connection.institution) && typeof connection.needsReconnect === 'boolean'
+        && (!connection.needsReconnect || (typeof connection.reconnectUrl === 'string'
+          && /^\/bank\/link\?token=[A-Za-z0-9_.%-]+$/.test(connection.reconnectUrl))))))) throw new Error("Couldn’t read the latest bank review.")
   return data
 }
 class ReviewRequestError extends Error { constructor(message: string, readonly status: number) { super(message) } }
@@ -162,9 +168,11 @@ export function ReconciliationScreen({ controller }: { controller: Controller })
     </SlidingSelection>}
     {!snapshot && !error && <p className="bb-reconcile-muted" role="status">Loading bank transactions…</p>}
     {error && <div className="bb-reconcile-message" role="alert"><p>{error}</p><button type="button" disabled={busy} onClick={() => void load()}>{needsRefresh ? "Check status" : "Try again"}</button></div>}
-    {snapshot?.notice && <p className="bb-reconcile-muted" role="status">{snapshot.notice}</p>}
+    {snapshot?.notice && <div className="bb-reconcile-message" role={snapshot.connections?.length ? 'alert' : 'status'}><p>{snapshot.notice}</p>
+      {snapshot.connections?.filter(connection => connection.needsReconnect).map(connection => <a key={connection.id}
+        className="bb-reconcile-action" href={connection.reconnectUrl}>Reconnect {connection.institution}</a>)}</div>}
     {filter === "pending" && visibleRows.length > 0 && <p className="bb-reconcile-muted">Bank amounts may change. Matches stay tentative until posted.</p>}
-    {snapshot?.enabled && !visibleRows.length && <div className="bb-reconcile-empty"><Check size={22} aria-hidden="true" /><p>{filter === "needs_review" ? "Nothing needs review." : filter === "pending" ? "No pending transactions." : "No checked transactions yet."}</p></div>}
+    {snapshot?.enabled && !visibleRows.length && <div className="bb-reconcile-empty"><Check size={22} aria-hidden="true" /><p>{filter === "needs_review" ? snapshot.connections?.length ? "No saved transactions need review." : "Nothing needs review." : filter === "pending" ? "No pending transactions." : "No checked transactions yet."}</p></div>}
     <div className="bb-reconcile-list">{visibleRows.map(item => { const detail = details[item.id]; return <TransactionRow key={item.id} item={item} open={openId === item.id}
       onToggle={() => setOpenId(value => value === item.id ? null : item.id)}>
       {openId === item.id && loadingDetail && <p className="bb-reconcile-muted" role="status">Finding logged expenses…</p>}

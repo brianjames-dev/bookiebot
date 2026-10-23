@@ -1,12 +1,14 @@
 from __future__ import annotations
 
 import base64
+import asyncio
 import hashlib
 import hmac
 import json
 import os
 import time
 from typing import Any
+from urllib.parse import urlencode
 
 from aiohttp import web
 
@@ -40,6 +42,7 @@ def create_bank_link_setup_token(
     actor_key: str,
     owner_key: str,
     ttl_seconds: int = 900,
+    item_db_id: int | None = None,
 ) -> str:
     secret = _signing_secret()
     if not secret:
@@ -49,6 +52,10 @@ def create_bank_link_setup_token(
         "owner_key": str(owner_key),
         "exp": int(time.time()) + max(60, int(ttl_seconds)),
     }
+    if item_db_id is not None:
+        if type(item_db_id) is not int or item_db_id <= 0:
+            raise BankLinkTokenError('Invalid bank connection')
+        payload['item_db_id'] = str(item_db_id)
     payload_bytes = json.dumps(payload, sort_keys=True, separators=(",", ":")).encode("utf-8")
     signature = hmac.new(secret.encode("utf-8"), payload_bytes, hashlib.sha256).digest()
     return f"{_b64encode(payload_bytes)}.{_b64encode(signature)}"
@@ -77,7 +84,18 @@ def verify_bank_link_setup_token(token: str) -> dict[str, str]:
     owner_key = str(payload.get("owner_key") or "")
     if not actor_key or not owner_key:
         raise BankLinkTokenError("Bank link token is missing owner data")
-    return {"actor_key": actor_key, "owner_key": owner_key}
+    result = {"actor_key": actor_key, "owner_key": owner_key}
+    if 'item_db_id' in payload:
+        item_id = str(payload['item_db_id'])
+        if not item_id.isdecimal() or int(item_id) <= 0:
+            raise BankLinkTokenError('Invalid bank connection')
+        result['item_db_id'] = item_id
+    return result
+
+
+def bank_reconnect_url(actor_key: str, owner_key: str, item_db_id: int, base_url: str = '') -> str:
+    token = create_bank_link_setup_token(actor_key=actor_key, owner_key=owner_key, item_db_id=item_db_id)
+    return f"{base_url.rstrip('/')}/bank/link?{urlencode({'token': token})}"
 
 
 def create_bank_link_app() -> web.Application:
@@ -86,6 +104,7 @@ def create_bank_link_app() -> web.Application:
     app.router.add_get("/bank/link", _bank_link_page)
     app.router.add_post("/bank/link-token", _bank_link_token)
     app.router.add_post("/bank/exchange-public-token", _bank_exchange_public_token)
+    app.router.add_post('/bank/reconnect-complete', _bank_reconnect_complete)
     app.router.add_post("/bank/plaid-webhook", _bank_plaid_webhook)
     return app
 
@@ -97,22 +116,35 @@ async def _health(_request: web.Request) -> web.Response:
 async def _bank_link_page(request: web.Request) -> web.Response:
     token = request.query.get("token", "").strip()
     try:
-        verify_bank_link_setup_token(token)
+        data = verify_bank_link_setup_token(token)
     except BankLinkTokenError as exc:
         return web.Response(text=f"Invalid or expired bank link: {exc}", status=400)
-    return web.Response(text=_link_page_html(token), content_type="text/html")
+    html = _reconnect_page_html(token, complete=request.query.get('complete') == '1') if 'item_db_id' in data else _link_page_html(token)
+    return web.Response(text=html, content_type="text/html",
+        headers={'Cache-Control': 'no-store', 'Referrer-Policy': 'no-referrer'})
 
 
 async def _bank_link_token(request: web.Request) -> web.Response:
     try:
         token_data = await _verified_request_token(request)
         service = build_banking_service()
+        if 'item_db_id' in token_data:
+            base_url = (service.config.public_base_url or '').rstrip('/')
+            if not base_url:
+                return _json_error('Bank reconnect is not configured. Please try again later.', status=503)
+            completion = base_url + '/bank/link?' + urlencode({
+                'token': (await _request_json(request))['setup_token'], 'complete': '1',
+            })
+            hosted_url = await service.create_reconnect_link(token_data['owner_key'], int(token_data['item_db_id']), completion)
+            return web.json_response({'hosted_link_url': hosted_url}, headers={'Cache-Control': 'no-store'})
         link_token = await service.create_link_token(token_data["owner_key"])
         return web.json_response({"link_token": link_token})
     except web.HTTPException as exc:
         return _json_error(exc.text or exc.reason, status=exc.status)
     except PlaidApiError as exc:
         return _json_error(str(exc), status=502)
+    except ValueError as exc:
+        return _json_error(str(exc), status=404)
     except Exception as exc:
         return _json_error(f"{type(exc).__name__}: {exc}", status=500)
 
@@ -120,6 +152,8 @@ async def _bank_link_token(request: web.Request) -> web.Response:
 async def _bank_exchange_public_token(request: web.Request) -> web.Response:
     try:
         token_data = await _verified_request_token(request)
+        if 'item_db_id' in token_data:
+            return _json_error('Reconnect uses the existing bank connection.', status=400)
         body = await _request_json(request)
         public_token = str(body.get("public_token") or "").strip()
         metadata = body.get("metadata") if isinstance(body.get("metadata"), dict) else {}
@@ -149,6 +183,63 @@ async def _bank_exchange_public_token(request: web.Request) -> web.Response:
         return _json_error(str(exc), status=502)
     except Exception as exc:
         return _json_error(f"{type(exc).__name__}: {exc}", status=500)
+
+
+async def _bank_reconnect_complete(request: web.Request) -> web.Response:
+    try:
+        data = await _verified_request_token(request)
+        if 'item_db_id' not in data:
+            return _json_error('Use an existing bank reconnect link.', status=400)
+        service = build_banking_service()
+        result = await asyncio.wait_for(service.complete_reconnect(data['owner_key'], int(data['item_db_id'])), timeout=60)
+        return web.json_response({'ok': True, 'added': result.added, 'modified': result.modified,
+                                 'removed': result.removed}, headers={'Cache-Control': 'no-store'})
+    except web.HTTPException as exc:
+        return _json_error(exc.text or exc.reason, status=exc.status)
+    except ValueError as exc:
+        return _json_error(str(exc), status=404)
+    except Exception:
+        return _json_error('Bank sync is not ready yet. Retry checking the connection, or return to Reconcile for a fresh reconnect link.', status=502)
+
+
+def _reconnect_page_html(setup_token: str, *, complete: bool = False) -> str:
+    # Plaid hosts the credential/OAuth screens. Completion never exchanges a
+    # public token; the server checks the original Item with its saved token.
+    return '''<!doctype html><html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1"><title>Reconnect bank · BookieBot</title>
+<style>body{font:16px system-ui;margin:0;background:#111318;color:#f4f4f5}main{max-width:520px;margin:12vh auto;padding:24px}button,a{font:inherit;min-height:44px}button{padding:12px 18px;background:#7c3aed;color:white;border:0;border-radius:8px;cursor:pointer}button:disabled{opacity:.6}p{line-height:1.6}a{color:#c4b5fd}#status{white-space:pre-wrap}</style>
+</head><body><main><h1>Reconnect bank</h1><p>Restore your existing read-only bank connection. Your transactions and review history stay in BookieBot. Sign in only on Plaid or your bank’s secure screen.</p>
+<button id="connect">Reconnect bank</button><p id="status" role="status" aria-live="polite"></p><p><a href="/app/expenses">Return to BookieBot</a></p></main>
+<script>
+const setupToken = SETUP_TOKEN;
+const complete = IS_COMPLETE;
+const button = document.getElementById('connect'), status = document.getElementById('status');
+async function post(path) {
+  const response = await fetch(path, {method:'POST', headers:{'Content-Type':'application/json'}, cache:'no-store', body:JSON.stringify({setup_token:setupToken})});
+  const data = await response.json();
+  if (!response.ok) throw Error(data.error || 'Could not reconnect. Please try again.');
+  return data;
+}
+async function run() {
+  button.disabled = true;
+  status.textContent = complete ? 'Checking your bank connection and syncing transactions…' : 'Opening secure Plaid reconnect…';
+  try {
+    if (complete) {
+      await post('/bank/reconnect-complete');
+      status.textContent = 'Bank reconnected. Transaction sync succeeded. New bank activity may take a few minutes to arrive. Return to Reconcile and tap Check for matches.';
+      button.hidden = true;
+    } else {
+      const result = await post('/bank/link-token');
+      const url = new URL(result.hosted_link_url);
+      if (url.protocol !== 'https:' || url.hostname !== 'secure.plaid.com') throw Error('Invalid Plaid reconnect link.');
+      window.location.assign(url.href);
+    }
+  } catch (error) { status.textContent = error.message; button.disabled = false; }
+}
+button.textContent = complete ? 'Retry checking connection' : 'Reconnect bank';
+button.addEventListener('click', run);
+if (complete) run();
+</script></body></html>'''.replace('SETUP_TOKEN', json.dumps(setup_token)).replace('IS_COMPLETE', json.dumps(complete))
 
 
 async def _bank_plaid_webhook(request: web.Request) -> web.Response:

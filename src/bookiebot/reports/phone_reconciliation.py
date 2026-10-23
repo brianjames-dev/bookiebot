@@ -12,6 +12,8 @@ from typing import Any, Literal, cast
 from aiohttp import web
 
 from bookiebot.banking.models import BankTransaction, ReconciliationItem
+from bookiebot.banking.plaid_client import PlaidApiError
+from bookiebot.core.bank_link import bank_reconnect_url
 from bookiebot.banking.reconciliation import (
     ActionLogCandidate, claimed_schedule_action_ids, find_action_log_candidates, find_scheduled_pull_candidates,
 )
@@ -99,6 +101,13 @@ def snapshot(service: BankingService, owner: str) -> dict[str, Any]:
         "enabled": True, "checkedAt": sync["checkedAt"],
         "items": [_row(transaction, by_transaction.get(transaction.id)) for transaction in transactions],
     }
+    issues = service.connection_issues(owner)
+    if issues:
+        result['connections'] = issues
+        result['notice'] = ('Your bank needs reconnecting. Transactions and pending statuses may be out of date.'
+            if any(issue['needsReconnect'] for issue in issues) else
+            'Bank sync failed. Transactions and pending statuses may be out of date. Try Check again later.')
+        return result
     if sync["syncFailed"]:
         result["notice"] = "Bank sync is delayed. Showing the last available transactions."
     elif len(transactions) >= _LIMIT:
@@ -226,6 +235,7 @@ async def _review(request: web.Request) -> web.Response:
         if session is None:
             return _json({"error": "Reconnect this phone using /expense_app in Discord."}, status=401)
         service = build_banking_service()
+        result: dict[str, Any]
         if not await asyncio.to_thread(_enabled, service, session.owner_key):
             return _json({"enabled": False, "checkedAt": None, "items": []})
         if request.method == "POST":
@@ -251,7 +261,12 @@ async def _review(request: web.Request) -> web.Response:
                         if not done.cancelled():
                             done.exception()  # Retrieve exceptions after a disconnected request.
                     task.add_done_callback(finished)
-                await asyncio.wait_for(asyncio.shield(task), timeout=45)
+                try:
+                    await asyncio.wait_for(asyncio.shield(task), timeout=45)
+                except PlaidApiError:
+                    # The sync saved its failure. Keep the known snapshot and
+                    # actionable reconnect warning instead of an uncertain mutation error.
+                    pass
                 result = await asyncio.to_thread(snapshot, service, session.owner_key)
             else:
                 result = await asyncio.to_thread(command, service, session.owner_key, session.actor_key, body)
@@ -268,6 +283,9 @@ async def _review(request: web.Request) -> web.Response:
         current = await _session(request)
         if current is None or current.owner_key != session.owner_key:
             return _json({"error": "Reconnect this phone using /expense_app in Discord."}, status=401)
+        for connection in result.get('connections', []):
+            if connection['needsReconnect']:
+                connection['reconnectUrl'] = bank_reconnect_url(session.actor_key, session.owner_key, connection['id'])
         return _json(result)
     except ReviewConflict as exc:
         return _json({"error": str(exc)}, status=409)

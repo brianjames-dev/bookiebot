@@ -41,6 +41,7 @@
 .bb-reconcile-message button { border: 0; background: transparent; color: hsl(var(--primary)); font: inherit; min-height: 44px; padding: 8px 0; }
 .bb-reconcile-message { padding: 12px 0; color: hsl(var(--foreground)); font-size: 13px; line-height: 1.5; }
 .bb-reconcile-message p { margin: 0; }
+.bb-reconcile-message a { display: flex; align-items: center; width: fit-content; min-height: 44px; text-decoration: underline; }
 .bb-reconcile-empty { min-height: 180px; display: flex; align-items: center; justify-content: center; gap: 9px; color: hsl(var(--muted-foreground)); font-size: 14px; }
 @media (max-width: 350px) { .bb-reconcile-row-toggle { grid-template-columns: minmax(0, 1fr) auto 14px; gap: 7px; } .bb-reconcile-direction { display: none; } .bb-reconcile-filters { gap: 1px; } .bb-reconcile-filters button { font-size: 12px; gap: 3px; } }
 @media (prefers-reduced-motion: reduce) { .bb-reconcile-chevron { transition-duration: 0ms; } }

@@ -681,7 +681,7 @@ class BankStore:
                 (item_db_id, cursor, now, now),
             )
 
-    def mark_sync_error(self, item_db_id: int, error: str) -> None:
+    def mark_sync_error(self, item_db_id: int, error: str, *, observed_at: str | None = None) -> None:
         now = utc_now_iso()
         with self.connect() as conn:
             conn.execute(
@@ -691,8 +691,10 @@ class BankStore:
                 ON CONFLICT(item_id) DO UPDATE SET
                     last_sync_at = excluded.last_sync_at,
                     last_error = excluded.last_error
+                WHERE CAST(? AS TEXT) IS NULL OR bank_sync_state.last_success_at IS NULL
+                    OR bank_sync_state.last_success_at <= ?
                 """,
-                (item_db_id, now, error[:1000]),
+                (item_db_id, now, error[:1000], observed_at, observed_at),
             )
 
     def reset_sync_cursors(self, owner_key: str) -> int:
@@ -1227,6 +1229,21 @@ class BankStore:
             'checkedAt': min(successful) if rows and len(successful) == len(rows) else None,
             'syncFailed': any(bool(row['last_error']) for row in rows),
         }
+
+    def connection_sync_issues(self, owner_key: str) -> list[dict[str, Any]]:
+        """Owner-scoped failures for active, watched Items; no access tokens."""
+        self.initialize()
+        with self.connect() as conn:
+            rows = conn.execute(
+                """SELECT i.id, i.institution_name, s.last_success_at, s.last_error
+                   FROM bank_items i JOIN bank_sync_state s ON s.item_id = i.id
+                   WHERE i.owner_key = ? AND i.status = 'active'
+                     AND s.last_error IS NOT NULL AND s.last_error <> ''
+                     AND EXISTS (SELECT 1 FROM bank_accounts a
+                                 WHERE a.item_id = i.id AND a.owner_key = i.owner_key AND a.watched = 1)
+                   ORDER BY i.id""", (owner_key,),
+            ).fetchall()
+        return [dict(row) for row in rows]
 
     def transaction_count(self, owner_key: str) -> int:
         self.initialize()

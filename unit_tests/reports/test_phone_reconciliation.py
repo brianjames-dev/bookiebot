@@ -12,6 +12,7 @@ import pytest_asyncio
 from bookiebot.banking.config import BankingConfig
 from bookiebot.banking.crypto import TokenCipher
 from bookiebot.banking.models import BankAccount
+from bookiebot.banking.plaid_client import PlaidApiError
 from bookiebot.banking.reconciliation import ActionLogCandidate
 from bookiebot.banking.service import BankingService
 from bookiebot.banking.store import BankStore
@@ -24,6 +25,32 @@ from bookiebot.sheets.undo import LoggedAction, UndoAction
 BRIAN = "676638528590970917"
 HANNAH = "830984827904851969"
 HEADERS = {"X-BookieBot-App": "1", "Origin": "http://127.0.0.1"}
+
+
+@pytest.mark.asyncio
+async def test_failed_sync_exposes_owner_scoped_reconnect_with_empty_inbox(client, monkeypatch):
+    from bookiebot.core.bank_link import verify_bank_link_setup_token
+    from urllib.parse import urlparse, parse_qs
+    monkeypatch.setenv('BANK_LINK_SIGNING_SECRET', 'test-reconnect-signing')
+    seed(client)
+    item = client.service.linked_items('brian')[0]
+    client.store.mark_sync_error(item.id, 'PlaidApiError: ITEM_LOGIN_REQUIRED')
+    connect(client)
+    response = await client.http.get('/app/reconciliation')
+    data = await response.json()
+    assert response.status == 200
+    assert 'needs reconnecting' in data['notice']
+    url = data['connections'][0]['reconnectUrl']
+    payload = verify_bank_link_setup_token(parse_qs(urlparse(url).query)['token'][0])
+    assert payload == {'actor_key': BRIAN, 'owner_key': 'brian', 'item_db_id': str(item.id)}
+    assert 'private-bank-token' not in str(data) and 'ITEM_LOGIN_REQUIRED' not in str(data)
+    client.service.sync_owner.side_effect = PlaidApiError('ITEM_LOGIN_REQUIRED')
+    response = await client.http.post('/app/reconciliation', headers=HEADERS, json={'operation': 'check'})
+    assert response.status == 200
+    assert (await response.json())['connections'][0]['needsReconnect']
+    connect(client, HANNAH, 'hannah')
+    data = await (await client.http.get('/app/reconciliation')).json()
+    assert 'connections' not in data
 
 
 def logged(amount="12.34", label="Coffee", action_id="coffee", row=12):

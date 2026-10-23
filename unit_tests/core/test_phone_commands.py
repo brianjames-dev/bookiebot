@@ -51,6 +51,25 @@ def interaction(actor_key="111", *, bot=False):
 
 
 @pytest.mark.asyncio
+async def test_bank_reconnect_command_is_private_and_uses_authenticated_owner(phone_commands, monkeypatch):
+    from bookiebot.core.bank_link import verify_bank_link_setup_token
+    from urllib.parse import urlparse, parse_qs
+    monkeypatch.setenv('BANK_LINK_SIGNING_SECRET', 'test-bank-key')
+    monkeypatch.setattr(commands, 'get_user_config', lambda actor: SimpleNamespace(budget_owner_key='brian'))
+    service = SimpleNamespace(config=SimpleNamespace(public_base_url='https://bookie.test'),
+        linked_items=Mock(return_value=[SimpleNamespace(id=3, institution_name='Example Bank', status='active')]))
+    monkeypatch.setattr(commands, 'build_banking_service', lambda: service)
+    request = interaction()
+    await phone_commands['bank_reconnect'].callback(request)
+    request.response.defer.assert_awaited_once_with(ephemeral=True)
+    service.linked_items.assert_called_once_with('brian')
+    reply = request.edit_original_response.call_args.kwargs
+    token = parse_qs(urlparse(reply['view'].children[0].url).query)['token'][0]
+    assert verify_bank_link_setup_token(token) == {'actor_key': '111', 'owner_key': 'brian', 'item_db_id': '3'}
+
+
+
+@pytest.mark.asyncio
 @pytest.mark.parametrize("actor_key", ["111", "222"])
 async def test_setup_uses_actual_mapped_user_and_returns_only_private_link(phone_commands, phone_service, mapped_profiles, actor_key):
     request = interaction(actor_key)
