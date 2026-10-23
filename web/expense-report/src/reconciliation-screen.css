@@ -47,3 +47,21 @@
 .bb-reconcile-empty { min-height: 180px; display: flex; align-items: center; justify-content: center; gap: 9px; color: hsl(var(--muted-foreground)); font-size: 14px; }
 @media (max-width: 350px) { .bb-reconcile-row-toggle { grid-template-columns: minmax(0, 1fr) auto 14px; gap: 7px; } .bb-reconcile-direction { display: none; } .bb-reconcile-filters { gap: 1px; } .bb-reconcile-filters button { font-size: 12px; gap: 3px; } }
 @media (prefers-reduced-motion: reduce) { .bb-reconcile-chevron { transition-duration: 0ms; } }
+.bb-reconcile-primary { display: inline-flex; align-items: center; justify-content: center; width: 100%; padding: 11px 16px; border-radius: 10px; background: hsl(var(--primary)); color: hsl(var(--primary-foreground)); font-weight: 600; margin: 8px 0; }
+.bb-reconcile-outline { width: 100%; border: 1px solid hsl(var(--border)); border-radius: 10px; padding: 10px 12px; margin: 8px 0; }
+.bb-reconcile-eyebrow { font-size: 11px; font-weight: 600; letter-spacing: .04em; text-transform: uppercase; color: hsl(var(--primary)); margin: 0 0 8px; }
+.bb-reconcile-suggestion { border: 1px solid transparent; }
+.bb-reconcile-suggestion[data-selected="true"] { border-color: hsl(var(--primary) / .55); }
+.bb-reconcile-choice { display: block; width: 100%; min-height: 44px; padding: 0; text-align: left; border: 0; background: transparent; color: hsl(var(--foreground)); font: inherit; }
+.bb-reconcile-choice > .bb-reconcile-muted { display: block; margin: 6px 0 0; font-size: 12px; }
+.bb-reconcile-alternatives summary { min-height: 44px; display: list-item; align-content: center; cursor: pointer; color: hsl(var(--muted-foreground)); font-size: 13px; }
+.bb-reconcile-confirm, .bb-reconcile-log { border: 1px solid hsl(var(--border)); border-radius: 12px; padding: 14px; margin: 12px 0; font-size: 13px; line-height: 1.5; }
+.bb-reconcile-log h3 { margin: 0; font-size: 16px; }
+.bb-reconcile-log label { display: grid; gap: 5px; margin: 12px 0; color: hsl(var(--muted-foreground)); }
+.bb-reconcile-log input, .bb-reconcile-log select { width: 100%; min-width: 0; box-sizing: border-box; min-height: 44px; border: 1px solid hsl(var(--border)); border-radius: 8px; background: hsl(var(--background)); color: hsl(var(--foreground)); padding: 9px; font: inherit; font-size: 16px; }
+.bb-reconcile-log dl > div { display: grid; grid-template-columns: 100px minmax(0, 1fr); gap: 8px; margin: 6px 0; }
+.bb-reconcile-log dt { color: hsl(var(--muted-foreground)); text-transform: capitalize; }
+.bb-reconcile-log dd { margin: 0; overflow-wrap: anywhere; }
+.bb-reconcile-form-actions { display: flex; gap: 12px; align-items: center; }
+.bb-reconcile-form-actions .bb-reconcile-primary { width: auto; flex: 1; }
+.bb-reconcile button:focus-visible, .bb-reconcile summary:focus-visible { outline: 2px solid hsl(var(--primary)); outline-offset: 3px; }

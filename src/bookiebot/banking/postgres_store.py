@@ -59,7 +59,7 @@ class PostgresBankStore(BankStore):
         finally:
             conn.close()
 
-    def initialize(self) -> None:
+    def _initialize_schema(self) -> None:
         with self.connect() as conn:
             conn.execute(
                 """

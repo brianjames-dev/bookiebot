@@ -96,3 +96,31 @@ def test_legacy_row_only_revert_reference_cannot_pick_between_categories():
     assert banking._find_action_for_sheet_ref([food, shopping], 'expense!row 4#month=2026-10') is None
     assert banking._find_action_for_sheet_ref([food, shopping],
         'expense!row 4#cols=14,15,16,17,18#month=2026-10') == food
+
+
+def test_selected_preview_changes_before_amount_write_are_rejected(reviews, monkeypatch):
+    from dataclasses import replace
+    service, store, purchase, seed = reviews
+    item = seed('amount-bank', 73.27)
+    preview = action_log_candidate_by_id(purchase)
+    assert preview is not None
+    # Ranking notes/confidence may differ; the saved source evidence may not.
+    preview = replace(preview, confidence=.8, notes='ranked suggestion')
+    purchase.action.new_values[2] = 'Different shop'
+    calls = []
+    monkeypatch.setattr(banking, 'update_recent_action', lambda *args, **kwargs: calls.append(kwargs))
+    result, _, status = service.confirm_reconciliation_action_match('brian', item.id, actor_key='actor',
+        action_id=purchase.id, expected_item=item, expected_candidate=preview)
+    assert status == 'candidate_changed' and result == item and calls == []
+
+
+def test_income_label_uses_the_saved_source_cell_including_label():
+    logged = LoggedAction('income', '2026-10-21', 'actor', UndoAction(
+        worksheet='income', kind='delete_row', row=4, columns=[], previous_values=[],
+        new_values=['10/21/2026', '50.00', 'Employer · Bonus'],
+        metadata={'type': 'income', 'source': '', 'income_date_column': '1',
+                  'income_amount_column': '2', 'income_source_column': '3'},
+        description='income $50 from ',
+    ))
+    candidate = action_log_candidate_by_id(logged)
+    assert candidate is not None and candidate.label == 'Employer · Bonus'

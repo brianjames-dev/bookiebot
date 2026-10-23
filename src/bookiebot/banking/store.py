@@ -5,6 +5,7 @@ from datetime import date, datetime, timedelta, timezone
 import json
 from pathlib import Path
 import sqlite3
+from threading import Lock
 from typing import Any, Callable, Iterator, Literal, Protocol
 from uuid import uuid4
 
@@ -84,6 +85,8 @@ class BankStore:
     def __init__(self, path: Path, cipher: TokenCipher):
         self.path = path
         self.cipher = cipher
+        self._schema_ready = False
+        self._schema_lock = Lock()
 
     @contextmanager
     def connect(self) -> Iterator[BankStoreConnection]:
@@ -98,6 +101,14 @@ class BankStore:
             conn.close()
 
     def initialize(self) -> None:
+        if self._schema_ready:
+            return
+        with self._schema_lock:
+            if not self._schema_ready:
+                self._initialize_schema()
+                self._schema_ready = True
+
+    def _initialize_schema(self) -> None:
         with self.connect() as conn:
             conn.executescript(
                 """

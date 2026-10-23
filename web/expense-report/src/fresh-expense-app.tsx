@@ -24,10 +24,12 @@ function useFreshExpenseReport(config: ExpenseAppConfig) {
     const stopWatching = watchExpenseAppLifecycle(current)
     const refreshSettlements = () => { void current.refresh(true) }
     window.addEventListener("bookiebot:reimbursements-changed", refreshSettlements)
+    window.addEventListener("bookiebot:transactions-changed", refreshSettlements)
     void current.refresh(true)
     return () => {
       stopWatching()
       window.removeEventListener("bookiebot:reimbursements-changed", refreshSettlements)
+      window.removeEventListener("bookiebot:transactions-changed", refreshSettlements)
       unsubscribe()
       current.dispose()
       session.current = null

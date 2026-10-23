@@ -1,5 +1,11 @@
 # Agent Decisions
 
+## 2026-10-23 - Explicit Web Sheet Writes And Short-Lived Review Previews
+
+Phone reconciliation may correct a recorded amount or add a missing current-month expense/income only after a separate explicit review and confirmation. Use the canonical action update/match path and durable bank-import claim/recovery path, preserving bank-provided amount/date, owner payment methods, action lineage and stale/claimed/pending protections. Revalidate current source evidence before matching; amount correction additionally compares selected source identity/date/amount/label/reference immediately before writing. Browse ranking/confidence changes do not authorize a different source. Scheduled mismatches still require their bill/subscription amount to be corrected; adding an expense explicitly writes the expense sheet, not a scheduled bill actual.
+
+Expose a separate bank/review state version for Ignore/Reopen, which never need candidate or Google Sheets reads. Cache successful browsing history for 30 seconds per store/owner/actor, with single-flight reads; fresh confirmation bypasses it and failures invalidate it. Retain unchanged client row previews for the same interval. Cache service construction by complete immutable configuration and initialize each store schema once under a lock, marking success only after schema setup completes. Do not cache financial mutation authorization. Existing import recovery prevents a timed-out write from being retried. Successful financial changes invalidate previews and refresh Overview; drafts participate in the existing app work guard. No new database schema or automatic sheet writes.
+
 ## 2026-10-23 - Refresh Shared Review State Before A Morning Recovery Digest
 
 Bank reconnect completion and explicit phone/Discord resync must finish a real sync and force the same owner-scoped recent reconciliation preview before claiming review is refreshed. Reuse the 200-row/age boundary and preserve confirmed/ignored/import lineage. Refresh on app foreground so returning from bank OAuth exposes the new state.

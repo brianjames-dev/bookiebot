@@ -1,4 +1,5 @@
 from contextlib import nullcontext
+from dataclasses import replace
 from datetime import date
 from pathlib import Path
 from typing import cast
@@ -13,6 +14,7 @@ import bookiebot.banking.service as banking_service
 from bookiebot.banking.reconciliation import (
     ScheduledPullCandidate,
     action_log_bank_transaction,
+    action_log_candidate_by_id,
     classify_transaction,
     find_scheduled_pull_candidates,
     find_action_log_candidate_groups,
@@ -1692,11 +1694,14 @@ def test_confirm_reconciliation_action_match_updates_sheet_amount_after_user_mat
     service.seed_unmatched_debug_transaction("brian", name="ArmK Oracle Park F&b", amount=20.89, date="2026-05-17")
     item = service.reconciliation_preview("brian", force=True).items[0]
 
+    preview = action_log_candidate_by_id(action)
+    assert preview is not None
     confirmed, candidate, status = service.confirm_reconciliation_action_match(
         "brian",
         item.id,
         actor_key="676638528590970917",
         action_id="abc123",
+        expected_candidate=replace(preview, confidence=.8, notes='ranked preview'),
     )
 
     assert status == "matched_updated"
@@ -2142,3 +2147,10 @@ def test_confirm_reconciliation_action_group_match_can_adjust_selected_row(monke
     assert update_calls == [
         ("676638528590970917", {"amount": "37.66"}, "wrong123"),
     ]
+
+
+def test_income_candidates_do_not_load_outgoing_schedules(monkeypatch):
+    def no_schedule(*args, **kwargs):
+        raise AssertionError('Money-in cannot match an outgoing payment schedule')
+    monkeypatch.setattr(banking_service, '_schedule_sources_for_actor', no_schedule)
+    assert banking_service._scheduled_pulls_for_transactions([_transaction('Employer', -50)], actor_key='brian') == []
