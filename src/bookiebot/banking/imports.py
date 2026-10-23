@@ -46,6 +46,9 @@ def _completed_result(operation: BankImportOperation) -> BankImportResult:
 
 
 def _recover_import(store: BankStore, operation: BankImportOperation) -> BankImportResult:
+    if operation.kind == 'schedule_adjustment':
+        from bookiebot.banking.schedule_changes import recover_schedule_change
+        return recover_schedule_change(store, operation)
     if operation.status == 'completed':
         item = store.get_reconciliation_item(operation.owner_key, operation.reconciliation_id)
         if (item is not None and item.status == 'confirmed'

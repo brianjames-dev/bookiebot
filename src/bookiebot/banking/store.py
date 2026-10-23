@@ -300,6 +300,11 @@ class BankStore:
                 and request.get('expected_last_seen_at') and request.get('expected_updated_at')
             ):
                 return BankImportOperation(**dict(previous)), False
+            if request.get('reserved_sheet_refs') and identity is not None and self._reconciliation_match_taken(
+                conn, owner_key, identity['bank_transaction_id'], request.get('reserved_action_id'),
+                request['reserved_sheet_refs'],
+            ):
+                return None, False
             claimed = conn.execute(
                 """
                 UPDATE bank_reconciliation_items
@@ -368,6 +373,25 @@ class BankStore:
                 (utc_now_iso(), operation_id, owner_key),
             ).rowcount == 1
 
+    def cancel_unwritten_schedule_change(self, operation: BankImportOperation) -> None:
+        """Release only a schedule claim whose writer never started; keep its audit."""
+        request = json.loads(operation.request_json)
+        with self.connect() as conn:
+            self._lock_reconciliation_owner(conn, operation.owner_key)
+            removed = conn.execute(
+                "DELETE FROM bank_import_operations WHERE operation_id = ? AND owner_key = ? AND kind = 'schedule_adjustment' AND status = 'claimed'",
+                (operation.operation_id, operation.owner_key),
+            ).rowcount
+            if removed:
+                now = utc_now_iso()
+                conn.execute("UPDATE bank_reconciliation_items SET status = ?, last_seen_at = ? WHERE id = ? AND owner_key = ? AND status = 'import_requested'",
+                             (request['expected_status'], now, operation.reconciliation_id, operation.owner_key))
+                conn.execute("""INSERT INTO bank_reconciliation_events
+                    (event_id, reconciliation_id, owner_key, event_type, occurred_at, payload_json)
+                    VALUES (?, ?, ?, 'schedule_amount_change_cancelled', ?, ?)""",
+                    (uuid4().hex, operation.reconciliation_id, operation.owner_key, now,
+                     json.dumps({'operation_id': operation.operation_id, 'request': request}, sort_keys=True)))
+
     def mark_import_needs_recovery(self, owner_key: str, operation_id: str, error: str) -> None:
         with self.connect() as conn:
             conn.execute(
@@ -378,7 +402,7 @@ class BankStore:
             )
 
     def complete_reconciliation_import(
-        self, operation: BankImportOperation, *, action_id: str, sheet_ref: str,
+        self, operation: BankImportOperation, *, action_id: str | None, sheet_ref: str,
     ) -> BankImportOperation:
         """Persist the written action and confirmation together; never overwrite another resolution."""
         request = json.loads(operation.request_json)
@@ -398,7 +422,7 @@ class BankStore:
                     UPDATE bank_reconciliation_items
                     SET status = 'confirmed', resolved_at = ?, last_seen_at = ?,
                         matched_action_log_id = ?, matched_sheet_ref = ?,
-                        notes = 'logged from bank reconciliation import'
+                        notes = ?
                     WHERE id = ? AND owner_key = ? AND status = 'import_requested'
                       AND EXISTS (
                         SELECT 1 FROM bank_transactions t
@@ -407,9 +431,19 @@ class BankStore:
                           AND t.amount = ? AND COALESCE(t.date, t.authorized_date, '') = ?
                       )
                     """,
-                    (now, now, action_id, sheet_ref, operation.reconciliation_id, operation.owner_key,
+                    (now, now, action_id, sheet_ref,
+                     'scheduled payment amount updated from reconciliation' if operation.kind == 'schedule_adjustment'
+                     else 'logged from bank reconciliation import', operation.reconciliation_id, operation.owner_key,
                      request['bank_amount'], request['bank_date']),
                 ).rowcount == 1
+                if confirmed and operation.kind == 'schedule_adjustment':
+                    conn.execute(
+                        """INSERT INTO bank_reconciliation_events
+                           (event_id, reconciliation_id, owner_key, event_type, occurred_at, payload_json)
+                           VALUES (?, ?, ?, 'schedule_amount_updated', ?, ?)""",
+                        (uuid4().hex, operation.reconciliation_id, operation.owner_key, now,
+                         json.dumps({'operation_id': operation.operation_id, 'request': request}, sort_keys=True)),
+                    )
                 conn.execute(
                     """UPDATE bank_import_operations SET status = ?, error = ?
                        WHERE operation_id = ? AND owner_key = ?""",
@@ -1531,6 +1565,20 @@ class BankStore:
             existing_refs = {part.strip() for part in (row['matched_sheet_ref'] or '').split(' + ') if part.strip()}
             if any(_sheet_reference_conflicts(wanted, existing, month, str(row['bank_date'])[:7])
                    for wanted in wanted_refs for existing in existing_refs):
+                return True
+        pending = conn.execute(
+            """SELECT o.request_json FROM bank_import_operations o
+               JOIN bank_reconciliation_items r ON r.id = o.reconciliation_id AND r.owner_key = o.owner_key
+               WHERE o.owner_key = ? AND r.bank_transaction_id != ? AND o.kind = 'schedule_adjustment'
+                 AND o.status IN ('claimed', 'writing', 'needs_recovery')""",
+            (owner_key, bank_transaction_id),
+        ).fetchall()
+        for operation in pending:
+            reserved = json.loads(operation['request_json'])
+            if reserved.get('reserved_action_id') in wanted_ids:
+                return True
+            existing = reserved.get('reserved_sheet_refs', '').split(' + ')
+            if any(_sheet_reference_conflicts(wanted, ref, month, month) for wanted in wanted_refs for ref in existing):
                 return True
         return False
 

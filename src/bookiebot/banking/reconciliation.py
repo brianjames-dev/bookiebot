@@ -365,7 +365,7 @@ def find_scheduled_pull_candidates(
         candidate_amount = pull.amount if pull.amount > 0 else abs(transaction.amount)
         amount_delta = abs(candidate_amount - abs(transaction.amount))
         amount_tolerance = _candidate_amount_tolerance(abs(transaction.amount), name_score)
-        if amount_delta > amount_tolerance:
+        if amount_delta > amount_tolerance and name_score < 0.5:
             continue
         exact_or_wildcard_amount = pull.amount <= 0 or amount_delta <= 0.01
         if pull.amount <= 0 and name_score < 0.5:
