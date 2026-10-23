@@ -4,6 +4,12 @@ Last updated: 2026-10-23
 
 ## Goal
 
+### Existing-Item reconnect and explicit alerts — 2026-10-23
+
+Implementation complete locally at the user's request: signed owner/Item-scoped repair links use Plaid Hosted Link update mode for Discord/iOS browser OAuth, without token exchange, account/product expansion, duplicate Items or cursor resets. Completion checks the original connection with an actual transaction sync before clearing errors. Phone has named Reconnect links and stale-data feedback; failed Check retains known saved state. `/bank_reconnect` returns a private fresh 15-minute link. Daily health alerts are independent of cached review counts and use a separate post-delivery event, so recovery can still produce a normal digest that morning. Default/example send hour is 10 AM Pacific; the explicit production override must change with release. ITEM ERROR is retained as sync health; LOGIN_REPAIRED requires successful sync. Errors received before a newer successful repair cannot regress the warning state. No new storage schema or sheet mutation paths.
+
+Provider/HTTP/storage/Discord/frontend regressions cover existing identity/cursor/history/watch preservation, owner/disconnection guards, failed repair, pending replacement, health isolation, empty inbox, safe links, DM failure and same-day digest recovery. Full local **2,355 passed / 384 optional skipped** including the final delayed-webhook follow-up; frontend types/contract/build and Pyright pass. Release/CI, Railway override, actual BofA reauthentication and native sync/digest acceptance remain first On Deck in STATUS. The investigation below is the pre-repair evidence; no live bank or financial writes during implementation.
+
 ### Plaid sync outage investigation — 2026-10-23
 
 Read-only production audit confirmed Brian's existing Bank of America Item fails `/accounts/get` with `ITEM_LOGIN_REQUIRED`. PostgreSQL last success is `2026-10-15T14:00:45.389214+00:00` (7:00:45 AM Pacific); last attempted sync is `2026-10-23T14:59:13.224480+00:00`. The live Discord saved inbox still serves 53 current-month records: 25 automatic matches, nine confirmed/logged, twelve ignored and seven pending, with zero unresolved. This is cached history, not evidence of current bank activity. Today's 10 AM subscription DM is present; actual reconciliation configuration is 7 AM with 60-second checks and the default one-hour morning window.

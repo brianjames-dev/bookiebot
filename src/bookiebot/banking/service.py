@@ -25,7 +25,7 @@ from bookiebot.banking.models import (
     ReconciliationReportMatch,
     SyncResult,
 )
-from bookiebot.banking.plaid_client import PlaidClient
+from bookiebot.banking.plaid_client import PlaidClient, requires_bank_reconnect
 from bookiebot.banking.reconciliation import (
     ActionLogCandidate,
     ActionLogCandidateGroup,
@@ -453,6 +453,29 @@ class BankingService:
     async def create_link_token(self, owner_key: str) -> str:
         return await self.plaid.create_link_token(owner_key=owner_key)
 
+    def connection_issues(self, owner_key: str) -> list[dict[str, Any]]:
+        return [{
+            'id': row['id'], 'institution': row['institution_name'] or 'Bank',
+            'checkedAt': row['last_success_at'],
+            'needsReconnect': requires_bank_reconnect(row['last_error']),
+        } for row in self.store.connection_sync_issues(owner_key)]
+
+    def _reconnect_item(self, owner_key: str, item_db_id: int) -> LinkedBankItem:
+        item = self.store.get_item(owner_key, item_db_id)
+        if item is None or item.status != 'active':
+            raise ValueError('This bank connection is no longer available for this person.')
+        return item
+
+    async def create_reconnect_link(self, owner_key: str, item_db_id: int, completion_redirect_uri: str) -> str:
+        item = self._reconnect_item(owner_key, item_db_id)
+        return await self.plaid.create_update_link(owner_key=owner_key,
+            access_token=self.store.get_access_token(item.id), completion_redirect_uri=completion_redirect_uri)
+
+    async def complete_reconnect(self, owner_key: str, item_db_id: int) -> SyncResult:
+        # Link's return URL is not evidence of recovery. Only a successful real
+        # sync clears the stored error, preserving the original cursor/history.
+        return await self.sync_item(self._reconnect_item(owner_key, item_db_id))
+
     async def link_public_token(
         self,
         owner_key: str,
@@ -570,6 +593,22 @@ class BankingService:
             try:
                 webhook_type = (event.webhook_type or "").upper()
                 webhook_code = (event.webhook_code or "").upper()
+                if webhook_type == 'ITEM' and webhook_code in {'ERROR', 'LOGIN_REPAIRED'}:
+                    item = self.store.get_item_by_provider_item_id(item_id or '')
+                    if item is None:
+                        raise RuntimeError('Unknown Plaid Item in connection notification')
+                    if item.status != 'active':
+                        skipped += 1
+                    elif webhook_code == 'ERROR':
+                        error = payload.get('error')
+                        code = str(error.get('error_code') or 'PLAID_ITEM_ERROR') if isinstance(error, dict) else 'PLAID_ITEM_ERROR'
+                        self.store.mark_sync_error(item.id, f'{code}: Bank connection reported an error.',
+                                                   observed_at=event.received_at)
+                    else:
+                        await asyncio.wait_for(self.sync_item(item), timeout=WEBHOOK_LEASE_SECONDS - 60)
+                    if self.store.mark_plaid_webhook_processed(event.id, item_id, claim_token=claim_token):
+                        processed += 1
+                    continue
                 if webhook_type != "TRANSACTIONS":
                     skipped += 1
                     self.store.mark_plaid_webhook_processed(event.id, item_id, claim_token=claim_token)

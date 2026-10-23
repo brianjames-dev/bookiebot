@@ -1,4 +1,5 @@
 import asyncio
+import logging
 import os
 os.environ.setdefault("DISCORD_AUDIO_DISABLE", "1")
 
@@ -22,7 +23,7 @@ from bookiebot.banking.formatting import (
 )
 from bookiebot.banking.plaid_client import PlaidApiError
 from bookiebot.banking.service import build_banking_service
-from bookiebot.core.bank_link import BankLinkTokenError, create_bank_link_setup_token
+from bookiebot.core.bank_link import BankLinkTokenError, create_bank_link_setup_token, bank_reconnect_url
 from bookiebot.core.bank_reconciliation import (
     bank_reconciliation_digest_view,
     prepare_bank_reconciliation_digest_messages,
@@ -308,6 +309,29 @@ def register_commands(tree: app_commands.CommandTree):
                 "After linking, run `/debug_bank_status` and `/debug_bank_sync`."
             )
         )
+
+    @tree.command(name='bank_reconnect', description='Get a private reconnect link for your existing bank connection')
+    async def bank_reconnect(interaction: discord.Interaction):
+        await interaction.response.defer(ephemeral=True)
+        try:
+            owner = get_user_config(interaction.user.id)
+            service = build_banking_service()
+            items = await asyncio.to_thread(service.linked_items, owner.budget_owner_key)
+            items = [item for item in items if item.status == 'active']
+            base_url = service.config.public_base_url or ''
+            if not base_url or not items:
+                await interaction.edit_original_response(content='No existing bank connection is available to reconnect.')
+                return
+            view = discord.ui.View(timeout=None)
+            for item in items[:5]:
+                view.add_item(discord.ui.Button(label=f'Reconnect {item.institution_name or "bank"}'[:80],
+                    url=bank_reconnect_url(str(interaction.user.id), owner.budget_owner_key, item.id, base_url)))
+            await interaction.edit_original_response(content=(
+                'Reconnect your existing bank below. Your transaction and review history stay in BookieBot. '
+                'These private links expire in 15 minutes; run `/bank_reconnect` again for a fresh link.'), view=view)
+        except Exception:
+            logging.getLogger(__name__).exception('Could not prepare bank reconnect')
+            await interaction.edit_original_response(content='Could not prepare your bank reconnect. Try again in a moment.')
 
     @tree.command(name="debug_bank_items", description="(Admin) List linked bank Items for your budget owner")
     async def debug_bank_items(interaction: discord.Interaction):

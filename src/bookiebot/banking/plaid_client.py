@@ -11,6 +11,10 @@ class PlaidApiError(RuntimeError):
     pass
 
 
+def requires_bank_reconnect(error: str | None) -> bool:
+    return bool(error and 'ITEM_LOGIN_REQUIRED' in error)
+
+
 class PlaidClient:
     def __init__(self, config: BankingConfig):
         self.config = config
@@ -53,6 +57,25 @@ class PlaidClient:
     async def exchange_public_token(self, public_token: str) -> tuple[str, str]:
         data = await self._post("/item/public_token/exchange", {"public_token": public_token})
         return str(data["access_token"]), str(data["item_id"])
+
+    async def create_update_link(
+        self, *, owner_key: str, access_token: str, completion_redirect_uri: str,
+    ) -> str:
+        # Hosted Link supports bank OAuth from Discord/iOS browsers without
+        # replacing the Item or requiring a separate app OAuth callback.
+        payload: dict[str, Any] = {
+            'client_name': 'BookieBot', 'country_codes': ['US'], 'language': 'en',
+            'user': {'client_user_id': owner_key}, 'access_token': access_token,
+            'hosted_link': {'completion_redirect_uri': completion_redirect_uri,
+                            'is_mobile_app': False, 'url_lifetime_seconds': 900},
+        }
+        if self.config.plaid_webhook_url:
+            payload['webhook'] = self.config.plaid_webhook_url
+        data = await self._post('/link/token/create', payload)
+        url = str(data.get('hosted_link_url') or '')
+        if not url.startswith('https://secure.plaid.com/'):
+            raise PlaidApiError('Plaid did not return a valid reconnect link')
+        return url
 
     async def get_accounts(self, access_token: str) -> list[dict[str, Any]]:
         data = await self._post("/accounts/get", {"access_token": access_token})

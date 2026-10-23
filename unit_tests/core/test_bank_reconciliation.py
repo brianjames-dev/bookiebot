@@ -543,7 +543,7 @@ async def test_claim_bank_reconciliation_prompt_allows_one_start(monkeypatch):
     assert await bank_reconciliation._claim_bank_reconciliation_prompt(interaction, "123") is False
 
 
-def test_prepare_bank_reconciliation_digest_uses_cached_items_when_sync_fails(monkeypatch):
+def test_prepare_bank_reconciliation_digest_reports_sync_failure_instead_of_stale_review(monkeypatch):
     transaction = BankTransaction(
         id=1,
         provider_transaction_id="txn-1",
@@ -580,7 +580,10 @@ def test_prepare_bank_reconciliation_digest_uses_cached_items_when_sync_fails(mo
     )
 
     class FakeService:
-        config = SimpleNamespace(configured=True)
+        config = SimpleNamespace(configured=True, public_base_url=None)
+
+        def connection_issues(self, _owner_key):
+            return []
 
         async def sync_owner(self, _owner_key):
             raise RuntimeError("Plaid unavailable")
@@ -616,9 +619,9 @@ def test_prepare_bank_reconciliation_digest_uses_cached_items_when_sync_fails(mo
     )
 
     assert output is not None
-    assert "bank reconciliation found `1` item" in output
-    assert "Bank sync warning: using cached bank data for this digest." in output
-    assert "Unlogged Coffee" in output
+    assert 'Bank sync failed' in output
+    assert 'Pending statuses may be out of date' in output
+    assert 'Unlogged Coffee' not in output
 
 
 @pytest.mark.asyncio

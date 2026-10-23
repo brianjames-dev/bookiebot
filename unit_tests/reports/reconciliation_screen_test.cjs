@@ -122,6 +122,20 @@ const snapshot = (items = rows, enabled = true) => ({ enabled, checkedAt: '2026-
   assert.ok(button('Try again')); assert.ok(button('Check').props.disabled)
   // Malformed payload does not replace a good snapshot; owner change disposes all reads/state.
   await run(() => controller.load()); await respond(snapshot())
+  // Reconnect is visible even with no actionable transactions, uses a same-origin
+  // signed link, and does not silently initiate a new bank connection.
+  await run(() => controller.load())
+  const issue = { id: 3, institution: 'Example Bank', needsReconnect: true, reconnectUrl: '/bank/link?token=signed.token' }
+  await respond({ ...snapshot([]), notice: 'Your bank needs reconnecting. Transactions may be out of date.', connections: [issue] })
+  assert.match(rendered(), /needs reconnecting/)
+  const reconnect = tree.root.findAllByType('a').find(node => text(node) === 'Reconnect Example Bank')
+  assert.equal(reconnect.props.href, '/bank/link?token=signed.token')
+  assert.equal(latest().options.method, 'GET', 'Showing a reconnect alert does not start Link')
+  await run(() => controller.load())
+  await respond({ ...snapshot([]), connections: [{ ...issue, reconnectUrl: 'https://untrusted.example/link' }] })
+  assert.match(rendered(), /Couldn’t read/)
+  await run(() => controller.load()); await respond(snapshot())
+  assert.equal(tree.root.findAllByType('a').length, 0, 'Successful recovery removes the reconnect link')
   await run(() => controller.load()); await respond({ ...snapshot(), items: [{ ...rows[0], amountCents: 1.25 }] })
   assert.match(rendered(), /Coffee/); assert.match(rendered(), /Couldn’t read/)
   await expand('Coffee'); const brianDetail = latest()

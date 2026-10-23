@@ -15,11 +15,13 @@ from bookiebot.banking.formatting import format_reconciliation_match_report_chun
 from bookiebot.banking.models import ReconciliationItem, ReconciliationPreview, ReconciliationReportMatch
 from bookiebot.banking.service import build_banking_service
 from bookiebot.core.bank_reconciliation_flow import send_next_bank_reconciliation_item
+from bookiebot.core.bank_link import bank_reconnect_url
 from bookiebot.sheets.routing import (
     APPLE_SHORTCUT_RELAY_USER_ID,
     get_discord_user_config,
     get_user_config,
     now_pacific,
+    PACIFIC_TZ,
 )
 from bookiebot.sheets.undo import has_system_event, record_system_event
 from bookiebot.ui.bank_reconciliation import (
@@ -45,6 +47,8 @@ class PreparedBankReconciliationDigest:
     owner_name: str = ""
     reviewed_items: tuple[ReconciliationItem, ...] = ()
     preview: ReconciliationPreview | None = None
+    event_type: str = 'bank_reconciliation_digest_sent'
+    reconnect_links: tuple[tuple[str, str], ...] = ()
 
 
 def _bank_reconciliation_enabled() -> bool:
@@ -65,11 +69,11 @@ def _check_interval_seconds() -> int:
 
 
 def _send_hour() -> int:
-    raw = os.getenv("BOOKIEBOT_BANK_RECONCILIATION_SEND_HOUR", "7").strip()
+    raw = os.getenv("BOOKIEBOT_BANK_RECONCILIATION_SEND_HOUR", "10").strip()
     try:
         return min(max(int(raw), 0), 23)
     except ValueError:
-        return 7
+        return 10
 
 
 def _send_window_minutes() -> int:
@@ -231,11 +235,17 @@ async def send_due_bank_reconciliation_digest(client: Any, today: date | None = 
         )
         if not digest:
             continue
+        if digest.event_type == 'bank_connection_alert_sent':
+            view = discord.ui.View(timeout=None)
+            for label, url in digest.reconnect_links[:5]:
+                view.add_item(discord.ui.Button(label=label[:80], url=url))
+        else:
+            view = bank_reconciliation_digest_view(actor_key)
         delivered = await _send_user_dm(
             client,
             actor_key,
             f"{digest.public_message}\n\u200b",
-            view=bank_reconciliation_digest_view(actor_key),
+            **({'view': view} if view.children else {}),
         )
         if not delivered:
             if fallback_channel is not None:
@@ -246,9 +256,9 @@ async def send_due_bank_reconciliation_digest(client: Any, today: date | None = 
         if not await asyncio.to_thread(
             record_system_event,
             actor_key,
-            "bank_reconciliation_digest_sent",
+            digest.event_type,
             {**_digest_metadata(current), "sent_after": "discord_dm_send"},
-            f"Bank reconciliation digest sent for {current.isoformat()}",
+            f"{'Bank connection alert' if digest.event_type == 'bank_connection_alert_sent' else 'Bank reconciliation digest'} sent for {current.isoformat()}",
         ):
             logger.warning(
                 "Bank reconciliation digest sent but system event was not recorded",
@@ -559,6 +569,31 @@ def prepare_bank_reconciliation_digest_messages(
                 "Bank sync failed before reconciliation digest; using cached data",
                 extra={"actor_key": actor_key, "error": sync_error},
             )
+
+    issues = service.connection_issues(owner.budget_owner_key)
+    if sync_error or issues:
+        event_type = 'bank_connection_alert_sent'
+        if not force and has_system_event(actor_key, event_type, metadata):
+            return None
+        reconnect = [issue for issue in issues if issue['needsReconnect']]
+        names = ', '.join(str(issue['institution'])[:100] for issue in reconnect)
+        text = (f'{mention} **Reconnect {names} to resume bank updates.**'
+                if reconnect else f'{mention} **Bank sync failed.**')
+        text += '\nTransactions and Pending statuses may be out of date. Saved review history is preserved.'
+        for issue in issues[:5]:
+            if issue['checkedAt']:
+                checked = datetime.fromisoformat(issue['checkedAt']).astimezone(PACIFIC_TZ)
+                text += f"\n{issue['institution']}: last successful sync {checked:%b %d, %I:%M %p} Pacific."
+        base_url = (service.config.public_base_url or '').rstrip('/')
+        links = tuple((f"Reconnect {issue['institution']}", bank_reconnect_url(
+            actor_key, owner.budget_owner_key, issue['id'], base_url)) for issue in reconnect) if base_url else ()
+        text += ('\nUse Reconnect below, open Reconcile in the app, or run `/bank_reconnect` for a fresh link. Links expire after 15 minutes.'
+                 if reconnect else '\nOpen Reconcile in the app and try Check again later.')
+        if mark_sent and not record_system_event(actor_key, event_type, metadata,
+                f'Bank connection alert sent for {current.isoformat()}'):
+            return None
+        return PreparedBankReconciliationDigest(public_message=text, detail_message=text,
+            owner_key=owner.budget_owner_key, event_type=event_type, reconnect_links=links)
 
     try:
         preview = service.reconciliation_preview(

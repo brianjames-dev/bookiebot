@@ -60,6 +60,25 @@ def _seed(store, owner="brian", suffix="1", amount=12.50):
     return item, transaction, review
 
 
+def test_connection_health_is_owner_scoped_and_retains_last_success_until_real_recovery(contract_store):
+    store = contract_store
+    item, _, _ = _seed(store)
+    store.mark_sync_success(item.id, 'cursor')
+    success = store.review_sync_status('brian')['checkedAt']
+    store.mark_sync_error(item.id, 'ITEM_LOGIN_REQUIRED')
+    issues = store.connection_sync_issues('brian')
+    assert len(issues) == 1 and issues[0]['id'] == item.id
+    assert issues[0]['last_success_at'] == success
+    assert issues[0]['last_error'] == 'ITEM_LOGIN_REQUIRED'
+    assert store.connection_sync_issues('hannah') == []
+    assert not any('token' in key for key in issues[0])
+    store.mark_sync_success(item.id, 'next-cursor')
+    assert store.connection_sync_issues('brian') == []
+    store.mark_sync_error(item.id, 'ITEM_LOGIN_REQUIRED', observed_at='2020-01-01T00:00:00+00:00')
+    assert store.connection_sync_issues('brian') == []
+    assert store.get_cursor(item.id) == 'next-cursor'
+
+
 def _claim(store, review, *, owner="brian", operation_id=None):
     return store.claim_reconciliation_import(owner, review.id, operation_id=operation_id or uuid.uuid4().hex,
         actor_key="discord-actor", kind="expense", request={"bank_amount": review.transaction.amount, "bank_date": review.transaction.date})
