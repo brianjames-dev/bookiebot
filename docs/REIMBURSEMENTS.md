@@ -32,6 +32,14 @@ After matching, **Review Hannah’s share** offers a separate receipt review. Yo
 
 Matching does not record a repayment. The payer budget retains the full cash payment until a receipt is confirmed in Shared. Already received money and the reduced budget cell stay unchanged when the full bill matches the bank. Reverse confirmed repayments or resolve pending payment reports in Shared before correcting the full bill amount. If a saved correction is still syncing, refresh Shared, then use **Verify saved payment change** in Reconcile; that verification never repeats the financial writer.
 
+## Received-share review in Discord reconciliation
+
+The **10 AM Pacific** reconciliation digest and private **View Inbox** offer **Review shared repayments**. Choose an outstanding share linked to a saved automatic or manual bank match, or select **Review Hannah’s share** after matching a shared payment. The list covers the latest 200 watched current-month bank transactions, paginated 25 choices at a time; other shared expenses remain in the app’s Shared view. Links require exact saved source/month/gross evidence, never a guessed merchant or equal amount alone.
+
+Review the full bank payment, partner share, already received, separately cleared amount and balance still owed. **Mark Hannah’s share received** opens the actual amount/date/note form; submitting that form only opens another review. **Confirm received record** is the separate action that saves the receipt. Partial amounts are supported, dates use Pacific today by default, and Cancel records nothing. Matching remains independent of repayment.
+
+If Hannah has already reported a payment, select that reported payment and confirm its amount/date separately; no additional receipt is created. Settled/cleared shares cannot receive another payment, and saved sheet updates must finish first. **Refresh saved sheet updates** replays saved projections only. Changed bank links, balances, reports or ownership require a fresh review. If a response is uncertain, **Retry this record** reuses the exact durable command; do not start a second receipt. Receipts retain the same canonical history, budget projection and bank-match identity as the web flow. The morning digest’s schedule and delivery audit are unchanged.
+
 ## Editing a split in Discord
 
 Select the expense in recent transactions to use **Update**, **Move**, **Split**, **Delete**, or **Cancel**. Update changes the original purchase amount, location, item or payer account where those fields exist. Amount changes recalculate both shares using the existing split method. Payer account changes stay within the original payer's accounts. Fixed bill payments retain amount-only editing and cannot move or delete a budget row.

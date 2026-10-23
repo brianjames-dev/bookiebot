@@ -15,6 +15,7 @@ from bookiebot.banking.formatting import format_reconciliation_match_report_chun
 from bookiebot.banking.models import ReconciliationItem, ReconciliationPreview, ReconciliationReportMatch
 from bookiebot.banking.service import build_banking_service, refresh_reconciliation_review
 from bookiebot.core.bank_reconciliation_flow import send_next_bank_reconciliation_item
+from bookiebot.core.bank_reconciliation_receipts import send_bank_receipt_inbox
 from bookiebot.core.bank_link import bank_reconnect_url
 from bookiebot.sheets.routing import (
     APPLE_SHORTCUT_RELAY_USER_ID,
@@ -420,6 +421,9 @@ async def _send_bank_reconciliation_inbox(interaction: Any, actor_key: str) -> N
             if action == "start":
                 await _start_bank_reconciliation_from_prompt(action_interaction, actor_key, clear_prompt=False)
                 return
+            if action == "receipts":
+                await send_bank_receipt_inbox(action_interaction, owner=digest.owner_key, actor=actor_key)
+                return
             if action == "ignore_all":
                 service = build_banking_service()
                 ignored_count = 0
@@ -511,6 +515,8 @@ def bank_reconciliation_digest_view(actor_key: str) -> BankReconciliationDigestV
                 await _send_bank_reconciliation_inbox(interaction, actor_key)
             if action == 'resync':
                 await _resync_bank_information(interaction, actor_key)
+            if action == 'receipts':
+                await send_bank_receipt_inbox(interaction, owner=get_user_config(actor_key).budget_owner_key, actor=actor_key)
 
     return BankReconciliationDigestView(handle_action, actor_key=str(actor_key))
 
@@ -533,6 +539,8 @@ def persistent_bank_reconciliation_digest_view(actor_key: str) -> BankReconcilia
                 await _send_bank_reconciliation_inbox(interaction, actor_key)
             if action == 'resync':
                 await _resync_bank_information(interaction, actor_key)
+            if action == 'receipts':
+                await send_bank_receipt_inbox(interaction, owner=get_user_config(actor_key).budget_owner_key, actor=actor_key)
 
     return BankReconciliationDigestView(handle_action, actor_key=str(actor_key))
 
@@ -845,6 +853,7 @@ def format_bank_reconciliation_public_prompt(
         ]
     if sync_error:
         lines.append("Bank sync warning: using cached bank data.")
+    lines.append("Use `Review shared repayments` to separately confirm money received. Bank matching never records repayment.")
     return "\n".join(lines)
 
 

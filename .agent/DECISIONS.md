@@ -1,5 +1,11 @@
 # Agent Decisions
 
+## 2026-10-23 - Reuse Canonical Receipts In Discord Reconciliation
+
+The persistent morning digest, private inbox and successful manual matches expose a separate shared-repayment review. Resolve saved automatic/manual matches with the same exact bank-to-allocation evidence as the web; list the latest 200 watched current-month transactions and paginate choices by 25 without syncing the bank or replaying projections on entry. Reuse one allocation snapshot for the list. Never infer repayment from matching.
+
+Show gross, partner share, actual receipts, cleared amount and remaining balance. A modal collects actual partial amount/date/note, then a separate Confirm received record invokes the existing canonical command. Existing pending sender reports use confirm_payment with their saved event/date/amount rather than a duplicate receive. Require trusted Discord actor/owner, unchanged bank/allocation/pending reports, completed projections and existing settlement/reset guards. Freeze the reviewed command and request ID; lock repeated clicks, distinguish failed preflight from unknown submission, and retain same-ID retry even if the bank state changes after a committed receipt. Cancel cannot claim nothing was recorded while submission is uncertain. Existing ledger events and sheet projection provide the audit and recovery; no schema, bank mutation or delivery-schedule change.
+
 ## 2026-10-23 - Keep Matched-Bank Review And Shared Receipts Separate
 
 Expose a read-only shortcut from a posted saved bank match to exactly one canonical cash-v1 allocation owned by the payee, with matching gross and stable source action/month or physical row/column/month evidence. Schedule-only bill links additionally resolve the exact schedule source and occurrence. Never guess by merchant or amount alone; missing, changed, opposite-payer, historical, inactive or ambiguous evidence offers no receipt action. An unavailable optional shortcut cannot invalidate a successful bank match.

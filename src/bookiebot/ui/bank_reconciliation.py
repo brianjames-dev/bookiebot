@@ -29,9 +29,11 @@ class BankReconciliationMatchSelect(SelectBase):  # type: ignore[misc]
         self,
         options_with_actions: list[tuple[SelectOption, str]],
         callback_func: Callable,
+        *,
+        placeholder: str = "Select a match",
     ):
         super().__init__(
-            placeholder="Select a match",
+            placeholder=placeholder,
             options=[option for option, _action in options_with_actions],
         )
         self.actions_by_value = {
@@ -144,6 +146,8 @@ class BankReconciliationDigestView(ViewBase):  # type: ignore[misc]
         )
         self.add_item(BankReconciliationButton("Resync bank", "resync", callback_func,
             custom_id=f"bank_reconcile:resync:{actor_key}"))
+        self.add_item(BankReconciliationButton("Review shared repayments", "receipts", callback_func,
+            custom_id=f"bank_reconcile:receipts:{actor_key}"))
 
 
 class BankReconciliationInboxView(ViewBase):  # type: ignore[misc]
@@ -155,6 +159,7 @@ class BankReconciliationInboxView(ViewBase):  # type: ignore[misc]
         matches: list[ReconciliationReportMatch] | None = None,
     ):
         super().__init__(timeout=600)
+        self.add_item(BankReconciliationButton("Review shared repayments", "receipts", callback_func))
         if has_unresolved:
             self.add_item(BankReconciliationButton("Reconcile Now", "start", callback_func))
             self.add_item(BankReconciliationButton("Ignore All", "ignore_all", callback_func))
