@@ -295,10 +295,13 @@ def command(service: BankingService, owner: str, actor: str, body: dict) -> dict
         if operation == 'update_schedule':
             fingerprint = body.get('scheduleVersion')
             update_future = body.get('updateFuture', False)
+            split_method = body.get('splitMethod', 'income')
             if not isinstance(fingerprint, str) or len(fingerprint) != 64 or type(update_future) is not bool:
                 raise ReviewValidation('Review this scheduled payment before confirming.')
+            if not isinstance(split_method, str) or split_method not in {'income', 'equal', 'none'}:
+                raise ReviewValidation('Choose By income, 50/50, or No split.')
             result = apply_schedule_change(service, owner, actor, item, candidate, fingerprint,
-                                           update_future=update_future)
+                                           update_future=update_future, split_method=split_method)
             _invalidate_review_actions(service, owner, actor)
             clear_schedule_source_cache(actor)
             if result.status != 'completed':
@@ -342,7 +345,8 @@ def command(service: BankingService, owner: str, actor: str, body: dict) -> dict
 def schedule_preview(service: BankingService, owner: str, actor: str, review_id: int, query):
     expected, suggestion_id = query.get('version'), query.get('suggestionId')
     future = query.get('future', '0')
-    if not isinstance(expected, str) or len(expected) != 64 or not isinstance(suggestion_id, str) or len(suggestion_id) > 500 or future not in {'0', '1'}:
+    split_method = query.get('splitMethod', 'income')
+    if not isinstance(expected, str) or len(expected) != 64 or not isinstance(suggestion_id, str) or len(suggestion_id) > 500 or future not in {'0', '1'} or split_method not in {'income', 'equal', 'none'}:
         raise ReviewValidation('Choose a scheduled payment first.')
     clear_schedule_source_cache(actor)
     row, candidates, _, item = detail(service, owner, actor, review_id, fresh=True)
@@ -351,7 +355,7 @@ def schedule_preview(service: BankingService, owner: str, actor: str, review_id:
     candidate = next((entry for entry in candidates if entry.action_id == suggestion_id), None)
     if candidate is None:
         raise ReviewConflict('This scheduled payment is no longer available.')
-    plan = prepare_schedule_change(owner, actor, item, candidate, update_future=future == '1')
+    plan = prepare_schedule_change(owner, actor, item, candidate, update_future=future == '1', split_method=split_method)
     return {'change': {**public_schedule_change(plan), 'version': row['version']}}
 
 

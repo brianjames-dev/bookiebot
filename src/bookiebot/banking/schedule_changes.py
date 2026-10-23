@@ -1,13 +1,14 @@
 """Reviewed bank-to-schedule changes, claimed once before any sheet write."""
 from __future__ import annotations
 
-from dataclasses import asdict
+from dataclasses import asdict, replace
+from datetime import date
 import hashlib
 import json
 import logging
 import math
 import re
-from typing import Any
+from typing import Any, cast
 from uuid import uuid4
 
 from gspread.exceptions import WorksheetNotFound
@@ -19,8 +20,11 @@ from bookiebot.sheets.auth import get_existing_personal_worksheet
 from bookiebot.sheets.bills import list_bill_schedules
 from bookiebot.sheets.routing import get_user_config, now_pacific, sheet_user_context
 from bookiebot.sheets.subscriptions import parse_visible_subscription_schedules
+from bookiebot.reimbursements import service as reimbursements
+from bookiebot.reimbursements.store import build_reimbursement_store
+from bookiebot.sheets.collaboration import SplitMethod, split_amounts, split_method_label, partner_owner_key
 from bookiebot.sheets.undo import (
-    UndoAction, read_active_logged_actions, read_logged_action_history,
+    UndoAction, active_logged_action_by_id, read_active_logged_actions, read_logged_action_history,
     record_undo_action, update_recent_action,
 )
 
@@ -60,7 +64,8 @@ def _eligible(owner: str, actor: str, item: ReconciliationItem):
 
 
 def prepare_schedule_change(owner: str, actor: str, item: ReconciliationItem,
-                            candidate: ActionLogCandidate, *, update_future: bool = False) -> dict[str, Any]:
+                            candidate: ActionLogCandidate, *, update_future: bool = False,
+                            split_method: str = 'income') -> dict[str, Any]:
     """Read exact source/mirror/payment cells. No provisioning or writes."""
     _eligible(owner, actor, item)
     if candidate.action_type != 'schedule':
@@ -75,6 +80,10 @@ def prepare_schedule_change(owner: str, actor: str, item: ReconciliationItem,
     payment = None
     schedule_amount = None
     future_amount = None
+    sharing = None
+    allocation = None
+    if split_method not in {'income', 'equal', 'none'}:
+        raise ScheduleChangeConflict('Choose By income, 50/50, or No split.')
     with sheet_user_context(actor):
         sheets = {}
         def read(title):
@@ -194,10 +203,58 @@ def prepare_schedule_change(owner: str, actor: str, item: ReconciliationItem,
                 if len(actions) > 1 or (actions and (actions[0].action.row != pr or pc + 1 not in actions[0].action.columns
                         or normalized(actions[0].action.metadata.get('category', '')) != normalized(bill.source_label))):
                     raise ScheduleChangeConflict('The recorded payment history no longer matches this bill row.')
-                payment = dict(row=pr, col=pc + 1, category=bill.source_label,
+                payment = dict(row=pr, col=pc + 1, category=bill.bill_key,
                                actionId=actions[0].id if actions else None)
                 if actions:
                     contexts.append(asdict(actions[0].action))
+                # A monthly cell can already be net of confirmed repayments.
+                # Resolve the ledger independently of action-log availability;
+                # missing history must never turn a shared bill into a raw write.
+                ledger = build_reimbursement_store().snapshot(owner, include_inactive=True) if reimbursements.enabled() else None
+                norm = normalized(bill.source_label)
+                related = [value for value in (ledger or {}).get('allocations', [])
+                           if value['sourceWorksheet'] == 'income'
+                           and value['sourceYear'] == now_pacific().year
+                           and (value.get('sourceSheetTitle') == month or
+                                not value.get('sourceSheetTitle') and value['expenseDate'][:7] == today_month())
+                           and (normalized(value['category']) == norm or
+                                value['payerOwner'] == owner and value['sourceRow'] == pr)
+                           and value.get('lifecycle', 'active') != 'deleted']
+                if len(related) > 1 or (related and related[0]['payerOwner'] != owner):
+                    raise ScheduleChangeConflict('This bill has another shared payment. Review it in Shared before changing it.')
+                allocation = related[0] if related else None
+                supported = norm in {'rent', 'pge', 'recology', 'water'}
+                method = split_method if supported else 'none'
+                if allocation:
+                    assert ledger is not None
+                    if (allocation['accounting'] != 'cash_v1' or allocation.get('lifecycle', 'active') != 'active'
+                            or not actions or actions[0].id != allocation['sourceActionId']
+                            or normalized(allocation['category']) != norm
+                            or allocation['sourceRow'] != pr or allocation['sourceColumnMap'].get('amount') != pc + 1
+                            or allocation['sourceSpreadsheetId'] != read(month)[0].spreadsheet_id
+                            or allocation.get('sourceSheetTitle') != month):
+                        raise ScheduleChangeConflict('The shared bill history needs review before its amount can change.')
+                    method = allocation['method']
+                    gross_changed = allocation['grossCents'] != _money(target)
+                    events = [event for event in ledger['events'] if event['allocationId'] == allocation['id']]
+                    if gross_changed and (allocation.get('settledCents') or allocation.get('clearedCents')
+                            or allocation['version'] != allocation['projectedVersion']
+                            or any(event['status'] in {'pending', 'confirmed'} for event in events)):
+                        raise ScheduleChangeConflict('Resolve pending payments or reverse confirmed repayments in Shared before changing the full bill amount.')
+                    payer, partner = (split_amounts(float(target), method, owner) if gross_changed else
+                                      (allocation['payerShareCents'] / 100, allocation['partnerShareCents'] / 100))
+                    targets[-1]['value'] = f"{float(target) - allocation['settledCents'] / 100:.2f}"
+                else:
+                    if supported and not reimbursements.enabled():
+                        raise ScheduleChangeConflict('Shared bill accounting must be available before changing this payment.')
+                    payer, partner = split_amounts(float(target), cast(SplitMethod, method), owner) if method != 'none' else (float(target), 0)
+                sharing = dict(method=method, canChoose=supported and allocation is None,
+                               payer=owner.title(), partner=partner_owner_key(owner).title(),
+                               payerShareCents=round(payer * 100), partnerShareCents=round(partner * 100),
+                               settledCents=allocation['settledCents'] if allocation else 0,
+                               budgetAmountCents=_money(targets[-1]['value']),
+                               label=split_method_label(cast(SplitMethod, method)) if method != 'none' else 'No split')
+                sharing['oldGrossCents'] = allocation['grossCents'] if allocation else None
             if update_future or bill.tracking_mode == 'automatic':
                 headers = _headers(rows[0])
                 _unique_headers(headers)
@@ -212,16 +269,21 @@ def prepare_schedule_change(owner: str, actor: str, item: ReconciliationItem,
             raise ScheduleChangeConflict('The scheduled amount changed. Review it again.')
     # Include source identity, recurrence and payment lineage as well as raw target cells.
     bindings = [dict(sheet=title, workbook=ws.spreadsheet_id, worksheet=ws.id) for title, (ws, _, _) in sheets.items()]
-    fingerprint = hashlib.sha256(json.dumps([targets, checks, derived, contexts, payment, bindings, update_future], sort_keys=True).encode()).hexdigest()
+    fingerprint = hashlib.sha256(json.dumps([targets, checks, derived, contexts, payment, bindings, update_future, sharing, allocation], sort_keys=True).encode()).hexdigest()
     return dict(kind=kind, name=name, oldAmountCents=old_amount, newAmountCents=round(item.transaction.amount * 100),
                 description=description, canUpdateFuture=can_future, updateFuture=update_future,
                 scheduleAmountCents=schedule_amount, futureAmountCents=future_amount,
+                sharing=sharing, allocation=allocation,
                 fingerprint=fingerprint, targets=targets, checks=checks, derived=derived, bindings=bindings, payment=payment, sourceRef=source_ref,
                 scheduleRef=candidate.sheet_ref)
 
 
+def today_month():
+    return now_pacific().strftime('%Y-%m')
+
+
 def public_schedule_change(plan: dict[str, Any]) -> dict[str, Any]:
-    return {key: value for key, value in plan.items() if key not in {'targets', 'checks', 'derived', 'bindings', 'payment', 'sourceRef', 'scheduleRef'}}
+    return {key: value for key, value in plan.items() if key not in {'targets', 'checks', 'derived', 'bindings', 'payment', 'allocation', 'sourceRef', 'scheduleRef'}}
 
 
 def _verify_targets(request: dict, actor: str) -> None:
@@ -247,6 +309,35 @@ def _verify_targets(request: dict, actor: str) -> None:
                 raise ScheduleChangeConflict('The calculated bill amount did not follow its setting.')
 
 
+def _verify_sharing(plan: dict, action_id: str) -> None:
+    sharing = plan.get('sharing')
+    if not sharing or sharing['method'] == 'none':
+        return
+    store = build_reimbursement_store()
+    prior = plan.get('allocation')
+    value = store.get_allocation(prior['id']) if prior else store.find_by_source(action_id, now_pacific().year)
+    if not value or (value['sourceActionId'] != action_id or value['accounting'] != 'cash_v1'
+            or value.get('lifecycle', 'active') != 'active'
+            or value['grossCents'] != plan['newAmountCents']
+            or value['method'] != sharing['method']
+            or value['payerShareCents'] != sharing['payerShareCents']
+            or value['partnerShareCents'] != sharing['partnerShareCents']
+            or value['settledCents'] != sharing['settledCents']
+            or value['projectedVersion'] != value['version']):
+        raise ScheduleChangeConflict('The shared bill is saved but its split or sheet projection needs verification. Refresh Shared first.')
+    if prior:
+        changed = prior['grossCents'] != value['grossCents']
+        if value['version'] != prior['version'] + int(changed):
+            raise ScheduleChangeConflict('The shared bill changed after this review.')
+        if changed:
+            revision = value.get('sourceRevision', {})
+            before = revision.get('before', {})
+            if (revision.get('operation') != 'update' or revision.get('version') != value['version']
+                    or before.get('grossCents') != prior['grossCents']
+                    or before.get('sourceActionId') != prior['sourceActionId']):
+                raise ScheduleChangeConflict('The bill correction history needs review.')
+
+
 def recover_schedule_change(store, operation: BankImportOperation) -> BankImportResult:
     if operation.status == 'completed':
         item = store.get_reconciliation_item(operation.owner_key, operation.reconciliation_id)
@@ -264,8 +355,10 @@ def recover_schedule_change(store, operation: BankImportOperation) -> BankImport
             with sheet_user_context(operation.actor_key):
                 history = read_logged_action_history(operation.actor_key)
                 evidence = [entry for entry in history if entry.status == 'active'
+                            and entry.action.metadata.get('type') != 'split'
                             and entry.action.metadata.get('bank_import_operation_id') == operation.operation_id]
-                if len(evidence) != 1:
+                prior = request['plan'].get('allocation')
+                if not prior and len(evidence) != 1:
                     raise ScheduleChangeConflict('The payment action needs recovery.')
                 active = read_active_logged_actions(operation.actor_key)
                 found = [entry for entry in active if entry.action.worksheet == 'income' and entry.action.row == payment['row']
@@ -273,6 +366,9 @@ def recover_schedule_change(store, operation: BankImportOperation) -> BankImport
                 if len(found) != 1:
                     raise ScheduleChangeConflict('The current payment action needs recovery.')
                 action_id = found[0].id
+                if prior and action_id != prior['sourceActionId']:
+                    raise ScheduleChangeConflict('The shared bill source changed.')
+                _verify_sharing(request['plan'], action_id)
         ref = request['plan']['scheduleRef']
         if payment:
             ref += f" + income!row {payment['row']}#cols={payment['col']}#month={request['bank_date'][:7]}"
@@ -285,14 +381,15 @@ def recover_schedule_change(store, operation: BankImportOperation) -> BankImport
 
 
 def apply_schedule_change(service, owner: str, actor: str, item: ReconciliationItem,
-                          candidate: ActionLogCandidate, fingerprint: str, *, update_future: bool = False) -> BankImportResult:
+                          candidate: ActionLogCandidate, fingerprint: str, *, update_future: bool = False,
+                          split_method: str = 'income') -> BankImportResult:
     _eligible(owner, actor, item)
     existing = service.store.get_import_operation(owner, item.id)
     if existing:
         if existing.kind != 'schedule_adjustment':
             raise ScheduleChangeConflict('A sheet operation already owns this bank transaction.')
         return recover_schedule_change(service.store, existing)
-    plan = prepare_schedule_change(owner, actor, item, candidate, update_future=update_future)
+    plan = prepare_schedule_change(owner, actor, item, candidate, update_future=update_future, split_method=split_method)
     if plan['fingerprint'] != fingerprint:
         raise ScheduleChangeConflict('The scheduled payment changed. Review the new amount before confirming.')
     payment = plan['payment']
@@ -312,7 +409,7 @@ def apply_schedule_change(service, owner: str, actor: str, item: ReconciliationI
     writing = False
     try:
         # Validate once more after obtaining the cross-process source reservation.
-        current = prepare_schedule_change(owner, actor, item, candidate, update_future=update_future)
+        current = prepare_schedule_change(owner, actor, item, candidate, update_future=update_future, split_method=split_method)
         if current['fingerprint'] != fingerprint:
             raise ScheduleChangeConflict('The source changed before writing.')
         if not service.store.mark_import_writing(owner, operation.operation_id):
@@ -322,7 +419,24 @@ def apply_schedule_change(service, owner: str, actor: str, item: ReconciliationI
             metadata = dict(origin='bank_reconciliation', bank_reconciliation_id=str(item.id),
                             bank_import_operation_id=operation.operation_id)
             targets = list(plan['targets'])
-            if payment and payment['actionId']:
+            allocation, sharing = plan.get('allocation'), plan.get('sharing')
+            action_id = payment['actionId'] if payment else None
+            if allocation:
+                assert sharing is not None
+                # The ledger's version guard also rejects a concurrent receipt.
+                # Save exactly the reviewed gross and shares, then use the same
+                # recoverable projection as Discord/Shared; never raw-write net.
+                ledger = build_reimbursement_store()
+                if allocation['grossCents'] != plan['newAmountCents']:
+                    values = dict(allocation['sourceValues'], amount=f'{item.transaction.amount:.2f}')
+                    ledger.revise_allocation(owner, allocation['id'], allocation['version'], dict(
+                        grossCents=plan['newAmountCents'], payerShareCents=sharing['payerShareCents'],
+                        partnerShareCents=sharing['partnerShareCents'], sourceValues=values), operation='update')
+                    from bookiebot.reimbursements.projection import sync_pending
+                    if not sync_pending(ledger, allocation_ids={allocation['id']}):
+                        raise ScheduleChangeConflict('The bill correction is saved; refresh Shared to finish syncing.')
+                targets = [target for target in targets if target['sheet'] != now_pacific().strftime('%B')]
+            elif payment and payment['actionId']:
                 success, _ = update_recent_action(actor, action_id=payment['actionId'],
                     updates={'amount': f'{item.transaction.amount:.2f}'}, metadata_extra=metadata)
                 if not success:
@@ -347,6 +461,21 @@ def apply_schedule_change(service, owner: str, actor: str, item: ReconciliationI
                     description=f"{payment['category']} payment ${actual['value']}"))
                 if not action_id:
                     raise ScheduleChangeConflict('The payment audit record needs recovery.')
+            if payment and not allocation and sharing and sharing['method'] != 'none':
+                assert action_id is not None
+                logged = active_logged_action_by_id(actor, action_id)
+                if not logged:
+                    raise ScheduleChangeConflict('The payment source needs recovery before splitting.')
+                logged = replace(logged, action=replace(logged.action,
+                    metadata={**logged.action.metadata, 'category': payment['category']}))
+                ws = get_existing_personal_worksheet(now_pacific().strftime('%B'))
+                success, _ = reimbursements.record_split(actor, logged, ws, {'amount': payment['col']},
+                    {'amount': f'{item.transaction.amount:.2f}'}, get_user_config(actor).name,
+                    sharing['method'], item.transaction.amount,
+                    sharing['payerShareCents'] / 100, sharing['partnerShareCents'] / 100,
+                    expense_date=date.fromisoformat(str(request['bank_date'])))
+                if not success:
+                    raise ScheduleChangeConflict('The shared bill split needs recovery.')
         return recover_schedule_change(service.store, operation)
     except Exception:
         if not writing:

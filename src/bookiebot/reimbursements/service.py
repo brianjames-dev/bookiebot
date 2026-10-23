@@ -77,7 +77,8 @@ def command(owner: str, body: dict[str, Any]) -> dict[str, Any]:
 
 
 def record_split(user_key: str, logged: Any, ws: Any, fields: dict[str, int], values: dict[str, str],
-                 payer: str, method: str, gross: float, payer_share: float, partner_share: float) -> tuple[bool, str]:
+                 payer: str, method: str, gross: float, payer_share: float, partner_share: float,
+                 *, expense_date: date | None = None) -> tuple[bool, str]:
     """Create one durable allocation before any projection changes sheet values."""
     from bookiebot.sheets.collaboration import partner_owner_key
     from bookiebot.sheets.routing import get_shared_expenses_spreadsheet_id, get_budget_spreadsheet_id_for_user
@@ -95,7 +96,7 @@ def record_split(user_key: str, logged: Any, ws: Any, fields: dict[str, int], va
             raise ReimbursementValidationError("The source bill label could not be verified.")
         fields["item"], values["item"] = 2, label
     today = now_pacific().date()
-    spent_on = _expense_date(values.get("date", "")) or today
+    spent_on = expense_date or _expense_date(values.get("date", "")) or today
     year = today.year  # Recent actions belong to the active source workbook.
     identity = hashlib.sha256(f"{owner}:{year}:{logged.id}".encode()).hexdigest()[:24]
     store = build_reimbursement_store()

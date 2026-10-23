@@ -16,7 +16,7 @@ export interface ReconciliationItem {
 }
 interface ConnectionIssue { id: number; institution: string; needsReconnect: boolean; reconnectUrl?: string }
 interface Snapshot { enabled: boolean; checkedAt: string | null; items: ReconciliationItem[]; notice?: string; connections?: ConnectionIssue[] }
-type Command = { operation: "check" } | { operation: "confirm" | "update_match" | "update_schedule" | "recover_schedule" | "log" | "ignore" | "reopen"; id: number; version: string; suggestionId?: string; fields?: Record<string, string>; scheduleVersion?: string; updateFuture?: boolean }
+type Command = { operation: "check" } | { operation: "confirm" | "update_match" | "update_schedule" | "recover_schedule" | "log" | "ignore" | "reopen"; id: number; version: string; suggestionId?: string; fields?: Record<string, string>; scheduleVersion?: string; updateFuture?: boolean; splitMethod?: string }
 const endpoint = "/app/reconciliation"
 const isText = (value: unknown, max = 300): value is string => typeof value === "string" && value.length <= max
 const isDate = (value: unknown): value is string => isText(value) && Number.isFinite(Date.parse(value))
@@ -226,7 +226,7 @@ function ReviewChoices({ item, disabled, onCommand, onRefresh, onRejectAccess }:
     {suggestion.id === recommended?.id && <p className="bb-reconcile-eyebrow">Suggested match</p>}
     <button type="button" className="bb-reconcile-choice" aria-pressed={selectedId === suggestion.id} disabled={disabled} onClick={() => choose(suggestion)}>
       <span className="bb-reconcile-suggestion-title"><strong>{suggestion.item}</strong><span>{money(suggestion.amountCents)}</span></span>
-      <span className="bb-reconcile-muted">{suggestion.kind === "schedule" ? suggestion.recorded ? "Scheduled payment" : "Scheduled · not recorded in sheet" : item.amountCents < 0 ? "Logged income" : "Logged expense"} · {dateLabel(suggestion.date)}</span>
+      <span className="bb-reconcile-muted">{suggestion.kind === "schedule" ? suggestion.recorded ? "Scheduled payment" : "Scheduled · not recorded in sheet" : item.amountCents < 0 ? "Logged income" : suggestion.category === "Payment" ? "Logged bill payment · full amount" : "Logged expense"} · {dateLabel(suggestion.date)}</span>
       <span className="bb-reconcile-muted">{suggestion.amountCents === Math.abs(item.amountCents) ? "Amount matches bank" : `Sheet ${money(suggestion.amountCents)} → Bank ${money(item.amountCents)}`}{selectedId === suggestion.id ? " · Selected" : " · Choose this entry"}</span>
     </button>
   </div>
@@ -245,7 +245,7 @@ function ReviewChoices({ item, disabled, onCommand, onRefresh, onRejectAccess }:
         : reviewAmount ? <ScheduleAmountReview item={item} suggestion={selected} disabled={disabled} onCommand={onCommand} onCancel={() => setReviewAmount(false)} onRefresh={onRefresh} onRejectAccess={onRejectAccess} />
         : <button type="button" className="bb-reconcile-action bb-reconcile-primary" disabled={disabled} onClick={() => setReviewAmount(true)}>Review payment change</button>
       : selected.amountCents !== Math.abs(item.amountCents) ? reviewAmount ? <div className="bb-reconcile-confirm" role="group" aria-label="Review amount change">
-        <strong>Update {selected.item}?</strong><p>Change its sheet amount from {money(selected.amountCents)} to {money(item.amountCents)}, then match this bank transaction. Its other details stay the same.</p>
+        <strong>Update {selected.item}?</strong>{selected.category === "Payment" && <p>The bank amount is the full bill. Any existing split method is preserved and its shares are recalculated. Existing repayment safeguards still apply.</p>}<p>Change its {selected.category === "Payment" ? "full bill" : "sheet"} amount from {money(selected.amountCents)} to {money(item.amountCents)}, then match this bank transaction. Its other details stay the same.</p>
         <button type="button" className="bb-reconcile-action bb-reconcile-primary" disabled={disabled} onClick={() => send("update_match")}>Update amount &amp; match</button>
         <button type="button" className="bb-reconcile-action" disabled={disabled} onClick={() => setReviewAmount(false)}>Cancel amount change</button>
       </div> : <button type="button" className="bb-reconcile-action bb-reconcile-primary" disabled={disabled} onClick={() => setReviewAmount(true)}>Review amount change</button>
@@ -274,7 +274,12 @@ function ReviewChoices({ item, disabled, onCommand, onRefresh, onRejectAccess }:
     {editable && !item.suggestions.length && <p className="bb-reconcile-muted">No matching entry was found in your budget sheet.{item.logging?.allowed && " Adding it here records the bank amount and date in the sheet."}</p>}
   </div>
 }
+interface BillSharing {
+  method: string; label: string; canChoose: boolean; payer: string; partner: string
+  payerShareCents: number; partnerShareCents: number; budgetAmountCents: number; settledCents: number; oldGrossCents: number | null
+}
 interface ScheduleChange {
+  sharing?: BillSharing | null
   version: string; fingerprint: string; name: string; kind: "bill" | "subscription"
   oldAmountCents: number; newAmountCents: number; scheduleAmountCents?: number | null; futureAmountCents?: number | null; description: string; canUpdateFuture: boolean; updateFuture: boolean
 }
@@ -282,13 +287,14 @@ function ScheduleAmountReview({ item, suggestion, disabled, onCommand, onCancel,
   item: ReconciliationItem; suggestion: Suggestion; disabled: boolean; onCommand: (command: Command) => void; onCancel: () => void; onRefresh: () => void; onRejectAccess: (message: string) => void
 }) {
   const [future, setFuture] = useState(false)
+  const [splitMethod, setSplitMethod] = useState("income")
   const [plan, setPlan] = useState<ScheduleChange | null>(null)
   const [loading, setLoading] = useState(true), [error, setError] = useState("")
   useAppWorkStatus({ label: "Scheduled payment preview", pending: loading })
   useEffect(() => {
     const abort = new AbortController(); let active = true
     setLoading(true); setError("")
-    const query = `version=${encodeURIComponent(item.version)}&suggestionId=${encodeURIComponent(suggestion.id)}&future=${future ? "1" : "0"}`
+    const query = `version=${encodeURIComponent(item.version)}&suggestionId=${encodeURIComponent(suggestion.id)}&future=${future ? "1" : "0"}&splitMethod=${splitMethod}`
     void request(`${endpoint}/${item.id}/schedule?${query}`, abort).then(value => {
       const change = (value as { change?: ScheduleChange })?.change
       if (!change || !isText(change.version) || !isText(change.fingerprint) || change.fingerprint.length !== 64
@@ -296,6 +302,11 @@ function ScheduleAmountReview({ item, suggestion, disabled, onCommand, onCancel,
         || !isAmount(change.oldAmountCents) || !isAmount(change.newAmountCents) || change.newAmountCents !== Math.abs(item.amountCents)
         || (change.scheduleAmountCents !== undefined && change.scheduleAmountCents !== null && !isAmount(change.scheduleAmountCents))
         || (change.futureAmountCents !== undefined && change.futureAmountCents !== null && !isAmount(change.futureAmountCents))
+        || (change.sharing != null && (!["income", "equal", "fronted", "none"].includes(change.sharing.method)
+          || !isText(change.sharing.payer) || !isText(change.sharing.partner) || !isText(change.sharing.label)
+          || typeof change.sharing.canChoose !== "boolean"
+          || ![change.sharing.payerShareCents, change.sharing.partnerShareCents, change.sharing.budgetAmountCents, change.sharing.settledCents].every(isAmount)
+          || change.sharing.payerShareCents + change.sharing.partnerShareCents !== change.newAmountCents))
         || typeof change.canUpdateFuture !== "boolean" || change.updateFuture !== future) throw new Error("Couldn’t read the scheduled payment review.")
       if (active) setPlan(change)
     }).catch(failure => { if (active) {
@@ -304,18 +315,27 @@ function ScheduleAmountReview({ item, suggestion, disabled, onCommand, onCancel,
     } })
       .finally(() => { if (active) setLoading(false) })
     return () => { active = false; abort.abort() }
-  }, [item.id, item.version, suggestion.id, future, onRejectAccess])
+  }, [item.id, item.version, suggestion.id, future, splitMethod, onRejectAccess])
   return <div className="bb-reconcile-confirm" role="group" aria-label="Review scheduled payment change">
     <strong>Update {suggestion.item}?</strong>
     {loading && <p role="status">Preparing payment change…</p>}
     {error && <div role="alert"><p>{error}</p><button type="button" className="bb-reconcile-action" disabled={disabled} onClick={onRefresh}>Refresh suggestions</button></div>}
-    {plan && !error && <><p>Change {plan.name} from {money(plan.oldAmountCents)} to {money(plan.newAmountCents)}, then match this bank transaction.</p>
+    {plan && !error && <>{plan.sharing ? <>
+      <p>Full {plan.name} bill from the bank: <strong>{money(plan.newAmountCents)}</strong>.</p>
+      {plan.sharing.oldGrossCents != null && <p>Previously logged full bill: {money(plan.sharing.oldGrossCents)}.</p>}
+      {plan.sharing.canChoose ? <label className="bb-reconcile-split">Split this bill<select aria-label="Split this bill" value={splitMethod} disabled={disabled || loading} onChange={event => setSplitMethod(event.target.value)}>
+        <option value="income">By income</option><option value="equal">50/50</option><option value="none">No split</option>
+      </select></label> : <p>Keep existing split: {plan.sharing.label}.</p>}
+      <p>{plan.sharing.payer}’s share: <strong>{money(plan.sharing.payerShareCents)}</strong><br />{plan.sharing.partner}’s share: <strong>{money(plan.sharing.partnerShareCents)}</strong></p>
+      <p>Budget payment: {money(plan.oldAmountCents)} → {money(plan.sharing.budgetAmountCents)}. {plan.sharing.method !== "none" && (plan.sharing.settledCents ? `${money(plan.sharing.settledCents)} already received is preserved.` : `The full cash payment stays in your budget until ${plan.sharing.partner}’s repayment is confirmed in Shared.`)}</p>
+      <p>Matching this bank transaction does not mark a repayment received.</p>
+    </> : <p>Change {plan.name} from {money(plan.oldAmountCents)} to {money(plan.newAmountCents)}, then match this bank transaction.</p>}
       {typeof plan.scheduleAmountCents === "number" && plan.scheduleAmountCents !== plan.oldAmountCents && <p>The schedule currently uses {money(plan.scheduleAmountCents)}. Both the source and schedule will use {money(plan.newAmountCents)}.</p>}
       <p>{plan.description}</p>
-      {plan.updateFuture && <p>Future estimate: {typeof plan.futureAmountCents === "number" ? money(plan.futureAmountCents) : "Not set"} → {money(plan.newAmountCents)}</p>}
+      {plan.updateFuture && <p>Future full-bill estimate: {typeof plan.futureAmountCents === "number" ? money(plan.futureAmountCents) : "Not set"} → {money(plan.newAmountCents)}</p>}
       {plan.canUpdateFuture && <label className="bb-reconcile-future"><input type="checkbox" checked={future} disabled={disabled || loading} onChange={event => setFuture(event.target.checked)} />Also update the future bill estimate</label>}
       <button type="button" className="bb-reconcile-action bb-reconcile-primary" disabled={disabled || loading} onClick={() => onCommand({
-        operation: "update_schedule", id: item.id, version: plan.version, suggestionId: suggestion.id, scheduleVersion: plan.fingerprint, updateFuture: future,
+        operation: "update_schedule", id: item.id, version: plan.version, suggestionId: suggestion.id, scheduleVersion: plan.fingerprint, updateFuture: future, splitMethod,
       })}>Update scheduled payment &amp; match</button></>}
     <button type="button" className="bb-reconcile-action" disabled={disabled} onClick={onCancel}>Cancel payment change</button>
   </div>

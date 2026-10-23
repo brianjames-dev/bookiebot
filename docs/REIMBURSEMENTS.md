@@ -24,6 +24,12 @@ Received historical splits imported from the older model are read-only. Importin
 
 Before resetting, resolve pending sent-payment reports and let sheet updates finish. A stale preview is rejected if the shared ledger changes before confirmation. An unsupported outstanding historical allocation blocks the complete reset instead of silently leaving a balance behind. If a reset is saved while its sheet mirror is unavailable, the app shows a syncing notice; refresh safely retries it. Undo/redo waits for that mirror update to finish.
 
+## Shared bills in reconciliation
+
+A bank debit is the full bill, including Hannah’s portion. **Review payment change** shows that full amount, both shares and the amount that will remain in your budget. New Rent, PG&E, Recology and Water payments default to **By income**; you can review **50/50** or **No split** instead. Existing shared bills keep their split method. Changing the future full-bill estimate is a separate optional choice.
+
+Matching does not record a repayment. The payer budget retains the full cash payment until a receipt is confirmed in Shared. Already received money and the reduced budget cell stay unchanged when the full bill matches the bank. Reverse confirmed repayments or resolve pending payment reports in Shared before correcting the full bill amount. If a saved correction is still syncing, refresh Shared, then use **Verify saved payment change** in Reconcile; that verification never repeats the financial writer.
+
 ## Editing a split in Discord
 
 Select the expense in recent transactions to use **Update**, **Move**, **Split**, **Delete**, or **Cancel**. Update changes the original purchase amount, location, item or payer account where those fields exist. Amount changes recalculate both shares using the existing split method. Payer account changes stay within the original payer's accounts. Fixed bill payments retain amount-only editing and cannot move or delete a budget row.
