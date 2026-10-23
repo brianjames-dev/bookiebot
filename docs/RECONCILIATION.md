@@ -52,6 +52,8 @@ Recovery uses [Plaid Link update mode](https://plaid.com/docs/link/update-mode/)
 
 Release and real-bank acceptance:
 
+The October 23 release passed **2,739 CI tests with no skips**, including PostgreSQL, and is deployed with the production send hour set to **10**. The real existing-Item repair page reaches Bank of America sign-in. User authentication and the following live recovery/digest checks remain required.
+
 1. Complete the existing Item's bank reauthentication personally; retain saved review/import history and watched settings.
 2. Run **Reconcile → Check**. Verify `last_success_at` advances beyond October 15, `last_error` clears and newly available bank transactions appear. Confirm the app shows the new check time.
 3. Compare an actual posted transaction with its old pending authorization. Show only the posted replacement when the bank supplies the link/removal; do not create test purchases or assume all pending records should post.
