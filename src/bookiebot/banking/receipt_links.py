@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import calendar
 import re
+from typing import Any
 
 from bookiebot.reimbursements import service as reimbursements
 from bookiebot.sheets.auth import get_existing_personal_worksheet
@@ -10,14 +11,16 @@ from bookiebot.sheets.bills import list_bill_schedules
 from bookiebot.sheets.routing import sheet_user_context
 
 
-def matched_receipt_link(owner, actor, item):
+def matched_receipt_link(owner, actor, item, *, allocations: list[dict[str, Any]] | None = None):
     if (not reimbursements.enabled() or item is None or item.status not in {'matched', 'confirmed'}
             or item.transaction.pending or item.transaction.amount <= 0):
         return None
-    rows = reimbursements.snapshot(owner)['allocations']
+    rows = reimbursements.snapshot(owner)['allocations'] if allocations is None else allocations
     gross = round(item.transaction.amount * 100)
     eligible = [row for row in rows if row['payerOwner'] == owner and row['accounting'] == 'cash_v1'
                 and row.get('lifecycle', 'active') == 'active' and row['grossCents'] == gross]
+    if not eligible:
+        return None
     refs = [part.strip() for part in (item.matched_sheet_ref or '').split(' + ')]
     def source_month(row):
         month_name = row.get('sourceSheetTitle')

@@ -28,6 +28,8 @@ Normal morning reconciliation uses **10–11 AM Pacific**. A failed bank sync pr
 
 The session retains its original batch: **Reconciling item `2` of `4`** follows the first decision. Both numbers use inline code. Skipped items can be reviewed later, items resolved in the app stop counting as skipped, and newly queued transactions wait for a new session. A completion message describes that batch rather than claiming no new transactions exist.
 
+**Review shared repayments** opens a private choice of outstanding shares linked to saved bank matches, including automatic and manually confirmed matches. A successful shared match also offers **Review Hannah’s share** separately. Review the full bank amount and the remaining share, enter the amount actually received and its date, then explicitly **Confirm received record** in a separate review. Opening, entering details and Cancel record nothing. Pending sender reports are reviewed and confirmed once, rather than added as new receipts; partial receipts, stale controls and uncertain same-request retries use the existing Shared safeguards. See [Received-share review](REIMBURSEMENTS.md#received-share-review-in-discord-reconciliation). No receipt changes the bank match or its full amount.
+
 Discord's explicitly selected single/group amount corrections retain their existing behavior and validate the current bank/review state before changing Sheets. Normal forms and admin imports share one durable import operation; retries recover a recorded row or require inspection rather than writing another row. Pending, hidden, disconnected and changed transactions cannot be imported from an old form. An import in progress cannot be ignored/reopened by another review.
 
 ## Matching safeguards

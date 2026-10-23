@@ -469,6 +469,7 @@ async def test_bank_reconciliation_digest_view_is_persistent():
         "bank_reconcile:start:123",
         "bank_reconcile:inbox:123",
         "bank_reconcile:resync:123",
+        "bank_reconcile:receipts:123",
     ]
 
 
@@ -773,8 +774,9 @@ async def test_bank_reconciliation_inbox_shows_recent_auto_matches_without_actio
     assert "Confirmed matches this run:" in content
     assert "CREDIT CARD 3333 PAYMENT" in content
     children = getattr(kwargs["view"], "children", [])
-    assert len(children) == 1
-    assert getattr(children[0], "placeholder", "") == "Unmatch a confirmed transaction"
+    assert len(children) == 2
+    assert children[0].label == "Review shared repayments"
+    assert getattr(children[1], "placeholder", "") == "Unmatch a confirmed transaction"
 
 
 @pytest.mark.asyncio
@@ -850,7 +852,7 @@ async def test_inbox_optional_sheet_details_preserve_report_and_review_snapshot(
         assert "Sheet:  expense!N12:R12 (2026-05); details unavailable" in text
     assert "no spreadsheet row" not in text
     assert all(kwargs["ephemeral"] for _content, kwargs in interaction.followup.messages)
-    assert len(interaction.followup.messages[-1][1]["view"].children) == 1
+    assert len(interaction.followup.messages[-1][1]["view"].children) == 2
     if lookup == "service-failure":
         reader.assert_not_awaited()
     else:
@@ -919,7 +921,7 @@ async def test_bank_reconciliation_inbox_sends_all_chunks_as_private_followups(m
     assert [
         getattr(child, "label", None)
         for child in interaction.followup.messages[0][1]["view"].children
-    ] == ["Reconcile Now", "Ignore All"]
+    ] == ["Review shared repayments", "Reconcile Now", "Ignore All"]
     assert interaction.followup.messages[0][1]["ephemeral"] is True
     assert interaction.followup.messages[1] == ("second chunk", {"ephemeral": True})
 
@@ -992,7 +994,7 @@ async def test_digest_view_inbox_delivers_report_through_discord_webhook(
     state.store_view.assert_called_once()
     controls = state.store_view.call_args.args[0]
     assert [child.label for child in controls.children if hasattr(child, "label")] == (
-        ["Reconcile Now", "Ignore All"] if has_unresolved else []
+        ["Review shared repayments"] + (["Reconcile Now", "Ignore All"] if has_unresolved else [])
     )
     assert controls.children[-1].placeholder == "Unmatch a confirmed transaction"
     assert len(controls.children[-1].options) == match_count

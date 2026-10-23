@@ -11,6 +11,7 @@ from bookiebot.banking.formatting import (
     format_reconciliation_detail,
 )
 from bookiebot.banking.service import build_banking_service
+from bookiebot.core.bank_reconciliation_receipts import offer_bank_receipt_review
 from bookiebot.ui.bank_reconciliation import (
     BankExpenseFixedFieldsView,
     BankReconciliationDetailView,
@@ -214,6 +215,7 @@ async def send_bank_reconciliation_detail(
                     ),
                     ephemeral=True,
                 )
+                await offer_bank_receipt_review(action_interaction, owner=owner_key, actor=actor_key, item=matched_item)
                 await continue_session(action_interaction)
                 return
 
@@ -267,6 +269,7 @@ async def send_bank_reconciliation_detail(
                     ),
                     ephemeral=True,
                 )
+                await offer_bank_receipt_review(action_interaction, owner=owner_key, actor=actor_key, item=matched_item)
                 await continue_session(action_interaction)
                 return
 
@@ -302,6 +305,7 @@ async def send_bank_reconciliation_detail(
                         ),
                         ephemeral=True,
                     )
+                    await offer_bank_receipt_review(action_interaction, owner=owner_key, actor=actor_key, item=matched_item)
                     await continue_session(action_interaction)
                     return
                 matched_item, matched_candidate, status = await asyncio.to_thread(
@@ -336,6 +340,7 @@ async def send_bank_reconciliation_detail(
                     ),
                     ephemeral=True,
                 )
+                await offer_bank_receipt_review(action_interaction, owner=owner_key, actor=actor_key, item=matched_item)
                 await continue_session(action_interaction)
                 return
 
