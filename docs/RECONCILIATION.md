@@ -36,6 +36,24 @@ Discord's explicitly selected single/group amount corrections retain their exist
 - Confirmed, ignored and in-progress import records survive rescoring with their lineage intact. Hiding an account does not release an existing claim on a logged expense.
 - Both surfaces validate the reviewed bank/reconciliation version; phone confirmation also compares fresh candidate values. Database checks prevent two bank transactions from claiming the same expense. Review events retain the previous state for auditing.
 
+## If bank updates stop
+
+An available app or a working Discord DM does not prove that Plaid is receiving fresh bank data. Compare `bank_sync_state.last_success_at`, `last_sync_at` and `last_error` for the affected Item. The phone's **Checked** timestamp is the last successful application sync; **Check** requests a sync, while opening Reconcile or Discord **View Inbox** reads cached bank records. A successful sync itself does not guarantee that the bank has posted an authorization yet.
+
+The October 23, 2026 investigation found Brian's Bank of America connection requires reauthentication: Plaid returns `ITEM_LOGIN_REQUIRED` at `/accounts/get`, before transaction sync. Last success was **October 15 at 7:00:45 AM Pacific**; the October 23 morning attempts still failed. The saved current-month inbox contains 53 records, including seven pending authorizations and zero unresolved items. These authorizations cannot be assumed to remain pending at the bank while updates are blocked.
+
+Discord's 10 AM bill/subscription reminder continues to work. Production reconciliation has a separate `BOOKIEBOT_BANK_RECONCILIATION_SEND_HOUR=7`, a 60-second check interval and the default 60-minute window. A failed sync currently falls back to cached reconciliation; when there are no unresolved items or fresh automatic matches, it sends nothing. Phone feedback currently reports a generic delay/failure rather than a reconnect action. Item-error webhooks are stored but skipped by the transaction-only worker.
+
+Recovery requires [Plaid Link update mode](https://plaid.com/docs/link/update-mode/) for the **existing Item**, followed by the user's bank reauthentication. BookieBot currently implements only new-item Link; `/debug_bank_link` does not provide this repair flow. The queued repair must preserve existing Item/account IDs, watched settings, transaction cursor and reconciliation/import history, expose reconnect-required feedback in both surfaces even with an empty inbox, handle Item-error notifications and align reconciliation to the requested **10 AM Pacific** window. Do not purge history, reset the cursor or create a duplicate bank link to clear the error. The investigation did not change production state or establish which bank authentication requirement triggered the error.
+
+After the repair is implemented and released:
+
+1. Complete the existing Item's bank reauthentication personally; retain saved review/import history and watched settings.
+2. Run **Reconcile → Check**. Verify `last_success_at` advances beyond October 15, `last_error` clears and newly available bank transactions appear. Confirm the app shows the new check time.
+3. Compare an actual posted transaction with its old pending authorization. Show only the posted replacement when the bank supplies the link/removal; do not create test purchases or assume all pending records should post.
+4. Verify **View Inbox** reads the same saved decisions and dates. Observe the next normal **10–11 AM Pacific** reconciliation window for newly actionable items; preserve one successful digest per day and record delivery only after Discord succeeds. No review items is a valid quiet outcome only when sync health is clear.
+5. Use synthetic fixtures/Sandbox to verify reconnect-required feedback with zero unresolved items, Item-error webhooks, failed/canceled repair, owner isolation and retry without a second Item or financial write. These repair cases remain pending; the existing pending/posting and surface regression suite passed **163 tests**, with **76 optional PostgreSQL cases skipped** locally.
+
 ## Verification checklist
 
 Use synthetic fixtures or Plaid Sandbox for financial-action testing; do not create test purchases in a real budget.

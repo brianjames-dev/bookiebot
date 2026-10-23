@@ -4,6 +4,16 @@ Last updated: 2026-10-23
 
 ## Goal
 
+### Plaid sync outage investigation — 2026-10-23
+
+Read-only production audit confirmed Brian's existing Bank of America Item fails `/accounts/get` with `ITEM_LOGIN_REQUIRED`. PostgreSQL last success is `2026-10-15T14:00:45.389214+00:00` (7:00:45 AM Pacific); last attempted sync is `2026-10-23T14:59:13.224480+00:00`. The live Discord saved inbox still serves 53 current-month records: 25 automatic matches, nine confirmed/logged, twelve ignored and seven pending, with zero unresolved. This is cached history, not evidence of current bank activity. Today's 10 AM subscription DM is present; actual reconciliation configuration is 7 AM with 60-second checks and the default one-hour morning window.
+
+Application gaps: digest preparation swallows a sync failure into cached results and returns no message when there are no actionable/new matches; phone snapshot only says sync is delayed and Check uses a generic error; webhook processing skips non-TRANSACTIONS events, including Item errors; existing Link setup creates new Items and cannot repair this Item through update mode. Plaid explicitly requires user reauthentication through update mode for this error. No evidence establishes whether credentials, MFA, consent or another bank requirement caused it.
+
+Status: **investigation complete; recovery implementation and bank reauthentication pending**. Add an owner-scoped update-mode repair that preserves Item/account/cursor/review lineage; explicit reconnect-required phone/Discord feedback independent of inbox count; Item-error handling; and release reconciliation at the user's expected 10 AM Pacific. Do not disconnect/purge/relink or reset cursors as a workaround. Recovery acceptance is in `docs/RECONCILIATION.md` and this is first On Deck in STATUS. No runtime, production configuration, review or sheet changes were made.
+
+Verification: existing Plaid client, lifecycle recovery, storage contract, Discord digest and phone reconciliation tests **163 passed / 76 optional PostgreSQL skipped**. The pending-to-posted storage contract passes locally; production updates remain blocked, so end-to-end recovery is unverified. Public health and the existing live Discord View Inbox response passed. Initial localhost test-server binding restrictions were resolved by rerunning with localhost permission. No durable architecture decision was introduced by this investigation.
+
 ### Recorded ESPP withholding correction — 2026-10-23
 
 Implementation and authorized native sheet update complete on `codex/espp-actual-withholding`; review/release remains pending. First actual payroll establishes a gross-based deduction; the earlier net-pay inference understated ESPP. Reused the empty fourth income column, kept the monthly total automatic and targeted 20% of deposit + withholding with cash covering the remainder. Minimum cash remains 7.5% enrolled/10% other. Missing/invalid/orphaned amounts and inconsistent totals stay incomplete; explicit zero is valid. Income amount corrections/Delete/Undo preserve deduction lineage, legacy snapshots/Hannah retain their prior calculations, and estimates never increase actual investment history. No reconciliation lifecycle change.
