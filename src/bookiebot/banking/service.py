@@ -1066,10 +1066,11 @@ class BankingService:
                 window_days=14,
                 limit=25,
             )
-            return next(
-                (candidate for candidate in candidates if candidate.sheet_ref == item.matched_sheet_ref),
-                None,
-            )
+            selected = next((candidate for candidate in candidates if candidate.sheet_ref == item.matched_sheet_ref), None)
+            if selected is not None and item.status in {'confirmed', 'matched'}:
+                # A later recurring-price edit must not rewrite a saved payment's amount.
+                return replace(selected, amount=abs(item.transaction.amount))
+            return selected
         return None
 
     def confirm_reconciliation_schedule_match(

@@ -16,6 +16,9 @@ from aiohttp import web
 
 from bookiebot.banking.models import BankTransaction, ReconciliationItem
 from bookiebot.banking.plaid_client import PlaidApiError
+from bookiebot.banking.schedule_changes import (
+    ScheduleChangeConflict, prepare_schedule_change, public_schedule_change, apply_schedule_change, recover_schedule_change,
+)
 from bookiebot.core.bank_link import bank_reconnect_url
 from bookiebot.banking.reconciliation import (
     ActionLogCandidate, claimed_schedule_action_ids, find_action_log_candidates, find_scheduled_pull_candidates,
@@ -113,13 +116,20 @@ def _row(transaction: BankTransaction, item: ReconciliationItem | None) -> dict[
         "needsCheck": not transaction.pending and item is None,
         "readOnly": recovering,
         "matchLabel": (
-            "Import needs recovery in BookieBot" if recovering else
+            "Sheet change needs recovery in BookieBot" if recovering else
             "Matches logged entry" if item and item.matched_action_log_id else
             "Matches scheduled payment" if item and item.matched_sheet_ref else
             "Transfer or account payment" if item and item.classification == "transfer_or_payment" else None
         ),
         "matchedSuggestionId": item.matched_action_log_id if item else None,
     }
+
+
+def _recovery_controls(service: BankingService, owner: str, row: dict) -> dict:
+    if row['readOnly']:
+        operation = service.store.get_import_operation(owner, row['id'])
+        row['scheduleRecovery'] = bool(operation and operation.kind == 'schedule_adjustment')
+    return row
 
 
 def _records(service: BankingService, owner: str):
@@ -135,7 +145,7 @@ def snapshot(service: BankingService, owner: str) -> dict[str, Any]:
     sync = service.store.review_sync_status(owner)
     result: dict[str, Any] = {
         "enabled": True, "checkedAt": sync["checkedAt"],
-        "items": [_row(transaction, by_transaction.get(transaction.id)) for transaction in transactions],
+        "items": [_recovery_controls(service, owner, _row(transaction, by_transaction.get(transaction.id))) for transaction in transactions],
     }
     issues = service.connection_issues(owner)
     if issues:
@@ -177,7 +187,7 @@ def _suggestion(candidate: ActionLogCandidate, transaction: BankTransaction) -> 
 
 def detail(service: BankingService, owner: str, actor: str, review_id: int, *, fresh: bool = False):
     transaction, item = _find(service, owner, review_id)
-    row = _row(transaction, item)
+    row = _recovery_controls(service, owner, _row(transaction, item))
     candidates: list[ActionLogCandidate] = []
     if row["status"] in {"needs_review", "pending"} and not row["readOnly"]:
         actions = _review_actions(service, owner, actor, fresh=fresh)
@@ -220,13 +230,25 @@ def detail(service: BankingService, owner: str, actor: str, review_id: int, *, f
 
 def command(service: BankingService, owner: str, actor: str, body: dict) -> dict:
     operation = body.get("operation")
-    if not isinstance(operation, str) or operation not in {"confirm", "update_match", "log", "ignore", "reopen"}:
+    if not isinstance(operation, str) or operation not in {"confirm", "update_match", "update_schedule", "recover_schedule", "log", "ignore", "reopen"}:
         raise ReviewValidation("Invalid review action.")
     review_id = body.get("id")
     expected = body.get("version")
     if type(review_id) is not int or review_id <= 0 or not isinstance(expected, str) or len(expected) != 64:
         raise ReviewValidation("Check this transaction before reviewing it.")
     transaction, item = _find(service, owner, review_id)
+    if operation == 'recover_schedule':
+        if item is None or expected != _version(transaction, item) or item.status != 'import_requested':
+            raise ReviewConflict('This payment changed. Check status before verifying it.')
+        saved = service.store.get_import_operation(owner, item.id)
+        if saved is None or saved.kind != 'schedule_adjustment':
+            raise ReviewConflict('No scheduled payment change is awaiting verification.')
+        result = recover_schedule_change(service.store, saved)
+        _invalidate_review_actions(service, owner, actor)
+        clear_schedule_source_cache(actor)
+        if result.status != 'completed':
+            raise ReviewConflict('The saved amounts or payment history need inspection. No write was retried.')
+        return snapshot(service, owner)
     if item is None or transaction.pending or item.status == "import_requested":
         raise ReviewConflict("This transaction cannot be changed yet. Check again.")
     if operation != "reopen" and item.status in {"confirmed", "ignored"}:
@@ -259,7 +281,7 @@ def command(service: BankingService, owner: str, actor: str, body: dict) -> dict
             raise ReviewConflict('The entry needs review before another attempt. Check status; an entry may already exist.'
                 if result.status == 'needs_recovery' else result.message)
         return snapshot(service, owner)
-    if operation in {"confirm", "update_match"}:
+    if operation in {"confirm", "update_match", "update_schedule"}:
         # A bill/subscription may have been edited since the row was opened.
         # Explicit confirmation must compare current source evidence, not the
         # schedule cache used to keep ordinary browsing inexpensive.
@@ -270,6 +292,18 @@ def command(service: BankingService, owner: str, actor: str, body: dict) -> dict
         candidate = next((entry for entry in candidates if entry.action_id == body.get("suggestionId")), None)
         if candidate is None:
             raise ReviewConflict("That suggestion is no longer available. Check again.")
+        if operation == 'update_schedule':
+            fingerprint = body.get('scheduleVersion')
+            update_future = body.get('updateFuture', False)
+            if not isinstance(fingerprint, str) or len(fingerprint) != 64 or type(update_future) is not bool:
+                raise ReviewValidation('Review this scheduled payment before confirming.')
+            result = apply_schedule_change(service, owner, actor, item, candidate, fingerprint,
+                                           update_future=update_future)
+            _invalidate_review_actions(service, owner, actor)
+            clear_schedule_source_cache(actor)
+            if result.status != 'completed':
+                raise ReviewConflict(result.message)
+            return snapshot(service, owner)
         mismatch = round(candidate.amount * 100) != round(abs(transaction.amount) * 100)
         if not candidate.amount_recorded or (mismatch and operation != 'update_match'):
             raise ReviewConflict("Review the amount change before matching this entry.")
@@ -303,6 +337,22 @@ def command(service: BankingService, owner: str, actor: str, body: dict) -> dict
             raise ReviewConflict("That row is already linked or no longer eligible. Check status or choose another suggestion.")
         raise ReviewConflict("This transaction was already changed. Check again.")
     return snapshot(service, owner)
+
+
+def schedule_preview(service: BankingService, owner: str, actor: str, review_id: int, query):
+    expected, suggestion_id = query.get('version'), query.get('suggestionId')
+    future = query.get('future', '0')
+    if not isinstance(expected, str) or len(expected) != 64 or not isinstance(suggestion_id, str) or len(suggestion_id) > 500 or future not in {'0', '1'}:
+        raise ReviewValidation('Choose a scheduled payment first.')
+    clear_schedule_source_cache(actor)
+    row, candidates, _, item = detail(service, owner, actor, review_id, fresh=True)
+    if item is None or row['version'] != expected:
+        raise ReviewConflict('This payment changed. Refresh its suggestions before reviewing the amount.')
+    candidate = next((entry for entry in candidates if entry.action_id == suggestion_id), None)
+    if candidate is None:
+        raise ReviewConflict('This scheduled payment is no longer available.')
+    plan = prepare_schedule_change(owner, actor, item, candidate, update_future=future == '1')
+    return {'change': {**public_schedule_change(plan), 'version': row['version']}}
 
 
 async def _check(service: BankingService, owner: str, actor: str) -> None:
@@ -343,7 +393,7 @@ async def _review(request: web.Request) -> web.Response:
                 raise ReviewValidation("Invalid review request.")
             requested_operation = body.get('operation')
             operation = requested_operation if isinstance(requested_operation, str) and requested_operation in {
-                'check', 'confirm', 'update_match', 'log', 'ignore', 'reopen',
+                'check', 'confirm', 'update_match', 'update_schedule', 'recover_schedule', 'log', 'ignore', 'reopen',
             } else 'invalid'
             if body.get("operation") == "check":
                 task = _checks.get(session.owner_key)
@@ -370,9 +420,13 @@ async def _review(request: web.Request) -> web.Response:
                 review_id = int(request.match_info["review_id"])
             except ValueError as exc:
                 raise ReviewValidation("Invalid review request.") from exc
-            row, _, _, _ = await asyncio.to_thread(detail, service, session.owner_key, session.actor_key,
-                                                   review_id)
-            result = {"item": row}
+            if request.path.endswith('/schedule'):
+                operation = 'schedule_preview'
+                result = await asyncio.to_thread(schedule_preview, service, session.owner_key, session.actor_key,
+                                                 review_id, request.query)
+            else:
+                row, _, _, _ = await asyncio.to_thread(detail, service, session.owner_key, session.actor_key, review_id)
+                result = {"item": row}
         else:
             result = await asyncio.to_thread(snapshot, service, session.owner_key)
         current = await _session(request)
@@ -382,7 +436,7 @@ async def _review(request: web.Request) -> web.Response:
             if connection['needsReconnect']:
                 connection['reconnectUrl'] = bank_reconnect_url(session.actor_key, session.owner_key, connection['id'])
         return _json(result)
-    except ReviewConflict as exc:
+    except (ReviewConflict, ScheduleChangeConflict) as exc:
         return _json({"error": str(exc)}, status=409)
     except ReviewNotFound:
         return _json({"error": "This transaction is no longer available. Check again."}, status=404)
@@ -399,4 +453,5 @@ async def _review(request: web.Request) -> web.Response:
 def register_phone_reconciliation_routes(app: web.Application) -> None:
     app.router.add_get("/app/reconciliation", _review)
     app.router.add_get("/app/reconciliation/{review_id}", _review)
+    app.router.add_get("/app/reconciliation/{review_id}/schedule", _review)
     app.router.add_post("/app/reconciliation", _review)

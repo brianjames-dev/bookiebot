@@ -576,3 +576,76 @@ def test_failed_fresh_source_does_not_reenable_an_old_preview(client, monkeypatc
     with pytest.raises(RuntimeError):
         review._review_actions(client.service, 'brian', BRIAN)
     assert calls == [BRIAN, BRIAN]
+
+
+@pytest.mark.asyncio
+async def test_schedule_preview_is_read_only_and_confirmation_uses_its_version(client, monkeypatch):
+    from bookiebot.banking.models import BankImportResult
+    item = seed(client, amount=14)
+    connect(client)
+    candidate = ActionLogCandidate('schedule:subscription:cloud', 'Subscriptions!A3:C3#pull=2026-10-23',
+        'schedule', now_pacific().date(), 12.34, 'Cloud', .8, 'Scheduled', True)
+    monkeypatch.setattr(client.service, 'reconciliation_match_candidates', lambda *args, **kwargs: (item, [candidate], []))
+    row = await details(client, item.id)
+    calls = []
+    def prepare(owner, actor, reviewed, selected, **kwargs):
+        assert owner == 'brian' and actor == BRIAN and reviewed == item and selected == candidate
+        return dict(fingerprint='f' * 64, kind='subscription', name='Cloud', oldAmountCents=1234, newAmountCents=1400,
+            description='Update future subscription amounts', canUpdateFuture=False, updateFuture=False)
+    monkeypatch.setattr(review, 'prepare_schedule_change', prepare)
+    response = await client.http.get(f"/app/reconciliation/{item.id}/schedule", params={
+        'version': row['version'], 'suggestionId': candidate.action_id})
+    assert response.status == 200 and calls == []
+    plan = (await response.json())['change']
+    assert plan['version'] == row['version'] and plan['fingerprint'] == 'f' * 64
+    def apply(service, owner, actor, reviewed, selected, fingerprint, **kwargs):
+        calls.append(fingerprint)
+        assert reviewed == item and selected == candidate and not kwargs['update_future']
+        client.store.confirm_reconciliation_item(owner, item.id, matched_sheet_ref=candidate.sheet_ref, expected_item=item)
+        return BankImportResult('completed', 'Updated')
+    monkeypatch.setattr(review, 'apply_schedule_change', apply)
+    body = dict(operation='update_schedule', id=item.id, version=plan['version'], suggestionId=candidate.action_id,
+                scheduleVersion=plan['fingerprint'], updateFuture=False)
+    response = await client.http.post('/app/reconciliation', headers=HEADERS, json=body)
+    assert response.status == 200 and calls == ['f' * 64]
+    assert (await client.http.post('/app/reconciliation', headers=HEADERS, json=body)).status == 409
+
+
+@pytest.mark.asyncio
+async def test_schedule_preview_rejects_bad_stale_cross_owner_and_expired_requests(client):
+    item = seed(client)
+    connect(client)
+    row = await details(client, item.id)
+    base = f'/app/reconciliation/{item.id}/schedule'
+    assert (await client.http.get(base)).status == 400
+    assert (await client.http.get(base, params={'version': 'x' * 64, 'suggestionId': 'coffee'})).status == 409
+    connect(client, HANNAH, 'hannah')
+    seed(client, owner='hannah')
+    assert (await client.http.get(base, params={'version': row['version'], 'suggestionId': 'coffee'})).status == 404
+    client.access.revoke_owner('hannah')
+    assert (await client.http.get(base)).status == 401
+
+
+@pytest.mark.asyncio
+async def test_saved_schedule_change_can_be_verified_in_web_without_a_writer(client, monkeypatch):
+    from bookiebot.banking.models import BankImportResult
+    item = seed(client)
+    request = dict(bank_amount=item.transaction.amount, bank_date=item.transaction.date,
+        expected_status=item.status, expected_updated_at=item.transaction.updated_at,
+        expected_last_seen_at=item.last_seen_at)
+    op, claimed = client.store.claim_reconciliation_import('brian', item.id, actor_key=BRIAN,
+        operation_id='schedule-recovery', kind='schedule_adjustment', request=request)
+    assert op is not None and claimed
+    connect(client)
+    row = await details(client, item.id)
+    assert row['scheduleRecovery'] and row['readOnly']
+    calls = []
+    def recover(store, operation):
+        calls.append(operation.operation_id)
+        store.complete_reconciliation_import(operation, action_id=None, sheet_ref='Subscriptions!A3:C3#pull=2026-10-23')
+        return BankImportResult('completed', 'Verified')
+    monkeypatch.setattr(review, 'recover_schedule_change', recover)
+    response = await client.http.post('/app/reconciliation', headers=HEADERS, json={
+        'operation': 'recover_schedule', 'id': item.id, 'version': row['stateVersion']})
+    assert response.status == 200 and calls == ['schedule-recovery']
+    assert (await response.json())['items'][0]['status'] == 'checked'

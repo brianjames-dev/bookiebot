@@ -65,3 +65,6 @@
 .bb-reconcile-form-actions { display: flex; gap: 12px; align-items: center; }
 .bb-reconcile-form-actions .bb-reconcile-primary { width: auto; flex: 1; }
 .bb-reconcile button:focus-visible, .bb-reconcile summary:focus-visible { outline: 2px solid hsl(var(--primary)); outline-offset: 3px; }
+
+.bb-reconcile-future { display: flex; align-items: center; gap: 9px; min-height: 44px; margin: 12px 0; }
+.bb-reconcile-future input { width: 18px; height: 18px; accent-color: hsl(var(--primary)); flex-shrink: 0; }

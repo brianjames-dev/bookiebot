@@ -12,11 +12,11 @@ interface Suggestion {
 export interface ReconciliationItem {
   id: number; version: string; stateVersion?: string; loadedAt?: number; status: ReviewStatus; date: string; merchant: string
   amountCents: number; currency: "USD"; accountLabel: string; suggestions: Suggestion[]
-  logging?: { allowed: boolean; kind: "expense" | "income"; categories: string[]; paymentMethods: string[]; reason: string }; matchedSuggestionId?: string | null; needsCheck?: boolean; readOnly?: boolean; matchLabel?: string | null
+  logging?: { allowed: boolean; kind: "expense" | "income"; categories: string[]; paymentMethods: string[]; reason: string }; matchedSuggestionId?: string | null; needsCheck?: boolean; readOnly?: boolean; scheduleRecovery?: boolean; matchLabel?: string | null
 }
 interface ConnectionIssue { id: number; institution: string; needsReconnect: boolean; reconnectUrl?: string }
 interface Snapshot { enabled: boolean; checkedAt: string | null; items: ReconciliationItem[]; notice?: string; connections?: ConnectionIssue[] }
-type Command = { operation: "check" } | { operation: "confirm" | "update_match" | "log" | "ignore" | "reopen"; id: number; version: string; suggestionId?: string; fields?: Record<string, string> }
+type Command = { operation: "check" } | { operation: "confirm" | "update_match" | "update_schedule" | "recover_schedule" | "log" | "ignore" | "reopen"; id: number; version: string; suggestionId?: string; fields?: Record<string, string>; scheduleVersion?: string; updateFuture?: boolean }
 const endpoint = "/app/reconciliation"
 const isText = (value: unknown, max = 300): value is string => typeof value === "string" && value.length <= max
 const isDate = (value: unknown): value is string => isText(value) && Number.isFinite(Date.parse(value))
@@ -31,6 +31,7 @@ function validItem(value: unknown): value is ReconciliationItem {
     && ["needs_review", "pending", "checked", "ignored"].includes(item.status) && (item.date === "" || isDate(item.date))
     && isText(item.merchant, 500) && isAmount(item.amountCents) && item.currency === "USD" && isText(item.accountLabel)
     && (item.needsCheck === undefined || typeof item.needsCheck === "boolean")
+    && (item.scheduleRecovery === undefined || typeof item.scheduleRecovery === "boolean")
     && (item.readOnly === undefined || typeof item.readOnly === "boolean")
     && (item.matchLabel === undefined || item.matchLabel === null || isText(item.matchLabel))
     && Array.isArray(item.suggestions) && item.suggestions.length <= 25 && item.suggestions.every(suggestion =>
@@ -93,7 +94,7 @@ export function useReconciliation() {
     try {
       const next = checkedSnapshot(await request(endpoint, controller, body))
       if (!active()) return
-      if (blocked.current || (body && ["update_match", "log"].includes(body.operation))) window.dispatchEvent(new Event("bookiebot:transactions-changed"))
+      if (blocked.current || (body && ["update_match", "update_schedule", "recover_schedule", "log"].includes(body.operation))) window.dispatchEvent(new Event("bookiebot:transactions-changed"))
       setSnapshot(next); setRevision(value => value + 1); blocked.current = false; setNeedsRefresh(false)
     } catch (failure) {
       if (!active()) return
@@ -197,8 +198,10 @@ export function ReconciliationScreen({ controller }: { controller: Controller })
       {openId === item.id && detailError && <div className="bb-reconcile-message" role="alert"><p>{detailError}</p><button type="button" onClick={() => { setDetails({}); setDetailRetry(value => value + 1) }}>Try suggestions again</button></div>}
       {detail?.id === item.id && <>
         {detail.matchLabel && <p className="bb-reconcile-matched"><Check size={15} aria-hidden="true" />{detail.matchLabel}</p>}
-        {detail.readOnly && <p className="bb-reconcile-muted">Finish this transaction in BookieBot before checking again.</p>}
-        <ReviewChoices key={detail.version} item={detail} disabled={busy || needsRefresh || loadingDetail || Boolean(detailError)} onCommand={command => void load(command)} />
+        {detail.scheduleRecovery && <button type="button" className="bb-reconcile-action bb-reconcile-outline" disabled={busy || needsRefresh}
+          onClick={() => void load({ operation: "recover_schedule", id: detail.id, version: detail.stateVersion ?? detail.version })}>Verify saved payment change</button>}
+        {detail.readOnly && <p className="bb-reconcile-muted">{detail.scheduleRecovery ? "A sheet change may have finished. Verify the saved amounts without writing them again." : "Finish this transaction in BookieBot before checking again."}</p>}
+        <ReviewChoices key={detail.version} item={detail} disabled={busy || needsRefresh || loadingDetail || Boolean(detailError)} onCommand={command => void load(command)} onRejectAccess={rejectAccess} onRefresh={() => { setDetails({}); setDetailRetry(value => value + 1) }} />
         {(detail.needsCheck || detail.id < 0) && detail.status !== "pending" && !detail.readOnly && <button type="button" className="bb-reconcile-action" disabled={busy || needsRefresh} onClick={() => void load({ operation: "check" })}>Check for matches</button>}
         {detail.id > 0 && !detail.needsCheck && !detail.readOnly && detail.status !== "pending" && <button type="button" className="bb-reconcile-action bb-reconcile-secondary" disabled={busy || needsRefresh || loadingDetail || Boolean(detailError)}
           onClick={() => void load({ operation: detail.status === "needs_review" ? "ignore" : "reopen", id: detail.id, version: detail.stateVersion ?? detail.version })}>{detail.status === "needs_review" ? "Ignore transaction" : "Reopen review"}</button>}
@@ -206,7 +209,7 @@ export function ReconciliationScreen({ controller }: { controller: Controller })
     </TransactionRow> })}</div>
   </section>
 }
-function ReviewChoices({ item, disabled, onCommand }: { item: ReconciliationItem; disabled: boolean; onCommand: (command: Command) => void }) {
+function ReviewChoices({ item, disabled, onCommand, onRefresh, onRejectAccess }: { item: ReconciliationItem; disabled: boolean; onCommand: (command: Command) => void; onRefresh: () => void; onRejectAccess: (message: string) => void }) {
   const recommended = item.suggestions.find((_, index) => index === 0 && (item.suggestions[0].confidence ?? 1) >= .72)
   const [selectedId, setSelectedId] = useState(recommended?.id ?? "")
   const [reviewAmount, setReviewAmount] = useState(false)
@@ -237,9 +240,11 @@ function ReviewChoices({ item, disabled, onCommand }: { item: ReconciliationItem
     {others.length > 0 && <details className="bb-reconcile-alternatives"><summary>Other possible entries ({others.length})</summary>{others.map(card)}</details>}
     {item.status === "pending" && <p className="bb-reconcile-muted">{selected?.amountMismatch ? "Wait for the payment to post before changing the logged amount." : "Tentative match · review after the bank posts it."}</p>}
     {editable && selected && !logging && <div className="bb-reconcile-decision">
-      {!selected.recorded && selected.kind === "schedule" ? <p className="bb-reconcile-muted">This is a planned payment, with no recorded sheet amount. Add an entry below if this bank transaction has not been recorded.</p>
-      : selected.amountCents !== Math.abs(item.amountCents) ? selected.kind === "schedule" ? <p className="bb-reconcile-muted">This scheduled payment has a different recorded amount. Correct the bill or subscription entry before matching.</p>
-      : reviewAmount ? <div className="bb-reconcile-confirm" role="group" aria-label="Review amount change">
+      {selected.kind === "schedule" && (!selected.recorded || selected.amountCents !== Math.abs(item.amountCents)) ? item.logging?.allowed === false
+        ? <p className="bb-reconcile-muted">Scheduled payment changes are available for the current month.</p>
+        : reviewAmount ? <ScheduleAmountReview item={item} suggestion={selected} disabled={disabled} onCommand={onCommand} onCancel={() => setReviewAmount(false)} onRefresh={onRefresh} onRejectAccess={onRejectAccess} />
+        : <button type="button" className="bb-reconcile-action bb-reconcile-primary" disabled={disabled} onClick={() => setReviewAmount(true)}>Review payment change</button>
+      : selected.amountCents !== Math.abs(item.amountCents) ? reviewAmount ? <div className="bb-reconcile-confirm" role="group" aria-label="Review amount change">
         <strong>Update {selected.item}?</strong><p>Change its sheet amount from {money(selected.amountCents)} to {money(item.amountCents)}, then match this bank transaction. Its other details stay the same.</p>
         <button type="button" className="bb-reconcile-action bb-reconcile-primary" disabled={disabled} onClick={() => send("update_match")}>Update amount &amp; match</button>
         <button type="button" className="bb-reconcile-action" disabled={disabled} onClick={() => setReviewAmount(false)}>Cancel amount change</button>
@@ -267,6 +272,52 @@ function ReviewChoices({ item, disabled, onCommand }: { item: ReconciliationItem
     </>}
     {editable && item.logging && !item.logging.allowed && <p className="bb-reconcile-muted">{item.logging.reason}</p>}
     {editable && !item.suggestions.length && <p className="bb-reconcile-muted">No matching entry was found in your budget sheet.{item.logging?.allowed && " Adding it here records the bank amount and date in the sheet."}</p>}
+  </div>
+}
+interface ScheduleChange {
+  version: string; fingerprint: string; name: string; kind: "bill" | "subscription"
+  oldAmountCents: number; newAmountCents: number; scheduleAmountCents?: number | null; futureAmountCents?: number | null; description: string; canUpdateFuture: boolean; updateFuture: boolean
+}
+function ScheduleAmountReview({ item, suggestion, disabled, onCommand, onCancel, onRefresh, onRejectAccess }: {
+  item: ReconciliationItem; suggestion: Suggestion; disabled: boolean; onCommand: (command: Command) => void; onCancel: () => void; onRefresh: () => void; onRejectAccess: (message: string) => void
+}) {
+  const [future, setFuture] = useState(false)
+  const [plan, setPlan] = useState<ScheduleChange | null>(null)
+  const [loading, setLoading] = useState(true), [error, setError] = useState("")
+  useAppWorkStatus({ label: "Scheduled payment preview", pending: loading })
+  useEffect(() => {
+    const abort = new AbortController(); let active = true
+    setLoading(true); setError("")
+    const query = `version=${encodeURIComponent(item.version)}&suggestionId=${encodeURIComponent(suggestion.id)}&future=${future ? "1" : "0"}`
+    void request(`${endpoint}/${item.id}/schedule?${query}`, abort).then(value => {
+      const change = (value as { change?: ScheduleChange })?.change
+      if (!change || !isText(change.version) || !isText(change.fingerprint) || change.fingerprint.length !== 64
+        || !isText(change.name) || !isText(change.description, 500) || !["bill", "subscription"].includes(change.kind)
+        || !isAmount(change.oldAmountCents) || !isAmount(change.newAmountCents) || change.newAmountCents !== Math.abs(item.amountCents)
+        || (change.scheduleAmountCents !== undefined && change.scheduleAmountCents !== null && !isAmount(change.scheduleAmountCents))
+        || (change.futureAmountCents !== undefined && change.futureAmountCents !== null && !isAmount(change.futureAmountCents))
+        || typeof change.canUpdateFuture !== "boolean" || change.updateFuture !== future) throw new Error("Couldn’t read the scheduled payment review.")
+      if (active) setPlan(change)
+    }).catch(failure => { if (active) {
+      if (failure instanceof ReviewRequestError && [401, 403].includes(failure.status)) onRejectAccess(failure.message)
+      else setError(failure instanceof Error ? failure.message : "Couldn’t prepare the payment change.")
+    } })
+      .finally(() => { if (active) setLoading(false) })
+    return () => { active = false; abort.abort() }
+  }, [item.id, item.version, suggestion.id, future, onRejectAccess])
+  return <div className="bb-reconcile-confirm" role="group" aria-label="Review scheduled payment change">
+    <strong>Update {suggestion.item}?</strong>
+    {loading && <p role="status">Preparing payment change…</p>}
+    {error && <div role="alert"><p>{error}</p><button type="button" className="bb-reconcile-action" disabled={disabled} onClick={onRefresh}>Refresh suggestions</button></div>}
+    {plan && !error && <><p>Change {plan.name} from {money(plan.oldAmountCents)} to {money(plan.newAmountCents)}, then match this bank transaction.</p>
+      {typeof plan.scheduleAmountCents === "number" && plan.scheduleAmountCents !== plan.oldAmountCents && <p>The schedule currently uses {money(plan.scheduleAmountCents)}. Both the source and schedule will use {money(plan.newAmountCents)}.</p>}
+      <p>{plan.description}</p>
+      {plan.updateFuture && <p>Future estimate: {typeof plan.futureAmountCents === "number" ? money(plan.futureAmountCents) : "Not set"} → {money(plan.newAmountCents)}</p>}
+      {plan.canUpdateFuture && <label className="bb-reconcile-future"><input type="checkbox" checked={future} disabled={disabled || loading} onChange={event => setFuture(event.target.checked)} />Also update the future bill estimate</label>}
+      <button type="button" className="bb-reconcile-action bb-reconcile-primary" disabled={disabled || loading} onClick={() => onCommand({
+        operation: "update_schedule", id: item.id, version: plan.version, suggestionId: suggestion.id, scheduleVersion: plan.fingerprint, updateFuture: future,
+      })}>Update scheduled payment &amp; match</button></>}
+    <button type="button" className="bb-reconcile-action" disabled={disabled} onClick={onCancel}>Cancel payment change</button>
   </div>
 }
 function TransactionRow({ item, open, onToggle, children }: { item: ReconciliationItem; open: boolean; onToggle: () => void; children: React.ReactNode }) {

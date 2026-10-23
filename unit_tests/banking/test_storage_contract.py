@@ -833,3 +833,38 @@ def test_inflight_import_cannot_be_reopened_or_ignored_by_stale_discord_controls
     assert store.reopen_reconciliation_item('brian', review.id) is None
     assert store.ignore_reconciliation_item('brian', review.id) is None
     assert store.get_reconciliation_item('brian', review.id).status == 'import_requested'
+
+
+@pytest.mark.parametrize('stage', ['claimed', 'writing', 'needs_recovery'])
+def test_schedule_operation_reserves_source_and_nullable_action_completion(contract_store, stage):
+    store = contract_store
+    _, _, first = _seed(store, suffix='schedule-first')
+    _, _, second = _seed(store, suffix='schedule-second')
+    ref = 'Subscriptions!A3:C3#pull=2026-09-06'
+    request = dict(bank_amount=first.transaction.amount, bank_date=first.transaction.date,
+        expected_status=first.status, expected_updated_at=first.transaction.updated_at,
+        expected_last_seen_at=first.last_seen_at,
+        reserved_sheet_refs=ref + ' + schedule-source:Subscriptions!A3:C3')
+    operation, claimed = store.claim_reconciliation_import('brian', first.id, actor_key='actor',
+        operation_id='schedule-operation', kind='schedule_adjustment', request=request)
+    assert operation is not None and claimed
+    if stage != 'claimed':
+        assert store.mark_import_writing('brian', operation.operation_id)
+    if stage == 'needs_recovery':
+        store.mark_import_needs_recovery('brian', operation.operation_id, 'response lost')
+    request.update(expected_status=second.status, expected_updated_at=second.transaction.updated_at,
+                   expected_last_seen_at=second.last_seen_at)
+    assert store.claim_reconciliation_import('brian', second.id, actor_key='actor', operation_id='conflicting',
+        kind='schedule_adjustment', request=request) == (None, False)
+    assert store.confirm_reconciliation_item('brian', second.id, matched_sheet_ref=ref, expected_item=second) is None
+    # Another occurrence cannot concurrently change the same recurring source either.
+    request['reserved_sheet_refs'] = 'Subscriptions!A3:C3#pull=2026-09-07 + schedule-source:Subscriptions!A3:C3'
+    assert store.claim_reconciliation_import('brian', second.id, actor_key='actor', operation_id='different-occurrence',
+        kind='schedule_adjustment', request=request) == (None, False)
+    completed = store.complete_reconciliation_import(operation, action_id=None, sheet_ref=ref)
+    assert completed.status == 'completed'
+    assert store.get_reconciliation_item('brian', first.id).matched_action_log_id is None
+    assert [event['event_type'] for event in store.reconciliation_events('brian', first.id)] == ['schedule_amount_updated']
+    # The source lock is only for in-flight work, not future occurrences.
+    assert store.claim_reconciliation_import('brian', second.id, actor_key='actor', operation_id='later-occurrence',
+        kind='schedule_adjustment', request=request)[1]
