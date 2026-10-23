@@ -56,6 +56,35 @@ def _reference(actor, action_id):
     return undo.active_logged_action_by_id(actor, action_id).action.row
 
 
+def test_recorded_withholding_travels_through_amount_update_delete_and_undo(repo):
+    sheet = repo.budgets['brian']
+    sheet.update_cell(7, 5, 'ESPP withheld')
+    sheet.update_cell(8, 5, '300.00')
+    action_id = _income_action(repo, BRIAN, 8)
+    with sheet_user_context(BRIAN):
+        assert undo.update_recent_action(BRIAN, action_id=action_id, updates={'amount': 3400.00})[0]
+        assert sheet.cell(8, 5).value == '300.00'
+        current_id = undo.recent_actions(BRIAN)[0].id
+        assert undo.delete_recent_action(BRIAN, action_id=current_id)[0]
+        assert sheet.cell(8, 5).value != '300.00'
+        assert undo.undo_last_action(BRIAN)[0]
+        assert sheet.cell(8, 5).value == '300.00'
+        assert sheet.cell(8, 4).value == '$3400.00'
+
+
+def test_new_income_row_includes_withholding_without_copying_previous_amount(repo):
+    sheet = repo.budgets['brian']
+    sheet.update_cell(7, 5, 'ESPP withheld')
+    sheet.update_cell(8, 5, '300.00')
+    with sheet_user_context(BRIAN):
+        row, *_ = log_income_row({'source': 'Salary', 'amount': 3400.00, 'espp_withheld': 300.00}, sheet)
+        assert float(sheet.cell(row, 5).value) == 300
+        row, *_ = log_income_row({'source': 'Salary', 'amount': 3500}, sheet)
+        assert sheet.cell(row, 5).value == ''
+        action = undo.recent_actions(BRIAN)[0].action
+        assert action.metadata['income_espp_withheld_column'] == '5'
+
+
 def _log_rows_for(repo, actor):
     return [row for row in repo.action_log.get_all_values()[1:] if row[2] == actor]
 

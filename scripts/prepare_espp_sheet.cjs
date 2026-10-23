@@ -4,7 +4,7 @@ const fs = require("node:fs")
 const vm = require("node:vm")
 const path = require("node:path")
 
-function prepareSavingsPlan({rows, year, title, settingsRows, firstPaycheckDate = "2026-10-23"}) {
+function prepareSavingsPlan({rows, year, title, settingsRows, firstPaycheckDate = "2026-10-23", recordedWithholding = false}) {
   const requests = []
   const columnNumber = letters => [...letters].reduce((value, char) => value * 26 + char.charCodeAt(0) - 64, 0)
   const columnName = value => { let name = ""; for (; value; value = Math.floor((value-1)/26)) name = String.fromCharCode(65+(value-1)%26)+name; return name }
@@ -101,6 +101,7 @@ function prepareSavingsPlan({rows, year, title, settingsRows, firstPaycheckDate 
   const context = vm.createContext({console, SpreadsheetApp:{newDataValidation() {
     const rule = {strict:true, showCustomUi:true}
     const builder = {requireNumberBetween: (low,high) => { rule.condition = {type:"NUMBER_BETWEEN",values:[{userEnteredValue:String(low)},{userEnteredValue:String(high)}]}; return builder },
+      requireNumberGreaterThanOrEqualTo: low => { rule.condition = {type:"NUMBER_GREATER_THAN_EQ",values:[{userEnteredValue:String(low)}]}; return builder },
       requireDate: () => { rule.condition = {type:"DATE_IS_VALID"}; return builder }, setAllowInvalid: allow => { rule.strict = !allow; return builder }, build: () => rule}
     return builder
   }}})
@@ -108,7 +109,7 @@ function prepareSavingsPlan({rows, year, title, settingsRows, firstPaycheckDate 
   context.findCellByExactText = (value,text) => find(value,text,false)
   context.findCellContainingText = (value,text) => find(value,text,true)
   const plan=context.readPersonalBudgetSavingsPlan(sheet) || context.readSavingsEnrollmentSettings(book) || ["xAI", .05, firstPaycheckDate, .15, .075, ""]
-  context.writePersonalBudgetSavingsPlan(sheet, plan, year)
+  context.writePersonalBudgetSavingsPlan(sheet, plan, year, recordedWithholding)
   return requests
 }
 

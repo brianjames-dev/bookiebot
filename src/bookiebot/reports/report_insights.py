@@ -85,7 +85,7 @@ def metric_explanations(report: ExpenseBreakdownReport, payload: dict[str, Any])
                                 "source": "scheduled", "date": None})
 
         if espp - estimated_espp:
-            incomes.append({"label": "ESPP withheld from payroll", "amount": _money(espp - estimated_espp), "source": "calculated", "date": None})
+            incomes.append({"label": "ESPP withheld from payroll", "amount": _money(espp - estimated_espp), "source": "recorded" if report.savings_plan.recorded_withholding else "calculated", "date": None})
         if estimated_espp:
             incomes.append({"label": "Expected payroll ESPP", "amount": _money(estimated_espp), "source": "scheduled", "date": None})
 
@@ -187,8 +187,10 @@ def metric_explanations(report: ExpenseBreakdownReport, payload: dict[str, Any])
             explanations[mode]["saved"]["equation"] = "Recorded cash savings + payroll ESPP" + (" (includes expected ESPP)" if estimated_espp else "")
             explanations[mode]["saved"]["notes"][-1] = "Projected retains recorded cash savings and separately labels ESPP from expected paychecks."
             explanations[mode]["saved"]["notes"].extend([
-                "Cash targets use enrolled take-home before ESPP at 15% ideal / 7.5% minimum; other income uses 20% / 10%.",
-                f"ESPP: ${values['esppContribution']:,.2f}, calculated from payroll; already withheld before deposit.",
+                ("Cash goal is 20% of total take-home minus recorded ESPP. Minimum cash is 7.5% on enrolled pay and 10% on other income."
+                 if report.savings_plan.recorded_withholding else
+                 "Cash targets use enrolled take-home before ESPP at 15% ideal / 7.5% minimum; other income uses 20% / 10%."),
+                f"ESPP: ${values['esppContribution']:,.2f}, {'recorded' if report.savings_plan.recorded_withholding else 'calculated'} from payroll; already withheld before deposit.",
                 f"Cash savings plus ESPP: ${values['combinedContributions']:,.2f}.",
                 *values["warnings"],
             ])

@@ -82,3 +82,15 @@ const spaced=inline.map(row=>[...row]);spaced.splice(5,0,[]);spaced.splice(8,0,[
 assert.ok(!prepareSavingsPlan({rows:spaced,year:2026,title:'October'}).some(r=>r.insertDimension));
 const buffers=prepared.filter(r=>r.repeatCell?.cell.userEnteredFormat?.backgroundColor?.red===67/255);
 assert.ok(buffers.length>=3);
+
+const actual = prepareSavingsPlan({rows:fixture(),year:2026,title:'October',recordedWithholding:true})
+const actualWrites = writes(actual)
+assert.equal(actualWrites.get('9:4').stringValue, 'ESPP withheld')
+assert.ok(actualWrites.get('16:3').formulaValue.includes('SUM(FILTER(INDEX(E:E,'))
+assert.ok(actualWrites.get('16:3').formulaValue.includes('Enter ESPP withheld'))
+assert.ok(!actualWrites.get('16:3').formulaValue.includes('/(1-'))
+assert.ok(actualWrites.get('35:2').formulaValue.includes('MAX(0,ROUND((D16+D17)*0.2,2)-D17)'))
+assert.ok(actualWrites.get('35:3').formulaValue.includes('*0.075'))
+assert.ok(!actualWrites.has('35:4'))
+const actualCollision = fixture(); actualCollision[7][4] = 'Keep this cell'
+assert.throws(()=>prepareSavingsPlan({rows:actualCollision,year:2026,title:'October',recordedWithholding:true}),/Occupied ESPP withheld/)

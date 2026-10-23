@@ -1,8 +1,14 @@
 # Finance Operations Workstream
 
-Last updated: 2026-10-18
+Last updated: 2026-10-23
 
 ## Goal
+
+### Recorded ESPP withholding correction — 2026-10-23
+
+Implementation and authorized native sheet update complete on `codex/espp-actual-withholding`; review/release remains pending. First actual payroll establishes a gross-based deduction; the earlier net-pay inference understated ESPP. Reused the empty fourth income column, kept the monthly total automatic and targeted 20% of deposit + withholding with cash covering the remainder. Minimum cash remains 7.5% enrolled/10% other. Missing/invalid/orphaned amounts and inconsistent totals stay incomplete; explicit zero is valid. Income amount corrections/Delete/Undo preserve deduction lineage, legacy snapshots/Hannah retain their prior calculations, and estimates never increase actual investment history. No reconciliation lifecycle change.
+
+2026-10-23 work log: atomically updated only Brian October/Template with a private complete backup, entered the confirmed withholding in October E18 on the existing paycheck, and verified native formula parity. Independent readback confirms 13 expected input/formula changes, unchanged income/actual cash/Net Total/dimensions. Native disposable-tab missing/zero/source/date/delete/restore checks passed and the temporary tab was removed. Full local **2,336 passed / 383 optional PostgreSQL skipped**, final focused **50 passed**, Apps Script **5 passed**, types/frontend build clean. Read-only corrected-sheet preview verifies Saved/Income/Investments and separate chart slices. Manual/release checklist 145 is in STATUS. Do not merge/deploy until approved; update the matching saved live Apps Script source with that release before the next rollover. No new production test transactions or saved-action coordinate migrations.
 
 ### PG&E receipt sync and bulk received — 2026-10-18
 

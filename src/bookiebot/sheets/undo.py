@@ -203,6 +203,8 @@ def _income_row_property_bounds(
     columns = [layout["source"], layout["amount"]]
     if layout.get("date"):
         columns.append(layout["date"])
+    if layout.get("espp_withheld"):
+        columns.append(layout["espp_withheld"])
     start_column = min(columns)
     end_column = max(columns)
 
@@ -287,6 +289,8 @@ def _income_row_delete_snapshot(ws: Any, row: int) -> tuple[list[str], dict[str,
     }
     if layout.get("date"):
         metadata["income_date_column"] = str(layout["date"])
+    if layout.get("espp_withheld"):
+        metadata["income_espp_withheld_column"] = str(layout["espp_withheld"])
     if row_properties is not None:
         metadata["income_row_properties"] = json.dumps(row_properties, separators=(",", ":"))
 

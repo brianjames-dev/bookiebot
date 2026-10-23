@@ -977,7 +977,7 @@ function MetricExplanationDetails({detail}: {detail:MetricInspection}) {
       {view.savingsInvesting && <>
         <dl>
           <div><dt>Cash saved</dt><dd>{formatMoney(view.savingsInvesting.cashSaved)}</dd></div>
-          <div><dt>SpaceX ESPP{view.savingsInvesting.estimatedEsppContribution ? " · includes estimate" : " · calculated from payroll"}</dt><dd>{formatMoney(view.savingsInvesting.esppContribution)}</dd></div>
+          <div><dt>SpaceX ESPP{view.savingsInvesting.estimatedEsppContribution ? " · includes estimate" : view.savingsInvesting.source === "Recorded payroll withholding" ? " · withheld from payroll" : " · calculated from payroll"}</dt><dd>{formatMoney(view.savingsInvesting.esppContribution)}</dd></div>
           <div><dt>Cash saved + ESPP</dt><dd>{formatMoney(view.savingsInvesting.combinedContributions)}</dd></div>
         </dl>
         <p className="bb-activity-footnote">ESPP is already withheld before deposit. The progress bar measures cash savings.</p>
