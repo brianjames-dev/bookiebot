@@ -853,13 +853,27 @@ function preflightPersonalBudgetSavingsPlan(sheet) {
   return {income, total, savings, budget, summary, label, amount};
 }
 
-function writePersonalBudgetSavingsPlan(sheet, plan, explicitYear) {
+function writePersonalBudgetSavingsPlan(sheet, plan, explicitYear, recordedWithholding = false) {
   preflightPersonalBudgetSavingsPlan(sheet);
   const year = Number(explicitYear || /\b(20\d{2})\b/.exec(sheet.getParent().getName())?.[1]);
   if (!year) throw new Error("Cannot determine the budget year.");
   writeSavingsEnrollmentSettings(sheet, plan);
   spacePersonalSavingsTables(sheet);
   const {income,total,savings,budget,summary,label,amount}=preflightPersonalBudgetSavingsPlan(sheet);
+  const recorded = recordedWithholding || Boolean(income.esppWithheldColumn);
+  if (recorded) {
+    const column = income.esppWithheldColumn || income.amountColumn + 1;
+    const height = Math.max(0,total.getRow()-income.headerRow-1);
+    if (!income.esppWithheldColumn && sheet.getRange(income.headerRow,column,height+1,1).getValues().some(row=>row[0]!=="")) throw new Error("Occupied ESPP withheld column; no migration performed.");
+    sheet.getRange(income.headerRow,column).setValues([["ESPP withheld"]]).setBackground("#38761d").setFontColor("#ffffff").setFontWeight("bold").setFontFamily("Arial").setFontSize(10);
+    if (height) sheet.getRange(income.headerRow+1,column,height,1).setBackground("#d9ead3").setFontColor("#000000").setNumberFormat("$#,##0.00")
+      .setDataValidation(SpreadsheetApp.newDataValidation().requireNumberGreaterThanOrEqualTo(0).setAllowInvalid(false).build())
+      .setNote("Actual ESPP withheld on this paycheck's paystub. Enter 0 if confirmed none; leave blank only while unknown. Eligible payroll starts on the configured date.");
+    sheet.getRange(income.headerRow,column,height+1,1).setBorder(true,true,true,true,false,false);
+    income.esppWithheldColumn=column;
+    const settings=inlineSavingsEnrollmentLayout(sheet);
+    sheet.getRange(settings.headerRow,5).setNote("ESPP rate as a percentage of eligible gross pay. Actual deductions are recorded beside each paycheck; they are never inferred from the bank deposit.");
+  }
   const legacy = sheet.getMaxColumns()>=12 && sheet.getRange("G4:L4").getValues()[0].every((value,i)=>value===SAVINGS_PLAN_HEADERS[i]);
   if (legacy) sheet.getRange("G4:L5").clear().setBackground("#434343");
   if (summary) sheet.getRange(summary.getRow(),7,14,2).clear().setBackground("#434343");
@@ -886,22 +900,27 @@ function writePersonalBudgetSavingsPlan(sheet, plan, explicitYear) {
   const mask=`(${sourceMatches})*(${received}>=${start})*(${received}<=${end})*((${last}=0)+(${received}<=${last}))*(IFERROR(${rate}>0,FALSE))*(${amounts}>0)`;
   const bad=`OR(COUNT(${a})=0,COUNT(${a})<>COUNTA(${a}),COUNT(${d})<>COUNT(${a}),COUNTA(${c})<>COUNT(${a}),COUNT(${b})<>COUNTA(${b}),MIN(${d})<0,MAX(${d})>0.2,SUMPRODUCT((${a}<>"")*(LEN(TRIM(${c}))=0))>0,SUMPRODUCT((${a}="")*((${b}<>"")+(${c}<>"")+(${d}<>"")))>0,SUMPRODUCT((${b}<>"")*(${b}<${a}))>0,COUNT(${a})<>IFNA(COUNTUNIQUE(FILTER(${a},${a}<>"")),0))`;
   const eligible=`IF(${empty},0,IFNA(SUM(FILTER(${amounts},${mask})),0))`;
-  const deduction=`IF(${empty},0,IFNA(SUM(ARRAYFORMULA(ROUND(FILTER(${amounts}*${rate}/(1-${rate}),${mask}),2))),0))`;
+  const withheld=recorded ? range(income.esppWithheldColumn) : null;
+  const missing=recorded ? `IF(${empty},FALSE,SUMPRODUCT((${mask})*((NOT(ISNUMBER(${withheld})))+IFERROR(${withheld}<0,FALSE)))>0)` : "FALSE";
+  const unexpected=recorded ? `IF(${empty},FALSE,SUMPRODUCT((1-(${mask}))*IFERROR(${withheld}>0,FALSE))>0)` : "FALSE";
+  const deduction=recorded ? `IF(${empty},0,IFNA(SUM(FILTER(${withheld},${mask})),0))`
+    : `IF(${empty},0,IFNA(SUM(ARRAYFORMULA(ROUND(FILTER(${amounts}*${rate}/(1-${rate}),${mask}),2))),0))`;
   const delta=`IF(${empty},0,IFNA(SUM(ARRAYFORMULA(FILTER((${amounts}+ROUND(${amounts}*${rate}/(1-${rate}),2))*(0.2-${rate})-${amounts}*0.2,${mask}))),0))`;
   const esppRef=amount.getA1Notation();
-  const ideal=`ROUND(${totalRef}*0.2+${delta},2)`, minimum=`ROUND((${totalRef}*0.2+${delta})/2,2)`;
+  const ideal=recorded ? `MAX(0,ROUND((${totalRef}+${esppRef})*0.2,2)-${esppRef})` : `ROUND(${totalRef}*0.2+${delta},2)`;
+  const minimum=recorded ? `ROUND((${totalRef}-${eligible})*0.1+(${eligible}+${esppRef})*0.075,2)` : `ROUND((${totalRef}*0.2+${delta})/2,2)`;
   sheet.getRange(label.getRow(),2,1,4).clear();
   sheet.getRange(label.getRow(),2,1,3).setBackground("#cccccc").setFontColor("#000000").setFontWeight("bold").setFontFamily("Arial").setFontSize(10).setBorder(true,true,true,true,false,false);
   sheet.getRange(label.getRow(),5).setBackground("#434343");
   label.setValues([[ESPP_MONTHLY_LABEL]]);
-  amount.setFormula(`=IF(${bad},"Check ESPP settings",IF(${eligible}>${totalRef},"Check income total",${deduction}))`).setNumberFormat("$#,##0.00").setFontColor("#000000");
+  amount.setFormula(`=IF(${bad},"Check ESPP settings",IF(${eligible}>${totalRef},"Check income total",IF(${missing},"Enter ESPP withheld",IF(${unexpected},"Check ESPP date/source",${deduction}))))`).setNumberFormat("$#,##0.00").setFontColor("#000000");
   const guarded=value=>`IF(ISNUMBER(${esppRef}),${value},${esppRef})`;
   const needs=`ROUND((${totalRef}+${esppRef})*0.5,2)`;
   // Preserve currency text: existing burn-rate/margin formulas use REGEXEXTRACT.
   budget.offset(0,1).setFormula(`=${guarded(`TEXT(${needs},"$#,##0.00")`)}`);
   budget.offset(0,2).setFormula(`=${guarded(`TEXT(${totalRef}-${needs}-${ideal},"$#,##0.00")`)}`);
   budget.offset(0,3).setFormula(`=${guarded(`TEXT(${ideal},"$#,##0.00")`)}`);
-  budget.offset(1,3).setValues([["Cash savings"]]).setNote("15% ideal / 7.5% minimum on enrolled pre-ESPP pay; unrelated income retains 20% / 10%. ESPP enrollment is below Main Income Source.");
+  budget.offset(1,3).setValues([["Cash savings"]]).setNote(recorded ? "Cash goal = 20% of total take-home minus actual ESPP withheld. Minimum cash: 7.5% on enrolled pay and 10% on other income. Actual cash saved remains the recorded contribution." : "15% ideal / 7.5% minimum on enrolled pre-ESPP pay; unrelated income retains 20% / 10%. ESPP enrollment is below Main Income Source.");
   savings.offset(0,1).setFormula(`=${guarded(`"IDEAL = "&TEXT(${ideal},"$#,##0.00")`)}`);
   savings.offset(0,2).setFormula(`=${guarded(`"MINIMUM = "&TEXT(${minimum},"$#,##0.00")`)}`);
 }
@@ -1412,6 +1431,7 @@ function findPersonalBudgetIncomeLayout(sheet) {
     let dateColumn = null;
     let sourceColumn = null;
     let amountColumn = null;
+    let esppWithheldColumn = null;
     for (let columnIndex = 0; columnIndex < values[rowIndex].length; columnIndex++) {
       const normalized = String(values[rowIndex][columnIndex] || "")
         .trim()
@@ -1425,6 +1445,8 @@ function findPersonalBudgetIncomeLayout(sheet) {
         sourceColumn = columnIndex + 1;
       } else if (normalized === "amount") {
         amountColumn = columnIndex + 1;
+      } else if (normalized === "espp withheld") {
+        esppWithheldColumn = columnIndex + 1;
       }
     }
 
@@ -1434,6 +1456,7 @@ function findPersonalBudgetIncomeLayout(sheet) {
         dateColumn: dateColumn,
         sourceColumn: sourceColumn,
         amountColumn: amountColumn,
+        ...(esppWithheldColumn ? {esppWithheldColumn} : {}),
       };
     }
   }

@@ -199,6 +199,8 @@ export interface SavingsInvesting {
   categoryBudgets: CategoryBalanceAmounts
   warnings: string[]
   source: string
+  totalSavingsGoal?: number
+  complete?: boolean
 }
 
 export interface ExpenseReportData {
@@ -208,7 +210,9 @@ export interface ExpenseReportData {
     rate: number
     firstPaycheckDate: string | null
     lastPaycheckDate: string | null
-    cashIdealRate: number
+    cashIdealRate: number | null
+    contributionBasis?: "recorded_withholding" | "legacy_net_rate"
+    totalSavingsRate?: number
     cashMinimumRate: number
     otherCashIdealRate: number
     otherCashMinimumRate: number

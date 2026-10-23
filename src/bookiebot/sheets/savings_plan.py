@@ -1,7 +1,7 @@
 """Sheet-configured payroll savings, with ESPP kept outside spendable cash."""
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from datetime import date, datetime
 from decimal import Decimal, InvalidOperation, ROUND_HALF_UP
 import re
@@ -17,6 +17,7 @@ CENT = Decimal("0.01")
 SETTINGS_TAB = "ESPP Settings"
 SETTINGS_HEADERS = ("First eligible paycheck", "Last eligible paycheck", "Payroll source", "ESPP rate")
 ESPP_LABEL = "SpaceX ESPP this month"
+WITHHOLDING_HEADER = "ESPP withheld"
 
 
 def normalized_source(value: Any) -> str:
@@ -71,6 +72,8 @@ class SavingsPlan:
     cash_minimum_rate: Decimal = Decimal("0.075")
     status: str = "off"
     periods: tuple[SavingsPlan, ...] = ()
+    recorded_withholding: bool = False
+    orphaned_withholding: int = 0
 
     def for_paycheck(self, label: str, received: date | None) -> SavingsPlan | None:
         if self.periods:
@@ -95,7 +98,10 @@ class SavingsPlan:
         return {"status": self.status, "source": self.source, "rate": float(self.rate),
                 "firstPaycheckDate": self.first_paycheck.isoformat() if self.first_paycheck else None,
                 "lastPaycheckDate": self.last_paycheck.isoformat() if self.last_paycheck else None,
-                "cashIdealRate": float(self.cash_ideal_rate), "cashMinimumRate": float(self.cash_minimum_rate),
+                "cashIdealRate": None if self.recorded_withholding else float(self.cash_ideal_rate),
+                "cashMinimumRate": float(self.cash_minimum_rate),
+                "contributionBasis": "recorded_withholding" if self.recorded_withholding else "legacy_net_rate",
+                "totalSavingsRate": .2,
                 "otherCashIdealRate": .2, "otherCashMinimumRate": .1}
 
 
@@ -109,7 +115,50 @@ def inline_enrollment_rows(rows: list[list[Any]]) -> list[list[Any]] | None:
     return None
 
 
+def withholding_column(rows: list[list[Any]]) -> int | None:
+    """The explicit income header opts this month into recorded payroll amounts."""
+    for row in rows:
+        labels = [normalized_source(value) for value in row]
+        if "amount" in labels and ("source" in labels or "employer" in labels) and "espp withheld" in labels:
+            return labels.index("espp withheld")
+    return None
+
+
+def recorded_deduction(value: Any) -> Decimal | None:
+    if value is None or not str(value).strip():
+        return None
+    try:
+        number = Decimal(str(value).replace("$", "").replace(",", "").strip())
+        return number.quantize(CENT, rounding=ROUND_HALF_UP) if number.is_finite() and number >= 0 else None
+    except (InvalidOperation, ValueError):
+        return None
+
+
 def read_savings_plan(rows: list[list[Any]], settings_rows: list[list[Any]] | None = None,
+                      *, as_of: date | None = None) -> SavingsPlan:
+    plan = _read_savings_plan(rows, settings_rows, as_of=as_of)
+    if withholding_column(rows) is not None:
+        orphans = 0
+        for index, row in enumerate(rows):
+            labels = [normalized_source(value) for value in row]
+            if "espp withheld" not in labels or "amount" not in labels:
+                continue
+            column, amount_column = labels.index("espp withheld"), labels.index("amount")
+            source_column = labels.index("source") if "source" in labels else labels.index("employer")
+            for item in rows[index + 1:]:
+                if any(normalized_source(value) == "monthly income" for value in item):
+                    break
+                raw = item[column] if column < len(item) else ""
+                amount = item[amount_column] if amount_column < len(item) else ""
+                source = str(item[source_column]) if source_column < len(item) else ""
+                if str(raw).strip() and (money(amount) <= 0 or not source.strip() or source.startswith("<")):
+                    orphans += 1
+            break
+        plan = replace(plan, recorded_withholding=True, cash_minimum_rate=Decimal(".075"), orphaned_withholding=orphans)
+    return plan
+
+
+def _read_savings_plan(rows: list[list[Any]], settings_rows: list[list[Any]] | None = None,
                       *, as_of: date | None = None) -> SavingsPlan:
     # Monthly snapshots win over the transitional separate-tab layout and old
     # labels, which also contain the four-column header's "ESPP Rate" label.
@@ -178,16 +227,20 @@ def read_enrollment_settings(rows: list[list[Any]] | None, *, as_of: date | None
 
 
 def calculate_savings(
-    plan: SavingsPlan, income_total: float, entries: Iterable[tuple[str, float, Any]],
+    plan: SavingsPlan, income_total: float,
+    entries: Iterable[tuple[str, float, Any] | tuple[str, float, Any, Any]],
     period_start: date, period_end: date,
 ) -> dict[str, Any]:
-    """Round each payroll deduction to cents; conserve deposited cash exactly."""
+    """Use confirmed deductions on upgraded months; preserve older snapshots."""
     deposited = money(income_total)
     eligible = Decimal(0)
     espp = Decimal(0)
     enrolled_ideal = enrolled_minimum = Decimal(0)
     undated = 0
-    for label, amount, raw_date in entries:
+    missing = unexpected = 0
+    for entry in entries:
+        label, amount, raw_date = entry[:3]
+        withheld = recorded_deduction(entry[3]) if len(entry) > 3 else None
         received = parse_date(raw_date)
         value = money(amount)
         if value <= 0:
@@ -197,26 +250,46 @@ def calculate_savings(
         enrolled = plan.for_paycheck(label, received)
         if received and period_start <= received <= period_end and enrolled:
             eligible += value
-            deduction = (value * enrolled.rate / (1 - enrolled.rate)).quantize(CENT, rounding=ROUND_HALF_UP)
+            if plan.recorded_withholding:
+                if withheld is None:
+                    missing += 1
+                deduction = withheld or Decimal(0)
+            else:
+                deduction = (value * enrolled.rate / (1 - enrolled.rate)).quantize(CENT, rounding=ROUND_HALF_UP)
             espp += deduction
             enrolled_ideal += (value + deduction) * enrolled.cash_ideal_rate
-            enrolled_minimum += (value + deduction) * enrolled.cash_minimum_rate
+            enrolled_minimum += (value + deduction) * (plan.cash_minimum_rate if plan.recorded_withholding else enrolled.cash_minimum_rate)
+        elif plan.recorded_withholding and withheld:
+            unexpected += 1
     warnings = []
+    if plan.orphaned_withholding:
+        warnings.append("ESPP withheld is present without a completed paycheck; check the income rows.")
     if plan.status in {"invalid", "pending"}:
         warnings.append("Check ESPP enrollment settings before relying on savings targets.")
     if undated:
         warnings.append(f"{undated} payroll entries need dates before ESPP can be calculated.")
-    if eligible > deposited:
+    if missing:
+        warnings.append(f"{missing} eligible paycheck(s) need a valid ESPP withheld amount. Enter 0 only if payroll withheld nothing.")
+    if unexpected:
+        warnings.append(f"{unexpected} ESPP amount(s) are outside eligible payroll; check the source and date.")
+    inconsistent_total = eligible > deposited
+    if inconsistent_total:
         warnings.append("Income total is smaller than eligible paycheck entries; check the sheet total.")
         eligible = espp = enrolled_ideal = enrolled_minimum = Decimal(0)
     other = deposited - eligible
     base = deposited + espp
-    ideal = (enrolled_ideal + other * Decimal(".2")).quantize(CENT, rounding=ROUND_HALF_UP)
+    total_goal = (base * Decimal(".2")).quantize(CENT, rounding=ROUND_HALF_UP)
+    ideal = max(Decimal(0), total_goal - espp) if plan.recorded_withholding else (enrolled_ideal + other * Decimal(".2")).quantize(CENT, rounding=ROUND_HALF_UP)
     minimum = (enrolled_minimum + other * Decimal(".1")).quantize(CENT, rounding=ROUND_HALF_UP)
+    if plan.recorded_withholding and espp > total_goal:
+        warnings.append("ESPP already exceeds the 20% total savings goal; review the cash budget.")
+    if plan.recorded_withholding and minimum > ideal:
+        warnings.append("The minimum cash target exceeds the cash remaining within the 20% total savings goal.")
     needs = (base * Decimal(".5")).quantize(CENT, rounding=ROUND_HALF_UP)
     wants = deposited - needs - ideal
     return {"depositedIncome": float(deposited), "eligibleDeposits": float(eligible),
             "otherIncome": float(other), "takeHomeBeforeEspp": float(base),
             "esppContribution": float(espp), "cashIdeal": float(ideal), "cashMinimum": float(minimum),
             "categoryBudgets": {"needs": float(needs), "wants": float(wants), "savings": float(ideal)},
-            "warnings": warnings, "source": "Calculated from payroll"}
+            "warnings": warnings, "source": "Recorded payroll withholding" if plan.recorded_withholding else "Calculated from payroll",
+            "totalSavingsGoal": float(total_goal), "complete": not (missing or unexpected or undated or inconsistent_total or plan.orphaned_withholding or plan.status in {"invalid", "pending"})}

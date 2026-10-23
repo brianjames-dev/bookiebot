@@ -185,12 +185,21 @@ def log_income_row(data: dict[str, Any], worksheet: Any, *, return_action_id: bo
     source_column = layout["source"]
     amount_column = layout["amount"]
     date_column = layout.get("date")
+    withholding_column = layout.get("espp_withheld")
 
     description = _income_description(data.get("source"), data.get("label"))
     amount = data.get("amount", "")
-    row_values: list[Any] = [""] * max(source_column, amount_column, date_column or 0)
+    row_values: list[Any] = [""] * max(source_column, amount_column, date_column or 0, withholding_column or 0)
     row_values[source_column - 1] = description
     row_values[amount_column - 1] = amount
+    if withholding_column:
+        from bookiebot.sheets.savings_plan import recorded_deduction
+        raw_withheld = data.get("espp_withheld")
+        if raw_withheld is not None and str(raw_withheld).strip():
+            deduction = recorded_deduction(raw_withheld)
+            if deduction is None:
+                raise ValueError("ESPP withheld must be a non-negative dollar amount.")
+            row_values[withholding_column - 1] = float(deduction)
     if date_column:
         row_values[date_column - 1] = _income_date_text(data.get("date"))
 
@@ -253,6 +262,8 @@ def log_income_row(data: dict[str, Any], worksheet: Any, *, return_action_id: bo
     }
     if date_column:
         layout_metadata["income_date_column"] = str(date_column)
+    if withholding_column:
+        layout_metadata["income_espp_withheld_column"] = str(withholding_column)
     action_id = record_undo_action(
         get_current_discord_user_id(),
         UndoAction(
@@ -309,6 +320,9 @@ def _trailing_income_placeholder_rows(
         row = rows[row_number - 1] if row_number <= len(rows) else []
         source = row[source_column - 1] if source_column <= len(row) else ""
         amount = row[amount_column - 1] if amount_column <= len(row) else ""
+        withheld_column = layout.get("espp_withheld")
+        if withheld_column and withheld_column <= len(row) and str(row[withheld_column - 1]).strip():
+            break
         if not _is_income_placeholder_row(source, amount):
             break
         trailing.append(row_number)

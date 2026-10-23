@@ -31,7 +31,7 @@ from bookiebot.sheets.reimbursement_history import (
 )
 from bookiebot.sheets.routing import PACIFIC_TZ, now_pacific, resolve_sheet_context
 from bookiebot.sheets.utils import clean_money
-from bookiebot.sheets.savings_plan import SETTINGS_TAB, SavingsPlan, calculate_savings, read_savings_plan
+from bookiebot.sheets.savings_plan import SETTINGS_TAB, SavingsPlan, calculate_savings, read_savings_plan, recorded_deduction, parse_date, matches_payroll
 
 
 @dataclass(frozen=True)
@@ -87,6 +87,7 @@ class PaymentItem:
     group: str
     status: str = "entered"
     date: str = ""
+    espp_withheld: str | None = None
 
 
 @dataclass(frozen=True)
@@ -150,6 +151,7 @@ class _IncomeTableLayout:
     source_column: int
     amount_column: int
     date_column: int | None = None
+    withholding_column: int | None = None
 
 
 @dataclass
@@ -1697,6 +1699,7 @@ def _income_table_layout(
         source_column: int | None = None
         amount_column: int | None = None
         date_column: int | None = None
+        withholding_column: int | None = None
         for column, value in enumerate(row):
             normalized = _normalize_label(value)
             if normalized == "date":
@@ -1705,12 +1708,15 @@ def _income_table_layout(
                 source_column = column
             elif normalized == "amount":
                 amount_column = column
+            elif normalized == "espp withheld":
+                withholding_column = column
         if source_column is not None and amount_column is not None:
             return _IncomeTableLayout(
                 header_row_index=row_index,
                 source_column=source_column,
                 amount_column=amount_column,
                 date_column=date_column,
+                withholding_column=withholding_column,
             )
     return None
 
@@ -1727,7 +1733,8 @@ def _income_entry_from_layout(row: list[str], layout: _IncomeTableLayout) -> Pay
         candidate = str(row[layout.date_column]).strip()
         if _parse_date(candidate) is not None:
             date = candidate
-    return PaymentItem(label=label, amount=round(amount, 2), group="income", date=date)
+    withheld = (_cell(row, layout.withholding_column) if layout.withholding_column is not None else None)
+    return PaymentItem(label=label, amount=round(amount, 2), group="income", date=date, espp_withheld=withheld)
 
 
 def _income_projection_config(rows: list[list[str]]) -> IncomeProjectionConfig:
@@ -2568,6 +2575,7 @@ def _report_client_payload(
             projected_entries.extend(PaymentItem(
                 report.income_projection_config.source_label or report.savings_plan.source, event.amount, "income",
                 date=f"{report.month.year}-{report.month.month:02d}-{event.day:02d}",
+                espp_withheld=_projected_espp_withheld(report, event),
             ) for event in report.calendar_events if event.kind == "income" and event.projected_only)
         projected_savings = _calculate_month_savings(
             report.savings_plan, payload["incomeProjection"]["projectedAmount"], projected_entries, report.month,
@@ -2707,9 +2715,29 @@ def _report_mode_view_from_payload(
 
 
 def _calculate_month_savings(plan: SavingsPlan, income: float, entries: list[PaymentItem], month: BudgetMonth) -> dict[str, Any]:
-    return calculate_savings(plan, income, ((entry.label, entry.amount, entry.date) for entry in entries),
+    return calculate_savings(plan, income, ((entry.label, entry.amount, entry.date, entry.espp_withheld) for entry in entries),
                              month.as_datetime().date(),
                              datetime(month.year, month.month, calendar.monthrange(month.year, month.month)[1]).date())
+
+
+def _projected_espp_withheld(report: ExpenseBreakdownReport, event: CalendarEvent) -> str | None:
+    """A confirmed matching paycheck is an estimate only, never an actual entry."""
+    if not report.savings_plan.recorded_withholding:
+        return None
+    source = report.income_projection_config.source_label or report.savings_plan.source
+    received = datetime(report.month.year, report.month.month, event.day).date()
+    enrolled = report.savings_plan.for_paycheck(source, received)
+    if not enrolled:
+        return None
+    candidates = []
+    for entry in report.income_projection_receipts:
+        entry_date = parse_date(entry.date)
+        deduction = recorded_deduction(entry.espp_withheld)
+        previous = report.savings_plan.for_paycheck(entry.label, entry_date)
+        if (entry.amount > 0 and entry_date and entry_date <= received and deduction is not None
+                and previous and previous.rate == enrolled.rate and matches_payroll(entry.label, enrolled.source)):
+            candidates.append((entry_date, deduction))
+    return str(max(candidates, key=lambda value: value[0])[1]) if candidates else None
 
 
 def _espp_history(plan: SavingsPlan, rows: list[list[str]], history: tuple[BudgetHistoryRows, ...], month: BudgetMonth,
@@ -2728,7 +2756,10 @@ def _espp_history(plan: SavingsPlan, rows: list[list[str]], history: tuple[Budge
             item_plan = read_savings_plan(item.rows, item.savings_settings_rows) if item else SavingsPlan()
             if item and item_plan.present:
                 entries, income = _income_entries(item.rows)
-                amounts.append(_calculate_month_savings(item_plan, income, entries, item.month)["esppContribution"])
+                calculated = _calculate_month_savings(item_plan, income, entries, item.month)
+                amounts.append(calculated["esppContribution"])
+                if not calculated["complete"]:
+                    missing.append(f"{year}-{number:02d}")
             else:
                 missing.append(f"{year}-{number:02d}")
             year, number = (year + 1, 1) if number == 12 else (year, number + 1)

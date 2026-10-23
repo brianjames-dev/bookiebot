@@ -38,6 +38,8 @@ def income_sheet_layout(
             normalized = str(value).strip().rstrip(":").strip().lower()
             if normalized in {"date", "amount"}:
                 columns_by_header[normalized] = column
+            elif normalized == "espp withheld":
+                columns_by_header["espp_withheld"] = column
             elif normalized in {"source", "employer"}:
                 columns_by_header["source"] = column
                 source_placeholder = "<Enter Employer>" if normalized == "employer" else "<Enter Source>"

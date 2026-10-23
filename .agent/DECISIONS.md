@@ -1,5 +1,11 @@
 # Agent Decisions
 
+## 2026-10-23 - Record ESPP With Each Paycheck And Fill A Combined Savings Goal
+
+The confirmed first payroll deduction differs from the earlier net-pay percentage inference; actual withholding is authoritative. On upgraded months, an `ESPP withheld` income header selects explicit per-paycheck withholding as the source of actual ESPP. Blank/invalid amounts are incomplete; a confirmed 0 is valid. Source/date eligibility still excludes earlier pay and unrelated income. Keep older month layouts readable without rewriting history.
+
+Full take-home is deposited income plus confirmed withholding. Total ideal savings is 20% of that amount; the nonnegative cash ideal is the remainder after ESPP. Preserve 7.5% minimum cash for enrolled pay and 10% for other income, surfacing conflicts rather than silently changing the minimum. Actual cash saved remains independently recorded. Payroll amounts travel with their row through correction/Delete/Undo, without a second financial ledger. Projected ESPP may reuse the latest matching confirmed deduction as an explicit estimate; it never increases recorded investment history. Keep the existing app sections and totals.
+
 ## 2026-10-18 - Record All Received As One Reviewed Receipt Batch
 
 Add Mark all received under Owed to you, covering the full current outstanding payee ledger across all months, independently of pagination. Review count, amount and actual receipt date before submission. Validate a fresh household fingerprint and every eligible allocation in one locked transaction; confirm pending sender reports once and add only each remaining amount as a confirmed receipt. Preserve opposite-direction obligations, cleared amounts, prior receipts, purchase gross and income. Repeated or concurrent requests cannot duplicate settlement.
