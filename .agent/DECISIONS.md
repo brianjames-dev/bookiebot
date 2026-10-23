@@ -1,5 +1,13 @@
 # Agent Decisions
 
+## 2026-10-23 - Match Shared Bills At Gross And Preserve Confirmed-Repayment Accounting
+
+Bank bill debits are the full household payment. Reconciliation must not reinterpret a net personal budget cell as the original full bill. Resolve current-month bill allocations independently of action-log availability; require exact payer, workbook, row, label and source lineage. Preserve an existing split method and saved shares for unchanged gross amounts. Gross corrections recalculate shares through the existing income/equal rules and versioned canonical reimbursement revision/projection; confirmed/pending repayments, cleared debts, historical accounting and incomplete projections retain their existing guards. An unchanged gross bill may match while retaining its confirmed receipts and reduced budget cell.
+
+For newly shared Rent/PG&E/Recology/Water payments, default the explicit review to By income, with 50/50 and No split choices. Bind the selected method and exact cents to the review fingerprint. Record one normal payment action and use the existing durable split ledger; never invent a repayment. Show bank gross, both shares, already received amount, current budget target and separately opted-in full-bill estimate. Cash-v1 keeps gross minus confirmed receipts in the payer budget; partner share becomes a budget expense only through confirmed repayment. This extends the user's split-by-income preference without assuming every bill is shared.
+
+A schedule claim remains reserved until both financial cells and canonical split/projection verify. Shared refresh can recover an existing projection; reconciliation verification reads only and cannot repeat a writer or complete an intended shared payment as unsplit. No new schema, repayment protocol or ratio source.
+
 ## 2026-10-23 - Review And Recover Scheduled Payment Amount Changes In Reconciliation
 
 Extend the phone review to subscriptions and bills. A separate fresh preview binds the current source/mirror/raw amount, recurrence, workbook/sheet identity, selected bank/item version and payment lineage. Subscriptions update their recurring visible source and normalized schedule together. Manual bills default to this month's actual; changing the future estimate requires an explicit opt-in and separate old/new estimate. Automatic bills update their setting and verify the derived amount without overwriting formulas. Restrict writes to posted current-month outflows; use the canonical payment updater when an action exists, otherwise record a payment Undo action for the actual. Refresh shared report/source caches after success.

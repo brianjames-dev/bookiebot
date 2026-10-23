@@ -598,14 +598,20 @@ async def test_schedule_preview_is_read_only_and_confirmation_uses_its_version(c
     assert response.status == 200 and calls == []
     plan = (await response.json())['change']
     assert plan['version'] == row['version'] and plan['fingerprint'] == 'f' * 64
+    invalid_preview = await client.http.get(f"/app/reconciliation/{item.id}/schedule", params={
+        'version': row['version'], 'suggestionId': candidate.action_id, 'splitMethod': 'guess'})
+    assert invalid_preview.status == 400
     def apply(service, owner, actor, reviewed, selected, fingerprint, **kwargs):
         calls.append(fingerprint)
         assert reviewed == item and selected == candidate and not kwargs['update_future']
+        assert kwargs['split_method'] == 'income'
         client.store.confirm_reconciliation_item(owner, item.id, matched_sheet_ref=candidate.sheet_ref, expected_item=item)
         return BankImportResult('completed', 'Updated')
     monkeypatch.setattr(review, 'apply_schedule_change', apply)
     body = dict(operation='update_schedule', id=item.id, version=plan['version'], suggestionId=candidate.action_id,
                 scheduleVersion=plan['fingerprint'], updateFuture=False)
+    invalid_confirm = await client.http.post('/app/reconciliation', headers=HEADERS, json={**body, 'splitMethod': ['income']})
+    assert invalid_confirm.status == 400 and calls == []
     response = await client.http.post('/app/reconciliation', headers=HEADERS, json=body)
     assert response.status == 200 and calls == ['f' * 64]
     assert (await client.http.post('/app/reconciliation', headers=HEADERS, json=body)).status == 409
