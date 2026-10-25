@@ -4,7 +4,7 @@ Last updated: 2026-10-25
 
 ## Active Focus
 
-Discord reconciliation prompt simplification (2026-10-25): show bank recovery only for an unhealthy connection, with a focused single-action prompt. Remove the standalone daily repayment action; retain optional separately confirmed receipts on verified matched shared payments. Preserve old persistent controls safely, owner scope and morning recovery/delivery guards.
+Discord reconciliation prompt simplification released (2026-10-25): show bank recovery only for an unhealthy connection, with a focused single-action prompt. Remove the standalone daily repayment action; retain optional separately confirmed receipts on verified matched shared payments. Preserve old persistent controls safely, owner scope and morning recovery/delivery guards.
 
 Mobile navigation glow brightness refinement implemented (2026-10-23): render only the pointer-gradient layer at 60% opacity (40% dimmer), preserving the released 180px gradient size and selected-tab/label feedback. Rebuilt the shipped CSS. Focused navigation/shell/session tests **5 passed**, frontend typecheck/build pass, and **24 synthetic Chromium combinations** verify opacity, radius, pointer centering, fade, selection and tap targets in both themes. Preview screenshot inspected. CI/release pending; native acceptance is checklist 152.
 
@@ -172,7 +172,7 @@ All eight September 6 audit batches are implemented and verified locally. Each b
 
 ## On Deck
 
-First: finish release verification for the simplified Discord reconciliation prompt (checklist 153). Local healthy/failure/legacy-owner and contextual-receipt regressions pass; do not force a production digest or record a test receipt.
+First: native acceptance of the released focused Discord reconciliation prompt (checklist 153). PR #84 passed 2,909 CI tests with zero skips and all type/build/asset gates; Railway deployment, bot/web startup, health/assets and private authorization are verified. Observe the next normal digest when eligible transactions exist; do not force a production message, break a healthy bank link or record a test receipt.
 
 Native receipt safety acceptance remains checklist 151, with the daily entry point superseded by checklist 153: View Inbox → an eligible matched shared payment, or the post-match shortcut → receipt details → separate confirmation. PR #81 exact-source CI (2,904 passed) and production startup/health/assets were verified. Cancel for read-only acceptance. Do not force a digest or record synthetic receipts.
 
@@ -257,7 +257,7 @@ Student-loan activation is complete. Verify the deployed fixed-bill display and 
 
 ## Completed 2026-10-25
 
-- Simplified Discord reconciliation: healthy daily prompts contain only Reconcile Now/View Inbox; unhealthy prompts ask to refresh and expose one persistent Refresh bank connection action. Login links are created on demand. Old recovery controls recheck saved health; old repayment controls open the contextual inbox. Optional receipt choices identify eligible saved shared matches and the remaining partner balance, with existing separate receipt confirmation and post-match shortcut retained. Targeted **115 passed / 31 optional PostgreSQL skipped**, full local **2,491 passed / 418 optional PostgreSQL skipped**, clean Pyright. CI/release verification pending. README, reconciliation/reimbursement workflow, Finance Ops and decisions updated; manual checklist 153. No production financial writes or synthetic Discord messages.
+- Simplified Discord reconciliation: healthy daily prompts contain only Reconcile Now/View Inbox; unhealthy prompts ask to refresh and expose one persistent Refresh bank connection action. Login links are created on demand. Old recovery controls recheck saved health; old repayment controls open the contextual inbox. Optional receipt choices identify eligible saved shared matches and the remaining partner balance, with existing separate receipt confirmation and post-match shortcut retained. Targeted **115 passed / 31 optional PostgreSQL skipped**, full local **2,491 passed / 418 optional PostgreSQL skipped**, clean Pyright. PR #84 merged as `06e0c2f` with a tree identical to tested `fa283b7`; CI #224 passed **2,909 tests / zero skips**, PostgreSQL, Python/frontend types, build and committed asset parity. Railway `b6082101-b8c7-4d4b-8ea1-4cfb596913ee` successfully deployed commit `06e0c2f`; Discord login/command sync/web startup, health, exact frontend/assets (`9217df8485c906a6bc2911cc`) and private-data authorization verified. Native next-normal-digest acceptance remains checklist 153; no forced message or production financial action. README, reconciliation/reimbursement workflow, Finance Ops and decisions updated; manual checklist 153. No production financial writes or synthetic Discord messages.
 
 ## Completed 2026-10-23
 
