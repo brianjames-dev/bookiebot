@@ -4,6 +4,8 @@ Last updated: 2026-10-25
 
 ## Active Focus
 
+Recent-transaction Delete investigation complete (2026-10-25; proposal only): exact morning window has no matching error; October 24 late-night logs show uncaught Sheets 429 during per-cell pre-write snapshots, plus a related Recent launcher `view=None` failure. Selected action identity is absent, so RJ11 correlation is unproven. Isolated quota/ACK/native Discord reproductions confirm the defects; existing handler/router tests **280 passed**. Finance Ops records evidence, a scoped repair proposal and isolated acceptance. No application or production data changes.
+
 Discord reconciliation prompt simplification released (2026-10-25): show bank recovery only for an unhealthy connection, with a focused single-action prompt. Remove the standalone daily repayment action; retain optional separately confirmed receipts on verified matched shared payments. Preserve old persistent controls safely, owner scope and morning recovery/delivery guards.
 
 Mobile navigation glow brightness refinement implemented (2026-10-23): render only the pointer-gradient layer at 60% opacity (40% dimmer), preserving the released 180px gradient size and selected-tab/label feedback. Rebuilt the shipped CSS. Focused navigation/shell/session tests **5 passed**, frontend typecheck/build pass, and **24 synthetic Chromium combinations** verify opacity, radius, pointer centering, fade, selection and tap targets in both themes. Preview screenshot inspected. CI/release pending; native acceptance is checklist 152.
@@ -172,7 +174,9 @@ All eight September 6 audit batches are implemented and verified locally. Each b
 
 ## On Deck
 
-First: native acceptance of the released focused Discord reconciliation prompt (checklist 153). PR #84 passed 2,909 CI tests with zero skips and all type/build/asset gates; Railway deployment, bot/web startup, health/assets and private authorization are verified. Observe the next normal digest when eligible transactions exist; do not force a production message, break a healthy bank link or record a test receipt.
+First: review the diagnosed recent-transaction Delete repair proposal before implementation. Batch category reads; acknowledge before I/O; safely report read-quota failures; use exact selected IDs; repair Recent no-view follow-ups. Add call-count, 429-before-write, slow/failed ACK, stale/double-click, real Discord serialization and Delete/Undo lineage regressions. User requested investigation and a proposal only.
+
+Next: native acceptance of the released focused Discord reconciliation prompt (checklist 153). PR #84 passed 2,909 CI tests with zero skips and all type/build/asset gates; Railway deployment, bot/web startup, health/assets and private authorization are verified. Observe the next normal digest when eligible transactions exist; do not force a production message, break a healthy bank link or record a test receipt.
 
 Native receipt safety acceptance remains checklist 151, with the daily entry point superseded by checklist 153: View Inbox → an eligible matched shared payment, or the post-match shortcut → receipt details → separate confirmation. PR #81 exact-source CI (2,904 passed) and production startup/health/assets were verified. Cancel for read-only acceptance. Do not force a digest or record synthetic receipts.
 
@@ -256,6 +260,8 @@ Student-loan activation is complete. Verify the deployed fixed-bill display and 
 27. Explore clarifying questions before logging when BookieBot is uncertain instead of guessing or silently failing.
 
 ## Completed 2026-10-25
+
+- Investigated silent recent Delete failures in Railway logs; found uncaught Sheets 429 during per-cell pre-write snapshot, synchronous callback I/O and a related invalid `view=None` Recent launcher response. Exact requested morning window has no matching failure; documented actual October 24 late-night errors and missing per-action identity. Isolated quota/ACK/native Discord reproductions pass; existing handler/router tests 280 passed. Recorded a scoped repair proposal and isolated acceptance in Finance Ops. No application or production data changes.
 
 - Simplified Discord reconciliation: healthy daily prompts contain only Reconcile Now/View Inbox; unhealthy prompts ask to refresh and expose one persistent Refresh bank connection action. Login links are created on demand. Old recovery controls recheck saved health; old repayment controls open the contextual inbox. Optional receipt choices identify eligible saved shared matches and the remaining partner balance, with existing separate receipt confirmation and post-match shortcut retained. Targeted **115 passed / 31 optional PostgreSQL skipped**, full local **2,491 passed / 418 optional PostgreSQL skipped**, clean Pyright. PR #84 merged as `06e0c2f` with a tree identical to tested `fa283b7`; CI #224 passed **2,909 tests / zero skips**, PostgreSQL, Python/frontend types, build and committed asset parity. Railway `b6082101-b8c7-4d4b-8ea1-4cfb596913ee` successfully deployed commit `06e0c2f`; Discord login/command sync/web startup, health, exact frontend/assets (`9217df8485c906a6bc2911cc`) and private-data authorization verified. Native next-normal-digest acceptance remains checklist 153; no forced message or production financial action. README, reconciliation/reimbursement workflow, Finance Ops and decisions updated; manual checklist 153. No production financial writes or synthetic Discord messages.
 
