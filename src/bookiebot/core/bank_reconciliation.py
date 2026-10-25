@@ -15,7 +15,7 @@ from bookiebot.banking.formatting import format_reconciliation_match_report_chun
 from bookiebot.banking.models import ReconciliationItem, ReconciliationPreview, ReconciliationReportMatch
 from bookiebot.banking.service import build_banking_service, refresh_reconciliation_review
 from bookiebot.core.bank_reconciliation_flow import send_next_bank_reconciliation_item
-from bookiebot.core.bank_reconciliation_receipts import send_bank_receipt_inbox
+from bookiebot.core.bank_reconciliation_receipts import matched_bank_receipts, send_bank_receipt_inbox, send_bank_receipt_review
 from bookiebot.core.bank_link import bank_reconnect_url
 from bookiebot.sheets.routing import (
     APPLE_SHORTCUT_RELAY_USER_ID,
@@ -26,6 +26,7 @@ from bookiebot.sheets.routing import (
 )
 from bookiebot.sheets.undo import has_system_event, record_system_event, read_logged_action_history
 from bookiebot.ui.bank_reconciliation import (
+    BankConnectionAlertView,
     BankReconciliationDigestView,
     BankReconciliationInboxView,
 )
@@ -50,7 +51,6 @@ class PreparedBankReconciliationDigest:
     reviewed_items: tuple[ReconciliationItem, ...] = ()
     preview: ReconciliationPreview | None = None
     event_type: str = 'bank_reconciliation_digest_sent'
-    reconnect_links: tuple[tuple[str, str], ...] = ()
 
 
 def _bank_reconciliation_enabled() -> bool:
@@ -238,32 +238,43 @@ async def notify_bank_reconciliation_refreshed(actor_key: str) -> None:
         _BANK_RECONCILIATION_WAKE.set()
 
 
-def bank_connection_alert_view(actor_key: str, links: tuple[tuple[str, str], ...] = ()) -> BankReconciliationDigestView:
-    view = bank_reconciliation_digest_view(actor_key)
-    for child in list(view.children):
-        if getattr(child, 'action', '') != 'resync':
-            view.remove_item(child)
-    for label, url in links[:5]:
-        view.add_item(discord.ui.Button(label=label[:80], url=url))
-    return view
+def bank_connection_alert_view(actor_key: str) -> BankConnectionAlertView:
+    return BankConnectionAlertView(_bank_prompt_handler(str(actor_key)), actor_key=str(actor_key))
 
 
 async def _resync_bank_information(interaction: Any, actor_key: str) -> None:
     owner = get_user_config(actor_key)
     service = build_banking_service()
+    issues = await asyncio.to_thread(service.connection_issues, owner.budget_owner_key)
+    if not issues:
+        await interaction.followup.send('Your bank connection is working. No connection refresh is needed. '
+            'Use View Inbox for the current saved transactions.', ephemeral=True,
+            view=bank_reconciliation_digest_view(actor_key))
+        return
     try:
         await asyncio.wait_for(service.sync_owner(owner.budget_owner_key), timeout=60)
         await asyncio.wait_for(refresh_reconciliation_review(service, owner.budget_owner_key, actor_key), timeout=60)
     except Exception:
         logger.exception('Bank resync from Discord failed', extra={'actor_key': actor_key})
         issues = await asyncio.to_thread(service.connection_issues, owner.budget_owner_key)
+        if not issues:
+            await interaction.followup.send('Your bank connection is working, but reconciliation could not finish refreshing. '
+                'Use View Inbox to inspect saved transactions or open Reconcile in the app.', ephemeral=True,
+                view=bank_reconciliation_digest_view(actor_key))
+            return
         base_url = (service.config.public_base_url or '').rstrip('/')
         links = tuple((f"Reconnect {issue['institution']}", bank_reconnect_url(
             actor_key, owner.budget_owner_key, issue['id'], base_url))
             for issue in issues if issue['needsReconnect']) if base_url else ()
-        await interaction.followup.send('Bank sync could not finish. Use Reconnect below if sign-in is needed, '
-            'or try Resync bank again. Saved review history is preserved.', ephemeral=True,
-            view=bank_connection_alert_view(actor_key, links))
+        view: discord.ui.View = bank_connection_alert_view(actor_key)
+        if links:
+            view = discord.ui.View(timeout=600)
+            for label, url in links[:5]:
+                view.add_item(discord.ui.Button(label=label[:80], url=url))
+        text = ('Your bank needs you to sign in again. Use the secure connection link below. '
+                'It expires after 15 minutes; the original Refresh bank connection button can provide a fresh link.'
+                if links else 'Bank updates still cannot sync. Would you like to refresh the connection again?')
+        await interaction.followup.send(text + ' Saved review history is preserved.', ephemeral=True, view=view)
         return
     await notify_bank_reconciliation_refreshed(actor_key)
     await interaction.followup.send('Bank information and reconciliation refreshed. Open Reconcile in the web app '
@@ -294,7 +305,7 @@ async def send_due_bank_reconciliation_digest(client: Any, today: date | None = 
         if not digest:
             continue
         if digest.event_type == 'bank_connection_alert_sent':
-            view = bank_connection_alert_view(actor_key, digest.reconnect_links)
+            view = bank_connection_alert_view(actor_key)
         else:
             view = bank_reconciliation_digest_view(actor_key)
         delivered = await _send_user_dm(
@@ -407,6 +418,13 @@ async def _send_bank_reconciliation_inbox(interaction: Any, actor_key: str) -> N
         return
 
     digest = await _with_inbox_match_details(digest, actor_key)
+    receipt_matches = []
+    try:
+        receipt_matches = await asyncio.wait_for(asyncio.to_thread(
+            matched_bank_receipts, digest.owner_key, actor_key, list(digest.reviewed_items)),
+            timeout=_INBOX_MATCH_DETAILS_TIMEOUT_SECONDS)
+    except Exception:
+        logger.warning("Optional matched-payment receipt choices unavailable", extra={"actor_key": actor_key})
 
     async def handle_inbox_action(action_interaction: Any, action: str) -> None:
         interaction_actor_key = _interaction_actor_key(action_interaction)
@@ -423,6 +441,13 @@ async def _send_bank_reconciliation_inbox(interaction: Any, actor_key: str) -> N
                 return
             if action == "receipts":
                 await send_bank_receipt_inbox(action_interaction, owner=digest.owner_key, actor=actor_key)
+                return
+            if action.startswith("receipt:"):
+                identity = next((item.id for item, _ in receipt_matches if action == f"receipt:{item.id}"), None)
+                if identity is not None:
+                    await send_bank_receipt_review(action_interaction, owner=digest.owner_key, actor=actor_key, identity=identity)
+                else:
+                    await action_interaction.followup.send("That shared match is no longer in this inbox. Open View Inbox again.", ephemeral=True)
                 return
             if action == "ignore_all":
                 service = build_banking_service()
@@ -484,8 +509,9 @@ async def _send_bank_reconciliation_inbox(interaction: Any, actor_key: str) -> N
                 handle_inbox_action,
                 has_unresolved=bool(digest.item_ids),
                 matches=list(digest.report_matches),
+                receipt_matches=receipt_matches,
             )
-            if index == view_message_index and (digest.item_ids or digest.report_matches)
+            if index == view_message_index and (digest.item_ids or digest.report_matches or receipt_matches)
             else None
         )
         # Webhook.send rejects view=None; omit it on pages without controls.
@@ -497,7 +523,7 @@ async def _send_bank_reconciliation_inbox(interaction: Any, actor_key: str) -> N
         )
 
 
-def bank_reconciliation_digest_view(actor_key: str) -> BankReconciliationDigestView:
+def _bank_prompt_handler(actor_key: str) -> Callable:
     async def handle_action(interaction: Any, action: str) -> None:
         interaction_actor_key = _interaction_actor_key(interaction)
         if interaction_actor_key != str(actor_key):
@@ -516,33 +542,19 @@ def bank_reconciliation_digest_view(actor_key: str) -> BankReconciliationDigestV
             if action == 'resync':
                 await _resync_bank_information(interaction, actor_key)
             if action == 'receipts':
-                await send_bank_receipt_inbox(interaction, owner=get_user_config(actor_key).budget_owner_key, actor=actor_key)
+                await _send_bank_reconciliation_inbox(interaction, actor_key)
 
-    return BankReconciliationDigestView(handle_action, actor_key=str(actor_key))
+    return handle_action
+
+
+
+def bank_reconciliation_digest_view(actor_key: str) -> BankReconciliationDigestView:
+    return BankReconciliationDigestView(_bank_prompt_handler(str(actor_key)), actor_key=str(actor_key))
 
 
 def persistent_bank_reconciliation_digest_view(actor_key: str) -> BankReconciliationDigestView:
-    async def handle_action(interaction: Any, action: str) -> None:
-        interaction_actor_key = _interaction_actor_key(interaction)
-        if interaction_actor_key != str(actor_key):
-            await interaction.response.send_message(
-                "This reconciliation inbox belongs to another user.",
-                ephemeral=True,
-            )
-            return
-        await interaction.response.defer(ephemeral=True, thinking=False)
-        async with _interaction_typing(interaction):
-            if action == "start":
-                await _start_bank_reconciliation_from_prompt(interaction, actor_key, clear_prompt=True)
-                return
-            if action == "inbox":
-                await _send_bank_reconciliation_inbox(interaction, actor_key)
-            if action == 'resync':
-                await _resync_bank_information(interaction, actor_key)
-            if action == 'receipts':
-                await send_bank_receipt_inbox(interaction, owner=get_user_config(actor_key).budget_owner_key, actor=actor_key)
-
-    return BankReconciliationDigestView(handle_action, actor_key=str(actor_key))
+    # Only registered at startup; never delivered as a new prompt.
+    return BankReconciliationDigestView(_bank_prompt_handler(str(actor_key)), actor_key=str(actor_key), legacy_controls=True)
 
 
 def register_persistent_bank_reconciliation_views(client: Any) -> None:
@@ -648,23 +660,21 @@ def prepare_bank_reconciliation_digest_messages(
             return None
         reconnect = [issue for issue in issues if issue['needsReconnect']]
         names = ', '.join(str(issue['institution'])[:100] for issue in reconnect)
-        text = (f'{mention} **Reconnect {names} to resume bank updates.**'
-                if reconnect else f'{mention} **Bank sync failed.**')
+        text = (f'{mention} **Bank updates have stopped for {names}.**'
+                if reconnect else f'{mention} **Bank updates are not syncing properly.**')
+        text += '\nWould you like to refresh your bank connection?'
         text += '\nTransactions and Pending statuses may be out of date. Saved review history is preserved.'
         for issue in issues[:5]:
             if issue['checkedAt']:
                 checked = datetime.fromisoformat(issue['checkedAt']).astimezone(PACIFIC_TZ)
                 text += f"\n{issue['institution']}: last successful sync {checked:%b %d, %I:%M %p} Pacific."
-        base_url = (service.config.public_base_url or '').rstrip('/')
-        links = tuple((f"Reconnect {issue['institution']}", bank_reconnect_url(
-            actor_key, owner.budget_owner_key, issue['id'], base_url)) for issue in reconnect) if base_url else ()
-        text += ('\nUse Reconnect below, open Reconcile in the app, or run `/bank_reconnect` for a fresh link. Links expire after 15 minutes.'
-                 if reconnect else '\nUse Resync bank below or Resync bank information in the app. The morning digest refreshes after recovery.')
+        if reconnect:
+            text += '\nYour bank requires sign-in again. Refresh bank connection below provides a fresh secure link.'
         if mark_sent and not record_system_event(actor_key, event_type, metadata,
                 f'Bank connection alert sent for {current.isoformat()}'):
             return None
         return PreparedBankReconciliationDigest(public_message=text, detail_message=text,
-            owner_key=owner.budget_owner_key, event_type=event_type, reconnect_links=links)
+            owner_key=owner.budget_owner_key, event_type=event_type)
 
     event_type = 'bank_reconciliation_recovery_digest_sent' if recovering else 'bank_reconciliation_digest_sent'
     if not force and event_type in events:
@@ -853,7 +863,6 @@ def format_bank_reconciliation_public_prompt(
         ]
     if sync_error:
         lines.append("Bank sync warning: using cached bank data.")
-    lines.append("Use `Review shared repayments` to separately confirm money received. Bank matching never records repayment.")
     return "\n".join(lines)
 
 

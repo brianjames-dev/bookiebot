@@ -10,6 +10,7 @@ from uuid import uuid4
 
 import discord
 
+from bookiebot.banking.models import ReconciliationItem
 from bookiebot.banking.receipt_links import matched_receipt_link
 from bookiebot.banking.service import build_banking_service
 from bookiebot.reimbursements import service as reimbursements
@@ -309,21 +310,28 @@ async def offer_bank_receipt_review(interaction: Any, *, owner: str, actor: str,
         logger.exception("Optional Discord bank receipt shortcut unavailable")
 
 
+def matched_bank_receipts(owner: str, actor: str, items: list[ReconciliationItem]) -> list[tuple[ReconciliationItem, dict[str, Any]]]:
+    """Read optional receipt choices for specific saved matches, without writes."""
+    if not reimbursements.enabled() or not any(item.status in {"matched", "confirmed"} for item in items):
+        return []
+    rows = reimbursements.snapshot(owner)["allocations"]
+    found, seen = [], set()
+    for item in items:
+        link = matched_receipt_link(owner, actor, item, allocations=rows)
+        if link and link["outstandingCents"] > 0 and link["allocationId"] not in seen:
+            seen.add(link["allocationId"])
+            found.append((item, link))
+    return found
+
+
 async def send_bank_receipt_inbox(interaction: Any, *, owner: str, actor: str, page: int = 0) -> None:
     try:
         def load():
             if not reimbursements.enabled():
                 return []
-            rows = reimbursements.snapshot(owner)["allocations"]
             items = build_banking_service().store.review_reconciliation_items(
                 owner, start_date=now_pacific().date().replace(day=1).isoformat(), limit=200)
-            found, seen = [], set()
-            for item in items:
-                link = matched_receipt_link(owner, actor, item, allocations=rows)
-                if link and link["outstandingCents"] > 0 and link["allocationId"] not in seen:
-                    seen.add(link["allocationId"])
-                    found.append((item, link))
-            return found
+            return matched_bank_receipts(owner, actor, items)
         found = await asyncio.to_thread(load)
         if not found:
             await interaction.followup.send("No outstanding shares are linked to matched bank payments in the latest 200 current-month transactions. Match a shared payment first, or open Shared in the app for other expenses. Nothing was recorded.", ephemeral=True)

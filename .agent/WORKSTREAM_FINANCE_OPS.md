@@ -1,12 +1,16 @@
 # Finance Operations Workstream
 
-Last updated: 2026-10-23
+Last updated: 2026-10-25
 
 ## Goal
 
+### Focused daily reconciliation prompts — 2026-10-25
+
+Implemented: healthy digests offer Reconcile Now/View Inbox only; a failed connection instead asks to refresh and shows one Refresh bank connection action. Generate fresh scoped bank sign-in links after clicking; old recovery controls recheck saved health without another sync after recovery. Preserve persistent IDs, owner checks, morning recovery and post-delivery audit guards. Remove the global daily reimbursement task and attach optional receipt choices to eligible exact saved shared matches in View Inbox; keep post-match shortcuts and separate canonical amount/date/received confirmation. One read-only allocation snapshot, no projection replay, and optional lookup failure cannot block bank review. Targeted 115 passed / 31 optional PostgreSQL skipped, full local 2,491 passed / 418 optional PostgreSQL skipped and clean Pyright. CI/release verification pending. Workflow/decision docs and STATUS 153 cover acceptance. No production financial actions or synthetic Discord sends. The October 23 global repayment entry point below is superseded.
+
 ### Discord reconciliation receipt confirmation — 2026-10-23
 
-Implemented: persistent 10 AM digest/private inbox entry, exact saved automatic/manual bank-match choices and optional post-match receipt shortcut. Reuse the web mapper with one shared allocation snapshot, canonical receive/confirm_payment commands, actor ownership, fresh bank/allocation/report evidence and existing projection/reset/settlement guards. An amount/date/note modal leads to a separate confirmation; no receipt on match/open/modal/cancel. Preserve pending sender events, partial amounts and the original command through lost responses, concurrent clicks and parent cancellation; preflight failures cannot bypass fresh bank validation. Current-month latest-200 choices paginate by 25. Focused 108 passed / 30 optional PostgreSQL skipped; full local 2,487 passed / 417 optional PostgreSQL skipped and clean Python types. Real private Discord components and modal serialization pass; CI/release pending. Workflow/decision docs updated; manual/native next-digest acceptance is STATUS 151. No production receipts or synthetic Discord messages.
+Released: persistent 10 AM digest/private inbox entry, exact saved automatic/manual bank-match choices and optional post-match receipt shortcut. Reuse the web mapper with one shared allocation snapshot, canonical receive/confirm_payment commands, actor ownership, fresh bank/allocation/report evidence and existing projection/reset/settlement guards. An amount/date/note modal leads to a separate confirmation; no receipt on match/open/modal/cancel. Preserve pending sender events, partial amounts and the original command through lost responses, concurrent clicks and parent cancellation; preflight failures cannot bypass fresh bank validation. Current-month latest-200 choices paginate by 25. Focused 108 passed / 30 optional PostgreSQL skipped; full local 2,487 passed / 417 optional PostgreSQL skipped and clean Python types. Real private Discord components and modal serialization pass. PR #81 merged as `787bb3c` from exact source `36510c9`; CI #212 passed **2,904 / zero skips**, PostgreSQL/types/build/asset parity. Railway `adaef0ed` active for PR #81; Discord/command/web startup, health, unchanged exact frontend/assets (`513de9cd01fbaae2b98f933c`) and private authorization verified. Workflow/decision docs updated; manual/native next-digest acceptance is STATUS 151. No production receipts or synthetic Discord messages.
 
 ### Separate received-share confirmation in reconciliation — 2026-10-23
 

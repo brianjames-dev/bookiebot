@@ -1,5 +1,11 @@
 # Agent Decisions
 
+## 2026-10-25 - Keep Daily Reconciliation Focused On Bank Health And Matched Payments
+
+Deliver only Reconcile Now and View Inbox on healthy daily digests. An unhealthy connection instead gets one persistent Refresh bank connection action and a clear refresh question. Generate short-lived owner/Item-scoped login links only after that action if sign-in is still required. Recheck saved health when an old recovery control is pressed; a recovered connection does not sync or trigger another recovery event. Preserve morning recovery/delivery guards and old persistent component IDs.
+
+Remove the standalone daily shared-repayment task. Attach optional receipt choices to eligible exact saved matches in the private inbox and retain the post-match shortcut. Read one canonical allocation snapshot without replaying projections; unavailable optional choices cannot block the bank inbox. Full bill matching and actual partner repayment remain separate accounting events, with the same explicit amount/date review and separate received confirmation. No schema, financial command or bank matching changes. This supersedes the October 23 global digest/inbox repayment entry point only.
+
 ## 2026-10-23 - Reuse Canonical Receipts In Discord Reconciliation
 
 The persistent morning digest, private inbox and successful manual matches expose a separate shared-repayment review. Resolve saved automatic/manual matches with the same exact bank-to-allocation evidence as the web; list the latest 200 watched current-month transactions and paginate choices by 25 without syncing the bank or replaying projections on entry. Reuse one allocation snapshot for the list. Never infer repayment from matching.

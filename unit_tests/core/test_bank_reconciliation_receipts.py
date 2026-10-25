@@ -263,32 +263,57 @@ async def test_postmatch_shortcut_is_optional_read_only_and_actor_scoped(setup, 
 
 
 @pytest.mark.asyncio
-@pytest.mark.parametrize("persistent", [False, True])
-async def test_morning_digest_receipt_button_survives_restart_and_rejects_other_actor(monkeypatch, persistent):
+async def test_retired_morning_receipt_button_stays_actor_scoped_and_opens_matched_inbox(monkeypatch):
     send = AsyncMock()
-    monkeypatch.setattr(digest, "send_bank_receipt_inbox", send)
-    factory = digest.persistent_bank_reconciliation_digest_view if persistent else digest.bank_reconciliation_digest_view
-    control = next(child for child in factory(ACTOR).children if child.action == "receipts")
-    assert control.custom_id == f"bank_reconcile:receipts:{ACTOR}"
+    monkeypatch.setattr(digest, "_send_bank_reconciliation_inbox", send)
+    assert [child.action for child in digest.bank_reconciliation_digest_view(ACTOR).children] == ["start", "inbox"]
+    control = next(child for child in digest.persistent_bank_reconciliation_digest_view(ACTOR).children if child.action == "receipts")
     clicked = interaction()
     await control.callback(clicked)
-    send.assert_awaited_once_with(clicked, owner="brian", actor=ACTOR)
-    clicked.response.defer.assert_awaited_once_with(ephemeral=True, thinking=False)
+    send.assert_awaited_once_with(clicked, ACTOR)
     await control.callback(interaction("830984827904851969"))
     assert send.await_count == 1
 
 
 @pytest.mark.asyncio
-async def test_inbox_receipt_button_routes_to_owner_scoped_private_review(monkeypatch):
-    send = AsyncMock()
-    monkeypatch.setattr(digest, "send_bank_receipt_inbox", send)
+async def test_inbox_offers_receipts_only_on_verified_matched_shared_payments(setup, monkeypatch):
+    from bookiebot.banking.models import ReconciliationReportMatch
+    report_match = ReconciliationReportMatch(reconciliation_id=1, bank_name="Shared bill", bank_date="2026-10-19",
+        bank_amount=125, matched_date="2026-10-19", matched_name="Shared bill", matched_amount=125,
+        source_type="expense", matched_sheet_ref="ref", reason="saved", confidence=.99)
     monkeypatch.setattr(digest, "prepare_bank_reconciliation_inbox_messages", lambda *args: digest.PreparedBankReconciliationDigest(
-        public_message="generic", detail_message="private inbox", item_ids=(1,), owner_key="brian"))
+        public_message="generic", detail_message="private inbox", report_matches=(report_match,),
+        reviewed_items=(setup.bank,), owner_key="brian"))
     reply = interaction()
     await digest._send_bank_reconciliation_inbox(reply, ACTOR)
+    assert all(getattr(child, "label", None) != "Review shared repayments" for child in view(reply).children)
+    selector = next(child for child in view(reply).children if getattr(child, "placeholder", "") == "Record repayment for a matched payment")
+    assert "$44.09 owed" in selector.options[0].label
+    selector._values = ["receipt:1"]
+    foreign = interaction("830984827904851969")
+    await selector.callback(foreign)
+    foreign.response.send_message.assert_awaited_once()
+    foreign.response.defer.assert_not_awaited()
     clicked = interaction()
-    await button(reply, "receipts").callback(clicked)
-    send.assert_awaited_once_with(clicked, owner="brian", actor=ACTOR)
+    await selector.callback(clicked)
+    assert "$125.00" in text(clicked) and "Hannah" in text(clicked)
+    assert not setup.store.snapshot("brian")["events"]
+    # A paid share no longer contributes a repayment control to the bank inbox.
+    service.command("brian", payment(setup.row, 4409))
+    settled = interaction()
+    await digest._send_bank_reconciliation_inbox(settled, ACTOR)
+    assert all(getattr(child, "placeholder", "") != "Record repayment for a matched payment" for child in view(settled).children)
+
+
+@pytest.mark.asyncio
+async def test_optional_receipt_lookup_failure_keeps_bank_inbox_available(monkeypatch):
+    monkeypatch.setattr(digest, "prepare_bank_reconciliation_inbox_messages", lambda *args: digest.PreparedBankReconciliationDigest(
+        public_message="generic", detail_message="private inbox", item_ids=(1,), owner_key="brian"))
+    monkeypatch.setattr(digest, "matched_bank_receipts", Mock(side_effect=RuntimeError("Optional source unavailable")))
+    reply = interaction()
+    await digest._send_bank_reconciliation_inbox(reply, ACTOR)
+    assert text(reply) == "private inbox"
+    assert [child.action for child in view(reply).children] == ["start", "ignore_all"]
 
 
 @pytest.mark.asyncio

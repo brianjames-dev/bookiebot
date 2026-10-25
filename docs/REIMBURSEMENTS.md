@@ -34,7 +34,7 @@ Matching does not record a repayment. The payer budget retains the full cash pay
 
 ## Received-share review in Discord reconciliation
 
-The **10 AM Pacific** reconciliation digest and private **View Inbox** offer **Review shared repayments**. Choose an outstanding share linked to a saved automatic or manual bank match, or select **Review Hannah’s share** after matching a shared payment. The list covers the latest 200 watched current-month bank transactions, paginated 25 choices at a time; other shared expenses remain in the app’s Shared view. Links require exact saved source/month/gross evidence, never a guessed merchant or equal amount alone.
+The **10 AM Pacific** digest has no separate repayment task. Its private **View Inbox** shows **Record repayment for a matched payment** only when an eligible saved automatic or manual shared match has a balance owed. Choose the identified payment and partner balance, or select **Review Hannah’s share** after matching a shared payment. Up to 25 contextual choices appear directly; **More matched shared payments** opens the paged latest-200 current-month list if needed. Other shared expenses remain in the app’s Shared view. Links require exact saved source/month/gross evidence, never a guessed merchant or equal amount alone.
 
 Review the full bank payment, partner share, already received, separately cleared amount and balance still owed. **Mark Hannah’s share received** opens the actual amount/date/note form; submitting that form only opens another review. **Confirm received record** is the separate action that saves the receipt. Partial amounts are supported, dates use Pacific today by default, and Cancel records nothing. Matching remains independent of repayment.
 

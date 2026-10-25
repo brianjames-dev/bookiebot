@@ -148,14 +148,15 @@ def test_recovery_digest_confirms_healthy_empty_inbox_while_normal_empty_inbox_s
 @pytest.mark.asyncio
 @pytest.mark.parametrize('persistent', [False, True])
 async def test_discord_resync_checks_owner_and_refreshes_shared_review(morning, monkeypatch, persistent):
-    service = SimpleNamespace(sync_owner=AsyncMock())
+    service = SimpleNamespace(sync_owner=AsyncMock(), connection_issues=lambda owner: [
+        {'id': 3, 'institution': 'Example Bank', 'needsReconnect': False}])
     build = Mock(return_value=service)
     monkeypatch.setattr(digest, 'build_banking_service', build)
     monkeypatch.setattr(digest, 'get_user_config', lambda actor: SimpleNamespace(budget_owner_key='brian'))
     refresh, notify = AsyncMock(), AsyncMock()
     monkeypatch.setattr(digest, 'refresh_reconciliation_review', refresh)
     monkeypatch.setattr(digest, 'notify_bank_reconciliation_refreshed', notify)
-    factory = digest.persistent_bank_reconciliation_digest_view if persistent else digest.bank_reconciliation_digest_view
+    factory = digest.persistent_bank_reconciliation_digest_view if persistent else digest.bank_connection_alert_view
     button = next(child for child in factory('123').children if child.action == 'resync')
     interaction = SimpleNamespace(user=SimpleNamespace(id='999'),
         response=SimpleNamespace(send_message=AsyncMock(), defer=AsyncMock()),
@@ -183,6 +184,7 @@ async def test_discord_login_failure_offers_fresh_scoped_reconnect_without_diges
     await digest._resync_bank_information(interaction, '123')
     notify.assert_not_awaited()
     view = interaction.followup.send.call_args.kwargs['view']
+    assert len(view.children) == 1
     link = next(child.url for child in view.children if getattr(child, 'url', None))
     assert verify_bank_link_setup_token(link.split('token=')[1]) == {'actor_key': '123', 'owner_key': 'brian', 'item_db_id': '3'}
 

@@ -1,8 +1,9 @@
 from __future__ import annotations
 
 from collections.abc import Callable
+from typing import Any
 
-from bookiebot.banking.models import ReconciliationReportMatch
+from bookiebot.banking.models import ReconciliationItem, ReconciliationReportMatch
 from bookiebot.banking.reconciliation import ActionLogCandidate, ActionLogCandidateGroup
 from bookiebot.ui.card import ButtonBase, ButtonStyle, Interaction, SelectBase, SelectOption, ViewBase
 
@@ -126,7 +127,7 @@ class BankReconciliationDetailView(ViewBase):  # type: ignore[misc]
 
 
 class BankReconciliationDigestView(ViewBase):  # type: ignore[misc]
-    def __init__(self, callback_func: Callable, *, actor_key: str):
+    def __init__(self, callback_func: Callable, *, actor_key: str, legacy_controls: bool = False):
         super().__init__(timeout=None)
         self.add_item(
             BankReconciliationButton(
@@ -144,10 +145,20 @@ class BankReconciliationDigestView(ViewBase):  # type: ignore[misc]
                 custom_id=f"bank_reconcile:inbox:{actor_key}",
             )
         )
-        self.add_item(BankReconciliationButton("Resync bank", "resync", callback_func,
+        # Registration only: keep already-delivered component IDs working after
+        # restart without putting their retired controls on new healthy prompts.
+        if legacy_controls:
+            self.add_item(BankReconciliationButton("Refresh bank connection", "resync", callback_func,
+                custom_id=f"bank_reconcile:resync:{actor_key}"))
+            self.add_item(BankReconciliationButton("Review shared repayments", "receipts", callback_func,
+                custom_id=f"bank_reconcile:receipts:{actor_key}"))
+
+
+class BankConnectionAlertView(ViewBase):  # type: ignore[misc]
+    def __init__(self, callback_func: Callable, *, actor_key: str):
+        super().__init__(timeout=None)
+        self.add_item(BankReconciliationButton("Refresh bank connection", "resync", callback_func,
             custom_id=f"bank_reconcile:resync:{actor_key}"))
-        self.add_item(BankReconciliationButton("Review shared repayments", "receipts", callback_func,
-            custom_id=f"bank_reconcile:receipts:{actor_key}"))
 
 
 class BankReconciliationInboxView(ViewBase):  # type: ignore[misc]
@@ -157,12 +168,20 @@ class BankReconciliationInboxView(ViewBase):  # type: ignore[misc]
         *,
         has_unresolved: bool = True,
         matches: list[ReconciliationReportMatch] | None = None,
+        receipt_matches: list[tuple[ReconciliationItem, dict[str, Any]]] | None = None,
     ):
         super().__init__(timeout=600)
-        self.add_item(BankReconciliationButton("Review shared repayments", "receipts", callback_func))
         if has_unresolved:
             self.add_item(BankReconciliationButton("Reconcile Now", "start", callback_func))
             self.add_item(BankReconciliationButton("Ignore All", "ignore_all", callback_func))
+        if receipt_matches:
+            choices = [(SelectOption(label=f"{item.transaction.name} · {link['partner']} ${link['outstandingCents'] / 100:.2f} owed"[:100],
+                value=f"receipt:{item.id}", description=f"{item.transaction.date} · Bank ${abs(item.transaction.amount):.2f}"[:100]),
+                f"receipt:{item.id}") for item, link in receipt_matches[:25]]
+            self.add_item(BankReconciliationMatchSelect(choices, callback_func,
+                placeholder="Record repayment for a matched payment"))
+            if len(receipt_matches) > 25:
+                self.add_item(BankReconciliationButton("More matched shared payments", "receipts", callback_func))
         if matches:
             self.add_item(BankReconciliationUnmatchSelect(matches, callback_func))
 
