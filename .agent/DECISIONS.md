@@ -1,5 +1,13 @@
 # Agent Decisions
 
+## 2026-10-25 - Batch Delete Preparation And Finish Every Recent Workflow Response
+
+Prepare ordinary expense deletion from one fresh sheet snapshot, reusing it for the category extent, source identity and Undo data. Preserve blank/ragged cells; shared snapshot callers also use a batched read. Propagate read failures explicitly for Recent browsing/selection so unavailable history cannot be mistaken for an empty ledger. Catch pre-write failures and report that no deletion occurred; uncertain writes and failed Undo persistence must not claim success or invite blind retry. No automatic writer retry, schema or financial event change.
+
+Acknowledge owner-validated Discord selection/Delete with visible private progress before I/O; execute blocking work with actor context. Bind Delete to its exact saved action ID, never another recent index after stale selection. One submission per control, Cancel invalidation, rejected-ACK stop and fresh source checks protect repeated/old controls. Serialize process-local Delete/Undo operations while row compaction is in progress, retaining existing expense-level split guards. Save additive `preceding_restore_ids` in the existing Undo metadata before compaction so older gaps retain their relative position, preserving LIFO Undo order and neighboring lineage. Existing canonical settlement/projection guards and bank reopening remain authoritative.
+
+Omit absent webhook views in Recent follow-ups; empty histories and retryable read errors must serialize through the actual Discord API. Keep the temporary launcher until its private send succeeds. Record action ID/stage/duration/outcome without transaction contents. Use isolated financial fixtures for acceptance; the actual RJ11 entry must remain untouched.
+
 ## 2026-10-25 - Keep Daily Reconciliation Focused On Bank Health And Matched Payments
 
 Deliver only Reconcile Now and View Inbox on healthy daily digests. An unhealthy connection instead gets one persistent Refresh bank connection action and a clear refresh question. Generate short-lived owner/Item-scoped login links only after that action if sign-in is still required. Recheck saved health when an old recovery control is pressed; a recovered connection does not sync or trigger another recovery event. Preserve morning recovery/delivery guards and old persistent component IDs.
