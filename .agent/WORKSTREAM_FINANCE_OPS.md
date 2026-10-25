@@ -1,8 +1,12 @@
 # Finance Operations Workstream
 
-Last updated: 2026-10-23
+Last updated: 2026-10-25
 
 ## Goal
+
+### Focused daily reconciliation prompts — 2026-10-25
+
+Implemented: healthy digests offer Reconcile Now/View Inbox only; a failed connection instead asks to refresh and shows one Refresh bank connection action. Generate fresh scoped bank sign-in links after clicking; old recovery controls recheck saved health without another sync after recovery. Preserve persistent IDs, owner checks, morning recovery and post-delivery audit guards. Remove the global daily reimbursement task and attach optional receipt choices to eligible exact saved shared matches in View Inbox; keep post-match shortcuts and separate canonical amount/date/received confirmation. One read-only allocation snapshot, no projection replay, and optional lookup failure cannot block bank review. Targeted 115 passed / 31 optional PostgreSQL skipped, full local 2,491 passed / 418 optional PostgreSQL skipped and clean Pyright. CI/release verification pending. Workflow/decision docs and STATUS 153 cover acceptance. No production financial actions or synthetic Discord sends. The October 23 global repayment entry point below is superseded.
 
 ### Discord reconciliation receipt confirmation — 2026-10-23
 
