@@ -101,6 +101,11 @@ class TypingChannel(DummyChannel):
 @pytest.fixture(autouse=True)
 def _patch_resolver(monkeypatch):
     ih._RECENT_PRIVATE_FOLLOWUPS.clear()
+    # Each local grid has independent action IDs; stale controls from a previous
+    # fixture must not point into the next test's replacement history.
+    from bookiebot.sheets.undo import clear_pending_action_selection
+    clear_pending_action_selection("830984827904851969")
+    clear_pending_action_selection("676638528590970917")
     monkeypatch.setattr(ih, "resolve_query_persons", lambda user, person=None, user_id=None: ["Hannah"])
     yield
     ih._RECENT_PRIVATE_FOLLOWUPS.clear()
@@ -802,7 +807,7 @@ async def test_recent_component_prompts_are_ephemeral(monkeypatch, message):
         decision_view = select_response.sent[0][1]["view"]
         update_button = next(child for child in decision_view.children if getattr(child, "label", None) == "Update")
         update_response = Response()
-        update_interaction = SimpleNamespace(user=message.author, response=update_response)
+        update_interaction = SimpleNamespace(user=message.author, response=update_response, followup=SimpleNamespace(send=update_response.send_message))
 
         await update_button.callback(update_interaction)
 
@@ -1037,7 +1042,7 @@ async def test_existing_canonical_split_keeps_transaction_update_and_split_menus
 
     update_interaction = _recent_test_interaction(message.author)
     await next(child for child in decision_view.children if child.label == "Update").callback(update_interaction)
-    update_call = update_interaction.response.send_message.call_args
+    update_call = update_interaction.followup.send.call_args
     assert "Which field would you like to update?" in update_call.args[0]
     assert [child.label for child in update_call.kwargs["view"].children] == ["Amount", "Location", "Person"]
     assert update_call.kwargs["ephemeral"] is True
@@ -2420,7 +2425,7 @@ async def test_move_category_view_excludes_current_category(monkeypatch, message
         from bookiebot.sheets.undo import recent_actions
 
         action_id = recent_actions(str(message.author.id), 1)[0].id
-        view = ih._move_category_view(str(message.author.id), action_id)
+        view = ih._move_category_view(str(message.author.id), action_id, source_category="grocery")
 
     labels = [child.label for child in view.children]
     assert "Grocery" not in labels

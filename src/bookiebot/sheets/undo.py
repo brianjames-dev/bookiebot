@@ -40,15 +40,15 @@ ActionKind = Literal[
 ]
 
 
-_DELETE_UNDO_LOCK = threading.RLock()
+_RECENT_MUTATION_LOCK = threading.RLock()
 
 
-def _serialize_delete_undo(operation):
+def _serialize_recent_mutation(operation):
     @wraps(operation)
     def run(*args, **kwargs):
-        # Compaction changes neighboring coordinates. Worker deletes and Undo
-        # must not read different snapshots and then shift the same rows.
-        with _DELETE_UNDO_LOCK:
+        # Compaction changes neighboring coordinates. Update, Move, Delete and
+        # Undo must prepare and write against the same row positions.
+        with _RECENT_MUTATION_LOCK:
             return operation(*args, **kwargs)
     return run
 
@@ -895,9 +895,9 @@ def action_title(action: UndoAction) -> str:
     return "Transaction"
 
 
-def format_recent_actions(user_key: str | None, limit: int = 5, offset: int = 0) -> str:
+def format_recent_actions(user_key: str | None, limit: int = 5, offset: int = 0, *, strict: bool = False) -> str:
     return _format_actions(
-        recent_actions(user_key, limit, offset),
+        recent_actions(user_key, limit, offset, strict=True) if strict else recent_actions(user_key, limit, offset),
         empty_message="I do not have any recent logged actions for you this month.",
         final_prompt="Type `show more` to see older transactions.",
     )
@@ -1070,12 +1070,12 @@ def select_recent_action(
     return None
 
 
-def matching_recent_actions(user_key: str | None, match_text: str, limit: int = 10) -> list[LoggedAction]:
+def matching_recent_actions(user_key: str | None, match_text: str, limit: int = 10, *, strict: bool = False) -> list[LoggedAction]:
     needles = [part for part in match_text.lower().split() if part]
     if not needles:
         return []
     matches = []
-    for logged in recent_actions(user_key, limit):
+    for logged in (recent_actions(user_key, limit, strict=True) if strict else recent_actions(user_key, limit)):
         haystack = _action_search_text(logged)
         if all(needle in haystack for needle in needles):
             matches.append(logged)
@@ -1162,9 +1162,9 @@ def format_delete_candidates(user_key: str | None, match_text: str, limit: int =
     )
 
 
-def format_update_candidates(user_key: str | None, match_text: str, limit: int = 10) -> str:
+def format_update_candidates(user_key: str | None, match_text: str, limit: int = 10, *, strict: bool = False) -> str:
     key = _pending_key(user_key)
-    actions = matching_recent_actions(user_key, match_text, limit)
+    actions = matching_recent_actions(user_key, match_text, limit, strict=True) if strict else matching_recent_actions(user_key, match_text, limit)
     if key:
         _PENDING_UPDATE_IDS_BY_USER[key] = _new_pending_selection([logged.id for logged in actions])
     return _format_actions(
@@ -1174,9 +1174,9 @@ def format_update_candidates(user_key: str | None, match_text: str, limit: int =
     )
 
 
-def format_move_candidates(user_key: str | None, match_text: str, limit: int = 10) -> str:
+def format_move_candidates(user_key: str | None, match_text: str, limit: int = 10, *, strict: bool = False) -> str:
     key = _pending_key(user_key)
-    actions = matching_recent_actions(user_key, match_text, limit)
+    actions = matching_recent_actions(user_key, match_text, limit, strict=True) if strict else matching_recent_actions(user_key, match_text, limit)
     if key:
         _PENDING_MOVE_IDS_BY_USER[key] = _new_pending_selection([logged.id for logged in actions])
     return _format_actions(
@@ -1550,7 +1550,7 @@ def _transaction_type(action: UndoAction) -> str:
 _STALE_BUDGET_TARGET_MESSAGE = "That saved action no longer points to its expected budget label, so I did not change anything."
 
 
-def _fixed_budget_target_matches(ws: Any, action: UndoAction) -> bool:
+def _fixed_budget_target_matches(ws: Any, action: UndoAction, *, values: list[list[Any]] | None = None) -> bool:
     if action.worksheet != "income":
         return True
     source_type = _transaction_type(action)
@@ -1558,21 +1558,21 @@ def _fixed_budget_target_matches(ws: Any, action: UndoAction) -> bool:
         source_type = action.metadata.get("source_type", "")
     if source_type not in {"payment", "savings"}:
         return True
-    rows = ws.get_all_values()
-    values = rows[action.row - 1] if 0 < action.row <= len(rows) else []
+    rows = ws.get_all_values() if values is None else values
+    row_values = rows[action.row - 1] if 0 < action.row <= len(rows) else []
     amount_column = _field_columns_for_action(action).get("amount")
     if source_type == "payment":
         if "exact_source_label" in action.metadata:
             expected = action.metadata["exact_source_label"].strip().casefold()
-            actual = str(values[1]).strip().casefold() if len(values) > 1 else ""
+            actual = str(row_values[1]).strip().casefold() if len(row_values) > 1 else ""
             return bool(expected) and amount_column == 3 and actual == expected
         category = _normalized_sheet_label(action.metadata.get("category"))
-        label = _normalized_sheet_label(values[1]) if len(values) > 1 else ""
+        label = _normalized_sheet_label(row_values[1]) if len(row_values) > 1 else ""
         return bool(category) and amount_column == 3 and (label == category or label.startswith(category + " "))
     savings_labels = {"enter monthly savings contribution", "enter 1st paycheck deposit", "enter 2nd paycheck deposit"}
     return any(
         _normalized_sheet_label(value) in savings_labels and amount_column == column + 3
-        for column, value in enumerate(values, start=1)
+        for column, value in enumerate(row_values, start=1)
     )
 
 
@@ -1633,6 +1633,10 @@ def _update_logged_new_values(
         return
     ws, row_index, logged = found
     columns = logged.action.columns
+    if logged.action.metadata.get("display_fields"):
+        fields = list(_field_values_for_action(logged.action))
+        field_columns = _field_columns_for_action(logged.action)
+        columns = [field_columns.get(field, -1) for field in fields]
     values = list(logged.action.new_values)
     while len(values) < len(columns):
         values.append("")
@@ -1654,13 +1658,13 @@ def _category_columns(category: str) -> dict[str, int]:
     }
 
 
-def _first_empty_category_row(ws: Any, category: str) -> int:
+def _first_empty_category_row(ws: Any, category: str, *, values: list[list[Any]] | None = None) -> int:
     from bookiebot.sheets.config import get_category_columns
 
     config = get_category_columns[category]
     row_start = config["start_row"]
     columns = list(_category_columns(category).values())
-    rows = ws.get_all_values()
+    rows = ws.get_all_values() if values is None else values
     for row in range(row_start, len(rows) + 1):
         if not any(column <= len(rows[row - 1]) and str(rows[row - 1][column - 1]).strip() for column in columns):
             return row
@@ -1951,6 +1955,41 @@ def _missing_move_fields_message(missing: list[str], source_category: str, desti
     )
 
 
+def _recent_edit_preparation_error(exc: Exception, operation: str) -> str:
+    if isinstance(exc, SpreadsheetQuotaError) or is_google_sheets_quota_error(exc):
+        return f"Google Sheets is temporarily rate-limiting reads. Nothing was changed. Wait about a minute, then open Recent transactions and try {operation} again."
+    return f"I could not prepare the {operation}. Nothing was changed. Open Recent transactions and try again."
+
+
+def _recent_edit_list(user_key: str | None, operation: str, match_text: str | None = None) -> tuple[bool, str]:
+    try:
+        if match_text:
+            formatter = format_update_candidates if operation == "Update" else format_move_candidates
+            return False, formatter(user_key, match_text, 10, strict=True)
+        return False, format_recent_actions(user_key, 5, strict=True)
+    except Exception as exc:
+        logger.exception("Recent %s choices unavailable", operation)
+        return False, _recent_edit_preparation_error(exc, operation)
+
+
+def _select_recent_edit(user_key: str | None, kind: Literal["update", "move"], *,
+                        index: int | None, action_id: str | None, match_text: str | None) -> tuple[LoggedAction | None, str]:
+    if index is not None and user_key and not action_id:
+        pending, expired = _pending_selection_for_kind(user_key, kind)
+        if expired:
+            pop_pending_action_expiration_notice(user_key)
+            return None, _PENDING_SELECTION_EXPIRED_MESSAGE
+        if pending and pending.action_ids:
+            if not 1 <= index <= len(pending.action_ids):
+                return None, "That selection is no longer available. Nothing was changed. Open Recent transactions again."
+            action_id, index = pending.action_ids[index - 1], None
+    logged = select_recent_action(user_key, index=index, action_id=action_id, match_text=match_text, strict=True)
+    if logged is None and action_id:
+        return None, "That transaction is no longer available. Nothing was changed. Open Recent transactions again."
+    return logged, ""
+
+
+@_serialize_recent_mutation
 def move_recent_action(
     user_key: str | None,
     *,
@@ -1965,32 +2004,21 @@ def move_recent_action(
     updates = updates or {}
     destination_category = normalize_expense_category(destination_category)
     if match_text and not index and not action_id:
-        return False, format_move_candidates(user_key, match_text, 10)
+        return _recent_edit_list(user_key, "Move", match_text)
 
     key = str(user_key) if user_key else ""
-    requested_index = index
-    if index is not None and key:
-        pending, expired = _pending_selection_for_kind(user_key, "move")
-        if expired:
-            pop_pending_action_expiration_notice(user_key)
-            return False, _PENDING_SELECTION_EXPIRED_MESSAGE
-        candidate_ids = pending.action_ids if pending else []
-        if 1 <= index <= len(candidate_ids):
-            action_id = candidate_ids[index - 1]
-            index = None
-
     if not index and not action_id and not match_text:
-        return False, format_recent_actions(user_key, 5)
-
+        return _recent_edit_list(user_key, "Move")
     if destination_category not in get_category_columns:
         available = ", ".join(sorted(get_category_columns))
         return False, f"Tell me which category to move it to. Available categories: {available}."
-
-    logged = select_recent_action(user_key, index=index, action_id=action_id, match_text=match_text)
-    if logged is None and requested_index is not None and action_id:
-        logged = select_recent_action(user_key, index=requested_index)
+    try:
+        logged, error = _select_recent_edit(user_key, "move", index=index, action_id=action_id, match_text=match_text)
+    except Exception as exc:
+        logger.exception("Recent Move selection failed", extra={"action_id": action_id, "stage": "select"})
+        return False, _recent_edit_preparation_error(exc, "Move")
     if logged is None:
-        return False, format_recent_actions(user_key, 5)
+        return (False, error) if error else _recent_edit_list(user_key, "Move")
 
     action = logged.action
     capabilities = action_capabilities(action)
@@ -2011,43 +2039,46 @@ def move_recent_action(
     if source_category == destination_category:
         return False, f"That expense is already in {destination_category}."
 
-    ws = _worksheet("expense")
-    source_columns_by_field = _category_columns(source_category)
-    source_fields = list(source_columns_by_field)
-    source_category_columns = list(source_columns_by_field.values())
-    source_current_values = [
-        _sheet_value(ws.cell(action.row, col).value)
-        for col in source_category_columns
-    ]
-    source_values = {
-        field: source_current_values[index]
-        for index, field in enumerate(source_fields)
-    }
-    destination_values = _values_for_category(source_values, destination_category, updates)
-    missing = _missing_required_move_fields(destination_values, destination_category)
-    if missing:
-        if missing == ["item"]:
-            set_pending_move_item(user_key, logged.id, destination_category)
-            return False, _move_item_prompt(source_category, destination_category)
-        return False, _missing_move_fields_message(missing, source_category, destination_category)
+    try:
+        ws = _worksheet("expense")
+        source_columns_by_field = _category_columns(source_category)
+        source_fields = list(source_columns_by_field)
+        source_category_columns = list(source_columns_by_field.values())
+        sheet_values = ws.get_all_values()
+        source_current_values = _category_snapshot(ws, range(action.row, action.row + 1), source_category_columns, values=sheet_values)[0]
+        source_values = {
+            field: source_current_values[index]
+            for index, field in enumerate(source_fields)
+        }
+        destination_values = _values_for_category(source_values, destination_category, updates)
+        missing = _missing_required_move_fields(destination_values, destination_category)
+        if missing:
+            if missing == ["item"]:
+                set_pending_move_item(user_key, logged.id, destination_category)
+                return False, _move_item_prompt(source_category, destination_category)
+            return False, _missing_move_fields_message(missing, source_category, destination_category)
 
-    source_end_row = max(action.row, _last_occupied_category_row(ws, source_category))
-    source_snapshot = _category_snapshot(ws, range(action.row, source_end_row + 1), source_category_columns)
-    destination_row = _first_empty_category_row(ws, destination_category)
-    destination_columns_by_field = _category_columns(destination_category)
-    destination_fields = list(destination_values.keys())
-    destination_columns = [destination_columns_by_field[field] for field in destination_fields]
-    destination_new_values = [destination_values[field] for field in destination_fields]
-    destination_sheet_values = [
-        _sheet_user_entered_value(field, destination_values[field])
-        for field in destination_fields
-    ]
-    destination_previous_values = [_sheet_value(ws.cell(destination_row, col).value) for col in destination_columns]
+        source_end_row = max(action.row, _last_occupied_category_row(ws, source_category, values=sheet_values))
+        source_snapshot = _category_snapshot(ws, range(action.row, source_end_row + 1), source_category_columns, values=sheet_values)
+        destination_row = _first_empty_category_row(ws, destination_category, values=sheet_values)
+        destination_columns_by_field = _category_columns(destination_category)
+        destination_fields = list(destination_values.keys())
+        destination_columns = [destination_columns_by_field[field] for field in destination_fields]
+        destination_new_values = [destination_values[field] for field in destination_fields]
+        destination_sheet_values = [
+            _sheet_user_entered_value(field, destination_values[field])
+            for field in destination_fields
+        ]
+        destination_previous_values = _category_snapshot(ws, range(destination_row, destination_row + 1), destination_columns, values=sheet_values)[0]
+        log_data = _read_log_data(raise_on_error=True)
+        if log_data is None:
+            raise RuntimeError("Could not read action log before Move")
+        preceding_restore_ids = _preceding_restore_ids(log_data, source_category, action.row)
+    except Exception as exc:
+        logger.exception("Recent Move preparation failed", extra={"action_id": logged.id, "stage": "prepare"})
+        return False, _recent_edit_preparation_error(exc, "Move")
 
     try:
-        log_data = _read_log_data()
-        if log_data is None:
-            return False, "Something went wrong while reading the action log."
         _shift_category_cells_up(
             ws,
             start_row=action.row,
@@ -2066,13 +2097,14 @@ def move_recent_action(
         )
     except Exception as e:
         logger.exception("Failed to move recent action", extra={"exception": str(e)})
-        return False, "Something went wrong while moving that expense."
+        clear_pending_action_selection(user_key)
+        return False, "I could not verify the move. Check Recent transactions and Undo before trying again; part of the change may already be saved."
 
     if key:
         _PENDING_MOVE_IDS_BY_USER.pop(key, None)
         _PENDING_MOVE_ITEM_BY_USER.pop(key, None)
 
-    record_undo_action(
+    undo_id = record_undo_action(
         user_key,
         UndoAction(
             worksheet="expense",
@@ -2094,6 +2126,7 @@ def move_recent_action(
                 "source_compact_start_row": str(action.row),
                 "source_compact_end_row": str(source_end_row),
                 "source_category_snapshot": json.dumps(source_snapshot),
+                "preceding_restore_ids": json.dumps(preceding_restore_ids),
                 "destination_category": destination_category,
                 "display_fields": json.dumps(destination_fields),
             },
@@ -2101,6 +2134,8 @@ def move_recent_action(
         ),
     )
     _sync_reconciliation_after_action_mutation(user_key, {logged.id}, reason="moved")
+    if undo_id is None:
+        return False, "The expense was moved, but I could not save its Undo record. Do not move it again; the saved history needs inspection."
     destination_display_action = UndoAction(
         worksheet="expense",
         kind="clear_cells",
@@ -2647,6 +2682,7 @@ def cancel_split_recent_action(user_key: str | None, *, action_id: str) -> tuple
     )
 
 
+@_serialize_recent_mutation
 def update_recent_action(
     user_key: str | None,
     *,
@@ -2662,30 +2698,16 @@ def update_recent_action(
         if value not in (None, "")
     }
     if match_text and not normalized_updates and not index and not action_id:
-        return False, format_update_candidates(user_key, match_text, 10)
+        return _recent_edit_list(user_key, "Update", match_text)
 
     key = str(user_key) if user_key else ""
-    requested_index = index
-    if index is not None and key:
-        pending, expired = _pending_selection_for_kind(user_key, "update")
-        if expired:
-            pop_pending_action_expiration_notice(user_key)
-            return False, _PENDING_SELECTION_EXPIRED_MESSAGE
-        candidate_ids = pending.action_ids if pending else []
-        if 1 <= index <= len(candidate_ids):
-            action_id = candidate_ids[index - 1]
-            index = None
-
-    logged = select_recent_action(
-        user_key,
-        index=index,
-        action_id=action_id,
-        match_text=match_text,
-    )
-    if logged is None and requested_index is not None and action_id:
-        logged = select_recent_action(user_key, index=requested_index)
+    try:
+        logged, error = _select_recent_edit(user_key, "update", index=index, action_id=action_id, match_text=match_text)
+    except Exception as exc:
+        logger.exception("Recent Update selection failed", extra={"action_id": action_id, "stage": "select"})
+        return False, _recent_edit_preparation_error(exc, "Update")
     if logged is None:
-        return False, format_recent_actions(user_key, 5)
+        return (False, error) if error else _recent_edit_list(user_key, "Update")
 
     capabilities = action_capabilities(logged.action)
     field_columns = _field_columns_for_action(logged.action)
@@ -2706,38 +2728,45 @@ def update_recent_action(
                                         metadata_extra=metadata_extra)
 
     display_fields = list(field_columns.keys())
-    ws = _worksheet(logged.action.worksheet)
-    if not _fixed_budget_target_matches(ws, logged.action):
-        return False, _STALE_BUDGET_TARGET_MESSAGE
-    before_values = [
-        _sheet_value(ws.cell(logged.action.row, col).value)
-        for col in field_columns.values()
-    ]
-    after_values = list(before_values)
-    previous_values: list[str] = []
-    columns: list[int] = []
-    values: list[str] = []
-    updates_by_col: dict[int, Any] = {}
-    for field, value in normalized_updates.items():
-        col = field_columns[field]
-        previous_values.append(_sheet_value(ws.cell(logged.action.row, col).value))
-        columns.append(col)
-        values.append(_sheet_user_entered_value(field, value))
-        updates_by_col[col] = value
-        field_index = list(field_columns).index(field)
-        after_values[field_index] = str(value)
+    try:
+        ws = _worksheet(logged.action.worksheet)
+        sheet_values = ws.get_all_values()
+        if not _fixed_budget_target_matches(ws, logged.action, values=sheet_values):
+            return False, _STALE_BUDGET_TARGET_MESSAGE
+        before_values = _category_snapshot(ws, range(logged.action.row, logged.action.row + 1),
+                                           list(field_columns.values()), values=sheet_values)[0]
+        after_values = list(before_values)
+        previous_values: list[str] = []
+        columns: list[int] = []
+        values: list[str] = []
+        updates_by_col: dict[int, Any] = {}
+        for field, value in normalized_updates.items():
+            col = field_columns[field]
+            field_index = display_fields.index(field)
+            previous_values.append(before_values[field_index])
+            columns.append(col)
+            values.append(_sheet_user_entered_value(field, value))
+            updates_by_col[col] = value
+            after_values[field_index] = str(value)
+        log_data = _read_log_data(raise_on_error=True)
+        if log_data is None:
+            raise RuntimeError("Could not read action log before Update")
+    except Exception as exc:
+        logger.exception("Recent Update preparation failed", extra={"action_id": logged.id, "stage": "prepare"})
+        return False, _recent_edit_preparation_error(exc, "Update")
 
     try:
         _update_contiguous_row(ws, logged.action.row, columns, values)
-    except Exception as e:
-        logger.exception("Failed to update recent action", extra={"exception": str(e)})
-        return False, "Something went wrong while updating that logged action."
+        _update_logged_new_values(logged.id, updates_by_col, log_data)
+    except Exception:
+        logger.exception("Recent Update outcome unavailable", extra={"action_id": logged.id, "stage": "write"})
+        clear_pending_action_selection(user_key)
+        return False, "I could not verify the update. Check Recent transactions and Undo before trying again; part of the change may already be saved."
 
-    _update_logged_new_values(logged.id, updates_by_col)
     if key:
         _PENDING_UPDATE_IDS_BY_USER.pop(key, None)
         _PENDING_UPDATE_FIELD_BY_USER.pop(key, None)
-    record_undo_action(
+    undo_id = record_undo_action(
         user_key,
         UndoAction(
             worksheet=logged.action.worksheet,
@@ -2763,6 +2792,8 @@ def update_recent_action(
         reason="updated",
         metadata_extra=metadata_extra,
     )
+    if undo_id is None:
+        return False, "The transaction was updated, but I could not save its Undo record. Do not update it again; the saved history needs inspection."
     return (
         True,
         "Updated logged action:\n"
@@ -2800,6 +2831,25 @@ def _latest_logged_action(
     return _latest_raw_logged_action(user_key, log_data)
 
 
+def _removed_category_row(action: UndoAction, category: str) -> int | None:
+    if action.kind == "compact_category_cells" and _action_category(action) == category:
+        return action.row
+    if action.kind == "move_expense" and action.metadata.get("source_category") == category:
+        return _positive_metadata_int(action, "source_row")
+    return None
+
+
+def _preceding_restore_ids(log_data: _ActionLogData, category: str, row: int) -> list[str]:
+    return [record.logged.id for record in log_data.records
+            if record.logged.status == "active" and _removed_category_row(record.logged.action, category) == row]
+
+
+def _expand_lineage_ids(ids: set[str], log_data: _ActionLogData) -> set[str]:
+    actions = {record.logged.id: record.logged for record in log_data.records}
+    lineages = {_lineage_id(actions[action_id], actions) for action_id in ids if action_id in actions}
+    return ids | {logged.id for logged in actions.values() if _lineage_id(logged, actions) in lineages}
+
+
 def _restore_removed_category_row(
     ws: Any, *, category: str, row: int, columns: list[int], values: list[str],
     restored_ids: set[str], log_data: _ActionLogData | None, restore_action_id: str = "",
@@ -2821,6 +2871,7 @@ def _restore_removed_category_row(
     start_row = max(first_row, min(row, end_row + 1))
     current = [[_sheet_value(rows[index - 1][column - 1]) if column <= len(rows[index - 1]) else ""
                 for column in columns] for index in range(start_row, end_row + 1)]
+    restored_ids = _expand_lineage_ids(restored_ids, data)
     excluded = set(restored_ids)
     restore_record = next((record.logged for record in data.records if record.logged.id == restore_action_id), None)
     preceding = _json_metadata_value(restore_record.action.metadata, "preceding_restore_ids") if restore_record else None
@@ -2830,10 +2881,12 @@ def _restore_removed_category_row(
         for record in data.records:
             earlier = record.logged
             if (earlier.id in preceding and earlier.status == "active"
-                    and earlier.action.kind == "compact_category_cells"
-                    and _action_category(earlier.action) == category and earlier.action.row == start_row):
+                    and _removed_category_row(earlier.action, category) == start_row):
                 excluded.add(earlier.id)
-                excluded.update(_deleted_action_ids(earlier.action))
+                source_ids = _deleted_action_ids(earlier.action)
+                if earlier.action.kind == "move_expense":
+                    source_ids.add(earlier.action.metadata.get("source_action_id", ""))
+                excluded.update(_expand_lineage_ids(source_ids, data))
     _shift_logged_action_rows(category=category, lower_row=start_row, upper_row=end_row,
                               delta=1, exclude_ids=excluded, log_data=data)
     for record in data.records:
@@ -2855,8 +2908,9 @@ def _restore_removed_category_row(
 def _moved_destination_is_unchanged(ws: Any, action: UndoAction) -> bool:
     fields = _field_columns_for_action(action)
     expected = _field_values_for_action(action)
-    for field, column in fields.items():
-        current = _sheet_value(ws.cell(action.row, column).value).strip()
+    current_values = _category_snapshot(ws, range(action.row, action.row + 1), list(fields.values()))[0]
+    for field, value in zip(fields, current_values):
+        current = value.strip()
         saved = _sheet_value(expected.get(field, "")).strip()
         if field == "amount":
             if _money_display_value(current) != _money_display_value(saved):
@@ -2894,7 +2948,7 @@ def _apply_undo_action(
                 ws, category=source_category,
                 row=int(action.metadata.get("source_row", action.metadata["source_compact_start_row"])),
                 columns=source_columns, values=source_snapshot[0],
-                restored_ids={action.metadata.get("source_action_id", "")}, log_data=log_data,
+                restored_ids={action.metadata.get("source_action_id", "")}, log_data=log_data, restore_action_id=action_id,
             )
         else:
             source_row = int(action.metadata["source_row"])
@@ -2947,7 +3001,7 @@ def _apply_undo_action(
     elif action.kind == "clear_cells":
         _update_contiguous_row(ws, action.row, action.columns, [""] * len(action.columns))
     elif action.kind == "restore_cells":
-        current_values = [_sheet_value(ws.cell(action.row, col).value) for col in action.columns]
+        current_values = _category_snapshot(ws, range(action.row, action.row + 1), action.columns)[0]
         if action.metadata.get("type") == "split":
             from bookiebot.sheets.collaboration import allocation_by_id, normalize_split_method, update_allocation
 
@@ -3043,9 +3097,7 @@ def _delete_expense_action_with_compaction(user_key: str | None, logged: LoggedA
         if log_data is None:
             return False, "I could not read the action log. Nothing was deleted. Try Recent transactions again."
         lineage_ids = _active_lineage_ids(logged, log_data)
-        preceding_restore_ids = [record.logged.id for record in log_data.records
-            if record.logged.status == "active" and record.logged.action.kind == "compact_category_cells"
-            and _action_category(record.logged.action) == category and record.logged.action.row == action.row]
+        preceding_restore_ids = _preceding_restore_ids(log_data, category, action.row)
     except Exception as exc:
         logger.exception("Recent Delete preparation failed", extra={"action_id": logged.id, "stage": "prepare"})
         return False, _delete_preparation_error(exc)
@@ -3149,7 +3201,7 @@ def _delete_income_action_with_compaction(user_key: str | None, logged: LoggedAc
     return True, f"Deleted: {action.description}"
 
 
-@_serialize_delete_undo
+@_serialize_recent_mutation
 def delete_recent_action(
     user_key: str | None,
     *,
@@ -3223,7 +3275,7 @@ def delete_recent_action(
     return True, f"Deleted: {logged.action.description}"
 
 
-@_serialize_delete_undo
+@_serialize_recent_mutation
 def undo_logged_action(user_key: str | None, action_id: str) -> tuple[bool, str]:
     key = str(user_key) if user_key else None
     log_data = _read_log_data()
@@ -3263,7 +3315,7 @@ def undo_logged_action(user_key: str | None, action_id: str) -> tuple[bool, str]
     return True, detail
 
 
-@_serialize_delete_undo
+@_serialize_recent_mutation
 def undo_last_action(user_key: str | None) -> tuple[bool, str]:
     global _GLOBAL_LAST_ACTION
     key = str(user_key) if user_key else None

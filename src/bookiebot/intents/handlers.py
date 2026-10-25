@@ -313,7 +313,12 @@ async def delete_recent_action_handler(entities: IntentEntities, message: Any) -
             action_id=entities.get("action_id"), match_text=match_text,
         )
     if detail.startswith("Recent logged actions"):
-        actions = matching_recent_actions(actor_key, str(match_text), 10) if match_text else recent_actions(actor_key, 5)
+        try:
+            actions = await _recent_edit_candidates(actor_key, match_text)
+        except Exception:
+            logger.exception("Recent Delete candidates unavailable")
+            await _send_recent_private_message(message, "I could not load the choices. Nothing was changed. Open Recent transactions again.")
+            return
         view = _delete_candidates_view(actor_key, actions) if actions else None
         detail = _without_single_candidate_instruction(detail, actions)
         await _send_recent_private_message(message, _with_component_spacer(detail, view), view=view)
@@ -852,57 +857,96 @@ async def _prompt_cancel_recent_split(interaction: Any, actor_key: str | None, a
     )
 
 
-def _recent_delete_callback(actor_key: str | None, action_id: str, *, state: dict[str, bool] | None = None):
+async def _ack_recent(interaction: Any, action_id: str, operation: str) -> bool:
+    try:
+        await interaction.response.defer(ephemeral=True, thinking=True)
+    except Exception:
+        logger.exception("Recent %s acknowledgement failed", operation, extra={"action_id": action_id})
+        return False
+    return True
+
+
+async def _load_recent_selection(interaction: Any, actor_key: str | None, action_id: str):
+    if not await _ack_recent(interaction, action_id, "selection"):
+        return None
+    try:
+        with sheet_user_context(actor_key):
+            logged = await asyncio.to_thread(select_recent_action, actor_key, action_id=action_id, strict=True)
+    except Exception as exc:
+        logger.exception("Recent selection failed", extra={"action_id": action_id, "stage": "select"})
+        quota = isinstance(exc, SpreadsheetQuotaError) or is_google_sheets_quota_error(exc)
+        detail = "Google Sheets is temporarily rate-limiting reads. Wait about a minute, then open Recent transactions again." if quota else "I could not load that transaction. Open Recent transactions again to retry."
+        await interaction.followup.send(detail, ephemeral=True)
+        return None
+    if logged is None:
+        await interaction.followup.send("That transaction is no longer available. Open Recent transactions again.", ephemeral=True)
+    return logged
+
+
+def _recent_request_blocked(state: dict[str, Any]) -> str | None:
+    if state.get("canceled"):
+        return "This request was canceled. Open Recent transactions again."
+    if state.get("attempted"):
+        return f"{state.get('operation', 'Change')} was already requested from this control. Check the result or open Recent transactions again."
+    return None
+
+
+async def _cancel_recent_request(interaction: Any, actor_key: str | None, state: dict[str, Any]) -> None:
+    if state.get("attempted"):
+        await interaction.response.send_message(f"{state.get('operation', 'Change')} was already requested. Check its result or open Recent transactions; it cannot be canceled here.", ephemeral=True)
+        return
+    state["canceled"] = True
+    clear_pending_action_selection(actor_key)
+    await interaction.response.send_message("Canceled.", ephemeral=True)
+
+
+def _recent_mutation_callback(actor_key: str | None, action_id: str, operation: str, *,
+                              state: dict[str, Any] | None = None, **kwargs: Any):
     state = {} if state is None else state
 
-    async def delete_selected(interaction: Any) -> None:
+    async def mutate_selected(interaction: Any) -> None:
         if await _reject_unowned_recent_interaction(interaction, actor_key):
             return
         # Never perform a financial action after an expired/rejected ACK.
-        try:
-            await interaction.response.defer(ephemeral=True, thinking=True)
-        except Exception:
-            logger.exception("Recent Delete acknowledgement failed", extra={"action_id": action_id})
+        if not await _ack_recent(interaction, action_id, operation):
             return
-        if state.get("canceled"):
-            await interaction.followup.send("This Delete request was canceled. Open Recent transactions again.", ephemeral=True)
+        blocked = _recent_request_blocked(state)
+        if blocked:
+            await interaction.followup.send(blocked, ephemeral=True)
             return
-        if state.get("attempted"):
-            await interaction.followup.send("Delete was already requested from this control. Check the result or open Recent transactions again.", ephemeral=True)
-            return
-        state["attempted"] = True
+        state.update(attempted=True, operation=operation)
         started = time.perf_counter()
         try:
-            success, detail = await asyncio.to_thread(run_split_operation, delete_recent_action, actor_key, action_id=action_id)
+            writer = {"Delete": delete_recent_action, "Update": update_recent_action, "Move": move_recent_action}[operation]
+            success, detail = await asyncio.to_thread(run_split_operation, writer, actor_key, action_id=action_id, **kwargs)
         except Exception:
-            logger.exception("Recent Delete outcome unavailable", extra={"action_id": action_id, "stage": "delete"})
-            success, detail = False, "I could not verify the deletion. Check Recent transactions and Undo before trying again; part of the change may already be saved."
-        logger.info("Recent Delete finished in %.2fs (action=%s; success=%s)", time.perf_counter() - started, action_id, success)
+            logger.exception("Recent %s outcome unavailable", operation, extra={"action_id": action_id, "stage": "write"})
+            noun = {"Delete": "deletion", "Update": "update", "Move": "move"}[operation]
+            detail = f"I could not verify the {noun}. Check Recent transactions and Undo before trying again; part of the change may already be saved."
+            success = False
+        logger.info("Recent %s finished in %.2fs (action=%s; success=%s)", operation, time.perf_counter() - started, action_id, success)
         await _send_interaction_action_result(interaction, success, detail)
 
-    return delete_selected
+    return mutate_selected
+
+
+def _recent_delete_callback(actor_key: str | None, action_id: str, *, state: dict[str, Any] | None = None):
+    return _recent_mutation_callback(actor_key, action_id, "Delete", state=state)
 
 
 def _recent_action_select_view(actor_key: str | None, actions: list[Any], *, destination_category: str | None = None, updates: dict[str, Any] | None = None):
+    move_state: dict[str, Any] = {}
+
     async def handle_select(interaction: Any, action_id: str) -> None:
         if await _reject_unowned_recent_interaction(interaction, actor_key):
             return
         if destination_category:
-            try:
-                await interaction.response.defer(ephemeral=True)
-            except Exception:
-                pass
-            success, detail = move_recent_action(
-                actor_key,
-                destination_category=destination_category,
-                updates=updates or {},
-                action_id=action_id,
-            )
-            await _send_interaction_action_result(interaction, success, detail)
+            await _recent_mutation_callback(actor_key, action_id, "Move", state=move_state,
+                                            destination_category=destination_category, updates=updates or {})(interaction)
             return
 
-        delete_state: dict[str, bool] = {}
-        delete_selected = _recent_delete_callback(actor_key, action_id, state=delete_state)
+        request_state: dict[str, Any] = {}
+        delete_selected = _recent_delete_callback(actor_key, action_id, state=request_state)
 
         async def handle_decision(decision_interaction: Any, decision: str) -> None:
             if await _reject_unowned_recent_interaction(decision_interaction, actor_key):
@@ -911,59 +955,25 @@ def _recent_action_select_view(actor_key: str | None, actions: list[Any], *, des
                 await delete_selected(decision_interaction)
                 return
             if decision == "cancel":
-                if delete_state.get("attempted"):
-                    await decision_interaction.response.send_message("Delete was already requested. Check its result or open Recent transactions; it cannot be canceled here.", ephemeral=True)
-                else:
-                    delete_state["canceled"] = True
-                    clear_pending_action_selection(actor_key)
-                    await decision_interaction.response.send_message("Canceled.", ephemeral=True)
+                await _cancel_recent_request(decision_interaction, actor_key, request_state)
+                return
+            blocked = _recent_request_blocked(request_state)
+            if blocked:
+                await decision_interaction.response.send_message(blocked, ephemeral=True)
+                return
+            if decision == "update":
+                await _send_update_field_prompt(decision_interaction, actor_key, action_id, state=request_state)
+                return
+            if decision == "move":
+                await _send_move_category_prompt(decision_interaction, actor_key, action_id, state=request_state)
                 return
             if decision == "cancel_split":
                 await _prompt_cancel_recent_split(decision_interaction, actor_key, action_id)
                 return
-            splitting = decision in {"split", "change_split"}
-            if splitting:
-                await decision_interaction.response.defer(ephemeral=True, thinking=True)
-                try:
-                    with sheet_user_context(actor_key):
-                        selected = await asyncio.to_thread(select_recent_action, actor_key, action_id=action_id)
-                except Exception:
-                    logger.exception("Split selection failed", extra={"action_id": action_id})
-                    await decision_interaction.followup.send("I could not load that expense. Try opening Recent transactions again.", ephemeral=True)
-                    return
-                if selected is None:
-                    await decision_interaction.followup.send("That expense is no longer available. Open Recent transactions again.", ephemeral=True)
-                    return
-            else:
-                selected = select_recent_action(actor_key, action_id=action_id)
-            capabilities = action_capabilities(selected.action) if selected else None
-            if decision == "update":
-                if capabilities and not capabilities.can_update:
-                    await decision_interaction.response.send_message(capabilities.update_reason, ephemeral=True)
-                    return
-                set_pending_update_selection(actor_key, action_id)
-                logged = selected
-                fields = editable_fields_for_action(logged.action) if logged else []
-                if not fields:
-                    await decision_interaction.response.send_message("I do not know how to update fields for that transaction yet.", ephemeral=True)
-                    return
-                await decision_interaction.response.send_message(
-                    _with_component_spacer("Which field would you like to update?", True),
-                    view=_update_field_view(actor_key, action_id, fields),
-                    ephemeral=True,
-                )
+            selected = await _load_recent_selection(decision_interaction, actor_key, action_id)
+            if selected is None:
                 return
-            if decision == "move":
-                if capabilities and not capabilities.can_move:
-                    await decision_interaction.response.send_message(capabilities.move_reason, ephemeral=True)
-                    return
-                set_pending_move_selection(actor_key, action_id)
-                await decision_interaction.response.send_message(
-                    _with_component_spacer(_move_category_prompt(actor_key, action_id), True),
-                    view=_move_category_view(actor_key, action_id),
-                    ephemeral=True,
-                )
-                return
+            capabilities = action_capabilities(selected.action)
             if decision == "change_split" or (decision == "split" and capabilities and capabilities.can_change_split):
                 if capabilities and not capabilities.can_change_split:
                     await decision_interaction.followup.send(capabilities.change_split_reason, ephemeral=True)
@@ -989,18 +999,10 @@ def _recent_action_select_view(actor_key: str | None, actions: list[Any], *, des
                 )
                 return
             clear_pending_action_selection(actor_key)
-            await decision_interaction.response.send_message("Canceled.", ephemeral=True)
+            await decision_interaction.followup.send("Canceled.", ephemeral=True)
 
-        await interaction.response.defer(ephemeral=True, thinking=True)
-        try:
-            with sheet_user_context(actor_key):
-                logged = await asyncio.to_thread(select_recent_action, actor_key, action_id=action_id, strict=True)
-        except Exception:
-            logger.exception("Recent transaction selection failed", extra={"action_id": action_id})
-            await interaction.followup.send("I could not load that transaction. Open Recent transactions again to retry.", ephemeral=True)
-            return
+        logged = await _load_recent_selection(interaction, actor_key, action_id)
         if logged is None:
-            await interaction.followup.send("That transaction is no longer available. Open Recent transactions again.", ephemeral=True)
             return
         capabilities = action_capabilities(logged.action)
         detail_block = f"\n\n{format_action_detail_block(logged.action)}"
@@ -1011,6 +1013,7 @@ def _recent_action_select_view(actor_key: str | None, actions: list[Any], *, des
         )
 
     return RecentActionSelectView(actions, handle_select)
+
 def _delete_candidates_view(actor_key: str | None, actions: list[Any]):
     if len(actions) == 1:
         return _delete_confirm_view(actor_key, actions[0].id)
@@ -1044,7 +1047,7 @@ def _delete_action_select_view(actor_key: str | None, actions: list[Any]):
 
 
 def _delete_confirm_view(actor_key: str | None, action_id: str):
-    delete_state: dict[str, bool] = {}
+    delete_state: dict[str, Any] = {}
     delete_selected = _recent_delete_callback(actor_key, action_id, state=delete_state)
 
     async def handle_confirm(interaction: Any, decision: str) -> None:
@@ -1095,10 +1098,12 @@ def _move_action_select_view(
     async def handle_select(interaction: Any, action_id: str) -> None:
         if await _reject_unowned_recent_interaction(interaction, actor_key):
             return
-        logged = select_recent_action(actor_key, action_id=action_id)
+        logged = await _load_recent_selection(interaction, actor_key, action_id)
+        if logged is None:
+            return
         detail_block = f"\n\n{format_action_detail_block(logged.action)}" if logged else ""
         set_pending_move_selection(actor_key, action_id)
-        await interaction.response.send_message(
+        await interaction.followup.send(
             _with_component_spacer(f"Move this transaction?{detail_block}", True),
             view=_move_confirm_view(
                 actor_key,
@@ -1119,77 +1124,91 @@ def _move_confirm_view(
     destination_category: str | None = None,
     updates: dict[str, Any] | None = None,
 ):
+    state: dict[str, Any] = {}
+
     async def handle_confirm(interaction: Any, decision: str) -> None:
         if await _reject_unowned_recent_interaction(interaction, actor_key):
             return
         if decision == "confirm_move":
-            set_pending_move_selection(actor_key, action_id)
             if destination_category:
-                try:
-                    await interaction.response.defer(ephemeral=True)
-                except Exception:
-                    pass
-                success, detail = move_recent_action(
-                    actor_key,
-                    destination_category=destination_category,
-                    updates=updates or {},
-                    action_id=action_id,
-                )
-                await _send_interaction_action_result(interaction, success, detail)
-                return
-            await interaction.response.send_message(
-                _with_component_spacer(_move_category_prompt(actor_key, action_id), True),
-                view=_move_category_view(actor_key, action_id, updates),
-                ephemeral=True,
-            )
+                await _recent_mutation_callback(actor_key, action_id, "Move", state=state,
+                                                destination_category=destination_category, updates=updates or {})(interaction)
+            else:
+                await _send_move_category_prompt(interaction, actor_key, action_id, updates=updates, state=state)
             return
-        clear_pending_action_selection(actor_key)
-        await interaction.response.send_message("Canceled.", ephemeral=True)
+        await _cancel_recent_request(interaction, actor_key, state)
 
     return MoveConfirmView(handle_confirm)
 
 
-def _move_category_view(actor_key: str | None, action_id: str, updates: dict[str, Any] | None = None):
-    async def handle_category(interaction: Any, category: str) -> None:
-        if await _reject_unowned_recent_interaction(interaction, actor_key):
-            return
-        try:
-            await interaction.response.defer(ephemeral=True)
-        except Exception:
-            pass
-        success, detail = move_recent_action(
-            actor_key,
-            destination_category=category,
-            updates=updates or {},
-            action_id=action_id,
-        )
-        await _send_interaction_action_result(interaction, success, detail)
+async def _send_move_category_prompt(interaction: Any, actor_key: str | None, action_id: str, *,
+                                      updates: dict[str, Any] | None = None, state: dict[str, Any] | None = None) -> None:
+    state = {} if state is None else state
+    logged = await _load_recent_selection(interaction, actor_key, action_id)
+    if logged is None:
+        return
+    blocked = _recent_request_blocked(state)
+    capabilities = action_capabilities(logged.action)
+    if blocked or not capabilities.can_move:
+        await interaction.followup.send(blocked or capabilities.move_reason, ephemeral=True)
+        return
+    set_pending_move_selection(actor_key, action_id)
+    category = logged.action.metadata.get("category")
+    await interaction.followup.send(
+        _with_component_spacer(_move_category_prompt(category), True),
+        view=_move_category_view(actor_key, action_id, updates, source_category=category, state=state), ephemeral=True,
+    )
 
-    logged = select_recent_action(actor_key, action_id=action_id)
-    source_category = logged.action.metadata.get("category") if logged else None
+
+def _move_category_view(actor_key: str | None, action_id: str, updates: dict[str, Any] | None = None, *,
+                        source_category: str | None = None, state: dict[str, Any] | None = None):
+    state = {} if state is None else state
+
+    async def handle_category(interaction: Any, category: str) -> None:
+        await _recent_mutation_callback(actor_key, action_id, "Move", state=state,
+                                        destination_category=category, updates=updates or {})(interaction)
+
     return MoveCategoryView(handle_category, exclude_category=source_category)
 
 
-def _move_category_prompt(actor_key: str | None, action_id: str) -> str:
-    logged = select_recent_action(actor_key, action_id=action_id)
-    source_category = logged.action.metadata.get("category") if logged else None
+def _move_category_prompt(source_category: str | None) -> str:
     if source_category:
         source_label = "Needs" if source_category == "need_expenses" else source_category
         return f"Move this {source_label} expense to which category?"
     return "Which category would you like to move this transaction to?"
 
 
-async def _send_update_field_prompt(target: Any, actor_key: str | None, action_id: str) -> None:
-    logged = select_recent_action(actor_key, action_id=action_id)
-    fields = editable_fields_for_action(logged.action) if logged else []
-    if not fields:
-        await target.response.send_message("I do not know how to update fields for that transaction yet.", ephemeral=True)
+async def _send_update_field_prompt(target: Any, actor_key: str | None, action_id: str, *,
+                                    state: dict[str, Any] | None = None, from_message: bool = False) -> None:
+    state = {} if state is None else state
+    if from_message:
+        # Text replies already have a private delivery route, not an interaction ACK.
+        try:
+            with sheet_user_context(actor_key):
+                logged = await asyncio.to_thread(select_recent_action, actor_key, action_id=action_id, strict=True)
+        except Exception:
+            logger.exception("Recent Update field selection failed", extra={"action_id": action_id})
+            await target.response.send_message("I could not load that transaction. Open Recent transactions again.", ephemeral=True)
+            return
+        send = target.response.send_message
+    else:
+        logged = await _load_recent_selection(target, actor_key, action_id)
+        if logged is None:
+            return
+        send = target.followup.send
+    blocked = _recent_request_blocked(state)
+    if logged is None or blocked:
+        await send(blocked or "That transaction is no longer available. Open Recent transactions again.", ephemeral=True)
         return
-    detail_block = f"\n\n{format_action_detail_block(logged.action)}" if logged else ""
-    await target.response.send_message(
-        _with_component_spacer(f"Which field would you like to update?{detail_block}", True),
-        view=_update_field_view(actor_key, action_id, fields),
-        ephemeral=True,
+    capabilities = action_capabilities(logged.action)
+    fields = editable_fields_for_action(logged.action)
+    if not capabilities.can_update or not fields:
+        await send(capabilities.update_reason, ephemeral=True)
+        return
+    set_pending_update_selection(actor_key, action_id)
+    await send(
+        _with_component_spacer(f"Which field would you like to update?\n\n{format_action_detail_block(logged.action)}", True),
+        view=_update_field_view(actor_key, action_id, fields, state=state), ephemeral=True,
     )
 
 
@@ -1203,10 +1222,12 @@ def _update_action_select_view(actor_key: str | None, actions: list[Any]):
     async def handle_select(interaction: Any, action_id: str) -> None:
         if await _reject_unowned_recent_interaction(interaction, actor_key):
             return
-        logged = select_recent_action(actor_key, action_id=action_id)
+        logged = await _load_recent_selection(interaction, actor_key, action_id)
+        if logged is None:
+            return
         detail_block = f"\n\n{format_action_detail_block(logged.action)}" if logged else ""
         set_pending_update_selection(actor_key, action_id)
-        await interaction.response.send_message(
+        await interaction.followup.send(
             _with_component_spacer(f"Update this transaction?{detail_block}", True),
             view=_update_confirm_view(actor_key, action_id),
             ephemeral=True,
@@ -1216,42 +1237,37 @@ def _update_action_select_view(actor_key: str | None, actions: list[Any]):
 
 
 def _update_confirm_view(actor_key: str | None, action_id: str):
+    state: dict[str, Any] = {}
+
     async def handle_confirm(interaction: Any, decision: str) -> None:
         if await _reject_unowned_recent_interaction(interaction, actor_key):
             return
         if decision == "confirm_update":
-            set_pending_update_selection(actor_key, action_id)
-            await _send_update_field_prompt(interaction, actor_key, action_id)
+            await _send_update_field_prompt(interaction, actor_key, action_id, state=state)
             return
-        clear_pending_action_selection(actor_key)
-        await interaction.response.send_message("Canceled.", ephemeral=True)
+        await _cancel_recent_request(interaction, actor_key, state)
 
     return UpdateConfirmView(handle_confirm)
 
 
-def _update_field_view(actor_key: str | None, action_id: str, fields: list[str]):
+def _update_field_view(actor_key: str | None, action_id: str, fields: list[str], *, state: dict[str, Any] | None = None):
+    state = {} if state is None else state
+
     async def handle_field(interaction: Any, field: str) -> None:
         if await _reject_unowned_recent_interaction(interaction, actor_key):
             return
+        blocked = _recent_request_blocked(state)
+        if blocked or field not in fields:
+            await interaction.response.send_message(blocked or "Choose an available field from Recent transactions.", ephemeral=True)
+            return
         if field == "person":
             async def handle_person(person_interaction: Any, person: str) -> None:
-                if await _reject_unowned_recent_interaction(person_interaction, actor_key):
-                    return
-                try:
-                    await person_interaction.response.defer(ephemeral=True)
-                except Exception:
-                    pass
-                success, detail = update_recent_action(
-                    actor_key,
-                    updates={"person": person},
-                    action_id=action_id,
-                )
-                await _send_interaction_action_result(person_interaction, success, detail)
+                await _recent_mutation_callback(actor_key, action_id, "Update", state=state,
+                                                updates={"person": person})(person_interaction)
 
             await interaction.response.send_message(
                 _with_component_spacer("Which person/card should this transaction use?", True),
-                view=PersonSelectView(handle_person),
-                ephemeral=True,
+                view=PersonSelectView(handle_person), ephemeral=True,
             )
             return
 
@@ -1260,6 +1276,26 @@ def _update_field_view(actor_key: str | None, action_id: str, fields: list[str])
         await interaction.response.send_message(f"Reply with the new {label}.", ephemeral=True)
 
     return UpdateFieldView(fields, handle_field)
+
+
+async def _run_recent_text_operation(operation: str, actor_key: str | None, **kwargs: Any) -> tuple[bool, str]:
+    started = time.perf_counter()
+    try:
+        with sheet_user_context(actor_key):
+            writer = {"Update": update_recent_action, "Move": move_recent_action}[operation]
+            result = await asyncio.to_thread(writer, actor_key, **kwargs)
+    except Exception:
+        logger.exception("Recent %s text outcome unavailable", operation, extra={"action_id": kwargs.get("action_id")})
+        return False, f"I could not verify the {operation.lower()}. Check Recent transactions and Undo before trying again; part of the change may already be saved."
+    logger.info("Recent %s text finished in %.2fs (action=%s; success=%s)", operation, time.perf_counter() - started, kwargs.get("action_id"), result[0])
+    return result
+
+
+async def _recent_edit_candidates(actor_key: str | None, match_text: str | None):
+    with sheet_user_context(actor_key):
+        if match_text:
+            return await asyncio.to_thread(matching_recent_actions, actor_key, str(match_text), 10, strict=True)
+        return await asyncio.to_thread(recent_actions, actor_key, 5, strict=True)
 
 
 async def update_recent_action_handler(entities: IntentEntities, message: Any) -> None:
@@ -1282,15 +1318,20 @@ async def update_recent_action_handler(entities: IntentEntities, message: Any) -
     action_id = entities.get("action_id")
     match_text = entities.get("match_text") or entities.get("description") or entities.get("location") or entities.get("item")
 
-    success, detail = update_recent_action(
-        actor_key,
+    success, detail = await _run_recent_text_operation(
+        "Update", actor_key,
         updates=updates,
         index=index,
         action_id=action_id,
         match_text=match_text,
     )
     if detail.startswith("Recent logged actions"):
-        actions = matching_recent_actions(actor_key, str(match_text), 10) if match_text else recent_actions(actor_key, 5)
+        try:
+            actions = await _recent_edit_candidates(actor_key, match_text)
+        except Exception:
+            logger.exception("Recent Update candidates unavailable")
+            await _send_recent_private_message(message, "I could not load the choices. Nothing was changed. Open Recent transactions again.")
+            return
         view = _update_candidates_view(actor_key, actions) if actions else None
         detail = _without_single_candidate_instruction(detail, actions)
         await _send_recent_private_message(message, _with_component_spacer(detail, view), view=view)
@@ -1300,7 +1341,13 @@ async def update_recent_action_handler(entities: IntentEntities, message: Any) -
         if selected_action_id is None and index is not None:
             selected_action_id = pending_action_selection_id(actor_key, "update", index)
             if selected_action_id is None:
-                logged = select_recent_action(actor_key, index=index)
+                try:
+                    with sheet_user_context(actor_key):
+                        logged = await asyncio.to_thread(select_recent_action, actor_key, index=index, strict=True)
+                except Exception:
+                    logger.exception("Recent Update field choice unavailable")
+                    await _send_recent_private_message(message, "I could not load that choice. Nothing was changed. Open Recent transactions again.")
+                    return
                 selected_action_id = logged.id if logged else None
         if selected_action_id:
             class _ChannelResponse:
@@ -1311,7 +1358,7 @@ async def update_recent_action_handler(entities: IntentEntities, message: Any) -
             class _MessageTarget:
                 response = _ChannelResponse()
 
-            await _send_update_field_prompt(_MessageTarget(), actor_key, selected_action_id)
+            await _send_update_field_prompt(_MessageTarget(), actor_key, selected_action_id, from_message=True)
             return
     await _send_action_result(message, success, detail)
 
@@ -1334,8 +1381,8 @@ async def move_recent_action_handler(entities: IntentEntities, message: Any) -> 
     destination_category = entities.get("category") or entities.get("destination_category")
     match_text = entities.get("match_text") or entities.get("description") or entities.get("location") or entities.get("item")
 
-    success, detail = move_recent_action(
-        actor_key,
+    success, detail = await _run_recent_text_operation(
+        "Move", actor_key,
         destination_category=destination_category,
         updates=updates,
         index=index,
@@ -1343,10 +1390,12 @@ async def move_recent_action_handler(entities: IntentEntities, message: Any) -> 
         match_text=match_text,
     )
     if detail.startswith("Recent logged actions"):
-        if match_text:
-            actions = matching_recent_actions(actor_key, match_text, 10)
-        else:
-            actions = recent_actions(actor_key, 5)
+        try:
+            actions = await _recent_edit_candidates(actor_key, match_text)
+        except Exception:
+            logger.exception("Recent Move candidates unavailable")
+            await _send_recent_private_message(message, "I could not load the choices. Nothing was changed. Open Recent transactions again.")
+            return
         view = _move_candidates_view(
             actor_key,
             actions,
