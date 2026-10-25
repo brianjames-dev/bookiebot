@@ -4,6 +4,12 @@ Last updated: 2026-10-25
 
 ## Goal
 
+### Transactions workspace and Overview consolidation — 2026-10-25
+
+Implemented; final verification/release in progress on isolated `codex/app-transactions` checkout so concurrent custom-repayment work remains separate. Overview contains all former Spending content; Transactions replaces the tab and lists recorded expenses/income/payment/cash savings, including verified manual sheet rows, with month/all-month search, type/category/person/split filters and 40-row pages. Read-only batched history/canonical overlays avoid scheduled estimates and generated repayment edits. Current/historical month routing uses worker-local repositories, preserving the real clock/source year. Existing Discord financial actions/canonical guards are reused behind fresh explicit app reviews and durable owner-scoped command claims. Unknown outcomes cannot repeat a writer. Supported Undo persists across reload, including exact deletion records; unfinished confirmations can be checked from another authenticated session. No real transaction or repayment used for testing.
+
+Added isolated SQLite/PostgreSQL command/source/history/API contracts and React recovery/navigation tests. README, Transactions workflow, decisions and manual checklist 156 updated. Local full **2,601 passed / 445 optional PostgreSQL skipped** before the final two added recovery contracts; final targeted/type/build results and release evidence follow in STATUS. Native sample 390px search, Move review/cancel and 320px layout/nav inspected. Native user/device financial acceptance remains separate.
+
 ### Recent Update/Move quota and responsiveness audit — 2026-10-25
 
 Released. The same synchronous-before-ACK and per-cell preparation pattern was present in Update/Move, including candidate/confirmation/person/category controls and typed replies. These paths now use private progress before owner-scoped worker I/O, one strict menu read, pure view constructors and a shared one-shot/Cancel mutation controller. Fresh batched preparation supplies all current/previous fields and Move extent/destination values. Pre-write quota errors preserve all cells/history; uncertain writes and missing persisted Undo have explicit inspection feedback. Stale candidate IDs never select another recent index. Canonical shared-payment correction and settlement guards are unchanged.

@@ -1,5 +1,13 @@
 # Agent Decisions
 
+## 2026-10-25 - Add A Reviewed Recorded-Transactions Workspace
+
+Append all Spending content to Overview and use its navigation position for Transactions. Keep recorded activity separate from bank review and projected estimates. List existing configured months with owner-scoped batched source/history reads, lineage deduplication, canonical overlays, pagination and a short browsing cache; failures never mean zero transactions. Manual source rows are visible without provisioning action logs. Explicit confirmation may adopt a verified existing row as lineage without copying it. Generated repayment rows and recipient bill projections stay read-only here.
+
+Use the existing Update/Move/Delete/Split/cancel/Undo services and their shared settlement/projection/bank guards. Bind historical sources to a context-local repository and explicit source year; do not redirect global worksheets or the current clock. Fresh reviews bind source/month/owner/current values and the exact normalized change; financial confirmation revalidates under the existing mutation lock. Preserve Discord compatibility and canonical Undo restrictions. Ordinary deletion Undo can address its exact saved delete record.
+
+Add owner and command tables to the existing SQLite/PostgreSQL app database. Commit a frozen request/fingerprint/timestamp claim before any financial writer. Repeated requests return the recorded result; claimed running/uncertain requests never re-execute, including after a process restart. Retain uncertain claims for saved-history inspection, with request IDs attached to new action-log records. Expose owner-scoped unfinished confirmations and the latest supported Undo on list reads; browser session storage retains the same confirmation through response loss. A separate review/confirm, work guard, stale-query cancellation and account-scoped controller protect client recovery. No bank or repayment semantics change.
+
 ## 2026-10-25 - Apply Recent Recovery Guards To Update And Move
 
 Prepare ordinary Updates and Moves from one fresh sheet snapshot; reuse it for before/Undo values, fixed-budget identity checks and Move source extent/destination placement. Strict selection/history failures remain distinguishable from absent records. Pending candidate IDs never fall back to a different recent index. Pre-write quota errors explicitly report no change; uncertain writes and missing persisted Undo require inspection without an automatic writer retry. Existing canonical shared mutations, settlement/projection guards and bank-reconciliation synchronization remain authoritative.

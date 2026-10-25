@@ -16,10 +16,11 @@ import { AskBookieBotPanel } from "./ask-bookiebot-panel"
 import { AppUpdatePrompt } from "./app-update-prompt"
 import { useAppWorkGuard } from "./app-work-guard"
 import { ReconciliationScreen, useReconciliation } from "./reconciliation-screen"
+import { TransactionsScreen } from "./transactions-screen"
 import type { ExpenseReportData } from "./types"
 
 const mainScreens = [
-  { id: "overview", Icon: House }, { id: "spending", Icon: ReceiptText },
+  { id: "overview", Icon: House }, { id: "transactions", Icon: ReceiptText },
   { id: "shared", Icon: Users }, { id: "savings", Icon: PiggyBank },
 ] as const
 
@@ -171,7 +172,7 @@ export function ExpenseAppShell({ report, controls, monthControl, comparison, av
     return () => window.clearTimeout(timer)
   }, [sourceRequest, screen])
 
-  const reportVisible = screen === "overview" || screen === "spending"
+  const reportVisible = screen === "overview"
   const fallback = <SharedReimbursementsCard items={report.sharedReimbursements ?? []} openItems={report.openSharedReimbursements}
     receivedItems={report.receivedSharedReimbursements} coverage={report.reimbursementCoverage}
     monthLabel={report.monthLabel} year={report.year} month={report.month} />
@@ -199,6 +200,9 @@ export function ExpenseAppShell({ report, controls, monthControl, comparison, av
         <div className="bb-page-header"><div className="bb-report-context"><h1>{monthControl}</h1></div>{controls}</div>
         <p role="status" className="bb-settings-note">Load the selected month to view its report. Shared and Savings are still available.</p>
       </main>}
+      <main className="bb-shell-transactions bb-main" aria-label="Transactions" hidden={screen !== "transactions"}>
+        <TransactionsScreen key={report.ownerName} active={screen === "transactions"} ownerName={report.ownerName} initialMonth={`${report.year}-${String(report.month).padStart(2,"0")}`} />
+      </main>
       <main className="bb-shell-shared bb-main" aria-label="Shared" hidden={screen !== "shared"}>
         <ReimbursementLedger fallback={fallback} refreshKey={report.generatedAt} />
       </main>

@@ -823,7 +823,7 @@ export function ExpenseReportApp({ report, appControls, appAvatarUrl, appSession
           </button>}
         </ReportMenu>
       </div>}
-      <header className="bb-page-header" hidden={Boolean(navigation && navigation.screen !== "overview" && navigation.screen !== "spending")}>
+      <header className="bb-page-header" hidden={Boolean(navigation && navigation.screen !== "overview")}>
         <h1 className="bb-report-context">{appMonthControl ?? report.monthLabel}</h1>
         <div className="bb-header-actions">
           <ProjectionToggle
@@ -905,8 +905,6 @@ export function ExpenseReportApp({ report, appControls, appAvatarUrl, appSession
             </div>
           </div>
         </section>
-        </ReportScreen>
-        <ReportScreen name="spending">
         <Card className="bb-report-section bb-daily-section">
           <CardHeader>
             <div className="bb-card-title-row bb-inline-toggle-row">
