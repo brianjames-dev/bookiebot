@@ -233,3 +233,7 @@ def test_failed_split_worker_releases_lock_and_owner_context():
         splits.run_split_operation(MagicMock(side_effect=TimeoutError()), actor, action_id="failure")
     assert (actor, "failure") not in splits._SPLIT_LOCKS
     assert get_current_discord_user_id() == context_before
+
+
+def test_custom_split_directive_requires_the_phone_percentage_editor():
+    assert requested_split_directive({"split_method": "custom"}) is None

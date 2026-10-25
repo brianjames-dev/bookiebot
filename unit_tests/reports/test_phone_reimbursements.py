@@ -377,3 +377,23 @@ async def test_reset_lost_projection_response_reuses_committed_request(client, m
     state = await retry.json()
     assert len(state["resets"]) == 1 and state["projectionPending"] is False
     assert state["allocations"][0]["version"] == 2
+
+
+@pytest.mark.asyncio
+async def test_split_editor_authenticates_payer_and_replays_combined_change(client):
+    body = {"operation": "edit_split", "requestId": uuid4().hex, "allocationId": client.allocation["id"],
+            "version": client.allocation["version"], "grossCents": 12345, "payerBasisPoints": 6525}
+    assert (await client.http.post("/app/reimbursements", json=body, headers=HEADERS)).status == 401
+    connect(client, HANNAH, "hannah")
+    client.store.mark_projected(client.allocation["id"], client.allocation["version"])
+    assert (await client.http.post("/app/reimbursements?owner=brian", json=body, headers=HEADERS)).status == 400
+    connect(client)
+    assert (await client.http.post("/app/reimbursements", json=body)).status == 403
+    result = await client.http.post("/app/reimbursements", json=body, headers=HEADERS)
+    assert result.status == 200
+    changed = (await result.json())["allocations"][0]
+    assert (changed["grossCents"], changed["payerShareCents"], changed["partnerShareCents"]) == (12345, 8055, 4290)
+    assert changed["method"] == "custom" and changed["customPayerBasisPoints"] == 6525
+    assert (await client.http.post("/app/reimbursements", json=body, headers=HEADERS)).status == 200
+    assert client.store.snapshot("brian")["events"] == []
+    assert client.store.get_allocation(changed["id"])["version"] == changed["version"]

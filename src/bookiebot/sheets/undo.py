@@ -2189,7 +2189,7 @@ def split_recent_action(
     )
 
     method = normalize_split_method(split_method)
-    if method is None:
+    if method is None or method == "custom":
         return False, "Choose By income, 50/50, or Fronted for this split."
 
     logged = select_recent_action(
@@ -2394,7 +2394,7 @@ def change_split_recent_action(
     )
 
     method = normalize_split_method(split_method)
-    if method is None:
+    if method is None or method == "custom":
         return False, "Choose By income, 50/50, or Fronted for this split."
     logged = select_recent_action(user_key, action_id=action_id)
     if logged is None or logged.action.metadata.get("type") != "split":

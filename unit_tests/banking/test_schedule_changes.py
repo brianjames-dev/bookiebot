@@ -360,10 +360,10 @@ def test_recovery_rejects_a_retargeted_workbook(setup):
     assert setup.book.writes == 1
 
 
-def shared_bill(data, *, gross=10000, settled=0, method='income'):
+def shared_bill(data, *, gross=10000, settled=0, method='income', basis=None):
     from unit_tests.reimbursements.test_store import payload
     from bookiebot.sheets.collaboration import split_amounts
-    payer, partner = split_amounts(gross / 100, method, 'brian')
+    payer, partner = split_amounts(gross / 100, method, 'brian', custom_payer_basis_points=basis)
     value = data.ledger.register_allocation(payload(
         id='shared-water', sourceActionId='old-payment', splitActionId='old-split',
         item='Water', category='water', sourceWorksheet='income', sourceRow=1,
@@ -371,7 +371,7 @@ def shared_bill(data, *, gross=10000, settled=0, method='income'):
         sourceSheetTitle=now_pacific().strftime('%B'), sourceSpreadsheetId='isolated-budget',
         sourceColumnMap={'item': 2, 'amount': 3}, sourceValues={'item': 'Water', 'amount': f'{gross / 100:.2f}'},
         grossCents=gross, payerShareCents=round(payer * 100), partnerShareCents=round(partner * 100),
-        settledCents=settled, method=method))
+        settledCents=settled, method=method, **({"customPayerBasisPoints": basis} if method == "custom" else {})))
     data.ledger.mark_projected(value['id'], value['version'])
     data.book.sheets[now_pacific().strftime('%B')].rows[0][2] = f'{(gross - settled) / 100:.2f}'
     action = LoggedAction('old-payment', now_pacific().date().isoformat(), ACTOR, UndoAction(
@@ -536,3 +536,16 @@ def test_changed_shared_ledger_invalidates_review_before_claim(setup):
     with pytest.raises(change.ScheduleChangeConflict):
         apply(setup, item, candidate, plan)
     assert not setup.book.writes and setup.store.get_import_operation('brian', item.id) is None
+
+
+def test_custom_bill_percentage_survives_reconciliation_gross_correction(setup):
+    item, candidate = setup.seed('bill')
+    before = shared_bill(setup, method='custom', basis=3333)
+    plan = preview(setup, item, candidate)
+    assert plan['sharing']['method'] == 'custom'
+    assert plan['sharing']['payerShareCents'] == 4166
+    assert plan['sharing']['partnerShareCents'] == 8334
+    assert apply(setup, item, candidate, plan).status == 'completed'
+    after = setup.ledger.get_allocation(before['id'])
+    assert (after['grossCents'], after['payerShareCents'], after['partnerShareCents']) == (12500, 4166, 8334)
+    assert after['customPayerBasisPoints'] == 3333

@@ -4,6 +4,12 @@ Last updated: 2026-10-25
 
 ## Goal
 
+### Reimbursement percentage and total editor — 2026-10-25
+
+Complete (user-requested slice): eligible payers can edit each Shared expense with a 0–100% slider at 0.01% precision and a separate full-total input. Both shares preview immediately; Save atomically stores gross, custom percentage and exact cent shares through the existing command/revision tables. Cancel changes nothing. Preserve payer-only, active/cash-v1, version, pending/confirmed repayment, reset and completed-projection guards. Custom percentages survive later Discord and reconciliation bill amount corrections; choosing a preset removes obsolete custom metadata. A 100% payer share shows No reimbursement due instead of suggesting a payment was received.
+
+Changed gross totals reopen linked bank matches and pre-split ancestors after verified source/mirror updates, before marking the revision synced; failures recover through Shared refresh. Percentage-only changes retain matching. UI drafts survive refresh but stale reviews cannot save; uncertain requests retain the same request ID. The rebuilt app explicitly deduplicates React after browser QA exposed a duplicate runtime in this checkout. Verification is in STATUS; isolated browser fixtures never contact financial services. Release/native acceptance is checklist 156; no production financial writes. General canonical correction Undo and historical net-accounting edits remain outside this slice.
+
 ### Recent Update/Move quota and responsiveness audit — 2026-10-25
 
 Released. The same synchronous-before-ACK and per-cell preparation pattern was present in Update/Move, including candidate/confirmation/person/category controls and typed replies. These paths now use private progress before owner-scoped worker I/O, one strict menu read, pure view constructors and a shared one-shot/Cancel mutation controller. Fresh batched preparation supplies all current/previous fields and Move extent/destination values. Pre-write quota errors preserve all cells/history; uncertain writes and missing persisted Undo have explicit inspection feedback. Stale candidate IDs never select another recent index. Canonical shared-payment correction and settlement guards are unchanged.

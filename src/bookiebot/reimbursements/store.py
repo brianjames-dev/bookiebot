@@ -90,7 +90,7 @@ def _allocation_details(payload: Any) -> dict[str, Any]:
                 "sourceWorksheet", "sourceRow", "sourceActionId", "sourceYear", "grossCents", "payerShareCents",
                 "partnerShareCents", "method", "accounting"}
     optional = {"splitActionId", "sourceSpreadsheetId", "settledCents", "sourceValues", "sourceColumnMap", "actorKey",
-                "ledgerSpreadsheetId", "ledgerYear", "originalPerson", "legacyReceivedAt", "sourceSheetTitle", "baselineSettledCents", "lifecycle"}
+                "ledgerSpreadsheetId", "ledgerYear", "originalPerson", "legacyReceivedAt", "sourceSheetTitle", "baselineSettledCents", "lifecycle", "customPayerBasisPoints"}
     if not isinstance(payload, dict) or set(payload) - required - optional or required - set(payload):
         raise ReimbursementValidationError("Allocation fields are missing or unexpected.")
     result: dict[str, Any] = {}
@@ -119,9 +119,16 @@ def _allocation_details(payload: Any) -> dict[str, Any]:
     result["baselineSettledCents"] = result["settledCents"]
     if result["settledCents"] > result["partnerShareCents"]:
         raise ReimbursementValidationError("Settlement cannot exceed the partner's share.")
-    if payload["method"] not in ("income", "equal", "fronted") or payload["accounting"] not in ("cash_v1", "legacy_net"):
+    if payload["method"] not in ("income", "equal", "fronted", "custom") or payload["accounting"] not in ("cash_v1", "legacy_net"):
         raise ReimbursementValidationError("Unknown split or accounting method.")
     result["method"], result["accounting"] = payload["method"], payload["accounting"]
+    if result["method"] == "custom":
+        basis = _integer(payload.get("customPayerBasisPoints"), "Payer percentage", 0, 10_000)
+        result["customPayerBasisPoints"] = basis
+        if result["payerShareCents"] != (result["grossCents"] * basis + 5_000) // 10_000:
+            raise ReimbursementValidationError("The shares must match the custom percentage to the cent.")
+    elif "customPayerBasisPoints" in payload:
+        raise ReimbursementValidationError("A custom percentage requires a custom split.")
     if "lifecycle" in payload:
         if payload["lifecycle"] not in {"active", "void", "deleted"}:
             raise ReimbursementValidationError("Unknown reimbursement lifecycle.")
@@ -330,66 +337,72 @@ class ReimbursementStore:
         Historical purchase/action identity and every before/after value remain
         in the audit table. No remote sheet write occurs inside this transaction.
         """
-        owner = _owner(owner)
-        allocation_id = _text(allocation_id, "Allocation identifier", 200, required=True)
-        if operation not in {"split", "update", "move", "cancel", "delete"}:
-            raise ReimbursementValidationError("Unknown expense correction.")
-        allowed = {"grossCents", "payerShareCents", "partnerShareCents", "method", "payerPerson", "item",
-                   "location", "category", "sourceColumnMap", "sourceValues", "lifecycle"}
-        if not isinstance(updates, dict) or not updates or set(updates) - allowed:
-            raise ReimbursementValidationError("Unexpected expense correction fields.")
         with self.access.connect(write=True) as db:
             self._lock(db)
-            row = self._row(db, allocation_id)
-            before = json.loads(row["payload_json"])
-            if before["accounting"] != "cash_v1":
-                raise ReimbursementConflictError("Historical net-accounting reimbursements are read-only.")
-            if owner != row["payer_owner"]:
-                raise ReimbursementValidationError("Only the original payer can edit this expense.")
-            self._version(row, expected_version)
-            self._not_cleared(row)
-            if before.get("lifecycle") == "deleted":
-                raise ReimbursementConflictError("This expense has already been deleted.")
-            if int(row["projected_version"]) != int(row["version"]):
-                raise ReimbursementConflictError("The previous expense change is still syncing. Retry it before editing again.")
-            self._no_pending(db, allocation_id)
-            paid = db.execute("SELECT id FROM app_reimbursement_events WHERE allocation_id = ? AND status = 'confirmed' LIMIT 1",
-                              (allocation_id,)).fetchone()
-            if int(row["settled_cents"]) or paid is not None:
-                raise ReimbursementConflictError("This expense has confirmed repayments. Reverse its settlement before changing the original expense.")
-            before.pop("sourceRevision", None)
-            # Reset metadata is internal and must not become source input on a
-            # later edit after Undo. The revision audit still retains it.
-            source = {key: value for key, value in before.items() if key not in {"clearedCents", "mirrorOnlyVersion"}}
-            value = _allocation_details({**source, **updates, "settledCents": 0})
-            lifecycle = value.get("lifecycle", "active")
-            expected_lifecycle = {"cancel": "void", "delete": "deleted", "split": "active"}.get(operation, before.get("lifecycle", "active"))
-            if lifecycle != expected_lifecycle:
-                raise ReimbursementValidationError("The expense correction has an invalid lifecycle transition.")
-            if operation in {"split", "cancel", "delete"}:
-                allowed_changes = {"method", "payerShareCents", "partnerShareCents", "lifecycle"} if operation == "split" else {"lifecycle"}
-                if any(before.get(key) != new for key, new in value.items() if key not in allowed_changes):
-                    raise ReimbursementValidationError("This action cannot change transaction details.")
-            if operation != "move" and any(before.get(key) != value.get(key) for key in ("category", "sourceColumnMap")):
-                raise ReimbursementValidationError("Only Move can change this expense's category.")
-            # Every later projection starts from this revision's actual source,
-            # including allocations migrated from the earlier net-share model.
-            source_values, fields = value.get("sourceValues", {}), value.get("sourceColumnMap", {})
-            if "amount" in fields:
-                source_values["amount"] = f"{value['grossCents'] / 100:.2f}"
-            for field, key in (("person", "payerPerson"), ("location", "location"), ("item", "item")):
-                if field in fields and (field != "item" or value["sourceWorksheet"] == "expense"):
-                    source_values[field] = value[key]
-            version, now, revision_id = int(row["version"]) + 1, _now(), uuid4().hex
-            db.execute("""INSERT INTO app_reimbursement_revisions(id,allocation_id,version,actor_owner,operation,before_json,after_json,created_at)
-                          VALUES (?,?,?,?,?,?,?,?)""",
-                       (revision_id, allocation_id, version, owner, operation, _json(before), _json(value), now))
-            value["sourceRevision"] = {"id": revision_id, "operation": operation, "version": version,
-                                       "before": before, "actorOwner": owner, "createdAt": now}
-            db.execute("""UPDATE app_reimbursement_allocations SET payload_json = ?, gross_cents = ?, payer_share_cents = ?,
-                          partner_share_cents = ?, version = ?, updated_at = ? WHERE id = ?""",
-                       (_json(value), value["grossCents"], value["payerShareCents"], value["partnerShareCents"], version, now, allocation_id))
-            return self._payload(self._row(db, allocation_id))
+            return self._revise_allocation(db, owner, allocation_id, expected_version, updates, operation=operation)
+
+    def _revise_allocation(self, db: Any, owner: str, allocation_id: str, expected_version: Any,
+                           updates: dict[str, Any], *, operation: str) -> dict[str, Any]:
+        owner = _owner(owner)
+        allocation_id = _text(allocation_id, "Allocation identifier", 200, required=True)
+        if operation not in {"split", "update", "move", "cancel", "delete", "edit_split"}:
+            raise ReimbursementValidationError("Unknown expense correction.")
+        allowed = {"grossCents", "payerShareCents", "partnerShareCents", "method", "payerPerson", "item",
+                   "location", "category", "sourceColumnMap", "sourceValues", "lifecycle", "customPayerBasisPoints"}
+        if not isinstance(updates, dict) or not updates or set(updates) - allowed:
+            raise ReimbursementValidationError("Unexpected expense correction fields.")
+        row = self._row(db, allocation_id)
+        before = json.loads(row["payload_json"])
+        if before["accounting"] != "cash_v1":
+            raise ReimbursementConflictError("Historical net-accounting reimbursements are read-only.")
+        if owner != row["payer_owner"]:
+            raise ReimbursementValidationError("Only the original payer can edit this expense.")
+        self._version(row, expected_version)
+        self._not_cleared(row)
+        if before.get("lifecycle") == "deleted":
+            raise ReimbursementConflictError("This expense has already been deleted.")
+        if int(row["projected_version"]) != int(row["version"]):
+            raise ReimbursementConflictError("The previous expense change is still syncing. Retry it before editing again.")
+        self._no_pending(db, allocation_id)
+        paid = db.execute("SELECT id FROM app_reimbursement_events WHERE allocation_id = ? AND status = 'confirmed' LIMIT 1",
+                          (allocation_id,)).fetchone()
+        if int(row["settled_cents"]) or paid is not None:
+            raise ReimbursementConflictError("This expense has confirmed repayments. Reverse its settlement before changing the original expense.")
+        before.pop("sourceRevision", None)
+        # Reset metadata is internal and must not become source input on a
+        # later edit after Undo. The revision audit still retains it.
+        source = {key: value for key, value in before.items() if key not in {"clearedCents", "mirrorOnlyVersion"}}
+        if updates.get("method", source["method"]) != "custom":
+            source.pop("customPayerBasisPoints", None)
+        value = _allocation_details({**source, **updates, "settledCents": 0})
+        lifecycle = value.get("lifecycle", "active")
+        expected_lifecycle = {"cancel": "void", "delete": "deleted", "split": "active"}.get(operation, before.get("lifecycle", "active"))
+        if lifecycle != expected_lifecycle:
+            raise ReimbursementValidationError("The expense correction has an invalid lifecycle transition.")
+        if operation in {"split", "cancel", "delete"}:
+            allowed_changes = {"method", "payerShareCents", "partnerShareCents", "lifecycle", "customPayerBasisPoints"} if operation == "split" else {"lifecycle"}
+            if any(before.get(key) != new for key, new in value.items() if key not in allowed_changes):
+                raise ReimbursementValidationError("This action cannot change transaction details.")
+        if operation != "move" and any(before.get(key) != value.get(key) for key in ("category", "sourceColumnMap")):
+            raise ReimbursementValidationError("Only Move can change this expense's category.")
+        # Every later projection starts from this revision's actual source,
+        # including allocations migrated from the earlier net-share model.
+        source_values, fields = value.get("sourceValues", {}), value.get("sourceColumnMap", {})
+        if "amount" in fields:
+            source_values["amount"] = f"{value['grossCents'] / 100:.2f}"
+        for field, key in (("person", "payerPerson"), ("location", "location"), ("item", "item")):
+            if field in fields and (field != "item" or value["sourceWorksheet"] == "expense"):
+                source_values[field] = value[key]
+        version, now, revision_id = int(row["version"]) + 1, _now(), uuid4().hex
+        db.execute("""INSERT INTO app_reimbursement_revisions(id,allocation_id,version,actor_owner,operation,before_json,after_json,created_at)
+                      VALUES (?,?,?,?,?,?,?,?)""",
+                   (revision_id, allocation_id, version, owner, operation, _json(before), _json(value), now))
+        value["sourceRevision"] = {"id": revision_id, "operation": operation, "version": version,
+                                   "before": before, "actorOwner": owner, "createdAt": now}
+        db.execute("""UPDATE app_reimbursement_allocations SET payload_json = ?, gross_cents = ?, payer_share_cents = ?,
+                      partner_share_cents = ?, version = ?, updated_at = ? WHERE id = ?""",
+                   (_json(value), value["grossCents"], value["payerShareCents"], value["partnerShareCents"], version, now, allocation_id))
+        return self._payload(self._row(db, allocation_id))
 
     def pending_projections(self) -> list[dict[str, Any]]:
         with self.access.connect(write=True) as db:
@@ -630,6 +643,7 @@ class ReimbursementStore:
                        "confirm_payment": {"allocationId", "version", "eventId"},
                        "offset": {"entries", "date", "note"}, "reverse": {"eventId"},
                        "receive_all": {"expectedState", "date", "note"},
+                       "edit_split": {"allocationId", "version", "grossCents", "payerBasisPoints"},
                        "reset": {"expectedState", "note"},
                        "undo_reset": {"resetId", "version"}, "redo_reset": {"resetId", "version"}}
             if not isinstance(operation, str) or operation not in allowed or set(body) - common - allowed[operation]:
@@ -637,7 +651,18 @@ class ReimbursementStore:
             changed: list[str] = []
             event_ids: list[str] = []
             reset_id = ""
-            if operation in {"reset", "undo_reset", "redo_reset"}:
+            if operation == "edit_split":
+                allocation_id = _text(body.get("allocationId"), "Allocation identifier", 200, required=True)
+                self._writable(self._row(db, allocation_id))
+                gross = _cents(body.get("grossCents"), "Expense total")
+                basis = _integer(body.get("payerBasisPoints"), "Payer percentage", 0, 10_000)
+                payer = (gross * basis + 5_000) // 10_000
+                self._revise_allocation(db, owner, allocation_id, body.get("version"), {
+                    "grossCents": gross, "payerShareCents": payer, "partnerShareCents": gross - payer,
+                    "method": "custom", "customPayerBasisPoints": basis,
+                }, operation="edit_split")
+                changed.append(allocation_id)
+            elif operation in {"reset", "undo_reset", "redo_reset"}:
                 changed, reset_id = self._change_reset(db, owner, body, operation_id, now)
             elif operation == "receive_all":
                 if body.get("expectedState") != self._reset_state(db):

@@ -20,6 +20,12 @@ VALUES = {"date": "1/3/2026", "item": "Hannah's T", "amount": "464.72", "locatio
 @pytest.fixture
 def setup(access, monkeypatch):
     monkeypatch.setattr(migration, "verify_budget_links", lambda *args, **kwargs: None)
+    from bookiebot.banking import service as banking_service
+    from bookiebot.reports import phone_reconciliation
+    bank_calls = []
+    banking = SimpleNamespace(reopen_reconciliation_items_for_action_ids=lambda owner, ids, **kwargs: bank_calls.append((owner, ids)))
+    monkeypatch.setattr(banking_service, "build_banking_service", lambda: banking)
+    monkeypatch.setattr(phone_reconciliation, "_invalidate_review_actions", lambda *args: None)
     store = ReimbursementStore(access)
     store.initialize()
     book = Book()
@@ -43,7 +49,7 @@ def setup(access, monkeypatch):
         history.append(action)
         return "split-" + logged.id
     monkeypatch.setattr(undo, "record_undo_action", record)
-    return SimpleNamespace(store=store, book=book, sheet=sheet, logged=logged, history=history)
+    return SimpleNamespace(store=store, book=book, sheet=sheet, logged=logged, history=history, bank_calls=bank_calls)
 
 
 def split(setup, **changes):
@@ -572,3 +578,86 @@ def test_saved_correction_and_no_change_retry_survive_projection_setup_failure(s
     assert ok and "syncing" not in message
     current = setup.store.get_allocation(pending["id"])
     assert current["version"] == current["projectedVersion"] == pending["version"]
+
+
+def test_phone_split_editor_projects_total_and_preserves_percentage_on_later_updates(setup):
+    assert split(setup)[0]
+    value = setup.store.snapshot("brian")["allocations"][0]
+    body = command("edit_split", allocationId=value["id"], version=value["version"], grossCents=10001, payerBasisPoints=3333)
+    result = service.command("brian", body)
+    changed = result["allocations"][0]
+    assert result["projectionPending"] is False
+    assert setup.bank_calls == [("brian", {value["sourceActionId"], value["splitActionId"]})]
+    assert setup.sheet.read(2, 31, 32) == [100.01]
+    assert (changed["payerShareCents"], changed["partnerShareCents"]) == (3333, 6668)
+    assert changed["sourceValues"]["amount"] == "100.01"
+    assert setup.book.worksheet("Shared Reimbursements").rows[1][16] == "custom"
+    assert service.command("brian", body)["allocations"][0]["version"] == changed["version"]
+    assert len(setup.bank_calls) == 1
+    assert service.mutate_recent_action(BRIAN, setup.logged, "update", updates={"amount": "300.03"})[0]
+    changed = setup.store.get_allocation(value["id"])
+    assert (changed["payerShareCents"], changed["partnerShareCents"]) == (10000, 20003)
+    assert setup.sheet.read(2, 31, 32) == [300.03]
+    assert service.mutate_recent_action(BRIAN, setup.logged, "split", split_method="equal")[0]
+    changed = setup.store.get_allocation(value["id"])
+    assert changed["method"] == "equal" and "customPayerBasisPoints" not in changed
+    assert len(setup.store.snapshot("brian")["events"]) == 0
+
+
+def test_phone_split_editor_recovers_lost_sheet_write_without_duplicate_revision(setup):
+    assert split(setup)[0]
+    value = setup.store.snapshot("brian")["allocations"][0]
+    body = command("edit_split", allocationId=value["id"], version=value["version"], grossCents=20000, payerBasisPoints=7500)
+    setup.book.timeout_after_values = True
+    assert service.command("brian", body)["projectionPending"] is True
+    assert setup.sheet.read(2, 31, 32) == [200.0]
+    recovered = service.command("brian", body)
+    assert recovered["projectionPending"] is False
+    assert recovered["allocations"][0]["version"] == value["version"] + 1
+    assert recovered["allocations"][0]["partnerShareCents"] == 5000
+
+
+def test_percentage_only_edit_preserves_bank_match_and_gross_cash(setup):
+    assert split(setup)[0]
+    value = setup.store.snapshot("brian")["allocations"][0]
+    result = service.command("brian", command("edit_split", allocationId=value["id"], version=value["version"],
+                                              grossCents=value["grossCents"], payerBasisPoints=0))
+    assert not result["projectionPending"]
+    assert setup.bank_calls == []
+    assert setup.sheet.read(2, 31, 32) == [464.72]
+    assert result["allocations"][0]["partnerShareCents"] == 46472
+    assert not result["events"]
+
+
+def test_split_gross_correction_recovers_bank_link_failure_before_marking_synced(setup, monkeypatch):
+    from bookiebot.banking import service as banking_service
+    assert split(setup)[0]
+    value = setup.store.snapshot("brian")["allocations"][0]
+    attempts = []
+    def reopen(owner, ids, **kwargs):
+        attempts.append((owner, ids))
+        if len(attempts) == 1:
+            raise RuntimeError("Bank metadata temporarily unavailable")
+    monkeypatch.setattr(banking_service, "build_banking_service", lambda: SimpleNamespace(reopen_reconciliation_items_for_action_ids=reopen))
+    body = command("edit_split", allocationId=value["id"], version=value["version"], grossCents=20000, payerBasisPoints=7500)
+    assert service.command("brian", body)["projectionPending"]
+    assert setup.sheet.read(2, 31, 32) == [200.0]
+    assert not service.snapshot("brian", retry_projection=True)["projectionPending"]
+    assert len(attempts) == 2
+    assert not service.command("brian", body)["projectionPending"]
+    assert len(attempts) == 2
+
+
+def test_total_edit_reopens_pre_split_bank_match_ancestors(setup):
+    from dataclasses import asdict
+    import json
+    assert split(setup)[0]
+    value = setup.store.snapshot("brian")["allocations"][0]
+    parent = "original-purchase"
+    source = replace(setup.logged.action, metadata={**setup.logged.action.metadata, "updated_action_id": parent})
+    setup.book.add_sheet(f"_BookieBot Action Log - {value['sourceYear']}-01", [undo._LOG_HEADERS,
+        [value["sourceActionId"], "2026-01-03", BRIAN, "active", "", json.dumps(asdict(source))]])
+    result = service.command("brian", command("edit_split", allocationId=value["id"], version=value["version"],
+                                              grossCents=30000, payerBasisPoints=5000))
+    assert not result["projectionPending"]
+    assert setup.bank_calls == [("brian", {value["sourceActionId"], value["splitActionId"], parent})]

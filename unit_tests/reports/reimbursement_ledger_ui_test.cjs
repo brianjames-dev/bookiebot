@@ -336,7 +336,7 @@ async function emptyDirectionsAndMarkerContracts() {
   assert.ok(button(tree.root, "View 3 expenses"))
   assert.ok(text(tree.root).includes("Net owed to you$95.00"))
   await expand(tree, "PG&E")
-  assert.ok(text(tree.root).includes("Payment recorded; budget and reimbursement sheets still need to update."), "A recorded payment cannot appear fully synced while its sheet projection is pending")
+  assert.ok(text(tree.root).includes("Change saved; budget and reimbursement sheets still need to update."), "A recorded payment cannot appear fully synced while its sheet projection is pending")
   await unmount(tree)
 
   state = fixture()
@@ -881,7 +881,97 @@ async function matchedReceiptContracts() {
   await unmount(tree)
 }
 
+
+async function splitEditorContracts() {
+  const ready = () => {
+    const state = fixture()
+    state.snapshot.allocations = [allocation({ settledCents: 0, outstandingCents: 10000 })]
+    state.snapshot.events = []
+    return state
+  }
+  let state = ready(), tree = await mount()
+  await expand(tree, "PG&E")
+  await tap(button(tree.root, "Edit split"))
+  assert.equal(button(tree.root, "Save split").props.disabled, true)
+  await fill(tree, "Your share", "33.33")
+  assert.ok(text(form(tree)).includes("Brian · 33.33%$66.66"))
+  assert.ok(text(form(tree)).includes("Hannah · 66.67%$133.34"))
+  await fill(tree, "Expense total", "100.01")
+  assert.ok(text(form(tree)).includes("Brian · 33.33%$33.33"))
+  assert.ok(text(form(tree)).includes("Hannah · 66.67%$66.68"))
+  assert.equal(writes(state).length, 0, "Dragging and typing never persist a financial change")
+  for (const [value, payer, partner] of [["0", "$0.00", "$100.01"], ["100", "$100.01", "$0.00"]]) {
+    await fill(tree, "Your share", value)
+    assert.ok(text(form(tree)).includes(`Brian · ${value}%${payer}`))
+    assert.ok(text(form(tree)).includes(`Hannah · ${100 - Number(value)}%${partner}`))
+  }
+  for (const invalid of ["", "0", "-1", "1.001", "1e3", "100000000.01"]) {
+    await fill(tree, "Expense total", invalid)
+    assert.ok(button(tree.root, "Save split").props.disabled)
+    await submit(tree)
+  }
+  assert.equal(writes(state).length, 0)
+  await tap(button(tree.root, "Cancel"))
+  await tap(button(tree.root, "Edit split"))
+  assert.equal(form(tree).findByProps({ type: "range" }).props.value, 50, "Reopening starts from saved values")
+  await fill(tree, "Your share", "65.25")
+  await fill(tree, "Expense total", "123.45")
+  await submit(tree)
+  assert.deepEqual(clone(writes(state)[0].body), {
+    operation: "edit_split", allocationId: "a", version: 3, grossCents: 12345, payerBasisPoints: 6525,
+    requestId: writes(state)[0].body.requestId,
+  })
+  await unmount(tree)
+
+  state = ready()
+  state.snapshot.allocations[0] = allocation({ settledCents: 0, outstandingCents: 0, partnerShareCents: 0,
+    payerShareCents: 20000, status: "settled", method: "custom", customPayerBasisPoints: 10000 })
+  tree = await mount(); await expand(tree, "PG&E")
+  assert.ok(text(row(tree, "PG&E")).includes("No reimbursement due"), "A zero partner share is not a receipt")
+  assert.ok(!button(tree.root, "Record received"))
+  await tap(button(tree.root, "Edit split"))
+  assert.equal(form(tree).findByProps({ type: "range" }).props.value, 100, "Saved custom percentages reopen exactly")
+  await unmount(tree)
+
+  for (const changes of [{ settledCents: 2000, outstandingCents: 8000 }, { projectedVersion: 2 },
+    { clearedCents: 10000, outstandingCents: 0 }, { accounting: "legacy_net" },
+    { payerOwner: "hannah", partnerOwner: "brian" }]) {
+    state = ready(); state.snapshot.allocations[0] = allocation({ settledCents: 0, outstandingCents: 10000, ...changes })
+    tree = await mount()
+    if (changes.payerOwner) await tap(button(tree.root, "You owe", true))
+    await expand(tree, "PG&E")
+    const edit = button(tree.root, "Edit split")
+    assert.ok(!edit || edit.props.disabled, "Only an eligible payer can edit")
+    await unmount(tree)
+  }
+  state = ready(); state.snapshot.events = [receipt({ kind: "report_payment", status: "pending" })]
+  tree = await mount(); await expand(tree, "PG&E")
+  assert.ok(button(tree.root, "Edit split").props.disabled)
+  await unmount(tree)
+
+  state = ready(); tree = await mount(); await expand(tree, "PG&E"); await tap(button(tree.root, "Edit split"))
+  await fill(tree, "Expense total", "90.00")
+  state.snapshot.allocations[0].version++
+  await act(async () => { tree.update(React.createElement(ReimbursementLedger, { fallback, refreshKey: "new" })); await flush() })
+  assert.ok(text(tree.root).includes("This expense changed."))
+  assert.equal(form(tree).findAllByType("input")[0].props.value, "90.00", "A refresh retains the user's draft")
+  await submit(tree); assert.equal(writes(state).length, 0, "A stale draft cannot write")
+  await tap(button(tree.root, "Cancel")); await unmount(tree)
+
+  let attempts = 0
+  state = fixture({ post: () => { if (++attempts === 1) throw Error("Saved response lost"); return response(clone(state.snapshot)) } })
+  state.snapshot.allocations = [allocation({ settledCents: 0, outstandingCents: 10000 })]; state.snapshot.events = []
+  tree = await mount(); await expand(tree, "PG&E"); await tap(button(tree.root, "Edit split"))
+  await fill(tree, "Your share", "12.34"); await submit(tree)
+  assert.ok(form(tree).findByType("fieldset").props.disabled)
+  await submit(tree); assert.equal(writes(state).length, 1)
+  await tap(button(tree.root, "Retry this record"))
+  assert.deepEqual(writes(state)[0].body, writes(state)[1].body, "Retry uses the identical reviewed split and request ID")
+  await unmount(tree)
+}
+
 ;(async () => {
+  await splitEditorContracts()
   await matchedReceiptContracts()
   await bulkReceiveContracts()
   await monthPaginationContracts()

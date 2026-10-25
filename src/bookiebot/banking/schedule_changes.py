@@ -241,7 +241,8 @@ def prepare_schedule_change(owner: str, actor: str, item: ReconciliationItem,
                             or allocation['version'] != allocation['projectedVersion']
                             or any(event['status'] in {'pending', 'confirmed'} for event in events)):
                         raise ScheduleChangeConflict('Resolve pending payments or reverse confirmed repayments in Shared before changing the full bill amount.')
-                    payer, partner = (split_amounts(float(target), method, owner) if gross_changed else
+                    payer, partner = (split_amounts(float(target), method, owner,
+                                                  custom_payer_basis_points=allocation.get('customPayerBasisPoints')) if gross_changed else
                                       (allocation['payerShareCents'] / 100, allocation['partnerShareCents'] / 100))
                     targets[-1]['value'] = f"{float(target) - allocation['settledCents'] / 100:.2f}"
                 else:

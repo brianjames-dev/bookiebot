@@ -20,7 +20,7 @@ from bookiebot.sheets.utils import clean_money
 
 logger = logging.getLogger(__name__)
 
-SplitMethod = Literal["income", "equal", "fronted"]
+SplitMethod = Literal["income", "equal", "fronted", "custom"]
 AllocationStatus = Literal["outstanding", "reimbursed", "cleared", "void"]
 
 BRIAN_ANNUAL_INCOME = Decimal("156000")
@@ -101,6 +101,8 @@ class SharedAllocation:
 
 def normalize_split_method(value: Any) -> SplitMethod | None:
     normalized = str(value or "").strip().lower().replace("_", " ")
+    if normalized == "custom":
+        return "custom"
     if normalized in {"income", "by income", "income based", "income-based", "proportional"}:
         return "income"
     if normalized in {"equal", "even", "evenly", "50/50", "50 50", "half"}:
@@ -115,6 +117,8 @@ def normalize_split_method(value: Any) -> SplitMethod | None:
 
 
 def split_method_label(method: SplitMethod) -> str:
+    if method == "custom":
+        return "Custom"
     if method == "income":
         return "By income"
     if method == "fronted":
@@ -131,13 +135,18 @@ def payer_owner_from_person(person: Any, actor_key: str | None) -> str:
     return get_user_config(actor_key).budget_owner_key
 
 
-def split_amounts(gross_amount: Any, method: SplitMethod, payer_owner: str) -> tuple[float, float]:
+def split_amounts(gross_amount: Any, method: SplitMethod, payer_owner: str, *,
+                  custom_payer_basis_points: int | None = None) -> tuple[float, float]:
     gross = Decimal(str(clean_money(str(gross_amount)))).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
     if gross <= 0:
         raise ValueError("Split expenses must have an amount greater than zero.")
     if method == "fronted":
         return 0.0, float(gross)
-    if method == "equal":
+    if method == "custom":
+        if type(custom_payer_basis_points) is not int or not 0 <= custom_payer_basis_points <= 10_000:
+            raise ValueError("A custom split needs a payer percentage between 0 and 100.")
+        ratio = Decimal(custom_payer_basis_points) / 10_000
+    elif method == "equal":
         ratio = Decimal("0.5")
     elif payer_owner == "hannah":
         ratio = HANNAH_ANNUAL_INCOME / HOUSEHOLD_ANNUAL_INCOME

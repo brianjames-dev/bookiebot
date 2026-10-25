@@ -12,6 +12,7 @@ export interface LedgerAllocation {
   grossCents: number; payerShareCents: number; partnerShareCents: number
   settledCents: number; clearedCents?: number; outstandingCents: number; method: string; version: number
   status: "outstanding" | "settled" | "cleared"; projectedVersion: number; accounting: string
+  customPayerBasisPoints?: number
 }
 export interface LedgerEvent {
   id: string; operationId: string; allocationId: string; kind: "receive" | "report_payment" | "offset"
@@ -133,6 +134,9 @@ function validate(snapshot: LedgerResponse) {
       .every(value => Number.isSafeInteger(value) && value >= 0)
       || item.grossCents !== item.payerShareCents + item.partnerShareCents
       || item.partnerShareCents !== item.settledCents + (item.clearedCents ?? 0) + item.outstandingCents) throw new Error("Incomplete reimbursement amounts")
+    if (item.method === "custom" && (!Number.isSafeInteger(item.customPayerBasisPoints)
+      || item.customPayerBasisPoints! < 0 || item.customPayerBasisPoints! > 10_000
+      || item.payerShareCents !== Math.floor((item.grossCents * item.customPayerBasisPoints! + 5_000) / 10_000))) throw new Error("Incomplete custom split")
   }
   if (snapshot.resets !== undefined) {
     if (!Array.isArray(snapshot.resets)) throw new Error("Incomplete reset history")
@@ -411,8 +415,9 @@ function LedgerMonth({ group, visible, events, reversibleIds, owner, disabled, r
 function LedgerRow({ allocation: item, events, reversibleIds, owner, open, onOpenChange, disabled, run }: {
   allocation: LedgerAllocation; events: LedgerEvent[]; reversibleIds: Set<string>; owner: string; open: boolean; onOpenChange: (open: boolean) => void; disabled: boolean; run: Run
 }) {
-  const [mode, setMode] = useState<"" | "payment" | "history">("")
-  const paymentId = useId(), historyId = useId()
+  const [mode, setMode] = useState<"" | "payment" | "history" | "split">("")
+  const [splitReview, setSplitReview] = useState(0)
+  const paymentId = useId(), historyId = useId(), splitId = useId()
   const payer = item.payerPerson || person(item.payerOwner), partner = person(item.partnerOwner)
   const isPayer = owner === item.payerOwner
   const settled = item.outstandingCents === 0
@@ -421,7 +426,9 @@ function LedgerRow({ allocation: item, events, reversibleIds, owner, open, onOpe
   const pendingSent = events.some(event => event.status === "pending")
   const canWrite = writable(item)
   const sheetPending = item.version !== item.projectedVersion
-  const settledLabel = sheetPending ? "Sheet update pending" : cleared > 0 ? "Cleared" : events.some(event => event.kind === "offset" && event.status === "confirmed") ? "Settled" : isPayer ? "Received" : "Paid"
+  const splitBlocked = pendingSent || sheetPending || cleared > 0 || item.settledCents > 0
+    || events.some(event => event.status === "confirmed")
+  const settledLabel = sheetPending ? "Sheet update pending" : item.partnerShareCents === 0 ? "No reimbursement due" : cleared > 0 ? "Cleared" : events.some(event => event.kind === "offset" && event.status === "confirmed") ? "Settled" : isPayer ? "Received" : "Paid"
   return <AnimatedDisclosure open={open} onOpenChange={onOpenChange} summary={<>
     <span className="bb-reimbursement-item"><strong title={item.item || item.category}>{item.item || item.category || "Shared expense"}</strong></span>
     <div className="bb-reimbursement-status" data-settled={settled}>{settled ? settledLabel : <><FittedAmount className="bb-reimbursement-due">{money(item.outstandingCents)}</FittedAmount><i className="bb-reimbursement-due-key" aria-hidden="true" /><small>due</small></>}</div>
@@ -429,7 +436,7 @@ function LedgerRow({ allocation: item, events, reversibleIds, owner, open, onOpe
   </>}>
     <div className="bb-reimbursement-detail">
       <div className="bb-reimbursement-receipt-meta"><p><time dateTime={isoDate(item.expenseDate) || undefined} title={item.expenseDate}>{dateLabel(item.expenseDate)}</time></p>
-        <p>{item.method === "fronted" ? `Fronted for ${partner}` : item.method === "income" ? "By income" : item.method === "equal" ? "Split 50/50" : item.method}</p>
+        <p>{item.method === "fronted" ? `Fronted for ${partner}` : item.method === "income" ? "By income" : item.method === "equal" ? "Split 50/50" : item.method === "custom" ? "Custom split" : item.method}</p>
         {item.location && <p>{item.location}</p>}</div>
       <div className="bb-reimbursement-visual" role="img" aria-label={`${payer} paid ${money(item.grossCents)}. ${person(item.payerOwner)}’s share ${money(item.payerShareCents)}. ${partner}’s share ${money(item.partnerShareCents)}: ${money(item.settledCents)} settled; ${cleared ? `${money(cleared)} cleared without payment; ` : ""}${money(item.outstandingCents)} still owed.`}>
         <div className="bb-reimbursement-visual-segments" aria-hidden="true">{["personal", "received", "cleared", "outstanding"].map((portion, index) => <span key={portion} data-portion={portion} style={{ width: `${shares[index]}%` }} />)}</div>
@@ -439,17 +446,59 @@ function LedgerRow({ allocation: item, events, reversibleIds, owner, open, onOpe
         <div><dt><i className="bb-reimbursement-visual-key" data-portion="received" aria-hidden="true" /><span>{isPayer ? partner : "You"} {events.some(event => event.kind === "offset" && event.status === "confirmed") ? "settled" : "paid"}</span></dt><dd>{money(item.settledCents)}</dd></div>
         {cleared > 0 && <div><dt><i className="bb-reimbursement-visual-key" data-portion="cleared" aria-hidden="true" /><span>Cleared without payment</span></dt><dd>{money(cleared)}</dd></div>}</dl>
       {!canWrite && <p className="bb-ledger-note">Historical split · read only</p>}
-      {sheetPending && <p className="bb-ledger-note" role="status">Payment recorded; budget and reimbursement sheets still need to update. Refresh Shared to retry.</p>}
+      {sheetPending && <p className="bb-ledger-note" role="status">Change saved; budget and reimbursement sheets still need to update. Refresh Shared to retry.</p>}
       {pendingSent && <p className="bb-ledger-note">{isPayer ? "Review the pending payment above before recording another receipt." : "Sent payment awaiting confirmation. The balance changes when received."}</p>}
       {cleared > 0 && <p className="bb-ledger-note">Undo the balance reset before changing this expense or reversing its payments.</p>}
+      {isPayer && canWrite && item.settledCents > 0 && <p className="bb-ledger-note">Reverse confirmed repayments before editing the split or expense total.</p>}
       <div className="bb-ledger-actions">
+        {canWrite && isPayer && <button type="button" disabled={disabled || splitBlocked} aria-expanded={mode === "split"} aria-controls={splitId}
+          onClick={() => { if (mode !== "split") setSplitReview(value => value + 1); setMode(mode === "split" ? "" : "split") }}>Edit split</button>}
         {canWrite && !settled && <button type="button" disabled={disabled || pendingSent} aria-expanded={mode === "payment"} aria-controls={paymentId} onClick={() => setMode(mode === "payment" ? "" : "payment")}>{isPayer ? "Record received" : "Record sent payment"}</button>}
         <button type="button" aria-expanded={mode === "history"} aria-controls={historyId} onClick={() => setMode(mode === "history" ? "" : "history")}>History ({events.length})</button>
       </div>
+      <RetainedPanel id={splitId} open={open && mode === "split"}><SplitEditor key={splitReview} allocation={item}
+        disabled={disabled} blocked={splitBlocked} run={run} close={() => setMode("")} /></RetainedPanel>
       <RetainedPanel id={paymentId} open={open && mode === "payment"}><PaymentEditor key={item.version} allocation={item} isPayer={isPayer} disabled={disabled || pendingSent} run={run} close={() => setMode("")} /></RetainedPanel>
       <RetainedPanel id={historyId} open={open && mode === "history"}><PaymentHistory allocation={item} events={events} reversibleIds={reversibleIds} disabled={disabled} run={run} /></RetainedPanel>
     </div>
   </AnimatedDisclosure>
+}
+
+function SplitEditor({ allocation, disabled, blocked, run, close }: { allocation: LedgerAllocation; disabled: boolean; blocked: boolean; run: Run; close: () => void }) {
+  const [review] = useState(allocation)
+  const initialBasis = review.customPayerBasisPoints ?? Math.round(review.payerShareCents / review.grossCents * 10_000)
+  const [basis, setBasis] = useState(initialBasis)
+  const [total, setTotal] = useState((review.grossCents / 100).toFixed(2))
+  const gross = reimbursementAmountCents(total)
+  const valid = gross !== null && gross > 0
+  const changed = gross !== review.grossCents || basis !== initialBasis
+  const payerShare = valid ? changed ? Math.floor((gross * basis + 5_000) / 10_000) : review.payerShareCents : null
+  const partnerShare = valid && payerShare !== null ? gross - payerShare : null
+  const stale = allocation.version !== review.version
+  const percent = (value: number) => `${Number((value / 100).toFixed(2))}%`
+  const payer = person(review.payerOwner), partner = person(review.partnerOwner)
+  useAppWorkStatus({ label: "Split changes", dirty: changed,
+    onDiscard: () => { setBasis(initialBasis); setTotal((review.grossCents / 100).toFixed(2)); close() } })
+  return <form className="bb-ledger-form bb-ledger-split-editor" onSubmit={event => {
+    event.preventDefault()
+    if (disabled || blocked || stale || !valid || !changed) return
+    run({ operation: "edit_split", allocationId: review.id, version: review.version, grossCents: gross, payerBasisPoints: basis }, close)
+  }}><fieldset disabled={disabled || blocked || stale}><legend>Edit split</legend>
+    <label>Expense total ($)<input required inputMode="decimal" value={total} aria-invalid={!valid}
+      onChange={event => setTotal(event.target.value)} /></label>
+    {!valid && <p className="bb-ledger-note" role="status">Enter a total greater than $0.00 with at most two decimal places.</p>}
+    <label>Your share · {percent(basis)}<input type="range" min="0" max="100" step="0.01" value={basis / 100}
+      aria-label="Your share percentage" aria-valuetext={`${percent(basis)}${payerShare === null ? "" : `, ${money(payerShare)}`}`}
+      onChange={event => setBasis(Math.max(0, Math.min(10_000, Math.round(Number(event.target.value) * 100))))} /></label>
+    <div className="bb-ledger-split-preview" aria-live="polite" aria-atomic="true">
+      <div><span>{payer} · {percent(basis)}</span><strong>{payerShare === null ? "—" : money(payerShare)}</strong></div>
+      <div><span>{partner} · {percent(10_000 - basis)}</span><strong>{partnerShare === null ? "—" : money(partnerShare)}</strong></div>
+    </div>
+    <p className="bb-ledger-note">Save to apply this split and expense total. The full expense stays in your budget until repayment is confirmed.</p>
+  </fieldset>{stale && <p className="bb-ledger-note" role="status">This expense changed. Cancel and reopen Edit split to review the latest amounts.</p>}
+    <div className="bb-ledger-actions"><button type="submit" disabled={disabled || blocked || stale || !valid || !changed}>Save split</button>
+      <button type="button" disabled={disabled} onClick={close}>Cancel</button></div>
+  </form>
 }
 
 function ResetAmounts({ to, from }: { to: number; from: number }) {

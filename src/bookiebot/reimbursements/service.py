@@ -218,7 +218,7 @@ def mutate_recent_action(user_key: str, logged: Any, operation: str, *,
         source_values = _current_source_values(value)
         if operation == "split":
             method = normalize_split_method(split_method)
-            if method is None:
+            if method is None or method == "custom":
                 raise ReimbursementValidationError("Choose By income, 50/50, or Fronted for this split.")
             if method == "fronted" and value["sourceWorksheet"] != "expense":
                 raise ReimbursementValidationError("Fronted is currently available only for shared expense rows.")
@@ -249,7 +249,8 @@ def mutate_recent_action(user_key: str, logged: Any, operation: str, *,
                 gross = money_cents(updates["amount"])
                 if not gross:
                     raise ReimbursementValidationError("The expense amount must be greater than zero.")
-                payer, partner = split_amounts(gross / 100, value["method"], owner)
+                payer, partner = split_amounts(gross / 100, value["method"], owner,
+                                               custom_payer_basis_points=value.get("customPayerBasisPoints"))
                 changes.update(grossCents=gross, payerShareCents=money_cents(payer), partnerShareCents=money_cents(partner))
                 updates["amount"] = f"{gross / 100:.2f}"
             source_values.update({key: str(item).strip() for key, item in updates.items()})

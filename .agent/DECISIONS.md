@@ -1,5 +1,13 @@
 # Agent Decisions
 
+## 2026-10-25 - Save Reviewed Custom Percentages And Gross Totals Together
+
+The Shared expense editor previews both people's percentages and monetary shares locally, then explicitly saves one combined correction. Store custom payer percentages as integer basis points (`customPayerBasisPoints`, 0–10000) in the existing allocation JSON with method `custom`; round the payer share half-up to cents and assign the exact remainder to the partner. Full gross stays authoritative for the purchase and bank matching. Later gross corrections reuse this saved ratio; switching to a preset drops the custom metadata. No new database columns or repayment events.
+
+Reuse the household lock, request-id result cache and before/after revision audit for `edit_split`. Require the original payer, an active cash-v1 allocation, the reviewed version, completed projection and no pending/confirmed payments or cleared balance. Keep drafts local until Save, freeze their reviewed version through refresh, and retain uncertain commands for identical retry. A zero partner share creates no receipt and is labeled No reimbursement due.
+
+Project changed totals with the existing named-range source and generated mirror checks. Before marking an edit fully synced, reopen bank links for the stable source/split IDs and recorded ancestors, then invalidate cached review sources. A failed bank follow-up remains pending and retries on Shared refresh; replaying a completed command cannot reopen a subsequent valid match. Percentage-only revisions leave bank matches intact. Existing confirmed-payment accounting and explicit repayment confirmation remain unchanged.
+
 ## 2026-10-25 - Apply Recent Recovery Guards To Update And Move
 
 Prepare ordinary Updates and Moves from one fresh sheet snapshot; reuse it for before/Undo values, fixed-budget identity checks and Move source extent/destination placement. Strict selection/history failures remain distinguishable from absent records. Pending candidate IDs never fall back to a different recent index. Pre-write quota errors explicitly report no change; uncertain writes and missing persisted Undo require inspection without an automatic writer retry. Existing canonical shared mutations, settlement/projection guards and bank-reconciliation synchronization remain authoritative.

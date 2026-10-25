@@ -910,3 +910,89 @@ def test_cleared_source_attachment_retries_are_safe_and_changes_preserve_undo(st
         store.attach_source(allocation["id"], {"sourceRow": allocation["sourceRow"] + 1})
     assert store.snapshot("brian")["resets"][0]["canUndo"]
     assert toggle_reset(store, reset, "undo_reset")["allocations"][0]["outstandingCents"] == 4000
+
+
+def edit_split(value, **changes):
+    return command("edit_split", allocationId=value["id"], version=value["version"],
+                   grossCents=10001, payerBasisPoints=3333, **changes)
+
+
+@pytest.mark.parametrize("gross,basis,expected", [(10001, 3333, 3333), (1, 5000, 1),
+                                                    (10000, 0, 0), (10000, 10000, 10000),
+                                                    (MAX_CENTS, 9999, 9_999_000_000)])
+def test_edit_split_saves_total_percentage_and_revision_atomically_once(store, gross, basis, expected):
+    value = store.register_allocation(payload())
+    store.mark_projected(value["id"], value["version"])
+    body = edit_split(value) | {"grossCents": gross, "payerBasisPoints": basis}
+    result = store.command("brian", body)
+    changed = result["allocations"][0]
+    assert (changed["grossCents"], changed["payerShareCents"], changed["partnerShareCents"]) == (gross, expected, gross - expected)
+    assert changed["customPayerBasisPoints"] == basis and changed["method"] == "custom"
+    assert changed["sourceRevision"]["before"]["grossCents"] == 10000
+    assert changed["version"] == value["version"] + 1
+    assert changed["settledCents"] == 0 and result["events"] == []
+    assert store.command("brian", body) == result
+    assert store.get_allocation(value["id"])["version"] == changed["version"]
+    with store.access.connect() as db:
+        assert db.execute("SELECT COUNT(*) AS count FROM app_reimbursement_revisions").fetchone()["count"] == 1
+
+
+@pytest.mark.parametrize("changes", [{"grossCents": 0}, {"grossCents": -1}, {"grossCents": 1.5},
+                                     {"grossCents": True}, {"grossCents": MAX_CENTS + 1},
+                                     {"payerBasisPoints": -1}, {"payerBasisPoints": 10001},
+                                     {"payerBasisPoints": 33.3}, {"payerBasisPoints": True},
+                                     {"payerShareCents": 1}, {"ownerKey": "hannah"}])
+def test_edit_split_rejects_invalid_or_forged_values_without_partial_revision(store, changes):
+    value = store.register_allocation(payload())
+    store.mark_projected(value["id"], value["version"])
+    before = store.get_allocation(value["id"])
+    with pytest.raises(ReimbursementValidationError):
+        store.command("brian", edit_split(value) | changes)
+    assert store.get_allocation(value["id"]) == before
+    with store.access.connect() as db:
+        assert db.execute("SELECT COUNT(*) AS count FROM app_reimbursement_commands").fetchone()["count"] == 0
+        assert db.execute("SELECT COUNT(*) AS count FROM app_reimbursement_revisions").fetchone()["count"] == 0
+
+
+@pytest.mark.parametrize("guard", ["debtor", "stale", "syncing", "legacy", "pending", "received", "cleared", "void"])
+def test_edit_split_preserves_existing_financial_guards(store, guard):
+    value = store.register_allocation(payload(accounting="legacy_net" if guard == "legacy" else "cash_v1"))
+    if guard != "syncing":
+        store.mark_projected(value["id"], value["version"])
+    if guard in {"pending", "received"}:
+        store.command("hannah" if guard == "pending" else "brian", payment(value, operation="report_payment" if guard == "pending" else "receive"))
+        latest = store.get_allocation(value["id"])
+        store.mark_projected(latest["id"], latest["version"])
+    if guard == "cleared":
+        store.command("brian", command("reset", expectedState=store.snapshot("brian")["resetState"]))
+        latest = store.get_allocation(value["id"])
+        store.mark_projected(latest["id"], latest["version"])
+    if guard == "void":
+        store.revise_allocation("brian", value["id"], value["version"], {"lifecycle": "void"}, operation="cancel")
+        latest = store.get_allocation(value["id"])
+        store.mark_projected(latest["id"], latest["version"])
+    current = store.get_allocation(value["id"])
+    body = edit_split(current)
+    if guard == "stale":
+        body["version"] = 0
+    with pytest.raises((ReimbursementValidationError, ReimbursementConflictError)):
+        store.command("hannah" if guard == "debtor" else "brian", body)
+    assert store.get_allocation(value["id"]) == current
+
+
+def test_split_edit_and_receipt_share_the_same_versioned_household_lock(store):
+    value = store.register_allocation(payload())
+    store.mark_projected(value["id"], value["version"])
+    gate = Barrier(2)
+    def run(body):
+        gate.wait()
+        try:
+            return store.command("brian", body)
+        except ReimbursementConflictError:
+            return None
+    with ThreadPoolExecutor(max_workers=2) as executor:
+        results = list(executor.map(run, [edit_split(value), payment(value)]))
+    assert sum(result is not None for result in results) == 1
+    current = store.get_allocation(value["id"])
+    assert current["version"] == value["version"] + 1
+    assert (current["grossCents"], current["settledCents"]) in {(10001, 0), (10000, 1000)}
