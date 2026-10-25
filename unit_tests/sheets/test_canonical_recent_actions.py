@@ -33,7 +33,7 @@ def canonical(monkeypatch):
                            snapshot=lambda _owner, **_kwargs: {"allocations": [value]})
     monkeypatch.setenv("BOOKIEBOT_REIMBURSEMENTS_ENABLED", "true")
     monkeypatch.setattr(store_module, "build_reimbursement_store", lambda: store)
-    monkeypatch.setattr(undo, "active_logged_action_by_id", lambda *_args: logged)
+    monkeypatch.setattr(undo, "active_logged_action_by_id", lambda *_args, **_kwargs: logged)
     monkeypatch.setattr(undo, "_active_lineage_ids", lambda logged: {logged.id})
     monkeypatch.setattr(undo, "_worksheet", lambda *_args: pytest.fail("Canonical corrections must use the ledger projection"))
     synced = []

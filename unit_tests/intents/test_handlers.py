@@ -621,7 +621,7 @@ async def test_query_recent_actions_sends_transaction_list_privately(monkeypatch
     launcher_content, launcher_kwargs, response, followup, launcher_message = await _open_recent_launcher(author)
     assert launcher_content == "Open your temporary recent transactions workflow."
     assert launcher_kwargs["delete_after"] == 300
-    assert response.defer_kwargs == {"ephemeral": True, "thinking": False}
+    assert response.defer_kwargs == {"ephemeral": True, "thinking": True}
     recent_dm, kwargs = followup.sent[-1]
     assert "Burrito" in (recent_dm or "")
     assert "Chipotle" in (recent_dm or "")
@@ -767,6 +767,9 @@ async def test_recent_component_prompts_are_ephemeral(monkeypatch, message):
         def __init__(self):
             self.sent = []
 
+        async def defer(self, **kwargs):
+            assert kwargs == {"ephemeral": True, "thinking": True}
+
         async def send_message(self, content=None, **kwargs):
             self.sent.append((content, kwargs))
 
@@ -791,7 +794,7 @@ async def test_recent_component_prompts_are_ephemeral(monkeypatch, message):
         select = select_view.children[0]
         select._values = [logged.id]
         select_response = Response()
-        select_interaction = SimpleNamespace(user=message.author, response=select_response)
+        select_interaction = SimpleNamespace(user=message.author, response=select_response, followup=SimpleNamespace(send=select_response.send_message))
 
         await select.callback(select_interaction)
 
@@ -1024,7 +1027,7 @@ async def _open_split_decision(monkeypatch, message, logged):
     selection._values = [logged.id]
     interaction = _recent_test_interaction(message.author)
     await selection.callback(interaction)
-    return interaction.response.send_message.call_args.kwargs["view"]
+    return interaction.followup.send.call_args.kwargs["view"]
 
 
 @pytest.mark.asyncio

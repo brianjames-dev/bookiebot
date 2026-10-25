@@ -4,6 +4,12 @@ Last updated: 2026-10-25
 
 ## Goal
 
+### Recent Delete and recovery implementation — 2026-10-25
+
+Implemented, CI/release in progress: one fresh expense-sheet snapshot replaces per-cell deletion reads and supplies extent/Undo/source checks. Shared snapshot callers batch reads as well. Strict Recent/selection reads surface quota/unavailable history instead of an empty list, without advancing failed pagination. Private selection/Delete ACKs precede worker I/O with actor context. Exact-ID deletion, per-control one-shot/Cancel and failed-ACK guards prevent unintended retry/fallback. Safe pre-write errors explicitly report no deletion; uncertain writes and missing persisted Undo records require inspection rather than a repeated writer. No schema or canonical financial-command changes.
+
+Process-local Delete/Undo serialization protects overlapping compactions. Added a regression/fix for adjacent deletions sharing a restore position: LIFO Undo retains the original row order. Existing updated/moved/income and canonical shared-expense/settlement regressions remain part of targeted verification. Real Discord webhook validation covers empty and failed Recent launcher recovery with omitted absent views, private flags and launcher cleanup only after delivery. Timings include action ID/outcome. User explicitly authorized implementation and deployment and forbade deleting the real RJ11 transaction; all delete/Undo acceptance uses isolated fixtures. Targeted **355 passed**, full local **2,517 passed / 418 optional PostgreSQL skipped**, clean Pyright. CI/deployment pending; manual acceptance is checklist 154.
+
 ### Silent recent-transaction Delete investigation — 2026-10-25
 
 Status: **diagnosed; repair proposed, not implemented**. User reports RJ11 Delete produced no UI result. Read-only Railway search of October 25 08:00–10:00 Pacific on the then-live PR #83 deployment (`4067d60c`) shows only a gateway resume, with no Delete callback/error. Broader logs show three Delete failures at October 24 **23:08:44, 23:09:34 and 23:27:32 Pacific** (application timestamps; UTC October 25 06:08/06:09/06:27). No selected action ID/name is logged, so these entries cannot be conclusively assigned to RJ11.

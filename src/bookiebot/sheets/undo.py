@@ -5,6 +5,8 @@ from dataclasses import asdict, dataclass, field, replace
 from datetime import datetime
 import json
 import logging
+from functools import wraps
+import threading
 import time
 from typing import Any, Callable, Literal
 import weakref
@@ -20,7 +22,10 @@ from bookiebot.sheets.income import (
     repair_income_summary_formula,
 )
 from bookiebot.sheets.repo import get_sheets_repo
-from bookiebot.sheets.routing import actor_key_aliases, get_current_discord_user_id, get_user_config, now_pacific
+from bookiebot.sheets.routing import (
+    SpreadsheetQuotaError, actor_key_aliases, get_current_discord_user_id, get_user_config,
+    is_google_sheets_quota_error, now_pacific,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -33,6 +38,19 @@ ActionKind = Literal[
     "move_expense",
     "compact_category_cells",
 ]
+
+
+_DELETE_UNDO_LOCK = threading.RLock()
+
+
+def _serialize_delete_undo(operation):
+    @wraps(operation)
+    def run(*args, **kwargs):
+        # Compaction changes neighboring coordinates. Worker deletes and Undo
+        # must not read different snapshots and then shift the same rows.
+        with _DELETE_UNDO_LOCK:
+            return operation(*args, **kwargs)
+    return run
 
 
 @dataclass
@@ -537,13 +555,15 @@ def _logged_action_from_row(row: list[str]) -> LoggedAction:
     )
 
 
-def _read_log_data() -> _ActionLogData | None:
+def _read_log_data(*, raise_on_error: bool = False) -> _ActionLogData | None:
     try:
         ws = _log_sheet()
         _ensure_log_header(ws)
         rows = ws.get_all_values()
     except Exception:
         logger.exception("Failed to read action log worksheet")
+        if raise_on_error:
+            raise
         return None
 
     records: list[_LogRecord] = []
@@ -748,9 +768,9 @@ def _dedupe_actions_by_lineage(actions: list[LoggedAction], all_actions: list[Lo
     return deduped
 
 
-def recent_actions(user_key: str | None, limit: int = 5, offset: int = 0) -> list[LoggedAction]:
+def recent_actions(user_key: str | None, limit: int = 5, offset: int = 0, *, strict: bool = False) -> list[LoggedAction]:
     keys = actor_key_aliases(str(user_key)) if user_key else set()
-    data = _read_log_data()
+    data = _read_log_data(raise_on_error=True) if strict else _read_log_data()
     if data is None:
         return []
     all_actions = [record.logged for record in data.records]
@@ -767,12 +787,12 @@ def recent_actions(user_key: str | None, limit: int = 5, offset: int = 0) -> lis
     return matches[start:end]
 
 
-def active_logged_action_by_id(user_key: str | None, action_id: str) -> LoggedAction | None:
+def active_logged_action_by_id(user_key: str | None, action_id: str, *, strict: bool = False) -> LoggedAction | None:
     action_id = str(action_id or "").strip().lower()
     if not action_id:
         return None
     keys = actor_key_aliases(str(user_key)) if user_key else set()
-    data = _read_log_data()
+    data = _read_log_data(raise_on_error=True) if strict else _read_log_data()
     if data is None:
         return None
     for record in reversed(data.records):
@@ -883,10 +903,10 @@ def format_recent_actions(user_key: str | None, limit: int = 5, offset: int = 0)
     )
 
 
-def next_recent_actions_page(user_key: str | None, page_size: int = 5) -> tuple[str, list[LoggedAction]]:
+def next_recent_actions_page(user_key: str | None, page_size: int = 5, *, strict: bool = False) -> tuple[str, list[LoggedAction]]:
     key = str(user_key) if user_key else ""
     offset = _RECENT_ACTION_OFFSET_BY_USER.get(key, 0)
-    actions = recent_actions(user_key, page_size, offset)
+    actions = recent_actions(user_key, page_size, offset, strict=True) if strict else recent_actions(user_key, page_size, offset)
     if actions and key:
         _RECENT_ACTION_OFFSET_BY_USER[key] = offset + page_size
     return (
@@ -1034,10 +1054,11 @@ def select_recent_action(
     action_id: str | None = None,
     match_text: str | None = None,
     limit: int = 10,
+    strict: bool = False,
 ) -> LoggedAction | None:
     if action_id:
-        return _canonical_action(active_logged_action_by_id(user_key, action_id))
-    actions = recent_actions(user_key, limit)
+        return _canonical_action(active_logged_action_by_id(user_key, action_id, strict=True) if strict else active_logged_action_by_id(user_key, action_id))
+    actions = recent_actions(user_key, limit, strict=True) if strict else recent_actions(user_key, limit)
     if index is not None and 1 <= index <= len(actions):
         return _canonical_action(actions[index - 1])
     if match_text:
@@ -1646,24 +1667,24 @@ def _first_empty_category_row(ws: Any, category: str) -> int:
     return max(row_start, len(rows) + 1)
 
 
-def _last_occupied_category_row(ws: Any, category: str) -> int:
+def _last_occupied_category_row(ws: Any, category: str, *, values: list[list[Any]] | None = None) -> int:
     from bookiebot.sheets.config import get_category_columns
 
     config = get_category_columns[category]
     row_start = int(config["start_row"])
     columns = list(_category_columns(category).values())
-    rows = ws.get_all_values()
+    rows = ws.get_all_values() if values is None else values
     for row in range(len(rows), row_start - 1, -1):
         if any(column <= len(rows[row - 1]) and str(rows[row - 1][column - 1]).strip() for column in columns):
             return row
     return row_start - 1
 
 
-def _category_snapshot(ws: Any, rows: range, columns: list[int]) -> list[list[str]]:
-    return [
-        [_sheet_value(ws.cell(row, col).value) for col in columns]
-        for row in rows
-    ]
+def _category_snapshot(ws: Any, rows: range, columns: list[int], *, values: list[list[Any]] | None = None) -> list[list[str]]:
+    # Read once, including ragged/blank rows; never issue an API request per cell.
+    sheet_values: list[list[Any]] = ws.get_all_values() if values is None else values
+    return [[_sheet_value(sheet_values[row - 1][col - 1]) if 0 < row <= len(sheet_values) and 0 < col <= len(sheet_values[row - 1]) else ""
+             for col in columns] for row in rows]
 
 
 def _restore_category_snapshot(ws: Any, start_row: int, columns: list[int], snapshot: list[list[str]]) -> None:
@@ -2781,7 +2802,7 @@ def _latest_logged_action(
 
 def _restore_removed_category_row(
     ws: Any, *, category: str, row: int, columns: list[int], values: list[str],
-    restored_ids: set[str], log_data: _ActionLogData | None,
+    restored_ids: set[str], log_data: _ActionLogData | None, restore_action_id: str = "",
 ) -> None:
     """Insert the removed row into current contents, never replay neighbors' history."""
     from bookiebot.sheets.config import get_category_columns
@@ -2800,8 +2821,21 @@ def _restore_removed_category_row(
     start_row = max(first_row, min(row, end_row + 1))
     current = [[_sheet_value(rows[index - 1][column - 1]) if column <= len(rows[index - 1]) else ""
                 for column in columns] for index in range(start_row, end_row + 1)]
+    excluded = set(restored_ids)
+    restore_record = next((record.logged for record in data.records if record.logged.id == restore_action_id), None)
+    preceding = _json_metadata_value(restore_record.action.metadata, "preceding_restore_ids") if restore_record else None
+    if isinstance(preceding, list):
+        # Record relative gaps before compaction: equal current positions alone
+        # cannot distinguish an earlier removed row before this row from one after it.
+        for record in data.records:
+            earlier = record.logged
+            if (earlier.id in preceding and earlier.status == "active"
+                    and earlier.action.kind == "compact_category_cells"
+                    and _action_category(earlier.action) == category and earlier.action.row == start_row):
+                excluded.add(earlier.id)
+                excluded.update(_deleted_action_ids(earlier.action))
     _shift_logged_action_rows(category=category, lower_row=start_row, upper_row=end_row,
-                              delta=1, exclude_ids=restored_ids, log_data=data)
+                              delta=1, exclude_ids=excluded, log_data=data)
     for record in data.records:
         if record.logged.id in restored_ids and _action_category(record.logged.action) == category:
             record.logged.action.row = start_row
@@ -2882,7 +2916,7 @@ def _apply_undo_action(
         _restore_removed_category_row(
             ws, category=action.metadata["category"], row=action.row,
             columns=action.columns, values=snapshot[0],
-            restored_ids=_deleted_action_ids(action), log_data=log_data,
+            restored_ids=_deleted_action_ids(action), log_data=log_data, restore_action_id=action_id,
         )
     elif action.kind == "delete_row":
         if action.worksheet == "income" and _is_income_display_action(action):
@@ -2974,24 +3008,49 @@ def _apply_undo_action(
     return True, f"Undid: {action.description}"
 
 
+def _delete_preparation_error(exc: Exception) -> str:
+    if isinstance(exc, SpreadsheetQuotaError) or is_google_sheets_quota_error(exc):
+        return "Google Sheets is temporarily rate-limiting reads. Nothing was deleted. Wait about a minute, then open Recent transactions and try again."
+    return "I could not prepare the deletion. Nothing was deleted. Please open Recent transactions and try again."
+
+
 def _delete_expense_action_with_compaction(user_key: str | None, logged: LoggedAction) -> tuple[bool, str]:
     action = logged.action
     category = _action_category(action)
     if action.metadata.get("type") not in {"expense", "update", "move"} or not category:
         return False, ""
 
-    ws = _worksheet("expense")
-    category_columns_by_field = _category_columns(category)
-    columns = list(category_columns_by_field.values())
-    end_row = max(action.row, _last_occupied_category_row(ws, category))
-    rows = range(action.row, end_row + 1)
-    snapshot = _category_snapshot(ws, rows, columns)
+    try:
+        ws = _worksheet("expense")
+        category_columns_by_field = _category_columns(category)
+        columns = list(category_columns_by_field.values())
+        values = ws.get_all_values()
+        end_row = max(action.row, _last_occupied_category_row(ws, category, values=values))
+        snapshot = _category_snapshot(ws, range(action.row, end_row + 1), columns, values=values)
+        # Reject a shifted/changed source rather than deleting its neighbor.
+        for field, expected in _field_values_for_action(action).items():
+            column = category_columns_by_field.get(field)
+            if column is None:
+                continue
+            current = values[action.row - 1][column - 1] if 0 < action.row <= len(values) and column <= len(values[action.row - 1]) else ""
+            if field == "amount":
+                matches = _money_display_value(current) == _money_display_value(expected)
+            else:
+                matches = _sheet_value(current).strip() == _sheet_value(expected).strip()
+            if not matches:
+                return False, "That transaction changed in the sheet. Nothing was deleted. Open Recent transactions again."
+        log_data = _read_log_data(raise_on_error=True)
+        if log_data is None:
+            return False, "I could not read the action log. Nothing was deleted. Try Recent transactions again."
+        lineage_ids = _active_lineage_ids(logged, log_data)
+        preceding_restore_ids = [record.logged.id for record in log_data.records
+            if record.logged.status == "active" and record.logged.action.kind == "compact_category_cells"
+            and _action_category(record.logged.action) == category and record.logged.action.row == action.row]
+    except Exception as exc:
+        logger.exception("Recent Delete preparation failed", extra={"action_id": logged.id, "stage": "prepare"})
+        return False, _delete_preparation_error(exc)
 
     try:
-        log_data = _read_log_data()
-        if log_data is None:
-            return False, "Something went wrong while reading the action log."
-        lineage_ids = _active_lineage_ids(logged, log_data)
         _shift_category_cells_up(ws, start_row=action.row, end_row=end_row, columns=columns)
         _mark_logged_ids_undone(lineage_ids, log_data)
         _shift_logged_action_rows(
@@ -3004,9 +3063,9 @@ def _delete_expense_action_with_compaction(user_key: str | None, logged: LoggedA
         )
     except Exception as e:
         logger.exception("Failed to compact deleted expense", extra={"exception": str(e)})
-        return False, "Something went wrong while deleting that logged action."
+        return False, "I could not verify the deletion. Check Recent transactions and Undo before trying again; part of the change may already be saved."
 
-    record_undo_action(
+    undo_id = record_undo_action(
         user_key,
         UndoAction(
             worksheet="expense",
@@ -3023,11 +3082,14 @@ def _delete_expense_action_with_compaction(user_key: str | None, logged: LoggedA
                 "compact_start_row": str(action.row),
                 "compact_end_row": str(end_row),
                 "category_snapshot": json.dumps(snapshot),
+                "preceding_restore_ids": json.dumps(preceding_restore_ids),
             },
             description=f"deleted {action.description}",
         ),
     )
     _sync_reconciliation_after_action_mutation(user_key, set(lineage_ids), reason="deleted")
+    if undo_id is None:
+        return False, "The row was deleted, but I could not save its Undo record. Do not delete it again; the saved history needs inspection."
     return True, f"Deleted: {action.description}"
 
 
@@ -3087,6 +3149,7 @@ def _delete_income_action_with_compaction(user_key: str | None, logged: LoggedAc
     return True, f"Deleted: {action.description}"
 
 
+@_serialize_delete_undo
 def delete_recent_action(
     user_key: str | None,
     *,
@@ -3099,23 +3162,28 @@ def delete_recent_action(
         return False, format_delete_candidates(user_key, match_text, 10)
 
     logged: LoggedAction | None = None
-    requested_index = index
-    if action_id:
-        logged = select_recent_action(user_key, action_id=action_id)
-    elif index is not None and key:
-        pending, expired = _pending_selection_for_kind(user_key, "delete")
-        if expired:
-            pop_pending_action_expiration_notice(user_key)
-            return False, _PENDING_SELECTION_EXPIRED_MESSAGE
-        candidate_ids = pending.action_ids if pending else []
-        if 1 <= index <= len(candidate_ids):
-            logged = select_recent_action(user_key, action_id=candidate_ids[index - 1])
-        else:
-            logged = select_recent_action(user_key, index=index)
-    if logged is None and requested_index is not None:
-        logged = select_recent_action(user_key, index=requested_index)
-
+    try:
+        if action_id:
+            logged = select_recent_action(user_key, action_id=action_id, strict=True)
+        elif index is not None and key:
+            pending, expired = _pending_selection_for_kind(user_key, "delete")
+            if expired:
+                pop_pending_action_expiration_notice(user_key)
+                return False, _PENDING_SELECTION_EXPIRED_MESSAGE
+            candidate_ids = pending.action_ids if pending else []
+            if candidate_ids:
+                if not 1 <= index <= len(candidate_ids):
+                    return False, "That selection is no longer available. Open Recent transactions again."
+                action_id = candidate_ids[index - 1]
+                logged = select_recent_action(user_key, action_id=action_id, strict=True)
+            else:
+                logged = select_recent_action(user_key, index=index, strict=True)
+    except Exception as exc:
+        logger.exception("Recent Delete selection failed", extra={"action_id": action_id, "stage": "select"})
+        return False, _delete_preparation_error(exc)
     if logged is None:
+        if action_id:
+            return False, "That transaction is no longer available. Nothing was deleted. Open Recent transactions again."
         return False, format_recent_actions(user_key, 5)
 
     capabilities = action_capabilities(logged.action)
@@ -3155,6 +3223,7 @@ def delete_recent_action(
     return True, f"Deleted: {logged.action.description}"
 
 
+@_serialize_delete_undo
 def undo_logged_action(user_key: str | None, action_id: str) -> tuple[bool, str]:
     key = str(user_key) if user_key else None
     log_data = _read_log_data()
@@ -3194,6 +3263,7 @@ def undo_logged_action(user_key: str | None, action_id: str) -> tuple[bool, str]
     return True, detail
 
 
+@_serialize_delete_undo
 def undo_last_action(user_key: str | None) -> tuple[bool, str]:
     global _GLOBAL_LAST_ACTION
     key = str(user_key) if user_key else None

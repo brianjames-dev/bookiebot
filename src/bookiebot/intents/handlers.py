@@ -36,6 +36,7 @@ from bookiebot.sheets.routing import (
     SheetRoutingError,
     UnknownDiscordUserError,
     actor_key_aliases,
+    is_google_sheets_quota_error,
     get_user_config,
     resolve_actor_key,
     sheet_user_context,
@@ -290,7 +291,9 @@ async def handle_intent(intent: str, entities: IntentEntities, message: Any, las
 
 
 async def undo_last_transaction_handler(message: Any) -> None:
-    success, detail = undo_last_action(_message_actor_key(message))
+    actor_key = _message_actor_key(message)
+    with sheet_user_context(actor_key):
+        success, detail = await asyncio.to_thread(undo_last_action, actor_key)
     prefix = "✅" if success else "❌"
     await message.channel.send(f"{prefix} {detail}")
 
@@ -304,12 +307,11 @@ async def delete_recent_action_handler(entities: IntentEntities, message: Any) -
 
     actor_key = _message_actor_key(message)
     match_text = entities.get("match_text") or entities.get("description") or entities.get("location") or entities.get("item")
-    success, detail = delete_recent_action(
-        actor_key,
-        index=index,
-        action_id=entities.get("action_id"),
-        match_text=match_text,
-    )
+    with sheet_user_context(actor_key):
+        success, detail = await asyncio.to_thread(
+            delete_recent_action, actor_key, index=index,
+            action_id=entities.get("action_id"), match_text=match_text,
+        )
     if detail.startswith("Recent logged actions"):
         actions = matching_recent_actions(actor_key, str(match_text), 10) if match_text else recent_actions(actor_key, 5)
         view = _delete_candidates_view(actor_key, actions) if actions else None
@@ -329,12 +331,22 @@ async def query_recent_actions_handler(entities: IntentEntities, message: Any) -
     max_limit = max_explicit_limit if entities.get("explicit_n") else page_size
     limit = min(max(limit, 1), max_limit)
     actor_key = _message_actor_key(message)
-    if entities.get("more"):
-        output, actions = next_recent_actions_page(actor_key, page_size)
-    else:
-        actions = recent_actions(actor_key, limit)
-        reset_recent_actions_page(actor_key, limit)
-        output = format_recent_action_list(actions)
+    def load_page():
+        with sheet_user_context(actor_key):
+            if entities.get("more"):
+                return next_recent_actions_page(actor_key, page_size, strict=True)
+            actions = recent_actions(actor_key, limit, strict=True)
+            reset_recent_actions_page(actor_key, limit)
+            return format_recent_action_list(actions), actions
+
+    try:
+        output, actions = await asyncio.to_thread(load_page)
+    except Exception as exc:
+        logger.exception("Recent transactions load failed")
+        actions = []
+        output = ("Google Sheets is temporarily rate-limiting reads. Wait about a minute, then type `recent` again."
+                  if isinstance(exc, SpreadsheetQuotaError) or is_google_sheets_quota_error(exc)
+                  else "I could not load Recent transactions. Please type `recent` again to retry.")
 
     view = _recent_action_select_view(actor_key, actions) if actions else None
     await _send_recent_private_message(
@@ -636,6 +648,9 @@ async def _send_recent_followup_chunks(
 ) -> None:
     for index, chunk in enumerate(chunks):
         chunk_kwargs = dict(kwargs) if index == len(chunks) - 1 else {}
+        # Webhook.send distinguishes an omitted view from the invalid view=None.
+        if chunk_kwargs.get("view") is None:
+            chunk_kwargs.pop("view", None)
         chunk_kwargs["ephemeral"] = True
         await followup_send(chunk, **chunk_kwargs)
 
@@ -648,7 +663,7 @@ def _recent_actions_launcher_view(
     async def handle_open(interaction: Any, _action: str) -> None:
         if await _reject_unowned_recent_interaction(interaction, actor_key):
             return
-        await interaction.response.defer(ephemeral=True, thinking=False)
+        await interaction.response.defer(ephemeral=True, thinking=True)
         _remember_recent_private_followup(actor_key, interaction)
         followup_send = _recent_private_followup(actor_key)
         if followup_send is None:
@@ -837,6 +852,37 @@ async def _prompt_cancel_recent_split(interaction: Any, actor_key: str | None, a
     )
 
 
+def _recent_delete_callback(actor_key: str | None, action_id: str, *, state: dict[str, bool] | None = None):
+    state = {} if state is None else state
+
+    async def delete_selected(interaction: Any) -> None:
+        if await _reject_unowned_recent_interaction(interaction, actor_key):
+            return
+        # Never perform a financial action after an expired/rejected ACK.
+        try:
+            await interaction.response.defer(ephemeral=True, thinking=True)
+        except Exception:
+            logger.exception("Recent Delete acknowledgement failed", extra={"action_id": action_id})
+            return
+        if state.get("canceled"):
+            await interaction.followup.send("This Delete request was canceled. Open Recent transactions again.", ephemeral=True)
+            return
+        if state.get("attempted"):
+            await interaction.followup.send("Delete was already requested from this control. Check the result or open Recent transactions again.", ephemeral=True)
+            return
+        state["attempted"] = True
+        started = time.perf_counter()
+        try:
+            success, detail = await asyncio.to_thread(run_split_operation, delete_recent_action, actor_key, action_id=action_id)
+        except Exception:
+            logger.exception("Recent Delete outcome unavailable", extra={"action_id": action_id, "stage": "delete"})
+            success, detail = False, "I could not verify the deletion. Check Recent transactions and Undo before trying again; part of the change may already be saved."
+        logger.info("Recent Delete finished in %.2fs (action=%s; success=%s)", time.perf_counter() - started, action_id, success)
+        await _send_interaction_action_result(interaction, success, detail)
+
+    return delete_selected
+
+
 def _recent_action_select_view(actor_key: str | None, actions: list[Any], *, destination_category: str | None = None, updates: dict[str, Any] | None = None):
     async def handle_select(interaction: Any, action_id: str) -> None:
         if await _reject_unowned_recent_interaction(interaction, actor_key):
@@ -855,8 +901,22 @@ def _recent_action_select_view(actor_key: str | None, actions: list[Any], *, des
             await _send_interaction_action_result(interaction, success, detail)
             return
 
+        delete_state: dict[str, bool] = {}
+        delete_selected = _recent_delete_callback(actor_key, action_id, state=delete_state)
+
         async def handle_decision(decision_interaction: Any, decision: str) -> None:
             if await _reject_unowned_recent_interaction(decision_interaction, actor_key):
+                return
+            if decision == "delete":
+                await delete_selected(decision_interaction)
+                return
+            if decision == "cancel":
+                if delete_state.get("attempted"):
+                    await decision_interaction.response.send_message("Delete was already requested. Check its result or open Recent transactions; it cannot be canceled here.", ephemeral=True)
+                else:
+                    delete_state["canceled"] = True
+                    clear_pending_action_selection(actor_key)
+                    await decision_interaction.response.send_message("Canceled.", ephemeral=True)
                 return
             if decision == "cancel_split":
                 await _prompt_cancel_recent_split(decision_interaction, actor_key, action_id)
@@ -892,18 +952,6 @@ def _recent_action_select_view(actor_key: str | None, actions: list[Any], *, des
                     view=_update_field_view(actor_key, action_id, fields),
                     ephemeral=True,
                 )
-                return
-            if decision == "delete":
-                if capabilities and not capabilities.can_delete:
-                    await decision_interaction.response.send_message(capabilities.delete_reason, ephemeral=True)
-                    return
-                set_pending_delete_selection(actor_key, action_id)
-                try:
-                    await decision_interaction.response.defer(ephemeral=True)
-                except Exception:
-                    pass
-                success, detail = delete_recent_action(actor_key, index=1)
-                await _send_interaction_action_result(decision_interaction, success, detail)
                 return
             if decision == "move":
                 if capabilities and not capabilities.can_move:
@@ -943,10 +991,20 @@ def _recent_action_select_view(actor_key: str | None, actions: list[Any], *, des
             clear_pending_action_selection(actor_key)
             await decision_interaction.response.send_message("Canceled.", ephemeral=True)
 
-        logged = select_recent_action(actor_key, action_id=action_id)
-        capabilities = action_capabilities(logged.action) if logged else None
-        detail_block = f"\n\n{format_action_detail_block(logged.action)}" if logged else ""
-        await interaction.response.send_message(
+        await interaction.response.defer(ephemeral=True, thinking=True)
+        try:
+            with sheet_user_context(actor_key):
+                logged = await asyncio.to_thread(select_recent_action, actor_key, action_id=action_id, strict=True)
+        except Exception:
+            logger.exception("Recent transaction selection failed", extra={"action_id": action_id})
+            await interaction.followup.send("I could not load that transaction. Open Recent transactions again to retry.", ephemeral=True)
+            return
+        if logged is None:
+            await interaction.followup.send("That transaction is no longer available. Open Recent transactions again.", ephemeral=True)
+            return
+        capabilities = action_capabilities(logged.action)
+        detail_block = f"\n\n{format_action_detail_block(logged.action)}"
+        await interaction.followup.send(
             _with_component_spacer(f"What would you like to do with this transaction?{detail_block}", True),
             view=RecentActionDecisionView(handle_decision, capabilities),
             ephemeral=True,
@@ -963,10 +1021,20 @@ def _delete_action_select_view(actor_key: str | None, actions: list[Any]):
     async def handle_select(interaction: Any, action_id: str) -> None:
         if await _reject_unowned_recent_interaction(interaction, actor_key):
             return
-        logged = select_recent_action(actor_key, action_id=action_id)
-        detail_block = f"\n\n{format_action_detail_block(logged.action)}" if logged else ""
+        await interaction.response.defer(ephemeral=True, thinking=True)
+        try:
+            with sheet_user_context(actor_key):
+                logged = await asyncio.to_thread(select_recent_action, actor_key, action_id=action_id, strict=True)
+        except Exception:
+            logger.exception("Recent Delete candidate selection failed", extra={"action_id": action_id})
+            await interaction.followup.send("I could not load that transaction. Nothing was deleted. Open Recent transactions again.", ephemeral=True)
+            return
+        if logged is None:
+            await interaction.followup.send("That transaction is no longer available. Nothing was deleted. Open Recent transactions again.", ephemeral=True)
+            return
+        detail_block = f"\n\n{format_action_detail_block(logged.action)}"
         set_pending_delete_selection(actor_key, action_id)
-        await interaction.response.send_message(
+        await interaction.followup.send(
             _with_component_spacer(f"Delete this transaction?{detail_block}", True),
             view=_delete_confirm_view(actor_key, action_id),
             ephemeral=True,
@@ -976,18 +1044,19 @@ def _delete_action_select_view(actor_key: str | None, actions: list[Any]):
 
 
 def _delete_confirm_view(actor_key: str | None, action_id: str):
+    delete_state: dict[str, bool] = {}
+    delete_selected = _recent_delete_callback(actor_key, action_id, state=delete_state)
+
     async def handle_confirm(interaction: Any, decision: str) -> None:
         if await _reject_unowned_recent_interaction(interaction, actor_key):
             return
         if decision == "confirm_delete":
-            set_pending_delete_selection(actor_key, action_id)
-            try:
-                await interaction.response.defer(ephemeral=True)
-            except Exception:
-                pass
-            success, detail = delete_recent_action(actor_key, action_id=action_id)
-            await _send_interaction_action_result(interaction, success, detail)
+            await delete_selected(interaction)
             return
+        if delete_state.get("attempted"):
+            await interaction.response.send_message("Delete was already requested. Check its result or open Recent transactions; it cannot be canceled here.", ephemeral=True)
+            return
+        delete_state["canceled"] = True
         clear_pending_action_selection(actor_key)
         await interaction.response.send_message("Canceled.", ephemeral=True)
 
