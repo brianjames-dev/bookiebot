@@ -1,5 +1,13 @@
 # Agent Decisions
 
+## 2026-10-25 - Apply Recent Recovery Guards To Update And Move
+
+Prepare ordinary Updates and Moves from one fresh sheet snapshot; reuse it for before/Undo values, fixed-budget identity checks and Move source extent/destination placement. Strict selection/history failures remain distinguishable from absent records. Pending candidate IDs never fall back to a different recent index. Pre-write quota errors explicitly report no change; uncertain writes and missing persisted Undo require inspection without an automatic writer retry. Existing canonical shared mutations, settlement/projection guards and bank-reconciliation synchronization remain authoritative.
+
+Use one guarded Discord mutation callback for Update/Move/Delete: owner check, visible private ACK before worker I/O, actor sheet context, one submission per control and shared Cancel state across child menus. Make field/category view construction free of sheet reads; candidate/confirmation reads and typed replies also run off the event loop. Keep action-ID/stage/timing/outcome diagnostics free of purchase contents. This extends the earlier Delete decision without changing the financial command protocol.
+
+Extend process-local compaction serialization to Update/Move/Delete/Undo. Reuse additive `preceding_restore_ids` for Move source gaps as well as Delete gaps and restore every ancestor's coordinates together; do not replay neighboring values from an older snapshot. Update saved display values by their full display-field mapping, independently of the partial write columns, so successive Updates and Undo retain correct values. No new schema or repayment semantics. All financial acceptance remains isolated from real transactions, including RJ11.
+
 ## 2026-10-25 - Batch Delete Preparation And Finish Every Recent Workflow Response
 
 Prepare ordinary expense deletion from one fresh sheet snapshot, reusing it for the category extent, source identity and Undo data. Preserve blank/ragged cells; shared snapshot callers also use a batched read. Propagate read failures explicitly for Recent browsing/selection so unavailable history cannot be mistaken for an empty ledger. Catch pre-write failures and report that no deletion occurred; uncertain writes and failed Undo persistence must not claim success or invite blind retry. No automatic writer retry, schema or financial event change.
