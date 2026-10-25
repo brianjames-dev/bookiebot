@@ -22,6 +22,8 @@
 .bb-app-shell .bb-bottom-navigation > div:last-child { height: 60px; padding: 0; width: 100%; gap: 0; transition: height var(--bb-motion-duration) var(--bb-motion-ease); }
 .bb-app-shell .bb-navigation-pane { width: 100%; pointer-events: auto; box-shadow: 0 5px 26px hsl(var(--foreground) / .10); color: hsl(var(--foreground)); }
 .bb-app-shell .bb-navigation-pane .k-glass { color: hsl(var(--foreground)); }
+/* Keep Konsta's pointer glow local and subdued within the capsule. */
+.bb-app-shell .bb-navigation-pane > span > span[style*="radial-gradient"] { background-size: 180px 180px; background-position: center; background-repeat: no-repeat; opacity: .6; }
 .bb-app-shell .bb-navigation-link { flex: 1 1 0; min-width: 0; min-height: 44px; margin: 0; border: 0; background: transparent; padding: 5px 3px; color: hsl(var(--muted-foreground)); font: inherit; cursor: pointer; transition: padding var(--bb-motion-duration) var(--bb-motion-ease); }
 .bb-app-shell .bb-navigation-link.k-tabbar-link-active { color: hsl(var(--primary)); }
 .bb-app-shell .bb-navigation-link > span { gap: 3px; transition: gap var(--bb-motion-duration) var(--bb-motion-ease); }
