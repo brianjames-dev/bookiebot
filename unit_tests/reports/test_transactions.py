@@ -282,3 +282,15 @@ def test_another_session_can_find_frozen_unresolved_confirmation_without_resubmi
     assert tx.TransactionCommands(saved.access).overview("brian","all")["pendingCommand"]==command
     assert saved.commands.saved("brian",command["requestId"])["state"]=="uncertain"
     writer.assert_called_once()
+
+
+def test_legacy_failure_message_is_not_permission_to_repeat_a_possible_writer(saved,monkeypatch):
+    value=body(saved);preview=tx.review(B,value)["review"]
+    command={**value,"reviewVersion":preview["reviewVersion"],"requestId":"isolated-request-0000001"}
+    writer=Mock(return_value=(False,"Something went wrong while saving that split. The original amount was left in place."))
+    monkeypatch.setattr(undo,"update_recent_action",writer)
+    result=saved.commands.command(B,command)
+    assert result["state"]=="uncertain" and "could not verify" in result["detail"]
+    assert "original amount was left" not in result["detail"]
+    assert saved.commands.command(B,command)==result
+    writer.assert_called_once()

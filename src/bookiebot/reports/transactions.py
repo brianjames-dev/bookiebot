@@ -488,8 +488,10 @@ class TransactionCommands:
                     writer_started = True
                     success, detail = writer(actor, action_id=logged.id, **data)
                     result = {"success": success, "detail": detail}
-                    if not success and ("could not verify" in detail.lower() or "Undo record" in detail):
+                    if not success and any(marker in detail.lower() for marker in (
+                        "could not verify", "undo record", "something went wrong", "could not safely", "may already")):
                         state = "uncertain"
+                        result["detail"] = "I could not verify the change. Check Transactions and saved history before another change. This request will not be submitted again."
                     elif success:
                         history = undo._read_log_data(raise_on_error=True)
                         new = [record.logged for record in history.records if record.logged.id not in before and record.logged.user_key in actor_key_aliases(actor)] if history else []
