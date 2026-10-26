@@ -4,6 +4,8 @@ Last updated: 2026-10-25
 
 ## Active Focus
 
+Reimbursement CI follow-up (2026-10-25): push run [Verification #237](https://github.com/brianjames-dev/bookiebot/actions/runs/40246771197) failed only committed JavaScript asset parity. All **3,054 tests / zero skips**, PostgreSQL, Apps Script, Python/frontend types and build passed. The prior local bundle included transitive packages resolved from a different checkout (including a second tailwind-merge), despite one React runtime. Rebuilt from an isolated `git archive` plus `npm ci` using CI's Node 22.23.3; two clean builds produce identical JS/CSS hashes and match the available CI bundle prefix/size. Corrected the committed JS only; source and financial behavior are unchanged. Replacement CI confirmation pending before release.
+
 Reimbursement percentage/total editor implemented (2026-10-25): Shared → expense → Edit split offers a 0–100% slider in 0.01% steps, both live percentages/amounts and an editable full expense total. Save commits one versioned custom allocation; Cancel leaves it unchanged. Existing payer/payment/reset/history/sync guards remain. Custom ratios survive later amount corrections. Changed totals recover source/mirror and bank-match updates before sync completion. React deduplication keeps the rebuilt app on one runtime. Local verification and isolated browser results are recorded below; release/native acceptance is checklist 156.
 
 Recent Update/Move recovery released (2026-10-25). Fresh bulk preparation, private ACK before worker I/O, strict exact-ID selection and shared one-shot/Cancel controls cover menus/confirmations/person/category and typed replies. Update/Move/Delete/Undo serialize compactions; full-display Update snapshots and adjacent Move/Delete lineage/gaps preserve repeated Undo. Canonical settlement guards remain unchanged. Targeted **411 passed**, full local **2,573 passed / 418 optional PostgreSQL skipped**, clean Pyright. [PR #86](https://github.com/brianjames-dev/bookiebot/pull/86) merged as `ed30b40`, with a tree identical to tested `0ba3963`. [CI #233](https://github.com/brianjames-dev/bookiebot/actions/runs/40241712397) passed **2,991 tests / zero skips**, PostgreSQL, Python/frontend types, Apps Script, build and committed asset parity. Railway `10683101-ad24-4f41-9359-2bf495d84c57` successfully deployed the exact merge commit; Discord login/command sync, web startup, health, exact unchanged frontend/assets (`9217df8485c906a6bc2911cc`) and private-data authorization verified. Native user-control acceptance remains checklist 155; no real Update/Move/Delete/Undo, repayment or synthetic Discord message was used for testing. Real transactions including RJ11 remain untouched.
@@ -178,7 +180,7 @@ All eight September 6 audit batches are implemented and verified locally. Each b
 
 ## On Deck
 
-First: release and native phone acceptance for reimbursement percentage/total editing (checklist 156). Implementation uses isolated sample data; production financial changes must be genuine user corrections.
+First: verify the asset-repair CI run, then release and complete native phone acceptance for reimbursement percentage/total editing (checklist 156). Implementation uses isolated sample data; production financial changes must be genuine user corrections.
 
 First: native user-control acceptance for the released Update/Move fixes (checklist 155). Type `recent` for fresh controls, inspect menus/private progress and Cancel. Financial Update/Move/Undo acceptance stays in isolated data; do not mutate RJ11 or any real transaction as a test. CI and exact-source production deployment/startup/health checks passed.
 
@@ -268,6 +270,8 @@ Student-loan activation is complete. Verify the deployed fixed-bill display and 
 27. Explore clarifying questions before logging when BookieBot is uncertain instead of guessing or silently failing.
 
 ## Completed 2026-10-25
+
+- Diagnosed the reimbursement push's failed asset-parity gate and regenerated JavaScript from an isolated locked install. Repeated clean builds match byte-for-byte; all 3,054 CI tests/types/build had already passed. Existing asset-parity CI remains the regression gate. Replacement CI verification is pending; no production changes.
 
 - Added the reimbursement percentage slider and editable expense total, live cent-exact previews, explicit Save/Cancel, guarded durable revisions and safe retries. Preserved custom ratios in Discord and scheduled-bill amount corrections; changed totals reopen linked bank matches, including pre-split ancestors, through recoverable projection. Rebuilt frontend assets with one React runtime. Updated Finance Ops, decisions, README and reimbursement workflow/manual acceptance. Verification: see the new baseline entry below. Not deployed.
 
