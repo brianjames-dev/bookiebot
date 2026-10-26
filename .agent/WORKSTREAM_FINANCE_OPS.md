@@ -6,6 +6,8 @@ Last updated: 2026-10-25
 
 ### Daily Spending transaction disclosure and type filter — 2026-10-25
 
+Presentation follow-up: rename the disclosure **Transactions** and give Expense Highlights the chart carousel's existing full-width card surface. Overview now alternates metrics/page → charts/card → daily/page → highlights/card in both themes. Existing disclosure/filter behavior and Finance Ops backlog are unchanged; verification/manual acceptance is recorded in STATUS checklist 159.
+
 Complete in code and local verification; release/native acceptance is STATUS checklist 159. Overview's existing Details button now expands every Daily Spending transaction below the chart instead of summary statistics. The full-width list starts collapsed on phone and desktop and includes undated/recorded/scheduled rows from the active report scope. Type filters by category, updates grouped day totals and carries the category into day inspection; chart totals remain independent. Month/bucket changes reset the dropdown and unavailable categories fall back to All types. Kept the shared disclosure animation and accessible button/content linkage. Safari's native select sizing required an explicit appearance reset; the dropdown retains its native picker with a 44px target and 16px text. Added executed React regression coverage, rebuilt locked production assets and documented manual steps. Finance Ops financial backlog is unchanged; no production writes.
 
 ### Rejected-match recovery and compacted expense references — 2026-10-25

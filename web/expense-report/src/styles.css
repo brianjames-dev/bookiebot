@@ -2665,6 +2665,7 @@ tr:last-child td {
   padding-bottom: 0;
   border-bottom: 0;
 }
+.bb-main > .bb-highlights-section,
 .bb-main > .bb-reimbursement-section {
   background: hsl(var(--card));
   color: hsl(var(--card-foreground));

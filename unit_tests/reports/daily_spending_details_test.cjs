@@ -64,6 +64,7 @@ const changeCategory = value => act(() => { select().props.onChange({ target: { 
 const update = changes => { props = { ...props, ...changes }; act(() => renderer.update(React.createElement(Section, props))) }
 const text = () => JSON.stringify(renderer.toJSON())
 
+assert.equal(toggle().props.children, "Transactions")
 assert.equal(toggle().props["aria-expanded"], false)
 assert.equal(disclosure().props.inert, true)
 assert.equal(toggle().props["aria-controls"], disclosure().props.id)
