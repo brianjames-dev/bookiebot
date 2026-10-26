@@ -1,5 +1,11 @@
 # Agent Decisions
 
+## 2026-10-25 - Daily Spending Details Expands The Complete Transaction List
+
+Keep the existing Details button beside Total Spent and use it to expand the full-width daily transaction list, initially collapsed at every viewport size. Remove the former tracked-day/average/highest-day statistics. Include every row already supplied to Daily Spending, including undated entries and the active view's recorded/scheduled bills and subscriptions, without a preview limit. Reuse the existing animated disclosure and day grouping.
+
+The expanded Type dropdown selects a transaction category such as Food or Shopping, defaults to All types, and filters only the list and its day totals. Chart totals and All/Needs/Wants retain their existing scope. Day inspection from the filtered list retains its category; chart inspection stays unfiltered by this dropdown. Reset the category on month or bucket changes and fall back to All types when a refreshed/mode-switched dataset no longer contains it. Filters and expansion remain local presentation state.
+
 
 ## 2026-10-25 - Refresh Compacted Expense Reservations During Explicit Matching
 
