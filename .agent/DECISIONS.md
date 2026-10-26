@@ -1,5 +1,12 @@
 # Agent Decisions
 
+
+## 2026-10-25 - Refresh Compacted Expense Reservations During Explicit Matching
+
+Fresh owner-scoped action history is authoritative for a previously matched single expense's current row after category compaction. Within the existing owner lock and a valid explicit confirmation, refresh its qualified physical reference only when action ID, cents, category columns and source month remain unchanged and history is unambiguous. Preserve status, resolution/version timestamps, occurrence aliases and all existing duplicate checks. Groups, unknown history and unfinished writes retain their reservations. Append `expense_match_reference_refreshed` with old/new references; no schema, sheet-value, bank-value or repayment change. Browsing remains read-only.
+
+Known rejected metadata decisions close obsolete choices and read saved state once. Lost/server responses from sheet writers remain uncertain and never retry automatically. Expose read-only Check status from the header while mutations remain guarded. Rationale: a stale ear-plug row reservation rejected the shirt purchase, then the client treated that known rejection as an unknown financial save and disabled refresh.
+
 ## 2026-10-25 - Save Reviewed Custom Percentages And Gross Totals Together
 
 The Shared expense editor previews both people's percentages and monetary shares locally, then explicitly saves one combined correction. Store custom payer percentages as integer basis points (`customPayerBasisPoints`, 0–10000) in the existing allocation JSON with method `custom`; round the payer share half-up to cents and assign the exact remainder to the partner. Full gross stays authoritative for the purchase and bank matching. Later gross corrections reuse this saved ratio; switching to a preset drops the custom metadata. No new database columns or repayment events.

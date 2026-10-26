@@ -22,7 +22,7 @@ from bookiebot.banking.schedule_changes import (
 )
 from bookiebot.core.bank_link import bank_reconnect_url
 from bookiebot.banking.reconciliation import (
-    ActionLogCandidate, claimed_schedule_action_ids, find_action_log_candidates, find_scheduled_pull_candidates,
+    ActionLogCandidate, claimed_schedule_action_ids, expense_match_references, find_action_log_candidates, find_scheduled_pull_candidates,
 )
 from bookiebot.banking.service import (
     BankingService, _reconciliation_max_age_days, _scheduled_pulls_for_transactions,
@@ -357,6 +357,7 @@ def command(service: BankingService, owner: str, actor: str, body: dict) -> dict
         owner, item.id, action=cast(Literal["confirm", "ignore", "reopen"], operation), expected_status=item.status,
         expected_updated_at=transaction.updated_at, expected_last_seen_at=item.last_seen_at,
         matched_action_log_id=action_id, matched_sheet_ref=sheet_ref,
+        current_expense_refs=expense_match_references(_review_actions(service, owner, actor)) if operation == "confirm" else None,
     )
     if applied is None:
         current = service.get_reconciliation_item(owner, item.id)

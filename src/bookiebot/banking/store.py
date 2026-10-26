@@ -3,6 +3,7 @@ from __future__ import annotations
 from contextlib import contextmanager
 from datetime import date, datetime, timedelta, timezone
 import json
+import re
 from pathlib import Path
 import sqlite3
 from threading import Lock
@@ -1840,6 +1841,48 @@ class BankStore:
             matched_refs.update(part.strip() for part in raw_ref.split(" + ") if part.strip())
         return matched_refs
 
+    @staticmethod
+    def _refresh_expense_match_references(
+        conn: BankStoreConnection, owner_key: str, current_refs: dict[str, tuple[str, int]],
+    ) -> None:
+        # Compaction shifts history coordinates without changing purchase IDs.
+        # Refresh only single, unchanged active purchases in the same qualified
+        # category/month. Unknown history, groups and pending writes stay reserved.
+        rows = conn.execute(
+            """SELECT r.id, r.matched_action_log_id, r.matched_sheet_ref, t.amount
+               FROM bank_reconciliation_items r
+               JOIN bank_transactions t ON t.id = r.bank_transaction_id AND t.owner_key = r.owner_key
+               WHERE r.owner_key = ? AND r.status IN ('matched', 'confirmed')
+                 AND t.removed_at IS NULL AND t.pending = 0""", (owner_key,),
+        ).fetchall()
+        pattern = r"expense!row [1-9][0-9]*(#cols=[0-9]+(?:,[0-9]+)*#month=[0-9]{4}-[0-9]{2})"
+        for row in rows:
+            current = current_refs.get(row['matched_action_log_id'])
+            if current is None or current[1] != round(abs(row['amount']) * 100):
+                continue
+            new_ref, _ = current
+            new_scope = re.fullmatch(pattern, new_ref)
+            parts: list[str] = str(row['matched_sheet_ref'] or '').split(' + ')
+            physical = [(index, re.fullmatch(pattern, part)) for index, part in enumerate(parts)]
+            physical = [(index, scope) for index, scope in physical if scope is not None]
+            if new_scope is None or len(physical) != 1:
+                continue
+            index, old_scope = physical[0]
+            if old_scope is None or old_scope.group(1) != new_scope.group(1) or parts[index] == new_ref:
+                continue
+            parts[index] = new_ref
+            updated = ' + '.join(parts)
+            conn.execute('UPDATE bank_reconciliation_items SET matched_sheet_ref = ? WHERE id = ? AND owner_key = ?',
+                         (updated, row['id'], owner_key))
+            conn.execute(
+                """INSERT INTO bank_reconciliation_events
+                   (event_id, reconciliation_id, owner_key, event_type, occurred_at, payload_json)
+                   VALUES (?, ?, ?, ?, ?, ?)""",
+                (uuid4().hex, row['id'], owner_key, 'expense_match_reference_refreshed', utc_now_iso(),
+                 json.dumps({'action_id': row['matched_action_log_id'], 'previous_sheet_ref': row['matched_sheet_ref'],
+                             'matched_sheet_ref': updated}, sort_keys=True)),
+            )
+
     def apply_reconciliation_review(
         self, owner_key: str, reconciliation_id: int, *,
         action: Literal['confirm', 'ignore', 'reopen'],
@@ -1847,6 +1890,7 @@ class BankStore:
         matched_action_log_id: str | None = None, matched_sheet_ref: str | None = None,
         source: Literal['phone', 'discord'] = 'phone', notes: str | None = None,
         before_confirm: Callable[[], None] | None = None,
+        current_expense_refs: dict[str, tuple[str, int]] | None = None,
     ) -> ReconciliationItem | None:
         """Apply a reviewed metadata decision, or return None for a stale view.
 
@@ -1891,6 +1935,8 @@ class BankStore:
                 or row['last_seen_at'] != expected_last_seen_at
             ):
                 return None
+            if action == 'confirm' and current_expense_refs:
+                self._refresh_expense_match_references(conn, owner_key, current_expense_refs)
             if action == 'confirm' and self._reconciliation_match_taken(
                 conn, owner_key, row['bank_transaction_id'], matched_action_log_id, matched_sheet_ref,
             ):
@@ -1931,6 +1977,7 @@ class BankStore:
         matched_action_log_id: str | None = None, matched_sheet_ref: str | None = None,
         notes: str = "logged from bank review", expected_item: ReconciliationItem | None = None,
         before_confirm: Callable[[], None] | None = None,
+        current_expense_refs: dict[str, tuple[str, int]] | None = None,
     ) -> ReconciliationItem | None:
         item = self.get_reconciliation_item(owner_key, reconciliation_id)
         if item is None or (expected_item is not None and item != expected_item):
@@ -1940,7 +1987,7 @@ class BankStore:
             expected_updated_at=item.transaction.updated_at, expected_last_seen_at=item.last_seen_at,
             matched_action_log_id=matched_action_log_id or item.matched_action_log_id,
             matched_sheet_ref=matched_sheet_ref or item.matched_sheet_ref,
-            source='discord', notes=notes, before_confirm=before_confirm,
+            source='discord', notes=notes, before_confirm=before_confirm, current_expense_refs=current_expense_refs,
         )
 
     def reopen_reconciliation_item(

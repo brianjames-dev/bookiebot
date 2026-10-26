@@ -37,6 +37,7 @@ from bookiebot.banking.reconciliation import (
     action_log_bank_transaction,
     action_log_candidate_by_id,
     claimed_schedule_action_ids,
+    expense_match_references,
     action_sheet_ref,
     find_action_log_candidates,
     find_action_log_candidate_groups,
@@ -827,13 +828,14 @@ class BankingService:
         notes: str = "logged from bank review",
         expected_item: ReconciliationItem | None = None,
         before_confirm: Callable[[], None] | None = None,
+        current_expense_refs: dict[str, tuple[str, int]] | None = None,
     ):
         return self.store.confirm_reconciliation_item(
             owner_key,
             reconciliation_id,
             matched_action_log_id=matched_action_log_id,
             matched_sheet_ref=matched_sheet_ref,
-            notes=notes, expected_item=expected_item, before_confirm=before_confirm,
+            notes=notes, expected_item=expected_item, before_confirm=before_confirm, current_expense_refs=current_expense_refs,
         )
 
     def reconciliation_match_candidates(
@@ -1195,6 +1197,7 @@ class BankingService:
                 matched_action_log_id=candidate.action_id,
                 matched_sheet_ref=candidate.sheet_ref,
                 notes="matched existing sheet/action-log row", expected_item=item, before_confirm=correct_amount,
+                current_expense_refs=expense_match_references(action_by_id.values()),
             )
         except _MatchCorrectionFailed as exc:
             return item, candidate, str(exc)
@@ -1366,6 +1369,7 @@ class BankingService:
                 matched_action_log_id=match_id,
                 matched_sheet_ref=sheet_ref,
                 notes="matched existing grouped rows", expected_item=item, before_confirm=correct_group,
+                current_expense_refs=expense_match_references(action_by_id.values()),
             )
         except _MatchCorrectionFailed as exc:
             return item, candidates, str(exc)

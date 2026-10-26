@@ -4,6 +4,12 @@ Last updated: 2026-10-25
 
 ## Goal
 
+### Rejected-match recovery and compacted expense references — 2026-10-25
+
+Implemented; CI/release pending. Production read-only audit traced the $50 shirt rejection to a confirmed $4 ear-plug reference still at Shopping row 20 after history compacted it to row 19. During explicit confirmation only, fresh owner history can relocate a single unchanged matched expense within the same qualified category/month under the existing owner lock. Preserve decisions, amounts, timestamps, additional occurrence aliases and duplicate protection; log the old/new reference. Missing/ambiguous history, changed amounts/scope, groups and pending writes fail closed. Phone and Discord use the same store path. No financial data or production match was changed during diagnosis.
+
+Rejected metadata commands close stale review and automatically read saved state once. True unknown financial responses retain the work guard; header Check status always permits a read-only status request. No automatic command retries. Regression, full verification and sample-browser recovery passed: full **2,647/482 optional skipped**, focused **474/82**, clean types/build and repeated isolated asset parity. Native/release checklist 158 is next; existing expense/reimbursement balances stay intact.
+
 ### Reimbursement percentage and total editor — 2026-10-25
 
 Released through [PR #88](https://github.com/brianjames-dev/bookiebot/pull/88) as `f60df57` (exact combined source `bcaff0b`). Combined CI #247 and main CI #249 passed **3,119 tests / zero skips** and all PostgreSQL/type/build/assets gates. Railway `20058428-31af-4e90-877a-1113457ca671` is successful/active for the exact merge; bot/command/web startup, health, authorization and exact frontend **3e99f84c40b7df1fd441cdf1** assets verified. Live preview/cancel passed $123.45 at 33.33% ($41.15 / $82.30), then restored the saved split. Regression fixes preserve custom percentages in Transactions amount review/confirmation and read personal-bill ancestors from shared monthly history. Local full **2,639 passed / 480 optional PostgreSQL skipped**, focused **438 passed / 277 skipped**, clean Python/frontend types and repeated isolated build parity. Native checklist 157 remains; Transactions keeps 156. No production financial writes.
