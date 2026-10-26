@@ -191,8 +191,9 @@ def _manual_actions(actor: str, month: str, expenses: list[list[str]], personal:
 def load_transactions(actor: str, month: str, *, fresh: bool = False) -> list[dict[str, Any]]:
     key = (actor, month)
     with _READ_LOCKS.setdefault(actor, threading.RLock()):
-        if not fresh and key in _CACHE and time.monotonic() - _CACHE[key][0] < 30:
-            return _CACHE[key][1]
+        with _CACHE_LOCK:
+            if not fresh and key in _CACHE and time.monotonic() - _CACHE[key][0] < 30:
+                return _CACHE[key][1]
         periods = [parse_phone_report_month(month)] if month != "all" else []
         years = sorted({p.year for p in periods}) if periods else sorted(configured_reimbursement_workbooks(actor, now_pacific().year), reverse=True)
         client, result = get_gspread_client(), []
@@ -261,7 +262,7 @@ def load_transactions(actor: str, month: str, *, fresh: bool = False) -> list[di
                     if row["amountCents"] > 0:
                         result.append(row)
         result.sort(key=lambda row: (row["month"], row["date"], row["_logged"].created_at, row["id"]), reverse=True)
-        if not fresh:
+        with _CACHE_LOCK:
             if len(_CACHE) >= 32:
                 _CACHE.pop(next(iter(_CACHE)))
             _CACHE[key] = time.monotonic(), result
@@ -276,7 +277,7 @@ def listing(actor: str, query: Any) -> dict[str, Any]:
     month = query.get("month") or now_pacific().strftime("%Y-%m")
     if len(str(query.get("search", ""))) > 200:
         raise TransactionValidation("Use a search of up to 200 characters.")
-    rows = load_transactions(actor, month)
+    rows = load_transactions(actor, month, fresh=query.get("fresh") == "1")
     search = str(query.get("search", "")).casefold().split()
     kind, category, person, split = (query.get(key, "") for key in ("kind", "category", "person", "split"))
     try:

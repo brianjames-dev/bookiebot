@@ -55,6 +55,7 @@ export function TransactionsScreen({active, ownerName, initialMonth}: {active: b
   const inFlight = useRef(false), generation = useRef(0), mounted = useRef(true)
   const editor = useRef<HTMLElement>(null)
   const facets = useRef<{categories:string[];persons:string[]}>({categories:[],persons:[]})
+  const freshNext = useRef(false)
   const loadAbort = useRef<AbortController | null>(null)
   const storageKey = `bookiebot:transaction-request:${ownerName}`
   const uncertain = Boolean(pending && result?.state !== "done")
@@ -70,10 +71,10 @@ export function TransactionsScreen({active, ownerName, initialMonth}: {active: b
     try { const saved = sessionStorage.getItem(storageKey); if (saved) { const body = JSON.parse(saved); if (body.requestId && body.id) {setPending(body); setResult({state: "running"})} } } catch {}
     return () => { mounted.current = false; loadAbort.current?.abort() }
   }, [storageKey])
-  const load = useCallback(async (offset = 0, append = false) => {
+  const load = useCallback(async (offset = 0, append = false, fresh = false) => {
     const token = ++generation.current
     loadAbort.current?.abort(); const controller = new AbortController(); loadAbort.current = controller
-    const query = new URLSearchParams({month, search, kind, category, person, split, offset: String(offset)})
+    const query = new URLSearchParams({month, search, kind, category, person, split, offset: String(offset),fresh:fresh ? "1" : ""})
     setLoading(true); setError("")
     try {
       const next = checkedListing(await request(`/app/transactions?${query}`, undefined, controller.signal))
@@ -90,11 +91,11 @@ export function TransactionsScreen({active, ownerName, initialMonth}: {active: b
   useEffect(() => {
     if (!active) return
     setListing(null); setLoading(true)
-    const timer = window.setTimeout(() => { void load() }, search ? 250 : 0)
+    const timer = window.setTimeout(() => { const fresh=freshNext.current; freshNext.current=false; void load(0,false,fresh) }, search ? 250 : 0)
     return () => { window.clearTimeout(timer); ++generation.current; loadAbort.current?.abort() }
   }, [active, load, revision])
   useEffect(() => {
-    const refresh = () => setRevision(value => value + 1)
+    const refresh = () => { freshNext.current=true; setRevision(value => value + 1) }
     window.addEventListener("bookiebot:reimbursements-changed", refresh)
     return () => window.removeEventListener("bookiebot:reimbursements-changed", refresh)
   }, [])
@@ -168,7 +169,7 @@ export function TransactionsScreen({active, ownerName, initialMonth}: {active: b
   const locked = busy || uncertain
   const filterCount = [kind,category,person,split].filter(Boolean).length
   return <section className="bb-transactions" aria-label="Recorded transactions">
-    <header className="bb-transactions-heading"><div><h1>Transactions</h1><p>Everything you’ve recorded, in one place.</p></div><button type="button" aria-label="Refresh transactions" disabled={locked || loading} onClick={() => void load()}><RefreshCw size={18} /></button></header>
+    <header className="bb-transactions-heading"><div><h1>Transactions</h1><p>Everything you’ve recorded, in one place.</p></div><button type="button" aria-label="Refresh transactions" disabled={locked || loading} onClick={() => void load(0,false,true)}><RefreshCw size={18} /></button></header>
     <div className="bb-transactions-toolbar"><label className="bb-transaction-search"><Search size={18} aria-hidden="true"/><input type="search" aria-label="Search transactions" placeholder="Search transactions" value={search} onChange={event=>setSearch(event.target.value)} /></label><button type="button" aria-expanded={filters} aria-controls="bb-transaction-filters" onClick={()=>setFilters(value=>!value)}><SlidersHorizontal size={18}/><span>Filters{filterCount ? ` · ${filterCount}` : ""}</span></button></div>
     <div className="bb-transaction-period"><label>Period<select aria-label="Transaction period" value={month === "all" ? "all" : "selected"} onChange={event=>setMonth(event.target.value === "all" ? "all" : initialMonth)}><option value="selected">One month</option><option value="all">All months</option></select></label>{month !== "all" && <input aria-label="Recorded month" type="month" max={new Date().toISOString().slice(0,7)} value={month} onChange={event=>{if(event.target.value)setMonth(event.target.value)}}/>}</div>
     <CollapsibleContent open={filters} id="bb-transaction-filters"><div className="bb-transaction-filters">
@@ -207,6 +208,6 @@ export function TransactionsScreen({active, ownerName, initialMonth}: {active: b
       <CollapsibleContent open={selected?.id === row.id}><div className="bb-transaction-row-actions">{row.notice && <p>{row.notice}</p>}{(["update","move","split","delete"] as Operation[]).filter(op=>row.capabilities[op]).map(op=><button key={op} type="button" disabled={locked || Boolean(operation)} onClick={()=>begin(row,op)}>{op === "split" && row.split ? "Edit split" : labels[op]}</button>)}{row.capabilities.cancel_split && <button type="button" disabled={locked || Boolean(operation)} onClick={()=>begin(row,"cancel_split")}>Cancel split</button>}</div></CollapsibleContent>
     </article>)}</div>
     {listing?.nextOffset !== null && listing?.nextOffset !== undefined && <button className="bb-transaction-load" type="button" disabled={loading} onClick={()=>void load(listing.nextOffset!,true)}>{loading ? "Loading…" : "Load more transactions"}</button>}
-    {error && !listing && <button type="button" disabled={loading} onClick={()=>void load()}>Try again</button>}
+    {error && !listing && <button type="button" disabled={loading} onClick={()=>void load(0,false,true)}>Try again</button>}
   </section>
 }

@@ -34,6 +34,7 @@ const submit=async()=>run(()=>tree.root.findByType('form').props.onSubmit({preve
 ;(async()=>{
  await run(()=>{tree=Renderer.create(fixture(false))});await tick();assert.equal(requests.length,0,'Hidden Transactions does not add startup reads')
  await run(()=>tree.update(fixture(true)));await tick();assert.match(latest().url,/\/app\/transactions\?/);await respond(listing())
+ await click('Refresh transactions');assert.match(latest().url,/fresh=1/);await respond(listing())
  await expand();await click('Update');assert.equal(work.dirty,true)
  await run(()=>tree.root.findAllByType('input').find(n=>n.props.value==='12.34').props.onChange({target:{value:'15.99'}}))
  assert.equal(requests.filter(r=>r.options.body).length,0,'Editing does not write')
