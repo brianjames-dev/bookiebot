@@ -2,6 +2,7 @@ import {
   memo,
   useCallback,
   useEffect,
+  useId,
   useLayoutEffect,
   useRef,
   useState,
@@ -544,7 +545,6 @@ export function ExpenseReportApp({ report, appControls, appAvatarUrl, appSession
   const [metricInspection, setMetricInspection] = useState<MetricInspection | null>(null)
   useViewportScrollbarWidth()
   const [inspection, setInspection] = useState<{key:string; title:string; entries:ReportActivity[]; total:number; note?:string} | null>(null)
-  const dailySpendingDetailsOpen = useMediaQuery("(min-width: 861px)")
   const localPreferences = useReportViewPreferences(report.ownerName, Boolean(report.burnRate), Boolean(appSession))
   const viewPreferences = navigation?.preferences ?? localPreferences
   const projectionActive = viewPreferences.mode === "projected"
@@ -604,9 +604,9 @@ export function ExpenseReportApp({ report, appControls, appAvatarUrl, appSession
     setInspection({key:`category-${item.key}`, title:item.label, entries, total:item.amount,
       note:item.key === "left" ? "Available budget after spending and savings; this is a balance, not a transaction." : item.key === "savings" ? "Monthly cash savings are summarized in Saved." : item.key === "espp" ? "Calculated from enrolled payroll and already withheld before deposit. Projected mode includes explicitly estimated contributions." : undefined})
   }, [])
-  const inspectDay = (day: string) => {
+  const inspectDay = (day: string, category = "") => {
     dismissChartTooltips()
-    const entries = allActivity.filter(entry => (Number.isFinite(Number(day)) ? entry.day === Number(day) : entry.day === null) && (dailySpendingFilter === "all" || dailyEntryFilter(entry) === dailySpendingFilter))
+    const entries = allActivity.filter(entry => (Number.isFinite(Number(day)) ? entry.day === Number(day) : entry.day === null) && (dailySpendingFilter === "all" || dailyEntryFilter(entry) === dailySpendingFilter) && (!category || entry.category === category))
     setInspection({key:`day-${day}`, title:Number.isFinite(Number(day)) ? `${monthOnlyLabel(report.monthLabel)} ${day}` : "Entries without a date", entries, total:activitySummary(entries).total})
   }
   const spentTotal = amountRowsTotal(activeReport.breakdown)
@@ -913,15 +913,16 @@ export function ExpenseReportApp({ report, appControls, appAvatarUrl, appSession
             </div>
           </CardHeader>
           <CardContent className="bb-daily-spending-content">
-            <DailySpendingChart
+            <DailySpendingSection
               data={dailyTotals}
               onInspectDay={inspectDay}
               total={dailyTotal}
-              elapsedDays={report.elapsedDays}
               filter={dailySpendingFilter}
-              defaultDetailsOpen={dailySpendingDetailsOpen}
+              entries={dailyTableEntries}
+              categoryColors={categoryColors}
+              year={report.year}
+              month={report.month}
             />
-            <DailyEntriesTable onInspectDay={inspectDay} entries={dailyTableEntries} categoryColors={categoryColors} year={report.year} month={report.month} />
           </CardContent>
         </Card>
 
@@ -2466,23 +2467,65 @@ type DailySpendingAxis = {
 
 type DailyEntryDisplayRow = ExpenseEntry & { status?: "recorded" | "scheduled" }
 
+function DailySpendingSection({ data, total, filter, entries, categoryColors, year, month, onInspectDay }: {
+  data: DailySpendingRow[]
+  total: number
+  filter: DailySpendingFilter
+  entries: DailyEntryDisplayRow[]
+  categoryColors: Record<string, string>
+  year: number
+  month: number
+  onInspectDay: (day: string, category?: string) => void
+}) {
+  const [open, setOpen] = useState(false)
+  const [category, setCategory] = useState("")
+  const detailsId = useId()
+  const filterId = useId()
+  const categories = Array.from(new Set(entries.map(entry => entry.category))).sort((left, right) => left.localeCompare(right))
+  const selectedCategory = categories.includes(category) ? category : ""
+  const filteredEntries = selectedCategory ? entries.filter(entry => entry.category === selectedCategory) : entries
+
+  useEffect(() => { setCategory("") }, [year, month, filter])
+
+  return <>
+    <DailySpendingChart data={data} total={total} filter={filter} onInspectDay={onInspectDay}
+      detailsOpen={open} detailsId={detailsId} onToggleDetails={() => setOpen(current => !current)} />
+    <CollapsibleContent open={open} id={detailsId}>
+      <div className="bb-daily-transactions">
+        <div className="bb-daily-entry-filter">
+          <label htmlFor={filterId}>Type</label>
+          <div className="bb-daily-entry-select">
+            <select id={filterId} value={selectedCategory} onChange={event => setCategory(event.target.value)}>
+              <option value="">All types</option>
+              {categories.map(value => <option key={value} value={value}>{value}</option>)}
+            </select>
+            <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="m6 9 6 6 6-6" /></svg>
+          </div>
+        </div>
+        <DailyEntriesTable entries={filteredEntries} categoryColors={categoryColors} year={year} month={month}
+          onInspectDay={day => onInspectDay(day, selectedCategory)} />
+      </div>
+    </CollapsibleContent>
+  </>
+}
+
 function DailySpendingChart({
   data,
   total,
-  elapsedDays,
   filter,
-  defaultDetailsOpen,
+  detailsOpen,
+  detailsId,
+  onToggleDetails,
   onInspectDay,
 }: {
   onInspectDay: (day: string) => void
   data: DailySpendingRow[]
   total: number
-  elapsedDays: number
   filter: DailySpendingFilter
-  defaultDetailsOpen: boolean
+  detailsOpen: boolean
+  detailsId: string
+  onToggleDetails: () => void
 }) {
-  const peak = data.reduce<AmountRow | null>((best, item) => (!best || item.amount > best.amount ? item : best), null)
-  const averageDaySpend = elapsedDays ? total / elapsedDays : 0
   const axis = dailySpendingAxis(data)
   const chartData = dailySpendingChartRows(data, axis)
   const showStackedBars = filter === "all"
@@ -2543,16 +2586,9 @@ function DailySpendingChart({
           <div className="bb-chart-kicker">Total Spent</div>
           <div className="bb-chart-total">{formatMoney(total)}</div>
         </div>
-        <DetailsPanel summary="Details" defaultOpen={defaultDetailsOpen}>
-          <StatList
-            rows={[
-              ["Tracked days", String(data.length)],
-              ["Avg/day", formatMoney(averageDaySpend)],
-              ["Days counted", String(elapsedDays)],
-              ["Highest day", peak ? `${peak.label} - ${formatMoney(peak.amount)}` : "N/A"],
-            ]}
-          />
-        </DetailsPanel>
+        <button type="button" className="bb-details-toggle" aria-expanded={detailsOpen} aria-controls={detailsId} onClick={onToggleDetails}>
+          Details
+        </button>
       </div>
     </div>
   )
@@ -3278,7 +3314,7 @@ function DailyEntriesTable({ entries, categoryColors, year, month, onInspectDay 
   month: number
 }) {
   if (!entries.length) {
-    return <div className="bb-empty">No shared expense entries found.</div>
+    return <div className="bb-empty">No transactions found.</div>
   }
 
   const grouped = new Map<string, DailyEntryDisplayRow[]>()

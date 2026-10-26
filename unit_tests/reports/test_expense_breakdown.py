@@ -616,8 +616,10 @@ def test_build_expense_breakdown_report_aggregates_shared_and_personal_data():
     assert "bb-chart-tooltip-frame-dismissing" in html
     assert "bb-theme-toggle-moon" in html
     assert "bb-table-row-divider" in html
-    assert "Highest day" in html
-    assert "Days counted" in html
+    assert "Highest day" not in html
+    assert "bb-daily-entry-filter" in html
+    assert "All types" in html
+    assert "Days counted" not in html
     assert "Daily Spending" in html
     assert "bb-daily-spending-grid" in html
     assert "bb-daily-spending-x-axis-label" in html
@@ -2001,8 +2003,8 @@ def test_report_frontend_calendar_largest_and_burn_rate_presentation_regressions
     assert 'categoryMixPressure("wants", categoryBalances, burnRate.spent)' in source
     assert "Food + Shopping + Wants subscriptions" in source
     assert "after cross-category coverage" in source
-    assert 'const dailySpendingDetailsOpen = useMediaQuery("(min-width: 861px)")' in source
-    assert "defaultDetailsOpen={dailySpendingDetailsOpen}" in source
+    assert "<DailySpendingSection" in source
+    assert 'aria-controls={detailsId}' in source
     assert '<h1 className="bb-report-context">{appMonthControl ?? report.monthLabel}' in source
     assert "<ReportMenu>" in source
     assert "<h1>Expense Breakdown</h1>" not in source

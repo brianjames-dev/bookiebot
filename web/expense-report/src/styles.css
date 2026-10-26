@@ -640,6 +640,56 @@ summary {
   margin-left: auto;
 }
 
+.bb-daily-transactions {
+  display: grid;
+  gap: 16px;
+  min-width: 0;
+}
+
+.bb-daily-entry-filter {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+  color: hsl(var(--muted-foreground));
+  font-size: 14px;
+}
+
+.bb-daily-entry-select {
+  position: relative;
+  min-width: 0;
+  flex: 0 1 280px;
+}
+
+.bb-daily-entry-select svg {
+  position: absolute;
+  right: 12px;
+  top: 50%;
+  width: 16px;
+  height: 16px;
+  transform: translateY(-50%);
+  pointer-events: none;
+}
+
+.bb-daily-entry-filter select {
+  appearance: none;
+  min-width: 0;
+  width: 100%;
+  min-height: 44px;
+  padding: 8px 36px 8px 12px;
+  border: 1px solid hsl(var(--border));
+  border-radius: var(--radius);
+  background: hsl(var(--card));
+  color: hsl(var(--foreground));
+  font: inherit;
+  font-size: 16px;
+}
+
+.bb-daily-entry-filter select:focus-visible {
+  outline: 2px solid hsl(var(--ring));
+  outline-offset: 2px;
+}
+
 .bb-daily-spending-content .recharts-cartesian-grid-horizontal .bb-daily-spending-grid {
   stroke: hsl(var(--muted-foreground));
   stroke-width: 1;
