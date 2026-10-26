@@ -1,5 +1,11 @@
 # Agent Decisions
 
+## 2026-10-25 - Use Browser Opacity Transitions For Compact And Touch Charts
+
+Category Mix and Daily Spending render final Recharts geometry immediately on viewports up to 860px or devices with a coarse primary pointer. Use one cancellable 180ms browser opacity animation on the mounted plot instead of rebuilding SVG sectors/bars on every animation frame. Desktop fine-pointer layouts retain their existing geometry animation. Reduce Motion disables both geometry animation and the fade, including when the preference changes during a transition.
+
+Transition identity uses visible chart values, category/color and daily filter rather than array identity, so resize, tooltip and equivalent-data renders do not restart feedback. Cancel old browser work on changed data, preference or unmount; retain mounted chart identity, current-data inspection and all filter/list behavior. Rationale: native phone feedback remained laggy after report render isolation; profiles show hundreds of SVG path creations per tap inside the remaining chart animations. No financial calculation, storage or workflow changes.
+
 ## 2026-10-25 - Isolate Overview Rendering And Lazily Mount Read-Only Lists
 
 Carousel filters, swipe state and tooltip cooldown belong to the memoized OverviewCharts boundary. A stable command context updates the shared tooltip provider's own revision, preserving global dismissal without invalidating the report or unrelated section controllers. Daily Spending owns its bucket filter and derived rows; Highlights owns its view and caches its sorted entries. Keep unchanged chart panels and sections memoized with stable inputs/callbacks. Component-local report-view/activity/color calculations invalidate on a fresh report or Current/Projected change. Page-level dismissal/collapse signals still reach each chart region, and page-owned inspection callbacks always use the current report and explicit daily bucket/category. Preserve chart preferences, Ask source routing, mounted chart identity and existing animation timing.

@@ -43,6 +43,7 @@ const runtime = {
   exports: {}, require: req, useState: React.useState, useEffect: React.useEffect, useId: React.useId,
   memo: React.memo, useMemo: React.useMemo, useCallback: React.useCallback,
   CollapsibleContent: motionRuntime.exports.CollapsibleContent,
+  useChartTransition: () => ({ ref: null, mode: "none" }),
   ChartContainer: chartSurface, ResponsiveContainer: chartSurface, BarChart: chartSurface,
   CartesianGrid: () => null, XAxis: () => null, YAxis: () => null, Bar: () => null,
   ChartTooltip: () => null, DailySpendingTooltipContent: () => null,

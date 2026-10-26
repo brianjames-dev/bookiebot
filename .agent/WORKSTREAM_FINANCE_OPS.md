@@ -4,7 +4,13 @@ Last updated: 2026-10-25
 
 ## Goal
 
+### Overview phone chart animation follow-up — 2026-10-25
+
+Implemented and locally verified; release/native acceptance pending. Native feedback after the first rendering release identified remaining Needs/Wants lag. Category Mix and Daily Spending now use immediately committed geometry plus one cancellable 180ms browser opacity transition on compact/coarse-pointer devices. Desktop morphs remain; reduced motion disables both. Visible-data signatures prevent tooltip/resize restarts, and charts retain current-data inspection. Added real-Recharts frame-work regressions for pie/bar geometry, cancellation, equivalent data and media changes. Full local **2,651 passed / 482 optional skipped**, clean types/build/asset parity and **26 Chromium/WebKit cases** pass; synthetic phone profiling reduces scripting by 78.6% in both charts. Finance Ops financial backlog is unchanged; manual acceptance is STATUS checklist 161.
+
 ### Overview filter rendering — 2026-10-25
+
+Released/verified: PR #92 merged as `df377b3`; main CI passed **3,132 tests / zero skips** and all type/build/asset checks. Production frontend **7f226d3bc7f11080bc0e133a** and all three public assets exactly match the merged build; health 200/private data 401. Includes PRs #90–91's Transactions disclosure/type filter and alternating backgrounds. Phone update instructions and outstanding native acceptance are STATUS checklists 159–160. Release verification was read-only; financial backlog unchanged.
 
 Implemented: isolate carousel and Daily Spending state, cache unchanged report/activity/sorted highlight inputs, memoize independent panels and lazily mount full read-only transaction lists. Provider-owned global tooltip dismissal and page-owned fresh inspection preserve cross-section behavior; form disclosures keep their existing mounted lifecycle. Regression checks reproduce the previous unrelated recalculation and cover independent filters, mode/refresh invalidation, scoped day inspection, swipes, Ask sources and lazy exit/reversal/reduced-motion cleanup. A 1,500-row CPU-throttled sample reduces initially mounted DOM from 13,296 to 784 while keeping every expanded transaction. Verification/benchmark details and native acceptance are in STATUS checklist 160. Finance Ops financial backlog is unchanged; no production writes.
 

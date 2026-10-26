@@ -39,6 +39,7 @@ let animate = false
 const observed = []
 const runtime = {
   exports: {}, require: req, memo: React.memo,
+  useChartTransition: () => ({ ref: null, mode: animate ? "morph" : "none" }),
   ResponsiveContainer: ({ children }) => children,
   PieChart: props => React.createElement(Recharts.PieChart, { ...props, width: 400, height: 320, compact: true }),
   Pie: props => React.createElement(Recharts.Pie, { ...props, zIndex: 0, isAnimationActive: animate }),
