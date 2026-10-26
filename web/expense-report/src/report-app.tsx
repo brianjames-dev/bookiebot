@@ -4,6 +4,7 @@ import {
   useEffect,
   useId,
   useLayoutEffect,
+  useMemo,
   useRef,
   useState,
   type ComponentProps,
@@ -43,7 +44,7 @@ import { ReimbursementLedger } from "./reimbursement-ledger"
 import { reportActivity, activitySummary, activityDay, activityMatchesCategory, calendarActivityCategory, calendarActivityStatus, type ReportActivity } from "./report-activity"
 import type { MetricExplanation } from "./types"
 import { useReportViewPreferences, type PreferredChart } from "./report-view-preferences"
-import { ChartContainer, ChartTooltip, ChartTooltipContent, ChartTooltipDismissProvider } from "./components/ui/chart"
+import { ChartContainer, ChartTooltip, ChartTooltipContent, ChartTooltipDismissProvider, useChartTooltipDismiss } from "./components/ui/chart"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "./components/ui/tabs"
 import { CollapsibleContent, SlidingSelection } from "./components/ui/motion"
 import type {
@@ -548,53 +549,25 @@ export function ExpenseReportApp({ report, appControls, appAvatarUrl, appSession
   const localPreferences = useReportViewPreferences(report.ownerName, Boolean(report.burnRate), Boolean(appSession))
   const viewPreferences = navigation?.preferences ?? localPreferences
   const projectionActive = viewPreferences.mode === "projected"
-  const [categoryMixFilter, setCategoryMixFilter] = useState<CategoryMixFilter>("all")
-  const [calendarFilter, setCalendarFilter] = useState<CalendarFilter>("all")
-  const [dailySpendingFilter, setDailySpendingFilter] = useState<DailySpendingFilter>("all")
-  const [chartTouch, setChartTouch] = useState<ChartTouchState | null>(null)
-  const chartGestureRef = useRef<ChartTouchState | null>(null)
-  const tooltipCooldownTimeoutRef = useRef<number | null>(null)
-  const [chartTooltipCooldown, setChartTooltipCooldown] = useState(false)
   const [chartTooltipDismissRevision, setChartTooltipDismissRevision] = useState(0)
   const [chartCollapseKey, setChartCollapseKey] = useState(0)
-  const dismissChartTooltips = () => {
-    setChartTooltipDismissRevision((current) => current + 1)
-  }
-  const switchCategoryMixFilter = (nextFilter: CategoryMixFilter) => {
-    if (nextFilter === categoryMixFilter) {
-      return
-    }
-    dismissChartTooltips()
-    setCategoryMixFilter(nextFilter)
-  }
-  const switchCalendarFilter = (nextFilter: CalendarFilter) => {
-    if (nextFilter === calendarFilter) {
-      return
-    }
-    dismissChartTooltips()
-    setCalendarFilter(nextFilter)
-  }
-  const switchDailySpendingFilter = (nextFilter: DailySpendingFilter) => {
-    if (nextFilter === dailySpendingFilter) {
-      return
-    }
-    dismissChartTooltips()
-    setDailySpendingFilter(nextFilter)
-  }
+  const [sourceRequest, setSourceRequest] = useState<{ section: string; id: number } | null>(null)
+  const dismissChartTooltips = useCallback(() => setChartTooltipDismissRevision(current => current + 1), [])
+  const showQuestionSource = useCallback((section: string) => {
+    setSourceRequest(current => ({ section, id: (current?.id ?? 0) + 1 }))
+  }, [])
+  const preferencesRef = useRef(viewPreferences)
+  preferencesRef.current = viewPreferences
+  const selectChart = useCallback((chart: PreferredChart) => preferencesRef.current.setChartId(chart), [])
   const toggleProjection = () => {
     dismissChartTooltips()
     viewPreferences.setMode(projectionActive ? "current" : "projected")
   }
-  const activeReport = buildReportView(report, projectionActive)
-  const chartBreakdown = activeReport.breakdown.map((item) => ({ ...item, color: CATEGORY_CHART_COLORS[item.key] ?? item.color }))
-  const categoryColors: Record<string, string> = Object.fromEntries(chartBreakdown.map((item) => [item.label, item.color]))
-  const dailyEntries = filterDailyEntries(report.dailyEntries, dailySpendingFilter)
-  const dailyCalendarEvents = dailySpendingCalendarEvents(activeReport.calendarEvents, dailySpendingFilter, projectionActive)
-  const dailyTableEntries = dailyEntriesWithCalendarEvents(dailyEntries, dailyCalendarEvents, report.month)
-  const dailyTotals = dailyTotalsForEntries(dailyEntries, dailyCalendarEvents, report.year, report.month)
-  const dailyTotal = dailySpendingTotal(dailyEntries, dailyCalendarEvents)
+  const activeReport = useMemo(() => buildReportView(report, projectionActive), [report, projectionActive])
+  const chartBreakdown = useMemo(() => activeReport.breakdown.map((item) => ({ ...item, color: CATEGORY_CHART_COLORS[item.key] ?? item.color })), [activeReport.breakdown])
+  const categoryColors: Record<string, string> = useMemo(() => Object.fromEntries(chartBreakdown.map((item) => [item.label, item.color])), [chartBreakdown])
   const metricDetails = report.metricExplanations?.[projectionActive ? "projected" : "current"]
-  const allActivity = reportActivity(report, activeReport.calendarEvents, projectionActive)
+  const allActivity = useMemo(() => reportActivity(report, activeReport.calendarEvents, projectionActive), [report, activeReport.calendarEvents, projectionActive])
   const activityRef = useRef(allActivity)
   activityRef.current = allActivity
   const inspectCategory = useCallback((item: BreakdownItem) => {
@@ -604,12 +577,153 @@ export function ExpenseReportApp({ report, appControls, appAvatarUrl, appSession
     setInspection({key:`category-${item.key}`, title:item.label, entries, total:item.amount,
       note:item.key === "left" ? "Available budget after spending and savings; this is a balance, not a transaction." : item.key === "savings" ? "Monthly cash savings are summarized in Saved." : item.key === "espp" ? "Calculated from enrolled payroll and already withheld before deposit. Projected mode includes explicitly estimated contributions." : undefined})
   }, [])
-  const inspectDay = (day: string, category = "") => {
+  const inspectDay = useCallback((day: string, dailySpendingFilter: DailySpendingFilter, category = "") => {
     dismissChartTooltips()
     const entries = allActivity.filter(entry => (Number.isFinite(Number(day)) ? entry.day === Number(day) : entry.day === null) && (dailySpendingFilter === "all" || dailyEntryFilter(entry) === dailySpendingFilter) && (!category || entry.category === category))
     setInspection({key:`day-${day}`, title:Number.isFinite(Number(day)) ? `${monthOnlyLabel(report.monthLabel)} ${day}` : "Entries without a date", entries, total:activitySummary(entries).total})
-  }
+  }, [allActivity, report.monthLabel, dismissChartTooltips])
   const spentTotal = amountRowsTotal(activeReport.breakdown)
+  useEffect(() => {
+    if (!navigation) return
+    dismissChartTooltips()
+    setMetricInspection(null)
+    setInspection(null)
+  }, [navigation?.screen])
+
+  return (
+    <div className={navigation ? "bb-report-content" : "bb-page"}>
+      {!navigation && <div className="bb-masthead">
+        <span className="bb-wordmark">{appAvatarUrl ? <img className="bb-app-avatar" src={appAvatarUrl} alt="" /> : <span className="bb-wordmark-symbol" aria-hidden="true">b.</span>}BookieBot<span className="bb-report-owner"><span aria-hidden="true">•</span>{" "}{report.ownerName}</span></span>
+        <ReportMenu>
+          <ThemeToggle theme={theme} onToggle={toggleTheme} />
+          {appSession && <button type="button" className="bb-report-menu-action" disabled={appSession.signingOut} onClick={appSession.signOut}>
+            {appSession.signingOut ? "Signing out…" : "Sign out"}
+          </button>}
+        </ReportMenu>
+      </div>}
+      <header className="bb-page-header" hidden={Boolean(navigation && navigation.screen !== "overview")}>
+        <h1 className="bb-report-context">{appMonthControl ?? report.monthLabel}</h1>
+        <div className="bb-header-actions">
+          <ProjectionToggle
+            active={projectionActive}
+            onToggle={toggleProjection}
+          />
+        </div>
+        {appControls ?? <span className="bb-report-updated">Updated {generatedTimeLabel(report.generatedAt)}</span>}
+      </header>
+      {appUpdate}
+      <ChartTooltipDismissProvider revision={chartTooltipDismissRevision}>
+        <main className="bb-main" data-bb-tooltip-dismiss-revision={chartTooltipDismissRevision}>
+        <ReportScreen name="overview">
+        <section className="bb-metrics-grid" aria-label="Budget metrics">
+          <MetricCard
+            label="Income"
+            onExplain={metricDetails ? () => setMetricInspection({...metricDetails.income, key: "income", view: activeReport}) : undefined}
+            value={activeReport.metrics.monthlyIncome}
+          />
+          <MetricCard label="Spent" value={spentTotal} onExplain={metricDetails ? () => setMetricInspection({...metricDetails.spent, key: "spent", view: activeReport}) : undefined} />
+          <MetricCard
+            label="Left"
+            onExplain={metricDetails ? () => setMetricInspection({...metricDetails.left, key: "left", view: activeReport}) : undefined}
+            value={activeReport.metrics.incomeAfterExpenses}
+            accent
+          />
+          <SavingsMetricCard
+            progressValue={activeReport.savingsInvesting?.cashSaved}
+            onExplain={metricDetails ? () => setMetricInspection({...metricDetails.saved, key: "saved", view: activeReport}) : undefined}
+            value={activeReport.metrics.amountSaved}
+            minimum={activeReport.metrics.savingsMinimum}
+            ideal={activeReport.metrics.savingsIdeal}
+          />
+        </section>
+
+        {appComparison}
+        <OverviewCharts report={report} activeReport={activeReport} chartBreakdown={chartBreakdown}
+          projected={projectionActive} preferredChart={viewPreferences.chartId} onChartChange={selectChart}
+          onInspectCategory={inspectCategory} collapseKey={chartCollapseKey}
+          sourceRequest={sourceRequest} />
+        <DailySpendingCard report={report} calendarEvents={activeReport.calendarEvents}
+          projected={projectionActive} categoryColors={categoryColors} onInspectDay={inspectDay} />
+
+        {navigation && <MemoizedExpenseInsightsCard topEntries={report.topEntries} merchantOccurrences={report.merchantOccurrences} />}
+        </ReportScreen>
+
+        {!navigation && (appSession ? <ReimbursementLedger refreshKey={report.generatedAt} fallback={
+          <SharedReimbursementsCard items={report.sharedReimbursements ?? []} openItems={report.openSharedReimbursements}
+            receivedItems={report.receivedSharedReimbursements} coverage={report.reimbursementCoverage}
+            monthLabel={report.monthLabel} year={report.year} month={report.month} />
+        } /> : <SharedReimbursementsCard items={report.sharedReimbursements ?? []} openItems={report.openSharedReimbursements}
+          receivedItems={report.receivedSharedReimbursements} coverage={report.reimbursementCoverage}
+          monthLabel={report.monthLabel} year={report.year} month={report.month} />)}
+
+        {!navigation && <MemoizedExpenseInsightsCard
+          topEntries={report.topEntries}
+          merchantOccurrences={report.merchantOccurrences}
+        />}
+
+        {!navigation && appSession && <SavingsGoals />}
+        {!navigation && <Investments report={report} />}
+
+        {!navigation && appSession && <ReportQuestions month={`${report.year}-${String(report.month).padStart(2, "0")}`}
+          mode={projectionActive ? "projected" : "current"} onShowSource={showQuestionSource} />}
+
+        {!navigation && appSession && <PhoneNotifications />}
+
+        <ModalDetails summary="Calculation" title={`${metricInspection?.title ?? "Total"} explained`} selection={metricInspection?.title ?? null}
+          onDismiss={() => setMetricInspection(null)} triggerHidden>
+          {metricInspection && <MetricExplanationDetails detail={metricInspection} />}
+        </ModalDetails>
+        <ModalDetails summary="Transactions" title={inspection?.title ?? "Transactions"} selection={inspection?.key ?? null}
+          onDismiss={() => setInspection(null)} triggerHidden>
+          {inspection && <ActivityDetails entries={inspection.entries} total={inspection.total} note={inspection.note} colors={categoryColors} />}
+        </ModalDetails>
+        </main>
+      </ChartTooltipDismissProvider>
+    </div>
+  )
+}
+
+const MemoizedBurnRateChart = memo(BurnRateChart)
+const MemoizedCalendarAnalyticsPanel = memo(CalendarAnalyticsPanel)
+const MemoizedBillsUtilitiesPanel = memo(BillsUtilitiesPanel)
+const MemoizedExpenseInsightsCard = memo(ExpenseInsightsCard)
+
+const OverviewCharts = memo(function OverviewCharts({ report, activeReport, chartBreakdown, projected: projectionActive,
+  preferredChart, onChartChange, onInspectCategory: inspectCategory, collapseKey, sourceRequest }: {
+  report: ExpenseReportData
+  activeReport: ReturnType<typeof buildReportView>
+  chartBreakdown: BreakdownItem[]
+  projected: boolean
+  preferredChart: PreferredChart
+  onChartChange: (chart: PreferredChart) => void
+  onInspectCategory: (item: BreakdownItem) => void
+  collapseKey: number
+  sourceRequest: { section: string; id: number } | null
+}) {
+  const navigation = useAppNavigation()
+  const [categoryMixFilter, setCategoryMixFilter] = useState<CategoryMixFilter>("all")
+  const [calendarFilter, setCalendarFilter] = useState<CalendarFilter>("all")
+  const [chartTouch, setChartTouch] = useState<ChartTouchState | null>(null)
+  const chartGestureRef = useRef<ChartTouchState | null>(null)
+  const tooltipCooldownTimeoutRef = useRef<number | null>(null)
+  const [chartTooltipCooldown, setChartTooltipCooldown] = useState(false)
+  const [localCollapseKey, setLocalCollapseKey] = useState(0)
+  const dismissChartTooltips = useChartTooltipDismiss()
+  const switchCategoryMixFilter = useCallback((nextFilter: CategoryMixFilter) => {
+    if (nextFilter === categoryMixFilter) {
+      return
+    }
+    dismissChartTooltips()
+    setCategoryMixFilter(nextFilter)
+  }, [categoryMixFilter, dismissChartTooltips])
+  const switchCalendarFilter = useCallback((nextFilter: CalendarFilter) => {
+    if (nextFilter === calendarFilter) {
+      return
+    }
+    dismissChartTooltips()
+    setCalendarFilter(nextFilter)
+  }, [calendarFilter, dismissChartTooltips])
+  const chartCollapseKey = collapseKey + localCollapseKey
   const chartPanels: ChartPanel[] = [
     {
       id: "category",
@@ -636,7 +750,7 @@ export function ExpenseReportApp({ report, appControls, appAvatarUrl, appSession
             id: "burn-rate",
             title: "Burn Rate",
             content: (
-              <BurnRateChart
+              <MemoizedBurnRateChart
                 burnRate={activeReport.burnRate}
                 categoryBalances={activeReport.categoryBalances}
                 collapseKey={chartCollapseKey}
@@ -649,7 +763,7 @@ export function ExpenseReportApp({ report, appControls, appAvatarUrl, appSession
       id: "calendar",
       title: "Calendar",
       content: (
-        <CalendarAnalyticsPanel
+        <MemoizedCalendarAnalyticsPanel
           year={report.year}
           month={report.month}
           monthLabel={report.monthLabel}
@@ -668,7 +782,7 @@ export function ExpenseReportApp({ report, appControls, appAvatarUrl, appSession
       id: "bills",
       title: "Bills & Utilities",
       content: (
-        <BillsUtilitiesPanel
+        <MemoizedBillsUtilitiesPanel
           items={activeReport.utilityHistory}
           events={activeReport.calendarEvents}
           year={report.year}
@@ -679,7 +793,7 @@ export function ExpenseReportApp({ report, appControls, appAvatarUrl, appSession
       ),
     },
   ]
-  const activeChartIndex = Math.max(0, chartPanels.findIndex(panel => panel.id === viewPreferences.chartId))
+  const activeChartIndex = Math.max(0, chartPanels.findIndex(panel => panel.id === preferredChart))
 
   useEffect(() => {
     return () => {
@@ -705,10 +819,10 @@ export function ExpenseReportApp({ report, appControls, appAvatarUrl, appSession
     if (next === activeChartIndex) {
       return
     }
-    setChartCollapseKey((current) => current + 1)
-    setChartTooltipDismissRevision((current) => current + 1)
+    setLocalCollapseKey((current) => current + 1)
+    dismissChartTooltips()
     startChartTooltipCooldown()
-    viewPreferences.setChartId(chartPanels[next].id as PreferredChart)
+    onChartChange(chartPanels[next].id as PreferredChart)
   }
 
   const showQuestionSource = (section: string) => {
@@ -732,22 +846,15 @@ export function ExpenseReportApp({ report, appControls, appAvatarUrl, appSession
   }
 
   useEffect(() => {
-    if (!navigation) return
-    dismissChartTooltips()
-    setMetricInspection(null)
-    setInspection(null)
-  }, [navigation?.screen])
-
-  useEffect(() => {
-    const request = navigation?.sourceRequest
-    if (!request || request.section === "reimbursements") return
+    const request = navigation?.sourceRequest ?? sourceRequest
+    if (!request || (navigation && request.section === "reimbursements")) return
     // Let the Ask panel finish its exit and release focus before the drilldown.
     const timer = window.setTimeout(() => {
       showQuestionSource(request.section)
       navigation?.consumeSource?.(request.id)
-    }, 280)
+    }, navigation ? 280 : 0)
     return () => window.clearTimeout(timer)
-  }, [navigation?.sourceRequest?.id, navigation?.screen])
+  }, [navigation?.sourceRequest?.id, navigation?.screen, sourceRequest?.id])
 
   const handleChartTouchStart = (event: TouchEvent<HTMLDivElement>) => {
     if (isInteractiveTouchTarget(event.target)) {
@@ -812,54 +919,7 @@ export function ExpenseReportApp({ report, appControls, appAvatarUrl, appSession
   const swipeOffset = chartTouch?.dragging ? clamp(chartTouch.deltaX * edgeDragFactor, -220, 220) : 0
   const carouselTransform = `translate3d(calc(${-activeChartIndex * 100}% - ${activeChartIndex * CHART_CAROUSEL_GAP}px + ${swipeOffset}px), 0, 0)`
 
-  return (
-    <div className={navigation ? "bb-report-content" : "bb-page"}>
-      {!navigation && <div className="bb-masthead">
-        <span className="bb-wordmark">{appAvatarUrl ? <img className="bb-app-avatar" src={appAvatarUrl} alt="" /> : <span className="bb-wordmark-symbol" aria-hidden="true">b.</span>}BookieBot<span className="bb-report-owner"><span aria-hidden="true">•</span>{" "}{report.ownerName}</span></span>
-        <ReportMenu>
-          <ThemeToggle theme={theme} onToggle={toggleTheme} />
-          {appSession && <button type="button" className="bb-report-menu-action" disabled={appSession.signingOut} onClick={appSession.signOut}>
-            {appSession.signingOut ? "Signing out…" : "Sign out"}
-          </button>}
-        </ReportMenu>
-      </div>}
-      <header className="bb-page-header" hidden={Boolean(navigation && navigation.screen !== "overview")}>
-        <h1 className="bb-report-context">{appMonthControl ?? report.monthLabel}</h1>
-        <div className="bb-header-actions">
-          <ProjectionToggle
-            active={projectionActive}
-            onToggle={toggleProjection}
-          />
-        </div>
-        {appControls ?? <span className="bb-report-updated">Updated {generatedTimeLabel(report.generatedAt)}</span>}
-      </header>
-      {appUpdate}
-      <ChartTooltipDismissProvider revision={chartTooltipDismissRevision}>
-        <main className="bb-main" data-bb-tooltip-dismiss-revision={chartTooltipDismissRevision}>
-        <ReportScreen name="overview">
-        <section className="bb-metrics-grid" aria-label="Budget metrics">
-          <MetricCard
-            label="Income"
-            onExplain={metricDetails ? () => setMetricInspection({...metricDetails.income, key: "income", view: activeReport}) : undefined}
-            value={activeReport.metrics.monthlyIncome}
-          />
-          <MetricCard label="Spent" value={spentTotal} onExplain={metricDetails ? () => setMetricInspection({...metricDetails.spent, key: "spent", view: activeReport}) : undefined} />
-          <MetricCard
-            label="Left"
-            onExplain={metricDetails ? () => setMetricInspection({...metricDetails.left, key: "left", view: activeReport}) : undefined}
-            value={activeReport.metrics.incomeAfterExpenses}
-            accent
-          />
-          <SavingsMetricCard
-            progressValue={activeReport.savingsInvesting?.cashSaved}
-            onExplain={metricDetails ? () => setMetricInspection({...metricDetails.saved, key: "saved", view: activeReport}) : undefined}
-            value={activeReport.metrics.amountSaved}
-            minimum={activeReport.metrics.savingsMinimum}
-            ideal={activeReport.metrics.savingsIdeal}
-          />
-        </section>
-
-        {appComparison}
+  return <>
         <ChartCarouselNavigation
           panels={chartPanels}
           activeIndex={activeChartIndex}
@@ -905,6 +965,34 @@ export function ExpenseReportApp({ report, appControls, appAvatarUrl, appSession
             </div>
           </div>
         </section>
+  </>
+})
+
+const DailySpendingCard = memo(function DailySpendingCard({ report, calendarEvents, projected: projectionActive,
+  categoryColors, onInspectDay }: {
+  report: ExpenseReportData
+  calendarEvents: CalendarEvent[]
+  projected: boolean
+  categoryColors: Record<string, string>
+  onInspectDay: (day: string, filter: DailySpendingFilter, category?: string) => void
+}) {
+  const [dailySpendingFilter, setDailySpendingFilter] = useState<DailySpendingFilter>("all")
+  const dismissChartTooltips = useChartTooltipDismiss()
+  const switchDailySpendingFilter = (filter: DailySpendingFilter) => {
+    if (filter === dailySpendingFilter) return
+    dismissChartTooltips()
+    setDailySpendingFilter(filter)
+  }
+  const { dailyTableEntries, dailyTotals, dailyTotal } = useMemo(() => {
+    const dailyEntries = filterDailyEntries(report.dailyEntries, dailySpendingFilter)
+    const dailyCalendarEvents = dailySpendingCalendarEvents(calendarEvents, dailySpendingFilter, projectionActive)
+    const dailyTableEntries = dailyEntriesWithCalendarEvents(dailyEntries, dailyCalendarEvents, report.month)
+    const dailyTotals = dailyTotalsForEntries(dailyEntries, dailyCalendarEvents, report.year, report.month)
+    const dailyTotal = dailySpendingTotal(dailyEntries, dailyCalendarEvents)
+    return { dailyTableEntries, dailyTotals, dailyTotal }
+  }, [report.dailyEntries, report.year, report.month, calendarEvents, projectionActive, dailySpendingFilter])
+  const inspectDay = useCallback((day: string, category?: string) => onInspectDay(day, dailySpendingFilter, category), [onInspectDay, dailySpendingFilter])
+  return (
         <Card className="bb-report-section bb-daily-section">
           <CardHeader>
             <div className="bb-card-title-row bb-inline-toggle-row">
@@ -925,45 +1013,8 @@ export function ExpenseReportApp({ report, appControls, appAvatarUrl, appSession
             />
           </CardContent>
         </Card>
-
-        {navigation && <ExpenseInsightsCard topEntries={report.topEntries} merchantOccurrences={report.merchantOccurrences} onViewChange={dismissChartTooltips} />}
-        </ReportScreen>
-
-        {!navigation && (appSession ? <ReimbursementLedger refreshKey={report.generatedAt} fallback={
-          <SharedReimbursementsCard items={report.sharedReimbursements ?? []} openItems={report.openSharedReimbursements}
-            receivedItems={report.receivedSharedReimbursements} coverage={report.reimbursementCoverage}
-            monthLabel={report.monthLabel} year={report.year} month={report.month} />
-        } /> : <SharedReimbursementsCard items={report.sharedReimbursements ?? []} openItems={report.openSharedReimbursements}
-          receivedItems={report.receivedSharedReimbursements} coverage={report.reimbursementCoverage}
-          monthLabel={report.monthLabel} year={report.year} month={report.month} />)}
-
-        {!navigation && <ExpenseInsightsCard
-          topEntries={report.topEntries}
-          merchantOccurrences={report.merchantOccurrences}
-          onViewChange={dismissChartTooltips}
-        />}
-
-        {!navigation && appSession && <SavingsGoals />}
-        {!navigation && <Investments report={report} />}
-
-        {!navigation && appSession && <ReportQuestions month={`${report.year}-${String(report.month).padStart(2, "0")}`}
-          mode={projectionActive ? "projected" : "current"} onShowSource={showQuestionSource} />}
-
-        {!navigation && appSession && <PhoneNotifications />}
-
-        <ModalDetails summary="Calculation" title={`${metricInspection?.title ?? "Total"} explained`} selection={metricInspection?.title ?? null}
-          onDismiss={() => setMetricInspection(null)} triggerHidden>
-          {metricInspection && <MetricExplanationDetails detail={metricInspection} />}
-        </ModalDetails>
-        <ModalDetails summary="Transactions" title={inspection?.title ?? "Transactions"} selection={inspection?.key ?? null}
-          onDismiss={() => setInspection(null)} triggerHidden>
-          {inspection && <ActivityDetails entries={inspection.entries} total={inspection.total} note={inspection.note} colors={categoryColors} />}
-        </ModalDetails>
-        </main>
-      </ChartTooltipDismissProvider>
-    </div>
   )
-}
+})
 
 function MetricExplanationDetails({detail}: {detail:MetricInspection}) {
   const {key, view} = detail
@@ -2467,6 +2518,8 @@ type DailySpendingAxis = {
 
 type DailyEntryDisplayRow = ExpenseEntry & { status?: "recorded" | "scheduled" }
 
+const MemoizedDailySpendingChart = memo(DailySpendingChart)
+
 function DailySpendingSection({ data, total, filter, entries, categoryColors, year, month, onInspectDay }: {
   data: DailySpendingRow[]
   total: number
@@ -2481,16 +2534,17 @@ function DailySpendingSection({ data, total, filter, entries, categoryColors, ye
   const [category, setCategory] = useState("")
   const detailsId = useId()
   const filterId = useId()
-  const categories = Array.from(new Set(entries.map(entry => entry.category))).sort((left, right) => left.localeCompare(right))
+  const categories = useMemo(() => Array.from(new Set(entries.map(entry => entry.category))).sort((left, right) => left.localeCompare(right)), [entries])
   const selectedCategory = categories.includes(category) ? category : ""
-  const filteredEntries = selectedCategory ? entries.filter(entry => entry.category === selectedCategory) : entries
+  const filteredEntries = useMemo(() => selectedCategory ? entries.filter(entry => entry.category === selectedCategory) : entries, [entries, selectedCategory])
+  const toggleDetails = useCallback(() => setOpen(current => !current), [])
 
   useEffect(() => { setCategory("") }, [year, month, filter])
 
   return <>
-    <DailySpendingChart data={data} total={total} filter={filter} onInspectDay={onInspectDay}
-      detailsOpen={open} detailsId={detailsId} onToggleDetails={() => setOpen(current => !current)} />
-    <CollapsibleContent open={open} id={detailsId}>
+    <MemoizedDailySpendingChart data={data} total={total} filter={filter} onInspectDay={onInspectDay}
+      detailsOpen={open} detailsId={detailsId} onToggleDetails={toggleDetails} />
+    <CollapsibleContent open={open} id={detailsId} lazy>
       <div className="bb-daily-transactions">
         <div className="bb-daily-entry-filter">
           <label htmlFor={filterId}>Type</label>
@@ -2895,26 +2949,25 @@ type ExpenseInsightsView = "largest" | "merchants"
 function ExpenseInsightsCard({
   topEntries,
   merchantOccurrences,
-  onViewChange,
 }: {
   topEntries: ExpenseEntry[]
   merchantOccurrences: OccurrenceRow[]
-  onViewChange: () => void
 }) {
   const [view, setView] = useState<ExpenseInsightsView>("largest")
-  const largestEntries = topEntries
+  const dismissChartTooltips = useChartTooltipDismiss()
+  const largestEntries = useMemo(() => topEntries
     .filter((entry) => entry.category.trim().toLowerCase() !== "rent" && expenseEntryItemLabel(entry).trim().toLowerCase() !== "rent")
     .sort((left, right) => (
       right.amount - left.amount
       || right.date.localeCompare(left.date)
       || expenseEntryItemLabel(left).localeCompare(expenseEntryItemLabel(right))
-    ))
+    )), [topEntries])
   const switchView = (nextView: string) => {
     const resolvedView = nextView as ExpenseInsightsView
     if (resolvedView === view) {
       return
     }
-    onViewChange()
+    dismissChartTooltips()
     setView(resolvedView)
   }
 
@@ -3190,7 +3243,7 @@ function HiddenListPanel({ children, total, collapseKey }: { children: ReactNode
   useEffect(() => setExpanded(false), [collapseKey])
   return (
     <div className="bb-hidden-list-panel">
-      <CollapsibleContent open={expanded}>{children}</CollapsibleContent>
+      <CollapsibleContent open={expanded} lazy>{children}</CollapsibleContent>
       <ExpandRowsButton expanded={expanded} total={total} onToggle={() => setExpanded((current) => !current)} />
     </div>
   )

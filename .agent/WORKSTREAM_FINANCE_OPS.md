@@ -4,6 +4,10 @@ Last updated: 2026-10-25
 
 ## Goal
 
+### Overview filter rendering — 2026-10-25
+
+Implemented: isolate carousel and Daily Spending state, cache unchanged report/activity/sorted highlight inputs, memoize independent panels and lazily mount full read-only transaction lists. Provider-owned global tooltip dismissal and page-owned fresh inspection preserve cross-section behavior; form disclosures keep their existing mounted lifecycle. Regression checks reproduce the previous unrelated recalculation and cover independent filters, mode/refresh invalidation, scoped day inspection, swipes, Ask sources and lazy exit/reversal/reduced-motion cleanup. A 1,500-row CPU-throttled sample reduces initially mounted DOM from 13,296 to 784 while keeping every expanded transaction. Verification/benchmark details and native acceptance are in STATUS checklist 160. Finance Ops financial backlog is unchanged; no production writes.
+
 ### Daily Spending transaction disclosure and type filter — 2026-10-25
 
 Presentation follow-up: rename the disclosure **Transactions** and give Expense Highlights the chart carousel's existing full-width card surface. Overview now alternates metrics/page → charts/card → daily/page → highlights/card in both themes. Existing disclosure/filter behavior and Finance Ops backlog are unchanged; verification/manual acceptance is recorded in STATUS checklist 159.

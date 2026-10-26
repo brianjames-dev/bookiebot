@@ -1998,7 +1998,7 @@ def test_report_frontend_calendar_largest_and_burn_rate_presentation_regressions
     assert '<CalendarChangingValue value={formatMoney(outflowTotal)} />' in source
     assert 'data-bb-calendar-summary="outflow"' in source
     assert '<div className="bb-subscription-total" data-bb-calendar-static-label="month">' in source
-    assert "const largestEntries = topEntries" in source
+    assert "const largestEntries = useMemo(() => topEntries" in source
     assert 'entry.category.trim().toLowerCase() !== "rent"' in source
     assert 'categoryMixPressure("wants", categoryBalances, burnRate.spent)' in source
     assert "Food + Shopping + Wants subscriptions" in source

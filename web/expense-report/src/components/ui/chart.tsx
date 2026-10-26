@@ -14,6 +14,9 @@ export type ChartConfig = Record<
 const ChartContext = React.createContext<ChartConfig | null>(null)
 const ChartInteractionContext = React.createContext(0)
 const ChartTooltipDismissContext = React.createContext(0)
+// Keep the command stable while the signal changes: controls can dismiss every
+// tooltip without invalidating the report or the other section controllers.
+const ChartTooltipDismissControllerContext = React.createContext<() => void>(() => {})
 const TOOLTIP_LAST_TRANSFORM_ATTRIBUTE = "data-bb-last-transform"
 const TOOLTIP_MOTION_READY_ATTRIBUTE = "data-bb-tooltip-motion-ready"
 const TOOLTIP_FADE_DURATION = 180
@@ -25,11 +28,19 @@ function ChartTooltipDismissProvider({
   revision: number
   children: React.ReactNode
 }) {
+  const [localRevision, setLocalRevision] = React.useState(0)
+  const dismiss = React.useCallback(() => setLocalRevision(current => current + 1), [])
   return (
-    <ChartTooltipDismissContext.Provider value={revision}>
-      {children}
-    </ChartTooltipDismissContext.Provider>
+    <ChartTooltipDismissControllerContext.Provider value={dismiss}>
+      <ChartTooltipDismissContext.Provider value={revision + localRevision}>
+        {children}
+      </ChartTooltipDismissContext.Provider>
+    </ChartTooltipDismissControllerContext.Provider>
   )
+}
+
+function useChartTooltipDismiss() {
+  return React.useContext(ChartTooltipDismissControllerContext)
 }
 
 function ChartContainer({
@@ -427,4 +438,4 @@ function ChartTooltip({
   )
 }
 
-export { ChartContainer, ChartTooltip, ChartTooltipContent, ChartTooltipDismissProvider }
+export { ChartContainer, ChartTooltip, ChartTooltipContent, ChartTooltipDismissProvider, useChartTooltipDismiss }

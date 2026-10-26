@@ -14,7 +14,7 @@ global.IS_REACT_ACT_ENVIRONMENT = true
 const source = fs.readFileSync("web/expense-report/src/report-app.tsx", "utf8")
 const file = ts.createSourceFile("report-app.tsx", source, ts.ScriptTarget.Latest, true, ts.ScriptKind.TSX)
 const names = new Set([
-  "money", "formatMoney", "DailySpendingSection", "DailySpendingChart", "DailyEntriesTable",
+  "money", "formatMoney", "DailySpendingSection", "DailySpendingChart", "MemoizedDailySpendingChart", "DailyEntriesTable",
   "compareDayGroups", "dailyEntryDayLabel", "isCurrentCalendarDay", "PACIFIC_CALENDAR_DATE",
   "NEEDS_BAR_COLOR", "WANTS_BAR_COLOR", "DAILY_SPENDING_BAR_RADIUS", "DAILY_SPENDING_GRID_COLOR", "DAILY_SPENDING_BOUNDARY_COLOR",
   "dailySpendingAxis", "dailySpendingBreakAmount", "dailySpendingChartRows", "dailySpendingVisualAmount",
@@ -31,7 +31,9 @@ const activityDay = activityFile.statements.find(node => ts.isFunctionDeclaratio
 const motion = ts.transpileModule(fs.readFileSync("web/expense-report/src/components/ui/motion.tsx", "utf8"), {
   compilerOptions: { module: ts.ModuleKind.CommonJS, jsx: ts.JsxEmit.ReactJSX },
 }).outputText
-const motionRuntime = { exports: {}, require: req }
+const motionRuntime = { exports: {}, require: req, window: {
+  matchMedia: () => ({ matches: false }), setTimeout, clearTimeout,
+} }
 vm.runInNewContext(motion, motionRuntime)
 const compiled = ts.transpileModule(activityDay + "\n" + declarations.map(node => node.getText(file)).join("\n") + "\nexports.Section = DailySpendingSection", {
   compilerOptions: { target: ts.ScriptTarget.ES2020, module: ts.ModuleKind.CommonJS, jsx: ts.JsxEmit.ReactJSX },
@@ -39,6 +41,7 @@ const compiled = ts.transpileModule(activityDay + "\n" + declarations.map(node =
 const chartSurface = ({ children }) => React.createElement("div", null, children)
 const runtime = {
   exports: {}, require: req, useState: React.useState, useEffect: React.useEffect, useId: React.useId,
+  memo: React.memo, useMemo: React.useMemo, useCallback: React.useCallback,
   CollapsibleContent: motionRuntime.exports.CollapsibleContent,
   ChartContainer: chartSurface, ResponsiveContainer: chartSurface, BarChart: chartSurface,
   CartesianGrid: () => null, XAxis: () => null, YAxis: () => null, Bar: () => null,
@@ -46,6 +49,9 @@ const runtime = {
 }
 vm.runInNewContext(compiled, runtime)
 const Section = runtime.exports.Section
+let chartRenders = 0
+const axis = runtime.dailySpendingAxis
+runtime.dailySpendingAxis = (...args) => { chartRenders++; return axis(...args) }
 const entries = Array.from({ length: 42 }, (_, index) => ({
   date: index === 41 ? "" : `10/${index % 10 + 1}/2026`,
   category: index % 2 ? "Shopping" : "Food", item: `Purchase ${index}`, location: "", person: "Brian",
@@ -66,6 +72,7 @@ const text = () => JSON.stringify(renderer.toJSON())
 
 assert.equal(toggle().props.children, "Transactions")
 assert.equal(toggle().props["aria-expanded"], false)
+assert.equal(renderer.root.findAllByType(runtime.DailyEntriesTable).length, 0, "Closed transaction rows are not mounted")
 assert.equal(disclosure().props.inert, true)
 assert.equal(toggle().props["aria-controls"], disclosure().props.id)
 act(() => toggle().props.onClick())
@@ -78,7 +85,9 @@ for (const label of ["Tracked days", "Avg/day", "Days counted", "Highest day"]) 
 assert.deepEqual(select().findAllByType("option").map(option => option.props.children), ["All types", "Food", "Shopping"])
 assert.equal(renderer.root.findByType("label").props.htmlFor, select().props.id)
 
+const chartRendersBeforeTypeChange = chartRenders
 changeCategory("Shopping")
+assert.equal(chartRenders, chartRendersBeforeTypeChange, "A list type filter cannot rebuild or restart the chart")
 assert.equal(table().props.entries.length, 21)
 assert.ok(table().props.entries.every(entry => entry.category === "Shopping"))
 assert.ok(!text().includes("Purchase 0\"") && text().includes("Purchase 1\""))
