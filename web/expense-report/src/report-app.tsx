@@ -2587,7 +2587,7 @@ function DailySpendingChart({
           <div className="bb-chart-total">{formatMoney(total)}</div>
         </div>
         <button type="button" className="bb-details-toggle" aria-expanded={detailsOpen} aria-controls={detailsId} onClick={onToggleDetails}>
-          Details
+          Transactions
         </button>
       </div>
     </div>
