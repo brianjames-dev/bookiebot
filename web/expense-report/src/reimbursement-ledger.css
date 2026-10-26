@@ -36,6 +36,11 @@
 .bb-ledger-form label { display: grid; grid-template-columns: minmax(0, 1fr); gap: 6px; margin: 0 0 12px; min-width: 0; color: hsl(var(--muted-foreground)); font-size: 12px; }
 .bb-ledger-form input { box-sizing: border-box; width: 100%; min-width: 0; max-width: 100%; min-height: 44px; padding: 10px 11px; border: 1px solid hsl(var(--border)); border-radius: var(--radius); background: hsl(var(--background)); color: hsl(var(--foreground)); font: inherit; font-size: 16px; }
 .bb-ledger-form input:focus-visible { outline: 2px solid hsl(var(--primary)); outline-offset: 2px; }
+.bb-ledger-form input[type="range"] { padding: 0; border: 0; background: transparent; accent-color: hsl(var(--primary)); cursor: pointer; touch-action: pan-y; }
+.bb-ledger-split-preview { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; padding: 14px 0; border-block: 1px solid hsl(var(--border)); }
+.bb-ledger-split-preview > div { display: grid; gap: 6px; min-width: 0; overflow-wrap: anywhere; }
+.bb-ledger-split-preview span { color: hsl(var(--muted-foreground)); font-size: 12px; }
+.bb-ledger-split-preview strong { font-size: clamp(16px, 4.5vw, 22px); font-weight: 500; font-variant-numeric: tabular-nums; }
 .bb-ledger-fields { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
 .bb-ledger-date-field { display: block; box-sizing: border-box; min-width: 0; width: 100%; min-height: 44px; padding: 10px 11px; border: 1px solid hsl(var(--border)); border-radius: var(--radius); background: hsl(var(--background)); }
 .bb-ledger-form input[type="date"] { display: block; -webkit-appearance: none; appearance: none; padding: 0; border: 0; border-radius: 0; min-height: 24px; background: transparent; line-height: 1.5; text-align: left; }

@@ -206,7 +206,7 @@ class SheetsProjection:
         revision = allocation["sourceRevision"]
         before = revision["before"]
         operation = revision["operation"]
-        if (operation not in {"split", "update", "move", "cancel", "delete"}
+        if (operation not in {"split", "update", "move", "cancel", "delete", "edit_split"}
                 or before["id"] != allocation["id"]
                 or before["payerOwner"] != allocation["payerOwner"]
                 or before["sourceSpreadsheetId"] != allocation["sourceSpreadsheetId"]
@@ -266,6 +266,51 @@ class SheetsProjection:
                 or (not deleted and not matches(verified, fields, expected))):
             raise ProjectionConflictError("The expense correction could not be verified; syncing will retry safely.")
         allocation["sourceRow"] = self._ranges(book)[full]["range"]["startRowIndex"] + 1
+
+    def refresh_split_matches(self, allocation: dict[str, Any]) -> None:
+        """Reopen changed-gross bank links before this revision is fully synced.
+
+        Retrying a completed command cannot reopen a later valid bank match.
+        A failed bank update leaves the revision pending for normal recovery.
+        """
+        revision = allocation.get("sourceRevision", {})
+        if (revision.get("operation") != "edit_split"
+                or allocation["projectedVersion"] >= revision["version"]
+                or revision["before"]["grossCents"] == allocation["grossCents"]):
+            return
+        from bookiebot.banking.service import build_banking_service, clear_schedule_source_cache
+        from bookiebot.reports.phone_reconciliation import _invalidate_review_actions
+        from bookiebot.sheets import undo
+        from bookiebot.sheets.collaboration import actor_key_for_owner
+
+        ids = {allocation["sourceActionId"], allocation.get("splitActionId", "")} - {""}
+        # Expense and personal-bill action history both live in the shared book.
+        book = self._book(get_shared_expenses_spreadsheet_id(allocation["sourceYear"]))
+        spent_on = date.fromisoformat(allocation["expenseDate"])
+        title = allocation.get("sourceSheetTitle") or spent_on.strftime("%B")
+        month = list(calendar.month_name).index(title)
+        try:
+            log = book.worksheet(f"_BookieBot Action Log - {allocation['sourceYear']:04d}-{month:02d}")
+        except WorksheetNotFound:
+            log = None
+        if log is not None:
+            rows = log.get_all_values()
+            if not rows or rows[0][:6] != undo._LOG_HEADERS:
+                raise ProjectionConflictError("The expense history could not be verified before refreshing bank links.")
+            actions = {cells[0]: undo._logged_action_from_row(cells) for cells in rows[1:] if cells and cells[0]}
+            for identity in list(ids):
+                while identity in actions:
+                    identity = undo._lineage_parent_id(actions[identity].action) or ""
+                    if not identity or identity in ids:
+                        break
+                    ids.add(identity)
+        banking = build_banking_service()
+        banking.reopen_reconciliation_items_for_action_ids(allocation["payerOwner"], ids,
+                                                          notes="reopened because shared expense total changed")
+        actor = actor_key_for_owner(allocation["payerOwner"])
+        if actor:
+            clear_schedule_source_cache(actor)
+            _invalidate_review_actions(banking, allocation["payerOwner"], actor)
 
     def _move_source(self, book: Any, sheet: Any, allocation: dict[str, Any], before: dict[str, Any], expected: dict[str, Any]) -> None:
         fields, old_fields = allocation["sourceColumnMap"], before["sourceColumnMap"]
@@ -659,6 +704,7 @@ def sync_pending(store: Any, projector: Any | None = None, *, allocation_ids: se
                     if revision.get("operation") == "move" and allocation.get("projectedVersion", 0) < revision.get("version", 0):
                         refresh_source_positions(store, projector, allocation)
                     mirror_allocation(projector.client, allocation, projector=projector)
+                    projector.refresh_split_matches(allocation)
                 source = {"source_row": allocation["sourceRow"]} if isinstance(projector, SheetsProjection) else {}
                 if not store.mark_projected(allocation["id"], allocation["version"], **source):
                     success = False

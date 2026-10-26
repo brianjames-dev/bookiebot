@@ -971,6 +971,10 @@ def _allocation_action(logged: LoggedAction, value: dict[str, Any], *, for_recon
                     split_method=value["method"], gross_amount=values["amount"],
                     payer_share=f"{value['payerShareCents'] / 100:.2f}",
                     partner_share=f"{value['partnerShareCents'] / 100:.2f}")
+    if value["method"] == "custom":
+        metadata["custom_payer_basis_points"] = str(value["customPayerBasisPoints"])
+    else:
+        metadata.pop("custom_payer_basis_points", None)
     # Only the original source remains bank-matchable; split leaves are audit
     # records. Bank matching always uses gross, including after repayments.
     metadata["type"] = (source_type if logged.id == value["sourceActionId"] else "split") if for_reconciliation else ("split" if active_split else source_type)
@@ -2199,7 +2203,7 @@ def split_recent_action(
     )
 
     method = normalize_split_method(split_method)
-    if method is None:
+    if method is None or method == "custom":
         return False, "Choose By income, 50/50, or Fronted for this split."
 
     logged = select_recent_action(
@@ -2404,7 +2408,7 @@ def change_split_recent_action(
     )
 
     method = normalize_split_method(split_method)
-    if method is None:
+    if method is None or method == "custom":
         return False, "Choose By income, 50/50, or Fronted for this split."
     logged = select_recent_action(user_key, action_id=action_id)
     if logged is None or logged.action.metadata.get("type") != "split":

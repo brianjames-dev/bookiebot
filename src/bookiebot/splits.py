@@ -60,7 +60,7 @@ async def _apply_split(interaction: Any, actor_key: str | None, action_id: str, 
 def requested_split_directive(data: dict[str, Any], content: str = "") -> SplitDirective | None:
     raw_method = data.get("split_method") or data.get("split")
     normalized_method = normalize_split_method(raw_method)
-    if normalized_method is not None:
+    if normalized_method is not None and normalized_method != "custom":
         return normalized_method
     raw_method_text = str(raw_method or "").strip().lower()
     if raw_method_text in {"none", "no", "no split", "cancel"}:

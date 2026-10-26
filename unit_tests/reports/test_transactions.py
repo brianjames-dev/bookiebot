@@ -299,3 +299,30 @@ def test_legacy_failure_message_is_not_permission_to_repeat_a_possible_writer(sa
     assert "original amount was left" not in result["detail"]
     assert saved.commands.command(B,command)==result
     writer.assert_called_once()
+
+
+def test_transactions_amount_review_and_update_preserve_custom_reimbursement_percentage(canonical, saved, monkeypatch):
+    from bookiebot.reimbursements import service
+    from unit_tests.reimbursements.test_store import command as ledger_command
+    monkeypatch.setenv("BOOKIEBOT_REIMBURSEMENTS_ENABLED", "true")
+    saved.repos["2026-01"] = SheetsRepoStub()
+    assert canonical_split(canonical)[0]
+    allocation = canonical.store.snapshot("brian")["allocations"][0]
+    service.command("brian", ledger_command("edit_split", allocationId=allocation["id"], version=allocation["version"],
+                                            grossCents=allocation["grossCents"], payerBasisPoints=3333))
+    logged = undo.LoggedAction(id=canonical.logged.id, created_at="2026-01-03", user_key=B, action=canonical.logged.action)
+    current = undo._canonical_action(logged)
+    public = tx._public(B, "2026-01", current, [])
+    monkeypatch.setattr(tx, "load_transactions", lambda *args, **kwargs: [public])
+    monkeypatch.setattr(undo, "select_recent_action", lambda *args, **kwargs: current)
+    monkeypatch.setattr(undo, "_read_log_data", lambda **kwargs: SimpleNamespace(records=[]))
+    change = {"id": public["id"], "month": "2026-01", "version": public["version"],
+              "operation": "update", "updates": {"amount": 12345}}
+    preview = tx.review(B, change)["review"]
+    assert preview["share"] == {"method": "custom", "payerCents": 4115, "partnerCents": 8230}
+    result = confirm(saved, change)
+    assert result["success"], result
+    corrected = canonical.store.get_allocation(allocation["id"])
+    assert corrected["customPayerBasisPoints"] == 3333
+    assert (corrected["grossCents"], corrected["payerShareCents"], corrected["partnerShareCents"]) == (12345, 4115, 8230)
+    assert canonical.store.snapshot("brian")["events"] == []

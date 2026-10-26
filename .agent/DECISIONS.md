@@ -1,5 +1,12 @@
 # Agent Decisions
 
+## 2026-10-25 - Save Reviewed Custom Percentages And Gross Totals Together
+
+The Shared expense editor previews both people's percentages and monetary shares locally, then explicitly saves one combined correction. Store custom payer percentages as integer basis points (`customPayerBasisPoints`, 0–10000) in the existing allocation JSON with method `custom`; round the payer share half-up to cents and assign the exact remainder to the partner. Full gross stays authoritative for the purchase and bank matching. Later gross corrections reuse this saved ratio; switching to a preset drops the custom metadata. No new database columns or repayment events.
+
+Reuse the household lock, request-id result cache and before/after revision audit for `edit_split`. Require the original payer, an active cash-v1 allocation, the reviewed version, completed projection and no pending/confirmed payments or cleared balance. Keep drafts local until Save, freeze their reviewed version through refresh, and retain uncertain commands for identical retry. A zero partner share creates no receipt and is labeled No reimbursement due.
+
+Project changed totals with the existing named-range source and generated mirror checks. Before marking an edit fully synced, reopen bank links for the stable source/split IDs and recorded ancestors, then invalidate cached review sources. A failed bank follow-up remains pending and retries on Shared refresh; replaying a completed command cannot reopen a subsequent valid match. Percentage-only revisions leave bank matches intact. Existing confirmed-payment accounting and explicit repayment confirmation remain unchanged.
 ## 2026-10-25 - Add A Reviewed Recorded-Transactions Workspace
 
 Append all Spending content to Overview and use its navigation position for Transactions. Keep recorded activity separate from bank review and projected estimates. List existing configured months with owner-scoped batched source/history reads, lineage deduplication, canonical overlays, pagination and a short browsing cache; failures never mean zero transactions. Manual source rows are visible without provisioning action logs. Explicit confirmation may adopt a verified existing row as lineage without copying it. Generated repayment rows and recipient bill projections stay read-only here.

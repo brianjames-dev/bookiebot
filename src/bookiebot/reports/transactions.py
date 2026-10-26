@@ -397,7 +397,14 @@ def review(actor: str, body: dict[str, Any]) -> dict[str, Any]:
     if normalized["operation"] == "split" or (row["split"] and normalized["operation"] == "update" and "amount" in normalized.get("updates", {})):
         from bookiebot.sheets.collaboration import split_amounts
         method = normalized.get("split_method") or row["split"]
-        payer, partner = split_amounts(cents(after.get("amount")) / 100, method, get_user_config(actor).budget_owner_key)
+        basis = None
+        if method == "custom":
+            try:
+                basis = int(row["_logged"].action.metadata.get("custom_payer_basis_points", ""))
+            except (ValueError, TypeError) as exc:
+                raise TransactionValidation("Review this custom split in Shared before changing its amount.") from exc
+        payer, partner = split_amounts(cents(after.get("amount")) / 100, method, get_user_config(actor).budget_owner_key,
+                                       custom_payer_basis_points=basis)
         payload["share"] = {"method": method, "payerCents": round(payer * 100), "partnerCents": round(partner * 100)}
     return {"review": payload, "_row": row, "_normalized": normalized}
 
