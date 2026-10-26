@@ -558,6 +558,42 @@ def test_category_cell_reservations_do_not_collide_across_columns(contract_store
         assert _phone_review(store, duplicate, matched_action_log_id='grocery-action', matched_sheet_ref=second_ref) is None
 
 
+
+@pytest.mark.parametrize("grouped", [False, True])
+def test_compacted_expense_reservation_refresh_keeps_decisions_and_exclusivity(contract_store, grouped):
+    store = contract_store
+    _, _, old = _seed(store, suffix='ear-plugs', amount=4)
+    _, _, purchase = _seed(store, suffix='shirt', amount=50)
+    _, _, foreign = _seed(store, owner='hannah', suffix='foreign', amount=4)
+    old_ref = 'expense!row 20#cols=22,23,24,25,26#month=2026-09'
+    current_ref = old_ref.replace('row 20', 'row 19')
+    action_id = 'ear-plugs+other' if grouped else 'ear-plugs'
+    original = _phone_review(store, old, matched_action_log_id=action_id, matched_sheet_ref=old_ref)
+    foreign_saved = store.confirm_reconciliation_item('hannah', foreign.id,
+        matched_action_log_id='ear-plugs', matched_sheet_ref=old_ref)
+    refs = {'ear-plugs': (current_ref, 400)}
+    confirmed = _phone_review(store, purchase, matched_action_log_id='shirt', matched_sheet_ref=old_ref,
+                              current_expense_refs=refs)
+    assert (confirmed is None) == grouped
+    refreshed = store.get_reconciliation_item('brian', old.id)
+    assert refreshed.matched_sheet_ref == (old_ref if grouped else current_ref)
+    assert refreshed.matched_action_log_id == action_id and refreshed.status == original.status
+    assert refreshed.resolved_at == original.resolved_at and refreshed.last_seen_at == original.last_seen_at
+    assert store.get_reconciliation_item('hannah', foreign.id) == foreign_saved
+    _, _, duplicate = _seed(store, suffix='duplicate')
+    assert _phone_review(store, duplicate, matched_action_log_id='ear-plugs', matched_sheet_ref=current_ref,
+                         current_expense_refs=refs) is None
+    if not grouped:
+        assert _phone_review(store, duplicate, matched_action_log_id='another-id', matched_sheet_ref=current_ref,
+                             current_expense_refs=refs) is None
+    with store.connect() as conn:
+        events = conn.execute("SELECT payload_json FROM bank_reconciliation_events WHERE owner_key = ? AND reconciliation_id = ? AND event_type = ?",
+                              ('brian', old.id, 'expense_match_reference_refreshed')).fetchall()
+    assert len(events) == (0 if grouped else 1), 'Refreshing unchanged references is idempotent'
+    if events:
+        assert json.loads(events[0]['payload_json'])['previous_sheet_ref'] == old_ref
+
+
 def test_completed_import_replacement_is_atomic_and_audits_the_previous_attempt(contract_store):
     store = contract_store
     _, _, review = _seed(store)

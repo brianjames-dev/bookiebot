@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from collections import Counter
+
 from dataclasses import dataclass, replace
 from datetime import date, datetime
 import re
@@ -314,6 +316,16 @@ def action_sheet_ref(logged: LoggedAction, scheduled_pulls: Iterable[ScheduledPu
     if candidate is not None:
         refs.extend(pull.occurrence_ref for pull in scheduled_pulls if _schedule_represents_action(pull, candidate))
     return " + ".join(dict.fromkeys(refs))
+
+
+def expense_match_references(action_log: Iterable[LoggedAction]) -> dict[str, tuple[str, int]]:
+    """Current owner history for relocating unchanged, previously matched purchases."""
+    refs = {logged.id: (action_sheet_ref(logged), round(candidate.amount * 100))
+            for logged in action_log if logged.status == "active"
+            and (candidate := action_log_candidate_by_id(logged)) is not None
+            and candidate.action_type == "expense"}
+    counts = Counter(reference for reference, _ in refs.values())
+    return {action_id: value for action_id, value in refs.items() if counts[value[0]] == 1}
 
 
 def claimed_schedule_action_ids(

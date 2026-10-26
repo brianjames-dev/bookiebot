@@ -180,6 +180,52 @@ async def test_phone_category_reservations_and_unchanged_conflict(client, first_
 
 
 @pytest.mark.asyncio
+@pytest.mark.parametrize("history_case", ["shifted", "missing", "amount_changed", "category_changed", "month_changed", "ambiguous_history"])
+async def test_confirm_refreshes_only_verified_shifted_expense_reservations(client, history_case):
+    first = seed(client)
+    month = now_pacific().strftime('%Y-%m')
+    old_ref = f'expense!row 12#cols=14,15,16,17,18#month={month}'
+    assert client.store.confirm_reconciliation_item('brian', first.id,
+        matched_action_log_id='coffee', matched_sheet_ref=old_ref)
+    saved = client.store.get_reconciliation_item('brian', first.id)
+    client.store.upsert_transactions([{
+        'transaction_id': 'after-compaction', 'account_id': 'account-brian',
+        'date': now_pacific().date().isoformat(), 'name': 'Starbucks', 'amount': 12.34, 'pending': False,
+    }], 'brian')
+    transaction = next(tx for tx in client.store.recent_transactions('brian') if tx.provider_transaction_id == 'after-compaction')
+    second = client.store.upsert_reconciliation_item(owner_key='brian', transaction=transaction,
+        classification='expense', status='needs_review', confidence=0)
+    moved = logged(action_id='coffee', row=11, amount='99.00' if history_case == 'amount_changed' else '12.34')
+    if history_case == 'category_changed':
+        moved.action.metadata['category'] = 'shopping'
+        moved.action.columns = [22, 23, 24, 25, 26]
+    if history_case == 'month_changed':
+        moved.action.new_values[0] = (now_pacific().date().replace(day=1) - timedelta(days=1)).strftime('%m/%d/%Y')
+    client.actions[:] = ([moved] if history_case != 'missing' else []) + [logged(action_id='second-action', row=12)]
+    if history_case == 'ambiguous_history':
+        client.actions.append(logged(action_id='ambiguous', row=11))
+    connect(client)
+    current = await details(client, second.id)
+    assert client.store.get_reconciliation_item('brian', first.id) == saved, 'Browsing never rewrites saved match evidence'
+    response = await client.http.post('/app/reconciliation', headers=HEADERS, json={
+        'operation': 'confirm', 'id': second.id, 'version': current['version'], 'suggestionId': 'second-action',
+    })
+    assert response.status == (200 if history_case == 'shifted' else 409), await response.text()
+    refreshed = client.store.get_reconciliation_item('brian', first.id)
+    assert refreshed.status == saved.status and refreshed.matched_action_log_id == 'coffee'
+    assert refreshed.last_seen_at == saved.last_seen_at and refreshed.resolved_at == saved.resolved_at
+    if history_case == 'shifted':
+        assert refreshed.matched_sheet_ref == old_ref.replace('row 12', 'row 11')
+        assert client.store.get_reconciliation_item('brian', second.id).status == 'confirmed'
+        with client.store.connect() as conn:
+            events = conn.execute("SELECT event_type FROM bank_reconciliation_events WHERE owner_key = ? AND reconciliation_id = ?", ('brian', first.id)).fetchall()
+        assert any(event['event_type'] == 'expense_match_reference_refreshed' for event in events)
+    else:
+        assert refreshed == saved
+        assert client.store.get_reconciliation_item('brian', second.id).status == 'needs_review'
+
+
+@pytest.mark.asyncio
 async def test_auth_owner_scope_and_fast_list_never_reads_sheets(client):
     seed(client)
     seed(client, owner="hannah")

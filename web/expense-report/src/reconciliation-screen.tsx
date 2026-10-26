@@ -92,6 +92,7 @@ export function useReconciliation() {
   const [needsRefresh, setNeedsRefresh] = useState(false)
   const [pendingOperation, setPendingOperation] = useState<Command["operation"] | null>(null)
   const [revision, setRevision] = useState(0)
+  const [resetReview, setResetReview] = useState(0)
   const mounted = useRef(false), current = useRef<AbortController | null>(null), blocked = useRef(false)
   const updateWork = useAppWorkStatus({ label: "Bank reconciliation", pending: busy, uncertain: needsRefresh })
   const load = useCallback(async (body?: Command) => {
@@ -110,6 +111,23 @@ export function useReconciliation() {
       const known = failure instanceof ReviewRequestError && failure.status < 500
       if (failure instanceof ReviewRequestError && [401, 403].includes(failure.status)) {
         setSnapshot(null); blocked.current = false; setNeedsRefresh(false); setRevision(value => value + 1)
+      } else if (body && known && [400, 404, 409].includes(failure.status)
+        && ["confirm", "ignore", "reopen"].includes(body.operation)) {
+        // These commands only change review metadata, and a rejected compare-and-
+        // apply did not save it. Close stale choices and read current state once.
+        // Never repeat the command or use this recovery for uncertain sheet writes.
+        blocked.current = false; setNeedsRefresh(false); setResetReview(value => value + 1)
+        setPendingOperation(null)
+        try {
+          const next = checkedSnapshot(await request(endpoint, controller))
+          if (!active()) return
+          setSnapshot(next); setRevision(value => value + 1)
+        } catch (refreshFailure) {
+          if (!active()) return
+          if (refreshFailure instanceof ReviewRequestError && [401, 403].includes(refreshFailure.status)) setSnapshot(null)
+          setError(`${failure.message} Couldn’t refresh the review. Try again.`)
+          return
+        }
       } else if (body) { blocked.current = true; setNeedsRefresh(true) }
       setError(body && !known ? "This check may have finished. Check its status before trying another change."
         : failure instanceof Error ? failure.message : "Couldn’t load bank transactions.")
@@ -129,7 +147,7 @@ export function useReconciliation() {
     setSnapshot(null); setRevision(value => value + 1); setError(message); setBusy(false)
     blocked.current = false; setNeedsRefresh(false)
   }, [])
-  return { snapshot, error, busy, needsRefresh, revision, pendingOperation, load, rejectAccess }
+  return { snapshot, error, busy, needsRefresh, revision, resetReview, pendingOperation, load, rejectAccess }
 }
 type Controller = ReturnType<typeof useReconciliation>
 const filterLabels = { needs_review: "Needs review", pending: "Pending", checked: "Checked" } as const
@@ -139,7 +157,7 @@ const money = (value: number) => `${value < 0 ? "+" : ""}${new Intl.NumberFormat
 const statusLabel = (value: ReviewStatus) => value === "ignored" ? "Ignored" : value === "checked" ? "Matched" : value === "pending" ? "Pending" : "Needs review"
 
 export function ReconciliationScreen({ controller }: { controller: Controller }) {
-  const { snapshot, error, busy, needsRefresh, revision, pendingOperation, load, rejectAccess } = controller
+  const { snapshot, error, busy, needsRefresh, revision, resetReview, pendingOperation, load, rejectAccess } = controller
   const [filter, setFilter] = useState<Filter>("needs_review")
   const [openId, setOpenId] = useState<number | null>(null)
   const [details, setDetails] = useState<Record<number, ReconciliationItem>>({})
@@ -155,6 +173,7 @@ export function ReconciliationScreen({ controller }: { controller: Controller })
     window.addEventListener("bookiebot:reimbursements-changed", refresh)
     return () => window.removeEventListener("bookiebot:reimbursements-changed", refresh)
   }, [])
+  useEffect(() => { setOpenId(null); setDetails({}) }, [resetReview])
   const locked = busy || needsRefresh || Boolean(receiptTarget)
   const rows = snapshot?.items ?? []
   const matchesFilter = (item: ReconciliationItem) => filter === "checked" ? ["checked", "ignored"].includes(item.status) : item.status === filter
@@ -195,7 +214,7 @@ export function ReconciliationScreen({ controller }: { controller: Controller })
   return <section className="bb-reconcile" aria-labelledby="bb-reconcile-title">
     <div className="bb-reconcile-heading"><div><h1 id="bb-reconcile-title">Reconcile</h1><p className="bb-reconcile-muted">{snapshot?.checkedAt
       ? `Checked ${new Date(snapshot.checkedAt).toLocaleString(undefined, { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" })}` : "Review your logged expenses"}</p></div>
-      <button type="button" className="bb-reconcile-check" disabled={!snapshot?.enabled || locked} onClick={() => void load({ operation: "check" })}><RefreshCw size={17} aria-hidden="true" />{busy ? "Checking…" : "Check"}</button></div>
+      <button type="button" className="bb-reconcile-check" disabled={!snapshot?.enabled || busy || Boolean(receiptTarget)} onClick={() => void load(needsRefresh ? undefined : { operation: "check" })}><RefreshCw size={17} aria-hidden="true" />{busy ? "Checking…" : needsRefresh ? "Check status" : "Check"}</button></div>
     {receiptTarget && <div ref={receiptPanel}><ReimbursementLedger key={receiptTarget.allocationId} fallback={<p>Shared payments are currently unavailable.</p>}
       matchedReceipt={receiptTarget} onClose={() => setReceiptTarget(null)} onRejectAccess={rejectReceiptAccess} /></div>}
     {!receiptTarget && snapshot?.receiptFollowup && <div className="bb-reconcile-message" role="status"><p>Bank match saved. Receiving your partner’s share is a separate step.</p>
