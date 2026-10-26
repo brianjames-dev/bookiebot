@@ -97,7 +97,8 @@ def record_split(user_key: str, logged: Any, ws: Any, fields: dict[str, int], va
         fields["item"], values["item"] = 2, label
     today = now_pacific().date()
     spent_on = expense_date or _expense_date(values.get("date", "")) or today
-    year = today.year  # Recent actions belong to the active source workbook.
+    from bookiebot.sheets.undo import _source_year
+    year = _source_year()  # App history explicitly binds the source workbook.
     identity = hashlib.sha256(f"{owner}:{year}:{logged.id}".encode()).hexdigest()[:24]
     store = build_reimbursement_store()
     try:
@@ -184,7 +185,7 @@ def mutate_recent_action(user_key: str, logged: Any, operation: str, *,
         store = build_reimbursement_store()
         allocation_id = logged.action.metadata.get("allocation_id", "")
         value = (store.get_allocation(allocation_id) if allocation_id
-                 else store.find_by_source(logged.id, now_pacific().year))
+                 else store.find_by_source(logged.id, undo._source_year()))
         if value is None:
             return False, "I could not find the linked reimbursement for that expense."
         if value["payerOwner"] != owner:

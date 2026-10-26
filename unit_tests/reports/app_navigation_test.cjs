@@ -23,7 +23,7 @@ state=nextScrollNavigation(state,1000,1000)
 assert.equal(state.compact,true,'Bottom rubber-band bounce is not upward navigation')
 assert.equal(nextScrollNavigation(state,-20,1000).compact,false)
 assert.equal(nextScrollNavigation(state,100,0).compact,false,'A short screen has no compact scroll state')
-assert.equal(screenForReportSource('activity'),'spending')
+assert.equal(screenForReportSource('activity'),'overview')
 assert.equal(screenForReportSource('reimbursements'),'shared')
 for(const source of ['overview','categories','cash_flow','commitments','burn_rate']) assert.equal(screenForReportSource(source),'overview')
 
@@ -34,16 +34,16 @@ function Draft() {
  return React.createElement('input',{value,onChange:event=>setValue(event.target.value)})
 }
 function Screen({screen}) {
- return React.createElement(AppNavigationContext.Provider,{value:{screen}},React.createElement(ReportScreen,{name:'spending'},React.createElement(Draft)))
+ return React.createElement(AppNavigationContext.Provider,{value:{screen}},React.createElement(ReportScreen,{name:'transactions'},React.createElement(Draft)))
 }
 ;(async()=>{
  let tree
- await React.act(async()=>{tree=Renderer.create(React.createElement(Screen,{screen:'spending'}))})
+ await React.act(async()=>{tree=Renderer.create(React.createElement(Screen,{screen:'transactions'}))})
  await React.act(async()=>setDraft('Unfinished expense detail'))
- for(const screen of ['overview','shared','savings','settings','spending']) {
+ for(const screen of ['overview','shared','savings','settings','transactions']) {
   await React.act(async()=>tree.update(React.createElement(Screen,{screen})))
   assert.equal(tree.root.findByType('input').props.value,'Unfinished expense detail')
-  assert.equal(tree.root.findByType('section').props.hidden,screen!=='spending')
+  assert.equal(tree.root.findByType('section').props.hidden,screen!=='transactions')
  }
  assert.equal(mounts,1);assert.equal(unmounts,0,'Tab changes preserve child/controller identity')
  await React.act(async()=>tree.unmount());assert.equal(unmounts,1)

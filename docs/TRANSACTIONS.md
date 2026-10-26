@@ -1,0 +1,27 @@
+# Recorded transactions in the app
+
+Overview now ends with the former Spending content: Daily Spending, its day/transaction details, and Expense Highlights (Largest / Most Frequent). Ask's activity source opens Overview. The former Spending navigation position is Transactions.
+
+Transactions lists recorded expenses, income, payments and cash savings for the selected month, with an explicit All months choice across configured existing annual workbooks. It is separate from the Plaid review inbox and excludes scheduled estimates and derived ESPP totals. Search covers descriptions, locations, people/cards, dates and amounts; filters cover type, category, person/card and split status. Results are newest first, in pages of 40. Failed reads are errors, not an empty history. Two batched worksheet reads per annual workbook load existing monthly sources and action logs; owner/month browsing snapshots last 30 seconds. Search and filtering reuse them. Explicit Refresh and financial-change events request fresh source data and replace the browsing cache. Opening the tab is lazy and does not add sheet reads to initial Overview loading.
+
+## Actions and confirmation
+
+Select a transaction for Update, Move, Delete, Split, or the existing split editor/cancellation, according to the same capabilities as Discord. Existing Discord controls remain compatible. Dates stay source-controlled. Income supports source/amount edits; fixed bill and savings rows retain their existing amount-only restrictions. A move can collect the item name required by its destination. Update shows changed before/after values; split review shows full purchase amount and both income-based/equal/fronted shares. Matching a bank record and recording a repayment remain separate.
+
+Every action has a fresh read-only review and an explicit confirmation. The server revalidates owner, selected month, exact saved source, current values, canonical version and normalized changes immediately before calling the existing financial service. Current and historical worksheets are bound to one worker with a context-local repository, rather than changing process-global routing or the clock. Historical splits retain their source workbook year. Existing canonical projection, pending-report, receipt, cleared-balance and correction guards remain authoritative; supported Undo is exposed after success and as a persistent Undo last change shortcut. Undo of a deleted transaction targets its exact saved deletion record. Shared corrections keep the existing audit/repayment reversal rules rather than offering an unsafe general Undo.
+
+Manual sheet expenses, income, bill actuals and cash savings remain visible without creating action logs on browse. Explicit confirmation may adopt the existing row as audit lineage, then apply the chosen action; it does not import or duplicate a financial row. Generated reimbursement/offset rows and linked recipient bill cells are read-only here and point to Shared. Canonical source identity wins over a guessed manual source. Stale saved row references cannot expose a shifted neighbor as the original purchase.
+
+## Recovery and audit
+
+Two small operational tables in the existing authenticated app database reserve owner-scoped confirmation IDs before a writer can run. They retain the frozen command, fingerprint, timestamp and result. Concurrent/repeated requests replay the saved result; an already claimed running or uncertain request is never re-executed. A failed preflight releases further work through a recorded failed result. A write with an unknown outcome, or failed Undo persistence, requires saved-history inspection instead of a blind retry.
+
+The exact request remains in owner-scoped browser session storage through a lost response/reload. The authenticated list also discovers unfinished claims from another session and the latest supported app Undo. Check saved status is read-only; Retry same confirmation retains the original request and cannot repeat a claimed writer. If a process stops mid-write, the conservative claim may require inspection of the frozen command and sheet/action history. New Undo/adoption records carry `app_request_id` for that audit. No new repayment event, bank transaction or financial mirror is created by opening/reviewing/canceling.
+
+Drafts and in-flight/uncertain changes participate in the app work guard. Account changes remount the controller; access failures clear private content. Successful changes refresh Overview and Shared; confirmations stay frozen across unrelated list refreshes. Search responses are canceled/versioned so an older query cannot replace a newer one.
+
+## Acceptance
+
+Use isolated sheets and an isolated SQLite/PostgreSQL database for every financial action. Check all supported fields, required Move item collection, each split method, split cancellation, Delete, successive Updates, adjacent Moves/Deletes and Undo. Verify source/neighbor coordinates, action lineage, bank reopening and unchanged repayments. Include a prior month/year, duplicate requests, stale/foreign source IDs, quota/read failures, lost responses, restart/another-session recovery, generated repayment rows and pending/received/cleared canonical guards.
+
+On production, inspect Overview and Transactions, search/filter, open a review, then Cancel. Do not alter RJ11 or another real transaction as a test. Native iPhone and real user financial acceptance remain separate from isolated automated tests and deployment health checks; checklist 156 records the release procedure.
