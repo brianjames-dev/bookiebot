@@ -1,14 +1,31 @@
-import { useId, useLayoutEffect, useRef, useState, type HTMLAttributes, type ReactNode } from "react"
+import { useEffect, useId, useLayoutEffect, useRef, useState, type HTMLAttributes, type ReactNode } from "react"
 
 export function CollapsibleContent({
   open,
   children,
   id,
+  lazy = false,
 }: {
   open: boolean
   children: ReactNode
   id?: string
+  lazy?: boolean
 }) {
+  const [retained, setRetained] = useState(open)
+  useEffect(() => {
+    if (!lazy) return
+    if (open) {
+      setRetained(true)
+      return
+    }
+    if (!retained) return
+    // Keep rows through the exit transition, then release the hidden subtree.
+    // The timer also covers interrupted/no-transition and reduced-motion exits.
+    const duration = window.matchMedia("(prefers-reduced-motion: reduce)").matches ? 0 : 320
+    const timer = window.setTimeout(() => setRetained(false), duration)
+    return () => window.clearTimeout(timer)
+  }, [lazy, open, retained])
+
   return (
     <div
       id={id}
@@ -16,8 +33,11 @@ export function CollapsibleContent({
       data-state={open ? "open" : "closed"}
       aria-hidden={!open}
       inert={!open}
+      onTransitionEnd={lazy ? event => {
+        if (!open && event.target === event.currentTarget && event.propertyName === "grid-template-rows") setRetained(false)
+      } : undefined}
     >
-      <div className="bb-details-content-inner">{children}</div>
+      <div className="bb-details-content-inner">{!lazy || open || retained ? children : null}</div>
     </div>
   )
 }

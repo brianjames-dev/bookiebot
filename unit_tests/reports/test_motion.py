@@ -8,7 +8,7 @@ ROOT = Path(__file__).resolve().parents[2]
 FRONTEND = ROOT / "web/expense-report/src"
 
 
-@pytest.mark.parametrize("script", ["motion_test.cjs", "modal_motion_test.cjs"])
+@pytest.mark.parametrize("script", ["motion_test.cjs", "modal_motion_test.cjs", "lazy_disclosure_test.cjs"])
 def test_disclosure_and_modal_motion_lifecycle(script):
     if not (ROOT / "web/expense-report/node_modules/typescript").exists():
         pytest.skip("Install the expense-report frontend dependencies to execute disclosure regression checks")

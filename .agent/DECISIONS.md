@@ -1,5 +1,11 @@
 # Agent Decisions
 
+## 2026-10-25 - Isolate Overview Rendering And Lazily Mount Read-Only Lists
+
+Carousel filters, swipe state and tooltip cooldown belong to the memoized OverviewCharts boundary. A stable command context updates the shared tooltip provider's own revision, preserving global dismissal without invalidating the report or unrelated section controllers. Daily Spending owns its bucket filter and derived rows; Highlights owns its view and caches its sorted entries. Keep unchanged chart panels and sections memoized with stable inputs/callbacks. Component-local report-view/activity/color calculations invalidate on a fresh report or Current/Projected change. Page-level dismissal/collapse signals still reach each chart region, and page-owned inspection callbacks always use the current report and explicit daily bucket/category. Preserve chart preferences, Ask source routing, mounted chart identity and existing animation timing.
+
+Only read-only transaction/highlight lists opt into lazy CollapsibleContent. Initially closed lists mount no rows; closing keeps rows inert through the existing exit, then unmounts on its own grid transition or a cancellable fallback. Rapid reopening cancels cleanup; reduced motion uses immediate cleanup. Keep disclosure/filter state outside the released subtree and show every row on expansion. The default disclosure behavior retains mounted content so existing financial forms and recovery state are unchanged. No financial formulas, storage, writes or cross-refresh data caching change.
+
 ## 2026-10-25 - Daily Spending Details Expands The Complete Transaction List
 
 Keep the existing button beside Total Spent and use it to expand the full-width daily transaction list, initially collapsed at every viewport size. Its user-selected label is **Transactions** (formerly Details). Remove the former tracked-day/average/highest-day statistics. Include every row already supplied to Daily Spending, including undated entries and the active view's recorded/scheduled bills and subscriptions, without a preview limit. Reuse the existing animated disclosure and day grouping. Overview alternates page/card surfaces: metrics, chart carousel, Daily Spending, Expense Highlights. Highlights uses the same full-width card surface as Category Mix in both themes.
