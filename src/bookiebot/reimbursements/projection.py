@@ -284,7 +284,8 @@ class SheetsProjection:
         from bookiebot.sheets.collaboration import actor_key_for_owner
 
         ids = {allocation["sourceActionId"], allocation.get("splitActionId", "")} - {""}
-        book = self._book(allocation["sourceSpreadsheetId"])
+        # Expense and personal-bill action history both live in the shared book.
+        book = self._book(get_shared_expenses_spreadsheet_id(allocation["sourceYear"]))
         spent_on = date.fromisoformat(allocation["expenseDate"])
         title = allocation.get("sourceSheetTitle") or spent_on.strftime("%B")
         month = list(calendar.month_name).index(title)

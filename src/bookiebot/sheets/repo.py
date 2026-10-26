@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 from typing import Protocol, Any
+from contextlib import contextmanager
+from contextvars import ContextVar
 
 from bookiebot.sheets.auth import (
     get_action_log_worksheet,
@@ -75,12 +77,43 @@ class GSpreadSheetsRepository:
 
 
 _REPO: SheetsRepository = GSpreadSheetsRepository()
+_SCOPED_REPO: ContextVar[SheetsRepository | None] = ContextVar("scoped_sheets_repository", default=None)
 
 
 def get_sheets_repo() -> SheetsRepository:
-    return _REPO
+    return _SCOPED_REPO.get() or _REPO
 
 
 def override_sheets_repo(repo: SheetsRepository) -> None:
     global _REPO
     _REPO = repo
+
+
+@contextmanager
+def sheets_repository_context(repo: SheetsRepository):
+    """Bind an explicit existing month to this worker without changing other users."""
+    token = _SCOPED_REPO.set(repo)
+    try:
+        yield
+    finally:
+        _SCOPED_REPO.reset(token)
+
+
+def scoped_sheet_period():
+    return getattr(_SCOPED_REPO.get(), "period", None)
+
+
+_SHEET_COMMAND_ID: ContextVar[str | None] = ContextVar("sheet_command_id", default=None)
+
+
+@contextmanager
+def sheet_command_context(request_id: str):
+    token = _SHEET_COMMAND_ID.set(request_id)
+    try:
+        yield
+    finally:
+        _SHEET_COMMAND_ID.reset(token)
+
+
+def sheet_command_id() -> str | None:
+    return _SHEET_COMMAND_ID.get()

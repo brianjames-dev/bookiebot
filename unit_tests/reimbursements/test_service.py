@@ -661,3 +661,22 @@ def test_total_edit_reopens_pre_split_bank_match_ancestors(setup):
                                               grossCents=30000, payerBasisPoints=5000))
     assert not result["projectionPending"]
     assert setup.bank_calls == [("brian", {value["sourceActionId"], value["splitActionId"], parent})]
+
+
+def test_personal_bill_total_edit_reads_ancestors_from_shared_monthly_history(setup):
+    from dataclasses import asdict
+    import json
+    assert split(setup)[0]
+    value = setup.store.snapshot("brian")["allocations"][0]
+    parent = "prior-bill-payment"
+    source = replace(setup.logged.action, metadata={**setup.logged.action.metadata, "updated_action_id": parent})
+    setup.book.add_sheet(f"_BookieBot Action Log - {value['sourceYear']}-01", [undo._LOG_HEADERS,
+        [value["sourceActionId"], "2026-01-03", BRIAN, "active", "", json.dumps(asdict(source))]])
+    bill_book = Book()
+    bill_book.add_sheet("January")
+    client = SimpleNamespace(open_by_key=lambda key: bill_book if key == "personal-budget" else setup.book)
+    projector = projection.SheetsProjection(client)
+    corrected = {**value, "sourceWorksheet": "income", "sourceSpreadsheetId": "personal-budget", "grossCents": 30000,
+                 "sourceRevision": {"operation": "edit_split", "version": value["version"] + 1, "before": value}}
+    projector.refresh_split_matches(corrected)
+    assert setup.bank_calls == [("brian", {value["sourceActionId"], value["splitActionId"], parent})]

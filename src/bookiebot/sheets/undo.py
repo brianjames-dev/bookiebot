@@ -682,6 +682,10 @@ def _worksheet(name: WorksheetName):
 
 def record_undo_action(user_key: str | None, action: UndoAction) -> str | None:
     global _GLOBAL_LAST_ACTION
+    from bookiebot.sheets.repo import sheet_command_id
+    request_id = sheet_command_id()
+    if request_id:
+        action = replace(action, metadata={**action.metadata, "app_request_id": request_id})
     _GLOBAL_LAST_ACTION = action
     if user_key:
         _LAST_ACTION_BY_USER[str(user_key)] = action
@@ -967,6 +971,10 @@ def _allocation_action(logged: LoggedAction, value: dict[str, Any], *, for_recon
                     split_method=value["method"], gross_amount=values["amount"],
                     payer_share=f"{value['payerShareCents'] / 100:.2f}",
                     partner_share=f"{value['partnerShareCents'] / 100:.2f}")
+    if value["method"] == "custom":
+        metadata["custom_payer_basis_points"] = str(value["customPayerBasisPoints"])
+    else:
+        metadata.pop("custom_payer_basis_points", None)
     # Only the original source remains bank-matchable; split leaves are audit
     # records. Bank matching always uses gross, including after repayments.
     metadata["type"] = (source_type if logged.id == value["sourceActionId"] else "split") if for_reconciliation else ("split" if active_split else source_type)
@@ -1022,6 +1030,12 @@ def canonical_logged_actions(actions: list[LoggedAction], *, for_reconciliation:
     return result
 
 
+def _source_year() -> int:
+    from bookiebot.sheets.repo import scoped_sheet_period
+    period = scoped_sheet_period()
+    return period.year if period is not None else now_pacific().year
+
+
 def _canonical_action(logged: LoggedAction | None) -> LoggedAction | None:
     if logged is None:
         return None
@@ -1032,7 +1046,7 @@ def _canonical_action(logged: LoggedAction | None) -> LoggedAction | None:
     store = build_reimbursement_store()
     allocation_id = logged.action.metadata.get("allocation_id", "")
     try:
-        value = store.get_allocation(allocation_id) if allocation_id else store.find_by_source(logged.id, now_pacific().year)
+        value = store.get_allocation(allocation_id) if allocation_id else store.find_by_source(logged.id, _source_year())
     except ReimbursementNotFoundError:
         value = None
     if value is None:
@@ -2929,7 +2943,7 @@ def _apply_undo_action(
         allocation_id = action.metadata.get("allocation_id", "")
         store = build_reimbursement_store()
         allocation = (store.get_allocation(allocation_id) if service.is_managed(allocation_id)
-                      else store.find_by_source(action_id, now_pacific().year) if action_id else None)
+                      else store.find_by_source(action_id, _source_year()) if action_id else None)
         if allocation:
             if allocation.get("clearedCents", 0):
                 return False, "Undo this expense's balance reset from Shared before changing it."
@@ -3281,7 +3295,10 @@ def undo_logged_action(user_key: str | None, action_id: str) -> tuple[bool, str]
     log_data = _read_log_data()
     if log_data is None:
         return False, "I could not read the action log right now."
-    logged = select_recent_action(key, action_id=action_id)
+    found = _find_log_row(action_id, log_data)
+    deleted = found[2] if found else None
+    logged = (deleted if deleted and deleted.status == "active" and deleted.action.metadata.get("type") == "delete"
+              and (not key or deleted.user_key in actor_key_aliases(key)) else select_recent_action(key, action_id=action_id))
     if logged is None:
         return False, f"I could not find active action `{action_id}`."
     try:

@@ -61,11 +61,12 @@ function ReportLeaf({ report, appControls, appMonthControl, appComparison }) {
   const [instance] = React.useState(() => ++reportMounts)
   return h('div', { 'data-report-instance': instance, 'data-report-month': report.month },
     h(navigation.ReportScreen, { name: 'overview' }, appControls, appMonthControl, appComparison, h('p', null, 'Report overview')),
-    h(navigation.ReportScreen, { name: 'spending' }, h('p', null, 'Daily spending')))
+    h(navigation.ReportScreen, { name: 'transactions' }, h('p', null, 'Daily spending')))
 }
 function useTheme() { const [theme, setTheme] = React.useState('dark'); return { theme, toggleTheme() { setTheme(value => value === 'dark' ? 'light' : 'dark') } } }
 function AskLeaf(props) { ask = props; const [draft, setDraft] = React.useState(''); return h('aside', { hidden: !props.open }, h('input', { 'aria-label': 'Question fixture', value: draft, onChange: e => setDraft(e.target.value) })) }
 function NotificationsLeaf() { const [value, setValue] = React.useState(false); return h('button', { 'aria-label': 'Notification fixture', 'aria-pressed': value, onClick: () => setValue(!value) }, 'Fixture preference') }
+mocks.set(src('transactions-screen.tsx'), {TransactionsScreen: () => h('p', null, 'Transactions fixture')})
 mocks.set(src('report-app.tsx'), { ExpenseReportApp: ReportLeaf, useExpenseReportTheme: useTheme })
 mocks.set(src('ask-bookiebot-panel.tsx'), { AskBookieBotPanel: AskLeaf })
 mocks.set(src('phone-notifications.tsx'), { PhoneNotifications: NotificationsLeaf })
@@ -132,7 +133,7 @@ async function main() {
   await run(() => ask.onClose())
   assert.equal(button(tree, 'Ask BookieBot').props['aria-expanded'], false)
   const initialReportInstance = rawReport(tree).props['data-report-instance']
-  for (const label of ['Overview', 'Spending', 'Shared', 'Savings']) {
+  for (const label of ['Overview', 'Transactions', 'Shared', 'Savings']) {
     const node = button(tree, label)
     assert.ok(node && node.props.role !== 'link', 'Screen navigation uses button semantics, including Konsta-rendered controls')
   }
@@ -164,7 +165,7 @@ async function main() {
   assert.equal(widgetWrites.length, 1)
   win.scrollY = 700; await tap(tree, 'Setup & widgets'); await tap(tree, 'Settings')
   assert.equal(screen(tree), 'settings'); assert.equal(win.scrollY, 700); assert.equal(setupCode(), retainedCode, 'The gear returns from setup without leaving Settings or replacing its code')
-  await tap(tree, 'Setup & widgets'); win.scrollY = 360; await tap(tree, 'Spending'); await tap(tree, 'Settings')
+  await tap(tree, 'Setup & widgets'); win.scrollY = 360; await tap(tree, 'Transactions'); await tap(tree, 'Settings')
   assert.equal(win.scrollY, 700); assert.equal(setupCode(), retainedCode, 'A tab detour returns to the original Settings position, not guide scroll')
   await tap(tree, 'Setup & widgets'); await tap(tree, 'Get a setup code')
   assert.equal(widgetFocuses, 1); assert.equal(widgetScrolls, 1); assert.equal(win.scrollY, 480)
@@ -173,7 +174,7 @@ async function main() {
   assert.equal(button(tree, 'Notification fixture').props['aria-pressed'], true)
   assert.equal(guard.dirty, true, 'Hidden forms and pairing codes stay registered with the work guard')
   await tap(tree, 'Done')
-  for (const name of ['Overview', 'Spending', 'Shared', 'Savings', 'Settings']) await tap(tree, name)
+  for (const name of ['Overview', 'Transactions', 'Shared', 'Savings', 'Settings']) await tap(tree, name)
   assert.equal(reads.goals, 1); assert.equal(reads.reimbursements, 1, 'Navigating all screens never recreates financial controllers')
   assert.equal(rawReport(tree).props['data-report-instance'], initialReportInstance)
   assert.equal(button(tree, 'Notification fixture').props['aria-pressed'], true)
@@ -188,7 +189,7 @@ async function main() {
   await tap(tree, 'Shared'); assert.equal(input(tree, 'Amount ($)').props.value, '37.25'); assert.equal(input(tree, 'Note').props.value, 'Payment draft')
   await tap(tree, 'Ask BookieBot'); assert.equal(ask.open, true); assert.equal(ask.month, '2026-08')
   await run(() => nav.preferences.setMode('projected')); assert.equal(ask.mode, 'projected')
-  for (const [source, expected] of [['activity', 'spending'], ['reimbursements', 'shared'], ['burn-rate', 'overview']]) {
+  for (const [source, expected] of [['activity', 'overview'], ['reimbursements', 'shared'], ['burn-rate', 'overview']]) {
     await run(() => ask.onShowSource(source)); assert.equal(screen(tree), expected); assert.equal(ask.open, false); assert.equal(nav.sourceRequest.section, source)
     if (source === 'reimbursements') {
       await run(() => { for (const [id, timer] of [...timers]) if (timer.delay === 280) { timers.delete(id); timer.cb() } })
@@ -257,7 +258,7 @@ async function main() {
   await run(() => { tree = create(shell(report)) })
   const optionalNav = tree.root.findByProps({ 'aria-label': 'Main navigation' })
   assert.equal(optionalNav.props['data-tab-count'], 5)
-  for (const label of ['Overview', 'Spending', 'Shared', 'Savings', 'Reconcile']) assert.ok(button(tree, label))
+  for (const label of ['Overview', 'Transactions', 'Shared', 'Savings', 'Reconcile']) assert.ok(button(tree, label))
   const beforeReviewReads = { ...reads }, beforeReviewReport = rawReport(tree).props['data-report-instance']
   win.scrollY = 340; await tap(tree, 'Reconcile'); assert.equal(screen(tree), 'reconcile'); assert.equal(win.scrollY, 0)
   const visibleReviewText = () => text(tree.root.findAll(node => node.type === 'main' && node.props['aria-label'] === 'Reconcile')[0])
@@ -343,7 +344,7 @@ async function main() {
   assert.ok(tree.root.findAll(node => node.type === 'main' && node.props.className === 'bb-shell-report-loading bb-main').some(visible))
   assert.ok(tree.root.findAll(node => node.type === 'p' && node.props['data-refresh-phase'] === 'loading').some(visible))
   assert.equal(button(tree, 'Ask BookieBot').props.disabled, true)
-  for (const label of ['Overview', 'Spending', 'Shared', 'Savings']) assert.ok(!button(tree, label).props.disabled)
+  for (const label of ['Overview', 'Transactions', 'Shared', 'Savings']) assert.ok(!button(tree, label).props.disabled)
   await tap(tree, 'Savings'); assert.equal(input(tree, 'Goal name').props.value, 'Private Brian draft'); assert.equal(input(tree, 'Target ($)').props.value, '1000')
   await run(() => session.emitState({ report: null, selectedMonth: '2026-08', phase: 'error', message: 'Could not load August' }))
   assert.equal(screen(tree), 'savings'); assert.equal(input(tree, 'Goal name').props.value, 'Private Brian draft')
