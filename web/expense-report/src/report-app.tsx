@@ -1704,43 +1704,69 @@ type CategoryMixPieSurfaceProps = {
   layout: ExpensePieLayout
 }
 
+function useChartTransition(content: string) {
+  const ref = useRef<HTMLDivElement>(null)
+  const compact = useMediaQuery("(max-width: 860px), (pointer: coarse)")
+  const reducedMotion = useMediaQuery("(prefers-reduced-motion: reduce)")
+  const mode = reducedMotion ? "none" : compact ? "fade" : "morph"
+  // Use visible data rather than array identity: resize and tooltip renders
+  // must not restart the transition. Keep the chart mounted for inspection.
+
+  useLayoutEffect(() => {
+    if (mode !== "fade") return
+    // Recharts geometry animations rebuild SVG shapes on every frame.
+    // Phones render the final geometry once and let the browser fade the plot.
+    const animation = ref.current?.animate([{ opacity: 0.45 }, { opacity: 1 }], {
+      duration: 180,
+      easing: "ease-out",
+    })
+    return () => animation?.cancel()
+  }, [mode, content])
+
+  return { ref, mode }
+}
+
 const CategoryMixPieSurface = memo(function CategoryMixPieSurface({ data, layout, onInspect }: CategoryMixPieSurfaceProps) {
+  const transition = useChartTransition(JSON.stringify(data.map(item => [item.key, item.amount, item.color])))
   return (
-    <ResponsiveContainer width="100%" height="100%">
-      <PieChart margin={layout.margin}>
-        <ChartTooltip content={<ChartTooltipContent />} />
-        <Pie
-          data={data}
-          dataKey="amount"
-          nameKey="label"
-          shape={(props: unknown) => {
-            const { key: _key, ...sector } = props as ComponentProps<typeof Sector> & { key?: string; payload?: Pick<BreakdownItem, "key"> }
-            // Recharts can render its previous sectors while new data is being
-            // synchronized. Their indices no longer describe the current rows.
-            const item = data.find(row => row.key === sector.payload?.key)
-            if (!item) return <Sector {...sector} tabIndex={-1} aria-hidden="true" />
-            return <Sector {...sector} tabIndex={0} role="button" aria-label={`Inspect ${item.label}, ${formatMoney(item.amount)}`}
-              onClick={() => onInspect(item)} onKeyDown={(event) => { if (event.key === "Enter" || event.key === " ") { event.preventDefault(); onInspect(item) } }} />
-          }}
-          cx={layout.cx}
-          cy={layout.cy}
-          innerRadius={layout.innerRadius}
-          outerRadius={layout.outerRadius}
-          startAngle={PIE_METRIC_START_ANGLE}
-          endAngle={PIE_METRIC_END_ANGLE}
-          paddingAngle={PIE_METRIC_PADDING_ANGLE}
-          animationBegin={0}
-          animationDuration={520}
-          animationEasing="ease-out"
-          label={layout.showLabels ? (props) => renderPieMetricLabel(props, layout) : false}
-          labelLine={layout.showLabels ? (props) => renderPieMetricLabelLine(props, layout) : false}
-        >
-          {data.map((item) => (
-            <Cell key={item.key} fill={item.color} />
-          ))}
-        </Pie>
-      </PieChart>
-    </ResponsiveContainer>
+    <div ref={transition.ref} className="bb-category-pie-surface bb-chart-motion-surface" data-bb-pie-transition={transition.mode}>
+      <ResponsiveContainer width="100%" height="100%">
+        <PieChart margin={layout.margin}>
+          <ChartTooltip content={<ChartTooltipContent />} />
+          <Pie
+            data={data}
+            dataKey="amount"
+            nameKey="label"
+            shape={(props: unknown) => {
+              const { key: _key, ...sector } = props as ComponentProps<typeof Sector> & { key?: string; payload?: Pick<BreakdownItem, "key"> }
+              // Recharts can render its previous sectors while new data is being
+              // synchronized. Their indices no longer describe the current rows.
+              const item = data.find(row => row.key === sector.payload?.key)
+              if (!item) return <Sector {...sector} tabIndex={-1} aria-hidden="true" />
+              return <Sector {...sector} tabIndex={0} role="button" aria-label={`Inspect ${item.label}, ${formatMoney(item.amount)}`}
+                onClick={() => onInspect(item)} onKeyDown={(event) => { if (event.key === "Enter" || event.key === " ") { event.preventDefault(); onInspect(item) } }} />
+            }}
+            cx={layout.cx}
+            cy={layout.cy}
+            innerRadius={layout.innerRadius}
+            outerRadius={layout.outerRadius}
+            startAngle={PIE_METRIC_START_ANGLE}
+            endAngle={PIE_METRIC_END_ANGLE}
+            paddingAngle={PIE_METRIC_PADDING_ANGLE}
+            isAnimationActive={transition.mode === "morph"}
+            animationBegin={0}
+            animationDuration={520}
+            animationEasing="ease-out"
+            label={layout.showLabels ? (props) => renderPieMetricLabel(props, layout) : false}
+            labelLine={layout.showLabels ? (props) => renderPieMetricLabelLine(props, layout) : false}
+          >
+            {data.map((item) => (
+              <Cell key={item.key} fill={item.color} />
+            ))}
+          </Pie>
+        </PieChart>
+      </ResponsiveContainer>
+    </div>
   )
 }, areCategoryMixPieSurfacePropsEqual)
 
@@ -2582,6 +2608,8 @@ function DailySpendingChart({
 }) {
   const axis = dailySpendingAxis(data)
   const chartData = dailySpendingChartRows(data, axis)
+  const transition = useChartTransition(JSON.stringify([filter, chartData.map(item =>
+    [item.label, item.chartAmount, item.chartNeedsAmount, item.chartWantsAmount])]))
   const showStackedBars = filter === "all"
   const singleBarColor = filter === "needs" ? NEEDS_BAR_COLOR : filter === "wants" ? WANTS_BAR_COLOR : "hsl(var(--chart-1))"
   return (
@@ -2597,43 +2625,45 @@ function DailySpendingChart({
         }
         className="bb-chart-box"
       >
-        <ResponsiveContainer width="100%" height="100%">
-          <BarChart data={chartData} onClick={(state) => { if (state?.activeLabel !== undefined) onInspectDay(String(state.activeLabel)) }} margin={{ top: 12, right: 16, left: 0, bottom: 0 }}>
-            <CartesianGrid
-              className="bb-daily-spending-grid"
-              vertical={false}
-              syncWithTicks
-              stroke={DAILY_SPENDING_GRID_COLOR}
-              strokeDasharray="3 3"
-            />
-            <XAxis
-              dataKey="label"
-              tick={{ className: "bb-daily-spending-x-axis-label", fill: DAILY_SPENDING_BOUNDARY_COLOR }}
-              tickLine={false}
-              axisLine={false}
-            />
-            <YAxis
-              domain={axis.domain}
-              ticks={axis.ticks}
-              interval="preserveStartEnd"
-              scale={axis.compressed ? "linear" : "sqrt"}
-              tick={{ fill: DAILY_SPENDING_GRID_COLOR }}
-              tickFormatter={(value) => dailySpendingAxisTickLabel(Number(value), axis)}
-              tickLine={false}
-              axisLine={false}
-              width={58}
-            />
-            <ChartTooltip content={<DailySpendingTooltipContent filter={filter} />} cursor={{ fill: dailySpendingCursorFill(filter) }} />
-            {showStackedBars ? (
-              <>
-                <Bar dataKey="chartNeedsAmount" name="Needs" stackId="daily" fill={NEEDS_BAR_COLOR} radius={DAILY_SPENDING_BAR_RADIUS} />
-                <Bar dataKey="chartWantsAmount" name="Wants" stackId="daily" fill={WANTS_BAR_COLOR} radius={DAILY_SPENDING_BAR_RADIUS} />
-              </>
-            ) : (
-              <Bar dataKey="chartAmount" name="Daily spending" fill={singleBarColor} radius={DAILY_SPENDING_BAR_RADIUS} />
-            )}
-          </BarChart>
-        </ResponsiveContainer>
+        <div ref={transition.ref} className="bb-chart-motion-surface" data-bb-chart-transition={transition.mode}>
+          <ResponsiveContainer width="100%" height="100%">
+            <BarChart data={chartData} onClick={(state) => { if (state?.activeLabel !== undefined) onInspectDay(String(state.activeLabel)) }} margin={{ top: 12, right: 16, left: 0, bottom: 0 }}>
+              <CartesianGrid
+                className="bb-daily-spending-grid"
+                vertical={false}
+                syncWithTicks
+                stroke={DAILY_SPENDING_GRID_COLOR}
+                strokeDasharray="3 3"
+              />
+              <XAxis
+                dataKey="label"
+                tick={{ className: "bb-daily-spending-x-axis-label", fill: DAILY_SPENDING_BOUNDARY_COLOR }}
+                tickLine={false}
+                axisLine={false}
+              />
+              <YAxis
+                domain={axis.domain}
+                ticks={axis.ticks}
+                interval="preserveStartEnd"
+                scale={axis.compressed ? "linear" : "sqrt"}
+                tick={{ fill: DAILY_SPENDING_GRID_COLOR }}
+                tickFormatter={(value) => dailySpendingAxisTickLabel(Number(value), axis)}
+                tickLine={false}
+                axisLine={false}
+                width={58}
+              />
+              <ChartTooltip content={<DailySpendingTooltipContent filter={filter} />} cursor={{ fill: dailySpendingCursorFill(filter) }} />
+              {showStackedBars ? (
+                <>
+                  <Bar isAnimationActive={transition.mode === "morph"} dataKey="chartNeedsAmount" name="Needs" stackId="daily" fill={NEEDS_BAR_COLOR} radius={DAILY_SPENDING_BAR_RADIUS} />
+                  <Bar isAnimationActive={transition.mode === "morph"} dataKey="chartWantsAmount" name="Wants" stackId="daily" fill={WANTS_BAR_COLOR} radius={DAILY_SPENDING_BAR_RADIUS} />
+                </>
+              ) : (
+                <Bar isAnimationActive={transition.mode === "morph"} dataKey="chartAmount" name="Daily spending" fill={singleBarColor} radius={DAILY_SPENDING_BAR_RADIUS} />
+              )}
+            </BarChart>
+          </ResponsiveContainer>
+        </div>
       </ChartContainer>
       <div className="bb-chart-side">
         <div>
