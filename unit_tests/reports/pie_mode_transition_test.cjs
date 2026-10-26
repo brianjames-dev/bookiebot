@@ -39,12 +39,13 @@ let animate = false
 const observed = []
 const runtime = {
   exports: {}, require: req, memo: React.memo,
-  useChartTransition: () => ({ ref: null, mode: animate ? "morph" : "none" }),
+  useMediaQuery: () => !animate,
+  stablePieAnimation: undefined,
   ResponsiveContainer: ({ children }) => children,
   PieChart: props => React.createElement(Recharts.PieChart, { ...props, width: 400, height: 320, compact: true }),
   Pie: props => React.createElement(Recharts.Pie, { ...props, zIndex: 0, isAnimationActive: animate }),
   Cell: Recharts.Cell,
-  Sector: props => { observed.push(props); return React.createElement(Recharts.Sector, props) },
+  StablePieSector: props => { observed.push(props); return React.createElement(Recharts.Sector, props) },
   ChartTooltip: () => null, ChartTooltipContent: () => null,
   // Force each requested dataset through the production component. Its memo
   // comparison is tested separately and is unrelated to stale sector identity.

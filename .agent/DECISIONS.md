@@ -1,5 +1,13 @@
 # Agent Decisions
 
+## 2026-10-25 - Preserve Original Chart Motion With Stable SVG Shapes
+
+The user prefers the original pie morph and other original animations over the temporary compact/touch fades. Restore Category Mix's 520ms ease-out pie interpolation and Daily Spending's default 400ms ease bar growth at every viewport, retaining reduced-motion behavior and existing layout/disclosure/carousel animations. This supersedes the opacity-transition decision below.
+
+Use Recharts' public animationInterpolateFn/shape APIs to separate target identity from visible animation geometry. Keep target coordinates stable throughout a transition so Recharts reuses SVG elements; retain interpolated coordinates separately in returned items so interruption resumes from the visible position. Match the installed library's default interpolation, rounding, padding, entering/exiting and layout behavior. Regression checks compare sampled frames against the actual library and assert no per-frame shape remounts.
+
+Category Mix draws the same square-ended sector path with reused unit vectors and only its required SVG/interaction properties. Daily Spending draws native SVG rectangles with its existing uniform rounded corners. Preserve tooltip targeting, current-data pointer/keyboard inspection and report/list isolation. No dependency fork, custom timer/controller, financial calculation or persistence change. Public API reference: [Recharts animations](https://recharts.github.io/en-US/guide/animations/).
+
 ## 2026-10-25 - Use Browser Opacity Transitions For Compact And Touch Charts
 
 Category Mix and Daily Spending render final Recharts geometry immediately on viewports up to 860px or devices with a coarse primary pointer. Use one cancellable 180ms browser opacity animation on the mounted plot instead of rebuilding SVG sectors/bars on every animation frame. Desktop fine-pointer layouts retain their existing geometry animation. Reduce Motion disables both geometry animation and the fade, including when the preference changes during a transition.
