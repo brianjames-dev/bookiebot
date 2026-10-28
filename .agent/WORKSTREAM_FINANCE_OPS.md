@@ -1,8 +1,14 @@
 # Finance Operations Workstream
 
-Last updated: 2026-10-25
+Last updated: 2026-10-27
 
 ## Goal
+
+### Safari Transactions review request policy — 2026-10-27
+
+Repair in verification. The real Chipotle amount-edit review returned 403 twice at October 27 8:20 PM Pacific, before a financial command. Isolated Chromium succeeds while WebKit reproduces the exact Try again error: the page's no-referrer policy makes Safari send `Origin: null`. Transactions omitted the per-request `referrerPolicy: same-origin` already used by Reconcile, Shared and phone-session controls. Apply that existing policy to the shared Transactions request helper; retain server origin/header checks and all command/Undo semantics. Request-contract coverage includes reads/reviews/confirmations/retries/Undo, and both POST routes reject null/foreign/cross-site/missing-header requests.
+
+All four isolated Chromium/WebKit reviews pass after the change with zero financial writes. Focused **32 passed / 31 optional PostgreSQL skipped**, full **2,651 passed / 482 optional PostgreSQL skipped**; Python/frontend types and locked production build clean. Live Chrome description/merchant/amount/date search, filters and all four review/cancel paths pass, including Chipotle $39.88 → $24.88 and By income $25.81/$14.07. No confirmation was submitted and the real source remains unchanged. The audit tab blocks Shared automatic projection requests. CI/release and native acceptance are STATUS checklist 163.
 
 ### Original chart animations with stable SVG shapes — 2026-10-25
 
