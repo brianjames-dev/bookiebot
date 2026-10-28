@@ -115,6 +115,64 @@ def test_review_cancel_is_readonly_and_commands_preserve_undo_in_exact_month(sav
     assert saved.repos[saved.month].expense._rows==current
 
 
+@pytest.mark.parametrize("operation,extra",[("update",{"updates":{"amount":1234,"item":"Revised fixture"}}),("move",{"destination":"food"})])
+def test_undo_review_explains_current_and_restored_details_without_changing_undo(saved,monkeypatch,operation,extra):
+    result=confirm(saved,body(saved,operation,saved.previous,**extra))
+    assert result["success"],result
+    value={**result["undo"],"operation":"undo"}
+    repo=saved.repos[saved.previous]
+    cells,log=deepcopy(repo.expense._rows),deepcopy(repo.action_log._rows)
+    preview=tx.review(B,value)["review"]
+    assert repo.expense._rows==cells and repo.action_log._rows==log
+    with pytest.raises(tx.TransactionConflict):
+        tx.review(H,value)
+    restoration=preview["restoration"]
+    assert restoration["operation"]==operation
+    assert restoration["restoredCategory"]=="Shopping"
+    assert preview["after"]["amount"]=="$3.00"
+    assert preview["after"]["item"]=="Fixture cable 3"
+    if operation=="update":
+        assert restoration["current"]["amount"]=="$12.34"
+        assert restoration["current"]["item"]=="Revised fixture"
+        assert restoration["currentCategory"]=="Shopping"
+    else:
+        assert restoration["currentCategory"]=="Food"
+        assert restoration["current"]["amount"]=="$3.00"
+    assert not any(key.startswith("_") for key in preview["item"])
+    assert "restoration" not in preview["item"]
+    writer=Mock(wraps=undo.undo_logged_action)
+    monkeypatch.setattr(undo,"undo_logged_action",writer)
+    command={**value,"version":preview["item"]["version"],"reviewVersion":preview["reviewVersion"],"requestId":"isolated-undo-details-0001"}
+    undone=saved.commands.command(B,command)
+    assert undone["success"],undone
+    assert undone["summary"]["restoration"]==restoration
+    assert saved.commands.saved("brian",command["requestId"])==undone
+    assert saved.commands.saved("hannah",command["requestId"]) is None
+    assert saved.commands.command(B,command)==undone
+    writer.assert_called_once()
+    restored=next(r for r in tx.listing(B,{"month":saved.previous})["items"] if r["title"]=="Fixture cable 3")
+    assert restored["category"]=="shopping" and restored["amountCents"]==300
+
+
+@pytest.mark.parametrize("operation,extra",[("update",{}),("move",{"destination":"food"})])
+def test_changed_current_details_invalidate_the_undo_review_before_any_writer(saved,monkeypatch,operation,extra):
+    result=confirm(saved,body(saved,operation,**extra))
+    value={**result["undo"],"operation":"undo"}
+    preview=tx.review(B,value)["review"]
+    category=preview["item"]["category"]
+    repo=saved.repos[saved.month]
+    with tx.transaction_context(B,saved.month):
+        logged=undo._find_log_row(result["undo"]["id"].split(":",1)[1])[2]
+    repo.expense.update_cell(logged.action.row,undo._category_columns(category)["amount"],"$99.00")
+    cells,log=deepcopy(repo.expense._rows),deepcopy(repo.action_log._rows)
+    writer=Mock()
+    monkeypatch.setattr(undo,"undo_logged_action",writer)
+    rejected=saved.commands.command(B,{**value,"version":preview["item"]["version"],"reviewVersion":preview["reviewVersion"],"requestId":"isolated-stale-undo-0001"})
+    assert not rejected["success"] and rejected["state"]=="done"
+    writer.assert_not_called()
+    assert repo.expense._rows==cells and repo.action_log._rows==log
+
+
 def test_lost_response_replay_and_command_fingerprint_never_repeat_writer(saved,monkeypatch):
     value=body(saved)
     preview=tx.review(B,value)["review"]

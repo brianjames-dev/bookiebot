@@ -371,6 +371,12 @@ def _undo_review_row(actor: str, month: str, action_id: str) -> dict[str, Any]:
             for field, column in columns.items():
                 if col == column:
                     restored[field] = value
+    if action.metadata.get("type") in {"update", "move"}:
+        restored_category = action.metadata.get("source_category", row["category"]) if action.metadata["type"] == "move" else row["category"]
+        # Display evidence only: keep the existing restored row, version and writer target.
+        row["_restoration"] = {"operation": action.metadata["type"], "current": dict(row["fields"]),
+            "currentCategory": row["categoryLabel"],
+            "restoredCategory": expense_category_label(restored_category) if restored_category else row["categoryLabel"]}
     row["fields"], row["amountCents"] = restored, cents(restored.get("amount", ""))
     row.update(person=restored.get("person") or get_user_config(actor).name, location=restored.get("location", ""), date=_date(restored.get("date", "")))
     row["title"] = logged.action.description
@@ -394,6 +400,8 @@ def review(actor: str, body: dict[str, Any]) -> dict[str, Any]:
     payload: dict[str, Any] = {"item": public_row(row), "after": after,
         "operation": normalized["operation"], "destination": normalized.get("destination_category"),
         "reviewVersion": digest([row["version"], normalized])}
+    if row.get("_restoration"):
+        payload["restoration"] = row["_restoration"]
     if normalized["operation"] == "split" or (row["split"] and normalized["operation"] == "update" and "amount" in normalized.get("updates", {})):
         from bookiebot.sheets.collaboration import split_amounts
         method = normalized.get("split_method") or row["split"]
@@ -505,7 +513,7 @@ class TransactionCommands:
                         result["summary"] = {"operation": operation, "title": row["title"], "date": row["date"],
                             "category": row["categoryLabel"], "location": row["location"], "person": row["person"],
                             "amountCents": row["amountCents"], "before": dict(row["fields"]), "after": dict(reviewed["after"]),
-                            **{key: reviewed[key] for key in ("destination", "share") if reviewed.get(key) is not None}}
+                            **{key: reviewed[key] for key in ("destination", "share", "restoration") if reviewed.get(key) is not None}}
                         history = undo._read_log_data(raise_on_error=True)
                         new = [record.logged for record in history.records if record.logged.id not in before and record.logged.user_key in actor_key_aliases(actor)] if history else []
                         if new and operation != "undo" and undo.action_capabilities(new[-1].action).can_undo:

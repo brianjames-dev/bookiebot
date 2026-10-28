@@ -13,6 +13,7 @@ export interface TransactionChangeSummary {
   after: Record<string, string>
   destination?: string
   share?: {method: string; payerCents: number; partnerCents: number}
+  restoration?: {operation: "update" | "move"; current: Record<string, string>; currentCategory: string; restoredCategory: string}
 }
 
 const categories: Record<string, string> = {grocery: "Grocery", gas: "Gas", food: "Food", shopping: "Shopping", need_expenses: "Needs"}
@@ -28,20 +29,27 @@ function valueLabel(field: string, value: string) {
 export function TransactionChangeDetails({summary, saved = false}: {summary: TransactionChangeSummary; saved?: boolean}) {
   const title = summary.after.item || summary.after.source || summary.title
   const date = summary.date ? new Date(summary.date + "T12:00:00").toLocaleDateString(undefined, {month: "short", day: "numeric"}) : "Undated"
-  const changes = summary.operation === "update" ? Object.entries(summary.after).filter(([field, value]) => field !== "date" &&
-    (field === "amount" ? amount(value) !== amount(summary.before[field] ?? "") : value !== summary.before[field])) : []
-  const category = summary.operation === "move" ? categories[summary.destination ?? ""] || summary.category : summary.category
+  const restoration = summary.operation === "undo" ? summary.restoration : undefined
+  const before = restoration?.current ?? summary.before
+  const changes = summary.operation === "update" || restoration?.operation === "update" ? Object.entries(summary.after).filter(([field, value]) => field !== "date" &&
+    (field === "amount" ? amount(value) !== amount(before[field] ?? "") : value !== before[field])) : []
+  const category = restoration?.restoredCategory ?? (summary.operation === "move" ? categories[summary.destination ?? ""] || summary.category : summary.category)
   return <div className="bb-change-details">
     <div className="bb-change-context"><h3>{title}</h3>{(summary.after.location || summary.location) && <p>{summary.after.location || summary.location}</p>}
       <div className="bb-change-meta"><span>{date}</span><span>{category}</span><span>{summary.after.person || summary.person}</span></div>
     </div>
     {changes.length > 0 && <div className="bb-change-comparisons">{changes.map(([field, value]) => <div className="bb-change-comparison" key={field}>
       <p className="bb-change-label">{field === "amount" && summary.share ? "Full purchase amount" : fieldNames[field] || field}</p>
-      <div className="bb-change-values"><div className="bb-change-before"><span>Previous</span><strong>{valueLabel(field, summary.before[field] ?? "")}</strong></div>
-        <ArrowRight size={18} aria-hidden="true"/><div className="bb-change-after"><span>{saved ? "Updated" : "New value"}</span><strong>{valueLabel(field, value)}</strong></div></div>
+      <div className="bb-change-values"><div className="bb-change-before"><span>{restoration && !saved ? "Current" : "Previous"}</span><strong>{valueLabel(field, before[field] ?? "")}</strong></div>
+        <ArrowRight size={18} aria-hidden="true"/><div className="bb-change-after"><span>{restoration ? saved ? "Restored" : "Restore to" : saved ? "Updated" : "New value"}</span><strong>{valueLabel(field, value)}</strong></div></div>
     </div>)}</div>}
     {!changes.some(([field]) => field === "amount") && <div className="bb-change-total"><span>{summary.share ? "Full purchase amount" : "Amount"}</span><strong>{money(summary.amountCents)}</strong></div>}
     {summary.operation === "move" && <div className="bb-change-category"><span>{summary.category}</span><ArrowRight size={16} aria-hidden="true"/><strong>{category}</strong></div>}
+    {restoration?.operation === "move" && <div className="bb-change-comparison bb-change-restoration">
+      <p className="bb-change-label">Category</p><div className="bb-change-values">
+        <div className="bb-change-before"><span>{saved ? "Previous" : "Current"}</span><strong>{restoration.currentCategory}</strong></div>
+        <ArrowRight size={18} aria-hidden="true"/><div className="bb-change-after"><span>{saved ? "Restored" : "Restore to"}</span><strong>{category}</strong></div>
+      </div></div>}
     {summary.share && <div className="bb-change-split"><p className="bb-change-label">{method(summary.share.method)}</p><div className="bb-change-share-values">
       <div><span>Your share</span><strong>{money(summary.share.payerCents)}</strong></div><div><span>Partner’s share</span><strong>{money(summary.share.partnerCents)}</strong></div>
     </div><p className="bb-change-footnote">{saved ? "Repayments are unchanged." : "No repayment will be marked received."}</p></div>}

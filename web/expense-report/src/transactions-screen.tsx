@@ -13,7 +13,7 @@ export interface RecordedTransaction {
 }
 interface Listing { items: RecordedTransaction[]; total: number; nextOffset: number | null; categories: string[]; persons: string[]; month: string; undo?: {id:string;month:string}; pendingCommand?: Change & {requestId:string;reviewVersion:string} }
 interface Change { id: string; month: string; version?: string; operation: Operation; updates?: Record<string, string | number>; destination?: string; method?: string }
-interface Review { item: RecordedTransaction; after: Record<string, string>; reviewVersion: string; operation: Operation; destination?: string; share?: {method: string; payerCents: number; partnerCents: number} }
+interface Review { item: RecordedTransaction; after: Record<string, string>; reviewVersion: string; operation: Operation; destination?: string; share?: {method: string; payerCents: number; partnerCents: number}; restoration?: TransactionChangeSummary["restoration"] }
 interface Result { state: "running" | "done" | "uncertain"; success?: boolean; detail?: string; undo?: {month: string; id: string}; summary?: TransactionChangeSummary }
 const labels: Record<Operation, string> = {update: "Update", move: "Move", delete: "Delete", split: "Split", cancel_split: "Cancel split", undo: "Undo"}
 const reviewTitles: Record<Operation, string> = {update:"Update transaction",move:"Move transaction",delete:"Delete transaction",split:"Split transaction",cancel_split:"Remove split",undo:"Undo change"}
@@ -189,7 +189,7 @@ export function TransactionsScreen({active, ownerName, initialMonth}: {active: b
     {operation && <section ref={editor} className="bb-transaction-editor" aria-label="Edit transaction" aria-busy={busy}>
       <p className="bb-transaction-eyebrow">{review ? "Review change" : labels[operation]}</p><h2>{review ? reviewTitles[review.operation] : selected?.title}</h2>
       {review ? <><TransactionChangeDetails summary={{operation:review.operation,title:review.item.title,date:review.item.date,category:review.item.categoryLabel,
-        location:review.item.location,person:review.item.person,amountCents:review.item.amountCents,before:review.item.fields,after:review.after,destination:review.destination,share:review.share}}/>
+        location:review.item.location,person:review.item.person,amountCents:review.item.amountCents,before:review.item.fields,after:review.after,destination:review.destination,share:review.share,restoration:review.restoration}}/>
         {review.operation === "delete" && <p>The recorded transaction will be removed. Its saved history is retained.</p>}
         {review.item.split && !review.share && <p>The bank amount and shared repayment remain separate. Existing repayment safeguards apply.</p>}
         <div className="bb-transaction-form-actions"><button type="button" disabled={locked} onClick={()=>{setReview(null);setReviewBody(null)}}>Back</button><button className="bb-transaction-primary" type="button" disabled={locked} onClick={()=>void confirm()}>{busy ? "Saving…" : `Confirm ${labels[review.operation].toLowerCase()}`}</button></div></>

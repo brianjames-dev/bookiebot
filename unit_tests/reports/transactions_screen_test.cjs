@@ -63,7 +63,9 @@ const submit=async()=>run(()=>tree.root.findByType('form').props.onSubmit({preve
  assert.ok(!text(tree.toJSON()).includes('```')&&!text(tree.toJSON()).includes('Updated logged action'),'Discord audit formatting never renders as a web success receipt')
  assert.equal(work.uncertain,false);assert.equal(work.pending,false);assert.ok(events.includes('bookiebot:transactions-changed'));assert.ok(events.includes('bookiebot:reimbursements-changed'))
  assert.ok(button('Undo this change'));await click('Undo this change');assert.equal(body().operation,'undo');assert.equal(body().id,'2026-10:update-1')
- await respond(review(body(),{...row,id:'2026-10:update-1'}));assert.ok(button('Confirm undo'));await click('Cancel')
+ const undoReview=review(body(),{...row,id:'2026-10:update-1'})
+ undoReview.review.restoration={operation:'update',current:{...row.fields,amount:'22.00'},currentCategory:'Shopping',restoredCategory:'Shopping'}
+ await respond(undoReview);assert.ok(button('Confirm undo'));assert.match(text(tree.root.findByProps({'aria-label':'Edit transaction'})),/Current\$22.00Restore to\$12.34/);await click('Cancel')
  await tick();await respond(listing())
  await run(()=>tree.root.findByProps({'aria-label':'Search transactions'}).props.onChange({target:{value:'cable'}}));await tick();assert.match(latest().url,/search=cable/)
  const old=latest();await run(()=>tree.root.findByProps({'aria-label':'Search transactions'}).props.onChange({target:{value:'payroll'}}));await tick();const current=latest()
@@ -84,7 +86,19 @@ const submit=async()=>run(()=>tree.root.findByType('form').props.onSubmit({preve
  assert.ok(!text(tree.toJSON()).includes('Deleted isolated fixture'),'Legacy Discord result text stays out of the success card')
  const beforeDismiss=requests.length;await click('Dismiss transaction result');assert.equal(requests.length,beforeDismiss,'Dismiss is presentation only')
  await run(()=>tree.unmount())
- const {TransactionCompletion}=load(path.resolve('web/expense-report/src/transaction-change-summary.tsx'))
+ const {TransactionCompletion,TransactionChangeDetails}=load(path.resolve('web/expense-report/src/transaction-change-summary.tsx'))
+ for(const saved of [false,true])for(const operation of ['update','move']){
+  const restoration={operation,current:{...row.fields,amount:'24.88'},currentCategory:operation==='move'?'Food':'Shopping',restoredCategory:'Shopping'}
+  const restored={...summary,operation:'undo',amountCents:3988,before:{...row.fields,amount:'39.88'},after:{...row.fields,amount:'39.88'},restoration}
+  await run(()=>{tree=Renderer.create(React.createElement(TransactionChangeDetails,{summary:restored,saved}))})
+  const rendered=text(tree.toJSON())
+  if(operation==='update')assert.match(rendered,new RegExp(saved?'Previous\\$24.88Restored\\$39.88':'Current\\$24.88Restore to\\$39.88'))
+  else{
+   assert.match(text(tree.root.findByProps({className:'bb-change-meta'})),/Shopping/)
+   assert.match(rendered,new RegExp(saved?'PreviousFoodRestoredShopping':'CurrentFoodRestore toShopping'))
+  }
+  await run(()=>tree.unmount())
+ }
  for(const [operation,title] of [['update','Transaction updated'],['move','Transaction moved'],['delete','Transaction deleted'],['split','Split saved'],['cancel_split','Split removed'],['undo','Change undone']]){
   let undone=0,dismissed=0
   const receipt={...summary,operation,destination:operation==='move'?'food':undefined,share:operation==='split'?{method:'income',payerCents:800,partnerCents:434}:undefined}
