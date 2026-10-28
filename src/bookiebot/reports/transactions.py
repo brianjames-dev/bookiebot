@@ -501,6 +501,11 @@ class TransactionCommands:
                         state = "uncertain"
                         result["detail"] = "I could not verify the change. Check Transactions and saved history before another change. This request will not be submitted again."
                     elif success:
+                        reviewed = checked["review"]
+                        result["summary"] = {"operation": operation, "title": row["title"], "date": row["date"],
+                            "category": row["categoryLabel"], "location": row["location"], "person": row["person"],
+                            "amountCents": row["amountCents"], "before": dict(row["fields"]), "after": dict(reviewed["after"]),
+                            **{key: reviewed[key] for key in ("destination", "share") if reviewed.get(key) is not None}}
                         history = undo._read_log_data(raise_on_error=True)
                         new = [record.logged for record in history.records if record.logged.id not in before and record.logged.user_key in actor_key_aliases(actor)] if history else []
                         if new and operation != "undo" and undo.action_capabilities(new[-1].action).can_undo:

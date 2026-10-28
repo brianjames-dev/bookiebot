@@ -4,6 +4,10 @@ Last updated: 2026-10-27
 
 ## Goal
 
+### Structured transaction reviews and saved-change receipts — 2026-10-27
+
+Locally verified. The user's actual Safari Update succeeded, but the result rendered Discord Markdown/code fences as one plain paragraph. Persist a compact summary of the validated review in the existing result JSON and reuse it for saved-status/replay. The web now uses transaction context, styled changed-field comparisons, separate amount/share panels, an operation-specific success heading, supported Undo and completed-receipt dismissal. Legacy successes use a generic receipt; errors/uncertainty retain existing recovery controls. Financial commands, idempotency, source checks, Undo and repayments are unchanged. Full local **2,651 / 482 optional skipped**, clean types/build and **20 isolated Chromium/WebKit cases** pass across phone/desktop widths, both themes and every success variant; 390px screenshots inspected. All financial testing is isolated; CI/release and native acceptance remain STATUS 164.
+
 ### Safari Transactions review request policy — 2026-10-27
 
 Released. The real Chipotle amount-edit review returned 403 twice at October 27 8:20 PM Pacific, before a financial command. Isolated Chromium succeeds while WebKit reproduces the exact Try again error: the page's no-referrer policy makes Safari send `Origin: null`. Transactions omitted the per-request `referrerPolicy: same-origin` already used by Reconcile, Shared and phone-session controls. Apply that existing policy to the shared Transactions request helper; retain server origin/header checks and all command/Undo semantics. Request-contract coverage includes reads/reviews/confirmations/retries/Undo, and both POST routes reject null/foreign/cross-site/missing-header requests.

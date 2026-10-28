@@ -96,9 +96,19 @@ def test_review_cancel_is_readonly_and_commands_preserve_undo_in_exact_month(sav
     result=confirm(saved,value)
     assert result["success"],result
     assert result["undo"]
+    summary=result["summary"]
+    assert summary["operation"]==operation and summary["title"]=="Fixture cable 3"
+    assert summary["before"]["amount"]=="$3.00"
+    assert not any(key.startswith("_") for key in summary)
+    if operation=="update":
+        assert summary["after"]["amount"]=="12.34"
+    elif operation=="move":
+        assert summary["destination"]=="food"
+    assert saved.commands.saved("brian","isolated-request-0000001")["summary"]==summary
     undo_body={**result["undo"],"operation":"undo"}
     undone=confirm(saved,undo_body,"isolated-undo-0000001")
     assert undone["success"],undone
+    assert undone["summary"]["operation"]=="undo"
     columns=list(undo._category_columns("shopping").values())
     for i,values in enumerate(original,1):
         assert [tx.cell(repo.expense._rows,i,c) for c in columns]==[tx.cell(original,i,c) for c in columns]
