@@ -45,4 +45,40 @@
 .bb-transaction-notice p { margin:0 0 8px; }
 .bb-transaction-empty { text-align:center; padding:42px 15px; font-size:14px; line-height:1.5; color:hsl(var(--muted-foreground)); }
 .bb-transaction-load { width:100%; margin-top:16px; }
+.bb-transaction-completion { margin:20px 0; padding:18px; border:1px solid color-mix(in srgb,hsl(var(--primary)) 35%,hsl(var(--border))); border-radius:18px; background:hsl(var(--card)); }
+.bb-change-status { display:flex; align-items:center; gap:10px; margin-bottom:18px; }
+.bb-change-status h2 { flex:1; min-width:0; margin:0; font-size:15px; line-height:1.4; font-weight:600; }
+.bb-change-check { display:grid; place-items:center; flex-shrink:0; width:30px; height:30px; color:hsl(var(--primary)); background:color-mix(in srgb,hsl(var(--primary)) 13%,transparent); border-radius:50%; }
+.bb-transactions .bb-change-dismiss { display:grid; place-items:center; border:0; padding:0; width:44px; height:44px; min-height:44px; margin:-7px -9px -7px 0; color:hsl(var(--muted-foreground)); }
+.bb-change-details { min-width:0; }
+.bb-change-context { margin-bottom:18px; }
+.bb-change-context h3 { margin:0 0 5px; font-size:18px; line-height:1.35; font-weight:600; overflow-wrap:anywhere; }
+.bb-change-context p { margin:0 0 8px; font-size:13px; line-height:1.5; color:hsl(var(--muted-foreground)); overflow-wrap:anywhere; }
+.bb-change-meta { display:flex; flex-wrap:wrap; gap:5px 9px; color:hsl(var(--muted-foreground)); font-size:11px; line-height:1.5; }
+.bb-change-meta span { overflow-wrap:anywhere; }
+.bb-change-meta span+span::before { content:"·"; margin-right:9px; }
+.bb-change-comparisons { display:grid; gap:12px; }
+.bb-change-comparison { padding:14px; border-radius:12px; background:hsl(var(--background)); }
+.bb-transactions .bb-change-label { margin:0 0 12px; color:hsl(var(--muted-foreground)); font-size:11px; line-height:1.4; letter-spacing:.04em; text-transform:uppercase; }
+.bb-change-values { display:grid; grid-template-columns:minmax(0,1fr) 18px minmax(0,1fr); gap:10px; align-items:center; }
+.bb-change-values>svg { color:hsl(var(--muted-foreground)); }
+.bb-change-values>div,.bb-change-share-values>div { display:grid; min-width:0; gap:5px; }
+.bb-change-values span,.bb-change-share-values span { color:hsl(var(--muted-foreground)); font-size:11px; line-height:1.4; }
+.bb-change-values strong { font-size:clamp(19px,5vw,24px); font-weight:600; line-height:1.35; font-variant-numeric:tabular-nums; overflow-wrap:anywhere; }
+.bb-change-before strong { color:hsl(var(--muted-foreground)); text-decoration:line-through; text-decoration-thickness:1px; }
+.bb-change-after strong { color:hsl(var(--primary)); }
+.bb-change-total { display:flex; flex-wrap:wrap; justify-content:space-between; gap:8px; padding:14px; border-radius:12px; background:hsl(var(--background)); }
+.bb-change-total span { align-self:center; color:hsl(var(--muted-foreground)); font-size:12px; }
+.bb-change-total strong { font-size:23px; font-weight:600; font-variant-numeric:tabular-nums; overflow-wrap:anywhere; }
+.bb-change-comparisons+.bb-change-total { margin-top:12px; }
+.bb-change-category { display:flex; align-items:center; gap:12px; margin-top:14px; font-size:13px; overflow-wrap:anywhere; }
+.bb-change-category>span,.bb-change-category>svg { color:hsl(var(--muted-foreground)); }
+.bb-change-category>strong { color:hsl(var(--primary)); }
+.bb-change-split { margin-top:16px; padding-top:16px; border-top:1px solid hsl(var(--border)); }
+.bb-change-share-values { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:12px; }
+.bb-change-share-values strong { font-size:19px; font-weight:600; font-variant-numeric:tabular-nums; overflow-wrap:anywhere; }
+.bb-transactions .bb-change-footnote { margin:12px 0 0; font-size:11px; line-height:1.5; color:hsl(var(--muted-foreground)); }
+.bb-change-footer { margin-top:18px; padding-top:16px; border-top:1px solid hsl(var(--border)); }
+.bb-transactions .bb-change-undo { display:flex; justify-content:center; align-items:center; gap:8px; width:100%; background:color-mix(in srgb,hsl(var(--primary)) 7%,transparent); border-color:color-mix(in srgb,hsl(var(--primary)) 35%,hsl(var(--border))); font-weight:500; }
+.bb-change-legacy { margin:0; font-size:13px; color:hsl(var(--muted-foreground)); }
 @media(max-width:350px) { .bb-transactions .bb-transaction-row-toggle { grid-template-columns:minmax(0,1fr) auto 14px; gap:7px; }.bb-transaction-row-toggle>svg:first-child { display:none; }.bb-transaction-toolbar button span { display:none; } }

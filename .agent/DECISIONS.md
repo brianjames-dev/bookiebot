@@ -1,5 +1,11 @@
 # Agent Decisions
 
+## 2026-10-27 - Present Saved Transaction Changes As Structured Receipts
+
+Keep Discord's mutation detail text in the audit/result record, but never render that text as a successful web receipt. After a successful existing financial command, save a small summary of the already validated review (operation, transaction context, before/after fields, destination and optional shares) in the existing result JSON. Return the same summary on saved-status reads and identical-request replay. No new tables or financial commands; preserve request claims, Undo and repayment semantics.
+
+Use one visual detail component for pre-confirmation review and the saved receipt: transaction identity, labeled changed-field comparisons, full amount and separate split shares. Only confirmed success receives a success indicator; uncertain/failed outcomes retain recovery controls. Old saved successes without a summary show a concise generic receipt with their supported Undo rather than parsing or displaying Markdown. Dismiss only hides a completed receipt; it does not submit or undo a change.
+
 ## 2026-10-25 - Preserve Original Chart Motion With Stable SVG Shapes
 
 The user prefers the original pie morph and other original animations over the temporary compact/touch fades. Restore Category Mix's 520ms ease-out pie interpolation and Daily Spending's default 400ms ease bar growth at every viewport, retaining reduced-motion behavior and existing layout/disclosure/carousel animations. This supersedes the opacity-transition decision below.

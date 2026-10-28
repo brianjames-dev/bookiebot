@@ -54,8 +54,13 @@ const submit=async()=>run(()=>tree.root.findByType('form').props.onSubmit({preve
  const count=requests.filter(r=>r.url==='/app/transactions').length
  await run(()=>button('Saving…').props.onClick());assert.equal(requests.filter(r=>r.url==='/app/transactions').length,count,'Concurrent confirmation cannot submit twice')
  await reject();assert.equal(work.uncertain,true);assert.ok(button('Cancel').props.disabled)
+ assert.ok(!text(tree.toJSON()).includes('Transaction updated'),'An uncertain save never shows a success receipt')
  await click('Retry same confirmation');assert.deepEqual(body(),original,'Recovery retains the exact confirmed command and ID')
- await respond({state:'done',success:true,detail:'Updated isolated transaction',undo:{month:'2026-10',id:'2026-10:update-1'}})
+ const summary={operation:'update',title:row.title,date:row.date,category:row.categoryLabel,location:row.location,person:row.person,amountCents:row.amountCents,before:row.fields,after:{...row.fields,amount:'22.00'}}
+ await respond({state:'done',success:true,detail:'Updated logged action: Before: ``` raw Discord before ``` After: ``` raw Discord after ```',summary,undo:{month:'2026-10',id:'2026-10:update-1'}})
+ assert.match(text(tree.toJSON()),/Transaction updated/)
+ assert.match(text(tree.toJSON()),/Previous\$12.34Updated\$22.00/)
+ assert.ok(!text(tree.toJSON()).includes('```')&&!text(tree.toJSON()).includes('Updated logged action'),'Discord audit formatting never renders as a web success receipt')
  assert.equal(work.uncertain,false);assert.equal(work.pending,false);assert.ok(events.includes('bookiebot:transactions-changed'));assert.ok(events.includes('bookiebot:reimbursements-changed'))
  assert.ok(button('Undo this change'));await click('Undo this change');assert.equal(body().operation,'undo');assert.equal(body().id,'2026-10:update-1')
  await respond(review(body(),{...row,id:'2026-10:update-1'}));assert.ok(button('Confirm undo'));await click('Cancel')
@@ -63,7 +68,9 @@ const submit=async()=>run(()=>tree.root.findByType('form').props.onSubmit({preve
  await run(()=>tree.root.findByProps({'aria-label':'Search transactions'}).props.onChange({target:{value:'cable'}}));await tick();assert.match(latest().url,/search=cable/)
  const old=latest();await run(()=>tree.root.findByProps({'aria-label':'Search transactions'}).props.onChange({target:{value:'payroll'}}));await tick();const current=latest()
  await respond(listing([{...row,title:'Payroll fixture',id:'payroll'}]),200,current);await respond(listing(),200,old)
- assert.match(text(tree.toJSON()),/Payroll fixture/);assert.ok(!text(tree.toJSON()).includes('Fixture cable'),'Stale search responses cannot replace the latest results')
+ const resultList=()=>text(tree.root.findByProps({className:'bb-transaction-list'}))
+ assert.match(resultList(),/Payroll fixture/);assert.ok(!resultList().includes('Fixture cable'),'Stale search responses cannot replace the latest results')
+ assert.match(text(tree.root.findByProps({'aria-label':'Saved transaction change'})),/Fixture cable/,'The saved receipt retains its confirmed transaction through unrelated searches')
  await click('Filters');await run(()=>tree.root.findByProps({'aria-label':'Transaction type'}).props.onChange({target:{value:'income'}}));await tick();assert.match(latest().url,/kind=income/);await respond(listing([]))
  assert.match(text(tree.toJSON()),/No transactions match/)
  await click('Clear search and filters');await tick();await respond(listing())
@@ -73,7 +80,22 @@ const submit=async()=>run(()=>tree.root.findByType('form').props.onSubmit({preve
  await run(()=>{tree=Renderer.create(fixture(false))});assert.equal(requests.filter(r=>r.options.body).length,before,'Reload never repeats a financial writer')
  await click('Check saved status');assert.match(latest().url,new RegExp('/commands/'+deletion.requestId+'$'));await respond({state:'done',success:true,detail:'Deleted isolated fixture'})
  assert.equal(storage.size,0);assert.equal(work.uncertain,false)
+ assert.match(text(tree.toJSON()),/Change saved/,'Older saved results have a clear success fallback')
+ assert.ok(!text(tree.toJSON()).includes('Deleted isolated fixture'),'Legacy Discord result text stays out of the success card')
+ const beforeDismiss=requests.length;await click('Dismiss transaction result');assert.equal(requests.length,beforeDismiss,'Dismiss is presentation only')
  await run(()=>tree.unmount())
+ const {TransactionCompletion}=load(path.resolve('web/expense-report/src/transaction-change-summary.tsx'))
+ for(const [operation,title] of [['update','Transaction updated'],['move','Transaction moved'],['delete','Transaction deleted'],['split','Split saved'],['cancel_split','Split removed'],['undo','Change undone']]){
+  let undone=0,dismissed=0
+  const receipt={...summary,operation,destination:operation==='move'?'food':undefined,share:operation==='split'?{method:'income',payerCents:800,partnerCents:434}:undefined}
+  await run(()=>{tree=Renderer.create(React.createElement(TransactionCompletion,{summary:receipt,canUndo:operation!=='undo',disabled:false,onUndo:()=>undone++,onDismiss:()=>dismissed++}))})
+  assert.match(text(tree.toJSON()),new RegExp(title));assert.match(text(tree.toJSON()),/Fixture shop/)
+  if(operation==='move')assert.match(text(tree.toJSON()),/ShoppingFood/)
+  if(operation==='split'){assert.match(text(tree.toJSON()),/By income/);assert.match(text(tree.toJSON()),/Your share\$8.00Partner’s share\$4.34/);assert.match(text(tree.toJSON()),/Repayments are unchanged/)}
+  if(operation!=='undo'){await click('Undo this change');assert.equal(undone,1)}else assert.ok(!button('Undo this change'))
+  await click('Dismiss transaction result');assert.equal(dismissed,1)
+  await run(()=>tree.unmount())
+ }
  for(const {options} of requests){
   assert.equal(options.referrerPolicy,'same-origin','Transactions must preserve its real Origin under the private page no-referrer policy, including reviews and saved-command retries')
   assert.equal(options.mode,'same-origin')
