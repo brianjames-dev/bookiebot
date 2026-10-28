@@ -387,10 +387,89 @@ def test_transactions_amount_review_and_update_preserve_custom_reimbursement_per
     change = {"id": public["id"], "month": "2026-01", "version": public["version"],
               "operation": "update", "updates": {"amount": 12345}}
     preview = tx.review(B, change)["review"]
-    assert preview["share"] == {"method": "custom", "payerCents": 4115, "partnerCents": 8230}
+    assert preview["share"] == {"method": "custom", "payerCents": 4115, "partnerCents": 8230,
+                               "payerBasisPoints": 3333, "payerName": "Brian", "partnerName": "Hannah"}
     result = confirm(saved, change)
     assert result["success"], result
     corrected = canonical.store.get_allocation(allocation["id"])
     assert corrected["customPayerBasisPoints"] == 3333
     assert (corrected["grossCents"], corrected["payerShareCents"], corrected["partnerShareCents"]) == (12345, 4115, 8230)
     assert canonical.store.snapshot("brian")["events"] == []
+
+
+def custom_source(canonical,saved,monkeypatch):
+    from dataclasses import replace
+    monkeypatch.setenv("BOOKIEBOT_REIMBURSEMENTS_ENABLED","true")
+    saved.repos["2026-01"]=SheetsRepoStub()
+    logged=undo.LoggedAction(canonical.logged.id,"2026-01-03",B,replace(canonical.logged.action,
+        metadata={**canonical.logged.action.metadata,"type":"expense"}))
+    rows=[[],[],[""]*29+list(VALUES.values())]
+    monkeypatch.setattr(undo,"_worksheet",lambda *args:canonical.sheet)
+    monkeypatch.setattr(undo,"_read_log_data",lambda **kwargs:SimpleNamespace(records=[]))
+    monkeypatch.setattr(undo,"select_recent_action",lambda *args,**kwargs:logged)
+    public=tx._public(B,"2026-01",logged,rows)
+    monkeypatch.setattr(tx,"load_transactions",lambda *args,**kwargs:[public])
+    return logged,rows,public
+
+
+def test_transaction_custom_split_creation_edit_replay_and_exact_ratio_preload(canonical,saved,monkeypatch):
+    logged,rows,public=custom_source(canonical,saved,monkeypatch)
+    assert public["splitOptions"]=={"custom":True,"payerName":"Brian","partnerName":"Hannah","payerBasisPoints":5000}
+    change={"id":public["id"],"month":"2026-01","version":public["version"],"operation":"split","method":"custom","payerBasisPoints":3333}
+    cells=deepcopy(canonical.sheet.rows)
+    history=deepcopy(canonical.history)
+    preview=tx.review(B,change)["review"]
+    assert preview["share"]=={"method":"custom","payerCents":15489,"partnerCents":30983,
+                              "payerBasisPoints":3333,"payerName":"Brian","partnerName":"Hannah"}
+    assert canonical.sheet.rows==cells and canonical.history==history and canonical.store.snapshot("brian")["allocations"]==[]
+    writer=Mock(wraps=undo.split_recent_action);monkeypatch.setattr(undo,"split_recent_action",writer)
+    command={**change,"reviewVersion":preview["reviewVersion"],"requestId":"isolated-custom-create-01"}
+    result=saved.commands.command(B,command)
+    assert result["success"],result
+    assert result["summary"]["share"]==preview["share"]
+    assert saved.commands.command(B,command)==result
+    writer.assert_called_once()
+    with pytest.raises(tx.TransactionConflict):
+        saved.commands.command(B,{**command,"payerBasisPoints":3334})
+    assert "undo" not in result  # Canonical shared corrections retain their separate reversal rules.
+    current=undo._canonical_action(logged)
+    public=tx._public(B,"2026-01",current,rows)
+    assert public["split"]=="custom" and public["splitOptions"]["payerBasisPoints"]==3333
+    monkeypatch.setattr(tx,"load_transactions",lambda *args,**kwargs:[public])
+    monkeypatch.setattr(undo,"select_recent_action",lambda *args,**kwargs:current)
+    changed={**change,"version":public["version"],"payerBasisPoints":6667}
+    before=canonical.store.snapshot("brian")
+    tx.review(B,changed)
+    assert canonical.store.snapshot("brian")==before
+    updated=confirm(saved,changed,"isolated-custom-edit-0001")
+    assert updated["success"],updated
+    allocation=canonical.store.snapshot("brian")["allocations"][0]
+    assert (allocation["grossCents"],allocation["payerShareCents"],allocation["partnerShareCents"],allocation["customPayerBasisPoints"])==(46472,30983,15489,6667)
+    assert canonical.store.snapshot("brian")["events"]==[]
+    assert canonical.sheet.read(2,31,32)==[464.72]
+
+
+@pytest.mark.parametrize("basis",[None,True,False,-1,10001,3333.3,"3333"])
+def test_custom_split_review_rejects_invalid_percentages_before_any_mutation(canonical,saved,monkeypatch,basis):
+    _,_,public=custom_source(canonical,saved,monkeypatch)
+    before=canonical.store.snapshot("brian")
+    history=deepcopy(canonical.history)
+    with pytest.raises(tx.TransactionValidation):
+        tx.review(B,{"id":public["id"],"month":"2026-01","version":public["version"],"operation":"split","method":"custom","payerBasisPoints":basis})
+    assert canonical.store.snapshot("brian")==before and canonical.history==history
+
+
+def test_custom_percentage_change_requires_a_new_review_and_legacy_splits_stay_guarded(canonical,saved,monkeypatch):
+    _,_,public=custom_source(canonical,saved,monkeypatch)
+    change={"id":public["id"],"month":"2026-01","version":public["version"],"operation":"split","method":"custom","payerBasisPoints":3333}
+    preview=tx.review(B,change)["review"]
+    writer=Mock();monkeypatch.setattr(undo,"split_recent_action",writer)
+    before=canonical.store.snapshot("brian")
+    rejected=saved.commands.command(B,{**change,"payerBasisPoints":6667,"reviewVersion":preview["reviewVersion"],"requestId":"isolated-custom-stale-001"})
+    assert not rejected["success"] and rejected["state"]=="done"
+    writer.assert_not_called()
+    assert canonical.store.snapshot("brian")==before
+    monkeypatch.setenv("BOOKIEBOT_REIMBURSEMENTS_ENABLED","false")
+    public["splitOptions"]["custom"]=False
+    with pytest.raises(tx.TransactionValidation):
+        tx.review(B,change)

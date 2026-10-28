@@ -2186,8 +2186,9 @@ def split_recent_action(
     index: int | None = None,
     action_id: str | None = None,
     match_text: str | None = None,
+    custom_payer_basis_points: int | None = None,
 ) -> tuple[bool, str]:
-    """Allocate a gross logged expense and replace its visible amount with the payer's share."""
+    """Apply a split, retaining the full expense for canonical cash accounting."""
     from bookiebot.sheets.collaboration import (
         allocation_for_source_action,
         append_allocation,
@@ -2203,8 +2204,15 @@ def split_recent_action(
     )
 
     method = normalize_split_method(split_method)
-    if method is None or method == "custom":
+    if method is None:
         return False, "Choose By income, 50/50, or Fronted for this split."
+    from bookiebot.reimbursements import service as reimbursement_service
+    custom: dict[str, Any] = {"custom_payer_basis_points": custom_payer_basis_points} if method == "custom" else {}
+    if method == "custom" and (not reimbursement_service.enabled() or type(custom_payer_basis_points) is not int
+                               or not 0 <= custom_payer_basis_points <= 10_000):
+        return False, "Choose an available custom split percentage between 0 and 100."
+    if method != "custom" and custom_payer_basis_points is not None:
+        return False, "A custom percentage requires a custom split."
 
     logged = select_recent_action(
         user_key,
@@ -2219,7 +2227,7 @@ def split_recent_action(
     if not capabilities.can_split:
         return False, capabilities.split_reason
     if _is_canonical_reimbursement(logged.action):
-        return _mutate_canonical_action(user_key, logged, "split", split_method=method)
+        return _mutate_canonical_action(user_key, logged, "split", split_method=method, **custom)
     if allocation_for_source_action(logged.id, user_key) is not None:
         return False, "That transaction already has an active split."
 
@@ -2268,15 +2276,14 @@ def split_recent_action(
         original_person=payer,
     )
     try:
-        payer_share, partner_share = split_amounts(gross_amount, method, payer_owner)
+        payer_share, partner_share = split_amounts(gross_amount, method, payer_owner, **custom)
     except ValueError as exc:
         return False, str(exc)
 
-    from bookiebot.reimbursements import service as reimbursement_service
     if reimbursement_service.enabled():
         return reimbursement_service.record_split(
             str(user_key), logged, ws, field_columns, field_values, payer, method,
-            gross_amount, payer_share, partner_share,
+            gross_amount, payer_share, partner_share, **custom,
         )
 
     visible_amount = gross_amount if method == "fronted" else payer_share
@@ -2394,6 +2401,7 @@ def change_split_recent_action(
     *,
     split_method: str,
     action_id: str,
+    custom_payer_basis_points: int | None = None,
 ) -> tuple[bool, str]:
     """Change an outstanding split method while retaining its immutable gross amount."""
     from bookiebot.sheets.collaboration import (
@@ -2408,15 +2416,22 @@ def change_split_recent_action(
     )
 
     method = normalize_split_method(split_method)
-    if method is None or method == "custom":
+    if method is None:
         return False, "Choose By income, 50/50, or Fronted for this split."
+    custom: dict[str, Any] = {"custom_payer_basis_points": custom_payer_basis_points} if method == "custom" else {}
+    if method == "custom" and (type(custom_payer_basis_points) is not int or not 0 <= custom_payer_basis_points <= 10_000):
+        return False, "Enter a custom split percentage between 0 and 100."
+    if method != "custom" and custom_payer_basis_points is not None:
+        return False, "A custom percentage requires a custom split."
     logged = select_recent_action(user_key, action_id=action_id)
     if logged is None or logged.action.metadata.get("type") != "split":
         return False, "I could not find that active split."
 
     action = logged.action
     if _is_canonical_reimbursement(action):
-        return _mutate_canonical_action(user_key, logged, "split", split_method=method)
+        return _mutate_canonical_action(user_key, logged, "split", split_method=method, **custom)
+    if method == "custom":
+        return False, "Custom percentages are available for current shared expenses. This historical split retains its saved method."
     allocation_id = action.metadata.get("allocation_id", "")
     from bookiebot.reimbursements.service import is_managed
     if is_managed(allocation_id):

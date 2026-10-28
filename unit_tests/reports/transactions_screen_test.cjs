@@ -27,6 +27,7 @@ const respond=async(data,status=200,target=latest())=>run(()=>target.resolve({ok
 const reject=async(target=latest())=>run(()=>target.reject(Error('Lost connection')))
 const body=()=>JSON.parse(latest().options.body)
 const row={id:'2026-10:source-1',actionId:'source-1',month:'2026-10',version:'version-1',date:'2026-10-20',title:'Fixture cable',location:'Fixture shop',person:'Brian (BofA)',kind:'expense',category:'shopping',categoryLabel:'Shopping',amountCents:1234,split:'',fields:{date:'2026-10-20',item:'Fixture cable',amount:'12.34',location:'Fixture shop',person:'Brian (BofA)'},editableFields:['item','amount','location','person'],capabilities:{update:true,move:true,delete:true,split:true,cancel_split:false,undo:true},reasons:{}}
+row.splitOptions={custom:true,payerName:'Brian',partnerName:'Hannah',payerBasisPoints:5000}
 const listing=(items=[row],extra={})=>({items,total:items.length,nextOffset:null,categories:['shopping'],persons:['Brian (BofA)'],month:'2026-10',...extra})
 const review=(change,item=row)=>({review:{item,after:{...item.fields,amount:change.updates?.amount?String(change.updates.amount/100):item.fields.amount},operation:change.operation,destination:change.destination,reviewVersion:'review-'+change.operation,share:change.operation==='split'?{method:'income',payerCents:800,partnerCents:434}:undefined}})
 const expand=async()=>run(()=>tree.root.findAllByType('button').find(n=>n.props.className==='bb-transaction-row-toggle').props.onClick())
@@ -110,6 +111,44 @@ const submit=async()=>run(()=>tree.root.findByType('form').props.onSubmit({preve
   await click('Dismiss transaction result');assert.equal(dismissed,1)
   await run(()=>tree.unmount())
  }
+ for(const editing of [false,true]){
+  const customRow={...row,split:editing?'custom':'',splitOptions:{...row.splitOptions,payerBasisPoints:editing?3333:5000}}
+  await run(()=>{tree=Renderer.create(fixture(true))});await tick();await respond(listing([customRow]));await expand();await click(editing?'Edit split':'Split')
+  const select=tree.root.findByType('form').findByType('select')
+  assert.ok(select.findAllByType('option').some(n=>n.props.value==='custom'))
+  if(!editing)await run(()=>select.props.onChange({target:{value:'custom'}}))
+  const slider=()=>tree.root.findAllByType('input').find(n=>n.props.type==='range')
+  assert.equal(slider().props.value,editing?33.33:50)
+  assert.equal(slider().props.step,'0.01')
+  await run(()=>slider().props.onChange({target:{value:'33.33'}}))
+  assert.match(text(tree.toJSON()),/Brian\$4.11.*Hannah\$8.23/)
+  await run(()=>tree.root.findByProps({'aria-label':"Hannah's percentage"}).props.onChange({target:{value:'25'}}))
+  assert.equal(slider().props.value,75)
+  assert.match(text(tree.toJSON()),/Brian\$9.26.*Hannah\$3.08/)
+  const writes=requests.filter(r=>r.url==='/app/transactions').length
+  await submit();assert.equal(body().method,'custom');assert.equal(body().payerBasisPoints,7500)
+  const prepared=review(body(),customRow);prepared.review.share={method:'custom',payerCents:926,partnerCents:308,payerBasisPoints:7500,payerName:'Brian',partnerName:'Hannah'}
+  await respond(prepared)
+  assert.match(text(tree.toJSON()),/Brian\$9.2675.00%Hannah\$3.0825.00%/)
+  assert.match(text(tree.toJSON()),/No repayment will be marked received/)
+  await click('Back');assert.equal(slider().props.value,75,'Back keeps the exact custom draft')
+  await click('Cancel');assert.equal(requests.filter(r=>r.url==='/app/transactions').length,writes,'Custom preview/cancel never writes')
+  await expand();await click(editing?'Edit split':'Split');if(!editing)await run(()=>tree.root.findByType('form').findByType('select').props.onChange({target:{value:'custom'}}))
+  assert.equal(slider().props.value,editing?33.33:50,'Cancel/reopen restores the saved percentage')
+  if(editing){
+   await submit();const prepared=review(body(),customRow);prepared.review.share={method:'custom',payerCents:411,partnerCents:823,payerBasisPoints:3333,payerName:'Brian',partnerName:'Hannah'}
+   await respond(prepared);await click('Confirm split');const frozen=body();assert.equal(frozen.payerBasisPoints,3333)
+   await reject();await click('Retry same confirmation');assert.deepEqual(body(),frozen,'Custom recovery retains the reviewed percentage and request ID')
+   await respond({state:'done',success:true,summary:{...summary,operation:'split',share:prepared.review.share}})
+   assert.match(text(tree.toJSON()),/Custom splitBrian\$4.1133.33%Hannah\$8.2366.67%/)
+  }else await click('Cancel')
+  await run(()=>tree.unmount())
+ }
+ const customReceipt={...summary,operation:'split',share:{method:'custom',payerCents:411,partnerCents:823,payerBasisPoints:3333,payerName:'Brian',partnerName:'Hannah'}}
+ await run(()=>{tree=Renderer.create(React.createElement(TransactionCompletion,{summary:customReceipt,canUndo:false,disabled:false,onUndo(){},onDismiss(){}}))})
+ assert.match(text(tree.toJSON()),/Custom splitBrian\$4.1133.33%Hannah\$8.2366.67%/)
+ assert.match(text(tree.toJSON()),/Repayments are unchanged/)
+ await run(()=>tree.unmount())
  for(const {options} of requests){
   assert.equal(options.referrerPolicy,'same-origin','Transactions must preserve its real Origin under the private page no-referrer policy, including reviews and saved-command retries')
   assert.equal(options.mode,'same-origin')

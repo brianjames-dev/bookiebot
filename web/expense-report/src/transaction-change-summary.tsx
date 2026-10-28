@@ -1,4 +1,5 @@
 import { ArrowRight, Check, Undo2, X } from "lucide-react"
+import { CustomSplitShares } from "./custom-split"
 
 export type TransactionOperation = "update" | "move" | "delete" | "split" | "cancel_split" | "undo"
 export interface TransactionChangeSummary {
@@ -12,7 +13,7 @@ export interface TransactionChangeSummary {
   before: Record<string, string>
   after: Record<string, string>
   destination?: string
-  share?: {method: string; payerCents: number; partnerCents: number}
+  share?: {method: string; payerCents: number; partnerCents: number; payerBasisPoints?: number; payerName?: string; partnerName?: string}
   restoration?: {operation: "update" | "move"; current: Record<string, string>; currentCategory: string; restoredCategory: string}
 }
 
@@ -50,9 +51,12 @@ export function TransactionChangeDetails({summary, saved = false}: {summary: Tra
         <div className="bb-change-before"><span>{saved ? "Previous" : "Current"}</span><strong>{restoration.currentCategory}</strong></div>
         <ArrowRight size={18} aria-hidden="true"/><div className="bb-change-after"><span>{saved ? "Restored" : "Restore to"}</span><strong>{category}</strong></div>
       </div></div>}
-    {summary.share && <div className="bb-change-split"><p className="bb-change-label">{method(summary.share.method)}</p><div className="bb-change-share-values">
+    {summary.share && <div className="bb-change-split"><p className="bb-change-label">{method(summary.share.method)}</p>{summary.share.method === "custom" && summary.share.payerBasisPoints !== undefined
+      ? <CustomSplitShares payerName={summary.share.payerName ?? "You"} partnerName={summary.share.partnerName ?? "Partner"} payerCents={summary.share.payerCents}
+          partnerCents={summary.share.partnerCents} payerBasisPoints={summary.share.payerBasisPoints}/>
+      : <div className="bb-change-share-values">
       <div><span>Your share</span><strong>{money(summary.share.payerCents)}</strong></div><div><span>Partner’s share</span><strong>{money(summary.share.partnerCents)}</strong></div>
-    </div><p className="bb-change-footnote">{saved ? "Repayments are unchanged." : "No repayment will be marked received."}</p></div>}
+    </div>}<p className="bb-change-footnote">{saved ? "Repayments are unchanged." : "No repayment will be marked received."}</p></div>}
   </div>
 }
 

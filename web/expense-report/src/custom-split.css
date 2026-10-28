@@ -1,0 +1,11 @@
+.bb-custom-split-control { min-width:0; padding:14px; border:1px solid hsl(var(--border)); border-radius:12px; background:hsl(var(--background)); }
+.bb-custom-split-shares { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:16px; }
+.bb-custom-split-shares>div { display:flex; flex-direction:column; align-items:center; gap:7px; min-width:0; text-align:center; overflow-wrap:anywhere; }
+.bb-custom-split-shares>div>span { font-size:12px; color:hsl(var(--muted-foreground)); }
+.bb-custom-split-shares strong { max-width:100%; font-size:clamp(19px,5vw,23px); line-height:1.3; font-weight:600; font-variant-numeric:tabular-nums; }
+.bb-transactions .bb-custom-split-percentage { display:flex; align-items:center; justify-content:center; gap:5px; max-width:100%; margin:0; font-variant-numeric:tabular-nums; }
+.bb-transactions .bb-custom-split-percentage input { width:86px; min-width:0; max-width:calc(100% - 18px); padding:8px 4px; text-align:center; }
+.bb-custom-split-percent { font-variant-numeric:tabular-nums; }
+.bb-transactions .bb-custom-split-slider { margin:12px 0 0; font-size:11px; }
+.bb-transactions .bb-custom-split-control input[type="range"] { width:100%; min-height:44px; padding:0; border:0; background:transparent; accent-color:hsl(var(--primary)); touch-action:pan-y; cursor:pointer; }
+.bb-transactions .bb-custom-split-hint { margin:0; color:hsl(var(--muted-foreground)); text-align:center; font-size:11px; }

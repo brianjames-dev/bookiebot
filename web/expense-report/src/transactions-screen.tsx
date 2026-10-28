@@ -3,6 +3,7 @@ import { ArrowDownLeft, ArrowUpRight, ChevronDown, RefreshCw, Search, SlidersHor
 import { useAppWorkStatus } from "./app-work-guard"
 import { CollapsibleContent } from "./components/ui/motion"
 import { TransactionChangeDetails, TransactionCompletion, type TransactionChangeSummary, type TransactionOperation } from "./transaction-change-summary"
+import { CustomSplitControl } from "./custom-split"
 import "./transactions-screen.css"
 
 type Operation = TransactionOperation
@@ -10,17 +11,18 @@ export interface RecordedTransaction {
   id: string; actionId: string; month: string; version: string; date: string; title: string; location: string
   person: string; kind: string; category: string; categoryLabel: string; amountCents: number; split: string; notice?: string
   fields: Record<string, string>; editableFields: string[]; capabilities: Record<Operation, boolean>; reasons: Record<string, string>
+  splitOptions?: {custom: boolean; payerName: string; partnerName: string; payerBasisPoints: number}
 }
 interface Listing { items: RecordedTransaction[]; total: number; nextOffset: number | null; categories: string[]; persons: string[]; month: string; undo?: {id:string;month:string}; pendingCommand?: Change & {requestId:string;reviewVersion:string} }
-interface Change { id: string; month: string; version?: string; operation: Operation; updates?: Record<string, string | number>; destination?: string; method?: string }
-interface Review { item: RecordedTransaction; after: Record<string, string>; reviewVersion: string; operation: Operation; destination?: string; share?: {method: string; payerCents: number; partnerCents: number}; restoration?: TransactionChangeSummary["restoration"] }
+interface Change { id: string; month: string; version?: string; operation: Operation; updates?: Record<string, string | number>; destination?: string; method?: string; payerBasisPoints?: number }
+interface Review { item: RecordedTransaction; after: Record<string, string>; reviewVersion: string; operation: Operation; destination?: string; share?: TransactionChangeSummary["share"]; restoration?: TransactionChangeSummary["restoration"] }
 interface Result { state: "running" | "done" | "uncertain"; success?: boolean; detail?: string; undo?: {month: string; id: string}; summary?: TransactionChangeSummary }
 const labels: Record<Operation, string> = {update: "Update", move: "Move", delete: "Delete", split: "Split", cancel_split: "Cancel split", undo: "Undo"}
 const reviewTitles: Record<Operation, string> = {update:"Update transaction",move:"Move transaction",delete:"Delete transaction",split:"Split transaction",cancel_split:"Remove split",undo:"Undo change"}
 const categories: Record<string, string> = {grocery: "Grocery", gas: "Gas", food: "Food", shopping: "Shopping", need_expenses: "Needs"}
 const money = (cents: number) => new Intl.NumberFormat("en-US", {style: "currency", currency: "USD"}).format(cents / 100)
 const dateLabel = (value: string) => value ? new Date(value + "T12:00:00").toLocaleDateString(undefined, {month: "short", day: "numeric"}) : "Undated"
-const methodLabel = (value: string) => ({income: "By income", equal: "50/50", fronted: "Fronted"}[value] ?? value)
+const methodLabel = (value: string) => ({income: "By income", equal: "50/50", fronted: "Fronted", custom: "Custom split"}[value] ?? value)
 class RequestError extends Error { constructor(message: string, readonly status: number) { super(message) } }
 async function request(path: string, body?: unknown, signal?: AbortSignal): Promise<any> {
   const controller = new AbortController()
@@ -39,7 +41,9 @@ async function request(path: string, body?: unknown, signal?: AbortSignal): Prom
 }
 function checkedListing(value: any): Listing {
   if (!value || !Array.isArray(value.items) || value.items.length > 40 || !Number.isSafeInteger(value.total) || !Array.isArray(value.categories) || !Array.isArray(value.persons)
-    || value.items.some((row: any) => !row || typeof row.id !== "string" || typeof row.version !== "string" || !Number.isSafeInteger(row.amountCents) || !row.capabilities || !Array.isArray(row.editableFields))) throw new Error("Couldn't read the recorded transactions.")
+    || value.items.some((row: any) => !row || typeof row.id !== "string" || typeof row.version !== "string" || !Number.isSafeInteger(row.amountCents) || !row.capabilities || !Array.isArray(row.editableFields)
+      || row.splitOptions && (typeof row.splitOptions.custom !== "boolean" || !row.splitOptions.payerName || !row.splitOptions.partnerName
+        || !Number.isSafeInteger(row.splitOptions.payerBasisPoints) || row.splitOptions.payerBasisPoints < 0 || row.splitOptions.payerBasisPoints > 10_000))) throw new Error("Couldn't read the recorded transactions.")
   return value
 }
 
@@ -52,6 +56,7 @@ export function TransactionsScreen({active, ownerName, initialMonth}: {active: b
   const [selected, setSelected] = useState<RecordedTransaction | null>(null)
   const [operation, setOperation] = useState<Operation | null>(null), [draft, setDraft] = useState<Record<string, string>>({})
   const [destination, setDestination] = useState(""), [method, setMethod] = useState("income")
+  const [payerBasisPoints, setPayerBasisPoints] = useState(5000)
   const [review, setReview] = useState<Review | null>(null), [reviewBody, setReviewBody] = useState<Change | null>(null)
   const [busy, setBusy] = useState(false), [result, setResult] = useState<Result | null>(null), [pending, setPending] = useState<(Change & {requestId: string; reviewVersion: string}) | null>(null)
   const [revision, setRevision] = useState(0)
@@ -106,6 +111,7 @@ export function TransactionsScreen({active, ownerName, initialMonth}: {active: b
   const begin = (row: RecordedTransaction, op: Operation) => {
     setSelected(row); setOperation(op); setDraft({...row.fields, amount: (row.amountCents / 100).toFixed(2)})
     setDestination(""); setMethod(row.split || "income"); setReview(null); setReviewBody(null); setError(""); setResult(null)
+    setPayerBasisPoints(row.splitOptions?.payerBasisPoints ?? 5000)
   }
   const preview = async (undo?: {id: string; month: string}) => {
     if (inFlight.current || uncertain) return
@@ -128,7 +134,13 @@ export function TransactionsScreen({active, ownerName, initialMonth}: {active: b
         }
         if (operation === "move") body.destination = destination
       }
-      if (operation === "split") body.method = method
+      if (operation === "split") {
+        body.method = method
+        if (method === "custom") {
+          if (!row!.splitOptions?.custom) { setError("Custom percentages are unavailable for this recorded split."); return }
+          body.payerBasisPoints = payerBasisPoints
+        }
+      }
     }
     inFlight.current = true; setBusy(true); setError("")
     try {
@@ -196,7 +208,9 @@ export function TransactionsScreen({active, ownerName, initialMonth}: {active: b
       : <form onSubmit={event=>{event.preventDefault();void preview()}}>
         {operation === "update" && selected?.editableFields.map(field=><label key={field}>{field === "amount" && selected.split ? "Full purchase amount" : field === "person" ? "Person / card" : field[0].toUpperCase()+field.slice(1)}{field === "person" ? <select value={draft[field] ?? ""} onChange={e=>setDraft(value=>({...value,[field]:e.target.value}))}>{["Hannah","Brian (BofA)","Brian (AL)"].map(value=><option key={value}>{value}</option>)}</select> : <input required maxLength={200} inputMode={field === "amount" ? "decimal" : "text"} value={draft[field] ?? ""} onChange={e=>setDraft(value=>({...value,[field]:e.target.value}))}/>}</label>)}
         {operation === "move" && <><label>Move to<select required value={destination} onChange={e=>setDestination(e.target.value)}><option value="">Choose category</option>{Object.entries(categories).filter(([key])=>key!==selected?.category).map(([key,label])=><option value={key} key={key}>{label}</option>)}</select></label>{["food","shopping","need_expenses"].includes(destination) && <label>Item name<input required value={draft.item ?? ""} onChange={e=>setDraft(value=>({...value,item:e.target.value}))}/></label>}</>}
-        {operation === "split" && <label>Split method<select value={method} onChange={e=>setMethod(e.target.value)}><option value="income">By income</option><option value="equal">50/50</option>{selected?.kind === "expense" && <option value="fronted">Fronted</option>}</select></label>}
+        {operation === "split" && <><label>Split method<select value={method} onChange={e=>setMethod(e.target.value)}><option value="income">By income</option><option value="equal">50/50</option>{selected?.kind === "expense" && <option value="fronted">Fronted</option>}{(selected?.splitOptions?.custom || method === "custom") && <option value="custom" disabled={!selected?.splitOptions?.custom}>Custom</option>}</select></label>
+          {method === "custom" && selected?.splitOptions?.custom && <CustomSplitControl grossCents={selected.amountCents} payerName={selected.splitOptions.payerName}
+            partnerName={selected.splitOptions.partnerName} payerBasisPoints={payerBasisPoints} disabled={locked} onChange={setPayerBasisPoints}/>}</>}
         {operation === "delete" && <p>Review this deletion before removing the recorded transaction.</p>}{operation === "cancel_split" && <p>Remove the split and keep the full purchase recorded. No repayment will be marked received.</p>}
         <button className="bb-transaction-primary" type="submit" disabled={locked}>{busy ? "Preparing review…" : "Review change"}</button>
       </form>}
