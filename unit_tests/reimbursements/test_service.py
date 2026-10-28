@@ -307,6 +307,44 @@ def test_edit_split_changes_allocation_only_then_update_preserves_method(setup):
     assert setup.sheet.read(2, 31, 32) == [490.01]
 
 
+@pytest.mark.parametrize("basis,payer,partner",[(0,0,46472),(3333,15489,30983),(10000,46472,0)])
+def test_custom_split_creation_and_later_correction_preserve_precise_percentage(setup,basis,payer,partner):
+    assert split(setup,method="custom",custom_payer_basis_points=basis,payer_share=payer/100,partner_share=partner/100)[0]
+    value=setup.store.snapshot("brian")["allocations"][0]
+    assert value["customPayerBasisPoints"]==basis
+    assert setup.history[0].metadata["custom_payer_basis_points"]==str(basis)
+    assert setup.sheet.read(2,31,32)==[464.72]
+    ok,message=service.mutate_recent_action(BRIAN,selected(setup),"split",split_method="custom",custom_payer_basis_points=6667)
+    assert ok,message
+    value=setup.store.snapshot("brian")["allocations"][0]
+    assert (value["payerShareCents"],value["partnerShareCents"],value["customPayerBasisPoints"])==(30983,15489,6667)
+    assert service.mutate_recent_action(BRIAN,selected(setup),"update",updates={"amount":"123.45"})[0]
+    value=setup.store.snapshot("brian")["allocations"][0]
+    assert (value["payerShareCents"],value["partnerShareCents"])==(8230,4115)
+    assert setup.store.snapshot("brian")["events"]==[]
+
+
+@pytest.mark.parametrize("operation",["receive","report_payment"])
+def test_custom_split_edit_retains_received_and_pending_payment_guards(setup,operation):
+    assert split(setup)[0]
+    value=setup.store.snapshot("brian")["allocations"][0]
+    service.command("brian" if operation=="receive" else "hannah",payment(value,1000,operation))
+    before=setup.store.snapshot("brian")
+    ok,message=service.mutate_recent_action(BRIAN,selected(setup),"split",split_method="custom",custom_payer_basis_points=3333)
+    assert not ok,message
+    assert setup.store.snapshot("brian")==before
+
+
+def test_custom_creation_replay_cannot_change_ratio_when_rounded_amounts_are_identical(setup):
+    values={**VALUES,"amount":"0.01"}
+    setup.sheet.write(2,29,list(values.values()))
+    assert split(setup,values=values,method="custom",gross=.01,payer_share=0,partner_share=.01,custom_payer_basis_points=3000)[0]
+    before=setup.store.snapshot("brian")
+    with pytest.raises(ReimbursementConflictError):
+        split(setup,values=values,method="custom",gross=.01,payer_share=0,partner_share=.01,custom_payer_basis_points=3333)
+    assert setup.store.snapshot("brian")==before and len(setup.history)==1
+
+
 def test_split_move_preserves_obligation_and_repeated_move_prompts_for_missing_item(setup, monkeypatch):
     split(setup)
     ok, message = service.mutate_recent_action(BRIAN, selected(setup), "move", destination_category="grocery")

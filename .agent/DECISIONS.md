@@ -1,5 +1,11 @@
 # Agent Decisions
 
+## 2026-10-27 - Reuse Canonical Custom Percentages In Transactions
+
+Transactions Split/Edit split use the shared ledger's existing integer payer basis points (0–10,000, 0.01% precision), with a slider and either person's exact percentage field. Show named dollar amounts above complementary percentages in the editor, review and saved receipt. Preserve the exact saved percentage, including 0/100, rather than reconstructing it from rounded cents. The server validates both availability and integer range; the percentage participates in review and command fingerprints and creation replay identity, even when two ratios round to the same cents.
+
+Use existing split writers, canonical revisions/projections and full gross cash accounting. Custom corrections retain pending/received/cleared repayment guards and never record a repayment. Legacy historical splits keep their supported methods; no new storage, projection or Undo protocol. New custom drafts start at 50/50; existing custom splits preload their precise ratio. Retain separate review and financial confirmation, and persist named custom-share display evidence in the existing structured result summary.
+
 ## 2026-10-27 - Keep Undo Display Evidence Separate From Its Restoration Target
 
 Undo's existing restored row, action identity, version and financial writer remain authoritative. For Update/Move Undo only, attach optional restoration display evidence (current fields, current category and restored category) from the same fresh owner/month-scoped worksheet/action snapshot already used by review. Do not read Sheets again or replace the restored target with current values. Render Current → Restore to in review and Previous → Restored after success; Move context uses the restored category. Persist the optional evidence in the existing successful command summary so status recovery and same-ID replay preserve the reviewed explanation. Older responses without it keep their existing fallback. Delete/Split Undo, canonical repayment guards and all financial confirmation/recovery semantics are unchanged.

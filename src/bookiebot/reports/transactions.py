@@ -131,12 +131,17 @@ def _public(actor: str, month: str, logged: undo.LoggedAction, rows: list[list[s
     description = values.get("item") or values.get("source") or expense_category_label(category) or action.description
     generated = (action.metadata.get("linked_repayment") == "true") or manual and (values.get("item", "").startswith(("Reimbursement ·", "Offset ·"))
                             or values.get("location", "").startswith(("Reimbursement to ", "Offset to ")))
+    owner = get_user_config(actor).budget_owner_key
+    split_options = {"custom": shared.enabled() and not generated and (capabilities.can_split or canonical and capabilities.can_change_split),
+                     "payerName": owner.title(), "partnerName": "Brian" if owner == "hannah" else "Hannah",
+                     "payerBasisPoints": int(action.metadata.get("custom_payer_basis_points", "5000"))}
     return {"id": uid, "actionId": logged.id, "month": month, "version": version,
             "date": _date(values.get("date", "")), "title": description, "location": values.get("location", ""),
             "person": values.get("person") or action.metadata.get("person") or get_user_config(actor).name,
             "kind": kind, "category": category, "categoryLabel": expense_category_label(category) if category else kind.title(),
             "amountCents": cents(values.get("amount", "")), "fields": values,
             "split": action.metadata.get("split_method", "") if capabilities.can_change_split else "",
+            "splitOptions": split_options,
             "capabilities": {"update": capabilities.can_update and not generated, "move": capabilities.can_move and not generated,
                 "delete": capabilities.can_delete and not generated, "split": (capabilities.can_split or capabilities.can_change_split) and not generated,
                 "cancel_split": capabilities.can_cancel_split and not generated, "undo": capabilities.can_undo and not manual and not generated},
@@ -335,9 +340,18 @@ def _normalized(body: dict[str, Any], row: dict[str, Any]) -> dict[str, Any]:
         result["destination_category"] = destination
     if operation == "split":
         method = body.get("method")
-        if method not in {"income", "equal", "fronted"} or (method == "fronted" and row["kind"] != "expense"):
+        if method not in {"income", "equal", "fronted", "custom"} or (method == "fronted" and row["kind"] != "expense"):
             raise TransactionValidation("Choose By income or 50/50 for a payment, or a supported expense split.")
         result["split_method"] = method
+        if method == "custom":
+            basis = body.get("payerBasisPoints")
+            if not row.get("splitOptions", {}).get("custom") or type(basis) is not int or not 0 <= basis <= 10_000:
+                raise TransactionValidation("Choose an available custom split percentage between 0 and 100.")
+            result["custom_payer_basis_points"] = basis
+        elif "payerBasisPoints" in body:
+            raise TransactionValidation("A custom percentage requires a custom split.")
+    elif "payerBasisPoints" in body:
+        raise TransactionValidation("Only a custom split can change its percentage.")
     return result
 
 
@@ -405,15 +419,18 @@ def review(actor: str, body: dict[str, Any]) -> dict[str, Any]:
     if normalized["operation"] == "split" or (row["split"] and normalized["operation"] == "update" and "amount" in normalized.get("updates", {})):
         from bookiebot.sheets.collaboration import split_amounts
         method = normalized.get("split_method") or row["split"]
-        basis = None
+        basis = normalized.get("custom_payer_basis_points")
         if method == "custom":
-            try:
-                basis = int(row["_logged"].action.metadata.get("custom_payer_basis_points", ""))
-            except (ValueError, TypeError) as exc:
-                raise TransactionValidation("Review this custom split in Shared before changing its amount.") from exc
+            if basis is None:
+                try:
+                    basis = int(row["_logged"].action.metadata.get("custom_payer_basis_points", ""))
+                except (ValueError, TypeError) as exc:
+                    raise TransactionValidation("Review this custom split in Shared before changing its amount.") from exc
         payer, partner = split_amounts(cents(after.get("amount")) / 100, method, get_user_config(actor).budget_owner_key,
                                        custom_payer_basis_points=basis)
         payload["share"] = {"method": method, "payerCents": round(payer * 100), "partnerCents": round(partner * 100)}
+        if method == "custom":
+            payload["share"].update(payerBasisPoints=basis, payerName=row["splitOptions"]["payerName"], partnerName=row["splitOptions"]["partnerName"])
     return {"review": payload, "_row": row, "_normalized": normalized}
 
 
