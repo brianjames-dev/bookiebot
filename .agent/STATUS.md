@@ -1,8 +1,10 @@
 # Agent Status
 
-Last updated: 2026-10-25
+Last updated: 2026-10-27
 
 ## Active Focus
+
+Transactions Safari review repair locally verified (2026-10-27): live October 27 8:20 PM Pacific requests returned 403 at Review change, before any financial command. Isolated WebKit reproduces `Origin: null` under the private page's no-referrer policy; Chromium succeeds. Add the existing app `referrerPolicy: same-origin` to every Transactions request, retaining the strict server origin check, Undo and frozen command recovery. All four isolated reviews now pass in Chromium/WebKit with zero financial writes; focused **32 passed / 31 optional PostgreSQL skipped**, full **2,651 passed / 482 optional PostgreSQL skipped**, clean Python/frontend types and production build. Live description/merchant/amount/date search, type/category/card/split filters and all four Chrome review/cancel paths pass; Chipotle remains $39.88. Shared automatic projection requests are blocked in the audit tab to keep acceptance read-only. CI/release and native Safari checklist 163 remain.
 
 Original chart-animation restoration implemented and locally verified (2026-10-25): restored the original 520ms pie morph and 400ms bar growth at every viewport, replacing temporary fades while preserving reduced motion and other existing animations. Public Recharts adapters keep SVG target identity stable and retain visible geometry for interruption; equivalent lean drawing reduces work. Focused **13 passed**, final full **2,651 passed / 482 optional PostgreSQL skipped**, clean types/build/repeated parity and **28 Chromium/WebKit cases** pass. Controlled phone fixture: scripting **30.8% lower** for pie, **28.2% lower** for bars; WebKit new SVG shapes **94.1% / 93.0% lower**. Release/native acceptance is checklist 162.
 
@@ -197,6 +199,8 @@ All eight September 6 audit batches are implemented and verified locally. Each b
 
 ## On Deck
 
+First: complete CI/release of the locally verified Transactions Safari request-policy repair and native checklist 163. Review/cancel only on production; do not change the Chipotle dinner, RJ11 or any real transaction as a test. Preserve the income-based split and separate repayment confirmation.
+
 First: release/native acceptance of the restored original pie/bar animations (checklist 162). Original motion/timing/easing, stable SVG reuse, interpolation/path parity, interruption, fresh inspections, reduced motion, full lists and 28 browser cases are verified locally. Merge and verify the deployed frontend, then test native phone smoothness.
 
 Previous temporary-fade acceptance (checklist 161) is superseded by the user-requested original-motion restoration in checklist 162. Retain the earlier report/list render isolation.
@@ -296,6 +300,10 @@ Student-loan activation is complete. Verify the deployed fixed-bill display and 
 25. Harden recent-action pending state across restarts/deploys, since selections currently live only in process memory.
 26. Improve targeted recent-action search so commands can find older matches, not only the latest 10 recent actions.
 27. Explore clarifying questions before logging when BookieBot is uncertain instead of guessing or silently failing.
+
+## Completed 2026-10-27
+
+- Diagnosed the real Chipotle $39.88 → $24.88 review rejection from production logs (October 27 8:20 PM Pacific); only `/app/transactions/review` returned 403, with no financial command. A local WebKit fixture reproduces the exact Try again screen and null Origin; the corrected same-origin request policy passes Update/Move/Delete/Split reviews in both engines without financial writes. Regression contracts cover every Transactions request including Undo/recovery, plus rejection of null/foreign/cross-site requests at both POST routes. Live Chrome update/move/delete/income-split previews were canceled, leaving the source unchanged. Verification/release evidence follows above; manual acceptance is checklist 163.
 
 ## Completed 2026-10-25
 
@@ -1072,6 +1080,8 @@ Student-loan activation is complete. Verify the deployed fixed-bill display and 
   - undoing update/delete/move
 
 ## Manual Test Checklist
+
+163. Transactions Safari reviews: load Settings → About & updates → Update now, then Transactions on Safari/Home Screen. Search dinner, Chipotle, amount and date; test one/all months, type/category/person/split filters, clear/reset, empty results and pagination. Select the October 27 Chipotle dinner ($39.88), Update amount to $24.88, Review change and verify the before/after and separate Confirm update; Cancel without confirming. Likewise open Move, Delete and By income Split reviews, inspect destination/gross/both shares/no repayment received, then Cancel. The saved dinner must remain $39.88/Food/unsplit. Do not submit financial confirmations or Undo in production. Use isolated fixtures for successful changes, same-ID response-loss retries and Undo. Strict missing-header/null/foreign/cross-site POSTs must remain rejected. If Shared's automatic GET may replay saved projections, block that route in the audit tab before opening the full app; restore browser test settings after closing the tab. Deployment/Chromium checks do not substitute for native Safari acceptance.
 
 162. Original chart animations: update the phone frontend through Settings → About & updates → Update now. Category Mix should retain the original 520ms slice morph, and Daily Spending its original bar growth/movement, with no whole-plot fade. Rapidly switch Needs/Wants/All and Category Mix Savings, including mid-animation reversals and lists closed/expanded. Verify correct final totals/slices/bars, current slice/day inspection by touch and keyboard, tooltips, Categories dialog, Current/Projected, month/refresh, chart swipes and full transaction rows/Type filtering. Check phone portrait/landscape, tablet/coarse-pointer and desktop layouts, both themes, and reduced motion changed during a transition. Reduced motion must stop the animation and show final data. Prior disclosure/carousel/layout animations and report isolation remain. This supersedes checklist 161's fade expectation. Native iPhone smoothness remains separate from synthetic profiling; all acceptance is read-only.
 

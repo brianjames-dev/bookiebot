@@ -34,8 +34,10 @@ async def test_auth_and_same_origin_required_before_financial_service(client,mon
     for path in ["/app/transactions","/app/transactions/review"]:
         assert (await client.http.post(path,headers=HEADERS,json={})).status==401
     client.connect()
-    assert (await client.http.post('/app/transactions',json={})).status==403
-    assert (await client.http.post('/app/transactions',headers={**HEADERS,"Origin":"https://foreign.invalid"},json={})).status==403
+    for path in ['/app/transactions','/app/transactions/review']:
+        for headers in [{}, {**HEADERS,"Origin":"https://foreign.invalid"},
+                        {**HEADERS,"Origin":"null"}, {**HEADERS,"Sec-Fetch-Site":"cross-site"}]:
+            assert (await client.http.post(path,headers=headers,json={})).status==403
     assert (await client.http.post('/app/transactions',headers=HEADERS,data='x'*8193)).status==400
     writer.assert_not_called()
 

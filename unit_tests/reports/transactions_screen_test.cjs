@@ -74,5 +74,11 @@ const submit=async()=>run(()=>tree.root.findByType('form').props.onSubmit({preve
  await click('Check saved status');assert.match(latest().url,new RegExp('/commands/'+deletion.requestId+'$'));await respond({state:'done',success:true,detail:'Deleted isolated fixture'})
  assert.equal(storage.size,0);assert.equal(work.uncertain,false)
  await run(()=>tree.unmount())
+ for(const {options} of requests){
+  assert.equal(options.referrerPolicy,'same-origin','Transactions must preserve its real Origin under the private page no-referrer policy, including reviews and saved-command retries')
+  assert.equal(options.mode,'same-origin')
+  assert.equal(options.credentials,'same-origin')
+  assert.equal(options.headers['X-BookieBot-App'],'1')
+ }
  console.log('Transactions search/filter, stale responses, review/cancel, every action, Undo, private recovery and request identity passed')
 })().catch(e=>{console.error(e);process.exitCode=1})

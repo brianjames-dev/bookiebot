@@ -27,7 +27,8 @@ async function request(path: string, body?: unknown, signal?: AbortSignal): Prom
   signal?.addEventListener("abort", abort, {once:true})
   const deadline = window.setTimeout(abort, 30_000)
   try {
-  const response = await fetch(path, {method: body ? "POST" : "GET", credentials: "same-origin", cache: "no-store", mode: "same-origin", redirect: "error", signal:controller.signal,
+  // Keep Safari's real Origin under the private page's no-referrer policy.
+  const response = await fetch(path, {method: body ? "POST" : "GET", credentials: "same-origin", cache: "no-store", mode: "same-origin", referrerPolicy: "same-origin", redirect: "error", signal:controller.signal,
     headers: {"X-BookieBot-App": "1", "Content-Type": "application/json"}, body: body ? JSON.stringify(body) : undefined})
   const data = await response.json()
   if (!response.ok) throw new RequestError(response.status === 401 ? "Reconnect BookieBot using /expense_app in Discord." : typeof data?.error === "string" ? data.error : "Couldn't finish this request.", response.status)
