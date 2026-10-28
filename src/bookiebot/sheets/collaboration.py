@@ -135,17 +135,32 @@ def payer_owner_from_person(person: Any, actor_key: str | None) -> str:
     return get_user_config(actor_key).budget_owner_key
 
 
+def custom_split_ratio(basis: int | None, ratio: list[int] | None = None) -> Decimal:
+    """Read legacy percentage splits or an exact amount ratio without losing cents."""
+    if ratio is not None:
+        if (basis is not None or not isinstance(ratio, list) or len(ratio) != 2
+                or any(type(value) is not int for value in ratio)
+                or not 0 <= ratio[0] <= ratio[1] <= 10_000_000_000 or ratio[1] == 0):
+            raise ValueError("A custom split needs valid amounts within the full purchase total.")
+        return Decimal(ratio[0]) / Decimal(ratio[1])
+    if type(basis) is not int or not 0 <= basis <= 10_000:
+        raise ValueError("A custom split needs a payer percentage between 0 and 100.")
+    return Decimal(basis) / 10_000
+
+
 def split_amounts(gross_amount: Any, method: SplitMethod, payer_owner: str, *,
-                  custom_payer_basis_points: int | None = None) -> tuple[float, float]:
+                  custom_payer_basis_points: int | None = None, custom_payer_ratio: list[int] | None = None) -> tuple[float, float]:
     gross = Decimal(str(clean_money(str(gross_amount)))).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
     if gross <= 0:
         raise ValueError("Split expenses must have an amount greater than zero.")
     if method == "fronted":
         return 0.0, float(gross)
     if method == "custom":
-        if type(custom_payer_basis_points) is not int or not 0 <= custom_payer_basis_points <= 10_000:
-            raise ValueError("A custom split needs a payer percentage between 0 and 100.")
-        ratio = Decimal(custom_payer_basis_points) / 10_000
+        ratio = custom_split_ratio(custom_payer_basis_points, custom_payer_ratio)
+        if custom_payer_ratio is not None:
+            numerator, denominator = custom_payer_ratio
+            payer_cents = (2 * int(gross * 100) * numerator + denominator) // (2 * denominator)
+            return payer_cents / 100, (int(gross * 100) - payer_cents) / 100
     elif method == "equal":
         ratio = Decimal("0.5")
     elif payer_owner == "hannah":

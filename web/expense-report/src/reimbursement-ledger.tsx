@@ -1,3 +1,4 @@
+import { ratioShareCents } from "./split-ratio"
 import { useCallback, useEffect, useId, useRef, useState, type ReactNode } from "react"
 import { Card, CardContent, CardHeader, CardTitle } from "./components/ui/card"
 import { AnimatedDisclosure, CollapsibleContent, SlidingSelection } from "./components/ui/motion"
@@ -13,6 +14,7 @@ export interface LedgerAllocation {
   settledCents: number; clearedCents?: number; outstandingCents: number; method: string; version: number
   status: "outstanding" | "settled" | "cleared"; projectedVersion: number; accounting: string
   customPayerBasisPoints?: number
+  customPayerRatio?: [number, number]
 }
 export interface LedgerEvent {
   id: string; operationId: string; allocationId: string; kind: "receive" | "report_payment" | "offset"
@@ -134,9 +136,14 @@ function validate(snapshot: LedgerResponse) {
       .every(value => Number.isSafeInteger(value) && value >= 0)
       || item.grossCents !== item.payerShareCents + item.partnerShareCents
       || item.partnerShareCents !== item.settledCents + (item.clearedCents ?? 0) + item.outstandingCents) throw new Error("Incomplete reimbursement amounts")
-    if (item.method === "custom" && (!Number.isSafeInteger(item.customPayerBasisPoints)
-      || item.customPayerBasisPoints! < 0 || item.customPayerBasisPoints! > 10_000
-      || item.payerShareCents !== Math.floor((item.grossCents * item.customPayerBasisPoints! + 5_000) / 10_000))) throw new Error("Incomplete custom split")
+    if (item.method === "custom") {
+      const ratio = item.customPayerRatio
+      if (ratio !== undefined ? !Array.isArray(ratio) || ratio.length !== 2 || item.customPayerBasisPoints !== undefined
+        || !ratio.every(Number.isSafeInteger) || ratio[0] < 0 || ratio[0] > ratio[1] || ratio[1] <= 0 || ratio[1] > 10_000_000_000
+        || item.payerShareCents !== ratioShareCents(item.grossCents, ratio)
+        : !Number.isSafeInteger(item.customPayerBasisPoints) || item.customPayerBasisPoints! < 0 || item.customPayerBasisPoints! > 10_000
+          || item.payerShareCents !== Math.floor((item.grossCents * item.customPayerBasisPoints! + 5_000) / 10_000)) throw new Error("Incomplete custom split")
+    }
   }
   if (snapshot.resets !== undefined) {
     if (!Array.isArray(snapshot.resets)) throw new Error("Incomplete reset history")
@@ -472,7 +479,8 @@ function SplitEditor({ allocation, disabled, blocked, run, close }: { allocation
   const gross = reimbursementAmountCents(total)
   const valid = gross !== null && gross > 0
   const changed = gross !== review.grossCents || basis !== initialBasis
-  const payerShare = valid ? changed ? Math.floor((gross * basis + 5_000) / 10_000) : review.payerShareCents : null
+  const preserveRatio = review.customPayerRatio && basis === initialBasis
+  const payerShare = valid ? changed ? preserveRatio ? ratioShareCents(gross, review.customPayerRatio!) : Math.floor((gross * basis + 5_000) / 10_000) : review.payerShareCents : null
   const partnerShare = valid && payerShare !== null ? gross - payerShare : null
   const stale = allocation.version !== review.version
   const percent = (value: number) => `${Number((value / 100).toFixed(2))}%`
@@ -482,7 +490,7 @@ function SplitEditor({ allocation, disabled, blocked, run, close }: { allocation
   return <form className="bb-ledger-form bb-ledger-split-editor" onSubmit={event => {
     event.preventDefault()
     if (disabled || blocked || stale || !valid || !changed) return
-    run({ operation: "edit_split", allocationId: review.id, version: review.version, grossCents: gross, payerBasisPoints: basis }, close)
+    run({ operation: "edit_split", allocationId: review.id, version: review.version, grossCents: gross, ...(preserveRatio ? {payerShareCents: payerShare} : {payerBasisPoints: basis}) }, close)
   }}><fieldset disabled={disabled || blocked || stale}><legend>Edit split</legend>
     <label>Expense total ($)<input required inputMode="decimal" value={total} aria-invalid={!valid}
       onChange={event => setTotal(event.target.value)} /></label>

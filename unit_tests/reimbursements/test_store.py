@@ -996,3 +996,29 @@ def test_split_edit_and_receipt_share_the_same_versioned_household_lock(store):
     current = store.get_allocation(value["id"])
     assert current["version"] == value["version"] + 1
     assert (current["grossCents"], current["settledCents"]) in {(10001, 0), (10000, 1000)}
+
+
+def test_dollar_share_edit_switches_between_exact_amount_and_legacy_percentage(store):
+    value=store.register_allocation(payload())
+    store.mark_projected(value["id"],value["version"])
+    for fields in ({"payerShareCents":1000},{"payerBasisPoints":3333},{"payerShareCents":0},{"payerShareCents":46472}):
+        body=command("edit_split",allocationId=value["id"],version=value["version"],grossCents=46472,**fields)
+        result=store.command("brian",body)
+        value=result["allocations"][0]
+        assert result["events"]==[] and store.command("brian",body)==result
+        if "payerShareCents" in fields:
+            assert value["payerShareCents"]==fields["payerShareCents"]
+            assert value["customPayerRatio"]==[fields["payerShareCents"],46472]
+            assert "customPayerBasisPoints" not in value
+        else:
+            assert value["customPayerBasisPoints"]==3333 and "customPayerRatio" not in value
+        store.mark_projected(value["id"],value["version"])
+    value=store.revise_allocation("brian",value["id"],value["version"],{"method":"equal","payerShareCents":23236,"partnerShareCents":23236},operation="split")
+    assert "customPayerRatio" not in value and "customPayerBasisPoints" not in value
+
+
+@pytest.mark.parametrize("ratio",[[1,0],[True,10000],[10001,10000],[-1,10000],[1,1.5],[1,10000,1],"1/10000",[1,MAX_CENTS+1]])
+def test_invalid_exact_custom_ratios_cannot_register_an_allocation(store,ratio):
+    with pytest.raises(ReimbursementValidationError):
+        store.register_allocation(payload()|{"method":"custom","customPayerRatio":ratio})
+    assert store.snapshot("brian")["allocations"]==[]

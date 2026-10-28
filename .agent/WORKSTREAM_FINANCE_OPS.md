@@ -1,8 +1,14 @@
 # Finance Operations Workstream
 
-Last updated: 2026-10-27
+Last updated: 2026-10-28
 
 ## Goal
+
+### Dollar-first Transactions Custom split — 2026-10-28
+
+Implemented; final release/native acceptance is STATUS checklist 167. Supersedes editable percentage fields in Transactions with editable dollar amounts and read-only percentage readouts. Either named amount updates the complementary share, and the slider steps by one cent. Invalid drafts disable review with a correction hint. Persist the exact payer/gross integer ratio in existing canonical JSON so values such as $10.00 of $464.72 do not round to $9.99 through percentage quantization; legacy basis-point allocations remain valid. Integer half-up rounding preserves that original ratio through later gross corrections. Canonical metadata/review/replay and Shared validation/total-only edits support either representation. No table migration or extra sheet reads; full gross bank matching, Undo and all repayment/owner/source/version/claim guards remain.
+
+Focused **333 / 261 optional PostgreSQL skipped**, full local **2,695 / 523 optional skipped**, clean Python/frontend types/build and **24 mobile Chromium/WebKit cases** pass; final release checks are in STATUS. Added regression coverage for exact creation/edit/reopen/replay, invalid shares and ratios, original-ratio preservation, legacy percentage/dollar/method transitions, Shared readability and half-cent/maximum arithmetic. Financial tests use isolated Sheets/database data. No production financial test writes.
 
 ### Transactions Custom split — 2026-10-27
 

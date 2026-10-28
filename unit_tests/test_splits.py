@@ -237,3 +237,11 @@ def test_failed_split_worker_releases_lock_and_owner_context():
 
 def test_custom_split_directive_requires_the_phone_percentage_editor():
     assert requested_split_directive({"split_method": "custom"}) is None
+
+
+@pytest.mark.parametrize("gross,ratio,payer",[(.03,[1,6],.01),(464.72,[1000,46472],10.00),(100_000_000,[9_999_999_999,10_000_000_000],99_999_999.99)])
+def test_exact_custom_ratio_rounds_half_up_without_percentage_quantization(gross,ratio,payer):
+    from bookiebot.sheets.collaboration import split_amounts
+    actual,partner=split_amounts(gross,"custom","brian",custom_payer_ratio=ratio)
+    assert actual==payer
+    assert round(actual*100)+round(partner*100)==round(gross*100)

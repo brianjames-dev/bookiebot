@@ -6,6 +6,7 @@ from types import SimpleNamespace
 from unittest.mock import Mock
 
 import pytest
+import json
 from bookiebot.reports import transactions as tx
 from bookiebot.reports.app_access import AppAccessStore
 from bookiebot.sheets import undo
@@ -473,3 +474,52 @@ def test_custom_percentage_change_requires_a_new_review_and_legacy_splits_stay_g
     public["splitOptions"]["custom"]=False
     with pytest.raises(tx.TransactionValidation):
         tx.review(B,change)
+
+
+def test_custom_dollar_shares_save_exact_cents_edit_reopen_and_preserve_ratio_on_total_correction(canonical,saved,monkeypatch):
+    logged,rows,public=custom_source(canonical,saved,monkeypatch)
+    change={"id":public["id"],"month":"2026-01","version":public["version"],"operation":"split","method":"custom","payerShareCents":1000}
+    before=deepcopy(canonical.sheet.rows)
+    preview=tx.review(B,change)["review"]
+    assert (preview["share"]["payerCents"],preview["share"]["partnerCents"])==(1000,45472)
+    assert canonical.sheet.rows==before and canonical.store.snapshot("brian")["allocations"]==[]
+    writer=Mock(wraps=undo.split_recent_action);monkeypatch.setattr(undo,"split_recent_action",writer)
+    body={**change,"reviewVersion":preview["reviewVersion"],"requestId":"isolated-dollar-create-01"}
+    result=saved.commands.command(B,body)
+    assert result["success"],result
+    assert saved.commands.command(B,body)==result
+    writer.assert_called_once()
+    with pytest.raises(tx.TransactionConflict):
+        saved.commands.command(B,{**body,"payerShareCents":1001})
+    current=undo._canonical_action(logged)
+    public=tx._public(B,"2026-01",current,rows)
+    assert public["splitOptions"]["payerCents"]==1000
+    assert json.loads(current.action.metadata["custom_payer_ratio"])==[1000,46472]
+    assert "custom_payer_basis_points" not in current.action.metadata
+    monkeypatch.setattr(tx,"load_transactions",lambda *args,**kwargs:[public])
+    monkeypatch.setattr(undo,"select_recent_action",lambda *args,**kwargs:current)
+    edited=confirm(saved,{**change,"version":public["version"],"payerShareCents":1001},"isolated-dollar-edit-0001")
+    assert edited["success"],edited
+    current=undo._canonical_action(logged)
+    public=tx._public(B,"2026-01",current,rows)
+    assert public["splitOptions"]["payerCents"]==1001
+    monkeypatch.setattr(tx,"load_transactions",lambda *args,**kwargs:[public])
+    monkeypatch.setattr(undo,"select_recent_action",lambda *args,**kwargs:current)
+    update={"id":public["id"],"month":"2026-01","version":public["version"],"operation":"update","updates":{"amount":12345}}
+    preview=tx.review(B,update)["review"]
+    assert (preview["share"]["payerCents"],preview["share"]["partnerCents"])==(266,12079)
+    result=confirm(saved,update,"isolated-dollar-total-001")
+    assert result["success"],result
+    value=canonical.store.snapshot("brian")["allocations"][0]
+    assert (value["grossCents"],value["payerShareCents"],value["partnerShareCents"],value["customPayerRatio"])==(12345,266,12079,[1001,46472])
+    assert canonical.store.snapshot("brian")["events"]==[]
+    assert canonical.sheet.read(2,31,32)==[123.45]
+
+
+@pytest.mark.parametrize("share",[None,True,False,-1,46473,1000.1,"1000"])
+def test_custom_dollar_review_rejects_invalid_cents_without_writes(canonical,saved,monkeypatch,share):
+    _,_,public=custom_source(canonical,saved,monkeypatch)
+    before=canonical.store.snapshot("brian")
+    with pytest.raises(tx.TransactionValidation):
+        tx.review(B,{"id":public["id"],"month":"2026-01","version":public["version"],"operation":"split","method":"custom","payerShareCents":share})
+    assert canonical.store.snapshot("brian")==before

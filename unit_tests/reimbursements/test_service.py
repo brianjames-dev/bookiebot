@@ -325,12 +325,13 @@ def test_custom_split_creation_and_later_correction_preserve_precise_percentage(
 
 
 @pytest.mark.parametrize("operation",["receive","report_payment"])
-def test_custom_split_edit_retains_received_and_pending_payment_guards(setup,operation):
+@pytest.mark.parametrize("custom",[{"custom_payer_basis_points":3333},{"custom_payer_ratio":[1000,46472]}])
+def test_custom_split_edit_retains_received_and_pending_payment_guards(setup,operation,custom):
     assert split(setup)[0]
     value=setup.store.snapshot("brian")["allocations"][0]
     service.command("brian" if operation=="receive" else "hannah",payment(value,1000,operation))
     before=setup.store.snapshot("brian")
-    ok,message=service.mutate_recent_action(BRIAN,selected(setup),"split",split_method="custom",custom_payer_basis_points=3333)
+    ok,message=service.mutate_recent_action(BRIAN,selected(setup),"split",split_method="custom",**custom)
     assert not ok,message
     assert setup.store.snapshot("brian")==before
 
@@ -718,3 +719,18 @@ def test_personal_bill_total_edit_reads_ancestors_from_shared_monthly_history(se
                  "sourceRevision": {"operation": "edit_split", "version": value["version"] + 1, "before": value}}
     projector.refresh_split_matches(corrected)
     assert setup.bank_calls == [("brian", {value["sourceActionId"], value["splitActionId"], parent})]
+
+
+@pytest.mark.parametrize("payer",[0,1000,46472])
+def test_dollar_split_exact_cents_and_repeated_gross_edits_retain_original_ratio(setup,payer):
+    assert split(setup,method="custom",custom_payer_ratio=[payer,46472],payer_share=payer/100,partner_share=(46472-payer)/100)[0]
+    value=setup.store.snapshot("brian")["allocations"][0]
+    assert value["customPayerRatio"]==[payer,46472]
+    for total in (12345,999999,46472):
+        assert service.mutate_recent_action(BRIAN,selected(setup),"update",updates={"amount":str(total/100)})[0]
+        value=setup.store.snapshot("brian")["allocations"][0]
+        assert value["customPayerRatio"]==[payer,46472]
+        assert value["payerShareCents"]==(2*total*payer+46472)//92944
+        assert value["payerShareCents"]+value["partnerShareCents"]==total
+    assert value["payerShareCents"]==payer
+    assert setup.store.snapshot("brian")["events"]==[]
