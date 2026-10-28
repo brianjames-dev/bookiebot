@@ -51,9 +51,9 @@ export function TransactionChangeDetails({summary, saved = false}: {summary: Tra
         <div className="bb-change-before"><span>{saved ? "Previous" : "Current"}</span><strong>{restoration.currentCategory}</strong></div>
         <ArrowRight size={18} aria-hidden="true"/><div className="bb-change-after"><span>{saved ? "Restored" : "Restore to"}</span><strong>{category}</strong></div>
       </div></div>}
-    {summary.share && <div className="bb-change-split"><p className="bb-change-label">{method(summary.share.method)}</p>{summary.share.method === "custom" && summary.share.payerBasisPoints !== undefined
+    {summary.share && <div className="bb-change-split"><p className="bb-change-label">{method(summary.share.method)}</p>{summary.share.method === "custom"
       ? <CustomSplitShares payerName={summary.share.payerName ?? "You"} partnerName={summary.share.partnerName ?? "Partner"} payerCents={summary.share.payerCents}
-          partnerCents={summary.share.partnerCents} payerBasisPoints={summary.share.payerBasisPoints}/>
+          partnerCents={summary.share.partnerCents}/>
       : <div className="bb-change-share-values">
       <div><span>Your share</span><strong>{money(summary.share.payerCents)}</strong></div><div><span>Partner’s share</span><strong>{money(summary.share.partnerCents)}</strong></div>
     </div>}<p className="bb-change-footnote">{saved ? "Repayments are unchanged." : "No repayment will be marked received."}</p></div>}

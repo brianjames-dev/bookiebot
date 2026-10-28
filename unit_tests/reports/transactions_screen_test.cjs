@@ -112,41 +112,49 @@ const submit=async()=>run(()=>tree.root.findByType('form').props.onSubmit({preve
   await run(()=>tree.unmount())
  }
  for(const editing of [false,true]){
-  const customRow={...row,split:editing?'custom':'',splitOptions:{...row.splitOptions,payerBasisPoints:editing?3333:5000}}
+  const customRow={...row,split:editing?'custom':'',splitOptions:{...row.splitOptions,payerBasisPoints:editing?3333:5000,...(editing?{payerCents:411}:{})}}
   await run(()=>{tree=Renderer.create(fixture(true))});await tick();await respond(listing([customRow]));await expand();await click(editing?'Edit split':'Split')
   const select=tree.root.findByType('form').findByType('select')
   assert.ok(select.findAllByType('option').some(n=>n.props.value==='custom'))
   if(!editing)await run(()=>select.props.onChange({target:{value:'custom'}}))
   const slider=()=>tree.root.findAllByType('input').find(n=>n.props.type==='range')
-  assert.equal(slider().props.value,editing?33.33:50)
-  assert.equal(slider().props.step,'0.01')
-  await run(()=>slider().props.onChange({target:{value:'33.33'}}))
-  assert.match(text(tree.toJSON()),/Brian\$4.11.*Hannah\$8.23/)
-  await run(()=>tree.root.findByProps({'aria-label':"Hannah's percentage"}).props.onChange({target:{value:'25'}}))
-  assert.equal(slider().props.value,75)
-  assert.match(text(tree.toJSON()),/Brian\$9.26.*Hannah\$3.08/)
+  assert.equal(slider().props.value,editing?411:617)
+  assert.equal(slider().props.step,'1')
+  const beforeInvalid=requests.length
+  for(const invalid of['','-1','12.35','1.001','1e2']){
+   await run(()=>tree.root.findByProps({'aria-label':"Brian's share amount"}).props.onChange({target:{value:invalid}}))
+   assert.equal(button('Review change').props.disabled,true)
+   await submit();assert.equal(requests.length,beforeInvalid,'Invalid dollar input cannot request a review')
+  }
+  await run(()=>slider().props.onChange({target:{value:'411'}}))
+  assert.equal(button('Review change').props.disabled,false,'The slider clears an invalid dollar draft')
+  assert.equal(tree.root.findByProps({'aria-label':"Brian's share amount"}).props.value,'4.11')
+  await run(()=>tree.root.findByProps({'aria-label':"Hannah's share amount"}).props.onChange({target:{value:'3.08'}}))
+  assert.equal(slider().props.value,926)
+  assert.equal(tree.root.findByProps({'aria-label':"Brian's share amount"}).props.value,'9.26')
+  assert.match(text(tree.toJSON()),/75.04%.*24.96%/)
   const writes=requests.filter(r=>r.url==='/app/transactions').length
-  await submit();assert.equal(body().method,'custom');assert.equal(body().payerBasisPoints,7500)
+  await submit();assert.equal(body().method,'custom');assert.equal(body().payerShareCents,926)
   const prepared=review(body(),customRow);prepared.review.share={method:'custom',payerCents:926,partnerCents:308,payerBasisPoints:7500,payerName:'Brian',partnerName:'Hannah'}
   await respond(prepared)
-  assert.match(text(tree.toJSON()),/Brian\$9.2675.00%Hannah\$3.0825.00%/)
+  assert.match(text(tree.toJSON()),/Brian\$9.2675.04%Hannah\$3.0824.96%/)
   assert.match(text(tree.toJSON()),/No repayment will be marked received/)
-  await click('Back');assert.equal(slider().props.value,75,'Back keeps the exact custom draft')
+  await click('Back');assert.equal(slider().props.value,926,'Back keeps the exact custom draft')
   await click('Cancel');assert.equal(requests.filter(r=>r.url==='/app/transactions').length,writes,'Custom preview/cancel never writes')
   await expand();await click(editing?'Edit split':'Split');if(!editing)await run(()=>tree.root.findByType('form').findByType('select').props.onChange({target:{value:'custom'}}))
-  assert.equal(slider().props.value,editing?33.33:50,'Cancel/reopen restores the saved percentage')
+  assert.equal(slider().props.value,editing?411:617,'Cancel/reopen restores the saved percentage')
   if(editing){
    await submit();const prepared=review(body(),customRow);prepared.review.share={method:'custom',payerCents:411,partnerCents:823,payerBasisPoints:3333,payerName:'Brian',partnerName:'Hannah'}
-   await respond(prepared);await click('Confirm split');const frozen=body();assert.equal(frozen.payerBasisPoints,3333)
+   await respond(prepared);await click('Confirm split');const frozen=body();assert.equal(frozen.payerShareCents,411)
    await reject();await click('Retry same confirmation');assert.deepEqual(body(),frozen,'Custom recovery retains the reviewed percentage and request ID')
    await respond({state:'done',success:true,summary:{...summary,operation:'split',share:prepared.review.share}})
-   assert.match(text(tree.toJSON()),/Custom splitBrian\$4.1133.33%Hannah\$8.2366.67%/)
+   assert.match(text(tree.toJSON()),/Custom splitBrian\$4.1133.31%Hannah\$8.2366.69%/)
   }else await click('Cancel')
   await run(()=>tree.unmount())
  }
  const customReceipt={...summary,operation:'split',share:{method:'custom',payerCents:411,partnerCents:823,payerBasisPoints:3333,payerName:'Brian',partnerName:'Hannah'}}
  await run(()=>{tree=Renderer.create(React.createElement(TransactionCompletion,{summary:customReceipt,canUndo:false,disabled:false,onUndo(){},onDismiss(){}}))})
- assert.match(text(tree.toJSON()),/Custom splitBrian\$4.1133.33%Hannah\$8.2366.67%/)
+ assert.match(text(tree.toJSON()),/Custom splitBrian\$4.1133.31%Hannah\$8.2366.69%/)
  assert.match(text(tree.toJSON()),/Repayments are unchanged/)
  await run(()=>tree.unmount())
  for(const {options} of requests){

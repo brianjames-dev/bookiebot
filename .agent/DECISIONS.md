@@ -1,5 +1,13 @@
 # Agent Decisions
 
+## 2026-10-28 - Make Custom Dollar Amounts Authoritative
+
+At the user's request, Transactions Custom split edits dollar amounts, displays derived percentages, and uses a cent-step slider. The two shares always sum to the full purchase. Keep raw decimal drafts while typing; invalid amounts block review rather than submitting the previous valid value. Review and receipts show the same exact amounts with read-only percentages. This supersedes the editable percentage controls below.
+
+An integer 0.01% step cannot represent every cent of larger purchases. New dollar splits therefore store optional `customPayerRatio: [payerCents, grossCents]` in the existing allocation JSON, mutually exclusive with legacy `customPayerBasisPoints`. Validate both representations and their exact rounded shares. Preserve the original numerator/denominator through later total corrections, using integer half-up arithmetic (including JS BigInt for large products). No table migration. Canonical action metadata, review/command identity and replay include the exact ratio. A deliberate split edit may replace it; switching to a noncustom method removes custom metadata. Old percentage commands/allocations remain compatible.
+
+Shared accepts both representations; a total-only Shared edit scales an exact amount ratio unless the user deliberately adjusts its existing percentage slider. Full gross cash/bank matching, owner/version/claim/projection lifecycle, Undo, pending/received/cleared repayment guards and separate repayment confirmation remain unchanged.
+
 ## 2026-10-27 - Reuse Canonical Custom Percentages In Transactions
 
 Transactions Split/Edit split use the shared ledger's existing integer payer basis points (0–10,000, 0.01% precision), with a slider and either person's exact percentage field. Show named dollar amounts above complementary percentages in the editor, review and saved receipt. Preserve the exact saved percentage, including 0/100, rather than reconstructing it from rounded cents. The server validates both availability and integer range; the percentage participates in review and command fingerprints and creation replay identity, even when two ratios round to the same cents.

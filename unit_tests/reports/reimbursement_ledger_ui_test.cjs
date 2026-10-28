@@ -933,6 +933,16 @@ async function splitEditorContracts() {
   assert.equal(form(tree).findByProps({ type: "range" }).props.value, 100, "Saved custom percentages reopen exactly")
   await unmount(tree)
 
+  state = ready()
+  state.snapshot.allocations[0] = allocation({ grossCents:46472, payerShareCents:1000, partnerShareCents:45472,
+    settledCents:0, outstandingCents:45472, method:"custom", customPayerRatio:[1000,46472] })
+  tree = await mount(); await expand(tree,"PG&E"); await tap(button(tree.root,"Edit split"))
+  assert.ok(text(form(tree)).includes("$10.00"),"Exact dollar allocations stay readable in Shared")
+  await fill(tree,"Expense total","123.45"); await submit(tree)
+  assert.equal(writes(state)[0].body.payerShareCents,266,"A total-only Shared edit preserves the exact amount ratio")
+  assert.equal(writes(state)[0].body.payerBasisPoints,undefined)
+  await unmount(tree)
+
   for (const changes of [{ settledCents: 2000, outstandingCents: 8000 }, { projectedVersion: 2 },
     { clearedCents: 10000, outstandingCents: 0 }, { accounting: "legacy_net" },
     { payerOwner: "hannah", partnerOwner: "brian" }]) {

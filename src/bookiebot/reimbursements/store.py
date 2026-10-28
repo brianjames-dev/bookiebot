@@ -90,7 +90,7 @@ def _allocation_details(payload: Any) -> dict[str, Any]:
                 "sourceWorksheet", "sourceRow", "sourceActionId", "sourceYear", "grossCents", "payerShareCents",
                 "partnerShareCents", "method", "accounting"}
     optional = {"splitActionId", "sourceSpreadsheetId", "settledCents", "sourceValues", "sourceColumnMap", "actorKey",
-                "ledgerSpreadsheetId", "ledgerYear", "originalPerson", "legacyReceivedAt", "sourceSheetTitle", "baselineSettledCents", "lifecycle", "customPayerBasisPoints"}
+                "ledgerSpreadsheetId", "ledgerYear", "originalPerson", "legacyReceivedAt", "sourceSheetTitle", "baselineSettledCents", "lifecycle", "customPayerBasisPoints", "customPayerRatio"}
     if not isinstance(payload, dict) or set(payload) - required - optional or required - set(payload):
         raise ReimbursementValidationError("Allocation fields are missing or unexpected.")
     result: dict[str, Any] = {}
@@ -123,12 +123,19 @@ def _allocation_details(payload: Any) -> dict[str, Any]:
         raise ReimbursementValidationError("Unknown split or accounting method.")
     result["method"], result["accounting"] = payload["method"], payload["accounting"]
     if result["method"] == "custom":
-        basis = _integer(payload.get("customPayerBasisPoints"), "Payer percentage", 0, 10_000)
-        result["customPayerBasisPoints"] = basis
-        if result["payerShareCents"] != (result["grossCents"] * basis + 5_000) // 10_000:
-            raise ReimbursementValidationError("The shares must match the custom percentage to the cent.")
-    elif "customPayerBasisPoints" in payload:
-        raise ReimbursementValidationError("A custom percentage requires a custom split.")
+        from bookiebot.sheets.collaboration import split_amounts
+        basis, ratio = payload.get("customPayerBasisPoints"), payload.get("customPayerRatio")
+        try:
+            payer, _ = split_amounts(result["grossCents"] / 100, "custom", result["payerOwner"],
+                                    custom_payer_basis_points=basis, custom_payer_ratio=ratio)
+        except ValueError as exc:
+            raise ReimbursementValidationError(str(exc)) from exc
+        key = "customPayerRatio" if ratio is not None else "customPayerBasisPoints"
+        result[key] = ratio if ratio is not None else basis
+        if result["payerShareCents"] != round(payer * 100):
+            raise ReimbursementValidationError("The shares must match the saved custom split to the cent.")
+    elif "customPayerBasisPoints" in payload or "customPayerRatio" in payload:
+        raise ReimbursementValidationError("A custom allocation requires a custom split.")
     if "lifecycle" in payload:
         if payload["lifecycle"] not in {"active", "void", "deleted"}:
             raise ReimbursementValidationError("Unknown reimbursement lifecycle.")
@@ -348,7 +355,7 @@ class ReimbursementStore:
         if operation not in {"split", "update", "move", "cancel", "delete", "edit_split"}:
             raise ReimbursementValidationError("Unknown expense correction.")
         allowed = {"grossCents", "payerShareCents", "partnerShareCents", "method", "payerPerson", "item",
-                   "location", "category", "sourceColumnMap", "sourceValues", "lifecycle", "customPayerBasisPoints"}
+                   "location", "category", "sourceColumnMap", "sourceValues", "lifecycle", "customPayerBasisPoints", "customPayerRatio"}
         if not isinstance(updates, dict) or not updates or set(updates) - allowed:
             raise ReimbursementValidationError("Unexpected expense correction fields.")
         row = self._row(db, allocation_id)
@@ -372,15 +379,16 @@ class ReimbursementStore:
         # Reset metadata is internal and must not become source input on a
         # later edit after Undo. The revision audit still retains it.
         source = {key: value for key, value in before.items() if key not in {"clearedCents", "mirrorOnlyVersion"}}
-        if updates.get("method", source["method"]) != "custom":
-            source.pop("customPayerBasisPoints", None)
+        for key, other in (("customPayerBasisPoints", "customPayerRatio"), ("customPayerRatio", "customPayerBasisPoints")):
+            if updates.get("method", source["method"]) != "custom" or other in updates:
+                source.pop(key, None)
         value = _allocation_details({**source, **updates, "settledCents": 0})
         lifecycle = value.get("lifecycle", "active")
         expected_lifecycle = {"cancel": "void", "delete": "deleted", "split": "active"}.get(operation, before.get("lifecycle", "active"))
         if lifecycle != expected_lifecycle:
             raise ReimbursementValidationError("The expense correction has an invalid lifecycle transition.")
         if operation in {"split", "cancel", "delete"}:
-            allowed_changes = {"method", "payerShareCents", "partnerShareCents", "lifecycle", "customPayerBasisPoints"} if operation == "split" else {"lifecycle"}
+            allowed_changes = {"method", "payerShareCents", "partnerShareCents", "lifecycle", "customPayerBasisPoints", "customPayerRatio"} if operation == "split" else {"lifecycle"}
             if any(before.get(key) != new for key, new in value.items() if key not in allowed_changes):
                 raise ReimbursementValidationError("This action cannot change transaction details.")
         if operation != "move" and any(before.get(key) != value.get(key) for key in ("category", "sourceColumnMap")):
@@ -643,7 +651,7 @@ class ReimbursementStore:
                        "confirm_payment": {"allocationId", "version", "eventId"},
                        "offset": {"entries", "date", "note"}, "reverse": {"eventId"},
                        "receive_all": {"expectedState", "date", "note"},
-                       "edit_split": {"allocationId", "version", "grossCents", "payerBasisPoints"},
+                       "edit_split": {"allocationId", "version", "grossCents", "payerBasisPoints", "payerShareCents"},
                        "reset": {"expectedState", "note"},
                        "undo_reset": {"resetId", "version"}, "redo_reset": {"resetId", "version"}}
             if not isinstance(operation, str) or operation not in allowed or set(body) - common - allowed[operation]:
@@ -655,11 +663,18 @@ class ReimbursementStore:
                 allocation_id = _text(body.get("allocationId"), "Allocation identifier", 200, required=True)
                 self._writable(self._row(db, allocation_id))
                 gross = _cents(body.get("grossCents"), "Expense total")
-                basis = _integer(body.get("payerBasisPoints"), "Payer percentage", 0, 10_000)
-                payer = (gross * basis + 5_000) // 10_000
+                if "payerShareCents" in body:
+                    if "payerBasisPoints" in body:
+                        raise ReimbursementValidationError("Choose a custom amount or percentage, not both.")
+                    payer = _integer(body["payerShareCents"], "Payer share", 0, gross)
+                    custom = {"customPayerRatio": [payer, gross]}
+                else:
+                    basis = _integer(body.get("payerBasisPoints"), "Payer percentage", 0, 10_000)
+                    payer = (gross * basis + 5_000) // 10_000
+                    custom = {"customPayerBasisPoints": basis}
                 self._revise_allocation(db, owner, allocation_id, body.get("version"), {
                     "grossCents": gross, "payerShareCents": payer, "partnerShareCents": gross - payer,
-                    "method": "custom", "customPayerBasisPoints": basis,
+                    "method": "custom", **custom,
                 }, operation="edit_split")
                 changed.append(allocation_id)
             elif operation in {"reset", "undo_reset", "redo_reset"}:

@@ -78,7 +78,7 @@ def command(owner: str, body: dict[str, Any]) -> dict[str, Any]:
 
 def record_split(user_key: str, logged: Any, ws: Any, fields: dict[str, int], values: dict[str, str],
                  payer: str, method: str, gross: float, payer_share: float, partner_share: float,
-                 *, expense_date: date | None = None, custom_payer_basis_points: int | None = None) -> tuple[bool, str]:
+                 *, expense_date: date | None = None, custom_payer_basis_points: int | None = None, custom_payer_ratio: list[int] | None = None) -> tuple[bool, str]:
     """Create one durable allocation before any projection changes sheet values."""
     from bookiebot.sheets.collaboration import partner_owner_key
     from bookiebot.sheets.routing import get_shared_expenses_spreadsheet_id, get_budget_spreadsheet_id_for_user
@@ -105,13 +105,19 @@ def record_split(user_key: str, logged: Any, ws: Any, fields: dict[str, int], va
         allocation = store.get_allocation(identity)
     except ReimbursementNotFoundError:
         allocation = None
-    amounts = {"grossCents": money_cents(gross), "payerShareCents": money_cents(payer_share),
+    amounts: dict[str, Any] = {"grossCents": money_cents(gross), "payerShareCents": money_cents(payer_share),
                "partnerShareCents": money_cents(partner_share)}
     if method == "custom":
-        if type(custom_payer_basis_points) is not int or not 0 <= custom_payer_basis_points <= 10_000:
-            raise ReimbursementValidationError("Enter a custom percentage between 0 and 100.")
-        amounts["customPayerBasisPoints"] = custom_payer_basis_points
-    elif custom_payer_basis_points is not None:
+        from bookiebot.sheets.collaboration import custom_split_ratio
+        try:
+            custom_split_ratio(custom_payer_basis_points, custom_payer_ratio)
+        except ValueError as exc:
+            raise ReimbursementValidationError(str(exc)) from exc
+        if custom_payer_ratio is not None:
+            amounts["customPayerRatio"] = custom_payer_ratio
+        else:
+            amounts["customPayerBasisPoints"] = custom_payer_basis_points
+    elif custom_payer_basis_points is not None or custom_payer_ratio is not None:
         raise ReimbursementValidationError("A custom percentage requires a custom split.")
     if allocation is not None and any(allocation.get(key) != value for key, value in {
         **amounts, "payerOwner": owner, "payerPerson": payer, "method": method,
@@ -144,7 +150,8 @@ def record_split(user_key: str, logged: Any, ws: Any, fields: dict[str, int], va
                       "partner_share": f"{partner_share:.2f}", "original_person": payer,
                       "responsible_person": payer, "responsible_owner_key": owner,
                       "display_fields": json.dumps(list(fields)), "split_operation": "apply",
-                      **({"custom_payer_basis_points": str(custom_payer_basis_points)} if method == "custom" else {})},
+                      **({"custom_payer_ratio": json.dumps(custom_payer_ratio)} if custom_payer_ratio is not None else
+                         {"custom_payer_basis_points": str(custom_payer_basis_points)} if method == "custom" else {})},
             description=f"split {logged.action.description}"))
         if split_id is None:
             return True, "The split is recorded. Action history still needs syncing; no payment has been marked received."
@@ -174,7 +181,7 @@ def _current_source_values(value: dict[str, Any]) -> dict[str, str]:
 
 def mutate_recent_action(user_key: str, logged: Any, operation: str, *,
                          updates: dict[str, Any] | None = None, destination_category: str | None = None,
-                         split_method: str | None = None, custom_payer_basis_points: int | None = None) -> tuple[bool, str]:
+                         split_method: str | None = None, custom_payer_basis_points: int | None = None, custom_payer_ratio: list[int] | None = None) -> tuple[bool, str]:
     """Correct one canonical expense and replay its desired sheet state.
 
     Recent-action records keep their stable IDs. The ledger's durable revisions
@@ -229,18 +236,24 @@ def mutate_recent_action(user_key: str, logged: Any, operation: str, *,
             if method is None:
                 raise ReimbursementValidationError("Choose By income, 50/50, Fronted, or Custom for this split.")
             if method == "custom":
-                if type(custom_payer_basis_points) is not int or not 0 <= custom_payer_basis_points <= 10_000:
-                    raise ReimbursementValidationError("Enter a custom percentage between 0 and 100.")
-            elif custom_payer_basis_points is not None:
+                from bookiebot.sheets.collaboration import custom_split_ratio
+                try:
+                    custom_split_ratio(custom_payer_basis_points, custom_payer_ratio)
+                except ValueError as exc:
+                    raise ReimbursementValidationError(str(exc)) from exc
+            elif custom_payer_basis_points is not None or custom_payer_ratio is not None:
                 raise ReimbursementValidationError("A custom percentage requires a custom split.")
             if method == "fronted" and value["sourceWorksheet"] != "expense":
                 raise ReimbursementValidationError("Fronted is currently available only for shared expense rows.")
             payer, partner = split_amounts(value["grossCents"] / 100, method, owner,
-                                           custom_payer_basis_points=custom_payer_basis_points)
+                                           custom_payer_basis_points=custom_payer_basis_points, custom_payer_ratio=custom_payer_ratio)
             changes = {"method": method, "payerShareCents": money_cents(payer),
                        "partnerShareCents": money_cents(partner), "lifecycle": "active"}
             if method == "custom":
-                changes["customPayerBasisPoints"] = custom_payer_basis_points
+                if custom_payer_ratio is not None:
+                    changes["customPayerRatio"] = custom_payer_ratio
+                else:
+                    changes["customPayerBasisPoints"] = custom_payer_basis_points
             message = f"Updated split to {split_method_label(method)}. {value['partnerOwner'].title()} owes ${partner:.2f}."
         elif operation in {"update", "move"}:
             allowed = set(fields) - {"date"}
@@ -266,7 +279,7 @@ def mutate_recent_action(user_key: str, logged: Any, operation: str, *,
                 if not gross:
                     raise ReimbursementValidationError("The expense amount must be greater than zero.")
                 payer, partner = split_amounts(gross / 100, value["method"], owner,
-                                               custom_payer_basis_points=value.get("customPayerBasisPoints"))
+                                               custom_payer_basis_points=value.get("customPayerBasisPoints"), custom_payer_ratio=value.get("customPayerRatio"))
                 changes.update(grossCents=gross, payerShareCents=money_cents(payer), partnerShareCents=money_cents(partner))
                 updates["amount"] = f"{gross / 100:.2f}"
             source_values.update({key: str(item).strip() for key, item in updates.items()})
