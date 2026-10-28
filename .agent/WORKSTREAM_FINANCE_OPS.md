@@ -4,6 +4,10 @@ Last updated: 2026-10-27
 
 ## Goal
 
+### Update/Move Undo restoration display — 2026-10-27
+
+Implemented and locally verified; release in progress. The two mobile-audit findings are fixed with optional display evidence from the Undo review's existing owner/month-scoped fresh action/worksheet snapshot. Keep current fields and current/restored category separately from the original restored target. Update renders Current → Restore to amounts/changed fields; Move renders the original category and explicit reverse category comparison. Success receipts render Previous → Restored, and persist/replay that evidence in the existing result JSON. No extra sheet reads or changes to financial writers, confirmation/version/claim checks, Delete/Split Undo or repayment behavior. Isolated historical-source/review-cancel, actual Undo, foreign-owner, stale-current-source, status/replay/single-writer and frontend regressions pass. Focused **32 / 31 optional skipped**, full **2,655 / 486 optional skipped**, clean Python/frontend types/locked build and **32 Chromium/WebKit mobile cases** pass in both themes at 320/390px, including actual isolated Update/Move Undo receipts and unchanged Delete/Split cancel/dismiss. The initial sandboxed full run blocked local sockets/chart startup; the final full run with those local test facilities permitted passed. Manual/native acceptance is STATUS 165; no real financial test changes.
+
 ### Mobile transaction confirmation audit — 2026-10-27
 
 Read-only production review/cancel checks passed for Update/Move/Delete/By income Split and the existing Update Undo at 320/390px. Real gross $24.88 and income shares $16.10/$8.78 remain distinct; all controls are 44px and cards have no horizontal overflow. Exact deployed release/assets/health/auth verified. Railway records 10 successful read-only review requests, no financial command POSTs and no automatic Shared projection GETs. The Chipotle source version/amount/category/split/Undo are identical before and after; test browser settings/tools were restored/closed.

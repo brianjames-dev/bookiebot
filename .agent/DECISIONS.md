@@ -1,5 +1,9 @@
 # Agent Decisions
 
+## 2026-10-27 - Keep Undo Display Evidence Separate From Its Restoration Target
+
+Undo's existing restored row, action identity, version and financial writer remain authoritative. For Update/Move Undo only, attach optional restoration display evidence (current fields, current category and restored category) from the same fresh owner/month-scoped worksheet/action snapshot already used by review. Do not read Sheets again or replace the restored target with current values. Render Current → Restore to in review and Previous → Restored after success; Move context uses the restored category. Persist the optional evidence in the existing successful command summary so status recovery and same-ID replay preserve the reviewed explanation. Older responses without it keep their existing fallback. Delete/Split Undo, canonical repayment guards and all financial confirmation/recovery semantics are unchanged.
+
 ## 2026-10-27 - Present Saved Transaction Changes As Structured Receipts
 
 Keep Discord's mutation detail text in the audit/result record, but never render that text as a successful web receipt. After a successful existing financial command, save a small summary of the already validated review (operation, transaction context, before/after fields, destination and optional shares) in the existing result JSON. Return the same summary on saved-status reads and identical-request replay. No new tables or financial commands; preserve request claims, Undo and repayment semantics.

@@ -59,6 +59,7 @@
 .bb-change-meta span+span::before { content:"·"; margin-right:9px; }
 .bb-change-comparisons { display:grid; gap:12px; }
 .bb-change-comparison { padding:14px; border-radius:12px; background:hsl(var(--background)); }
+.bb-change-restoration { margin-top:14px; }
 .bb-transactions .bb-change-label { margin:0 0 12px; color:hsl(var(--muted-foreground)); font-size:11px; line-height:1.4; letter-spacing:.04em; text-transform:uppercase; }
 .bb-change-values { display:grid; grid-template-columns:minmax(0,1fr) 18px minmax(0,1fr); gap:10px; align-items:center; }
 .bb-change-values>svg { color:hsl(var(--muted-foreground)); }
