@@ -9,21 +9,29 @@ const output = req('esbuild').buildSync({entryPoints:['web/expense-report/src/ap
 const moduleObject = {exports:{}}
 vm.runInNewContext(output,{module:moduleObject,exports:moduleObject.exports,require:req})
 const {nextScrollNavigation,screenForReportSource,ReportScreen,AppNavigationContext,fitNavigationSelection} = moduleObject.exports
-// Unequal tracks and compact icons must keep a fitted bubble centered on the
-// actual content, instead of assuming an equal fraction of the whole nav bar.
-for (const [button,content] of [
- [{x:61,y:0,width:86,height:60},{width:69,height:41}],
- [{x:113,y:0,width:77,height:60},{width:69,height:41}],
- [{x:202,y:0,width:94,height:60},{width:35,height:41}],
- [{x:57,y:0,width:55,height:44},{width:21,height:21}],
- [{x:81.390625,y:0,width:88.421875,height:60},{width:68.859375,height:41}],
+// All tabs share one capsule size, centered on their real unequal tracks.
+for (const [pane,tabs,expectedSize] of [
+ [{width:296,height:60},[
+  {button:{x:16,y:4.5,width:49,height:51},content:{width:48,height:41}},
+  {button:{x:65.125,y:4.5,width:71,height:51},content:{width:68.859375,height:41}},
+  {button:{x:136,y:4.5,width:45,height:51},content:{width:36,height:41}},
+  {button:{x:181,y:4.5,width:45,height:51},content:{width:40,height:41}},
+  {button:{x:226,y:4.5,width:54,height:51},content:{width:54,height:41}},
+ ],{width:77,height:52}],
+ [{width:275,height:44},Array.from({length:5},(_,i)=>({button:{x:55*i,y:0,width:55,height:44},content:{width:21,height:21}})),{width:33,height:33}],
 ]) {
- const bubble=fitNavigationSelection(button,content)
- assert.equal(bubble.x+bubble.width/2,button.x+button.width/2)
- assert.equal(bubble.y+bubble.height/2,button.y+button.height/2)
- assert.ok(bubble.width>content.width&&bubble.height>content.height,'The full icon/label stack fits inside the bubble')
- assert.ok(bubble.width<=content.width+12&&bubble.height<=content.height+12,'The bubble stays close to its contents')
- assert.ok(bubble.x>=button.x&&bubble.x+bubble.width<=button.x+button.width,'The bubble stays within its own unequal track')
+ const bubbles=tabs.map((_,i)=>fitNavigationSelection(tabs,i,pane))
+ bubbles.forEach((bubble,i)=>{
+  const {button,content}=tabs[i]
+  assert.equal(bubble.width,bubbles[0].width,'Selecting another tab must never resize the capsule')
+  assert.equal(bubble.height,bubbles[0].height)
+  assert.ok(Math.abs(bubble.x+bubble.width/2-button.x-button.width/2)<1e-8)
+  assert.equal(bubble.y+bubble.height/2,button.y+button.height/2)
+  assert.ok(bubble.width>content.width&&bubble.height>content.height,'The full icon/label stack fits inside the bubble')
+  assert.ok(bubble.x>=2&&bubble.x+bubble.width<=pane.width-2,'Edge capsules stay inside the glass')
+ })
+ assert.equal(bubbles[0].width,expectedSize.width)
+ assert.equal(bubbles[0].height,expectedSize.height)
 }
 let state={lastY:0,travel:0,compact:false}
 for(const y of [5,9,18,23]) state=nextScrollNavigation(state,y,1000)

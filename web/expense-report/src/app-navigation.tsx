@@ -20,9 +20,15 @@ export const AppNavigationContext = createContext<AppNavigation | null>(null)
 export const useAppNavigation = () => useContext(AppNavigationContext)
 
 export interface NavigationBounds { x: number; y: number; width: number; height: number }
-export function fitNavigationSelection(button: NavigationBounds, content: Pick<NavigationBounds, "width" | "height">): NavigationBounds {
-  const width = Math.min(button.width - 4, content.width + 12)
-  const height = Math.min(button.height - 8, content.height + 12)
+type NavigationSize = Pick<NavigationBounds, "width" | "height">
+export function fitNavigationSelection(tabs: { button: NavigationBounds; content: NavigationSize }[], selected: number, pane: NavigationSize): NavigationBounds {
+  // Size once for the largest stack. Keep that same capsule inside the glass
+  // even at the first/last tab, rather than clamping it to unequal tab tracks.
+  const width = Math.min(Math.max(...tabs.map(tab => tab.content.width)) + 12,
+    ...tabs.map(({ button }) => 2 * Math.min(button.x + button.width / 2, pane.width - button.x - button.width / 2) - 4))
+  const height = Math.min(Math.max(...tabs.map(tab => tab.content.height)) + 12,
+    ...tabs.map(({ button }) => 2 * Math.min(button.y + button.height / 2, pane.height - button.y - button.height / 2) - 8))
+  const { button } = tabs[selected]
   return { x: button.x + (button.width - width) / 2, y: button.y + (button.height - height) / 2, width, height }
 }
 

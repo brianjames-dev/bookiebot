@@ -33,6 +33,7 @@ async function geometry(page, label, compact) {
       selected: selected.getAttribute('aria-label'), button: rect(selected),
       bubble: rect(host.querySelector('.bb-navigation-selection')),
       icon: rect(selected.querySelector('svg')), label: rect(selected.firstElementChild.lastElementChild),
+      pane: rect(host), stacks: [...host.querySelectorAll('button > span')].map(rect),
       targets: [...host.querySelectorAll('button')].map(rect),
       overflow: document.documentElement.scrollWidth > innerWidth,
     }
@@ -44,15 +45,17 @@ async function geometry(page, label, compact) {
   close(bubble.y + bubble.height / 2, button.y + button.height / 2, 'Vertical centering')
   close(bubble.x + bubble.width / 2, icon.x + icon.width / 2, 'Icon must center in the bubble')
   const contents = compact ? [icon] : [icon, result.label]
-  const contentWidth = Math.max(...contents.map(content => content.width))
-  const contentHeight = Math.max(...contents.map(content => content.bottom)) - Math.min(...contents.map(content => content.y))
-  assert.ok(bubble.width <= contentWidth + 13 && bubble.height <= contentHeight + 13, 'Bubble must fit the icon/label stack rather than filling a whole tab slot')
+  const widestStack = Math.max(...result.stacks.map(stack => stack.width))
+  const tallestStack = Math.max(...result.stacks.map(stack => stack.height))
+  assert.ok(bubble.width <= widestStack + 13 && bubble.height <= tallestStack + 13, 'One shared size fits the largest icon/label stack')
+  assert.ok(bubble.x >= result.pane.x + 1 && bubble.right <= result.pane.right - 1, 'Edge capsules stay inside the glass')
   for (const content of contents) {
     assert.ok(content.x >= bubble.x + 1 && content.right <= bubble.right - 1, `Bubble must enclose ${label} horizontally`)
     assert.ok(content.y >= bubble.y + 1 && content.bottom <= bubble.bottom - 1, `Bubble must enclose ${label} vertically`)
   }
   result.targets.forEach(target => assert.ok(target.width >= 44 && target.height >= 44, 'At least 44px touch targets'))
   assert.equal(result.overflow, false, 'Navigation must not widen the document')
+  return { width: bubble.width, height: bubble.height }
 }
 
 async function fixture(browser, width, dark, reducedMotion = 'reduce') {
@@ -73,9 +76,15 @@ async function fixture(browser, width, dark, reducedMotion = 'reduce') {
         const page = await fixture(browser, width, dark)
         for (const count of [4, 5]) for (const compact of [false, true]) {
           await page.evaluate(config => window.configure(config), { count, compact })
+          let sharedSize
           for (const label of ['Overview', 'Transactions', 'Shared', 'Savings', ...(count === 5 ? ['Reconcile'] : [])]) {
             await page.getByRole('button', { name: label, exact: true }).click()
-            await geometry(page, label, compact)
+            const size = await geometry(page, label, compact)
+            if (sharedSize) {
+              assert.ok(Math.abs(size.width - sharedSize.width) <= 0.25, 'Every tab must use the same capsule width')
+              assert.ok(Math.abs(size.height - sharedSize.height) <= 0.25, 'Every tab must use the same capsule height')
+            }
+            sharedSize = size
           }
           cases++
         }

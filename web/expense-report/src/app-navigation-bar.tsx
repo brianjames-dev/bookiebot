@@ -16,18 +16,22 @@ function NavigationButton(props: ComponentProps<"button">) {
 }
 
 function selectionBounds(button: HTMLElement) {
-  const content = button.firstElementChild as HTMLElement
   const pane = button.parentElement!
   const frame = pane.getBoundingClientRect()
   const style = getComputedStyle(pane)
   // Preserve subpixel positions, normalizing Konsta's touch/hover scale.
   const scaleX = frame.width / parseFloat(style.width) || 1
   const scaleY = frame.height / parseFloat(style.height) || 1
-  const target = button.getBoundingClientRect()
-  const stack = content.getBoundingClientRect()
-  // Fit the icon/label stack with 6px padding, within the button's own track.
-  return fitNavigationSelection({ x: (target.x - frame.x) / scaleX, y: (target.y - frame.y) / scaleY, width: target.width / scaleX, height: target.height / scaleY },
-    { width: stack.width / scaleX, height: stack.height / scaleY })
+  const buttons = [...pane.querySelectorAll<HTMLElement>("button[data-nav-screen]")]
+  const tabs = buttons.map(target => {
+    const bounds = target.getBoundingClientRect()
+    const stack = target.firstElementChild!.getBoundingClientRect()
+    return {
+      button: { x: (bounds.x - frame.x) / scaleX, y: (bounds.y - frame.y) / scaleY, width: bounds.width / scaleX, height: bounds.height / scaleY },
+      content: { width: stack.width / scaleX, height: stack.height / scaleY },
+    }
+  })
+  return fitNavigationSelection(tabs, buttons.indexOf(button), { width: frame.width / scaleX, height: frame.height / scaleY })
 }
 
 export function AppNavigationBar({ active, current = active, compact, reconciliationVisible, hidden, onSelect }: {

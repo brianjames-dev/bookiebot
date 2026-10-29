@@ -1,5 +1,9 @@
 # Agent Decisions
 
+## 2026-10-29 - Keep Navigation Selection Bubbles Uniform
+
+The user clarified that selected-tab bubbles must share dimensions. Supersede the per-label sizing below: measure all visible stacks, use one capsule sized for the largest stack and constrain it consistently to the glass edges. Center it on each actual button, retaining fractional bounds and touch-scale normalization. Expanded end insets give the first/last capsule room; compact tabs share one icon-sized circle. Keep label-aware target widths, content/host observation, pointer/keyboard behavior and guarded routing. Only the selection position changes when selecting another tab; responsive/compact layout changes may resize the common capsule.
+
 ## 2026-10-29 - Refresh The Active Page With One Pull Gesture
 
 Replace the phone app's routine per-section refresh buttons with one top-edge pull interaction and shared progress/loading/result indicator. Register each mounted controller's existing async refresh by screen, preserving forms, filters and ownership. A single-finger downward drag must start at the document top and reach the resisted threshold on release; short/retreated, horizontal, canceled, multi-touch, nested-scroll and modal gestures cannot refresh. Prevent the browser's native page reload, retain focus/keyboard/desktop access to the same action and respect reduced motion. One in-flight gesture waits for every active-page handler; failures retain each controller's detailed feedback and last data.
