@@ -279,7 +279,7 @@ export function ReconciliationScreen({ controller }: { controller: Controller })
           onClick={() => void load({ operation: "recover_schedule", id: detail.id, version: detail.stateVersion ?? detail.version })}>Verify saved payment change</button>}
         {detail.readOnly && <p className="bb-reconcile-muted">{detail.scheduleRecovery ? "A sheet change may have finished. Verify the saved amounts without writing them again." : "Finish this transaction in BookieBot before checking again."}</p>}
         <ReviewChoices key={detail.version} item={detail} initialReview={snapshot?.preparedReview?.id === detail.id ? snapshot.preparedReview : undefined} disabled={locked || loadingDetail || Boolean(detailError)} onCommand={command => void load(command)} onRejectAccess={rejectAccess} onRefresh={() => { setDetails({}); setDetailRetry(value => value + 1) }} />
-        {!detail.readOnly && detail.status !== "pending" && <button type="button" className="bb-reconcile-action bb-reconcile-secondary" disabled={locked || loadingDetail || Boolean(detailError)}
+        {!detail.readOnly && detail.status !== "pending" && <button type="button" className={`bb-reconcile-action ${detail.status === "needs_review" ? "bb-reconcile-danger" : "bb-reconcile-secondary"}`} disabled={locked || loadingDetail || Boolean(detailError)}
           onClick={() => void load({ operation: detail.status === "needs_review" ? "ignore" : "reopen", id: detail.id, version: detail.stateVersion ?? detail.version })}>{detail.status === "needs_review" ? "Ignore transaction" : "Reopen review"}</button>}
       </>}
     </TransactionRow> })}</div>

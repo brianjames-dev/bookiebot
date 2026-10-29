@@ -158,6 +158,7 @@ const snapshot = (items = rows, enabled = true) => ({ enabled, checkedAt: '2026-
   await expand('Paycheck'); await respond(detail(rows[5]))
   assert.match(rendered(), /\+\$15\.99/); assert.ok(button('Confirm match'), 'Exact income compares absolute bank cents, while displaying money-in direction')
   await expand('New posted'); await respond(detail(rows[6], [])); assert.ok(button('Ignore transaction'))
+  assert.match(button('Ignore transaction').props.className, /bb-reconcile-danger/)
   assert.match(rendered(), /No close match found in your budget sheet/)
   assert.equal(button('Review transaction'), undefined); assert.equal(button('Check for matches'), undefined)
   await expand('New posted'); await expand('New posted'); const rawExact = detail(rows[6]); rawExact.item.version = 'raw-exact-version'; await respond(rawExact)
