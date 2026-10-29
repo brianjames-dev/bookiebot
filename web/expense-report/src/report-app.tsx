@@ -14,6 +14,7 @@ import {
   type TouchEvent,
 } from "react"
 import { createPortal } from "react-dom"
+import { ChevronDown } from "lucide-react"
 import { stablePieAnimation, stableBarAnimation, stableBarShape, StablePieSector, type AnimatedPieSector } from "./chart-animation"
 import { ReportScreen, useAppNavigation } from "./app-navigation"
 import { ReportHeader } from "./report-header"
@@ -1124,27 +1125,14 @@ function CategoryMixFilterControl({
   onFilterChange: (filter: CategoryMixFilter) => void
 }) {
   return (
-    <SlidingSelection
-      value={filter}
-      className="bb-tabs-list bb-category-mix-filter"
-      role="tablist"
-      aria-label="Category mix filter"
-      data-bb-tooltip-dismiss-trigger="category-mix"
-    >
-      {CATEGORY_MIX_FILTERS.map((item) => (
-        <button
-          type="button"
-          key={item.value}
-          className="bb-tabs-trigger"
-          data-state={filter === item.value ? "active" : "inactive"}
-          role="tab"
-          aria-selected={filter === item.value}
-          onClick={() => onFilterChange(item.value)}
-        >
-          {item.label}
-        </button>
-      ))}
-    </SlidingSelection>
+    <div className="bb-category-mix-filter" data-bb-tooltip-dismiss-trigger="category-mix">
+      <select aria-label="Category mix filter" value={filter} onChange={(event) => onFilterChange(event.target.value as CategoryMixFilter)}>
+        {CATEGORY_MIX_FILTERS.map((item) => (
+          <option key={item.value} value={item.value}>{item.value === "all" ? "All categories" : item.label}</option>
+        ))}
+      </select>
+      <ChevronDown className="bb-category-filter-chevron" aria-hidden="true" />
+    </div>
   )
 }
 
@@ -1607,8 +1595,11 @@ const CategoryMixChart = memo(function CategoryMixChart({
   const selectedRollover = categoryMixRollover(categoryBalances, filter)
   const transferRows = categoryMixTransferRows(categoryBalances, filter)
   const chartData = categoryMixRows(data, selectedRollover, filter, amountSaved, transferRows, espp, estimatedEspp)
+  // Spend/savings begin at noon; keep the remaining balance at the end of
+  // the ring without changing the established Categories dialog order.
+  const ringData = [...chartData.filter(item => item.key !== "left"), ...chartData.filter(item => item.key === "left")]
   const [pieHostRef, pieHostSize] = useElementSize<HTMLDivElement>()
-  const pieLayout = useExpensePieLayout(chartData, pieHostSize)
+  const pieLayout = useExpensePieLayout(ringData, pieHostSize)
   const spentTotal = filter === "all" ? allSpentTotal : amountRowsTotal(chartData.filter((item) => item.key !== "left"))
   const pressure = categoryMixPressure(filter, categoryBalances, spentTotal)
   const selectedBudget = (filter === "all" ? categoryBudgetTotal(categoryBudgets) : categoryBudgets[filter]) + ((filter === "all" || filter === "savings") ? espp ?? 0 : 0)
@@ -1618,19 +1609,21 @@ const CategoryMixChart = memo(function CategoryMixChart({
     <div className="bb-chart-stack bb-chart-page">
       <div className="bb-panel-head bb-chart-page-header bb-category-mix-summary">
         <div>
-          <div className="bb-chart-kicker">{filter === "savings" ? "Saved" : "Spent"}</div>
-          <div className="bb-chart-total">{formatMoney(spentTotal)}</div>
-          <div className="bb-chart-mode-note">{projected ? "Projected" : "Current"}</div>
+          <div className="bb-category-summary-label">
+            <span className="bb-chart-kicker">{filter === "savings" ? "Saved" : "Spent"}</span>
+            <span className="bb-chart-mode-note">{projected ? "Projected" : "Current"}</span>
+          </div>
+          <FittedAmount className="bb-chart-total">{formatMoney(spentTotal)}</FittedAmount>
           {selectedBudget > 0 ? (
             <div className="bb-chart-budget-note">
-              {formatMoney(selectedBudget)} budget • {usedPercent.toFixed(2)}% used
+              {formatMoney(selectedBudget)} budget
             </div>
           ) : null}
         </div>
         <div className="bb-chart-page-header-actions">
           <CategoryMixFilterControl filter={filter} onFilterChange={onFilterChange} />
-          {pressure ? <CategoryMixPressureBar pressure={pressure} /> : null}
         </div>
+        {pressure ? <CategoryMixPressureBar pressure={pressure} /> : null}
       </div>
       <div className="bb-chart-layout bb-category-chart-layout bb-chart-page-body">
         <ChartContainer config={chartConfig(chartData)} className="bb-chart-box bb-category-chart-box">
@@ -1639,7 +1632,11 @@ const CategoryMixChart = memo(function CategoryMixChart({
             layout={pieLayout}
             filter={filter}
           >
-            <CategoryMixPieSurface data={chartData} layout={pieLayout} onInspect={onInspect} />
+            <CategoryMixPieSurface data={ringData} layout={pieLayout} onInspect={onInspect} />
+            <div className="bb-category-pie-center" style={{ left: pieLayout.cx, top: pieLayout.cy, width: pieLayout.innerRadius * 1.7 }} aria-live="polite">
+              <FittedAmount className="bb-category-used">{selectedBudget > 0 ? `${Number(usedPercent.toFixed(2))}%` : "—"}</FittedAmount>
+              <span>{selectedBudget > 0 ? "used" : "no budget"}</span>
+            </div>
           </CategoryMixPieMotionHost>
         </ChartContainer>
       </div>
@@ -2033,11 +2030,11 @@ function useExpensePieLayout(data: BreakdownItem[], hostSize: ElementSize) {
       fallbackWidth: 360,
       fallbackHeight: 330,
       minOuterRadius: 72,
-      maxOuterRadius: 122,
-      innerRadiusRatio: 72 / 122,
+      maxOuterRadius: Math.max(PIE_METRIC_MINIMUM_RADIUS, Math.min(hostSize.width || 360, hostSize.height || 330) / 2 - 8),
+      innerRadiusRatio: 0.75,
       labelOffset: 20,
       labelGap: PIE_METRIC_LABEL_GAP,
-      containerPadding: 12,
+      containerPadding: 8,
       compactLabel: false,
       showLabels: false,
     }
@@ -2047,7 +2044,7 @@ function useExpensePieLayout(data: BreakdownItem[], hostSize: ElementSize) {
       fallbackHeight: 390,
       minOuterRadius: 96,
       maxOuterRadius: 150,
-      innerRadiusRatio: 86 / 150,
+      innerRadiusRatio: 0.75,
       labelOffset: 26,
       labelGap: PIE_METRIC_LABEL_GAP,
       containerPadding: 14,
@@ -2060,7 +2057,7 @@ function useExpensePieLayout(data: BreakdownItem[], hostSize: ElementSize) {
       fallbackHeight: 460,
       minOuterRadius: 120,
       maxOuterRadius: 220,
-      innerRadiusRatio: 122 / 220,
+      innerRadiusRatio: 0.75,
       labelOffset: 42,
       labelGap: PIE_METRIC_LABEL_GAP,
       containerPadding: 16,
@@ -2087,8 +2084,8 @@ const PIE_METRIC_LABEL_HALF_HEIGHT = 8
 const PIE_METRIC_LABEL_MIN_VERTICAL_GAP = 18
 const PIE_METRIC_LABEL_WIDTH_SAFETY = 4
 const PIE_METRIC_MINIMUM_RADIUS = 54
-const PIE_METRIC_START_ANGLE = 0
-const PIE_METRIC_END_ANGLE = 360
+const PIE_METRIC_START_ANGLE = 90
+const PIE_METRIC_END_ANGLE = -270
 const PIE_METRIC_PADDING_ANGLE = 1
 
 type PieMetricDelta = {

@@ -50,9 +50,23 @@ const money=value=>new Intl.NumberFormat('en-US',{style:'currency',currency:'USD
         await page.getByRole('button',{name:'Show Category Mix',exact:true}).click()
         for(const [i,mode] of ['Current','Projected'].entries()) {
           await page.getByRole('button',{name:mode,exact:true}).click()
-          await category.getByRole('tab',{name:'All',exact:true}).click()
+          await category.getByRole('combobox',{name:'Category mix filter',exact:true}).selectOption('all')
           assert.equal(await total.innerText(),money(fixture.expected[i]),`${engine.name()} ${width} ${fixture.name} ${mode}: All includes Saved once and retains the canonical adjustment`)
           assert.equal(await total.innerText(),await spentCard.innerText(),'All and the Spent card agree')
+          await page.waitForTimeout(650)
+          const geometry=await category.evaluate(el=>{
+            const rect=selector=>el.querySelector(selector).getBoundingClientRect()
+            const host=rect('.bb-category-pie-host'),ring=rect('.recharts-pie'),center=rect('.bb-category-pie-center'),chevron=rect('.bb-category-filter-chevron'),select=rect('.bb-category-mix-filter select'),amount=rect('.bb-chart-total .bb-fitted-amount-text')
+            const stage=document.querySelector('.bb-chart-carousel-band').getBoundingClientRect()
+            return {fills:ring.width/Math.min(host.width,host.height),centerX:Math.abs((center.left+center.right-ring.left-ring.right)/2),centerY:Math.abs((center.top+center.bottom-ring.top-ring.bottom)/2),inset:select.right-chevron.right,headerFits:amount.right+8<select.left,stage:stage.height,used:el.querySelector('.bb-category-used .bb-fitted-amount-text').textContent,budget:el.querySelector('.bb-chart-budget-note').textContent,mode:el.querySelector('.bb-chart-mode-note').textContent}
+          })
+          assert.ok(geometry.fills>.90&&geometry.fills<=1.01,JSON.stringify(geometry))
+          assert.ok(geometry.centerX<1&&geometry.centerY<1,JSON.stringify(geometry))
+          assert.equal(geometry.inset,14,'The chevron retains its approved right inset')
+          assert.equal(geometry.headerFits,true,'Exact cents fit beside the native dropdown')
+          assert.equal(geometry.mode,mode)
+          assert.equal(geometry.used,`${Number((fixture.expected[i]/(5000+(fixture.espp[i]??0))*100).toFixed(2))}%`)
+          assert.ok(!geometry.budget.includes('used'),'The percentage belongs inside the ring')
           await page.getByRole('button',{name:'Explain Spent',exact:true}).click()
           const dialog=page.getByRole('dialog')
           await dialog.waitFor()
@@ -60,10 +74,10 @@ const money=value=>new Intl.NumberFormat('en-US',{style:'currency',currency:'USD
           if(fixture.name==='cash-espp'&&i===1)assert.ok((await dialog.innerText()).includes('Includes estimated ESPP'))
           await page.keyboard.press('Escape');await page.waitForTimeout(350)
           for(const [filter,expected] of [['Needs',500],['Wants',i?200:150],['Savings',fixture.cash+(fixture.espp[i]??0)]]) {
-            await category.getByRole('tab',{name:filter,exact:true}).click()
+            await category.getByRole('combobox',{name:'Category mix filter',exact:true}).selectOption(filter.toLowerCase())
             assert.equal(await total.innerText(),money(expected),`${filter} retains its own scoped total`)
           }
-          await category.getByRole('tab',{name:'All',exact:true}).click()
+          await category.getByRole('combobox',{name:'Category mix filter',exact:true}).selectOption('all')
           await category.getByRole('button',{name:'Categories',exact:true}).click();await dialog.waitFor()
           const labels=await dialog.locator('.bb-legend-row > span:nth-child(2)').allTextContents()
           assert.equal(labels.filter(label=>label==='Saved'||label==='Cash saved').length,Number(fixture.cash>0),'Recorded cash appears once in All for enrolled and non-enrolled reports')
@@ -74,6 +88,7 @@ const money=value=>new Intl.NumberFormat('en-US',{style:'currency',currency:'USD
         }
         assert.deepEqual(errors,[]);assert.deepEqual(requests,[],'The report test never contacts an app or financial service')
         if(width===390&&dark&&fixture.name==='cash-espp')await page.screenshot({path:`/tmp/bookiebot-category-spent-${engine.name()}.png`,fullPage:true})
+        if(width===390&&dark&&fixture.name==='cash-espp')await category.screenshot({path:`/tmp/bookiebot-category-layout-${engine.name()}.png`})
         await page.close()
       }
     } finally {await browser.close()}

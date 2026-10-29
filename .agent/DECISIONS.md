@@ -1,5 +1,11 @@
 # Agent Decisions
 
+## 2026-10-29 - Apply The Approved Full Width Category Mix Layout
+
+Keep the shared chart tabs, stage height, Categories modal/footer and current financial calculations. Replace only Category Mix's scope tabs with a controlled native All categories/Needs/Wants/Savings selector. Reserve label space and inset its decorative chevron 14px from the right edge; retain a 44px target and 16px text on touch devices. Place the fitted exact-cent Spent/Saved amount, quieter Current/Projected context and budget above the chart, without another month or section title. Keep scoped allocation-pressure information.
+
+Fit the phone ring to its available width and height, retaining category colors, inspection, 520ms morph and Reduce Motion. Draw clockwise from noon, with Income left last in plotted order while preserving the modal's existing order. Use the approved 0.75 inner/outer radius ratio and place the canonical budget-used percentage inside the same measured center, moving it with the existing layout handoff. A missing/zero budget shows no budget rather than an invented percentage. No financial values, records, request scope or persistence change. Native acceptance is checklist 182.
+
 ## 2026-10-29 - Match Category Mix All To The Spent Headline
 
 Extend the user's combined Spent presentation to Category Mix's All header. Share the card's canonical expense-plus-Saved calculation, rather than summing only itemized slices or excluding cash/ESPP. Preserve unitemized sheet adjustments in the displayed total and its budget-used percentage. Saved is the active mode's combined cash and payroll ESPP amount, added once; Projected retains estimate labeling.

@@ -1516,11 +1516,36 @@ summary {
 .bb-panel-head.bb-category-mix-summary {
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;
+  align-items: start;
+  gap: 12px;
 }
-.bb-category-mix-summary > :first-child { grid-column: 1; grid-row: 1 / span 2; }
-.bb-category-mix-summary .bb-chart-page-header-actions { display: contents; }
-.bb-category-mix-summary .bb-category-mix-filter { grid-column: 2; grid-row: 1; align-self: start; }
-.bb-category-mix-summary .bb-category-pressure { grid-column: 2; grid-row: 2; justify-self: end; }
+.bb-category-mix-summary > :first-child { grid-column: 1; grid-row: 1; }
+.bb-category-mix-summary .bb-chart-page-header-actions { grid-column: 2; grid-row: 1; }
+.bb-category-mix-summary > .bb-category-pressure { grid-column: 1 / -1; grid-row: 2; justify-self: stretch; }
+.bb-category-summary-label { display: flex; align-items: baseline; gap: 5px; white-space: nowrap; }
+.bb-category-summary-label .bb-chart-kicker { font-size: 11px; font-weight: 500; letter-spacing: .07em; text-transform: uppercase; }
+.bb-category-summary-label .bb-chart-mode-note { margin: 0; font-size: 11px; font-weight: 400; }
+.bb-category-summary-label .bb-chart-mode-note::before { content: "·"; margin-right: 5px; }
+.bb-category-mix-summary .bb-chart-total { margin-top: 5px; font-size: 40px; line-height: 1.08; letter-spacing: -.055em; }
+.bb-category-mix-summary .bb-chart-budget-note { margin-top: 7px; }
+.bb-category-mix-filter { position: relative; width: 146px; min-width: 0; }
+.bb-category-mix-filter select {
+  appearance: none;
+  -webkit-appearance: none;
+  width: 100%;
+  min-height: 44px;
+  border: 1px solid hsl(var(--border));
+  border-radius: 24px;
+  padding: 8px 36px 8px 12px;
+  background: hsl(var(--primary) / .08);
+  color: hsl(var(--foreground));
+  font: inherit;
+  font-size: 14px;
+  cursor: pointer;
+}
+.bb-category-mix-filter option { color: hsl(var(--foreground)); background: hsl(var(--card)); }
+.bb-category-filter-chevron { position: absolute; top: 50%; right: 14px; width: 16px; height: 16px; transform: translateY(-50%); color: hsl(var(--muted-foreground)); pointer-events: none; }
+@media (pointer: coarse) { .bb-category-mix-filter select { font-size: 16px; } }
 
 .bb-chart-page-body {
   width: 100%;
@@ -1674,6 +1699,18 @@ summary {
   min-width: 0;
   min-height: 0;
 }
+.bb-category-pie-host { position: relative; }
+.bb-category-pie-center {
+  position: absolute;
+  display: grid;
+  gap: 4px;
+  text-align: center;
+  color: hsl(var(--muted-foreground));
+  font-size: 12px;
+  pointer-events: none;
+  transform: translate(calc(-50% + var(--bb-pie-layout-offset-x, 0px)), calc(-50% + var(--bb-pie-layout-offset-y, 0px)));
+}
+.bb-category-used { color: hsl(var(--foreground)); font-size: 46px; font-weight: 500; line-height: 1.1; letter-spacing: -.04em; font-variant-numeric: tabular-nums; }
 
 .bb-category-pie-host .recharts-pie {
   transform: translate(
@@ -1684,11 +1721,13 @@ summary {
   transform-origin: 0 0;
 }
 
-.bb-category-pie-host[data-bb-pie-layout-motion="primed"] .recharts-pie {
+.bb-category-pie-host[data-bb-pie-layout-motion="primed"] .recharts-pie,
+.bb-category-pie-host[data-bb-pie-layout-motion="primed"] .bb-category-pie-center {
   transition: none;
 }
 
-.bb-category-pie-host[data-bb-pie-layout-motion="active"] .recharts-pie {
+.bb-category-pie-host[data-bb-pie-layout-motion="active"] .recharts-pie,
+.bb-category-pie-host[data-bb-pie-layout-motion="active"] .bb-category-pie-center {
   pointer-events: none;
   transition: transform 520ms cubic-bezier(0.22, 1, 0.36, 1);
   will-change: transform;
@@ -1907,7 +1946,8 @@ summary {
 @media (prefers-reduced-motion: reduce) { .bb-report-loading-spinner { animation: none; } }
 
 @media (prefers-reduced-motion: reduce) {
-  .bb-category-pie-host[data-bb-pie-layout-motion="active"] .recharts-pie {
+  .bb-category-pie-host[data-bb-pie-layout-motion="active"] .recharts-pie,
+  .bb-category-pie-host[data-bb-pie-layout-motion="active"] .bb-category-pie-center {
     transition: none;
   }
 }
@@ -3041,10 +3081,6 @@ button:focus-visible, summary:focus-visible {
   .bb-savings-progress-labels span:last-child { text-align: left; }
   .bb-chart-carousel-indicators { width: 100%; gap: 0; justify-content: space-between; }
   .bb-chart-carousel-dot { font-size: 12px; min-height: 52px; }
-  .bb-panel-head.bb-category-mix-summary { grid-template-columns: minmax(0, 1fr); gap: 12px; }
-  .bb-category-mix-summary > :first-child { grid-column: 1; grid-row: 2; }
-  .bb-category-mix-summary .bb-category-mix-filter { grid-column: 1; grid-row: 1; justify-self: start; }
-  .bb-category-mix-summary .bb-category-pressure { grid-column: 1; grid-row: 3; justify-self: start; }
   .bb-report-section { padding: 32px 0 var(--bb-section-footer-space); }
   .bb-card-title { font-size: 27px; }
   .bb-reimbursement-at-glance { grid-template-columns: 1fr; gap: 24px; }
