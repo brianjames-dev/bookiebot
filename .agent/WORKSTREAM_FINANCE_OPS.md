@@ -1,8 +1,12 @@
 # Finance Operations Workstream
 
-Last updated: 2026-10-28
+Last updated: 2026-10-29
 
 ## Goal
+
+### Native-scroll refresh follow-up — 2026-10-29
+
+Replace bounce suppression/canceling drag handlers with passive native-scroll observation. A single continuous pan can reach the top and pull to refresh; no layout stretch is added during touch movement. Retain the larger loading/checkmark and existing page-specific operations after release, accounting for remaining Safari bounce. Added native-pan/boundary/noncancelable/negative-scroll regression coverage and checklist 175. **3 targeted / 2,758 full tests passed**, **557 optional PostgreSQL skipped**, clean types/build and **48 Chromium/WebKit page cases**, including a real continuous Chromium pan. No Finance Ops backlog, financial workflow or persistence change; browser APIs remain isolated fixtures. Physical iOS acceptance remains pending.
 
 ### Pull-refresh header and completion motion — 2026-10-29
 

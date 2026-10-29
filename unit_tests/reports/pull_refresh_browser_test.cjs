@@ -39,7 +39,11 @@ async function waitReady(page,label) {
         const page=await browser.newPage({viewport:{width,height:780},hasTouch:true,isMobile:true,reducedMotion:dark?'reduce':'no-preference'})
         // Push permission/service-worker setup has its own tests. This fixture
         // verifies settings reads and unsaved preferences without enabling push.
-        await page.addInitScript(()=>{delete window.PushManager})
+        await page.addInitScript(()=>{
+          delete window.PushManager
+          window.__preventedMoves=0
+          window.addEventListener('touchmove',event=>{if(event.defaultPrevented)window.__preventedMoves++},{passive:true})
+        })
         const requests=[],errors=[];let failedCheck=false,reportNumber=0,holdCheck=false,releaseCheck
         page.on('pageerror',error=>errors.push(error.message))
         await page.route('**/*',async route=>{
@@ -104,20 +108,25 @@ async function waitReady(page,label) {
         await waitReady(page,'Reconcile');await gesture(page)
         await page.waitForFunction(()=>document.querySelector('.bb-pull-refresh')?.dataset.phase==='done')
         assert.equal(requests.filter(r=>r.name==='/app/reconciliation').at(-1).method,'GET','Uncertain checks refresh status without repeating the bank command')
-        // Real browser touch input validates native capture and prevention too.
+        // Native scrolling stays in the browser; the app only observes it.
         if(width===390&&!dark) {
           await page.waitForFunction(()=>document.querySelector('.bb-pull-refresh')?.dataset.phase==='idle'&&document.querySelector('.bb-pull-refresh-space').getBoundingClientRect().height<.1)
           const geometry=()=>page.evaluate(()=>Object.fromEntries(['.bb-wordmark','.bb-app-avatar','.bb-shell-header-actions','#bb-reconcile-title'].map(selector=>[selector,document.querySelector(selector).getBoundingClientRect().top])))
           const original=await geometry()
+          const originalHeight=await page.evaluate(()=>document.documentElement.scrollHeight)
           holdCheck=true
           const cdp=engine===chromium ? await page.context().newCDPSession(page) : null,before=requests.filter(r=>r.name==='/app/reconciliation').length
           if(cdp) {
             await cdp.send('Input.dispatchTouchEvent',{type:'touchStart',touchPoints:[{x:16,y:78}]})
             for(const y of [100,135,175,220,260])await cdp.send('Input.dispatchTouchEvent',{type:'touchMove',touchPoints:[{x:16,y}]})
           } else await gesture(page,260,{start:78,finish:false})
-          assert.equal(await page.locator('.bb-pull-refresh').getAttribute('data-phase'),'armed')
+          await page.waitForFunction(()=>document.querySelector('.bb-pull-refresh')?.dataset.phase==='armed')
           const pulled=await geometry()
-          for(const selector in original)assert.ok(Math.abs(pulled[selector]-original[selector]-72)<.5,`${selector} must follow the whole-page pull`)
+          for(const selector in original)assert.ok(Math.abs(pulled[selector]-original[selector])<.5,`${selector} must not get a second, scripted drag offset`)
+          assert.equal(await page.locator('.bb-pull-refresh-space').evaluate(node=>node.getBoundingClientRect().height),0,'Dragging never changes page layout')
+          assert.equal(await page.evaluate(()=>document.documentElement.scrollHeight),originalHeight,'Dragging never changes the scroll extent')
+          assert.equal(await page.evaluate(()=>getComputedStyle(document.documentElement).overscrollBehaviorY),'contain','Local native bounce remains enabled')
+          assert.equal(await page.evaluate(()=>window.__preventedMoves),0,'No native touch movement is canceled')
           assert.equal(await page.locator('.bb-pull-refresh-label').count(),0,'There is no visible label')
           assert.ok(await page.evaluate(()=>document.querySelector('#bb-reconcile-title').getBoundingClientRect().top>document.querySelector('.bb-pull-refresh').getBoundingClientRect().bottom),'The pull indicator must not cover the heading')
           await page.screenshot({path:'/tmp/bookiebot-pull-refresh-armed.png'})
@@ -153,6 +162,31 @@ async function waitReady(page,label) {
           await page.waitForFunction(()=>document.querySelector('.bb-pull-refresh')?.dataset.phase==='idle')
           assert.equal(requests.filter(r=>r.name==='/app/reconciliation').length,before+1)
           assert.equal(await page.evaluate(()=>scrollY),0,'The gesture must not reload/navigate or scroll the document')
+          // One continuous real pan must scroll normally from below the top and
+          // then arm refresh, without requiring another touchstart at the edge.
+          if(cdp) {
+            await page.evaluate(()=>{
+              const space=document.createElement('div');space.id='native-scroll-fixture';space.style.height='1400px';document.body.append(space)
+              window.scrollTo(0,120)
+            })
+            await page.waitForFunction(()=>scrollY===120)
+            const count=requests.filter(r=>r.name==='/app/reconciliation').length
+            // Start in the page gutter, outside the filter buttons; interactive
+            // controls intentionally retain their own gesture handling.
+            await cdp.send('Input.dispatchTouchEvent',{type:'touchStart',touchPoints:[{x:4,y:100}]})
+            for(const y of [130,180,240,300,380,460,540]) {
+              await cdp.send('Input.dispatchTouchEvent',{type:'touchMove',touchPoints:[{x:4,y}]})
+              await page.waitForTimeout(35)
+            }
+            assert.equal(await page.evaluate(()=>scrollY),0,'The browser pans freely to the top')
+            await page.waitForFunction(()=>document.querySelector('.bb-pull-refresh')?.dataset.phase==='armed')
+            assert.equal(await page.locator('.bb-pull-refresh-space').evaluate(node=>node.getBoundingClientRect().height),0)
+            assert.equal(await page.evaluate(()=>window.__preventedMoves),0)
+            await cdp.send('Input.dispatchTouchEvent',{type:'touchEnd',touchPoints:[]})
+            await page.waitForFunction(()=>document.querySelector('.bb-pull-refresh')?.dataset.phase==='done')
+            assert.equal(requests.filter(r=>r.name==='/app/reconciliation').length,count+1,'One native pan performs exactly one refresh')
+            await page.evaluate(()=>document.querySelector('#native-scroll-fixture').remove())
+          }
         }
         assert.deepEqual(errors,[])
         assert.ok(requests.filter(r=>r.method==='POST').every(r=>r.name==='/app/reconciliation'&&r.body?.operation==='check'),'No financial mutation or notification POSTs')

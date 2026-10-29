@@ -1,6 +1,8 @@
-html.bb-pull-refresh-enabled { overscroll-behavior-y: none; }
+/* Keep the browser's local bounce; suppress only its separate page-reload action. */
+html.bb-pull-refresh-enabled { overscroll-behavior-y: contain; }
 .bb-pull-refresh-space { flex-shrink: 0; transition: height 320ms var(--bb-motion-ease); }
 .bb-pull-refresh-space[data-phase="pulling"], .bb-pull-refresh-space[data-phase="armed"] { transition: none; }
+.bb-pull-refresh-space[data-native-bounce="true"] { transition: none; }
 .bb-pull-refresh { position: fixed; z-index: 65; top: max(10px, env(safe-area-inset-top, 0px)); left: 50%; transform: translate(-50%, -80px); opacity: 0; pointer-events: none; transition: transform 320ms var(--bb-motion-ease), opacity 260ms; }
 .bb-pull-refresh[data-visible="true"] { transform: translate(-50%, calc(var(--bb-pull-distance) / 2 - 28px)); opacity: 1; }
 .bb-pull-refresh[data-phase="pulling"], .bb-pull-refresh[data-phase="armed"] { transition: opacity 100ms; }

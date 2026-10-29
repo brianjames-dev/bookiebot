@@ -1,5 +1,11 @@
 # Agent Decisions
 
+## 2026-10-29 - Observe Native Scrolling For Pull Refresh
+
+The user's device feedback identified a sticky top boundary from disabling bounce, canceling touch moves and replacing them with layout stretch. Use passive touch/scroll observers without preventDefault, preserve the browser's pan/momentum/local bounce, and allow a single gesture to scroll to the top before counting overpull. Keep root overscroll containment solely to avoid the browser's separate full-page reload; remove the bounce-disabling `none` policy. Noncancelable native-pan events remain observable. Coalesce visual progress to animation frames and leave page height/header offsets unchanged while the finger is down.
+
+After a threshold release, retain the existing loading/result space and icon animation. Subtract Safari's remaining negative scroll offset so native bounce and the loading hold do not double-stretch the page. Momentum alone never dispatches a refresh. This supersedes the scripted drag displacement/start-at-top rules below; thresholds, active-page data scope, drafts, financial confirmation/recovery and keyboard access remain unchanged. Physical Safari/Home Screen acceptance is checklist 175.
+
 ## 2026-10-29 - Pull The Brand And Ease Refresh Into Success
 
 At the user's request, place refresh's in-flow space before the masthead so the title/avatar and page content move together; the fixed header tools mirror the same offset. Use one larger, icon-only refresh control with accessible names/status. Release retracts the page to a 64px hold while the loading ring rotates until all active-page refresh handlers finish. Success fades the spinning ring into a drawn/scaled checkmark, retains that glyph during final retraction, then returns to idle. Failure uses a distinct error icon and retains existing controller errors. Use explicit start/end rotation keyframes: the WebKit frame regression found that a one-sided full turn stayed visually frozen. Reduced motion disables spin/transitions. This supersedes checklist 173's visible labels and fixed-brand/tools presentation; request scope, thresholds, drafts and financial recovery semantics stay the same.
