@@ -1,6 +1,8 @@
 # Agent Status
 
-Last updated: 2026-10-28
+Last updated: 2026-10-29
+
+Main navigation selection alignment (2026-10-29): reproduced the unequal-track defect: Transactions grew wider while Konsta's indicator still used equal fractions, leaving its label outside the bubble. Use the shared sliding selection with measured button/content bounds, content-sized expanded capsules and compact icon bubbles. Touch capture selects by actual button edges and commits once on release; cancel and rejected navigation restore the committed selection. Local **2,757 passed / 557 optional PostgreSQL skipped** (including the newer main changes), **13 focused tests passed**, clean Python/frontend types and locked Node 22 build. The committed browser regression passed **48 Chromium/WebKit width/theme/count/compact cases**, all tabs, native taps, real Chromium drag/cancel, keyboard, guarded navigation, resize and motion. CI/release pending; checklist 172. Finance Ops priorities and financial behavior are unchanged.
 
 Direct reconciliation actions (2026-10-28): Ignore transaction now uses the theme’s red destructive color at the user’s request. Remove the separate Review match/Review transaction setup tap at the user's request. Exact recorded suggestions expose Confirm match directly, including new posted rows; Confirm/Ignore validate fresh state and internally prepare one metadata row before the existing stable-ID claim/CAS writer. Review amount/payment change or Add entry prepares behind that chosen action and opens its actual review/form with the selected alternative retained. GETs/expansion remain read-only; all financial confirmations, owner/source/version/claim and shared-receipt/projection guards remain. Focused **71 passed / 5 optional PostgreSQL skipped**, full local **2,744 passed / 557 optional PostgreSQL skipped**, clean Python/frontend types, Apps Script and locked Node 22 build. **24 isolated full-app mobile Chromium/WebKit cases** pass at 320/390px in both themes, including direct exact confirmation, rejected-confirm recovery, amount/log review/cancel, 44px controls and no overflow; external requests blocked. Read-only live baseline now records Venmo ignored and Ohana/Russian River checked by the user; do not reopen these completed reviews as tests. Release/native acceptance is checklist 170, superseding checklist 169's extra tap.
 
@@ -224,6 +226,8 @@ All eight September 6 audit batches are implemented and verified locally. Each b
 
 ## On Deck
 
+Finish CI/release and native acceptance of the requested main-nav selection alignment (checklist 172); geometry and touch/keyboard regressions pass locally.
+
 First: deployment/native acceptance of the verified Spent/Saved presentation (checklist 171). Spent includes recorded cash plus payroll ESPP exactly once through Saved; Left retains “Savings remaining.” Expense calculations and financial data stay unchanged.
 
 First: release/native acceptance of direct posted reconciliation actions (checklist 170), superseding checklist 169's separate Review match step. Local full/type/build/Apps Script and 24 isolated mobile cases pass. Merge/deploy and verify assets/health/authentication plus the current live completed-decision baseline without changing real transactions. Keep financial test writes isolated; no posted needs-review row is currently available for live button acceptance.
@@ -337,6 +341,10 @@ Student-loan activation is complete. Verify the deployed fixed-bill display and 
 25. Harden recent-action pending state across restarts/deploys, since selections currently live only in process memory.
 26. Improve targeted recent-action search so commands can find older matches, not only the latest 10 recent actions.
 27. Explore clarifying questions before logging when BookieBot is uncertain instead of guessing or silently failing.
+
+## Completed 2026-10-29
+
+- Fixed main-nav bubble geometry using actual button/content measurements and intrinsic label-aware track widths. Reuse the existing sliding-selection observer with optional content sizing; retain glass/glow, 44px targets, pointer drag/cancel, keyboard semantics and guarded routing. Rebuilt assets. Local **2,757 passed / 557 optional PostgreSQL skipped** (including the newer main changes), **13 focused tests passed**, clean types/build, **48 browser combinations** plus touch/resize/motion acceptance pass. Added executed numeric geometry and browser regressions; updated Status, decisions and checklist 172. CI/release pending.
 
 ## Completed 2026-10-28
 
@@ -1133,6 +1141,8 @@ Student-loan activation is complete. Verify the deployed fixed-bill display and 
   - undoing update/delete/move
 
 ## Manual Test Checklist
+
+172. Main navigation selection alignment: after release, load Update now and select each tab in both themes at 320/390px and tablet/desktop widths. The bubble must center on the icon and fully surround the icon + complete label, including Transactions; compact mode must fit the icon alone. Scroll down/up, resize, switch four/five tabs, rapidly change selections, and open Settings: geometry must settle correctly while Settings retains the previous main-tab bubble. Test Space/Enter, tap near Transactions' edges, drag across tabs and cancel a drag; navigate once on release and never on cancel. With a pending/draft work guard, rejected navigation must restore the existing tab. Check reduced motion, at least 44px targets, retained subtle glow and no overflow. Reproduce isolated geometry coverage after building via `BOOKIEBOT_PLAYWRIGHT_MODULE=<installed-playwright-module> node unit_tests/reports/navigation_layout_browser_test.cjs`; no production financial action is needed. Native iPhone acceptance remains pending.
 
 171. Spent includes Saved: update/reopen BookieBot and open Overview in Current and Projected. Spent's info total must equal the card; Needs + Wants + Saved + any sheet adjustment must sum to it. Saved must match the separate Saved card, including cash and ESPP once; projected withholding shows “Includes estimated ESPP” only when present. Left still uses “Savings remaining” with unchanged amounts/percentages and no added “budget” label. Check an ordinary cash-only month and a zero-savings month. For the previously verified October example, Current is Spent $8,513.04 / Saved $1,996.62 / Left $1,470.04; new legitimate transactions may change these figures. Recheck on the phone in both themes; no financial test writes are needed.
 

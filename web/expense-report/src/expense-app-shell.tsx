@@ -1,7 +1,8 @@
-import { useEffect, useLayoutEffect, useRef, useState, type ComponentProps, type ReactNode } from "react"
-import { Tabbar, TabbarLink, Toolbar, ToolbarPane } from "konsta/react"
-import { ArrowLeft, House, ListChecks, MessageCircle, PiggyBank, ReceiptText, Settings, Users } from "lucide-react"
+import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from "react"
+import { Toolbar, ToolbarPane } from "konsta/react"
+import { ArrowLeft, MessageCircle, Settings } from "lucide-react"
 import { AppNavigationContext, nextScrollNavigation, screenForReportSource, screenTitles, type AppScreen, type MainScreen, type ScrollNavigationState } from "./app-navigation"
+import { AppNavigationBar } from "./app-navigation-bar"
 import { ExpenseReportApp, useExpenseReportTheme } from "./report-app"
 import { useReportViewPreferences } from "./report-view-preferences"
 import { expenseReportIdentity } from "./expense-app-session"
@@ -18,17 +19,6 @@ import { useAppWorkGuard } from "./app-work-guard"
 import { ReconciliationScreen, useReconciliation } from "./reconciliation-screen"
 import { TransactionsScreen } from "./transactions-screen"
 import type { ExpenseReportData } from "./types"
-
-const mainScreens = [
-  { id: "overview", Icon: House }, { id: "transactions", Icon: ReceiptText },
-  { id: "shared", Icon: Users }, { id: "savings", Icon: PiggyBank },
-] as const
-
-// Konsta's Link sets role="link" even for a button component. Preserve native
-// button semantics for in-page navigation, including Space/Enter activation.
-function NavigationButton(props: ComponentProps<"button">) {
-  return <button {...props} role={undefined} />
-}
 
 export function ExpenseAppShell({ report, controls, monthControl, comparison, avatarUrl, initialVersion, signOut, signingOut, monthlyReady = true, questionMonth }: {
   report: ExpenseReportData; controls: ReactNode; monthControl: ReactNode; comparison: ReactNode
@@ -236,13 +226,8 @@ export function ExpenseAppShell({ report, controls, monthControl, comparison, av
       </main>}
 
       {/* top omits Konsta’s under-bar blur/gradient; CSS anchors this floating bar at the bottom. */}
-      <Tabbar top component="nav" icons labels className="bb-bottom-navigation" aria-label="Main navigation" data-compact={compact && !askOpen} data-tab-count={reconciliationVisible ? 5 : 4} hidden={keyboardOpen}>
-        <ToolbarPane className="bb-navigation-pane">
-          {[...mainScreens, ...(reconciliationVisible ? [{ id: "reconcile" as const, Icon: ListChecks }] : [])].map(({ id, Icon }) => <TabbarLink key={id} component={NavigationButton} linkProps={{ type: "button" }} className="bb-navigation-link"
-            active={screen === id || (screen === "settings" && lastMain === id)} aria-label={screenTitles[id]} aria-current={screen === id ? "page" : undefined}
-            label={screenTitles[id]} icon={<Icon size={23} strokeWidth={1.7} aria-hidden="true" />} onClick={() => selectScreen(id)} />)}
-        </ToolbarPane>
-      </Tabbar>
+      <AppNavigationBar active={screen === "settings" ? lastMain : screen} current={screen === "settings" ? null : screen} compact={compact && !askOpen}
+        reconciliationVisible={reconciliationVisible} hidden={keyboardOpen} onSelect={selectScreen} />
       <AskBookieBotPanel open={askOpen && monthlyReady} openerRef={askTriggerRef} onClose={() => setAskOpen(false)} month={questionMonth ?? `${report.year}-${String(report.month).padStart(2, "0")}`} mode={preferences.mode} onShowSource={showSource} />
       <AppUpdatePrompt initialVersion={initialVersion} onAvailabilityChange={setAvailableVersion} />
     </div>

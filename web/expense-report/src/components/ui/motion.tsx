@@ -67,7 +67,7 @@ export function AnimatedDisclosure({ summary, children, open: controlledOpen, on
 
 // Measure actual button widths so the same moving indicator supports both short
 // filters and variable-width chart names, including after a responsive resize.
-export function useSlidingSelection(value: string | number) {
+export function useSlidingSelection(value: string | number, measureSelection?: (selected: HTMLElement) => { x: number; y: number; width: number; height: number }) {
   const ref = useRef<HTMLDivElement | null>(null)
   useLayoutEffect(() => {
     const host = ref.current
@@ -78,10 +78,11 @@ export function useSlidingSelection(value: string | number) {
         ':scope > button[data-state="active"], :scope > button[aria-pressed="true"], :scope > button[aria-selected="true"]',
       )
       if (!selected || !selected.offsetWidth) return
-      host.style.setProperty("--bb-selection-x", `${selected.offsetLeft}px`)
-      host.style.setProperty("--bb-selection-y", `${selected.offsetTop}px`)
-      host.style.setProperty("--bb-selection-width", `${selected.offsetWidth}px`)
-      host.style.setProperty("--bb-selection-height", `${selected.offsetHeight}px`)
+      const bounds = measureSelection?.(selected) ?? { x: selected.offsetLeft, y: selected.offsetTop, width: selected.offsetWidth, height: selected.offsetHeight }
+      host.style.setProperty("--bb-selection-x", `${bounds.x}px`)
+      host.style.setProperty("--bb-selection-y", `${bounds.y}px`)
+      host.style.setProperty("--bb-selection-width", `${bounds.width}px`)
+      host.style.setProperty("--bb-selection-height", `${bounds.height}px`)
       if (!host.dataset.selectionReady) {
         readyFrame = requestAnimationFrame(() => { host.dataset.selectionReady = "true" })
       }
@@ -89,12 +90,15 @@ export function useSlidingSelection(value: string | number) {
     measure()
     const observer = new ResizeObserver(measure)
     observer.observe(host)
-    host.querySelectorAll("button").forEach((button) => observer.observe(button))
+    host.querySelectorAll("button").forEach((button) => {
+      observer.observe(button)
+      if (measureSelection && button.firstElementChild) observer.observe(button.firstElementChild)
+    })
     return () => {
       observer.disconnect()
       cancelAnimationFrame(readyFrame)
     }
-  }, [value])
+  }, [value, measureSelection])
   return ref
 }
 

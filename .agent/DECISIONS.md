@@ -1,5 +1,11 @@
 # Agent Decisions
 
+## 2026-10-29 - Fit Navigation Selections To Rendered Tab Content
+
+Main navigation keeps Konsta glass and native button semantics, but uses the report's shared measured sliding indicator instead of Konsta's equal-width tab highlight. Intrinsic label-aware button widths and measured icon/label bounds determine the capsule; compact mode fits the icon alone. Touch capture uses actual button edges, commits once on release and restores the active selection after cancellation or rejected routing. Observe content as well as button/container resizes. Other sliding selectors retain their existing button-bound measurement.
+
+Rationale: the longer Transactions label needed a wider track, while Konsta positioned its highlight using equal fractions. Measuring the rendered content removes both the positional drift and excessive width without shrinking labels or reducing tap targets.
+
 ## 2026-10-28 - Include Saved In The Spent Headline
 
 At the user's request, Overview Spent and its explanation show expense outflows plus the active mode's Saved amount. The compact breakdown uses Needs, Wants and Saved, retaining any legacy sheet adjustment. Saved already combines cash savings and payroll ESPP; add that combined value once, and identify estimated ESPP in Projected. Keep Left and its “Savings remaining” label unchanged, without adding “budget.” A zero savings remainder means the allocation has already been used, including recorded savings and any existing overspending coverage.
