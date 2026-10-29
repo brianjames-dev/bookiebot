@@ -1,0 +1,19 @@
+html.bb-pull-refresh-enabled { overscroll-behavior-y: none; }
+.bb-pull-refresh-space { flex-shrink: 0; transition: height 180ms var(--bb-motion-ease); }
+.bb-pull-refresh-space[data-phase="pulling"], .bb-pull-refresh-space[data-phase="armed"] { transition: none; }
+.bb-pull-refresh { position: fixed; z-index: 65; top: max(10px, env(safe-area-inset-top, 0px)); left: 50%; transform: translate(-50%, -80px); opacity: 0; pointer-events: none; transition: transform 180ms var(--bb-motion-ease), opacity 180ms; }
+.bb-pull-refresh[data-visible="true"] { transform: translate(-50%, var(--bb-pull-distance)); opacity: 1; }
+.bb-pull-refresh[data-phase="pulling"], .bb-pull-refresh[data-phase="armed"] { transition: opacity 100ms; }
+.bb-pull-refresh-button { display: flex; align-items: center; gap: 7px; min-height: 44px; border: 1px solid hsl(var(--border)); border-radius: 24px; padding: 5px 12px 5px 6px; background: hsl(var(--card)); color: hsl(var(--primary)); box-shadow: 0 3px 14px #0001; font: inherit; font-size: 12px; white-space: nowrap; cursor: pointer; pointer-events: auto; touch-action: manipulation; }
+.bb-pull-refresh-button svg { width: 30px; height: 30px; fill: none; stroke: currentColor; stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; }
+.bb-pull-track { opacity: .16; }
+.bb-pull-progress { transform: rotate(-90deg); transform-origin: center; }
+.bb-pull-arrow { stroke-width: 1.5; }
+.bb-pull-refresh[data-phase="refreshing"] .bb-pull-progress { stroke-dashoffset: 25; animation: bb-pull-spin 850ms linear infinite; }
+.bb-pull-refresh[data-phase="refreshing"] .bb-pull-arrow { opacity: 0; }
+.bb-pull-refresh[data-phase="error"] .bb-pull-refresh-button { color: hsl(var(--destructive)); }
+.bb-pull-refresh-button:focus-visible { outline: 2px solid hsl(var(--primary)); outline-offset: 3px; }
+.bb-pull-refresh:focus-within { opacity: 1; transform: translate(-50%, 66px); }
+@media (hover: hover) and (pointer: fine) { .bb-pull-refresh[data-visible="false"] { opacity: 1; transform: translate(-50%, 0); } .bb-pull-refresh[data-visible="false"] .bb-pull-refresh-label { font-size: 0; } .bb-pull-refresh[data-visible="false"] .bb-pull-refresh-label::after { content: "Refresh"; font-size: 12px; } }
+@keyframes bb-pull-spin { to { transform: rotate(270deg); } }
+@media (prefers-reduced-motion: reduce) { .bb-pull-refresh, .bb-pull-refresh-space { transition: none; } .bb-pull-refresh[data-phase="refreshing"] .bb-pull-progress { animation: none; } }

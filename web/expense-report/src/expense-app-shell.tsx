@@ -18,13 +18,20 @@ import { AppUpdatePrompt } from "./app-update-prompt"
 import { useAppWorkGuard } from "./app-work-guard"
 import { ReconciliationScreen, useReconciliation } from "./reconciliation-screen"
 import { TransactionsScreen } from "./transactions-screen"
+import { PageRefreshProvider, usePageRefresh } from "./page-refresh"
+import { PullToRefresh } from "./pull-to-refresh"
 import type { ExpenseReportData } from "./types"
 
-export function ExpenseAppShell({ report, controls, monthControl, comparison, avatarUrl, initialVersion, signOut, signingOut, monthlyReady = true, questionMonth }: {
+interface ExpenseAppShellProps {
   report: ExpenseReportData; controls: ReactNode; monthControl: ReactNode; comparison: ReactNode
   avatarUrl: string; initialVersion: string; signOut: () => void; signingOut: boolean
   monthlyReady?: boolean; questionMonth?: string
-}) {
+  onRefresh?: () => Promise<boolean>; reportBusy?: boolean
+}
+export function ExpenseAppShell(props: ExpenseAppShellProps) {
+  return <PageRefreshProvider><ExpenseAppShellContent {...props} /></PageRefreshProvider>
+}
+function ExpenseAppShellContent({ report, controls, monthControl, comparison, avatarUrl, initialVersion, signOut, signingOut, monthlyReady = true, questionMonth, onRefresh, reportBusy = false }: ExpenseAppShellProps) {
   const { theme, toggleTheme } = useExpenseReportTheme()
   const reconciliation = useReconciliation()
   const reconciliationEnabled = reconciliation.snapshot?.enabled === true
@@ -50,6 +57,9 @@ export function ExpenseAppShell({ report, controls, monthControl, comparison, av
   const sourceId = useRef(0)
   const scrollState = useRef<ScrollNavigationState>({ lastY: 0, travel: 0, compact: false })
   const guard = useAppWorkGuard()
+  const reportRefresh = { refresh: onRefresh ?? (async () => false), disabled: !onRefresh || reportBusy || signingOut || guard.pending || guard.uncertain }
+  usePageRefresh("overview", reportRefresh)
+  usePageRefresh("savings", reportRefresh)
   const selectScreen = (next: AppScreen) => {
     if (next === "reconcile" && !visibleRef.current) return
     if (next === screenRef.current) {
@@ -181,6 +191,8 @@ export function ExpenseAppShell({ report, controls, monthControl, comparison, av
           </ToolbarPane>
         </Toolbar>
       </header>
+
+      <PullToRefresh screen={screen} blocked={signingOut || askOpen || keyboardOpen || widgetGuideOpen} />
 
       <div className="bb-shell-report" hidden={!reportVisible || !monthlyReady}>
         <ExpenseReportApp key={expenseReportIdentity(report)} report={report} appControls={controls} appMonthControl={monthControl}

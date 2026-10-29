@@ -4,6 +4,10 @@ Last updated: 2026-10-28
 
 ## Goal
 
+### Unified active-page refresh — 2026-10-29
+
+Implemented the user's shared top-edge pull gesture across all six app pages. Refresh dispatch preserves each controller's filters, drafts and financial guards. Reconcile pulls perform the existing bank check, with read-only status recovery after uncertainty; matched-payment views refresh their ledger instead. Shared pulls retain existing pending-projection recovery, and Transactions requests fresh filtered rows. Savings/Settings wait for their respective combined reads. Threshold release, cancel/retreat, direction, inner-scroll/modal, single-flight and failure behavior share one indicator; routine app buttons are replaced with common keyboard/desktop access. No financial lifecycle/schema change and no backlog reprioritization beyond this requested UI slice. Verification and phone acceptance are in STATUS checklist 173; all financial browser traffic uses isolated fixtures.
+
 ### Spent includes Saved — 2026-10-28
 
 User-requested report presentation: Spent includes the mode's combined Saved amount once, with a Saved row and explicit estimated-ESPP hint in Projected. Left retains its existing “Savings remaining” wording and cash balances. Underlying expense metrics, reconciliation, transactions and reimbursement accounting remain unchanged; the financial backlog is unchanged. Backend explanations, Overview card/modal and read-only agent summaries agree. Current/projected, zero savings, cash/ESPP, sheet adjustments and cached-modal regressions added. Verification/release and native acceptance are in STATUS checklist 171.

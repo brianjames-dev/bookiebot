@@ -37,6 +37,7 @@ function load(file) {
   return exports
 }
 const { PhoneNotifications, pushKeyBytes } = load(path.join(frontend, "src/phone-notifications.tsx"))
+const {PageRefreshProvider, usePageRefreshRegistry} = load(path.join(frontend, "src/page-refresh.tsx"))
 const html = renderToStaticMarkup(React.createElement(PhoneNotifications))
 const embeddedHtml = renderToStaticMarkup(React.createElement(PhoneNotifications, { embedded: true }))
 assert.ok(embeddedHtml.includes('aria-label="Phone notifications"'))
@@ -280,5 +281,18 @@ async function lifecycleContracts() {
   assert.equal(mutations(state).length, 0)
   await unmount(tree)
   assert.equal(timers.size, 0, "Unmount cleans up all notification timeouts")
+
+  let registry, registrations = 0
+  function RefreshProbe() { registry = usePageRefreshRegistry(); return null }
+  state = resetBrowser({register:()=>++registrations===1 ? Promise.reject(Error('Worker unavailable')) : Promise.resolve(state.registration)})
+  await act(async()=>{tree=TestRenderer.create(React.createElement(PageRefreshProvider,null,
+    React.createElement(PhoneNotifications,{embedded:true}),React.createElement(RefreshProbe)));await flush()})
+  assert.equal(state.steps.register,1)
+  assert.ok(tree.root.findByProps({role:'alert'}))
+  await act(async()=>{assert.equal(await registry.refresh('settings'),true);await flush()})
+  assert.equal(state.steps.register,2,'Common Settings refresh retries unavailable notification setup')
+  assert.equal(tree.root.findAllByProps({role:'alert'}).length,0)
+  assert.equal(state.steps.permission,0);assert.equal(state.steps.subscribe,0);assert.equal(mutations(state).length,0,'Refresh cannot enable push or send notifications')
+  await unmount(tree)
 }
 workerContracts().then(lifecycleContracts).then(() => console.log("Phone notification UI, worker and real React lifecycle checks passed")).catch(error => { console.error(error); process.exitCode = 1 })

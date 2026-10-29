@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react"
 import { ArrowDownLeft, ArrowUpRight, ChevronDown, RefreshCw, Search, SlidersHorizontal } from "lucide-react"
+import { usePageRefresh } from "./page-refresh"
 import { useAppWorkStatus } from "./app-work-guard"
 import { CollapsibleContent } from "./components/ui/motion"
 import { TransactionChangeDetails, TransactionCompletion, type TransactionChangeSummary, type TransactionOperation } from "./transaction-change-summary"
@@ -94,8 +95,10 @@ export function TransactionsScreen({active, ownerName, initialMonth}: {active: b
         try { sessionStorage.setItem(storageKey,JSON.stringify(next.pendingCommand)) } catch {}
       }
       setListing(previous => append && previous ? {...next, items: [...previous.items, ...next.items]} : next)
+      return true
     } catch (failure) { if (mounted.current && token === generation.current && !controller.signal.aborted) handleError(failure) }
     finally { if (mounted.current && token === generation.current) setLoading(false) }
+    return false
   }, [month, search, kind, category, person, split])
   useEffect(() => {
     if (!active) return
@@ -184,9 +187,10 @@ export function TransactionsScreen({active, ownerName, initialMonth}: {active: b
   }, [active, operation])
   const categoryOptions = {...categories, ...Object.fromEntries((listing?.categories ?? facets.current.categories).filter(value=>!(value in categories)).map(value=>[value,value]))}
   const locked = busy || uncertain
+  const pageRefresh = usePageRefresh("transactions", { refresh: () => load(0, false, true), disabled: locked || loading })
   const filterCount = [kind,category,person,split].filter(Boolean).length
   return <section className="bb-transactions" aria-label="Recorded transactions">
-    <header className="bb-transactions-heading"><div><h1>Transactions</h1><p>Everything you’ve recorded, in one place.</p></div><button type="button" aria-label="Refresh transactions" disabled={locked || loading} onClick={() => void load(0,false,true)}><RefreshCw size={18} /></button></header>
+    <header className="bb-transactions-heading"><div><h1>Transactions</h1><p>Everything you’ve recorded, in one place.</p></div>{!pageRefresh && <button type="button" aria-label="Refresh transactions" disabled={locked || loading} onClick={() => void load(0,false,true)}><RefreshCw size={18} /></button>}</header>
     <div className="bb-transactions-toolbar"><label className="bb-transaction-search"><Search size={18} aria-hidden="true"/><input type="search" aria-label="Search transactions" placeholder="Search transactions" value={search} onChange={event=>setSearch(event.target.value)} /></label><button type="button" aria-expanded={filters} aria-controls="bb-transaction-filters" onClick={()=>setFilters(value=>!value)}><SlidersHorizontal size={18}/><span>Filters{filterCount ? ` · ${filterCount}` : ""}</span></button></div>
     <div className="bb-transaction-period"><label>Period<select aria-label="Transaction period" value={month === "all" ? "all" : "selected"} onChange={event=>setMonth(event.target.value === "all" ? "all" : initialMonth)}><option value="selected">One month</option><option value="all">All months</option></select></label>{month !== "all" && <input aria-label="Recorded month" type="month" max={new Date().toISOString().slice(0,7)} value={month} onChange={event=>{if(event.target.value)setMonth(event.target.value)}}/>}</div>
     <CollapsibleContent open={filters} id="bb-transaction-filters"><div className="bb-transaction-filters">

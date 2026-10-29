@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react"
+import { usePageRefresh } from "./page-refresh"
 import { AnimatedDisclosure } from "./components/ui/motion"
 import { useAppWorkStatus } from "./app-work-guard"
 import "./phone-notifications.css"
@@ -114,6 +115,25 @@ export function PhoneNotifications({ embedded = false }: { embedded?: boolean } 
       finish: () => { window.clearTimeout(timeout); if (current()) { operation.current = null; setBusy(false) } },
     }
   }
+
+  usePageRefresh("settings", { disabled: busy || preparing, refresh: async () => {
+    const action = beginOperation()
+    if (!action) return false
+    try {
+      const next = checkedSettings(await notificationRequest(endpoint, action.controller))
+      if (!action.active()) return false
+      setSettings(next)
+      if (!dirty) setPreferences(next.preferences)
+      if (supported && !registration) {
+        await whileActive(navigator.serviceWorker.register("/app/notifications/worker.js", { scope: "/app/", updateViaCache: "none" }), action.controller.signal)
+        const ready = await whileActive(navigator.serviceWorker.ready, action.controller.signal)
+        if (!action.active()) return false
+        setRegistration(ready)
+      }
+      return true
+    } catch (caught) { action.failed(caught); return false }
+    finally { action.finish() }
+  } })
 
   const save = async (nextPreferences = preferences) => {
     if (!settings || (!settings.enabled && !registration)) return
