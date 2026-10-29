@@ -3,10 +3,10 @@ import { screenTitles, type AppScreen } from "./app-navigation"
 import { usePageRefreshRegistry } from "./page-refresh"
 import "./pull-to-refresh.css"
 
-// Finger travel is resisted; 180px of downward travel fills the 72px indicator.
+// Finger travel is resisted; 270px of downward travel fills the 72px indicator.
 export const PULL_REFRESH_THRESHOLD = 72
 const PULL_REFRESH_HOLD = 64
-export function pullRefreshDistance(travel: number) { return Math.min(96, Math.max(0, travel) / 2.5) }
+export function pullRefreshDistance(travel: number) { return Math.min(96, Math.max(0, travel) / 3.75) }
 type Phase = "idle" | "pulling" | "armed" | "refreshing" | "done" | "settling" | "error"
 type Gesture = { x: number; y: number; lastY: number; scrollY: number; identifier: number; captured: boolean }
 
@@ -31,7 +31,7 @@ export function PullToRefresh({ screen, blocked = false }: { screen: AppScreen; 
   const registry = usePageRefreshRegistry()!
   useSyncExternalStore(registry.subscribe, registry.getSnapshot, registry.getSnapshot)
   const [phase, setPhase] = useState<Phase>("idle"), [distance, setDistance] = useState(0)
-  const [nativeOverscroll, setNativeOverscroll] = useState(0)
+  const [releaseOverscroll, setReleaseOverscroll] = useState(0)
   const [message, setMessage] = useState("")
   const state = useRef({ screen, blocked }), gesture = useRef<Gesture | null>(null), pulled = useRef(0)
   const running = useRef(false), mounted = useRef(false), timer = useRef<number | undefined>(undefined)
@@ -43,7 +43,9 @@ export function PullToRefresh({ screen, blocked = false }: { screen: AppScreen; 
     const selected = state.current.screen
     if (running.current || state.current.blocked || pageIsBlocked() || !registry.available(selected)) return
     running.current = true; refreshScreen.current = selected; window.clearTimeout(timer.current)
-    gesture.current = null; pulled.current = 0; setNativeOverscroll(Math.max(0, -window.scrollY)); setDistance(PULL_REFRESH_HOLD); setPhase("refreshing"); setMessage("")
+    // Snapshot the bounce once for the icon's CSS handoff. Never feed later
+    // scroll positions back into layout while the browser releases its spring.
+    gesture.current = null; pulled.current = 0; setReleaseOverscroll(Math.max(0, -window.scrollY)); setDistance(PULL_REFRESH_HOLD); setPhase("refreshing"); setMessage("")
     const success = await registry.refresh(selected)
     running.current = false
     if (!mounted.current) return
@@ -65,7 +67,6 @@ export function PullToRefresh({ screen, blocked = false }: { screen: AppScreen; 
     let frame = 0
     const paint = () => {
       frame = 0
-      setNativeOverscroll(Math.max(0, -window.scrollY))
       if (!gesture.current || running.current) return
       setDistance(pulled.current)
       setPhase(pulled.current >= PULL_REFRESH_THRESHOLD ? "armed" : pulled.current > 0 ? "pulling" : "idle")
@@ -110,6 +111,7 @@ export function PullToRefresh({ screen, blocked = false }: { screen: AppScreen; 
     }
     const scroll = () => {
       const current = gesture.current
+      if (!current) return
       if (current && !current.captured && current.scrollY > 1 && window.scrollY <= 1) {
         current.y = current.lastY; current.scrollY = 0
       }
@@ -143,17 +145,16 @@ export function PullToRefresh({ screen, blocked = false }: { screen: AppScreen; 
   useEffect(() => { window.clearTimeout(timer.current); gesture.current = null; pulled.current = 0; setDistance(0); setMessage(""); if (!running.current) setPhase("idle") }, [screen, blocked])
 
   const visible = !blocked && (phase !== "refreshing" || refreshScreen.current === screen) && (distance > 0 || phase === "refreshing" || phase === "done" || phase === "error")
-  // Native rubber banding owns the page while the finger is down. Only reserve
-  // the loading/result space after release, subtracting Safari's remaining
-  // bounce so the two motions never add up and stretch the page twice.
+  // Native rubber banding owns the page while the finger is down. After release,
+  // animate once toward a stable loading gap; scroll frames must not resize it.
   const tracking = phase === "pulling" || phase === "armed"
-  const offset = visible && !tracking ? Math.max(0, Math.min(distance, PULL_REFRESH_THRESHOLD) - nativeOverscroll) : 0
-  const ratio = Math.min(1, distance / PULL_REFRESH_THRESHOLD), progress = Math.round(ratio * 100)
-  return <div className="bb-pull-refresh-space" data-phase={phase} data-native-bounce={nativeOverscroll > 0} style={{ height: offset }}>
+  const offset = visible && !tracking ? Math.min(distance, PULL_REFRESH_THRESHOLD) : 0
+  const ratio = Math.min(1, distance / PULL_REFRESH_THRESHOLD), progress = Math.min(ratio < 1 ? 99 : 100, Math.round(ratio * 100))
+  return <div className="bb-pull-refresh-space" data-phase={phase} data-released={offset > 0} style={{ height: offset }}>
     <div className="bb-pull-refresh" data-phase={phase} data-visible={visible} style={{
       "--bb-pull-distance": `${visible ? Math.min(distance, PULL_REFRESH_THRESHOLD) : 0}px`,
       "--bb-pull-scale": tracking ? .72 + .36 * ratio : 1,
-      "--bb-native-overscroll": `${nativeOverscroll}px`,
+      "--bb-release-overscroll": `${releaseOverscroll}px`,
     } as CSSProperties}>
     <button type="button" className="bb-pull-refresh-button" aria-label={`Refresh ${screenTitles[screen]}`} title={`Refresh ${screenTitles[screen]}`} disabled={!available || running.current}
       aria-busy={phase === "refreshing"} onClick={() => void refresh()}>

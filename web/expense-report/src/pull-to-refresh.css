@@ -2,10 +2,10 @@
 html.bb-pull-refresh-enabled { overscroll-behavior-y: contain; }
 .bb-pull-refresh-space { position: relative; flex-shrink: 0; transition: height 320ms var(--bb-motion-ease); }
 .bb-pull-refresh-space[data-phase="pulling"], .bb-pull-refresh-space[data-phase="armed"] { transition: none; }
-.bb-pull-refresh-space[data-native-bounce="true"] { transition: none; }
 /* Loading/results stay in the document above the masthead and scroll with it.
    Only live pulling uses viewport positioning to avoid adding a drag offset. */
-.bb-pull-refresh { position: absolute; z-index: 65; top: calc(max(10px, env(safe-area-inset-top, 0px)) - var(--bb-native-overscroll, 0px)); left: 50%; transform: translate(-50%, -24px); opacity: 0; pointer-events: none; transition: transform 320ms var(--bb-motion-ease), opacity 260ms; }
+.bb-pull-refresh { position: absolute; z-index: 65; top: max(10px, env(safe-area-inset-top, 0px)); left: 50%; transform: translate(-50%, -24px); opacity: 0; pointer-events: none; transition: transform 320ms var(--bb-motion-ease), opacity 260ms; }
+.bb-pull-refresh-space[data-released="true"] > .bb-pull-refresh { animation: bb-pull-release 320ms var(--bb-motion-ease) both; }
 .bb-pull-refresh[data-visible="true"] { transform: translate(-50%, calc(var(--bb-pull-distance) / 2 - 32px)); opacity: 1; }
 .bb-pull-refresh[data-phase="pulling"], .bb-pull-refresh[data-phase="armed"] { position: fixed; top: max(10px, env(safe-area-inset-top, 0px)); transition: opacity 100ms; }
 .bb-pull-refresh-button { position: relative; display: grid; place-items: center; width: 64px; height: 64px; border: 0; border-radius: 50%; padding: 6px; background: transparent; color: hsl(var(--primary)); cursor: pointer; pointer-events: auto; touch-action: manipulation; }
@@ -33,6 +33,7 @@ html.bb-pull-refresh-enabled { overscroll-behavior-y: contain; }
 .bb-pull-refresh:has(:focus-visible) { opacity: 1; transform: translate(-50%, 0); }
 @media (hover: hover) and (pointer: fine) { .bb-pull-refresh[data-phase="idle"] { opacity: 1; transform: translate(-50%, 0); } }
 @keyframes bb-pull-spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+@keyframes bb-pull-release { from { translate: 0 calc(-1 * var(--bb-release-overscroll, 0px)); } to { translate: 0 0; } }
 @keyframes bb-pull-pop { 0% { transform: scale(.92); } 45% { transform: scale(1.15); } 75% { transform: scale(.98); } 100% { transform: scale(1); } }
 @keyframes bb-pull-burst { 0% { opacity: 0; transform: scale(.65); stroke-dashoffset: 6; } 25% { opacity: .85; stroke-dashoffset: 0; } 100% { opacity: 0; transform: scale(1.22); stroke-dashoffset: -6; } }
-@media (prefers-reduced-motion: reduce) { .bb-pull-refresh, .bb-pull-refresh-space, .bb-pull-refresh svg *, .bb-pull-disc { transition: none; } .bb-pull-refresh :is(.bb-pull-spinner, .bb-pull-disc, .bb-pull-burst) { animation: none !important; } }
+@media (prefers-reduced-motion: reduce) { .bb-pull-refresh, .bb-pull-refresh-space, .bb-pull-refresh svg *, .bb-pull-disc { transition: none; } .bb-pull-refresh-space > .bb-pull-refresh, .bb-pull-refresh :is(.bb-pull-spinner, .bb-pull-disc, .bb-pull-burst) { animation: none !important; } }

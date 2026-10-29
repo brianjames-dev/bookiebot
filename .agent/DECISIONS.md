@@ -1,5 +1,11 @@
 # Agent Decisions
 
+## 2026-10-29 - Let Native Rebound Finish Without Layout Feedback
+
+The user's release stutter exposed the remaining feedback loop: each negative scroll sample changed the loading-gap height, while the native-bounce flag disabled its transition. Stop observing scroll once the gesture is released. Give the loading gap a stable 64px target with its existing CSS transition; never resize it from rebound frames. Snapshot the native offset once at release solely for a composited icon handoff, with one CSS timeline that persists across refreshing → success/error so quick results do not restart it. Keep document anchoring, passive touch/momentum, fixed tools and accepted visuals.
+
+At the user's request, increase required finger travel by 50%, from 180px to 270px (resistance 3.75 for the same 72px visual threshold). A just-short pull must not refresh or announce 100% progress. This supersedes the scroll-driven gap subtraction in earlier refresh decisions. No financial operation, request scope, draft or persistence change. Physical acceptance is checklist 178.
+
 ## 2026-10-29 - Align Report Controls And Anchor Refresh Results To The Document
 
 Place Current/Projected at the right edge of the month row, retaining the existing measured selection, preferences and financial modes. Keep the full month label; its year may wrap within the left control on narrow screens. Preserve 44px targets and full-width error/update status below. When the common pull control owns loading feedback, hide the old busy label visually but retain its screen-reader announcement, last update and failures.

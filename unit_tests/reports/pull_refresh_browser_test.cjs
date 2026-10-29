@@ -15,7 +15,7 @@ const css=fs.readFileSync(path.join(root,'src/bookiebot/reports/assets/expense-r
 const js=fs.readFileSync(path.join(root,'src/bookiebot/reports/assets/expense-report-app.js'),'utf8')
 const html=dark=>`<!doctype html><html data-theme="${dark?'dark':'light'}"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><style>${css}</style></head><body><div id="bookiebot-expense-report-root"></div><script id="bookiebot-expense-app-config" type="application/json">${JSON.stringify({ownerName:'Brian',reportUrl:'/app/expenses/data',logoutUrl:'/app/logout'})}</script><script>localStorage.setItem('bookiebot-expense-report-theme','${dark?'dark':'light'}')</script><script type="module">${js}</script></body></html>`
 const screens={Overview:'/app/expenses/data',Transactions:'/app/transactions',Shared:'/app/reimbursements',Savings:'/app/goals',Reconcile:'/app/reconciliation',Settings:'/app/widgets/settings'}
-async function gesture(page,end=280,{start=80,x=16,cancel=false,finish=true,selector='.bb-shell-masthead',drift=false,begin=true}={}) {
+async function gesture(page,end=380,{start=80,x=16,cancel=false,finish=true,selector='.bb-shell-masthead',drift=false,begin=true}={}) {
   await page.evaluate(({start,end,x,cancel,finish,selector,drift,begin})=>{
     const target=document.querySelector(selector)
     const touch=y=>({identifier:71,target,clientX:x,clientY:y,pageX:x,pageY:y})
@@ -110,16 +110,20 @@ async function waitReady(page,label) {
           assert.equal(requests.filter(r=>r.name===path).length,before,'Short pull must not request data')
           await gesture(page,224);await page.waitForTimeout(120)
           assert.equal(requests.filter(r=>r.name===path).length,before,'The former 144px trigger must no longer refresh')
+          await gesture(page,260);await page.waitForTimeout(120)
+          assert.equal(requests.filter(r=>r.name===path).length,before,'The former 180px trigger is below the new 270px threshold')
           if(label==='Overview')holdReport=true
           await gesture(page)
           if(label==='Overview') {
             await page.waitForFunction(()=>document.querySelector('.bb-pull-refresh')?.dataset.phase==='refreshing')
             const busy=page.locator('.bb-report-header .bb-app-status span').filter({hasText:'Refreshing…'})
             assert.equal(await busy.getAttribute('class'),'sr-only','The duplicate loading text is accessible without a visible label under the month')
+            if(!dark)await page.evaluate(()=>{window.__releaseAnimation=document.querySelector('.bb-pull-refresh').getAnimations().find(a=>a.animationName==='bb-pull-release')})
             while(!releaseReport)await page.waitForTimeout(10)
             holdReport=false;releaseReport()
           }
           await page.waitForFunction(()=>document.querySelector('.bb-pull-refresh')?.dataset.phase==='done')
+          if(label==='Overview'&&!dark)assert.equal(await page.evaluate(()=>document.querySelector('.bb-pull-refresh').getAnimations().find(a=>a.animationName==='bb-pull-release')===window.__releaseAnimation),true,'Fast completion must not restart the release animation')
           if(dark) {
             assert.equal(await page.locator('.bb-pull-disc').evaluate(n=>getComputedStyle(n).animationName),'none','Reduced motion skips the pop')
             assert.equal(await page.locator('.bb-pull-burst').evaluate(n=>getComputedStyle(n).animationName),'none','Reduced motion skips the burst')
@@ -171,8 +175,8 @@ async function waitReady(page,label) {
           } else await gesture(page,135,{start:78,finish:false})
           await page.waitForTimeout(100)
           const growingFrom=await page.locator('.bb-pull-disc').evaluate(n=>n.getBoundingClientRect().width)
-          if(cdp)for(const y of [175,220,260])await cdp.send('Input.dispatchTouchEvent',{type:'touchMove',touchPoints:[{x:16,y}]})
-          else await gesture(page,260,{start:78,finish:false,begin:false})
+          if(cdp)for(const y of [175,220,280,370])await cdp.send('Input.dispatchTouchEvent',{type:'touchMove',touchPoints:[{x:16,y}]})
+          else await gesture(page,370,{start:78,finish:false,begin:false})
           await page.waitForFunction(()=>document.querySelector('.bb-pull-refresh')?.dataset.phase==='armed')
           await page.waitForTimeout(100)
           assert.ok(await page.locator('.bb-pull-disc').evaluate(n=>n.getBoundingClientRect().width)>growingFrom+8,'The icon progressively grows with the pull')
@@ -185,14 +189,41 @@ async function waitReady(page,label) {
           assert.equal(await page.locator('.bb-pull-refresh-label').count(),0,'There is no visible label')
           assert.ok(await page.evaluate(()=>document.querySelector('#bb-reconcile-title').getBoundingClientRect().top>document.querySelector('.bb-pull-refresh').getBoundingClientRect().bottom),'The pull indicator must not cover the heading')
           await page.screenshot({path:'/tmp/bookiebot-pull-refresh-armed.png'})
+          // Simulate Safari's reported negative offsets while the release is
+          // in progress. They must never retarget/restart the loading gap.
+          await page.evaluate(()=>{
+            const descriptor=Object.getOwnPropertyDescriptor(window,'scrollY'),space=document.querySelector('.bb-pull-refresh-space')
+            const probe=window.__releaseProbe={descriptor,y:-96,samples:[],writes:0,running:true}
+            Object.defineProperty(window,'scrollY',{configurable:true,get:()=>probe.y})
+            probe.observer=new MutationObserver(records=>{probe.writes+=records.length})
+            probe.observer.observe(space,{attributes:true,attributeFilter:['style']})
+            const sample=()=>{
+              if(!probe.running)return
+              if(space.dataset.phase==='refreshing')probe.samples.push({height:space.getBoundingClientRect().height,target:space.style.height,transition:getComputedStyle(space).transitionDuration})
+              requestAnimationFrame(sample)
+            }
+            sample()
+            for(const [i,y] of [-76,-52,-30,-14,0].entries())setTimeout(()=>{probe.y=y;window.dispatchEvent(new Event('scroll'))},40*(i+1))
+          })
           if(cdp)await cdp.send('Input.dispatchTouchEvent',{type:'touchEnd',touchPoints:[]})
           else await page.evaluate(()=>{
             const event=new Event('touchend',{bubbles:true,cancelable:true})
-            Object.defineProperties(event,{touches:{value:[]},changedTouches:{value:[{identifier:71,clientY:260,clientX:16}]}})
+            Object.defineProperties(event,{touches:{value:[]},changedTouches:{value:[{identifier:71,clientY:370,clientX:16}]}})
             document.querySelector('.bb-shell-masthead').dispatchEvent(event)
           })
           await page.waitForFunction(()=>document.querySelector('.bb-pull-refresh')?.dataset.phase==='refreshing')
           await page.waitForTimeout(350)
+          const releaseMotion=await page.evaluate(()=>{
+            const p=window.__releaseProbe;p.running=false;p.observer.disconnect()
+            if(p.descriptor)Object.defineProperty(window,'scrollY',p.descriptor);else delete window.scrollY
+            return {samples:p.samples,writes:p.writes,snapshot:document.querySelector('.bb-pull-refresh').style.getPropertyValue('--bb-release-overscroll')}
+          })
+          assert.equal(releaseMotion.snapshot,'96px','Release uses one native-offset snapshot')
+          assert.equal(releaseMotion.writes,1,'Native rebound frames must not rewrite the loading gap')
+          assert.ok(releaseMotion.samples.length>=5)
+          assert.ok(releaseMotion.samples.every(s=>s.target==='64px'&&s.transition==='0.32s'),'One stable target keeps the transition enabled throughout release')
+          assert.ok(releaseMotion.samples.some(s=>s.height>1&&s.height<63),'Release actually interpolates')
+          for(let i=1;i<releaseMotion.samples.length;i++)assert.ok(releaseMotion.samples[i].height>=releaseMotion.samples[i-1].height-.1,'Release follows one forward curve without bouncing layout targets')
           const held=await geometry()
           for(const selector in original)assert.ok(Math.abs(held[selector]-original[selector]-(selector==='.bb-shell-header-actions'?0:64))<.5,`${selector} must retain its correct loading position`)
           const spinner=page.locator('.bb-pull-spinner')

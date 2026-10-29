@@ -68,77 +68,84 @@ const settle = async () => {await act(async()=>{await Promise.resolve();await Pr
   for(const name of ['touchstart','touchmove','touchend','touchcancel'])assert.equal(listeners.get(`document:${name}`).options.passive,true,'Touch observers never block native scrolling')
   const button=new Element({tag:'button'}),buttonIcon=new Element({tag:'svg'});buttonIcon.parentElement=button
   for(const target of [button,buttonIcon,new Element({tag:'a'}),new Element({selector:'[role=tablist]'})]) {
-    start({target});move({y:90});assert.equal(progress(),39,'Ordinary controls also show pull feedback')
+    start({target});move({y:90});assert.equal(progress(),26,'Ordinary controls also show pull feedback')
     assert.equal(renderer.root.findByProps({className:'bb-pull-refresh'}).props['data-visible'],true)
     await release({y:90});assert.equal(calls.length,0)
   }
-  start();move({y:28,x:48});move({y:90,x:55});assert.equal(progress(),39,'A sideways start can develop into a vertical pull')
+  start();move({y:28,x:48});move({y:90,x:55});assert.equal(progress(),26,'A sideways start can develop into a vertical pull')
   await release({y:90,x:55});assert.equal(calls.length,0)
-  start();move({y:164});assert.equal(progress(),80);assert.equal(phase(),'pulling')
+  start();move({y:164});assert.equal(progress(),53);assert.equal(phase(),'pulling')
   await release({y:164});assert.equal(calls.length,0,'The old 144px trigger now remains below threshold')
-  start();move({y:199});assert.equal(phase(),'pulling')
-  await release({y:199});assert.equal(calls.length,0,'179px is still below the new threshold')
-  start(); move({y:90}); assert.equal(progress(),39)
+  start();move({y:200});assert.equal(progress(),67);assert.equal(phase(),'pulling')
+  await release({y:200});assert.equal(calls.length,0,'The former 180px threshold cannot refresh')
+  start();move({y:289});assert.equal(phase(),'pulling');assert.equal(progress(),99)
+  await release({y:289});assert.equal(calls.length,0,'269px is still below the new 270px threshold')
+  start(); move({y:90}); assert.equal(progress(),26)
   const smallScale=renderer.root.findByProps({className:'bb-pull-refresh'}).props.style['--bb-pull-scale']
   move({y:150});assert.ok(renderer.root.findByProps({className:'bb-pull-refresh'}).props.style['--bb-pull-scale']>smallScale,'The icon grows with finger travel')
   await release({y:90}); assert.equal(calls.length,0,'Short pull cancels')
-  start(); move({y:200}); assert.equal(phase(),'armed'); assert.equal(progress(),100)
+  start(); move({y:290}); assert.equal(phase(),'armed'); assert.equal(progress(),100)
   move({y:100}); await release({y:100}); assert.equal(calls.length,0,'Retreat below threshold cancels')
-  start({target:buttonIcon}); const captured=move({y:200}); assert.equal(captured.defaultPrevented,false)
+  start({target:buttonIcon}); const captured=move({y:290}); assert.equal(captured.defaultPrevented,false)
   assert.equal(renderer.root.findByProps({className:'bb-pull-refresh-space'}).props.style.height,0,'Native scrolling owns page position throughout a pull')
   assert.equal(calls.length,0,'Threshold never triggers before release')
-  await release({y:200}); assert.deepEqual(calls,['overview']); assert.equal(phase(),'done')
-  for(const options of [{y:240,x:320},{y:0}]) {
+  await release({y:290}); assert.deepEqual(calls,['overview']); assert.equal(phase(),'done')
+  for(const options of [{y:310,x:420},{y:0}]) {
     start(); move(options); await release(options)
   }
   assert.equal(calls.length,1,'Horizontal/upward gestures never refresh')
   for(const target of [new Element({tag:'input'}),new Element({tag:'textarea'}),new Element({tag:'select'}),new Element({selector:'[contenteditable=true]'}),new Element({selector:'[role=slider]'}),new Element({selector:'.bb-bottom-navigation'}),new Element({scrollable:true})]) {
-    start({target});move({y:200});await release({y:200})
+    start({target});move({y:290});await release({y:290})
   }
-  win.scrollY=100;start();win.scrollY=0;move({y:200});await release({y:200})
-  modal=true;start();move({y:200});await release({y:200});modal=false
-  doc.documentElement.dataset.bbModalScrollLock='true';start();move({y:200});await release({y:200});delete doc.documentElement.dataset.bbModalScrollLock
-  start();move({y:200,touches:[touch(200),touch(210,40,2)]});await release({y:200})
-  start();move({y:200});act(()=>fire('touchcancel'));await release({y:200})
+  win.scrollY=100;start();win.scrollY=0;move({y:290});await release({y:290})
+  modal=true;start();move({y:290});await release({y:290});modal=false
+  doc.documentElement.dataset.bbModalScrollLock='true';start();move({y:290});await release({y:290});delete doc.documentElement.dataset.bbModalScrollLock
+  start();move({y:290,touches:[touch(290),touch(300,40,2)]});await release({y:290})
+  start();move({y:290});act(()=>fire('touchcancel'));await release({y:290})
   assert.equal(calls.length,1,'Nested/interactive/scrolled/modal/multitouch/cancel paths remain untouched')
-  start();move({y:200});act(()=>renderer.update(fixture({screen:'shared'})));await release({y:200})
+  start();move({y:290});act(()=>renderer.update(fixture({screen:'shared'})));await release({y:290})
   assert.equal(calls.length,1,'Tab changes cancel the captured gesture')
   // Native panning makes subsequent touch moves noncancelable. Crossing the top
   // must keep the same gesture and count only the travel beyond that boundary.
   act(()=>renderer.update(fixture()))
   win.scrollY=120;start({target:doc.documentElement});move({y:80,cancelable:false});scroll(60)
   move({y:140,cancelable:false});scroll(0)
-  move({y:220,cancelable:false});assert.equal(progress(),44)
+  move({y:220,cancelable:false});assert.equal(progress(),30)
   await release({y:220});assert.equal(calls.length,1,'Scrolling up to the edge alone is not a refresh')
   win.scrollY=120;start({target:doc.documentElement});move({y:80,cancelable:false});scroll(60)
   move({y:140,cancelable:false});scroll(0)
-  const nativeMove=move({y:320,cancelable:false})
+  const nativeMove=move({y:410,cancelable:false})
   assert.equal(nativeMove.defaultPrevented,false);assert.equal(phase(),'armed')
   scroll(-48)
   assert.equal(renderer.root.findByProps({className:'bb-pull-refresh-space'}).props.style.height,0,'Safari bounce is never doubled while pulling')
-  await release({y:320});assert.equal(calls.length,2,'A continuous native pan can reach the edge and refresh without retrying')
-  assert.equal(renderer.root.findByProps({className:'bb-pull-refresh-space'}).props.style.height,16,'Loading space subtracts remaining native overscroll')
-  scroll(0);assert.equal(renderer.root.findByProps({className:'bb-pull-refresh-space'}).props.style.height,64)
+  await release({y:410});assert.equal(calls.length,2,'A continuous native pan can reach the edge and refresh without retrying')
+  assert.equal(renderer.root.findByProps({className:'bb-pull-refresh-space'}).props.style.height,64,'Release sets one stable loading target')
+  for(const y of [-42,-31,-18,-7,0]) {
+    scroll(y)
+    assert.equal(renderer.root.findByProps({className:'bb-pull-refresh-space'}).props.style.height,64,'Native rebound frames never resize the loading gap')
+    assert.equal(renderer.root.findByProps({className:'bb-pull-refresh'}).props.style['--bb-release-overscroll'],'48px','The icon handoff uses the release snapshot only')
+    assert.equal(frames.size,0,'Released gestures do not schedule scroll-driven rendering')
+  }
   scroll(-80);scroll(0);assert.equal(calls.length,2,'Momentum/bounce without a finger cannot refresh')
   for(const screen of ['transactions','shared','savings','reconcile','settings']) {
     act(()=>renderer.update(fixture({screen})))
-    start();move({y:200});await release({y:200})
+    start();move({y:290});await release({y:290})
     assert.ok(calls.includes(screen),`${screen} uses its own registered implementation`)
   }
   assert.equal(calls.filter(call=>call==='investments').length,1,'Savings refresh waits for both goals and investments')
   act(()=>renderer.update(fixture({disabled:true})))
-  start();move({y:200});await release({y:200});assert.equal(calls.filter(call=>call==='overview').length,2)
+  start();move({y:290});await release({y:290});assert.equal(calls.filter(call=>call==='overview').length,2)
   act(()=>renderer.update(fixture({blocked:true})))
-  start();move({y:200});await release({y:200});assert.equal(calls.filter(call=>call==='overview').length,2)
+  start();move({y:290});await release({y:290});assert.equal(calls.filter(call=>call==='overview').length,2)
   act(()=>renderer.update(fixture()));pending=true
-  start();move({y:200});await release({y:200});assert.equal(phase(),'refreshing')
+  start();move({y:290});await release({y:290});assert.equal(phase(),'refreshing')
   assert.equal(renderer.root.findByProps({className:'bb-pull-refresh-space'}).props.style.height,64,'Release reverses to the loading hold distance')
   assert.equal(renderer.root.findAllByProps({className:'bb-pull-refresh-label'}).length,0,'The refresh control is icon-only')
   assert.equal(renderer.root.findByProps({className:'bb-pull-refresh-space'}).findAllByProps({className:'bb-pull-refresh'}).length,1,'The loading indicator belongs to the document anchor above the masthead')
   assert.equal(renderer.root.findByProps({className:'bb-pull-refresh-space'}).props['aria-hidden'],undefined,'The anchored refresh control stays accessible')
   assert.equal(renderer.root.findByProps({className:'bb-pull-burst'}).findAllByType('path').length,8,'Success has eight radial rays')
   const check=renderer.root.findByProps({className:'bb-pull-check'}),checkPath=check.props.d
-  start();move({y:200});await release({y:200})
+  start();move({y:290});await release({y:290})
   assert.equal(calls.filter(call=>call==='overview').length,3,'In-flight refresh cannot be duplicated')
   pending=false;await act(async()=>finish());await settle();assert.equal(phase(),'done')
   assert.equal(renderer.root.findByProps({className:'bb-pull-check'}).props.d,checkPath,'The checkmark is retained for an animated reveal')
