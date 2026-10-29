@@ -385,7 +385,9 @@ class ReimbursementStore:
 
     def bank_amount_review(self, owner: str, allocation_id: str, gross: int, review_id: int) -> dict[str, Any] | None:
         gross = _cents(gross, 'Bank amount')
-        review_id = _integer(review_id, 'Bank review', 1, 2**53 - 1)
+        review_id = _integer(review_id, 'Bank review', -(2**53 - 1), 2**53 - 1)
+        if review_id == 0:
+            raise ReimbursementValidationError('Choose a bank transaction.')
         with self.access.connect(write=True) as db:
             self._lock(db)
             row = self._row(db, allocation_id)
@@ -401,6 +403,8 @@ class ReimbursementStore:
                 if value['projectedVersion'] < value.get('sourceRevision', {}).get('version', 0):
                     raise ReimbursementConflictError('The expense correction is still syncing. Finish syncing before matching.')
                 return None
+            if review_id < 0:
+                raise ReimbursementConflictError('The shared amount changed. Reopen the transaction to review it again.')
             return self._bank_amount_review(db, owner, row, gross, review_id)
 
     def correct_bank_amount(self, owner: str, allocation_id: str, gross: int, review_id: int, token: str) -> dict[str, Any]:

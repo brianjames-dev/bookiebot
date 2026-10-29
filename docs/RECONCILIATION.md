@@ -8,7 +8,7 @@ BookieBot checks bank transactions against expenses you already logged. It does 
 
 1. Open **Reconcile**. The initial list reads saved bank data without querying Sheets or starting a bank sync.
 2. Tap **Check** to sync your bank and compare recent transactions with existing logs and schedules. The timestamp describes the bank data; the bank may still report a delayed or pending charge.
-3. Open a **Needs review** row to see suggestions. If the posted transaction is new to review, tap **Review match** (or **Review transaction**). This prepares only that row from saved bank data, then opens fresh suggestions and normal review controls. It does not sync the bank, choose a match, log an entry or record a repayment. **Confirm match** is the separate step that checks an exact-amount match without rewriting an expense.
+3. Open a **Needs review** row to see suggestions. An exact recorded amount offers **Confirm match** directly. **Review amount change**, **Review payment change** and **Add expense/income to budget sheet** open their respective review or form without a preliminary Review match step. If the posted transaction has no saved review yet, the chosen action prepares its metadata internally from saved bank data. Expansion stays read-only; preparation does not sync the bank, write an expense or record a repayment. Only your explicit confirmation saves a match or financial change.
 4. **Pending** shows authorizations and tentative matches. These remain read-only until posted; the posted replacement replaces its pending entry.
 5. **Checked** includes automatic matches, confirmed matches and ignored transactions. **Reopen review** changes the reconciliation status only; it does not undo an expense or an earlier sheet correction.
 

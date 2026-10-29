@@ -12,7 +12,7 @@ from unit_tests.reimbursements.test_service import setup, FIELDS, VALUES, BRIAN 
 from unit_tests.reports.test_phone_reconciliation import client, seed, connect, details, HEADERS  # noqa: F401
 
 
-def prepare(setup, client, monkeypatch):
+def prepare(setup, client, monkeypatch, *, reviewed=True, bank_amount=226.94):
     monkeypatch.setattr(review, '_invalidate_review_actions', invalidate_review_actions)
     today = now_pacific().date()
     values = {**VALUES, "date": today.strftime('%m/%d/%Y'), "amount": "221.82", "item": "Sushi dinner"}
@@ -28,9 +28,43 @@ def prepare(setup, client, monkeypatch):
     value_id = value['id']
     monkeypatch.setattr(review, 'read_active_logged_actions', source)
     monkeypatch.setattr(banking, '_read_current_logged_actions', source)
-    item = seed(client, amount=226.94)
+    item = seed(client, amount=bank_amount, reviewed=reviewed)
     connect(client)
     return item, value_id
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize('pending_report', [False, True])
+async def test_direct_raw_shared_exact_match_preserves_received_and_pending_reports(setup, client, monkeypatch, pending_report):
+    transaction, allocation_id = prepare(setup, client, monkeypatch, reviewed=False, bank_amount=221.82)
+    if pending_report:
+        value = setup.store.get_allocation(allocation_id)
+        repayments.command('hannah', payment(value, 100, 'report_payment'))
+    before = setup.store.snapshot('brian')
+    row = await details(client, -transaction.id)
+    assert 'sharedAmount' not in row['suggestions'][0]
+    response = await client.http.post('/app/reconciliation', headers=HEADERS, json={
+        'operation': 'confirm', 'id': row['id'], 'version': row['version'], 'suggestionId': setup.logged.id,
+    })
+    assert response.status == 200, await response.text()
+    assert client.store.get_reconciliation_item_for_transaction('brian', transaction.id).status == 'confirmed'
+    assert setup.store.snapshot('brian') == before
+
+
+@pytest.mark.asyncio
+async def test_direct_raw_shared_match_cannot_bypass_unverified_source_correction(setup, client, monkeypatch):
+    transaction, allocation_id = prepare(setup, client, monkeypatch, reviewed=False)
+    plan = setup.store.bank_amount_review('brian', allocation_id, 22694, 990)
+    setup.store.correct_bank_amount('brian', allocation_id, 22694, 990, plan['token'])
+    before = setup.store.snapshot('brian')
+    row = await details(client, -transaction.id)
+    assert 'still syncing' in row['suggestions'][0]['sharedAmount']['blocked']
+    response = await client.http.post('/app/reconciliation', headers=HEADERS, json={
+        'operation': 'confirm', 'id': row['id'], 'version': row['version'], 'suggestionId': setup.logged.id,
+    })
+    assert response.status == 409
+    assert setup.store.snapshot('brian') == before
+    assert client.store.get_reconciliation_item_for_transaction('brian', transaction.id) is None
 
 
 @pytest.mark.asyncio
