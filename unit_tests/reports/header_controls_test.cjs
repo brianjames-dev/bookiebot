@@ -46,6 +46,20 @@ assert.ok(render({ signingOut: true }).includes('disabled=""'))
 const old = render({ updatedAt: new Date(2020, 0, 2, 8, 15).getTime() })
 assert.ok(/Updated [^<]*Jan/.test(old), "An older update must include its date, not just a misleading clock time")
 
+const { ReportBrand, ReportHeader } = load('report-header.tsx', {require: name => name === './components/ui/motion'
+  ? {SlidingSelection: ({children}) => React.createElement('div', null, children)} : frontendRequire(name)})
+for (const phase of ['ready', 'refreshing', 'stale', 'error']) {
+  const state = {phase, updatedAt: Date.now(), signingOut: false, message: 'Couldn’t refresh.'}
+  const html = renderToStaticMarkup(React.createElement(ReportBrand, {owner: 'Brian', avatarUrl: '/fixture-avatar',
+    status: React.createElement(AppRefreshControl, {state, refresh() {}, showButton: false})}))
+  assert.ok(html.includes('BookieBot') && html.includes('Brian') && html.includes('bb-app-avatar'))
+  assert.ok(html.indexOf('bb-brand-status') > html.indexOf('bb-wordmark') && html.includes('<time'), 'The actual timestamp belongs beneath the brand title')
+  assert.equal((html.match(/role="status"/g) || []).length, 1, 'Keep one live status announcement through refresh and failure')
+  if (phase === 'stale' || phase === 'error') assert.ok(html.includes('Couldn’t refresh.') && html.includes('Showing '), 'Failure context remains available beneath the title')
+}
+const monthHeader = renderToStaticMarkup(React.createElement(ReportHeader, {month: 'October 2026', projected: false, onToggle() {}}))
+assert.ok(monthHeader.includes('October') && monthHeader.includes('Current') && !monthHeader.includes('bb-app-status'), 'The month/view row needs no second timestamp')
+
 const { ReportMenu } = load("components/ui/report-menu.tsx")
 const menu = renderToStaticMarkup(React.createElement(ReportMenu, null, React.createElement("button", null, "Sign out")))
 assert.ok(menu.includes('aria-expanded="false"') && menu.includes('inert=""'))

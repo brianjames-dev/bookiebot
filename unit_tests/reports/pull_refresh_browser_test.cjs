@@ -138,7 +138,7 @@ async function waitReady(page,label) {
           await gesture(page)
           if(label==='Overview') {
             await page.waitForFunction(()=>document.querySelector('.bb-pull-refresh')?.dataset.phase==='refreshing')
-            const busy=page.locator('.bb-report-header .bb-app-status span').filter({hasText:'Refreshing…'})
+            const busy=page.locator('.bb-brand-status .bb-app-status span').filter({hasText:'Refreshing…'})
             assert.equal(await busy.getAttribute('class'),'sr-only','The duplicate loading text is accessible without a visible label under the month')
             if(!dark)await page.evaluate(()=>{window.__releaseAnimation=document.querySelector('.bb-pull-refresh').getAnimations().find(a=>a.animationName==='bb-pull-release')})
             while(!releaseReport)await page.waitForTimeout(10)

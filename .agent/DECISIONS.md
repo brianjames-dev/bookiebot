@@ -1,5 +1,11 @@
 # Agent Decisions
 
+## 2026-10-29 - Clarify Left Precision And Tighten The Overview Header
+
+The user clarifies that only Left's small bar amounts omit cents: restore exact cents in its main headline, and remove the now-unused whole-dollar headline option. Split the prior phone Income/Spent bottom padding difference at 30px. Lift the category rows 4px to align the Savings bar with the final Saved target text, retaining the graphic's size and financial values.
+
+Share the real brand/avatar/status layout between the app shell and standalone report. Place the existing live update/failure status immediately beneath the title/name with a 1px row gap; preserve its timestamp semantics, accessible announcements, refresh state and Overview visibility. Reserve its small row through startup and tab switches so the title stays stable. The month/view row no longer owns that status, and its bottom spacing is 12px. Keep the accepted fixed tools, native refresh, Glass Capsule settings and exact calculations. This supersedes checklist 185's headline/spacing choices; native acceptance is checklist 186.
+
 ## 2026-10-29 - Refine Overview After Device Review
 
 Supersede the previous adjacent-icon and smart-cent Left display choices at the user's request: align every info icon to its frame's content right edge, display Left's headline and N/W/S amounts as rounded whole-dollar currency, and give Income/Spent 40px below their numbers in the two-column phone layout. Keep exact cents in explanation/accessibility data and bar calculations, other headline formatting, Glass Capsule settings and existing financial behavior. Native acceptance is checklist 185.

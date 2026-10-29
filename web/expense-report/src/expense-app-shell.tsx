@@ -20,7 +20,7 @@ import { ReconciliationScreen, useReconciliation } from "./reconciliation-screen
 import { TransactionsScreen } from "./transactions-screen"
 import { PageRefreshProvider, usePageRefresh } from "./page-refresh"
 import { PullToRefresh } from "./pull-to-refresh"
-import { ReportHeader } from "./report-header"
+import { ReportBrand, ReportHeader } from "./report-header"
 import type { ExpenseReportData } from "./types"
 
 interface ExpenseAppShellProps {
@@ -185,7 +185,7 @@ function ExpenseAppShellContent({ report, ownerName = "BookieBot", controls, mon
     <div className="bb-page bb-app-shell k-ios" data-screen={screen} data-keyboard-open={keyboardOpen}>
       <PullToRefresh screen={screen} blocked={!report || signingOut || askOpen || keyboardOpen || widgetGuideOpen} />
       <header className="bb-masthead bb-shell-masthead">
-        <span className="bb-wordmark"><img className="bb-app-avatar" src={avatarUrl} alt="" />BookieBot{owner !== "BookieBot" && <span className="bb-report-owner"><span aria-hidden="true">•</span>{" "}{owner}</span>}</span>
+        <ReportBrand owner={owner} avatarUrl={avatarUrl} status={controls} statusHidden={!reportVisible} />
         <Toolbar top className="bb-shell-header-actions" role="group" aria-label="BookieBot tools" innerClassName="bb-shell-toolbar-inner">
           <ToolbarPane className="bb-shell-toolbar-pane">
             <button ref={askTriggerRef} type="button" className="bb-shell-icon" aria-label="Ask BookieBot" aria-haspopup="dialog" aria-expanded={askOpen && monthlyReady} disabled={!report || !monthlyReady} onClick={() => setAskOpen(true)}><MessageCircle aria-hidden="true" /></button>
@@ -199,7 +199,7 @@ function ExpenseAppShellContent({ report, ownerName = "BookieBot", controls, mon
 
       <ReportHeader month={monthControl} projected={preferences.mode === "projected"}
         onToggle={() => preferences.setMode(preferences.mode === "projected" ? "current" : "projected")}
-        controls={controls} disabled={!report} hidden={!reportVisible} />
+        disabled={!report} hidden={!reportVisible} />
       <div className="bb-shell-report" hidden={!reportVisible || !monthlyReady}>
         {report && <ExpenseReportApp key={reportIdentity} report={report} externalHeader
           appComparison={comparison} appSession={{ signOut, signingOut }} />}

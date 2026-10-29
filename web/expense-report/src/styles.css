@@ -539,6 +539,7 @@ button.bb-left-categories { cursor: pointer; }
   min-width: 0;
   font-size: 11px;
   line-height: 1.1;
+  transform: translateY(-4px);
 }
 .bb-left-category-row { display: contents; }
 .bb-left-category-track { height: 6px; overflow: hidden; border-radius: 4px; background: hsl(var(--muted) / .22); }
@@ -2709,6 +2710,13 @@ tr:last-child td {
   font-weight: 600;
   letter-spacing: -0.025em;
 }
+.bb-report-brand { display: flex; align-items: center; gap: 10px; min-width: 0; }
+.bb-brand-copy { display: grid; grid-template-rows: auto minmax(14px, auto); gap: 1px; min-width: 0; }
+.bb-brand-copy .bb-wordmark { line-height: 1.2; }
+.bb-brand-status { min-width: 0; min-height: 14px; line-height: 1.2; }
+.bb-brand-status[hidden] { display: none; }
+.bb-brand-status .bb-app-controls { max-width: none; justify-items: start; }
+.bb-brand-status .bb-app-status { text-align: left; }
 .bb-wordmark-symbol {
   display: grid;
   place-items: center;
@@ -3134,7 +3142,7 @@ button:focus-visible, summary:focus-visible {
 @media (max-width: 640px) {
   .bb-burn-rate-page .bb-stat-list { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px 12px; }
   .bb-metrics-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); padding: 0; margin-bottom: 20px; }
-  .bb-metrics-grid > .bb-metric-card:nth-child(-n+2) { padding-bottom: 40px; }
+  .bb-metrics-grid > .bb-metric-card:nth-child(-n+2) { padding-bottom: 30px; }
   .bb-metric-card:nth-child(odd) { border-left: 0; }
   .bb-metric-card:nth-child(n+3) { border-top: 1px solid hsl(var(--border)); }
   .bb-metric-value { font-size: 30px; }
@@ -3342,7 +3350,7 @@ button:focus-visible, summary:focus-visible {
 .bb-page-header .bb-app-status, .bb-page-header > .bb-report-updated { grid-column: 2; grid-row: 2; max-width: 160px; justify-self: end; }
 .bb-page-header .bb-app-controls[data-state="stale"] .bb-app-status,
 .bb-page-header .bb-app-controls[data-state="error"] .bb-app-status { grid-column: 1 / -1; grid-row: 3; justify-self: start; max-width: none; text-align: left; }
-.bb-report-header { grid-template-columns: minmax(0, 1fr) auto; gap: 8px 12px; }
+.bb-report-header { grid-template-columns: minmax(0, 1fr) auto; gap: 8px 12px; padding-bottom: 12px; }
 .bb-report-header > .bb-report-context { display: flex; align-items: center; min-width: 0; }
 .bb-report-header h1 { font-size: clamp(24px, calc(14.2857vw - 21.714px), 34px); }
 .bb-report-header > .bb-header-actions { grid-column: 2; grid-row: 1; justify-self: end; align-items: center; }

@@ -31,9 +31,9 @@ assert.ok(fractionalTargets.includes('Minimum <b>$500</b>') && fractionalTargets
 assert.ok(fractionalTargets.includes('minimum $500.49; ideal $1,000.51'), 'Progress retains exact accessible targets')
 assert.ok(fractionalTargets.includes('Saved<span aria-hidden="true">ⓘ</span>'), 'Info remains in the same labeled explanation button')
 
-for (const [value, expected] of [[1317.14, '$1,317'], [1317.75, '$1,318'], [-50.50, '-$51'], [0, '$0'], [null, 'N/A'], [undefined, 'N/A']]) {
-  const html = renderToStaticMarkup(React.createElement(runtime.exports.Metric, {label: 'Left', value, accent: true, wholeDollars: true}))
-  assert.ok(html.includes(`>${expected}</div>`), 'Left uses whole-dollar display, including unavailable and negative balances')
+for (const [value, expected] of [[1317.14, '$1,317.14'], [1317.75, '$1,317.75'], [-50.50, '-$50.50'], [0, '$0.00'], [null, 'N/A'], [undefined, 'N/A']]) {
+  const html = renderToStaticMarkup(React.createElement(runtime.exports.Metric, {label: 'Left', value, accent: true}))
+  assert.ok(html.includes(`>${expected}</div>`), 'Left headline retains exact cents, including unavailable and negative balances')
 }
 for (const label of ['Income', 'Spent']) {
   const html = renderToStaticMarkup(React.createElement(runtime.exports.Metric, {label, value: 1317.14}))

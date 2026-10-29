@@ -17,7 +17,7 @@ import { createPortal } from "react-dom"
 import { ChevronDown } from "lucide-react"
 import { stablePieAnimation, stableBarAnimation, stableBarShape, StablePieSector, type AnimatedPieSector } from "./chart-animation"
 import { ReportScreen, useAppNavigation } from "./app-navigation"
-import { ReportHeader } from "./report-header"
+import { ReportBrand, ReportHeader } from "./report-header"
 import {
   Bar,
   BarChart,
@@ -602,7 +602,8 @@ export function ExpenseReportApp({ report, appControls, appAvatarUrl, appSession
   return (
     <div className={navigation ? "bb-report-content" : "bb-page"}>
       {!navigation && <div className="bb-masthead">
-        <span className="bb-wordmark">{appAvatarUrl ? <img className="bb-app-avatar" src={appAvatarUrl} alt="" /> : <span className="bb-wordmark-symbol" aria-hidden="true">b.</span>}BookieBot<span className="bb-report-owner"><span aria-hidden="true">•</span>{" "}{report.ownerName}</span></span>
+        <ReportBrand owner={report.ownerName} avatarUrl={appAvatarUrl}
+          status={appControls ?? <span className="bb-report-updated">Updated {generatedTimeLabel(report.generatedAt)}</span>} />
         <ReportMenu>
           <ThemeToggle theme={theme} onToggle={toggleTheme} />
           {appSession && <button type="button" className="bb-report-menu-action" disabled={appSession.signingOut} onClick={appSession.signOut}>
@@ -611,8 +612,7 @@ export function ExpenseReportApp({ report, appControls, appAvatarUrl, appSession
         </ReportMenu>
       </div>}
       {!externalHeader && <ReportHeader month={appMonthControl ?? report.monthLabel} projected={projectionActive} onToggle={toggleProjection}
-        hidden={Boolean(navigation && navigation.screen !== "overview")}
-        controls={appControls ?? <span className="bb-report-updated">Updated {generatedTimeLabel(report.generatedAt)}</span>} />}
+        hidden={Boolean(navigation && navigation.screen !== "overview")} />}
       {appUpdate}
       <ChartTooltipDismissProvider revision={chartTooltipDismissRevision}>
         <main className="bb-main" data-bb-tooltip-dismiss-revision={chartTooltipDismissRevision}>
@@ -629,7 +629,6 @@ export function ExpenseReportApp({ report, appControls, appAvatarUrl, appSession
             onExplain={metricDetails ? () => setMetricInspection({...metricDetails.left, key: "left", view: activeReport}) : undefined}
             value={activeReport.metrics.incomeAfterExpenses}
             accent
-            wholeDollars
           >
             <RemainingCategoryBars balances={activeReport.categoryBalances} budgets={activeReport.categoryBudgets}
               onExplain={metricDetails ? () => setMetricInspection({...metricDetails.left, key: "left", view: activeReport}) : undefined} />
@@ -1493,7 +1492,6 @@ function MetricCard({
   control,
   onExplain,
   children,
-  wholeDollars = false,
 }: {
   onExplain?: () => void
   label: string
@@ -1502,7 +1500,6 @@ function MetricCard({
   accent?: boolean
   control?: ReactNode
   children?: ReactNode
-  wholeDollars?: boolean
 }) {
   const positive = accent && value !== null && value !== undefined && value >= 0
   const negative = value !== null && value !== undefined && value < 0
@@ -1513,7 +1510,7 @@ function MetricCard({
         {control}
       </div>
       <FittedAmount className={negative ? "bb-metric-value bb-negative" : positive ? "bb-metric-value bb-positive" : "bb-metric-value"}>
-        {wholeDollars && value !== null && value !== undefined ? wholeMoney.format(value) : formatMoney(value)}
+        {formatMoney(value)}
       </FittedAmount>
       {description ? <div className="bb-metric-note">{description}</div> : null}
       {children}
