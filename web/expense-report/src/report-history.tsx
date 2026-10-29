@@ -156,7 +156,7 @@ export function MonthHistoryControl({ monthLabel, selectedMonth, catalog, loadin
   }
   const partial = catalog && catalog.coverage.status !== "complete"
   return <span className="bb-month-history">
-    <MonthPicker label="Report month" value={selectedMonth ?? currentMonth} triggerLabel={monthLabel} variant="title"
+    <MonthPicker label="Report month" value={selectedMonth ?? currentMonth} triggerLabel={monthLabel.replace(/\s+\d{4}\s*$/, "")} triggerDescription={monthLabel} variant="title"
       options={options} disabled={disabled || (loading && !catalog)}
       onSelect={(value) => onSelect(value === currentMonth ? null : value)} />
     {(error || partial) && <span className="bb-history-catalog-status" role="status">

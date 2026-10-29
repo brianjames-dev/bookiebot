@@ -72,6 +72,7 @@ const money = new Intl.NumberFormat("en-US", {
   style: "currency",
   currency: "USD",
 })
+const wholeMoney = new Intl.NumberFormat("en-US", {style: "currency", currency: "USD", maximumFractionDigits: 0})
 
 function formatMoney(value: number | null | undefined) {
   if (value === null || value === undefined) {
@@ -628,7 +629,10 @@ export function ExpenseReportApp({ report, appControls, appAvatarUrl, appSession
             onExplain={metricDetails ? () => setMetricInspection({...metricDetails.left, key: "left", view: activeReport}) : undefined}
             value={activeReport.metrics.incomeAfterExpenses}
             accent
-          />
+          >
+            <RemainingCategoryBars balances={activeReport.categoryBalances} budgets={activeReport.categoryBudgets}
+              onExplain={metricDetails ? () => setMetricInspection({...metricDetails.left, key: "left", view: activeReport}) : undefined} />
+          </MetricCard>
           <SavingsMetricCard
             progressValue={activeReport.savingsInvesting?.cashSaved}
             onExplain={metricDetails ? () => setMetricInspection({...metricDetails.saved, key: "saved", view: activeReport}) : undefined}
@@ -1487,6 +1491,7 @@ function MetricCard({
   accent = false,
   control,
   onExplain,
+  children,
 }: {
   onExplain?: () => void
   label: string
@@ -1494,6 +1499,7 @@ function MetricCard({
   description?: string
   accent?: boolean
   control?: ReactNode
+  children?: ReactNode
 }) {
   const positive = accent && value !== null && value !== undefined && value >= 0
   const negative = value !== null && value !== undefined && value < 0
@@ -1507,8 +1513,30 @@ function MetricCard({
         {formatMoney(value)}
       </FittedAmount>
       {description ? <div className="bb-metric-note">{description}</div> : null}
+      {children}
     </div>
   )
+}
+
+function RemainingCategoryBars({balances, budgets, onExplain}: {
+  balances: CategoryBalances; budgets: CategoryBalanceAmounts; onExplain?: () => void
+}) {
+  const categories = ["needs", "wants", "savings"] as const
+  const summary = categories.map(key => `${CATEGORY_BALANCE_LABELS[key]}: ${formatMoney(balances.remaining[key])} remaining of ${formatMoney(budgets[key])}`).join("; ")
+  const rows = <span className="bb-left-category-rows" aria-hidden="true">
+    {categories.map(key => {
+      const amount = balances.remaining[key]
+      const fraction = budgets[key] > 0 ? clamp(amount / budgets[key], 0, 1) : 0
+      return <span className="bb-left-category-row" data-category={key} key={key}>
+        <span>{key[0].toUpperCase()}</span>
+        <span className="bb-left-category-track"><span style={{width: `${fraction * 100}%`}} /></span>
+        <span className="bb-left-category-amount">{Number.isInteger(amount) ? wholeMoney.format(amount) : formatMoney(amount)}</span>
+      </span>
+    })}
+  </span>
+  return onExplain
+    ? <button type="button" className="bb-left-categories" aria-label={`Explain Left: ${summary}`} onClick={onExplain}>{rows}</button>
+    : <div className="bb-left-categories" role="img" aria-label={summary}>{rows}</div>
 }
 
 function isSavingsNearGoal(value: number | null | undefined, goal: number | null | undefined) {
@@ -1559,8 +1587,8 @@ function SavingsProgress({value, minimum, ideal, showTargets = true}: {value:num
           ) : null}
         </div>
         {showTargets && <div className="bb-savings-progress-labels">
-          <span>Minimum {formatMoney(minimum)}</span>
-          <span>Ideal {formatMoney(ideal)}</span>
+          <span>Minimum <b>{wholeMoney.format(minimum)}</b></span>
+          <span>Ideal <b>{wholeMoney.format(ideal)}</b></span>
         </div>}
       </div>
   )

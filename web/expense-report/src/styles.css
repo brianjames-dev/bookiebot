@@ -357,9 +357,11 @@ summary {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 0;
-  border-top: 2px solid hsl(var(--foreground));
-  border-bottom: 1px solid hsl(var(--border));
-  padding: 28px 0;
+  border: 1px solid hsl(var(--border));
+  border-radius: 20px;
+  overflow: hidden;
+  background: hsl(var(--card));
+  padding: 0;
   margin-bottom: 36px;
 }
 
@@ -369,7 +371,8 @@ summary {
 }
 
 .bb-metric-card {
-  padding: 0 24px;
+  padding: 16px 14px 19px;
+  min-height: 124px;
   border-left: 1px solid hsl(var(--border));
   min-width: 0;
 }
@@ -382,12 +385,15 @@ summary {
 }
 
 .bb-metric-label {
+  display: flex;
+  align-items: center;
+  min-height: 34px;
   color: hsl(var(--muted-foreground));
   font-size: 14px;
 }
 
 .bb-metric-value {
-  margin-top: 8px;
+  margin-top: 10px;
   font-size: clamp(24px, 2.8vw, 38px);
   font-weight: 500;
   line-height: 1.2;
@@ -431,7 +437,7 @@ summary {
 
 .bb-savings-progress {
   --bb-savings-progress-color: hsl(var(--muted-foreground));
-  margin-top: 10px;
+  margin-top: 18px;
 }
 
 .bb-savings-progress-low {
@@ -460,7 +466,8 @@ summary {
 
 .bb-savings-progress-track {
   position: relative;
-  height: 3px;
+  height: 4px;
+  border-radius: 4px;
   overflow: hidden;
   background: hsl(var(--muted) / 0.22);
 }
@@ -488,11 +495,55 @@ summary {
   flex-wrap: wrap;
   justify-content: space-between;
   gap: 2px 8px;
-  margin-top: 7px;
+  margin-top: 10px;
   color: hsl(var(--muted-foreground));
-  font-size: 12px;
+  font-size: 11px;
   line-height: 1.35;
 }
+
+.bb-savings-progress-labels b {
+  display: block;
+  margin-top: 2px;
+  color: hsl(var(--foreground));
+  font-size: 12px;
+  font-weight: 400;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.bb-left-categories {
+  display: flex;
+  align-items: center;
+  width: 100%;
+  min-width: 0;
+  min-height: 76px;
+  margin-top: 10px;
+  padding: 0;
+  border: 0;
+  border-radius: 4px;
+  background: transparent;
+  color: hsl(var(--muted-foreground));
+  font: inherit;
+  text-align: left;
+}
+button.bb-left-categories { cursor: pointer; }
+.bb-left-categories:focus-visible { outline: 2px solid hsl(var(--primary)); outline-offset: 3px; }
+.bb-left-category-rows {
+  display: grid;
+  grid-template-columns: 10px minmax(8px, 1fr) auto;
+  align-items: center;
+  gap: 2px 5px;
+  width: 100%;
+  min-width: 0;
+  font-size: 11px;
+  line-height: 1.1;
+}
+.bb-left-category-row { display: contents; }
+.bb-left-category-track { height: 6px; overflow: hidden; border-radius: 4px; background: hsl(var(--muted) / .22); }
+.bb-left-category-track > span { display: block; height: 100%; border-radius: inherit; background: hsl(var(--chart-1)); transition: width 240ms var(--bb-motion-ease); }
+.bb-left-category-row[data-category="wants"] .bb-left-category-track > span { background: hsl(var(--chart-2)); }
+.bb-left-category-row[data-category="savings"] .bb-left-category-track > span { background: hsl(var(--chart-4)); }
+.bb-left-category-amount { color: hsl(var(--foreground)); text-align: right; white-space: nowrap; font-variant-numeric: tabular-nums; }
 
 .bb-savings-progress-labels span:last-child {
   text-align: right;
@@ -1421,9 +1472,14 @@ summary {
 }
 
 .bb-projection-control > .bb-selection-indicator {
+  left: 2px;
+  top: calc(var(--bb-selection-y, 0px) + 2px);
+  width: calc(var(--bb-selection-width, 0px) - 4px);
+  height: calc(var(--bb-selection-height, 0px) - 4px);
   border: 0;
-  border-radius: 2px;
-  background: hsl(var(--foreground));
+  border-radius: 15px;
+  background: color-mix(in srgb, hsl(var(--primary)) 14%, hsl(var(--card)));
+  box-shadow: inset 0 0 0 1px hsl(var(--primary) / .18), 0 2px 5px hsl(var(--foreground) / .08);
 }
 
 .bb-chart-carousel-indicators > .bb-selection-indicator {
@@ -2679,19 +2735,32 @@ tr:last-child td {
   color: hsl(var(--muted-foreground));
 }
 .bb-projection-control {
-  display: flex;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   flex-shrink: 0;
-  padding: 3px;
-  border: 1px solid hsl(var(--border));
-  border-radius: var(--radius);
+  width: 154px;
+  height: 46px;
+  padding: 0;
+  border: 1px solid color-mix(in srgb, hsl(var(--foreground)) 13%, hsl(var(--card)));
+  border-radius: 18px;
+  background: color-mix(in srgb, hsl(var(--card)) 94%, hsl(var(--background)));
+  box-shadow: inset 0 1px 0 hsl(var(--foreground) / .05), 0 3px 8px hsl(var(--foreground) / .04);
+}
+.bb-projection-control .bb-metric-toggle {
+  width: 100%;
+  min-width: 0;
+  padding: 6px;
+  border-radius: 18px;
+  font-size: 12px;
+  white-space: nowrap;
+}
+.bb-projection-control .bb-metric-toggle[aria-pressed="true"] {
+  color: hsl(var(--primary));
 }
 .bb-metric-card:first-child {
-  padding-left: 0;
   border-left: 0;
 }
-.bb-metric-card:last-child {
-  padding-right: 0;
-}
+.bb-metric-card[data-accent] { background: color-mix(in srgb, hsl(var(--primary)) 6%, hsl(var(--card))); }
 .bb-metric-card[data-accent] .bb-metric-label {
   color: hsl(var(--primary));
 }
@@ -2933,7 +3002,6 @@ button:focus-visible, summary:focus-visible {
     grid-template-columns: 1fr;
   }
 
-  .bb-metric-card { padding-inline: 16px; }
   .bb-chart-side { border-left: 0; padding-left: 0; }
   .bb-reimbursement-at-glance { column-gap: 28px; }
   .bb-chart-carousel-arrows { display: none; }
@@ -2979,7 +3047,6 @@ button:focus-visible, summary:focus-visible {
 }
 
 @media (max-width: 420px) {
-  .bb-projection-control .bb-metric-toggle { padding-inline: 12px; }
   .bb-page {
     padding-top: 0;
     padding-bottom: 32px;
@@ -3013,18 +3080,13 @@ button:focus-visible, summary:focus-visible {
     font-size: 24px;
   }
 
-  .bb-metric-card {
-    min-height: 112px;
-    padding: 16px 0 16px 16px;
-  }
-
   .bb-metric-label,
   .bb-metric-note {
     line-height: 1.25;
   }
 
   .bb-metric-label {
-    font-size: 12px;
+    font-size: 14px;
   }
 
   .bb-metric-value {
@@ -3034,11 +3096,6 @@ button:focus-visible, summary:focus-visible {
 
   .bb-metric-note {
     font-size: 11px;
-  }
-
-  .bb-savings-progress-labels {
-    gap: 4px;
-    font-size: 12px;
   }
 
   .bb-chart-total {
@@ -3075,12 +3132,9 @@ button:focus-visible, summary:focus-visible {
 @media (max-width: 640px) {
   .bb-burn-rate-page .bb-stat-list { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px 12px; }
   .bb-metrics-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); padding: 0; margin-bottom: 20px; }
-  .bb-metric-card { padding: 20px 0 20px 20px; }
-  .bb-metric-card:nth-child(odd) { border-left: 0; padding-left: 0; padding-right: 16px; }
+  .bb-metric-card:nth-child(odd) { border-left: 0; }
   .bb-metric-card:nth-child(n+3) { border-top: 1px solid hsl(var(--border)); }
   .bb-metric-value { font-size: 30px; }
-  .bb-savings-progress-labels { flex-direction: column; }
-  .bb-savings-progress-labels span:last-child { text-align: left; }
   .bb-chart-carousel-indicators { width: 100%; gap: 0; justify-content: space-between; }
   .bb-chart-carousel-dot { font-size: 12px; min-height: 52px; }
   .bb-report-section { padding: 32px 0 var(--bb-section-footer-space); }
@@ -3287,16 +3341,19 @@ button:focus-visible, summary:focus-visible {
 .bb-page-header .bb-app-controls[data-state="error"] .bb-app-status { grid-column: 1 / -1; grid-row: 3; justify-self: start; max-width: none; text-align: left; }
 .bb-report-header { grid-template-columns: minmax(0, 1fr) auto; gap: 8px 12px; }
 .bb-report-header > .bb-report-context { display: flex; align-items: center; min-width: 0; }
+.bb-report-header h1 { font-size: clamp(24px, calc(14.2857vw - 21.714px), 34px); }
 .bb-report-header > .bb-header-actions { grid-column: 2; grid-row: 1; justify-self: end; align-items: center; }
 .bb-report-header .bb-metric-toggle { min-height: 44px; }
 .bb-report-header .bb-app-status, .bb-report-header > .bb-report-updated { grid-column: 1 / -1; grid-row: 2; justify-self: start; max-width: none; text-align: left; }
-.bb-report-header .bb-month-trigger > span { overflow-wrap: normal; }
+.bb-report-header .bb-month-trigger { gap: 10px; }
+.bb-report-header .bb-month-trigger > span { overflow-wrap: normal; white-space: nowrap; }
 @media (max-width: 360px) {
   .bb-report-header { column-gap: 8px; }
-  .bb-report-header h1 { font-size: 20px; }
+  .bb-report-header .bb-projection-control { width: 136px; }
   .bb-report-header .bb-month-trigger { gap: 8px; }
-  .bb-report-header .bb-metric-toggle { font-size: 13px; padding-inline: 10px; }
 }
+@media (pointer: coarse) { .bb-metric-label, .bb-metric-explain { min-height: 44px; } }
+@media (prefers-reduced-motion: reduce) { .bb-left-category-track > span { transition: none; } }
 .bb-page > .bb-app-update { width:min(var(--bb-content-max),100%); margin-inline:auto; }
 
 .bb-chart-box svg [role="button"] { cursor:pointer; }

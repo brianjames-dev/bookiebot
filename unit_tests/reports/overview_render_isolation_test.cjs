@@ -67,7 +67,7 @@ const runtime = { exports:{}, require:req, window, document,
   TopExpensesChart,MerchantChart,Tabs,ChartTooltipDismissProvider,useChartTooltipDismiss,
 }
 for(const name of ['Card','CardHeader','CardTitle','CardContent','ReportScreen','ReportMenu','TabsList','TabsTrigger','TabsContent','HiddenListPanel'])runtime[name]=passthrough
-for(const name of ['MetricCard','SavingsMetricCard','ReportHeader','ThemeToggle','SharedReimbursementsCard','ReimbursementLedger','Investments','SavingsGoals','ReportQuestions','PhoneNotifications','ActivityDetails','MetricExplanationDetails','TopExpensesTable','MerchantOccurrencesTable'])runtime[name]=leaf(name)
+for(const name of ['MetricCard','RemainingCategoryBars','SavingsMetricCard','ReportHeader','ThemeToggle','SharedReimbursementsCard','ReimbursementLedger','Investments','SavingsGoals','ReportQuestions','PhoneNotifications','ActivityDetails','MetricExplanationDetails','TopExpensesTable','MerchantOccurrencesTable'])runtime[name]=leaf(name)
 runtime.ModalDetails=passthrough
 runtime.generatedTimeLabel=()=>''
 vm.runInNewContext(compiled,runtime)

@@ -1,5 +1,11 @@
 # Agent Decisions
 
+## 2026-10-29 - Apply The Approved Overview Panel And Glass Capsule
+
+Use the approved unified metrics panel (20px radius, 16px top padding), with the existing two-column phone/four-column desktop response. Keep info icons immediately after each title. Left gains compact N/W/S bars, 6px tall with 2px row gaps and smart exact-cent amounts inline on the right. Their values come directly from the active mode's canonical remaining balances after donor coverage; fill is the clamped share of each allocation remaining. Do not recompute Left, add ESPP to its cash allocations, or invent a balance from raw category values. The graphic opens the existing Left explanation.
+
+Keep the measured sliding selection and saved view preference. Apply Glass Capsule at the user's selected 154×46px, 18px radius and 12px labels, with a 34px month-only heading. Fit narrow screens responsively; retain the full month/year in accessible context and the existing catalog/year picker. Startup keeps the same real header nodes. Saved's frame target labels round to whole-dollar currency only; its headline, accessible progress values, details and financial calculations retain exact cents and cash-only progress. No request, storage or financial writer changes. Device acceptance is checklist 184.
+
 ## 2026-10-29 - Tighten Category Mix After Native Review
 
 At the user's request, shorten the scope label to All and its control to 128px; keep the 14px chevron inset, native selection and 44px target. Reduce the fitted total's maximum font from 40px to 36px and the centered percentage from 46px to 42px. Change the ring's inner/outer radius ratio from 0.75 to 0.72, increasing band thickness 12% without changing its outer fit, categories or calculations. This supersedes checklist 182's dimensions only.

@@ -9,13 +9,14 @@ const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "
 const validMonth = (value: string) => /^\d{4}-(0[1-9]|1[0-2])$/.test(value)
 
 /** A catalog-backed month grid. Choosing a year never requests another report. */
-export function MonthPicker({ label, value, options, onSelect, disabled = false, triggerLabel, variant = "compact" }: {
+export function MonthPicker({ label, value, options, onSelect, disabled = false, triggerLabel, triggerDescription, variant = "compact" }: {
   label: string
   value: string
   options: MonthPickerOption[]
   onSelect: (value: string) => void
   disabled?: boolean
   triggerLabel?: string
+  triggerDescription?: string
   variant?: "title" | "compact"
 }) {
   const id = useId()
@@ -116,7 +117,7 @@ export function MonthPicker({ label, value, options, onSelect, disabled = false,
   }
 
   return <span className={`bb-month-control bb-month-control-${variant}`}>
-    <button ref={trigger} type="button" className="bb-month-trigger" aria-label={label} aria-haspopup="dialog"
+    <button ref={trigger} type="button" className="bb-month-trigger" aria-label={label} aria-description={triggerDescription} aria-haspopup="dialog"
       aria-expanded={open} aria-controls={id} disabled={disabled || !months.size}
       onClick={() => { setYear(initialYear); setOpen(current => !current) }}>
       <span>{triggerLabel ?? months.get(value)?.label ?? value}</span>
