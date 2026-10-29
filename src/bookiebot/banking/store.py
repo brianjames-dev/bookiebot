@@ -1426,6 +1426,57 @@ class BankStore:
             ).fetchall()
         return [_bank_transaction_from_row(row) for row in rows]
 
+    def prepare_reconciliation_review(
+        self, owner_key: str, transaction: BankTransaction, *, start_date: str,
+    ) -> ReconciliationItem | None:
+        """Start one explicit review without syncing, matching or writing Sheets.
+
+        A first review must not overwrite a concurrent decision or materialize
+        an outdated authorization, removed charge or unwatched account.
+        """
+        from bookiebot.banking.reconciliation import classify_transaction
+        if transaction.owner_key != owner_key or transaction.pending:
+            return None
+        self.initialize()
+        now = utc_now_iso()
+        with self.connect() as conn:
+            self._lock_reconciliation_owner(conn, owner_key)
+            conn.execute('UPDATE bank_transactions SET id = id WHERE id = ? AND owner_key = ?',
+                         (transaction.id, owner_key))
+            row = conn.execute(
+                """SELECT t.id FROM bank_transactions t
+                   JOIN bank_accounts a ON a.id = t.account_id AND a.owner_key = t.owner_key
+                   JOIN bank_items i ON i.id = a.item_id AND i.owner_key = t.owner_key
+                   WHERE t.id = ? AND t.owner_key = ? AND t.updated_at = ?
+                     AND t.removed_at IS NULL AND t.pending = 0
+                     AND a.watched = 1 AND i.status = 'active'
+                     AND COALESCE(t.date, t.authorized_date, '') >= ?
+                     AND NOT EXISTS (SELECT 1 FROM bank_reconciliation_items r WHERE r.bank_transaction_id = t.id)""",
+                (transaction.id, owner_key, transaction.updated_at, start_date),
+            ).fetchone()
+            if row is None:
+                return None
+            classification, _, _, _ = classify_transaction(transaction)
+            conn.execute(
+                """INSERT INTO bank_reconciliation_items
+                   (owner_key, bank_transaction_id, classification, status, confidence, first_seen_at, last_seen_at, notes)
+                   VALUES (?, ?, ?, 'needs_review', 0, ?, ?, ?)""",
+                (owner_key, transaction.id, classification, now, now, 'Review opened in the app; no match or sheet change applied.'),
+            )
+            review = conn.execute('SELECT id FROM bank_reconciliation_items WHERE bank_transaction_id = ?',
+                                  (transaction.id,)).fetchone()
+            assert review is not None
+            conn.execute(
+                """INSERT INTO bank_reconciliation_events
+                   (event_id, reconciliation_id, owner_key, event_type, occurred_at, payload_json)
+                   VALUES (?, ?, ?, 'phone_review_prepare', ?, ?)""",
+                (uuid4().hex, review['id'], owner_key, now, json.dumps({
+                    'bank_transaction_id': transaction.id, 'bank_updated_at': transaction.updated_at,
+                    'status': 'needs_review',
+                }, sort_keys=True)),
+            )
+        return self.get_reconciliation_item(owner_key, int(review['id']))
+
     def upsert_reconciliation_item(
         self,
         *,

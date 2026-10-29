@@ -362,6 +362,59 @@ async def test_old_items_hidden_and_unreviewed_items_need_check(client):
 
 
 @pytest.mark.asyncio
+async def test_unreviewed_posted_match_prepares_one_row_then_requires_explicit_confirmation(client):
+    transaction = seed(client, reviewed=False)
+    connect(client)
+    row = await details(client, -transaction.id)
+    assert row['suggestions'][0]['confirmable'] and row['needsCheck']
+    assert client.store.get_reconciliation_item_for_transaction('brian', transaction.id) is None
+    # Reading a suggestion or preparing its review never chooses the match.
+    response = await client.http.post('/app/reconciliation', headers=HEADERS, json={
+        'operation': 'prepare', 'id': row['id'], 'version': row['stateVersion'],
+    })
+    assert response.status == 200, await response.text()
+    result = await response.json()
+    prepared_id = result['preparedReview']['id']
+    assert result['preparedReview']['fromId'] == row['id']
+    prepared = client.service.get_reconciliation_item('brian', prepared_id)
+    assert prepared.status == 'needs_review' and prepared.matched_action_log_id is None
+    assert client.store.recent_transactions('brian')[0] == transaction
+    client.service.sync_owner.assert_not_awaited()
+    client.notify.assert_not_awaited()
+    fresh = await details(client, prepared_id)
+    assert fresh['needsCheck'] is False and fresh['suggestions'][0]['confirmable']
+    response = await client.http.post('/app/reconciliation', headers=HEADERS, json={
+        'operation': 'confirm', 'id': prepared_id, 'version': fresh['version'], 'suggestionId': 'coffee',
+    })
+    assert response.status == 200, await response.text()
+    assert client.service.get_reconciliation_item('brian', prepared_id).status == 'confirmed'
+    with client.store.connect() as db:
+        events = db.execute('SELECT event_type FROM bank_reconciliation_events ORDER BY occurred_at').fetchall()
+    assert [e['event_type'] for e in events] == ['phone_review_prepare', 'phone_review_confirm']
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize('problem', ['pending', 'stale', 'wrong_owner', 'old', 'positive_id', 'direct_confirm'])
+async def test_prepare_rejects_ineligible_or_obsolete_requests_without_bank_sync(client, problem):
+    transaction = seed(client, reviewed=problem == 'positive_id', pending=problem == 'pending', age=61 if problem == 'old' else 0)
+    connect(client)
+    review_id = transaction.id if problem == 'positive_id' else -transaction.id
+    version = '0' * 64
+    if problem not in {'old', 'stale'}:
+        version = (await details(client, review_id))['stateVersion']
+    if problem == 'wrong_owner':
+        connect(client, HANNAH, 'hannah')
+        seed(client, owner='hannah', reviewed=False)
+    response = await client.http.post('/app/reconciliation', headers=HEADERS, json={
+        'operation': 'confirm' if problem == 'direct_confirm' else 'prepare', 'id': review_id, 'version': version,
+    })
+    assert response.status in {400, 404, 409}
+    assert (await response.json())['outcome'] == 'not_applied'
+    client.service.sync_owner.assert_not_awaited()
+    client.notify.assert_not_awaited()
+
+
+@pytest.mark.asyncio
 async def test_parallel_phone_checks_share_sync_and_failure_recovers(client):
     seed(client)
     connect(client)

@@ -273,13 +273,24 @@ def _command_snapshot(service, owner, actor, review_id):
 
 def command(service: BankingService, owner: str, actor: str, body: dict) -> dict:
     operation = body.get("operation")
-    if not isinstance(operation, str) or operation not in {"confirm", "update_match", "update_schedule", "recover_schedule", "log", "ignore", "reopen"}:
+    if not isinstance(operation, str) or operation not in {"prepare", "confirm", "update_match", "update_schedule", "recover_schedule", "log", "ignore", "reopen"}:
         raise ReviewValidation("Invalid review action.")
     review_id = body.get("id")
     expected = body.get("version")
-    if type(review_id) is not int or review_id <= 0 or not isinstance(expected, str) or len(expected) != 64:
+    if (type(review_id) is not int or (review_id >= 0 if operation == 'prepare' else review_id <= 0)
+            or not isinstance(expected, str) or len(expected) != 64):
         raise ReviewValidation("Check this transaction before reviewing it.")
     transaction, item = _find(service, owner, review_id)
+    if operation == 'prepare':
+        if item is not None or transaction.pending or expected != _version(transaction, None):
+            raise ReviewRejected('This transaction changed. Reopen it to review the latest information.')
+        prepared = service.store.prepare_reconciliation_review(owner, transaction, start_date=_cutoff())
+        if prepared is None:
+            raise ReviewRejected('This transaction changed or was already reviewed. Reopen it to continue.')
+        result = snapshot(service, owner)
+        if any(row['id'] == prepared.id for row in result['items']):
+            result['preparedReview'] = {'fromId': review_id, 'id': prepared.id}
+        return result
     if operation == 'recover_schedule':
         if item is None or expected != _version(transaction, item) or item.status != 'import_requested':
             raise ReviewRejected('This payment changed. Check status before verifying it.')
@@ -458,7 +469,7 @@ async def _review(request: web.Request) -> web.Response:
                 raise ReviewValidation("Invalid review request.")
             requested_operation = body.get('operation')
             operation = requested_operation if isinstance(requested_operation, str) and requested_operation in {
-                'check', 'confirm', 'update_match', 'update_schedule', 'recover_schedule', 'log', 'ignore', 'reopen',
+                'check', 'prepare', 'confirm', 'update_match', 'update_schedule', 'recover_schedule', 'log', 'ignore', 'reopen',
             } else 'invalid'
             if body.get("operation") == "check":
                 task = _checks.get(session.owner_key)
