@@ -1,12 +1,12 @@
-import { useEffect, useLayoutEffect, useRef, useState, useSyncExternalStore, type CSSProperties } from "react"
+import { useEffect, useRef, useState, useSyncExternalStore, type CSSProperties } from "react"
 import { screenTitles, type AppScreen } from "./app-navigation"
 import { usePageRefreshRegistry } from "./page-refresh"
 import "./pull-to-refresh.css"
 
-// Finger travel is resisted; 144px of downward travel fills the 72px indicator.
+// Finger travel is resisted; 180px of downward travel fills the 72px indicator.
 export const PULL_REFRESH_THRESHOLD = 72
 const PULL_REFRESH_HOLD = 64
-export function pullRefreshDistance(travel: number) { return Math.min(96, Math.max(0, travel) / 2) }
+export function pullRefreshDistance(travel: number) { return Math.min(96, Math.max(0, travel) / 2.5) }
 type Phase = "idle" | "pulling" | "armed" | "refreshing" | "done" | "settling" | "error"
 type Gesture = { x: number; y: number; lastY: number; scrollY: number; identifier: number; captured: boolean }
 
@@ -16,7 +16,9 @@ function pageIsBlocked() {
 
 function excludedTarget(target: EventTarget | null) {
   if (!(target instanceof Element)) return true
-  if (target.closest("button,a,input,textarea,select,[contenteditable=true],[role=slider],[role=tablist],.bb-bottom-navigation")) return true
+  // Native panning cancels clicks on ordinary buttons/links. Excluding those
+  // surfaces made the indicator depend on where the same pull happened to start.
+  if (target.closest("input,textarea,select,[contenteditable=true],[role=slider],.bb-bottom-navigation")) return true
   // An inner scroller owns its own gesture, even when it has reached its edge.
   for (let element: Element | null = target; element && element !== document.body && element !== document.documentElement; element = element.parentElement) {
     const style = window.getComputedStyle(element)
@@ -34,7 +36,6 @@ export function PullToRefresh({ screen, blocked = false }: { screen: AppScreen; 
   const state = useRef({ screen, blocked }), gesture = useRef<Gesture | null>(null), pulled = useRef(0)
   const running = useRef(false), mounted = useRef(false), timer = useRef<number | undefined>(undefined)
   const refreshScreen = useRef<AppScreen | null>(null)
-  const spacer = useRef<HTMLDivElement>(null)
   state.current = { screen, blocked }
   const available = !blocked && registry.available(screen)
   const reset = () => { gesture.current = null; pulled.current = 0; setDistance(0); if (!running.current) setPhase("idle") }
@@ -99,7 +100,9 @@ export function PullToRefresh({ screen, blocked = false }: { screen: AppScreen; 
       if (!current.captured) {
         if (Math.abs(dx) < 8 && Math.abs(dy) < 8) return
         if (dy <= 0) { current.x = touch.clientX; current.y = touch.clientY; pulled.current = 0; schedule(); return }
-        if (Math.abs(dx) >= dy) { actions.current.reset(); return }
+        // Wait for vertical intent instead of permanently rejecting a pull
+        // because its first few pixels drifted sideways.
+        if (Math.abs(dx) >= dy) return
         current.captured = true
       }
       pulled.current = pullRefreshDistance(dy)
@@ -145,21 +148,9 @@ export function PullToRefresh({ screen, blocked = false }: { screen: AppScreen; 
   // bounce so the two motions never add up and stretch the page twice.
   const tracking = phase === "pulling" || phase === "armed"
   const offset = visible && !tracking ? Math.max(0, Math.min(distance, PULL_REFRESH_THRESHOLD) - nativeOverscroll) : 0
-  useLayoutEffect(() => {
-    const shell = spacer.current?.closest<HTMLElement>(".bb-app-shell")
-    if (!shell) return
-    // Fixed header tools follow the same offset as the in-flow brand/content.
-    shell.style.setProperty("--bb-pull-offset", `${offset}px`)
-    shell.dataset.pullPhase = phase
-  }, [offset, phase])
-  useLayoutEffect(() => () => {
-    const shell = spacer.current?.closest<HTMLElement>(".bb-app-shell")
-    shell?.style.removeProperty("--bb-pull-offset")
-    if (shell) delete shell.dataset.pullPhase
-  }, [])
   const progress = Math.round(Math.min(1, distance / PULL_REFRESH_THRESHOLD) * 100)
   return <>
-    <div ref={spacer} className="bb-pull-refresh-space" data-phase={phase} data-native-bounce={nativeOverscroll > 0} aria-hidden="true" style={{ height: offset }} />
+    <div className="bb-pull-refresh-space" data-phase={phase} data-native-bounce={nativeOverscroll > 0} aria-hidden="true" style={{ height: offset }} />
     <div className="bb-pull-refresh" data-phase={phase} data-visible={visible} style={{ "--bb-pull-distance": `${visible ? Math.min(distance, PULL_REFRESH_THRESHOLD) : 0}px` } as CSSProperties}>
     <button type="button" className="bb-pull-refresh-button" aria-label={`Refresh ${screenTitles[screen]}`} title={`Refresh ${screenTitles[screen]}`} disabled={!available || running.current}
       aria-busy={phase === "refreshing"} onClick={() => void refresh()}>

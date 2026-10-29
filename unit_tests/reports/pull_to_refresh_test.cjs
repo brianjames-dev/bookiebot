@@ -8,8 +8,8 @@ global.IS_REACT_ACT_ENVIRONMENT = true
 const h = React.createElement, listeners = new Map(), timers = new Map(), frames = new Map(), classes = new Set()
 let serial = 0, modal = false
 class Element {
-  constructor({interactive = false, scrollable = false} = {}) { this.interactive = interactive; this.scrollable = scrollable; this.scrollHeight = scrollable ? 200 : 0; this.clientHeight = 100; this.parentElement = null }
-  closest() { return this.interactive ? this : null }
+  constructor({tag = 'div', selector = '', scrollable = false} = {}) { this.tag = tag; this.selector = selector; this.scrollable = scrollable; this.scrollHeight = scrollable ? 200 : 0; this.clientHeight = 100; this.parentElement = null }
+  closest(selectors) { return selectors.split(',').some(selector=>selector===this.tag||selector===this.selector) ? this : this.parentElement?.closest(selectors)??null }
 }
 const eventHost = name => ({
   addEventListener(type, callback, options) { listeners.set(`${name}:${type}`, {callback,options}) },
@@ -66,19 +66,31 @@ const settle = async () => {await act(async()=>{await Promise.resolve();await Pr
 ;(async()=>{
   act(()=>{renderer=Renderer.create(fixture())})
   for(const name of ['touchstart','touchmove','touchend','touchcancel'])assert.equal(listeners.get(`document:${name}`).options.passive,true,'Touch observers never block native scrolling')
-  start(); move({y:90}); assert.equal(progress(),49)
+  const button=new Element({tag:'button'}),buttonIcon=new Element({tag:'svg'});buttonIcon.parentElement=button
+  for(const target of [button,buttonIcon,new Element({tag:'a'}),new Element({selector:'[role=tablist]'})]) {
+    start({target});move({y:90});assert.equal(progress(),39,'Ordinary controls also show pull feedback')
+    assert.equal(renderer.root.findByProps({className:'bb-pull-refresh'}).props['data-visible'],true)
+    await release({y:90});assert.equal(calls.length,0)
+  }
+  start();move({y:28,x:48});move({y:90,x:55});assert.equal(progress(),39,'A sideways start can develop into a vertical pull')
+  await release({y:90,x:55});assert.equal(calls.length,0)
+  start();move({y:164});assert.equal(progress(),80);assert.equal(phase(),'pulling')
+  await release({y:164});assert.equal(calls.length,0,'The old 144px trigger now remains below threshold')
+  start();move({y:199});assert.equal(phase(),'pulling')
+  await release({y:199});assert.equal(calls.length,0,'179px is still below the new threshold')
+  start(); move({y:90}); assert.equal(progress(),39)
   await release({y:90}); assert.equal(calls.length,0,'Short pull cancels')
-  start(); move({y:180}); assert.equal(phase(),'armed'); assert.equal(progress(),100)
+  start(); move({y:200}); assert.equal(phase(),'armed'); assert.equal(progress(),100)
   move({y:100}); await release({y:100}); assert.equal(calls.length,0,'Retreat below threshold cancels')
-  start(); const captured=move({y:164}); assert.equal(captured.defaultPrevented,false)
+  start({target:buttonIcon}); const captured=move({y:200}); assert.equal(captured.defaultPrevented,false)
   assert.equal(renderer.root.findByProps({className:'bb-pull-refresh-space'}).props.style.height,0,'Native scrolling owns page position throughout a pull')
   assert.equal(calls.length,0,'Threshold never triggers before release')
-  await release({y:164}); assert.deepEqual(calls,['overview']); assert.equal(phase(),'done')
-  for(const options of [{y:180,x:220},{y:0}]) {
+  await release({y:200}); assert.deepEqual(calls,['overview']); assert.equal(phase(),'done')
+  for(const options of [{y:240,x:320},{y:0}]) {
     start(); move(options); await release(options)
   }
   assert.equal(calls.length,1,'Horizontal/upward gestures never refresh')
-  for(const target of [new Element({interactive:true}),new Element({scrollable:true})]) {
+  for(const target of [new Element({tag:'input'}),new Element({tag:'textarea'}),new Element({tag:'select'}),new Element({selector:'[contenteditable=true]'}),new Element({selector:'[role=slider]'}),new Element({selector:'.bb-bottom-navigation'}),new Element({scrollable:true})]) {
     start({target});move({y:200});await release({y:200})
   }
   win.scrollY=100;start();win.scrollY=0;move({y:200});await release({y:200})
@@ -94,21 +106,21 @@ const settle = async () => {await act(async()=>{await Promise.resolve();await Pr
   act(()=>renderer.update(fixture()))
   win.scrollY=120;start({target:doc.documentElement});move({y:80,cancelable:false});scroll(60)
   move({y:140,cancelable:false});scroll(0)
-  move({y:220,cancelable:false});assert.equal(progress(),56)
+  move({y:220,cancelable:false});assert.equal(progress(),44)
   await release({y:220});assert.equal(calls.length,1,'Scrolling up to the edge alone is not a refresh')
   win.scrollY=120;start({target:doc.documentElement});move({y:80,cancelable:false});scroll(60)
   move({y:140,cancelable:false});scroll(0)
-  const nativeMove=move({y:284,cancelable:false})
+  const nativeMove=move({y:320,cancelable:false})
   assert.equal(nativeMove.defaultPrevented,false);assert.equal(phase(),'armed')
   scroll(-48)
   assert.equal(renderer.root.findByProps({className:'bb-pull-refresh-space'}).props.style.height,0,'Safari bounce is never doubled while pulling')
-  await release({y:284});assert.equal(calls.length,2,'A continuous native pan can reach the edge and refresh without retrying')
+  await release({y:320});assert.equal(calls.length,2,'A continuous native pan can reach the edge and refresh without retrying')
   assert.equal(renderer.root.findByProps({className:'bb-pull-refresh-space'}).props.style.height,16,'Loading space subtracts remaining native overscroll')
   scroll(0);assert.equal(renderer.root.findByProps({className:'bb-pull-refresh-space'}).props.style.height,64)
   scroll(-80);scroll(0);assert.equal(calls.length,2,'Momentum/bounce without a finger cannot refresh')
   for(const screen of ['transactions','shared','savings','reconcile','settings']) {
     act(()=>renderer.update(fixture({screen})))
-    start();move({y:170});await release({y:170})
+    start();move({y:200});await release({y:200})
     assert.ok(calls.includes(screen),`${screen} uses its own registered implementation`)
   }
   assert.equal(calls.filter(call=>call==='investments').length,1,'Savings refresh waits for both goals and investments')

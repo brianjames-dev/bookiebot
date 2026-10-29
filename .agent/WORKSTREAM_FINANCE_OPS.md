@@ -4,6 +4,10 @@ Last updated: 2026-10-29
 
 ## Goal
 
+### Consistent pull feedback and anchored toolbar — 2026-10-29
+
+The user accepted native scroll behavior. Follow up on missing feedback by observing pulls over normal buttons/links and waiting through an initially slanted move. Keep native taps and protected field/slider/nav/modal/busy gestures. Remove scripted toolbar movement so message/settings stay fixed; require 180px rather than 144px pull travel. **6 focused / 2,758 full tests passed**, **557 optional PostgreSQL skipped**, clean types/build and **48 Chromium/WebKit page cases**, including frame-level toolbar anchoring and native button pan/tap checks. Native acceptance is STATUS checklist 176. No Finance Ops backlog, financial operation or persistence change; all browser APIs use isolated fixtures.
+
 ### Native-scroll refresh follow-up — 2026-10-29
 
 Replace bounce suppression/canceling drag handlers with passive native-scroll observation. A single continuous pan can reach the top and pull to refresh; no layout stretch is added during touch movement. Retain the larger loading/checkmark and existing page-specific operations after release, accounting for remaining Safari bounce. Added native-pan/boundary/noncancelable/negative-scroll regression coverage and checklist 175. **3 targeted / 2,758 full tests passed**, **557 optional PostgreSQL skipped**, clean types/build and **48 Chromium/WebKit page cases**, including a real continuous Chromium pan. No Finance Ops backlog, financial workflow or persistence change; browser APIs remain isolated fixtures. Physical iOS acceptance remains pending.

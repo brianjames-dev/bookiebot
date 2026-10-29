@@ -15,17 +15,19 @@ const css=fs.readFileSync(path.join(root,'src/bookiebot/reports/assets/expense-r
 const js=fs.readFileSync(path.join(root,'src/bookiebot/reports/assets/expense-report-app.js'),'utf8')
 const html=dark=>`<!doctype html><html data-theme="${dark?'dark':'light'}"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><style>${css}</style></head><body><div id="bookiebot-expense-report-root"></div><script id="bookiebot-expense-app-config" type="application/json">${JSON.stringify({ownerName:'Brian',reportUrl:'/app/expenses/data',logoutUrl:'/app/logout'})}</script><script>localStorage.setItem('bookiebot-expense-report-theme','${dark?'dark':'light'}')</script><script type="module">${js}</script></body></html>`
 const screens={Overview:'/app/expenses/data',Transactions:'/app/transactions',Shared:'/app/reimbursements',Savings:'/app/goals',Reconcile:'/app/reconciliation',Settings:'/app/widgets/settings'}
-async function gesture(page,end=245,{start=80,x=16,cancel=false,finish=true}={}) {
-  await page.evaluate(({start,end,x,cancel,finish})=>{
-    const target=document.querySelector('.bb-shell-masthead')
+async function gesture(page,end=280,{start=80,x=16,cancel=false,finish=true,selector='.bb-shell-masthead',drift=false}={}) {
+  await page.evaluate(({start,end,x,cancel,finish,selector,drift})=>{
+    const target=document.querySelector(selector)
     const touch=y=>({identifier:71,target,clientX:x,clientY:y,pageX:x,pageY:y})
     const fire=(type,y)=>{
       const event=new Event(type,{bubbles:true,cancelable:true})
       Object.defineProperties(event,{touches:{value:type==='touchend'||type==='touchcancel'?[]:[touch(y)]},changedTouches:{value:[touch(y)]}})
       return target.dispatchEvent(event)
     }
-    fire('touchstart',start);fire('touchmove',end);if(finish)fire(cancel?'touchcancel':'touchend',end)
-  },{start,end,x,cancel,finish})
+    fire('touchstart',start)
+    if(drift) {x+=18;fire('touchmove',start+8)}
+    fire('touchmove',end);if(finish)fire(cancel?'touchcancel':'touchend',end)
+  },{start,end,x,cancel,finish,selector,drift})
 }
 async function waitReady(page,label) {
   await page.waitForFunction(label=>document.querySelector(`button[aria-label="Refresh ${label}"]`)?.disabled===false,label)
@@ -82,6 +84,8 @@ async function waitReady(page,label) {
           const notificationsBefore=requests.filter(r=>r.name==='/app/notifications').length
           await gesture(page,150);await page.waitForTimeout(120)
           assert.equal(requests.filter(r=>r.name===path).length,before,'Short pull must not request data')
+          await gesture(page,224);await page.waitForTimeout(120)
+          assert.equal(requests.filter(r=>r.name===path).length,before,'The former 144px trigger must no longer refresh')
           await gesture(page)
           await page.waitForFunction(()=>document.querySelector('.bb-pull-refresh')?.dataset.phase==='done')
           assert.equal(requests.filter(r=>r.name===path).length,before+1,`${label} refreshes the active data once`)
@@ -114,6 +118,15 @@ async function waitReady(page,label) {
           const geometry=()=>page.evaluate(()=>Object.fromEntries(['.bb-wordmark','.bb-app-avatar','.bb-shell-header-actions','#bb-reconcile-title'].map(selector=>[selector,document.querySelector(selector).getBoundingClientRect().top])))
           const original=await geometry()
           const originalHeight=await page.evaluate(()=>document.documentElement.scrollHeight)
+          await page.evaluate(()=>{
+            window.__toolbarMotion=[];window.__sampleToolbar=true
+            const sample=()=>{
+              if(!window.__sampleToolbar)return
+              window.__toolbarMotion.push({top:document.querySelector('.bb-shell-header-actions').getBoundingClientRect().top,phase:document.querySelector('.bb-pull-refresh').dataset.phase})
+              requestAnimationFrame(sample)
+            }
+            sample()
+          })
           holdCheck=true
           const cdp=engine===chromium ? await page.context().newCDPSession(page) : null,before=requests.filter(r=>r.name==='/app/reconciliation').length
           if(cdp) {
@@ -139,7 +152,7 @@ async function waitReady(page,label) {
           await page.waitForFunction(()=>document.querySelector('.bb-pull-refresh')?.dataset.phase==='refreshing')
           await page.waitForTimeout(350)
           const held=await geometry()
-          for(const selector in original)assert.ok(Math.abs(held[selector]-original[selector]-64)<.5,`${selector} must retract with the loading indicator`)
+          for(const selector in original)assert.ok(Math.abs(held[selector]-original[selector]-(selector==='.bb-shell-header-actions'?0:64))<.5,`${selector} must retain its correct loading position`)
           const spinner=page.locator('.bb-pull-spinner')
           const first=await spinner.evaluate(node=>({transform:getComputedStyle(node).transform,animation:getComputedStyle(node).animationName}))
           await page.waitForTimeout(100)
@@ -160,31 +173,47 @@ async function waitReady(page,label) {
           await page.waitForFunction(()=>document.querySelector('.bb-pull-refresh')?.dataset.phase==='settling')
           assert.equal(await page.locator('.bb-pull-check').evaluate(node=>Number(getComputedStyle(node).opacity)),1,'The checkmark stays during the final retraction')
           await page.waitForFunction(()=>document.querySelector('.bb-pull-refresh')?.dataset.phase==='idle')
+          const motion=await page.evaluate(()=>{window.__sampleToolbar=false;return window.__toolbarMotion})
+          assert.ok(motion.every(frame=>Math.abs(frame.top-original['.bb-shell-header-actions'])<.5),'Top-right controls stay anchored through every refresh animation frame')
+          for(const phase of ['refreshing','done','settling'])assert.ok(motion.some(frame=>frame.phase===phase),`Toolbar position sampled during ${phase}`)
           assert.equal(requests.filter(r=>r.name==='/app/reconciliation').length,before+1)
           assert.equal(await page.evaluate(()=>scrollY),0,'The gesture must not reload/navigate or scroll the document')
+          // A pull from an ordinary filter button, even with a sideways start,
+          // must reveal the indicator. A short release still cancels.
+          const controlCount=requests.filter(r=>r.name==='/app/reconciliation').length
+          await gesture(page,150,{selector:'.bb-reconcile-filters button',finish:false,drift:true})
+          await page.waitForFunction(()=>document.querySelector('.bb-pull-refresh')?.dataset.visible==='true')
+          assert.equal(await page.locator('.bb-pull-refresh').getAttribute('data-phase'),'pulling')
+          await page.evaluate(()=>document.dispatchEvent(new Event('touchcancel',{bubbles:true})))
+          assert.equal(requests.filter(r=>r.name==='/app/reconciliation').length,controlCount)
+          await page.locator('.bb-reconcile-filters button').nth(1).tap()
+          assert.equal(await page.locator('.bb-reconcile-filters button').nth(1).getAttribute('aria-pressed'),'true','Normal native taps still select filters')
           // One continuous real pan must scroll normally from below the top and
           // then arm refresh, without requiring another touchstart at the edge.
           if(cdp) {
             await page.evaluate(()=>{
               const space=document.createElement('div');space.id='native-scroll-fixture';space.style.height='1400px';document.body.append(space)
-              window.scrollTo(0,120)
             })
-            await page.waitForFunction(()=>scrollY===120)
-            const count=requests.filter(r=>r.name==='/app/reconciliation').length
-            // Start in the page gutter, outside the filter buttons; interactive
-            // controls intentionally retain their own gesture handling.
-            await cdp.send('Input.dispatchTouchEvent',{type:'touchStart',touchPoints:[{x:4,y:100}]})
-            for(const y of [130,180,240,300,380,460,540]) {
-              await cdp.send('Input.dispatchTouchEvent',{type:'touchMove',touchPoints:[{x:4,y}]})
-              await page.waitForTimeout(35)
+            for(const initialScroll of [120,0]) {
+              await page.waitForFunction(()=>document.querySelector('.bb-pull-refresh')?.dataset.phase==='idle'&&document.querySelector('.bb-pull-refresh-space').getBoundingClientRect().height<.1)
+              await page.evaluate(top=>window.scrollTo(0,top),initialScroll)
+              await page.waitForFunction(top=>scrollY===top,initialScroll)
+              const count=requests.filter(r=>r.name==='/app/reconciliation').length
+              const bounds=await page.locator('.bb-reconcile-filters button').first().boundingBox(),x=bounds.x+20,start=bounds.y+bounds.height/2
+              await cdp.send('Input.dispatchTouchEvent',{type:'touchStart',touchPoints:[{x,y:start}]})
+              for(const delta of [30,80,140,200,280,360,440]) {
+                await cdp.send('Input.dispatchTouchEvent',{type:'touchMove',touchPoints:[{x,y:start+delta}]})
+                await page.waitForTimeout(35)
+              }
+              assert.equal(await page.evaluate(()=>scrollY),0,'The browser pans freely to the top')
+              await page.waitForFunction(()=>document.querySelector('.bb-pull-refresh')?.dataset.phase==='armed')
+              assert.equal(await page.locator('.bb-pull-refresh-space').evaluate(node=>node.getBoundingClientRect().height),0)
+              assert.equal(await page.evaluate(()=>window.__preventedMoves),0)
+              await cdp.send('Input.dispatchTouchEvent',{type:'touchEnd',touchPoints:[]})
+              await page.waitForFunction(()=>document.querySelector('.bb-pull-refresh')?.dataset.phase==='done')
+              assert.equal(requests.filter(r=>r.name==='/app/reconciliation').length,count+1,'One native pan performs exactly one refresh')
+              assert.equal(await page.locator('.bb-reconcile-filters button').nth(1).getAttribute('aria-pressed'),'true','A native pan from a button does not activate its click')
             }
-            assert.equal(await page.evaluate(()=>scrollY),0,'The browser pans freely to the top')
-            await page.waitForFunction(()=>document.querySelector('.bb-pull-refresh')?.dataset.phase==='armed')
-            assert.equal(await page.locator('.bb-pull-refresh-space').evaluate(node=>node.getBoundingClientRect().height),0)
-            assert.equal(await page.evaluate(()=>window.__preventedMoves),0)
-            await cdp.send('Input.dispatchTouchEvent',{type:'touchEnd',touchPoints:[]})
-            await page.waitForFunction(()=>document.querySelector('.bb-pull-refresh')?.dataset.phase==='done')
-            assert.equal(requests.filter(r=>r.name==='/app/reconciliation').length,count+1,'One native pan performs exactly one refresh')
             await page.evaluate(()=>document.querySelector('#native-scroll-fixture').remove())
           }
         }

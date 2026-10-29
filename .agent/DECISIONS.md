@@ -1,5 +1,11 @@
 # Agent Decisions
 
+## 2026-10-29 - Keep Pull Feedback Consistent And Toolbar Anchored
+
+The user accepted native scrolling and requested consistent feedback, stationary top-right message/settings controls and a slightly longer pull. Observe pans beginning on ordinary buttons, links and tab selectors; native scrolling suppresses their click after a pan, while taps remain native. Continue excluding form fields, sliders, main navigation, nested scrollers and modal/busy states. A slanted first move waits for vertical intent instead of permanently dropping the gesture. Horizontal-only movement still cannot refresh. All observers remain passive and no layout stretch is added during dragging.
+
+Remove the shell-offset bridge and toolbar transform entirely: the two top-right controls retain their fixed viewport position through loading, success/error and settling. The in-flow title/content retain the existing loading space and Safari-bounce accounting. Increase resistance from 2 to 2.5, requiring 180px instead of 144px travel to fill the same 72px progress threshold. Keep the spinner/checkmark, active-page dispatch, financial guards and drafts. This supersedes the earlier toolbar-follow behavior and shorter trigger; device acceptance is checklist 176.
+
 ## 2026-10-29 - Observe Native Scrolling For Pull Refresh
 
 The user's device feedback identified a sticky top boundary from disabling bounce, canceling touch moves and replacing them with layout stretch. Use passive touch/scroll observers without preventDefault, preserve the browser's pan/momentum/local bounce, and allow a single gesture to scroll to the top before counting overpull. Keep root overscroll containment solely to avoid the browser's separate full-page reload; remove the bounce-disabling `none` policy. Noncancelable native-pan events remain observable. Coalesce visual progress to animation frames and leave page height/header offsets unchanged while the finger is down.
