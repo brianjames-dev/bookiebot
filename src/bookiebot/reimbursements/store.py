@@ -344,15 +344,96 @@ class ReimbursementStore:
         Historical purchase/action identity and every before/after value remain
         in the audit table. No remote sheet write occurs inside this transaction.
         """
+        if operation == "bank_amount":
+            raise ReimbursementValidationError("Bank corrections require a reviewed bank amount.")
         with self.access.connect(write=True) as db:
             self._lock(db)
             return self._revise_allocation(db, owner, allocation_id, expected_version, updates, operation=operation)
+
+    def _bank_amount_review(self, db: Any, owner: str, row: Any, gross: int, review_id: int) -> dict[str, Any]:
+        """Read one version-bound correction; received money is never rewritten."""
+        from bookiebot.sheets.collaboration import split_amounts
+        owner, gross = _owner(owner), _cents(gross, "Bank amount")
+        review_id = _integer(review_id, "Bank review", 1, 2**53 - 1)
+        value = self._payload(row)
+        if value["payerOwner"] != owner:
+            raise ReimbursementValidationError("Only the original payer can correct this expense.")
+        self._not_cleared(row)
+        self._no_pending(db, value["id"])
+        saved = value.get("sourceRevision", {}).get("bankReview")
+        if saved and saved["reviewId"] == review_id and saved["grossCents"] == gross:
+            if value["version"] != saved["allocationVersion"] + 1:
+                raise ReimbursementConflictError("The repayment changed after this correction. Review its saved balance in Shared before matching.")
+            return {**saved, "recovery": True}
+        self._writable(row)
+        if value["version"] != value["projectedVersion"]:
+            raise ReimbursementConflictError("The previous change is still syncing. Finish syncing before reviewing another amount.")
+        payer, partner = split_amounts(gross / 100, value["method"], owner,
+            custom_payer_basis_points=value.get("customPayerBasisPoints"), custom_payer_ratio=value.get("customPayerRatio"))
+        payer_cents, partner_cents = round(payer * 100), round(partner * 100)
+        if partner_cents < value["settledCents"]:
+            raise ReimbursementConflictError("The revised share is less than already received. Review the repayment before reducing this expense.")
+        plan = {"allocationId": value["id"], "allocationVersion": value["version"], "reviewId": review_id,
+                "method": value["method"], "payer": owner.title(), "partner": value["partnerOwner"].title(),
+                "previousGrossCents": value["grossCents"], "grossCents": gross,
+                "previousPayerShareCents": value["payerShareCents"], "payerShareCents": payer_cents,
+                "previousPartnerShareCents": value["partnerShareCents"], "partnerShareCents": partner_cents,
+                "receivedCents": value["settledCents"], "remainingCents": partner_cents - value["settledCents"],
+                "recovery": False}
+        plan["token"] = hashlib.sha256(_json(plan).encode()).hexdigest()
+        return plan
+
+    def bank_amount_review(self, owner: str, allocation_id: str, gross: int, review_id: int) -> dict[str, Any] | None:
+        gross = _cents(gross, 'Bank amount')
+        review_id = _integer(review_id, 'Bank review', 1, 2**53 - 1)
+        with self.access.connect(write=True) as db:
+            self._lock(db)
+            row = self._row(db, allocation_id)
+            value = self._payload(row)
+            if value['payerOwner'] != _owner(owner):
+                raise ReimbursementValidationError('Only the original payer can correct this expense.')
+            saved = value.get('sourceRevision', {}).get('bankReview', {})
+            recovering = (saved.get('reviewId') == review_id and saved.get('grossCents') == gross
+                          and value['version'] == saved['allocationVersion'] + 1)
+            if value['grossCents'] == gross and not recovering:
+                # Exact bank metadata matches remain independent of repayments.
+                # An unfinished source correction still needs verification.
+                if value['projectedVersion'] < value.get('sourceRevision', {}).get('version', 0):
+                    raise ReimbursementConflictError('The expense correction is still syncing. Finish syncing before matching.')
+                return None
+            return self._bank_amount_review(db, owner, row, gross, review_id)
+
+    def correct_bank_amount(self, owner: str, allocation_id: str, gross: int, review_id: int, token: str) -> dict[str, Any]:
+        with self.access.connect(write=True) as db:
+            self._lock(db)
+            row = self._row(db, allocation_id)
+            # A saved correction can only resume its projection and bank match.
+            # It cannot create another revision or another payment.
+            saved = json.loads(row["payload_json"]).get("sourceRevision", {}).get("bankReview")
+            if saved and saved["token"] == token and saved["reviewId"] == review_id and saved["grossCents"] == gross:
+                if row["payer_owner"] != _owner(owner):
+                    raise ReimbursementValidationError("Only the original payer can correct this expense.")
+                self._bank_amount_review(db, owner, row, gross, review_id)
+                return self._payload(row)
+            plan = self._bank_amount_review(db, owner, row, gross, review_id)
+            if not isinstance(token, str) or token != plan["token"]:
+                raise ReimbursementConflictError("This shared expense or repayment changed. Review the revised shares again.")
+            before = self._payload(row)
+            changes = {key: plan[key] for key in ("grossCents", "payerShareCents", "partnerShareCents")}
+            changes["sourceValues"] = {**before.get("sourceValues", {}), "amount": f"{gross / 100:.2f}"}
+            self._revise_allocation(db, owner, allocation_id, before["version"], changes, operation="bank_amount")
+            raw = json.loads(self._row(db, allocation_id)["payload_json"])
+            raw["sourceRevision"]["bankReview"] = plan
+            # The prior source projection already includes these confirmed receipts.
+            raw["sourceRevision"]["before"]["settledCents"] = before["settledCents"]
+            db.execute("UPDATE app_reimbursement_allocations SET payload_json = ? WHERE id = ?", (_json(raw), allocation_id))
+            return self._payload(self._row(db, allocation_id))
 
     def _revise_allocation(self, db: Any, owner: str, allocation_id: str, expected_version: Any,
                            updates: dict[str, Any], *, operation: str) -> dict[str, Any]:
         owner = _owner(owner)
         allocation_id = _text(allocation_id, "Allocation identifier", 200, required=True)
-        if operation not in {"split", "update", "move", "cancel", "delete", "edit_split"}:
+        if operation not in {"split", "update", "move", "cancel", "delete", "edit_split", "bank_amount"}:
             raise ReimbursementValidationError("Unknown expense correction.")
         allowed = {"grossCents", "payerShareCents", "partnerShareCents", "method", "payerPerson", "item",
                    "location", "category", "sourceColumnMap", "sourceValues", "lifecycle", "customPayerBasisPoints", "customPayerRatio"}
@@ -373,7 +454,7 @@ class ReimbursementStore:
         self._no_pending(db, allocation_id)
         paid = db.execute("SELECT id FROM app_reimbursement_events WHERE allocation_id = ? AND status = 'confirmed' LIMIT 1",
                           (allocation_id,)).fetchone()
-        if int(row["settled_cents"]) or paid is not None:
+        if operation != "bank_amount" and (int(row["settled_cents"]) or paid is not None):
             raise ReimbursementConflictError("This expense has confirmed repayments. Reverse its settlement before changing the original expense.")
         before.pop("sourceRevision", None)
         # Reset metadata is internal and must not become source input on a
@@ -383,6 +464,12 @@ class ReimbursementStore:
             if updates.get("method", source["method"]) != "custom" or other in updates:
                 source.pop(key, None)
         value = _allocation_details({**source, **updates, "settledCents": 0})
+        if operation == "bank_amount":
+            allowed_changes = {"grossCents", "payerShareCents", "partnerShareCents", "sourceValues"}
+            if (any(before.get(key) != new for key, new in value.items() if key not in allowed_changes)
+                    or any(before.get("sourceValues", {}).get(key) != new for key, new in value.get("sourceValues", {}).items() if key != "amount")
+                    or value["partnerShareCents"] < int(row["settled_cents"])):
+                raise ReimbursementValidationError("A bank correction may only change the amount while preserving received payments and the split.")
         lifecycle = value.get("lifecycle", "active")
         expected_lifecycle = {"cancel": "void", "delete": "deleted", "split": "active"}.get(operation, before.get("lifecycle", "active"))
         if lifecycle != expected_lifecycle:

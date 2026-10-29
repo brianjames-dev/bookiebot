@@ -50,6 +50,8 @@ Select the expense in recent transactions to use **Update**, **Move**, **Split**
 
 Resolve pending payment reports and reverse confirmed repayments before correcting the source expense. Fully reversed payment history is preserved in its original location. Historical net-accounting imports remain read-only. Direct Undo remains unavailable for canonical split corrections; use these explicit actions or reverse a payment in Shared.
 
+The app's explicitly reviewed **bank amount correction** is a narrow exception: preserve confirmed received amounts, keep the saved split method/ratio, and recalculate shares against the full bank total. The review shows the old/new shares, retained receipt and remaining debt. Pending reports, active resets, stale versions, incomplete earlier projections and a new share below money already received still block it. A version-bound canonical `bank_amount` revision records the correction without changing receipt events. Sheet projection updates the payer's net purchase while keeping the partner's existing receipt entries; only verified projection permits the bank match. Interrupted syncing resumes the saved revision through Reconcile, without another receipt or revision. Ordinary Update/Move/Split/Delete/Undo repayment safeguards remain.
+
 For an expense included in an active balance reset, first use **Undo reset** in Shared before Update, Move, Split, Cancel split, Delete or reversing an earlier repayment. This restores the complete reset group for review and prevents a correction from silently reopening an old debt. After correcting the expense, create a fresh reset if it should still be cleared. Ordinary new expense logging and its existing actions remain available.
 
 ## Storage and integrity

@@ -7,9 +7,17 @@ import "./reconciliation-screen.css"
 
 type ReviewStatus = "needs_review" | "pending" | "checked" | "ignored"
 interface ReceiptLink { allocationId: string; partner: string; bankAmountCents: number; outstandingCents: number }
+interface SharedAmountPlan {
+  token: string; allocationId: string; allocationVersion: number; reviewId: number; method: "income" | "equal" | "fronted" | "custom"
+  payer: string; partner: string; previousGrossCents: number; grossCents: number
+  previousPayerShareCents: number; payerShareCents: number; previousPartnerShareCents: number; partnerShareCents: number
+  receivedCents: number; remainingCents: number; recovery: boolean
+}
+type SharedAmount = SharedAmountPlan | { blocked: string }
 interface Suggestion {
   id: string; item: string; date: string; amountCents: number; category: string
   amountMismatch: boolean; kind: "recorded" | "schedule"; confirmable: boolean; recorded?: boolean; confidence?: number
+  sharedAmount?: SharedAmount
 }
 export interface ReconciliationItem {
   id: number; version: string; stateVersion?: string; loadedAt?: number; status: ReviewStatus; date: string; merchant: string
@@ -19,11 +27,20 @@ export interface ReconciliationItem {
 }
 interface ConnectionIssue { id: number; institution: string; needsReconnect: boolean; reconnectUrl?: string }
 interface Snapshot { enabled: boolean; checkedAt: string | null; items: ReconciliationItem[]; notice?: string; connections?: ConnectionIssue[]; receiptFollowup?: { id: number; receipt: ReceiptLink } }
-type Command = { operation: "check" } | { operation: "confirm" | "update_match" | "update_schedule" | "recover_schedule" | "log" | "ignore" | "reopen"; id: number; version: string; suggestionId?: string; fields?: Record<string, string>; scheduleVersion?: string; updateFuture?: boolean; splitMethod?: string }
+type Command = { operation: "check" } | { operation: "confirm" | "update_match" | "update_schedule" | "recover_schedule" | "log" | "ignore" | "reopen"; id: number; version: string; suggestionId?: string; fields?: Record<string, string>; scheduleVersion?: string; updateFuture?: boolean; splitMethod?: string; sharedAmountToken?: string }
 const endpoint = "/app/reconciliation"
 const isText = (value: unknown, max = 300): value is string => typeof value === "string" && value.length <= max
 const isDate = (value: unknown): value is string => isText(value) && Number.isFinite(Date.parse(value))
 const isAmount = (value: unknown): value is number => typeof value === "number" && Number.isSafeInteger(value)
+const validSharedAmount = (value: SharedAmount) => value && ("blocked" in value ? isText(value.blocked, 500) && Boolean(value.blocked)
+  : isText(value.token, 64) && /^[a-f0-9]{64}$/.test(value.token) && isText(value.allocationId, 200)
+    && isAmount(value.allocationVersion) && value.allocationVersion > 0 && isAmount(value.reviewId) && value.reviewId > 0
+    && ["income", "equal", "fronted", "custom"].includes(value.method) && isText(value.payer) && isText(value.partner)
+    && [value.previousGrossCents, value.grossCents, value.previousPayerShareCents, value.payerShareCents, value.previousPartnerShareCents,
+      value.partnerShareCents, value.receivedCents, value.remainingCents].every(amount => isAmount(amount) && amount >= 0)
+    && value.grossCents > 0 && value.payerShareCents + value.partnerShareCents === value.grossCents
+    && value.previousPayerShareCents + value.previousPartnerShareCents === value.previousGrossCents
+    && value.partnerShareCents - value.receivedCents === value.remainingCents && typeof value.recovery === "boolean")
 const validReceipt = (value: ReceiptLink) => value && isText(value.allocationId, 200) && Boolean(value.allocationId)
   && isText(value.partner) && Boolean(value.partner) && isAmount(value.bankAmountCents) && value.bankAmountCents > 0
   && isAmount(value.outstandingCents) && value.outstandingCents >= 0 && value.outstandingCents <= value.bankAmountCents
@@ -46,6 +63,8 @@ function validItem(value: unknown): value is ReconciliationItem {
       && isAmount(suggestion.amountCents) && isText(suggestion.category) && typeof suggestion.amountMismatch === "boolean"
       && ["recorded", "schedule"].includes(suggestion.kind) && typeof suggestion.confirmable === "boolean"
       && (suggestion.recorded === undefined || typeof suggestion.recorded === "boolean")
+      && (suggestion.sharedAmount === undefined || (validSharedAmount(suggestion.sharedAmount) && ("blocked" in suggestion.sharedAmount
+        || suggestion.sharedAmount.grossCents === Math.abs(item.amountCents) && suggestion.sharedAmount.reviewId === item.id)))
       && (suggestion.confidence === undefined || (Number.isFinite(suggestion.confidence) && suggestion.confidence >= 0 && suggestion.confidence <= 1))))
 }
 function checkedSnapshot(value: unknown): Snapshot {
@@ -63,7 +82,7 @@ function checkedSnapshot(value: unknown): Snapshot {
           && /^\/bank\/link\?token=[A-Za-z0-9_.%-]+$/.test(connection.reconnectUrl))))))) throw new Error("Couldn’t read the latest bank review.")
   return data
 }
-class ReviewRequestError extends Error { constructor(message: string, readonly status: number) { super(message) } }
+class ReviewRequestError extends Error { constructor(message: string, readonly status: number, readonly notApplied = false) { super(message) } }
 async function request(path: string, controller: AbortController, body?: Command): Promise<unknown> {
   let abort = () => {}
   const timeout = window.setTimeout(() => controller.abort(), body?.operation === "check" ? 60_000 : 20_000)
@@ -78,7 +97,7 @@ async function request(path: string, controller: AbortController, body?: Command
       }).then(async response => {
         const value = await response.json()
         if (!response.ok) throw new ReviewRequestError(response.status === 401 ? "Reconnect BookieBot to review your bank transactions."
-          : isText(value?.error) ? value.error : "Couldn’t finish the bank review. Try again.", response.status)
+          : isText(value?.error) ? value.error : "Couldn’t finish the bank review. Try again.", response.status, value?.outcome === "not_applied")
         return value
       }).then(resolve, reject)
     })
@@ -104,6 +123,7 @@ export function useReconciliation() {
     try {
       const next = checkedSnapshot(await request(endpoint, controller, body))
       if (!active()) return
+      if (blocked.current) setResetReview(value => value + 1)
       if (blocked.current || (body && ["update_match", "update_schedule", "recover_schedule", "log"].includes(body.operation))) window.dispatchEvent(new Event("bookiebot:transactions-changed"))
       setSnapshot(next); setRevision(value => value + 1); blocked.current = false; setNeedsRefresh(false)
     } catch (failure) {
@@ -112,10 +132,10 @@ export function useReconciliation() {
       if (failure instanceof ReviewRequestError && [401, 403].includes(failure.status)) {
         setSnapshot(null); blocked.current = false; setNeedsRefresh(false); setRevision(value => value + 1)
       } else if (body && known && [400, 404, 409].includes(failure.status)
-        && ["confirm", "ignore", "reopen"].includes(body.operation)) {
-        // These commands only change review metadata, and a rejected compare-and-
-        // apply did not save it. Close stale choices and read current state once.
-        // Never repeat the command or use this recovery for uncertain sheet writes.
+        && (["confirm", "ignore", "reopen"].includes(body.operation) || failure.notApplied)) {
+        // Metadata conflicts and explicit no-write rejections can safely close
+        // stale choices and read current state once. Never retry the command;
+        // unknown financial outcomes retain their recovery lock.
         blocked.current = false; setNeedsRefresh(false); setResetReview(value => value + 1)
         setPendingOperation(null)
         try {
@@ -264,6 +284,7 @@ function ReviewChoices({ item, disabled, onCommand, onRefresh, onRejectAccess }:
   const discardDraft = useCallback(() => { setLogging(""); setReviewAmount(false) }, [])
   useAppWorkStatus({ label: "Bank entry review", dirty: Boolean(logging || reviewAmount), onDiscard: discardDraft })
   const selected = item.suggestions.find(entry => entry.id === selectedId)
+  const shared = selected?.sharedAmount
   const editable = item.status === "needs_review" && item.id > 0 && !item.needsCheck && !item.readOnly
   const choose = (suggestion: Suggestion) => { setSelectedId(suggestion.id); setReviewAmount(false); setLogging("") }
   const card = (suggestion: Suggestion) => <div key={suggestion.id} className="bb-reconcile-suggestion" data-selected={selectedId === suggestion.id}>
@@ -276,7 +297,8 @@ function ReviewChoices({ item, disabled, onCommand, onRefresh, onRejectAccess }:
   </div>
   if (item.readOnly || ["checked", "ignored"].includes(item.status)) return null
   const others = item.suggestions.filter(entry => entry.id !== recommended?.id)
-  const send = (operation: "confirm" | "update_match") => onCommand({ operation, id: item.id, version: item.version, suggestionId: selectedId })
+  const send = (operation: "confirm" | "update_match") => onCommand({ operation, id: item.id, version: item.version, suggestionId: selectedId,
+    ...(operation === "update_match" && shared && !("blocked" in shared) ? { sharedAmountToken: shared.token } : {}) })
   const readyToLog = item.amountCents < 0 ? Boolean(fields.source.trim()) : Boolean(fields.category && fields.item.trim() && fields.person)
   return <div className="bb-reconcile-choices">
     {!recommended && <p className="bb-reconcile-muted">{item.status === "pending" ? "No close tentative match yet." : "No close match found in your budget sheet."}</p>}
@@ -288,9 +310,13 @@ function ReviewChoices({ item, disabled, onCommand, onRefresh, onRejectAccess }:
         ? <p className="bb-reconcile-muted">Scheduled payment changes are available for the current month.</p>
         : reviewAmount ? <ScheduleAmountReview item={item} suggestion={selected} disabled={disabled} onCommand={onCommand} onCancel={() => setReviewAmount(false)} onRefresh={onRefresh} onRejectAccess={onRejectAccess} />
         : <button type="button" className="bb-reconcile-action bb-reconcile-primary" disabled={disabled} onClick={() => setReviewAmount(true)}>Review payment change</button>
-      : selected.amountCents !== Math.abs(item.amountCents) ? reviewAmount ? <div className="bb-reconcile-confirm" role="group" aria-label="Review amount change">
-        <strong>Update {selected.item}?</strong>{selected.category === "Payment" && <p>The bank amount is the full bill. Any existing split method is preserved and its shares are recalculated. Existing repayment safeguards still apply.</p>}<p>Change its {selected.category === "Payment" ? "full bill" : "sheet"} amount from {money(selected.amountCents)} to {money(item.amountCents)}, then match this bank transaction. Its other details stay the same.</p>
-        <button type="button" className="bb-reconcile-action bb-reconcile-primary" disabled={disabled} onClick={() => send("update_match")}>Update amount &amp; match</button>
+      : shared && "blocked" in shared ? <p role="status" className="bb-reconcile-muted">{shared.blocked}</p>
+      : selected.amountCents !== Math.abs(item.amountCents) || shared?.recovery ? reviewAmount ? <div className="bb-reconcile-confirm" role="group" aria-label="Review amount change">
+        <strong>{shared?.recovery ? "Resume" : "Update"} {selected.item}?</strong>
+        {shared && !("blocked" in shared) ? <SharedAmountReview plan={shared} /> : <>
+          {selected.category === "Payment" && <p>The bank amount is the full bill. Any existing split method is preserved and its shares are recalculated. Existing repayment safeguards still apply.</p>}
+          <p>Change its {selected.category === "Payment" ? "full bill" : "sheet"} amount from {money(selected.amountCents)} to {money(item.amountCents)}, then match this bank transaction. Its other details stay the same.</p></>}
+        <button type="button" className="bb-reconcile-action bb-reconcile-primary" disabled={disabled} onClick={() => send("update_match")}>{shared?.recovery ? "Finish syncing & match" : "Update amount & match"}</button>
         <button type="button" className="bb-reconcile-action" disabled={disabled} onClick={() => setReviewAmount(false)}>Cancel amount change</button>
       </div> : <button type="button" className="bb-reconcile-action bb-reconcile-primary" disabled={disabled} onClick={() => setReviewAmount(true)}>Review amount change</button>
       : selected.confirmable && <button type="button" className="bb-reconcile-action bb-reconcile-primary" disabled={disabled} onClick={() => send("confirm")}>Confirm match</button>}
@@ -317,6 +343,22 @@ function ReviewChoices({ item, disabled, onCommand, onRefresh, onRejectAccess }:
     {editable && item.logging && !item.logging.allowed && <p className="bb-reconcile-muted">{item.logging.reason}</p>}
     {editable && !item.suggestions.length && <p className="bb-reconcile-muted">No matching entry was found in your budget sheet.{item.logging?.allowed && " Adding it here records the bank amount and date in the sheet."}</p>}
   </div>
+}
+
+function SharedAmountReview({ plan }: { plan: SharedAmountPlan }) {
+  const method = { income: "By income", equal: "50/50", fronted: "Fronted", custom: "Custom" }[plan.method]
+  return <>
+    <p>{plan.recovery ? "The amount correction is saved. Finish syncing its sheets, then match the full bank transaction." : "Update the full purchase amount and match this bank transaction."}</p>
+    <p className="bb-reconcile-muted">Keep {method} split</p>
+    <dl className="bb-reconcile-share-review">
+      <div><dt>Full purchase</dt><dd>{money(plan.previousGrossCents)} → <strong>{money(plan.grossCents)}</strong></dd></div>
+      <div><dt>{plan.payer}’s share</dt><dd>{money(plan.previousPayerShareCents)} → <strong>{money(plan.payerShareCents)}</strong></dd></div>
+      <div><dt>{plan.partner}’s share</dt><dd>{money(plan.previousPartnerShareCents)} → <strong>{money(plan.partnerShareCents)}</strong></dd></div>
+      <div><dt>Already received · kept</dt><dd>{money(plan.receivedCents)}</dd></div>
+      <div><dt>{plan.partner} still owes</dt><dd><strong>{money(plan.remainingCents)}</strong></dd></div>
+    </dl>
+    <p className="bb-reconcile-muted">This records no additional repayment. Received money stays unchanged.</p>
+  </>
 }
 interface BillSharing {
   method: string; label: string; canChoose: boolean; payer: string; partner: string
