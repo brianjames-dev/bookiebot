@@ -1,5 +1,11 @@
 # Agent Decisions
 
+## 2026-10-28 - Include Saved In The Spent Headline
+
+At the user's request, Overview Spent and its explanation show expense outflows plus the active mode's Saved amount. The compact breakdown uses Needs, Wants and Saved, retaining any legacy sheet adjustment. Saved already combines cash savings and payroll ESPP; add that combined value once, and identify estimated ESPP in Projected. Keep Left and its “Savings remaining” label unchanged, without adding “budget.” A zero savings remainder means the allocation has already been used, including recorded savings and any existing overspending coverage.
+
+Preserve `metrics.totalExpenses` as expense-only for charts, comparisons, burn rate and other financial calculations. `metricExplanations.spent` and the read-only agent's `headlineSpent` expose the display total and its meaning. The frontend snapshots the same headline value into the modal, including for cached older explanations. No sheet, financial record or savings-target changes. This supersedes the expense-only Spent presentation in the October 10, 12 and 13 decisions, while retaining their underlying cash-accounting rules.
+
 ## 2026-10-28 - Keep Posted Review Preparation Behind the Chosen Action
 
 The user found the separate Review match step unnecessary. Supersede that UI step below: exact suggestions offer Confirm match directly, including posted transactions with negative display IDs. Confirm and Ignore validate fresh state/candidates before internally preparing one needs-review row and using the existing stable-ID claim/CAS writer. Concurrent decisions win unchanged. GETs and row expansion remain read-only; no automatic bank sync, sheet write or receipt.

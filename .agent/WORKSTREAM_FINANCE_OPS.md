@@ -4,6 +4,10 @@ Last updated: 2026-10-28
 
 ## Goal
 
+### Spent includes Saved — 2026-10-28
+
+User-requested report presentation: Spent includes the mode's combined Saved amount once, with a Saved row and explicit estimated-ESPP hint in Projected. Left retains its existing “Savings remaining” wording and cash balances. Underlying expense metrics, reconciliation, transactions and reimbursement accounting remain unchanged; the financial backlog is unchanged. Backend explanations, Overview card/modal and read-only agent summaries agree. Current/projected, zero savings, cash/ESPP, sheet adjustments and cached-modal regressions added. Verification/release and native acceptance are in STATUS checklist 171.
+
 ### Direct posted match actions — 2026-10-28
 
 Implemented and locally verified; release/native acceptance is STATUS checklist 170. Ignore transaction uses the theme’s red destructive color, while Reopen review retains its secondary styling. At the user's request, remove PR #101's separate Review match/Review transaction setup step. Raw posted suggestions now expose Confirm match and Ignore directly; each validates fresh state before internally preparing one metadata row and using the existing stable-ID claim/CAS writer. Review amount/payment change and Add entry prepare behind that chosen action, retain the selected alternative and open the necessary review/form immediately. Missing/changed candidates require a fresh choice. GETs/expansion remain read-only, financial writers still require stable IDs, and shared exact-match eligibility rejects unfinished source corrections without treating a receipt/pending sender report as a bank-match blocker. Existing guards, separate repayment confirmation and prepare compatibility remain; no schema or financial test writes.
