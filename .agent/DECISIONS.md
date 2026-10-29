@@ -1,5 +1,11 @@
 # Agent Decisions
 
+## 2026-10-29 - Fit Navigation Selections To Rendered Tab Content
+
+Main navigation keeps Konsta glass and native button semantics, but uses the report's shared measured sliding indicator instead of Konsta's equal-width tab highlight. Intrinsic label-aware button widths and measured icon/label bounds determine the capsule; compact mode fits the icon alone. Touch capture uses actual button edges, commits once on release and restores the active selection after cancellation or rejected routing. Observe content as well as button/container resizes. Other sliding selectors retain their existing button-bound measurement.
+
+Rationale: the longer Transactions label needed a wider track, while Konsta positioned its highlight using equal fractions. Measuring the rendered content removes both the positional drift and excessive width without shrinking labels or reducing tap targets.
+
 ## 2026-10-28 - Prepare Individual Posted Reviews Explicitly
 
 Raw posted transactions may display fresh suggestions before a reconciliation row exists. Keep GET/list/detail read-only and negative raw IDs as display identities. Offer Review match/Review transaction as an explicit metadata-only prepare command, rather than requiring a whole-bank sync. Under the shared owner and transaction locks, verify the same bank version, active watched account, owner, posted/recent/unremoved state and absence of any reconciliation row. Create one needs-review row and phone_review_prepare audit event without matching, ignoring, writing a sheet, syncing Plaid or sending a notification. A concurrent/existing decision wins unchanged.

@@ -19,6 +19,13 @@ export interface AppNavigation {
 export const AppNavigationContext = createContext<AppNavigation | null>(null)
 export const useAppNavigation = () => useContext(AppNavigationContext)
 
+export interface NavigationBounds { x: number; y: number; width: number; height: number }
+export function fitNavigationSelection(button: NavigationBounds, content: Pick<NavigationBounds, "width" | "height">): NavigationBounds {
+  const width = Math.min(button.width - 4, content.width + 12)
+  const height = Math.min(button.height - 8, content.height + 12)
+  return { x: button.x + (button.width - width) / 2, y: button.y + (button.height - height) / 2, width, height }
+}
+
 // Hidden panels remain mounted: their controls, charts and drafts keep identity.
 export function ReportScreen({ name, children }: { name: MainScreen; children: ReactNode }) {
   const navigation = useAppNavigation()

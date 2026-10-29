@@ -1,6 +1,8 @@
 # Agent Status
 
-Last updated: 2026-10-28
+Last updated: 2026-10-29
+
+Main navigation selection alignment (2026-10-29): reproduced the unequal-track defect: Transactions grew wider while Konsta's indicator still used equal fractions, leaving its label outside the bubble. Use the shared sliding selection with measured button/content bounds, content-sized expanded capsules and compact icon bubbles. Touch capture selects by actual button edges and commits once on release; cancel and rejected navigation restore the committed selection. Local **2,733 passed / 554 optional PostgreSQL skipped**, clean Python/frontend types and locked Node 22 build. The committed browser regression passed **48 Chromium/WebKit width/theme/count/compact cases**, all tabs, native taps, real Chromium drag/cancel, keyboard, guarded navigation, resize and motion. CI/release pending; checklist 170. Finance Ops priorities and financial behavior are unchanged.
 
 Missing reconciliation controls (2026-10-28): authenticated read-only investigation confirmed Russian River $40, Ohana $25.47 and Venmo $16.49 are posted transactions without persisted review rows. The detail read already found Russian River’s exact $40 dinner suggestion, but negative raw IDs/needsCheck hid every action behind a whole-bank Check. Add an explicit one-row prepare operation from saved bank data: Review match (or Review transaction) creates only metadata, hands the UI to the new stable row and fetches fresh suggestions. Matching, amount correction, logging and ignoring still require their own explicit actions. GETs remain read-only; no bank sync, notifications, auto-match, sheet write or receipt is triggered by preparation. Owner/posted/watched/active/recent/version checks and owner/transaction locks reject concurrent or stale preparation without overwriting an existing decision. Focused **68 passed / 9 optional PostgreSQL skipped**, full local **2,733 passed / 554 optional PostgreSQL skipped**, clean Python/frontend types and locked Node 22 build. All **24 isolated full-app Chromium/WebKit mobile cases** passed at 320/390px, both themes, exact/mismatch/no-result paths, rejected prepare/reopen, explicit synthetic confirm, form/cancel, 44px targets and no overflow; external traffic blocked. Release verification pending; checklist 169.
 
@@ -221,6 +223,8 @@ All eight September 6 audit batches are implemented and verified locally. Each b
 
 ## On Deck
 
+Finish CI/release and native acceptance of the requested main-nav selection alignment (checklist 170); geometry and touch/keyboard regressions pass locally.
+
 First: finish release/read-only acceptance of posted reconciliation match controls (checklist 169). Preparation must expose normal reviews without a bank resync or financial write. Keep the three real affected bank rows unchanged during acceptance.
 
 First: native acceptance of released reconciliation shared amount correction/recovery (checklist 168). PR #100, CI #295, exact-source deployment/startup/health/assets, authenticated live review data and unchanged bank/receipt/allocation baseline are verified. Review/cancel on production only; all financial correction, repayment and recovery testing remains isolated.
@@ -332,6 +336,10 @@ Student-loan activation is complete. Verify the deployed fixed-bill display and 
 25. Harden recent-action pending state across restarts/deploys, since selections currently live only in process memory.
 26. Improve targeted recent-action search so commands can find older matches, not only the latest 10 recent actions.
 27. Explore clarifying questions before logging when BookieBot is uncertain instead of guessing or silently failing.
+
+## Completed 2026-10-29
+
+- Fixed main-nav bubble geometry using actual button/content measurements and intrinsic label-aware track widths. Reuse the existing sliding-selection observer with optional content sizing; retain glass/glow, 44px targets, pointer drag/cancel, keyboard semantics and guarded routing. Rebuilt assets. Local **2,733 passed / 554 optional PostgreSQL skipped**, clean types/build, **48 browser combinations** plus touch/resize/motion acceptance pass. Added executed numeric geometry and browser regressions; updated Status, decisions and checklist 170. CI/release pending.
 
 ## Completed 2026-10-28
 
@@ -1124,6 +1132,8 @@ Student-loan activation is complete. Verify the deployed fixed-bill display and 
   - undoing update/delete/move
 
 ## Manual Test Checklist
+
+170. Main navigation selection alignment: after release, load Update now and select each tab in both themes at 320/390px and tablet/desktop widths. The bubble must center on the icon and fully surround the icon + complete label, including Transactions; compact mode must fit the icon alone. Scroll down/up, resize, switch four/five tabs, rapidly change selections, and open Settings: geometry must settle correctly while Settings retains the previous main-tab bubble. Test Space/Enter, tap near Transactions' edges, drag across tabs and cancel a drag; navigate once on release and never on cancel. With a pending/draft work guard, rejected navigation must restore the existing tab. Check reduced motion, at least 44px targets, retained subtle glow and no overflow. Reproduce isolated geometry coverage after building via `BOOKIEBOT_PLAYWRIGHT_MODULE=<installed-playwright-module> node unit_tests/reports/navigation_layout_browser_test.cjs`; no production financial action is needed. Native iPhone acceptance remains pending.
 
 169. Posted transaction match controls (release pending): load the deployed app update and expand Russian River $40 (or another posted row with no saved review). Its dinner $40 suggestion must have a primary Review match button; other/no suggestions offer Review transaction. In production inspect only, then collapse: do not press Prepare/Review match, Confirm, Ignore, Check/Resync, log, update an amount or record a repayment as a test. Compare all three affected raw IDs, status, bank amounts and state versions with baseline. In isolated fixtures, Review match must create one needs-review metadata row and audit event, keep bank timestamp/data and source/receipt records unchanged, and open fresh suggestions under the new positive ID. An exact match exposes Confirm match; mismatch exposes Review amount change; no match exposes Add expense/income and Ignore. Only a separate explicit confirmation changes a match or sheet. Test known rejected prepare (one list refresh, no retry), lost response/status recovery, concurrent prepare, already-reviewed races and stale/pending/removed/unwatched/disconnected/old/wrong-owner guards. Check 320/390px, both themes, Chromium/WebKit, 44px targets, no overflow and no unexpected bank sync/Discord notification. Preserve normal global Check, shared income/custom split/received safeguards and recovery. Native phone acceptance remains separate.
 

@@ -20,23 +20,28 @@
 .bb-app-shell .bb-shell-shared > .bb-report-section, .bb-app-shell .bb-shell-savings > .bb-report-section { margin-top: 0; }
 .bb-app-shell .bb-bottom-navigation { position: fixed; z-index: 50; left: 50%; bottom: 0; width: min(460px, 100%); transform: translateX(-50%); padding-inline: 12px; padding-bottom: max(12px, env(safe-area-inset-bottom, 0px)); height: auto; pointer-events: none; transition: width var(--bb-motion-duration) var(--bb-motion-ease); }
 .bb-app-shell .bb-bottom-navigation > div:last-child { height: 60px; padding: 0; width: 100%; gap: 0; transition: height var(--bb-motion-duration) var(--bb-motion-ease); }
-.bb-app-shell .bb-navigation-pane { width: 100%; pointer-events: auto; box-shadow: 0 5px 26px hsl(var(--foreground) / .10); color: hsl(var(--foreground)); }
+.bb-app-shell .bb-navigation-pane { display: flex; align-items: center; width: 100%; height: 100%; border-radius: 999px; pointer-events: auto; box-shadow: 0 5px 26px hsl(var(--foreground) / .10); color: hsl(var(--foreground)); }
+.bb-app-shell .bb-navigation-selection { border: 0; border-radius: 999px; background: rgb(0 0 0 / .1); }
+[data-theme="dark"] .bb-app-shell .bb-navigation-selection { background: rgb(255 255 255 / .15); }
 .bb-app-shell .bb-navigation-pane .k-glass { color: hsl(var(--foreground)); }
 /* Keep Konsta's pointer glow local and subdued within the capsule. */
 .bb-app-shell .bb-navigation-pane > span > span[style*="radial-gradient"] { background-size: 180px 180px; background-position: center; background-repeat: no-repeat; opacity: .6; }
-.bb-app-shell .bb-navigation-link { flex: 1 1 0; min-width: 0; min-height: 44px; margin: 0; border: 0; background: transparent; padding: 5px 3px; color: hsl(var(--muted-foreground)); font: inherit; cursor: pointer; transition: padding var(--bb-motion-duration) var(--bb-motion-ease); }
+.bb-app-shell .bb-navigation-link { flex: 1 1 auto; width: auto; min-width: 44px; min-height: 44px; margin: 0; border: 0; background: transparent; padding: 5px; color: hsl(var(--muted-foreground)); font: inherit; cursor: pointer; transition: padding var(--bb-motion-duration) var(--bb-motion-ease); }
 .bb-app-shell .bb-navigation-link.k-tabbar-link-active { color: hsl(var(--primary)); }
-.bb-app-shell .bb-navigation-link > span { gap: 3px; transition: gap var(--bb-motion-duration) var(--bb-motion-ease); }
+.bb-app-shell .bb-navigation-link > span { height: auto; padding: 0; gap: 3px; transition: gap var(--bb-motion-duration) var(--bb-motion-ease); }
+.bb-app-shell .bb-navigation-link .k-tabbar-link-icon { flex-shrink: 0; width: 23px; height: 23px; transition: width var(--bb-motion-duration) var(--bb-motion-ease), height var(--bb-motion-duration) var(--bb-motion-ease); }
 .bb-app-shell .bb-navigation-link > span > span:last-child { font-size: 11px; line-height: 15px; letter-spacing: 0; font-weight: 500; }
 .bb-app-shell .bb-navigation-link svg { flex-shrink: 0; width: 23px; height: 23px; transition: width var(--bb-motion-duration) var(--bb-motion-ease), height var(--bb-motion-duration) var(--bb-motion-ease); }
 /* Four 55px-wide targets keep the compact glass capsule comfortably tappable. */
 .bb-app-shell .bb-bottom-navigation[data-compact="true"] { width: min(244px, 100%); }
 .bb-app-shell .bb-bottom-navigation[data-compact="true"][data-tab-count="5"] { width: min(299px, 100%); }
 .bb-app-shell .bb-bottom-navigation[data-compact="true"] > div:last-child { height: 44px; }
-.bb-app-shell .bb-bottom-navigation[data-compact="true"] .bb-navigation-link { padding-top: 0; padding-bottom: 0; }
+.bb-app-shell .bb-bottom-navigation[data-compact="true"] .bb-navigation-link { flex: 1 1 0; padding-top: 0; padding-bottom: 0; }
 .bb-app-shell .bb-bottom-navigation[data-compact="true"] .bb-navigation-link > span { gap: 0; }
 .bb-app-shell .bb-bottom-navigation[data-compact="true"] .bb-navigation-link svg { width: 21px; height: 21px; }
 .bb-app-shell .bb-bottom-navigation[data-compact="true"] .bb-navigation-link > span > span:last-child { max-height: 0; opacity: 0; overflow: hidden; }
+.bb-app-shell .bb-bottom-navigation[data-compact="true"] .bb-navigation-link > span > span:last-child { width: 0; }
+.bb-app-shell .bb-bottom-navigation[data-compact="true"] .bb-navigation-link .k-tabbar-link-icon { width: 21px; height: 21px; }
 .bb-app-shell .bb-navigation-link > span > span:last-child { max-height: 18px; opacity: 1; transition: max-height var(--bb-motion-duration) var(--bb-motion-ease), opacity var(--bb-motion-duration) var(--bb-motion-ease); }
 .bb-app-shell .bb-navigation-pane > span { transition-duration: var(--bb-motion-duration); transition-timing-function: var(--bb-motion-ease); }
 .bb-app-shell .bb-shell-settings { --bb-settings-inset: clamp(12px, 3vw, 20px); max-width: 720px; padding-top: 4px; gap: 20px; }
@@ -67,6 +72,3 @@
   .bb-app-shell .bb-page-header .bb-app-status { grid-column: 1 / -1; grid-row: 3; justify-self: start; max-width: none; }
 }
 @media (prefers-reduced-motion: reduce) { .bb-app-shell .bb-bottom-navigation, .bb-app-shell .bb-bottom-navigation *, .bb-app-shell .bb-setting-switch *, .bb-app-shell .bb-shell-icon { transition-duration: 0ms !important; } }
-
-/* The full Transactions label needs room on five-tab 320px screens. */
-.bb-app-shell .bb-bottom-navigation[data-compact="false"] .bb-navigation-link[aria-label="Transactions"] { flex-grow: 1.3; }
