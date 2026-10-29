@@ -1124,11 +1124,14 @@ function CategoryMixFilterControl({
   filter: CategoryMixFilter
   onFilterChange: (filter: CategoryMixFilter) => void
 }) {
+  const [pointerFocus, setPointerFocus] = useState(false)
   return (
-    <div className="bb-category-mix-filter" data-bb-tooltip-dismiss-trigger="category-mix">
-      <select aria-label="Category mix filter" value={filter} onChange={(event) => onFilterChange(event.target.value as CategoryMixFilter)}>
+    <div className="bb-category-mix-filter" data-bb-tooltip-dismiss-trigger="category-mix" data-pointer-focus={pointerFocus ? "true" : undefined}>
+      <select aria-label="Category mix filter" value={filter}
+        onPointerDown={() => setPointerFocus(true)} onKeyDown={() => setPointerFocus(false)} onBlur={() => setPointerFocus(false)}
+        onChange={(event) => onFilterChange(event.target.value as CategoryMixFilter)}>
         {CATEGORY_MIX_FILTERS.map((item) => (
-          <option key={item.value} value={item.value}>{item.value === "all" ? "All categories" : item.label}</option>
+          <option key={item.value} value={item.value}>{item.label}</option>
         ))}
       </select>
       <ChevronDown className="bb-category-filter-chevron" aria-hidden="true" />
@@ -2031,7 +2034,7 @@ function useExpensePieLayout(data: BreakdownItem[], hostSize: ElementSize) {
       fallbackHeight: 330,
       minOuterRadius: 72,
       maxOuterRadius: Math.max(PIE_METRIC_MINIMUM_RADIUS, Math.min(hostSize.width || 360, hostSize.height || 330) / 2 - 8),
-      innerRadiusRatio: 0.75,
+      innerRadiusRatio: 0.72,
       labelOffset: 20,
       labelGap: PIE_METRIC_LABEL_GAP,
       containerPadding: 8,
@@ -2044,7 +2047,7 @@ function useExpensePieLayout(data: BreakdownItem[], hostSize: ElementSize) {
       fallbackHeight: 390,
       minOuterRadius: 96,
       maxOuterRadius: 150,
-      innerRadiusRatio: 0.75,
+      innerRadiusRatio: 0.72,
       labelOffset: 26,
       labelGap: PIE_METRIC_LABEL_GAP,
       containerPadding: 14,
@@ -2057,7 +2060,7 @@ function useExpensePieLayout(data: BreakdownItem[], hostSize: ElementSize) {
       fallbackHeight: 460,
       minOuterRadius: 120,
       maxOuterRadius: 220,
-      innerRadiusRatio: 0.75,
+      innerRadiusRatio: 0.72,
       labelOffset: 42,
       labelGap: PIE_METRIC_LABEL_GAP,
       containerPadding: 16,

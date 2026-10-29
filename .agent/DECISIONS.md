@@ -1,5 +1,11 @@
 # Agent Decisions
 
+## 2026-10-29 - Tighten Category Mix After Native Review
+
+At the user's request, shorten the scope label to All and its control to 128px; keep the 14px chevron inset, native selection and 44px target. Reduce the fitted total's maximum font from 40px to 36px and the centered percentage from 46px to 42px. Change the ring's inner/outer radius ratio from 0.75 to 0.72, increasing band thickness 12% without changing its outer fit, categories or calculations. This supersedes checklist 182's dimensions only.
+
+Keep pointer-focus state local to the selector: touch/mouse selection suppresses its lingering native outline/shadow; keyboard input and blur clear that state so Tab navigation retains a visible focus indicator. Do not blur after every change or intercept native selection. Existing section height, Categories modal, canonical values, animations and persistence remain unchanged. Native acceptance is checklist 183.
+
 ## 2026-10-29 - Apply The Approved Full Width Category Mix Layout
 
 Keep the shared chart tabs, stage height, Categories modal/footer and current financial calculations. Replace only Category Mix's scope tabs with a controlled native All categories/Needs/Wants/Savings selector. Reserve label space and inset its decorative chevron 14px from the right edge; retain a 44px target and 16px text on touch devices. Place the fitted exact-cent Spent/Saved amount, quieter Current/Projected context and budget above the chart, without another month or section title. Keep scoped allocation-pressure information.

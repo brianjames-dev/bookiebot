@@ -48,6 +48,15 @@ const money=value=>new Intl.NumberFormat('en-US',{style:'currency',currency:'USD
         const category=page.locator('#bb-chart-category'),total=category.locator('.bb-chart-total')
         const spentCard=page.locator('.bb-metric-card').filter({has:page.getByRole('button',{name:'Explain Spent',exact:true})}).locator('.bb-fitted-amount-text')
         await page.getByRole('button',{name:'Show Category Mix',exact:true}).click()
+        const scope=category.getByRole('combobox',{name:'Category mix filter',exact:true})
+        assert.equal(await scope.locator('option[value="all"]').innerText(),'All')
+        await scope.focus();await page.keyboard.press('Shift+Tab');await page.keyboard.press('Tab')
+        assert.equal(await scope.evaluate(el=>el===document.activeElement&&getComputedStyle(el).outlineStyle==='solid'),true,'Tab navigation retains visible keyboard focus')
+        await scope.tap();await scope.selectOption('needs')
+        assert.equal(await scope.evaluate(el=>getComputedStyle(el).outlineStyle),'none','Touch selection leaves no sticky focus outline')
+        // Escape is keyboard input and intentionally restores keyboard focus.
+        // Check the touch state before dismissing a native test popup with it.
+        await page.keyboard.press('Escape')
         for(const [i,mode] of ['Current','Projected'].entries()) {
           await page.getByRole('button',{name:mode,exact:true}).click()
           await category.getByRole('combobox',{name:'Category mix filter',exact:true}).selectOption('all')
@@ -58,11 +67,14 @@ const money=value=>new Intl.NumberFormat('en-US',{style:'currency',currency:'USD
             const rect=selector=>el.querySelector(selector).getBoundingClientRect()
             const host=rect('.bb-category-pie-host'),ring=rect('.recharts-pie'),center=rect('.bb-category-pie-center'),chevron=rect('.bb-category-filter-chevron'),select=rect('.bb-category-mix-filter select'),amount=rect('.bb-chart-total .bb-fitted-amount-text')
             const stage=document.querySelector('.bb-chart-carousel-band').getBoundingClientRect()
-            return {fills:ring.width/Math.min(host.width,host.height),centerX:Math.abs((center.left+center.right-ring.left-ring.right)/2),centerY:Math.abs((center.top+center.bottom-ring.top-ring.bottom)/2),inset:select.right-chevron.right,headerFits:amount.right+8<select.left,stage:stage.height,used:el.querySelector('.bb-category-used .bb-fitted-amount-text').textContent,budget:el.querySelector('.bb-chart-budget-note').textContent,mode:el.querySelector('.bb-chart-mode-note').textContent}
+            return {fills:ring.width/Math.min(host.width,host.height),centerX:Math.abs((center.left+center.right-ring.left-ring.right)/2),centerY:Math.abs((center.top+center.bottom-ring.top-ring.bottom)/2),inset:select.right-chevron.right,dropdownWidth:select.width,totalFont:getComputedStyle(el.querySelector('.bb-chart-total')).fontSize,usedFont:getComputedStyle(el.querySelector('.bb-category-used')).fontSize,headerFits:amount.right+8<select.left,stage:stage.height,used:el.querySelector('.bb-category-used .bb-fitted-amount-text').textContent,budget:el.querySelector('.bb-chart-budget-note').textContent,mode:el.querySelector('.bb-chart-mode-note').textContent}
           })
           assert.ok(geometry.fills>.90&&geometry.fills<=1.01,JSON.stringify(geometry))
           assert.ok(geometry.centerX<1&&geometry.centerY<1,JSON.stringify(geometry))
           assert.equal(geometry.inset,14,'The chevron retains its approved right inset')
+          assert.equal(geometry.dropdownWidth,128,'The scope dropdown is more compact')
+          assert.equal(geometry.totalFont,'36px')
+          assert.equal(geometry.usedFont,'42px')
           assert.equal(geometry.headerFits,true,'Exact cents fit beside the native dropdown')
           assert.equal(geometry.mode,mode)
           assert.equal(geometry.used,`${Number((fixture.expected[i]/(5000+(fixture.espp[i]??0))*100).toFixed(2))}%`)
