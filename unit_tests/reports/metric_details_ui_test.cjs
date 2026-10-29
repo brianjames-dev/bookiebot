@@ -37,18 +37,18 @@ const render = (key, changes = {}) => renderToStaticMarkup(React.createElement(D
 }}))
 const rows = html => [...html.matchAll(/<dt>(.*?)<\/dt><dd>(.*?)<\/dd>/g)].map(match => [match[1], match[2]])
 
-for (const [needs, wants, income] of [[1200, 400, 5000], [2200, 600, 7500], [0, 0, 0]]) {
-  const html = render("spent", {value: needs + wants, view: {...view,
-    metrics: {...view.metrics, monthlyIncome: income},
-    categorySpending: {needs, wants, savings: 300},
+for (const [needs, wants, income, saved] of [[1200, 400, 5000, 300], [2200, 600, 7500, 300], [0, 0, 0, 0]]) {
+  const html = render("spent", {value: needs + wants + saved, view: {...view,
+    metrics: {...view.metrics, monthlyIncome: income, amountSaved: saved},
+    categorySpending: {needs, wants, savings: saved},
   }})
-  assert.deepEqual(rows(html), [["Needs", `$${needs.toLocaleString("en-US")}.00`], ["Wants", `$${wants.toLocaleString("en-US")}.00`], ["Savings", "$0.00"]])
+  assert.deepEqual(rows(html), [["Needs", `$${needs.toLocaleString("en-US")}.00`], ["Wants", `$${wants.toLocaleString("en-US")}.00`], ["Saved", `$${saved.toLocaleString("en-US")}.00`]])
+  assert.ok(html.includes(`<div class="bb-chart-total">$${(needs + wants + saved).toLocaleString("en-US")}.00</div>`))
   for (const removed of ["Old detailed expense", "Old calculation equation", "Old verbose note", "Another grey explanation", "bb-activity-footnote"]) assert.ok(!html.includes(removed))
-  assert.ok(!html.includes("$300.00"), "Saved deposits must not be counted again as Spent")
 }
-assert.deepEqual(rows(render("spent", {value: 1625, view: {...view, breakdown: [...view.breakdown, {key: "savings", amount: 25}]}})),
-  [["Needs", "$1,200.00"], ["Wants", "$400.00"], ["Savings", "$25.00"]], "An explicit savings expense retains its bucket")
-assert.deepEqual(rows(render("spent", {value: 1650})).at(-1), ["Sheet adjustment", "$50.00"], "Legacy sheet totals retain any otherwise unclassified amount")
+assert.deepEqual(rows(render("spent", {value: 1925, view: {...view, breakdown: [...view.breakdown, {key: "savings", amount: 25}]}})),
+  [["Needs", "$1,200.00"], ["Wants", "$400.00"], ["Saved", "$300.00"], ["Sheet adjustment", "$25.00"]], "Legacy expense adjustments stay separate from actual Saved")
+assert.deepEqual(rows(render("spent", {value: 1950})).at(-1), ["Sheet adjustment", "$50.00"], "Legacy sheet totals retain any otherwise unclassified amount")
 
 const remaining = ["Needs", "Wants", "Savings"].map(label => ({label: `${label} remaining`, amount: 100}))
 for (const [budgets, expected] of [
@@ -58,6 +58,7 @@ for (const [budgets, expected] of [
 ]) {
   const html = render("left", {components: remaining, view: {...view, categoryBudgets: budgets}})
   assert.equal(rows(html).length, 3)
+  assert.ok(html.includes("Savings remaining") && !html.toLowerCase().includes("budget"), "Left keeps its concise remaining labels")
   for (const percentage of expected) assert.ok(html.includes(`${percentage}% of income`), "Allocation percentages use the active mode and month settings")
   assert.ok(!html.includes("bb-activity-footnote") && !html.includes("Old calculation equation"))
 }
@@ -98,4 +99,14 @@ assert.ok(!esppDetails.includes('Take-home before ESPP'))
 const esppCard=renderToStaticMarkup(React.createElement(Card,{value:1600,progressValue:1200,minimum:700,ideal:1400,onExplain:()=>{}}))
 assert.ok(esppCard.includes('Explain Saved')&&!esppCard.includes('Explain Cash saved'))
 for(const surface of [esppCard,esppDetails])assert.ok(surface.includes(`width:${1200/1400*100}%`),'The progress bar uses recorded cash while the headline includes ESPP')
+for (const estimated of [0, 400]) {
+  const saved = 1600 + estimated
+  const spent = render('spent', {value: 1600 + saved, view: {...esppView,
+    metrics: {...esppView.metrics, amountSaved: saved},
+    savingsInvesting: {...investing, combinedContributions: saved, esppContribution: 400 + estimated, estimatedEsppContribution: estimated},
+  }})
+  assert.deepEqual(rows(spent), [['Needs', '$1,200.00'], ['Wants', '$400.00'],
+    [estimated ? 'Saved<small>Includes estimated ESPP</small>' : 'Saved', `$${saved.toLocaleString('en-US')}.00`]])
+  assert.ok(!spent.includes('Sheet adjustment'), 'Cash and actual/projected ESPP are included exactly once')
+}
 console.log('Saved separates cash progress and monthly ESPP while income owns reconstructed take-home.')

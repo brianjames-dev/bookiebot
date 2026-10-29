@@ -6,6 +6,21 @@ Main navigation keeps Konsta glass and native button semantics, but uses the rep
 
 Rationale: the longer Transactions label needed a wider track, while Konsta positioned its highlight using equal fractions. Measuring the rendered content removes both the positional drift and excessive width without shrinking labels or reducing tap targets.
 
+## 2026-10-28 - Include Saved In The Spent Headline
+
+At the user's request, Overview Spent and its explanation show expense outflows plus the active mode's Saved amount. The compact breakdown uses Needs, Wants and Saved, retaining any legacy sheet adjustment. Saved already combines cash savings and payroll ESPP; add that combined value once, and identify estimated ESPP in Projected. Keep Left and its “Savings remaining” label unchanged, without adding “budget.” A zero savings remainder means the allocation has already been used, including recorded savings and any existing overspending coverage.
+
+Preserve `metrics.totalExpenses` as expense-only for charts, comparisons, burn rate and other financial calculations. `metricExplanations.spent` and the read-only agent's `headlineSpent` expose the display total and its meaning. The frontend snapshots the same headline value into the modal, including for cached older explanations. No sheet, financial record or savings-target changes. This supersedes the expense-only Spent presentation in the October 10, 12 and 13 decisions, while retaining their underlying cash-accounting rules.
+
+## 2026-10-28 - Keep Posted Review Preparation Behind the Chosen Action
+
+The user found the separate Review match step unnecessary. Supersede that UI step below: exact suggestions offer Confirm match directly, including posted transactions with negative display IDs. Confirm and Ignore validate fresh state/candidates before internally preparing one needs-review row and using the existing stable-ID claim/CAS writer. Concurrent decisions win unchanged. GETs and row expansion remain read-only; no automatic bank sync, sheet write or receipt.
+
+Amount/scheduled-payment reviews and missing-entry forms retain explicit financial confirmation. Their chosen action uses the existing metadata-only prepare command, carrying optional intent and selected suggestion ID so the fresh stable row opens the requested review/form immediately. Preserve a selected alternative; a vanished candidate requires a new choice rather than silently choosing another. Actual amount/schedule/log writers still require positive stable review IDs. Existing prepare clients remain compatible; no schema change.
+
+The shared exact-match eligibility read accepts a negative display ID solely to check the same gross amount and reject unfinished source corrections before preparation. It cannot issue a negative-ID correction plan/token or bypass pending/reset/received-balance safeguards. Exact full-bank matching remains independent of confirmed receipts and pending sender reports. Keep owner/watched/date/version/source/claim checks, recovery and separate repayment confirmation.
+
+
 ## 2026-10-28 - Prepare Individual Posted Reviews Explicitly
 
 Raw posted transactions may display fresh suggestions before a reconciliation row exists. Keep GET/list/detail read-only and negative raw IDs as display identities. Offer Review match/Review transaction as an explicit metadata-only prepare command, rather than requiring a whole-bank sync. Under the shared owner and transaction locks, verify the same bank version, active watched account, owner, posted/recent/unremoved state and absence of any reconciliation row. Create one needs-review row and phone_review_prepare audit event without matching, ignoring, writing a sheet, syncing Plaid or sending a notification. A concurrent/existing decision wins unchanged.

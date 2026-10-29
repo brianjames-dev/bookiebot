@@ -583,7 +583,7 @@ export function ExpenseReportApp({ report, appControls, appAvatarUrl, appSession
     const entries = allActivity.filter(entry => (Number.isFinite(Number(day)) ? entry.day === Number(day) : entry.day === null) && (dailySpendingFilter === "all" || dailyEntryFilter(entry) === dailySpendingFilter) && (!category || entry.category === category))
     setInspection({key:`day-${day}`, title:Number.isFinite(Number(day)) ? `${monthOnlyLabel(report.monthLabel)} ${day}` : "Entries without a date", entries, total:activitySummary(entries).total})
   }, [allActivity, report.monthLabel, dismissChartTooltips])
-  const spentTotal = amountRowsTotal(activeReport.breakdown)
+  const spentTotal = roundCurrency(activeReport.metrics.totalExpenses + activeReport.metrics.amountSaved)
   useEffect(() => {
     if (!navigation) return
     dismissChartTooltips()
@@ -622,7 +622,7 @@ export function ExpenseReportApp({ report, appControls, appAvatarUrl, appSession
             onExplain={metricDetails ? () => setMetricInspection({...metricDetails.income, key: "income", view: activeReport}) : undefined}
             value={activeReport.metrics.monthlyIncome}
           />
-          <MetricCard label="Spent" value={spentTotal} onExplain={metricDetails ? () => setMetricInspection({...metricDetails.spent, key: "spent", view: activeReport}) : undefined} />
+          <MetricCard label="Spent" value={spentTotal} onExplain={metricDetails ? () => setMetricInspection({...metricDetails.spent, value: spentTotal, key: "spent", view: activeReport}) : undefined} />
           <MetricCard
             label="Left"
             onExplain={metricDetails ? () => setMetricInspection({...metricDetails.left, key: "left", view: activeReport}) : undefined}
@@ -1038,12 +1038,12 @@ function MetricExplanationDetails({detail}: {detail:MetricInspection}) {
   }
   let components = detail.components
   if (key === "spent") {
-    // Savings deposits are not expense outflows. Use only expense breakdown
-    // entries here, preserving the existing Spent total and legacy adjustments.
+    // The headline includes money spent and saved. Keep expense calculations
+    // separate and use combined cash/ESPP savings exactly once.
     components = [
       {label: "Needs", amount: view.categorySpending.needs},
       {label: "Wants", amount: view.categorySpending.wants},
-      {label: "Savings", amount: amountRowsTotal(view.breakdown.filter(item => item.key === "savings"))},
+      {label: "Saved", amount: view.metrics.amountSaved},
     ]
     const difference = roundCurrency(detail.value - amountRowsTotal(components))
     if (difference) components.push({label: "Sheet adjustment", amount: difference})
@@ -1055,6 +1055,7 @@ function MetricExplanationDetails({detail}: {detail:MetricInspection}) {
       {key === "left" && index < 3 && view.metrics.monthlyIncome > 0 && <small>
         {(100 * view.categoryBudgets[(["needs", "wants", "savings"] as const)[index]] / view.metrics.monthlyIncome).toLocaleString("en-US", {maximumFractionDigits: 1})}% of income
       </small>}
+      {key === "spent" && component.label === "Saved" && Boolean(view.savingsInvesting?.estimatedEsppContribution) && <small>Includes estimated ESPP</small>}
       {component.date && <small>{component.date}</small>}{component.source === "scheduled" && <small>Scheduled estimate</small>}</dt>
       <dd>{formatMoney(component.amount)}</dd></div>)}</dl>
     {key === "income" && detail.notes.map((note,index)=><p className="bb-activity-footnote" key={index}>{note}</p>)}

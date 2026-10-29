@@ -279,7 +279,7 @@ async def test_pending_is_visible_tentative_and_cannot_be_confirmed(client):
     assert expanded["suggestions"] and not expanded["suggestions"][0]["confirmable"]
     result = await client.http.post("/app/reconciliation", headers=HEADERS,
                                    json={"operation": "confirm", "id": row["id"], "version": expanded["version"], "suggestionId": "coffee"})
-    assert result.status == 400
+    assert result.status == 409
 
 
 @pytest.mark.asyncio
@@ -391,6 +391,76 @@ async def test_unreviewed_posted_match_prepares_one_row_then_requires_explicit_c
     with client.store.connect() as db:
         events = db.execute('SELECT event_type FROM bank_reconciliation_events ORDER BY occurred_at').fetchall()
     assert [e['event_type'] for e in events] == ['phone_review_prepare', 'phone_review_confirm']
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize('operation', ['confirm', 'ignore'])
+async def test_new_posted_transaction_uses_one_explicit_command_without_prepare_tap(client, operation):
+    transaction = seed(client, reviewed=False)
+    connect(client)
+    row = await details(client, -transaction.id)
+    assert client.store.get_reconciliation_item_for_transaction('brian', transaction.id) is None
+    response = await client.http.post('/app/reconciliation', headers=HEADERS, json={
+        'operation': operation, 'id': row['id'], 'version': row['version'] if operation == 'confirm' else row['stateVersion'],
+        **({'suggestionId': 'coffee'} if operation == 'confirm' else {}),
+    })
+    assert response.status == 200, await response.text()
+    saved = client.store.get_reconciliation_item_for_transaction('brian', transaction.id)
+    assert saved.status == ('confirmed' if operation == 'confirm' else 'ignored')
+    assert saved.matched_action_log_id == ('coffee' if operation == 'confirm' else None)
+    assert client.store.recent_transactions('brian')[0] == transaction
+    client.service.sync_owner.assert_not_awaited()
+    client.notify.assert_not_awaited()
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize('problem', ['mismatch', 'stale', 'claimed', 'concurrent_review'])
+async def test_direct_raw_confirmation_never_bypasses_existing_review_guards(client, monkeypatch, problem):
+    transaction = seed(client, reviewed=False, amount=14 if problem == 'mismatch' else 12.34)
+    connect(client)
+    row = await details(client, -transaction.id)
+    if problem == 'stale':
+        client.actions[:] = [logged(amount='99.00')]
+    elif problem == 'claimed':
+        other = client.service.seed_unmatched_debug_transaction('brian', name='Other charge', amount=12.34,
+            date=now_pacific().date().isoformat())
+        previous = client.store.upsert_reconciliation_item(owner_key='brian', transaction=other,
+            classification='expense', status='needs_review', confidence=0)
+        client.store.confirm_reconciliation_item('brian', previous.id, matched_action_log_id='coffee')
+    elif problem == 'concurrent_review':
+        actual = client.store.prepare_reconciliation_review
+        def race(owner, bank, **kwargs):
+            saved = actual(owner, bank, **kwargs)
+            assert saved is not None
+            return client.store.ignore_reconciliation_item(owner, saved.id)
+        monkeypatch.setattr(client.store, 'prepare_reconciliation_review', race)
+    response = await client.http.post('/app/reconciliation', headers=HEADERS, json={
+        'operation': 'confirm', 'id': row['id'], 'version': row['version'], 'suggestionId': 'coffee',
+    })
+    assert response.status == 409, await response.text()
+    saved = client.store.get_reconciliation_item_for_transaction('brian', transaction.id)
+    assert saved is None if problem != 'concurrent_review' else saved.status == 'ignored'
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize('intent', ['amount', 'log'])
+async def test_internal_prepare_returns_chosen_action_without_applying_it(client, intent):
+    transaction = seed(client, reviewed=False)
+    connect(client)
+    row = await details(client, -transaction.id)
+    response = await client.http.post('/app/reconciliation', headers=HEADERS, json={
+        'operation': 'prepare', 'id': row['id'], 'version': row['stateVersion'],
+        'reviewIntent': intent, 'suggestionId': 'coffee',
+    })
+    assert response.status == 200, await response.text()
+    result = await response.json()
+    assert result['preparedReview']['intent'] == intent
+    assert result['preparedReview']['suggestionId'] == 'coffee'
+    saved = client.store.get_reconciliation_item_for_transaction('brian', transaction.id)
+    assert saved.status == 'needs_review' and saved.matched_action_log_id is None
+    assert client.store.recent_transactions('brian')[0] == transaction
+    client.service.sync_owner.assert_not_awaited()
+    client.notify.assert_not_awaited()
 
 
 @pytest.mark.asyncio

@@ -17,9 +17,17 @@ function NavigationButton(props: ComponentProps<"button">) {
 
 function selectionBounds(button: HTMLElement) {
   const content = button.firstElementChild as HTMLElement
+  const pane = button.parentElement!
+  const frame = pane.getBoundingClientRect()
+  const style = getComputedStyle(pane)
+  // Preserve subpixel positions, normalizing Konsta's touch/hover scale.
+  const scaleX = frame.width / parseFloat(style.width) || 1
+  const scaleY = frame.height / parseFloat(style.height) || 1
+  const target = button.getBoundingClientRect()
+  const stack = content.getBoundingClientRect()
   // Fit the icon/label stack with 6px padding, within the button's own track.
-  return fitNavigationSelection({ x: button.offsetLeft, y: button.offsetTop, width: button.offsetWidth, height: button.offsetHeight },
-    { width: content.offsetWidth, height: content.offsetHeight })
+  return fitNavigationSelection({ x: (target.x - frame.x) / scaleX, y: (target.y - frame.y) / scaleY, width: target.width / scaleX, height: target.height / scaleY },
+    { width: stack.width / scaleX, height: stack.height / scaleY })
 }
 
 export function AppNavigationBar({ active, current = active, compact, reconciliationVisible, hidden, onSelect }: {

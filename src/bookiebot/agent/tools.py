@@ -300,9 +300,24 @@ def _financial_report_section(
     mode: str,
     limit: int,
 ) -> dict[str, Any]:
+    headline_spent = None
+    if section in {"overview", "cash_flow"}:
+        metrics = view["metrics"]
+        explanation = payload.get("metricExplanations", {}).get(mode, {}).get("spent", {})
+        headline_spent = {
+            "value": explanation.get("value", round(
+                float(metrics.get("totalExpenses") or 0.0) + float(metrics.get("amountSaved") or 0.0), 2,
+            )),
+            "equation": explanation.get("equation", "Expenses + Saved"),
+            "note": (
+                "Overview Spent includes Saved once (cash savings plus ESPP, including projected estimates). "
+                "totalExpenses and its comparison change remain expense-only; Left uses the existing category balances."
+            ),
+        }
     if section == "overview":
         return {
             "metrics": view["metrics"],
+            "headlineSpent": headline_spent,
             "incomeProjectionSettings": payload.get("incomeProjectionSettings"),
             "savingsPlan": payload.get("savingsPlan"),
             "savingsInvesting": view.get("savingsInvesting"),
@@ -335,6 +350,7 @@ def _financial_report_section(
             events = [event for event in events if not event.get("projectedOnly")]
         return {
             "metrics": view["metrics"],
+            "headlineSpent": headline_spent,
             "incomeProjection": payload["incomeProjection"],
             "incomeProjectionSettings": payload.get("incomeProjectionSettings"),
             "savingsProjection": payload["savingsProjection"],

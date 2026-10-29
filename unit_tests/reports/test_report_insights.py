@@ -1,4 +1,5 @@
 from dataclasses import replace
+from copy import deepcopy
 from datetime import datetime
 
 import pytest
@@ -45,7 +46,7 @@ def test_comparison_sources_keep_real_dates_separate_from_schedule_dates(monkeyp
     assert data["unitemizedIncome"] == 0
 
 
-@pytest.mark.parametrize("income,saved", [(0, 0), (3000, 300), (100.01, 15.99)])
+@pytest.mark.parametrize("income,saved", [(0, 0), (3000, 0), (3000, 300), (100.01, 15.99)])
 def test_explanations_always_sum_to_each_exact_current_and_projected_metric(monkeypatch, income, saved):
     report = base_report(monkeypatch)
     report.income_total = income
@@ -61,10 +62,22 @@ def test_explanations_always_sum_to_each_exact_current_and_projected_metric(monk
     payload = reports.expense_breakdown_client_payload(report)
     keys = {"income": "monthlyIncome", "spent": "totalExpenses", "left": "incomeAfterExpenses", "saved": "amountSaved"}
     for mode in ("current", "projected"):
+        metrics = payload["modeViews"][mode]["metrics"]
         for key, metric in keys.items():
             detail = payload["metricExplanations"][mode][key]
-            assert detail["value"] == payload["modeViews"][mode]["metrics"][metric]
+            expected = round(metrics[metric] + (metrics["amountSaved"] if key == "spent" else 0), 2)
+            assert detail["value"] == expected
             assert round(sum(item["amount"] for item in detail["components"]), 2) == detail["value"]
+        assert metrics["totalExpenses"] == 3050
+        assert [item for item in payload["metricExplanations"][mode]["spent"]["components"] if item["label"] == "Saved"] == [
+            {"label": "Saved", "amount": saved, "source": "summary", "date": None},
+        ]
+        assert [item["label"] for item in payload["metricExplanations"][mode]["left"]["components"]] == [
+            "Needs remaining", "Wants remaining", "Savings remaining",
+        ]
+    before = deepcopy(payload)
+    assert metric_explanations(report, payload) == payload["metricExplanations"]
+    assert payload == before, "Explaining Spent cannot change the expense metrics or any mode data"
     current = payload["metricExplanations"]["current"]
     projected = payload["metricExplanations"]["projected"]
     assert current["income"]["components"][0]["date"] == "2026-09-04"
@@ -83,7 +96,12 @@ def test_explanations_preserve_legacy_sheet_totals_and_do_not_invent_transaction
     payload = reports.expense_breakdown_client_payload(report)
     details = payload["metricExplanations"]["current"]
     assert details["income"]["components"] == [{"label": "Other recorded income from the sheet", "amount": 1000, "source": "sheet", "date": None}]
-    assert details["spent"]["components"] == [{"label": "Other sheet outflows", "amount": 150, "source": "sheet", "date": None}]
+    assert details["spent"]["value"] == 175
+    assert details["spent"]["components"] == [
+        {"label": "Other sheet outflows", "amount": 150, "source": "sheet", "date": None},
+        {"label": "Saved", "amount": 25, "source": "summary", "date": None},
+    ]
+    assert payload["modeViews"]["current"]["metrics"]["totalExpenses"] == 150
     assert details["saved"]["components"] == [{"label": "Other saved amount from the sheet", "amount": 25, "source": "sheet", "date": None}]
 
 
@@ -94,7 +112,7 @@ def test_projected_bill_remainder_is_scheduled_and_large_residual_is_not_called_
     report.calendar_events = [reports.CalendarEvent("bill", "Rent", 100, 20, "rent", projected_only=True)]
     payload = reports.expense_breakdown_client_payload(report)
     components = payload["metricExplanations"]["projected"]["spent"]["components"]
-    assert [(item["amount"], item["source"]) for item in components] == [(50, "sheet"), (50, "scheduled")]
+    assert [(item["amount"], item["source"]) for item in components] == [(50, "sheet"), (50, "scheduled"), (0, "summary")]
     payload["modeViews"]["current"]["metrics"]["incomeAfterExpenses"] += 100
     detail = metric_explanations(report, payload)["current"]["left"]
     assert detail["components"][-1]["label"] == "Additional balance from the sheet"

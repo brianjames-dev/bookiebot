@@ -213,16 +213,18 @@ def detail(service: BankingService, owner: str, actor: str, review_id: int, *, f
                 transaction, pulls, limit=4, action_log=actions,
             )
     row["suggestions"] = [_suggestion(candidate, transaction) for candidate in candidates]
-    if item is not None and candidates:
+    if candidates:
         from bookiebot.banking.shared_amounts import shared_amount_review
         from bookiebot.reimbursements.store import ReimbursementConflictError, ReimbursementNotFoundError, ReimbursementValidationError
         by_id = {logged.id: logged for logged in actions}
         for suggestion in row["suggestions"]:
+            if item is None and suggestion['amountMismatch']:
+                continue  # Shared amount review starts after the chosen action prepares its stable identity.
             logged = by_id.get(suggestion["id"])
             if logged is None:
                 continue
             try:
-                plan = shared_amount_review(owner, logged, round(abs(transaction.amount) * 100), item.id)
+                plan = shared_amount_review(owner, logged, round(abs(transaction.amount) * 100), item.id if item else review_id)
                 if plan:
                     suggestion["sharedAmount"] = plan
             except (ReimbursementConflictError, ReimbursementNotFoundError, ReimbursementValidationError) as exc:
@@ -231,7 +233,7 @@ def detail(service: BankingService, owner: str, actor: str, review_id: int, *, f
     receipt = _receipt_link(owner, actor, item)
     if receipt:
         row['receipt'] = receipt
-    if row["status"] == "needs_review" and not row["readOnly"] and item is not None:
+    if row["status"] == "needs_review" and not row["readOnly"]:
         current_month = now_pacific().strftime('%Y-%m')
         bank_month = (transaction.date or transaction.authorized_date or '')[:7]
         row['logging'] = {
@@ -277,11 +279,16 @@ def command(service: BankingService, owner: str, actor: str, body: dict) -> dict
         raise ReviewValidation("Invalid review action.")
     review_id = body.get("id")
     expected = body.get("version")
-    if (type(review_id) is not int or (review_id >= 0 if operation == 'prepare' else review_id <= 0)
+    if (type(review_id) is not int or review_id == 0 or (operation == 'prepare' and review_id > 0)
+            or (review_id < 0 and operation not in {'prepare', 'confirm', 'ignore'})
             or not isinstance(expected, str) or len(expected) != 64):
         raise ReviewValidation("Check this transaction before reviewing it.")
     transaction, item = _find(service, owner, review_id)
     if operation == 'prepare':
+        intent, suggestion_id = body.get('reviewIntent'), body.get('suggestionId')
+        if (intent is not None and (not isinstance(intent, str) or intent not in {'amount', 'log'})
+                or suggestion_id is not None and (not isinstance(suggestion_id, str) or len(suggestion_id) > 200)):
+            raise ReviewValidation('Choose a transaction action.')
         if item is not None or transaction.pending or expected != _version(transaction, None):
             raise ReviewRejected('This transaction changed. Reopen it to review the latest information.')
         prepared = service.store.prepare_reconciliation_review(owner, transaction, start_date=_cutoff())
@@ -289,7 +296,8 @@ def command(service: BankingService, owner: str, actor: str, body: dict) -> dict
             raise ReviewRejected('This transaction changed or was already reviewed. Reopen it to continue.')
         result = snapshot(service, owner)
         if any(row['id'] == prepared.id for row in result['items']):
-            result['preparedReview'] = {'fromId': review_id, 'id': prepared.id}
+            result['preparedReview'] = {'fromId': review_id, 'id': prepared.id,
+                **({'intent': intent} if intent else {}), **({'suggestionId': suggestion_id} if suggestion_id else {})}
         return result
     if operation == 'recover_schedule':
         if item is None or expected != _version(transaction, item) or item.status != 'import_requested':
@@ -303,12 +311,13 @@ def command(service: BankingService, owner: str, actor: str, body: dict) -> dict
         if result.status != 'completed':
             raise ReviewConflict('The saved amounts or payment history need inspection. No write was retried.')
         return _command_snapshot(service, owner, actor, review_id)
-    if item is None or transaction.pending or item.status == "import_requested":
+    if transaction.pending or (item is None and review_id > 0) or (item and item.status == "import_requested"):
         raise ReviewRejected("This transaction cannot be changed yet. Check again.")
-    if operation != "reopen" and item.status in {"confirmed", "ignored"}:
+    if operation != "reopen" and item and item.status in {"confirmed", "ignored"}:
         raise ReviewRejected("This transaction was already reviewed in the app or Discord. Check status to see the current decision.")
     action_id = sheet_ref = None
     if operation == 'log':
+        assert item is not None
         if (transaction.date or transaction.authorized_date or '')[:7] != now_pacific().strftime('%Y-%m'):
             raise ReviewRejected('Adding bank transactions is supported for the current month. Match an existing sheet entry instead.')
         if expected != _version(transaction, item):
@@ -341,12 +350,13 @@ def command(service: BankingService, owner: str, actor: str, body: dict) -> dict
         # schedule cache used to keep ordinary browsing inexpensive.
         clear_schedule_source_cache(actor)
         row, candidates, transaction, item = detail(service, owner, actor, review_id, fresh=True)
-        if item is None or expected != row["version"] or row["status"] != "needs_review":
+        if (item is None and review_id > 0) or expected != row["version"] or row["status"] != "needs_review":
             raise ReviewRejected("This transaction or its suggestion changed. Review it again.")
         candidate = next((entry for entry in candidates if entry.action_id == body.get("suggestionId")), None)
         if candidate is None:
             raise ReviewRejected("That suggestion is no longer available. Check again.")
         if operation == 'update_schedule':
+            assert item is not None
             fingerprint = body.get('scheduleVersion')
             update_future = body.get('updateFuture', False)
             split_method = body.get('splitMethod', 'income')
@@ -371,6 +381,7 @@ def command(service: BankingService, owner: str, actor: str, body: dict) -> dict
         if not candidate.amount_recorded or (mismatch and operation != 'update_match'):
             raise ReviewRejected("Review the amount change before matching this entry.")
         if operation == 'update_match':
+            assert item is not None
             if candidate.action_type == 'schedule' or not (mismatch or recovery):
                 raise ReviewRejected('Choose a recorded expense or income with a different amount.')
             kwargs = {'shared_amount_token': shared['token']} if shared else {}
@@ -397,8 +408,15 @@ def command(service: BankingService, owner: str, actor: str, body: dict) -> dict
         # Expanded rows use a detail version. Validate it without persisting any
         # financial values or trusting a candidate supplied by the phone.
         row, _, transaction, item = detail(service, owner, actor, review_id)
-        if expected != row["version"] or item is None:
+        if expected != row["version"] or (item is None and review_id > 0):
             raise ReviewRejected("This transaction changed. Review it again.")
+    if item is None:
+        # The user's Confirm/Ignore action initializes only this fresh posted
+        # row, then uses the same claim/version checks as every saved review.
+        item = service.store.prepare_reconciliation_review(owner, transaction, start_date=_cutoff())
+        if item is None or item.status != 'needs_review' or item.matched_action_log_id or item.matched_sheet_ref:
+            raise ReviewRejected('This transaction changed or was already reviewed. Reopen it to continue.')
+        review_id = item.id
     assert item is not None
     applied = service.store.apply_reconciliation_review(
         owner, item.id, action=cast(Literal["confirm", "ignore", "reopen"], operation), expected_status=item.status,

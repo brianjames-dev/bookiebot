@@ -16,6 +16,7 @@ for (const [button,content] of [
  [{x:113,y:0,width:77,height:60},{width:69,height:41}],
  [{x:202,y:0,width:94,height:60},{width:35,height:41}],
  [{x:57,y:0,width:55,height:44},{width:21,height:21}],
+ [{x:81.390625,y:0,width:88.421875,height:60},{width:68.859375,height:41}],
 ]) {
  const bubble=fitNavigationSelection(button,content)
  assert.equal(bubble.x+bubble.width/2,button.x+button.width/2)

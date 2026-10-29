@@ -39,7 +39,7 @@ async function geometry(page, label, compact) {
   })
   assert.equal(result.selected, label)
   const { button, bubble, icon } = result
-  const close = (a, b, message) => assert.ok(Math.abs(a - b) <= 1, `${message}: ${a} vs ${b}`)
+  const close = (a, b, message) => assert.ok(Math.abs(a - b) <= 0.25, `${message}: ${a} vs ${b}`)
   close(bubble.x + bubble.width / 2, button.x + button.width / 2, 'Bubble must center on the actual selected button')
   close(bubble.y + bubble.height / 2, button.y + button.height / 2, 'Vertical centering')
   close(bubble.x + bubble.width / 2, icon.x + icon.width / 2, 'Icon must center in the bubble')

@@ -58,6 +58,7 @@ const runtime = { exports:{}, require:req, window, document,
   dailyTotalsForEntries:()=>[],dailySpendingTotal:entries=>entries.reduce((sum,e)=>sum+e.amount,0),
   dailyEntryFilter:entry=>['Food','Shopping'].includes(entry.category)?'wants':'needs',
   amountRowsTotal:rows=>rows.reduce((sum,e)=>sum+e.amount,0),activitySummary:entries=>({total:entries.reduce((sum,e)=>sum+e.amount,0)}),
+  roundCurrency:value=>Math.round(value*100)/100,
   activityMatchesCategory:(entry,item)=>entry.category===item.label,monthOnlyLabel:label=>label.split(' ')[0],
   expenseEntryItemLabel:entry=>{count('highlightLabels');return entry.item||entry.location||'Transaction'},
   CATEGORY_CHART_COLORS:{food:'red',grocery:'green'},CHART_CAROUSEL_GAP:16,clamp:(value,min,max)=>Math.max(min,Math.min(max,value)),
@@ -73,11 +74,16 @@ vm.runInNewContext(compiled,runtime)
 const App=runtime.exports.ExpenseReportApp
 const activity=[{day:1,date:'10/1/2026',category:'Food',item:'Lunch',amount:12},{day:1,date:'10/1/2026',category:'Shopping',item:'Shirt',amount:30},{day:1,date:'10/1/2026',category:'Grocery',item:'Groceries',amount:20}]
 const breakdown=[{key:'food',label:'Food',amount:42},{key:'grocery',label:'Grocery',amount:20}]
-const view={metrics:{monthlyIncome:5000,incomeAfterExpenses:4000,amountSaved:500,savingsMinimum:500,savingsIdeal:1000},breakdown,categoryBalances:{},categoryBudgets:{},calendarEvents:[],utilityHistory:[],burnRate:{}}
-let report={ownerName:'Brian',year:2026,month:10,monthLabel:'October 2026',generatedAt:'2026-10-25',elapsedDays:25,dailyEntries:activity,activity,topEntries:activity,merchantOccurrences:[],currentView:view,projectedView:{...view,metrics:{...view.metrics,monthlyIncome:6000}},burnRate:{}}
+const view={metrics:{monthlyIncome:5000,totalExpenses:72,incomeAfterExpenses:4428,amountSaved:500,savingsMinimum:500,savingsIdeal:1000},breakdown,categoryBalances:{},categoryBudgets:{},calendarEvents:[],utilityHistory:[],burnRate:{}}
+let report={ownerName:'Brian',year:2026,month:10,monthLabel:'October 2026',generatedAt:'2026-10-25',elapsedDays:25,dailyEntries:activity,activity,topEntries:activity,merchantOccurrences:[],currentView:view,projectedView:{...view,metrics:{...view.metrics,monthlyIncome:6000,totalExpenses:172,amountSaved:600}},burnRate:{},metricExplanations:{current:{spent:{value:72}},projected:{spent:{value:172}}}}
 const appSession = {signOut:()=>{},signingOut:false}
 let renderer
 act(()=>{renderer=Renderer.create(h(App,{report,appSession}))})
+const spentCard=()=>renderer.root.findAllByType(runtime.MetricCard).find(card=>card.props.label==='Spent')
+assert.equal(spentCard().props.value,572,'Spent includes saved funds and the authoritative expense total, including sheet adjustments')
+act(()=>spentCard().props.onExplain())
+assert.equal(renderer.root.findByType(runtime.MetricExplanationDetails).props.detail.value,572,'The modal matches the card even with a cached expense-only explanation')
+assert.equal(renderer.root.findByType(runtime.MetricExplanationDetails).props.detail.view,view)
 const snapshot=()=>({...counts})
 const unchanged=(before,keys)=>keys.forEach(key=>assert.equal(counts[key],before[key],`${key} must stay untouched by an unrelated filter`))
 let before=snapshot()
@@ -100,6 +106,9 @@ unchanged(before,['viewCalculation','activityCalculation','dailyCalculation','da
 // Actual page-level changes must still recompute fresh values and inspections.
 act(()=>renderer.root.findByType(runtime.ProjectionToggle).props.onToggle())
 assert.equal(renderer.root.findAllByType(runtime.MetricCard)[0].props.value,6000)
+assert.equal(spentCard().props.value,772,'Projected Spent uses its own expense and Saved values')
+act(()=>spentCard().props.onExplain())
+assert.equal(renderer.root.findByType(runtime.MetricExplanationDetails).props.detail.value,772)
 assert.equal(revisions.highlights,5);assert.equal(revisions.daily,5);assert.equal(revisions.category,5)
 assert.equal(counts.viewCalculation,before.viewCalculation+1)
 assert.equal(counts.activityCalculation,before.activityCalculation+1)

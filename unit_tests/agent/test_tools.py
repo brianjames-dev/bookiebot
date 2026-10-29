@@ -122,8 +122,11 @@ async def test_category_tool_normalizes_needs_without_accepting_an_owner(monkeyp
     total_for_category.assert_awaited_once_with("need_expenses", ("Brian (BofA)", "Brian (AL)"))
 
 
+@pytest.mark.parametrize("section", ["overview", "cash_flow"])
+@pytest.mark.parametrize("mode", ["current", "projected", "comparison"])
+@pytest.mark.parametrize("with_explanations", [False, True])
 @pytest.mark.asyncio
-async def test_financial_report_tool_uses_canonical_mode_views_and_trusted_actor(monkeypatch):
+async def test_financial_report_tool_uses_canonical_mode_views_and_trusted_actor(monkeypatch, section, mode, with_explanations):
     report = object()
     build_report = MagicMock(return_value=report)
     payload = {
@@ -133,6 +136,9 @@ async def test_financial_report_tool_uses_canonical_mode_views_and_trusted_actor
         "elapsedDays": 17,
         "daysInMonth": 31,
         "metrics": {"fixedCommitments": 2500.0},
+        "incomeProjection": {"currentAmount": 3137.49, "projectedAmount": 6274.98},
+        "savingsProjection": {"currentAmount": 100.01},
+        "dailyTotals": [],
         "incomeProjectionSettings": {"source": "xAI", "mode": "biweekly", "description": "xAI · biweekly"},
         "modeViews": {
             "current": {
@@ -140,7 +146,7 @@ async def test_financial_report_tool_uses_canonical_mode_views_and_trusted_actor
                     "monthlyIncome": 3137.49,
                     "totalExpenses": 2671.9,
                     "incomeAfterExpenses": 465.59,
-                    "amountSaved": 0.0,
+                    "amountSaved": 125.13,
                     "savingsIdeal": 627.5,
                     "savingsMinimum": 313.75,
                 },
@@ -157,7 +163,7 @@ async def test_financial_report_tool_uses_canonical_mode_views_and_trusted_actor
                     "monthlyIncome": 6274.98,
                     "totalExpenses": 3935.56,
                     "incomeAfterExpenses": 2339.42,
-                    "amountSaved": 0.0,
+                    "amountSaved": 150.25,
                     "savingsIdeal": 1255.0,
                     "savingsMinimum": 627.5,
                 },
@@ -171,24 +177,40 @@ async def test_financial_report_tool_uses_canonical_mode_views_and_trusted_actor
             },
         },
     }
+    if with_explanations:
+        payload["metricExplanations"] = {
+            "current": {"spent": {"value": 2797.03, "equation": "Expense categories + Saved"}},
+            "projected": {"spent": {"value": 4085.81, "equation": "Expense categories + Saved"}},
+        }
     monkeypatch.setattr(agent_tools, "build_expense_breakdown_report", build_report)
     monkeypatch.setattr(agent_tools, "expense_breakdown_client_payload", MagicMock(return_value=payload))
 
     result = await agent_tools.load_financial_report(
         _context(),
-        section="overview",
-        mode="comparison",
+        section=section,
+        mode=mode,
         month="August 2026",
         limit=10,
     )
 
     assert result["source"] == "expense_breakdown_report"
     assert result["owner"] == "Brian"
-    assert result["section"] == "overview"
-    assert result["current"]["metrics"]["incomeAfterExpenses"] == 465.59
-    assert result["projected"]["metrics"]["incomeAfterExpenses"] == 2339.42
-    assert result["projected"]["incomeProjectionSettings"] == payload["incomeProjectionSettings"]
-    assert result["changes"]["incomeAfterExpenses"] == 1873.83
+    assert result["section"] == section
+    expected_modes = ("current", "projected") if mode == "comparison" else (mode,)
+    for selected_mode in expected_modes:
+        view = result[selected_mode]
+        assert view["metrics"] == payload["modeViews"][selected_mode]["metrics"]
+        assert view["incomeProjectionSettings"] == payload["incomeProjectionSettings"]
+        assert view["headlineSpent"]["value"] == (2797.03 if selected_mode == "current" else 4085.81)
+        assert view["headlineSpent"]["equation"] == ("Expense categories + Saved" if with_explanations else "Expenses + Saved")
+        assert "cash savings plus ESPP" in view["headlineSpent"]["note"]
+        assert "expense-only" in view["headlineSpent"]["note"]
+        assert "Left uses the existing category balances" in view["headlineSpent"]["note"]
+    if mode == "comparison":
+        assert result["changes"]["incomeAfterExpenses"] == 1873.83
+        assert result["changes"]["totalExpenses"] == 1263.66
+        assert result["changes"]["amountSaved"] == 25.12
+        assert "headlineSpent" not in result["changes"]
     assert build_report.call_args.kwargs["actor_key"] == "676638528590970917"
     assert build_report.call_args.kwargs["owner_name"] == "Brian"
     assert build_report.call_args.kwargs["persons"] == ["Brian (BofA)", "Brian (AL)"]
