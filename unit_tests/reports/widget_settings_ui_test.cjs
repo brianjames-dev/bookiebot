@@ -21,7 +21,7 @@ const runtime = {exports: {}, URL, Date, Error, AbortController,
   fetch: (url,options)=>new Promise((resolve,reject)=>requests.push({url,options,resolve,reject})),
   require: name => name.endsWith('.css') ? {} : name === './components/ui/motion' ? {
     CollapsibleContent: ({open,id,children})=>React.createElement('div', {id,'data-open':open},children),
-  } : name === './components/ui/report-menu' ? menuRuntime.exports : name === './app-work-guard' ? {useAppWorkStatus: value=>{workHistory.push(value);return value=>workHistory.push(value)}} : req(name),
+  } : name === './components/ui/report-menu' ? menuRuntime.exports : name === './page-refresh' ? {usePageRefresh:()=>false} : name === './app-work-guard' ? {useAppWorkStatus: value=>{workHistory.push(value);return value=>workHistory.push(value)}} : req(name),
 }
 vm.runInNewContext(source,runtime)
 const component = ()=>React.createElement(runtime.exports.WidgetSettings, {ownerName:owner, defaultMode:'projected', onOpenGuide:()=>guides++})

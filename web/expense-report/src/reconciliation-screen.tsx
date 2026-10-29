@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useId, useRef, useState } from "react"
 import { ArrowDownLeft, ArrowUpRight, Check, ChevronDown, RefreshCw } from "lucide-react"
+import { usePageRefresh } from "./page-refresh"
 import { CollapsibleContent, SlidingSelection } from "./components/ui/motion"
 import { useAppWorkStatus } from "./app-work-guard"
 import { ReimbursementLedger } from "./reimbursement-ledger"
@@ -131,6 +132,7 @@ export function useReconciliation() {
       if (blocked.current) setResetReview(value => value + 1)
       if (blocked.current || (body && ["update_match", "update_schedule", "recover_schedule", "log"].includes(body.operation))) window.dispatchEvent(new Event("bookiebot:transactions-changed"))
       setSnapshot(next); setRevision(value => value + 1); blocked.current = false; setNeedsRefresh(false)
+      return true
     } catch (failure) {
       if (!active()) return
       const known = failure instanceof ReviewRequestError && failure.status < 500
@@ -156,6 +158,7 @@ export function useReconciliation() {
       } else if (body) { blocked.current = true; setNeedsRefresh(true) }
       setError(body && !known ? "This check may have finished. Check its status before trying another change."
         : failure instanceof Error ? failure.message : "Couldn’t load bank transactions.")
+      return false
     } finally { if (active()) { current.current = null; setBusy(false); setPendingOperation(null) } }
   }, [updateWork])
   useEffect(() => {
@@ -244,10 +247,14 @@ export function ReconciliationScreen({ controller }: { controller: Controller })
     return () => { active = false; controller.abort() }
   }, [openId, revision, detailRetry, snapshot?.enabled, rejectAccess, load])
   const visibleRows = rows.filter(matchesFilter)
+  const pageRefresh = usePageRefresh(receiptTarget ? null : "reconcile", {
+    refresh: () => load(needsRefresh || !snapshot?.enabled ? undefined : { operation: "check" }),
+    disabled: busy || Boolean(receiptTarget),
+  })
   return <section className="bb-reconcile" aria-labelledby="bb-reconcile-title">
     <div className="bb-reconcile-heading"><div><h1 id="bb-reconcile-title">Reconcile</h1><p className="bb-reconcile-muted">{snapshot?.checkedAt
       ? `Checked ${new Date(snapshot.checkedAt).toLocaleString(undefined, { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" })}` : "Review your logged expenses"}</p></div>
-      <button type="button" className="bb-reconcile-check" disabled={!snapshot?.enabled || busy || Boolean(receiptTarget)} onClick={() => void load(needsRefresh ? undefined : { operation: "check" })}><RefreshCw size={17} aria-hidden="true" />{busy ? "Checking…" : needsRefresh ? "Check status" : "Check"}</button></div>
+      {!pageRefresh && <button type="button" className="bb-reconcile-check" disabled={!snapshot?.enabled || busy || Boolean(receiptTarget)} onClick={() => void load(needsRefresh ? undefined : { operation: "check" })}><RefreshCw size={17} aria-hidden="true" />{busy ? "Checking…" : needsRefresh ? "Check status" : "Check"}</button>}</div>
     {receiptTarget && <div ref={receiptPanel}><ReimbursementLedger key={receiptTarget.allocationId} fallback={<p>Shared payments are currently unavailable.</p>}
       matchedReceipt={receiptTarget} onClose={() => setReceiptTarget(null)} onRejectAccess={rejectReceiptAccess} /></div>}
     {!receiptTarget && snapshot?.receiptFollowup && <div className="bb-reconcile-message" role="status"><p>Bank match saved. Receiving your partner’s share is a separate step.</p>

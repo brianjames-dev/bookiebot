@@ -7,7 +7,7 @@ After deployment and the bot restart, repeat separately for Brian and Hannah:
 3. Verify your name and tap **Connect as Brian** or **Connect as Hannah**.
 4. When your report opens, tap Safari **Share** (or **More → Share**) → **Add to Home Screen**.
 5. Name it **BookieBot**, keep **Open as Web App** enabled if shown, and tap **Add**.
-6. Launch the icon. Confirm your name and current month on **Overview**. The selected report refreshes on opening and returning from the background; the **↻ refresh icon** updates it manually. **Updated** shows the last successful fetch. The header **gear** opens Settings for dark mode, notifications, account/signout and app updates.
+6. Launch the icon. Confirm your name and current month on **Overview**. The selected report refreshes on opening and returning from the background; pull down from the top until **Release to refresh** appears, then let go to update the active page. **Updated** shows the last successful fetch. The header **gear** opens Settings for dark mode, notifications, account/signout and app updates.
 
 Use current iOS when possible. Safari copies sign-in cookies into a newly installed Home Screen app on iOS 17.2 and later. If the app asks to connect, follow the reconnect steps below. Internet is required for fresh sheet values; failed refreshes keep the last report and its update time. If Google Sheets takes too long, the app identifies that timeout. Try Refresh again shortly; after a successful refresh, unavailable month history is checked once automatically. You can also use the history warning’s Retry button. A timeout does not require reinstalling or signing in again.
 
@@ -23,6 +23,8 @@ Use the bottom navigation to switch screens:
 | **Spending** | Daily spending and largest/frequent expenses | Same selected month and view |
 | **Shared** | Owed to you, You owe, payment history and offsets | Canonical reimbursement balances across months |
 | **Savings** | Total recorded savings, goals and contribution history | Personal goals across months |
+
+**Refresh any page:** start at its top, pull down to fill the circle and release at or beyond the threshold. Short pulls and moving back below the threshold cancel. The same indicator shows loading, success or failure; another pull retries after completion. Overview refreshes the selected report, Transactions its filtered list, Shared its ledger/pending sheet updates, Savings its goals and investment data, and Settings widget/notification state. Reconcile runs its bank check, or only reads status when an earlier result is uncertain; an open repayment view refreshes that payment. Forms and filters remain in place. Scroll gestures inside dialogs/inner lists are separate. Keyboard and desktop users can activate the common **Refresh** control. App updates remain in Settings.
 
 The Konsta navigation bar becomes compact while you scroll down and expands when you scroll up. Switching screens keeps their scroll positions, open controls and forms during the current app session. A compact glass toolbar keeps chat and Settings visible at the top right as you scroll. The gear opens **Settings**; **Back** returns to the last main screen. The chat icon opens Ask BookieBot from any screen. Signed report links retain their existing report layout; this navigation belongs to the authenticated phone app.
 

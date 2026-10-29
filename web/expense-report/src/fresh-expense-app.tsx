@@ -37,7 +37,12 @@ function useFreshExpenseReport(config: ExpenseAppConfig) {
   }, [config])
   return {
     state,
-    refresh: () => { void session.current?.refresh(true) },
+    refresh: async () => {
+      const current = session.current
+      if (!current) return false
+      await current.refresh(true)
+      return current.state.phase === "ready"
+    },
     signOut: () => { void session.current?.signOut() },
     selectMonth: (month: string | null) => { void session.current?.selectMonth(month) },
     expire: () => { session.current?.expire() },
@@ -68,7 +73,7 @@ function FreshExpenseContent({ config }: { config: ExpenseAppConfig }) {
   else if (state.report) lastReport.current = state.report
   const shellReport = state.report ?? lastReport.current
   const avatarUrl = `/app/avatar.png?day=${new Date().toISOString().slice(0, 10)}`
-  const controls = <AppRefreshControl state={state} refresh={refresh} />
+  const controls = <AppRefreshControl state={state} refresh={refresh} showButton={!shellReport} />
   const reportMonth = state.report ? `${state.report.year}-${String(state.report.month).padStart(2, "0")}` : undefined
   const history = useReportMonthCatalog(!disconnected, expire, reportMonth, state.report)
   const monthControl = <MonthHistoryControl monthLabel={state.report?.monthLabel ?? reportMonthLabel(state.selectedMonth)}
@@ -80,6 +85,7 @@ function FreshExpenseContent({ config }: { config: ExpenseAppConfig }) {
       key={shellReport.ownerName}
       report={shellReport}
       monthlyReady={Boolean(state.report)}
+      onRefresh={refresh} reportBusy={busy}
       questionMonth={state.selectedMonth ?? history.catalog?.currentMonth ?? reportMonth}
       controls={controls}
       initialVersion={config.version ?? ""}

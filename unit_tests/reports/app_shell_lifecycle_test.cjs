@@ -24,7 +24,7 @@ const win = { ...events('window'), scrollY: 0, innerHeight: 800, navigator: { on
   setInterval(cb, delay) { const id = ++timerId; intervals.set(id, { cb, delay }); return id }, clearInterval(id) { intervals.delete(id) },
 }
 const doc = { ...events('document'), visibilityState: 'visible', activeElement: new Element(),
-  documentElement: { dataset: {}, style: {}, scrollHeight: 6000 },
+  documentElement: { dataset: {}, style: {}, scrollHeight: 6000, classList: {add(){},remove(){}} },
   querySelector: selector => selector === '.bb-shell-shared .bb-reimbursement-section' ? sharedTarget : selector === '.bb-widget-settings' ? widgetTarget : null,
 }
 const konsta = new Module(path.join(frontend, '__shell_konsta.cjs'), module)
@@ -264,9 +264,9 @@ async function main() {
   const visibleReviewText = () => text(tree.root.findAll(node => node.type === 'main' && node.props['aria-label'] === 'Reconcile')[0])
   assert.match(visibleReviewText(), /Loading bank transactions/)
   assert.doesNotMatch(visibleReviewText(), /Nothing needs review/)
-  assert.ok(button(tree, 'Checking…').props.disabled)
+  assert.ok(tree.root.findByProps({'aria-label':'Refresh Reconcile'}).props.disabled)
   await run(() => bankReadRequest.reject(Error('Offline')))
-  assert.equal(screen(tree), 'reconcile'); assert.ok(button(tree, 'Try again')); assert.ok(button(tree, 'Check').props.disabled)
+  assert.equal(screen(tree), 'reconcile'); assert.ok(button(tree, 'Try again')); assert.equal(tree.root.findByProps({'aria-label':'Refresh Reconcile'}).props.disabled,false,'Pull refresh can retry failed connection discovery')
   assert.equal(optionalNav.props['data-tab-count'], 5)
   bankReadRequest = deferred(); await tap(tree, 'Try again')
   assert.match(visibleReviewText(), /Loading bank transactions/)
@@ -278,7 +278,7 @@ async function main() {
   assert.equal(screen(tree), 'reconcile'); assert.equal(win.scrollY, 220)
   await tap(tree, 'Overview'); assert.equal(win.scrollY, 340)
   assert.deepEqual(reads, beforeReviewReads); assert.equal(rawReport(tree).props['data-report-instance'], beforeReviewReport)
-  await tap(tree, 'Reconcile'); bankRequest = deferred(); await tap(tree, 'Check')
+  await tap(tree, 'Reconcile'); bankRequest = deferred(); await run(() => tree.root.findByProps({'aria-label':'Refresh Reconcile'}).props.onClick())
   assert.equal(guard.pending, true, 'Bank checks participate in the real update/signout work guard')
   await tap(tree, 'Settings'); assert.equal(button(tree, 'Update available · Update now').props.disabled, true)
   await run(() => bankRequest.resolve(response({ enabled: true, checkedAt: '2026-09-09T20:00:00Z', items: [] })))

@@ -4,6 +4,7 @@ import { CollapsibleContent } from "./components/ui/motion"
 import { FittedAmount } from "./components/ui/fitted-amount"
 import { ReportMenu } from "./components/ui/report-menu"
 import { useAppWorkStatus } from "./app-work-guard"
+import { usePageRefresh } from "./page-refresh"
 import "./savings-goals.css"
 
 export interface SavingsGoal {
@@ -73,7 +74,7 @@ export function SavingsGoals() {
     const id = ++readId.current
     try {
       const result = await request<{ goals: SavingsGoal[] }>("/app/goals")
-      if (mounted.current && id === readId.current) { setGoals(result.goals); setLoaded(true) }
+      if (mounted.current && id === readId.current) { setGoals(result.goals); setLoaded(true); setError("") }
       return true
     } catch (failure) {
       if (mounted.current && id === readId.current) {
@@ -83,6 +84,7 @@ export function SavingsGoals() {
       return false
     }
   }, [])
+  const pageRefresh = usePageRefresh("savings", { refresh: load, disabled: busy || uncertain || (!loaded && !error) })
   useEffect(() => {
     mounted.current = true
     void load()
@@ -147,7 +149,7 @@ export function SavingsGoals() {
       {error && <div className="bb-goals-message" role="alert"><p>{error}</p>
         {uncertain ? <div className="bb-goals-actions"><button type="button" disabled={busy} onClick={() => void execute()}>Retry this change</button>
           <button type="button" disabled={busy} onClick={() => void checkLatest()}>Check latest</button></div>
-          : <button type="button" disabled={busy} onClick={() => { setError(""); void load() }}>Refresh goals</button>}</div>}
+          : pageRefresh ? <p>Pull down from the top to refresh.</p> : <button type="button" disabled={busy} onClick={() => { setError(""); void load() }}>Refresh goals</button>}</div>}
       {!loaded && !error && <p role="status">Loading your goals…</p>}
       <div className="bb-goals-heading"><h3>Goals</h3>
         <button type="button" className="bb-goals-new" disabled={locked || !loaded} aria-expanded={creating} aria-controls={createId} onClick={() => { setCreating(!creating); setActiveGoal(null); setError("") }}>＋ Goal</button>

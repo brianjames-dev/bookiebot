@@ -2,6 +2,7 @@ import { useEffect, useId, useRef, useState } from "react"
 import { CollapsibleContent } from "./components/ui/motion"
 import { ReportMenu } from "./components/ui/report-menu"
 import { RefreshCw } from "lucide-react"
+import { usePageRefresh } from "./page-refresh"
 import { useAppWorkStatus } from "./app-work-guard"
 import "./widget-settings.css"
 
@@ -123,17 +124,21 @@ function WidgetSettingsContent({ ownerName, defaultMode, onOpenGuide }: WidgetSe
       if (created) { copyGeneration.current++; setPairing(created); setFormOpen(false); setLabel(initialLabel); setMode(defaultMode) }
       else if (body?.operation === "revoke") { setConfirmRevoke(null); setMessage("Widget access removed.") }
       else if (body?.operation === "mode") setMessage("Saved. Updates on the next widget refresh.")
+      return true
     } catch (caught) {
       if (!active()) return
       if (body) setNeedsRefresh(true)
       setError(body?.operation === "pair"
         ? "Couldn’t confirm pairing. Refresh widgets before trying again, then remove any unused pending pairing."
         : caught instanceof Error ? caught.message : "Couldn’t load widgets. Refresh widgets to try again.")
+      return false
     } finally {
       window.clearTimeout(timer)
       if (active()) { operation.current = null; setBusy(false); setLoading(false) }
     }
   }
+
+  const pageRefresh = usePageRefresh("settings", { refresh: () => run(), disabled: busy || loading })
 
   useEffect(() => {
     mounted.current = true
@@ -163,7 +168,7 @@ function WidgetSettingsContent({ ownerName, defaultMode, onOpenGuide }: WidgetSe
   }
   const canCreate = Boolean(settings && settings.connections.length < 5 && !busy && !needsRefresh && !pairing)
   return <section className="bb-settings-section bb-widget-settings" aria-labelledby={`${id}-title`}>
-    <div className="bb-widget-heading"><h2 id={`${id}-title`}>Widgets</h2><button className="bb-icon-button bb-widget-refresh" type="button" disabled={busy} aria-busy={busy} onClick={() => void run()} aria-label="Refresh widgets" title="Refresh widgets"><RefreshCw aria-hidden="true" /></button></div>
+    <div className="bb-widget-heading"><h2 id={`${id}-title`}>Widgets</h2>{!pageRefresh && <button className="bb-icon-button bb-widget-refresh" type="button" disabled={busy} aria-busy={busy} onClick={() => void run()} aria-label="Refresh widgets" title="Refresh widgets"><RefreshCw aria-hidden="true" /></button>}</div>
     {loading && <p className="bb-settings-note" role="status">Loading widgets…</p>}
     {settings && <div className="bb-widget-connections">
       {settings.connections.length === 0 && <p className="bb-settings-note bb-widget-empty">No widgets paired yet.</p>}
