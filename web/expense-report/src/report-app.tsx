@@ -262,6 +262,10 @@ type ChartTouchState = {
 type ReportView = ReportModeView
 type MetricInspection = MetricExplanation & { key: "income" | "spent" | "left" | "saved"; view: ReportView }
 
+function reportSpentTotal(metrics: ReportView["metrics"]) {
+  return roundCurrency(metrics.totalExpenses + metrics.amountSaved)
+}
+
 function buildReportView(report: ExpenseReportData, projected: boolean): ReportView {
   const serverView = projected ? report.modeViews?.projected : report.modeViews?.current
   if (serverView) {
@@ -585,7 +589,7 @@ export function ExpenseReportApp({ report, appControls, appAvatarUrl, appSession
     const entries = allActivity.filter(entry => (Number.isFinite(Number(day)) ? entry.day === Number(day) : entry.day === null) && (dailySpendingFilter === "all" || dailyEntryFilter(entry) === dailySpendingFilter) && (!category || entry.category === category))
     setInspection({key:`day-${day}`, title:Number.isFinite(Number(day)) ? `${monthOnlyLabel(report.monthLabel)} ${day}` : "Entries without a date", entries, total:activitySummary(entries).total})
   }, [allActivity, report.monthLabel, dismissChartTooltips])
-  const spentTotal = roundCurrency(activeReport.metrics.totalExpenses + activeReport.metrics.amountSaved)
+  const spentTotal = reportSpentTotal(activeReport.metrics)
   useEffect(() => {
     if (!navigation) return
     dismissChartTooltips()
@@ -731,6 +735,7 @@ const OverviewCharts = memo(function OverviewCharts({ report, activeReport, char
           categoryBalances={activeReport.categoryBalances}
           categoryBudgets={activeReport.categoryBudgets}
           amountSaved={activeReport.savingsInvesting?.cashSaved ?? activeReport.metrics.amountSaved}
+          allSpentTotal={reportSpentTotal(activeReport.metrics)}
           espp={activeReport.savingsInvesting?.esppContribution}
           estimatedEspp={activeReport.savingsInvesting?.estimatedEsppContribution}
           filter={categoryMixFilter}
@@ -1576,6 +1581,7 @@ type CategoryMixChartProps = {
   categoryBalances: CategoryBalances
   categoryBudgets: CategoryBalanceAmounts
   amountSaved: number
+  allSpentTotal: number
   espp?: number
   estimatedEspp?: number
   filter: CategoryMixFilter
@@ -1590,6 +1596,7 @@ const CategoryMixChart = memo(function CategoryMixChart({
   categoryBalances,
   categoryBudgets,
   amountSaved,
+  allSpentTotal,
   espp,
   estimatedEspp,
   filter,
@@ -1602,7 +1609,7 @@ const CategoryMixChart = memo(function CategoryMixChart({
   const chartData = categoryMixRows(data, selectedRollover, filter, amountSaved, transferRows, espp, estimatedEspp)
   const [pieHostRef, pieHostSize] = useElementSize<HTMLDivElement>()
   const pieLayout = useExpensePieLayout(chartData, pieHostSize)
-  const spentTotal = amountRowsTotal(chartData.filter((item) => item.key !== "left" && (filter === "savings" || espp === undefined || (item.key !== "savings" && item.key !== "espp"))))
+  const spentTotal = filter === "all" ? allSpentTotal : amountRowsTotal(chartData.filter((item) => item.key !== "left"))
   const pressure = categoryMixPressure(filter, categoryBalances, spentTotal)
   const selectedBudget = (filter === "all" ? categoryBudgetTotal(categoryBudgets) : categoryBudgets[filter]) + ((filter === "all" || filter === "savings") ? espp ?? 0 : 0)
   const usedPercent = selectedBudget > 0 ? (spentTotal / selectedBudget) * 100 : 0
@@ -1752,6 +1759,7 @@ function areCategoryMixChartPropsEqual(previous: CategoryMixChartProps, next: Ca
   return (
     previous.onInspect === next.onInspect &&
     previous.amountSaved === next.amountSaved &&
+    previous.allSpentTotal === next.allSpentTotal &&
     previous.espp === next.espp && previous.estimatedEspp === next.estimatedEspp &&
     previous.categoryBudgets.needs === next.categoryBudgets.needs &&
     previous.categoryBudgets.wants === next.categoryBudgets.wants &&
@@ -1915,7 +1923,7 @@ function categoryMixRows(
     if (filter === "wants") return CATEGORY_WANTS_KEYS.has(item.key)
     return filter === "all" && item.key !== "savings"
   })
-  if (filter === "savings" || (filter === "all" && espp !== undefined)) {
+  if (filter === "savings" || filter === "all") {
     filtered = [...filtered, ...(amountSaved > 0
       ? [{
           key: "savings",

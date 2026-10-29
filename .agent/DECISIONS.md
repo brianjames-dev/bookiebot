@@ -1,5 +1,11 @@
 # Agent Decisions
 
+## 2026-10-29 - Match Category Mix All To The Spent Headline
+
+Extend the user's combined Spent presentation to Category Mix's All header. Share the card's canonical expense-plus-Saved calculation, rather than summing only itemized slices or excluding cash/ESPP. Preserve unitemized sheet adjustments in the displayed total and its budget-used percentage. Saved is the active mode's combined cash and payroll ESPP amount, added once; Projected retains estimate labeling.
+
+All includes the cash-savings slice even for non-enrolled months, with enrolled cash/ESPP slices still separate. Filtered Needs/Wants retain category spending and donor coverage; Savings retains its saved breakdown. Expense metrics, comparisons, burn rate, targets, financial records and writers stay unchanged. Extend chart memo comparison to the authoritative headline so an expense-only refresh updates it. This narrows the earlier expense-only chart rule for the All display only; checklist 181 covers acceptance.
+
 ## 2026-10-29 - Finish Refresh Retraction And Hydrate The Existing App Chrome
 
 The final close uses a 360ms easing curve with zero initial/final velocity. Temporarily exclude the app content from browser scroll anchoring while the artificial gap is open/closing, keep the completed icon handoff attached, and clear success only after the gap's height transition ends, preserving any new finger already down. A 500ms fallback covers missing transition events (immediate cleanup with reduced motion). Native scroll/touch observers, 270px trigger and fixed controls remain intact; there are no scripted scroll corrections.

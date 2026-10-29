@@ -4,6 +4,10 @@ Last updated: 2026-10-29
 
 ## Goal
 
+### Category Mix All matches Spent — 2026-10-29
+
+The user found that All retained the old expense-only total after the card/modal started including Saved. Use one canonical display calculation for both, preserving expense metrics and sheet adjustments. Include cash savings in All with or without ESPP and invalidate the chart memo for headline-only changes; retain scoped filters and donor coverage. **4 focused / 2,758 full tests passed**, **557 optional PostgreSQL skipped**, clean types/build. **48 Chromium/WebKit mode cases passed** at 320/390px in both themes, with no API traffic; native acceptance is STATUS checklist 181. No Finance Ops backlog, financial lifecycle, sheet, schema or persistence change.
+
 ### Consistent report section footer spacing — 2026-10-29
 
 The user accepted refresh/startup and requested that section-ending controls match Category Mix's Categories spacing. Share its fluid edge gutter, retain padding on final sections, and place disclosure spacing inside clipped content rather than closed wrapper/grid gaps. Covers Daily Transactions, Expense Highlights View all, chart Details and Savings Archived goals, including desktop alignment. **4 focused / 2,758 full tests passed**, **557 optional PostgreSQL skipped**, clean types/build. **16 Chromium/WebKit geometry cases passed** across 320/390/768/1280px, both themes and repeated disclosure states; native acceptance is STATUS checklist 180. No Finance Ops backlog, financial operation, lifecycle or persistence changes.

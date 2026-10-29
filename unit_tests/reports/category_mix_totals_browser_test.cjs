@@ -1,0 +1,82 @@
+// Run after npm run build. Execute the shared report UI with isolated payloads.
+const assert=require('node:assert/strict'),fs=require('node:fs'),path=require('node:path'),{execFileSync}=require('node:child_process'),{createRequire}=require('node:module')
+const root=path.resolve(__dirname,'../..'),req=createRequire(path.join(root,'web/expense-report/package.json'))
+const {chromium,webkit}=process.env.BOOKIEBOT_PLAYWRIGHT_MODULE?require(process.env.BOOKIEBOT_PLAYWRIGHT_MODULE):req('playwright')
+const [plain,enrolled]=JSON.parse(execFileSync(process.env.BOOKIEBOT_TEST_PYTHON||'python',['-c',`
+import json
+from unit_tests.reports.test_income_projection import build,income_rows
+from unit_tests.reports.test_espp_tracking import plan_rows
+from bookiebot.reports.expense_breakdown import expense_breakdown_client_payload as payload
+print(json.dumps([payload(build(income_rows(('9/1/2026','Fixture income','5000')))),payload(build(plan_rows(('9/11/2026','xAI paycheck','3800'))))]))
+`],{cwd:root,env:{...process.env,PYTHONPATH:path.join(root,'src')}}).toString())
+const cases=[{name:'cash',base:plain,cash:1200,espp:[undefined,undefined],expected:[1875.50,1925.75]},
+  {name:'cash-espp',base:enrolled,cash:1200,espp:[400,600],expected:[2275.50,2525.75]},
+  {name:'zero-saved',base:plain,cash:0,espp:[undefined,undefined],expected:[675.50,725.75]}]
+for(const fixture of cases) {
+  fixture.report=JSON.parse(JSON.stringify(fixture.base))
+  for(const [i,mode] of ['current','projected'].entries()) {
+    const view=fixture.report.modeViews[mode],espp=fixture.espp[i]??0
+    view.metrics.totalExpenses=i?725.75:675.50 // Includes a real-world-style sheet adjustment beyond itemized rows.
+    view.metrics.amountSaved=fixture.cash+espp
+    view.metrics.monthlyIncome=5000+espp
+    view.categoryBudgets={needs:2000,wants:1000,savings:2000}
+    const remaining={needs:1500,wants:i?800:850,savings:2000-fixture.cash}
+    view.categoryBalances={raw:remaining,remaining,deficits:{needs:0,wants:0,savings:0},transfers:[],totalOverspend:0}
+    view.metrics.incomeAfterExpenses=view.metrics.monthlyIncome-view.metrics.totalExpenses-view.metrics.amountSaved
+    view.breakdown=[{key:'rent',label:'Rent',amount:500,percentage:0,color:'green'},{key:'food',label:'Food',amount:i?200:150,percentage:0,color:'orange'},
+      {key:'savings',label:'Legacy savings row',amount:999,percentage:0,color:'blue'}]
+    view.categorySpending={needs:500,wants:i?200:150,savings:fixture.cash}
+    if(view.savingsInvesting)Object.assign(view.savingsInvesting,{cashSaved:fixture.cash,esppContribution:espp,estimatedEsppContribution:i?200:0,combinedContributions:fixture.cash+espp})
+  }
+}
+const css=fs.readFileSync(path.join(root,'src/bookiebot/reports/assets/expense-report-app.css'),'utf8'),js=fs.readFileSync(path.join(root,'src/bookiebot/reports/assets/expense-report-app.js'),'utf8')
+const html=(report,dark)=>`<!doctype html><html data-theme="${dark?'dark':'light'}"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><style>${css}</style></head><body><div id="bookiebot-expense-report-root"></div><script>localStorage.setItem('bookiebot-expense-report-theme','${dark?'dark':'light'}')</script><script id="bookiebot-expense-report-data" type="application/json">${JSON.stringify(report)}</script><script type="module">${js}</script></body></html>`
+const money=value=>new Intl.NumberFormat('en-US',{style:'currency',currency:'USD'}).format(value)
+;(async()=>{
+  let count=0
+  for(const engine of [chromium,webkit]) {
+    const browser=await engine.launch({headless:true})
+    try {
+      for(const width of [320,390]) for(const dark of [false,true]) for(const fixture of cases) {
+        const page=await browser.newPage({viewport:{width,height:850},hasTouch:true,isMobile:true,reducedMotion:dark?'reduce':'no-preference'}),errors=[],requests=[]
+        page.on('pageerror',e=>errors.push(e.message))
+        await page.route('**/*',async route=>{
+          if(route.request().url()==='https://bookie.test/report')await route.fulfill({contentType:'text/html',body:html(fixture.report,dark)})
+          else {requests.push(route.request().url());await route.abort()}
+        })
+        await page.goto('https://bookie.test/report')
+        const category=page.locator('#bb-chart-category'),total=category.locator('.bb-chart-total')
+        const spentCard=page.locator('.bb-metric-card').filter({has:page.getByRole('button',{name:'Explain Spent',exact:true})}).locator('.bb-fitted-amount-text')
+        await page.getByRole('button',{name:'Show Category Mix',exact:true}).click()
+        for(const [i,mode] of ['Current','Projected'].entries()) {
+          await page.getByRole('button',{name:mode,exact:true}).click()
+          await category.getByRole('tab',{name:'All',exact:true}).click()
+          assert.equal(await total.innerText(),money(fixture.expected[i]),`${engine.name()} ${width} ${fixture.name} ${mode}: All includes Saved once and retains the canonical adjustment`)
+          assert.equal(await total.innerText(),await spentCard.innerText(),'All and the Spent card agree')
+          await page.getByRole('button',{name:'Explain Spent',exact:true}).click()
+          const dialog=page.getByRole('dialog')
+          await dialog.waitFor()
+          assert.equal(await dialog.locator('.bb-metric-explanation > .bb-chart-total').innerText(),money(fixture.expected[i]),'All, card and modal agree even with an older cached explanation')
+          if(fixture.name==='cash-espp'&&i===1)assert.ok((await dialog.innerText()).includes('Includes estimated ESPP'))
+          await page.keyboard.press('Escape');await page.waitForTimeout(350)
+          for(const [filter,expected] of [['Needs',500],['Wants',i?200:150],['Savings',fixture.cash+(fixture.espp[i]??0)]]) {
+            await category.getByRole('tab',{name:filter,exact:true}).click()
+            assert.equal(await total.innerText(),money(expected),`${filter} retains its own scoped total`)
+          }
+          await category.getByRole('tab',{name:'All',exact:true}).click()
+          await category.getByRole('button',{name:'Categories',exact:true}).click();await dialog.waitFor()
+          const labels=await dialog.locator('.bb-legend-row > span:nth-child(2)').allTextContents()
+          assert.equal(labels.filter(label=>label==='Saved'||label==='Cash saved').length,Number(fixture.cash>0),'Recorded cash appears once in All for enrolled and non-enrolled reports')
+          assert.equal(labels.some(label=>label.includes('ESPP')),Boolean(fixture.espp[i]))
+          await page.keyboard.press('Escape');await page.waitForTimeout(350)
+          assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth),false)
+          count++
+        }
+        assert.deepEqual(errors,[]);assert.deepEqual(requests,[],'The report test never contacts an app or financial service')
+        if(width===390&&dark&&fixture.name==='cash-espp')await page.screenshot({path:`/tmp/bookiebot-category-spent-${engine.name()}.png`,fullPage:true})
+        await page.close()
+      }
+    } finally {await browser.close()}
+  }
+  console.log(`${count} Chromium/WebKit Category Mix/Spent mode cases passed; no API traffic`)
+})().catch(error=>{console.error(error);process.exitCode=1})

@@ -10,7 +10,7 @@ const h = React.createElement
 global.IS_REACT_ACT_ENVIRONMENT = true
 const source = fs.readFileSync(process.argv[2] || 'web/expense-report/src/report-app.tsx', 'utf8')
 const file = ts.createSourceFile('report-app.tsx', source, ts.ScriptTarget.Latest, true, ts.ScriptKind.TSX)
-const names = new Set(['ExpenseReportApp', 'OverviewCharts', 'DailySpendingCard', 'ExpenseInsightsCard',
+const names = new Set(['reportSpentTotal', 'ExpenseReportApp', 'OverviewCharts', 'DailySpendingCard', 'ExpenseInsightsCard',
   'MemoizedBurnRateChart', 'MemoizedCalendarAnalyticsPanel', 'MemoizedBillsUtilitiesPanel', 'MemoizedExpenseInsightsCard'])
 const declarations = file.statements.filter(node => ts.isFunctionDeclaration(node) ? names.has(node.name?.text)
   : ts.isVariableStatement(node) && node.declarationList.declarations.some(item => names.has(item.name.getText(file))))
@@ -81,6 +81,7 @@ let renderer
 act(()=>{renderer=Renderer.create(h(App,{report,appSession}))})
 const spentCard=()=>renderer.root.findAllByType(runtime.MetricCard).find(card=>card.props.label==='Spent')
 assert.equal(spentCard().props.value,572,'Spent includes saved funds and the authoritative expense total, including sheet adjustments')
+assert.equal(renderer.root.findByType(CategoryMixChartLeaf).props.allSpentTotal,572,'Category Mix receives the same authoritative Current headline')
 act(()=>spentCard().props.onExplain())
 assert.equal(renderer.root.findByType(runtime.MetricExplanationDetails).props.detail.value,572,'The modal matches the card even with a cached expense-only explanation')
 assert.equal(renderer.root.findByType(runtime.MetricExplanationDetails).props.detail.view,view)
@@ -107,6 +108,7 @@ unchanged(before,['viewCalculation','activityCalculation','dailyCalculation','da
 act(()=>renderer.root.findByType(runtime.ReportHeader).props.onToggle())
 assert.equal(renderer.root.findAllByType(runtime.MetricCard)[0].props.value,6000)
 assert.equal(spentCard().props.value,772,'Projected Spent uses its own expense and Saved values')
+assert.equal(renderer.root.findByType(CategoryMixChartLeaf).props.allSpentTotal,772,'Category Mix receives the same Projected headline')
 act(()=>spentCard().props.onExplain())
 assert.equal(renderer.root.findByType(runtime.MetricExplanationDetails).props.detail.value,772)
 assert.equal(revisions.highlights,5);assert.equal(revisions.daily,5);assert.equal(revisions.category,5)

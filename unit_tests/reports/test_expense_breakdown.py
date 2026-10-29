@@ -1964,7 +1964,7 @@ def test_savings_minimum_rounds_ten_percent_of_income_directly(monkeypatch):
     assert savings["projectedMinimum"] == 323.89
 
 
-def test_report_frontend_keeps_saved_amount_actual_and_out_of_spending():
+def test_report_frontend_keeps_expense_metrics_separate_from_saved_headlines():
     source = (Path(__file__).resolve().parents[2] / "web/expense-report/src/report-app.tsx").read_text()
 
     assert "const savings = savingsForMode(report, projected)" in source
