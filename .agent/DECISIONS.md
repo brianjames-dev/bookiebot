@@ -1,5 +1,9 @@
 # Agent Decisions
 
+## 2026-10-29 - Pull The Brand And Ease Refresh Into Success
+
+At the user's request, place refresh's in-flow space before the masthead so the title/avatar and page content move together; the fixed header tools mirror the same offset. Use one larger, icon-only refresh control with accessible names/status. Release retracts the page to a 64px hold while the loading ring rotates until all active-page refresh handlers finish. Success fades the spinning ring into a drawn/scaled checkmark, retains that glyph during final retraction, then returns to idle. Failure uses a distinct error icon and retains existing controller errors. Use explicit start/end rotation keyframes: the WebKit frame regression found that a one-sided full turn stayed visually frozen. Reduced motion disables spin/transitions. This supersedes checklist 173's visible labels and fixed-brand/tools presentation; request scope, thresholds, drafts and financial recovery semantics stay the same.
+
 ## 2026-10-29 - Keep Navigation Selection Bubbles Uniform
 
 The user clarified that selected-tab bubbles must share dimensions. Supersede the per-label sizing below: measure all visible stacks, use one capsule sized for the largest stack and constrain it consistently to the glass edges. Center it on each actual button, retaining fractional bounds and touch-scale normalization. Expanded end insets give the first/last capsule room; compact tabs share one icon-sized circle. Keep label-aware target widths, content/host observation, pointer/keyboard behavior and guarded routing. Only the selection position changes when selecting another tab; responsive/compact layout changes may resize the common capsule.

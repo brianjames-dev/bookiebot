@@ -16,7 +16,7 @@ const eventHost = name => ({
   removeEventListener(type) { listeners.delete(`${name}:${type}`) },
 })
 const win = {...eventHost('window'), scrollY: 0, getComputedStyle: element => ({overflowY:element.scrollable ? 'auto' : 'visible'}),
-  setTimeout(callback) { const id = ++serial; timers.set(id,callback); return id }, clearTimeout(id) { timers.delete(id) },
+  setTimeout(callback,delay) { const id = ++serial; timers.set(id,{callback,delay}); return id }, clearTimeout(id) { timers.delete(id) },
 }
 const doc = {...eventHost('document'), body: new Element(), querySelector: () => modal ? {} : null,
   documentElement: {dataset:{}, classList:{add:name=>classes.add(name),remove:name=>classes.delete(name)}},
@@ -97,9 +97,18 @@ const settle = async () => {await act(async()=>{await Promise.resolve();await Pr
   start();move({y:200});await release({y:200});assert.equal(calls.filter(call=>call==='overview').length,1)
   act(()=>renderer.update(fixture()));pending=true
   start();move({y:200});await release({y:200});assert.equal(phase(),'refreshing')
+  assert.equal(renderer.root.findByProps({className:'bb-pull-refresh-space'}).props.style.height,64,'Release reverses to the loading hold distance')
+  assert.equal(renderer.root.findAllByProps({className:'bb-pull-refresh-label'}).length,0,'The refresh control is icon-only')
+  const check=renderer.root.findByProps({className:'bb-pull-check'}),checkPath=check.props.d
   start();move({y:200});await release({y:200})
   assert.equal(calls.filter(call=>call==='overview').length,2,'In-flight refresh cannot be duplicated')
   pending=false;await act(async()=>finish());await settle();assert.equal(phase(),'done')
+  assert.equal(renderer.root.findByProps({className:'bb-pull-check'}).props.d,checkPath,'The checkmark is retained for an animated reveal')
+  act(()=>{for(const [id,timer] of [...timers])if(timer.delay===900){timers.delete(id);timer.callback()}})
+  assert.equal(phase(),'settling');assert.equal(renderer.root.findByProps({className:'bb-pull-refresh-space'}).props.style.height,0)
+  assert.equal(renderer.root.findByProps({className:'bb-pull-check'}).props.d,checkPath,'Retraction keeps the successful icon instead of swapping back to an arrow')
+  act(()=>{for(const [id,timer] of [...timers])if(timer.delay===320){timers.delete(id);timer.callback()}})
+  assert.equal(phase(),'idle')
   failure=true;await act(async()=>renderer.root.findByType('button').props.onClick());await settle();assert.equal(phase(),'error')
   assert.ok(renderer.root.findByProps({role:'status'}).children.join('').includes('Couldn’t refresh Overview'))
   failure=false;await act(async()=>renderer.root.findByType('button').props.onClick());await settle();assert.equal(phase(),'done','Common keyboard/button path recovers from failure')

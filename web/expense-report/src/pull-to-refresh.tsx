@@ -1,12 +1,13 @@
-import { useEffect, useRef, useState, useSyncExternalStore, type CSSProperties } from "react"
+import { useEffect, useLayoutEffect, useRef, useState, useSyncExternalStore, type CSSProperties } from "react"
 import { screenTitles, type AppScreen } from "./app-navigation"
 import { usePageRefreshRegistry } from "./page-refresh"
 import "./pull-to-refresh.css"
 
 // Finger travel is resisted; 144px of downward travel fills the 72px indicator.
 export const PULL_REFRESH_THRESHOLD = 72
+const PULL_REFRESH_HOLD = 64
 export function pullRefreshDistance(travel: number) { return Math.min(96, Math.max(0, travel) / 2) }
-type Phase = "idle" | "pulling" | "armed" | "refreshing" | "done" | "error"
+type Phase = "idle" | "pulling" | "armed" | "refreshing" | "done" | "settling" | "error"
 type Gesture = { x: number; y: number; identifier: number; captured: boolean }
 
 function pageIsBlocked() {
@@ -32,6 +33,7 @@ export function PullToRefresh({ screen, blocked = false }: { screen: AppScreen; 
   const state = useRef({ screen, blocked }), gesture = useRef<Gesture | null>(null), pulled = useRef(0)
   const running = useRef(false), mounted = useRef(false), timer = useRef<number | undefined>(undefined)
   const refreshScreen = useRef<AppScreen | null>(null)
+  const spacer = useRef<HTMLDivElement>(null)
   state.current = { screen, blocked }
   const available = !blocked && registry.available(screen)
   const reset = () => { gesture.current = null; pulled.current = 0; setDistance(0); if (!running.current) setPhase("idle") }
@@ -39,14 +41,19 @@ export function PullToRefresh({ screen, blocked = false }: { screen: AppScreen; 
     const selected = state.current.screen
     if (running.current || state.current.blocked || pageIsBlocked() || !registry.available(selected)) return
     running.current = true; refreshScreen.current = selected; window.clearTimeout(timer.current)
-    gesture.current = null; pulled.current = 0; setDistance(PULL_REFRESH_THRESHOLD); setPhase("refreshing"); setMessage("")
+    gesture.current = null; pulled.current = 0; setDistance(PULL_REFRESH_HOLD); setPhase("refreshing"); setMessage("")
     const success = await registry.refresh(selected)
     running.current = false
     if (!mounted.current) return
     if (state.current.screen !== selected) { reset(); return }
     setPhase(success ? "done" : "error")
     setMessage(success ? `${screenTitles[selected]} refreshed` : `Couldn’t refresh ${screenTitles[selected]}. Pull down to try again.`)
-    timer.current = window.setTimeout(reset, success ? 900 : 4000)
+    timer.current = window.setTimeout(() => {
+      if (!success) { reset(); return }
+      // Keep the successful glyph while the page and indicator ease home.
+      setDistance(0); setPhase("settling")
+      timer.current = window.setTimeout(reset, 320)
+    }, success ? 900 : 4000)
   }
   const actions = useRef({ reset, refresh }); actions.current = { reset, refresh }
 
@@ -103,17 +110,32 @@ export function PullToRefresh({ screen, blocked = false }: { screen: AppScreen; 
   useEffect(() => { window.clearTimeout(timer.current); gesture.current = null; pulled.current = 0; setDistance(0); setMessage(""); if (!running.current) setPhase("idle") }, [screen, blocked])
 
   const visible = !blocked && (phase !== "refreshing" || refreshScreen.current === screen) && (distance > 0 || phase === "refreshing" || phase === "done" || phase === "error")
+  const offset = visible ? Math.min(distance, PULL_REFRESH_THRESHOLD) : 0
+  useLayoutEffect(() => {
+    const shell = spacer.current?.closest<HTMLElement>(".bb-app-shell")
+    if (!shell) return
+    // Fixed header tools follow the same offset as the in-flow brand/content.
+    shell.style.setProperty("--bb-pull-offset", `${offset}px`)
+    shell.dataset.pullPhase = phase
+  }, [offset, phase])
+  useLayoutEffect(() => () => {
+    const shell = spacer.current?.closest<HTMLElement>(".bb-app-shell")
+    shell?.style.removeProperty("--bb-pull-offset")
+    if (shell) delete shell.dataset.pullPhase
+  }, [])
   const progress = Math.round(Math.min(1, distance / PULL_REFRESH_THRESHOLD) * 100)
-  const label = phase === "refreshing" ? "Refreshing…" : phase === "armed" ? "Release to refresh" : phase === "done" ? "Updated" : phase === "error" ? "Try again" : "Pull down to refresh"
   return <>
-    <div className="bb-pull-refresh-space" data-phase={phase} aria-hidden="true" style={{ height: visible ? Math.min(distance, PULL_REFRESH_THRESHOLD) : 0 }} />
-    <div className="bb-pull-refresh" data-phase={phase} data-visible={visible} style={{ "--bb-pull-distance": `${Math.min(distance, PULL_REFRESH_THRESHOLD)}px` } as CSSProperties}>
-    <button type="button" className="bb-pull-refresh-button" aria-label={`Refresh ${screenTitles[screen]}`} disabled={!available || running.current}
+    <div ref={spacer} className="bb-pull-refresh-space" data-phase={phase} aria-hidden="true" style={{ height: offset }} />
+    <div className="bb-pull-refresh" data-phase={phase} data-visible={visible} style={{ "--bb-pull-distance": `${offset}px` } as CSSProperties}>
+    <button type="button" className="bb-pull-refresh-button" aria-label={`Refresh ${screenTitles[screen]}`} title={`Refresh ${screenTitles[screen]}`} disabled={!available || running.current}
       aria-busy={phase === "refreshing"} onClick={() => void refresh()}>
-      <svg viewBox="0 0 32 32" aria-hidden="true"><circle className="bb-pull-track" cx="16" cy="16" r="12" />
+      <span className="bb-pull-spinner" aria-hidden="true"><svg viewBox="0 0 32 32">
         <circle className="bb-pull-progress" cx="16" cy="16" r="12" pathLength="100" strokeDasharray="100" strokeDashoffset={100 - progress} />
-        <path className="bb-pull-arrow" d={phase === "done" ? "m11 16 3.5 3.5L22 12" : "M16 10v12m-5-5 5 5 5-5"} /></svg>
-      <span className="bb-pull-refresh-label">{label}</span>
+      </svg></span>
+      <svg className="bb-pull-glyph" viewBox="0 0 32 32" aria-hidden="true"><circle className="bb-pull-track" cx="16" cy="16" r="12" />
+        <path className="bb-pull-arrow" d="M16 10v12m-5-5 5 5 5-5" />
+        <path className="bb-pull-check" d="m9 16 5 5 9-10" pathLength="1" />
+        <path className="bb-pull-error" d="m11 11 10 10m0-10L11 21" /></svg>
     </button>
     {(phase === "pulling" || phase === "armed") && <span className="sr-only" role="progressbar" aria-label="Pull to refresh" aria-valuemin={0} aria-valuemax={100} aria-valuenow={progress} />}
     <span className="sr-only" role="status" aria-live="polite">{phase === "armed" ? "Release to refresh" : phase === "refreshing" ? `Refreshing ${screenTitles[refreshScreen.current ?? screen]}` : message}</span>

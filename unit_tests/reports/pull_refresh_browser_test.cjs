@@ -15,8 +15,8 @@ const css=fs.readFileSync(path.join(root,'src/bookiebot/reports/assets/expense-r
 const js=fs.readFileSync(path.join(root,'src/bookiebot/reports/assets/expense-report-app.js'),'utf8')
 const html=dark=>`<!doctype html><html data-theme="${dark?'dark':'light'}"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><style>${css}</style></head><body><div id="bookiebot-expense-report-root"></div><script id="bookiebot-expense-app-config" type="application/json">${JSON.stringify({ownerName:'Brian',reportUrl:'/app/expenses/data',logoutUrl:'/app/logout'})}</script><script>localStorage.setItem('bookiebot-expense-report-theme','${dark?'dark':'light'}')</script><script type="module">${js}</script></body></html>`
 const screens={Overview:'/app/expenses/data',Transactions:'/app/transactions',Shared:'/app/reimbursements',Savings:'/app/goals',Reconcile:'/app/reconciliation',Settings:'/app/widgets/settings'}
-async function gesture(page,end=245,{start=80,x=16,cancel=false}={}) {
-  await page.evaluate(({start,end,x,cancel})=>{
+async function gesture(page,end=245,{start=80,x=16,cancel=false,finish=true}={}) {
+  await page.evaluate(({start,end,x,cancel,finish})=>{
     const target=document.querySelector('.bb-shell-masthead')
     const touch=y=>({identifier:71,target,clientX:x,clientY:y,pageX:x,pageY:y})
     const fire=(type,y)=>{
@@ -24,8 +24,8 @@ async function gesture(page,end=245,{start=80,x=16,cancel=false}={}) {
       Object.defineProperties(event,{touches:{value:type==='touchend'||type==='touchcancel'?[]:[touch(y)]},changedTouches:{value:[touch(y)]}})
       return target.dispatchEvent(event)
     }
-    fire('touchstart',start);fire('touchmove',end);fire(cancel?'touchcancel':'touchend',end)
-  },{start,end,x,cancel})
+    fire('touchstart',start);fire('touchmove',end);if(finish)fire(cancel?'touchcancel':'touchend',end)
+  },{start,end,x,cancel,finish})
 }
 async function waitReady(page,label) {
   await page.waitForFunction(label=>document.querySelector(`button[aria-label="Refresh ${label}"]`)?.disabled===false,label)
@@ -40,7 +40,7 @@ async function waitReady(page,label) {
         // Push permission/service-worker setup has its own tests. This fixture
         // verifies settings reads and unsaved preferences without enabling push.
         await page.addInitScript(()=>{delete window.PushManager})
-        const requests=[],errors=[];let failedCheck=false,reportNumber=0
+        const requests=[],errors=[];let failedCheck=false,reportNumber=0,holdCheck=false,releaseCheck
         page.on('pageerror',error=>errors.push(error.message))
         await page.route('**/*',async route=>{
           const request=route.request(),url=new URL(request.url()),name=url.pathname,body=request.postDataJSON()
@@ -51,6 +51,7 @@ async function waitReady(page,label) {
           let value
           if(name==='/app/expenses/data')value={...report,generatedAt:new Date(Date.now()+ ++reportNumber*1000).toISOString()}
           else if(name==='/app/reconciliation') {
+            if(body?.operation==='check'&&holdCheck)await new Promise(resolve=>{releaseCheck=resolve})
             if(body?.operation==='check'&&failedCheck){failedCheck=false;await route.fulfill({status:500,json:{error:'Fixture offline'}});return}
             value={enabled:true,checkedAt:'2026-10-29T07:00:00Z',items:[]}
           } else if(name==='/app/reimbursements') value={enabled:true,ownerKey:'brian',currency:'USD',allocations:[],events:[],resets:[],resetState:'fixture'}
@@ -104,15 +105,52 @@ async function waitReady(page,label) {
         await page.waitForFunction(()=>document.querySelector('.bb-pull-refresh')?.dataset.phase==='done')
         assert.equal(requests.filter(r=>r.name==='/app/reconciliation').at(-1).method,'GET','Uncertain checks refresh status without repeating the bank command')
         // Real browser touch input validates native capture and prevention too.
-        if(engine===chromium&&width===390&&!dark) {
-          const cdp=await page.context().newCDPSession(page),before=requests.filter(r=>r.name==='/app/reconciliation').length
-          await cdp.send('Input.dispatchTouchEvent',{type:'touchStart',touchPoints:[{x:16,y:78}]})
-          for(const y of [100,135,175,220,260])await cdp.send('Input.dispatchTouchEvent',{type:'touchMove',touchPoints:[{x:16,y}]})
+        if(width===390&&!dark) {
+          await page.waitForFunction(()=>document.querySelector('.bb-pull-refresh')?.dataset.phase==='idle'&&document.querySelector('.bb-pull-refresh-space').getBoundingClientRect().height<.1)
+          const geometry=()=>page.evaluate(()=>Object.fromEntries(['.bb-wordmark','.bb-app-avatar','.bb-shell-header-actions','#bb-reconcile-title'].map(selector=>[selector,document.querySelector(selector).getBoundingClientRect().top])))
+          const original=await geometry()
+          holdCheck=true
+          const cdp=engine===chromium ? await page.context().newCDPSession(page) : null,before=requests.filter(r=>r.name==='/app/reconciliation').length
+          if(cdp) {
+            await cdp.send('Input.dispatchTouchEvent',{type:'touchStart',touchPoints:[{x:16,y:78}]})
+            for(const y of [100,135,175,220,260])await cdp.send('Input.dispatchTouchEvent',{type:'touchMove',touchPoints:[{x:16,y}]})
+          } else await gesture(page,260,{start:78,finish:false})
           assert.equal(await page.locator('.bb-pull-refresh').getAttribute('data-phase'),'armed')
+          const pulled=await geometry()
+          for(const selector in original)assert.ok(Math.abs(pulled[selector]-original[selector]-72)<.5,`${selector} must follow the whole-page pull`)
+          assert.equal(await page.locator('.bb-pull-refresh-label').count(),0,'There is no visible label')
           assert.ok(await page.evaluate(()=>document.querySelector('#bb-reconcile-title').getBoundingClientRect().top>document.querySelector('.bb-pull-refresh').getBoundingClientRect().bottom),'The pull indicator must not cover the heading')
           await page.screenshot({path:'/tmp/bookiebot-pull-refresh-armed.png'})
-          await cdp.send('Input.dispatchTouchEvent',{type:'touchEnd',touchPoints:[]})
+          if(cdp)await cdp.send('Input.dispatchTouchEvent',{type:'touchEnd',touchPoints:[]})
+          else await page.evaluate(()=>{
+            const event=new Event('touchend',{bubbles:true,cancelable:true})
+            Object.defineProperties(event,{touches:{value:[]},changedTouches:{value:[{identifier:71,clientY:260,clientX:16}]}})
+            document.querySelector('.bb-shell-masthead').dispatchEvent(event)
+          })
+          await page.waitForFunction(()=>document.querySelector('.bb-pull-refresh')?.dataset.phase==='refreshing')
+          await page.waitForTimeout(350)
+          const held=await geometry()
+          for(const selector in original)assert.ok(Math.abs(held[selector]-original[selector]-64)<.5,`${selector} must retract with the loading indicator`)
+          const spinner=page.locator('.bb-pull-spinner')
+          const first=await spinner.evaluate(node=>({transform:getComputedStyle(node).transform,animation:getComputedStyle(node).animationName}))
+          await page.waitForTimeout(100)
+          const second=await spinner.evaluate(node=>getComputedStyle(node).transform)
+          assert.equal(first.animation,'bb-pull-spin');assert.notEqual(first.transform,second,'Loading must animate while the response is pending')
+          assert.equal(await page.locator('.bb-pull-glyph').evaluate(node=>node.getBoundingClientRect().width),44,'Larger refresh icon')
+          await page.screenshot({path:'/tmp/bookiebot-pull-refresh-loading.png'})
+          while(!releaseCheck)await page.waitForTimeout(10)
+          holdCheck=false;releaseCheck()
           await page.waitForFunction(()=>document.querySelector('.bb-pull-refresh')?.dataset.phase==='done')
+          await page.waitForTimeout(80)
+          const revealing=await page.locator('.bb-pull-check').evaluate(node=>Number(getComputedStyle(node).opacity))
+          assert.ok(revealing>0&&revealing<1,'The checkmark must ease into view')
+          await page.waitForTimeout(280)
+          assert.equal(await page.locator('.bb-pull-check').evaluate(node=>Number(getComputedStyle(node).opacity)),1)
+          assert.equal(await page.locator('.bb-pull-progress').evaluate(node=>Number(getComputedStyle(node).opacity)),0)
+          await page.screenshot({path:'/tmp/bookiebot-pull-refresh-success.png'})
+          await page.waitForFunction(()=>document.querySelector('.bb-pull-refresh')?.dataset.phase==='settling')
+          assert.equal(await page.locator('.bb-pull-check').evaluate(node=>Number(getComputedStyle(node).opacity)),1,'The checkmark stays during the final retraction')
+          await page.waitForFunction(()=>document.querySelector('.bb-pull-refresh')?.dataset.phase==='idle')
           assert.equal(requests.filter(r=>r.name==='/app/reconciliation').length,before+1)
           assert.equal(await page.evaluate(()=>scrollY),0,'The gesture must not reload/navigate or scroll the document')
         }

@@ -4,6 +4,10 @@ Last updated: 2026-10-28
 
 ## Goal
 
+### Pull-refresh header and completion motion — 2026-10-29
+
+Presentation follow-up requested by the user: pull the title/avatar/top controls with content, use a larger icon without visible labels, keep loading active during release retraction until completion, and ease into a checkmark retained through final settling. Existing per-page refresh, financial guards/recovery, drafts and backlog scope are unchanged. Executed gesture/settling and browser geometry/spin/transition regressions added; verification/native acceptance is STATUS checklist 174. No production financial test writes.
+
 ### Unified active-page refresh — 2026-10-29
 
 Implemented the user's shared top-edge pull gesture across all six app pages. Refresh dispatch preserves each controller's filters, drafts and financial guards. Reconcile pulls perform the existing bank check, with read-only status recovery after uncertainty; matched-payment views refresh their ledger instead. Shared pulls retain existing pending-projection recovery, and Transactions requests fresh filtered rows. Savings/Settings wait for their respective combined reads. Threshold release, cancel/retreat, direction, inner-scroll/modal, single-flight and failure behavior share one indicator; routine app buttons are replaced with common keyboard/desktop access. No financial lifecycle/schema change and no backlog reprioritization beyond this requested UI slice. Verification and phone acceptance are in STATUS checklist 173; all financial browser traffic uses isolated fixtures.

@@ -180,6 +180,7 @@ function ExpenseAppShellContent({ report, controls, monthControl, comparison, av
   const scopedSourceRequest = sourceRequest?.scope === expenseReportIdentity(report) ? sourceRequest : null
   return <AppNavigationContext.Provider value={{ screen, selectScreen, preferences, sourceRequest: scopedSourceRequest, consumeSource }}>
     <div className="bb-page bb-app-shell k-ios" data-screen={screen} data-keyboard-open={keyboardOpen}>
+      <PullToRefresh screen={screen} blocked={signingOut || askOpen || keyboardOpen || widgetGuideOpen} />
       <header className="bb-masthead bb-shell-masthead">
         <span className="bb-wordmark"><img className="bb-app-avatar" src={avatarUrl} alt="" />BookieBot<span className="bb-report-owner"><span aria-hidden="true">•</span>{" "}{report.ownerName}</span></span>
         <Toolbar top className="bb-shell-header-actions" role="group" aria-label="BookieBot tools" innerClassName="bb-shell-toolbar-inner">
@@ -192,7 +193,6 @@ function ExpenseAppShellContent({ report, controls, monthControl, comparison, av
         </Toolbar>
       </header>
 
-      <PullToRefresh screen={screen} blocked={signingOut || askOpen || keyboardOpen || widgetGuideOpen} />
 
       <div className="bb-shell-report" hidden={!reportVisible || !monthlyReady}>
         <ExpenseReportApp key={expenseReportIdentity(report)} report={report} appControls={controls} appMonthControl={monthControl}
