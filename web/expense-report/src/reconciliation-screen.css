@@ -75,3 +75,7 @@
 .bb-reconcile-receipt-amounts > div { display: flex; justify-content: space-between; gap: 16px; margin: 8px 0; }
 .bb-reconcile-receipt-amounts dd { margin: 0; font-variant-numeric: tabular-nums; white-space: nowrap; }
 .bb-reconcile-receipt .bb-reconcile-primary { color: hsl(var(--primary-foreground)); }
+.bb-reconcile-share-review { margin: 16px 0; display: grid; gap: 14px; }
+.bb-reconcile-share-review > div { display: grid; gap: 4px; }
+.bb-reconcile-share-review dt { font-size: .85rem; opacity: .72; }
+.bb-reconcile-share-review dd { margin: 0; font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }

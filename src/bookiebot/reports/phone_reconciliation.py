@@ -72,6 +72,10 @@ class ReviewConflict(ValueError):
     pass
 
 
+class ReviewRejected(ReviewConflict):
+    """A preflight rejection with no financial mutation attempted."""
+
+
 class ReviewValidation(ValueError):
     pass
 
@@ -190,6 +194,7 @@ def detail(service: BankingService, owner: str, actor: str, review_id: int, *, f
     transaction, item = _find(service, owner, review_id)
     row = _recovery_controls(service, owner, _row(transaction, item))
     candidates: list[ActionLogCandidate] = []
+    actions: list[Any] = []
     if row["status"] in {"needs_review", "pending"} and not row["readOnly"]:
         actions = _review_actions(service, owner, actor, fresh=fresh)
         if item is not None:
@@ -208,6 +213,20 @@ def detail(service: BankingService, owner: str, actor: str, review_id: int, *, f
                 transaction, pulls, limit=4, action_log=actions,
             )
     row["suggestions"] = [_suggestion(candidate, transaction) for candidate in candidates]
+    if item is not None and candidates:
+        from bookiebot.banking.shared_amounts import shared_amount_review
+        from bookiebot.reimbursements.store import ReimbursementConflictError, ReimbursementNotFoundError, ReimbursementValidationError
+        by_id = {logged.id: logged for logged in actions}
+        for suggestion in row["suggestions"]:
+            logged = by_id.get(suggestion["id"])
+            if logged is None:
+                continue
+            try:
+                plan = shared_amount_review(owner, logged, round(abs(transaction.amount) * 100), item.id)
+                if plan:
+                    suggestion["sharedAmount"] = plan
+            except (ReimbursementConflictError, ReimbursementNotFoundError, ReimbursementValidationError) as exc:
+                suggestion["sharedAmount"] = {"blocked": str(exc)}
     row["suggestions"].sort(key=lambda entry: entry["confidence"], reverse=True)
     receipt = _receipt_link(owner, actor, item)
     if receipt:
@@ -228,7 +247,7 @@ def detail(service: BankingService, owner: str, actor: str, review_id: int, *, f
     # while they ran (including a pending transaction that has since posted).
     current_transaction, current_item = _find(service, owner, review_id)
     if _version(current_transaction, current_item) != _version(transaction, item):
-        raise ReviewConflict("This transaction changed. Check again.")
+        raise ReviewRejected("This transaction changed. Check again.")
     return row, candidates, transaction, item
 
 
@@ -263,10 +282,10 @@ def command(service: BankingService, owner: str, actor: str, body: dict) -> dict
     transaction, item = _find(service, owner, review_id)
     if operation == 'recover_schedule':
         if item is None or expected != _version(transaction, item) or item.status != 'import_requested':
-            raise ReviewConflict('This payment changed. Check status before verifying it.')
+            raise ReviewRejected('This payment changed. Check status before verifying it.')
         saved = service.store.get_import_operation(owner, item.id)
         if saved is None or saved.kind != 'schedule_adjustment':
-            raise ReviewConflict('No scheduled payment change is awaiting verification.')
+            raise ReviewRejected('No scheduled payment change is awaiting verification.')
         result = recover_schedule_change(service.store, saved)
         _invalidate_review_actions(service, owner, actor)
         clear_schedule_source_cache(actor)
@@ -274,15 +293,15 @@ def command(service: BankingService, owner: str, actor: str, body: dict) -> dict
             raise ReviewConflict('The saved amounts or payment history need inspection. No write was retried.')
         return _command_snapshot(service, owner, actor, review_id)
     if item is None or transaction.pending or item.status == "import_requested":
-        raise ReviewConflict("This transaction cannot be changed yet. Check again.")
+        raise ReviewRejected("This transaction cannot be changed yet. Check again.")
     if operation != "reopen" and item.status in {"confirmed", "ignored"}:
-        raise ReviewConflict("This transaction was already reviewed in the app or Discord. Check status to see the current decision.")
+        raise ReviewRejected("This transaction was already reviewed in the app or Discord. Check status to see the current decision.")
     action_id = sheet_ref = None
     if operation == 'log':
         if (transaction.date or transaction.authorized_date or '')[:7] != now_pacific().strftime('%Y-%m'):
-            raise ReviewConflict('Adding bank transactions is supported for the current month. Match an existing sheet entry instead.')
+            raise ReviewRejected('Adding bank transactions is supported for the current month. Match an existing sheet entry instead.')
         if expected != _version(transaction, item):
-            raise ReviewConflict('This transaction changed. Review it again.')
+            raise ReviewRejected('This transaction changed. Review it again.')
         fields = body.get('fields')
         kind = 'income' if transaction.amount < 0 else 'expense'
         allowed = {'source', 'label'} if kind == 'income' else {'category', 'item', 'location', 'person'}
@@ -312,10 +331,10 @@ def command(service: BankingService, owner: str, actor: str, body: dict) -> dict
         clear_schedule_source_cache(actor)
         row, candidates, transaction, item = detail(service, owner, actor, review_id, fresh=True)
         if item is None or expected != row["version"] or row["status"] != "needs_review":
-            raise ReviewConflict("This transaction or its suggestion changed. Review it again.")
+            raise ReviewRejected("This transaction or its suggestion changed. Review it again.")
         candidate = next((entry for entry in candidates if entry.action_id == body.get("suggestionId")), None)
         if candidate is None:
-            raise ReviewConflict("That suggestion is no longer available. Check again.")
+            raise ReviewRejected("That suggestion is no longer available. Check again.")
         if operation == 'update_schedule':
             fingerprint = body.get('scheduleVersion')
             update_future = body.get('updateFuture', False)
@@ -332,16 +351,33 @@ def command(service: BankingService, owner: str, actor: str, body: dict) -> dict
                 raise ReviewConflict(result.message)
             return _command_snapshot(service, owner, actor, review_id)
         mismatch = round(candidate.amount * 100) != round(abs(transaction.amount) * 100)
+        shared = next(entry for entry in row['suggestions'] if entry['id'] == candidate.action_id).get('sharedAmount')
+        if shared and shared.get('blocked'):
+            raise ReviewRejected(shared['blocked'])
+        recovery = bool(shared and shared.get('recovery'))
+        if shared and (mismatch or recovery) and (operation != 'update_match' or body.get('sharedAmountToken') != shared['token']):
+            raise ReviewRejected('Review the revised shares and received amount before confirming.')
         if not candidate.amount_recorded or (mismatch and operation != 'update_match'):
-            raise ReviewConflict("Review the amount change before matching this entry.")
+            raise ReviewRejected("Review the amount change before matching this entry.")
         if operation == 'update_match':
-            if candidate.action_type == 'schedule' or not mismatch:
-                raise ReviewConflict('Choose a recorded expense or income with a different amount.')
+            if candidate.action_type == 'schedule' or not (mismatch or recovery):
+                raise ReviewRejected('Choose a recorded expense or income with a different amount.')
+            kwargs = {'shared_amount_token': shared['token']} if shared else {}
             _, _, status = service.confirm_reconciliation_action_match(owner, item.id, actor_key=actor,
-                action_id=candidate.action_id, expected_item=item, expected_candidate=candidate)
+                action_id=candidate.action_id, expected_item=item, expected_candidate=candidate, **kwargs)
             _invalidate_review_actions(service, owner, actor)
             clear_schedule_source_cache(actor)
             if status != 'matched_updated':
+                logger.warning('Phone amount correction did not complete', extra={
+                    'reconciliation_id': item.id, 'action_id': candidate.action_id, 'correction_status': status,
+                })
+                if status.startswith('shared_rejected: '):
+                    raise ReviewRejected(status.removeprefix('shared_rejected: '))
+                if status == 'shared_projection_pending':
+                    raise ReviewConflict('The amount correction is saved; sheet syncing is pending. Check status, then resume the saved correction. No additional repayment was recorded.')
+                if status in {'not_found', 'not_unresolved', 'changed', 'pending_transaction', 'already_matched',
+                              'action_not_found', 'action_not_reconcilable', 'candidate_changed', 'match_unavailable'}:
+                    raise ReviewRejected('This entry changed or is already linked. Review the refreshed suggestions; no amount was changed.')
                 raise ReviewConflict('Could not safely update this entry. Check status and review it again.')
             return _command_snapshot(service, owner, actor, review_id)
         sheet_ref = candidate.sheet_ref
@@ -351,7 +387,7 @@ def command(service: BankingService, owner: str, actor: str, body: dict) -> dict
         # financial values or trusting a candidate supplied by the phone.
         row, _, transaction, item = detail(service, owner, actor, review_id)
         if expected != row["version"] or item is None:
-            raise ReviewConflict("This transaction changed. Review it again.")
+            raise ReviewRejected("This transaction changed. Review it again.")
     assert item is not None
     applied = service.store.apply_reconciliation_review(
         owner, item.id, action=cast(Literal["confirm", "ignore", "reopen"], operation), expected_status=item.status,
@@ -362,8 +398,8 @@ def command(service: BankingService, owner: str, actor: str, body: dict) -> dict
     if applied is None:
         current = service.get_reconciliation_item(owner, item.id)
         if operation == 'confirm' and current == item:
-            raise ReviewConflict("That row is already linked or no longer eligible. Check status or choose another suggestion.")
-        raise ReviewConflict("This transaction was already changed. Check again.")
+            raise ReviewRejected("That row is already linked or no longer eligible. Check status or choose another suggestion.")
+        raise ReviewRejected("This transaction was already changed. Check again.")
     return _command_snapshot(service, owner, actor, review_id)
 
 
@@ -376,10 +412,10 @@ def schedule_preview(service: BankingService, owner: str, actor: str, review_id:
     clear_schedule_source_cache(actor)
     row, candidates, _, item = detail(service, owner, actor, review_id, fresh=True)
     if item is None or row['version'] != expected:
-        raise ReviewConflict('This payment changed. Refresh its suggestions before reviewing the amount.')
+        raise ReviewRejected('This payment changed. Refresh its suggestions before reviewing the amount.')
     candidate = next((entry for entry in candidates if entry.action_id == suggestion_id), None)
     if candidate is None:
-        raise ReviewConflict('This scheduled payment is no longer available.')
+        raise ReviewRejected('This scheduled payment is no longer available.')
     plan = prepare_schedule_change(owner, actor, item, candidate, update_future=future == '1', split_method=split_method)
     return {'change': {**public_schedule_change(plan), 'version': row['version']}}
 
@@ -465,12 +501,14 @@ async def _review(request: web.Request) -> web.Response:
             if connection['needsReconnect']:
                 connection['reconnectUrl'] = bank_reconnect_url(session.actor_key, session.owner_key, connection['id'])
         return _json(result)
+    except ReviewRejected as exc:
+        return _json({"error": str(exc), "outcome": "not_applied"}, status=409)
     except (ReviewConflict, ScheduleChangeConflict) as exc:
         return _json({"error": str(exc)}, status=409)
     except ReviewNotFound:
-        return _json({"error": "This transaction is no longer available. Check again."}, status=404)
+        return _json({"error": "This transaction is no longer available. Check again.", "outcome": "not_applied"}, status=404)
     except ReviewValidation:
-        return _json({"error": "Invalid review request. Check again."}, status=400)
+        return _json({"error": "Invalid review request. Check again.", "outcome": "not_applied"}, status=400)
     except Exception:
         logger.exception("Phone reconciliation is temporarily unavailable")
         return _json({"error": "Couldn't finish checking. Check status before trying again."}, status=503)

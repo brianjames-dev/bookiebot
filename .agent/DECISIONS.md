@@ -1,5 +1,14 @@
 # Agent Decisions
 
+## 2026-10-28 - Review Bank Total Corrections While Retaining Confirmed Receipts
+
+The user explicitly selected preserving already received money when correcting a shared purchase to its bank total. Add a narrow `bank_amount` canonical revision through Reconcile, with full old/new amount, saved split method, both revised shares, received amount and remaining debt shown before confirmation. Bind approval to the owner, allocation/version, bank review ID, target gross and calculated shares/received balance. Revalidate under the household lock after bank claim/version checks. Ordinary Update/Move/Split/Delete/Undo repayment guards remain; this supersedes only their prior application to this explicit bank-amount workflow.
+
+Keep confirmed receipt events and authoritative settled cents unchanged; preserve income/equal/fronted/custom method and exact custom ratio. Pending sender reports, active resets, historical accounting, stale versions, incomplete earlier projections and a partner share below confirmed received money reject before saving. Exact-amount bank metadata matching remains independent of repayments. Save the revision and reviewed evidence in existing canonical JSON/audit tables; no schema migration. Use the actual prior net source (gross minus received) for projection, retain partner receipt cash rows, and verify source/mirror before marking the bank match confirmed. A saved revision may resume only its same bank ID/gross/token, without adding another revision or repayment.
+
+A typed `not_applied` response means the current request failed before a new financial mutation. The phone closes its stale confirmation and refreshes once without replaying the command. Unknown outcomes retain the status lock; a successful read closes the obsolete form, and a saved bank correction offers Finish syncing & match. This prevents rejected financial forms from becoming permanently disabled while preserving recovery after partial external writes.
+
+
 ## 2026-10-28 - Make Custom Dollar Amounts Authoritative
 
 At the user's request, Transactions Custom split edits dollar amounts, displays derived percentages, and uses a cent-step slider. The two shares always sum to the full purchase. Keep raw decimal drafts while typing; invalid amounts block review rather than submitting the previous valid value. Review and receipts show the same exact amounts with read-only percentages. This supersedes the editable percentage controls below.

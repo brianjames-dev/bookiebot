@@ -206,7 +206,7 @@ class SheetsProjection:
         revision = allocation["sourceRevision"]
         before = revision["before"]
         operation = revision["operation"]
-        if (operation not in {"split", "update", "move", "cancel", "delete", "edit_split"}
+        if (operation not in {"split", "update", "move", "cancel", "delete", "edit_split", "bank_amount"}
                 or before["id"] != allocation["id"]
                 or before["payerOwner"] != allocation["payerOwner"]
                 or before["sourceSpreadsheetId"] != allocation["sourceSpreadsheetId"]
@@ -214,8 +214,15 @@ class SheetsProjection:
                 or before["sourceWorksheet"] != allocation["sourceWorksheet"]
                 or (operation in {"move", "delete"} and allocation["sourceWorksheet"] != "expense")):
             raise ProjectionConflictError("This source correction does not identify the same shared expense.")
-        if allocation["settledCents"] or before["settledCents"] or any(
-                event["status"] in {"confirmed", "pending"} for event in allocation.get("events", [])):
+        bank_review = revision.get("bankReview", {})
+        retained_receipts = (operation == "bank_amount" and bank_review.get("receivedCents") == allocation["settledCents"]
+                            and before["settledCents"] == allocation["settledCents"]
+                            and bank_review.get("grossCents") == allocation["grossCents"]
+                            and allocation["partnerShareCents"] >= allocation["settledCents"])
+        has_pending = any(event["status"] == "pending" for event in allocation.get("events", []))
+        has_received = allocation["settledCents"] or before["settledCents"] or any(
+            event["status"] == "confirmed" for event in allocation.get("events", []))
+        if has_pending or (has_received and not retained_receipts):
             raise ProjectionConflictError("Reverse recorded and pending payments before changing this split.")
         book = self._book(allocation["sourceSpreadsheetId"])
         sheet = self._sheet(allocation["sourceSpreadsheetId"], allocation.get("sourceSheetTitle") or date.fromisoformat(allocation["expenseDate"]).strftime("%B"))

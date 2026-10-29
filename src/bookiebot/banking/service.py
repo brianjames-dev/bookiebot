@@ -1128,6 +1128,7 @@ class BankingService:
         action_id: str,
         expected_item: ReconciliationItem | None = None,
         expected_candidate: ActionLogCandidate | None = None,
+        shared_amount_token: str | None = None,
     ) -> tuple[ReconciliationItem | None, ActionLogCandidate | None, str]:
         item = self.get_reconciliation_item(owner_key, reconciliation_id)
         if item is None:
@@ -1166,11 +1167,29 @@ class BankingService:
             return item, candidate, "candidate_changed"
 
         bank_amount = abs(item.transaction.amount)
+        from bookiebot.banking.shared_amounts import apply_shared_amount, shared_amount_review, SharedAmountRejected
+        from bookiebot.reimbursements.store import ReimbursementConflictError, ReimbursementNotFoundError, ReimbursementValidationError
+        try:
+            shared_review = shared_amount_review(owner_key, logged, round(bank_amount * 100), reconciliation_id)
+            if shared_review and shared_review['previousGrossCents'] == shared_review['grossCents'] and not shared_review['recovery']:
+                shared_review = None  # An exact match records no amount correction.
+            if shared_review and shared_amount_token != shared_review["token"]:
+                return item, candidate, "shared_rejected: Review the revised shares and received amount before confirming."
+        except (ReimbursementConflictError, ReimbursementNotFoundError, ReimbursementValidationError) as exc:
+            return item, candidate, f"shared_rejected: {exc}"
         update_status = "matched"
         def correct_amount() -> None:
             nonlocal candidate, update_status
             assert candidate is not None
-            if round(candidate.amount * 100) != round(bank_amount * 100):
+            if shared_review:
+                try:
+                    synced = apply_shared_amount(owner_key, logged, round(bank_amount * 100), reconciliation_id, shared_amount_token or "")
+                except SharedAmountRejected as exc:
+                    raise _MatchCorrectionFailed(f"shared_rejected: {exc}") from exc
+                if not synced:
+                    raise _MatchCorrectionFailed("shared_projection_pending")
+                update_status = "matched_updated"
+            elif round(candidate.amount * 100) != round(bank_amount * 100):
                 success, detail = update_recent_action(
                     actor_key,
                     updates={"amount": f"{bank_amount:.2f}"},

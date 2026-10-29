@@ -123,6 +123,28 @@ const snapshot = (items = rows, enabled = true) => ({ enabled, checkedAt: '2026-
   await click('Check status'); assert.equal(latest().options.method, 'GET')
   await reject(); assert.equal(work.uncertain, true, 'Failed status reads cannot clear uncertain writes')
   await click('Check status'); await respond(snapshot()); assert.ok(events.includes('bookiebot:transactions-changed'))
+  assert.equal(button('Update amount & match'), undefined, 'Successful status recovery discards the stale financial confirmation')
+  const sharedPlan = { token: 'a'.repeat(64), allocationId: 'shared-a', allocationVersion: 3, reviewId: 2,
+    method: 'equal', payer: 'Brian', partner: 'Hannah', previousGrossCents: 1800, grossCents: 1599,
+    previousPayerShareCents: 900, payerShareCents: 800, previousPartnerShareCents: 900, partnerShareCents: 799,
+    receivedCents: 600, remainingCents: 199, recovery: false }
+  await expand('Restaurant'); await respond(detail(rows[1], [suggestion({ amountCents: 1800, amountMismatch: true, sharedAmount: sharedPlan })]))
+  await click('Review amount change')
+  assert.match(rendered(), /Keep 50\/50 split/); assert.match(rendered(), /Brian’s share\$9\.00 → \$8\.00/)
+  assert.match(rendered(), /Hannah’s share\$9\.00 → \$7\.99/); assert.match(rendered(), /Already received · kept\$6\.00/)
+  assert.match(rendered(), /Hannah still owes\$1\.99/); assert.match(rendered(), /records no additional repayment/)
+  await click('Update amount & match'); assert.equal(body().sharedAmountToken, sharedPlan.token)
+  const rejectedPosts = requests.filter(r => r.options.method === 'POST').length
+  await respond({ error: 'This shared expense or repayment changed. Review the revised shares again.', outcome: 'not_applied' }, 409)
+  assert.equal(latest().options.method, 'GET', 'A guaranteed no-write rejection refreshes once without repeating a financial command')
+  await respond(snapshot()); assert.equal(work.uncertain, false); assert.equal(button('Update amount & match'), undefined)
+  assert.equal(requests.filter(r => r.options.method === 'POST').length, rejectedPosts)
+  await expand('Restaurant'); await respond(detail(rows[1], [suggestion({ sharedAmount: { ...sharedPlan, recovery: true } })]))
+  await click('Review amount change'); await click('Finish syncing & match')
+  assert.equal(body().sharedAmountToken, sharedPlan.token); await respond(snapshot())
+  await expand('Restaurant'); await expand('Restaurant'); await respond(detail(rows[1], [suggestion({ sharedAmount: { blocked: 'Confirm or dismiss the pending reported payment first.' } })]))
+  assert.match(rendered(), /pending reported payment/); assert.equal(button('Confirm match'), undefined)
+  assert.equal(button('Review amount change'), undefined)
   await filter('Pending'); await expand('Pending charge'); await respond(detail(rows[2]))
   assert.match(rendered(), /Tentative match/); assert.equal(button('Confirm match'), undefined); assert.equal(button('Ignore transaction'), undefined); assert.equal(button('Check for matches'), undefined)
   await expand('Pending charge'); await expand('Pending charge'); await respond(detail(rows[2], [suggestion({ amountCents: 1700, amountMismatch: true })]))
