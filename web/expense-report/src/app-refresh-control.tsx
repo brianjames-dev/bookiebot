@@ -20,7 +20,7 @@ export function AppRefreshControl({ state, refresh, showButton = true }: { state
         </svg>
       </button>}
       <div className="bb-app-status" role="status" aria-live="polite" aria-atomic="true">
-        {status && <span>{status}</span>}
+        {status && <span className={busy && !state.signingOut && !showButton ? "sr-only" : undefined}>{status}</span>}
         {updated && <time className="bb-app-updated" dateTime={updated.toISOString()} title={updated.toLocaleString()}>
           {stale ? "Showing" : "Updated"} {time}
         </time>}

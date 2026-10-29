@@ -3245,6 +3245,18 @@ button:focus-visible, summary:focus-visible {
 .bb-page-header .bb-app-status, .bb-page-header > .bb-report-updated { grid-column: 2; grid-row: 2; max-width: 160px; justify-self: end; }
 .bb-page-header .bb-app-controls[data-state="stale"] .bb-app-status,
 .bb-page-header .bb-app-controls[data-state="error"] .bb-app-status { grid-column: 1 / -1; grid-row: 3; justify-self: start; max-width: none; text-align: left; }
+.bb-report-header { grid-template-columns: minmax(0, 1fr) auto; gap: 8px 12px; }
+.bb-report-header > .bb-report-context { display: flex; align-items: center; min-width: 0; }
+.bb-report-header > .bb-header-actions { grid-column: 2; grid-row: 1; justify-self: end; align-items: center; }
+.bb-report-header .bb-metric-toggle { min-height: 44px; }
+.bb-report-header .bb-app-status, .bb-report-header > .bb-report-updated { grid-column: 1 / -1; grid-row: 2; justify-self: start; max-width: none; text-align: left; }
+.bb-report-header .bb-month-trigger > span { overflow-wrap: normal; }
+@media (max-width: 360px) {
+  .bb-report-header { column-gap: 8px; }
+  .bb-report-header h1 { font-size: 20px; }
+  .bb-report-header .bb-month-trigger { gap: 8px; }
+  .bb-report-header .bb-metric-toggle { font-size: 13px; padding-inline: 10px; }
+}
 .bb-page > .bb-app-update { width:min(var(--bb-content-max),100%); margin-inline:auto; }
 
 .bb-chart-box svg [role="button"] { cursor:pointer; }

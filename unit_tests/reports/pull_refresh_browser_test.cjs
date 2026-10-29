@@ -15,8 +15,8 @@ const css=fs.readFileSync(path.join(root,'src/bookiebot/reports/assets/expense-r
 const js=fs.readFileSync(path.join(root,'src/bookiebot/reports/assets/expense-report-app.js'),'utf8')
 const html=dark=>`<!doctype html><html data-theme="${dark?'dark':'light'}"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><style>${css}</style></head><body><div id="bookiebot-expense-report-root"></div><script id="bookiebot-expense-app-config" type="application/json">${JSON.stringify({ownerName:'Brian',reportUrl:'/app/expenses/data',logoutUrl:'/app/logout'})}</script><script>localStorage.setItem('bookiebot-expense-report-theme','${dark?'dark':'light'}')</script><script type="module">${js}</script></body></html>`
 const screens={Overview:'/app/expenses/data',Transactions:'/app/transactions',Shared:'/app/reimbursements',Savings:'/app/goals',Reconcile:'/app/reconciliation',Settings:'/app/widgets/settings'}
-async function gesture(page,end=280,{start=80,x=16,cancel=false,finish=true,selector='.bb-shell-masthead',drift=false}={}) {
-  await page.evaluate(({start,end,x,cancel,finish,selector,drift})=>{
+async function gesture(page,end=280,{start=80,x=16,cancel=false,finish=true,selector='.bb-shell-masthead',drift=false,begin=true}={}) {
+  await page.evaluate(({start,end,x,cancel,finish,selector,drift,begin})=>{
     const target=document.querySelector(selector)
     const touch=y=>({identifier:71,target,clientX:x,clientY:y,pageX:x,pageY:y})
     const fire=(type,y)=>{
@@ -24,10 +24,10 @@ async function gesture(page,end=280,{start=80,x=16,cancel=false,finish=true,sele
       Object.defineProperties(event,{touches:{value:type==='touchend'||type==='touchcancel'?[]:[touch(y)]},changedTouches:{value:[touch(y)]}})
       return target.dispatchEvent(event)
     }
-    fire('touchstart',start)
+    if(begin)fire('touchstart',start)
     if(drift) {x+=18;fire('touchmove',start+8)}
     fire('touchmove',end);if(finish)fire(cancel?'touchcancel':'touchend',end)
-  },{start,end,x,cancel,finish,selector,drift})
+  },{start,end,x,cancel,finish,selector,drift,begin})
 }
 async function waitReady(page,label) {
   await page.waitForFunction(label=>document.querySelector(`button[aria-label="Refresh ${label}"]`)?.disabled===false,label)
@@ -46,7 +46,7 @@ async function waitReady(page,label) {
           window.__preventedMoves=0
           window.addEventListener('touchmove',event=>{if(event.defaultPrevented)window.__preventedMoves++},{passive:true})
         })
-        const requests=[],errors=[];let failedCheck=false,reportNumber=0,holdCheck=false,releaseCheck
+        const requests=[],errors=[];let failedCheck=false,reportNumber=0,holdCheck=false,releaseCheck,holdReport=false,releaseReport
         page.on('pageerror',error=>errors.push(error.message))
         await page.route('**/*',async route=>{
           const request=route.request(),url=new URL(request.url()),name=url.pathname,body=request.postDataJSON()
@@ -55,7 +55,10 @@ async function waitReady(page,label) {
           requests.push({name,method:request.method(),query:url.search,body})
           await new Promise(resolve=>setTimeout(resolve,90))
           let value
-          if(name==='/app/expenses/data')value={...report,generatedAt:new Date(Date.now()+ ++reportNumber*1000).toISOString()}
+          if(name==='/app/expenses/data') {
+            if(holdReport)await new Promise(resolve=>{releaseReport=resolve})
+            value={...report,generatedAt:new Date(Date.now()+ ++reportNumber*1000).toISOString()}
+          }
           else if(name==='/app/reconciliation') {
             if(body?.operation==='check'&&holdCheck)await new Promise(resolve=>{releaseCheck=resolve})
             if(body?.operation==='check'&&failedCheck){failedCheck=false;await route.fulfill({status:500,json:{error:'Fixture offline'}});return}
@@ -73,6 +76,27 @@ async function waitReady(page,label) {
         })
         await page.goto('https://bookie.test/app/expenses')
         await page.locator('.bb-app-shell').waitFor();await waitReady(page,'Overview')
+        if(width===320&&!dark) {
+          for(const layoutWidth of [320,360,390,768,1024]) {
+            await page.setViewportSize({width:layoutWidth,height:780})
+            await page.waitForTimeout(100)
+            const layout=await page.evaluate(()=>{
+              const rect=selector=>{const r=document.querySelector(selector).getBoundingClientRect();return {left:r.left,right:r.right,top:r.top,height:r.height}}
+              return {header:rect('.bb-report-header'),month:rect('.bb-report-header .bb-month-trigger'),toggle:rect('.bb-report-header .bb-projection-control'),targets:[...document.querySelectorAll('.bb-report-header .bb-metric-toggle')].map(n=>n.getBoundingClientRect().height),overflow:document.documentElement.scrollWidth>innerWidth}
+            })
+            assert.ok(layout.month.right+6<=layout.toggle.left,'Month and view toggle must not overlap')
+            assert.ok(Math.abs(layout.toggle.right-layout.header.right)<1,'View toggle anchors to the right edge')
+            assert.ok(Math.abs(layout.month.top+layout.month.height/2-layout.toggle.top-layout.toggle.height/2)<1,'Month and view toggle share the same row')
+            assert.ok(layout.targets.every(h=>h>=44));assert.equal(layout.overflow,false)
+          }
+          await page.setViewportSize({width,height:780})
+          await page.getByRole('button',{name:'Projected',exact:true}).click()
+          assert.equal(await page.getByRole('button',{name:'Projected',exact:true}).getAttribute('aria-pressed'),'true')
+          await page.getByRole('button',{name:'Current',exact:true}).click()
+          assert.equal(await page.getByRole('button',{name:'Current',exact:true}).getAttribute('aria-pressed'),'true')
+          await page.waitForTimeout(350)
+          await page.screenshot({path:`/tmp/bookiebot-header-${engine.name()}.png`})
+        }
         for(const [label,path] of Object.entries(screens)) {
           await (label==='Settings' ? page.getByRole('button',{name:label,exact:true}) : page.getByRole('navigation',{name:'Main navigation'}).getByRole('button',{name:label,exact:true})).click()
           await page.evaluate(()=>window.scrollTo(0,0));await waitReady(page,label)
@@ -86,8 +110,20 @@ async function waitReady(page,label) {
           assert.equal(requests.filter(r=>r.name===path).length,before,'Short pull must not request data')
           await gesture(page,224);await page.waitForTimeout(120)
           assert.equal(requests.filter(r=>r.name===path).length,before,'The former 144px trigger must no longer refresh')
+          if(label==='Overview')holdReport=true
           await gesture(page)
+          if(label==='Overview') {
+            await page.waitForFunction(()=>document.querySelector('.bb-pull-refresh')?.dataset.phase==='refreshing')
+            const busy=page.locator('.bb-report-header .bb-app-status span').filter({hasText:'Refreshing…'})
+            assert.equal(await busy.getAttribute('class'),'sr-only','The duplicate loading text is accessible without a visible label under the month')
+            while(!releaseReport)await page.waitForTimeout(10)
+            holdReport=false;releaseReport()
+          }
           await page.waitForFunction(()=>document.querySelector('.bb-pull-refresh')?.dataset.phase==='done')
+          if(dark) {
+            assert.equal(await page.locator('.bb-pull-disc').evaluate(n=>getComputedStyle(n).animationName),'none','Reduced motion skips the pop')
+            assert.equal(await page.locator('.bb-pull-burst').evaluate(n=>getComputedStyle(n).animationName),'none','Reduced motion skips the burst')
+          }
           assert.equal(requests.filter(r=>r.name===path).length,before+1,`${label} refreshes the active data once`)
           if(label==='Transactions') {
             const last=requests.filter(r=>r.name===path).at(-1)
@@ -131,9 +167,15 @@ async function waitReady(page,label) {
           const cdp=engine===chromium ? await page.context().newCDPSession(page) : null,before=requests.filter(r=>r.name==='/app/reconciliation').length
           if(cdp) {
             await cdp.send('Input.dispatchTouchEvent',{type:'touchStart',touchPoints:[{x:16,y:78}]})
-            for(const y of [100,135,175,220,260])await cdp.send('Input.dispatchTouchEvent',{type:'touchMove',touchPoints:[{x:16,y}]})
-          } else await gesture(page,260,{start:78,finish:false})
+            for(const y of [100,135])await cdp.send('Input.dispatchTouchEvent',{type:'touchMove',touchPoints:[{x:16,y}]})
+          } else await gesture(page,135,{start:78,finish:false})
+          await page.waitForTimeout(100)
+          const growingFrom=await page.locator('.bb-pull-disc').evaluate(n=>n.getBoundingClientRect().width)
+          if(cdp)for(const y of [175,220,260])await cdp.send('Input.dispatchTouchEvent',{type:'touchMove',touchPoints:[{x:16,y}]})
+          else await gesture(page,260,{start:78,finish:false,begin:false})
           await page.waitForFunction(()=>document.querySelector('.bb-pull-refresh')?.dataset.phase==='armed')
+          await page.waitForTimeout(100)
+          assert.ok(await page.locator('.bb-pull-disc').evaluate(n=>n.getBoundingClientRect().width)>growingFrom+8,'The icon progressively grows with the pull')
           const pulled=await geometry()
           for(const selector in original)assert.ok(Math.abs(pulled[selector]-original[selector])<.5,`${selector} must not get a second, scripted drag offset`)
           assert.equal(await page.locator('.bb-pull-refresh-space').evaluate(node=>node.getBoundingClientRect().height),0,'Dragging never changes page layout')
@@ -158,18 +200,31 @@ async function waitReady(page,label) {
           await page.waitForTimeout(100)
           const second=await spinner.evaluate(node=>getComputedStyle(node).transform)
           assert.equal(first.animation,'bb-pull-spin');assert.notEqual(first.transform,second,'Loading must animate while the response is pending')
-          assert.equal(await page.locator('.bb-pull-glyph').evaluate(node=>node.getBoundingClientRect().width),44,'Larger refresh icon')
+          assert.equal(await page.locator('.bb-pull-glyph').evaluate(node=>node.getBoundingClientRect().width),52,'Larger refresh icon')
           await page.screenshot({path:'/tmp/bookiebot-pull-refresh-loading.png'})
+          const anchorBefore=await page.locator('.bb-pull-refresh').boundingBox()
+          await page.evaluate(()=>{const space=document.createElement('div');space.id='refresh-scroll-fixture';space.style.height='1400px';document.body.append(space);window.scrollTo(0,160)})
+          await page.waitForFunction(()=>scrollY===160)
+          const scrolling=await page.evaluate(()=>({spinner:document.querySelector('.bb-pull-refresh').getBoundingClientRect().bottom,brand:document.querySelector('.bb-wordmark').getBoundingClientRect().top,position:getComputedStyle(document.querySelector('.bb-pull-refresh')).position}))
+          assert.equal(scrolling.position,'absolute');assert.ok(scrolling.spinner<scrolling.brand,'Loading stays above the brand while scrolling')
+          assert.ok(Math.abs((await page.locator('.bb-pull-refresh').boundingBox()).y-anchorBefore.y+160)<1,'Loading scrolls out with the document instead of overlaying content')
+          await page.evaluate(()=>{window.scrollTo(0,0);document.querySelector('#refresh-scroll-fixture').remove()})
+          await page.waitForFunction(()=>scrollY===0)
           while(!releaseCheck)await page.waitForTimeout(10)
           holdCheck=false;releaseCheck()
           await page.waitForFunction(()=>document.querySelector('.bb-pull-refresh')?.dataset.phase==='done')
           await page.waitForTimeout(80)
           const revealing=await page.locator('.bb-pull-check').evaluate(node=>Number(getComputedStyle(node).opacity))
           assert.ok(revealing>0&&revealing<1,'The checkmark must ease into view')
+          const celebration=await page.locator('.bb-pull-burst').evaluate(n=>({animation:getComputedStyle(n).animationName,opacity:Number(getComputedStyle(n).opacity)}))
+          assert.equal(celebration.animation,'bb-pull-burst');assert.ok(celebration.opacity>0,'Success emits radial lines')
+          assert.equal(await page.locator('.bb-pull-disc').evaluate(n=>getComputedStyle(n).animationName),'bb-pull-pop')
           await page.waitForTimeout(280)
           assert.equal(await page.locator('.bb-pull-check').evaluate(node=>Number(getComputedStyle(node).opacity)),1)
           assert.equal(await page.locator('.bb-pull-progress').evaluate(node=>Number(getComputedStyle(node).opacity)),0)
           await page.screenshot({path:'/tmp/bookiebot-pull-refresh-success.png'})
+          await page.waitForTimeout(250)
+          assert.equal(await page.locator('.bb-pull-burst').evaluate(n=>Number(getComputedStyle(n).opacity)),0,'The success burst finishes once')
           await page.waitForFunction(()=>document.querySelector('.bb-pull-refresh')?.dataset.phase==='settling')
           assert.equal(await page.locator('.bb-pull-check').evaluate(node=>Number(getComputedStyle(node).opacity)),1,'The checkmark stays during the final retraction')
           await page.waitForFunction(()=>document.querySelector('.bb-pull-refresh')?.dataset.phase==='idle')

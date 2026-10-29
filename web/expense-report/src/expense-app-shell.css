@@ -70,7 +70,7 @@
 @media (min-width: 861px) { .bb-app-shell .bb-bottom-navigation { bottom: 12px; } .bb-app-shell .bb-shell-masthead { margin-bottom: 26px; } }
 @media (max-width: 390px) { .bb-app-shell .bb-wordmark { gap: 7px; font-size: 17px; } .bb-app-shell .bb-app-avatar { width: 36px; height: 36px; } .bb-app-shell .bb-report-owner { font-size: 12px; } }
 @media (max-width: 480px) {
-  .bb-app-shell .bb-page-header { grid-template-columns: minmax(0, 1fr) 44px; gap: 8px 12px; }
-  .bb-app-shell .bb-page-header .bb-app-status { grid-column: 1 / -1; grid-row: 3; justify-self: start; max-width: none; }
+  .bb-app-shell .bb-page-header { grid-template-columns: minmax(0, 1fr) auto; gap: 8px 12px; }
+  .bb-app-shell .bb-page-header .bb-app-status { grid-column: 1 / -1; grid-row: 2; justify-self: start; max-width: none; }
 }
 @media (prefers-reduced-motion: reduce) { .bb-app-shell .bb-bottom-navigation, .bb-app-shell .bb-bottom-navigation *, .bb-app-shell .bb-setting-switch *, .bb-app-shell .bb-shell-icon, .bb-app-shell .bb-shell-header-actions { transition-duration: 0ms !important; } }

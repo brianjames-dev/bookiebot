@@ -148,22 +148,26 @@ export function PullToRefresh({ screen, blocked = false }: { screen: AppScreen; 
   // bounce so the two motions never add up and stretch the page twice.
   const tracking = phase === "pulling" || phase === "armed"
   const offset = visible && !tracking ? Math.max(0, Math.min(distance, PULL_REFRESH_THRESHOLD) - nativeOverscroll) : 0
-  const progress = Math.round(Math.min(1, distance / PULL_REFRESH_THRESHOLD) * 100)
-  return <>
-    <div className="bb-pull-refresh-space" data-phase={phase} data-native-bounce={nativeOverscroll > 0} aria-hidden="true" style={{ height: offset }} />
-    <div className="bb-pull-refresh" data-phase={phase} data-visible={visible} style={{ "--bb-pull-distance": `${visible ? Math.min(distance, PULL_REFRESH_THRESHOLD) : 0}px` } as CSSProperties}>
+  const ratio = Math.min(1, distance / PULL_REFRESH_THRESHOLD), progress = Math.round(ratio * 100)
+  return <div className="bb-pull-refresh-space" data-phase={phase} data-native-bounce={nativeOverscroll > 0} style={{ height: offset }}>
+    <div className="bb-pull-refresh" data-phase={phase} data-visible={visible} style={{
+      "--bb-pull-distance": `${visible ? Math.min(distance, PULL_REFRESH_THRESHOLD) : 0}px`,
+      "--bb-pull-scale": tracking ? .72 + .36 * ratio : 1,
+      "--bb-native-overscroll": `${nativeOverscroll}px`,
+    } as CSSProperties}>
     <button type="button" className="bb-pull-refresh-button" aria-label={`Refresh ${screenTitles[screen]}`} title={`Refresh ${screenTitles[screen]}`} disabled={!available || running.current}
       aria-busy={phase === "refreshing"} onClick={() => void refresh()}>
-      <span className="bb-pull-spinner" aria-hidden="true"><svg viewBox="0 0 32 32">
+      <span className="bb-pull-disc" aria-hidden="true"><span className="bb-pull-spinner"><svg viewBox="0 0 32 32">
         <circle className="bb-pull-progress" cx="16" cy="16" r="12" pathLength="100" strokeDasharray="100" strokeDashoffset={100 - progress} />
       </svg></span>
-      <svg className="bb-pull-glyph" viewBox="0 0 32 32" aria-hidden="true"><circle className="bb-pull-track" cx="16" cy="16" r="12" />
+      <svg className="bb-pull-glyph" viewBox="0 0 32 32"><circle className="bb-pull-track" cx="16" cy="16" r="12" />
         <path className="bb-pull-arrow" d="M16 10v12m-5-5 5 5 5-5" />
         <path className="bb-pull-check" d="m9 16 5 5 9-10" pathLength="1" />
         <path className="bb-pull-error" d="m11 11 10 10m0-10L11 21" /></svg>
+      <svg className="bb-pull-burst" viewBox="0 0 64 64">{["M32 7V2", "m49.7 14.3 3.5-3.5", "M57 32h5", "m49.7 49.7 3.5 3.5", "M32 57v5", "m14.3 49.7-3.5 3.5", "M7 32H2", "m14.3 14.3-3.5-3.5"].map(d => <path key={d} d={d} />)}</svg></span>
     </button>
     {(phase === "pulling" || phase === "armed") && <span className="sr-only" role="progressbar" aria-label="Pull to refresh" aria-valuemin={0} aria-valuemax={100} aria-valuenow={progress} />}
     <span className="sr-only" role="status" aria-live="polite">{phase === "armed" ? "Release to refresh" : phase === "refreshing" ? `Refreshing ${screenTitles[refreshScreen.current ?? screen]}` : message}</span>
     </div>
-  </>
+  </div>
 }

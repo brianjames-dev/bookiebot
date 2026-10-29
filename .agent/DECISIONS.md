@@ -1,5 +1,11 @@
 # Agent Decisions
 
+## 2026-10-29 - Align Report Controls And Anchor Refresh Results To The Document
+
+Place Current/Projected at the right edge of the month row, retaining the existing measured selection, preferences and financial modes. Keep the full month label; its year may wrap within the left control on narrow screens. Preserve 44px targets and full-width error/update status below. When the common pull control owns loading feedback, hide the old busy label visually but retain its screen-reader announcement, last update and failures.
+
+Keep the passive gesture recognition, resistance/threshold and page-specific dispatch unchanged. Grow a larger refresh disc with progress, retain continuous loading and the drawn checkmark, and add one brief success pop/eight-ray burst. Respect Reduce Motion. Nest the indicator in the pre-masthead loading-space anchor: pulling keeps its viewport position, while loading/results use document positioning with existing native-bounce compensation. This prevents scrolling during refresh from leaving the spinner over page content. Top-right tools remain independently fixed. No persistence, financial lifecycle or request-scope change; physical acceptance is checklist 177.
+
 ## 2026-10-29 - Keep Pull Feedback Consistent And Toolbar Anchored
 
 The user accepted native scrolling and requested consistent feedback, stationary top-right message/settings controls and a slightly longer pull. Observe pans beginning on ordinary buttons, links and tab selectors; native scrolling suppresses their click after a pan, while taps remain native. Continue excluding form fields, sliders, main navigation, nested scrollers and modal/busy states. A slanted first move waits for vertical intent instead of permanently dropping the gesture. Horizontal-only movement still cannot refresh. All observers remain passive and no layout stretch is added during dragging.

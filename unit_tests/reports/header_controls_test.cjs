@@ -20,9 +20,10 @@ function load(relative, globals = {}) {
 }
 
 const { AppRefreshControl } = load("app-refresh-control.tsx")
-const render = (changes = {}) => renderToStaticMarkup(React.createElement(AppRefreshControl, {
+const render = (changes = {}, props = {}) => renderToStaticMarkup(React.createElement(AppRefreshControl, {
   state: { phase: "ready", updatedAt: Date.now(), signingOut: false, message: "", ...changes },
   refresh: () => {},
+  ...props,
 }))
 const ready = render()
 assert.ok(ready.includes('aria-label="Refresh expenses"'), "Icon-only refresh retains a useful accessible name")
@@ -33,6 +34,9 @@ assert.ok(!ready.includes('disabled=""'))
 const refreshing = render({ phase: "refreshing" })
 assert.ok(refreshing.includes("is-refreshing") && refreshing.includes('disabled=""'))
 assert.ok(refreshing.includes("Refreshing…"))
+const commonRefreshing=render({phase:"refreshing"},{showButton:false})
+assert.ok(commonRefreshing.includes('<span class="sr-only">Refreshing…</span>'),"The common pull indicator owns visible loading feedback; the duplicate announcement remains accessible")
+assert.ok(commonRefreshing.includes("Updated ")&&!commonRefreshing.includes('class="bb-icon-button'),"Keep the last update time without a second refresh control")
 const stale = render({ phase: "stale", message: "Couldn’t refresh. Check your connection and try again." })
 assert.ok(stale.includes("Couldn’t refresh") && stale.includes("Showing "))
 assert.ok(!stale.includes("Updated "), "A failed refresh must never suggest old data is freshly updated")

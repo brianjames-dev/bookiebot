@@ -4,6 +4,10 @@ Last updated: 2026-10-29
 
 ## Goal
 
+### Inline report controls and refresh visuals — 2026-10-29
+
+Move Current/Projected to the month row's right edge. Polish the shared refresh disc with progressive growth, a larger icon and one success pop/ray burst; suppress duplicate visible busy text while preserving accessible/error/update details. Loading/results now scroll with the document above the masthead; fixed top-right tools, native gesture behavior and page-specific operations remain intact. **5 focused / 2,758 full tests passed**, **557 optional PostgreSQL skipped**, clean types/build and **48 Chromium/WebKit page cases**, including responsive alignment, reduced motion and pending-response scrolling. Native acceptance is STATUS checklist 177. All APIs are isolated fixtures; no Finance Ops backlog, financial lifecycle or persistence change.
+
 ### Consistent pull feedback and anchored toolbar — 2026-10-29
 
 The user accepted native scroll behavior. Follow up on missing feedback by observing pulls over normal buttons/links and waiting through an initially slanted move. Keep native taps and protected field/slider/nav/modal/busy gestures. Remove scripted toolbar movement so message/settings stay fixed; require 180px rather than 144px pull travel. **6 focused / 2,758 full tests passed**, **557 optional PostgreSQL skipped**, clean types/build and **48 Chromium/WebKit page cases**, including frame-level toolbar anchoring and native button pan/tap checks. Native acceptance is STATUS checklist 176. No Finance Ops backlog, financial operation or persistence change; all browser APIs use isolated fixtures.

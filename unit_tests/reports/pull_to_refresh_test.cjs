@@ -79,6 +79,8 @@ const settle = async () => {await act(async()=>{await Promise.resolve();await Pr
   start();move({y:199});assert.equal(phase(),'pulling')
   await release({y:199});assert.equal(calls.length,0,'179px is still below the new threshold')
   start(); move({y:90}); assert.equal(progress(),39)
+  const smallScale=renderer.root.findByProps({className:'bb-pull-refresh'}).props.style['--bb-pull-scale']
+  move({y:150});assert.ok(renderer.root.findByProps({className:'bb-pull-refresh'}).props.style['--bb-pull-scale']>smallScale,'The icon grows with finger travel')
   await release({y:90}); assert.equal(calls.length,0,'Short pull cancels')
   start(); move({y:200}); assert.equal(phase(),'armed'); assert.equal(progress(),100)
   move({y:100}); await release({y:100}); assert.equal(calls.length,0,'Retreat below threshold cancels')
@@ -132,6 +134,9 @@ const settle = async () => {await act(async()=>{await Promise.resolve();await Pr
   start();move({y:200});await release({y:200});assert.equal(phase(),'refreshing')
   assert.equal(renderer.root.findByProps({className:'bb-pull-refresh-space'}).props.style.height,64,'Release reverses to the loading hold distance')
   assert.equal(renderer.root.findAllByProps({className:'bb-pull-refresh-label'}).length,0,'The refresh control is icon-only')
+  assert.equal(renderer.root.findByProps({className:'bb-pull-refresh-space'}).findAllByProps({className:'bb-pull-refresh'}).length,1,'The loading indicator belongs to the document anchor above the masthead')
+  assert.equal(renderer.root.findByProps({className:'bb-pull-refresh-space'}).props['aria-hidden'],undefined,'The anchored refresh control stays accessible')
+  assert.equal(renderer.root.findByProps({className:'bb-pull-burst'}).findAllByType('path').length,8,'Success has eight radial rays')
   const check=renderer.root.findByProps({className:'bb-pull-check'}),checkPath=check.props.d
   start();move({y:200});await release({y:200})
   assert.equal(calls.filter(call=>call==='overview').length,3,'In-flight refresh cannot be duplicated')

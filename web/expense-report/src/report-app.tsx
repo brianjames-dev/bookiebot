@@ -602,7 +602,7 @@ export function ExpenseReportApp({ report, appControls, appAvatarUrl, appSession
           </button>}
         </ReportMenu>
       </div>}
-      <header className="bb-page-header" hidden={Boolean(navigation && navigation.screen !== "overview")}>
+      <header className="bb-page-header bb-report-header" hidden={Boolean(navigation && navigation.screen !== "overview")}>
         <h1 className="bb-report-context">{appMonthControl ?? report.monthLabel}</h1>
         <div className="bb-header-actions">
           <ProjectionToggle
