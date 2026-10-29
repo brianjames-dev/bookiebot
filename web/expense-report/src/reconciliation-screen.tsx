@@ -26,8 +26,8 @@ export interface ReconciliationItem {
   logging?: { allowed: boolean; kind: "expense" | "income"; categories: string[]; paymentMethods: string[]; reason: string }; matchedSuggestionId?: string | null; needsCheck?: boolean; readOnly?: boolean; scheduleRecovery?: boolean; matchLabel?: string | null
 }
 interface ConnectionIssue { id: number; institution: string; needsReconnect: boolean; reconnectUrl?: string }
-interface Snapshot { enabled: boolean; checkedAt: string | null; items: ReconciliationItem[]; notice?: string; connections?: ConnectionIssue[]; receiptFollowup?: { id: number; receipt: ReceiptLink } }
-type Command = { operation: "check" } | { operation: "confirm" | "update_match" | "update_schedule" | "recover_schedule" | "log" | "ignore" | "reopen"; id: number; version: string; suggestionId?: string; fields?: Record<string, string>; scheduleVersion?: string; updateFuture?: boolean; splitMethod?: string; sharedAmountToken?: string }
+interface Snapshot { enabled: boolean; checkedAt: string | null; items: ReconciliationItem[]; notice?: string; connections?: ConnectionIssue[]; receiptFollowup?: { id: number; receipt: ReceiptLink }; preparedReview?: { fromId: number; id: number } }
+type Command = { operation: "check" } | { operation: "prepare" | "confirm" | "update_match" | "update_schedule" | "recover_schedule" | "log" | "ignore" | "reopen"; id: number; version: string; suggestionId?: string; fields?: Record<string, string>; scheduleVersion?: string; updateFuture?: boolean; splitMethod?: string; sharedAmountToken?: string }
 const endpoint = "/app/reconciliation"
 const isText = (value: unknown, max = 300): value is string => typeof value === "string" && value.length <= max
 const isDate = (value: unknown): value is string => isText(value) && Number.isFinite(Date.parse(value))
@@ -72,6 +72,8 @@ function checkedSnapshot(value: unknown): Snapshot {
   if (!data || typeof data.enabled !== "boolean" || (data.checkedAt !== null && !isDate(data.checkedAt))
     || !Array.isArray(data.items) || data.items.length > 300 || !data.items.every(validItem)
     || new Set(data.items.map(item => item.id)).size !== data.items.length
+    || (data.preparedReview !== undefined && (!isAmount(data.preparedReview.fromId) || data.preparedReview.fromId >= 0
+      || !isAmount(data.preparedReview.id) || data.preparedReview.id <= 0 || !data.items.some(item => item.id === data.preparedReview?.id)))
     || (data.receiptFollowup !== undefined && (!validReceipt(data.receiptFollowup.receipt)
       || !data.items.some(item => item.id === data.receiptFollowup?.id && item.status === "checked" && item.amountCents === data.receiptFollowup.receipt.bankAmountCents)))
     || (data.notice !== undefined && !isText(data.notice, 500))
@@ -132,7 +134,7 @@ export function useReconciliation() {
       if (failure instanceof ReviewRequestError && [401, 403].includes(failure.status)) {
         setSnapshot(null); blocked.current = false; setNeedsRefresh(false); setRevision(value => value + 1)
       } else if (body && known && [400, 404, 409].includes(failure.status)
-        && (["confirm", "ignore", "reopen"].includes(body.operation) || failure.notApplied)) {
+        && (["prepare", "confirm", "ignore", "reopen"].includes(body.operation) || failure.notApplied)) {
         // Metadata conflicts and explicit no-write rejections can safely close
         // stale choices and read current state once. Never retry the command;
         // unknown financial outcomes retain their recovery lock.
@@ -194,12 +196,20 @@ export function ReconciliationScreen({ controller }: { controller: Controller })
     return () => window.removeEventListener("bookiebot:reimbursements-changed", refresh)
   }, [])
   useEffect(() => { setOpenId(null); setDetails({}) }, [resetReview])
+  const preparedId = snapshot?.preparedReview?.id
   const locked = busy || needsRefresh || Boolean(receiptTarget)
   const rows = snapshot?.items ?? []
   const matchesFilter = (item: ReconciliationItem) => filter === "checked" ? ["checked", "ignored"].includes(item.status) : item.status === filter
   const openRow = rows.find(item => item.id === openId && matchesFilter(item))
   useEffect(() => { if (needsRefresh) setDetails(previous => Object.fromEntries(Object.entries(previous).map(([id, item]) => [id, { ...item, loadedAt: 0 }]))) }, [needsRefresh])
   useEffect(() => { if (openId !== null && !openRow) setOpenId(null) }, [openId, openRow])
+  useEffect(() => {
+    if (preparedId === undefined) return
+    const prepared = snapshot?.items.find(item => item.id === preparedId)
+    if (!prepared) return
+    setFilter(["checked", "ignored"].includes(prepared.status) ? "checked" : prepared.status === "pending" ? "pending" : "needs_review")
+    setDetails({}); setOpenId(preparedId)
+  }, [preparedId])
   // Keep source previews for unchanged bank/review versions for up to 30 seconds.
   // Every financial confirmation still validates fresh server-side evidence.
   useEffect(() => { setDetails(previous => Object.fromEntries(Object.entries(previous).filter(([id, detail]) => {
@@ -245,7 +255,7 @@ export function ReconciliationScreen({ controller }: { controller: Controller })
     </SlidingSelection>}
     {!snapshot && !error && <p className="bb-reconcile-muted" role="status">Loading bank transactions…</p>}
     {error && <div className="bb-reconcile-message" role="alert"><p>{error}</p><button type="button" disabled={busy} onClick={() => void load()}>{needsRefresh ? "Check status" : "Try again"}</button></div>}
-    {busy && pendingOperation && pendingOperation !== "check" && <p className="bb-reconcile-muted" role="status">Saving your review…</p>}
+    {busy && pendingOperation && pendingOperation !== "check" && <p className="bb-reconcile-muted" role="status">{pendingOperation === "prepare" ? "Opening your review…" : "Saving your review…"}</p>}
     {snapshot?.notice && <div className="bb-reconcile-message" role={snapshot.connections?.length ? 'alert' : 'status'}><p>{snapshot.notice}</p>
       <div className="bb-reconcile-recovery-actions">
       {snapshot.connections?.filter(connection => connection.needsReconnect).map(connection => <a key={connection.id}
@@ -266,7 +276,11 @@ export function ReconciliationScreen({ controller }: { controller: Controller })
           onClick={() => void load({ operation: "recover_schedule", id: detail.id, version: detail.stateVersion ?? detail.version })}>Verify saved payment change</button>}
         {detail.readOnly && <p className="bb-reconcile-muted">{detail.scheduleRecovery ? "A sheet change may have finished. Verify the saved amounts without writing them again." : "Finish this transaction in BookieBot before checking again."}</p>}
         <ReviewChoices key={detail.version} item={detail} disabled={locked || loadingDetail || Boolean(detailError)} onCommand={command => void load(command)} onRejectAccess={rejectAccess} onRefresh={() => { setDetails({}); setDetailRetry(value => value + 1) }} />
-        {(detail.needsCheck || detail.id < 0) && detail.status !== "pending" && !detail.readOnly && <button type="button" className="bb-reconcile-action" disabled={busy || needsRefresh} onClick={() => void load({ operation: "check" })}>Check for matches</button>}
+        {(detail.needsCheck || detail.id < 0) && detail.status === "needs_review" && !detail.readOnly && <>
+          <button type="button" className="bb-reconcile-action bb-reconcile-primary" disabled={locked || loadingDetail || Boolean(detailError)}
+            onClick={() => void load({ operation: "prepare", id: detail.id, version: detail.stateVersion ?? detail.version })}>{detail.suggestions.some(s => s.confirmable) ? "Review match" : "Review transaction"}</button>
+          <p className="bb-reconcile-muted">Confirm a match, add a missing entry, or ignore this transaction in the next step.</p>
+        </>}
         {detail.id > 0 && !detail.needsCheck && !detail.readOnly && detail.status !== "pending" && <button type="button" className="bb-reconcile-action bb-reconcile-secondary" disabled={locked || loadingDetail || Boolean(detailError)}
           onClick={() => void load({ operation: detail.status === "needs_review" ? "ignore" : "reopen", id: detail.id, version: detail.stateVersion ?? detail.version })}>{detail.status === "needs_review" ? "Ignore transaction" : "Reopen review"}</button>}
       </>}

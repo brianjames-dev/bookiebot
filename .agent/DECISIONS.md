@@ -1,5 +1,12 @@
 # Agent Decisions
 
+## 2026-10-28 - Prepare Individual Posted Reviews Explicitly
+
+Raw posted transactions may display fresh suggestions before a reconciliation row exists. Keep GET/list/detail read-only and negative raw IDs as display identities. Offer Review match/Review transaction as an explicit metadata-only prepare command, rather than requiring a whole-bank sync. Under the shared owner and transaction locks, verify the same bank version, active watched account, owner, posted/recent/unremoved state and absence of any reconciliation row. Create one needs-review row and phone_review_prepare audit event without matching, ignoring, writing a sheet, syncing Plaid or sending a notification. A concurrent/existing decision wins unchanged.
+
+Return the old/new review identities so the UI opens the new stable row and reloads its suggestions. Actual Confirm match, amount/schedule correction, missing-entry logging and Ignore remain separate explicit actions with their current validation, claims, repayment and recovery safeguards. Pending authorizations remain read-only. Normal global Check remains available. This closes the missing-control gap without making an expansion/read an implicit reconciliation decision. No schema migration.
+
+
 ## 2026-10-28 - Review Bank Total Corrections While Retaining Confirmed Receipts
 
 The user explicitly selected preserving already received money when correcting a shared purchase to its bank total. Add a narrow `bank_amount` canonical revision through Reconcile, with full old/new amount, saved split method, both revised shares, received amount and remaining debt shown before confirmation. Bind approval to the owner, allocation/version, bank review ID, target gross and calculated shares/received balance. Revalidate under the household lock after bank claim/version checks. Ordinary Update/Move/Split/Delete/Undo repayment guards remain; this supersedes only their prior application to this explicit bank-amount workflow.
