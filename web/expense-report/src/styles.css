@@ -1885,24 +1885,11 @@ summary {
   font-size: 13px;
 }
 
-.bb-app-loading-sheet {
-  display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 20px;
-  padding: 28px 0;
-}
-
-.bb-app-loading-sheet span {
-  height: 88px;
-  border-top: 2px solid hsl(var(--border));
-  border-bottom: 1px solid hsl(var(--border));
-  background: hsl(var(--foreground) / 0.025);
-}
-
-@media (max-width: 520px) {
-  .bb-app-opening { margin-top: 28px; }
-  .bb-app-loading-sheet { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-}
+.bb-report-loading { display: grid; place-items: center; min-height: 160px; color: hsl(var(--primary)); }
+.bb-report-loading-spinner { position: relative; animation: bb-pull-spin 850ms linear infinite; }
+.bb-report-loading-spinner svg { width: 52px; height: 52px; fill: none; stroke: currentColor; stroke-width: 1.7; stroke-linecap: round; }
+@media (max-width: 520px) { .bb-app-opening { margin-top: 28px; } }
+@media (prefers-reduced-motion: reduce) { .bb-report-loading-spinner { animation: none; } }
 
 @media (prefers-reduced-motion: reduce) {
   .bb-category-pie-host[data-bb-pie-layout-motion="active"] .recharts-pie {

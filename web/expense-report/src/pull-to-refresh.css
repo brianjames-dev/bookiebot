@@ -2,6 +2,11 @@
 html.bb-pull-refresh-enabled { overscroll-behavior-y: contain; }
 .bb-pull-refresh-space { position: relative; flex-shrink: 0; transition: height 320ms var(--bb-motion-ease); }
 .bb-pull-refresh-space[data-phase="pulling"], .bb-pull-refresh-space[data-phase="armed"] { transition: none; }
+/* The temporary gap owns this motion. Scroll anchoring must not counter its
+   shrinking height with a second stream of viewport corrections. */
+.bb-app-shell:has(> .bb-pull-refresh-space[data-released="true"]) { overflow-anchor: none; }
+.bb-pull-refresh-space[data-phase="settling"] { transition: height 360ms cubic-bezier(.4, 0, .2, 1); }
+.bb-pull-refresh[data-phase="settling"] { transition: transform 360ms cubic-bezier(.4, 0, .2, 1), opacity 260ms; }
 /* Loading/results stay in the document above the masthead and scroll with it.
    Only live pulling uses viewport positioning to avoid adding a drag offset. */
 .bb-pull-refresh { position: absolute; z-index: 65; top: max(10px, env(safe-area-inset-top, 0px)); left: 50%; transform: translate(-50%, -24px); opacity: 0; pointer-events: none; transition: transform 320ms var(--bb-motion-ease), opacity 260ms; }
@@ -31,9 +36,10 @@ html.bb-pull-refresh-enabled { overscroll-behavior-y: contain; }
 .bb-pull-refresh[data-phase="error"] .bb-pull-refresh-button { color: hsl(var(--destructive)); }
 .bb-pull-refresh-button:focus-visible { outline: 2px solid hsl(var(--primary)); outline-offset: 3px; }
 .bb-pull-refresh:has(:focus-visible) { opacity: 1; transform: translate(-50%, 0); }
+.bb-pull-refresh[data-blocked="true"] { visibility: hidden; }
 @media (hover: hover) and (pointer: fine) { .bb-pull-refresh[data-phase="idle"] { opacity: 1; transform: translate(-50%, 0); } }
 @keyframes bb-pull-spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
 @keyframes bb-pull-release { from { translate: 0 calc(-1 * var(--bb-release-overscroll, 0px)); } to { translate: 0 0; } }
 @keyframes bb-pull-pop { 0% { transform: scale(.92); } 45% { transform: scale(1.15); } 75% { transform: scale(.98); } 100% { transform: scale(1); } }
 @keyframes bb-pull-burst { 0% { opacity: 0; transform: scale(.65); stroke-dashoffset: 6; } 25% { opacity: .85; stroke-dashoffset: 0; } 100% { opacity: 0; transform: scale(1.22); stroke-dashoffset: -6; } }
-@media (prefers-reduced-motion: reduce) { .bb-pull-refresh, .bb-pull-refresh-space, .bb-pull-refresh svg *, .bb-pull-disc { transition: none; } .bb-pull-refresh-space > .bb-pull-refresh, .bb-pull-refresh :is(.bb-pull-spinner, .bb-pull-disc, .bb-pull-burst) { animation: none !important; } }
+@media (prefers-reduced-motion: reduce) { .bb-pull-refresh[data-phase], .bb-pull-refresh-space[data-phase], .bb-pull-refresh svg *, .bb-pull-disc { transition: none; } .bb-pull-refresh-space > .bb-pull-refresh, .bb-pull-refresh :is(.bb-pull-spinner, .bb-pull-disc, .bb-pull-burst) { animation: none !important; } }

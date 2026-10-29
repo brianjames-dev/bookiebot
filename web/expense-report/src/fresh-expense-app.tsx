@@ -73,17 +73,24 @@ function FreshExpenseContent({ config }: { config: ExpenseAppConfig }) {
   else if (state.report) lastReport.current = state.report
   const shellReport = state.report ?? lastReport.current
   const avatarUrl = `/app/avatar.png?day=${new Date().toISOString().slice(0, 10)}`
-  const controls = <AppRefreshControl state={state} refresh={refresh} showButton={!shellReport} />
+  // Learning the initial owner hydrates the existing chrome. A subsequent
+  // owner change still disposes all previous financial controllers and drafts.
+  const ownerScope = useRef({ owner: "", generation: 0 })
+  if (state.report) {
+    if (ownerScope.current.owner && ownerScope.current.owner !== state.report.ownerName) ownerScope.current.generation++
+    ownerScope.current.owner = state.report.ownerName
+  }
+  const controls = <AppRefreshControl state={state} refresh={refresh} showButton={false} />
   const reportMonth = state.report ? `${state.report.year}-${String(state.report.month).padStart(2, "0")}` : undefined
   const history = useReportMonthCatalog(!disconnected, expire, reportMonth, state.report)
   const monthControl = <MonthHistoryControl monthLabel={state.report?.monthLabel ?? reportMonthLabel(state.selectedMonth)}
     selectedMonth={state.selectedMonth} catalog={history.catalog} loading={history.loading} error={history.error} errorMessage={history.errorMessage}
     onSelect={selectMonth} onRetry={history.refresh} disabled={state.signingOut} />
 
-  if (shellReport) {
+  if (!disconnected) {
     return <ExpenseAppShell
-      key={shellReport.ownerName}
-      report={shellReport}
+      key={ownerScope.current.generation}
+      report={shellReport} ownerName={config.ownerName}
       monthlyReady={Boolean(state.report)}
       onRefresh={refresh} reportBusy={busy}
       questionMonth={state.selectedMonth ?? history.catalog?.currentMonth ?? reportMonth}
@@ -92,7 +99,7 @@ function FreshExpenseContent({ config }: { config: ExpenseAppConfig }) {
       avatarUrl={avatarUrl}
       signOut={signOut} signingOut={state.signingOut}
       monthControl={monthControl}
-      comparison={<ReportComparison report={shellReport} onExpired={expire} refreshing={busy || !state.report}
+      comparison={shellReport && <ReportComparison report={shellReport} onExpired={expire} refreshing={busy || !state.report}
         catalog={history.catalog} catalogLoading={history.loading} catalogError={history.error} catalogErrorMessage={history.errorMessage} onCatalogRetry={history.refresh} />}
     />
   }
@@ -101,20 +108,11 @@ function FreshExpenseContent({ config }: { config: ExpenseAppConfig }) {
     <div className="bb-page bb-app-welcome">
       <div className="bb-masthead">
         <span className="bb-wordmark"><img className="bb-app-avatar" src={avatarUrl} alt="" />BookieBot</span>
-        {!disconnected && config.ownerName !== "BookieBot" && <span className="bb-app-owner">{config.ownerName}</span>}
       </div>
       <main className="bb-app-opening" aria-busy={busy}>
-        <p className="bb-report-period">Your spending, at a glance</p>
-        <h1>{disconnected ? state.phase === "signed-out" ? "You’re signed out" : "Reconnect to BookieBot" : monthControl}</h1>
-        {disconnected ? (
-          <div>
-            <p role="status">{state.phase === "expired" ? "Your connection has expired." : "Your report is closed on this device."}</p>
-            <ExpenseAppReconnect />
-          </div>
-        ) : <>
-          {controls}
-          {busy && <div className="bb-app-loading-sheet" aria-hidden="true"><span /><span /><span /><span /></div>}
-        </>}
+        <h1>{state.phase === "signed-out" ? "You’re signed out" : "Reconnect to BookieBot"}</h1>
+        <p role="status">{state.phase === "expired" ? "Your connection has expired." : "Your report is closed on this device."}</p>
+        <ExpenseAppReconnect />
       </main>
     </div>
   )

@@ -16,6 +16,7 @@ import {
 import { createPortal } from "react-dom"
 import { stablePieAnimation, stableBarAnimation, stableBarShape, StablePieSector, type AnimatedPieSector } from "./chart-animation"
 import { ReportScreen, useAppNavigation } from "./app-navigation"
+import { ReportHeader } from "./report-header"
 import {
   Bar,
   BarChart,
@@ -533,7 +534,8 @@ function useViewportScrollbarWidth() {
   }, [])
 }
 
-export function ExpenseReportApp({ report, appControls, appAvatarUrl, appSession, appMonthControl, appComparison, appUpdate }: {
+export function ExpenseReportApp({ report, appControls, appAvatarUrl, appSession, appMonthControl, appComparison, appUpdate, externalHeader = false }: {
+  externalHeader?: boolean
   appUpdate?: ReactNode
   appMonthControl?: ReactNode
   appComparison?: ReactNode
@@ -589,7 +591,7 @@ export function ExpenseReportApp({ report, appControls, appAvatarUrl, appSession
     dismissChartTooltips()
     setMetricInspection(null)
     setInspection(null)
-  }, [navigation?.screen])
+  }, [navigation?.screen, projectionActive])
 
   return (
     <div className={navigation ? "bb-report-content" : "bb-page"}>
@@ -602,16 +604,9 @@ export function ExpenseReportApp({ report, appControls, appAvatarUrl, appSession
           </button>}
         </ReportMenu>
       </div>}
-      <header className="bb-page-header bb-report-header" hidden={Boolean(navigation && navigation.screen !== "overview")}>
-        <h1 className="bb-report-context">{appMonthControl ?? report.monthLabel}</h1>
-        <div className="bb-header-actions">
-          <ProjectionToggle
-            active={projectionActive}
-            onToggle={toggleProjection}
-          />
-        </div>
-        {appControls ?? <span className="bb-report-updated">Updated {generatedTimeLabel(report.generatedAt)}</span>}
-      </header>
+      {!externalHeader && <ReportHeader month={appMonthControl ?? report.monthLabel} projected={projectionActive} onToggle={toggleProjection}
+        hidden={Boolean(navigation && navigation.screen !== "overview")}
+        controls={appControls ?? <span className="bb-report-updated">Updated {generatedTimeLabel(report.generatedAt)}</span>} />}
       {appUpdate}
       <ChartTooltipDismissProvider revision={chartTooltipDismissRevision}>
         <main className="bb-main" data-bb-tooltip-dismiss-revision={chartTooltipDismissRevision}>
@@ -1205,15 +1200,6 @@ function ChartCarouselIndicators({
           {panel.title}
         </button>
       ))}
-    </SlidingSelection>
-  )
-}
-
-function ProjectionToggle({ active, onToggle }: { active: boolean; onToggle: () => void }) {
-  return (
-    <SlidingSelection value={Number(active)} className="bb-projection-control" role="group" aria-label="Report view" data-bb-tooltip-dismiss-trigger="projection">
-      <button type="button" className="bb-metric-toggle" aria-pressed={!active} onClick={() => { if (active) onToggle() }}>Current</button>
-      <button type="button" className="bb-metric-toggle" aria-pressed={active} onClick={() => { if (!active) onToggle() }}>Projected</button>
     </SlidingSelection>
   )
 }

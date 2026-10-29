@@ -38,7 +38,7 @@ export function PullToRefresh({ screen, blocked = false }: { screen: AppScreen; 
   const refreshScreen = useRef<AppScreen | null>(null)
   state.current = { screen, blocked }
   const available = !blocked && registry.available(screen)
-  const reset = () => { gesture.current = null; pulled.current = 0; setDistance(0); if (!running.current) setPhase("idle") }
+  const reset = () => { window.clearTimeout(timer.current); gesture.current = null; pulled.current = 0; setDistance(0); if (!running.current) setPhase("idle") }
   const refresh = async () => {
     const selected = state.current.screen
     if (running.current || state.current.blocked || pageIsBlocked() || !registry.available(selected)) return
@@ -56,7 +56,9 @@ export function PullToRefresh({ screen, blocked = false }: { screen: AppScreen; 
       if (!success) { reset(); return }
       // Keep the successful glyph while the page and indicator ease home.
       setDistance(0); setPhase("settling")
-      timer.current = window.setTimeout(reset, 320)
+      // Finish on the actual CSS transition, after the browser paints its last
+      // frame. A fallback also clears hidden/reduced-motion pages without events.
+      timer.current = window.setTimeout(reset, window.matchMedia?.("(prefers-reduced-motion: reduce)").matches ? 0 : 500)
     }, success ? 900 : 4000)
   }
   const actions = useRef({ reset, refresh }); actions.current = { reset, refresh }
@@ -150,8 +152,14 @@ export function PullToRefresh({ screen, blocked = false }: { screen: AppScreen; 
   const tracking = phase === "pulling" || phase === "armed"
   const offset = visible && !tracking ? Math.min(distance, PULL_REFRESH_THRESHOLD) : 0
   const ratio = Math.min(1, distance / PULL_REFRESH_THRESHOLD), progress = Math.min(ratio < 1 ? 99 : 100, Math.round(ratio * 100))
-  return <div className="bb-pull-refresh-space" data-phase={phase} data-released={offset > 0} style={{ height: offset }}>
-    <div className="bb-pull-refresh" data-phase={phase} data-visible={visible} style={{
+  return <div className="bb-pull-refresh-space" data-phase={phase} data-released={offset > 0 || phase === "settling"} style={{ height: offset }}
+    onTransitionEnd={event => {
+      if (phase !== "settling" || event.target !== event.currentTarget || event.propertyName !== "height") return
+      // A new finger may already be down; finishing the previous animation
+      // must not discard that native gesture before its first movement.
+      window.clearTimeout(timer.current); setPhase("idle")
+    }}>
+    <div className="bb-pull-refresh" data-phase={phase} data-visible={visible} data-blocked={blocked} style={{
       "--bb-pull-distance": `${visible ? Math.min(distance, PULL_REFRESH_THRESHOLD) : 0}px`,
       "--bb-pull-scale": tracking ? .72 + .36 * ratio : 1,
       "--bb-release-overscroll": `${releaseOverscroll}px`,

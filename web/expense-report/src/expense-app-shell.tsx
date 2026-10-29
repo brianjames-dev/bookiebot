@@ -20,10 +20,11 @@ import { ReconciliationScreen, useReconciliation } from "./reconciliation-screen
 import { TransactionsScreen } from "./transactions-screen"
 import { PageRefreshProvider, usePageRefresh } from "./page-refresh"
 import { PullToRefresh } from "./pull-to-refresh"
+import { ReportHeader } from "./report-header"
 import type { ExpenseReportData } from "./types"
 
 interface ExpenseAppShellProps {
-  report: ExpenseReportData; controls: ReactNode; monthControl: ReactNode; comparison: ReactNode
+  report: ExpenseReportData | null; ownerName?: string; controls: ReactNode; monthControl: ReactNode; comparison: ReactNode
   avatarUrl: string; initialVersion: string; signOut: () => void; signingOut: boolean
   monthlyReady?: boolean; questionMonth?: string
   onRefresh?: () => Promise<boolean>; reportBusy?: boolean
@@ -31,16 +32,17 @@ interface ExpenseAppShellProps {
 export function ExpenseAppShell(props: ExpenseAppShellProps) {
   return <PageRefreshProvider><ExpenseAppShellContent {...props} /></PageRefreshProvider>
 }
-function ExpenseAppShellContent({ report, controls, monthControl, comparison, avatarUrl, initialVersion, signOut, signingOut, monthlyReady = true, questionMonth, onRefresh, reportBusy = false }: ExpenseAppShellProps) {
+function ExpenseAppShellContent({ report, ownerName = "BookieBot", controls, monthControl, comparison, avatarUrl, initialVersion, signOut, signingOut, monthlyReady = true, questionMonth, onRefresh, reportBusy = false }: ExpenseAppShellProps) {
   const { theme, toggleTheme } = useExpenseReportTheme()
-  const reconciliation = useReconciliation()
+  const reconciliation = useReconciliation(Boolean(report))
+  const owner = report?.ownerName ?? ownerName
   const reconciliationEnabled = reconciliation.snapshot?.enabled === true
   // Reserve the tab immediately; only a completed connection check can prove
   // it is unavailable. Slow or failed reads stay reachable through the tab.
   const reconciliationVisible = reconciliation.snapshot?.enabled !== false
   const visibleRef = useRef(reconciliationVisible)
   visibleRef.current = reconciliationVisible
-  const preferences = useReportViewPreferences(report.ownerName, Boolean(report.burnRate))
+  const preferences = useReportViewPreferences(owner, Boolean(report?.burnRate), Boolean(report))
   const [screen, setScreen] = useState<AppScreen>(() => window.location.hash === "#settings" ? "settings" : "overview")
   const [lastMain, setLastMain] = useState<MainScreen>("overview")
   const [widgetGuideOpen, setWidgetGuideOpen] = useState(false)
@@ -57,10 +59,11 @@ function ExpenseAppShellContent({ report, controls, monthControl, comparison, av
   const sourceId = useRef(0)
   const scrollState = useRef<ScrollNavigationState>({ lastY: 0, travel: 0, compact: false })
   const guard = useAppWorkGuard()
-  const reportRefresh = { refresh: onRefresh ?? (async () => false), disabled: !onRefresh || reportBusy || signingOut || guard.pending || guard.uncertain }
+  const reportRefresh = { refresh: onRefresh ?? (async () => false), disabled: !report || !onRefresh || reportBusy || signingOut || guard.pending || guard.uncertain }
   usePageRefresh("overview", reportRefresh)
   usePageRefresh("savings", reportRefresh)
   const selectScreen = (next: AppScreen) => {
+    if (!report) return
     if (next === "reconcile" && !visibleRef.current) return
     if (next === screenRef.current) {
       if (next === "settings" && widgetGuideRef.current) {
@@ -105,9 +108,9 @@ function ExpenseAppShellContent({ report, controls, monthControl, comparison, av
     const returnToSettings = () => { if (window.location.hash === "#settings") selectScreen("settings") }
     window.addEventListener("hashchange", returnToSettings)
     return () => window.removeEventListener("hashchange", returnToSettings)
-  }, [])
+  }, [Boolean(report)])
 
-  const reportIdentity = expenseReportIdentity(report)
+  const reportIdentity = report ? expenseReportIdentity(report) : ""
   useEffect(() => { setSourceRequest(null) }, [reportIdentity, monthlyReady])
   const consumeSource = (id: number) => setSourceRequest(current => current?.id === id ? null : current)
 
@@ -158,7 +161,7 @@ function ExpenseAppShellContent({ report, controls, monthControl, comparison, av
   const showSource = (section: string) => {
     setAskOpen(false)
     selectScreen(screenForReportSource(section))
-    setSourceRequest({ section, id: ++sourceId.current, scope: expenseReportIdentity(report) })
+    setSourceRequest({ section, id: ++sourceId.current, scope: reportIdentity })
   }
   useEffect(() => {
     if (sourceRequest?.section !== "reimbursements" || screen !== "shared") return
@@ -173,50 +176,54 @@ function ExpenseAppShellContent({ report, controls, monthControl, comparison, av
   }, [sourceRequest, screen])
 
   const reportVisible = screen === "overview"
-  const fallback = <SharedReimbursementsCard items={report.sharedReimbursements ?? []} openItems={report.openSharedReimbursements}
+  const fallback = report && <SharedReimbursementsCard items={report.sharedReimbursements ?? []} openItems={report.openSharedReimbursements}
     receivedItems={report.receivedSharedReimbursements} coverage={report.reimbursementCoverage}
     monthLabel={report.monthLabel} year={report.year} month={report.month} />
 
-  const scopedSourceRequest = sourceRequest?.scope === expenseReportIdentity(report) ? sourceRequest : null
+  const scopedSourceRequest = sourceRequest?.scope === reportIdentity ? sourceRequest : null
   return <AppNavigationContext.Provider value={{ screen, selectScreen, preferences, sourceRequest: scopedSourceRequest, consumeSource }}>
     <div className="bb-page bb-app-shell k-ios" data-screen={screen} data-keyboard-open={keyboardOpen}>
-      <PullToRefresh screen={screen} blocked={signingOut || askOpen || keyboardOpen || widgetGuideOpen} />
+      <PullToRefresh screen={screen} blocked={!report || signingOut || askOpen || keyboardOpen || widgetGuideOpen} />
       <header className="bb-masthead bb-shell-masthead">
-        <span className="bb-wordmark"><img className="bb-app-avatar" src={avatarUrl} alt="" />BookieBot<span className="bb-report-owner"><span aria-hidden="true">•</span>{" "}{report.ownerName}</span></span>
+        <span className="bb-wordmark"><img className="bb-app-avatar" src={avatarUrl} alt="" />BookieBot{owner !== "BookieBot" && <span className="bb-report-owner"><span aria-hidden="true">•</span>{" "}{owner}</span>}</span>
         <Toolbar top className="bb-shell-header-actions" role="group" aria-label="BookieBot tools" innerClassName="bb-shell-toolbar-inner">
           <ToolbarPane className="bb-shell-toolbar-pane">
-            <button ref={askTriggerRef} type="button" className="bb-shell-icon" aria-label="Ask BookieBot" aria-haspopup="dialog" aria-expanded={askOpen && monthlyReady} disabled={!monthlyReady} onClick={() => setAskOpen(true)}><MessageCircle aria-hidden="true" /></button>
+            <button ref={askTriggerRef} type="button" className="bb-shell-icon" aria-label="Ask BookieBot" aria-haspopup="dialog" aria-expanded={askOpen && monthlyReady} disabled={!report || !monthlyReady} onClick={() => setAskOpen(true)}><MessageCircle aria-hidden="true" /></button>
           </ToolbarPane>
           <ToolbarPane className="bb-shell-toolbar-pane">
-            <button type="button" className="bb-shell-icon" aria-label="Settings" aria-current={screen === "settings" ? "page" : undefined} onClick={() => selectScreen(screen === "settings" && !widgetGuideOpen ? lastMain : "settings")}><Settings aria-hidden="true" /></button>
+            <button type="button" className="bb-shell-icon" aria-label="Settings" disabled={!report} aria-current={screen === "settings" ? "page" : undefined} onClick={() => selectScreen(screen === "settings" && !widgetGuideOpen ? lastMain : "settings")}><Settings aria-hidden="true" /></button>
           </ToolbarPane>
         </Toolbar>
       </header>
 
 
+      <ReportHeader month={monthControl} projected={preferences.mode === "projected"}
+        onToggle={() => preferences.setMode(preferences.mode === "projected" ? "current" : "projected")}
+        controls={controls} disabled={!report} hidden={!reportVisible} />
       <div className="bb-shell-report" hidden={!reportVisible || !monthlyReady}>
-        <ExpenseReportApp key={expenseReportIdentity(report)} report={report} appControls={controls} appMonthControl={monthControl}
-          appComparison={comparison} appSession={{ signOut, signingOut }} />
+        {report && <ExpenseReportApp key={reportIdentity} report={report} externalHeader
+          appComparison={comparison} appSession={{ signOut, signingOut }} />}
       </div>
-      {!monthlyReady && reportVisible && <main className="bb-shell-report-loading bb-main">
-        <div className="bb-page-header"><div className="bb-report-context"><h1>{monthControl}</h1></div>{controls}</div>
-        <p role="status" className="bb-settings-note">Load the selected month to view its report. Shared and Savings are still available.</p>
+      {!monthlyReady && <main className="bb-shell-report-loading bb-main" hidden={!reportVisible && Boolean(report)} aria-busy={reportBusy}>
+        {reportBusy ? <div className="bb-report-loading" role="status">
+          <span className="bb-pull-spinner bb-report-loading-spinner" aria-hidden="true"><svg viewBox="0 0 32 32"><circle className="bb-pull-progress" cx="16" cy="16" r="12" pathLength="100" strokeDasharray="100" strokeDashoffset="25" /></svg></span>
+          <span className="sr-only">Loading your report…</span>
+        </div> : <button type="button" className="bb-settings-action" onClick={() => void onRefresh?.()}>Try loading the report again</button>}
       </main>}
       <main className="bb-shell-transactions bb-main" aria-label="Transactions" hidden={screen !== "transactions"}>
-        <TransactionsScreen key={report.ownerName} active={screen === "transactions"} ownerName={report.ownerName} initialMonth={`${report.year}-${String(report.month).padStart(2,"0")}`} />
+        {report && <TransactionsScreen key={report.ownerName} active={screen === "transactions"} ownerName={report.ownerName} initialMonth={`${report.year}-${String(report.month).padStart(2,"0")}`} />}
       </main>
       <main className="bb-shell-shared bb-main" aria-label="Shared" hidden={screen !== "shared"}>
-        <ReimbursementLedger fallback={fallback} refreshKey={report.generatedAt} />
+        {report && <ReimbursementLedger fallback={fallback} refreshKey={report.generatedAt} />}
       </main>
       <main className="bb-shell-savings bb-main" aria-label="Savings" hidden={screen !== "savings"}>
-        <SavingsGoals />
-        <Investments report={report} ready={monthlyReady} />
+        {report && <><SavingsGoals /><Investments report={report} ready={monthlyReady} /></>}
       </main>
       <main className="bb-shell-reconcile bb-main" aria-label="Reconcile" hidden={screen !== "reconcile" || !reconciliationVisible}>
-        <ReconciliationScreen controller={reconciliation} />
+        {report && <ReconciliationScreen controller={reconciliation} />}
       </main>
       <main className="bb-shell-settings bb-main" aria-label="Settings" hidden={screen !== "settings" || widgetGuideOpen}>
-        <div className="bb-settings-heading"><button type="button" className="bb-settings-back" onClick={() => selectScreen(lastMain)}><ArrowLeft aria-hidden="true" />Back</button><h1>Settings</h1></div>
+        {report && <><div className="bb-settings-heading"><button type="button" className="bb-settings-back" onClick={() => selectScreen(lastMain)}><ArrowLeft aria-hidden="true" />Back</button><h1>Settings</h1></div>
         <section className="bb-settings-section" aria-labelledby="bb-appearance-title"><h2 id="bb-appearance-title">Appearance</h2>
           <div className="bb-setting-row"><span>Dark mode</span><button type="button" className="bb-setting-switch" role="switch" aria-label="Dark mode" aria-checked={theme === "dark"} onClick={toggleTheme}><span /></button></div>
         </section>
@@ -232,6 +239,7 @@ function ExpenseAppShellContent({ report, controls, monthControl, comparison, av
           {availableVersion ? <button type="button" className="bb-settings-action" disabled={guard.pending || guard.uncertain} onClick={() => window.dispatchEvent(new CustomEvent("bookiebot:request-app-update"))}>Update available · Update now</button>
             : <p className="bb-settings-note">Updates appear here when available.</p>}
         </section>
+        </>}
       </main>
       {screen === "settings" && widgetGuideOpen && <main className="bb-shell-settings bb-main" aria-label="Widget setup">
         <WidgetSetupGuide onBack={() => selectScreen("settings")} onPair={returnToWidgets} />
@@ -239,8 +247,8 @@ function ExpenseAppShellContent({ report, controls, monthControl, comparison, av
 
       {/* top omits Konsta’s under-bar blur/gradient; CSS anchors this floating bar at the bottom. */}
       <AppNavigationBar active={screen === "settings" ? lastMain : screen} current={screen === "settings" ? null : screen} compact={compact && !askOpen}
-        reconciliationVisible={reconciliationVisible} hidden={keyboardOpen} onSelect={selectScreen} />
-      <AskBookieBotPanel open={askOpen && monthlyReady} openerRef={askTriggerRef} onClose={() => setAskOpen(false)} month={questionMonth ?? `${report.year}-${String(report.month).padStart(2, "0")}`} mode={preferences.mode} onShowSource={showSource} />
+        reconciliationVisible={reconciliationVisible} hidden={keyboardOpen} disabled={!report} onSelect={selectScreen} />
+      {report && <AskBookieBotPanel open={askOpen && monthlyReady} openerRef={askTriggerRef} onClose={() => setAskOpen(false)} month={questionMonth ?? `${report.year}-${String(report.month).padStart(2, "0")}`} mode={preferences.mode} onShowSource={showSource} />}
       <AppUpdatePrompt initialVersion={initialVersion} onAvailabilityChange={setAvailableVersion} />
     </div>
   </AppNavigationContext.Provider>

@@ -34,12 +34,13 @@ function selectionBounds(button: HTMLElement) {
   return fitNavigationSelection(tabs, buttons.indexOf(button), { width: frame.width / scaleX, height: frame.height / scaleY })
 }
 
-export function AppNavigationBar({ active, current = active, compact, reconciliationVisible, hidden, onSelect }: {
+export function AppNavigationBar({ active, current = active, compact, reconciliationVisible, hidden, disabled = false, onSelect }: {
   active: MainScreen
   current?: MainScreen | null
   compact: boolean
   reconciliationVisible: boolean
   hidden?: boolean
+  disabled?: boolean
   onSelect: (screen: MainScreen) => void
 }) {
   const [preview, setPreview] = useState<MainScreen | null>(null)
@@ -57,6 +58,7 @@ export function AppNavigationBar({ active, current = active, compact, reconcilia
   const finishPointer = () => { pointer.current = null; setPreview(null) }
   const startPointer = (event: PointerEvent<HTMLElement>) => {
     suppressClick.current = false
+    if (disabled) return
     if (event.pointerType !== "touch" && event.pointerType !== "pen") return
     pointer.current = event.pointerId
     setPreview(screenAt(event.clientX))
@@ -73,7 +75,7 @@ export function AppNavigationBar({ active, current = active, compact, reconcilia
         const selected = screenAt(event.clientX)
         finishPointer()
         suppressClick.current = true
-        if (selected) onSelect(selected)
+        if (selected && !disabled) onSelect(selected)
       }}
       onPointerCancel={finishPointer} onLostPointerCapture={finishPointer}
       onClickCapture={event => {
@@ -84,10 +86,10 @@ export function AppNavigationBar({ active, current = active, compact, reconcilia
         }
       }}>
       <span className="bb-selection-indicator bb-navigation-selection" aria-hidden="true" />
-      {tabs.map(({ id, Icon }) => <TabbarLink key={id} component={NavigationButton} linkProps={{ type: "button" }} className="bb-navigation-link"
+      {tabs.map(({ id, Icon }) => <TabbarLink key={id} component={NavigationButton} linkProps={{ type: "button", disabled }} className="bb-navigation-link"
         active={active === id} data-state={(preview ?? active) === id ? "active" : "inactive"} data-nav-screen={id}
         aria-label={screenTitles[id]} aria-current={current === id ? "page" : undefined}
-        label={screenTitles[id]} icon={<Icon size={23} strokeWidth={1.7} aria-hidden="true" />} onClick={() => onSelect(id)} />)}
+        label={screenTitles[id]} icon={<Icon size={23} strokeWidth={1.7} aria-hidden="true" />} onClick={() => { if (!disabled) onSelect(id) }} />)}
     </Glass>
   </Tabbar>
 }

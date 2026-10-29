@@ -110,7 +110,7 @@ async function request(path: string, controller: AbortController, body?: Command
   } finally { window.clearTimeout(timeout); controller.signal.removeEventListener("abort", abort) }
 }
 
-export function useReconciliation() {
+export function useReconciliation(enabled = true) {
   const [snapshot, setSnapshot] = useState<Snapshot | null>(null)
   const [error, setError] = useState("")
   const [busy, setBusy] = useState(false)
@@ -162,6 +162,7 @@ export function useReconciliation() {
     } finally { if (active()) { current.current = null; setBusy(false); setPendingOperation(null) } }
   }, [updateWork])
   useEffect(() => {
+    if (!enabled) return
     mounted.current = true; void load()
     const refresh = () => { if (document.visibilityState === "visible" && !blocked.current) void load() }
     window.addEventListener("focus", refresh); window.addEventListener("online", refresh)
@@ -169,7 +170,7 @@ export function useReconciliation() {
     return () => { mounted.current = false; current.current?.abort(); current.current = null
       window.removeEventListener("focus", refresh); window.removeEventListener("online", refresh)
       document.removeEventListener("visibilitychange", refresh) }
-  }, [load])
+  }, [load, enabled])
   const rejectAccess = useCallback((message: string) => {
     current.current?.abort(); current.current = null
     setSnapshot(null); setRevision(value => value + 1); setError(message); setBusy(false)

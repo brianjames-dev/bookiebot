@@ -303,10 +303,10 @@ async function main() {
   await run(() => tree.unmount())
 
   // Exercise the real FreshExpenseApp ownership boundary, with only its network/catalog transport replaced.
-  let session
+  let session, bootPending = true
   class FixtureSession {
     constructor() { session = this; this.listeners = new Set() }
-    subscribe(fn) { this.listeners.add(fn); fn({ ...realSession.initialExpenseAppState, phase: 'ready', report }); return () => this.listeners.delete(fn) }
+    subscribe(fn) { this.listeners.add(fn); fn(bootPending ? realSession.initialExpenseAppState : { ...realSession.initialExpenseAppState, phase: 'ready', report }); return () => this.listeners.delete(fn) }
     emitState(next) { this.listeners.forEach(fn => fn({ ...realSession.initialExpenseAppState, ...next })) }
     emit(next) { this.emitState({ phase: 'ready', report: next }) }
     async refresh() {} dispose() {} async signOut() {} async selectMonth() {} expire() {}
@@ -316,8 +316,34 @@ async function main() {
   mocks.set(src('expense-app-reconnect.tsx'), { ExpenseAppReconnect: () => null })
   mocks.set(src('report-history.tsx'), { MonthHistoryControl: () => null, ReportComparison: () => null, reportMonthLabel: () => 'September 2026', useReportMonthCatalog: () => ({ catalog: null, loading: false, error: false, refresh() {} }) })
   const { FreshExpenseApp } = load(src('fresh-expense-app.tsx'))
-  const config = { reportUrl: '/synthetic-report', logoutUrl: '/synthetic-logout', ownerName: 'Brian', version: 'shell-version-1' }
+  const config = { reportUrl: '/synthetic-report', logoutUrl: '/synthetic-logout', ownerName: 'BookieBot', version: 'shell-version-1' }
   await run(() => { tree = create(h(FreshExpenseApp, { config })) })
+  const initialShell = tree.root.findByType(ExpenseAppShell)
+  const initialMasthead = tree.root.findByProps({className:'bb-masthead bb-shell-masthead'})
+  const initialHeader = tree.root.findByProps({className:'bb-page-header bb-report-header'})
+  const initialNav = tree.root.findByType('nav')
+  assert.equal(tree.root.findAllByProps({className:'bb-app-loading-sheet'}).length,0)
+  assert.equal(tree.root.findAllByProps({className:'bb-app-welcome'}).length,0)
+  assert.equal(tree.root.findAllByProps({className:'bb-report-loading'}).length,1,'Startup has one centered loading indicator')
+  for (const label of ['Overview','Transactions','Shared','Savings','Reconcile','Settings','Ask BookieBot','Current','Projected']) assert.equal(button(tree,label).props.disabled,true,`${label} waits for the first report`)
+  const bootReads = {...reads}
+  await run(() => win.dispatchEvent(new Event('focus')))
+  assert.deepEqual(reads,bootReads,'Boot chrome cannot start financial controllers, including bank focus checks')
+  await run(() => session.emitState({phase:'error',report:null,message:'Fixture connection unavailable'}))
+  assert.equal(tree.root.findByProps({className:'bb-page-header bb-report-header'}),initialHeader,'A startup error retains the actual header')
+  assert.ok(button(tree,'Try loading the report again'),'Startup failure retains an explicit retry')
+  assert.deepEqual(reads,bootReads,'An initial failure does not start financial controllers')
+  bootPending = false
+  await run(() => session.emit(report))
+  assert.equal(tree.root.findByType(ExpenseAppShell),initialShell,'Resolving an initially unknown owner keeps the same shell')
+  assert.equal(tree.root.findByProps({className:'bb-masthead bb-shell-masthead'}),initialMasthead)
+  assert.equal(tree.root.findByProps({className:'bb-page-header bb-report-header'}),initialHeader,'The real month/view header persists')
+  assert.equal(tree.root.findByType('nav'),initialNav,'The real navigation persists')
+  assert.equal(tree.root.findAllByProps({className:'bb-report-loading'}).length,0)
+  await run(() => { win.location.hash = '#settings'; win.dispatchEvent(new Event('hashchange')) })
+  assert.equal(screen(tree),'settings','Settings return routing becomes available after boot hydration')
+  win.location.hash = ''
+  await tap(tree,'Back')
   await tap(tree, 'Savings'); await tap(tree, '＋ Goal'); await fill(tree, 'Goal name', 'Private Brian draft')
   await fill(tree, 'Target ($)', '1000')
   await tap(tree, 'Shared'); await tap(tree, 'View 1 expense')

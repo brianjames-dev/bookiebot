@@ -1,5 +1,11 @@
 # Agent Decisions
 
+## 2026-10-29 - Finish Refresh Retraction And Hydrate The Existing App Chrome
+
+The final close uses a 360ms easing curve with zero initial/final velocity. Temporarily exclude the app content from browser scroll anchoring while the artificial gap is open/closing, keep the completed icon handoff attached, and clear success only after the gap's height transition ends, preserving any new finger already down. A 500ms fallback covers missing transition events (immediate cleanup with reduced motion). Native scroll/touch observers, 270px trigger and fixed controls remain intact; there are no scripted scroll corrections.
+
+Render the real app shell before its first report. Share the actual month/view header with standalone reports and keep the shell/header/nav nodes through startup readiness; show one centered spinner without fake report data. Keep data-dependent controls disabled and financial controllers unmounted/inactive until the first report. Initial owner discovery hydrates this shell; a later actual owner change still remounts it, and expiry/signout removes it. This extends the existing monthly shell-retention rule without persisting financial data or changing request/write semantics. Checklist 179 covers physical acceptance.
+
 ## 2026-10-29 - Let Native Rebound Finish Without Layout Feedback
 
 The user's release stutter exposed the remaining feedback loop: each negative scroll sample changed the loading-gap height, while the native-bounce flag disabled its transition. Stop observing scroll once the gesture is released. Give the loading gap a stable 64px target with its existing CSS transition; never resize it from rebound frames. Snapshot the native offset once at release solely for a composited icon handoff, with one CSS timeline that persists across refreshing → success/error so quick results do not restart it. Keep document anchoring, passive touch/momentum, fixed tools and accepted visuals.

@@ -2005,7 +2005,9 @@ def test_report_frontend_calendar_largest_and_burn_rate_presentation_regressions
     assert "after cross-category coverage" in source
     assert "<DailySpendingSection" in source
     assert 'aria-controls={detailsId}' in source
-    assert '<h1 className="bb-report-context">{appMonthControl ?? report.monthLabel}' in source
+    assert '<ReportHeader month={appMonthControl ?? report.monthLabel}' in source
+    header = (Path(__file__).resolve().parents[2] / "web/expense-report/src/report-header.tsx").read_text()
+    assert '<h1 className="bb-report-context">{month}</h1>' in header
     assert "<ReportMenu>" in source
     assert "<h1>Expense Breakdown</h1>" not in source
     assert "bb-burn-rate-primary" in source

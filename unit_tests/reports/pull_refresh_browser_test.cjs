@@ -46,7 +46,7 @@ async function waitReady(page,label) {
           window.__preventedMoves=0
           window.addEventListener('touchmove',event=>{if(event.defaultPrevented)window.__preventedMoves++},{passive:true})
         })
-        const requests=[],errors=[];let failedCheck=false,reportNumber=0,holdCheck=false,releaseCheck,holdReport=false,releaseReport
+        const requests=[],errors=[];let failedCheck=false,reportNumber=0,holdCheck=false,releaseCheck,holdReport=true,releaseReport
         page.on('pageerror',error=>errors.push(error.message))
         await page.route('**/*',async route=>{
           const request=route.request(),url=new URL(request.url()),name=url.pathname,body=request.postDataJSON()
@@ -75,7 +75,29 @@ async function waitReady(page,label) {
           await route.fulfill({json:value})
         })
         await page.goto('https://bookie.test/app/expenses')
-        await page.locator('.bb-app-shell').waitFor();await waitReady(page,'Overview')
+        await page.locator('.bb-report-loading-spinner').waitFor()
+        const boot = await page.evaluate(()=>{
+          const selectors=['.bb-shell-masthead','.bb-app-avatar','.bb-shell-header-actions','.bb-report-header','.bb-month-trigger','.bb-projection-control','.bb-bottom-navigation']
+          window.__bootElements=Object.fromEntries(selectors.map(s=>[s,document.querySelector(s)]))
+          const spinner=document.querySelector('.bb-report-loading-spinner').getBoundingClientRect(),main=document.querySelector('.bb-shell-report-loading').getBoundingClientRect()
+          return {spinnerCenter:spinner.x+spinner.width/2,mainCenter:main.x+main.width/2,disabled:[...document.querySelectorAll('.bb-bottom-navigation button,.bb-shell-icon,.bb-projection-control button')].every(n=>n.disabled),skeletons:document.querySelectorAll('.bb-app-loading-sheet,.bb-app-welcome,.bb-app-refresh').length,metrics:document.querySelectorAll('.bb-metrics-grid').length,overflow:document.documentElement.scrollWidth>innerWidth}
+        })
+        assert.ok(Math.abs(boot.spinnerCenter-boot.mainCenter)<1,'Startup spinner is centered in the actual content')
+        assert.equal(boot.disabled,true);assert.equal(boot.skeletons,0);assert.equal(boot.metrics,0,'No invented financial values before the first report');assert.equal(boot.overflow,false)
+        assert.ok(!requests.some(r=>['/app/reconciliation','/app/goals','/app/reimbursements','/app/widgets/settings','/app/transactions'].includes(r.name)),'The real chrome does not start financial controllers early')
+        if(width===390&&dark)await page.screenshot({path:`/tmp/bookiebot-startup-${engine.name()}.png`})
+        while(!releaseReport)await page.waitForTimeout(10)
+        holdReport=false;releaseReport()
+        await waitReady(page,'Overview')
+        assert.equal(await page.evaluate(()=>Object.entries(window.__bootElements).every(([s,n])=>document.querySelector(s)===n)),true,'Header, avatar, tools, month/view and navigation DOM persist after loading')
+        assert.equal(await page.locator('.bb-report-loading-spinner').count(),0)
+        if(dark) {
+          const transitions=await page.evaluate(()=>['.bb-pull-refresh-space','.bb-pull-refresh'].map(s=>{
+            const node=document.querySelector(s),phase=node.dataset.phase
+            node.dataset.phase='settling';const duration=getComputedStyle(node).transitionDuration;node.dataset.phase=phase;return duration
+          }))
+          assert.ok(transitions.every(duration=>parseFloat(duration)<=.001),'Reduced motion also overrides the more specific closing rules (including the global .01ms accessibility override)')
+        }
         if(width===320&&!dark) {
           for(const layoutWidth of [320,360,390,768,1024]) {
             await page.setViewportSize({width:layoutWidth,height:780})
@@ -162,7 +184,8 @@ async function waitReady(page,label) {
             window.__toolbarMotion=[];window.__sampleToolbar=true
             const sample=()=>{
               if(!window.__sampleToolbar)return
-              window.__toolbarMotion.push({top:document.querySelector('.bb-shell-header-actions').getBoundingClientRect().top,phase:document.querySelector('.bb-pull-refresh').dataset.phase})
+              const space=document.querySelector('.bb-pull-refresh-space')
+              window.__toolbarMotion.push({top:document.querySelector('.bb-shell-header-actions').getBoundingClientRect().top,phase:space.dataset.phase,height:space.getBoundingClientRect().height,target:space.style.height,brand:document.querySelector('.bb-wordmark').getBoundingClientRect().top,y:scrollY,anchoring:getComputedStyle(document.querySelector('.bb-app-shell')).overflowAnchor})
               requestAnimationFrame(sample)
             }
             sample()
@@ -262,6 +285,14 @@ async function waitReady(page,label) {
           const motion=await page.evaluate(()=>{window.__sampleToolbar=false;return window.__toolbarMotion})
           assert.ok(motion.every(frame=>Math.abs(frame.top-original['.bb-shell-header-actions'])<.5),'Top-right controls stay anchored through every refresh animation frame')
           for(const phase of ['refreshing','done','settling'])assert.ok(motion.some(frame=>frame.phase===phase),`Toolbar position sampled during ${phase}`)
+          const closing=motion.filter(frame=>frame.phase==='settling')
+          assert.ok(closing.length>=6,'Closing is an actual animation')
+          assert.ok(closing.every(f=>f.target==='0px'&&f.y===0),'Closing has one stable target and no competing scroll corrections')
+          assert.ok(closing[0].height>40,'The close begins gently instead of snapping most of the gap shut')
+          for(let i=1;i<closing.length;i++)assert.ok(closing[i].height<=closing[i-1].height+.1,'The final gap movement stays monotonic')
+          assert.ok(Math.min(...closing.map(f=>f.height))<1,'Animation completion precedes idle cleanup')
+          if(await page.evaluate(()=>CSS.supports('overflow-anchor','none')))assert.ok(closing.every(f=>f.anchoring==='none'),'Browser anchoring cannot counter the temporary gap')
+          assert.ok(Math.abs((await geometry())['.bb-wordmark']-original['.bb-wordmark'])<.5,'The brand finishes at its original position')
           assert.equal(requests.filter(r=>r.name==='/app/reconciliation').length,before+1)
           assert.equal(await page.evaluate(()=>scrollY),0,'The gesture must not reload/navigate or scroll the document')
           // A pull from an ordinary filter button, even with a sideways start,

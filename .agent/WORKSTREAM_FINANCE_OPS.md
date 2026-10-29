@@ -4,6 +4,10 @@ Last updated: 2026-10-29
 
 ## Goal
 
+### Refresh close-out and persistent startup chrome — 2026-10-29
+
+The user accepted initial release smoothing and the longer trigger. Refine final retraction with a gentle 360ms curve, scroll-anchor exclusion and transition-completion cleanup. Replace startup-only welcome/skeleton UI with the actual persistent app shell/header/nav and a centered spinner. Defer financial controllers until the first report; keep owner-change/expiry disposal and later month/draft retention. **7 focused / 2,758 full tests passed**, **557 optional PostgreSQL skipped**, clean Python/frontend types and locked Node 22 build; **48 Chromium/WebKit page cases** pass; native acceptance is STATUS checklist 179. No Finance Ops backlog, financial lifecycle or persistence change; browser APIs remain isolated fixtures.
+
 ### Smooth refresh release and 50% longer pull — 2026-10-29
 
 Remove scroll-frame loading-gap retargeting and transition suppression during native rebound. Use one stable loading target and a single native-offset snapshot for the icon's CSS handoff; quick completion retains that timeline. Increase trigger travel from 180px to 270px (+50%) while preserving the accepted header/visuals, native scrolling and page-specific operations. **5 focused / 2,758 full tests passed**, **557 optional PostgreSQL skipped**, clean types/build and **48 Chromium/WebKit page cases**, including rebound and quick-completion probes. Native acceptance is STATUS checklist 178. No Finance Ops backlog, financial lifecycle or persistence change; browser APIs remain isolated fixtures.

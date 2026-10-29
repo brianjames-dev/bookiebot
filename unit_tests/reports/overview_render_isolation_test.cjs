@@ -67,7 +67,7 @@ const runtime = { exports:{}, require:req, window, document,
   TopExpensesChart,MerchantChart,Tabs,ChartTooltipDismissProvider,useChartTooltipDismiss,
 }
 for(const name of ['Card','CardHeader','CardTitle','CardContent','ReportScreen','ReportMenu','TabsList','TabsTrigger','TabsContent','HiddenListPanel'])runtime[name]=passthrough
-for(const name of ['MetricCard','SavingsMetricCard','ProjectionToggle','ThemeToggle','SharedReimbursementsCard','ReimbursementLedger','Investments','SavingsGoals','ReportQuestions','PhoneNotifications','ActivityDetails','MetricExplanationDetails','TopExpensesTable','MerchantOccurrencesTable'])runtime[name]=leaf(name)
+for(const name of ['MetricCard','SavingsMetricCard','ReportHeader','ThemeToggle','SharedReimbursementsCard','ReimbursementLedger','Investments','SavingsGoals','ReportQuestions','PhoneNotifications','ActivityDetails','MetricExplanationDetails','TopExpensesTable','MerchantOccurrencesTable'])runtime[name]=leaf(name)
 runtime.ModalDetails=passthrough
 runtime.generatedTimeLabel=()=>''
 vm.runInNewContext(compiled,runtime)
@@ -104,7 +104,7 @@ act(()=>renderer.root.findByType(Tabs).props.onValueChange('merchants'))
 assert.equal(revisions.highlights,4);assert.equal(revisions.daily,4);assert.equal(revisions.category,4)
 unchanged(before,['viewCalculation','activityCalculation','dailyCalculation','daily','highlightLabels','category','calendar','burn','bills'])
 // Actual page-level changes must still recompute fresh values and inspections.
-act(()=>renderer.root.findByType(runtime.ProjectionToggle).props.onToggle())
+act(()=>renderer.root.findByType(runtime.ReportHeader).props.onToggle())
 assert.equal(renderer.root.findAllByType(runtime.MetricCard)[0].props.value,6000)
 assert.equal(spentCard().props.value,772,'Projected Spent uses its own expense and Saved values')
 act(()=>spentCard().props.onExplain())
