@@ -386,6 +386,8 @@ summary {
 
 .bb-metric-label {
   display: flex;
+  flex: 1;
+  min-width: 0;
   align-items: center;
   min-height: 34px;
   color: hsl(var(--muted-foreground));
@@ -3132,6 +3134,7 @@ button:focus-visible, summary:focus-visible {
 @media (max-width: 640px) {
   .bb-burn-rate-page .bb-stat-list { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px 12px; }
   .bb-metrics-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); padding: 0; margin-bottom: 20px; }
+  .bb-metrics-grid > .bb-metric-card:nth-child(-n+2) { padding-bottom: 40px; }
   .bb-metric-card:nth-child(odd) { border-left: 0; }
   .bb-metric-card:nth-child(n+3) { border-top: 1px solid hsl(var(--border)); }
   .bb-metric-value { font-size: 30px; }
@@ -3327,7 +3330,7 @@ button:focus-visible, summary:focus-visible {
 .bb-activity-list span, .bb-activity-list small { display:block; margin:4px 0 0; font-size:12px; }
 .bb-activity-summary, .bb-activity-footnote, .bb-activity-coverage { font-size:13px; line-height:1.6; color:hsl(var(--muted-foreground)); }
 
-.bb-metric-explain { display:flex; align-items:center; gap:7px; padding:0; color:inherit; background:transparent; border:0; font:inherit; cursor:pointer; }
+.bb-metric-explain { display:flex; align-items:center; justify-content:space-between; width:100%; gap:7px; padding:0; color:inherit; background:transparent; border:0; font:inherit; text-align:left; cursor:pointer; }
 .bb-metric-explain span { font-size:12px; opacity:.7; }
 .bb-metric-explanation dl { margin:22px 0; }
 .bb-metric-explanation dl > div { display:flex; justify-content:space-between; gap:16px; padding:12px 0; border-bottom:1px solid hsl(var(--border)); }

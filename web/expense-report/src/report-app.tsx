@@ -629,6 +629,7 @@ export function ExpenseReportApp({ report, appControls, appAvatarUrl, appSession
             onExplain={metricDetails ? () => setMetricInspection({...metricDetails.left, key: "left", view: activeReport}) : undefined}
             value={activeReport.metrics.incomeAfterExpenses}
             accent
+            wholeDollars
           >
             <RemainingCategoryBars balances={activeReport.categoryBalances} budgets={activeReport.categoryBudgets}
               onExplain={metricDetails ? () => setMetricInspection({...metricDetails.left, key: "left", view: activeReport}) : undefined} />
@@ -1492,6 +1493,7 @@ function MetricCard({
   control,
   onExplain,
   children,
+  wholeDollars = false,
 }: {
   onExplain?: () => void
   label: string
@@ -1500,6 +1502,7 @@ function MetricCard({
   accent?: boolean
   control?: ReactNode
   children?: ReactNode
+  wholeDollars?: boolean
 }) {
   const positive = accent && value !== null && value !== undefined && value >= 0
   const negative = value !== null && value !== undefined && value < 0
@@ -1510,7 +1513,7 @@ function MetricCard({
         {control}
       </div>
       <FittedAmount className={negative ? "bb-metric-value bb-negative" : positive ? "bb-metric-value bb-positive" : "bb-metric-value"}>
-        {formatMoney(value)}
+        {wholeDollars && value !== null && value !== undefined ? wholeMoney.format(value) : formatMoney(value)}
       </FittedAmount>
       {description ? <div className="bb-metric-note">{description}</div> : null}
       {children}
@@ -1530,7 +1533,7 @@ function RemainingCategoryBars({balances, budgets, onExplain}: {
       return <span className="bb-left-category-row" data-category={key} key={key}>
         <span>{key[0].toUpperCase()}</span>
         <span className="bb-left-category-track"><span style={{width: `${fraction * 100}%`}} /></span>
-        <span className="bb-left-category-amount">{Number.isInteger(amount) ? wholeMoney.format(amount) : formatMoney(amount)}</span>
+        <span className="bb-left-category-amount">{wholeMoney.format(amount)}</span>
       </span>
     })}
   </span>

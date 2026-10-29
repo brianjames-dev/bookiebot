@@ -22,6 +22,7 @@ const css = fs.readFileSync(path.join(root, 'src/bookiebot/reports/assets/expens
 const js = fs.readFileSync(path.join(root, 'src/bookiebot/reports/assets/expense-report-app.js'), 'utf8')
 const html = dark => `<!doctype html><html data-theme="${dark ? 'dark' : 'light'}"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><style>${css}</style></head><body><div id="bookiebot-expense-report-root"></div><script id="bookiebot-expense-app-config" type="application/json">${JSON.stringify({ownerName: 'Brian', reportUrl: '/app/expenses/data', logoutUrl: '/app/logout'})}</script><script>localStorage.setItem('bookiebot-expense-report-theme','${dark ? 'dark' : 'light'}')</script><script type="module">${js}</script></body></html>`
 const money = value => new Intl.NumberFormat('en-US', {style: 'currency', currency: 'USD'}).format(value)
+const wholeMoney = value => new Intl.NumberFormat('en-US', {style: 'currency', currency: 'USD', maximumFractionDigits: 0}).format(value)
 async function checkHeader(page, width) {
   const layout = await page.evaluate(() => {
     const rect = node => {const r = node.getBoundingClientRect(); return {left: r.left, right: r.right, top: r.top, width: r.width, height: r.height}}
@@ -86,8 +87,8 @@ async function checkHeader(page, width) {
           await page.waitForTimeout(300)
           const view = report.modeViews[mode.toLowerCase()]
           const totals = await page.locator('.bb-metrics-grid > .bb-metric-card > .bb-metric-value .bb-fitted-amount-text').allTextContents()
-          assert.deepEqual(totals, [view.metrics.monthlyIncome, view.metrics.totalExpenses + view.metrics.amountSaved, view.metrics.incomeAfterExpenses, view.metrics.amountSaved].map(money))
-          assert.deepEqual(await page.locator('.bb-left-category-amount').allTextContents(), (i ? ['$1,250.25', '$900', '$350.50'] : ['$1,150', '$500.25', '$100']))
+          assert.deepEqual(totals, [money(view.metrics.monthlyIncome), money(view.metrics.totalExpenses + view.metrics.amountSaved), wholeMoney(view.metrics.incomeAfterExpenses), money(view.metrics.amountSaved)])
+          assert.deepEqual(await page.locator('.bb-left-category-amount').allTextContents(), (i ? ['$1,250', '$900', '$351'] : ['$1,150', '$500', '$100']))
           assert.deepEqual(await page.locator('.bb-savings-metric-card .bb-savings-progress-labels b').allTextContents(), ['$800', '$1,601'])
           const geometry = await page.evaluate(() => {
             const grid = document.querySelector('.bb-metrics-grid'), rows = document.querySelector('.bb-left-category-rows')
@@ -95,13 +96,19 @@ async function checkHeader(page, width) {
             return {radius: getComputedStyle(grid).borderRadius, columns: getComputedStyle(grid).gridTemplateColumns.split(' ').length, gap: getComputedStyle(rows).rowGap,
               tracks: [...document.querySelectorAll('.bb-left-category-track')].map(node => rect(node).height),
               padding: [...grid.children].map(node => getComputedStyle(node).paddingTop),
-              icons: [...grid.querySelectorAll('.bb-metric-explain')].map(node => {const range = document.createRange(); range.selectNodeContents(node.firstChild); return rect(node.lastElementChild).left - range.getBoundingClientRect().right}),
+              icons: [...grid.querySelectorAll('.bb-metric-explain')].map(node => {const range = document.createRange(); range.selectNodeContents(node.firstChild); const icon = rect(node.lastElementChild), value = rect(node.closest('.bb-metric-card').querySelector('.bb-metric-value')); return {right: Math.abs(icon.right - value.right), gap: icon.left - range.getBoundingClientRect().right}}),
+              numberBottomGaps: [...grid.children].slice(0, 2).map(node => rect(node).bottom - rect(node.querySelector('.bb-metric-value')).bottom),
+              lowerContentGaps: [...grid.children].slice(2).map(node => rect(node).bottom - rect(node.querySelector('.bb-left-category-row:last-child .bb-left-category-amount, .bb-savings-progress-labels span:last-child b')).bottom),
               fits: [...grid.querySelectorAll('.bb-fitted-amount-text, .bb-left-category-amount, .bb-savings-progress-labels b')].every(node => rect(node).right <= rect(node.closest('.bb-metric-card')).right - 10),
               overflow: document.documentElement.scrollWidth > innerWidth}
           })
           assert.equal(geometry.radius, '20px'); assert.equal(geometry.columns, width <= 640 ? 2 : 4)
           assert.equal(geometry.gap, '2px'); assert.deepEqual(geometry.tracks, [6, 6, 6]); assert.ok(geometry.padding.every(value => value === '16px'))
-          assert.ok(geometry.icons.every(gap => gap >= 6 && gap <= 8), 'All info icons sit immediately after titles')
+          assert.ok(geometry.icons.every(icon => icon.right < 1 && icon.gap >= 12), 'All info icons align with their frame content’s right edge')
+          if (width <= 640) {
+            assert.ok(geometry.numberBottomGaps.every(gap => gap >= 39 && gap <= 41), 'Income and Spent retain generous space below the numbers')
+            assert.ok(geometry.lowerContentGaps.every(gap => Math.abs(gap - geometry.numberBottomGaps[0]) <= 12), 'Top frame bottom spacing is comparable to the lower frames')
+          }
           assert.equal(geometry.fits, true); assert.equal(geometry.overflow, false)
           await page.getByRole('button', {name: /^Explain Left:/}).click()
           const dialog = page.getByRole('dialog', {name: 'Left explained', exact: true})

@@ -12,13 +12,13 @@ const { renderToStaticMarkup } = req("react-dom/server")
 // current/projected values, without importing unrelated browser/chart effects.
 const source = fs.readFileSync("web/expense-report/src/report-app.tsx", "utf8")
 const file = ts.createSourceFile("report-app.tsx", source, ts.ScriptTarget.Latest, true, ts.ScriptKind.TSX)
-const names = new Set(["money", "wholeMoney", "formatMoney", "roundCurrency", "amountRowsTotal", "clamp", "isSavingsNearGoal", "SavingsProgress", "SavingsMetricCard", "MetricExplanationDetails", "RemainingCategoryBars", "CATEGORY_BALANCE_LABELS"])
+const names = new Set(["money", "wholeMoney", "formatMoney", "roundCurrency", "amountRowsTotal", "clamp", "isSavingsNearGoal", "SavingsProgress", "SavingsMetricCard", "MetricCard", "MetricExplanationDetails", "RemainingCategoryBars", "CATEGORY_BALANCE_LABELS"])
 const declarations = file.statements.filter(statement => {
   if (ts.isFunctionDeclaration(statement)) return names.has(statement.name?.text)
   return ts.isVariableStatement(statement) && statement.declarationList.declarations.some(item => names.has(item.name.getText(file)))
 })
 assert.equal(declarations.length, names.size)
-const compiled = ts.transpileModule(declarations.map(node => node.getText(file)).join("\n") + "\nexports.Details = MetricExplanationDetails; exports.Card = SavingsMetricCard; exports.Bars = RemainingCategoryBars", {
+const compiled = ts.transpileModule(declarations.map(node => node.getText(file)).join("\n") + "\nexports.Details = MetricExplanationDetails; exports.Card = SavingsMetricCard; exports.Metric = MetricCard; exports.Bars = RemainingCategoryBars", {
   compilerOptions: { target: ts.ScriptTarget.ES2020, module: ts.ModuleKind.CommonJS, jsx: ts.JsxEmit.ReactJSX },
 }).outputText
 const runtime = { exports: {}, require: req, FittedAmount: ({children, ...props}) => React.createElement("div", props, children) }
@@ -29,12 +29,21 @@ const fractionalTargets = renderToStaticMarkup(React.createElement(Card, {value:
 assert.ok(fractionalTargets.includes('>$321.45</div>'), 'Keep exact cents in the Saved headline')
 assert.ok(fractionalTargets.includes('Minimum <b>$500</b>') && fractionalTargets.includes('Ideal <b>$1,001</b>'), 'Only the frame target labels round to whole currency')
 assert.ok(fractionalTargets.includes('minimum $500.49; ideal $1,000.51'), 'Progress retains exact accessible targets')
-assert.ok(fractionalTargets.includes('Saved<span aria-hidden="true">ⓘ</span>'), 'Info follows the title immediately')
+assert.ok(fractionalTargets.includes('Saved<span aria-hidden="true">ⓘ</span>'), 'Info remains in the same labeled explanation button')
+
+for (const [value, expected] of [[1317.14, '$1,317'], [1317.75, '$1,318'], [-50.50, '-$51'], [0, '$0'], [null, 'N/A'], [undefined, 'N/A']]) {
+  const html = renderToStaticMarkup(React.createElement(runtime.exports.Metric, {label: 'Left', value, accent: true, wholeDollars: true}))
+  assert.ok(html.includes(`>${expected}</div>`), 'Left uses whole-dollar display, including unavailable and negative balances')
+}
+for (const label of ['Income', 'Spent']) {
+  const html = renderToStaticMarkup(React.createElement(runtime.exports.Metric, {label, value: 1317.14}))
+  assert.ok(html.includes('>$1,317.14</div>'), 'Other headlines retain cents')
+}
 
 let inspected = 0
 for (const [remaining, budgets, expectedWidths, expectedAmounts] of [
-  [{needs: 250.25, wants: 125, savings: 70.50}, {needs: 1000, wants: 500, savings: 200}, [25.025, 25, 35.25], ['$250.25', '$125', '$70.50']],
-  [{needs: 0, wants: -50.50, savings: 900}, {needs: 0, wants: 100, savings: 300}, [0, 0, 100], ['$0', '-$50.50', '$900']],
+  [{needs: 250.25, wants: 125, savings: 70.50}, {needs: 1000, wants: 500, savings: 200}, [25.025, 25, 35.25], ['$250', '$125', '$71']],
+  [{needs: 0, wants: -50.50, savings: 900}, {needs: 0, wants: 100, savings: 300}, [0, 0, 100], ['$0', '-$51', '$900']],
   [{needs: 50, wants: 0, savings: 0}, {needs: -100, wants: 0, savings: 0}, [0, 0, 0], ['$50', '$0', '$0']],
 ]) {
   const props = {balances: {raw: {needs: -900, wants: 1000, savings: 1000}, remaining}, budgets, onExplain: () => inspected++}
@@ -42,7 +51,8 @@ for (const [remaining, budgets, expectedWidths, expectedAmounts] of [
   element.props.onClick()
   const html = renderToStaticMarkup(element)
   const amounts = [...html.matchAll(/class="bb-left-category-amount">(.*?)<\/span>/g)].map(match => match[1])
-  assert.deepEqual(amounts, expectedAmounts, 'Show canonical balances after donor coverage, without adding ESPP or recomputing raw balances')
+  assert.deepEqual(amounts, expectedAmounts, 'Show canonical balances after donor coverage as whole-dollar display only')
+  for (const amount of Object.values(remaining)) assert.ok(html.includes(new Intl.NumberFormat('en-US', {style: 'currency', currency: 'USD'}).format(amount)), 'Accessible category balances retain exact cents')
   const widths = [...html.matchAll(/style="width:([\d.]+)%"/g)].map(match => Number(match[1]))
   expectedWidths.forEach((value, i) => assert.ok(Math.abs(value - widths[i]) < .0001, 'Each bar measures its remaining allocation, clamped safely'))
   assert.ok(!/NaN|Infinity/.test(html))

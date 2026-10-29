@@ -1,5 +1,9 @@
 # Agent Decisions
 
+## 2026-10-29 - Refine Overview After Device Review
+
+Supersede the previous adjacent-icon and smart-cent Left display choices at the user's request: align every info icon to its frame's content right edge, display Left's headline and N/W/S amounts as rounded whole-dollar currency, and give Income/Spent 40px below their numbers in the two-column phone layout. Keep exact cents in explanation/accessibility data and bar calculations, other headline formatting, Glass Capsule settings and existing financial behavior. Native acceptance is checklist 185.
+
 ## 2026-10-29 - Apply The Approved Overview Panel And Glass Capsule
 
 Use the approved unified metrics panel (20px radius, 16px top padding), with the existing two-column phone/four-column desktop response. Keep info icons immediately after each title. Left gains compact N/W/S bars, 6px tall with 2px row gaps and smart exact-cent amounts inline on the right. Their values come directly from the active mode's canonical remaining balances after donor coverage; fill is the clamped share of each allocation remaining. Do not recompute Left, add ESPP to its cash allocations, or invent a balance from raw category values. The graphic opens the existing Left explanation.
