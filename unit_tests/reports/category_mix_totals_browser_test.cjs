@@ -72,9 +72,9 @@ const money=value=>new Intl.NumberFormat('en-US',{style:'currency',currency:'USD
           assert.ok(geometry.fills>.90&&geometry.fills<=1.01,JSON.stringify(geometry))
           assert.ok(geometry.centerX<1&&geometry.centerY<1,JSON.stringify(geometry))
           assert.equal(geometry.inset,14,'The chevron retains its approved right inset')
-          assert.equal(geometry.dropdownWidth,128,'The scope dropdown is more compact')
+          assert.equal(geometry.dropdownWidth,120,'The scope dropdown is more compact')
           assert.equal(geometry.totalFont,'36px')
-          assert.equal(geometry.usedFont,'42px')
+          assert.equal(geometry.usedFont,'40px')
           assert.equal(geometry.headerFits,true,'Exact cents fit beside the native dropdown')
           assert.equal(geometry.mode,mode)
           assert.equal(geometry.used,`${Number((fixture.expected[i]/(5000+(fixture.espp[i]??0))*100).toFixed(2))}%`)
@@ -88,6 +88,11 @@ const money=value=>new Intl.NumberFormat('en-US',{style:'currency',currency:'USD
           for(const [filter,expected] of [['Needs',500],['Wants',i?200:150],['Savings',fixture.cash+(fixture.espp[i]??0)]]) {
             await category.getByRole('combobox',{name:'Category mix filter',exact:true}).selectOption(filter.toLowerCase())
             assert.equal(await total.innerText(),money(expected),`${filter} retains its own scoped total`)
+            assert.equal(await scope.evaluate(el=>{
+              const style=getComputedStyle(el),context=document.createElement('canvas').getContext('2d')
+              context.font=style.font
+              return context.measureText(el.selectedOptions[0].textContent).width<=el.clientWidth-parseFloat(style.paddingLeft)-parseFloat(style.paddingRight)
+            }),true,`${filter} fits in the narrower native dropdown`)
           }
           await category.getByRole('combobox',{name:'Category mix filter',exact:true}).selectOption('all')
           await category.getByRole('button',{name:'Categories',exact:true}).click();await dialog.waitFor()

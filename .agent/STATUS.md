@@ -37,7 +37,7 @@ Reconciliation shared amount correction (2026-10-28): diagnosed the October 28 1
 
 ## Active Focus
 
-Category Mix native-review polish (2026-10-29): All label, 128px selector retaining its 14px chevron inset, 36px maximum total, 42px percentage and a slightly thicker 0.72-ratio ring. Local pointer modality suppresses lingering touch selection focus while preserving keyboard focus and native selection. **79 focused / 2,759 full passed**, **557 optional PostgreSQL skipped**, clean Python/frontend types and locked Node 22 build. Frontend **793a6813682ac41c802dc13a**; native follow-up is checklist 183.
+Category Mix final size refinement (2026-10-29): 120px selector retaining its 14px chevron inset and a 40px centered percentage. Retain All, the 36px maximum total, 0.72-ratio ring and native touch/keyboard focus behavior from the preceding polish. **79 focused / 48 isolated Chromium/WebKit mode cases passed**, frontend typecheck and locked Node 22 build pass. Frontend **b2e8e0df9b53946bd74e6ebb**; native follow-up remains checklist 183.
 
 Approved Category Mix presentation implemented (2026-10-29): full-width phone ring, clockwise from noon, centered budget-used percentage, compact fitted Spent/Saved and mode/budget header, and a native scope dropdown with a 14px chevron inset. Shared tabs/stage/footer and the Categories modal remain; scoped pressure, colors, inspection, canonical totals and animations are preserved. **79 focused / 2,759 full tests passed**, **557 optional PostgreSQL skipped**, clean Python/frontend types and locked Node 22 build. **48 isolated Chromium/WebKit mode cases** pass at 320/390px in both themes. Device acceptance is checklist 182; frontend **171942716a5dd8cdb001b24a**.
 
@@ -252,7 +252,7 @@ All eight September 6 audit batches are implemented and verified locally. Each b
 
 ## On Deck
 
-First: native acceptance of Category Mix device refinements (checklist 183), superseding 182's dimensions. Check All, the narrower dropdown, smaller total/percentage, thicker band and absence of a lingering touch focus outline; preserve keyboard access, shared layout and Categories/inspection dialogs.
+First: native acceptance of the final Category Mix size refinement (checklist 183), superseding 182's dimensions. Check All, the 120px dropdown, 40px centered percentage, smaller total, thicker band and absence of a lingering touch focus outline; preserve keyboard access, shared layout and Categories/inspection dialogs.
 
 First: native acceptance of Category Mix All matching Spent (checklist 181), including Current/Projected and recorded/estimated savings. Preserve the underlying expense metrics and scoped filters.
 
@@ -377,6 +377,8 @@ Student-loan activation is complete. Verify the deployed fixed-bill display and 
 27. Explore clarifying questions before logging when BookieBot is uncertain instead of guessing or silently failing.
 
 ## Completed 2026-10-29
+
+- Further reduced the Category Mix dropdown 128→120px and centered percentage 42→40px at the user's request. Retain the 14px chevron inset, native selection/focus, total sizing, ring and shared section layout. Updated browser dimension assertions and added text-fit checks for every scoped label. **79 focused / 48 isolated Chromium/WebKit mode cases passed**, frontend typecheck and locked Node 22 build pass. Updated checklist 183; no financial, workflow or persistence changes.
 
 - Refined Category Mix after the user's phone review: All replaces All categories, dropdown width 146→128px, maximum fitted total 40→36px, percentage 46→42px and inner/outer ring ratio 0.75→0.72 (12% thicker band). Retain exact values, 14px chevron inset, 44px native chooser, outer ring fit, shared stage/footer and original Categories modal. Local pointer-focus state hides touch/mouse outlines after selection; keyboard and blur restore the normal focus path without forced blur. Extended executed layout/selector regressions and browser checks for dimensions, labels and keyboard-versus-touch behavior. **79 focused / 2,759 full passed**, **557 optional PostgreSQL skipped**, one existing Kaleido warning; clean Python/frontend types and locked Node 22 build. Updated decisions, phone guide and device checklist 183; no financial or persistence changes.
 
@@ -1200,7 +1202,7 @@ Student-loan activation is complete. Verify the deployed fixed-bill display and 
 
 ## Manual Test Checklist
 
-183. Category Mix device refinements: update/reopen Safari and the Home Screen app. The chooser says All and is slightly narrower, with comfortable 14px right chevron inset. Spent/Saved and the centered percentage should be slightly smaller, and the ring band slightly thicker while retaining the large outer size and shared section height. Tap the dropdown, select each category and return to All: no native focus outline/shadow should linger around the control. Repeat after closing/reopening the chooser and switching Current/Projected. With a keyboard, Tab into the chooser and use arrows/Space; a visible keyboard focus indicator and ordinary native selection should remain. Check exact-cent values, savings/ESPP consistency, the Categories modal/footer, both themes, portrait/landscape and Reduce Motion. This supersedes checklist 182's sizing only. Use existing records without financial test writes.
+183. Category Mix device refinements: update/reopen Safari and the Home Screen app. The chooser says All and is now 120px wide, with comfortable 14px right chevron inset and all labels fitting. Spent/Saved retains its smaller size, the centered percentage is now 40px, and the ring keeps its thicker band, large outer size and shared section height. Tap the dropdown, select each category and return to All: no native focus outline/shadow should linger around the control. Repeat after closing/reopening the chooser and switching Current/Projected. With a keyboard, Tab into the chooser and use arrows/Space; a visible keyboard focus indicator and ordinary native selection should remain. Check exact-cent values, savings/ESPP consistency, the Categories modal/footer, both themes, portrait/landscape and Reduce Motion. This supersedes checklist 182's sizing only. Use existing records without financial test writes.
 
 182. Approved Category Mix layout: update/reopen Safari and the Home Screen app, then Overview → Category Mix. The existing shared tabs provide its title; there is no repeated month/title inside. Spent/Saved, Current/Projected and the exact budget sit above the ring beside All categories. Check the dropdown's right chevron breathing room, native chooser, 44px touch target and complete labels. The phone ring should use the available width, start spending clockwise at noon and show its budget-used percentage centered inside. Switch Needs/Wants/Savings and both modes; scoped pressure remains, Savings says Saved, and All still matches the Spent card/modal with savings/ESPP counted once. Categories keeps its original modal, full breakdown and bottom spacing; slice touch/keyboard inspection must show the current category/amount without a square focus box. Switch Burn Rate/Calendar/Bills and confirm the common section height/footer do not jump. Check portrait/landscape, both themes, Reduce Motion, a historical month and long amounts if available. Use existing records; keep financial test writes isolated.
 
@@ -1562,6 +1564,8 @@ Use a test row or low-risk real row in Discord:
 142. Savings menu overflow: after deployment, choose Update, open Savings and tap the last active goal's ⋯. All four actions must remain visible and tappable over the darker Investments section. Open Archive goal and cancel; verify Escape and tapping outside dismiss the menu. Expand Archived goals and inspect the final goal's History/Restore menu across the same boundary. Check both themes and narrow/desktop widths; dismiss without submitting changes to real goals.
 
 ## Verification Baseline
+
+2026-10-29 Category Mix final sizing: **79 focused / 48 isolated Chromium/WebKit mode cases passed**, frontend typecheck and locked Node 22 build pass. Frontend **b2e8e0df9b53946bd74e6ebb**; browser checks verify the 120px control, 40px percentage, untruncated Needs/Wants/Savings labels, focus, mode/scope totals and modal behavior at 320/390px in both themes without API traffic. Checklist 183 covers physical acceptance.
 
 The Category Mix device-polish production build also passes **48 isolated Chromium/WebKit phone mode cases** at 320/390px in both themes, including actual Tab focus and touch selection, All, 128px control width, 36px/42px type, the retained 14px chevron inset, ring fill/centering and canonical scope/mode totals. Both modal paths remain covered; no app or financial service traffic occurs.
 

@@ -1528,7 +1528,7 @@ summary {
 .bb-category-summary-label .bb-chart-mode-note::before { content: "·"; margin-right: 5px; }
 .bb-category-mix-summary .bb-chart-total { margin-top: 5px; font-size: 36px; line-height: 1.08; letter-spacing: -.055em; }
 .bb-category-mix-summary .bb-chart-budget-note { margin-top: 7px; }
-.bb-category-mix-filter { position: relative; width: 128px; min-width: 0; }
+.bb-category-mix-filter { position: relative; width: 120px; min-width: 0; }
 .bb-category-mix-filter select {
   appearance: none;
   -webkit-appearance: none;
@@ -1712,7 +1712,7 @@ summary {
   pointer-events: none;
   transform: translate(calc(-50% + var(--bb-pie-layout-offset-x, 0px)), calc(-50% + var(--bb-pie-layout-offset-y, 0px)));
 }
-.bb-category-used { color: hsl(var(--foreground)); font-size: 42px; font-weight: 500; line-height: 1.1; letter-spacing: -.04em; font-variant-numeric: tabular-nums; }
+.bb-category-used { color: hsl(var(--foreground)); font-size: 40px; font-weight: 500; line-height: 1.1; letter-spacing: -.04em; font-variant-numeric: tabular-nums; }
 
 .bb-category-pie-host .recharts-pie {
   transform: translate(
