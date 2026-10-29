@@ -1,5 +1,9 @@
 # Agent Decisions
 
+## 2026-10-29 - Keep Navigation Selection Bubbles Uniform
+
+The user clarified that selected-tab bubbles must share dimensions. Supersede the per-label sizing below: measure all visible stacks, use one capsule sized for the largest stack and constrain it consistently to the glass edges. Center it on each actual button, retaining fractional bounds and touch-scale normalization. Expanded end insets give the first/last capsule room; compact tabs share one icon-sized circle. Keep label-aware target widths, content/host observation, pointer/keyboard behavior and guarded routing. Only the selection position changes when selecting another tab; responsive/compact layout changes may resize the common capsule.
+
 ## 2026-10-29 - Fit Navigation Selections To Rendered Tab Content
 
 Main navigation keeps Konsta glass and native button semantics, but uses the report's shared measured sliding indicator instead of Konsta's equal-width tab highlight. Intrinsic label-aware button widths and measured icon/label bounds determine the capsule; compact mode fits the icon alone. Touch capture uses actual button edges, commits once on release and restores the active selection after cancellation or rejected routing. Observe content as well as button/container resizes. Other sliding selectors retain their existing button-bound measurement.

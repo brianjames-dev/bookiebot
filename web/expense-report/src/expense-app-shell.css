@@ -20,7 +20,8 @@
 .bb-app-shell .bb-shell-shared > .bb-report-section, .bb-app-shell .bb-shell-savings > .bb-report-section { margin-top: 0; }
 .bb-app-shell .bb-bottom-navigation { position: fixed; z-index: 50; left: 50%; bottom: 0; width: min(460px, 100%); transform: translateX(-50%); padding-inline: 12px; padding-bottom: max(12px, env(safe-area-inset-bottom, 0px)); height: auto; pointer-events: none; transition: width var(--bb-motion-duration) var(--bb-motion-ease); }
 .bb-app-shell .bb-bottom-navigation > div:last-child { height: 60px; padding: 0; width: 100%; gap: 0; transition: height var(--bb-motion-duration) var(--bb-motion-ease); }
-.bb-app-shell .bb-navigation-pane { display: flex; align-items: center; width: 100%; height: 100%; border-radius: 999px; pointer-events: auto; box-shadow: 0 5px 26px hsl(var(--foreground) / .10); color: hsl(var(--foreground)); }
+/* End insets leave room for the same wide capsule on every tab. */
+.bb-app-shell .bb-navigation-pane { display: flex; align-items: center; width: 100%; height: 100%; padding-inline: 16px; border-radius: 999px; pointer-events: auto; box-shadow: 0 5px 26px hsl(var(--foreground) / .10); color: hsl(var(--foreground)); }
 .bb-app-shell .bb-navigation-selection { border: 0; border-radius: 999px; background: rgb(0 0 0 / .1); }
 [data-theme="dark"] .bb-app-shell .bb-navigation-selection { background: rgb(255 255 255 / .15); }
 .bb-app-shell .bb-navigation-pane .k-glass { color: hsl(var(--foreground)); }
@@ -36,6 +37,7 @@
 .bb-app-shell .bb-bottom-navigation[data-compact="true"] { width: min(244px, 100%); }
 .bb-app-shell .bb-bottom-navigation[data-compact="true"][data-tab-count="5"] { width: min(299px, 100%); }
 .bb-app-shell .bb-bottom-navigation[data-compact="true"] > div:last-child { height: 44px; }
+.bb-app-shell .bb-bottom-navigation[data-compact="true"] .bb-navigation-pane { padding-inline: 0; }
 .bb-app-shell .bb-bottom-navigation[data-compact="true"] .bb-navigation-link { flex: 1 1 0; padding-top: 0; padding-bottom: 0; }
 .bb-app-shell .bb-bottom-navigation[data-compact="true"] .bb-navigation-link > span { gap: 0; }
 .bb-app-shell .bb-bottom-navigation[data-compact="true"] .bb-navigation-link svg { width: 21px; height: 21px; }
