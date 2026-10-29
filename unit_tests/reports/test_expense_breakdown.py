@@ -110,7 +110,8 @@ def test_top_chart_carousel_uses_one_fixed_full_bleed_surface_without_panel_card
     assert "padding: 0;" in styles.split(".bb-chart-carousel-slide > .bb-card-content {", 1)[1].split("}", 1)[0]
     chart_page_styles = styles.split(".bb-chart-page {", 1)[1].split("}", 1)[0]
     assert "--bb-chart-page-gutter: clamp(16px, 4vw, 56px);" in chart_page_styles
-    assert "--bb-chart-page-block-gutter: clamp(16px, 3vw, 32px);" in chart_page_styles
+    assert "--bb-chart-page-block-gutter: var(--bb-section-block-gutter);" in chart_page_styles
+    assert "--bb-section-block-gutter: clamp(16px, 3vw, 32px);" in styles
     assert "padding-inline: max(var(--bb-chart-page-gutter), calc((100% - var(--bb-content-max)) / 2));" in chart_page_styles
     assert "padding-block: var(--bb-chart-page-block-gutter);" in chart_page_styles
     assert ".bb-chart-carousel-track {" in styles

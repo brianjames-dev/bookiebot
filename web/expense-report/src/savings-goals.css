@@ -33,6 +33,10 @@
 .bb-goals-section .bb-report-menu-action:hover { background: hsl(var(--foreground) / .06); }
 .bb-goals-section .bb-goal-archive-action { border-top: 1px solid hsl(var(--border)); border-radius: 0; margin-top: 4px; }
 .bb-goals-archived > .bb-details-content[data-state="open"], .bb-goals-archived > .bb-details-content[data-state="open"] > .bb-details-content-inner { overflow: visible; }
+/* Keep the archive's inner spacing in its clipped child, not in the closed
+   disclosure's box beneath the footer button. */
+.bb-goals-archived > .bb-details-content > .bb-details-content-inner { padding-top: 0; }
+.bb-goals-archived > .bb-details-content > .bb-details-content-inner > .bb-goals-list { padding-top: 2px; }
 .bb-goal .bb-details-content-inner { padding-top: 0; }
 .bb-goal-progress { height: 10px; border-radius: 2px; background: hsl(var(--foreground) / .1); overflow: hidden; }
 .bb-goal-progress > span { display: block; height: 100%; background: hsl(var(--primary)); transition: width var(--bb-motion-duration) var(--bb-motion-ease); }

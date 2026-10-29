@@ -35,6 +35,10 @@
   --radius: 4px;
   --bb-content-max: 1240px;
   --bb-page-gutter: clamp(16px, 4vw, 56px);
+  --bb-section-block-gutter: clamp(16px, 3vw, 32px);
+  /* Categories has a 40px control in a 42px footer. Preserve its approved
+     button-to-band spacing for every other section, including the last one. */
+  --bb-section-footer-space: calc(var(--bb-section-block-gutter) + 2px);
   --bb-display-font: "Iowan Old Style", "Palatino Linotype", "Book Antiqua", Georgia, serif;
   --bb-motion-duration: 240ms;
   --bb-motion-ease: cubic-bezier(0.22, 1, 0.36, 1);
@@ -633,8 +637,14 @@ summary {
 
 .bb-daily-spending-content {
   display: grid;
-  gap: 20px;
+  gap: 0;
 }
+
+/* Put disclosure spacing inside the animated region so a closed list leaves
+   no empty row or grid gap below its Transactions button. */
+.bb-daily-spending-content > .bb-details-content > .bb-details-content-inner { padding-top: 0; }
+.bb-daily-spending-content .bb-daily-transactions { padding-top: 20px; }
+.bb-daily-section .bb-chart-side { align-content: space-between; }
 
 .bb-daily-spending-filter {
   margin-left: auto;
@@ -1471,7 +1481,7 @@ summary {
 
 .bb-chart-page {
   --bb-chart-page-gutter: clamp(16px, 4vw, 56px);
-  --bb-chart-page-block-gutter: clamp(16px, 3vw, 32px);
+  --bb-chart-page-block-gutter: var(--bb-section-block-gutter);
   display: grid;
   grid-template-rows: auto minmax(0, 1fr) auto;
   gap: 16px;
@@ -1525,6 +1535,11 @@ summary {
   min-width: 0;
   min-height: 42px;
 }
+
+/* Inline chart details use the same closed footer as the Categories dialog. */
+.bb-chart-page-footer .bb-details-panel { gap: 0; }
+.bb-chart-page-footer .bb-details-panel .bb-details-content-inner { padding-top: 0; }
+.bb-chart-page-footer .bb-details-panel .bb-details-content-inner > :first-child { padding-top: 10px; }
 
 .bb-panel-head {
   display: flex;
@@ -2645,12 +2660,12 @@ tr:last-child td {
   padding-bottom: 8px;
 }
 .bb-report-section {
-  padding: 40px 0;
+  padding: 40px 0 var(--bb-section-footer-space);
   border-bottom: 0;
 }
 .bb-daily-section { border-bottom: 0; }
 .bb-report-section:last-child {
-  padding-bottom: 0;
+  padding-bottom: var(--bb-section-footer-space);
   border-bottom: 0;
 }
 .bb-main > .bb-highlights-section,
@@ -3030,7 +3045,7 @@ button:focus-visible, summary:focus-visible {
   .bb-category-mix-summary > :first-child { grid-column: 1; grid-row: 2; }
   .bb-category-mix-summary .bb-category-mix-filter { grid-column: 1; grid-row: 1; justify-self: start; }
   .bb-category-mix-summary .bb-category-pressure { grid-column: 1; grid-row: 3; justify-self: start; }
-  .bb-report-section { padding: 32px 0; }
+  .bb-report-section { padding: 32px 0 var(--bb-section-footer-space); }
   .bb-card-title { font-size: 27px; }
   .bb-reimbursement-at-glance { grid-template-columns: 1fr; gap: 24px; }
   .bb-reimbursement-toggle { gap: 12px; }

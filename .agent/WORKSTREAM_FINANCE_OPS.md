@@ -4,6 +4,10 @@ Last updated: 2026-10-29
 
 ## Goal
 
+### Consistent report section footer spacing — 2026-10-29
+
+The user accepted refresh/startup and requested that section-ending controls match Category Mix's Categories spacing. Share its fluid edge gutter, retain padding on final sections, and place disclosure spacing inside clipped content rather than closed wrapper/grid gaps. Covers Daily Transactions, Expense Highlights View all, chart Details and Savings Archived goals, including desktop alignment. **4 focused / 2,758 full tests passed**, **557 optional PostgreSQL skipped**, clean types/build. **16 Chromium/WebKit geometry cases passed** across 320/390/768/1280px, both themes and repeated disclosure states; native acceptance is STATUS checklist 180. No Finance Ops backlog, financial operation, lifecycle or persistence changes.
+
 ### Refresh close-out and persistent startup chrome — 2026-10-29
 
 The user accepted initial release smoothing and the longer trigger. Refine final retraction with a gentle 360ms curve, scroll-anchor exclusion and transition-completion cleanup. Replace startup-only welcome/skeleton UI with the actual persistent app shell/header/nav and a centered spinner. Defer financial controllers until the first report; keep owner-change/expiry disposal and later month/draft retention. **7 focused / 2,758 full tests passed**, **557 optional PostgreSQL skipped**, clean Python/frontend types and locked Node 22 build; **48 Chromium/WebKit page cases** pass; native acceptance is STATUS checklist 179. No Finance Ops backlog, financial lifecycle or persistence change; browser APIs remain isolated fixtures.
