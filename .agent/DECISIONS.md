@@ -1,5 +1,9 @@
 # Agent Decisions
 
+## 2026-10-30 - Remove Redundant Category Mix Details
+
+Remove the Category Mix Recharts tooltip entirely so hover/touch cannot produce the old slice thumbnails. Remove its Categories button/modal and unused collapse prop; callouts supply category amounts/percentages and both callouts/slices retain the existing category transactions inspection. Keep the shared stage height and current ring area exactly as shipped by reserving the old 42px footer grid row until a later spacing/height design pass. Scope this implementation to Category Mix: Burn Rate, Calendar and Bills & Utilities keep their current details while their integrated replacements are designed. This supersedes 195’s retained Categories list; native acceptance is checklist 196. The adjustable hidden-callout draft reproduces the current large-ring settings, with local saved styling controls; it does not change production styling. No data, storage, financial calculation or Finance Ops change.
+
 ## 2026-10-30 - Explicit Category Ring And Callout Views
 
 Default Category Mix to a large, unlabeled ring fitted to the chart host (8px inset), retaining the current 26px band, colors, clockwise noon start and centered usage percentage (40px large / 32px compact). Deliberate taps on the center or empty chart background toggle the smaller Refined flow composition and its callouts; slices and callouts both inspect that category's existing transactions modal. Do not toggle from scrolling, carousel swipes, filters, unrelated page taps or dialog dismissal. Keep the explicit choice through report/mode/filter rerenders within the mounted chart; do not add persistent storage.

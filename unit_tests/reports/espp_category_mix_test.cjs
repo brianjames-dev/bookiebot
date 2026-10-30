@@ -7,7 +7,8 @@ const names=new Set(['money','formatMoney','formatPct','roundCurrency','amountRo
 const declarations=ast.statements.filter(node=>ts.isFunctionDeclaration(node)?names.has(node.name?.text):ts.isVariableStatement(node)&&node.declarationList.declarations.some(item=>names.has(item.name.getText(ast))))
 assert.equal(declarations.length,names.size)
 const passthrough=({children})=>React.createElement('div',null,children)
-const runtime={exports:{},memo:React.memo,useState:React.useState,require:req,FittedAmount:({children,className})=>React.createElement('div',{className},children),useElementSize:()=>[null,{width:300,height:300}],useExpensePieLayout:()=>({cx:150,cy:150,innerRadius:100}),chartConfig:()=>({}),categoryMixPressure:()=>null,ChartContainer:passthrough,CategoryMixPieMotionHost:passthrough,CategoryMixPieSurface:()=>null,CategoryContourCallouts:()=>null,CategoryMixFilterControl:()=>null,CategoryMixPressureBar:()=>null,ModalDetails:passthrough,CATEGORY_BALANCE_LABELS:{needs:'Needs',wants:'Wants',savings:'Savings'},NEEDS_BAR_COLOR:'needs',WANTS_BAR_COLOR:'wants',CATEGORY_NEEDS_KEYS:new Set(['rent']),CATEGORY_WANTS_KEYS:new Set(['food']),SAVINGS_CATEGORY_COLOR:'cash',LEFT_CATEGORY_COLOR:'left'}
+let renderedRows=[]
+const runtime={exports:{},memo:React.memo,useState:React.useState,require:req,FittedAmount:({children,className})=>React.createElement('div',{className},children),useElementSize:()=>[null,{width:300,height:300}],useExpensePieLayout:()=>({cx:150,cy:150,innerRadius:100}),chartConfig:()=>({}),categoryMixPressure:()=>null,ChartContainer:passthrough,CategoryMixPieMotionHost:passthrough,CategoryMixPieSurface:({data})=>{renderedRows=data;return null},CategoryContourCallouts:()=>null,CategoryMixFilterControl:()=>null,CategoryMixPressureBar:()=>null,ModalDetails:passthrough,CATEGORY_BALANCE_LABELS:{needs:'Needs',wants:'Wants',savings:'Savings'},NEEDS_BAR_COLOR:'needs',WANTS_BAR_COLOR:'wants',CATEGORY_NEEDS_KEYS:new Set(['rent']),CATEGORY_WANTS_KEYS:new Set(['food']),SAVINGS_CATEGORY_COLOR:'cash',LEFT_CATEGORY_COLOR:'left'}
 vm.runInNewContext(ts.transpileModule(declarations.map(node=>node.getText(ast)).join('\n')+'\nexports.rows=categoryMixRows;exports.Chart=CategoryMixChart;exports.headline=reportSpentTotal;exports.equal=areCategoryMixChartPropsEqual',{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2020,jsx:ts.JsxEmit.ReactJSX}}).outputText,runtime)
 const rows=(...args)=>JSON.parse(JSON.stringify(runtime.exports.rows(...args)))
 const data=[{key:'rent',label:'Rent',amount:500},{key:'food',label:'Eating out',amount:150}]
@@ -68,7 +69,8 @@ const donor={...base,filter:'wants',amountSaved:1200,espp:400,allSpentTotal:650,
   categoryBalances:{...base.categoryBalances,transfers:[{from:'wants',to:'savings',amount:25}]}}
 const donorMarkup=renderToStaticMarkup(React.createElement(Chart,donor))
 assert.ok(donorMarkup.includes('17.5%'),'Coverage still consumes category budget in the ring')
-assert.ok(donorMarkup.includes('Savings overspend coverage'),'Coverage stays visible in Categories')
+assert.ok(renderedRows.some(row=>row.label==='Savings overspend coverage'),'Coverage stays visible in the ring/callout data')
 const savingDonor={...donor,filter:'savings',categoryBalances:{...base.categoryBalances,transfers:[{from:'savings',to:'needs',amount:25}]}}
 assert.equal(displayed(savingDonor),'$1,600.00','A transfer covering expenses is not counted as additional Saved')
-assert.ok(renderToStaticMarkup(React.createElement(Chart,savingDonor)).includes('Needs overspend coverage'))
+renderToStaticMarkup(React.createElement(Chart,savingDonor))
+assert.ok(renderedRows.some(row=>row.label==='Needs overspend coverage'))

@@ -3350,8 +3350,8 @@ button:focus-visible, summary:focus-visible {
 .bb-toolbar-button:disabled { opacity: .5; cursor: default; }
 @media (prefers-reduced-motion: reduce) { .bb-toolbar-button { transition: none; } }
 
-/* Refined flow shares the existing chart stage and Categories footer. */
-.bb-category-mix-page { row-gap: 0; }
+/* Refined flow retains its chart stage and former footer height until the layout is redesigned. */
+.bb-category-mix-page { row-gap: 0; grid-template-rows: auto minmax(0, 1fr) 42px; }
 .bb-category-mix-page .bb-category-chart-layout { max-width: none; width: calc(100% + 2 * var(--bb-chart-page-gutter)); margin-inline: calc(-1 * var(--bb-chart-page-gutter)); }
 .bb-contour-callouts { position: absolute; inset: 0; width: 100%; height: 100%; overflow: visible; pointer-events: none; opacity: 0; visibility: hidden; transition: opacity 220ms ease-out, visibility 0s 220ms; }
 .bb-contour-callouts[data-visible="true"][data-ready="true"] { opacity: 1; visibility: visible; transition-delay: 180ms; }

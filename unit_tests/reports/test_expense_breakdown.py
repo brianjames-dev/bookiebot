@@ -136,7 +136,8 @@ def test_top_chart_details_percent_and_calendar_markers_keep_stage_stable():
 
     assert 'filter === "all" ? categoryBudgetTotal(categoryBudgets) : categoryBudgets[filter]' in category_source
     assert "filter !== \"all\" && selectedBudget > 0" not in category_source
-    assert '<ModalDetails summary="Categories"' in category_source
+    assert '<ModalDetails summary="Categories"' not in category_source
+    assert "CategoryContourCallouts" in category_source
     assert '<ModalDetails summary="Details"' in source.split("function CalendarAnalyticsPanel", 1)[1].split(
         "function CalendarChangingValue", 1
     )[0]
@@ -166,7 +167,7 @@ def test_top_chart_pages_share_regions_lock_modals_and_show_complete_details():
 
     assert source.count("bb-chart-page-header") >= 4
     assert source.count("bb-chart-page-body") >= 4
-    assert source.count("bb-chart-page-footer") >= 4
+    assert source.count("bb-chart-page-footer") == 3
     assert "panel.titleAccessory" not in carousel_source
     assert "panel.headerControl" not in carousel_source
     assert "useModalPageScrollLock(open)" in source
@@ -573,7 +574,7 @@ def test_build_expense_breakdown_report_aggregates_shared_and_personal_data():
     assert "bb-subscription-summary" in html
     assert "Projected view" not in html
     assert "Current view" not in html
-    assert "Categories" in html
+    assert "Show category callouts" in html
     assert "Bill details" not in html
     assert "bb-bill-history-dot" in html
     assert "bb-chart-carousel-slide" in html

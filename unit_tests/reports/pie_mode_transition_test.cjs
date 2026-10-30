@@ -37,6 +37,7 @@ const compiled = ts.transpileModule(declarations.map(node => node.getText(file))
 
 let animate = false
 const observed = []
+let tooltipMounts = 0
 const runtime = {
   exports: {}, require: req, memo: React.memo,
   useMediaQuery: () => !animate,
@@ -46,7 +47,7 @@ const runtime = {
   Pie: props => React.createElement(Recharts.Pie, { ...props, zIndex: 0, isAnimationActive: animate }),
   Cell: Recharts.Cell,
   StablePieSector: props => { observed.push(props); return React.createElement(Recharts.Sector, props) },
-  ChartTooltip: () => null, ChartTooltipContent: () => null,
+  ChartTooltip: () => { tooltipMounts++; return null }, ChartTooltipContent: () => null,
   // Force each requested dataset through the production component. Its memo
   // comparison is tested separately and is unrelated to stale sector identity.
   areCategoryMixPieSurfacePropsEqual: () => false,
@@ -128,3 +129,5 @@ for (animate of [false, true]) {
   }
 }
 console.log("Real Recharts mode/filter transitions retain safe category identity and keyboard drilldowns")
+
+assert.equal(tooltipMounts,0,"The category ring must never register the obsolete hover/touch tooltip")

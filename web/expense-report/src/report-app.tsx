@@ -748,7 +748,6 @@ const OverviewCharts = memo(function OverviewCharts({ report, activeReport, char
           filter={categoryMixFilter}
           onFilterChange={switchCategoryMixFilter}
           projected={projectionActive}
-          collapseKey={chartCollapseKey}
         />
       ),
     },
@@ -1596,7 +1595,6 @@ type CategoryMixChartProps = {
   filter: CategoryMixFilter
   onFilterChange: (filter: CategoryMixFilter) => void
   projected: boolean
-  collapseKey: number
 }
 
 const CategoryMixChart = memo(function CategoryMixChart({
@@ -1611,7 +1609,6 @@ const CategoryMixChart = memo(function CategoryMixChart({
   filter,
   onFilterChange,
   projected,
-  collapseKey,
 }: CategoryMixChartProps) {
   const selectedRollover = categoryMixRollover(categoryBalances, filter)
   const transferRows = categoryMixTransferRows(categoryBalances, filter)
@@ -1669,21 +1666,6 @@ const CategoryMixChart = memo(function CategoryMixChart({
           </CategoryMixPieMotionHost>
         </ChartContainer>
       </div>
-      <div className="bb-chart-page-footer">
-        <ModalDetails summary="Categories" title="Category details" collapseKey={collapseKey}>
-          <div className="bb-legend-list">
-            {chartData.map((item) => (
-              <div className="bb-legend-row" key={item.key}>
-                <span className="bb-swatch" style={{ backgroundColor: item.color }} />
-                <span>{item.label}</span>
-                <strong>
-                  {formatMoney(item.amount)} <span>{formatPct(item.percentage)}</span>
-                </strong>
-              </div>
-            ))}
-          </div>
-        </ModalDetails>
-      </div>
     </div>
   )
 }, areCategoryMixChartPropsEqual)
@@ -1731,7 +1713,6 @@ const CategoryMixPieSurface = memo(function CategoryMixPieSurface({ data, layout
     <div className="bb-category-pie-surface bb-chart-motion-surface" data-bb-pie-transition={reducedMotion ? "none" : "morph"}>
       <ResponsiveContainer width="100%" height="100%">
         <PieChart margin={layout.margin}>
-          <ChartTooltip content={<ChartTooltipContent />} />
           <Pie
             data={data}
             dataKey="amount"
@@ -1794,7 +1775,6 @@ function areCategoryMixChartPropsEqual(previous: CategoryMixChartProps, next: Ca
     categoryBalancesEqual(previous.categoryBalances, next.categoryBalances) &&
     previous.filter === next.filter &&
     previous.projected === next.projected &&
-    previous.collapseKey === next.collapseKey &&
     breakdownRowsEqual(previous.data, next.data)
   )
 }
