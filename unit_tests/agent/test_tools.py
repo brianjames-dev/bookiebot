@@ -201,9 +201,9 @@ async def test_financial_report_tool_uses_canonical_mode_views_and_trusted_actor
         view = result[selected_mode]
         assert view["metrics"] == payload["modeViews"][selected_mode]["metrics"]
         assert view["incomeProjectionSettings"] == payload["incomeProjectionSettings"]
-        assert view["headlineSpent"]["value"] == (2797.03 if selected_mode == "current" else 4085.81)
-        assert view["headlineSpent"]["equation"] == ("Expense categories + Saved" if with_explanations else "Expenses + Saved")
-        assert "cash savings plus ESPP" in view["headlineSpent"]["note"]
+        assert view["headlineSpent"]["value"] == view["metrics"]["totalExpenses"], "Cached explanations cannot add savings back to Spent"
+        assert view["headlineSpent"]["equation"] == "Expense outflows"
+        assert "cash savings and ESPP" in view["headlineSpent"]["note"]
         assert "expense-only" in view["headlineSpent"]["note"]
         assert "Left uses the existing category balances" in view["headlineSpent"]["note"]
     if mode == "comparison":

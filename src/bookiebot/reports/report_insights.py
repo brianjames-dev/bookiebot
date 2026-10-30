@@ -92,6 +92,8 @@ def metric_explanations(report: ExpenseBreakdownReport, payload: dict[str, Any])
         current_amounts = {item["key"]: _money(item["amount"]) for item in payload["modeViews"]["current"]["breakdown"]}
         spent = []
         for item in view["breakdown"]:
+            if item["key"] in {"savings", "espp"}:
+                continue
             amount = _money(item["amount"])
             if item["key"] == "static_bills_subscriptions_needs":
                 # This category also contains real fixed bills. Keep their
@@ -125,12 +127,9 @@ def metric_explanations(report: ExpenseBreakdownReport, payload: dict[str, Any])
         spending_remainder = _money(metrics["totalExpenses"] - _total(item["amount"] for item in spent))
         if spending_remainder:
             spent.append({"label": "Other sheet outflows", "amount": spending_remainder, "source": "sheet", "date": None})
-        # The displayed Spent total includes savings, while totalExpenses stays
-        # expense-only for charts, comparisons and the category cascade. The
-        # canonical Saved amount already includes payroll ESPP for this mode.
-        spent.append({"label": "Saved", "amount": _money(metrics["amountSaved"]),
-                      "source": "summary", "date": None})
-        spent_total = _total((metrics["totalExpenses"], metrics["amountSaved"]))
+        # Spending remains expense-only; savings reduce available balances
+        # through the existing category accounting and are explained in Saved.
+        spent_total = _money(metrics["totalExpenses"])
 
         balances = view["categoryBalances"]
         left = [{"label": f"{category.title()} remaining", "amount": _money(balances["remaining"][category]),
@@ -174,8 +173,8 @@ def metric_explanations(report: ExpenseBreakdownReport, payload: dict[str, Any])
                 "Recorded income + expected income still to arrive" if mode == "projected" else "Sum of recorded income",
                 incomes, [payload["incomeProjectionSettings"]["description"],
                           "Expected income is an estimate; it is not a received deposit." if projected_remainder else "Only received income contributes to this total."]),
-            "spent": detail("Spent", spent_total, "Expense outflows + Saved", spent, [
-                "Spent includes expenses and Saved once; Saved is money set aside, not an expense.",
+            "spent": detail("Spent", spent_total, "Expense outflows", spent, [
+                "Cash savings and payroll ESPP are shown in Saved and excluded from Spent.",
                 "Subscription amounts are based on their schedule, not confirmation from your bank.",
                 "Projected includes full scheduled commitments for the month." if mode == "projected" else "Current includes recorded costs and subscription schedules elapsed so far.",
             ]),
@@ -188,9 +187,6 @@ def metric_explanations(report: ExpenseBreakdownReport, payload: dict[str, Any])
         }
         if investing:
             values = investing
-            explanations[mode]["spent"]["notes"].append("Saved includes cash savings and payroll ESPP, without counting withholding again.")
-            if estimated_espp:
-                explanations[mode]["spent"]["notes"].append(f"${estimated_espp:,.2f} of Saved is estimated ESPP from expected paychecks.")
             explanations[mode]["income"]["equation"] = "Deposited income + payroll ESPP" + (" + expected pay and ESPP" if mode == "projected" else "")
             explanations[mode]["income"]["notes"].append("Income includes payroll ESPP before withholding; Saved includes the same contribution once.")
             explanations[mode]["saved"]["equation"] = "Recorded cash savings + payroll ESPP" + (" (includes expected ESPP)" if estimated_espp else "")
@@ -203,6 +199,8 @@ def metric_explanations(report: ExpenseBreakdownReport, payload: dict[str, Any])
                 f"Cash savings plus ESPP: ${values['combinedContributions']:,.2f}.",
                 *values["warnings"],
             ])
+            if estimated_espp:
+                explanations[mode]["saved"]["notes"].append(f"${estimated_espp:,.2f} of Saved is estimated ESPP from expected paychecks.")
     return explanations
 
 

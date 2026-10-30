@@ -40,16 +40,34 @@ for(const [cash,espp,estimated] of [[1200,undefined,0],[1200,0,0],[1200,400,0],[
   for(const [projected,adjustment] of [[false,17.25],[true,38.75]]) {
     const allSpentTotal=headline({totalExpenses:650+adjustment,amountSaved:cash+(espp??0)})
     const props={...base,filter:'all',amountSaved:cash,espp,estimatedEspp:estimated,projected,allSpentTotal}
-    assert.equal(displayed(props),money(650+adjustment+cash+(espp??0)),'All matches authoritative expenses plus Saved exactly once')
+    assert.equal(displayed(props),money(650+adjustment),'All matches authoritative expenses without cash or ESPP savings')
     assert.equal(displayed({...props,filter:'needs'}),'$500.00','Needs stays expense-only')
     assert.equal(displayed({...props,filter:'wants'}),'$150.00','Wants stays expense-only')
     assert.equal(displayed({...props,filter:'savings'}),money(Math.max(0,cash)+(espp??0)),'Saved retains its cash/ESPP breakdown')
+    const html=renderToStaticMarkup(React.createElement(Chart,props))
+    assert.ok(html.includes('spent + saved'), 'All names the broader ring percentage explicitly')
+    const used=html.match(/class="bb-category-used">([^<]+)/)[1]
+    const allocated=650+adjustment+Math.max(0,cash)+(espp??0)
+    assert.equal(used,`${Number((allocated/(5000+(espp??0))*100).toFixed(2))}%`, 'The ring percentage retains savings while the Spent header excludes them')
     assert.equal(equal(props,{...props}),true)
     assert.equal(equal(props,{...props,allSpentTotal:allSpentTotal+1}),false,'A changed canonical expense total invalidates the header memo even when slices are unchanged')
   }
 }
 assert.equal(rows(base.data,0,'all',1200,[],400).filter(row=>row.key==='savings').length,1,'Legacy savings slices cannot duplicate recorded cash')
-console.log('Category Mix All matches the canonical Spent headline across modes, cash/ESPP/estimates, zero/negative savings and memo refreshes.')
+console.log('Category Mix keeps cash/ESPP slices and labels their combined allocation while Spent remains expense-only in both modes.')
 
 assert.equal(displayed({...base,filter:'wants',amountSaved:1200,espp:400,allSpentTotal:2250,
-  categoryBalances:{...base.categoryBalances,transfers:[{from:'wants',to:'savings',amount:25}]}}),'$175.00','Filtered donor coverage remains included exactly as before')
+  categoryBalances:{...base.categoryBalances,transfers:[{from:'wants',to:'savings',amount:25}]}}),'$150.00','Money moved to cover Savings cannot become Wants spending')
+
+const savingsOnly={...base,data:[],filter:'all',amountSaved:1200,espp:400,projected:false,allSpentTotal:headline({totalExpenses:0,amountSaved:1600})}
+assert.equal(displayed(savingsOnly),'$0.00','Saving money alone never becomes spending')
+assert.ok(renderToStaticMarkup(React.createElement(Chart,savingsOnly)).includes('29.63%'),'Savings-only allocation remains visible in the ring')
+
+const donor={...base,filter:'wants',amountSaved:1200,espp:400,allSpentTotal:650,
+  categoryBalances:{...base.categoryBalances,transfers:[{from:'wants',to:'savings',amount:25}]}}
+const donorMarkup=renderToStaticMarkup(React.createElement(Chart,donor))
+assert.ok(donorMarkup.includes('17.5%'),'Coverage still consumes category budget in the ring')
+assert.ok(donorMarkup.includes('Savings overspend coverage'),'Coverage stays visible in Categories')
+const savingDonor={...donor,filter:'savings',categoryBalances:{...base.categoryBalances,transfers:[{from:'savings',to:'needs',amount:25}]}}
+assert.equal(displayed(savingDonor),'$1,600.00','A transfer covering expenses is not counted as additional Saved')
+assert.ok(renderToStaticMarkup(React.createElement(Chart,savingDonor)).includes('Needs overspend coverage'))

@@ -118,7 +118,7 @@ async function checkComparisonCapsule(page) {
           await page.waitForTimeout(300)
           const view = report.modeViews[mode.toLowerCase()]
           const totals = await page.locator('.bb-metrics-grid > .bb-metric-card > .bb-metric-value .bb-fitted-amount-text').allTextContents()
-          assert.deepEqual(totals, [money(view.metrics.monthlyIncome), money(view.metrics.totalExpenses + view.metrics.amountSaved), money(view.metrics.incomeAfterExpenses), money(view.metrics.amountSaved)])
+          assert.deepEqual(totals, [money(view.metrics.monthlyIncome), money(view.metrics.totalExpenses), money(view.metrics.incomeAfterExpenses), money(view.metrics.amountSaved)])
           assert.deepEqual(await page.locator('.bb-left-category-amount').allTextContents(), (i ? ['$1,250', '$900', '$351'] : ['$1,150', '$500', '$100']))
           assert.deepEqual(await page.locator('.bb-savings-metric-card .bb-savings-progress-labels b').allTextContents(), ['$800', '$1,601'])
           const geometry = await page.evaluate(() => {

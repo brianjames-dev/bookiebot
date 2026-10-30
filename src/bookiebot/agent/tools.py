@@ -303,14 +303,11 @@ def _financial_report_section(
     headline_spent = None
     if section in {"overview", "cash_flow"}:
         metrics = view["metrics"]
-        explanation = payload.get("metricExplanations", {}).get(mode, {}).get("spent", {})
         headline_spent = {
-            "value": explanation.get("value", round(
-                float(metrics.get("totalExpenses") or 0.0) + float(metrics.get("amountSaved") or 0.0), 2,
-            )),
-            "equation": explanation.get("equation", "Expenses + Saved"),
+            "value": round(float(metrics.get("totalExpenses") or 0.0), 2),
+            "equation": "Expense outflows",
             "note": (
-                "Overview Spent includes Saved once (cash savings plus ESPP, including projected estimates). "
+                "Overview Spent is expense-only; cash savings and ESPP are reported separately in Saved. "
                 "totalExpenses and its comparison change remain expense-only; Left uses the existing category balances."
             ),
         }

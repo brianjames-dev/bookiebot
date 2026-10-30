@@ -265,7 +265,7 @@ type ReportView = ReportModeView
 type MetricInspection = MetricExplanation & { key: "income" | "spent" | "left" | "saved"; view: ReportView }
 
 function reportSpentTotal(metrics: ReportView["metrics"]) {
-  return roundCurrency(metrics.totalExpenses + metrics.amountSaved)
+  return roundCurrency(metrics.totalExpenses)
 }
 
 function buildReportView(report: ExpenseReportData, projected: boolean): ReportView {
@@ -1043,12 +1043,11 @@ function MetricExplanationDetails({detail}: {detail:MetricInspection}) {
   }
   let components = detail.components
   if (key === "spent") {
-    // The headline includes money spent and saved. Keep expense calculations
-    // separate and use combined cash/ESPP savings exactly once.
+    // Rebuild the compact expense summary from the active view, including
+    // authoritative sheet adjustments. Cash/ESPP savings belong only to Saved.
     components = [
       {label: "Needs", amount: view.categorySpending.needs},
       {label: "Wants", amount: view.categorySpending.wants},
-      {label: "Saved", amount: view.metrics.amountSaved},
     ]
     const difference = roundCurrency(detail.value - amountRowsTotal(components))
     if (difference) components.push({label: "Sheet adjustment", amount: difference})
@@ -1060,7 +1059,6 @@ function MetricExplanationDetails({detail}: {detail:MetricInspection}) {
       {key === "left" && index < 3 && view.metrics.monthlyIncome > 0 && <small>
         {(100 * view.categoryBudgets[(["needs", "wants", "savings"] as const)[index]] / view.metrics.monthlyIncome).toLocaleString("en-US", {maximumFractionDigits: 1})}% of income
       </small>}
-      {key === "spent" && component.label === "Saved" && Boolean(view.savingsInvesting?.estimatedEsppContribution) && <small>Includes estimated ESPP</small>}
       {component.date && <small>{component.date}</small>}{component.source === "scheduled" && <small>Scheduled estimate</small>}</dt>
       <dd>{formatMoney(component.amount)}</dd></div>)}</dl>
     {key === "income" && detail.notes.map((note,index)=><p className="bb-activity-footnote" key={index}>{note}</p>)}
@@ -1631,10 +1629,15 @@ const CategoryMixChart = memo(function CategoryMixChart({
   const ringData = [...chartData.filter(item => item.key !== "left"), ...chartData.filter(item => item.key === "left")]
   const [pieHostRef, pieHostSize] = useElementSize<HTMLDivElement>()
   const pieLayout = useExpensePieLayout(ringData, pieHostSize)
-  const spentTotal = filter === "all" ? allSpentTotal : amountRowsTotal(chartData.filter((item) => item.key !== "left"))
-  const pressure = categoryMixPressure(filter, categoryBalances, spentTotal)
+  const spentTotal = filter === "all" ? allSpentTotal : amountRowsTotal(chartData.filter((item) => item.key !== "left" && !item.key.startsWith("coverage-")))
   const selectedBudget = (filter === "all" ? categoryBudgetTotal(categoryBudgets) : categoryBudgets[filter]) + ((filter === "all" || filter === "savings") ? espp ?? 0 : 0)
-  const usedPercent = selectedBudget > 0 ? (spentTotal / selectedBudget) * 100 : 0
+  // All still shows where income went, including cash savings and ESPP.
+  // Keep its ring allocation distinct from the expense-only Spent headline.
+  const savedTotal = amountRowsTotal(chartData.filter((item) => item.key === "savings" || item.key === "espp"))
+  const usedTotal = filter === "all" ? roundCurrency(spentTotal + savedTotal) : amountRowsTotal(chartData.filter((item) => item.key !== "left"))
+  const usedLabel = filter === "all" ? "spent + saved" : "used"
+  const pressure = categoryMixPressure(filter, categoryBalances, usedTotal)
+  const usedPercent = selectedBudget > 0 ? (usedTotal / selectedBudget) * 100 : 0
 
   return (
     <div className="bb-chart-stack bb-chart-page">
@@ -1666,7 +1669,7 @@ const CategoryMixChart = memo(function CategoryMixChart({
             <CategoryMixPieSurface data={ringData} layout={pieLayout} onInspect={onInspect} />
             <div className="bb-category-pie-center" style={{ left: pieLayout.cx, top: pieLayout.cy, width: pieLayout.innerRadius * 1.7 }} aria-live="polite">
               <FittedAmount className="bb-category-used">{selectedBudget > 0 ? `${Number(usedPercent.toFixed(2))}%` : "—"}</FittedAmount>
-              <span>{selectedBudget > 0 ? "used" : "no budget"}</span>
+              <span>{selectedBudget > 0 ? usedLabel : "no budget"}</span>
             </div>
           </CategoryMixPieMotionHost>
         </ChartContainer>

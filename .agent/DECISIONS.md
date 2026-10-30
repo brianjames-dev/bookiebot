@@ -1,5 +1,11 @@
 # Agent Decisions
 
+## 2026-10-29 - Exclude Savings From Spent And Keep The Allocation Ring
+
+The user reverses the earlier savings-in-Spent choice: every Spent headline and explanation now uses canonical totalExpenses alone. Cash savings and actual/estimated ESPP stay in Saved; do not add those funds back to Left or change category balances, goals, targets, income, comparison windows, sheet records or writers. The frontend and read-only agent headline use the canonical expense value even with an older explanation in a report. Preserve sheet adjustments separately from savings and move estimated-ESPP context into the Saved explanation.
+
+The user clarifies that Category Mix All should still show saved cash and ESPP. Keep its existing slices, full allocation budget and Categories breakdown, but distinguish the expense-only Spent header from the center percentage labeled spent + saved. That percentage combines expenses with the displayed cash/ESPP contributions. Scoped Spent/Saved headers count their own expenses/contributions; donated category coverage remains a separate ring/budget usage and pressure signal. This prevents Savings coverage from being called spending and expense coverage from being called saving. Keep the selected chart styling and interactions. Native acceptance is checklist 191; this supersedes prior decisions to include savings in Spent, without changing financial persistence or the Finance Ops backlog.
+
 ## 2026-10-29 - Remove Comparison Details Entirely
 
 At the user’s request, remove the comparison’s Details + control and its expandable explanation/excluded-amount table, including the component state, hidden content and unused CSS. Keep only the existing recorded-spending/day-range caption beneath the month bars; unavailable/loading/error/retry feedback stays inline. Preserve the selected presentation, month picker and request lifecycle. The calculation remains dated recorded expenses over matching day ranges, with the hero showing selected minus baseline and the percentage relative to a positive baseline. It excludes savings, scheduled subscriptions, undated expenses and sheet adjustments; it does not use the top Spent headline or full previous-month costs against an incomplete current month. This supersedes earlier decisions to retain Details; native acceptance is checklist 190.

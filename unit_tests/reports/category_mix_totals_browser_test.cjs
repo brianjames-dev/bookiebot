@@ -9,8 +9,8 @@ from unit_tests.reports.test_espp_tracking import plan_rows
 from bookiebot.reports.expense_breakdown import expense_breakdown_client_payload as payload
 print(json.dumps([payload(build(income_rows(('9/1/2026','Fixture income','5000')))),payload(build(plan_rows(('9/11/2026','xAI paycheck','3800'))))]))
 `],{cwd:root,env:{...process.env,PYTHONPATH:path.join(root,'src')}}).toString())
-const cases=[{name:'cash',base:plain,cash:1200,espp:[undefined,undefined],expected:[1875.50,1925.75]},
-  {name:'cash-espp',base:enrolled,cash:1200,espp:[400,600],expected:[2275.50,2525.75]},
+const cases=[{name:'cash',base:plain,cash:1200,espp:[undefined,undefined],expected:[675.50,725.75]},
+  {name:'cash-espp',base:enrolled,cash:1200,espp:[400,600],expected:[675.50,725.75]},
   {name:'zero-saved',base:plain,cash:0,espp:[undefined,undefined],expected:[675.50,725.75]}]
 for(const fixture of cases) {
   fixture.report=JSON.parse(JSON.stringify(fixture.base))
@@ -18,6 +18,9 @@ for(const fixture of cases) {
     const view=fixture.report.modeViews[mode],espp=fixture.espp[i]??0
     view.metrics.totalExpenses=i?725.75:675.50 // Includes a real-world-style sheet adjustment beyond itemized rows.
     view.metrics.amountSaved=fixture.cash+espp
+    // Simulate an already-open report carrying the previous explanation shape.
+    fixture.report.metricExplanations[mode].spent.value=view.metrics.totalExpenses+view.metrics.amountSaved
+    fixture.report.metricExplanations[mode].spent.components=[{label:'Saved',amount:view.metrics.amountSaved,source:'summary',date:null}]
     view.metrics.monthlyIncome=5000+espp
     view.categoryBudgets={needs:2000,wants:1000,savings:2000}
     const remaining={needs:1500,wants:i?800:850,savings:2000-fixture.cash}
@@ -60,14 +63,14 @@ const money=value=>new Intl.NumberFormat('en-US',{style:'currency',currency:'USD
         for(const [i,mode] of ['Current','Projected'].entries()) {
           await page.getByRole('button',{name:mode,exact:true}).click()
           await category.getByRole('combobox',{name:'Category mix filter',exact:true}).selectOption('all')
-          assert.equal(await total.innerText(),money(fixture.expected[i]),`${engine.name()} ${width} ${fixture.name} ${mode}: All includes Saved once and retains the canonical adjustment`)
+          assert.equal(await total.innerText(),money(fixture.expected[i]),`${engine.name()} ${width} ${fixture.name} ${mode}: All excludes savings and retains the canonical expense adjustment`)
           assert.equal(await total.innerText(),await spentCard.innerText(),'All and the Spent card agree')
           await page.waitForTimeout(650)
           const geometry=await category.evaluate(el=>{
             const rect=selector=>el.querySelector(selector).getBoundingClientRect()
             const host=rect('.bb-category-pie-host'),ring=rect('.recharts-pie'),center=rect('.bb-category-pie-center'),chevron=rect('.bb-category-filter-chevron'),select=rect('.bb-category-mix-filter select'),amount=rect('.bb-chart-total .bb-fitted-amount-text')
             const stage=document.querySelector('.bb-chart-carousel-band').getBoundingClientRect()
-            return {fills:ring.width/Math.min(host.width,host.height),centerX:Math.abs((center.left+center.right-ring.left-ring.right)/2),centerY:Math.abs((center.top+center.bottom-ring.top-ring.bottom)/2),inset:select.right-chevron.right,dropdownWidth:select.width,totalFont:getComputedStyle(el.querySelector('.bb-chart-total')).fontSize,usedFont:getComputedStyle(el.querySelector('.bb-category-used')).fontSize,headerFits:amount.right+8<select.left,stage:stage.height,used:el.querySelector('.bb-category-used .bb-fitted-amount-text').textContent,budget:el.querySelector('.bb-chart-budget-note').textContent,mode:el.querySelector('.bb-chart-mode-note').textContent}
+            return {fills:ring.width/Math.min(host.width,host.height),centerX:Math.abs((center.left+center.right-ring.left-ring.right)/2),centerY:Math.abs((center.top+center.bottom-ring.top-ring.bottom)/2),inset:select.right-chevron.right,dropdownWidth:select.width,totalFont:getComputedStyle(el.querySelector('.bb-chart-total')).fontSize,usedFont:getComputedStyle(el.querySelector('.bb-category-used')).fontSize,headerFits:amount.right+8<select.left,stage:stage.height,used:el.querySelector('.bb-category-used .bb-fitted-amount-text').textContent,usedCaption:el.querySelector('.bb-category-pie-center > span').textContent,budget:el.querySelector('.bb-chart-budget-note').textContent,mode:el.querySelector('.bb-chart-mode-note').textContent,captionFits:el.querySelector('.bb-category-pie-center > span').getBoundingClientRect().width<=center.width}
           })
           assert.ok(geometry.fills>.90&&geometry.fills<=1.01,JSON.stringify(geometry))
           assert.ok(geometry.centerX<1&&geometry.centerY<1,JSON.stringify(geometry))
@@ -77,17 +80,21 @@ const money=value=>new Intl.NumberFormat('en-US',{style:'currency',currency:'USD
           assert.equal(geometry.usedFont,'40px')
           assert.equal(geometry.headerFits,true,'Exact cents fit beside the native dropdown')
           assert.equal(geometry.mode,mode)
-          assert.equal(geometry.used,`${Number((fixture.expected[i]/(5000+(fixture.espp[i]??0))*100).toFixed(2))}%`)
+          assert.equal(geometry.used,`${Number(((fixture.expected[i]+fixture.cash+(fixture.espp[i]??0))/(5000+(fixture.espp[i]??0))*100).toFixed(2))}%`)
+          assert.equal(geometry.usedCaption,'spent + saved','Ring allocation includes savings under an explicit label')
+          assert.equal(geometry.captionFits,true,'The broader allocation label fits inside the ring')
           assert.ok(!geometry.budget.includes('used'),'The percentage belongs inside the ring')
           await page.getByRole('button',{name:'Explain Spent',exact:true}).click()
           const dialog=page.getByRole('dialog')
           await dialog.waitFor()
           assert.equal(await dialog.locator('.bb-metric-explanation > .bb-chart-total').innerText(),money(fixture.expected[i]),'All, card and modal agree even with an older cached explanation')
-          if(fixture.name==='cash-espp'&&i===1)assert.ok((await dialog.innerText()).includes('Includes estimated ESPP'))
+          assert.ok(!(await dialog.innerText()).includes('Includes estimated ESPP'))
+          assert.ok(!(await dialog.locator('.bb-metric-explanation dt').allTextContents()).includes('Saved'),'The expense explanation has no savings row')
           await page.keyboard.press('Escape');await page.waitForTimeout(350)
           for(const [filter,expected] of [['Needs',500],['Wants',i?200:150],['Savings',fixture.cash+(fixture.espp[i]??0)]]) {
             await category.getByRole('combobox',{name:'Category mix filter',exact:true}).selectOption(filter.toLowerCase())
             assert.equal(await total.innerText(),money(expected),`${filter} retains its own scoped total`)
+            assert.equal(await category.locator('.bb-category-pie-center > span').innerText(),'used')
             assert.equal(await scope.evaluate(el=>{
               const style=getComputedStyle(el),context=document.createElement('canvas').getContext('2d')
               context.font=style.font

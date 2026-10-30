@@ -255,7 +255,7 @@ def test_category_mix_counts_donor_transfers_as_effective_category_usage():
     assert "categoryMixRows(data, selectedRollover, filter, amountSaved, transferRows, espp, estimatedEspp)" in category_source
     assert "transfer.from === filter" in transfer_source
     assert 'label: `${CATEGORY_BALANCE_LABELS[transfer.to]} overspend coverage`' in transfer_source
-    assert "spentTotal / selectedBudget" in category_source
+    assert "usedTotal / selectedBudget" in category_source
 
 
 def test_daily_spending_includes_bills_and_compresses_strong_outliers():
