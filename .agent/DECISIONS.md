@@ -1,5 +1,11 @@
 # Agent Decisions
 
+## 2026-10-30 - Apply Refined Flow Category Callouts
+
+Use the approved Refined flow settings: 220px phone ring, 26px band, 32px center, 12px callout labels (11.5px on narrow hosts), 10px gaps/insets, 18px callout radius, 6px side padding, 23px contour stagger and 65% stem opacity. Center matching-color category names above whole-dollar amounts in content-sized cards; use Needs subs, Wants subs, Other needs and Bills & utils only in these callouts. Keep exact canonical values, full names/cents in Categories and inspection, expense-only Spent, savings/ESPP allocations, native scope control, clockwise noon start and existing shared-stage height.
+
+Compute measured contour placement and curved obstacle routing in a dedicated same-origin hashed worker, preserving the existing Recharts sector animation and main-thread scrolling. Validate neighbor swaps against complete rendered path lengths and detours; preserve per-corner smoothing and separate stems. Cancel obsolete worker jobs and ignore late results; bound completed geometry reuse in per-chart memory that is released on unmount. Only the public compiled geometry worker joins the static asset allowlist; no new data API, storage, sheet writes or Finance Ops changes. Native acceptance: checklist 194.
+
 ## 2026-10-30 - Quiet Chart Header And Text-Fitting Scope
 
 Apply the selected Quiet header: 24px title, 6px inactive markers, 24px active marker, zero gap between 44px marker buttons and 12px/0px vertical padding. Show only the active graph title; named, pressed buttons and keyboard arrows provide direct access to every available graph. Retain the existing horizontal touch handlers and native vertical scrolling. Fit long titles in the available row; narrow phones stack the full-size title above right-aligned markers. Keep the shared stage height, content, financial accounting, modal controls and persisted graph/filter/mode state.

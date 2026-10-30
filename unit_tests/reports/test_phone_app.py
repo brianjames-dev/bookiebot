@@ -241,6 +241,13 @@ async def test_asset_allowlist_manifest_and_existing_rotating_avatar(phone):
     assert avatar.status == 200 and avatar.headers["Content-Type"].startswith("image/")
     assert (await phone.client.get("/app/assets/phone-setup.js")).status == 200
     assert (await phone.client.get("/app/assets/not-public.py")).status == 404
+    workers = list(phone_app._ASSETS.glob("category-mix-layout-*.js"))
+    assert workers
+    worker = await phone.client.get(f"/app/assets/{workers[0].name}")
+    assert worker.status == 200
+    assert worker.headers["Content-Type"].startswith("application/javascript")
+    assert await worker.read() == workers[0].read_bytes()
+    assert (await phone.client.get("/app/assets/category-mix-layout-missing.js")).status == 404
 
 
 @pytest.mark.asyncio

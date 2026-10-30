@@ -4,6 +4,7 @@ import tailwindcss from "@tailwindcss/vite"
 
 export default defineConfig({
   plugins: [react(), tailwindcss()],
+  worker: { rollupOptions: { output: { entryFileNames: "category-mix-layout-[hash].js" } } },
   resolve: { dedupe: ["react", "react-dom"] },
   define: {
     "process.env.NODE_ENV": JSON.stringify("production"),

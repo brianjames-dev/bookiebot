@@ -1984,7 +1984,7 @@ def test_report_frontend_keeps_expense_metrics_separate_from_saved_headlines():
     assert "categoryMixRows(data, selectedRollover, filter, amountSaved, transferRows, espp, estimatedEspp)" in source
     assert "categoryBudgets={activeReport.categoryBudgets}" in source
     assert "Budget remaining" not in source
-    assert "usedPercent.toFixed(2)" in source
+    assert "usedPercent.toFixed(1)" in source
     assert "<SavingsMetricCard" in source
     assert "savingsMetricDescription" not in source
     assert "savingsPaycheckCount" not in source

@@ -1759,7 +1759,7 @@ button.bb-left-categories { cursor: pointer; }
   pointer-events: none;
   transform: translate(calc(-50% + var(--bb-pie-layout-offset-x, 0px)), calc(-50% + var(--bb-pie-layout-offset-y, 0px)));
 }
-.bb-category-used { color: hsl(var(--foreground)); font-size: 40px; font-weight: 500; line-height: 1.1; letter-spacing: -.04em; font-variant-numeric: tabular-nums; }
+.bb-category-used { color: hsl(var(--foreground)); font-size: 32px; font-weight: 500; line-height: 1.1; letter-spacing: -.04em; font-variant-numeric: tabular-nums; }
 
 .bb-category-pie-host .recharts-pie {
   transform: translate(
@@ -3368,3 +3368,18 @@ button:focus-visible, summary:focus-visible {
 .bb-toolbar-button:focus-visible { outline: 2px solid hsl(var(--primary)); outline-offset: 3px; }
 .bb-toolbar-button:disabled { opacity: .5; cursor: default; }
 @media (prefers-reduced-motion: reduce) { .bb-toolbar-button { transition: none; } }
+
+/* Refined flow shares the existing chart stage and Categories footer. */
+.bb-category-mix-page { row-gap: 0; }
+.bb-category-mix-page .bb-category-chart-layout { max-width: none; width: calc(100% + 2 * var(--bb-chart-page-gutter)); margin-inline: calc(-1 * var(--bb-chart-page-gutter)); }
+.bb-contour-callouts { position: absolute; inset: 0; width: 100%; height: 100%; overflow: visible; pointer-events: none; }
+.bb-contour-stem { fill: none; stroke-width: 1.2px; stroke-linecap: round; opacity: .65; }
+.bb-contour-label rect { fill: color-mix(in srgb, hsl(var(--foreground)) 5%, hsl(var(--card))); }
+.bb-contour-name { font-weight: 400; }
+.bb-contour-name:not([fill]) { fill: hsl(var(--muted-foreground)); }
+.bb-contour-amount { fill: hsl(var(--foreground)); font-weight: 500; font-variant-numeric: tabular-nums; }
+.bb-contour-label, .bb-contour-stem { animation: bb-contour-enter 180ms ease-out both; }
+@keyframes bb-contour-enter { from { opacity: 0; } }
+@media (prefers-reduced-motion: reduce) { .bb-contour-label, .bb-contour-stem { animation: none; } }
+
+@media (min-width: 700px) { .bb-category-mix-page .bb-category-chart-layout { width: min(100%, 620px); margin-inline: auto; } }

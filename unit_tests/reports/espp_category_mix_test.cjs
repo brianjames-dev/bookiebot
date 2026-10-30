@@ -7,7 +7,7 @@ const names=new Set(['money','formatMoney','formatPct','roundCurrency','amountRo
 const declarations=ast.statements.filter(node=>ts.isFunctionDeclaration(node)?names.has(node.name?.text):ts.isVariableStatement(node)&&node.declarationList.declarations.some(item=>names.has(item.name.getText(ast))))
 assert.equal(declarations.length,names.size)
 const passthrough=({children})=>React.createElement('div',null,children)
-const runtime={exports:{},memo:React.memo,require:req,FittedAmount:({children,className})=>React.createElement('div',{className},children),useElementSize:()=>[null,{width:300,height:300}],useExpensePieLayout:()=>({cx:150,cy:150,innerRadius:100}),chartConfig:()=>({}),categoryMixPressure:()=>null,ChartContainer:passthrough,CategoryMixPieMotionHost:passthrough,CategoryMixPieSurface:()=>null,CategoryMixFilterControl:()=>null,CategoryMixPressureBar:()=>null,ModalDetails:passthrough,CATEGORY_BALANCE_LABELS:{needs:'Needs',wants:'Wants',savings:'Savings'},NEEDS_BAR_COLOR:'needs',WANTS_BAR_COLOR:'wants',CATEGORY_NEEDS_KEYS:new Set(['rent']),CATEGORY_WANTS_KEYS:new Set(['food']),SAVINGS_CATEGORY_COLOR:'cash',LEFT_CATEGORY_COLOR:'left'}
+const runtime={exports:{},memo:React.memo,require:req,FittedAmount:({children,className})=>React.createElement('div',{className},children),useElementSize:()=>[null,{width:300,height:300}],useExpensePieLayout:()=>({cx:150,cy:150,innerRadius:100}),chartConfig:()=>({}),categoryMixPressure:()=>null,ChartContainer:passthrough,CategoryMixPieMotionHost:passthrough,CategoryMixPieSurface:()=>null,CategoryContourCallouts:()=>null,CategoryMixFilterControl:()=>null,CategoryMixPressureBar:()=>null,ModalDetails:passthrough,CATEGORY_BALANCE_LABELS:{needs:'Needs',wants:'Wants',savings:'Savings'},NEEDS_BAR_COLOR:'needs',WANTS_BAR_COLOR:'wants',CATEGORY_NEEDS_KEYS:new Set(['rent']),CATEGORY_WANTS_KEYS:new Set(['food']),SAVINGS_CATEGORY_COLOR:'cash',LEFT_CATEGORY_COLOR:'left'}
 vm.runInNewContext(ts.transpileModule(declarations.map(node=>node.getText(ast)).join('\n')+'\nexports.rows=categoryMixRows;exports.Chart=CategoryMixChart;exports.headline=reportSpentTotal;exports.equal=areCategoryMixChartPropsEqual',{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2020,jsx:ts.JsxEmit.ReactJSX}}).outputText,runtime)
 const rows=(...args)=>JSON.parse(JSON.stringify(runtime.exports.rows(...args)))
 const data=[{key:'rent',label:'Rent',amount:500},{key:'food',label:'Eating out',amount:150}]
@@ -48,12 +48,13 @@ for(const [cash,espp,estimated] of [[1200,undefined,0],[1200,0,0],[1200,400,0],[
     assert.ok(html.includes('spent + saved'), 'All names the broader ring percentage explicitly')
     const used=html.match(/class="bb-category-used">([^<]+)/)[1]
     const allocated=650+adjustment+Math.max(0,cash)+(espp??0)
-    assert.equal(used,`${Number((allocated/(5000+(espp??0))*100).toFixed(2))}%`, 'The ring percentage retains savings while the Spent header excludes them')
+    assert.equal(used,`${Number((allocated/(5000+(espp??0))*100).toFixed(1))}%`, 'The ring percentage retains savings while the Spent header excludes them')
     assert.equal(equal(props,{...props}),true)
     assert.equal(equal(props,{...props,allSpentTotal:allSpentTotal+1}),false,'A changed canonical expense total invalidates the header memo even when slices are unchanged')
   }
 }
 assert.equal(rows(base.data,0,'all',1200,[],400).filter(row=>row.key==='savings').length,1,'Legacy savings slices cannot duplicate recorded cash')
+assert.match(renderToStaticMarkup(React.createElement(Chart,{...base,filter:'savings',amountSaved:1200,espp:400,allSpentTotal:650})),/>saved<\/span>/,'The Savings scope describes its allocation as saved')
 console.log('Category Mix keeps cash/ESPP slices and labels their combined allocation while Spent remains expense-only in both modes.')
 
 assert.equal(displayed({...base,filter:'wants',amountSaved:1200,espp:400,allSpentTotal:2250,
@@ -61,7 +62,7 @@ assert.equal(displayed({...base,filter:'wants',amountSaved:1200,espp:400,allSpen
 
 const savingsOnly={...base,data:[],filter:'all',amountSaved:1200,espp:400,projected:false,allSpentTotal:headline({totalExpenses:0,amountSaved:1600})}
 assert.equal(displayed(savingsOnly),'$0.00','Saving money alone never becomes spending')
-assert.ok(renderToStaticMarkup(React.createElement(Chart,savingsOnly)).includes('29.63%'),'Savings-only allocation remains visible in the ring')
+assert.ok(renderToStaticMarkup(React.createElement(Chart,savingsOnly)).includes('29.6%'),'Savings-only allocation remains visible in the ring')
 
 const donor={...base,filter:'wants',amountSaved:1200,espp:400,allSpentTotal:650,
   categoryBalances:{...base.categoryBalances,transfers:[{from:'wants',to:'savings',amount:25}]}}

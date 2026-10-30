@@ -5,6 +5,7 @@ import asyncio
 import hashlib
 import json
 import logging
+import re
 from pathlib import Path
 from urllib.parse import urlsplit
 
@@ -278,6 +279,8 @@ async def _asset(request: web.Request) -> web.StreamResponse:
         return web.Response(text=_theme_bootstrap_script(), content_type="application/javascript",
                             headers={"Cache-Control": "no-cache", "X-Content-Type-Options": "nosniff"})
     types = {"expense-report-app.js": "application/javascript", "expense-report-app.css": "text/css", "phone-setup.js": "application/javascript"}
+    if re.fullmatch(r"category-mix-layout-[A-Za-z0-9_-]+\.js", name) and (_ASSETS / name).is_file():
+        types[name] = "application/javascript"
     if name not in types:
         raise web.HTTPNotFound()
     return web.FileResponse(_ASSETS / name, headers={"Content-Type": types[name], "Cache-Control": "public, max-age=3600", "X-Content-Type-Options": "nosniff"})

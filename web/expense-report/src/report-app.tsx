@@ -15,6 +15,8 @@ import {
 } from "react"
 import { createPortal } from "react-dom"
 import { ChevronDown } from "lucide-react"
+import { useCategoryContour, CategoryContourCallouts } from "./category-mix-contour"
+import { CONTOUR_PADDING_ANGLE } from "./category-mix-layout"
 import { stablePieAnimation, stableBarAnimation, stableBarShape, StablePieSector, type AnimatedPieSector } from "./chart-animation"
 import { ReportScreen, useAppNavigation } from "./app-navigation"
 import { ReportBrand, ReportHeader } from "./report-header"
@@ -1625,12 +1627,12 @@ const CategoryMixChart = memo(function CategoryMixChart({
   // Keep its ring allocation distinct from the expense-only Spent headline.
   const savedTotal = amountRowsTotal(chartData.filter((item) => item.key === "savings" || item.key === "espp"))
   const usedTotal = filter === "all" ? roundCurrency(spentTotal + savedTotal) : amountRowsTotal(chartData.filter((item) => item.key !== "left"))
-  const usedLabel = filter === "all" ? "spent + saved" : "used"
+  const usedLabel = filter === "all" ? "spent + saved" : filter === "savings" ? "saved" : "used"
   const pressure = categoryMixPressure(filter, categoryBalances, usedTotal)
   const usedPercent = selectedBudget > 0 ? (usedTotal / selectedBudget) * 100 : 0
 
   return (
-    <div className="bb-chart-stack bb-chart-page">
+    <div className="bb-chart-stack bb-chart-page bb-category-mix-page">
       <div className="bb-panel-head bb-chart-page-header bb-category-mix-summary">
         <div>
           <div className="bb-category-summary-label">
@@ -1657,8 +1659,9 @@ const CategoryMixChart = memo(function CategoryMixChart({
             filter={filter}
           >
             <CategoryMixPieSurface data={ringData} layout={pieLayout} onInspect={onInspect} />
+            <CategoryContourCallouts scene={pieLayout.contour} data={ringData} ready={pieLayout.calloutsReady} />
             <div className="bb-category-pie-center" style={{ left: pieLayout.cx, top: pieLayout.cy, width: pieLayout.innerRadius * 1.7 }} aria-live="polite">
-              <FittedAmount className="bb-category-used">{selectedBudget > 0 ? `${Number(usedPercent.toFixed(2))}%` : "—"}</FittedAmount>
+              <FittedAmount className="bb-category-used">{selectedBudget > 0 ? `${Number(usedPercent.toFixed(1))}%` : "—"}</FittedAmount>
               <span>{selectedBudget > 0 ? usedLabel : "no budget"}</span>
             </div>
           </CategoryMixPieMotionHost>
@@ -1731,6 +1734,7 @@ const CategoryMixPieSurface = memo(function CategoryMixPieSurface({ data, layout
             data={data}
             dataKey="amount"
             nameKey="label"
+            stroke="none"
             shape={(props: unknown) => {
               const { key: _key, animationGeometry, ...sector } = props as ComponentProps<typeof Sector> & AnimatedPieSector & { key?: string; payload?: Pick<BreakdownItem, "key"> }
               const shape = { cx: sector.cx, cy: sector.cy, innerRadius: sector.innerRadius, outerRadius: sector.outerRadius,
@@ -1756,8 +1760,8 @@ const CategoryMixPieSurface = memo(function CategoryMixPieSurface({ data, layout
             animationBegin={0}
             animationDuration={520}
             animationEasing="ease-out"
-            label={layout.showLabels ? (props) => renderPieMetricLabel(props, layout) : false}
-            labelLine={layout.showLabels ? (props) => renderPieMetricLabelLine(props, layout) : false}
+            label={false}
+            labelLine={false}
           >
             {data.map((item) => (
               <Cell key={item.key} fill={item.color} />
@@ -2031,249 +2035,13 @@ function useElementSize<T extends HTMLElement>() {
   return [ref, size] as const
 }
 
-type ExpensePieBaseLayout = {
-  fallbackWidth: number
-  fallbackHeight: number
-  minOuterRadius: number
-  maxOuterRadius: number
-  innerRadiusRatio: number
-  labelOffset: number
-  labelGap: number
-  containerPadding: number
-  compactLabel: boolean
-  showLabels: boolean
-}
-
 function useExpensePieLayout(data: BreakdownItem[], hostSize: ElementSize) {
-  const isPhone = useMediaQuery("(max-width: 520px)")
-  const isTablet = useMediaQuery("(max-width: 860px)")
-
-  let base: ExpensePieBaseLayout
-  if (isPhone) {
-    base = {
-      fallbackWidth: 360,
-      fallbackHeight: 330,
-      minOuterRadius: 72,
-      maxOuterRadius: Math.max(PIE_METRIC_MINIMUM_RADIUS, Math.min(hostSize.width || 360, hostSize.height || 330) / 2 - 8),
-      innerRadiusRatio: 0.72,
-      labelOffset: 20,
-      labelGap: PIE_METRIC_LABEL_GAP,
-      containerPadding: 8,
-      compactLabel: false,
-      showLabels: false,
-    }
-  } else if (isTablet) {
-    base = {
-      fallbackWidth: 760,
-      fallbackHeight: 390,
-      minOuterRadius: 96,
-      maxOuterRadius: 150,
-      innerRadiusRatio: 0.72,
-      labelOffset: 26,
-      labelGap: PIE_METRIC_LABEL_GAP,
-      containerPadding: 14,
-      compactLabel: false,
-      showLabels: true,
-    }
-  } else {
-    base = {
-      fallbackWidth: 1100,
-      fallbackHeight: 460,
-      minOuterRadius: 120,
-      maxOuterRadius: 220,
-      innerRadiusRatio: 0.72,
-      labelOffset: 42,
-      labelGap: PIE_METRIC_LABEL_GAP,
-      containerPadding: 16,
-      compactLabel: false,
-      showLabels: true,
-    }
-  }
-
-  return fitExpensePieLayout(data, hostSize, base)
+  return useCategoryContour(data, hostSize)
 }
 
-function pieMetricAnimationDelay(index: number | undefined) {
-  return `${Math.min(index ?? 0, 8) * 10 + 35}ms`
-}
-
-function pieMetricColor(payload: BreakdownItem | undefined, fallback: string | undefined) {
-  return payload?.color ?? fallback ?? "hsl(var(--foreground))"
-}
-
-type PieMetricTextAnchor = "start" | "middle" | "end" | "inherit"
-
-const PIE_METRIC_LABEL_GAP = 10
-const PIE_METRIC_LABEL_HALF_HEIGHT = 8
-const PIE_METRIC_LABEL_MIN_VERTICAL_GAP = 18
-const PIE_METRIC_LABEL_WIDTH_SAFETY = 4
-const PIE_METRIC_MINIMUM_RADIUS = 54
 const PIE_METRIC_START_ANGLE = 90
 const PIE_METRIC_END_ANGLE = -270
-const PIE_METRIC_PADDING_ANGLE = 1
-
-type PieMetricDelta = {
-  x: number
-  y: number
-}
-
-type PieMetricEnvelope = {
-  minX: number
-  maxX: number
-  minY: number
-  maxY: number
-}
-
-type PieMetricPlacement = {
-  key: string
-  cos: number
-  sin: number
-  labelWidth: number
-  delta: PieMetricDelta
-}
-
-const pieMetricLabelWidthCache = new Map<string, number>()
-let pieMetricMeasureContext: CanvasRenderingContext2D | null | undefined
-
-function fitExpensePieLayout(data: BreakdownItem[], hostSize: ElementSize, base: ExpensePieBaseLayout) {
-  const width = hostSize.width || base.fallbackWidth
-  const height = hostSize.height || base.fallbackHeight
-  const safeWidth = Math.max(1, width - base.containerPadding * 2)
-  const safeHeight = Math.max(1, height - base.containerPadding * 2)
-  const minimumRadius = Math.min(base.minOuterRadius, base.maxOuterRadius, safeWidth / 2, safeHeight / 2)
-  let low = Math.min(PIE_METRIC_MINIMUM_RADIUS, minimumRadius)
-  let high = base.maxOuterRadius
-
-  for (let iteration = 0; iteration < 24; iteration += 1) {
-    const candidate = (low + high) / 2
-    const candidateEnvelope = expensePieEnvelope(data, candidate, base)
-    if (
-      candidateEnvelope.maxX - candidateEnvelope.minX <= safeWidth &&
-      candidateEnvelope.maxY - candidateEnvelope.minY <= safeHeight
-    ) {
-      low = candidate
-    } else {
-      high = candidate
-    }
-  }
-
-  const outerRadius = Math.max(PIE_METRIC_MINIMUM_RADIUS, Math.min(base.maxOuterRadius, low))
-  const envelope = expensePieEnvelope(data, outerRadius, base)
-  const envelopeWidth = envelope.maxX - envelope.minX
-  const envelopeHeight = envelope.maxY - envelope.minY
-  const cx = base.containerPadding + (safeWidth - envelopeWidth) / 2 - envelope.minX
-  const cy = base.containerPadding + (safeHeight - envelopeHeight) / 2 - envelope.minY
-
-  return {
-    ...base,
-    cx,
-    cy,
-    innerRadius: outerRadius * base.innerRadiusRatio,
-    outerRadius,
-    labelDeltas: pieMetricLabelDeltas(data, outerRadius, base),
-    margin: { top: 0, right: 0, bottom: 0, left: 0 },
-  }
-}
-
-function expensePieEnvelope(data: BreakdownItem[], outerRadius: number, layout: ExpensePieBaseLayout): PieMetricEnvelope {
-  const envelope: PieMetricEnvelope = {
-    minX: -outerRadius,
-    maxX: outerRadius,
-    minY: -outerRadius,
-    maxY: outerRadius,
-  }
-  if (!layout.showLabels) {
-    return envelope
-  }
-
-  for (const placement of pieMetricPlacements(data, outerRadius, layout)) {
-    const lineEndX = placement.cos * (outerRadius + layout.labelOffset) + placement.delta.x
-    const lineEndY = placement.sin * (outerRadius + layout.labelOffset) + placement.delta.y
-    const isRight = placement.cos >= 0
-    const labelNearX = lineEndX + (isRight ? layout.labelGap : -layout.labelGap)
-    const labelMinX = isRight ? labelNearX : labelNearX - placement.labelWidth
-    const labelMaxX = isRight ? labelNearX + placement.labelWidth : labelNearX
-
-    envelope.minX = Math.min(envelope.minX, lineEndX, labelMinX)
-    envelope.maxX = Math.max(envelope.maxX, lineEndX, labelMaxX)
-    envelope.minY = Math.min(envelope.minY, lineEndY - PIE_METRIC_LABEL_HALF_HEIGHT)
-    envelope.maxY = Math.max(envelope.maxY, lineEndY + PIE_METRIC_LABEL_HALF_HEIGHT)
-  }
-  return envelope
-}
-
-function pieMetricPlacements(data: BreakdownItem[], outerRadius: number, layout: ExpensePieBaseLayout) {
-  const total = amountRowsTotal(data)
-  const nonZeroCount = data.filter((item) => item.amount !== 0).length
-  const angleDirection = Math.sign(PIE_METRIC_END_ANGLE - PIE_METRIC_START_ANGLE) || 1
-  const realTotalAngle =
-    Math.abs(PIE_METRIC_END_ANGLE - PIE_METRIC_START_ANGLE) - nonZeroCount * PIE_METRIC_PADDING_ANGLE
-  let currentAngle = PIE_METRIC_START_ANGLE
-  const placements: PieMetricPlacement[] = data.map((item, index) => {
-    if (index > 0 && item.amount !== 0) {
-      currentAngle += angleDirection * PIE_METRIC_PADDING_ANGLE
-    }
-    const sweep = total ? (realTotalAngle * item.amount) / total : 0
-    const midAngle = currentAngle + (angleDirection * sweep) / 2
-    currentAngle += angleDirection * sweep
-    const radians = (-midAngle * Math.PI) / 180
-    return {
-      key: item.key,
-      cos: Math.cos(radians),
-      sin: Math.sin(radians),
-      labelWidth: pieMetricLabelWidth(item, layout.compactLabel),
-      delta: { x: 0, y: 0 },
-    }
-  })
-
-  for (const side of [-1, 1]) {
-    const sidePlacements = placements
-      .filter((placement) => (placement.cos >= 0 ? 1 : -1) === side)
-      .sort((left, right) => left.sin - right.sin)
-    let priorY = Number.NEGATIVE_INFINITY
-    for (const placement of sidePlacements) {
-      const baseY = placement.sin * (outerRadius + layout.labelOffset)
-      const adjustedY = Math.max(baseY, priorY + PIE_METRIC_LABEL_MIN_VERTICAL_GAP)
-      placement.delta.y = adjustedY - baseY
-      priorY = adjustedY
-    }
-    if (sidePlacements.length) {
-      const averageDelta = sidePlacements.reduce((sum, placement) => sum + placement.delta.y, 0) / sidePlacements.length
-      for (const placement of sidePlacements) {
-        placement.delta.y -= averageDelta
-      }
-    }
-  }
-
-  return placements
-}
-
-function pieMetricLabelDeltas(data: BreakdownItem[], outerRadius: number, layout: ExpensePieBaseLayout) {
-  return Object.fromEntries(
-    pieMetricPlacements(data, outerRadius, layout).map((placement) => [placement.key, placement.delta]),
-  ) as Record<string, PieMetricDelta>
-}
-
-function pieMetricLabelWidth(item: BreakdownItem, compactLabel: boolean) {
-  const text = compactLabel ? `${item.label}\n${formatMoney(item.amount)}` : `${item.label} ${formatMoney(item.amount)}`
-  const cached = pieMetricLabelWidthCache.get(text)
-  if (cached !== undefined) {
-    return cached
-  }
-
-  if (pieMetricMeasureContext === undefined) {
-    pieMetricMeasureContext = typeof document === "undefined" ? null : document.createElement("canvas").getContext("2d")
-    if (pieMetricMeasureContext) {
-      pieMetricMeasureContext.font = "650 12px Inter, ui-sans-serif, system-ui, sans-serif"
-    }
-  }
-  const width = pieMetricMeasureContext
-    ? pieMetricMeasureContext.measureText(text.replace("\n", " ")).width
-    : text.replace("\n", " ").length * 7
-  const measured = Math.ceil(width + PIE_METRIC_LABEL_WIDTH_SAFETY)
-  pieMetricLabelWidthCache.set(text, measured)
-  return measured
-}
+const PIE_METRIC_PADDING_ANGLE = CONTOUR_PADDING_ANGLE
 
 type ExpensePieLayout = ReturnType<typeof useExpensePieLayout>
 
@@ -2354,173 +2122,11 @@ function useExpensePieLayoutMotion(layout: ExpensePieLayout, filter: CategoryMix
 }
 
 function expensePieLayoutsEqual(previous: ExpensePieLayout, next: ExpensePieLayout) {
-  const previousDeltaKeys = Object.keys(previous.labelDeltas)
-  const nextDeltaKeys = Object.keys(next.labelDeltas)
-  return (
-    previous.fallbackWidth === next.fallbackWidth &&
-    previous.fallbackHeight === next.fallbackHeight &&
-    previous.minOuterRadius === next.minOuterRadius &&
-    previous.maxOuterRadius === next.maxOuterRadius &&
-    previous.innerRadiusRatio === next.innerRadiusRatio &&
-    previous.labelOffset === next.labelOffset &&
-    previous.labelGap === next.labelGap &&
-    previous.containerPadding === next.containerPadding &&
-    previous.compactLabel === next.compactLabel &&
-    previous.showLabels === next.showLabels &&
-    previous.cx === next.cx &&
-    previous.cy === next.cy &&
-    previous.innerRadius === next.innerRadius &&
-    previous.outerRadius === next.outerRadius &&
-    previous.margin.top === next.margin.top &&
-    previous.margin.right === next.margin.right &&
-    previous.margin.bottom === next.margin.bottom &&
-    previous.margin.left === next.margin.left &&
-    previousDeltaKeys.length === nextDeltaKeys.length &&
-    previousDeltaKeys.every((key) => (
-      previous.labelDeltas[key]?.x === next.labelDeltas[key]?.x &&
-      previous.labelDeltas[key]?.y === next.labelDeltas[key]?.y
-    ))
-  )
+  // Worker completion changes callouts, not the sector animation target.
+  return previous.cx === next.cx && previous.cy === next.cy &&
+    previous.innerRadius === next.innerRadius && previous.outerRadius === next.outerRadius
 }
 
-function pieMetricLabelX(x: number | string | undefined, textAnchor: PieMetricTextAnchor | undefined, gap: number) {
-  const numericX = typeof x === "number" ? x : typeof x === "string" && x.trim() ? Number(x) : Number.NaN
-  if (!Number.isFinite(numericX)) {
-    return x
-  }
-  if (textAnchor === "start") {
-    return numericX + gap
-  }
-  if (textAnchor === "end") {
-    return numericX - gap
-  }
-  return x
-}
-
-function renderPieMetricLabel(props: unknown, layout: ExpensePieLayout) {
-  const { name, value, payload, fill, index } = props as {
-    name?: string
-    value?: number
-    payload?: BreakdownItem
-    fill?: string
-    index?: number
-  }
-  const position = pieMetricLabelPosition(props, layout)
-  const label = payload?.label ?? name ?? ""
-  const amount = payload?.amount ?? Number(value ?? 0)
-  const labelX = pieMetricLabelX(position.x, position.textAnchor, layout.labelGap)
-  const amountLabel = formatMoney(amount)
-
-  return (
-    <text
-      x={labelX}
-      y={position.y}
-      textAnchor={position.textAnchor}
-      dominantBaseline="central"
-      className="bb-pie-metric-label"
-      style={{ animationDelay: pieMetricAnimationDelay(index), fill: pieMetricColor(payload, fill) }}
-    >
-      {layout.compactLabel ? (
-        <>
-          <tspan x={labelX} dy="-0.35em">
-            {label}
-          </tspan>
-          <tspan x={labelX} dy="1.25em">
-            {amountLabel}
-          </tspan>
-        </>
-      ) : (
-        `${label} ${amountLabel}`
-      )}
-    </text>
-  )
-}
-
-function renderPieMetricLabelLine(props: unknown, layout: ExpensePieLayout) {
-  const { payload, stroke, index } = props as {
-    payload?: BreakdownItem
-    stroke?: string
-    index?: number
-  }
-  const line = pieMetricLinePosition(props, layout)
-  if (!line) {
-    return <path className="bb-pie-metric-label-line" d="" fill="none" opacity={0} />
-  }
-
-  return (
-    <path
-      className="bb-pie-metric-label-line"
-      d={`M${line.start.x},${line.start.y}L${line.end.x},${line.end.y}`}
-      fill="none"
-      pathLength={1}
-      stroke={pieMetricColor(payload, stroke)}
-      strokeLinecap="round"
-      strokeWidth={1.5}
-      style={{ animationDelay: pieMetricAnimationDelay(index) }}
-    />
-  )
-}
-
-function pieMetricLabelPosition(props: unknown, layout: ExpensePieLayout) {
-  const { x, y, textAnchor } = props as {
-    x?: number | string
-    y?: number | string
-    textAnchor?: PieMetricTextAnchor
-  }
-  const delta = pieMetricPositionDelta(props, layout)
-  const computed = pieMetricPolarPoint(props, layout.outerRadius + layout.labelOffset)
-  if (computed) {
-    return {
-      x: computed.x + delta.x,
-      y: computed.y + delta.y,
-      textAnchor: computed.x > computed.cx ? "start" as const : "end" as const,
-    }
-  }
-  return { x, y, textAnchor }
-}
-
-function pieMetricLinePosition(props: unknown, layout: ExpensePieLayout) {
-  const delta = pieMetricPositionDelta(props, layout)
-  const start = pieMetricPolarPoint(props, layout.outerRadius)
-  const end = pieMetricPolarPoint(props, layout.outerRadius + layout.labelOffset)
-  if (start && end) {
-    return {
-      start,
-      end: { ...end, x: end.x + delta.x, y: end.y + delta.y },
-    }
-  }
-
-  const { points } = props as {
-    points?: Array<{ x?: number | string; y?: number | string }>
-  }
-  const [fallbackStart, fallbackEnd] = points ?? []
-  if (fallbackStart?.x === undefined || fallbackStart?.y === undefined || fallbackEnd?.x === undefined || fallbackEnd?.y === undefined) {
-    return null
-  }
-  return { start: fallbackStart, end: fallbackEnd }
-}
-
-function pieMetricPositionDelta(props: unknown, layout: ExpensePieLayout): PieMetricDelta {
-  const { payload } = props as { payload?: BreakdownItem }
-  return payload ? layout.labelDeltas[payload.key] ?? { x: 0, y: 0 } : { x: 0, y: 0 }
-}
-
-function pieMetricPolarPoint(props: unknown, radius: number) {
-  const { cx, cy, midAngle } = props as {
-    cx?: number
-    cy?: number
-    midAngle?: number
-  }
-  if (cx === undefined || cy === undefined || midAngle === undefined) {
-    return null
-  }
-  const radians = (-midAngle * Math.PI) / 180
-  return {
-    cx,
-    x: cx + Math.cos(radians) * radius,
-    y: cy + Math.sin(radians) * radius,
-  }
-}
 
 type DailySpendingRow = AmountRow & {
   needsAmount: number

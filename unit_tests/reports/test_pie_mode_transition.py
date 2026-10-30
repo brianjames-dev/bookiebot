@@ -52,3 +52,12 @@ def test_original_chart_animations_reuse_shapes_on_animation_frames():
         capture_output=True,
         text=True,
     )
+
+
+@pytest.mark.parametrize("script", ["category_mix_contour_test.cjs", "category_mix_worker_test.cjs"])
+def test_refined_flow_fits_live_category_rows_and_keeps_stems_separate(script):
+    root = Path(__file__).resolve().parents[2]
+    if not shutil.which("node") or not (root / "web/expense-report/node_modules/typescript").exists():
+        pytest.skip("Install the report frontend dependencies for geometry contracts")
+    subprocess.run(["node", str(Path(__file__).with_name(script))],
+                   cwd=root, check=True, capture_output=True, text=True)

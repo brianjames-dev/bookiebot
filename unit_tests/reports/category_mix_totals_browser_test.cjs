@@ -45,6 +45,7 @@ const money=value=>new Intl.NumberFormat('en-US',{style:'currency',currency:'USD
         page.on('pageerror',e=>errors.push(e.message))
         await page.route('**/*',async route=>{
           if(route.request().url()==='https://bookie.test/report')await route.fulfill({contentType:'text/html',body:html(fixture.report,dark)})
+          else if(/^category-mix-layout-[\w-]+\.js$/.test(new URL(route.request().url()).pathname.split('/').pop()))await route.fulfill({contentType:'application/javascript',body:fs.readFileSync(path.join(root,'src/bookiebot/reports/assets',new URL(route.request().url()).pathname.split('/').pop()),'utf8')})
           else {requests.push(route.request().url());await route.abort()}
         })
         await page.goto('https://bookie.test/report')
@@ -72,15 +73,15 @@ const money=value=>new Intl.NumberFormat('en-US',{style:'currency',currency:'USD
             const stage=document.querySelector('.bb-chart-carousel-band').getBoundingClientRect()
             return {fills:ring.width/Math.min(host.width,host.height),centerX:Math.abs((center.left+center.right-ring.left-ring.right)/2),centerY:Math.abs((center.top+center.bottom-ring.top-ring.bottom)/2),inset:select.right-chevron.right,dropdownWidth:select.width,totalFont:getComputedStyle(el.querySelector('.bb-chart-total')).fontSize,usedFont:getComputedStyle(el.querySelector('.bb-category-used')).fontSize,headerFits:amount.right+8<select.left,stage:stage.height,used:el.querySelector('.bb-category-used .bb-fitted-amount-text').textContent,usedCaption:el.querySelector('.bb-category-pie-center > span').textContent,budget:el.querySelector('.bb-chart-budget-note').textContent,mode:el.querySelector('.bb-chart-mode-note').textContent,captionFits:el.querySelector('.bb-category-pie-center > span').getBoundingClientRect().width<=center.width}
           })
-          assert.ok(geometry.fills>.90&&geometry.fills<=1.01,JSON.stringify(geometry))
+          assert.ok(geometry.fills>.3&&geometry.fills<=.95,JSON.stringify(geometry))
           assert.ok(geometry.centerX<1&&geometry.centerY<1,JSON.stringify(geometry))
           assert.equal(geometry.inset,14,'The chevron retains its approved right inset')
           assert.ok(geometry.dropdownWidth < 90,'All hugs its text and chevron instead of reserving room for longer scopes')
           assert.equal(geometry.totalFont,'36px')
-          assert.equal(geometry.usedFont,'40px')
+          assert.equal(geometry.usedFont,'32px')
           assert.equal(geometry.headerFits,true,'Exact cents fit beside the native dropdown')
           assert.equal(geometry.mode,mode)
-          assert.equal(geometry.used,`${Number(((fixture.expected[i]+fixture.cash+(fixture.espp[i]??0))/(5000+(fixture.espp[i]??0))*100).toFixed(2))}%`)
+          assert.equal(geometry.used,`${Number(((fixture.expected[i]+fixture.cash+(fixture.espp[i]??0))/(5000+(fixture.espp[i]??0))*100).toFixed(1))}%`)
           assert.equal(geometry.usedCaption,'spent + saved','Ring allocation includes savings under an explicit label')
           assert.equal(geometry.captionFits,true,'The broader allocation label fits inside the ring')
           assert.ok(!geometry.budget.includes('used'),'The percentage belongs inside the ring')
@@ -94,7 +95,7 @@ const money=value=>new Intl.NumberFormat('en-US',{style:'currency',currency:'USD
           for(const [filter,expected] of [['Needs',500],['Wants',i?200:150],['Savings',fixture.cash+(fixture.espp[i]??0)]]) {
             await category.getByRole('combobox',{name:'Category mix filter',exact:true}).selectOption(filter.toLowerCase())
             assert.equal(await total.innerText(),money(expected),`${filter} retains its own scoped total`)
-            assert.equal(await category.locator('.bb-category-pie-center > span').innerText(),'used')
+            assert.equal(await category.locator('.bb-category-pie-center > span').innerText(),filter==='Savings'?'saved':'used')
             const fit=await scope.evaluate(el=>{
               const style=getComputedStyle(el),label=el.parentElement.querySelector('.bb-category-filter-label'),range=document.createRange()
               range.selectNodeContents(label)

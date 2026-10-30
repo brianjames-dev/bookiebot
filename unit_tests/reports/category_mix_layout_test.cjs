@@ -4,19 +4,12 @@ const ts=req('typescript'),React=req('react'),Renderer=req('react-test-renderer'
 global.IS_REACT_ACT_ENVIRONMENT=true
 const source=fs.readFileSync('web/expense-report/src/report-app.tsx','utf8')
 const ast=ts.createSourceFile('report-app.tsx',source,ts.ScriptTarget.Latest,true,ts.ScriptKind.TSX)
-const names=new Set(['CategoryMixFilterControl','CATEGORY_MIX_FILTERS','useExpensePieLayout','fitExpensePieLayout','expensePieEnvelope','PIE_METRIC_LABEL_GAP','PIE_METRIC_MINIMUM_RADIUS','PIE_METRIC_START_ANGLE','PIE_METRIC_END_ANGLE'])
+const names=new Set(['CategoryMixFilterControl','CATEGORY_MIX_FILTERS','PIE_METRIC_START_ANGLE','PIE_METRIC_END_ANGLE'])
 const declarations=ast.statements.filter(node=>ts.isFunctionDeclaration(node)?names.has(node.name?.text):ts.isVariableStatement(node)&&node.declarationList.declarations.some(item=>names.has(item.name.getText(ast))))
 assert.equal(declarations.length,names.size)
 const runtime={exports:{},require:req,useState:React.useState,useMediaQuery:()=>true,pieMetricLabelDeltas:()=>({}),ChevronDown:props=>React.createElement('svg',props)}
-vm.runInNewContext(ts.transpileModule(declarations.map(node=>node.getText(ast)).join('\n')+'\nexports.Filter=CategoryMixFilterControl;exports.layout=useExpensePieLayout;exports.angles=[PIE_METRIC_START_ANGLE,PIE_METRIC_END_ANGLE]',{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2020,jsx:ts.JsxEmit.ReactJSX}}).outputText,runtime)
+vm.runInNewContext(ts.transpileModule(declarations.map(node=>node.getText(ast)).join('\n')+'\nexports.Filter=CategoryMixFilterControl;exports.angles=[PIE_METRIC_START_ANGLE,PIE_METRIC_END_ANGLE]',{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2020,jsx:ts.JsxEmit.ReactJSX}}).outputText,runtime)
 assert.deepEqual(Array.from(runtime.exports.angles),[90,-270],'The ring starts at noon and sweeps clockwise')
-for(const [width,height] of [[288,360],[358,360],[480,200],[250,340]]){
- const layout=runtime.exports.layout([],{width,height})
- assert.ok(Math.abs(layout.outerRadius-(Math.min(width,height)/2-8))<.001,'Use all available phone chart space, subject to its height')
- assert.equal(layout.innerRadius/layout.outerRadius,.72)
- assert.ok(Math.abs(layout.cx-width/2)<.001&&Math.abs(layout.cy-height/2)<.001,'Percentage and ring share the host center')
- assert.equal(layout.showLabels,false,'Phone category itemization stays in the Categories modal')
-}
 let tree;const selected=[]
 try{
  Renderer.act(()=>{tree=Renderer.create(React.createElement(runtime.exports.Filter,{filter:'all',onFilterChange:value=>selected.push(value)}))})
@@ -45,4 +38,4 @@ try{
  assert.equal(tree.root.findByProps({className:'bb-category-filter-label'}).children.join(''),'All','Returning to All releases the extra width')
  assert.equal(tree.root.findByType('svg').props['aria-hidden'],'true')
 }finally{if(tree)Renderer.act(()=>tree.unmount())}
-console.log('Category Mix uses a controlled native scope selector and fills the available phone ring area clockwise from noon.')
+console.log('Category Mix uses a controlled native scope selector and retains keyboard/touch behavior and clockwise ring direction.')
