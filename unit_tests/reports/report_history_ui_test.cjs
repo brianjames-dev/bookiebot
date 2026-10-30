@@ -37,7 +37,7 @@ function harness() {
     init.signal.addEventListener("abort", () => reject(new Error("aborted")), { once: true })
   })
   const require = name => name === "react" ? hooks : name.endsWith(".css") ? {}
-    : name.startsWith("./components") ? { CollapsibleContent: "disclosure", SlidingSelection: "selection", FittedAmount: "amount", MonthPicker: "month-picker" } : req(name)
+    : name.startsWith("./components") ? { SlidingSelection: "selection", FittedAmount: "amount", MonthPicker: "month-picker" } : req(name)
   const source = ts.transpileModule(fs.readFileSync("web/expense-report/src/report-history.tsx", "utf8"), {
     compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2020, jsx: ts.JsxEmit.ReactJSX },
   }).outputText
@@ -113,10 +113,6 @@ async function main() {
 
   const React = req("react")
   const renderer = req("react-test-renderer")
-  const motion = { exports: {}, require: req }
-  vm.runInNewContext(ts.transpileModule(fs.readFileSync("web/expense-report/src/components/ui/motion.tsx", "utf8"), {
-    compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2020, jsx: ts.JsxEmit.ReactJSX },
-  }).outputText, motion)
   const calls = [], timers = new Map()
   let timerId = 0, ignoreAbort = false
   const runtime = { exports: {}, AbortController, Intl, Date,
@@ -128,8 +124,7 @@ async function main() {
     }),
     require: name => name === "react" ? React : name.endsWith(".css") ? {}
       : name.startsWith("./components") ? {
-        CollapsibleContent: motion.exports.CollapsibleContent,
-        FittedAmount: ({children}) => React.createElement("span", null, children),
+        FittedAmount: ({children, className}) => React.createElement("span", {className}, children),
         MonthPicker: ({ label, ...props }) => React.createElement("test-month-picker", { "aria-label":label, ...props }),
       } : req(name),
   }
@@ -149,9 +144,31 @@ async function main() {
   const click = label => renderer.act(() => findButton(label).props.onClick())
   const selectMonth = value => renderer.act(() => tree.root.findByProps({"aria-label":"Comparison month"}).props.onSelect(value))
   const period = amount => ({datedSpending:amount,undatedSpending:0,scheduledSpending:0,unitemizedSpending:0,complete:true})
-  const result = (baseline, note) => ({selectedMonth:"2026-09", baselineMonth:baseline,
-    baselineKind:"selected-month", throughDay:7, status:"complete", selected:period(25),
-    baseline:period(50), changeAmount:-25, changePercent:-50, coverageNote:note})
+  // Distinct dollar amounts identify response generations even without the
+  // removed calculation notes. Stale/cached/refresh assertions inspect real UI.
+  const fixtureAmounts = new Map()
+  const money = value => new Intl.NumberFormat("en-US", {style:"currency", currency:"USD"}).format(value)
+  const result = (baseline, note) => {
+    if (!fixtureAmounts.has(note)) fixtureAmounts.set(note, 25 + fixtureAmounts.size)
+    const amount = fixtureAmounts.get(note)
+    return {selectedMonth:"2026-09", baselineMonth:baseline,
+      baselineKind:"selected-month", throughDay:7, status:"complete", selected:period(amount),
+      baseline:period(50), changeAmount:amount - 50, changePercent:(amount - 50) * 2, coverageNote:note}
+  }
+  const selectedAmount = () => tree.root.findAllByType("span").find(node => node.props.className === "bb-comparison-amount")?.children.join("")
+  const assertFixture = (note, message) => {
+    assert.ok(fixtureAmounts.has(note), `Known fixture: ${note}`)
+    assert.equal(selectedAmount(), money(fixtureAmounts.get(note)), message)
+  }
+  const assertNoFixture = (note, message) => {
+    assert.ok(fixtureAmounts.has(note), `Known fixture: ${note}`)
+    assert.notEqual(selectedAmount(), money(fixtureAmounts.get(note)), message)
+  }
+  const assertNoDetails = () => {
+    assert.ok(!findButton("Details"), "Comparison has no Details control")
+    assert.equal(tree.root.findAllByProps({className:"bb-comparison-details"}).length, 0, "The removed disclosure is not kept hidden")
+    assert.equal(tree.root.findAllByType("table").length, 0, "The excluded-amount table is removed entirely")
+  }
   const finish = async (call, status, data) => renderer.act(async () => { call.resolve(response(status, data)); await flush() })
   renderer.act(() => { tree = renderer.create(component()) })
   assert.equal(calls.length, 0, "Closed comparisons do not fetch two reports")
@@ -192,37 +209,21 @@ async function main() {
   await finish(oldMonth, 200, result("2026-08", "August completed"))
   assert.equal(calls.length, 2, "Only the latest waiting selection is fetched")
   assert.equal(calls.at(-1).url, "/app/expenses/comparison?month=2026-09&compare_month=2025-09")
-  assert.ok(!read().includes("August completed"), "A superseded reply never displays for the new month")
+  assertNoFixture("August completed", "A superseded reply never displays for the new month")
   await finish(calls.at(-1), 200, result("2025-09", "September completed"))
-  assert.match(read(), /September completed/)
-  const detailsPanel = () => tree.root.findAllByType("div").find(item => item.props.id === findButton("Details").props["aria-controls"])
-  assert.equal(findButton("Details").props["aria-expanded"], false)
-  const detailsMarker = findButton("Details").findByProps({ className: "bb-disclosure-mark" })
-  assert.deepEqual(detailsMarker.children, [])
-  assert.equal(detailsMarker.props["aria-hidden"], "true")
-  assert.equal(detailsPanel().props["aria-hidden"], true)
-  assert.equal(detailsPanel().props.inert, true, "Calculation notes start hidden from keyboard and screen reader navigation")
-  assert.match(text(detailsPanel().props.children), /September completed/)
-  const beforeDetails = calls.length
-  click("Details")
-  assert.equal(findButton("Details").findByProps({ className: "bb-disclosure-mark" }), detailsMarker)
-  assert.equal(detailsPanel().props["data-state"], "open")
-  assert.equal(detailsPanel().props.inert, false)
-  click("Details")
-  assert.equal(findButton("Details").findByProps({ className: "bb-disclosure-mark" }), detailsMarker, "Details collapse reuses the same CSS stroke element")
-  assert.equal(detailsPanel().props["data-state"], "closed")
-  assert.equal(calls.length, beforeDetails, "Calculation notes do not trigger another comparison read")
-  click("Details")
+  assertFixture("September completed")
+  assertNoDetails()
+  assert.ok(!read().includes("September completed"), "Removed calculation notes are not mounted")
   selectMonth("2026-08")
-  assert.equal(findButton("Details").props["aria-expanded"], false, "A different month starts with its own compact summary")
-  assert.match(read(), /August completed/)
+  assertNoDetails()
+  assertFixture("August completed")
   assert.equal(calls.length, 2, "Revisiting a month reuses its result for this displayed report")
   renderer.act(() => tree.update(component()))
   assert.equal(calls.length, 2, "New callback identities do not restart requests")
   report = {...report}
   renderer.act(() => tree.update(component()))
   assert.equal(calls.length, 3, "A fresh report invalidates comparison results")
-  assert.ok(!read().includes("August completed"), "Old amounts clear during a fresh comparison")
+  assertNoFixture("August completed", "Old amounts clear during a fresh comparison")
   const staleRefresh = calls.at(-1)
   report = {...report}
   renderer.act(() => tree.update(component()))
@@ -246,8 +247,8 @@ async function main() {
   assert.equal(calls.length,timeoutCalls,"Source timeouts remain explicit retry states")
   click("Try again")
   await finish(calls.at(-1), 200, result("2026-08", "Retry succeeded"))
-  assert.match(read(), /Retry succeeded/)
-  assert.ok(!read().includes("OBSOLETE"))
+  assertFixture("Retry succeeded")
+  assertNoFixture("OBSOLETE PRIVATE DATA")
   const beforeBusyReplacement = calls.length
   mainRefreshing = true
   report = {...report}
@@ -280,8 +281,8 @@ async function main() {
   assert.notEqual(transportRetry, stalledTransport, "A stalled request cannot retain the retry slot")
   await finish(transportRetry, 200, result("2026-08", "Recovered from stalled transport"))
   await finish(stalledTransport, 200, result("2026-08", "STALE HUNG RESPONSE"))
-  assert.match(read(), /Recovered from stalled transport/)
-  assert.ok(!read().includes("STALE HUNG RESPONSE"))
+  assertFixture("Recovered from stalled transport")
+  assertNoFixture("STALE HUNG RESPONSE")
 
   report = {...report}
   renderer.act(() => tree.update(component()))
@@ -291,13 +292,8 @@ async function main() {
   await finish(calls.at(-1), 200, partial)
   assert.match(read(), /Recorded spending · days 1– 7/)
   assert.match(text(tree.root.findByProps({className:"bb-comparison-change"}).props.children), /\$190.70.*54.6.*more spending/)
-  assert.equal(detailsPanel().props["aria-hidden"], true)
-  click("Details")
-  const exclusions = tree.root.findByType("table")
-  assert.equal(exclusions.findByType("caption").children.join(""), "Excluded amounts")
-  const rows = exclusions.findByType("tbody").findAllByType("tr")
-  assert.deepEqual(rows.map(row => text(row.props.children)), ["Without dates $2,287.40 $2,563.71", "Scheduled subscriptions $92.48 $92.48", "Sheet adjustments -$100.00 $0.00"])
-  assert.match(text(exclusions.findByType("thead").props.children), /September 2026.*August 2026/)
+  assertNoDetails()
+  assert.ok(!read().includes("$2,287.40"), "Excluded amounts are not retained in hidden content")
 
   report = {...report}
   renderer.act(() => tree.update(component()))
@@ -318,12 +314,12 @@ async function main() {
   assert.deepEqual(fills(), ["0%", "100%"], "Net refunds preserve signed dollars without negative-width bars")
   assert.match(read(), /-\$25.50/)
   assert.match(text(tree.root.findByProps({className:"bb-comparison-change"}).props.children), /\$75.50.*151.*less spending/)
-  assert.equal(tree.root.findAllByType("table").length, 0, "Zero exclusions do not create unnecessary rows")
+  assert.equal(tree.root.findAllByType("table").length, 0, "The removed exclusions table stays absent for refunds")
 
   report = {...report}
   renderer.act(() => tree.update(component()))
   await finish(calls.at(-1), 200, {...result("2026-08", "The comparison month is unavailable."),status:"unavailable",baseline:null,changeAmount:null,changePercent:null})
-  assert.ok(!findButton("Details"), "Unavailable data cannot be hidden behind a successful-result disclosure")
+  assertNoDetails()
   assert.match(read(), /The comparison month is unavailable/)
   assert.equal(tree.root.findAllByProps({className:"bb-comparison-values"}).length, 0, "Missing months are never presented as zero spending")
   report = {...report}
@@ -408,7 +404,7 @@ async function main() {
   assert.match(read(), /Couldn’t load/)
   click("Try again")
   await finish(calls.at(-1), 200, result("2026-08", "Comparison recovered while report stayed stale"))
-  assert.match(read(), /Comparison recovered while report stayed stale/)
+  assertFixture("Comparison recovered while report stayed stale")
   assert.equal(sessionState.phase, "stale")
 
   selectMonth("2025-09")
@@ -422,8 +418,8 @@ async function main() {
   assert.match(afterRefreshComparison.url, /compare_month=2025-09/)
   await finish(obsoleteComparison, 200, result("2025-09", "PRE-REFRESH AMOUNTS"))
   await finish(afterRefreshComparison, 200, result("2025-09", "Fresh report comparison"))
-  assert.match(read(), /Fresh report comparison/)
-  assert.ok(!read().includes("PRE-REFRESH AMOUNTS"))
+  assertFixture("Fresh report comparison")
+  assertNoFixture("PRE-REFRESH AMOUNTS")
 
   const browser = new EventTarget(), page = new EventTarget()
   page.visibilityState = "visible"
@@ -441,10 +437,10 @@ async function main() {
   await finish(foregroundRefresh, 200, liveReport())
   assert.equal(sessionState.phase, "ready")
   await finish(calls.at(-1), 200, result("2025-09", "Foreground comparison recovered"))
-  assert.match(read(), /Foreground comparison recovered/)
+  assertFixture("Foreground comparison recovered")
   renderer.act(() => { mainJob = session.refresh(true) })
   const deferredSelectionRefresh = calls.at(-1)
-  assert.match(read(), /Foreground comparison recovered/, "A refresh preserves a valid comparison until fresh report data arrives")
+  assertFixture("Foreground comparison recovered", "A refresh preserves a valid comparison until fresh report data arrives")
   selectMonth("2026-08")
   click("Compare spending")
   click("Compare spending")
@@ -453,7 +449,7 @@ async function main() {
   await mainJob
   assert.match(calls.at(-1).url, /compare_month=2026-08/)
   await finish(calls.at(-1), 200, result("2026-08", "Deferred month recovered"))
-  assert.match(read(), /Deferred month recovered/)
+  assertFixture("Deferred month recovered")
   stopWatching(); stop(); session.dispose()
   renderer.act(() => tree.unmount())
   assert.equal(timers.size, 0)

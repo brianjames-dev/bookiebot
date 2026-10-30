@@ -1,5 +1,9 @@
 # Agent Decisions
 
+## 2026-10-29 - Remove Comparison Details Entirely
+
+At the user’s request, remove the comparison’s Details + control and its expandable explanation/excluded-amount table, including the component state, hidden content and unused CSS. Keep only the existing recorded-spending/day-range caption beneath the month bars; unavailable/loading/error/retry feedback stays inline. Preserve the selected presentation, month picker and request lifecycle. The calculation remains dated recorded expenses over matching day ranges, with the hero showing selected minus baseline and the percentage relative to a positive baseline. It excludes savings, scheduled subscriptions, undated expenses and sheet adjustments; it does not use the top Spent headline or full previous-month costs against an incomplete current month. This supersedes earlier decisions to retain Details; native acceptance is checklist 190.
+
 ## 2026-10-29 - Match The Latest Comparison Divider Spacing
 
 Apply the latest morphing-container draft selection: 12px above and below the expanded comparison divider, superseding the prior 16px setting. Retain the selected 360ms expansion duration and all other approved styling and interactions. Native acceptance is checklist 189.

@@ -1,6 +1,5 @@
 import { useEffect, useId, useLayoutEffect, useMemo, useRef, useState } from "react"
 import { ArrowDownRight, ArrowLeftRight, ChevronDown } from "lucide-react"
-import { CollapsibleContent } from "./components/ui/motion"
 import { FittedAmount } from "./components/ui/fitted-amount"
 import { MonthPicker } from "./components/ui/month-picker"
 import type { ExpenseReportData } from "./types"
@@ -196,7 +195,7 @@ function useComparisonFrame(open: boolean) {
     fit.current = measure
     measure()
     const ready = requestAnimationFrame(() => { frame.dataset.ready = "true" })
-    // The content's intrinsic height also changes for results, errors and Details.
+    // The content's intrinsic height also changes for results and errors.
     // Observing it (rather than the animated frame) avoids feedback and snapping.
     let lastWidth = host.clientWidth
     let measureFrame = 0
@@ -227,41 +226,6 @@ function useComparisonFrame(open: boolean) {
     fit.current()
   }, [open])
   return { slot, card, body, toggle }
-}
-
-function ComparisonDetails({ comparison }: { comparison: ReportPeriodComparison }) {
-  const [detailsOpen, setDetailsOpen] = useState(false)
-  const detailsId = useId()
-  const { selected, baseline } = comparison
-  if (!selected || !baseline) return null
-  const excluded = [
-    { label: "Without dates", selected: selected.undatedSpending, baseline: baseline.undatedSpending },
-    { label: "Scheduled subscriptions", selected: selected.scheduledSpending, baseline: baseline.scheduledSpending },
-    { label: "Sheet adjustments", selected: selected.unitemizedSpending, baseline: baseline.unitemizedSpending },
-  ].filter((row) => row.selected !== 0 || row.baseline !== 0)
-  return <>
-    <div className="bb-comparison-footer">
-      <p className="bb-comparison-period">Recorded spending · days 1–{comparison.throughDay}</p>
-      <button type="button" className="bb-comparison-details-toggle" aria-expanded={detailsOpen} aria-controls={detailsId}
-        onClick={() => setDetailsOpen((value) => !value)}>
-        Details<span className="bb-disclosure-mark" aria-hidden="true" />
-      </button>
-    </div>
-    <CollapsibleContent open={detailsOpen} id={detailsId}>
-      <div className="bb-comparison-details">
-        <p className="bb-comparison-note">{comparison.coverageNote}</p>
-        {excluded.length > 0 && <table className="bb-comparison-exclusions">
-          <caption>Excluded amounts</caption>
-          <thead><tr><th scope="col">Type</th><th scope="col">{reportMonthLabel(comparison.selectedMonth)}</th><th scope="col">{reportMonthLabel(comparison.baselineMonth)}</th></tr></thead>
-          <tbody>{excluded.map((row) => <tr key={row.label}>
-            <th scope="row">{row.label}</th>
-            <td><FittedAmount className="bb-comparison-excluded-amount">{money(row.selected)}</FittedAmount></td>
-            <td><FittedAmount className="bb-comparison-excluded-amount">{money(row.baseline)}</FittedAmount></td>
-          </tr>)}</tbody>
-        </table>}
-      </div>
-    </CollapsibleContent>
-  </>
 }
 
 export function ReportComparison({ report, onExpired, catalog, catalogLoading = false, catalogError = false, catalogErrorMessage, onCatalogRetry, refreshing = false }: {
@@ -393,7 +357,7 @@ export function ReportComparison({ report, onExpired, catalog, catalogLoading = 
                 style={{ width: `${maximum > 0 ? Math.max(0, amounts[index]) / maximum * 100 : 0}%` }} /></div>}
             </div>)}
           </div>
-          {ready && amounts && <ComparisonDetails key={`${ready.selectedMonth}:${ready.baselineMonth}`} comparison={ready} />}
+          {ready && amounts && <p className="bb-comparison-period">Recorded spending · days 1–{ready.throughDay}</p>}
           {catalogLoading && !catalog && <p className="bb-comparison-note">Loading other months…</p>}
           {(catalogError || (catalog && catalog.coverage.status !== "complete")) && <p className="bb-comparison-note">
             {catalogError && catalogErrorMessage ? catalogErrorMessage : catalog?.coverage.code === "source_timeout"

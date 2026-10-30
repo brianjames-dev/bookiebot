@@ -38,21 +38,7 @@
 .bb-comparison-track { height: 8px; overflow: hidden; border-radius: 6px; background: color-mix(in srgb, hsl(var(--foreground)) 10%, hsl(var(--card))); }
 .bb-comparison-fill { display: block; height: 100%; border-radius: inherit; background: hsl(var(--primary)); }
 .bb-comparison-month-row[data-baseline="true"] .bb-comparison-fill { background: color-mix(in srgb, hsl(var(--foreground)) 36%, hsl(var(--card))); }
-.bb-comparison-footer { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 0 8px; margin-top: 12px; }
-.bb-comparison-period { margin: 0; color: hsl(var(--muted-foreground)); font-size: 11px; line-height: 1.5; }
+.bb-comparison-period { margin: 12px 0 0; color: hsl(var(--muted-foreground)); font-size: 11px; line-height: 1.5; }
 @container (max-width: 300px) { .bb-comparison-amount { font-size: 16px; } }
 @media (prefers-reduced-motion: reduce) { .bb-comparison-card, .bb-comparison-card * { transition: none !important; } }
-.bb-comparison-details-toggle { display: inline-flex; align-items: center; gap: 8px; min-height: 44px; margin-left: auto; padding: 8px 0 8px 8px; border: 0; background: none; color: hsl(var(--muted-foreground)); font: 500 12px/1.5 -apple-system, sans-serif; cursor: pointer; }
-.bb-comparison-details-toggle:hover { color: hsl(var(--foreground)); }
-.bb-comparison-details-toggle[aria-expanded="true"] .bb-disclosure-mark::after { transform: rotate(0deg); }
 .bb-comparison-note { color: hsl(var(--muted-foreground)); font-size: 12px; line-height: 1.65; margin: 12px 0 0; }
-.bb-comparison-details { padding-top: 4px; }
-.bb-comparison-details > .bb-comparison-note { margin-top: 0; }
-.bb-comparison-exclusions { width: 100%; table-layout: fixed; margin: 12px 0 0; font-size: 12px; }
-.bb-comparison-exclusions caption { text-align: left; padding: 0 0 8px; font-weight: 500; }
-.bb-comparison-exclusions th, .bb-comparison-exclusions td { padding: 8px 0 8px 12px; text-align: right; vertical-align: middle; font-size: inherit; }
-.bb-comparison-exclusions th { color: hsl(var(--muted-foreground)); font-weight: 400; letter-spacing: 0; text-transform: none; }
-.bb-comparison-exclusions th:first-child { width: 40%; padding-left: 0; text-align: left; }
-.bb-comparison-exclusions td { font-variant-numeric: tabular-nums; }
-.bb-comparison-exclusions tbody tr:last-child th { border-bottom: 0; }
-.bb-comparison-excluded-amount { font-size: 12px; }
