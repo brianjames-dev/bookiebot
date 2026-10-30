@@ -40,18 +40,18 @@ async function checkHeader(page, width) {
 }
 async function checkComparisonCapsule(page) {
   const layout = await page.locator('.bb-comparison-toggle').evaluate(button => {
-    const box = button.getBoundingClientRect(), metrics = document.querySelector('.bb-metrics-grid').getBoundingClientRect(), charts = document.querySelector('.bb-chart-carousel-indicators').getBoundingClientRect(), style = getComputedStyle(button)
+    const box = button.parentElement.getBoundingClientRect(), metrics = document.querySelector('.bb-metrics-grid').getBoundingClientRect(), charts = document.querySelector('.bb-chart-carousel-indicators').getBoundingClientRect(), style = getComputedStyle(button.parentElement)
     const copy = button.querySelector('.bb-comparison-copy').getBoundingClientRect(), icon = button.querySelector('.bb-comparison-icon').getBoundingClientRect(), chevron = button.querySelector('.bb-comparison-chevron').getBoundingClientRect()
     return {width: box.width, height: box.height, center: (box.left + box.right - metrics.left - metrics.right) / 2, metricWidth: metrics.width,
-      topGap: box.top - metrics.bottom, bottomGap: charts.top - box.bottom, padding: style.paddingLeft, radius: style.borderRadius, shadow: style.boxShadow,
+      topGap: box.top - metrics.bottom, bottomGap: charts.top - box.bottom, padding: getComputedStyle(button.querySelector(".bb-comparison-toggle-group")).left, radius: style.borderRadius, shadow: style.boxShadow,
       captionGap: getComputedStyle(button.querySelector('.bb-comparison-copy')).rowGap, iconGap: copy.left - icon.right, chevronGap: chevron.left - copy.right,
-      textFits: [...button.querySelectorAll('.bb-comparison-title, .bb-comparison-caption')].every(node => node.scrollWidth <= node.clientWidth), border: getComputedStyle(button.parentElement).borderBottomWidth}
+      textFits: [...button.querySelectorAll('.bb-comparison-title, .bb-comparison-caption')].every(node => node.scrollWidth <= node.clientWidth), border: getComputedStyle(button.closest(".bb-report-comparison")).borderBottomWidth}
   })
   assert.ok(layout.width < layout.metricWidth - 40, `Comparison hugs its content: ${JSON.stringify(layout)}`)
   assert.ok(Math.abs(layout.center) < 1)
   assert.equal(layout.height, 48); assert.equal(layout.radius, '16px'); assert.equal(layout.padding, '16px'); assert.equal(layout.captionGap, '2px')
   assert.equal(layout.topGap, 14); assert.equal(layout.bottomGap, 14); assert.equal(layout.shadow, 'none'); assert.equal(layout.border, '0px')
-  assert.equal(layout.iconGap, 12); assert.equal(layout.chevronGap, 12); assert.equal(layout.textFits, true)
+  assert.equal(layout.iconGap, 12); assert.ok(Math.abs(layout.chevronGap - 12) <= 1); assert.equal(layout.textFits, true)
   assert.equal(await page.locator('.bb-comparison-caption').innerText(), 'A month-to-month view')
 }
 ;(async () => {
@@ -61,7 +61,7 @@ async function checkComparisonCapsule(page) {
     try {
       for (const width of [320, 390, 736, 1280]) for (const dark of [false, true]) {
         const page = await browser.newPage({viewport: {width, height: 900}, hasTouch: true, isMobile: width < 768, reducedMotion: dark ? 'reduce' : 'no-preference'})
-        const errors = [], unexpected = [], comparisonReads = []; let firstReport = true, releaseReport
+        const errors = [], unexpected = [], comparisonReads = []; let firstReport = true, releaseReport, releaseComparison
         page.on('pageerror', error => errors.push(error.message))
         await page.addInitScript(() => {delete window.PushManager})
         await page.route('**/*', async route => {
@@ -75,6 +75,7 @@ async function checkComparisonCapsule(page) {
             value = {...report, year, month: number, monthLabel: new Intl.DateTimeFormat('en-US', {month: 'long', year: 'numeric', timeZone: 'UTC'}).format(new Date(Date.UTC(year, number - 1, 1)))}
           } else if (name === '/app/expenses/comparison') {
             comparisonReads.push(request.url())
+            if (comparisonReads.length === 1) await new Promise(resolve => {releaseComparison = resolve})
             const period = amount => ({datedSpending: amount, datedIncome: 5000, undatedSpending: 0, scheduledSpending: 0, unitemizedSpending: 0, expenseCount: 3, complete: true})
             value = {selectedMonth: url.searchParams.get('month'), baselineMonth: url.searchParams.get('compare_month'), baselineKind: 'selected-month', throughDay: 7, shortMonthAdjusted: false,
               selected: period(125), baseline: period(150), changeAmount: -25, changePercent: -16.7, status: 'complete', coverageNote: 'Matching dated spending from isolated fixtures.'}
@@ -155,25 +156,86 @@ async function checkComparisonCapsule(page) {
           if (dark) assert.ok(parseFloat(selected.transition) <= .001)
           cases++
         }
-        const compare = page.getByRole('button', {name: 'Compare spending', exact: true})
+        const compare = page.locator('.bb-comparison-toggle')
+        await page.evaluate(() => {
+          window.__comparisonCard = document.querySelector('.bb-comparison-card')
+          window.__comparisonPicker = document.querySelector('.bb-comparison-month-head .bb-month-trigger')
+          window.__comparisonFrames = []
+          const start = performance.now()
+          const sample = () => {
+            const rect = window.__comparisonCard.getBoundingClientRect()
+            window.__comparisonFrames.push({width: rect.width, height: rect.height})
+            if (performance.now() - start < 450) requestAnimationFrame(sample)
+          }
+          requestAnimationFrame(sample)
+        })
         await compare.focus(); await page.keyboard.press('Enter')
+        while (!releaseComparison) await page.waitForTimeout(10)
+        await page.getByText('Comparing matching days…').waitFor()
+        assert.equal(await compare.getAttribute('aria-label'), 'Collapse comparison')
+        releaseComparison()
         await page.locator('.bb-comparison-values').waitFor()
+        await page.waitForTimeout(500)
+        const expanded = await page.evaluate(() => {
+          const card = document.querySelector('.bb-comparison-card'), body = document.querySelector('.bb-comparison-content'), button = document.querySelector('.bb-comparison-toggle')
+          const rect = node => {const r = node.getBoundingClientRect(); return {left:r.left, right:r.right, top:r.top, bottom:r.bottom, width:r.width, height:r.height}}
+          const group = card.querySelector('.bb-comparison-toggle-group'), content = card.querySelector('.bb-comparison-viewport')
+          return {sameCard: card === window.__comparisonCard, samePicker: window.__comparisonPicker === card.querySelector('.bb-month-trigger'),
+            card:rect(card), body:rect(body), slot:rect(card.parentElement), button:rect(button), radius:getComputedStyle(card).borderRadius,
+            groupHidden:getComputedStyle(group).visibility === 'hidden' && group.getAttribute('aria-hidden') === 'true',
+            accessible:content.getAttribute('aria-hidden') === 'false' && !content.inert, duration:getComputedStyle(card).getPropertyValue('--bb-comparison-duration').trim(),
+            overflow:document.documentElement.scrollWidth > innerWidth,
+            amounts:[...card.querySelectorAll('.bb-comparison-difference .bb-fitted-amount-text, .bb-comparison-amount .bb-fitted-amount-text')].map(node => ({text:node.textContent, font:parseFloat(getComputedStyle(node).fontSize), box:rect(node)})),
+            tracks:[...card.querySelectorAll('.bb-comparison-track')].map(rect),
+            frames:window.__comparisonFrames}
+        })
+        assert.ok(expanded.sameCard && expanded.samePicker && expanded.groupHidden && expanded.accessible)
+        assert.ok(Math.abs(expanded.card.width - expanded.slot.width) < 1); assert.equal(expanded.radius, '20px'); assert.equal(parseFloat(expanded.duration) * (expanded.duration.endsWith('ms') ? 1 : 1000), 360)
+        assert.ok(Math.abs(expanded.card.height - expanded.body.height - 2) < 1, 'Container fits asynchronous result height')
+        assert.equal(expanded.button.width, 44); assert.equal(expanded.button.height, 44)
+        assert.equal(expanded.card.right - expanded.button.right, 9)
+        assert.ok(expanded.amounts.every(amount => amount.box.left >= expanded.body.left && amount.box.right <= expanded.body.right - 15), 'Complete amounts fit the panel')
+        assert.ok(expanded.amounts[0].box.right <= expanded.button.left, 'Difference clears the collapse control')
+        assert.deepEqual(expanded.amounts.map(amount => amount.text), ['$25.00', '$125.00', '$150.00'])
+        assert.ok(expanded.amounts[0].font >= 37 && expanded.amounts.slice(1).every(amount => amount.font >= (width === 320 ? 15 : 17)), 'Normal amounts retain the selected readable font sizes')
+        assert.ok(expanded.tracks.every(track => track.height === 8))
+        assert.equal(expanded.overflow, false)
+        if (!dark) assert.ok(new Set(expanded.frames.map(frame => Math.round(frame.width))).size > 2, 'Normal-motion expansion has intermediate widths')
+        if (width === 390) await page.screenshot({path:`/tmp/bookiebot-comparison-expanded-${engine.name()}-${dark ? 'dark' : 'light'}.png`})
+        await page.locator('.bb-comparison-card').getByRole('button', {name:'Details', exact:true}).click()
+        await page.waitForTimeout(600)
+        assert.ok(await page.locator('.bb-comparison-card').evaluate(card => Math.abs(card.getBoundingClientRect().height - card.querySelector('.bb-comparison-content').offsetHeight - 2) < 1), 'Expanded Details resizes the same container')
+        await page.locator('.bb-comparison-card').getByRole('button', {name:'Details', exact:true}).click()
+        await page.waitForTimeout(600)
         assert.equal(await compare.getAttribute('aria-expanded'), 'true'); assert.equal(comparisonReads.length, 1)
         await page.waitForFunction(() => new DOMMatrix(getComputedStyle(document.querySelector('.bb-comparison-chevron')).transform).a < -.99)
         await page.getByRole('button', {name: 'Comparison month', exact: true}).click()
         const comparisonPicker = page.getByRole('dialog', {name: 'Comparison month', exact: true})
         await comparisonPicker.waitFor(); await comparisonPicker.getByRole('button', {name: 'Previous year', exact: true}).click()
         await comparisonPicker.getByRole('button', {name: 'October 2025', exact: true}).click()
-        await page.waitForFunction(() => document.querySelector('.bb-comparison-values > div:nth-child(2) > span')?.textContent === 'October 2025')
+        await page.waitForFunction(() => document.querySelector('.bb-comparison-values .bb-month-trigger')?.textContent === 'October 2025')
         assert.equal(comparisonReads.length, 2)
-        await compare.focus(); await page.keyboard.press('Space'); await page.waitForTimeout(300)
+        await compare.focus(); await page.keyboard.press('Space'); await page.waitForTimeout(420)
         assert.equal(await compare.getAttribute('aria-expanded'), 'false')
-        const hiddenComparison = page.locator('.bb-report-comparison > .bb-details-content')
+        const hiddenComparison = page.locator('.bb-comparison-viewport')
         assert.equal(await hiddenComparison.getAttribute('aria-hidden'), 'true'); assert.equal(await hiddenComparison.evaluate(node => node.inert), true)
         assert.ok(await compare.evaluate(node => node === document.activeElement && getComputedStyle(node).outlineStyle !== 'none'), 'Capsule keeps visible keyboard focus')
         await checkComparisonCapsule(page)
-        await compare.click(); await page.waitForTimeout(300); assert.equal(comparisonReads.length, 2, 'Reopening reuses the selected comparison')
-        await compare.click(); await page.waitForTimeout(300)
+        await compare.click(); await page.waitForTimeout(420); assert.equal(comparisonReads.length, 2, 'Reopening reuses the selected comparison')
+        await compare.click(); await page.waitForTimeout(420)
+        if (width === 390) {
+          // Reverse unfinished transitions without replacing the frame or picker.
+          await compare.evaluate(node => node.click()); await page.waitForTimeout(50)
+          await compare.evaluate(node => node.click()); await page.waitForTimeout(50)
+          await compare.evaluate(node => node.click()); await page.waitForTimeout(450)
+          assert.ok(await page.locator('.bb-comparison-card').evaluate(card => card === window.__comparisonCard && card.dataset.open === 'true' && Math.abs(card.getBoundingClientRect().height - card.querySelector('.bb-comparison-content').offsetHeight - 2) < 1))
+          await page.setViewportSize({width:520, height:900}); await page.waitForTimeout(450)
+          assert.ok(await page.locator('.bb-comparison-card').evaluate(card => Math.abs(card.getBoundingClientRect().width - card.parentElement.clientWidth) < 1 && document.documentElement.scrollWidth <= innerWidth), 'Open comparison refits on rotation/resize')
+          await page.setViewportSize({width, height:900}); await page.waitForTimeout(450)
+          await compare.click(); await page.waitForTimeout(420)
+          await checkComparisonCapsule(page)
+          assert.equal(comparisonReads.length, 2, 'Motion and resizing cannot trigger report reads')
+        }
         await month.click()
         const picker = page.getByRole('dialog', {name: 'Report month', exact: true})
         await picker.waitFor(); await page.getByRole('button', {name: 'Previous year', exact: true}).click()
@@ -201,7 +263,7 @@ async function checkComparisonCapsule(page) {
         await page.locator('.bb-metrics-grid').waitFor()
         assert.equal(await page.getByRole('button', {name: 'Projected', exact: true}).getAttribute('aria-pressed'), 'true', 'Restyling preserves the existing per-owner mode preference')
         if (width === 390) {await page.waitForTimeout(300); await page.screenshot({path: `/tmp/bookiebot-overview-${engine.name()}-${dark ? 'dark' : 'light'}.png`})}
-        assert.deepEqual(errors, []); assert.deepEqual(unexpected, [], 'No external or financial write requests')
+        assert.deepEqual(errors, [], `${engine.name()} ${width}px ${dark ? 'dark' : 'light'} has no page errors`); assert.deepEqual(unexpected, [], 'No external or financial write requests')
         await page.close()
       }
     } finally {await browser.close()}

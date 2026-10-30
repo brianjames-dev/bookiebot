@@ -1,5 +1,5 @@
-import { useEffect, useId, useMemo, useRef, useState } from "react"
-import { ArrowLeftRight, ChevronDown } from "lucide-react"
+import { useEffect, useId, useLayoutEffect, useMemo, useRef, useState } from "react"
+import { ArrowDownRight, ArrowLeftRight, ChevronDown } from "lucide-react"
 import { CollapsibleContent } from "./components/ui/motion"
 import { FittedAmount } from "./components/ui/fitted-amount"
 import { MonthPicker } from "./components/ui/month-picker"
@@ -169,29 +169,79 @@ export function MonthHistoryControl({ monthLabel, selectedMonth, catalog, loadin
 
 const money = (value: number) => new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format(value)
 
-function ComparisonResult({ comparison }: { comparison: ReportPeriodComparison }) {
+// Measure the full-width body independently of the animated shell. Its width
+// stays fixed throughout the morph so text never reflows on every animation frame.
+function useComparisonFrame(open: boolean) {
+  const slot = useRef<HTMLElement>(null)
+  const card = useRef<HTMLDivElement>(null)
+  const body = useRef<HTMLDivElement>(null)
+  const toggle = useRef<HTMLButtonElement>(null)
+  const expanded = useRef(open)
+  const fit = useRef<() => void>(() => {})
+  expanded.current = open
+  useLayoutEffect(() => {
+    const host = slot.current, frame = card.current, content = body.current, button = toggle.current
+    if (!host || !frame || !content || !button) return
+    const group = button.querySelector<HTMLElement>(".bb-comparison-toggle-group")!
+    const measure = () => {
+      const available = host.clientWidth
+      // An inactive app tab has no geometry. ResizeObserver refits it on return.
+      if (!available) return
+      content.style.width = `${Math.max(0, available - 2)}px`
+      // Add the 20px chevron, 12px gap, two 16px insets and 2px border.
+      const compact = Math.min(available, Math.ceil(group.getBoundingClientRect().width + 66))
+      frame.style.width = `${expanded.current ? available : compact}px`
+      frame.style.height = `${expanded.current ? content.offsetHeight + 2 : 48}px`
+    }
+    fit.current = measure
+    measure()
+    const ready = requestAnimationFrame(() => { frame.dataset.ready = "true" })
+    // The content's intrinsic height also changes for results, errors and Details.
+    // Observing it (rather than the animated frame) avoids feedback and snapping.
+    let lastWidth = host.clientWidth
+    let measureFrame = 0
+    // Write outside observer delivery so a new shell height cannot cause a loop.
+    const scheduleMeasure = () => {
+      if (!measureFrame) measureFrame = requestAnimationFrame(() => { measureFrame = 0; measure() })
+    }
+    const observer = new ResizeObserver((entries) => {
+      const width = host.clientWidth
+      if (width !== lastWidth || entries.some((entry) => entry.target === content)) {
+        lastWidth = width
+        scheduleMeasure()
+      }
+    })
+    observer.observe(host)
+    observer.observe(content)
+    document.fonts?.addEventListener("loadingdone", scheduleMeasure)
+    return () => {
+      cancelAnimationFrame(ready)
+      cancelAnimationFrame(measureFrame)
+      observer.disconnect()
+      document.fonts?.removeEventListener("loadingdone", scheduleMeasure)
+      fit.current = () => {}
+    }
+  }, [])
+  useLayoutEffect(() => {
+    if (!open && body.current?.contains(document.activeElement)) toggle.current?.focus({ preventScroll: true })
+    fit.current()
+  }, [open])
+  return { slot, card, body, toggle }
+}
+
+function ComparisonDetails({ comparison }: { comparison: ReportPeriodComparison }) {
   const [detailsOpen, setDetailsOpen] = useState(false)
   const detailsId = useId()
   const { selected, baseline } = comparison
-  if (!selected || !baseline) return <p className="bb-comparison-note">{comparison.coverageNote}</p>
-
+  if (!selected || !baseline) return null
   const excluded = [
     { label: "Without dates", selected: selected.undatedSpending, baseline: baseline.undatedSpending },
     { label: "Scheduled subscriptions", selected: selected.scheduledSpending, baseline: baseline.scheduledSpending },
     { label: "Sheet adjustments", selected: selected.unitemizedSpending, baseline: baseline.unitemizedSpending },
   ].filter((row) => row.selected !== 0 || row.baseline !== 0)
-  const change = comparison.changeAmount
   return <>
-    <p className="bb-comparison-note bb-comparison-period">Recorded spending · days 1–{comparison.throughDay}</p>
-    <div className="bb-comparison-values">
-      <div><span>{reportMonthLabel(comparison.selectedMonth)}</span><FittedAmount className="bb-comparison-amount">{money(selected.datedSpending)}</FittedAmount></div>
-      <div><span>{reportMonthLabel(comparison.baselineMonth)}</span><FittedAmount className="bb-comparison-amount">{money(baseline.datedSpending)}</FittedAmount></div>
-    </div>
     <div className="bb-comparison-footer">
-      {change !== null && <p className="bb-comparison-change">
-        {change === 0 ? "Same spending" : <><strong>{money(Math.abs(change))}</strong> {change < 0 ? "less" : "more"}</>}
-        {comparison.changePercent !== null && comparison.changePercent !== 0 && <span className="bb-comparison-percent"> · {Math.abs(comparison.changePercent)}%</span>}
-      </p>}
+      <p className="bb-comparison-period">Recorded spending · days 1–{comparison.throughDay}</p>
       <button type="button" className="bb-comparison-details-toggle" aria-expanded={detailsOpen} aria-controls={detailsId}
         onClick={() => setDetailsOpen((value) => !value)}>
         Details<span className="bb-disclosure-mark" aria-hidden="true" />
@@ -294,36 +344,64 @@ export function ReportComparison({ report, onExpired, catalog, catalogLoading = 
     })
   }, [open, baseline, requests, selectedMonth, revision, refreshing])
 
-  return <section className="bb-report-comparison" aria-label="Spending comparison">
-    <button type="button" className="bb-comparison-toggle" aria-label="Compare spending" aria-expanded={open} aria-controls={id} onClick={() => setOpen((value) => !value)}>
-      <span className="bb-comparison-toggle-group">
-        <span className="bb-comparison-icon" aria-hidden="true"><ArrowLeftRight size={18} /></span>
-        <span className="bb-comparison-copy">
-          <span className="bb-comparison-title">Compare spending</span>
-          <span className="bb-comparison-caption">A month-to-month view</span>
+  const frame = useComparisonFrame(open)
+  const ready = !loading && !error && comparison?.selectedMonth === selectedMonth && comparison.baselineMonth === baseline ? comparison : null
+  const amounts = ready?.selected && ready.baseline ? [ready.selected.datedSpending, ready.baseline.datedSpending] : null
+  const change = amounts ? ready!.changeAmount : null
+  const direction = change === null || change === 0 ? "same" : change < 0 ? "less" : "more"
+  const maximum = amounts ? Math.max(0, ...amounts) : 0
+  const monthName = (value: string) => value.startsWith(`${report.year}-`) ? reportMonthLabel(value).replace(/\s+\d{4}$/, "") : reportMonthLabel(value)
+
+  return <section ref={frame.slot} className="bb-report-comparison" aria-label="Spending comparison">
+    <div ref={frame.card} className="bb-comparison-card" data-open={open} data-direction={direction}>
+      <button ref={frame.toggle} type="button" className="bb-comparison-toggle" aria-label={open ? "Collapse comparison" : "Compare spending"}
+        aria-expanded={open} aria-controls={id} onClick={() => setOpen((value) => !value)}>
+        <span className="bb-comparison-toggle-group" aria-hidden={open}>
+          <span className="bb-comparison-icon" aria-hidden="true"><ArrowLeftRight size={18} /></span>
+          <span className="bb-comparison-copy">
+            <span className="bb-comparison-title">Compare spending</span>
+            <span className="bb-comparison-caption">A month-to-month view</span>
+          </span>
         </span>
-      </span>
-      <span className="bb-comparison-chevron" aria-hidden="true"><ChevronDown size={18} /></span>
-    </button>
-    <CollapsibleContent open={open} id={id}>
-      <div className="bb-comparison-content">
-        <div className="bb-comparison-picker">
-          <span>Compare with</span>
-          <MonthPicker label="Comparison month" value={baseline} options={options} onSelect={setChosenMonth}
-            triggerLabel={reportMonthLabel(baseline)} />
-        </div>
-        {catalogLoading && !catalog && <p className="bb-comparison-note">Loading other months…</p>}
-        {(catalogError || (catalog && catalog.coverage.status !== "complete")) && <p className="bb-comparison-note">
-          {catalogError && catalogErrorMessage ? catalogErrorMessage : catalog?.coverage.code === "source_timeout"
-            ? "Some comparison months couldn’t be checked because Google Sheets timed out."
-            : "Some comparison months couldn’t be checked."} {onCatalogRetry && <button type="button" disabled={catalogLoading} onClick={onCatalogRetry}>Retry months</button>}
-        </p>}
-        <div role="status" aria-live="polite" aria-busy={loading}>
-          {loading && <p className="bb-comparison-note">{refreshing && !requests.pending ? "Waiting for the refreshed report…" : "Comparing matching days…"}</p>}
-          {error && <p className="bb-comparison-note">{error} <button type="button" onClick={() => { requests.results.delete(baseline); reload((value) => value + 1) }}>Try again</button></p>}
-          {!loading && !error && comparison && <ComparisonResult key={`${comparison.selectedMonth}:${comparison.baselineMonth}`} comparison={comparison} />}
+        <span className="bb-comparison-chevron" aria-hidden="true"><ChevronDown size={18} /></span>
+      </button>
+      <div className="bb-comparison-viewport" id={id} aria-hidden={!open} inert={!open}>
+        <div ref={frame.body} className="bb-comparison-content">
+          <div className="bb-comparison-hero" role="status" aria-live="polite" aria-busy={loading}>
+            {loading && <p className="bb-comparison-note">{refreshing && !requests.pending ? "Waiting for the refreshed report…" : "Comparing matching days…"}</p>}
+            {error && <p className="bb-comparison-note">{error} <button type="button" onClick={() => { requests.results.delete(baseline); reload((value) => value + 1) }}>Try again</button></p>}
+            {ready && !amounts && <p className="bb-comparison-note">{ready.coverageNote}</p>}
+            {change !== null && <div className="bb-comparison-change">
+              <div className="bb-comparison-hero-main">
+                <FittedAmount className="bb-comparison-difference">{money(Math.abs(change))}</FittedAmount>
+                {ready!.changePercent !== null && <span className="bb-comparison-percent">
+                  {change !== 0 && <ArrowDownRight size={16} aria-hidden="true" />}{Math.abs(ready!.changePercent)}%
+                </span>}
+              </div>
+              <p className="bb-comparison-direction">{change === 0 ? "Same spending" : `${direction} spending`}</p>
+            </div>}
+          </div>
+          <div className={amounts ? "bb-comparison-months bb-comparison-values" : "bb-comparison-months"} aria-label="Recorded spending by month">
+            {[selectedMonth, baseline].map((month, index) => <div className="bb-comparison-month-row" data-baseline={index === 1} key={index}>
+              <div className="bb-comparison-month-head">
+                {index === 0 ? <span className="bb-comparison-month-name" aria-label={reportMonthLabel(month)}>{monthName(month)}</span>
+                  : <MonthPicker label="Comparison month" value={baseline} options={options} onSelect={setChosenMonth}
+                    triggerLabel={monthName(baseline)} triggerDescription={reportMonthLabel(baseline)} />}
+                {amounts && <FittedAmount className="bb-comparison-amount">{money(amounts[index])}</FittedAmount>}
+              </div>
+              {amounts && <div className="bb-comparison-track" aria-hidden="true"><span className="bb-comparison-fill"
+                style={{ width: `${maximum > 0 ? Math.max(0, amounts[index]) / maximum * 100 : 0}%` }} /></div>}
+            </div>)}
+          </div>
+          {ready && amounts && <ComparisonDetails key={`${ready.selectedMonth}:${ready.baselineMonth}`} comparison={ready} />}
+          {catalogLoading && !catalog && <p className="bb-comparison-note">Loading other months…</p>}
+          {(catalogError || (catalog && catalog.coverage.status !== "complete")) && <p className="bb-comparison-note">
+            {catalogError && catalogErrorMessage ? catalogErrorMessage : catalog?.coverage.code === "source_timeout"
+              ? "Some comparison months couldn’t be checked because Google Sheets timed out."
+              : "Some comparison months couldn’t be checked."} {onCatalogRetry && <button type="button" disabled={catalogLoading} onClick={onCatalogRetry}>Retry months</button>}
+          </p>}
         </div>
       </div>
-    </CollapsibleContent>
+    </div>
   </section>
 }

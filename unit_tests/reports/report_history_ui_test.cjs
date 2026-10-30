@@ -163,7 +163,13 @@ async function main() {
   assert.equal(comparisonMarker.findAllByType("svg").length, 1)
   assert.equal(comparisonMarker.props["aria-hidden"], "true")
   assert.equal(tree.root.findAllByType("div").find(node => node.props.id === comparisonToggle.props["aria-controls"]).props["aria-hidden"], true)
+  const comparisonCard = tree.root.findByProps({className:"bb-comparison-card"})
+  const pickerBefore = tree.root.findByProps({"aria-label":"Comparison month"})
   click("Compare spending")
+  assert.equal(tree.root.findByProps({className:"bb-comparison-card"}), comparisonCard, "One persistent container owns both disclosure states")
+  assert.equal(comparisonCard.findByProps({className:"bb-comparison-toggle-group"}).props["aria-hidden"], true, "Expanded view hides the original label, subtitle and icon")
+  assert.equal(findButton("Compare spending").props["aria-label"], "Collapse comparison")
+  assert.equal(tree.root.findByProps({"aria-label":"Comparison month"}), pickerBefore, "Picker persists through loading and results")
   assert.equal(findButton("Compare spending").props["aria-expanded"], true)
   assert.equal(findButton("Compare spending").findByProps({ className: "bb-comparison-chevron" }), comparisonMarker)
   const oldMonth = calls.at(-1)
@@ -284,7 +290,7 @@ async function main() {
     baseline:{...period(349.31),undatedSpending:2563.71,scheduledSpending:92.48},changeAmount:190.70,changePercent:54.6}
   await finish(calls.at(-1), 200, partial)
   assert.match(read(), /Recorded spending · days 1– 7/)
-  assert.match(text(tree.root.findByProps({className:"bb-comparison-change"}).props.children), /\$190.70\s+more.*54.6/)
+  assert.match(text(tree.root.findByProps({className:"bb-comparison-change"}).props.children), /\$190.70.*54.6.*more spending/)
   assert.equal(detailsPanel().props["aria-hidden"], true)
   click("Details")
   const exclusions = tree.root.findByType("table")
@@ -296,7 +302,22 @@ async function main() {
   report = {...report}
   renderer.act(() => tree.update(component()))
   await finish(calls.at(-1), 200, {...result("2026-08", "Matching days"),selected:period(0),baseline:period(0),changeAmount:0,changePercent:null})
-  assert.equal(text(tree.root.findByProps({className:"bb-comparison-change"}).props.children), "Same spending")
+  assert.match(text(tree.root.findByProps({className:"bb-comparison-change"}).props.children), /\$0.00 Same spending/)
+  const fills = () => tree.root.findAllByProps({className:"bb-comparison-fill"}).map(node => node.props.style.width)
+  assert.deepEqual(fills(), ["0%", "0%"], "Zero periods never create NaN or a full bar")
+  assert.equal(tree.root.findAllByProps({className:"bb-comparison-percent"}).length, 0, "A null percentage is not invented")
+  assert.equal(tree.root.findByProps({"aria-label":"Comparison month"}), pickerBefore)
+  report = {...report}
+  renderer.act(() => tree.update(component()))
+  await finish(calls.at(-1), 200, {...result("2026-08", "No baseline spending"),selected:period(125),baseline:period(0),changeAmount:125,changePercent:null})
+  assert.deepEqual(fills(), ["100%", "0%"])
+  assert.equal(tree.root.findAllByProps({className:"bb-comparison-percent"}).length, 0, "A zero baseline has no infinite percentage")
+  report = {...report}
+  renderer.act(() => tree.update(component()))
+  await finish(calls.at(-1), 200, {...result("2026-08", "Net refunds"),selected:period(-25.50),baseline:period(50),changeAmount:-75.50,changePercent:-151})
+  assert.deepEqual(fills(), ["0%", "100%"], "Net refunds preserve signed dollars without negative-width bars")
+  assert.match(read(), /-\$25.50/)
+  assert.match(text(tree.root.findByProps({className:"bb-comparison-change"}).props.children), /\$75.50.*151.*less spending/)
   assert.equal(tree.root.findAllByType("table").length, 0, "Zero exclusions do not create unnecessary rows")
 
   report = {...report}
