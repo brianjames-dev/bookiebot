@@ -1,5 +1,11 @@
 # Agent Decisions
 
+## 2026-10-30 - Explicit Category Ring And Callout Views
+
+Default Category Mix to a large, unlabeled ring fitted to the chart host (8px inset), retaining the current 26px band, colors, clockwise noon start and centered usage percentage (40px large / 32px compact). Deliberate taps on the center or empty chart background toggle the smaller Refined flow composition and its callouts; slices and callouts both inspect that category's existing transactions modal. Do not toggle from scrolling, carousel swipes, filters, unrelated page taps or dialog dismissal. Keep the explicit choice through report/mode/filter rerenders within the mounted chart; do not add persistent storage.
+
+Morph radius/center through Recharts' public interpolation API, resuming from visible geometry on interruption. Fade callouts independently, retain the existing delayed angle settlement for data changes, precompute routes off-thread, and honor reduced motion. This replaces the separate CSS center-offset animation to avoid applying position changes twice. Callouts show whole dollars / ring percentage on one row; the percentage and slash use muted grey, measured in the app font with room for tabular figures. Keep content-sized, separate curved cards and fit the ring to their available space. Remove every slice focus outline/stroke, including after WebKit dialog restoration; center/card keyboard actions remain available. Retain the Categories list pending its eventual replacement. Native acceptance: checklist 195. No accounting, API, persistence or Finance Ops backlog changes.
+
 ## 2026-10-30 - Apply Refined Flow Category Callouts
 
 Use the approved Refined flow settings: 220px phone ring, 26px band, 32px center, 12px callout labels (11.5px on narrow hosts), 10px gaps/insets, 18px callout radius, 6px side padding, 23px contour stagger and 65% stem opacity. Center matching-color category names above whole-dollar amounts in content-sized cards; use Needs subs, Wants subs, Other needs and Bills & utils only in these callouts. Keep exact canonical values, full names/cents in Categories and inspection, expense-only Spent, savings/ESPP allocations, native scope control, clockwise noon start and existing shared-stage height.

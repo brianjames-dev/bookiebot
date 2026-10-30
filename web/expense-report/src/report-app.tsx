@@ -17,7 +17,7 @@ import { createPortal } from "react-dom"
 import { ChevronDown } from "lucide-react"
 import { useCategoryContour, CategoryContourCallouts } from "./category-mix-contour"
 import { CONTOUR_PADDING_ANGLE } from "./category-mix-layout"
-import { stablePieAnimation, stableBarAnimation, stableBarShape, StablePieSector, type AnimatedPieSector } from "./chart-animation"
+import { categoryRingAnimation, stableBarAnimation, stableBarShape, StablePieSector, type AnimatedPieSector } from "./chart-animation"
 import { ReportScreen, useAppNavigation } from "./app-navigation"
 import { ReportBrand, ReportHeader } from "./report-header"
 import {
@@ -1620,7 +1620,8 @@ const CategoryMixChart = memo(function CategoryMixChart({
   // the ring without changing the established Categories dialog order.
   const ringData = [...chartData.filter(item => item.key !== "left"), ...chartData.filter(item => item.key === "left")]
   const [pieHostRef, pieHostSize] = useElementSize<HTMLDivElement>()
-  const pieLayout = useExpensePieLayout(ringData, pieHostSize)
+  const [showCallouts, setShowCallouts] = useState(false)
+  const pieLayout = useExpensePieLayout(ringData, pieHostSize, showCallouts)
   const spentTotal = filter === "all" ? allSpentTotal : amountRowsTotal(chartData.filter((item) => item.key !== "left" && !item.key.startsWith("coverage-")))
   const selectedBudget = (filter === "all" ? categoryBudgetTotal(categoryBudgets) : categoryBudgets[filter]) + ((filter === "all" || filter === "savings") ? espp ?? 0 : 0)
   // All still shows where income went, including cash savings and ESPP.
@@ -1656,14 +1657,15 @@ const CategoryMixChart = memo(function CategoryMixChart({
           <CategoryMixPieMotionHost
             hostRef={pieHostRef}
             layout={pieLayout}
-            filter={filter}
+            showCallouts={showCallouts}
+            onToggle={() => setShowCallouts(shown => !shown)}
           >
             <CategoryMixPieSurface data={ringData} layout={pieLayout} onInspect={onInspect} />
-            <CategoryContourCallouts scene={pieLayout.contour} data={ringData} ready={pieLayout.calloutsReady} />
-            <div className="bb-category-pie-center" style={{ left: pieLayout.cx, top: pieLayout.cy, width: pieLayout.innerRadius * 1.7 }} aria-live="polite">
+            <CategoryContourCallouts scene={pieLayout.contour} data={ringData} ready={pieLayout.calloutsReady} visible={showCallouts} onInspect={onInspect} />
+            <button type="button" className="bb-category-pie-center" aria-label={showCallouts ? "Hide category callouts" : "Show category callouts"} aria-pressed={showCallouts} onClick={() => setShowCallouts(shown => !shown)} style={{ left: pieLayout.cx, top: pieLayout.cy, width: pieLayout.innerRadius * 1.7 }} aria-live="polite">
               <FittedAmount className="bb-category-used">{selectedBudget > 0 ? `${Number(usedPercent.toFixed(1))}%` : "—"}</FittedAmount>
               <span>{selectedBudget > 0 ? usedLabel : "no budget"}</span>
-            </div>
+            </button>
           </CategoryMixPieMotionHost>
         </ChartContainer>
       </div>
@@ -1689,31 +1691,31 @@ const CategoryMixChart = memo(function CategoryMixChart({
 type CategoryMixPieMotionHostProps = {
   hostRef: RefObject<HTMLDivElement | null>
   layout: ExpensePieLayout
-  filter: CategoryMixFilter
+  showCallouts: boolean
+  onToggle: () => void
   children: ReactNode
 }
 
-function CategoryMixPieMotionHost({ hostRef, layout, filter, children }: CategoryMixPieMotionHostProps) {
-  const motion = useExpensePieLayoutMotion(layout, filter)
-
+function CategoryMixPieMotionHost({ hostRef, layout, showCallouts, onToggle, children }: CategoryMixPieMotionHostProps) {
+  const gesture = useRef<{x: number; y: number; moved: boolean} | null>(null)
   return (
-    <div
-      ref={hostRef}
-      className="bb-category-pie-host"
-      data-bb-pie-fit-padding={layout.containerPadding}
-      data-bb-pie-layout-motion={motion.phase}
-      data-bb-pie-layout-motion-revision={motion.revision}
-      data-bb-pie-layout-travel-x={motion.travelX}
-      data-bb-pie-layout-travel-y={motion.travelY}
-      data-bb-pie-motion-isolated="true"
-      data-bb-pie-animation-synchronized="true"
-      style={{
-        "--bb-pie-layout-offset-x": `${motion.offsetX}px`,
-        "--bb-pie-layout-offset-y": `${motion.offsetY}px`,
-      } as CSSProperties}
-    >
-      {children}
-    </div>
+    <div ref={hostRef} className="bb-category-pie-host" data-callouts={showCallouts}
+      data-bb-pie-fit-padding={layout.containerPadding} data-bb-pie-layout-motion="geometry"
+      onPointerDownCapture={event => { gesture.current = event.isPrimary ? {x: event.clientX, y: event.clientY, moved: false} : null }}
+      onPointerMoveCapture={event => {
+        const start = gesture.current
+        if (start && Math.hypot(event.clientX - start.x, event.clientY - start.y) > 8) start.moved = true
+      }}
+      onPointerCancel={() => { gesture.current = null }}
+      onClick={event => {
+        const start = gesture.current
+        gesture.current = null
+        // Slice/callout inspection and keyboard buttons have their own actions.
+        // Never prevent native vertical scrolling or the carousel's swipe.
+        if (!start || start.moved || (event.target as Element).closest('[role="button"],button')) return
+        onToggle()
+      }}
+    >{children}</div>
   )
 }
 
@@ -1756,7 +1758,7 @@ const CategoryMixPieSurface = memo(function CategoryMixPieSurface({ data, layout
             endAngle={PIE_METRIC_END_ANGLE}
             paddingAngle={PIE_METRIC_PADDING_ANGLE}
             isAnimationActive={!reducedMotion}
-            animationInterpolateFn={stablePieAnimation}
+            animationInterpolateFn={categoryRingAnimation}
             animationBegin={0}
             animationDuration={520}
             animationEasing="ease-out"
@@ -2035,8 +2037,8 @@ function useElementSize<T extends HTMLElement>() {
   return [ref, size] as const
 }
 
-function useExpensePieLayout(data: BreakdownItem[], hostSize: ElementSize) {
-  return useCategoryContour(data, hostSize)
+function useExpensePieLayout(data: BreakdownItem[], hostSize: ElementSize, showCallouts = false) {
+  return useCategoryContour(data, hostSize, showCallouts)
 }
 
 const PIE_METRIC_START_ANGLE = 90
@@ -2044,82 +2046,6 @@ const PIE_METRIC_END_ANGLE = -270
 const PIE_METRIC_PADDING_ANGLE = CONTOUR_PADDING_ANGLE
 
 type ExpensePieLayout = ReturnType<typeof useExpensePieLayout>
-
-const PIE_LAYOUT_MOTION_DURATION_MS = 520
-const PIE_LAYOUT_MOTION_SETTLE_MS = 80
-
-type PieLayoutMotionPhase = "idle" | "primed" | "active"
-
-type PieLayoutMotion = {
-  phase: PieLayoutMotionPhase
-  offsetX: number
-  offsetY: number
-  travelX: number
-  travelY: number
-  revision: number
-}
-
-function useExpensePieLayoutMotion(layout: ExpensePieLayout, filter: CategoryMixFilter) {
-  const previousLayoutRef = useRef<{ filter: CategoryMixFilter; cx: number; cy: number } | null>(null)
-  const revisionRef = useRef(0)
-  const [motion, setMotion] = useState<PieLayoutMotion>({
-    phase: "idle",
-    offsetX: 0,
-    offsetY: 0,
-    travelX: 0,
-    travelY: 0,
-    revision: 0,
-  })
-
-  useLayoutEffect(() => {
-    const previous = previousLayoutRef.current
-    previousLayoutRef.current = { filter, cx: layout.cx, cy: layout.cy }
-    if (!previous) {
-      return
-    }
-
-    const offsetX = previous.cx - layout.cx
-    const offsetY = previous.cy - layout.cy
-    if (Math.abs(offsetX) < 0.1 && Math.abs(offsetY) < 0.1) {
-      setMotion((current) => current.phase === "idle"
-        ? current
-        : { ...current, phase: "idle", offsetX: 0, offsetY: 0 })
-      return
-    }
-
-    revisionRef.current += 1
-    const revision = revisionRef.current
-    setMotion({ phase: "primed", offsetX, offsetY, travelX: offsetX, travelY: offsetY, revision })
-
-    let startFrame = 0
-    let activeFrame = 0
-    let completionTimer = 0
-    startFrame = window.requestAnimationFrame(() => {
-      activeFrame = window.requestAnimationFrame(() => {
-        setMotion({ phase: "active", offsetX: 0, offsetY: 0, travelX: offsetX, travelY: offsetY, revision })
-        completionTimer = window.setTimeout(() => {
-          setMotion((current) => current.revision === revision
-            ? { phase: "idle", offsetX: 0, offsetY: 0, travelX: offsetX, travelY: offsetY, revision }
-            : current)
-        }, PIE_LAYOUT_MOTION_DURATION_MS + PIE_LAYOUT_MOTION_SETTLE_MS)
-      })
-    })
-
-    return () => {
-      window.cancelAnimationFrame(startFrame)
-      window.cancelAnimationFrame(activeFrame)
-      window.clearTimeout(completionTimer)
-    }
-  }, [filter])
-
-  useLayoutEffect(() => {
-    if (previousLayoutRef.current?.filter === filter) {
-      previousLayoutRef.current = { filter, cx: layout.cx, cy: layout.cy }
-    }
-  }, [filter, layout.cx, layout.cy])
-
-  return motion
-}
 
 function expensePieLayoutsEqual(previous: ExpensePieLayout, next: ExpensePieLayout) {
   // Worker completion changes callouts, not the sector animation target.

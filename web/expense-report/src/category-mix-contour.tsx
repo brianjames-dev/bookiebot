@@ -4,9 +4,10 @@ import { CONTOUR_STYLE, contourLabel, prepareContourScene, type ContourScene } f
 import type { BreakdownItem } from "./types"
 
 const money = new Intl.NumberFormat("en-US", { style: "currency", currency: "USD", maximumFractionDigits: 0 })
+const percent = new Intl.NumberFormat("en-US", { maximumFractionDigits: 1 })
 let context: CanvasRenderingContext2D | null | undefined
 
-export function prepareCategoryContour(data: BreakdownItem[], width: number, height: number, fontFamily = "Inter, ui-sans-serif, system-ui, sans-serif") {
+export function prepareCategoryContour(data: BreakdownItem[], width: number, height: number, fontFamily = typeof document !== "undefined" && document.body ? window.getComputedStyle(document.body).fontFamily : "system-ui, sans-serif") {
   const labelSize = width < 330 ? 11.5 : CONTOUR_STYLE.labelSize
   if (context === undefined) context = typeof document === "undefined" ? null : document.createElement("canvas").getContext("2d")
   const measure = (text: string, weight: number) => {
@@ -15,15 +16,17 @@ export function prepareCategoryContour(data: BreakdownItem[], width: number, hei
     return context.measureText(text).width
   }
   return prepareContourScene(data.map(item => {
-    const name = contourLabel(item.key, item.label), amountLabel = money.format(item.amount)
-    return { id: item.key, name, amount: item.amount, amountLabel, width: Math.ceil(Math.max(measure(name, 400), measure(amountLabel, 500)) + CONTOUR_STYLE.sidePadding * 2) }
+    const name = contourLabel(item.key, item.label), amountLabel = `${money.format(item.amount)} / ${percent.format(item.percentage)}%`
+    // SVG uses tabular figures; canvas measures proportional figures by default.
+    // Measure zeroes to reserve the full width of the displayed numeric row.
+    return { id: item.key, name, amount: item.amount, amountLabel, width: Math.ceil(Math.max(measure(name, 400), measure(amountLabel.replace(/\d/g, "0"), 500)) + CONTOUR_STYLE.sidePadding * 2) }
   }), width, height)
 }
 
-export function useCategoryContour(data: BreakdownItem[], size: {width: number; height: number}) {
+export function useCategoryContour(data: BreakdownItem[], size: {width: number; height: number}, showCallouts = false) {
   const cache = useRef(new Map<string, ContourScene>()).current
   const width = Math.max(240, size.width || 360), height = Math.max(200, size.height || 396)
-  const key = JSON.stringify([width, height, data.map(item => [item.key, item.label, item.amount])])
+  const key = JSON.stringify([width, height, data.map(item => [item.key, item.label, item.amount, item.percentage])])
   const prepared = useMemo(() => prepareCategoryContour(data, width, height), [key])
   const [result, setResult] = useState<{key: string; scene: ContourScene} | null>(null)
   const cached = cache.get(key)
@@ -59,25 +62,32 @@ export function useCategoryContour(data: BreakdownItem[], size: {width: number; 
     return () => { active = false; worker.terminate() }
   }, [key, prepared, size.width, size.height])
   const scene = cached ?? (result?.key === key ? result.scene : prepared)
+  const radius = Math.max(54, Math.min(width, height) / 2 - 8)
   return useMemo(() => ({
-    cx: scene.cx, cy: scene.cy, outerRadius: scene.radius, innerRadius: scene.inner,
+    cx: showCallouts ? scene.cx : width / 2, cy: showCallouts ? scene.cy : height / 2,
+    outerRadius: showCallouts ? scene.radius : radius,
+    innerRadius: showCallouts ? scene.inner : Math.max(8, radius - CONTOUR_STYLE.thickness),
     margin: {top: 0, right: 0, bottom: 0, left: 0}, containerPadding: scene.style.inset,
     showLabels: false, contour: scene, contourKey: key, calloutsReady: settledKey === key,
-  }), [scene, key, settledKey])
+  }), [scene, key, settledKey, showCallouts])
 }
 
-export function CategoryContourCallouts({scene, data, ready}: {scene: ContourScene; data: BreakdownItem[]; ready: boolean}) {
+export function CategoryContourCallouts({scene, data, ready, visible, onInspect}: {scene: ContourScene; data: BreakdownItem[]; ready: boolean; visible: boolean; onInspect: (item: BreakdownItem) => void}) {
   const colors = new Map(data.map(item => [item.key, item.color]))
   return (
-    <svg className="bb-contour-callouts" viewBox={`0 0 ${scene.width} ${scene.height}`} width={scene.width} height={scene.height} aria-hidden="true" data-ready={ready && Boolean(scene.routes)}>
+    <svg className="bb-contour-callouts" viewBox={`0 0 ${scene.width} ${scene.height}`} width={scene.width} height={scene.height} aria-hidden={!visible || !ready} data-visible={visible} data-ready={ready && Boolean(scene.routes)}>
       {ready ? scene.curvedRoutes?.map(route => <path key={route.id} className="bb-contour-stem" data-category={route.id} data-anchor={route.edge} d={route.d} stroke={colors.get(route.id)} />) : null}
       {ready && scene.routes ? scene.items.map(item => {
         const top = item.y - item.height / 2, x = item.x + item.width / 2
         const route = scene.routes?.find(route => route.id === item.id), end = route?.points[route.points.length - 1]
-        return <g key={item.id} className="bb-contour-label" data-category={item.id}>
+        const target = data.find(row => row.key === item.id)!
+        const [amount, share] = item.amountLabel.split(" / ")
+        return <g key={item.id} className="bb-contour-label" data-category={item.id} role="button" tabIndex={visible ? 0 : -1}
+          aria-label={`Inspect ${target.label}, ${money.format(target.amount)}, ${percent.format(target.percentage)}% of ring`}
+          onClick={() => onInspect(target)} onKeyDown={event => { if (event.key === "Enter" || event.key === " ") { event.preventDefault(); onInspect(target) } }}>
           <rect x={item.x} y={top} width={item.width} height={item.height} rx={Math.min(scene.style.calloutRadius, item.height / 2)} />
           <text className="bb-contour-name" textAnchor="middle" x={x} y={top + item.padding + scene.style.labelSize} fontSize={scene.style.labelSize} fill={item.id === "left" ? undefined : colors.get(item.id)}>{item.name}</text>
-          <text className="bb-contour-amount" textAnchor="middle" x={x} y={top + item.padding + 2 * item.lineHeight - 1} fontSize={item.valueSize}>{item.amountLabel}</text>
+          <text className="bb-contour-amount" textAnchor="middle" x={x} y={top + item.padding + 2 * item.lineHeight - 1} fontSize={item.valueSize}><tspan>{amount}</tspan><tspan className="bb-contour-percent">{` / ${share}`}</tspan></text>
           {end ? <circle cx={end[0]} cy={end[1]} r={1.6} fill={colors.get(item.id)} /> : null}
         </g>
       }) : null}

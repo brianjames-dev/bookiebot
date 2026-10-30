@@ -1,6 +1,6 @@
 import { type AnimationInterpolateFn, type BarRectangleItem, type BarShapeProps, type PieSectorDataItem, type PieSectorShapeProps } from "recharts"
 
-type PieGeometry = Pick<PieSectorDataItem, "startAngle" | "endAngle">
+type PieGeometry = Pick<PieSectorDataItem, "startAngle" | "endAngle"> & Partial<Pick<PieSectorDataItem, "cx" | "cy" | "innerRadius" | "outerRadius">>
 type BarGeometry = Pick<BarRectangleItem, "x" | "y" | "width" | "height">
 export type AnimatedPieSector = PieSectorShapeProps & { animationGeometry?: PieGeometry }
 type AnimatedBarRectangle = BarRectangleItem & { animationGeometry?: BarGeometry }
@@ -24,6 +24,24 @@ export const stablePieAnimation: AnimationInterpolateFn<PieSectorDataItem, "cent
     const startAngle = angle + padding
     angle = angle + span + padding
     return [{ ...next, animationGeometry: { startAngle, endAngle: angle } }]
+  })
+}
+
+// Keep the angle animation above, and morph the ring's position and size in
+// the same frame. Interrupted toggles resume from what is actually on screen.
+export const categoryRingAnimation: AnimationInterpolateFn<PieSectorDataItem, "centric" | "radial"> = (items, progress, layout) => {
+  const sectors = stablePieAnimation(items, progress, layout) as AnimatedPieSector[]
+  const matched = items?.filter(item => item.status !== "removed") ?? []
+  return sectors.map((sector, index) => {
+    const item = matched[index]
+    if (item.status !== "matched") return sector
+    const previous = item.prev as AnimatedPieSector
+    const geometry = { ...sector.animationGeometry! }
+    for (const key of ["cx", "cy", "innerRadius", "outerRadius"] as const) {
+      const from = previous.animationGeometry?.[key] ?? previous[key]
+      geometry[key] = interpolate(from, item.next[key], progress)
+    }
+    return { ...sector, animationGeometry: geometry }
   })
 }
 

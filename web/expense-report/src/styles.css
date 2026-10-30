@@ -1756,31 +1756,17 @@ button.bb-left-categories { cursor: pointer; }
   text-align: center;
   color: hsl(var(--muted-foreground));
   font-size: 12px;
-  pointer-events: none;
-  transform: translate(calc(-50% + var(--bb-pie-layout-offset-x, 0px)), calc(-50% + var(--bb-pie-layout-offset-y, 0px)));
+  border: 0;
+  padding: 8px 0;
+  background: transparent;
+  font-family: inherit;
+  cursor: pointer;
+  transform: translate(-50%, -50%);
+  transition: left 520ms ease-out, top 520ms ease-out, width 520ms ease-out;
 }
 .bb-category-used { color: hsl(var(--foreground)); font-size: 32px; font-weight: 500; line-height: 1.1; letter-spacing: -.04em; font-variant-numeric: tabular-nums; }
 
-.bb-category-pie-host .recharts-pie {
-  transform: translate(
-    var(--bb-pie-layout-offset-x, 0px),
-    var(--bb-pie-layout-offset-y, 0px)
-  );
-  transform-box: view-box;
-  transform-origin: 0 0;
-}
 
-.bb-category-pie-host[data-bb-pie-layout-motion="primed"] .recharts-pie,
-.bb-category-pie-host[data-bb-pie-layout-motion="primed"] .bb-category-pie-center {
-  transition: none;
-}
-
-.bb-category-pie-host[data-bb-pie-layout-motion="active"] .recharts-pie,
-.bb-category-pie-host[data-bb-pie-layout-motion="active"] .bb-category-pie-center {
-  pointer-events: none;
-  transition: transform 520ms cubic-bezier(0.22, 1, 0.36, 1);
-  will-change: transform;
-}
 
 .bb-app-avatar {
   width: 36px;
@@ -1995,10 +1981,6 @@ button.bb-left-categories { cursor: pointer; }
 @media (prefers-reduced-motion: reduce) { .bb-report-loading-spinner { animation: none; } }
 
 @media (prefers-reduced-motion: reduce) {
-  .bb-category-pie-host[data-bb-pie-layout-motion="active"] .recharts-pie,
-  .bb-category-pie-host[data-bb-pie-layout-motion="active"] .bb-category-pie-center {
-    transition: none;
-  }
 }
 
 .bb-chart-carousel .bb-chart-box {
@@ -3344,10 +3326,9 @@ button:focus-visible, summary:focus-visible {
 
 .bb-chart-box svg [role="button"] { cursor:pointer; }
 .bb-chart-box svg [role="button"]:focus-visible { outline:2px solid hsl(var(--foreground)) !important; outline-offset:3px; stroke:hsl(var(--foreground)); stroke-width:3px; }
-/* WebKit can preserve focus-visible after a slice tap or dialog dismissal.
-   Keep the keyboard indicator on the slice's curved stroke, without an SVG
-   bounding-box outline appearing around the selected category. */
-.bb-category-chart-box svg [role="button"]:focus-visible { outline: none !important; }
+/* WebKit may retain focus-visible after a touch or dialog dismissal.
+   Category slices keep their exact appearance in every focus state. */
+.bb-category-chart-box svg [role="button"]:focus-visible { outline: none !important; stroke: none !important; stroke-width: 0 !important; }
 
 /* Shared phone settings and update actions. */
 .bb-toolbar-button {
@@ -3372,14 +3353,19 @@ button:focus-visible, summary:focus-visible {
 /* Refined flow shares the existing chart stage and Categories footer. */
 .bb-category-mix-page { row-gap: 0; }
 .bb-category-mix-page .bb-category-chart-layout { max-width: none; width: calc(100% + 2 * var(--bb-chart-page-gutter)); margin-inline: calc(-1 * var(--bb-chart-page-gutter)); }
-.bb-contour-callouts { position: absolute; inset: 0; width: 100%; height: 100%; overflow: visible; pointer-events: none; }
+.bb-contour-callouts { position: absolute; inset: 0; width: 100%; height: 100%; overflow: visible; pointer-events: none; opacity: 0; visibility: hidden; transition: opacity 220ms ease-out, visibility 0s 220ms; }
+.bb-contour-callouts[data-visible="true"][data-ready="true"] { opacity: 1; visibility: visible; transition-delay: 180ms; }
+.bb-contour-callouts[data-visible="true"][data-ready="true"] .bb-contour-label { pointer-events: auto; }
+.bb-category-pie-center:focus-visible { outline: 2px solid hsl(var(--primary)); outline-offset: 4px; border-radius: 12px; }
+.bb-category-pie-host[data-callouts="false"] .bb-category-used { font-size: 40px; }
+.bb-category-pie-host .bb-category-used { transition: font-size 520ms ease-out; }
 .bb-contour-stem { fill: none; stroke-width: 1.2px; stroke-linecap: round; opacity: .65; }
 .bb-contour-label rect { fill: color-mix(in srgb, hsl(var(--foreground)) 5%, hsl(var(--card))); }
+.bb-contour-label:focus-visible rect { stroke: hsl(var(--primary)); stroke-width: 1px; }
 .bb-contour-name { font-weight: 400; }
 .bb-contour-name:not([fill]) { fill: hsl(var(--muted-foreground)); }
 .bb-contour-amount { fill: hsl(var(--foreground)); font-weight: 500; font-variant-numeric: tabular-nums; }
-.bb-contour-label, .bb-contour-stem { animation: bb-contour-enter 180ms ease-out both; }
-@keyframes bb-contour-enter { from { opacity: 0; } }
-@media (prefers-reduced-motion: reduce) { .bb-contour-label, .bb-contour-stem { animation: none; } }
+.bb-contour-percent { fill: hsl(var(--muted-foreground)); font-weight: 400; }
+@media (prefers-reduced-motion: reduce) { .bb-contour-callouts, .bb-category-pie-center, .bb-category-pie-host .bb-category-used { transition: none; } }
 
 @media (min-width: 700px) { .bb-category-mix-page .bb-category-chart-layout { width: min(100%, 620px); margin-inline: auto; } }

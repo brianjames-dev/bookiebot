@@ -12,7 +12,7 @@ const {prepareContourScene, refineContourScene, contourLabel, CONTOUR_STYLE} = l
 const {createContourPathProbe} = load('category-mix-path')
 const raw = [['rent','Rent',2500],['bills','Bills & Utilities',380],['needs-subscriptions','Subscriptions (Needs)',180],['need','Need transactions',650],['grocery','Grocery',680],['gas','Gas',250],['food','Food',1329.32],['shopping','Shopping',540],['wants-subscriptions','Subscriptions (Wants)',160],['savings','Cash saved',1596.62],['espp','SpaceX ESPP',400],['left','Income left',1317.14]]
 const measure = (text, size) => text.length * size * .56
-function input(rows, width) { const size=width<330?11.5:12; return rows.map(([id,label,amount])=>{const name=contourLabel(id,label),amountLabel=new Intl.NumberFormat('en-US',{style:'currency',currency:'USD',maximumFractionDigits:0}).format(amount);return {id,name,amount,amountLabel,width:Math.ceil(Math.max(measure(name,size),measure(amountLabel,size))+12)}}) }
+function input(rows, width) { const size=width<330?11.5:12; return rows.map(([id,label,amount])=>{const name=contourLabel(id,label),amountLabel=new Intl.NumberFormat('en-US',{style:'currency',currency:'USD',maximumFractionDigits:0}).format(amount)+' / '+new Intl.NumberFormat('en-US',{maximumFractionDigits:1}).format(amount/rows.reduce((sum,row)=>sum+Math.max(0,row[2]),0)*100)+'%';return {id,name,amount,amountLabel,width:Math.ceil(Math.max(measure(name,size),measure(amountLabel,size))+12)}}) }
 assert.equal(CONTOUR_STYLE.diameter,220);assert.equal(CONTOUR_STYLE.thickness,26);assert.equal(CONTOUR_STYLE.drift,23)
 assert.equal(contourLabel('needs-subscriptions','Subscriptions (Needs)'),'Needs subs')
 assert.equal(contourLabel('wants-subscriptions','Subscriptions (Wants)'),'Wants subs')
@@ -26,7 +26,7 @@ function validate(scene) {
   for(let i=0;i<scene.items.length;i++) {
     const a=scene.items[i]
     assert.ok(a.x>=9.9&&a.x+a.width<=scene.width-9.9&&a.y-a.height/2>=9.9&&a.y+a.height/2<=scene.height-9.9,'Labels fit the actual host')
-    assert.ok(/^\$[\d,]+$/.test(a.amountLabel),'Only callout amounts use whole-dollar formatting')
+    assert.ok(/^\$[\d,]+ \/ [\d.]+%$/.test(a.amountLabel),'Only callout amounts use whole-dollar formatting')
     for(const b of scene.items.slice(i+1))assert.ok(a.x+a.width+scene.style.labelGap-.2<=b.x||b.x+b.width+scene.style.labelGap-.2<=a.x||a.y+a.height/2+scene.style.labelGap-.2<=b.y-b.height/2||b.y+b.height/2+scene.style.labelGap-.2<=a.y-a.height/2,'Callout containers never overlap')
   }
   const probe=createContourPathProbe(),sampled=[]

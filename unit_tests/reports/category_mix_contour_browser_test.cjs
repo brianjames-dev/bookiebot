@@ -41,7 +41,23 @@ for(const view of Object.values(report.modeViews)) {
     const start=Date.now();await page.goto('https://bookie.test/report')
     const category=page.locator('#bb-chart-category')
     await page.getByRole('button',{name:'Show Category Mix',exact:true}).click()
+    await category.getByRole('button',{name:'Show category callouts',exact:true}).waitFor()
+    await page.waitForTimeout(700)
+    const large=await category.evaluate(el=>({ring:el.querySelector('.recharts-pie').getBoundingClientRect().width,host:el.querySelector('.bb-category-pie-host').getBoundingClientRect().width,opacity:getComputedStyle(el.querySelector('.bb-contour-callouts')).opacity,font:getComputedStyle(el.querySelector('.bb-category-used')).fontSize}))
+    assert.equal(large.opacity,'0','Callouts stay hidden until deliberately requested');assert.equal(large.font,'40px')
+    await category.screenshot({path:`/private/tmp/category-ring-large-${engine.name()}-${width}-${dark?'dark':'light'}.png`})
+    await category.getByRole('button',{name:'Show category callouts',exact:true}).click()
     await category.locator('.bb-contour-callouts[data-ready="true"]').waitFor({timeout:120000})
+    if(!dark){
+     await page.waitForTimeout(100)
+     const during=(await category.locator('.recharts-pie').boundingBox()).width
+     assert.ok(during<large.ring&&during>150,'The ring visibly interpolates its radius instead of snapping')
+     await category.getByRole('button',{name:'Hide category callouts',exact:true}).click()
+     await page.waitForTimeout(80)
+     await category.getByRole('button',{name:'Show category callouts',exact:true}).click()
+    }
+    await page.waitForTimeout(700)
+    assert.ok((await category.locator('.recharts-pie').boundingBox()).width<large.ring,'The ring shrinks to make room for callouts')
     console.log(engine.name(),width,dark?'dark':'light','first-layout-ms',Date.now()-start)
     const originalHeight=(await page.locator('.bb-chart-carousel-band').boundingBox()).height
     for(const filter of (process.env.BOOKIEBOT_CONTOUR_PREVIEW?['all']:['all','needs','wants','savings'])) {
@@ -56,13 +72,13 @@ for(const view of Object.values(report.modeViews)) {
       for(let i=0;i<boxes.length;i++)for(const b of boxes.slice(i+1)){const a=boxes[i].box,c=b.box;if(a.x<c.x+c.width+5&&a.x+a.width>c.x-5&&a.y<c.y+c.height+5&&a.y+a.height>c.y-5)overlap=true}
       for(const p of paths){const pts=[];for(let at=0;at<=p.getTotalLength();at+=.9){const point=p.getPointAtLength(at);pts.push([point.x,point.y]);for(const b of boxes){if(b.id===p.dataset.category)continue;const r=Math.min(18,b.box.height/2),qx=Math.abs(point.x-b.box.x-b.box.width/2)-b.box.width/2+r,qy=Math.abs(point.y-b.box.y-b.box.height/2)-b.box.height/2+r;if(Math.hypot(Math.max(qx,0),Math.max(qy,0))+Math.min(Math.max(qx,qy),0)-r<.5)intrusion={stem:p.dataset.category,box:b.id}}}samples.push({id:p.dataset.category,pts});byId.set(p.dataset.category,p)}
       const cells=new Map();for(const route of samples)for(const p of route.pts){const x=Math.floor(p[0]/4),y=Math.floor(p[1]/4);for(let dx=-1;dx<=1;dx++)for(let dy=-1;dy<=1;dy++)for(const q of cells.get(`${x+dx},${y+dy}`)||[])if(q.id!==route.id)minSeparation=Math.min(minSeparation,Math.hypot(q.p[0]-p[0],q.p[1]-p[1]));const key=`${x},${y}`;if(!cells.has(key))cells.set(key,[]);cells.get(key).push({id:route.id,p})}
-      return {hostCenter:(host.left+host.right)/2,ringWidth:el.querySelector(".recharts-pie").getBoundingClientRect().width,paths:paths.length,labels:labels.length,overlap,intrusion,minSeparation,curved:paths.every(p=>/[CQ]/.test(p.getAttribute('d'))),fits:boxes.every(({box:b})=>b.x>=0&&b.y>=0&&b.x+b.width<=host.width+.1&&b.y+b.height<=host.height+.1),whole:labels.every(label=>/^\$[\d,]+$/.test(label.querySelector('.bb-contour-amount').textContent)),centered:labels.every(label=>{const b=label.querySelector('rect').getBBox();return Math.abs(Number(label.querySelector('.bb-contour-name').getAttribute('x'))-b.x-b.width/2)<.1}),matched:labels.every(label=>label.dataset.category==='left'||getComputedStyle(label.querySelector('.bb-contour-name')).fill===getComputedStyle(byId.get(label.dataset.category)).stroke),textFits:labels.every(label=>label.querySelector('.bb-contour-name').getBBox().width<=label.querySelector('rect').getBBox().width-7),nameFont:labels.map(label=>getComputedStyle(label.querySelector('.bb-contour-name')).fontSize),percentFont:getComputedStyle(el.querySelector('.bb-category-used')).fontSize,captionFits:el.querySelector('.bb-category-pie-center > span').getBoundingClientRect().width<=center.width,hostWidth:host.width,hostHeight:host.height,names:labels.map(label=>label.querySelector('.bb-contour-name').textContent),overflow:document.documentElement.scrollWidth>innerWidth}
+      return {hostCenter:(host.left+host.right)/2,ringWidth:el.querySelector(".recharts-pie").getBoundingClientRect().width,paths:paths.length,labels:labels.length,overlap,intrusion,minSeparation,curved:paths.every(p=>/[CQ]/.test(p.getAttribute('d'))),fits:boxes.every(({box:b})=>b.x>=0&&b.y>=0&&b.x+b.width<=host.width+.1&&b.y+b.height<=host.height+.1),textSizes:labels.map(label=>({name:label.querySelector('.bb-contour-name').textContent,card:label.querySelector('rect').getBBox().width,amount:label.querySelector('.bb-contour-amount').getBBox().width})),dimmed:labels.every(label=>getComputedStyle(label.querySelector('.bb-contour-percent')).fill!==getComputedStyle(label.querySelector('.bb-contour-amount')).fill),whole:labels.every(label=>/^\$[\d,]+ \/ [\d.]+%$/.test(label.querySelector('.bb-contour-amount').textContent)),centered:labels.every(label=>{const b=label.querySelector('rect').getBBox();return Math.abs(Number(label.querySelector('.bb-contour-name').getAttribute('x'))-b.x-b.width/2)<.1}),matched:labels.every(label=>label.dataset.category==='left'||getComputedStyle(label.querySelector('.bb-contour-name')).fill===getComputedStyle(byId.get(label.dataset.category)).stroke),textFits:labels.every(label=>['.bb-contour-name','.bb-contour-amount'].every(selector=>label.querySelector(selector).getBBox().width<=label.querySelector('rect').getBBox().width-7)),nameFont:labels.map(label=>getComputedStyle(label.querySelector('.bb-contour-name')).fontSize),percentFont:getComputedStyle(el.querySelector('.bb-category-used')).fontSize,captionFits:el.querySelector('.bb-category-pie-center > span').getBoundingClientRect().width<=center.width,hostWidth:host.width,hostHeight:host.height,names:labels.map(label=>label.querySelector('.bb-contour-name').textContent),overflow:document.documentElement.scrollWidth>innerWidth}
      })
      assert.equal(geometry.paths,geometry.labels,JSON.stringify(geometry));assert.ok(geometry.labels>0,JSON.stringify(geometry))
-     for(const key of ['curved','fits','whole','centered','matched','textFits','captionFits'])assert.equal(geometry[key],true,JSON.stringify({engine:engine.name(),width,filter,key,geometry}))
+     for(const key of ['curved','fits','dimmed','whole','centered','matched','textFits','captionFits'])assert.equal(geometry[key],true,JSON.stringify({engine:engine.name(),width,filter,key,geometry}))
      assert.equal(geometry.overlap,false,JSON.stringify(geometry));assert.equal(geometry.intrusion,null,JSON.stringify(geometry));assert.ok(geometry.minSeparation>=1.4,JSON.stringify(geometry));assert.equal(geometry.overflow,false)
      assert.ok(Math.abs(geometry.hostCenter-width/2)<1,'The labeled ring stays centered in the page');assert.equal(geometry.percentFont,'32px');assert.equal((await page.locator('.bb-chart-carousel-band').boundingBox()).height,originalHeight)
-     if(filter==='all'){if(width===390)assert.ok(Math.abs(geometry.ringWidth-220)<1,'The selected ring diameter is retained');assert.equal(geometry.paths,12);assert.ok(geometry.names.includes('Other needs'));assert.ok(geometry.names.includes('Bills & utils'));assert.ok(geometry.names.includes('Needs subs'));assert.ok(geometry.names.includes('Wants subs'))}
+     if(filter==='all'){if(width===390)assert.ok(geometry.ringWidth<=221&&geometry.ringWidth>150,'The compact ring fits the percentage callouts');assert.equal(geometry.paths,12);assert.ok(geometry.names.includes('Other needs'));assert.ok(geometry.names.includes('Bills & utils'));assert.ok(geometry.names.includes('Needs subs'));assert.ok(geometry.names.includes('Wants subs'))}
      count++
     }
     await category.getByRole('combobox',{name:'Category mix filter',exact:true}).selectOption('all')
@@ -70,6 +86,30 @@ for(const view of Object.values(report.modeViews)) {
     await category.getByRole('button',{name:'Categories',exact:true}).click();const dialog=page.getByRole('dialog');await dialog.waitFor()
     assert.ok((await dialog.innerText()).includes('$1,329.32'),'The modal retains exact cents')
     await page.keyboard.press('Escape');await page.waitForTimeout(350)
+    assert.equal(await category.locator('.bb-category-pie-host').getAttribute('data-callouts'),'true','Opening unrelated dialogs preserves the explicit callout state')
+    const foodCard=category.locator('.bb-contour-label[data-category="food"]')
+    assert.match(await foodCard.textContent(),/\$1,329 \/ 13\.3%/,'Amounts include the same percentage as the Categories list')
+    await foodCard.click();await page.getByRole('dialog').waitFor()
+    assert.match(await page.getByRole('dialog').innerText(),/Food/)
+    await page.keyboard.press('Escape');await page.waitForTimeout(350)
+    const foodSlice=category.locator('.recharts-sector[aria-label="Inspect Food, $1,329.32"]')
+    await foodSlice.click();await page.getByRole('dialog').waitFor()
+    assert.match(await page.getByRole('dialog').innerText(),/Food/)
+    await page.keyboard.press('Escape');await page.waitForTimeout(350)
+    assert.equal(await category.locator('.bb-category-pie-host').getAttribute('data-callouts'),'true','Inspecting a slice or callout never toggles visibility')
+    const focus=await foodSlice.evaluate(el=>{el.focus();const css=getComputedStyle(el);return {outline:css.outlineStyle,stroke:css.stroke,width:css.strokeWidth}})
+    assert.equal(focus.outline,'none');assert.equal(focus.stroke,'none');assert.equal(focus.width,'0px','Touch/dialog focus cannot add a selection stroke')
+    const hostBox=await category.locator('.bb-category-pie-host').boundingBox()
+    await page.touchscreen.tap(hostBox.x+3,hostBox.y+3)
+    await page.waitForTimeout(700)
+    assert.equal(await category.locator('.bb-category-pie-host').getAttribute('data-callouts'),'false','Tapping empty chart background hides the callouts')
+    assert.ok(Math.abs((await category.locator('.recharts-pie').boundingBox()).width-large.ring)<1,'Hiding callouts restores the original full-size ring')
+    await page.mouse.move(hostBox.x+3,hostBox.y+3);await page.mouse.down();await page.mouse.move(hostBox.x+3,hostBox.y+40,{steps:6});await page.mouse.up()
+    assert.equal(await category.locator('.bb-category-pie-host').getAttribute('data-callouts'),'false','A vertical drag never toggles')
+    await category.getByRole('button',{name:'Show category callouts',exact:true}).focus();await page.keyboard.press('Enter')
+    await page.waitForTimeout(700)
+    assert.equal(await category.locator('.bb-category-pie-host').getAttribute('data-callouts'),'true','The center toggle works from the keyboard')
+    await foodCard.focus();await page.keyboard.press('Enter');await page.getByRole('dialog').waitFor();await page.keyboard.press('Escape');await page.waitForTimeout(350)
     await category.locator('.bb-chart-kicker').click()
     await category.screenshot({path:`/private/tmp/refined-flow-${engine.name()}-${width}-${dark?'dark':'light'}.png`})
     assert.deepEqual(errors,[]);assert.deepEqual(unexpected,[],'Only the public local geometry worker is requested')

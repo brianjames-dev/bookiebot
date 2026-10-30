@@ -5,15 +5,17 @@ import subprocess
 import pytest
 
 
-def test_category_pie_focus_uses_the_slice_stroke_without_a_selection_box():
+def test_category_pie_never_adds_a_focus_outline_or_stroke():
     root = Path(__file__).resolve().parents[2]
     styles = (root / "web/expense-report/src/styles.css").read_text()
     chart_focus = styles.split('.bb-chart-box svg [role="button"]:focus-visible {', 1)[1].split("}", 1)[0]
     pie_focus = styles.split('.bb-category-chart-box svg [role="button"]:focus-visible {', 1)[1].split("}", 1)[0]
 
-    # Safari may retain :focus-visible for touch and after restoring dialog
-    # focus. Its SVG outline is rectangular; a sector stroke follows the data.
+    # Safari retains focus after touch/dialog dismissal. Category slices must
+    # never acquire an outline or focus stroke. Other charts keep theirs.
     assert "outline: none !important;" in pie_focus
+    assert "stroke: none !important;" in pie_focus
+    assert "stroke-width: 0 !important;" in pie_focus
     assert "stroke:hsl(var(--foreground));" in chart_focus
     assert "stroke-width:3px;" in chart_focus
 
@@ -54,7 +56,7 @@ def test_original_chart_animations_reuse_shapes_on_animation_frames():
     )
 
 
-@pytest.mark.parametrize("script", ["category_mix_contour_test.cjs", "category_mix_worker_test.cjs"])
+@pytest.mark.parametrize("script", ["category_mix_contour_test.cjs", "category_mix_worker_test.cjs", "category_mix_toggle_test.cjs"])
 def test_refined_flow_fits_live_category_rows_and_keeps_stems_separate(script):
     root = Path(__file__).resolve().parents[2]
     if not shutil.which("node") or not (root / "web/expense-report/node_modules/typescript").exists():

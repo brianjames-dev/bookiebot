@@ -14,16 +14,22 @@ const prepared=(data,width,height)=>({cx:width/2,cy:height/2,radius:110,inner:84
 const runtime={exports:{},Worker,window,require:name=>{
  if(name==='react'||name==='react/jsx-runtime')return req(name)
  if(name.includes('?worker&url'))return {default:'/category-mix-layout-test.js'}
- if(name==='./category-mix-layout')return {CONTOUR_STYLE:{labelSize:12,sidePadding:6},contourLabel:(_key,label)=>label,prepareContourScene:prepared}
+ if(name==='./category-mix-layout')return {CONTOUR_STYLE:{labelSize:12,sidePadding:6,thickness:26},contourLabel:(_key,label)=>label,prepareContourScene:prepared}
  throw new Error(name)
 }}
 vm.runInNewContext(ts.transpileModule(fs.readFileSync('web/expense-report/src/category-mix-contour.tsx','utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2020,jsx:ts.JsxEmit.ReactJSX}}).outputText,runtime)
 const useContour=runtime.exports.useCategoryContour
-function Host({data,size}){return React.createElement('output',{layout:useContour(data,size)})}
-const data=[{key:'food',label:'Food',amount:12.99,color:'orange'}],size={width:390,height:396},act=Renderer.act
+function Host({data,size,shown=false}){return React.createElement('output',{layout:useContour(data,size,shown)})}
+const data=[{key:'food',label:'Food',amount:12.99,percentage:100,color:'orange'}],size={width:390,height:396},act=Renderer.act
 let tree
 try {
  act(()=>{tree=Renderer.create(React.createElement(Host,{data,size}))})
+ assert.equal(tree.root.findByType('output').props.layout.outerRadius,187,'Default ring fills the chart');
+ assert.equal(tree.root.findByType('output').props.layout.innerRadius,161,'Large ring preserves the current 26px band');
+ act(()=>tree.update(React.createElement(Host,{data,size,shown:true})))
+ assert.equal(tree.root.findByType('output').props.layout.outerRadius,110,'Showing callouts uses the compact Refined flow ring');
+ assert.match(workers[0].scene.items[0].amountLabel,/\$13 \/ 100%/,'Callouts include the ring percentage beside whole-dollar amounts');
+ assert.equal(workers.length,1,'Toggling uses the same background worker, without restarting geometry');
  assert.equal(workers.length,1);assert.equal(workers[0].url,'/app/assets/category-mix-layout-test.js');assert.equal(workers[0].options.type,'module')
  act(()=>tree.update(React.createElement(Host,{data:[{...data[0]}],size:{...size}})))
  assert.equal(workers.length,1,'Equivalent report refreshes reuse the existing request')
@@ -64,3 +70,17 @@ vm.runInNewContext(ts.transpileModule(equal.getText(file)+'\nexports.equal=expen
 const geometry={cx:195,cy:178,innerRadius:84,outerRadius:110}
 assert.equal(equality.exports.equal({...geometry,contour:{routes:null}},{...geometry,contour:{routes:[{}]}}),true,'Worker completion must not restart the unchanged sector morph')
 assert.equal(equality.exports.equal(geometry,{...geometry,outerRadius:105}),false,'A real host resize still updates sector geometry')
+
+const {CategoryContourCallouts}=runtime.exports
+const calls=[]
+const scene={width:390,height:396,style:{labelSize:12,calloutRadius:18},routes:[],curvedRoutes:[],items:[{id:'food',name:'Eating out',amountLabel:'$13 / 100%',x:20,y:25,width:110,height:34,padding:4,lineHeight:13,valueSize:12}]}
+try{
+ act(()=>{tree=Renderer.create(React.createElement(CategoryContourCallouts,{scene,data,ready:true,visible:true,onInspect:item=>calls.push(item)}))})
+ let card=tree.root.findByProps({role:'button'})
+ assert.equal(card.props.tabIndex,0);assert.match(card.props['aria-label'],/Food.*100% of ring/)
+ card.props.onClick();assert.equal(calls.pop(),data[0],'A callout opens the exact same current category as its slice')
+ for(const key of ['Enter',' ']){let prevented=false;card.props.onKeyDown({key,preventDefault(){prevented=true}});assert.ok(prevented);assert.equal(calls.pop(),data[0])}
+ act(()=>tree.update(React.createElement(CategoryContourCallouts,{scene,data,ready:true,visible:false,onInspect:item=>calls.push(item)})))
+ assert.equal(tree.root.findByType('svg').props['aria-hidden'],true)
+ assert.equal(tree.root.findByProps({role:'button'}).props.tabIndex,-1,'Hidden callouts leave the keyboard and accessibility order')
+}finally{if(tree)act(()=>tree.unmount())}

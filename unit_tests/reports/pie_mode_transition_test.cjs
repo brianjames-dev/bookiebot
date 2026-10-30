@@ -40,7 +40,7 @@ const observed = []
 const runtime = {
   exports: {}, require: req, memo: React.memo,
   useMediaQuery: () => !animate,
-  stablePieAnimation: undefined,
+  categoryRingAnimation: undefined,
   ResponsiveContainer: ({ children }) => children,
   PieChart: props => React.createElement(Recharts.PieChart, { ...props, width: 400, height: 320, compact: true }),
   Pie: props => React.createElement(Recharts.Pie, { ...props, zIndex: 0, isAnimationActive: animate }),
