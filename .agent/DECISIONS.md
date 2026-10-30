@@ -1,5 +1,11 @@
 # Agent Decisions
 
+## 2026-10-29 - Compare The Spent Basis Over Matching Days
+
+The user explicitly retains day-matched comparisons while aligning their definition with expense-only Spent. Begin with each month’s canonical active-mode totalExpenses, then subtract only known dated transactions and scheduled expenses after the common cutoff. This preserves signed sheet adjustments and excludes savings/ESPP without rebuilding a different spending definition. Keep existing Pacific elapsed-day, shorter-month, leap-day and historical/current-baseline clipping. Current/Projected applies to both months, including the dated subscription schedule and Projected-only expected bills.
+
+The user explicitly chooses to include recorded undated bills and sheet adjustments in full in each month. Do not fabricate payment dates from a bill schedule; mark timing coverage partial and add includes undated costs to the mode/day caption. Shortened windows can differ from full-month headlines; full-month windows must match exactly. Retain the selected morphing panel, no Details, picker and refresh/retry lifecycle. Cache results by month and mode within the report generation and keep one request in flight across mode changes. Annual comparison reads retain canonical expense metrics and same-year budget history from their existing four HTTP reads; preserve refresh invalidation/identity guards. Keep the previous response for installed clients that omit mode, whose existing caption still describes dated-only comparisons. No schema, writers, savings/Left accounting or Finance Ops backlog changes. Native acceptance is checklist 192; this supersedes the comparison exclusion rule retained by 190/191.
+
 ## 2026-10-29 - Exclude Savings From Spent And Keep The Allocation Ring
 
 The user reverses the earlier savings-in-Spent choice: every Spent headline and explanation now uses canonical totalExpenses alone. Cash savings and actual/estimated ESPP stay in Saved; do not add those funds back to Left or change category balances, goals, targets, income, comparison windows, sheet records or writers. The frontend and read-only agent headline use the canonical expense value even with an older explanation in a report. Preserve sheet adjustments separately from savings and move estimated-ESPP context into the Saved explanation.

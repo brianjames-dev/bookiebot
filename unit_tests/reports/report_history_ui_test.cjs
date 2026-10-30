@@ -37,6 +37,7 @@ function harness() {
     init.signal.addEventListener("abort", () => reject(new Error("aborted")), { once: true })
   })
   const require = name => name === "react" ? hooks : name.endsWith(".css") ? {}
+    : name === "./app-navigation" ? {useAppNavigation: () => null}
     : name.startsWith("./components") ? { SlidingSelection: "selection", FittedAmount: "amount", MonthPicker: "month-picker" } : req(name)
   const source = ts.transpileModule(fs.readFileSync("web/expense-report/src/report-history.tsx", "utf8"), {
     compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2020, jsx: ts.JsxEmit.ReactJSX },
@@ -114,6 +115,7 @@ async function main() {
   const React = req("react")
   const renderer = req("react-test-renderer")
   const calls = [], timers = new Map()
+  let mode = "current"
   let timerId = 0, ignoreAbort = false
   const runtime = { exports: {}, AbortController, Intl, Date,
     setTimeout(fn, delay) { const id = ++timerId; timers.set(id, { fn, delay }); return id },
@@ -123,6 +125,7 @@ async function main() {
       init.signal.addEventListener("abort", () => { if (!ignoreAbort) reject(new Error("aborted")) }, { once: true })
     }),
     require: name => name === "react" ? React : name.endsWith(".css") ? {}
+      : name === "./app-navigation" ? {useAppNavigation: () => ({preferences: {mode}})}
       : name.startsWith("./components") ? {
         FittedAmount: ({children, className}) => React.createElement("span", {className}, children),
         MonthPicker: ({ label, ...props }) => React.createElement("test-month-picker", { "aria-label":label, ...props }),
@@ -143,7 +146,7 @@ async function main() {
     || item.findAllByType("span").some(span => span.children.join("") === label))
   const click = label => renderer.act(() => findButton(label).props.onClick())
   const selectMonth = value => renderer.act(() => tree.root.findByProps({"aria-label":"Comparison month"}).props.onSelect(value))
-  const period = amount => ({datedSpending:amount,undatedSpending:0,scheduledSpending:0,unitemizedSpending:0,complete:true})
+  const period = amount => ({spending:amount,complete:true})
   // Distinct dollar amounts identify response generations even without the
   // removed calculation notes. Stale/cached/refresh assertions inspect real UI.
   const fixtureAmounts = new Map()
@@ -152,7 +155,7 @@ async function main() {
     if (!fixtureAmounts.has(note)) fixtureAmounts.set(note, 25 + fixtureAmounts.size)
     const amount = fixtureAmounts.get(note)
     return {selectedMonth:"2026-09", baselineMonth:baseline,
-      baselineKind:"selected-month", throughDay:7, status:"complete", selected:period(amount),
+      baselineKind:"selected-month", mode, throughDay:7, status:"complete", selected:period(amount),
       baseline:period(50), changeAmount:amount - 50, changePercent:(amount - 50) * 2, coverageNote:note}
   }
   const selectedAmount = () => tree.root.findAllByType("span").find(node => node.props.className === "bb-comparison-amount")?.children.join("")
@@ -190,7 +193,7 @@ async function main() {
   assert.equal(findButton("Compare spending").props["aria-expanded"], true)
   assert.equal(findButton("Compare spending").findByProps({ className: "bb-comparison-chevron" }), comparisonMarker)
   const oldMonth = calls.at(-1)
-  assert.equal(oldMonth.url, "/app/expenses/comparison?month=2026-09&compare_month=2026-08")
+  assert.equal(oldMonth.url, "/app/expenses/comparison?month=2026-09&compare_month=2026-08&mode=current")
   assert.equal(oldMonth.init.cache, "no-store")
   assert.equal(oldMonth.init.credentials, "same-origin")
   assert.ok([...timers.values()].some(timer => timer.delay === 60000), "Paired live builds have a 60s budget")
@@ -208,7 +211,7 @@ async function main() {
   selectMonth("2025-09")
   await finish(oldMonth, 200, result("2026-08", "August completed"))
   assert.equal(calls.length, 2, "Only the latest waiting selection is fetched")
-  assert.equal(calls.at(-1).url, "/app/expenses/comparison?month=2026-09&compare_month=2025-09")
+  assert.equal(calls.at(-1).url, "/app/expenses/comparison?month=2026-09&compare_month=2025-09&mode=current")
   assertNoFixture("August completed", "A superseded reply never displays for the new month")
   await finish(calls.at(-1), 200, result("2025-09", "September completed"))
   assertFixture("September completed")
@@ -286,14 +289,36 @@ async function main() {
 
   report = {...report}
   renderer.act(() => tree.update(component()))
-  const partial = {...result("2026-08", "Undated costs, sheet adjustments and scheduled subscriptions are excluded."),status:"partial",
-    selected:{...period(540.01),undatedSpending:2287.40,scheduledSpending:92.48,unitemizedSpending:-100},
-    baseline:{...period(349.31),undatedSpending:2563.71,scheduledSpending:92.48},changeAmount:190.70,changePercent:54.6}
-  await finish(calls.at(-1), 200, partial)
-  assert.match(read(), /Recorded spending · days 1– 7/)
+  const monthly = {...result("2026-08", "Monthly Spent, including bills and adjustments."),
+    status:"partial", selected:{...period(540.01),complete:false}, baseline:period(349.31),changeAmount:190.70,changePercent:54.6}
+  await finish(calls.at(-1), 200, monthly)
+  assert.match(read(), /Current\s+Spent · days 1– 7\s+· includes undated costs/)
   assert.match(text(tree.root.findByProps({className:"bb-comparison-change"}).props.children), /\$190.70.*54.6.*more spending/)
   assertNoDetails()
-  assert.ok(!read().includes("$2,287.40"), "Excluded amounts are not retained in hidden content")
+
+  const currentCalls = calls.length
+  mode = "projected"
+  renderer.act(() => tree.update(component()))
+  assert.equal(calls.length, currentCalls + 1, "Changing mode requests its own monthly totals")
+  assert.match(calls.at(-1).url, /mode=projected$/)
+  assert.equal(selectedAmount(), undefined, "Current values cannot flash as Projected")
+  const projectedCall = calls.at(-1)
+  mode = "current"
+  renderer.act(() => tree.update(component()))
+  assert.equal(selectedAmount(), money(540.01), "Returning to Current reuses its own result")
+  await finish(projectedCall, 200, result("2026-08", "Late Projected result"))
+  // The failed Projected read must not replace a cached Current result.
+  assert.equal(selectedAmount(), money(540.01))
+  mode = "projected"
+  renderer.act(() => tree.update(component()))
+  assert.match(read(), /Couldn’t load/, "A response labeled with the wrong mode is rejected")
+  click("Try again")
+  await finish(calls.at(-1), 200, result("2026-08", "Projected monthly total"))
+  assertFixture("Projected monthly total")
+  assert.match(read(), /Projected\s+Spent · days 1– 7/)
+  mode = "current"
+  renderer.act(() => tree.update(component()))
+  assert.equal(selectedAmount(), money(540.01))
 
   report = {...report}
   renderer.act(() => tree.update(component()))

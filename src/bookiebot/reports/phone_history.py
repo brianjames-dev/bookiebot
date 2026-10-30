@@ -157,6 +157,9 @@ async def _comparison(request: web.Request) -> web.Response:
         _valid_owner(session)
         current = now_pacific()
         raw_month = request.query.get("month")
+        mode = request.query.get("mode")
+        if mode is not None and mode not in {"current", "projected"}:
+            raise InvalidReportMonthError("Mode must be 'current' or 'projected'.")
         kind = request.query.get("baseline", "previous-month")
         selected_month = parse_phone_report_month(raw_month, current=current)
         raw_baseline = request.query.get("compare_month")
@@ -189,7 +192,13 @@ async def _comparison(request: web.Request) -> web.Response:
             baseline = None
         if await _session(request) is None:
             return _json({"error": "Reconnect this phone using /expense_app in Discord."}, status=401)
-        result = compare_report_periods(selected, baseline, baseline_month=baseline_key, baseline_kind=kind, as_of=current)
+        if mode is None:
+            # Installed older bundles still label these as matching-day totals.
+            result = compare_report_periods(selected, baseline, baseline_month=baseline_key, baseline_kind=kind, as_of=current)
+        else:
+            from bookiebot.reports.report_insights import compare_report_spending
+            result = compare_report_spending(selected, baseline, baseline_month=baseline_key,
+                                           baseline_kind=kind, mode=mode, as_of=current)
         if baseline is None and baseline_month.year in catalog["coverage"]["unavailableYears"]:
             result["coverageNote"] = "The comparison month could not be checked. Please try again shortly."
         return _json(result)

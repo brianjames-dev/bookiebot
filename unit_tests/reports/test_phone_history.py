@@ -166,7 +166,8 @@ async def test_history_endpoints_require_session_and_recheck_revocation(monkeypa
 
 
 @pytest.mark.asyncio
-async def test_refresh_then_comparison_does_not_rebuild_the_just_loaded_month(monkeypatch):
+@pytest.mark.parametrize("mode", [None, "current", "projected"])
+async def test_refresh_then_comparison_does_not_rebuild_the_just_loaded_month(monkeypatch, mode):
     calls = []
     async def session(_request):
         return SESSION
@@ -180,7 +181,10 @@ async def test_refresh_then_comparison_does_not_rebuild_the_just_loaded_month(mo
         if calls.count(9) > 1:
             raise RuntimeError("Synthetic source read budget exceeded")
         return {"ownerName": payload["owner_name"], "year": payload["year"], "month": payload["month"],
+                "modeViews": {"current": {"metrics": {"totalExpenses": 2000 + payload["month"]}},
+                              "projected": {"metrics": {"totalExpenses": 2200 + payload["month"]}}},
                 "comparisonData": {"recordedExpenses": [], "recordedIncome": [], "scheduledExpenses": [],
+                                   "modeExpenses": {mode: {"scheduledExpenses": [], "unitemizedExpenses": 0} for mode in ("current", "projected")},
                                    "unitemizedIncome": 0, "unitemizedExpenses": 0}}
     monkeypatch.setattr(phone_app, "_session", session)
     monkeypatch.setattr(phone_app, "now_pacific", lambda: NOW)
@@ -194,10 +198,16 @@ async def test_refresh_then_comparison_does_not_rebuild_the_just_loaded_month(mo
         refreshed = await phone_app._report_data(make_mocked_request("GET", "/app/expenses/data", app=app))
         assert refreshed.status == 200
         comparison = await history._comparison(make_mocked_request(
-            "GET", "/app/expenses/comparison?month=2026-09&compare_month=2026-08", app=app))
+            "GET", "/app/expenses/comparison?month=2026-09&compare_month=2026-08" + (f"&mode={mode}" if mode else ""), app=app))
         assert comparison.status == 200
         assert calls == [9, 8]
         assert comparison.headers["Cache-Control"] == "private, no-store"
+        if mode:
+            result = json.loads(comparison.text)
+            assert result["mode"] == mode
+            assert result["selected"]["spending"] == (2009 if mode == "current" else 2209)
+            assert result["baseline"]["spending"] == (2008 if mode == "current" else 2208)
+            assert result["changeAmount"] == 1
     finally:
         await builds.close()
 
@@ -284,6 +294,19 @@ async def test_custom_comparison_rejects_same_future_and_invalid_month_before_re
     monkeypatch.setattr(history, "now_pacific", lambda: NOW)
     monkeypatch.setattr(history, "phone_month_catalog", catalog)
     request = make_mocked_request("GET", f"/app/expenses/comparison?month=2026-09&compare_month={baseline}")
+    assert (await history._comparison(request)).status == 400
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("mode", ["", "all", "Current", "../current"])
+async def test_comparison_rejects_invalid_mode_before_reading_sheets(monkeypatch, mode):
+    async def session(_request):
+        return SESSION
+    async def catalog(*args, **kwargs):
+        pytest.fail("Invalid modes must not read sheets")
+    monkeypatch.setattr(phone_app, "_session", session)
+    monkeypatch.setattr(history, "phone_month_catalog", catalog)
+    request = make_mocked_request("GET", f"/app/expenses/comparison?month=2026-09&mode={mode}")
     assert (await history._comparison(request)).status == 400
 
 

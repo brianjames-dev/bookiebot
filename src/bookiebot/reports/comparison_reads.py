@@ -1,4 +1,4 @@
-"""Batch dated comparison inputs, without loading unrelated report history."""
+"""Batch canonical monthly totals and legacy dated comparison inputs."""
 from __future__ import annotations
 
 import calendar
@@ -6,7 +6,7 @@ from typing import Any
 
 from bookiebot.reports.batched_report_reads import ReportWorksheetRows
 from bookiebot.reports.expense_breakdown import (
-    BudgetMonth, ReportWorksheets, build_expense_breakdown_report, expense_breakdown_client_payload,
+    BudgetHistoryRows, BudgetMonth, ReportWorksheets, build_expense_breakdown_report, expense_breakdown_client_payload,
 )
 from bookiebot.reports.worksheet_reads import read_workbook_tabs
 from bookiebot.sheets.routing import (
@@ -29,13 +29,15 @@ def load_comparison_year(payload: dict) -> dict[int, dict[str, Any]]:
     personal = read_workbook_tabs(gc, get_budget_spreadsheet_id_for_user(actor, year),
                                  [*titles, "Subscriptions", "_BookieBot Bill Schedule"])
     shared = read_workbook_tabs(gc, get_shared_expenses_spreadsheet_id(year), titles)
+    history = tuple(BudgetHistoryRows(BudgetMonth(year, number), personal[calendar.month_name[number]])
+                    for number in months if calendar.month_name[number] in personal)
     results = {}
     for number in months:
         title = calendar.month_name[number]
         if title not in personal or title not in shared:
             continue
-        # Reuse canonical recorded/scheduled/residual calculations. Comparison
-        # does not use projections, utility history or reimbursement balances.
+        # Use the overview's calculations, including prior utility amounts for
+        # projected bills. All required history is already in this annual batch.
         report = build_expense_breakdown_report(
             actor_key=actor, owner_name=str(payload["owner_name"]),
             persons=[str(person) for person in payload["persons"]], month=BudgetMonth(year, number),
@@ -44,9 +46,12 @@ def load_comparison_year(payload: dict) -> dict[int, dict[str, Any]]:
                 personal_budget=ReportWorksheetRows(title, personal[title]),
                 subscriptions=ReportWorksheetRows("Subscriptions", personal["Subscriptions"]) if "Subscriptions" in personal else None,
                 bill_schedule=ReportWorksheetRows("_BookieBot Bill Schedule", personal["_BookieBot Bill Schedule"]) if "_BookieBot Bill Schedule" in personal else None,
+                budget_history=history,
             ),
         )
         canonical = expense_breakdown_client_payload(report)
         results[number] = {"ownerName": canonical["ownerName"], "year": year, "month": number,
-                           "comparisonData": canonical["comparisonData"]}
+                           "comparisonData": canonical["comparisonData"],
+                           "modeViews": {mode: {"metrics": {"totalExpenses": view["metrics"]["totalExpenses"]}}
+                                         for mode, view in canonical["modeViews"].items()}}
     return results

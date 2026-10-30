@@ -3,6 +3,7 @@ import { ArrowDownRight, ArrowLeftRight, ChevronDown } from "lucide-react"
 import { FittedAmount } from "./components/ui/fitted-amount"
 import { MonthPicker } from "./components/ui/month-picker"
 import type { ExpenseReportData } from "./types"
+import { useAppNavigation } from "./app-navigation"
 import "./report-history.css"
 
 export interface ReportMonthCatalog {
@@ -14,12 +15,7 @@ export interface ReportMonthCatalog {
 interface ComparisonPeriod {
   fromDate: string
   throughDate: string
-  datedSpending: number
-  datedIncome: number
-  undatedSpending: number
-  scheduledSpending: number
-  unitemizedSpending: number
-  expenseCount: number
+  spending: number
   complete: boolean
 }
 
@@ -27,6 +23,7 @@ interface ReportPeriodComparison {
   selectedMonth: string
   baselineMonth: string
   baselineKind: "previous-month" | "previous-year" | "selected-month"
+  mode: "current" | "projected"
   throughDay: number
   shortMonthAdjusted: boolean
   selected: ComparisonPeriod | null
@@ -238,6 +235,7 @@ export function ReportComparison({ report, onExpired, catalog, catalogLoading = 
   onCatalogRetry?: () => void
   refreshing?: boolean
 }) {
+  const mode = useAppNavigation()?.preferences.mode ?? "current"
   const [open, setOpen] = useState(false)
   const [chosenMonth, setChosenMonth] = useState<string | null>(null)
   const [comparison, setComparison] = useState<ReportPeriodComparison | null>(null)
@@ -250,6 +248,7 @@ export function ReportComparison({ report, onExpired, catalog, catalogLoading = 
   const selectedMonth = `${report.year}-${String(report.month).padStart(2, "0")}`
   const previousMonth = `${report.month === 1 ? report.year - 1 : report.year}-${String(report.month === 1 ? 12 : report.month - 1).padStart(2, "0")}`
   const baseline = chosenMonth && chosenMonth !== selectedMonth ? chosenMonth : previousMonth
+  const resultKey = `${baseline}:${mode}`
   const options = [{ value: previousMonth, label: reportMonthLabel(previousMonth) },
     ...(catalog?.months ?? []).filter((month) => month.value !== selectedMonth && month.value !== previousMonth)]
   // Results belong only to this displayed report. A fresh report invalidates
@@ -283,34 +282,34 @@ export function ReportComparison({ report, onExpired, catalog, catalogLoading = 
   }, [refreshing, requests])
   useEffect(() => {
     if (!open) return
-    const saved = requests.results.get(baseline)
+    const saved = requests.results.get(resultKey)
     setComparison(saved?.result ?? null)
     setLoading(!saved)
     setError(saved?.failed ? saved.message ?? "Couldn’t load the comparison." : "")
     if (saved || requests.pending || refreshing) return
     const pending = { controller: new AbortController() }
     requests.pending = pending
-    requestReportHistory<ReportPeriodComparison>(`/app/expenses/comparison?month=${selectedMonth}&compare_month=${baseline}`, pending.controller, 60000).then((result) => {
-      if (result.selectedMonth !== selectedMonth || result.baselineMonth !== baseline || typeof result.coverageNote !== "string") {
+    requestReportHistory<ReportPeriodComparison>(`/app/expenses/comparison?month=${selectedMonth}&compare_month=${baseline}&mode=${mode}`, pending.controller, 60000).then((result) => {
+      if (result.selectedMonth !== selectedMonth || result.baselineMonth !== baseline || result.mode !== mode || typeof result.coverageNote !== "string") {
         throw new Error("Comparison did not match the selected report")
       }
-      if (requests.active && requests.pending === pending) requests.results.set(baseline, { result })
+      if (requests.active && requests.pending === pending) requests.results.set(resultKey, { result })
     }).catch((reason) => {
       if (!requests.active || requests.pending !== pending) return
       if (reason instanceof HistorySessionExpired) expired.current()
       // Session expiry is terminal even if the parent has not unmounted yet.
-      requests.results.set(baseline, { failed: true, message: historyErrorMessage(reason, "The comparison") })
+      requests.results.set(resultKey, { failed: true, message: historyErrorMessage(reason, "The comparison") })
     }).finally(() => {
       if (requests.active && requests.pending === pending) {
         requests.pending = null
         reload((value) => value + 1)
       }
     })
-  }, [open, baseline, requests, selectedMonth, revision, refreshing])
+  }, [open, baseline, mode, resultKey, requests, selectedMonth, revision, refreshing])
 
   const frame = useComparisonFrame(open)
-  const ready = !loading && !error && comparison?.selectedMonth === selectedMonth && comparison.baselineMonth === baseline ? comparison : null
-  const amounts = ready?.selected && ready.baseline ? [ready.selected.datedSpending, ready.baseline.datedSpending] : null
+  const ready = !loading && !error && comparison?.selectedMonth === selectedMonth && comparison.baselineMonth === baseline && comparison.mode === mode ? comparison : null
+  const amounts = ready?.selected && ready.baseline ? [ready.selected.spending, ready.baseline.spending] : null
   const change = amounts ? ready!.changeAmount : null
   const direction = change === null || change === 0 ? "same" : change < 0 ? "less" : "more"
   const maximum = amounts ? Math.max(0, ...amounts) : 0
@@ -333,7 +332,7 @@ export function ReportComparison({ report, onExpired, catalog, catalogLoading = 
         <div ref={frame.body} className="bb-comparison-content">
           <div className="bb-comparison-hero" role="status" aria-live="polite" aria-busy={loading}>
             {loading && <p className="bb-comparison-note">{refreshing && !requests.pending ? "Waiting for the refreshed report…" : "Comparing matching days…"}</p>}
-            {error && <p className="bb-comparison-note">{error} <button type="button" onClick={() => { requests.results.delete(baseline); reload((value) => value + 1) }}>Try again</button></p>}
+            {error && <p className="bb-comparison-note">{error} <button type="button" onClick={() => { requests.results.delete(resultKey); reload((value) => value + 1) }}>Try again</button></p>}
             {ready && !amounts && <p className="bb-comparison-note">{ready.coverageNote}</p>}
             {change !== null && <div className="bb-comparison-change">
               <div className="bb-comparison-hero-main">
@@ -345,7 +344,7 @@ export function ReportComparison({ report, onExpired, catalog, catalogLoading = 
               <p className="bb-comparison-direction">{change === 0 ? "Same spending" : `${direction} spending`}</p>
             </div>}
           </div>
-          <div className={amounts ? "bb-comparison-months bb-comparison-values" : "bb-comparison-months"} aria-label="Recorded spending by month">
+          <div className={amounts ? "bb-comparison-months bb-comparison-values" : "bb-comparison-months"} aria-label={`${mode === "projected" ? "Projected" : "Current"} Spent by month`}>
             {[selectedMonth, baseline].map((month, index) => <div className="bb-comparison-month-row" data-baseline={index === 1} key={index}>
               <div className="bb-comparison-month-head">
                 {index === 0 ? <span className="bb-comparison-month-name" aria-label={reportMonthLabel(month)}>{monthName(month)}</span>
@@ -357,7 +356,7 @@ export function ReportComparison({ report, onExpired, catalog, catalogLoading = 
                 style={{ width: `${maximum > 0 ? Math.max(0, amounts[index]) / maximum * 100 : 0}%` }} /></div>}
             </div>)}
           </div>
-          {ready && amounts && <p className="bb-comparison-period">Recorded spending · days 1–{ready.throughDay}</p>}
+          {ready && amounts && <p className="bb-comparison-period">{mode === "projected" ? "Projected" : "Current"} Spent · days 1–{ready.throughDay}{ready.status === "partial" ? " · includes undated costs" : ""}</p>}
           {catalogLoading && !catalog && <p className="bb-comparison-note">Loading other months…</p>}
           {(catalogError || (catalog && catalog.coverage.status !== "complete")) && <p className="bb-comparison-note">
             {catalogError && catalogErrorMessage ? catalogErrorMessage : catalog?.coverage.code === "source_timeout"

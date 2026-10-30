@@ -13,7 +13,7 @@ print(json.dumps(expense_breakdown_client_payload(build(income_rows(('9/1/2026',
 Object.assign(report, {ownerName: 'Brian', year: 2026, month: 10, monthLabel: 'October 2026'})
 for (const [i, mode] of ['current', 'projected'].entries()) {
   const view = report.modeViews[mode]
-  Object.assign(view.metrics, {monthlyIncome: i ? 6500.25 : 5000.75, totalExpenses: 1200.50, amountSaved: i ? 700.25 : 500.75, savingsMinimum: 800.49, savingsIdeal: 1600.51, incomeAfterExpenses: i ? 4599.50 : 3299.50})
+  Object.assign(view.metrics, {monthlyIncome: i ? 6500.25 : 5000.75, totalExpenses: i ? 1450.75 : 1200.50, amountSaved: i ? 700.25 : 500.75, savingsMinimum: 800.49, savingsIdeal: 1600.51, incomeAfterExpenses: i ? 4599.50 : 3299.50})
   view.categoryBudgets = {needs: 2500, wants: 1500, savings: 1000}
   view.categoryBalances = {raw: {needs: -200, wants: 1100, savings: 1000}, remaining: {needs: i ? 1250.25 : 1150, wants: i ? 900 : 500.25, savings: i ? 350.50 : 100}, deficits: {needs: 0, wants: 0, savings: 0}, transfers: [], totalOverspend: 0}
   report.metricExplanations[mode].left.components = ['needs', 'wants', 'savings'].map(key => ({label: `${key[0].toUpperCase()}${key.slice(1)} remaining`, amount: view.categoryBalances.remaining[key]}))
@@ -76,9 +76,10 @@ async function checkComparisonCapsule(page) {
           } else if (name === '/app/expenses/comparison') {
             comparisonReads.push(request.url())
             if (comparisonReads.length === 1) await new Promise(resolve => {releaseComparison = resolve})
-            const period = amount => ({datedSpending: amount, datedIncome: 5000, undatedSpending: 0, scheduledSpending: 0, unitemizedSpending: 0, expenseCount: 3, complete: true})
-            value = {selectedMonth: url.searchParams.get('month'), baselineMonth: url.searchParams.get('compare_month'), baselineKind: 'selected-month', throughDay: 7, shortMonthAdjusted: false,
-              selected: period(125), baseline: period(150), changeAmount: -25, changePercent: -16.7, status: 'complete', coverageNote: 'Matching dated spending from isolated fixtures.'}
+            const mode = url.searchParams.get('mode'), amount = report.modeViews[mode].metrics.totalExpenses
+            const period = spending => ({spending, complete:false})
+            value = {selectedMonth: url.searchParams.get('month'), baselineMonth: url.searchParams.get('compare_month'), baselineKind: 'selected-month', mode,
+              throughDay:29, shortMonthAdjusted:false, selected: period(amount), baseline: period(amount + 25), changeAmount: -25, changePercent: Math.round(-25 / (amount + 25) * 1000) / 10, status: 'partial', coverageNote: 'Canonical Spent over matching days, including undated costs from isolated fixtures.'}
           } else if (name === '/app/expenses/months') value = {currentMonth: '2026-10', months: ['2025-10', '2026-09', '2026-10'].map(value => ({value, label: value === '2026-09' ? 'September 2026' : `October ${value.slice(0, 4)}`})), coverage: {status: 'complete', unavailableYears: []}}
           else if (name === '/app/reconciliation') value = {enabled: true, checkedAt: '2026-10-29T07:00:00Z', items: []}
           else if (name === '/app/reimbursements') value = {enabled: true, ownerKey: 'brian', currency: 'USD', allocations: [], events: [], resets: [], resetState: 'fixture'}
@@ -197,7 +198,8 @@ async function checkComparisonCapsule(page) {
         assert.equal(expanded.card.right - expanded.button.right, 9)
         assert.ok(expanded.amounts.every(amount => amount.box.left >= expanded.body.left && amount.box.right <= expanded.body.right - 15), 'Complete amounts fit the panel')
         assert.ok(expanded.amounts[0].box.right <= expanded.button.left, 'Difference clears the collapse control')
-        assert.deepEqual(expanded.amounts.map(amount => amount.text), ['$25.00', '$125.00', '$150.00'])
+        assert.deepEqual(expanded.amounts.map(amount => amount.text), ['$25.00', '$1,450.75', '$1,475.75'])
+        assert.equal(expanded.amounts[1].text, await page.locator('.bb-metrics-grid > .bb-metric-card').nth(1).locator('.bb-metric-value .bb-fitted-amount-text').innerText(), 'Selected comparison amount matches the overview Spent headline')
         assert.ok(expanded.amounts[0].font >= 37 && expanded.amounts.slice(1).every(amount => amount.font >= (width === 320 ? 15 : 17)), 'Normal amounts retain the selected readable font sizes')
         assert.ok(expanded.tracks.every(track => track.height === 8))
         assert.deepEqual(expanded.dividerPadding, ['12px', '12px'], 'The selected divider spacing applies to both sides')
@@ -206,22 +208,29 @@ async function checkComparisonCapsule(page) {
         if (width === 390) await page.screenshot({path:`/tmp/bookiebot-comparison-expanded-${engine.name()}-${dark ? 'dark' : 'light'}.png`})
         assert.equal(await page.locator('.bb-comparison-card').getByRole('button', {name:'Details', exact:true}).count(), 0, 'The comparison Details control is removed')
         assert.equal(await page.locator('.bb-comparison-card .bb-comparison-details, .bb-comparison-card table').count(), 0, 'No hidden details or exclusion table remain')
-        assert.equal(await page.locator('.bb-comparison-period').innerText(), 'Recorded spending · days 1–7', 'Matching-period context remains visible')
+        assert.equal(await page.locator('.bb-comparison-period').innerText(), 'Projected Spent · days 1–29 · includes undated costs', 'The caption describes matching days, the active mode and included undated costs')
         assert.equal(await compare.getAttribute('aria-expanded'), 'true'); assert.equal(comparisonReads.length, 1)
+        await page.getByRole('button', {name: 'Current', exact: true}).click()
+        await page.waitForFunction(() => document.querySelector('.bb-comparison-amount .bb-fitted-amount-text')?.textContent === '$1,200.50')
+        assert.equal(await page.locator('.bb-comparison-period').innerText(), 'Current Spent · days 1–29 · includes undated costs')
+        assert.equal(comparisonReads.length, 2)
+        await page.getByRole('button', {name: 'Projected', exact: true}).click()
+        await page.waitForFunction(() => document.querySelector('.bb-comparison-amount .bb-fitted-amount-text')?.textContent === '$1,450.75')
+        assert.equal(comparisonReads.length, 2, 'Each mode reuses its own cached monthly values')
         await page.waitForFunction(() => new DOMMatrix(getComputedStyle(document.querySelector('.bb-comparison-chevron')).transform).a < -.99)
         await page.getByRole('button', {name: 'Comparison month', exact: true}).click()
         const comparisonPicker = page.getByRole('dialog', {name: 'Comparison month', exact: true})
         await comparisonPicker.waitFor(); await comparisonPicker.getByRole('button', {name: 'Previous year', exact: true}).click()
         await comparisonPicker.getByRole('button', {name: 'October 2025', exact: true}).click()
         await page.waitForFunction(() => document.querySelector('.bb-comparison-values .bb-month-trigger')?.textContent === 'October 2025')
-        assert.equal(comparisonReads.length, 2)
+        assert.equal(comparisonReads.length, 3)
         await compare.focus(); await page.keyboard.press('Space'); await page.waitForTimeout(420)
         assert.equal(await compare.getAttribute('aria-expanded'), 'false')
         const hiddenComparison = page.locator('.bb-comparison-viewport')
         assert.equal(await hiddenComparison.getAttribute('aria-hidden'), 'true'); assert.equal(await hiddenComparison.evaluate(node => node.inert), true)
         assert.ok(await compare.evaluate(node => node === document.activeElement && getComputedStyle(node).outlineStyle !== 'none'), 'Capsule keeps visible keyboard focus')
         await checkComparisonCapsule(page)
-        await compare.click(); await page.waitForTimeout(420); assert.equal(comparisonReads.length, 2, 'Reopening reuses the selected comparison')
+        await compare.click(); await page.waitForTimeout(420); assert.equal(comparisonReads.length, 3, 'Reopening reuses the selected comparison')
         await compare.click(); await page.waitForTimeout(420)
         if (width === 390) {
           // Reverse unfinished transitions without replacing the frame or picker.
@@ -234,7 +243,7 @@ async function checkComparisonCapsule(page) {
           await page.setViewportSize({width, height:900}); await page.waitForTimeout(450)
           await compare.click(); await page.waitForTimeout(420)
           await checkComparisonCapsule(page)
-          assert.equal(comparisonReads.length, 2, 'Motion and resizing cannot trigger report reads')
+          assert.equal(comparisonReads.length, 3, 'Motion and resizing cannot trigger report reads')
         }
         await month.click()
         const picker = page.getByRole('dialog', {name: 'Report month', exact: true})

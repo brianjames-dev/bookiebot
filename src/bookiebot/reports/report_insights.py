@@ -1,4 +1,4 @@
-"""Explain canonical totals and compare only verifiably dated report activity."""
+"""Explain canonical totals and compare verifiably timed expense activity."""
 from __future__ import annotations
 
 import calendar
@@ -45,6 +45,11 @@ def comparison_data(report: ExpenseBreakdownReport, payload: dict[str, Any]) -> 
         entry(item.label, item.amount, item.group, f"{report.month.year}-{report.month.month:02d}-{item.day:02d}")
         for item in report.calendar_events if item.kind == "subscription" and not item.projected_only
     ]
+    projected_scheduled = [
+        entry(item.label, item.amount, item.group, f"{report.month.year}-{report.month.month:02d}-{item.day:02d}")
+        for item in report.calendar_events
+        if item.kind == "subscription" or (item.kind == "bill" and item.amount_estimated)
+    ]
     return {
         "recordedExpenses": recorded,
         "scheduledExpenses": scheduled,
@@ -53,6 +58,13 @@ def comparison_data(report: ExpenseBreakdownReport, payload: dict[str, Any]) -> 
                                       - _total(item["amount"] for item in recorded)
                                       - _total(item["amount"] for item in scheduled)),
         "unitemizedIncome": _money(report.income_total - _total(item["amount"] for item in income)),
+        "modeExpenses": {
+            mode: {"scheduledExpenses": scheduled_items,
+                   "unitemizedExpenses": _money(payload["modeViews"][mode]["metrics"]["totalExpenses"]
+                                                 - _total(item["amount"] for item in recorded)
+                                                 - _total(item["amount"] for item in scheduled_items))}
+            for mode, scheduled_items in (("current", scheduled), ("projected", projected_scheduled))
+        },
     }
 
 
@@ -204,6 +216,62 @@ def metric_explanations(report: ExpenseBreakdownReport, payload: dict[str, Any])
     return explanations
 
 
+def compare_report_spending(
+    selected: dict[str, Any], baseline: dict[str, Any] | None, *, baseline_month: str,
+    baseline_kind: str, mode: str, as_of: datetime,
+) -> dict[str, Any]:
+    """Compare the expense-only Spent basis over the same days in both months."""
+    from bookiebot.sheets.routing import PACIFIC_TZ
+    if mode not in {"current", "projected"}:
+        raise ValueError("Mode must be 'current' or 'projected'.")
+    as_of = as_of.replace(tzinfo=PACIFIC_TZ) if as_of.tzinfo is None else as_of.astimezone(PACIFIC_TZ)
+    selected_month = f"{selected['year']:04d}-{selected['month']:02d}"
+    requested_day, through_day, short_month_adjusted = _comparison_window(selected, baseline_month, as_of)
+    result: dict[str, Any] = {
+        "selectedMonth": selected_month, "baselineMonth": baseline_month, "baselineKind": baseline_kind,
+        "mode": mode, "selected": None, "baseline": None,
+        "throughDay": through_day, "shortMonthAdjusted": short_month_adjusted,
+        "changeAmount": None, "changePercent": None,
+        "status": "unavailable", "coverageNote": "The comparison month is unavailable.",
+    }
+
+    def period(payload: dict[str, Any]) -> dict[str, Any] | None:
+        metrics = payload.get("modeViews", {}).get(mode, {}).get("metrics", {})
+        if ("totalExpenses" not in metrics or metrics["totalExpenses"] is None
+                or mode not in payload.get("comparisonData", {}).get("modeExpenses", {})):
+            return None  # Missing source data must never become zero spending.
+        return _period(payload, through_day, mode=mode)
+
+    if baseline is not None:
+        if selected.get("ownerName") != baseline.get("ownerName"):
+            raise ValueError("Comparison reports must belong to the same owner.")
+        if f"{baseline['year']:04d}-{baseline['month']:02d}" != baseline_month:
+            raise ValueError("Comparison report month did not match the requested period.")
+    result["selected"] = period(selected)
+    if result["selected"] is None:
+        result["coverageNote"] = "Refresh this report to load its Spent comparison data."
+        return result
+    result["baseline"] = period(baseline) if baseline is not None else None
+    if result["baseline"] is None:
+        return result
+    amount = _money(result["selected"]["spending"] - result["baseline"]["spending"])
+    result["changeAmount"] = amount
+    if result["baseline"]["spending"] > 0:
+        result["changePercent"] = round(amount / result["baseline"]["spending"] * 100, 1)
+    partial = not result["selected"]["complete"] or not result["baseline"]["complete"]
+    result["status"] = "partial" if partial else "complete"
+    result["coverageNote"] = (
+        f"Compares {mode.title()} Spent over days 1–{through_day} in both months. "
+        "Dated expenses and scheduled subscriptions use that window; recorded undated bills and sheet adjustments "
+        "are included in full in each month because their payment dates are unknown. Savings and ESPP are excluded."
+    )
+    if through_day != requested_day:
+        base_year, base_number = map(int, baseline_month.split("-"))
+        reason = "the comparison month is still in progress" if (base_year, base_number) == (as_of.year, as_of.month) else "the comparison month is shorter"
+        result["coverageNote"] += f" Both periods end on day {through_day} because {reason}."
+    return result
+
+
 def compare_report_periods(
     selected: dict[str, Any], baseline: dict[str, Any] | None, *, baseline_month: str,
     baseline_kind: str, as_of: datetime,
@@ -211,13 +279,8 @@ def compare_report_periods(
     from bookiebot.sheets.routing import PACIFIC_TZ
     as_of = as_of.replace(tzinfo=PACIFIC_TZ) if as_of.tzinfo is None else as_of.astimezone(PACIFIC_TZ)
     selected_month = f"{selected['year']:04d}-{selected['month']:02d}"
-    requested_day = (as_of.day if (selected["year"], selected["month"]) == (as_of.year, as_of.month)
-                     else calendar.monthrange(selected["year"], selected["month"])[1])
+    requested_day, through_day, short_month_adjusted = _comparison_window(selected, baseline_month, as_of)
     base_year, base_number = map(int, baseline_month.split("-"))
-    through_day = min(requested_day, calendar.monthrange(base_year, base_number)[1])
-    short_month_adjusted = through_day != requested_day
-    if (base_year, base_number) == (as_of.year, as_of.month):
-        through_day = min(through_day, as_of.day)
     result: dict[str, Any] = {
         "selectedMonth": selected_month, "baselineMonth": baseline_month, "baselineKind": baseline_kind,
         "throughDay": through_day, "shortMonthAdjusted": short_month_adjusted,
@@ -250,7 +313,18 @@ def compare_report_periods(
     return result
 
 
-def _period(payload: dict[str, Any], through_day: int) -> dict[str, Any]:
+def _comparison_window(selected: dict[str, Any], baseline_month: str, as_of: datetime) -> tuple[int, int, bool]:
+    requested_day = (as_of.day if (selected["year"], selected["month"]) == (as_of.year, as_of.month)
+                     else calendar.monthrange(selected["year"], selected["month"])[1])
+    base_year, base_number = map(int, baseline_month.split("-"))
+    through_day = min(requested_day, calendar.monthrange(base_year, base_number)[1])
+    short_month_adjusted = through_day != requested_day
+    if (base_year, base_number) == (as_of.year, as_of.month):
+        through_day = min(through_day, as_of.day)
+    return requested_day, through_day, short_month_adjusted
+
+
+def _period(payload: dict[str, Any], through_day: int, *, mode: str | None = None) -> dict[str, Any]:
     data = payload["comparisonData"]
     month = f"{payload['year']:04d}-{payload['month']:02d}"
     def included(item):
@@ -259,12 +333,13 @@ def _period(payload: dict[str, Any], through_day: int) -> dict[str, Any]:
     expenses = data["recordedExpenses"]
     income = data["recordedIncome"]
     undated_count = sum(1 for item in expenses if not item.get("date") and item["amount"])
-    scheduled_count = sum(1 for item in data["scheduledExpenses"] if included(item) and item["amount"])
+    timed = data["modeExpenses"][mode] if mode else data
+    scheduled_count = sum(1 for item in timed["scheduledExpenses"] if included(item) and item["amount"])
     undated_expenses = _total(item["amount"] for item in expenses if not item.get("date"))
     undated_income = _total(item["amount"] for item in income if not item.get("date"))
-    scheduled = _total(item["amount"] for item in data["scheduledExpenses"] if included(item))
-    adjustment = _money(data["unitemizedExpenses"])
-    return {
+    scheduled = _total(item["amount"] for item in timed["scheduledExpenses"] if included(item))
+    adjustment = _money(timed["unitemizedExpenses"])
+    result = {
         "fromDate": f"{month}-01", "throughDate": f"{month}-{through_day:02d}",
         "datedSpending": _total(item["amount"] for item in expenses if included(item)),
         "datedIncome": _total(item["amount"] for item in income if included(item)),
@@ -275,3 +350,12 @@ def _period(payload: dict[str, Any], through_day: int) -> dict[str, Any]:
         "undatedExpenseCount": undated_count,
         "complete": not any((undated_count, scheduled_count, adjustment)),
     }
+    if mode:
+        # Start with the authoritative Spent value, preserving signed sheet
+        # adjustments. Remove only costs known to fall outside the window.
+        # A bill's due date is never treated as its actual payment date.
+        excluded = _total(item["amount"] for item in expenses if item.get("date") and not included(item))
+        excluded_scheduled = _total(item["amount"] for item in timed["scheduledExpenses"] if not included(item))
+        result["spending"] = _money(payload["modeViews"][mode]["metrics"]["totalExpenses"] - excluded - excluded_scheduled)
+        result["complete"] = not any((undated_count, adjustment))
+    return result
