@@ -1,4 +1,5 @@
 import { useEffect, useId, useMemo, useRef, useState } from "react"
+import { ArrowLeftRight, ChevronDown } from "lucide-react"
 import { CollapsibleContent } from "./components/ui/motion"
 import { FittedAmount } from "./components/ui/fitted-amount"
 import { MonthPicker } from "./components/ui/month-picker"
@@ -294,8 +295,15 @@ export function ReportComparison({ report, onExpired, catalog, catalogLoading = 
   }, [open, baseline, requests, selectedMonth, revision, refreshing])
 
   return <section className="bb-report-comparison" aria-label="Spending comparison">
-    <button type="button" className="bb-comparison-toggle" aria-expanded={open} aria-controls={id} onClick={() => setOpen((value) => !value)}>
-      <span>Compare spending</span><span className="bb-disclosure-mark" aria-hidden="true" />
+    <button type="button" className="bb-comparison-toggle" aria-label="Compare spending" aria-expanded={open} aria-controls={id} onClick={() => setOpen((value) => !value)}>
+      <span className="bb-comparison-toggle-group">
+        <span className="bb-comparison-icon" aria-hidden="true"><ArrowLeftRight size={18} /></span>
+        <span className="bb-comparison-copy">
+          <span className="bb-comparison-title">Compare spending</span>
+          <span className="bb-comparison-caption">A month-to-month view</span>
+        </span>
+      </span>
+      <span className="bb-comparison-chevron" aria-hidden="true"><ChevronDown size={18} /></span>
     </button>
     <CollapsibleContent open={open} id={id}>
       <div className="bb-comparison-content">

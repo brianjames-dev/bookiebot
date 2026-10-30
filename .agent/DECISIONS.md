@@ -1,5 +1,9 @@
 # Agent Decisions
 
+## 2026-10-29 - Apply The Approved Content-Width Comparison Capsule
+
+Use the user's selected Hug content design for Overview's Compare spending trigger: centered intrinsic width, 48px minimum height, 16px radius and side padding, 2px title/caption gap, and 14px external gaps above and below. Keep the leading comparison icon next to centered text, the caption A month-to-month view and a trailing chevron; remove the old full-width underline and add no glow. Remove the preceding metrics margin only when this comparison follows it, so the selected gap is not added to the old spacing. Keep keyboard focus and the existing animated disclosure, month selection, request lifecycle and financial calculations. The expanded comparison redesign remains a separate future task. Native acceptance is checklist 187.
+
 ## 2026-10-29 - Clarify Left Precision And Tighten The Overview Header
 
 The user clarifies that only Left's small bar amounts omit cents: restore exact cents in its main headline, and remove the now-unused whole-dollar headline option. Split the prior phone Income/Spent bottom padding difference at 30px. Lift the category rows 4px to align the Savings bar with the final Saved target text, retaining the graphic's size and financial values.

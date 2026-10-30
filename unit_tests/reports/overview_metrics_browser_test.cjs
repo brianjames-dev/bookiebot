@@ -38,6 +38,22 @@ async function checkHeader(page, width) {
   assert.ok(layout.labels.every(label => label.box.height >= 44 && label.font === '12px' && label.fits))
   assert.equal(layout.overflow, false)
 }
+async function checkComparisonCapsule(page) {
+  const layout = await page.locator('.bb-comparison-toggle').evaluate(button => {
+    const box = button.getBoundingClientRect(), metrics = document.querySelector('.bb-metrics-grid').getBoundingClientRect(), charts = document.querySelector('.bb-chart-carousel-indicators').getBoundingClientRect(), style = getComputedStyle(button)
+    const copy = button.querySelector('.bb-comparison-copy').getBoundingClientRect(), icon = button.querySelector('.bb-comparison-icon').getBoundingClientRect(), chevron = button.querySelector('.bb-comparison-chevron').getBoundingClientRect()
+    return {width: box.width, height: box.height, center: (box.left + box.right - metrics.left - metrics.right) / 2, metricWidth: metrics.width,
+      topGap: box.top - metrics.bottom, bottomGap: charts.top - box.bottom, padding: style.paddingLeft, radius: style.borderRadius, shadow: style.boxShadow,
+      captionGap: getComputedStyle(button.querySelector('.bb-comparison-copy')).rowGap, iconGap: copy.left - icon.right, chevronGap: chevron.left - copy.right,
+      textFits: [...button.querySelectorAll('.bb-comparison-title, .bb-comparison-caption')].every(node => node.scrollWidth <= node.clientWidth), border: getComputedStyle(button.parentElement).borderBottomWidth}
+  })
+  assert.ok(layout.width < layout.metricWidth - 40, `Comparison hugs its content: ${JSON.stringify(layout)}`)
+  assert.ok(Math.abs(layout.center) < 1)
+  assert.equal(layout.height, 48); assert.equal(layout.radius, '16px'); assert.equal(layout.padding, '16px'); assert.equal(layout.captionGap, '2px')
+  assert.equal(layout.topGap, 14); assert.equal(layout.bottomGap, 14); assert.equal(layout.shadow, 'none'); assert.equal(layout.border, '0px')
+  assert.equal(layout.iconGap, 12); assert.equal(layout.chevronGap, 12); assert.equal(layout.textFits, true)
+  assert.equal(await page.locator('.bb-comparison-caption').innerText(), 'A month-to-month view')
+}
 ;(async () => {
   let cases = 0
   for (const engine of [chromium, webkit]) {
@@ -45,7 +61,7 @@ async function checkHeader(page, width) {
     try {
       for (const width of [320, 390, 736, 1280]) for (const dark of [false, true]) {
         const page = await browser.newPage({viewport: {width, height: 900}, hasTouch: true, isMobile: width < 768, reducedMotion: dark ? 'reduce' : 'no-preference'})
-        const errors = [], unexpected = []; let firstReport = true, releaseReport
+        const errors = [], unexpected = [], comparisonReads = []; let firstReport = true, releaseReport
         page.on('pageerror', error => errors.push(error.message))
         await page.addInitScript(() => {delete window.PushManager})
         await page.route('**/*', async route => {
@@ -57,6 +73,11 @@ async function checkHeader(page, width) {
             if (firstReport) {firstReport = false; await new Promise(resolve => {releaseReport = resolve})}
             const month = url.searchParams.get('month') || '2026-10', [year, number] = month.split('-').map(Number)
             value = {...report, year, month: number, monthLabel: new Intl.DateTimeFormat('en-US', {month: 'long', year: 'numeric', timeZone: 'UTC'}).format(new Date(Date.UTC(year, number - 1, 1)))}
+          } else if (name === '/app/expenses/comparison') {
+            comparisonReads.push(request.url())
+            const period = amount => ({datedSpending: amount, datedIncome: 5000, undatedSpending: 0, scheduledSpending: 0, unitemizedSpending: 0, expenseCount: 3, complete: true})
+            value = {selectedMonth: url.searchParams.get('month'), baselineMonth: url.searchParams.get('compare_month'), baselineKind: 'selected-month', throughDay: 7, shortMonthAdjusted: false,
+              selected: period(125), baseline: period(150), changeAmount: -25, changePercent: -16.7, status: 'complete', coverageNote: 'Matching dated spending from isolated fixtures.'}
           } else if (name === '/app/expenses/months') value = {currentMonth: '2026-10', months: ['2025-10', '2026-09', '2026-10'].map(value => ({value, label: value === '2026-09' ? 'September 2026' : `October ${value.slice(0, 4)}`})), coverage: {status: 'complete', unavailableYears: []}}
           else if (name === '/app/reconciliation') value = {enabled: true, checkedAt: '2026-10-29T07:00:00Z', items: []}
           else if (name === '/app/reimbursements') value = {enabled: true, ownerKey: 'brian', currency: 'USD', allocations: [], events: [], resets: [], resetState: 'fixture'}
@@ -89,6 +110,8 @@ async function checkHeader(page, width) {
         assert.ok(headerSpacing.timeGap >= 0 && headerSpacing.timeGap <= 3 && headerSpacing.left < 1, 'Updated time sits directly beneath the brand text')
         assert.ok(headerSpacing.panelGap >= 10 && headerSpacing.panelGap <= 14, 'The metrics panel sits close to the month/view row')
         assert.equal(headerSpacing.duplicate, 0)
+        await checkComparisonCapsule(page)
+        assert.equal(comparisonReads.length, 0, 'Collapsed capsule does not fetch comparisons')
         for (const [i, mode] of ['Current', 'Projected'].entries()) {
           await page.getByRole('button', {name: mode, exact: true}).click()
           await page.waitForTimeout(300)
@@ -132,6 +155,25 @@ async function checkHeader(page, width) {
           if (dark) assert.ok(parseFloat(selected.transition) <= .001)
           cases++
         }
+        const compare = page.getByRole('button', {name: 'Compare spending', exact: true})
+        await compare.focus(); await page.keyboard.press('Enter')
+        await page.locator('.bb-comparison-values').waitFor()
+        assert.equal(await compare.getAttribute('aria-expanded'), 'true'); assert.equal(comparisonReads.length, 1)
+        await page.waitForFunction(() => new DOMMatrix(getComputedStyle(document.querySelector('.bb-comparison-chevron')).transform).a < -.99)
+        await page.getByRole('button', {name: 'Comparison month', exact: true}).click()
+        const comparisonPicker = page.getByRole('dialog', {name: 'Comparison month', exact: true})
+        await comparisonPicker.waitFor(); await comparisonPicker.getByRole('button', {name: 'Previous year', exact: true}).click()
+        await comparisonPicker.getByRole('button', {name: 'October 2025', exact: true}).click()
+        await page.waitForFunction(() => document.querySelector('.bb-comparison-values > div:nth-child(2) > span')?.textContent === 'October 2025')
+        assert.equal(comparisonReads.length, 2)
+        await compare.focus(); await page.keyboard.press('Space'); await page.waitForTimeout(300)
+        assert.equal(await compare.getAttribute('aria-expanded'), 'false')
+        const hiddenComparison = page.locator('.bb-report-comparison > .bb-details-content')
+        assert.equal(await hiddenComparison.getAttribute('aria-hidden'), 'true'); assert.equal(await hiddenComparison.evaluate(node => node.inert), true)
+        assert.ok(await compare.evaluate(node => node === document.activeElement && getComputedStyle(node).outlineStyle !== 'none'), 'Capsule keeps visible keyboard focus')
+        await checkComparisonCapsule(page)
+        await compare.click(); await page.waitForTimeout(300); assert.equal(comparisonReads.length, 2, 'Reopening reuses the selected comparison')
+        await compare.click(); await page.waitForTimeout(300)
         await month.click()
         const picker = page.getByRole('dialog', {name: 'Report month', exact: true})
         await picker.waitFor(); await page.getByRole('button', {name: 'Previous year', exact: true}).click()
@@ -164,5 +206,5 @@ async function checkHeader(page, width) {
       }
     } finally {await browser.close()}
   }
-  console.log(`${cases} Chromium/WebKit Overview mode cases passed, with startup, picker, geometry, details, keyboard, motion and preference checks; no external traffic or financial writes`)
+  console.log(`${cases} Chromium/WebKit Overview mode cases passed, with capsule geometry/picker/keyboard/caching, startup, metric details, motion and preferences; no external traffic or financial writes`)
 })().catch(error => {console.error(error); process.exitCode = 1})

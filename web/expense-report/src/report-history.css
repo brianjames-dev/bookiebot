@@ -1,10 +1,19 @@
 .bb-month-history { display: inline-flex; flex-wrap: wrap; gap: 8px 14px; align-items: center; max-width: 100%; }
 .bb-history-catalog-status button, .bb-comparison-note button { border: 0; background: none; color: hsl(var(--primary)); font: inherit; text-decoration: underline; text-underline-offset: 3px; cursor: pointer; }
 .bb-history-catalog-status { flex-basis: 100%; color: hsl(var(--muted-foreground)); font: 400 12px/1.5 -apple-system, sans-serif; }
-.bb-report-comparison { border-bottom: 1px solid hsl(var(--border)); }
-.bb-comparison-toggle { display: flex; align-items: center; gap: 14px; justify-content: space-between; width: 100%; min-height: 48px; padding: 12px 0; color: hsl(var(--muted-foreground)); border: 0; background: none; font: 500 13px/1.4 -apple-system, sans-serif; cursor: pointer; }
-.bb-comparison-toggle[aria-expanded="true"] .bb-disclosure-mark::after { transform: rotate(0deg); }
-.bb-comparison-content { max-width: 720px; padding: 0 0 16px; }
+.bb-metrics-grid:has(+ .bb-report-comparison) { margin-bottom: 0; }
+.bb-report-comparison { padding-block: 14px; }
+.bb-comparison-toggle { box-sizing: border-box; display: flex; align-items: center; gap: 12px; width: max-content; max-width: 100%; min-height: 48px; margin-inline: auto; padding: 6px 16px; color: hsl(var(--foreground)); border: 1px solid color-mix(in srgb, hsl(var(--foreground)) 13%, hsl(var(--card))); border-radius: 16px; background: color-mix(in srgb, hsl(var(--primary)) 4%, hsl(var(--card))); font: 400 14px/18px -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; cursor: pointer; }
+.bb-comparison-toggle-group { display: flex; align-items: center; gap: 12px; flex: 0 1 auto; min-width: 0; }
+.bb-comparison-copy { display: grid; gap: 2px; min-width: 0; text-align: center; }
+.bb-comparison-title { font-weight: 500; }
+.bb-comparison-caption { color: hsl(var(--muted-foreground)); font-size: 11px; line-height: 14px; }
+.bb-comparison-icon { display: grid; place-items: center; flex: 0 0 20px; width: 20px; height: 24px; color: hsl(var(--primary)); }
+.bb-comparison-chevron { display: grid; place-items: center; flex: 0 0 20px; width: 20px; height: 20px; color: hsl(var(--muted-foreground)); transition: transform var(--bb-motion-duration) var(--bb-motion-ease); }
+.bb-comparison-toggle[aria-expanded="true"] .bb-comparison-chevron { transform: rotate(180deg); }
+.bb-comparison-toggle:focus-visible { outline: 2px solid hsl(var(--primary)); outline-offset: 3px; }
+.bb-report-comparison > .bb-details-content > .bb-details-content-inner { padding-top: 0; }
+.bb-comparison-content { max-width: 720px; padding: 14px 0 16px; }
 .bb-comparison-picker { display: flex; align-items: center; flex-wrap: wrap; gap: 8px 12px; color: hsl(var(--muted-foreground)); font-size: 12px; }
 .bb-comparison-values { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; margin-top: 14px; }
 .bb-comparison-values > div { min-width: 0; display: flex; flex-direction: column; gap: 5px; }

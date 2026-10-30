@@ -37,6 +37,8 @@ Reconciliation shared amount correction (2026-10-28): diagnosed the October 28 1
 
 ## Active Focus
 
+Comparison capsule (2026-10-29): implemented the approved Hug content trigger with its selected 48px height, 16px radius/side padding, 2px caption spacing and 14px top/bottom gaps. Keep the existing expanded comparison and request lifecycle. **39 focused / 2,759 full tests passed**, **557 optional PostgreSQL skipped**, clean Python/frontend types and locked Node 22 build. **32 isolated Chromium/WebKit Overview mode cases pass**, including exact capsule geometry, month selection, keyboard focus, collapse and cached reopening; frontend **1dbf9b304da2433be81c5c65**. Native follow-up is checklist 187. The user accepted Overview header/precision checklist 186.
+
 Overview header/precision clarification (2026-10-29): restore cents in Left's main headline while keeping whole-dollar bar labels, split Income/Spent phone bottom spacing at 30px, lift the bars 4px, and move the actual update/failure status directly under the brand/name. Share the persistent brand layout, retain its small status row, and use a 12px month/view-to-panel gap. **68 focused / 2,759 full tests passed**, **557 optional PostgreSQL skipped**, clean Python/frontend types and locked Node 22 build. **80 isolated Chromium/WebKit cases pass** (32 Overview / 48 refresh); frontend **8f4d1747cc56052f13ef0fd5**. Native follow-up is checklist 186.
 
 Overview device refinements (2026-10-29): align info icons to each frame's right edge, display Left's headline and N/W/S amounts without cents, and increase phone Income/Spent bottom spacing to 40px. Canonical values, exact modal/accessibility amounts, bar fill and the other frames' formatting remain unchanged. **63 focused / 2,759 full tests passed**, **557 optional PostgreSQL skipped**, clean Python/frontend types and locked Node 22 build. **32 isolated Chromium/WebKit Overview cases pass**; frontend **dbf781cb0abc6ebd9ed2a54d**. Native follow-up is checklist 185, superseding these details in 184.
@@ -258,7 +260,7 @@ All eight September 6 audit batches are implemented and verified locally. Each b
 
 ## On Deck
 
-First: native acceptance of the Overview header/precision clarification (checklist 186), superseding 185's main Left formatting and top-frame spacing. Check the timestamp below the brand/name, closer panel and lifted bar alignment. Retain right-edge info icons, Glass Capsule, Category Mix, native refresh and shared footer behavior.
+First: release/native acceptance of the approved Compare spending Hug content capsule (checklist 187). Preserve the existing expanded comparison; its visual redesign is a separate future task. The user accepted Overview header/precision checklist 186; retain its values, spacing and header behavior.
 
 First: native acceptance of the final Category Mix size refinement (checklist 183), superseding 182's dimensions. Check All, the 120px dropdown, 40px centered percentage, smaller total, thicker band and absence of a lingering touch focus outline; preserve keyboard access, shared layout and Categories/inspection dialogs.
 
@@ -385,6 +387,8 @@ Student-loan activation is complete. Verify the deployed fixed-bill display and 
 27. Explore clarifying questions before logging when BookieBot is uncertain instead of guessing or silently failing.
 
 ## Completed 2026-10-29
+
+- Applied the approved Compare spending Hug content design: centered intrinsic width, 48px height, 16px corners/side padding, 2px caption gap and 14px outer gaps. Added the comparison icon, A month-to-month view caption and rotating chevron; removed the old underline and avoided any glow. Scoped the preceding metrics margin and hidden disclosure padding so the gaps are exact, retaining existing expanded content, requests, chosen-month/results and keyboard access. **39 focused / 2,759 full tests passed**, **557 optional PostgreSQL skipped**, clean Python/frontend types and locked Node 22 build; **32 isolated Chromium/WebKit Overview mode cases pass**. Updated lifecycle/geometry regressions, phone guide, decisions and checklist 187. No Finance Ops backlog or financial changes.
 
 - Restored cents to Left's headline while keeping whole-dollar bar labels, reduced Income/Spent phone bottom padding to 30px, and lifted the category rows 4px to align with Saved's target text. Shared the persistent brand/avatar/status layout across the shell and standalone report, moved update/failure status directly beneath the name, and tightened month/view-to-panel spacing to 12px. Updated formatting, header-status and browser geometry regressions, phone guide, decisions and checklist 186. **68 focused / 2,759 full tests passed**, **557 optional PostgreSQL skipped**, clean Python/frontend types and locked Node 22 build; **80 isolated Chromium/WebKit cases pass**. No Finance Ops backlog or financial changes.
 
@@ -1215,6 +1219,8 @@ Student-loan activation is complete. Verify the deployed fixed-bill display and 
   - undoing update/delete/move
 
 ## Manual Test Checklist
+
+187. Compare spending capsule: reopen/update Safari and the Home Screen app in both themes. The centered container should hug its comparison icon, centered title/A month-to-month view caption and trailing chevron, with 48px height, 16px corners/side padding, 2px caption spacing and 14px gaps from the metrics panel and chart tabs. There is no full-width comparison underline or glow. Check narrow/landscape widths and Current/Projected without moving the surrounding accepted header or metrics. Tap or use Enter/Space to expand/collapse; the chevron turns, keyboard focus remains visible, and hidden content cannot receive focus. The existing month/year picker, matching-day results, Details, loading/error/retry and refresh behavior remain available. Close/reopen a loaded comparison to confirm it retains the chosen month and result. This release changes only the collapsed styling; the expanded redesign comes later. Use existing records without financial test writes.
 
 186. Overview header/precision clarification: reopen/update Safari and the Home Screen app in both themes and Current/Projected. Left's main amount must retain cents; only its small N/W/S bar amounts omit them. Income/Spent bottom spacing should feel between the previous two versions (30px). The three bars sit 4px higher, with the Savings bar aligned to Saved's bottom target text. Updated time sits directly beneath BookieBot and your name with a very small gap; the four-frame panel sits close to the month/toggle row (12px). Check initial loading, tab switches and a report refresh: brand/avatar/title remain stable, the top-right tools stay fixed and refresh feedback remains above the title. A failed refresh must retain its error/Showing timestamp under the brand without suggesting stale data is newly updated. Repeat on narrow/landscape layouts, with a longer month name, keyboard navigation and Reduce Motion. Retain right-edge info icons and exact modal/financial values; no financial test writes. This supersedes 185's headline and spacing choices only.
 
