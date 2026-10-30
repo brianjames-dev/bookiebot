@@ -98,7 +98,7 @@ export type ContourScene = {
         routedAfter: Cost | null;
     };
 };
-export const CONTOUR_STYLE: ContourStyle = { diameter: 220, thickness: 26, centerSize: 32, labelSize: 12, labelGap: 10, inset: 10, stemOpacity: .65, bend: 10, calloutRadius: 18, sidePadding: 6, drift: 23 };
+export const CONTOUR_STYLE: ContourStyle = { diameter: 219, thickness: 26, centerSize: 24, labelSize: 11, labelGap: 6, inset: 8, stemOpacity: .65, bend: 10, calloutRadius: 18, sidePadding: 6, drift: 36 };
 export const CONTOUR_PADDING_ANGLE = .7;
 export function contourLabel(key: string, label: string): string {
     const names: Record<string, string> = { need: "Other needs", need_expenses: "Other needs", bills_utilities: "Bills & utils", needs: "Other needs", grocery: "Groceries", bills: "Bills & utils", utilities: "Bills & utils", needs_subscriptions: "Needs subs", wants_subscriptions: "Wants subs", food: "Eating out", espp: "SpaceX ESPP" };
@@ -709,10 +709,8 @@ function optimizeNeighbors(scene: ContourScene) {
 export function prepareContourScene(data: ContourInput[], width: number, height: number, overrides: Partial<ContourStyle> = {}): ContourScene {
     const style = { ...CONTOUR_STYLE, ...overrides };
     if (width < 330)
-        style.labelSize = 11.5;
-    // Preserve the selected phone size. Larger report surfaces scale the same
-    // composition within their fixed shared stage rather than stretching stems.
-    style.diameter = width > 520 ? Math.min(360, 220 + (width - 520) * .3) : 220;
+        style.labelSize = Math.min(style.labelSize, 11.5);
+    // Diameter is a limit; fit the selected composition within the chart stage.
     const lineHeight = style.labelSize + 1, cx = width / 2;
     let cy = height / 2, radius = style.diameter / 2, angle = 0;
     const selected = data.filter(item => Number.isFinite(item.amount) && item.amount > 0), total = selected.reduce((sum, item) => sum + item.amount, 0);
@@ -771,7 +769,7 @@ export function refineContourScene(prepared: ContourScene, spacingAttempt = 0): 
         }
     }
     if ((!scene.routes || scene.curvedRoutes?.some(route => route.smoothing === "unresolved")) && spacingAttempt < 3)
-        return refineContourScene(prepareContourScene(prepared.items, prepared.width, prepared.height, { labelGap: prepared.style.labelGap + 2 }), spacingAttempt + 1);
+        return refineContourScene(prepareContourScene(prepared.items, prepared.width, prepared.height, { ...prepared.style, labelGap: prepared.style.labelGap + 2 }), spacingAttempt + 1);
     return scene;
 }
 function point(scene: ContourScene, radius: number, angle: number): Point { return [scene.cx + radius * Math.sin(angle), scene.cy - radius * Math.cos(angle)]; }

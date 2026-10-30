@@ -73,12 +73,12 @@ const money=value=>new Intl.NumberFormat('en-US',{style:'currency',currency:'USD
             const stage=document.querySelector('.bb-chart-carousel-band').getBoundingClientRect()
             return {fills:ring.width/Math.min(host.width,host.height),centerX:Math.abs((center.left+center.right-ring.left-ring.right)/2),centerY:Math.abs((center.top+center.bottom-ring.top-ring.bottom)/2),inset:select.right-chevron.right,dropdownWidth:select.width,totalFont:getComputedStyle(el.querySelector('.bb-chart-total')).fontSize,usedFont:getComputedStyle(el.querySelector('.bb-category-used')).fontSize,headerFits:amount.right+8<select.left,stage:stage.height,used:el.querySelector('.bb-category-used .bb-fitted-amount-text').textContent,usedCaption:el.querySelector('.bb-category-pie-center > span').textContent,budget:el.querySelector('.bb-chart-budget-note').textContent,mode:el.querySelector('.bb-chart-mode-note').textContent,captionFits:el.querySelector('.bb-category-pie-center > span').getBoundingClientRect().width<=center.width}
           })
-          assert.ok(geometry.fills>.9&&geometry.fills<1,JSON.stringify(geometry))
+          assert.ok(geometry.fills>.7&&geometry.fills<1,JSON.stringify(geometry))
           assert.ok(geometry.centerX<1&&geometry.centerY<1,JSON.stringify(geometry))
           assert.equal(geometry.inset,14,'The chevron retains its approved right inset')
           assert.ok(geometry.dropdownWidth < 90,'All hugs its text and chevron instead of reserving room for longer scopes')
-          assert.equal(geometry.totalFont,'36px')
-          assert.equal(geometry.usedFont,'40px')
+          assert.equal(geometry.totalFont,'28px')
+          assert.equal(geometry.usedFont,'30px')
           assert.equal(geometry.headerFits,true,'Exact cents fit beside the native dropdown')
           assert.equal(geometry.mode,mode)
           assert.equal(geometry.used,`${Number(((fixture.expected[i]+fixture.cash+(fixture.espp[i]??0))/(5000+(fixture.espp[i]??0))*100).toFixed(1))}%`)
@@ -107,11 +107,13 @@ const money=value=>new Intl.NumberFormat('en-US',{style:'currency',currency:'USD
           }
           await category.getByRole('combobox',{name:'Category mix filter',exact:true}).selectOption('all')
           assert.ok(Math.abs((await scope.boundingBox()).width-geometry.dropdownWidth)<1,'All shrinks again after a longer scope')
-          await category.getByRole('button',{name:'Categories',exact:true}).click();await dialog.waitFor()
-          const labels=await dialog.locator('.bb-legend-row > span:nth-child(2)').allTextContents()
-          assert.equal(labels.filter(label=>label==='Saved'||label==='Cash saved').length,Number(fixture.cash>0),'Recorded cash appears once in All for enrolled and non-enrolled reports')
+          assert.equal(await category.getByRole('button',{name:'Categories',exact:true}).count(),0)
+          await category.getByRole('button',{name:'Show category callouts',exact:true}).click()
+          await category.locator('.bb-contour-callouts[data-ready="true"][data-visible="true"]').waitFor({timeout:120000})
+          const labels=await category.locator('.bb-contour-label').evaluateAll(nodes=>nodes.map(node=>node.getAttribute('aria-label')))
+          assert.equal(labels.filter(label=>/^Inspect (Saved|Cash saved),/.test(label)).length,Number(fixture.cash>0),'Recorded cash appears once in All for enrolled and non-enrolled reports')
           assert.equal(labels.some(label=>label.includes('ESPP')),Boolean(fixture.espp[i]))
-          await page.keyboard.press('Escape');await page.waitForTimeout(350)
+          await category.getByRole('button',{name:'Hide category callouts',exact:true}).click();await page.waitForTimeout(dark?30:600)
           assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth),false)
           count++
         }

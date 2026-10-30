@@ -10,11 +10,11 @@ class Worker {
  terminate(){this.stopped++}
  reply(scene){this.onmessage({data:{scene}})}
 }
-const prepared=(data,width,height)=>({cx:width/2,cy:height/2,radius:110,inner:84,width,height,style:{inset:10},items:data,routes:null})
+const prepared=(data,width,height)=>({cx:width/2,cy:height/2,radius:109.5,inner:83.5,width,height,style:{inset:8},items:data,routes:null})
 const runtime={exports:{},Worker,window,require:name=>{
  if(name==='react'||name==='react/jsx-runtime')return req(name)
  if(name.includes('?worker&url'))return {default:'/category-mix-layout-test.js'}
- if(name==='./category-mix-layout')return {CONTOUR_STYLE:{labelSize:12,sidePadding:6,thickness:26},contourLabel:(_key,label)=>label,prepareContourScene:prepared}
+ if(name==='./category-mix-layout')return {CONTOUR_STYLE:{labelSize:11,sidePadding:6,thickness:26},contourLabel:(_key,label)=>label,prepareContourScene:prepared}
  throw new Error(name)
 }}
 vm.runInNewContext(ts.transpileModule(fs.readFileSync('web/expense-report/src/category-mix-contour.tsx','utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2020,jsx:ts.JsxEmit.ReactJSX}}).outputText,runtime)
@@ -24,10 +24,11 @@ const data=[{key:'food',label:'Food',amount:12.99,percentage:100,color:'orange'}
 let tree
 try {
  act(()=>{tree=Renderer.create(React.createElement(Host,{data,size}))})
- assert.equal(tree.root.findByType('output').props.layout.outerRadius,187,'Default ring fills the chart');
- assert.equal(tree.root.findByType('output').props.layout.innerRadius,161,'Large ring preserves the current 26px band');
+ assert.equal(tree.root.findByType('output').props.layout.outerRadius,159,'Hidden ring uses the selected 36px inset');
+ assert.equal(tree.root.findByType('output').props.layout.innerRadius,111,'Hidden ring uses the selected 48px band');
+ assert.equal(tree.root.findByType('output').props.layout.cy,182,'Hidden ring moves 16px above the plot center');
  act(()=>tree.update(React.createElement(Host,{data,size,shown:true})))
- assert.equal(tree.root.findByType('output').props.layout.outerRadius,110,'Showing callouts uses the compact Refined flow ring');
+ assert.equal(tree.root.findByType('output').props.layout.outerRadius,109.5,'Showing callouts uses the compact Refined flow ring');
  assert.match(workers[0].scene.items[0].amountLabel,/\$13 \/ 100%/,'Callouts include the ring percentage beside whole-dollar amounts');
  assert.equal(workers.length,1,'Toggling uses the same background worker, without restarting geometry');
  assert.equal(workers.length,1);assert.equal(workers[0].url,'/app/assets/category-mix-layout-test.js');assert.equal(workers[0].options.type,'module')

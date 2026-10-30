@@ -72,10 +72,10 @@ async function checkQuietHeader(page, width, reduced) {
     assert.deepEqual(layout.padding,['12px','0px'])
     assert.equal(layout.buttons.length,4)
     assert.ok(layout.buttons.every((button,i) => button.box.width===44&&button.box.height===44&&button.marker.height===6&&button.marker.width===(i===index?24:6)&&button.text===''))
-    assert.ok(layout.value.right<=layout.title.right+1&&layout.font<=24,'Long headings fit without overlapping the position markers')
+    assert.ok(layout.value.right<=layout.title.right+1&&layout.font<=28,'Long headings fit without overlapping the position markers')
     if (width<=362) assert.ok(layout.title.bottom<=layout.dots.top+1,'Narrow phones retain full title text above right-aligned markers')
     else assert.ok(layout.title.right+8<=layout.dots.left+1)
-    if (name==='Category Mix') assert.equal(layout.font,24,'Approved title size is retained where it fits')
+    if (name==='Category Mix') assert.equal(layout.font,28,'Approved title size is retained where it fits')
     if (reduced) assert.ok(layout.buttons.every(button=>button.duration<=.001))
     assert.equal(layout.touchAction,'pan-y','Chart gestures leave vertical panning native')
     assert.equal((await stage.boundingBox()).height,height,'Every graph uses the unchanged shared stage height')
@@ -117,6 +117,7 @@ async function checkQuietHeader(page, width, reduced) {
         await page.route('**/*', async route => {
           const request = route.request(), url = new URL(request.url()), name = url.pathname
           if (url.origin !== 'https://bookie.test' || request.method() !== 'GET') {unexpected.push(`${request.method()} ${url}`); await route.abort(); return}
+          if (/^\/app\/assets\/category-mix-layout-[A-Za-z0-9_-]+\.js$/.test(name)) {await route.fulfill({contentType:'application/javascript',body:fs.readFileSync(path.join(root,'src/bookiebot/reports/assets',path.basename(name)),'utf8')}); return}
           let value
           if (name === '/app/expenses') {await route.fulfill({contentType: 'text/html', body: html(dark)}); return}
           if (name === '/app/expenses/data') {

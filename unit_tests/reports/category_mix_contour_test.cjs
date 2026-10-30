@@ -12,8 +12,8 @@ const {prepareContourScene, refineContourScene, contourLabel, CONTOUR_STYLE} = l
 const {createContourPathProbe} = load('category-mix-path')
 const raw = [['rent','Rent',2500],['bills','Bills & Utilities',380],['needs-subscriptions','Subscriptions (Needs)',180],['need','Need transactions',650],['grocery','Grocery',680],['gas','Gas',250],['food','Food',1329.32],['shopping','Shopping',540],['wants-subscriptions','Subscriptions (Wants)',160],['savings','Cash saved',1596.62],['espp','SpaceX ESPP',400],['left','Income left',1317.14]]
 const measure = (text, size) => text.length * size * .56
-function input(rows, width) { const size=width<330?11.5:12; return rows.map(([id,label,amount])=>{const name=contourLabel(id,label),amountLabel=new Intl.NumberFormat('en-US',{style:'currency',currency:'USD',maximumFractionDigits:0}).format(amount)+' / '+new Intl.NumberFormat('en-US',{maximumFractionDigits:1}).format(amount/rows.reduce((sum,row)=>sum+Math.max(0,row[2]),0)*100)+'%';return {id,name,amount,amountLabel,width:Math.ceil(Math.max(measure(name,size),measure(amountLabel,size))+12)}}) }
-assert.equal(CONTOUR_STYLE.diameter,220);assert.equal(CONTOUR_STYLE.thickness,26);assert.equal(CONTOUR_STYLE.drift,23)
+function input(rows, width) { const size=11; return rows.map(([id,label,amount])=>{const name=contourLabel(id,label),amountLabel=new Intl.NumberFormat('en-US',{style:'currency',currency:'USD',maximumFractionDigits:0}).format(amount)+' / '+new Intl.NumberFormat('en-US',{maximumFractionDigits:1}).format(amount/rows.reduce((sum,row)=>sum+Math.max(0,row[2]),0)*100)+'%';return {id,name,amount,amountLabel,width:Math.ceil(Math.max(measure(name,size),measure(amountLabel,size))+12)}}) }
+assert.equal(CONTOUR_STYLE.diameter,219);assert.equal(CONTOUR_STYLE.thickness,26);assert.equal(CONTOUR_STYLE.labelSize,11);assert.equal(CONTOUR_STYLE.labelGap,6);assert.equal(CONTOUR_STYLE.inset,8);assert.equal(CONTOUR_STYLE.drift,36)
 assert.equal(contourLabel('needs-subscriptions','Subscriptions (Needs)'),'Needs subs')
 assert.equal(contourLabel('wants-subscriptions','Subscriptions (Wants)'),'Wants subs')
 assert.equal(contourLabel('static_bills_subscriptions_needs','Static Bills & Subscriptions'),'Needs subs')
@@ -25,7 +25,7 @@ function validate(scene) {
   assert.equal(scene.radius-scene.inner,26,'The selected band thickness is retained')
   for(let i=0;i<scene.items.length;i++) {
     const a=scene.items[i]
-    assert.ok(a.x>=9.9&&a.x+a.width<=scene.width-9.9&&a.y-a.height/2>=9.9&&a.y+a.height/2<=scene.height-9.9,'Labels fit the actual host')
+    assert.ok(a.x>=scene.style.inset-.1&&a.x+a.width<=scene.width-scene.style.inset+.1&&a.y-a.height/2>=scene.style.inset-.1&&a.y+a.height/2<=scene.height-scene.style.inset+.1,'Labels fit the actual host')
     assert.ok(/^\$[\d,]+ \/ [\d.]+%$/.test(a.amountLabel),'Only callout amounts use whole-dollar formatting')
     for(const b of scene.items.slice(i+1))assert.ok(a.x+a.width+scene.style.labelGap-.2<=b.x||b.x+b.width+scene.style.labelGap-.2<=a.x||a.y+a.height/2+scene.style.labelGap-.2<=b.y-b.height/2||b.y+b.height/2+scene.style.labelGap-.2<=a.y-a.height/2,'Callout containers never overlap')
   }
@@ -55,9 +55,16 @@ let count=0
 for(const [width,height] of [[288,350],[358,374],[388,396],[700,400]]) {
   const rows=input(raw,width),before=JSON.stringify(rows),scene=refineContourScene(prepareContourScene(rows,width,height));validate(scene);count++;console.log('geometry',width,height)
   assert.equal(JSON.stringify(rows),before,'Layout must not mutate financial inputs')
-  assert.ok(scene.assignment.routedAfter.cost<=scene.assignment.routedBefore.cost,'Swaps are accepted against actual curved paths')
+  assert.ok(scene.assignment.routedAfter,'Optimization can recover a complete route plan when the initial grid has none')
+  if(scene.assignment.routedBefore)assert.ok(scene.assignment.routedAfter.cost<=scene.assignment.routedBefore.cost,'Swaps are accepted against actual curved paths')
 }
 for(const rows of [raw.slice(0,6),raw.slice(6,9),raw.slice(9),[['rent','Rent',100]],[],[['food','Food',0],['gas','Gas',-10]], [['need','Need transactions',110],['coverage-savings-needs','Needs overspend coverage',40],['left','Income left',350]]]) {
   const scene=refineContourScene(prepareContourScene(input(rows,358),358,374));validate(scene);count++
 }
 console.log(`${count} Refined flow geometry cases: measured whole-dollar cards, 26px band, rounded independent stems, efficient swaps, no collisions, zero/refund/coverage cases`)
+
+// Deliberately crowded measured names force all bounded spacing retries.
+// A retry must not silently restore the default diameter, band, inset or drift.
+const crowded=refineContourScene(prepareContourScene(input(raw,240).map(row=>({...row,width:210})),240,200,{diameter:193,thickness:24,labelSize:11,labelGap:8,inset:14,drift:17}))
+assert.equal(crowded.style.labelGap,14,'Crowded geometry exercises all three spacing retries')
+for(const [key,value] of Object.entries({diameter:193,thickness:24,labelSize:11,inset:14,drift:17}))assert.equal(crowded.style[key],value,'Spacing fallback preserves every selected style field')

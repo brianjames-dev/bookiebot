@@ -1613,8 +1613,7 @@ const CategoryMixChart = memo(function CategoryMixChart({
   const selectedRollover = categoryMixRollover(categoryBalances, filter)
   const transferRows = categoryMixTransferRows(categoryBalances, filter)
   const chartData = categoryMixRows(data, selectedRollover, filter, amountSaved, transferRows, espp, estimatedEspp)
-  // Spend/savings begin at noon; keep the remaining balance at the end of
-  // the ring without changing the established Categories dialog order.
+  // Spend/savings begin at noon, with the remaining balance last.
   const ringData = [...chartData.filter(item => item.key !== "left"), ...chartData.filter(item => item.key === "left")]
   const [pieHostRef, pieHostSize] = useElementSize<HTMLDivElement>()
   const [showCallouts, setShowCallouts] = useState(false)
@@ -1632,21 +1631,17 @@ const CategoryMixChart = memo(function CategoryMixChart({
   return (
     <div className="bb-chart-stack bb-chart-page bb-category-mix-page">
       <div className="bb-panel-head bb-chart-page-header bb-category-mix-summary">
-        <div>
-          <div className="bb-category-summary-label">
+        <div className="bb-category-summary-label">
             <span className="bb-chart-kicker">{filter === "savings" ? "Saved" : "Spent"}</span>
             <span className="bb-chart-mode-note">{projected ? "Projected" : "Current"}</span>
-          </div>
+        </div>
+        <div className="bb-category-amount-row">
           <FittedAmount className="bb-chart-total">{formatMoney(spentTotal)}</FittedAmount>
-          {selectedBudget > 0 ? (
-            <div className="bb-chart-budget-note">
-              {formatMoney(selectedBudget)} budget
-            </div>
-          ) : null}
+          <div className="bb-chart-page-header-actions">
+            <CategoryMixFilterControl filter={filter} onFilterChange={onFilterChange} />
+          </div>
         </div>
-        <div className="bb-chart-page-header-actions">
-          <CategoryMixFilterControl filter={filter} onFilterChange={onFilterChange} />
-        </div>
+        {selectedBudget > 0 ? <div className="bb-chart-budget-note">{formatMoney(selectedBudget)} budget</div> : null}
         {pressure ? <CategoryMixPressureBar pressure={pressure} /> : null}
       </div>
       <div className="bb-chart-layout bb-category-chart-layout bb-chart-page-body">

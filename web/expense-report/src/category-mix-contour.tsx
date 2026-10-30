@@ -8,7 +8,7 @@ const percent = new Intl.NumberFormat("en-US", { maximumFractionDigits: 1 })
 let context: CanvasRenderingContext2D | null | undefined
 
 export function prepareCategoryContour(data: BreakdownItem[], width: number, height: number, fontFamily = typeof document !== "undefined" && document.body ? window.getComputedStyle(document.body).fontFamily : "system-ui, sans-serif") {
-  const labelSize = width < 330 ? 11.5 : CONTOUR_STYLE.labelSize
+  const labelSize = width < 330 ? Math.min(11.5, CONTOUR_STYLE.labelSize) : CONTOUR_STYLE.labelSize
   if (context === undefined) context = typeof document === "undefined" ? null : document.createElement("canvas").getContext("2d")
   const measure = (text: string, weight: number) => {
     if (!context) return text.length * labelSize * .62
@@ -62,11 +62,12 @@ export function useCategoryContour(data: BreakdownItem[], size: {width: number; 
     return () => { active = false; worker.terminate() }
   }, [key, prepared, size.width, size.height])
   const scene = cached ?? (result?.key === key ? result.scene : prepared)
-  const radius = Math.max(54, Math.min(width, height) / 2 - 8)
+  const radius = Math.max(54, Math.min(width, height) / 2 - 36)
+  const cy = Math.max(radius, Math.min(height - radius, height / 2 - 16))
   return useMemo(() => ({
-    cx: showCallouts ? scene.cx : width / 2, cy: showCallouts ? scene.cy : height / 2,
+    cx: showCallouts ? scene.cx : width / 2, cy: showCallouts ? scene.cy : cy,
     outerRadius: showCallouts ? scene.radius : radius,
-    innerRadius: showCallouts ? scene.inner : Math.max(8, radius - CONTOUR_STYLE.thickness),
+    innerRadius: showCallouts ? scene.inner : Math.max(8, radius - 48),
     margin: {top: 0, right: 0, bottom: 0, left: 0}, containerPadding: scene.style.inset,
     showLabels: false, contour: scene, contourKey: key, calloutsReady: settledKey === key,
   }), [scene, key, settledKey, showCallouts])

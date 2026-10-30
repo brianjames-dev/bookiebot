@@ -1360,7 +1360,7 @@ button.bb-left-categories { cursor: pointer; }
   min-width: 0;
   margin: 0;
   color: hsl(var(--foreground));
-  font-size: 24px;
+  font-size: 28px;
   font-weight: 500;
   line-height: 1.25;
   letter-spacing: -.025em;
@@ -1557,21 +1557,17 @@ button.bb-left-categories { cursor: pointer; }
   flex-basis: 100%;
 }
 
-.bb-panel-head.bb-category-mix-summary {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
-  align-items: start;
-  gap: 12px;
-}
-.bb-category-mix-summary > :first-child { grid-column: 1; grid-row: 1; }
-.bb-category-mix-summary .bb-chart-page-header-actions { grid-column: 2; grid-row: 1; }
-.bb-category-mix-summary > .bb-category-pressure { grid-column: 1 / -1; grid-row: 2; justify-self: stretch; }
+.bb-panel-head.bb-category-mix-summary { display: block; min-width: 0; }
+.bb-category-amount-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; min-width: 0; }
+.bb-category-amount-row > .bb-chart-total { flex: 1 1 0; min-width: 0; }
+.bb-category-amount-row > .bb-chart-page-header-actions { flex: 0 0 auto; }
+.bb-category-mix-summary > .bb-category-pressure { width: 100%; margin: 12px 0 0; }
 .bb-category-summary-label { display: flex; align-items: baseline; gap: 5px; white-space: nowrap; }
 .bb-category-summary-label .bb-chart-kicker { font-size: 11px; font-weight: 500; letter-spacing: .07em; text-transform: uppercase; }
 .bb-category-summary-label .bb-chart-mode-note { margin: 0; font-size: 11px; font-weight: 400; }
 .bb-category-summary-label .bb-chart-mode-note::before { content: "·"; margin-right: 5px; }
-.bb-category-mix-summary .bb-chart-total { margin-top: 5px; font-size: 36px; line-height: 1.08; letter-spacing: -.055em; }
-.bb-category-mix-summary .bb-chart-budget-note { margin-top: 7px; }
+.bb-category-mix-summary .bb-chart-total { margin-top: 0; font-size: 28px; line-height: 1.08; letter-spacing: -.055em; }
+.bb-category-mix-summary .bb-chart-budget-note { margin-top: 0; }
 .bb-category-mix-filter { position: relative; display: inline-grid; min-width: 44px; max-width: 100%; font-size: 14px; }
 .bb-category-filter-label { visibility: hidden; pointer-events: none; white-space: pre; min-height: 44px; padding: 8px 36px 8px 12px; border: 1px solid transparent; }
 .bb-category-mix-filter select {
@@ -1752,19 +1748,20 @@ button.bb-left-categories { cursor: pointer; }
 .bb-category-pie-center {
   position: absolute;
   display: grid;
-  gap: 4px;
+  gap: 0;
   text-align: center;
   color: hsl(var(--muted-foreground));
-  font-size: 12px;
+  font-size: 11px;
+  line-height: 1.5;
   border: 0;
   padding: 8px 0;
   background: transparent;
   font-family: inherit;
   cursor: pointer;
   transform: translate(-50%, -50%);
-  transition: left 520ms ease-out, top 520ms ease-out, width 520ms ease-out;
+  transition: left 520ms ease-out, top 520ms ease-out, width 520ms ease-out, gap 520ms ease-out, font-size 520ms ease-out;
 }
-.bb-category-used { color: hsl(var(--foreground)); font-size: 32px; font-weight: 500; line-height: 1.1; letter-spacing: -.04em; font-variant-numeric: tabular-nums; }
+.bb-category-used { color: hsl(var(--foreground)); font-size: 24px; font-weight: 500; line-height: 1.1; letter-spacing: -.04em; font-variant-numeric: tabular-nums; }
 
 
 
@@ -3357,7 +3354,8 @@ button:focus-visible, summary:focus-visible {
 .bb-contour-callouts[data-visible="true"][data-ready="true"] { opacity: 1; visibility: visible; transition-delay: 180ms; }
 .bb-contour-callouts[data-visible="true"][data-ready="true"] .bb-contour-label { pointer-events: auto; }
 .bb-category-pie-center:focus-visible { outline: 2px solid hsl(var(--primary)); outline-offset: 4px; border-radius: 12px; }
-.bb-category-pie-host[data-callouts="false"] .bb-category-used { font-size: 40px; }
+.bb-category-pie-host[data-callouts="false"] .bb-category-used { font-size: 30px; }
+.bb-category-pie-host[data-callouts="false"] .bb-category-pie-center { font-size: 12px; gap: 4px; }
 .bb-category-pie-host .bb-category-used { transition: font-size 520ms ease-out; }
 .bb-contour-stem { fill: none; stroke-width: 1.2px; stroke-linecap: round; opacity: .65; }
 .bb-contour-label rect { fill: color-mix(in srgb, hsl(var(--foreground)) 5%, hsl(var(--card))); }

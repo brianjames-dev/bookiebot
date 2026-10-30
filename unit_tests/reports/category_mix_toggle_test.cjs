@@ -20,14 +20,14 @@ try{
 
 const animations={exports:{},require:req};vm.runInNewContext(compile(fs.readFileSync('web/expense-report/src/chart-animation.tsx','utf8')),animations)
 const animate=animations.exports.categoryRingAnimation
-const large={cx:195,cy:190,outerRadius:187,innerRadius:161,startAngle:90,endAngle:-170,paddingAngle:.7,payload:{key:'food'}}
-const compact={...large,cx:193,cy:200,outerRadius:110,innerRadius:84}
+const large={cx:195,cy:182,outerRadius:159,innerRadius:111,startAngle:90,endAngle:-170,paddingAngle:.7,payload:{key:'food'}}
+const compact={...large,cx:193,cy:200,outerRadius:109.5,innerRadius:83.5}
 const snapshot=animate([{status:'matched',prev:large,next:compact}],.4,'centric')[0]
-for(const [field,value] of Object.entries({cx:194.2,cy:194,outerRadius:156.2,innerRadius:130.2}))assert.equal(snapshot.animationGeometry[field],value)
-assert.equal(snapshot.animationGeometry.outerRadius-snapshot.animationGeometry.innerRadius,26,'Band thickness remains constant throughout the morph')
+for(const [field,value] of Object.entries({cx:194.2,cy:189.2,outerRadius:139.2,innerRadius:100}))assert.equal(snapshot.animationGeometry[field],value)
+assert.ok(Math.abs(snapshot.animationGeometry.outerRadius-snapshot.animationGeometry.innerRadius-39.2)<.0001,'Band thickness interpolates smoothly between the selected 48px and 26px states')
 const reversed=animate([{status:'matched',prev:snapshot,next:large}],0,'centric')[0]
 assert.deepEqual(reversed.animationGeometry,snapshot.animationGeometry,'A rapid reverse starts from the current visible geometry without snapping')
 const final=animate([{status:'matched',prev:snapshot,next:large}],1,'centric')[0]
-assert.equal(final.animationGeometry.outerRadius,187)
-assert.equal(final.outerRadius,187,'SVG target coordinates stay stable throughout animation')
+assert.equal(final.animationGeometry.outerRadius,159)
+assert.equal(final.outerRadius,159,'SVG target coordinates stay stable throughout animation')
 console.log('Explicit background toggles preserve slice/callout actions and native gestures; ring size and center morph smoothly through interruption')
