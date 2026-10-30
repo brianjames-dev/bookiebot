@@ -1,5 +1,9 @@
 # Agent Decisions
 
+## 2026-10-29 - Match The Latest Comparison Divider Spacing
+
+Apply the latest morphing-container draft selection: 12px above and below the expanded comparison divider, superseding the prior 16px setting. Retain the selected 360ms expansion duration and all other approved styling and interactions. Native acceptance is checklist 189.
+
 ## 2026-10-29 - Unify The Collapsed And Expanded Spending Comparison
 
 Implement the approved Left anchored composition as one persistent container that morphs from the accepted Hug content capsule. Use the user's selected 360ms easing; keep the collapsed 48px height, 16px radius/side inset, 2px caption gap and 14px outside gaps. Expanded settings: 16px padding, 20px corners, maximum 38px difference, 10px month-row gap, 8px bars and 16px summary/divider spacing. Hide the original title/caption/leading icon when expanded, replacing its full trigger with a 44px top-right collapse control. Lead with the canonical signed-change magnitude, more/less label and available percentage; stack the selected and comparison months with a common positive-spending bar scale. Keep signed refund amounts visible with zero positive fill; zero baselines never invent an infinite percentage. Retain the existing matching-day calculation, previous-month default, full-year picker context, coverage notes, excluded amounts/Details, retries, queue/cache and refresh semantics.

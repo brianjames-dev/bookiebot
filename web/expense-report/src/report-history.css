@@ -21,7 +21,7 @@
 .bb-comparison-viewport { opacity: 0; visibility: hidden; transform: translateY(5px); transition: opacity 160ms ease, transform 240ms var(--bb-comparison-ease), visibility 0s linear 360ms; }
 .bb-comparison-card[data-open="true"] .bb-comparison-viewport { opacity: 1; visibility: visible; transform: translateY(0); transition: opacity 160ms ease 90ms, transform 240ms var(--bb-comparison-ease) 90ms; }
 .bb-comparison-content { box-sizing: border-box; min-width: 0; padding: 16px; }
-.bb-comparison-hero { min-height: 66px; padding: 0 44px 16px 0; color: var(--bb-comparison-change-color); }
+.bb-comparison-hero { min-height: 66px; padding: 0 44px 12px 0; color: var(--bb-comparison-change-color); }
 .bb-comparison-hero > .bb-comparison-note { margin-top: 0; }
 .bb-comparison-change { margin: 0; font-variant-numeric: tabular-nums; }
 .bb-comparison-hero-main { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: 8px 12px; }
@@ -29,7 +29,7 @@
 .bb-comparison-direction { margin: 7px 0 0; color: hsl(var(--muted-foreground)); font-size: 12px; line-height: 1.5; }
 .bb-comparison-percent { display: inline-flex; align-items: center; gap: 5px; padding: 5px 8px; border-radius: 8px; background: color-mix(in srgb, var(--bb-comparison-change-color) 10%, hsl(var(--card))); font-size: 12px; line-height: 1.5; white-space: nowrap; }
 .bb-comparison-card[data-direction="more"] .bb-comparison-percent svg { transform: rotate(180deg); }
-.bb-comparison-months { display: grid; gap: 10px; border-top: 1px solid hsl(var(--border)); padding-top: 16px; }
+.bb-comparison-months { display: grid; gap: 10px; border-top: 1px solid hsl(var(--border)); padding-top: 12px; }
 .bb-comparison-month-row { min-width: 0; }
 .bb-comparison-month-head { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); align-items: center; gap: 0 8px; min-height: 44px; }
 .bb-comparison-month-name { display: flex; align-items: center; min-height: 44px; color: hsl(var(--muted-foreground)); font-size: 16px; line-height: 20px; }

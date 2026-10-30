@@ -187,6 +187,7 @@ async function checkComparisonCapsule(page) {
             overflow:document.documentElement.scrollWidth > innerWidth,
             amounts:[...card.querySelectorAll('.bb-comparison-difference .bb-fitted-amount-text, .bb-comparison-amount .bb-fitted-amount-text')].map(node => ({text:node.textContent, font:parseFloat(getComputedStyle(node).fontSize), box:rect(node)})),
             tracks:[...card.querySelectorAll('.bb-comparison-track')].map(rect),
+            dividerPadding:[getComputedStyle(card.querySelector('.bb-comparison-hero')).paddingBottom, getComputedStyle(card.querySelector('.bb-comparison-months')).paddingTop],
             frames:window.__comparisonFrames}
         })
         assert.ok(expanded.sameCard && expanded.samePicker && expanded.groupHidden && expanded.accessible)
@@ -199,6 +200,7 @@ async function checkComparisonCapsule(page) {
         assert.deepEqual(expanded.amounts.map(amount => amount.text), ['$25.00', '$125.00', '$150.00'])
         assert.ok(expanded.amounts[0].font >= 37 && expanded.amounts.slice(1).every(amount => amount.font >= (width === 320 ? 15 : 17)), 'Normal amounts retain the selected readable font sizes')
         assert.ok(expanded.tracks.every(track => track.height === 8))
+        assert.deepEqual(expanded.dividerPadding, ['12px', '12px'], 'The selected divider spacing applies to both sides')
         assert.equal(expanded.overflow, false)
         if (!dark) assert.ok(new Set(expanded.frames.map(frame => Math.round(frame.width))).size > 2, 'Normal-motion expansion has intermediate widths')
         if (width === 390) await page.screenshot({path:`/tmp/bookiebot-comparison-expanded-${engine.name()}-${dark ? 'dark' : 'light'}.png`})
