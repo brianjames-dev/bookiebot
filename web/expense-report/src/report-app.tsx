@@ -930,10 +930,6 @@ const OverviewCharts = memo(function OverviewCharts({ report, activeReport, char
           panels={chartPanels}
           activeIndex={activeChartIndex}
           onSelect={switchChart}
-          onPrevious={() => moveChart(-1)}
-          onNext={() => moveChart(1)}
-          canPrevious={activeChartIndex > 0}
-          canNext={activeChartIndex < chartPanels.length - 1}
         />
         <section
           className="bb-chart-carousel-band"
@@ -1091,30 +1087,17 @@ function ChartCarouselNavigation({
   panels,
   activeIndex,
   onSelect,
-  onPrevious,
-  onNext,
-  canPrevious,
-  canNext,
 }: {
   panels: ChartPanel[]
   activeIndex: number
   onSelect: (index: number) => void
-  onPrevious: () => void
-  onNext: () => void
-  canPrevious: boolean
-  canNext: boolean
 }) {
   return (
     <div className="bb-chart-carousel-nav">
+      <h2 className="bb-chart-carousel-title" aria-live="polite">
+        <FittedAmount className="bb-chart-carousel-title-value">{panels[activeIndex].title}</FittedAmount>
+      </h2>
       <ChartCarouselIndicators panels={panels} activeIndex={activeIndex} onSelect={onSelect} />
-      <div className="bb-chart-carousel-arrows">
-        <button type="button" className="bb-chart-carousel-button" aria-label="Previous chart" onClick={onPrevious} disabled={!canPrevious}>
-          <span aria-hidden="true">←</span>
-        </button>
-        <button type="button" className="bb-chart-carousel-button" aria-label="Next chart" onClick={onNext} disabled={!canNext}>
-          <span aria-hidden="true">→</span>
-        </button>
-      </div>
     </div>
   )
 }
@@ -1129,6 +1112,7 @@ function CategoryMixFilterControl({
   const [pointerFocus, setPointerFocus] = useState(false)
   return (
     <div className="bb-category-mix-filter" data-bb-tooltip-dismiss-trigger="category-mix" data-pointer-focus={pointerFocus ? "true" : undefined}>
+      <span className="bb-category-filter-label" aria-hidden="true">{CATEGORY_MIX_FILTERS.find(item => item.value === filter)?.label}</span>
       <select aria-label="Category mix filter" value={filter}
         onPointerDown={() => setPointerFocus(true)} onKeyDown={() => setPointerFocus(false)} onBlur={() => setPointerFocus(false)}
         onChange={(event) => onFilterChange(event.target.value as CategoryMixFilter)}>
@@ -1183,7 +1167,13 @@ function ChartCarouselIndicators({
   onSelect: (index: number) => void
 }) {
   return (
-    <SlidingSelection value={activeIndex} className="bb-chart-carousel-indicators" aria-label="Budget chart position">
+    <div className="bb-chart-carousel-indicators" role="group" aria-label="Budget chart position"
+      onKeyDown={(event) => {
+        const next = event.key === "ArrowRight" ? activeIndex + 1 : event.key === "ArrowLeft" ? activeIndex - 1 : null
+        if (next === null) return
+        event.preventDefault()
+        onSelect(clamp(next, 0, panels.length - 1))
+      }}>
       {panels.map((panel, index) => (
         <button
           type="button"
@@ -1195,10 +1185,10 @@ function ChartCarouselIndicators({
           aria-controls={`bb-chart-${panel.id}`}
           onClick={() => onSelect(index)}
         >
-          {panel.title}
+          <span aria-hidden="true" />
         </button>
       ))}
-    </SlidingSelection>
+    </div>
   )
 }
 

@@ -1344,73 +1344,66 @@ button.bb-left-categories { cursor: pointer; }
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 16px;
+  flex-wrap: wrap;
+  gap: 0 8px;
   width: 100%;
   min-width: 0;
-  border-bottom: 1px solid hsl(var(--border));
+  min-height: 64px;
+  padding-top: 12px;
+  background: hsl(var(--card));
+  box-shadow: 0 0 0 100vmax hsl(var(--card));
+  clip-path: inset(0 -100vmax);
 }
 
-.bb-chart-carousel-controls {
-  display: contents;
-}
-
-.bb-chart-carousel-button {
-  appearance: none;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 40px;
-  height: 40px;
-  border: 1px solid hsl(var(--border));
-  border-radius: var(--radius);
-  background: transparent;
+.bb-chart-carousel-title {
+  flex: 1 1 0;
+  min-width: 0;
+  margin: 0;
   color: hsl(var(--foreground));
-  cursor: pointer;
-  font: inherit;
-  font-size: 20px;
-  line-height: 1;
+  font-size: 24px;
+  font-weight: 500;
+  line-height: 1.25;
+  letter-spacing: -.025em;
 }
-
-.bb-chart-carousel-button:hover {
-  border-color: hsl(var(--muted));
-  background: hsl(var(--muted) / 0.12);
-}
-
-.bb-chart-carousel-button:disabled {
-  cursor: default;
-  opacity: 0.38;
+.bb-chart-carousel-title-value .bb-fitted-amount-text {
+  letter-spacing: inherit;
 }
 
 .bb-chart-carousel-indicators {
   display: flex;
-  align-items: stretch;
-  gap: clamp(12px, 2.5vw, 32px);
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: center;
+  gap: 0;
   min-width: 0;
-  overflow-x: auto;
-  scrollbar-width: thin;
 }
 
 .bb-chart-carousel-dot {
   appearance: none;
-  display: flex;
-  align-items: center;
-  flex: 0 0 auto;
-  gap: 8px;
-  min-height: 54px;
-  padding: 12px 0;
+  display: grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  padding: 0;
   border: 0;
-  border-bottom: 2px solid transparent;
+  border-radius: 10px;
   background: transparent;
-  color: hsl(var(--muted-foreground));
   cursor: pointer;
-  font: inherit;
-  font-size: 14px;
-  white-space: nowrap;
-  transition: border-color 160ms ease, color 160ms ease;
 }
-
-.bb-chart-carousel-dot[data-state="active"] {
-  color: hsl(var(--foreground));
+.bb-chart-carousel-dot > span {
+  width: 6px;
+  height: 6px;
+  border-radius: 8px;
+  background: color-mix(in srgb, hsl(var(--muted-foreground)) 50%, hsl(var(--card)));
+  transition: width 240ms cubic-bezier(.2,.7,.2,1), background 240ms ease;
+}
+.bb-chart-carousel-dot[data-state="active"] > span {
+  width: 24px;
+  background: hsl(var(--primary));
+}
+@media (max-width: 362px) {
+  .bb-chart-carousel-title { flex: 0 0 100%; }
+  .bb-chart-carousel-indicators { margin-left: auto; }
 }
 
 .bb-tabs-list {
@@ -1485,14 +1478,6 @@ button.bb-left-categories { cursor: pointer; }
   box-shadow: inset 0 0 0 1px hsl(var(--primary) / .18), 0 2px 5px hsl(var(--foreground) / .08);
 }
 
-.bb-chart-carousel-indicators > .bb-selection-indicator {
-  top: auto;
-  bottom: 0;
-  height: 2px;
-  border: 0;
-  border-radius: 0;
-  background: hsl(var(--primary));
-}
 
 .bb-expense-insights-content > .bb-tabs-content {
   grid-area: 1 / 1;
@@ -1587,8 +1572,11 @@ button.bb-left-categories { cursor: pointer; }
 .bb-category-summary-label .bb-chart-mode-note::before { content: "·"; margin-right: 5px; }
 .bb-category-mix-summary .bb-chart-total { margin-top: 5px; font-size: 36px; line-height: 1.08; letter-spacing: -.055em; }
 .bb-category-mix-summary .bb-chart-budget-note { margin-top: 7px; }
-.bb-category-mix-filter { position: relative; width: 120px; min-width: 0; }
+.bb-category-mix-filter { position: relative; display: inline-grid; min-width: 44px; max-width: 100%; font-size: 14px; }
+.bb-category-filter-label { visibility: hidden; pointer-events: none; white-space: pre; min-height: 44px; padding: 8px 36px 8px 12px; border: 1px solid transparent; }
 .bb-category-mix-filter select {
+  position: absolute;
+  inset: 0;
   appearance: none;
   -webkit-appearance: none;
   width: 100%;
@@ -1606,7 +1594,7 @@ button.bb-left-categories { cursor: pointer; }
 .bb-category-mix-filter select:focus { outline: none; box-shadow: none; }
 .bb-category-mix-filter:not([data-pointer-focus="true"]) select:focus-visible { outline: 2px solid hsl(var(--primary)); outline-offset: 3px; }
 .bb-category-filter-chevron { position: absolute; top: 50%; right: 14px; width: 16px; height: 16px; transform: translateY(-50%); color: hsl(var(--muted-foreground)); pointer-events: none; }
-@media (pointer: coarse) { .bb-category-mix-filter select { font-size: 16px; } }
+@media (pointer: coarse) { .bb-category-mix-filter, .bb-category-mix-filter select { font-size: 16px; } }
 
 .bb-chart-page-body {
   width: 100%;
@@ -2774,12 +2762,6 @@ tr:last-child td {
 .bb-metric-card[data-accent] .bb-metric-label {
   color: hsl(var(--primary));
 }
-.bb-chart-carousel-arrows {
-  display: flex;
-  flex-shrink: 0;
-  gap: 8px;
-  padding-bottom: 8px;
-}
 .bb-report-section {
   padding: 40px 0 var(--bb-section-footer-space);
   border-bottom: 0;
@@ -3001,7 +2983,7 @@ button:focus-visible, summary:focus-visible {
   outline: 2px solid hsl(var(--primary));
   outline-offset: 3px;
 }
-.bb-tabs-trigger:hover, .bb-chart-carousel-dot:hover {
+.bb-tabs-trigger:hover {
   color: hsl(var(--primary));
 }
 
@@ -3014,7 +2996,6 @@ button:focus-visible, summary:focus-visible {
 
   .bb-chart-side { border-left: 0; padding-left: 0; }
   .bb-reimbursement-at-glance { column-gap: 28px; }
-  .bb-chart-carousel-arrows { display: none; }
 
   .bb-page-header .bb-badge {
     justify-self: start;
@@ -3146,17 +3127,11 @@ button:focus-visible, summary:focus-visible {
   .bb-metric-card:nth-child(odd) { border-left: 0; }
   .bb-metric-card:nth-child(n+3) { border-top: 1px solid hsl(var(--border)); }
   .bb-metric-value { font-size: 30px; }
-  .bb-chart-carousel-indicators { width: 100%; gap: 0; justify-content: space-between; }
-  .bb-chart-carousel-dot { font-size: 12px; min-height: 52px; }
   .bb-report-section { padding: 32px 0 var(--bb-section-footer-space); }
   .bb-card-title { font-size: 27px; }
   .bb-reimbursement-at-glance { grid-template-columns: 1fr; gap: 24px; }
   .bb-reimbursement-toggle { gap: 12px; }
   .bb-reimbursement-total { font-size: 38px; }
-  .bb-chart-carousel-button {
-    display: none;
-  }
-
   .bb-subscription-all-grid {
     grid-template-columns: 1fr;
   }

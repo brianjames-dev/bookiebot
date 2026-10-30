@@ -23,6 +23,8 @@ try{
  let select=tree.root.findByType('select')
  assert.equal(select.props['aria-label'],'Category mix filter')
  assert.equal(select.props.value,'all')
+ assert.equal(tree.root.findByProps({className:'bb-category-filter-label'}).children.join(''),'All')
+ assert.equal(tree.root.findByProps({className:'bb-category-filter-label'}).props['aria-hidden'],'true','Intrinsic width label is hidden from assistive technology')
  assert.deepEqual(tree.root.findAllByType('option').map(option=>[option.props.value,option.children.join('')]),[['all','All'],['needs','Needs'],['wants','Wants'],['savings','Savings']])
  Renderer.act(()=>select.props.onPointerDown())
  assert.equal(tree.root.findByProps({className:'bb-category-mix-filter'}).props['data-pointer-focus'],'true')
@@ -38,6 +40,9 @@ try{
  assert.deepEqual(selected,['needs','wants','savings','all'])
  Renderer.act(()=>tree.update(React.createElement(runtime.exports.Filter,{filter:'savings',onFilterChange:value=>selected.push(value)})))
  assert.equal(tree.root.findByType('select').props.value,'savings','Refreshing/rerendering preserves the selected scope')
+ assert.equal(tree.root.findByProps({className:'bb-category-filter-label'}).children.join(''),'Savings','Width follows the controlled label rather than the longest option')
+ Renderer.act(()=>tree.update(React.createElement(runtime.exports.Filter,{filter:'all',onFilterChange:value=>selected.push(value)})))
+ assert.equal(tree.root.findByProps({className:'bb-category-filter-label'}).children.join(''),'All','Returning to All releases the extra width')
  assert.equal(tree.root.findByType('svg').props['aria-hidden'],'true')
 }finally{if(tree)Renderer.act(()=>tree.unmount())}
 console.log('Category Mix uses a controlled native scope selector and fills the available phone ring area clockwise from noon.')

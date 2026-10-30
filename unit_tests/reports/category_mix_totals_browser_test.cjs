@@ -75,7 +75,7 @@ const money=value=>new Intl.NumberFormat('en-US',{style:'currency',currency:'USD
           assert.ok(geometry.fills>.90&&geometry.fills<=1.01,JSON.stringify(geometry))
           assert.ok(geometry.centerX<1&&geometry.centerY<1,JSON.stringify(geometry))
           assert.equal(geometry.inset,14,'The chevron retains its approved right inset')
-          assert.equal(geometry.dropdownWidth,120,'The scope dropdown is more compact')
+          assert.ok(geometry.dropdownWidth < 90,'All hugs its text and chevron instead of reserving room for longer scopes')
           assert.equal(geometry.totalFont,'36px')
           assert.equal(geometry.usedFont,'40px')
           assert.equal(geometry.headerFits,true,'Exact cents fit beside the native dropdown')
@@ -95,13 +95,17 @@ const money=value=>new Intl.NumberFormat('en-US',{style:'currency',currency:'USD
             await category.getByRole('combobox',{name:'Category mix filter',exact:true}).selectOption(filter.toLowerCase())
             assert.equal(await total.innerText(),money(expected),`${filter} retains its own scoped total`)
             assert.equal(await category.locator('.bb-category-pie-center > span').innerText(),'used')
-            assert.equal(await scope.evaluate(el=>{
-              const style=getComputedStyle(el),context=document.createElement('canvas').getContext('2d')
-              context.font=style.font
-              return context.measureText(el.selectedOptions[0].textContent).width<=el.clientWidth-parseFloat(style.paddingLeft)-parseFloat(style.paddingRight)
-            }),true,`${filter} fits in the narrower native dropdown`)
+            const fit=await scope.evaluate(el=>{
+              const style=getComputedStyle(el),label=el.parentElement.querySelector('.bb-category-filter-label'),range=document.createRange()
+              range.selectNodeContents(label)
+              return {width:el.getBoundingClientRect().width,expected:range.getBoundingClientRect().width+parseFloat(style.paddingLeft)+parseFloat(style.paddingRight)+parseFloat(style.borderLeftWidth)+parseFloat(style.borderRightWidth),height:el.getBoundingClientRect().height,inset:el.getBoundingClientRect().right-el.parentElement.querySelector('svg').getBoundingClientRect().right}
+            })
+            assert.ok(Math.abs(fit.width-fit.expected)<1,`${filter} width follows its current text: ${JSON.stringify(fit)}`)
+            assert.ok(fit.height>=44&&fit.inset===14,'Dynamic width retains the touch target and chevron inset')
+            assert.ok(fit.width>geometry.dropdownWidth,`${filter} grows from All without truncation`)
           }
           await category.getByRole('combobox',{name:'Category mix filter',exact:true}).selectOption('all')
+          assert.ok(Math.abs((await scope.boundingBox()).width-geometry.dropdownWidth)<1,'All shrinks again after a longer scope')
           await category.getByRole('button',{name:'Categories',exact:true}).click();await dialog.waitFor()
           const labels=await dialog.locator('.bb-legend-row > span:nth-child(2)').allTextContents()
           assert.equal(labels.filter(label=>label==='Saved'||label==='Cash saved').length,Number(fixture.cash>0),'Recorded cash appears once in All for enrolled and non-enrolled reports')

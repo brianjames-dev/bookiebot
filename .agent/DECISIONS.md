@@ -1,5 +1,11 @@
 # Agent Decisions
 
+## 2026-10-30 - Quiet Chart Header And Text-Fitting Scope
+
+Apply the selected Quiet header: 24px title, 6px inactive markers, 24px active marker, zero gap between 44px marker buttons and 12px/0px vertical padding. Show only the active graph title; named, pressed buttons and keyboard arrows provide direct access to every available graph. Retain the existing horizontal touch handlers and native vertical scrolling. Fit long titles in the available row; narrow phones stack the full-size title above right-aligned markers. Keep the shared stage height, content, financial accounting, modal controls and persisted graph/filter/mode state.
+
+Size the native Category Mix selector from an aria-hidden mirror of its selected label with matching font/padding and room for the existing chevron. This avoids fixed longest-option width and reliance on newer select-sizing browser support. Retain 44px touch height, 14px chevron inset, pointer-focus suppression and visible keyboard focus. This supersedes 183’s fixed 120px width; physical acceptance is checklist 193. No data, persistence or Finance Ops changes.
+
 ## 2026-10-29 - Compare The Spent Basis Over Matching Days
 
 The user explicitly retains day-matched comparisons while aligning their definition with expense-only Spent. Begin with each month’s canonical active-mode totalExpenses, then subtract only known dated transactions and scheduled expenses after the common cutoff. This preserves signed sheet adjustments and excludes savings/ESPP without rebuilding a different spending definition. Keep existing Pacific elapsed-day, shorter-month, leap-day and historical/current-baseline clipping. Current/Projected applies to both months, including the dated subscription schedule and Projected-only expected bills.

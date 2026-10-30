@@ -200,7 +200,7 @@ def test_top_chart_navigation_names_each_panel_and_excludes_inactive_controls_fr
     assert "panels.map((panel, index)" in selectors
     assert 'type="button"' in selectors
     assert 'aria-label={`Show ${panel.title}`}' in selectors
-    assert "{panel.title}" in selectors
+    assert '<span aria-hidden="true" />' in selectors
     assert "bb-chart-number" not in selectors
     assert "onClick={() => onSelect(index)}" in selectors
     assert "aria-pressed={index === activeIndex}" in selectors
@@ -209,10 +209,11 @@ def test_top_chart_navigation_names_each_panel_and_excludes_inactive_controls_fr
     assert "aria-label={panel.title}" in carousel
     assert "aria-hidden={index !== activeChartIndex}" in carousel
     assert 'inert={index !== activeChartIndex}' in carousel
-    assert 'aria-label="Previous chart"' in navigation
-    assert "onClick={onPrevious} disabled={!canPrevious}" in navigation
-    assert 'aria-label="Next chart"' in navigation
-    assert "onClick={onNext} disabled={!canNext}" in navigation
+    assert '<h2 className="bb-chart-carousel-title" aria-live="polite">' in navigation
+    assert "{panels[activeIndex].title}" in navigation
+    assert "ChartCarouselIndicators" in navigation
+    assert 'aria-label="Previous chart"' not in navigation
+    assert 'aria-label="Next chart"' not in navigation
 
 
 def test_reimbursement_disclosures_preserve_complete_transaction_details():

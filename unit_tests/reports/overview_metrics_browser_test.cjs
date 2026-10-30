@@ -40,7 +40,7 @@ async function checkHeader(page, width) {
 }
 async function checkComparisonCapsule(page) {
   const layout = await page.locator('.bb-comparison-toggle').evaluate(button => {
-    const box = button.parentElement.getBoundingClientRect(), metrics = document.querySelector('.bb-metrics-grid').getBoundingClientRect(), charts = document.querySelector('.bb-chart-carousel-indicators').getBoundingClientRect(), style = getComputedStyle(button.parentElement)
+    const box = button.parentElement.getBoundingClientRect(), metrics = document.querySelector('.bb-metrics-grid').getBoundingClientRect(), charts = document.querySelector('.bb-chart-carousel-nav').getBoundingClientRect(), style = getComputedStyle(button.parentElement)
     const copy = button.querySelector('.bb-comparison-copy').getBoundingClientRect(), icon = button.querySelector('.bb-comparison-icon').getBoundingClientRect(), chevron = button.querySelector('.bb-comparison-chevron').getBoundingClientRect()
     return {width: box.width, height: box.height, center: (box.left + box.right - metrics.left - metrics.right) / 2, metricWidth: metrics.width,
       topGap: box.top - metrics.bottom, bottomGap: charts.top - box.bottom, padding: getComputedStyle(button.querySelector(".bb-comparison-toggle-group")).left, radius: style.borderRadius, shadow: style.boxShadow,
@@ -53,6 +53,56 @@ async function checkComparisonCapsule(page) {
   assert.equal(layout.topGap, 14); assert.equal(layout.bottomGap, 14); assert.equal(layout.shadow, 'none'); assert.equal(layout.border, '0px')
   assert.equal(layout.iconGap, 12); assert.ok(Math.abs(layout.chevronGap - 12) <= 1); assert.equal(layout.textFits, true)
   assert.equal(await page.locator('.bb-comparison-caption').innerText(), 'A month-to-month view')
+}
+async function checkQuietHeader(page, width, reduced) {
+  const panels = ['Category Mix', 'Burn Rate', 'Calendar', 'Bills & Utilities']
+  const nav = page.locator('.bb-chart-carousel-nav'), stage = page.locator('.bb-chart-carousel-band')
+  const height = (await stage.boundingBox()).height
+  for (const [index, name] of panels.entries()) {
+    await page.getByRole('button', {name: `Show ${name}`, exact: true}).click()
+    await page.waitForTimeout(300)
+    assert.equal(await nav.getByRole('heading').innerText(), name)
+    const layout = await nav.evaluate(el => {
+      const title = el.querySelector('.bb-chart-carousel-title'), value = title.querySelector('.bb-fitted-amount-text'), dots = el.querySelector('.bb-chart-carousel-indicators')
+      const box = node => {const r=node.getBoundingClientRect();return {left:r.left,right:r.right,top:r.top,bottom:r.bottom,width:r.width,height:r.height}}
+      return {title:box(title),value:box(value),dots:box(dots),font:parseFloat(getComputedStyle(value).fontSize),padding:[getComputedStyle(el).paddingTop,getComputedStyle(el).paddingBottom],
+        buttons:[...dots.children].map(button => ({box:box(button),marker:box(button.firstElementChild),text:button.textContent,pressed:button.getAttribute('aria-pressed'),duration:parseFloat(getComputedStyle(button.firstElementChild).transitionDuration)})),
+        touchAction:getComputedStyle(document.querySelector('.bb-chart-carousel')).touchAction}
+    })
+    assert.deepEqual(layout.padding,['12px','0px'])
+    assert.equal(layout.buttons.length,4)
+    assert.ok(layout.buttons.every((button,i) => button.box.width===44&&button.box.height===44&&button.marker.height===6&&button.marker.width===(i===index?24:6)&&button.text===''))
+    assert.ok(layout.value.right<=layout.title.right+1&&layout.font<=24,'Long headings fit without overlapping the position markers')
+    if (width<=362) assert.ok(layout.title.bottom<=layout.dots.top+1,'Narrow phones retain full title text above right-aligned markers')
+    else assert.ok(layout.title.right+8<=layout.dots.left+1)
+    if (name==='Category Mix') assert.equal(layout.font,24,'Approved title size is retained where it fits')
+    if (reduced) assert.ok(layout.buttons.every(button=>button.duration<=.001))
+    assert.equal(layout.touchAction,'pan-y','Chart gestures leave vertical panning native')
+    assert.equal((await stage.boundingBox()).height,height,'Every graph uses the unchanged shared stage height')
+    assert.equal(await page.locator('.bb-chart-carousel-slide:not([inert])').count(),1,'Only the visible chart exposes its controls')
+  }
+  assert.equal(await page.getByRole('button',{name:'Previous chart',exact:true}).count(),0)
+  assert.equal(await page.getByRole('button',{name:'Next chart',exact:true}).count(),0)
+  const category = page.getByRole('button',{name:'Show Category Mix',exact:true})
+  await category.focus();await page.keyboard.press('Enter');await page.keyboard.press('ArrowRight')
+  assert.equal(await nav.getByRole('heading').innerText(),'Burn Rate','Keyboard arrows change the graph')
+  await page.keyboard.press('ArrowLeft')
+  assert.equal(await nav.getByRole('heading').innerText(),'Category Mix')
+  // Use complete native event shapes; observers must leave vertical panning uncanceled.
+  const touch = async (type,x,y,selector='.bb-chart-carousel') => page.locator(selector).evaluate((target,{type,x,y})=>{
+    const event=new Event(type,{bubbles:true,cancelable:true}),point={clientX:x,clientY:y}
+    Object.defineProperties(event,{touches:{value:type==='touchend'?[]:[point]},changedTouches:{value:[point]},targetTouches:{value:type==='touchend'?[]:[point]}})
+    target.dispatchEvent(event)
+    return event.defaultPrevented
+  },{type,x,y})
+  for (const [type,x,y] of [['touchstart',240,120],['touchmove',235,280],['touchend',235,280]]) assert.equal(await touch(type,x,y),false)
+  assert.equal(await nav.getByRole('heading').innerText(),'Category Mix','Vertical movement does not select another chart')
+  for (const [type,x,y] of [['touchstart',240,120],['touchmove',35,124],['touchend',35,124]]) assert.equal(await touch(type,x,y),false)
+  assert.equal(await nav.getByRole('heading').innerText(),'Burn Rate','Horizontal swipe selects the next graph')
+  for (const [type,x,y] of [['touchstart',35,124],['touchmove',240,120],['touchend',240,120]]) assert.equal(await touch(type,x,y),false)
+  assert.equal(await nav.getByRole('heading').innerText(),'Category Mix')
+  for (const [type,x,y] of [['touchstart',240,120],['touchmove',35,124],['touchend',35,124]]) await touch(type,x,y,'.bb-category-mix-filter select')
+  assert.equal(await nav.getByRole('heading').innerText(),'Category Mix','Using the native filter cannot swipe the graph')
 }
 ;(async () => {
   let cases = 0
@@ -113,6 +163,7 @@ async function checkComparisonCapsule(page) {
         assert.ok(headerSpacing.panelGap >= 10 && headerSpacing.panelGap <= 14, 'The metrics panel sits close to the month/view row')
         assert.equal(headerSpacing.duplicate, 0)
         await checkComparisonCapsule(page)
+        await checkQuietHeader(page, width, dark)
         assert.equal(comparisonReads.length, 0, 'Collapsed capsule does not fetch comparisons')
         for (const [i, mode] of ['Current', 'Projected'].entries()) {
           await page.getByRole('button', {name: mode, exact: true}).click()
@@ -268,10 +319,12 @@ async function checkComparisonCapsule(page) {
         assert.equal(await month.evaluate(node => node === document.activeElement), true)
         await page.getByRole('button', {name: 'Current', exact: true}).focus(); await page.keyboard.press('Enter')
         assert.equal(await page.getByRole('button', {name: 'Current', exact: true}).getAttribute('aria-pressed'), 'true')
+        await page.getByRole('button', {name: 'Show Calendar', exact: true}).click()
         await page.getByRole('button', {name: 'Projected', exact: true}).click(); await page.reload()
         await page.locator('.bb-metrics-grid').waitFor()
         assert.equal(await page.getByRole('button', {name: 'Projected', exact: true}).getAttribute('aria-pressed'), 'true', 'Restyling preserves the existing per-owner mode preference')
-        if (width === 390) {await page.waitForTimeout(300); await page.screenshot({path: `/tmp/bookiebot-overview-${engine.name()}-${dark ? 'dark' : 'light'}.png`})}
+        assert.equal(await page.locator('.bb-chart-carousel-title').innerText(), 'Calendar', 'The selected chart survives a fresh report load')
+        if (width === 390) {await page.getByRole('button', {name:'Show Category Mix',exact:true}).click(); await page.waitForTimeout(300); await page.screenshot({path: `/tmp/bookiebot-overview-${engine.name()}-${dark ? 'dark' : 'light'}.png`})}
         assert.deepEqual(errors, [], `${engine.name()} ${width}px ${dark ? 'dark' : 'light'} has no page errors`); assert.deepEqual(unexpected, [], 'No external or financial write requests')
         await page.close()
       }
