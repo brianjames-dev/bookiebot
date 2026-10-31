@@ -1,5 +1,11 @@
 # Agent Decisions
 
+## 2026-10-30 - Compact Shared Graph Sections Gradually
+
+The user accepted Burn Rate’s popup placement and lifecycle from `0933f1a` (checklist 203). Preserve that behavior while refining the surrounding summary/footer. Explore a simple monthly balance graphic by default that expands on tap into the existing detailed Month limit / Spent / Left graphic, plus a more compact upper summary.
+
+For future Category Mix, Burn Rate, Calendar and Bills & Utilities edits, use the user’s Category Mix reference as the bottom-breathing-room guide. Reduce persistent detail and wasted height as each view is refined, working toward a shorter common carousel stage once all views fit. Keep useful information available through direct interaction. Match visual spacing rather than independently shrinking one production slide and breaking the shared height/swipe geometry. Exact heights, gaps and the new Burn Rate compact design are still draft choices; the draft’s 104px bottom-gap default is an adjustable visual approximation, not an approved production value.
+
 ## 2026-10-30 - Balance Burn Rate Popups Around Each Node
 
 Make internal text, axes and rails bounded readability preferences after fixed-control, selected-node and trend-line clearance. Normalize overlap by popup area and cap its cost so padded/overlapping label boxes cannot exile a nearby popup to the opposite corner. Search exact side-centered positions as well as above/below and nearby pockets; favor a close edge/corner without prescribing a top or bottom quadrant. This lets a low-node popup cross date ticks or supporting footer text when that gives a substantially closer clear placement.
