@@ -100,5 +100,5 @@ def test_chart_tooltip_entry_reuses_exit_motion_without_resetting_retained_conte
     assert ".bb-chart-tooltip-frame-entering,\n.bb-chart-tooltip-frame-dismissing {" in styles
     assert 'dismissing={phase === "dismissing"}' in frame_use
     assert "key=" not in frame_use
-    assert "React.cloneElement(content, renderProps)" in frame_use
+    assert "React.cloneElement(retainedContent, renderProps)" in frame_use
     assert 'if (!renderProps || phase === "hidden")' in lifecycle

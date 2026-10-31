@@ -1215,7 +1215,7 @@ function BurnRateChart({
             <YAxis domain={yAxisDomain} tickFormatter={(value) => `$${value}`} tickLine={false} axisLine={false} width={58} />
             <Area type="monotone" dataKey="variance" baseValue={0} stroke="none" fill={lineColor} fillOpacity={0.1} tooltipType="none" activeDot={false} connectNulls={false} isAnimationActive={false} />
             <ReferenceLine y={0} stroke="hsl(var(--foreground))" strokeOpacity={0.45} strokeWidth={1.5} />
-            {tooltipPortal && <ChartTooltip portal={tooltipPortal} trigger={touch ? "click" : "hover"} isAnimationActive={false} content={<BurnRateTooltipContent monthName={monthName} portal={tooltipPortal} />} />}
+            {tooltipPortal && <ChartTooltip portal={tooltipPortal} trigger={touch ? "click" : "hover"} isAnimationActive={false} fadeDuration={360} content={<BurnRateTooltipContent monthName={monthName} portal={tooltipPortal} />} />}
             <Line
               type="monotone"
               dataKey="variance"
@@ -1412,7 +1412,17 @@ function BurnRateTooltipContent({
     const observer = new ResizeObserver(place)
     observer.observe(node)
     if (portal.parentElement) observer.observe(portal.parentElement)
-    return () => observer.disconnect()
+    const page = portal.closest(".bb-burn-rate-page")
+    if (page) observer.observe(page)
+    window.addEventListener("scroll", place, { passive: true, capture: true })
+    window.visualViewport?.addEventListener("resize", place)
+    window.visualViewport?.addEventListener("scroll", place)
+    return () => {
+      observer.disconnect()
+      window.removeEventListener("scroll", place, true)
+      window.visualViewport?.removeEventListener("resize", place)
+      window.visualViewport?.removeEventListener("scroll", place)
+    }
   }, [active, point, coordinate?.x, portal])
   if (!active || !point || point.variance === null) {
     return null

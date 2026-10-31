@@ -9,31 +9,42 @@ export function burnRateBalance(spent: number, limit: number) {
   return { used, left, over, empty: used + left === 0, excess: Math.min(1, Math.max(0, spent - limit) / Math.max(limit, 0.01)) }
 }
 
-export function burnRateTooltipCorner(
+export function burnRateTooltipPlacement(
   plot: Rect, tooltip: { width: number; height: number }, samples: Point[],
-  selectedX?: number, previousCorner?: number,
+  selectedX?: number, bounds: Rect = plot, previous?: Point,
 ) {
   const { width, height } = tooltip
-  const loX = plot.x + 3, loY = plot.y + 3
-  const hiX = Math.max(loX, plot.x + plot.width - width - 3)
-  const hiY = Math.max(loY, plot.y + plot.height - height - 3)
+  const loX = bounds.x, loY = bounds.y
+  const hiX = Math.max(loX, bounds.x + bounds.width - width)
+  const hiY = Math.max(loY, bounds.y + bounds.height - height)
+  const clampX = (x: number) => Math.max(loX, Math.min(hiX, x))
+  const clampY = (y: number) => Math.max(loY, Math.min(hiY, y))
   // Axis tooltip coordinates carry the pointer's y, not the selected line's y.
   const selected = selectedX === undefined ? undefined : samples.reduce<Point | undefined>((best, point) =>
     !best || Math.abs(point.x - selectedX) < Math.abs(best.x - selectedX) ? point : best, undefined)
-  const candidates = [loX, hiX].flatMap(x => [loY, hiY].map(y => {
-    const overlaps = samples.filter(p => p.x > x - 10 && p.x < x + width + 10 && p.y > y - 10 && p.y < y + height + 10).length
-    const hidesPoint = Boolean(selected && selected.x > x - 8 && selected.x < x + width + 8 && selected.y > y - 8 && selected.y < y + height + 8)
-    return { x, y, hidesPoint, score: overlaps * 1000 + (hidesPoint ? 10000000 : 0) + (y - loY) * 0.01 + (x - loX) * 0.001 }
-  }))
-  let best = candidates.reduce((a, b) => a.score <= b.score ? a : b)
-  const previous = previousCorner === undefined ? undefined : candidates[previousCorner]
-  // Near-tied corners should not oscillate as the selected day changes.
-  if (previous && !previous.hidesPoint && previous.score <= best.score + 3000) best = previous
-  return { x: best.x, y: best.y, corner: candidates.indexOf(best) }
+  const anchor = selected ?? { x: plot.x + plot.width / 2, y: plot.y + plot.height / 2 }
+  const xs = [anchor.x - width / 2, anchor.x - width - 12, anchor.x + 12, loX, hiX].map(clampX)
+  const ys = [plot.y - height - 10, plot.y + plot.height + 10, anchor.y - height - 12, anchor.y + 12, loY, hiY].map(clampY)
+  const score = ({ x, y }: Point) => {
+    const covered = Math.max(0, Math.min(x + width, plot.x + plot.width) - Math.max(x, plot.x))
+      * Math.max(0, Math.min(y + height, plot.y + plot.height) - Math.max(y, plot.y))
+    const hidesPoint = anchor.x > x - 12 && anchor.x < x + width + 12 && anchor.y > y - 12 && anchor.y < y + height + 12
+    const overlaps = samples.filter(p => p.x > x - 6 && p.x < x + width + 6 && p.y > y - 6 && p.y < y + height + 6).length
+    const distance = Math.hypot(anchor.x - Math.max(x, Math.min(x + width, anchor.x)), anchor.y - Math.max(y, Math.min(y + height, anchor.y)))
+    return { x, y, hidesPoint, covered, score: covered * 10 + overlaps * 20 + distance }
+  }
+  const candidates = xs.flatMap(x => ys.map(y => score({ x, y })))
+  // Node clearance wins unconditionally; next preserve the plot, then stay close.
+  const safe = candidates.filter(p => !p.hidesPoint)
+  let best = (safe.length ? safe : candidates).reduce((a, b) => a.score <= b.score ? a : b)
+  const retained = previous && score({ x: clampX(previous.x), y: clampY(previous.y) })
+  // Retain near ties without sacrificing graph visibility or node clearance.
+  if (retained && !retained.hidesPoint && retained.covered <= best.covered && retained.score <= best.score + 24) best = retained
+  return { x: best.x, y: best.y }
 }
 
 const sampleCache = new WeakMap<SVGPathElement, { key: string; samples: Point[] }>()
-const cornerCache = new WeakMap<HTMLElement, number>()
+const placementCache = new WeakMap<HTMLElement, Point>()
 
 export function positionBurnRateTooltip(portal: HTMLElement, node: HTMLElement, selectedX?: number) {
   const host = portal.parentElement
@@ -43,6 +54,12 @@ export function positionBurnRateTooltip(portal: HTMLElement, node: HTMLElement, 
   const matrix = path?.getCTM()
   if (!host || !chart || !path || !clip || !matrix) return
   const bounds = chart.getBoundingClientRect()
+  const page = host.closest<HTMLElement>(".bb-burn-rate-page")?.getBoundingClientRect() ?? bounds
+  const viewport = window.visualViewport
+  const left = Math.max(page.left + 8, (viewport?.offsetLeft ?? 0) + 8)
+  const top = Math.max(page.top + 8, (viewport?.offsetTop ?? 0) + 8)
+  const right = Math.min(page.right - 8, (viewport?.offsetLeft ?? 0) + (viewport?.width ?? window.innerWidth) - 8)
+  const bottom = Math.min(page.bottom - 8, (viewport?.offsetTop ?? 0) + (viewport?.height ?? window.innerHeight) - 8)
   const key = [path.getAttribute("d"), bounds.width, bounds.height, matrix.a, matrix.b, matrix.c, matrix.d, matrix.e, matrix.f].join("|")
   let cached = sampleCache.get(path)
   if (cached?.key !== key) {
@@ -54,11 +71,13 @@ export function positionBurnRateTooltip(portal: HTMLElement, node: HTMLElement, 
     cached = { key, samples }
     sampleCache.set(path, cached)
   }
-  const next = burnRateTooltipCorner(
+  const next = burnRateTooltipPlacement(
     { x: clip.x.baseVal.value, y: clip.y.baseVal.value, width: clip.width.baseVal.value, height: clip.height.baseVal.value },
-    node.getBoundingClientRect(), cached.samples, selectedX, cornerCache.get(host),
+    // Layout dimensions do not shrink while the exit frame scales/fades.
+    { width: node.offsetWidth, height: node.offsetHeight }, cached.samples, selectedX,
+    { x: left - bounds.left, y: top - bounds.top, width: right - left, height: bottom - top }, placementCache.get(host),
   )
-  cornerCache.set(host, next.corner)
+  placementCache.set(host, next)
   portal.style.transform = `translate(${next.x}px, ${next.y}px)`
   portal.dataset.positionedDay = node.dataset.inspectedDay
 }

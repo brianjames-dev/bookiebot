@@ -2245,7 +2245,12 @@ button.bb-left-categories { cursor: pointer; }
 /* Native Recharts interaction/payload and shared hold/dismiss remain intact.
    Only the owned portal moves; never animate a second wrapper transform. */
 .bb-burn-tooltip-portal .recharts-tooltip-wrapper { position: static !important; transform: none !important; transition: none !important; pointer-events: none; }
-.bb-burn-tooltip-portal .bb-chart-tooltip-frame { transform: none; transition: opacity 140ms ease-out; }
+.bb-burn-tooltip-portal .bb-chart-tooltip-frame { transform: translateY(0) scale(1); transition-property: opacity, transform; transition-duration: var(--bb-tooltip-fade-duration) !important; transition-timing-function: cubic-bezier(.4, 0, .2, 1); }
+.bb-burn-tooltip-portal .bb-chart-tooltip-frame-entering,
+.bb-burn-tooltip-portal .bb-chart-tooltip-frame-dismissing { opacity: 0; transform: translateY(3px) scale(.97); }
+@media (prefers-reduced-motion: reduce) {
+  .bb-burn-tooltip-portal .bb-chart-tooltip-frame { transform: none; }
+}
 .bb-burn-node-tooltip { container-type: inline-size; width: 184px; max-width: calc(100cqw - 104px); padding: 9px; border: 1px solid hsl(var(--border)); border-radius: 12px; background: hsl(var(--card)); color: hsl(var(--foreground)); box-shadow: 0 5px 18px hsl(var(--background) / .38); font-size: 11px; font-variant-numeric: tabular-nums; white-space: normal; }
 .bb-burn-node-tooltip strong { font-weight: 500; white-space: nowrap; }
 .bb-burn-mini-header { display: flex; align-items: baseline; justify-content: space-between; flex-wrap: wrap; gap: 0 6px; color: hsl(var(--muted-foreground)); }
@@ -2473,7 +2478,7 @@ button.bb-left-categories { cursor: pointer; }
 .bb-chart-tooltip-frame {
   opacity: 1;
   transform: translateY(0);
-  transition: opacity 180ms ease-out, transform 180ms ease-out;
+  transition: opacity var(--bb-tooltip-fade-duration, 180ms) ease-out, transform var(--bb-tooltip-fade-duration, 180ms) ease-out;
 }
 
 .bb-chart-tooltip-frame-entering,

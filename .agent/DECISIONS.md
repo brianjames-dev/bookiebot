@@ -1,5 +1,11 @@
 # Agent Decisions
 
+## 2026-10-30 - Keep Burn Rate Inspection Clear Of The Plot
+
+Allow the native day popup to overflow the plotting rectangle into the surrounding chart panel, bounded by the panel/visual-viewport intersection. Prioritize selected-node clearance, then graph visibility and proximity; consider positions above/below the plot and around the node rather than four internal corners. Retain near ties without sacrificing clearance/visibility, keep cached chart-local path samples and one synchronous position owner, and remeasure on scroll/resize. Preserve carousel clipping, stage geometry, native interaction and financial scopes.
+
+Hold for five seconds, then retain the content through a 360ms opacity/scale exit; reduced motion keeps the opacity fade without movement. Share the configured duration between the lifecycle timer and CSS. Prevent Recharts' injected `content` prop from replacing the retained leaf with the lifecycle component itself, which nested animation frames. Every native tooltip has one lifecycle frame; the other graphs retain their default 180ms duration. Reopening reverses the retained frame and cancels stale timers. Native acceptance is checklist 200; this supersedes 198's four-corner restriction. No data, persistence or Finance Ops change.
+
 ## 2026-10-30 - Continuous Graph Swipes And Plot Tap Arbitration
 
 Keep the clipped, transformed graph viewport so Safari cannot focus-scroll it sideways. Remove the 220px drag cap and per-move React state: coalesce direct track writes into animation frames, follow the finger through the full neighboring page and apply continuous rubber-band resistance only at the bounds. Settle with a critically damped compositor spring seeded by recent release velocity; re-grabbing starts from the visible presentation position. Only committed selection changes can retarget settlement; resize, cancellation, multi-touch, reduced motion and unmount stop pending motion safely. Disable CSS transform transitions explicitly, including the global reduced-motion rule, so there is one position owner. Keep graph selection/persistence, page size and chart data unchanged.

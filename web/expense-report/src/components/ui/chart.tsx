@@ -168,6 +168,7 @@ function formatMoney(value: number) {
 
 type ChartTooltipProps = React.ComponentProps<typeof RechartsPrimitive.Tooltip> & {
   dismissDelay?: number
+  fadeDuration?: number
 }
 
 type ChartTooltipRenderProps = {
@@ -179,8 +180,8 @@ type ChartTooltipRenderProps = {
 
 const ChartTooltipMotionFrame = React.forwardRef<
   HTMLDivElement,
-  { dismissing: boolean; children: React.ReactNode }
->(({ dismissing, children }, ref) => {
+  { dismissing: boolean; fadeDuration: number; children: React.ReactNode }
+>(({ dismissing, fadeDuration, children }, ref) => {
   const [entered, setEntered] = React.useState(false)
 
   React.useLayoutEffect(() => {
@@ -199,6 +200,7 @@ const ChartTooltipMotionFrame = React.forwardRef<
   return (
     <div
       ref={ref}
+      style={{ "--bb-tooltip-fade-duration": `${fadeDuration}ms` } as React.CSSProperties}
       className={cn(
         "bb-chart-tooltip-frame",
         !entered && "bb-chart-tooltip-frame-entering",
@@ -212,16 +214,21 @@ const ChartTooltipMotionFrame = React.forwardRef<
 ChartTooltipMotionFrame.displayName = "ChartTooltipMotionFrame"
 
 function ChartTooltipAutoDismissContent({
-  content,
+  retainedContent,
+  // Recharts injects its own `content` prop when cloning a custom renderer.
+  // Do not let that replace the leaf with this lifecycle component itself.
+  content: _nativeContent,
   dismissDelay,
+  fadeDuration,
   animatePosition,
   active,
   payload,
   label,
   ...props
 }: {
-  content: React.ReactElement<ChartTooltipRenderProps>
+  retainedContent: React.ReactElement<ChartTooltipRenderProps>
   dismissDelay: number
+  fadeDuration: number
   animatePosition: boolean
 } & ChartTooltipRenderProps) {
   const interactionRevision = React.useContext(ChartInteractionContext)
@@ -270,8 +277,8 @@ function ChartTooltipAutoDismissContent({
     }, dismissDelay)
     hideTimerRef.current = window.setTimeout(() => {
       setPhase("hidden")
-    }, dismissDelay + TOOLTIP_FADE_DURATION)
-  }, [dismissDelay, hasActivePayload, interactionRevision, signature])
+    }, dismissDelay + fadeDuration)
+  }, [dismissDelay, fadeDuration, hasActivePayload, interactionRevision, signature])
 
   React.useLayoutEffect(() => {
     if (handledDismissRevisionRef.current === dismissRevision) {
@@ -298,8 +305,8 @@ function ChartTooltipAutoDismissContent({
     hideTimerRef.current = window.setTimeout(() => {
       setPhase("hidden")
       hideTimerRef.current = null
-    }, TOOLTIP_FADE_DURATION)
-  }, [dismissRevision, interactionRevision])
+    }, fadeDuration)
+  }, [dismissRevision, fadeDuration, interactionRevision])
 
   React.useLayoutEffect(() => {
     const renderedWrapper = frameRef.current?.parentElement
@@ -371,8 +378,9 @@ function ChartTooltipAutoDismissContent({
     <ChartTooltipMotionFrame
       ref={frameRef}
       dismissing={phase === "dismissing"}
+      fadeDuration={fadeDuration}
     >
-      {React.cloneElement(content, renderProps)}
+      {React.cloneElement(retainedContent, renderProps)}
     </ChartTooltipMotionFrame>
   )
 }
@@ -409,13 +417,15 @@ function ChartTooltip({
   animationEasing = "ease-out",
   content,
   dismissDelay = 5000,
+  fadeDuration = TOOLTIP_FADE_DURATION,
   wrapperStyle,
   ...props
 }: ChartTooltipProps) {
   const tooltipContent = React.isValidElement<ChartTooltipRenderProps>(content) ? (
     <ChartTooltipAutoDismissContent
-      content={content}
+      retainedContent={content}
       dismissDelay={dismissDelay}
+      fadeDuration={fadeDuration}
       animatePosition={isAnimationActive !== false}
     />
   ) : (
