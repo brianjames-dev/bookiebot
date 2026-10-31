@@ -107,6 +107,44 @@ async function inspect(page){return page.locator('#bb-chart-burn-rate').evaluate
    if(url.pathname.includes('avatar'))return route.fulfill({contentType:'image/png',body:fs.readFileSync(path.join(root,'assets/avatars/avatar7.png'))})
   }unexpected.push(url.pathname);await route.abort()})
   const open=async(scenario='regular',before=false)=>{await page.goto(`https://bookie.test/report?scenario=${scenario}${before?'&before=1':''}`);await page.getByRole('button',{name:'Show Burn Rate',exact:true}).click();await page.locator('#bb-chart-burn-rate').scrollIntoViewIfNeeded();await page.waitForFunction(()=>{const el=document.querySelector('.bb-chart-carousel');return el.dataset.settling==='false'&&Math.abs(el.scrollLeft-el.clientWidth-16)<1});await page.waitForTimeout(100)}
+  if(process.env.BOOKIEBOT_BURN_EXPIRY_ONLY){
+   await open('plateau');await nativePoint(page,13,touch)
+   await page.locator('.bb-burn-node-tooltip').waitFor({state:'detached',timeout:6500})
+   const chart=page.locator('#bb-chart-burn-rate .bb-chart-container'),revision=await chart.getAttribute('data-bb-chart-interaction-revision')
+   await page.evaluate(()=>{
+    window.__expiredReappearances=0
+    const portal=document.querySelector('.bb-burn-tooltip-portal')
+    window.__expiryObserver=new MutationObserver(records=>{for(const r of records)for(const n of r.addedNodes)if(n.nodeType===1&&(n.matches('.bb-burn-node-tooltip')||n.querySelector('.bb-burn-node-tooltip')))window.__expiredReappearances++})
+    window.__expiryObserver.observe(portal,{subtree:true,childList:true})
+   })
+   for(const delta of [45,-45,85,-85]){await page.evaluate(delta=>scrollBy(0,delta),delta);await page.waitForTimeout(55)}
+   assert.equal(await page.locator('.bb-burn-node-tooltip').count(),0,'Scrolling after the deadline cannot resurrect cached content');checks++
+   if(touch){
+    const box=await chart.boundingBox(),x=box.x+box.width*.55,y=Math.max(210,Math.min(650,box.y+box.height*.5))
+    if(engineName==='chromium'){
+     const cdp=await page.context().newCDPSession(page)
+     await cdp.send('Input.dispatchTouchEvent',{type:'touchStart',touchPoints:[{x,y}]})
+     await page.waitForTimeout(70)
+     assert.equal(await page.locator('.bb-burn-node-tooltip').count(),0,'Touching down to scroll is not selection intent')
+     for(const delta of [25,60,100]){await cdp.send('Input.dispatchTouchEvent',{type:'touchMove',touchPoints:[{x,y:y-delta}]});await page.waitForTimeout(35)}
+     await cdp.send('Input.dispatchTouchEvent',{type:'touchEnd',touchPoints:[]});await cdp.detach()
+    }else{
+     await chart.evaluate((el,{x,y})=>{
+      for(const [type,dy] of [['pointerdown',0],['pointermove',-35],['pointercancel',-80]])el.dispatchEvent(new PointerEvent(type,{bubbles:true,pointerType:'touch',pointerId:7,isPrimary:true,clientX:x,clientY:y+dy,button:0}))
+     },{x,y})
+     await page.mouse.wheel(0,100)
+    }
+   }else await page.mouse.wheel(0,100)
+   await page.waitForTimeout(350)
+   assert.equal(await chart.getAttribute('data-bb-chart-interaction-revision'),revision,'Vertical scroll never publishes a fresh inspection')
+   assert.equal(await page.locator('.bb-burn-node-tooltip').count(),0);checks++
+   await page.evaluate(()=>window.dispatchEvent(new Event('resize')));await page.locator('#bb-chart-burn-rate').scrollIntoViewIfNeeded();await page.waitForTimeout(200)
+   assert.equal(await page.locator('.bb-burn-node-tooltip').count(),0)
+   assert.equal(await page.evaluate(()=>{window.__expiryObserver.disconnect();return window.__expiredReappearances}),0,'No transient repaint is permitted after expiry');checks++
+   await nativePoint(page,touch?13:20,touch)
+   assert.equal(await page.locator('.bb-burn-node-tooltip').count(),1,'A deliberate tap on the same node or genuine desktop hover starts a new inspection');checks++
+   assert.deepEqual(errors,[]);assert.deepEqual(unexpected,[]);console.log(engineName,width,'expiry/scroll/renew',dark?'dark':'light','PASS');await page.close();continue
+  }
   if(shell){
    await open();checks=await checkCompactPresentation(page,width,engineName,checks)
    // Require a real scroll-driven flip, not merely 'zero or one'. Both sides

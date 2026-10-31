@@ -12,7 +12,7 @@ export type ChartConfig = Record<
 >
 
 const ChartContext = React.createContext<ChartConfig | null>(null)
-const ChartInteractionContext = React.createContext(0)
+const ChartInteractionContext = React.createContext({ revision: 0, reactivation: { current: false } })
 const ChartTooltipDismissContext = React.createContext(0)
 // Keep the command stable while the signal changes: controls can dismiss every
 // tooltip without invalidating the report or the other section controllers.
@@ -55,29 +55,31 @@ function ChartContainer({
   const chartId = React.useId()
   const resolvedId = `chart-${id || chartId.replace(/:/g, "")}`
   const [interactionRevision, setInteractionRevision] = React.useState(0)
+  const reactivation = React.useRef(false)
+  const mousePosition = React.useRef<{ x: number; y: number } | null>(null)
+  const interaction = React.useMemo(() => ({ revision: interactionRevision, reactivation }), [interactionRevision])
   const dismissRevision = React.useContext(ChartTooltipDismissContext)
   const releasedDismissRevisionRef = React.useRef(dismissRevision)
 
-  const handleMouseEnter = React.useCallback(() => {
-    if (releasedDismissRevisionRef.current !== dismissRevision) {
-      return
-    }
+  const handleMouseMove = React.useCallback((event: React.MouseEvent<HTMLDivElement>) => {
+    const previous = mousePosition.current
+    mousePosition.current = { x: event.clientX, y: event.clientY }
+    const moved = previous ? previous.x !== event.clientX || previous.y !== event.clientY : Boolean(event.movementX || event.movementY)
+    // Scroll can move a chart beneath a stationary mouse. Touch compatibility
+    // events are also not a fresh hover inspection on a phone.
+    if (!window.matchMedia("(hover: hover) and (pointer: fine)").matches || event.buttons || !moved) return
+    if (releasedDismissRevisionRef.current === dismissRevision && !reactivation.current) return
+    releasedDismissRevisionRef.current = dismissRevision
+    reactivation.current = false
     setInteractionRevision((revision) => revision + 1)
   }, [dismissRevision])
 
-  const handleMouseMove = React.useCallback(() => {
-    if (releasedDismissRevisionRef.current === dismissRevision) {
-      return
-    }
+  const handleClickCapture = React.useCallback((event: React.MouseEvent<HTMLDivElement>) => {
+    if (event.button !== 0) return
+    // Native scrolling cancels clicks. A finger touching down to pan must not
+    // renew an expired inspection or restart its five-second clock.
     releasedDismissRevisionRef.current = dismissRevision
-    setInteractionRevision((revision) => revision + 1)
-  }, [dismissRevision])
-
-  const handlePointerDownCapture = React.useCallback((event: React.PointerEvent<HTMLDivElement>) => {
-    if (event.pointerType === "mouse" && event.button !== 0) {
-      return
-    }
-    releasedDismissRevisionRef.current = dismissRevision
+    reactivation.current = false
     setInteractionRevision((revision) => revision + 1)
   }, [dismissRevision])
 
@@ -88,20 +90,20 @@ function ChartContainer({
     // Let Recharts handle the key without also scrolling its native carousel.
     if (event.key !== "Enter") event.preventDefault()
     releasedDismissRevisionRef.current = dismissRevision
+    reactivation.current = false
     setInteractionRevision((revision) => revision + 1)
   }, [dismissRevision])
 
   return (
     <ChartContext.Provider value={config}>
-      <ChartInteractionContext.Provider value={interactionRevision}>
+      <ChartInteractionContext.Provider value={interaction}>
         <div
           id={resolvedId}
           className={cn("bb-chart-container", className)}
           data-chart={resolvedId}
           data-bb-chart-interaction-revision={interactionRevision}
-          onMouseEnter={handleMouseEnter}
           onMouseMove={handleMouseMove}
-          onPointerDownCapture={handlePointerDownCapture}
+          onClickCapture={handleClickCapture}
           onKeyDownCapture={handleKeyDownCapture}
         >
           <ChartStyle id={resolvedId} config={config} />
@@ -242,7 +244,7 @@ function ChartTooltipAutoDismissContent({
   fadeDuration: number
   animatePosition: boolean
 } & ChartTooltipRenderProps) {
-  const interactionRevision = React.useContext(ChartInteractionContext)
+  const { revision: interactionRevision, reactivation } = React.useContext(ChartInteractionContext)
   const dismissRevision = React.useContext(ChartTooltipDismissContext)
   const [phase, setPhase] = React.useState<"hidden" | "visible" | "dismissing">("visible")
   const signature = React.useMemo(() => chartTooltipSignature(label, payload), [label, payload])
@@ -284,12 +286,16 @@ function ChartTooltipAutoDismissContent({
 
     setPhase("visible")
     dismissTimerRef.current = window.setTimeout(() => {
+      // Expiry is a real dismissal, just like graph/mode dismissal. Recharts
+      // may reactivate the cached payload during scrolling or geometry changes.
+      dismissedAtInteractionRevisionRef.current = interactionRevision
+      reactivation.current = true
       setPhase("dismissing")
     }, dismissDelay)
     hideTimerRef.current = window.setTimeout(() => {
       setPhase("hidden")
     }, dismissDelay + fadeDuration)
-  }, [dismissDelay, fadeDuration, hasActivePayload, interactionRevision, signature])
+  }, [dismissDelay, fadeDuration, hasActivePayload, interactionRevision, signature, reactivation])
 
   React.useLayoutEffect(() => {
     if (handledDismissRevisionRef.current === dismissRevision) {
@@ -297,6 +303,7 @@ function ChartTooltipAutoDismissContent({
     }
     handledDismissRevisionRef.current = dismissRevision
     dismissedAtInteractionRevisionRef.current = interactionRevision
+    reactivation.current = true
 
     if (dismissTimerRef.current !== null) {
       window.clearTimeout(dismissTimerRef.current)
@@ -317,7 +324,7 @@ function ChartTooltipAutoDismissContent({
       setPhase("hidden")
       hideTimerRef.current = null
     }, fadeDuration)
-  }, [dismissRevision, fadeDuration, interactionRevision])
+  }, [dismissRevision, fadeDuration, interactionRevision, reactivation])
 
   React.useLayoutEffect(() => {
     const renderedWrapper = frameRef.current?.parentElement

@@ -5,8 +5,8 @@ const source=fs.readFileSync('web/expense-report/src/components/ui/chart.tsx','u
 const names=new Set(['ChartTooltip','ChartTooltipMotionFrame','ChartTooltipAutoDismissContent','chartTooltipSignature','ChartInteractionContext','ChartTooltipDismissContext','TOOLTIP_LAST_TRANSFORM_ATTRIBUTE','TOOLTIP_MOTION_READY_ATTRIBUTE','TOOLTIP_FADE_DURATION','ChartContainer','ChartContext','ChartStyle'])
 const declarations=file.statements.filter(n=>ts.isFunctionDeclaration(n)?names.has(n.name?.text):ts.isVariableStatement(n)&&n.declarationList.declarations.some(d=>names.has(d.name.getText(file))))
 assert.equal(declarations.length,names.size)
-let now=0,serial=0;const timers=new Map()
-const window={matchMedia:()=>({matches:false}),setTimeout(fn,delay){const id=++serial;timers.set(id,{fn,at:now+delay});return id},clearTimeout:id=>timers.delete(id)}
+let now=0,serial=0,finePointer=false;const timers=new Map()
+const window={matchMedia:query=>({matches:finePointer&&query.includes('hover')}),setTimeout(fn,delay){const id=++serial;timers.set(id,{fn,at:now+delay});return id},clearTimeout:id=>timers.delete(id)}
 window.requestAnimationFrame=fn=>window.setTimeout(fn,16);window.cancelAnimationFrame=id=>window.clearTimeout(id)
 function advance(ms){const end=now+ms;for(;;){const next=[...timers].filter(([,t])=>t.at<=end).sort((a,b)=>a[1].at-b[1].at)[0];if(!next)break;now=next[1].at;timers.delete(next[0]);act(()=>next[1].fn())}now=end}
 class HTMLDivElement{constructor(){this.style={transform:'none'};this.attrs=new Map()}getAttribute(k){return this.attrs.get(k)}hasAttribute(k){return this.attrs.has(k)}setAttribute(k,v){this.attrs.set(k,v)}removeAttribute(k){this.attrs.delete(k)}}
@@ -17,16 +17,24 @@ const runtime={exports:{},require:req,React,window,HTMLDivElement,RechartsPrimit
 vm.runInNewContext(ts.transpileModule(declarations.map(n=>n.getText(file)).join('\n')+'\nexports.Chart=ChartTooltip;exports.Interaction=ChartInteractionContext;exports.Dismiss=ChartTooltipDismissContext;exports.Container=ChartContainer',{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2020,jsx:ts.JsxEmit.ReactJSX}}).outputText,runtime)
 const {Chart,Interaction,Dismiss}=runtime.exports,h=React.createElement,Leaf=({label})=>h('span',null,label)
 for(const fadeDuration of [180,360]){
- const wrapper=new HTMLDivElement();let revision=0,dismiss=0,label='Oct 13',active=true,view
- const render=()=>h(Interaction.Provider,{value:revision},h(Dismiss.Provider,{value:dismiss},h(Chart,{content:h(Leaf),dismissDelay:5000,fadeDuration:fadeDuration===180?undefined:fadeDuration,isAnimationActive:false,active,payload:[{value:13}],label})))
+ const reactivation={current:false},wrapper=new HTMLDivElement();let revision=0,dismiss=0,label='Oct 13',active=true,view
+ const render=()=>h(Interaction.Provider,{value:{revision,reactivation}},h(Dismiss.Provider,{value:dismiss},h(Chart,{content:h(Leaf),dismissDelay:5000,fadeDuration:fadeDuration===180?undefined:fadeDuration,isAnimationActive:false,active,payload:[{value:13}],label})))
  act(()=>{view=create(render(),{createNodeMock:()=>({parentElement:wrapper})})})
  assert.equal(view.root.findAll(n=>n.type==='div'&&n.props.className?.split(' ').includes('bb-chart-tooltip-frame')).length,1,'Native content injection must never nest lifecycle frames')
  const className=()=>view.toJSON()?.props.className??''
  const update=()=>act(()=>view.update(render()))
  advance(4999);assert.ok(!className().includes('dismissing'));assert.ok(view.toJSON())
  advance(1);assert.ok(className().includes('dismissing'));assert.equal(view.toJSON().props.style['--bb-tooltip-fade-duration'],`${fadeDuration}ms`)
+ active=false;update();active=true;label='Oct 14';update()
+ assert.ok(className().includes('dismissing'),'Native payload/coordinate changes during scroll cannot reverse expiry')
+ assert.equal(reactivation.current,true,'Timeout requires a new deliberate interaction')
  advance(fadeDuration-1);assert.ok(view.toJSON(),'Retain content until the CSS fade has finished')
  advance(1);assert.equal(view.toJSON(),null);assert.equal(wrapper.style.visibility,'hidden')
+ for(let i=0;i<4;i++){
+  active=false;update();active=true;label=`Oct ${15+i}`;update();advance(100)
+  assert.equal(view.toJSON(),null,'Post-expiry scroll/payload changes cannot reopen or restart the timer')
+ }
+ assert.equal(timers.size,0,'Expired scroll activity cannot create a new hold/fade timer')
  revision++;label='Oct 20';update();advance(5000);assert.ok(className().includes('dismissing'))
  advance(80);revision++;label='Oct 21';update();assert.ok(!className().includes('dismissing'),'Reopening reverses the retained frame instead of remounting it')
  advance(fadeDuration);assert.ok(view.toJSON(),'The previous exit timer cannot hide a newly selected day')
@@ -53,3 +61,34 @@ assert.equal(container().props['data-bb-chart-interaction-revision'],1)
 assert.equal(key('ArrowLeft').prevented,1);assert.equal(key('Enter').prevented,0,'Enter retains its native chart action')
 assert.equal(key('Tab').prevented,0);assert.equal(container().props['data-bb-chart-interaction-revision'],3)
 act(()=>keyboardView.unmount());assert.equal(timers.size,0)
+
+// Native vertical/horizontal pans have pointerdown/pointercancel but no click.
+// Only a completed tap, real desktop hover movement or chart key can renew.
+let intentView
+act(()=>{intentView=create(h(runtime.exports.Container,{config:{}},h(Chart,{content:h(Leaf),active:true,label:'Oct 13',payload:[{value:13}],dismissDelay:5000})))})
+const intentContainer=()=>intentView.root.find(n=>n.type==='div'&&n.props['data-chart'])
+const intentFrames=()=>intentView.root.findAll(n=>n.type==='div'&&n.props.className?.split(' ').includes('bb-chart-tooltip-frame'))
+const mouse=(x,y,buttons=0)=>({clientX:x,clientY:y,buttons})
+advance(5180);assert.equal(intentFrames().length,0)
+assert.equal(intentContainer().props.onPointerDownCapture,undefined,'Beginning a pan never publishes selection intent')
+act(()=>{intentContainer().props.onMouseMove(mouse(100,100));intentContainer().props.onMouseMove(mouse(102,103))})
+assert.equal(intentFrames().length,0,'Touch compatibility mouse events cannot renew expired inspection')
+finePointer=true
+act(()=>intentContainer().props.onMouseMove(mouse(102,103)))
+assert.equal(intentFrames().length,0,'Moving the page under a stationary desktop pointer cannot renew inspection')
+act(()=>intentContainer().props.onMouseMove(mouse(105,106,1)))
+assert.equal(intentFrames().length,0,'Dragging is not fresh hover intent')
+act(()=>intentContainer().props.onMouseMove(mouse(106,106)))
+assert.equal(intentFrames().length,1,'A real desktop hover movement renews expired inspection')
+assert.equal(intentContainer().props['data-bb-chart-interaction-revision'],1)
+act(()=>intentContainer().props.onMouseMove(mouse(108,108)))
+assert.equal(intentContainer().props['data-bb-chart-interaction-revision'],1,'Ordinary hover frames do not publish repeated interaction renders')
+advance(5180);assert.equal(intentFrames().length,0)
+act(()=>intentContainer().props.onClickCapture({button:2}))
+assert.equal(intentFrames().length,0,'Secondary clicks cannot renew inspection')
+finePointer=false
+act(()=>intentContainer().props.onClickCapture({button:0}))
+assert.equal(intentFrames().length,1,'A completed tap can explicitly inspect the same node again')
+assert.equal(intentContainer().props['data-bb-chart-interaction-revision'],2)
+act(()=>intentView.unmount());assert.equal(timers.size,0)
+console.log('PASS: expired inspections stay dismissed across scroll/native payload changes; only taps, actual hover movement and chart keys renew')
