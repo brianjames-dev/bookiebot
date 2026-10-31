@@ -47,7 +47,7 @@ export function AppNavigationBar({ active, current = active, compact, reconcilia
   const [preview, setPreview] = useState<MainScreen | null>(null)
   const paneRef = useRef<HTMLDivElement>(null)
   const lens = useNavigationLens(paneRef, preview ?? active)
-  const pointer = useRef<{ id: number; x: number; selected: MainScreen | null } | null>(null)
+  const pointer = useRef<{ id: number; x: number; y: number; selected: MainScreen | null } | null>(null)
   const suppressClick = useRef(false)
   const tabs = reconciliationVisible ? screens : screens.slice(0, 4)
   const screenAt = (clientX: number): MainScreen | null => {
@@ -67,9 +67,9 @@ export function AppNavigationBar({ active, current = active, compact, reconcilia
     if (event.pointerType !== "touch" && event.pointerType !== "pen") return
     const target = (event.target as Element).closest("button[data-nav-screen]") as HTMLElement | null
     const selected = (target?.dataset.navScreen as MainScreen | undefined) ?? screenAt(event.clientX)
-    pointer.current = { id: event.pointerId, x: event.clientX, selected }
+    pointer.current = { id: event.pointerId, x: event.clientX, y: event.clientY, selected }
     setPreview(selected)
-    lens.move(event.clientX)
+    lens.start(event.clientX, event.clientY)
     event.currentTarget.setPointerCapture(event.pointerId)
   }
 
@@ -80,9 +80,10 @@ export function AppNavigationBar({ active, current = active, compact, reconcilia
       onPointerDown={startPointer}
       onPointerMove={event => {
         const current = pointer.current
-        if (!current || current.id !== event.pointerId || current.x === event.clientX) return
-        current.x = event.clientX; current.selected = screenAt(event.clientX)
-        lens.move(event.clientX)
+        if (!current || current.id !== event.pointerId || (current.x === event.clientX && current.y === event.clientY)) return
+        if (current.x !== event.clientX) current.selected = screenAt(event.clientX)
+        current.x = event.clientX; current.y = event.clientY
+        lens.move(event.clientX, event.clientY)
         setPreview(current.selected)
       }}
       onPointerUp={event => {

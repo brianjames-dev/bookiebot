@@ -91,6 +91,24 @@ async function waitReady(page,label) {
         await waitReady(page,'Overview')
         assert.equal(await page.evaluate(()=>Object.entries(window.__bootElements).every(([s,n])=>document.querySelector(s)===n)),true,'Header, avatar, tools, month/view and navigation DOM persist after loading')
         assert.equal(await page.locator('.bb-report-loading-spinner').count(),0)
+        if(width===320&&!dark) {
+          await page.evaluate(()=>{
+            const pane=document.querySelector('.bb-navigation-pane');window.__quickContact=false;window.__quickDetour=false
+            window.__quickNav=new MutationObserver(()=>{window.__quickContact||=pane.dataset.glassContact==='true';window.__quickDetour||=!!pane.style.getPropertyValue('--bb-nav-lens-left')});window.__quickNav.observe(pane,{attributes:true})
+          })
+          const pane=await page.locator('.bb-navigation-pane').elementHandle()
+          for(const label of ['Transactions','Shared','Savings','Reconcile','Overview','Transactions','Overview']) {
+            const r=await page.getByRole('navigation',{name:'Main navigation'}).getByRole('button',{name:label,exact:true}).boundingBox()
+            await page.touchscreen.tap(r.x+r.width*.72,r.y+r.height/2)
+            assert.equal(await page.locator('.bb-app-shell').getAttribute('data-screen'),label.toLowerCase(),'Rapid native taps commit the intended page')
+          }
+          const quick=await page.evaluate(()=>{window.__quickNav.disconnect();return {contact:window.__quickContact,detour:window.__quickDetour}})
+          assert.equal(quick.contact,false,'Quick native taps never pulse the bar through its held shape')
+          assert.equal(quick.detour,false,'Quick native taps use the direct CSS track without a pointer-position detour')
+          assert.equal(await page.locator('.bb-navigation-pane').evaluate((node,original)=>node===original,pane),true,'The compiled app retains its nav DOM across rapid page changes')
+          await page.waitForTimeout(500)
+        }
+
         if(dark) {
           const transitions=await page.evaluate(()=>['.bb-pull-refresh-space','.bb-pull-refresh'].map(s=>{
             const node=document.querySelector(s),phase=node.dataset.phase

@@ -31,7 +31,7 @@ const bundle = req('esbuild').buildSync({ stdin: { resolveDir: frontend, loader:
 ` }, bundle: true, format: 'iife', write: false, define: { 'process.env.NODE_ENV': '"production"' } }).outputFiles[0].text
 
 async function geometry(page, label, compact) {
-  // Let the ResizeObserver run after a tab/count/viewport change.
+  // Let native layout settle after a tab/count/viewport change.
   await page.evaluate(() => new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve))))
   const result = await page.locator('.bb-navigation-pane').evaluate(host => {
     const rect = el => { const r = el.getBoundingClientRect(); return { x: r.x, y: r.y, right: r.right, bottom: r.bottom, width: r.width, height: r.height } }
@@ -81,6 +81,22 @@ async function fixture(browser, width, dark, reducedMotion = 'reduce') {
   await page.addScriptTag({ content: bundle })
   await page.locator('.bb-navigation-pane').waitFor()
   return page
+}
+
+// Compare actual pixels with only the light layer disabled. This separates
+// spatial illumination from the selection lens, glyphs and base material.
+async function checkIllumination(page, glass, near, far) {
+  const box=await glass.boundingBox(),lit=await page.screenshot()
+  const override=await page.addStyleTag({content:'.bb-glass-control::after { background-image: none !important; }'})
+  const unlit=await page.screenshot();await override.evaluate(el=>el.remove())
+  const delta=await page.evaluate(async({lit,unlit,box,near,far})=>{
+    const read=async data=>{const img=new Image();img.src='data:image/png;base64,'+data;await img.decode();const canvas=document.createElement('canvas');canvas.width=img.width;canvas.height=img.height;const context=canvas.getContext('2d');context.drawImage(img,0,0);return context.getImageData(0,0,img.width,img.height)}
+    const images=await Promise.all([read(lit),read(unlit)])
+    const difference=(fx,fy)=>{const x=Math.round(box.x+box.width*fx),y=Math.round(box.y+box.height*fy);return images.map(img=>{let sum=0;for(let dy=-1;dy<=1;dy++)for(let dx=-1;dx<=1;dx++){const i=((y+dy)*img.width+x+dx)*4;sum+=(img.data[i]+img.data[i+1]+img.data[i+2])/3}return sum/9}).reduce((a,b)=>a-b)}
+    return {near:difference(...near),far:difference(...far),outside:difference(.5,-6/box.height)}
+  },{lit:lit.toString('base64'),unlit:unlit.toString('base64'),box,near,far})
+  assert.ok(delta.near>delta.far+3&&delta.near>5,`Illumination is strongest by the finger and dims with distance: ${JSON.stringify(delta)}`)
+  assert.ok(Math.abs(delta.outside)<2,`The light stays within its rounded glass surface: ${JSON.stringify(delta)}`)
 }
 
 ;(async () => {
@@ -192,6 +208,28 @@ async function fixture(browser, width, dark, reducedMotion = 'reduce') {
       assert.equal(await moving.evaluate(()=>window.__navSvgNodes.every((node,i)=>node===document.querySelectorAll('.bb-navigation-pane svg')[i])),true,'SVG layers persist across release and interrupted selection')
       const surface=await moving.locator('.bb-navigation-lens-surface').boundingBox(),settled=await moving.locator('.bb-navigation-selection').boundingBox()
       assert.ok(Math.abs(surface.width-settled.width)<.25,'The settled material relaxes completely');cases++
+      // Rapid taps should only retarget the settled CSS track. They must not
+      // briefly grow/shrink the bar or detour the lens under a non-centered tap.
+      const rapid=await moving.evaluate(async()=>{
+        const pane=document.querySelector('.bb-navigation-pane'),capture=pane.setPointerCapture,frames=[],nodes=[...pane.querySelectorAll('svg')];pane.setPointerCapture=()=>{}
+        let sampling=true,contact=false,detour=false
+        const observer=new MutationObserver(()=>{contact||=pane.dataset.glassContact==='true';detour||=!!pane.style.getPropertyValue('--bb-nav-lens-left')});observer.observe(pane,{attributes:true})
+        const sample=()=>{if(!sampling)return;const r=pane.getBoundingClientRect(),lens=pane.querySelector('.bb-navigation-selection').getBoundingClientRect();frames.push({width:r.width,x:lens.x});requestAnimationFrame(sample)};sample()
+        for(const screen of ['savings','overview','reconcile','transactions','overview','transactions']) {
+          const r=pane.querySelector('[data-nav-screen="'+screen+'"]').getBoundingClientRect(),x=r.x+r.width*.72,y=r.y+r.height/2
+          pane.dispatchEvent(new PointerEvent('pointerdown',{bubbles:true,pointerId:91,pointerType:'touch',clientX:x,clientY:y}))
+          await new Promise(resolve=>setTimeout(resolve,24))
+          pane.dispatchEvent(new PointerEvent('pointerup',{bubbles:true,pointerId:91,pointerType:'touch',clientX:x,clientY:y}))
+          await new Promise(resolve=>setTimeout(resolve,24))
+        }
+        await new Promise(resolve=>setTimeout(resolve,700));sampling=false;observer.disconnect();pane.setPointerCapture=capture
+        return {frames,contact,detour,sameNodes:nodes.every((node,i)=>node===pane.querySelectorAll('svg')[i])}
+      })
+      assert.equal(rapid.contact,false,'Quick taps never enter and immediately reverse the held effect')
+      assert.equal(rapid.detour,false,'Quick taps never detour the selection toward the raw finger position')
+      assert.ok(Math.max(...rapid.frames.map(f=>f.width))-Math.min(...rapid.frames.map(f=>f.width))<.25,'Rapid taps leave bar dimensions stable')
+      assert.ok(new Set(rapid.frames.map(f=>Math.round(f.x))).size>6,'Rapid retargets retain intermediate CSS positions')
+      assert.equal(rapid.sameNodes,true);await geometry(moving,'Transactions',false);cases++
       // Held previews retain the committed icon, gently lift the bar and
       // normalize live finger tracking through that scale in both nav sizes.
       for(const compact of [false,true]) {
@@ -201,7 +239,7 @@ async function fixture(browser, width, dark, reducedMotion = 'reduce') {
         const button=await moving.getByRole('button',{name:'Transactions',exact:true}).boundingBox(),x=button.x+button.width/2,y=button.y+button.height/2
         const restIcon=await moving.getByRole('button',{name:'Transactions',exact:true}).locator('.bb-glass-icon').boundingBox()
         const event=async(type,x,y)=>pane.evaluate((el,{type,x,y})=>el.dispatchEvent(new PointerEvent(type,{bubbles:true,pointerId:81,pointerType:'touch',clientX:x,clientY:y})),{type,x,y})
-        await pane.evaluate(el=>{window.__capturePointer=el.setPointerCapture;el.setPointerCapture=()=>{};window.__holdFrames=[];window.__sampleHold=true;const sample=()=>{if(!window.__sampleHold)return;window.__holdFrames.push(el.getBoundingClientRect().width);requestAnimationFrame(sample)};sample()})
+        await pane.evaluate(el=>{window.__capturePointer=el.setPointerCapture;el.setPointerCapture=()=>{};window.__holdFrames=[];window.__sampleHold=true;const sample=()=>{if(!window.__sampleHold)return;window.__holdFrames.push({width:el.getBoundingClientRect().width,clip:getComputedStyle(el,'::after').clipPath});requestAnimationFrame(sample)};sample()})
         const selections=await moving.evaluate(()=>window.selections.length)
         await event('pointerdown',x,y);await moving.waitForTimeout(100)
         await event('pointermove',x+12,y);await moving.waitForTimeout(300)
@@ -209,17 +247,26 @@ async function fixture(browser, width, dark, reducedMotion = 'reduce') {
         const heldIcon=await moving.getByRole('button',{name:'Transactions',exact:true}).locator('.bb-glass-icon').boundingBox()
         assert.ok(Math.abs(following.x+following.width/2-x-12)<1,'The lens stays under the finger while the bar lifts')
         assert.notEqual(await pane.evaluate(el=>getComputedStyle(el).backgroundColor),restColor,'Holding changes the whole glass hue')
-        assert.ok(Math.abs(held.width/rest.width-1.035)<.001,'A held bar grows subtly by three and a half percent')
-        assert.ok(heldIcon.width-restIcon.width>.75&&heldIcon.width-restIcon.width<1.05,'Held icons grow slightly more in either size')
+        assert.ok(Math.abs(held.width/rest.width-1.07)<.001,'A held bar grows subtly by seven percent')
+        assert.ok(heldIcon.width-restIcon.width>1.5&&heldIcon.width-restIcon.width<2,'Held icons grow slightly more in either size')
         const holdFrames=await moving.evaluate(()=>{window.__sampleHold=false;return window.__holdFrames})
-        assert.ok(holdFrames.some(w=>w>rest.width*1.002&&w<rest.width*1.033),'The hold lift eases through intermediate sizes')
+        assert.ok(holdFrames.some(f=>f.width>rest.width*1.002&&f.width<rest.width*1.065),'The hold lift eases through intermediate sizes')
+        assert.ok(holdFrames.some(f=>{const radius=parseFloat(f.clip.match(/circle\(([^%]+)/)?.[1]);return radius>0&&radius<145}),'The radial light expands from the touch point instead of switching on at full size')
+        const origin=await pane.evaluate(el=>[.5+parseFloat(el.style.getPropertyValue('--bb-glass-dx'))/el.getBoundingClientRect().width,parseFloat(getComputedStyle(el).getPropertyValue('--bb-glass-origin-y'))+parseFloat(el.style.getPropertyValue('--bb-glass-dy'))/el.getBoundingClientRect().height])
+        assert.ok(Math.abs(origin[1]-.5)<.05,'The illumination uses the finger height')
+        await checkIllumination(moving,pane,[origin[0],.15],[origin[0]<.5?.9:.1,.15])
+        assert.ok(held.x>=0&&held.x+held.width<=320,'Held navigation remains within the viewport')
         const target=await moving.getByRole('button',{name:'Reconcile',exact:true}).boundingBox(),tx=target.x+target.width/2
         await event('pointermove',tx,y);await moving.waitForTimeout(100)
         assert.equal(await moving.getByRole('button',{name:'Reconcile',exact:true}).locator('.bb-glass-icon').getAttribute('data-selected'),'false','Previewed destinations stay outlined until release')
         assert.equal(await moving.getByRole('button',{name:'Transactions',exact:true}).locator('.bb-glass-icon').getAttribute('data-selected'),'true','The committed tab retains its fill during a swipe')
         assert.equal(await moving.evaluate(()=>window.selections.length),selections,'Holding and previewing cannot navigate')
         if(process.env.BOOKIEBOT_NAV_SCREENSHOT)await moving.screenshot({path:process.env.BOOKIEBOT_NAV_SCREENSHOT.replace('.png',`-${compact?'compact':'expanded'}-held.png`),clip:{x:0,y:610,width:320,height:90}})
-        await event('pointerup',tx,y);await moving.waitForTimeout(700);await geometry(moving,'Reconcile',compact)
+        const lastOrigin=await pane.evaluate(el=>[el.style.getPropertyValue('--bb-glass-dx'),el.style.getPropertyValue('--bb-glass-dy')])
+        await event('pointerup',tx,y);await moving.waitForTimeout(80)
+        assert.deepEqual(await pane.evaluate(el=>[el.style.getPropertyValue('--bb-glass-dx'),el.style.getPropertyValue('--bb-glass-dy')]),lastOrigin,'Release fades at the final origin without jumping to the middle')
+        assert.ok(await pane.evaluate(el=>+getComputedStyle(el,'::after').opacity)>0,'The radial light fades out fluidly after release')
+        await moving.waitForTimeout(620);await geometry(moving,'Reconcile',compact)
         assert.equal(await moving.evaluate(()=>window.selections.length),selections+1,'Release commits exactly once and then fills the destination')
         const cancelTarget=await moving.getByRole('button',{name:'Transactions',exact:true}).boundingBox(),cx=cancelTarget.x+cancelTarget.width/2
         await event('pointerdown',cx,y);await moving.waitForTimeout(300)
@@ -247,13 +294,24 @@ async function fixture(browser, width, dark, reducedMotion = 'reduce') {
           assert.ok(before.width>=44&&before.height>=44,'Independent header targets remain at least 44px')
           const point=await button.boundingBox(),x=point.x+point.width/2,y=point.y+point.height/2
           await tools.evaluate(()=>{window.__toolSvgNodes=[...document.querySelectorAll('.bb-shell-header-actions svg')]})
-          await tools.mouse.move(x,y);await tools.mouse.down();await tools.waitForTimeout(300)
+          await glass.evaluate(el=>{window.__lightFrames=[];window.__sampleLight=true;const sample=()=>{if(!window.__sampleLight)return;window.__lightFrames.push(getComputedStyle(el,'::after').clipPath);requestAnimationFrame(sample)};sample()})
+          await tools.mouse.move(x-7,y+6);await tools.mouse.down();await tools.waitForTimeout(400)
           const held=await glass.boundingBox()
-          assert.ok(Math.abs(held.width/before.width-(preference==='reduce'?1:1.035))<.001,'Header buttons share the stronger lift and Reduce Motion behavior')
+          assert.ok(Math.abs(held.width/before.width-(preference==='reduce'?1:1.28))<.001,'Header buttons share the stronger lift and Reduce Motion behavior')
           assert.notEqual(await glass.evaluate(el=>getComputedStyle(el).backgroundColor),restColor,'The held tool receives the same whole-surface tint')
+          const illumination=await tools.evaluate(()=>{window.__sampleLight=false;return window.__lightFrames})
+          if(preference==='no-preference')assert.ok(illumination.some(clip=>{const r=parseFloat(clip.match(/circle\(([^%]+)/)?.[1]);return r>0&&r<145}),'Tool illumination expands smoothly from contact')
+          const moved={x:held.x+held.width*.25,y:held.y+held.height*.75}
+          await tools.mouse.move(moved.x,moved.y);await tools.waitForTimeout(80)
+          const light=await glass.evaluate(el=>[.5+parseFloat(el.style.getPropertyValue('--bb-glass-dx'))/el.getBoundingClientRect().width,parseFloat(getComputedStyle(el).getPropertyValue('--bb-glass-origin-y'))+parseFloat(el.style.getPropertyValue('--bb-glass-dy'))/el.getBoundingClientRect().height])
+          assert.ok(Math.abs(light[0]-.25)<.02&&Math.abs(light[1]-.75)<.02,'The header light follows both axes through its enlarged geometry')
+          await checkIllumination(tools,glass,[.25,.75],[.75,.25])
+          const glyph=await button.locator('.bb-glass-icon').boundingBox()
+          assert.ok(Math.abs(glyph.width-(preference==='reduce'?24:25.56))<.1,'Header glyph growth stays subtle inside the larger control')
+          assert.ok(held.x>=0&&held.x+held.width<=390,'Enlarged tools stay within the screen')
           assert.equal(await button.locator('.bb-glass-icon').getAttribute('data-selected'),'false','Held tools stay outlined until activation')
           await button.evaluate(el=>{window.__toolFrames=[];window.__sampleTool=true;const sample=()=>{if(!window.__sampleTool)return;window.__toolFrames.push(+getComputedStyle(el.querySelector('.bb-glass-icon-solid')).opacity);requestAnimationFrame(sample)};sample()})
-          await tools.mouse.up();await tools.waitForTimeout(260)
+          await tools.mouse.up();await tools.waitForTimeout(300)
           assert.equal(await button.locator('.bb-glass-icon').getAttribute('data-selected'),'true','Activated tools fill only after release')
           await button.focus();await tools.keyboard.press('Space');await tools.waitForTimeout(260)
           const opacity=await tools.evaluate(()=>{window.__sampleTool=false;return window.__toolFrames})
