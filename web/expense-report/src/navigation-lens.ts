@@ -12,10 +12,15 @@ export function useNavigationLens(ref: RefObject<HTMLDivElement | null>, value: 
     const paint = () => {
       frame = 0
       if (pointerX === null) return
-      const box = host.getBoundingClientRect(), width = parseFloat(getComputedStyle(host).getPropertyValue("--bb-selection-width"))
+      const box = host.getBoundingClientRect(), computed = getComputedStyle(host)
+      const width = parseFloat(computed.getPropertyValue("--bb-selection-width"))
       if (!width) return
-      const inset = 4 + Math.max(0, Math.min(1, (box.height - 44) / 16))
-      const x = Math.max(inset, Math.min(box.width - width - inset, pointerX - box.left - width / 2))
+      // The held bar gently lifts in viewport space; the lens is positioned in
+      // its unscaled layout space so it stays directly beneath the finger.
+      const scaleX = box.width / parseFloat(computed.width) || 1
+      const scaleY = box.height / parseFloat(computed.height) || 1
+      const inset = 4 + Math.max(0, Math.min(1, (box.height / scaleY - 44) / 16))
+      const x = Math.max(inset, Math.min(box.width / scaleX - width - inset, (pointerX - box.left) / scaleX - width / 2))
       host.style.setProperty("--bb-nav-lens-center", `${x + width / 2}px`)
     }
     const release = () => {

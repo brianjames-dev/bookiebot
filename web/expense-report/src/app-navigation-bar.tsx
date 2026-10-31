@@ -128,9 +128,9 @@ export function AppNavigationBar({ active, current = active, compact, reconcilia
       }}>
       <span className="bb-selection-indicator bb-navigation-selection" aria-hidden="true"><span className="bb-navigation-lens-surface" /></span>
       {tabs.map(({ id }) => <TabbarLink key={id} component={NavigationButton} linkProps={{ type: "button", disabled }} className="bb-navigation-link"
-        active={(preview ?? active) === id} data-state={(preview ?? active) === id ? "active" : "inactive"} data-nav-screen={id}
+        active={active === id} data-state={(preview ?? active) === id ? "active" : "inactive"} data-nav-screen={id}
         aria-label={screenTitles[id]} aria-current={current === id ? "page" : undefined}
-        icon={<NavigationIcon id={id} selected={(preview ?? active) === id} />} onClick={() => { if (!disabled) onSelect(id) }} />)}
+        icon={<NavigationIcon id={id} selected={active === id} />} onClick={() => { if (!disabled) onSelect(id) }} />)}
     </Glass>
   </Tabbar>
 }

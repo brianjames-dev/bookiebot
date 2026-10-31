@@ -18,6 +18,7 @@ const bundle = req('esbuild').buildSync({ stdin: { resolveDir: frontend, loader:
     const scrollState=useRef({lastY:0,travel:0,compact:false});
     useEffect(()=>{const scroll=()=>{if(!window.scrollNav)return;const next=nextScrollNavigation(scrollState.current,scrollY,document.documentElement.scrollHeight-innerHeight);scrollState.current=next;setConfig(current=>({...current,compact:next.compact}));};window.addEventListener('scroll',scroll,{passive:true});return()=>window.removeEventListener('scroll',scroll);},[]);
     window.configure=changes=>setConfig(current=>({...current,...changes}));
+    window.currentScreen=config.active;
     return <KonstaProvider theme="ios" dark={window.dark}><div className="bb-app-shell">
       <AppNavigationBar active={config.active} current={config.settings ? null : config.active} compact={config.compact} reconciliationVisible={config.count===5}
         onSelect={active=>{window.selections.push(active); if(!window.blockNavigation) setConfig(current=>({...current,active}));}}/>
@@ -33,10 +34,10 @@ async function geometry(page, label, compact) {
     const rect = el => { const r = el.getBoundingClientRect(); return { x: r.x, y: r.y, right: r.right, bottom: r.bottom, width: r.width, height: r.height } }
     const selected = host.querySelector('button[data-state="active"]')
     return {
-      selected: selected.getAttribute('aria-label'), button: rect(selected),
+      selected: selected.getAttribute('aria-label'), committed:window.currentScreen, button: rect(selected),
       bubble: rect(host.querySelector('.bb-navigation-selection')),
       icon: rect(selected.querySelector('svg')),
-      variants: [...host.querySelectorAll('button')].map(n=>({state:n.dataset.state,variant:n.querySelector('svg').dataset.variant,fill:getComputedStyle(n.querySelector('svg')).fill,stroke:getComputedStyle(n.querySelector('svg')).stroke,text:n.innerText})),
+      variants: [...host.querySelectorAll('button')].map(n=>({screen:n.dataset.navScreen,variant:n.querySelector('svg').dataset.variant,fill:getComputedStyle(n.querySelector('svg')).fill,stroke:getComputedStyle(n.querySelector('svg')).stroke,text:n.innerText})),
       ink: getComputedStyle(host).color, iconColors: [...host.querySelectorAll('button svg')].map(n=>getComputedStyle(n).color),
       pane: rect(host), stacks: [...host.querySelectorAll('button > span')].map(rect),
       anchor:host.style.getPropertyValue('--bb-nav-selection-center'),lensLeft:getComputedStyle(host.querySelector('.bb-navigation-selection')).left,
@@ -52,7 +53,8 @@ async function geometry(page, label, compact) {
   close(bubble.x + bubble.width / 2, icon.x + icon.width / 2, 'Icon must center in the bubble')
   assert.ok(result.iconColors.every(color=>color===result.ink),'Selected and outline glyphs use the same neutral ink as the reference')
   const contents = [icon]
-  for(const item of result.variants){assert.equal(item.text,'','No visible nav labels in either size');assert.equal(item.variant,item.state==='active'?'filled':'outline');if(item.state==='active')assert.notEqual(item.fill,'none','Selected icons paint a solid silhouette');else{assert.equal(item.fill,'none');assert.notEqual(item.stroke,'none','Inactive icons retain their outline')}}
+  for(const item of result.variants){const committed=item.screen===result.committed;assert.equal(item.text,'','No visible nav labels in either size');assert.equal(item.variant,committed?'filled':'outline','Only the committed tab is filled, including during preview');if(committed)assert.notEqual(item.fill,'none','Selected icons paint a solid silhouette');else{assert.equal(item.fill,'none');assert.notEqual(item.stroke,'none','Inactive icons retain their outline')}}
+  close(icon.width,compact?23:27,'Expanded icons are larger; compact icons keep their current size')
   const centers=result.targets.map(r=>r.x+r.width/2),spacing=centers[1]-centers[0]
   result.targets.forEach(r=>close(r.width,result.targets[0].width,'Equal-width navigation targets'))
   for(let i=2;i<centers.length;i++)close(centers[i]-centers[i-1],spacing,'Icons must be equally spaced')
@@ -184,21 +186,44 @@ async function fixture(browser, width, dark, reducedMotion = 'reduce') {
       assert.ok(frames.some(f=>f.paintWidth>f.width*1.015),'The lens gently deforms in transit')
       const surface=await moving.locator('.bb-navigation-lens-surface').boundingBox(),settled=await moving.locator('.bb-navigation-selection').boundingBox()
       assert.ok(Math.abs(surface.width-settled.width)<.25,'The settled material relaxes completely');cases++
-      // A live finger can move the lens within one tab, not only at tab edges.
-      // WebKit's synthetic pointer uses the same handlers; Chromium's native
-      // pointer capture/drag/cancel coverage above remains in place.
-      const pane=moving.locator('.bb-navigation-pane'),button=await moving.getByRole('button',{name:'Transactions',exact:true}).boundingBox(),x=button.x+button.width/2,y=button.y+button.height/2
-      await pane.evaluate((el,{x,y})=>{window.__capturePointer=el.setPointerCapture;el.setPointerCapture=()=>{};el.dispatchEvent(new PointerEvent('pointerdown',{bubbles:true,pointerId:81,pointerType:'touch',clientX:x,clientY:y}))},{x,y})
-      await moving.waitForTimeout(100)
-      const selections=await moving.evaluate(()=>window.selections.length)
-      await pane.evaluate((el,{x,y})=>el.dispatchEvent(new PointerEvent('pointermove',{bubbles:true,pointerId:81,pointerType:'touch',clientX:x+12,clientY:y})),{x,y})
-      await moving.waitForTimeout(120)
-      const following=await moving.locator('.bb-navigation-selection').boundingBox()
-      assert.ok(Math.abs(following.x+following.width/2-x-12)<1,'The lens follows the finger continuously within one tab')
-      assert.equal(await moving.evaluate(()=>window.selections.length),selections,'Preview cannot navigate before release')
-      await pane.evaluate((el,{x,y})=>{el.dispatchEvent(new PointerEvent('pointercancel',{bubbles:true,pointerId:81,pointerType:'touch',clientX:x+12,clientY:y}));el.setPointerCapture=window.__capturePointer},{x,y})
-      await moving.waitForTimeout(700);await geometry(moving,'Transactions',false)
-      assert.equal(await moving.evaluate(()=>window.selections.length),selections,'Cancellation springs back without navigation');cases++
+      // Held previews retain the committed icon, gently lift the bar and
+      // normalize live finger tracking through that scale in both nav sizes.
+      for(const compact of [false,true]) {
+        await moving.evaluate(compact=>window.configure({active:'transactions',compact}),compact)
+        await moving.waitForTimeout(700);await geometry(moving,'Transactions',compact)
+        const pane=moving.locator('.bb-navigation-pane'),rest=await pane.boundingBox()
+        const button=await moving.getByRole('button',{name:'Transactions',exact:true}).boundingBox(),x=button.x+button.width/2,y=button.y+button.height/2
+        const restIcon=await moving.getByRole('button',{name:'Transactions',exact:true}).locator('svg').boundingBox()
+        const event=async(type,x,y)=>pane.evaluate((el,{type,x,y})=>el.dispatchEvent(new PointerEvent(type,{bubbles:true,pointerId:81,pointerType:'touch',clientX:x,clientY:y})),{type,x,y})
+        await pane.evaluate(el=>{window.__capturePointer=el.setPointerCapture;el.setPointerCapture=()=>{};window.__holdFrames=[];window.__sampleHold=true;const sample=()=>{if(!window.__sampleHold)return;window.__holdFrames.push(el.getBoundingClientRect().width);requestAnimationFrame(sample)};sample()})
+        const selections=await moving.evaluate(()=>window.selections.length)
+        await event('pointerdown',x,y);await moving.waitForTimeout(100)
+        await event('pointermove',x+12,y);await moving.waitForTimeout(300)
+        const following=await moving.locator('.bb-navigation-selection').boundingBox(),held=await pane.boundingBox()
+        const heldIcon=await moving.getByRole('button',{name:'Transactions',exact:true}).locator('svg').boundingBox()
+        assert.ok(Math.abs(following.x+following.width/2-x-12)<1,'The lens stays under the finger while the bar lifts')
+        assert.ok(Math.abs(held.width/rest.width-1.02)<.001,'A held bar grows subtly by two percent')
+        assert.ok(heldIcon.width-restIcon.width>.4&&heldIcon.width-restIcon.width<.65,'Held icons grow about half a pixel in either size')
+        const holdFrames=await moving.evaluate(()=>{window.__sampleHold=false;return window.__holdFrames})
+        assert.ok(holdFrames.some(w=>w>rest.width*1.002&&w<rest.width*1.018),'The hold lift eases through intermediate sizes')
+        const target=await moving.getByRole('button',{name:'Reconcile',exact:true}).boundingBox(),tx=target.x+target.width/2
+        await event('pointermove',tx,y);await moving.waitForTimeout(100)
+        assert.equal(await moving.getByRole('button',{name:'Reconcile',exact:true}).locator('svg').getAttribute('data-variant'),'outline','Previewed destinations stay outlined until release')
+        assert.equal(await moving.getByRole('button',{name:'Transactions',exact:true}).locator('svg').getAttribute('data-variant'),'filled','The committed tab retains its fill during a swipe')
+        assert.equal(await moving.evaluate(()=>window.selections.length),selections,'Holding and previewing cannot navigate')
+        if(process.env.BOOKIEBOT_NAV_SCREENSHOT)await moving.screenshot({path:process.env.BOOKIEBOT_NAV_SCREENSHOT.replace('.png',`-${compact?'compact':'expanded'}-held.png`),clip:{x:0,y:610,width:320,height:90}})
+        await event('pointerup',tx,y);await moving.waitForTimeout(700);await geometry(moving,'Reconcile',compact)
+        assert.equal(await moving.evaluate(()=>window.selections.length),selections+1,'Release commits exactly once and then fills the destination')
+        const cancelTarget=await moving.getByRole('button',{name:'Transactions',exact:true}).boundingBox(),cx=cancelTarget.x+cancelTarget.width/2
+        await event('pointerdown',cx,y);await moving.waitForTimeout(300)
+        assert.equal(await moving.getByRole('button',{name:'Transactions',exact:true}).locator('svg').getAttribute('data-variant'),'outline','Touch-down alone never fills a new icon')
+        await event('pointercancel',cx,y);await pane.evaluate(el=>el.setPointerCapture=window.__capturePointer)
+        await moving.waitForTimeout(700);await geometry(moving,'Reconcile',compact)
+        assert.equal(await moving.evaluate(()=>window.selections.length),selections+1,'Cancellation cannot change the committed icon or tab')
+        const released=await pane.boundingBox()
+        assert.ok(Math.abs(released.width-rest.width)<.25,'The lifted bar fully relaxes on release or cancellation');cases++
+      }
+      await moving.evaluate(()=>window.configure({compact:false}));await moving.waitForTimeout(700)
       if (process.env.BOOKIEBOT_NAV_SCREENSHOT) await moving.screenshot({ path: process.env.BOOKIEBOT_NAV_SCREENSHOT, clip: { x: 0, y: 610, width: 320, height: 90 } })
       await moving.close()
     } finally { await browser.close() }

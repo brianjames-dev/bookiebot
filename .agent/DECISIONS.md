@@ -1,5 +1,11 @@
 # Agent Decisions
 
+## 2026-10-31 - Commit Icon Fill On Release And Gently Lift Held Navigation
+
+Separate preview geometry from committed navigation: the lens follows the held pointer, but Konsta’s active state and solid icon follow the accepted `active` screen. A new destination remains outlined until release commits it; cancellation and rejected navigation retain the previous fill. Screen-reader current-page semantics remain committed as before. This supersedes 217’s preview-based fill rule.
+
+Use the existing contact attribute to ease the glass pane to 1.02 scale over 240ms, from its bottom center, then relax on release/cancellation. This gives 27px expanded / 23px compact glyphs roughly 0.5px extra size while held. Normalize pointer coordinates and rim calculations back into the unscaled layout space so enlargement cannot displace the lens. Keep current compact dimensions, scroll thresholds, responsive anchoring, spring/guards and touch targets. Reduce Motion disables the lift and elasticity; Reduce Transparency retains its opaque override. Lower normal glass opacity from .62 to .52 in light mode and .58 to .48 in dark, soften the rim and dark selection material; keep neutral icon ink legible. No new library, event owner or financial change. Physical acceptance is checklist 219.
+
 ## 2026-10-31 - Reference Glass Navigation And Continuous Selection Motion
 
 Use the supplied Instagram/Apple reference for the web navigation: a neutral translucent capsule with a fine lit rim, evenly spaced white/dark icons and a broad gray selection with a concentric 5px expanded / 4px compact inset. Keep the filled/outline icons, accessible names and native button semantics. This is a CSS recreation within the existing Konsta shell, not a native UIKit Liquid Glass renderer. [Apple’s Liquid Glass interaction guidance](https://developer.apple.com/videos/play/wwdc2025/219/) informs the restrained elastic settle and Reduce Motion treatment.
