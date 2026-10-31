@@ -20,15 +20,16 @@ def test_calendar_colors_and_today_highlight_runtime():
     )
 
 
-def test_calendar_focus_cannot_scroll_the_transformed_chart_viewport():
+def test_native_chart_scrolling_has_one_position_owner():
     styles = (FRONTEND / "styles.css").read_text()
     viewport = "\n".join(part.split("}", 1)[0] for part in styles.split(".bb-chart-carousel {")[1:])
-    # overflow:hidden is still a programmatically scrollable box: in WebKit a
-    # focused day-12 marker shifted the active Calendar slide 147px offscreen.
-    # The track owns horizontal movement; focus must not create another offset.
-    assert "overflow: clip;" in viewport
-    assert "overflow: hidden;" not in viewport
-    assert "touch-action: pan-y;" in viewport
+    track = styles.split(".bb-chart-carousel-track {", 1)[1].split("}", 1)[0]
+    # Native scrollLeft now owns both panning and focus scrolling. Combining it
+    # with a transformed track caused Calendar's historical double offset.
+    assert "overflow-x: auto;" in viewport
+    assert "scroll-snap-type: x mandatory;" in viewport
+    assert "touch-action: auto;" in viewport
+    assert "transform" not in track
 
 
 def test_calendar_markers_constrain_amounts_and_size_counts_to_the_day_cell():

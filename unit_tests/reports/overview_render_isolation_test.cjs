@@ -83,8 +83,12 @@ const breakdown=[{key:'food',label:'Food',amount:42},{key:'grocery',label:'Groce
 const view={metrics:{monthlyIncome:5000,totalExpenses:72,incomeAfterExpenses:4428,amountSaved:500,savingsMinimum:500,savingsIdeal:1000},breakdown,categoryBalances:{},categoryBudgets:{},calendarEvents:[],utilityHistory:[],burnRate:{}}
 let report={ownerName:'Brian',year:2026,month:10,monthLabel:'October 2026',generatedAt:'2026-10-25',elapsedDays:25,dailyEntries:activity,activity,topEntries:activity,merchantOccurrences:[],currentView:view,projectedView:{...view,metrics:{...view.metrics,monthlyIncome:6000,totalExpenses:172,amountSaved:600}},burnRate:{},metricExplanations:{current:{spent:{value:72}},projected:{spent:{value:172}}}}
 const appSession = {signOut:()=>{},signingOut:false}
+const swipeListeners={}
+const nativeViewport={clientWidth:390,scrollLeft:0,dataset:{},
+ addEventListener(name,fn){swipeListeners[name]=fn},removeEventListener(name){delete swipeListeners[name]},
+ scrollTo({left,behavior}){if(behavior==='instant')this.scrollLeft=left}}
 let renderer
-act(()=>{renderer=Renderer.create(h(App,{report,appSession}))})
+act(()=>{renderer=Renderer.create(h(App,{report,appSession}),{createNodeMock:el=>el.props.className==='bb-chart-carousel'?nativeViewport:null})})
 assert.deepEqual(renderer.root.findAllByType('h2').map(title=>title.findByType(runtime.FittedAmount).props.children),['Category Mix','Burn Rate','Calendar','Bills & Utilities'],'Every sliding page owns its own heading')
 const spentCard=()=>renderer.root.findAllByType(runtime.MetricCard).find(card=>card.props.label==='Spent')
 assert.equal(spentCard().props.value,72,'Spent uses authoritative expenses without cash or ESPP savings')
@@ -146,12 +150,17 @@ const nav=renderer.root.findByType(ChartCarouselNavigation)
 act(()=>nav.props.onSelect(0))
 assert.equal(renderer.root.findByType(ChartCarouselNavigation).props.activeIndex,0)
 assert.equal(renderer.root.findByType(CategoryMixChartLeaf).props.filter,'wants','Changing graph preserves its local filter')
-let carousel=renderer.root.findByProps({className:'bb-chart-carousel'})
-act(()=>carousel.props.onTouchStartCapture({target:{},touches:[{clientX:250,clientY:100}]}))
-act(()=>carousel.props.onTouchMoveCapture({stopPropagation(){},touches:[{clientX:40,clientY:104}]}))
+const swipeEvent=(x,touches=true)=>({target:nativeViewport,touches:touches?[{identifier:1,clientX:x,clientY:100}]:[],stopPropagation(){}})
+act(()=>swipeListeners.touchstart(swipeEvent(250)))
+act(()=>swipeListeners.touchmove(swipeEvent(40)))
+nativeViewport.scrollLeft=210
+act(()=>swipeListeners.scroll(swipeEvent(40)))
 assert.equal(renderer.root.findByType(ChartCarouselNavigation).props.activeIndex,0,'Dragging does not select/re-render the destination early')
-act(()=>renderer.root.findByProps({className:'bb-chart-carousel'}).props.onTouchEndCapture({stopPropagation(){},changedTouches:[{clientX:40,clientY:104}]}))
-assert.equal(renderer.root.findByType(ChartCarouselNavigation).props.activeIndex,1,'Horizontal swipes still select the next chart')
+act(()=>swipeListeners.touchend(swipeEvent(40,false)))
+assert.equal(renderer.root.findByType(ChartCarouselNavigation).props.activeIndex,0,'Release leaves inertia and snap to the native browser')
+nativeViewport.scrollLeft=406
+act(()=>{swipeListeners.scroll(swipeEvent(40));swipeListeners.scrollend(swipeEvent(40))})
+assert.equal(renderer.root.findByType(ChartCarouselNavigation).props.activeIndex,1,'Native scroll completion selects the next chart')
 assert.equal(renderer.root.findByType(CategoryMixChartLeaf).props.filter,'wants')
 act(()=>renderer.unmount())
 assert.equal(timers.size,0,'Unmount releases carousel cooldown timers')

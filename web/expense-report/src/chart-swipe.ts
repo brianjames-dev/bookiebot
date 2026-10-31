@@ -1,215 +1,170 @@
-import { useLayoutEffect, useRef, type MouseEvent, type TouchEvent } from "react"
+import { useLayoutEffect, useRef, type MouseEvent } from "react"
 
 const GAP = 16
-export const CHART_DRAG_BLEND_MS = 16
-type Sample = { x: number; time: number }
+const SCROLL_IDLE_MS = 160
+
 type Gesture = {
-  id: number; x: number; y: number; origin: number; width: number
-  axis: "pending" | "horizontal" | "vertical"; moved: boolean; samples: Sample[]
+  id: number; x: number; y: number
+  axis: "pending" | "horizontal" | "vertical"; moved: boolean
 }
 
-// Follow the finger through the whole page. Only the ends (and travel beyond
-// one neighboring page) receive continuous rubber-band resistance.
-export function chartDragOffset(offset: number, width: number, index: number, count: number) {
-  const stride = width + GAP
-  const low = index < count - 1 ? -stride : 0
-  const high = index > 0 ? stride : 0
-  const rubber = (distance: number) => width * 0.55 * distance / (width + 0.55 * distance)
-  return offset < low ? low - rubber(low - offset) : offset > high ? high + rubber(offset - high) : offset
-}
-
-export function chartReleaseIndex(index: number, count: number, width: number, offset: number, velocity: number) {
-  const projected = offset + Math.max(-3, Math.min(3, velocity)) * 180
-  const direction = Math.abs(projected) >= Math.min(160, width * 0.28) ? (projected < 0 ? 1 : -1) : 0
-  return Math.max(0, Math.min(count - 1, index + direction))
-}
-
-export function chartReleaseVelocity(samples: Sample[], now: number) {
-  const last = samples[samples.length - 1]
-  if (!last || now - last.time > 80) return 0
-  const first = samples.find(sample => sample.time >= last.time - 80) ?? last
-  return last.time > first.time ? (last.x - first.x) / (last.time - first.time) : 0
-}
-
-// A critically damped spring starts with the release velocity, instead of
-// stopping the finger's motion and restarting a fixed CSS easing curve.
-export function chartSpring(from: number, to: number, velocity: number) {
-  const displacement = from - to
-  const speed = Math.max(-3, Math.min(3, velocity)) * 1000
-  const frames: { transform: string; offset: number }[] = []
-  let duration = 0
-  const positions: number[] = []
-  for (let step = 0; step <= 42; step++) {
-    const time = step / 60, decay = Math.exp(-22 * time)
-    const coefficient = speed + 22 * displacement
-    const position = to + (displacement + coefficient * time) * decay
-    positions.push(position)
-    duration = time * 1000
-    if (step >= 12 && Math.abs(position - to) < 0.1 && Math.abs((speed - 22 * coefficient * time) * decay) < 3) break
-  }
-  positions.forEach((position, index) => frames.push({ transform: `translate3d(${index === positions.length - 1 ? to : position}px, 0, 0)`, offset: index / (positions.length - 1) }))
-  return { frames, duration }
-}
-
-function visibleX(track: HTMLDivElement | null, fallback: number) {
-  if (!track) return fallback
-  const transform = window.getComputedStyle(track).transform
-  const matrix = transform.match(/^matrix(3d)?\((.+)\)$/)
-  return matrix ? Number(matrix[2].split(",")[matrix[1] ? 12 : 4]) : fallback
-}
-
+// Native overflow owns every drag, inertia and snap frame. JS only requests a
+// page for external navigation and publishes the page after scrolling finishes.
 export function useChartSwipe({ index, count, onSelect, onDragStart, ignoreTarget }: {
   index: number; count: number; onSelect: (index: number) => void
   onDragStart: () => void; ignoreTarget: (target: EventTarget | null) => boolean
 }) {
   const viewportRef = useRef<HTMLDivElement>(null)
-  const trackRef = useRef<HTMLDivElement>(null)
   const options = useRef({ index, count, onSelect, onDragStart, ignoreTarget })
-  useLayoutEffect(() => { options.current = { index, count, onSelect, onDragStart, ignoreTarget } })
   const gesture = useRef<Gesture | null>(null)
-  const animation = useRef<Animation | null>(null)
-  const dragAnimation = useRef<Animation | null>(null)
-  const reducedMotion = useRef(false)
-  const frame = useRef<number | null>(null)
-  const pendingX = useRef(0)
-  const targetIndex = useRef<number | null>(null)
   const suppressClickUntil = useRef(0)
-  const width = () => viewportRef.current?.getBoundingClientRect().width || window.innerWidth
-  const dragging = (value: boolean) => { if (viewportRef.current) viewportRef.current.dataset.dragging = String(value) }
-  const stopFrame = () => { if (frame.current !== null) window.cancelAnimationFrame(frame.current); frame.current = null }
-  const stopAnimation = () => { animation.current?.cancel(); animation.current = null; if (viewportRef.current) viewportRef.current.dataset.settling = "false" }
-  const stopDragAnimation = () => { dragAnimation.current?.cancel(); dragAnimation.current = null }
-  const paint = (x: number) => { if (trackRef.current) trackRef.current.style.transform = `translate3d(${x}px, 0, 0)` }
-  const paintDrag = (x: number) => {
-    const track = trackRef.current
-    if (!track) return
-    const from = visibleX(track, x)
-    stopDragAnimation()
-    paint(x)
-    if (reducedMotion.current || Math.abs(from - x) < 0.1) return
-    // Touch/JS updates may arrive slower than the display. A tiny accelerated
-    // bridge fills those gaps without a timer, prediction or React render.
-    // Backwards fill prevents the target flashing before the first frame.
-    const motion = track.animate([
-      { transform: `translate3d(${from}px, 0, 0)` },
-      { transform: `translate3d(${x}px, 0, 0)` },
-    ], { duration: CHART_DRAG_BLEND_MS, easing: "linear", fill: "both" })
-    dragAnimation.current = motion
-    motion.onfinish = () => { if (dragAnimation.current === motion) stopDragAnimation() }
-  }
-  const settle = (next: number, velocity = 0, immediate = false) => {
-    stopFrame()
-    const track = trackRef.current, to = -next * (width() + GAP)
-    const from = visibleX(track, to)
-    stopDragAnimation()
-    stopAnimation()
-    dragging(false)
-    targetIndex.current = next
-    paint(to)
-    if (!track || immediate || window.matchMedia("(prefers-reduced-motion: reduce)").matches || Math.abs(from - to) < 0.1) return
-    const spring = chartSpring(from, to, velocity)
-    const motion = track.animate(spring.frames, { duration: spring.duration, easing: "linear" })
-    animation.current = motion
-    if (viewportRef.current) viewportRef.current.dataset.settling = "true"
-    motion.onfinish = () => { if (animation.current === motion) stopAnimation() }
-  }
+  const navigate = useRef<(next: number, immediate?: boolean) => void>(() => {})
+  useLayoutEffect(() => { options.current = { index, count, onSelect, onDragStart, ignoreTarget } })
 
-  useLayoutEffect(() => {
-    if (targetIndex.current !== index) {
-      gesture.current = null
-      settle(index, 0, targetIndex.current === null)
-    }
-  }, [index])
   useLayoutEffect(() => {
     const viewport = viewportRef.current
-    let previousWidth = width()
-    const resize = () => {
-      if (width() === previousWidth) return
-      previousWidth = width()
-      gesture.current = null
-      settle(options.current.index, 0, true)
-    }
-    const observer = new ResizeObserver(resize)
-    if (viewport) observer.observe(viewport)
+    if (!viewport) return
     const media = window.matchMedia("(prefers-reduced-motion: reduce)")
-    reducedMotion.current = media.matches
-    const reduce = () => { reducedMotion.current = media.matches; if (media.matches) settle(options.current.index, 0, true) }
+    let size = viewport.clientWidth
+    let selected = -1
+    let requested: number | null = null
+    let touching = false
+    let scrolling = false
+    let idle: number | undefined
+    const bounded = (next: number) => Math.max(0, Math.min(options.current.count - 1, next))
+    const clearIdle = () => { window.clearTimeout(idle); idle = undefined }
+    const begin = () => {
+      if (scrolling) return
+      scrolling = true
+      viewport.dataset.settling = "true"
+      viewport.dataset.dragging = "true"
+      options.current.onDragStart()
+    }
+    const finish = () => {
+      clearIdle()
+      // Native re-snapping during resize may finish before ResizeObserver.
+      // Preserve the committed page using the new stride before publishing.
+      if (!viewport.clientWidth) return
+      if (viewport.clientWidth !== size) { resize(); return }
+      // An aborted smooth scroll can emit scrollend for an older request. Never
+      // publish that intermediate page over the latest marker/keyboard choice.
+      if (touching || (requested !== null && Math.abs(viewport.scrollLeft - requested * (size + GAP)) > 1)) return
+      scrolling = false
+      viewport.dataset.dragging = "false"
+      viewport.dataset.settling = "false"
+      requested = null
+      const next = bounded(Math.round(viewport.scrollLeft / (size + GAP)))
+      selected = next
+      if (next !== options.current.index) options.current.onSelect(next)
+    }
+    const scheduleIdle = () => {
+      clearIdle()
+      // Also cover older Safari and final scroll events delivered after
+      // scrollend. This observes quiescence; it never drives scroll position,
+      // snap timing or a per-frame React update.
+      idle = window.setTimeout(finish, SCROLL_IDLE_MS)
+    }
+    const scroll = () => { begin(); scheduleIdle() }
+    navigate.current = (next, immediate = false) => {
+      next = bounded(next)
+      if (next === selected && !immediate) return
+      selected = next
+      requested = next
+      gesture.current = null
+      touching = false
+      clearIdle()
+      const left = next * (size + GAP)
+      viewport.dataset.settling = Math.abs(viewport.scrollLeft - left) > 1 ? "true" : "false"
+      viewport.scrollTo({ left, behavior: immediate || media.matches ? "instant" : "smooth" })
+      if (Math.abs(viewport.scrollLeft - left) <= 1) finish()
+      else scheduleIdle()
+    }
+    const start = (event: TouchEvent) => {
+      suppressClickUntil.current = 0
+      touching = event.touches.length > 0
+      // Re-grabbing is entirely native: do not read/rewrite the current offset
+      // or cancel momentum with a competing scrollTo/transform animation.
+      requested = null
+      if (event.touches.length !== 1 || options.current.ignoreTarget(event.target)) { gesture.current = null; return }
+      const touch = event.touches[0]
+      gesture.current = { id: touch.identifier, x: touch.clientX, y: touch.clientY, axis: "pending", moved: false }
+    }
+    const move = (event: TouchEvent) => {
+      const current = gesture.current
+      if (!current) return
+      if (event.touches.length !== 1) {
+        if (current.moved) suppressClickUntil.current = performance.now() + 750
+        gesture.current = null
+        return
+      }
+      const touch = event.touches[0]
+      if (touch.identifier !== current.id) return
+      const dx = touch.clientX - current.x, dy = touch.clientY - current.y
+      if (Math.hypot(dx, dy) > 8) current.moved = true
+      if (current.axis === "pending" && current.moved) {
+        if (Math.abs(dy) > Math.abs(dx) * 1.15) current.axis = "vertical"
+        else if (Math.abs(dx) > Math.abs(dy) * 1.15) current.axis = "horizontal"
+      }
+      if (current.axis !== "horizontal") return
+      begin()
+      // Keep Recharts from scrubbing nodes while Safari pans the scroller.
+      // All touch listeners are passive: neither axis waits for/cancels JS.
+      event.stopPropagation()
+    }
+    const end = (event: TouchEvent) => {
+      touching = event.touches.length > 0
+      const current = gesture.current
+      if (current && !Array.from(event.touches).some(touch => touch.identifier === current.id)) {
+        gesture.current = null
+        if (current.moved) suppressClickUntil.current = performance.now() + 750
+        if (current.axis === "horizontal") event.stopPropagation()
+      }
+      if (!touching) {
+        scheduleIdle()
+        // No scrolling (e.g. a canceled touch at an edge) produces no scrollend.
+        if (Math.abs(viewport.scrollLeft - selected * (size + GAP)) <= 1) finish()
+      }
+    }
+    const wheel = (event: WheelEvent) => { if (event.deltaX !== 0) requested = null }
+    const scrollEnd = (event: Event) => { if (event.target === viewport) finish() }
+    const resize = () => {
+      if (!viewport.clientWidth || viewport.clientWidth === size) return
+      size = viewport.clientWidth
+      navigate.current(options.current.index, true)
+    }
+    const reduce = () => { if (media.matches) navigate.current(options.current.index, true) }
+    const passive = { passive: true, capture: true }
+    viewport.addEventListener("touchstart", start, passive)
+    viewport.addEventListener("touchmove", move, passive)
+    viewport.addEventListener("touchend", end, passive)
+    viewport.addEventListener("touchcancel", end, passive)
+    viewport.addEventListener("wheel", wheel, { passive: true })
+    viewport.addEventListener("scroll", scroll, { passive: true })
+    viewport.addEventListener("scrollend", scrollEnd)
+    const observer = new ResizeObserver(resize)
+    observer.observe(viewport)
     media.addEventListener("change", reduce)
-    return () => { observer.disconnect(); media.removeEventListener("change", reduce); stopFrame(); stopDragAnimation(); stopAnimation() }
+    navigate.current(options.current.index, true)
+    return () => {
+      clearIdle()
+      observer.disconnect()
+      media.removeEventListener("change", reduce)
+      viewport.removeEventListener("touchstart", start, true)
+      viewport.removeEventListener("touchmove", move, true)
+      viewport.removeEventListener("touchend", end, true)
+      viewport.removeEventListener("touchcancel", end, true)
+      viewport.removeEventListener("wheel", wheel)
+      viewport.removeEventListener("scroll", scroll)
+      viewport.removeEventListener("scrollend", scrollEnd)
+      navigate.current = () => {}
+    }
   }, [])
+  useLayoutEffect(() => { navigate.current(index) }, [index, count])
 
-  const onTouchStartCapture = (event: TouchEvent<HTMLDivElement>) => {
-    suppressClickUntil.current = 0
-    if (event.touches.length !== 1 || options.current.ignoreTarget(event.target)) {
-      const previous = gesture.current
-      gesture.current = null
-      if (previous) {
-        if (previous.moved) suppressClickUntil.current = performance.now() + 750
-        settle(options.current.index)
-      }
-      return
-    }
-    const touch = event.touches[0], now = performance.now(), size = width()
-    const origin = visibleX(trackRef.current, -options.current.index * (size + GAP))
-    stopFrame()
-    stopDragAnimation()
-    stopAnimation()
-    paint(origin)
-    gesture.current = { id: touch.identifier, x: touch.clientX, y: touch.clientY, origin, width: size, axis: "pending", moved: false, samples: [{ x: touch.clientX, time: now }] }
-  }
-  const onTouchMoveCapture = (event: TouchEvent<HTMLDivElement>) => {
-    const current = gesture.current
-    if (!current) return
-    if (event.touches.length !== 1) {
-      if (current.moved) suppressClickUntil.current = performance.now() + 750
-      gesture.current = null
-      settle(options.current.index)
-      return
-    }
-    const touch = event.touches[0]
-    if (touch.identifier !== current.id) return
-    const dx = touch.clientX - current.x, dy = touch.clientY - current.y, now = performance.now()
-    if (Math.hypot(dx, dy) > 8) current.moved = true
-    current.samples.push({ x: touch.clientX, time: now })
-    current.samples = current.samples.filter(sample => sample.time >= now - 100)
-    if (current.axis === "pending" && current.moved) {
-      if (Math.abs(dy) > Math.abs(dx) * 1.15) current.axis = "vertical"
-      else if (Math.abs(dx) > Math.abs(dy) * 1.15) {
-        current.axis = "horizontal"
-        dragging(true)
-        options.current.onDragStart()
-      }
-    }
-    if (current.axis !== "horizontal") return
-    // Claimed horizontal drags must not scrub chart nodes underneath the finger.
-    // No touch event is canceled; vertical movement stays entirely native.
-    event.stopPropagation()
-    const { index: active, count: total } = options.current
-    pendingX.current = -active * (current.width + GAP) + chartDragOffset(current.origin + active * (current.width + GAP) + dx, current.width, active, total)
-    if (frame.current === null) frame.current = window.requestAnimationFrame(() => { frame.current = null; paintDrag(pendingX.current) })
-  }
-  const finish = (event: TouchEvent<HTMLDivElement>, canceled: boolean) => {
-    const current = gesture.current
-    gesture.current = null
-    if (!current) return
-    if (current.moved) suppressClickUntil.current = performance.now() + 750
-    const { index: active, count: total } = options.current
-    const touch = Array.from(event.changedTouches).find(item => item.identifier === current.id)
-    const horizontal = current.axis === "horizontal"
-    if (horizontal) event.stopPropagation()
-    const velocity = chartReleaseVelocity(current.samples, performance.now())
-    const offset = current.origin + active * (current.width + GAP) + (touch?.clientX ?? current.x) - current.x
-    const next = !canceled && horizontal ? chartReleaseIndex(active, total, current.width, offset, velocity) : active
-    settle(next, horizontal && !canceled ? velocity : 0)
-    if (next !== active) options.current.onSelect(next)
-  }
   const onClickCapture = (event: MouseEvent<HTMLDivElement>) => {
-    // Preserve keyboard/programmatic activation and the next deliberate tap.
     if (event.detail === 0 || (gesture.current?.axis !== "horizontal" && performance.now() >= suppressClickUntil.current)) return
     event.preventDefault()
     event.stopPropagation()
   }
-  return { viewportRef, trackRef, onTouchStartCapture, onTouchMoveCapture,
-    onTouchEndCapture: (event: TouchEvent<HTMLDivElement>) => finish(event, false),
-    onTouchCancelCapture: (event: TouchEvent<HTMLDivElement>) => finish(event, true), onClickCapture }
+  return { viewportRef, onClickCapture }
 }

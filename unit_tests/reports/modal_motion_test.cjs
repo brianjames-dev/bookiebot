@@ -252,12 +252,14 @@ assert.ok(viewportStart >= 0 && viewportEnd > viewportStart)
 const viewportScript = ts.transpileModule(source.slice(viewportStart, viewportEnd), {
   compilerOptions: { target: ts.ScriptTarget.ES2020, module: ts.ModuleKind.CommonJS },
 }).outputText
-let resize
-const viewport = { dataset: {}, clientWidth: 1000, style: { setProperty(key, value) { this[key] = value } } }
+let resize,probeResize,viewportCleanup,cssViewportWidth=1024,probeAttached=false,probeObserved=false,probeDisconnected=false
+const viewportProbe={style:{},getBoundingClientRect:()=>({width:cssViewportWidth}),remove(){probeAttached=false}}
+const viewport = { dataset: {}, clientWidth: 1000, style: { setProperty(key, value) { this[key] = value },removeProperty(key){delete this[key]} } }
 const viewportRuntime = vm.createContext({
-  document: { documentElement: viewport },
-  window: { innerWidth: 1024, addEventListener(event, callback) { assert.equal(event, "resize"); resize = callback } },
-  useLayoutEffect: (effect) => effect(),
+  document: { documentElement: viewport,createElement:()=>viewportProbe,body:{append(node){assert.equal(node,viewportProbe);probeAttached=true}} },
+  ResizeObserver:class{constructor(callback){probeResize=callback}observe(node){assert.equal(node,viewportProbe);probeObserved=true}disconnect(){probeDisconnected=true}},
+  window: { innerWidth: 1024, addEventListener(event, callback) { assert.equal(event, "resize"); resize = callback },removeEventListener(event,callback){assert.equal(callback,resize)} },
+  useLayoutEffect: (effect) => {viewportCleanup=effect()},
 })
 vm.runInContext(`${viewportScript}\nuseViewportScrollbarWidth()`, viewportRuntime)
 assert.equal(viewport.style["--bb-viewport-scrollbar-width"], "24px")
@@ -268,3 +270,17 @@ assert.equal(viewport.style["--bb-viewport-scrollbar-width"], "24px", "Do not re
 delete viewport.dataset.bbModalScrollLock
 resize()
 assert.equal(viewport.style["--bb-viewport-scrollbar-width"], "0px", "Ordinary viewport measurement resumes when unlocked")
+
+cssViewportWidth=390;viewport.clientWidth=390;viewportRuntime.window.innerWidth=563
+resize()
+assert.equal(viewport.style["--bb-viewport-scrollbar-width"],"0px","Mobile zoom/rotation innerWidth must not create a false scrollbar")
+cssViewportWidth=736;viewport.clientWidth=736;viewportRuntime.window.innerWidth=980
+resize()
+assert.equal(viewport.style["--bb-viewport-scrollbar-width"],"0px","CSS viewport units remain the position owner's width in landscape")
+// A resize event can precede CSS viewport settlement; observe the probe itself.
+viewport.clientWidth=390;resize()
+assert.equal(viewport.style["--bb-viewport-scrollbar-width"],"346px")
+cssViewportWidth=390;probeResize()
+assert.equal(viewport.style["--bb-viewport-scrollbar-width"],"0px","Late CSS viewport settlement repairs compensation without another window resize")
+assert.ok(probeObserved)
+viewportCleanup();assert.equal(probeAttached,false,"Unmount removes the invisible viewport probe");assert.ok(probeDisconnected)

@@ -1180,12 +1180,14 @@ button.bb-left-categories { cursor: pointer; }
   height: 100%;
   min-width: 0;
   margin-left: calc((100% - var(--bb-chart-carousel-viewport-width)) / 2);
-  /* This is a transformed track, not a scrolling viewport. Safari otherwise
-     scrolls the container sideways when a calendar marker receives focus. */
-  overflow: clip;
+  /* The browser scroll thread owns finger tracking, momentum and snapping. */
+  overflow-x: auto;
+  overflow-y: hidden;
+  scroll-snap-type: x mandatory;
+  scrollbar-width: none;
   overscroll-behavior-x: contain;
   overscroll-behavior-y: auto;
-  touch-action: pan-y;
+  touch-action: auto;
   /* The stationary header mask covers the full right gutter. Its second layer
      leaves every pixel below the heading visible, including chart popups. */
   -webkit-mask-image: linear-gradient(to right, #000 calc(var(--bb-chart-title-mask-edge) - 16px), transparent var(--bb-chart-title-mask-edge)), linear-gradient(#000, #000);
@@ -1199,21 +1201,19 @@ button.bb-left-categories { cursor: pointer; }
 }
 
 .bb-chart-carousel-track {
-  /* The compositor spring owns movement, including reduced-motion settlement.
-     Override the global reduced-motion duration so it cannot create a second
-     implicit transform transition with a stale WebKit presentation value. */
-  transition: none !important;
   display: flex;
   align-items: stretch;
   gap: var(--bb-chart-carousel-gap);
   height: 100%;
   min-width: 0;
   width: 100%;
-  will-change: transform;
 }
 
+.bb-chart-carousel::-webkit-scrollbar { display: none; }
 
 .bb-chart-carousel-slide {
+  scroll-snap-align: start;
+  scroll-snap-stop: always;
   display: flex;
   flex-direction: column;
   flex: 0 0 100%;

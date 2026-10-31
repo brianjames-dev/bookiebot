@@ -525,14 +525,25 @@ function clamp(value: number, min: number, max: number) {
 function useViewportScrollbarWidth() {
   useLayoutEffect(() => {
     const root = document.documentElement
+    // Match the carousel's CSS viewport units. Mobile innerWidth can briefly
+    // include zoom/overflow during rotation and misidentify hundreds of pixels
+    // as a scrollbar, leaving the full-bleed chart with the wrong width.
+    const probe = document.createElement("div")
+    probe.style.cssText = "position:fixed;left:0;top:0;width:100vw;height:0;padding:0;border:0;visibility:hidden;pointer-events:none"
+    document.body.append(probe)
     const update = () => {
       if (root.dataset.bbModalScrollLock === "true") return
-      root.style.setProperty("--bb-viewport-scrollbar-width", `${Math.max(window.innerWidth - root.clientWidth, 0)}px`)
+      root.style.setProperty("--bb-viewport-scrollbar-width", `${Math.max(probe.getBoundingClientRect().width - root.clientWidth, 0)}px`)
     }
     update()
+    // CSS viewport units can settle after the window resize event on mobile.
+    const observer = new ResizeObserver(update)
+    observer.observe(probe)
     window.addEventListener("resize", update)
     return () => {
       window.removeEventListener("resize", update)
+      observer.disconnect()
+      probe.remove()
       root.style.removeProperty("--bb-viewport-scrollbar-width")
     }
   }, [])
@@ -875,14 +886,9 @@ const OverviewCharts = memo(function OverviewCharts({ report, activeReport, char
             ref={swipe.viewportRef}
             data-dragging="false"
             data-tooltip-cooldown={chartTooltipCooldown ? "true" : "false"}
-            onTouchStartCapture={swipe.onTouchStartCapture}
-            onTouchMoveCapture={swipe.onTouchMoveCapture}
-            onTouchEndCapture={swipe.onTouchEndCapture}
-            onTouchCancelCapture={swipe.onTouchCancelCapture}
             onClickCapture={swipe.onClickCapture}
           >
             <div
-              ref={swipe.trackRef}
               className="bb-chart-carousel-track"
             >
               {chartPanels.map((panel, index) => (
