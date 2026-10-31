@@ -1,7 +1,7 @@
-import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from "react"
+import { startTransition, useCallback, useEffect, useLayoutEffect, useRef, useState, type ReactNode } from "react"
 import { ArrowLeft } from "lucide-react"
-import { AppNavigationContext, nextScrollNavigation, screenForReportSource, screenTitles, type AppScreen, type MainScreen, type ScrollNavigationState } from "./app-navigation"
-import { AppNavigationBar } from "./app-navigation-bar"
+import { AppNavigationContext, AppNavigationStore, nextScrollNavigation, screenForReportSource, screenTitles, type AppScreen, type MainScreen, type ScrollNavigationState } from "./app-navigation"
+import { AppNavigationDock } from "./app-navigation-bar"
 import { AppHeaderTools } from "./app-header-tools"
 import { ExpenseReportApp, useExpenseReportTheme } from "./report-app"
 import { useReportViewPreferences } from "./report-view-preferences"
@@ -43,16 +43,17 @@ function ExpenseAppShellContent({ report, ownerName = "BookieBot", controls, mon
   const visibleRef = useRef(reconciliationVisible)
   visibleRef.current = reconciliationVisible
   const preferences = useReportViewPreferences(owner, Boolean(report?.burnRate), Boolean(report))
-  const [screen, setScreen] = useState<AppScreen>(() => window.location.hash === "#settings" ? "settings" : "overview")
+  const [navigation] = useState(() => new AppNavigationStore(window.location.hash === "#settings" ? "settings" : "overview"))
+  const [screen, setScreen] = useState<AppScreen>(() => navigation.getSnapshot().screen)
   const [lastMain, setLastMain] = useState<MainScreen>("overview")
   const [widgetGuideOpen, setWidgetGuideOpen] = useState(false)
   const [askOpen, setAskOpen] = useState(false)
   const [sourceRequest, setSourceRequest] = useState<{ section: string; id: number; scope: string } | null>(null)
   const [availableVersion, setAvailableVersion] = useState<string | null>(null)
-  const [compact, setCompact] = useState(false)
   const [keyboardOpen, setKeyboardOpen] = useState(false)
   const askTriggerRef = useRef<HTMLButtonElement>(null)
   const screenRef = useRef(screen)
+  const displayedScreen = useRef(screen)
   const widgetGuideRef = useRef(false)
   const widgetFocusRequested = useRef(false)
   const positions = useRef<Partial<Record<AppScreen, number>>>({})
@@ -62,29 +63,35 @@ function ExpenseAppShellContent({ report, ownerName = "BookieBot", controls, mon
   const reportRefresh = { refresh: onRefresh ?? (async () => false), disabled: !report || !onRefresh || reportBusy || signingOut || guard.pending || guard.uncertain }
   usePageRefresh("overview", reportRefresh)
   usePageRefresh("savings", reportRefresh)
-  const selectScreen = (next: AppScreen) => {
-    if (!report) return
+  const ready = Boolean(report)
+  const selectScreen = useCallback((next: AppScreen) => {
+    if (!ready) return
     if (next === "reconcile" && !visibleRef.current) return
     if (next === screenRef.current) {
       if (next === "settings" && widgetGuideRef.current) {
         widgetGuideRef.current = false
-        setWidgetGuideOpen(false)
-        window.dispatchEvent(new CustomEvent("bookiebot:screen-change"))
+        startTransition(() => {
+          setWidgetGuideOpen(false)
+          window.dispatchEvent(new CustomEvent("bookiebot:screen-change"))
+        })
       }
       return
     }
-    setSourceRequest(null)
     // The guide is a temporary Settings view; its scroll must not replace the
     // form/code position that Back, the gear and later tab visits restore.
-    if (!widgetGuideRef.current) positions.current[screenRef.current] = window.scrollY
+    if (!widgetGuideRef.current) positions.current[displayedScreen.current] = window.scrollY
     widgetGuideRef.current = false
-    setWidgetGuideOpen(false)
     widgetFocusRequested.current = false
-    if (next !== "settings") setLastMain(next)
     screenRef.current = next
-    setScreen(next)
-    window.dispatchEvent(new CustomEvent("bookiebot:screen-change"))
-  }
+    navigation.select(next)
+    startTransition(() => {
+      setSourceRequest(null)
+      setWidgetGuideOpen(false)
+      if (next !== "settings") setLastMain(next)
+      setScreen(next)
+      window.dispatchEvent(new CustomEvent("bookiebot:screen-change"))
+    })
+  }, [ready, navigation])
   const openWidgetGuide = () => {
     positions.current.settings = window.scrollY
     widgetGuideRef.current = true
@@ -99,7 +106,10 @@ function ExpenseAppShellContent({ report, ownerName = "BookieBot", controls, mon
   useEffect(() => {
     if (reconciliationVisible) return
     if (screenRef.current === "reconcile") selectScreen("overview")
-    if (lastMain === "reconcile") setLastMain("overview")
+    if (lastMain === "reconcile") {
+      setLastMain("overview")
+      navigation.select(screenRef.current, "overview")
+    }
   }, [reconciliationVisible, lastMain])
 
   useEffect(() => {
@@ -115,6 +125,7 @@ function ExpenseAppShellContent({ report, ownerName = "BookieBot", controls, mon
   const consumeSource = (id: number) => setSourceRequest(current => current?.id === id ? null : current)
 
   useLayoutEffect(() => {
+    displayedScreen.current = screen
     const y = widgetGuideOpen ? 0 : positions.current[screen] ?? 0
     window.scrollTo({ top: y, behavior: "instant" })
     if (screen === "settings" && !widgetGuideOpen && widgetFocusRequested.current) {
@@ -126,8 +137,8 @@ function ExpenseAppShellContent({ report, ownerName = "BookieBot", controls, mon
         target.scrollIntoView({ block: "start", behavior: "instant" })
       }
     }
-    scrollState.current = { lastY: window.scrollY, travel: 0, compact: false }
-    setCompact(false)
+    // Restoring a page's position must not resize/restart the independent dock.
+    scrollState.current = { lastY: window.scrollY, travel: 0, compact: navigation.getSnapshot().compact }
   }, [screen, widgetGuideOpen])
 
   useEffect(() => {
@@ -138,7 +149,7 @@ function ExpenseAppShellContent({ report, ownerName = "BookieBot", controls, mon
       const previous = scrollState.current
       const state = nextScrollNavigation(previous, window.scrollY, document.documentElement.scrollHeight - window.innerHeight)
       scrollState.current = state
-      if (previous.compact !== state.compact) setCompact(state.compact)
+      if (previous.compact !== state.compact) navigation.setCompact(state.compact)
     }
     const scroll = () => { if (!frame) frame = requestAnimationFrame(readScroll) }
     const viewport = () => {
@@ -242,7 +253,7 @@ function ExpenseAppShellContent({ report, ownerName = "BookieBot", controls, mon
       </main>}
 
       {/* top omits Konsta’s under-bar blur/gradient; CSS anchors this floating bar at the bottom. */}
-      <AppNavigationBar active={screen === "settings" ? lastMain : screen} current={screen === "settings" ? null : screen} compact={compact && !askOpen}
+      <AppNavigationDock navigation={navigation} expanded={askOpen}
         reconciliationVisible={reconciliationVisible} hidden={keyboardOpen} disabled={!report} onSelect={selectScreen} />
       {report && <AskBookieBotPanel open={askOpen && monthlyReady} openerRef={askTriggerRef} onClose={() => setAskOpen(false)} month={questionMonth ?? `${report.year}-${String(report.month).padStart(2, "0")}`} mode={preferences.mode} onShowSource={showSource} />}
       <AppUpdatePrompt initialVersion={initialVersion} onAvailabilityChange={setAvailableVersion} />

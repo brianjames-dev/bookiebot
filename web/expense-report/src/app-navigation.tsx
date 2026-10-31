@@ -3,6 +3,28 @@ import type { useReportViewPreferences } from "./report-view-preferences"
 
 export type AppScreen = "overview" | "transactions" | "shared" | "savings" | "reconcile" | "settings"
 export type MainScreen = Exclude<AppScreen, "settings">
+// Chrome subscribes independently of the page tree. An accepted navigation
+// updates it synchronously; rendering/loading that page can run as a transition.
+export class AppNavigationStore {
+  private snapshot: { screen: AppScreen; main: MainScreen; compact: boolean }
+  private listeners = new Set<() => void>()
+  constructor(screen: AppScreen = "overview") {
+    this.snapshot = { screen, main: screen === "settings" ? "overview" : screen, compact: false }
+  }
+  getSnapshot = () => this.snapshot
+  subscribe = (listener: () => void) => { this.listeners.add(listener); return () => { this.listeners.delete(listener) } }
+  select(screen: AppScreen, lastMain = this.snapshot.main) {
+    const main = screen === "settings" ? lastMain : screen
+    if (screen === this.snapshot.screen && main === this.snapshot.main) return
+    this.snapshot = { screen, main, compact: false }
+    this.listeners.forEach(listener => listener())
+  }
+  setCompact(compact: boolean) {
+    if (compact === this.snapshot.compact) return
+    this.snapshot = { ...this.snapshot, compact }
+    this.listeners.forEach(listener => listener())
+  }
+}
 export const screenTitles: Record<AppScreen, string> = {
   overview: "Overview", transactions: "Transactions", shared: "Shared", savings: "Savings", reconcile: "Reconcile", settings: "Settings",
 }

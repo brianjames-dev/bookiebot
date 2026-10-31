@@ -41,7 +41,8 @@ async function geometry(page, label, compact) {
       bubble: rect(host.querySelector('.bb-navigation-selection')),
       icon: rect(selected.querySelector('.bb-glass-icon')),
       variants: [...host.querySelectorAll('button')].map(n=>({screen:n.dataset.navScreen,selected:n.querySelector('.bb-glass-icon').dataset.selected==='true',fill:getComputedStyle(n.querySelector('.bb-glass-icon-solid svg')).fill,stroke:getComputedStyle(n.querySelector('.bb-glass-icon-outline svg')).stroke,solid:+getComputedStyle(n.querySelector('.bb-glass-icon-solid')).opacity,outline:+getComputedStyle(n.querySelector('.bb-glass-icon-outline')).opacity,text:n.innerText})),
-      ink: getComputedStyle(host).color, iconColors: [...host.querySelectorAll('button svg')].map(n=>getComputedStyle(n).color),
+      ink: getComputedStyle(host).color, material:getComputedStyle(host).getPropertyValue('--bb-glass-base').trim(), theme:document.documentElement.dataset.theme,
+      toolMaterials:[...document.querySelectorAll('.bb-shell-toolbar-pane')].map(n=>getComputedStyle(n).getPropertyValue('--bb-glass-base').trim()), iconColors: [...host.querySelectorAll('button svg')].map(n=>getComputedStyle(n).color),
       pane: rect(host), stacks: [...host.querySelectorAll('button > span')].map(rect),
       anchor:host.style.getPropertyValue('--bb-nav-position'),lensLeft:getComputedStyle(host.querySelector('.bb-navigation-selection')).left,
       targets: [...host.querySelectorAll('button')].map(rect),
@@ -49,6 +50,8 @@ async function geometry(page, label, compact) {
     }
   })
   assert.equal(result.selected, label)
+  assert.equal(result.material,`rgb(${result.theme==='dark'?'43 45 48 / .42':'247 248 250 / .46'})`,'Glass is subtly more transparent in both themes')
+  assert.ok(result.toolMaterials.every(color=>color===result.material),'Both fixed buttons share the same transparency as the nav')
   const { button, bubble, icon } = result
   const close = (a, b, message) => assert.ok(Math.abs(a - b) <= 0.25, `${message}: ${a} vs ${b}; ${JSON.stringify(result)}`)
   close(bubble.x + bubble.width / 2, button.x + button.width / 2, 'Bubble must center on the actual selected button')

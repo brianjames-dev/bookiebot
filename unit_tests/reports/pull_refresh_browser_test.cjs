@@ -47,6 +47,7 @@ async function waitReady(page,label) {
           window.addEventListener('touchmove',event=>{if(event.defaultPrevented)window.__preventedMoves++},{passive:true})
         })
         const requests=[],errors=[];let failedCheck=false,reportNumber=0,holdCheck=false,releaseCheck,holdReport=true,releaseReport
+        let holdTransactions=false,releaseTransactions,transactionRows=[]
         page.on('pageerror',error=>errors.push(error.message))
         await page.route('**/*',async route=>{
           const request=route.request(),url=new URL(request.url()),name=url.pathname,body=request.postDataJSON()
@@ -65,7 +66,10 @@ async function waitReady(page,label) {
             value={enabled:true,checkedAt:'2026-10-29T07:00:00Z',items:[]}
           } else if(name==='/app/reimbursements') value={enabled:true,ownerKey:'brian',currency:'USD',allocations:[],events:[],resets:[],resetState:'fixture'}
           else if(name==='/app/goals') value={goals:[]}
-          else if(name==='/app/transactions')value={items:[],total:0,nextOffset:null,categories:[],persons:[],month:'2026-09'}
+          else if(name==='/app/transactions') {
+            if(holdTransactions)await new Promise(resolve=>{releaseTransactions=resolve})
+            value={items:transactionRows,total:transactionRows.length,nextOffset:null,categories:[],persons:[],month:'2026-09'}
+          }
           else if(name==='/app/widgets/settings')value={connections:[],scriptUrl:'/app/widgets/script',setupInstructionsUrl:'/app/widgets/help'}
           else if(name==='/app/notifications')value={enabled:false,publicKey:'B'+'A'.repeat(86),preferences:{weekly:true,upcoming:false,showAmounts:false,hour:10}}
           else if(name==='/app/expenses/months')value={currentMonth:'2026-09',months:[{value:'2026-09',label:'September 2026'}],coverage:{status:'complete',unavailableYears:[]}}
@@ -100,13 +104,40 @@ async function waitReady(page,label) {
           for(const label of ['Transactions','Shared','Savings','Reconcile','Overview','Transactions','Overview']) {
             const r=await page.getByRole('navigation',{name:'Main navigation'}).getByRole('button',{name:label,exact:true}).boundingBox()
             await page.touchscreen.tap(r.x+r.width*.72,r.y+r.height/2)
-            assert.equal(await page.locator('.bb-app-shell').getAttribute('data-screen'),label.toLowerCase(),'Rapid native taps commit the intended page')
+            assert.equal(await page.getByRole('navigation',{name:'Main navigation'}).getByRole('button',{name:label,exact:true}).getAttribute('aria-current'),'page','The dock accepts the release independently of page rendering')
+            await page.waitForFunction(screen=>document.querySelector('.bb-app-shell').dataset.screen===screen,label.toLowerCase())
           }
           const quick=await page.evaluate(()=>{window.__quickNav.disconnect();return {contact:window.__quickContact,detour:window.__quickDetour}})
           assert.equal(quick.contact,false,'Quick native taps never pulse the bar through its held shape')
           assert.equal(quick.detour,false,'Quick native taps use the direct CSS track without a pointer-position detour')
           assert.equal(await page.locator('.bb-navigation-pane').evaluate((node,original)=>node===original,pane),true,'The compiled app retains its nav DOM across rapid page changes')
           await page.waitForTimeout(500)
+          // A page response landing during the slide must not retarget or
+          // remount chrome, even when it paints a complete transaction listing.
+          transactionRows=Array.from({length:40},(_,i)=>({id:'fixture-'+i,actionId:'fixture-'+i,version:'fixture-v1',month:'2026-09',date:'2026-09-01',title:'Fixture purchase '+i,location:'Fixture',person:'Brian',kind:'expense',category:'food',categoryLabel:'Food',amountCents:1000,split:'',fields:{},editableFields:[],capabilities:{update:false,move:false,delete:false,split:false,cancel_split:false,undo:false},reasons:{}}))
+          holdTransactions=true
+          await page.evaluate(()=>{
+            const cursor=document.querySelector('.bb-navigation-cursor'),pane=document.querySelector('.bb-navigation-pane')
+            window.__loadingRuns=0;window.__loadingFrames=[];window.__loadingPane=pane;window.__samplingLoad=true
+            cursor.addEventListener('transitionrun',event=>{if(event.target===cursor&&event.propertyName==='transform')window.__loadingRuns++})
+            const sample=()=>{if(!window.__samplingLoad)return;const r=pane.querySelector('.bb-navigation-selection').getBoundingClientRect();window.__loadingFrames.push(r.x);requestAnimationFrame(sample)};sample()
+          })
+          await page.getByRole('navigation',{name:'Main navigation'}).getByRole('button',{name:'Transactions',exact:true}).click()
+          while(!releaseTransactions)await page.waitForTimeout(10)
+          assert.equal(await page.getByRole('navigation',{name:'Main navigation'}).getByRole('button',{name:'Transactions',exact:true}).getAttribute('aria-current'),'page','Selection does not wait for page data')
+          const loading=await page.locator('.bb-navigation-pane').evaluate(pane=>{const cursor=pane.querySelector('.bb-navigation-cursor');window.__loadingSlide=cursor.getAnimations().find(a=>a.transitionProperty==='transform');return {animation:!!window.__loadingSlide,width:pane.getBoundingClientRect().width}})
+          assert.equal(loading.animation,true,'The pill is already moving while the response is pending')
+          holdTransactions=false;releaseTransactions()
+          await page.getByText('Fixture purchase 39',{exact:true}).waitFor()
+          await page.waitForTimeout(500)
+          const loaded=await page.evaluate(()=>{window.__samplingLoad=false;const pane=document.querySelector('.bb-navigation-pane');return {runs:window.__loadingRuns,same:pane===window.__loadingPane,width:pane.getBoundingClientRect().width,positions:window.__loadingFrames,finished:window.__loadingSlide.playState==='finished'}})
+          assert.equal(loaded.runs,1,'Page paint never restarts the selection transition')
+          assert.equal(loaded.same,true);assert.ok(Math.abs(loaded.width-loading.width)<.25,'Page completion cannot resize the dock')
+          assert.ok(new Set(loaded.positions.map(x=>Math.round(x))).size>6,'The slide retains intermediate painted positions through loading')
+          assert.equal(loaded.finished,true)
+          transactionRows=[]
+          await page.getByRole('navigation',{name:'Main navigation'}).getByRole('button',{name:'Overview',exact:true}).click();await waitReady(page,'Overview');await page.waitForTimeout(500)
+          cases++
         }
 
         if(dark) {
@@ -407,5 +438,5 @@ async function waitReady(page,label) {
       }
     } finally {await browser.close()}
   }
-  console.log(`${cases} full-app Chromium/WebKit page refresh cases passed, plus status recovery/native touch/draft preservation; all APIs isolated`)
+  console.log(`${cases} full-app Chromium/WebKit page refresh/loading cases passed, plus status recovery/native touch/draft preservation; all APIs isolated`)
 })().catch(error=>{console.error(error);process.exitCode=1})

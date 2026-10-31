@@ -31,6 +31,8 @@ const konsta = new Module(path.join(frontend, '__shell_konsta.cjs'), module)
 konsta.filename = path.join(frontend, '__shell_konsta.cjs'); konsta.require = req
 konsta._compile(req('esbuild').buildSync({ stdin: { contents: 'export * from "konsta/react"', resolveDir: frontend }, bundle: true, platform: 'node', format: 'cjs', write: false, external: ['react', 'react-dom'], logLevel: 'silent' }).outputFiles[0].text, konsta.filename)
 const cache = new Map(), mocks = new Map()
+let holdPageTransitions=false,navRenders=0
+const pageTransitions=[]
 function load(file) {
   if (mocks.has(file)) return mocks.get(file)
   if (cache.has(file)) return cache.get(file)
@@ -38,6 +40,7 @@ function load(file) {
   const requireModule = name => {
     if (name.endsWith('.css')) return {}
     if (name === 'konsta/react') return konsta.exports
+    if (name === 'react' && file.endsWith('/expense-app-shell.tsx')) return {...React,startTransition:action=>holdPageTransitions?pageTransitions.push(action):React.startTransition(action)}
     if (!name.startsWith('.')) return req(name)
     const base = path.resolve(path.dirname(file), name)
     return load([base + '.tsx', base + '.ts'].find(fs.existsSync))
@@ -55,8 +58,9 @@ const src = file => path.join(frontend, 'src', file)
 const { AppWorkGuardProvider, useAppWorkGuard } = load(src('app-work-guard.tsx'))
 const navigation = load(src('app-navigation.tsx'))
 const realSession = load(src('expense-app-session.ts'))
-let nav, ask
+let nav, ask,reportRenders=0
 function ReportLeaf({ report, appControls, appMonthControl, appComparison }) {
+  reportRenders++
   nav = navigation.useAppNavigation()
   const [instance] = React.useState(() => ++reportMounts)
   return h('div', { 'data-report-instance': instance, 'data-report-month': report.month },
@@ -71,6 +75,7 @@ mocks.set(src('report-app.tsx'), { ExpenseReportApp: ReportLeaf, useExpenseRepor
 mocks.set(src('ask-bookiebot-panel.tsx'), { AskBookieBotPanel: AskLeaf })
 mocks.set(src('phone-notifications.tsx'), { PhoneNotifications: NotificationsLeaf })
 mocks.set(src('shared-reimbursements.tsx'), { SharedReimbursementsCard: () => h('p', null, 'Legacy fallback') })
+mocks.set(src('navigation-lens.ts'), {useNavigationLens:()=>{navRenders++;return {start(){},move(){},release(){}}}})
 const { ExpenseAppShell } = load(src('expense-app-shell.tsx'))
 let guard
 function Observe() { guard = useAppWorkGuard(); return null }
@@ -130,6 +135,26 @@ async function main() {
     assert.ok(node.findAllByType('span').every(n=>n.children.every(child=>typeof child!=='string')),'Nav renders no visible text labels')
   }
   const askTrigger = button(tree, 'Ask BookieBot')
+  const dock=tree.root.findAll(node=>node.props.navigation instanceof navigation.AppNavigationStore)[0].props.navigation
+  const beforeScroll=reportRenders
+  await run(()=>dock.setCompact(true))
+  assert.equal(reportRenders,beforeScroll,'Scroll compaction updates chrome without rerendering the report')
+  holdPageTransitions=true;win.scrollY=145
+  await tap(tree,'Transactions');await tap(tree,'Shared')
+  assert.equal(screen(tree),'overview','Page work may remain pending without blocking nav selection')
+  assert.equal(button(tree,'Shared').props['aria-current'],'page','The dock immediately reflects the latest accepted release')
+  assert.equal(button(tree,'Shared').findAll(n=>n.props.className==='bb-glass-icon')[0].props['data-selected'],true)
+  assert.equal(pageTransitions.length,2,'Page updates use the transition lane')
+  assert.equal(dock.getSnapshot().compact,false,'The accepted tab expands immediately, before its page commits')
+  const beforePageCommit=navRenders
+  holdPageTransitions=false
+  await run(()=>pageTransitions.splice(0).forEach(action=>action()))
+  assert.equal(navRenders,beforePageCommit,'Committing pending pages never rerenders or retargets the dock')
+  assert.equal(screen(tree),'shared');assert.equal(win.scrollY,0)
+  await tap(tree,'Overview');assert.equal(win.scrollY,145,'Rapid pending selections save the displayed page position, not an unrendered tab position')
+  const chromeRenders=navRenders
+  await run(()=>tree.update(shell(report)))
+  assert.equal(navRenders,chromeRenders,'Page/report updates do not rerender navigation chrome')
   assert.equal(askTrigger.props['aria-haspopup'], 'dialog')
   assert.equal(askTrigger.props['aria-expanded'], false)
   await run(() => askTrigger.props.onClick({ currentTarget: { focus() { throw Error('A pointer tap must not force focus') } } }))
@@ -146,7 +171,9 @@ async function main() {
   win.scrollY = 320; await tap(tree, 'Savings'); assert.equal(win.scrollY, 0)
   win.scrollY = 210; await tap(tree, 'Overview'); assert.equal(win.scrollY, 320)
   await tap(tree, 'Savings'); assert.equal(win.scrollY, 210, 'Each screen restores its own scroll position')
-  await tap(tree, 'Savings'); await tap(tree, '＋ Goal'); await fill(tree, 'Goal name', 'Trip draft'); await fill(tree, 'Target ($)', '1000')
+  await tap(tree, 'Savings'); await tap(tree, '＋ Goal'); const beforeDraft=navRenders
+  await fill(tree, 'Goal name', 'Trip draft'); await fill(tree, 'Target ($)', '1000')
+  assert.equal(navRenders,beforeDraft,'Page work-guard publications do not rerender the dock')
   assert.equal(guard.dirty, true)
   await tap(tree, 'Shared'); await tap(tree, 'View 1 expense')
   const sharedMonth = tree.root.findAllByType('button').filter(visible).find(node => node.props.className === 'bb-reimbursement-month-toggle')

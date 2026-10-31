@@ -1,5 +1,13 @@
 # Agent Decisions
 
+## 2026-10-31 - Keep Navigation Chrome Independent Of Page Work
+
+Use a small session-local `AppNavigationStore` for the accepted screen/main-tab intent and compact flag. A memoized dock subscribes through `useSyncExternalStore`, with a stable shell selection callback. After the existing readiness/availability checks accept a release, publish chrome immediately and schedule page setters plus screen-change cleanup in `startTransition`. Page requests, report refreshes, draft/work-guard publications and lower-priority page commits cannot rerender or retarget the dock. Passive scroll compaction updates only the chrome store. This is transient presentation state, with no persistence, financial state or event-protocol changes.
+
+Keep requested and displayed screen refs separate for scroll bookkeeping: rapid selections before rendering must save the currently displayed page, never a tab that has not appeared. Expand chrome on accepted navigation, and let the eventual page commit restore scroll without resetting nav size. Preserve Settings main-tab history, unavailable-Reconcile fallback, release-only fill, drafts, native scrolling and existing guards. No fixed loading delay or new dependency is introduced.
+
+Use slightly more transparent shared glass: light base/held alpha .52/.68 → .46/.62, dark .48/.56 → .42/.50. Keep ink, rim, illumination and selection contrast; Reduce Transparency remains opaque. Native acceptance is checklist 223.
+
 ## 2026-10-31 - Separate Pill Travel And Toolbar Gesture Ownership
 
 Move navigation selection travel onto a dedicated full-width `translate3d` carrier. Its percentages retain the pane coordinate system, while the pill keeps its own width/inset transitions and the glass keeps its accepted scale animation. This removes animated layout-position writes from selection travel. Rest/release still use the existing spring; held tracking uses a short eased transform transition. No resize observer, continuous JavaScript animation loop, dependency or page-scroll owner is introduced. Reduce Motion disables the carrier transition, while quick taps, release-only fill, cancel/guard behavior and accessible button semantics remain.

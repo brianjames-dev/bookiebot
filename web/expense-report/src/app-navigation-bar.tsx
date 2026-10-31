@@ -1,7 +1,7 @@
-import { useRef, useState, type ComponentProps, type CSSProperties, type PointerEvent } from "react"
+import { memo, useRef, useState, useSyncExternalStore, type ComponentProps, type CSSProperties, type PointerEvent } from "react"
 import { Glass, Tabbar, TabbarLink } from "konsta/react"
 import { ClipboardCheck, House, PiggyBank, ReceiptText, Users } from "lucide-react"
-import { screenTitles, type MainScreen } from "./app-navigation"
+import { screenTitles, type AppNavigationStore, type MainScreen } from "./app-navigation"
 import { useNavigationLens } from "./navigation-lens"
 import { GlassIcon } from "./glass-icon"
 
@@ -34,6 +34,19 @@ function NavigationIcon({ id, selected }: { id: MainScreen; selected: boolean })
 function NavigationButton(props: ComponentProps<"button">) {
   return <button {...props} role={undefined} />
 }
+
+export const AppNavigationDock = memo(function AppNavigationDock({ navigation, expanded, ...props }: {
+  navigation: AppNavigationStore
+  expanded: boolean
+  reconciliationVisible: boolean
+  hidden: boolean
+  disabled: boolean
+  onSelect: (screen: MainScreen) => void
+}) {
+  const selected = useSyncExternalStore(navigation.subscribe, navigation.getSnapshot, navigation.getSnapshot)
+  return <AppNavigationBar {...props} active={selected.main} current={selected.screen === "settings" ? null : selected.screen}
+    compact={selected.compact && !expanded} />
+})
 
 export function AppNavigationBar({ active, current = active, compact, reconciliationVisible, hidden, disabled = false, onSelect }: {
   active: MainScreen

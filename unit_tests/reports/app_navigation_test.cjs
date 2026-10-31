@@ -8,7 +8,16 @@ global.IS_REACT_ACT_ENVIRONMENT = true
 const output = req('esbuild').buildSync({entryPoints:['web/expense-report/src/app-navigation.tsx'],bundle:true,platform:'node',format:'cjs',write:false,external:['react','react/jsx-runtime']}).outputFiles[0].text
 const moduleObject = {exports:{}}
 vm.runInNewContext(output,{module:moduleObject,exports:moduleObject.exports,require:req})
-const {nextScrollNavigation,screenForReportSource,ReportScreen,AppNavigationContext} = moduleObject.exports
+const {AppNavigationStore,nextScrollNavigation,screenForReportSource,ReportScreen,AppNavigationContext} = moduleObject.exports
+const chrome=new AppNavigationStore(),first=chrome.getSnapshot();let publications=0
+const unsubscribe=chrome.subscribe(()=>publications++)
+chrome.select('overview');chrome.setCompact(false);assert.equal(chrome.getSnapshot(),first,'Unchanged chrome keeps a stable snapshot')
+chrome.setCompact(true);chrome.select('transactions')
+assert.equal(chrome.getSnapshot().main,'transactions');assert.equal(chrome.getSnapshot().compact,false,'Accepted selection expands chrome independently of page render')
+chrome.select('settings');assert.equal(chrome.getSnapshot().main,'transactions','Settings retains the last accepted main tab')
+chrome.select('reconcile');chrome.select('settings');chrome.select('settings','overview')
+assert.equal(chrome.getSnapshot().screen,'settings');assert.equal(chrome.getSnapshot().main,'overview','Unavailable reconciliation can fall back without leaving Settings')
+const beforeUnsubscribe=publications;unsubscribe();chrome.select('savings');assert.equal(publications,beforeUnsubscribe)
 let state={lastY:0,travel:0,compact:false}
 for(const y of [5,9,18,23]) state=nextScrollNavigation(state,y,1000)
 assert.equal(state.compact,false,'Tiny top-of-page movements leave full navigation visible')
