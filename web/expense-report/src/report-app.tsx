@@ -857,17 +857,18 @@ const OverviewCharts = memo(function OverviewCharts({ report, activeReport, char
     onSelect: switchChart, onDragStart: dismissChartTooltips, ignoreTarget: isInteractiveTouchTarget })
 
   return <>
-        <ChartCarouselNavigation
-          panels={chartPanels}
-          activeIndex={activeChartIndex}
-          onSelect={switchChart}
-        />
         <section
           className="bb-chart-carousel-band"
+          style={{ "--bb-chart-indicator-count": chartPanels.length } as CSSProperties}
           role="region"
           aria-roledescription="carousel"
           aria-label="Budget charts"
         >
+          <ChartCarouselNavigation
+            panels={chartPanels}
+            activeIndex={activeChartIndex}
+            onSelect={switchChart}
+          />
           <div
             className="bb-chart-carousel"
             ref={swipe.viewportRef}
@@ -894,6 +895,11 @@ const OverviewCharts = memo(function OverviewCharts({ report, activeReport, char
                   aria-hidden={index !== activeChartIndex}
                   inert={index !== activeChartIndex}
                 >
+                  <div className="bb-chart-carousel-heading">
+                    <h2 className="bb-chart-carousel-title">
+                      <FittedAmount className="bb-chart-carousel-title-value">{panel.title}</FittedAmount>
+                    </h2>
+                  </div>
                   <CardContent>{panel.content}</CardContent>
                 </div>
               ))}
@@ -1031,9 +1037,7 @@ function ChartCarouselNavigation({
 }) {
   return (
     <div className="bb-chart-carousel-nav">
-      <h2 className="bb-chart-carousel-title" aria-live="polite">
-        <FittedAmount className="bb-chart-carousel-title-value">{panels[activeIndex].title}</FittedAmount>
-      </h2>
+      <span className="sr-only" role="status" aria-live="polite">{panels[activeIndex].title}</span>
       <ChartCarouselIndicators panels={panels} activeIndex={activeIndex} onSelect={onSelect} />
     </div>
   )

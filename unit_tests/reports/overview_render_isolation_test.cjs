@@ -71,6 +71,7 @@ const runtime = { exports:{}, require:req, window, document,
 for(const name of ['Card','CardHeader','CardTitle','CardContent','ReportScreen','ReportMenu','TabsList','TabsTrigger','TabsContent','HiddenListPanel'])runtime[name]=passthrough
 for(const name of ['MetricCard','RemainingCategoryBars','SavingsMetricCard','ReportBrand','ReportHeader','ThemeToggle','SharedReimbursementsCard','ReimbursementLedger','Investments','SavingsGoals','ReportQuestions','PhoneNotifications','ActivityDetails','MetricExplanationDetails','TopExpensesTable','MerchantOccurrencesTable'])runtime[name]=leaf(name)
 runtime.ModalDetails=passthrough
+runtime.FittedAmount=passthrough
 runtime.generatedTimeLabel=()=>''
 const swipeRuntime={exports:{},require:req,window,performance:{now:()=>0},ResizeObserver:class{observe(){} disconnect(){}}}
 vm.runInNewContext(ts.transpileModule(fs.readFileSync('web/expense-report/src/chart-swipe.ts','utf8'),{compilerOptions:{target:ts.ScriptTarget.ES2020,module:ts.ModuleKind.CommonJS}}).outputText,swipeRuntime)
@@ -84,6 +85,7 @@ let report={ownerName:'Brian',year:2026,month:10,monthLabel:'October 2026',gener
 const appSession = {signOut:()=>{},signingOut:false}
 let renderer
 act(()=>{renderer=Renderer.create(h(App,{report,appSession}))})
+assert.deepEqual(renderer.root.findAllByType('h2').map(title=>title.findByType(runtime.FittedAmount).props.children),['Category Mix','Burn Rate','Calendar','Bills & Utilities'],'Every sliding page owns its own heading')
 const spentCard=()=>renderer.root.findAllByType(runtime.MetricCard).find(card=>card.props.label==='Spent')
 assert.equal(spentCard().props.value,72,'Spent uses authoritative expenses without cash or ESPP savings')
 assert.equal(renderer.root.findByType(CategoryMixChartLeaf).props.allSpentTotal,72,'Category Mix receives the same authoritative Current headline')

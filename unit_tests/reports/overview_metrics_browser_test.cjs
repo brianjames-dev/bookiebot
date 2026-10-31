@@ -60,10 +60,11 @@ async function checkQuietHeader(page, width, reduced) {
   const height = (await stage.boundingBox()).height
   for (const [index, name] of panels.entries()) {
     await page.getByRole('button', {name: `Show ${name}`, exact: true}).click()
-    await page.waitForTimeout(300)
-    assert.equal(await nav.getByRole('heading').innerText(), name)
+    await page.locator('.bb-chart-carousel[data-settling="false"]').waitFor()
+    await page.waitForFunction(()=>[...document.querySelectorAll('.bb-chart-carousel-dot')].every(button=>button.firstElementChild.getBoundingClientRect().width===(button.getAttribute('aria-pressed')==='true'?24:6)))
+    assert.equal(await page.locator('.bb-chart-carousel-slide[aria-hidden="false"] .bb-chart-carousel-title').innerText(), name)
     const layout = await nav.evaluate(el => {
-      const title = el.querySelector('.bb-chart-carousel-title'), value = title.querySelector('.bb-fitted-amount-text'), dots = el.querySelector('.bb-chart-carousel-indicators')
+      const title = el.closest('.bb-chart-carousel-band').querySelector('.bb-chart-carousel-slide[aria-hidden="false"] .bb-chart-carousel-title'), value = title.querySelector('.bb-fitted-amount-text'), dots = el.querySelector('.bb-chart-carousel-indicators')
       const box = node => {const r=node.getBoundingClientRect();return {left:r.left,right:r.right,top:r.top,bottom:r.bottom,width:r.width,height:r.height}}
       return {title:box(title),value:box(value),dots:box(dots),font:parseFloat(getComputedStyle(value).fontSize),padding:[getComputedStyle(el).paddingTop,getComputedStyle(el).paddingBottom],
         buttons:[...dots.children].map(button => ({box:box(button),marker:box(button.firstElementChild),text:button.textContent,pressed:button.getAttribute('aria-pressed'),duration:parseFloat(getComputedStyle(button.firstElementChild).transitionDuration)})),
@@ -71,10 +72,10 @@ async function checkQuietHeader(page, width, reduced) {
     })
     assert.deepEqual(layout.padding,['12px','0px'])
     assert.equal(layout.buttons.length,4)
-    assert.ok(layout.buttons.every((button,i) => button.box.width===44&&button.box.height===44&&button.marker.height===6&&button.marker.width===(i===index?24:6)&&button.text===''))
+    assert.ok(layout.buttons.every((button,i) => button.box.width===44&&button.box.height===44&&button.marker.height===6&&button.marker.width===(i===index?24:6)&&button.text===''),JSON.stringify(layout))
     assert.ok(layout.value.right<=layout.title.right+1&&layout.font<=28,'Long headings fit without overlapping the position markers')
     if (width<=362) assert.ok(layout.title.bottom<=layout.dots.top+1,'Narrow phones retain full title text above right-aligned markers')
-    else assert.ok(layout.title.right+8<=layout.dots.left+1)
+    else assert.ok(layout.title.right+8<=layout.dots.left+1,JSON.stringify(layout))
     if (name==='Category Mix') assert.equal(layout.font,28,'Approved title size is retained where it fits')
     if (reduced) assert.ok(layout.buttons.every(button=>button.duration<=.001))
     assert.equal(layout.touchAction,'pan-y','Chart gestures leave vertical panning native')
@@ -85,9 +86,9 @@ async function checkQuietHeader(page, width, reduced) {
   assert.equal(await page.getByRole('button',{name:'Next chart',exact:true}).count(),0)
   const category = page.getByRole('button',{name:'Show Category Mix',exact:true})
   await category.focus();await page.keyboard.press('Enter');await page.keyboard.press('ArrowRight')
-  assert.equal(await nav.getByRole('heading').innerText(),'Burn Rate','Keyboard arrows change the graph')
+  assert.equal(await page.locator('.bb-chart-carousel-slide[aria-hidden="false"] .bb-chart-carousel-title').innerText(),'Burn Rate','Keyboard arrows change the graph')
   await page.keyboard.press('ArrowLeft')
-  assert.equal(await nav.getByRole('heading').innerText(),'Category Mix')
+  assert.equal(await page.locator('.bb-chart-carousel-slide[aria-hidden="false"] .bb-chart-carousel-title').innerText(),'Category Mix')
   // These are settled-page navigation checks; interrupted dragging is exercised
   // separately by chart_swipe_browser_test.cjs.
   await page.locator('.bb-chart-carousel[data-settling="false"]').waitFor()
@@ -99,22 +100,22 @@ async function checkQuietHeader(page, width, reduced) {
     return event.defaultPrevented
   },{type,x,y})
   for (const [type,x,y] of [['touchstart',240,120],['touchmove',235,280],['touchend',235,280]]) assert.equal(await touch(type,x,y),false)
-  assert.equal(await nav.getByRole('heading').innerText(),'Category Mix','Vertical movement does not select another chart')
+  assert.equal(await page.locator('.bb-chart-carousel-slide[aria-hidden="false"] .bb-chart-carousel-title').innerText(),'Category Mix','Vertical movement does not select another chart')
   await page.locator('.bb-chart-carousel[data-settling="false"]').waitFor()
   for (const [type,x,y] of [['touchstart',240,120],['touchmove',35,124],['touchend',35,124]]) assert.equal(await touch(type,x,y),false)
-  assert.equal(await nav.getByRole('heading').innerText(),'Burn Rate','Horizontal swipe selects the next graph')
+  assert.equal(await page.locator('.bb-chart-carousel-slide[aria-hidden="false"] .bb-chart-carousel-title').innerText(),'Burn Rate','Horizontal swipe selects the next graph')
   await page.locator('.bb-chart-carousel[data-settling="false"]').waitFor()
   for (const [type,x,y] of [['touchstart',35,124],['touchmove',240,120],['touchend',240,120]]) assert.equal(await touch(type,x,y),false)
-  assert.equal(await nav.getByRole('heading').innerText(),'Category Mix')
+  assert.equal(await page.locator('.bb-chart-carousel-slide[aria-hidden="false"] .bb-chart-carousel-title').innerText(),'Category Mix')
   for (const [type,x,y] of [['touchstart',240,120],['touchmove',35,124],['touchend',35,124]]) await touch(type,x,y,'.bb-category-mix-filter select')
-  assert.equal(await nav.getByRole('heading').innerText(),'Category Mix','Using the native filter cannot swipe the graph')
+  assert.equal(await page.locator('.bb-chart-carousel-slide[aria-hidden="false"] .bb-chart-carousel-title').innerText(),'Category Mix','Using the native filter cannot swipe the graph')
 }
 ;(async () => {
   let cases = 0
   for (const engine of [chromium, webkit]) {
     const browser = await engine.launch({headless: true})
     try {
-      for (const width of [320, 390, 736, 1280]) for (const dark of [false, true]) {
+      for (const width of (process.env.BOOKIEBOT_OVERVIEW_QUICK ? [390] : [320, 390, 736, 1280])) for (const dark of [false, true]) {
         const page = await browser.newPage({viewport: {width, height: 900}, hasTouch: true, isMobile: width < 768, reducedMotion: dark ? 'reduce' : 'no-preference'})
         const errors = [], unexpected = [], comparisonReads = []; let firstReport = true, releaseReport, releaseComparison
         page.on('pageerror', error => errors.push(error.message))
@@ -329,7 +330,7 @@ async function checkQuietHeader(page, width, reduced) {
         await page.getByRole('button', {name: 'Projected', exact: true}).click(); await page.reload()
         await page.locator('.bb-metrics-grid').waitFor()
         assert.equal(await page.getByRole('button', {name: 'Projected', exact: true}).getAttribute('aria-pressed'), 'true', 'Restyling preserves the existing per-owner mode preference')
-        assert.equal(await page.locator('.bb-chart-carousel-title').innerText(), 'Calendar', 'The selected chart survives a fresh report load')
+        assert.equal(await page.locator('.bb-chart-carousel-slide[aria-hidden="false"] .bb-chart-carousel-title').innerText(), 'Calendar', 'The selected chart survives a fresh report load')
         if (width === 390) {await page.getByRole('button', {name:'Show Category Mix',exact:true}).click(); await page.waitForTimeout(300); await page.screenshot({path: `/tmp/bookiebot-overview-${engine.name()}-${dark ? 'dark' : 'light'}.png`})}
         assert.deepEqual(errors, [], `${engine.name()} ${width}px ${dark ? 'dark' : 'light'} has no page errors`); assert.deepEqual(unexpected, [], 'No external or financial write requests')
         await page.close()

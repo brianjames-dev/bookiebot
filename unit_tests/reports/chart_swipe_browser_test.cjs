@@ -15,7 +15,9 @@ for(const view of Object.values(report.modeViews)){
 }
 const assets=path.join(root,'src/bookiebot/reports/assets'),css=fs.readFileSync(path.join(assets,'expense-report-app.css'),'utf8'),js=fs.readFileSync(path.join(assets,'expense-report-app.js'),'utf8')
 const csp=fs.readFileSync(path.join(root,'src/bookiebot/reports/phone_app.py'),'utf8').match(/"Content-Security-Policy": "([^"]+)"/)[1]
-const html=dark=>`<!doctype html><html data-theme="${dark?'dark':'light'}"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><style>${css}</style></head><body><div id="bookiebot-expense-report-root"></div><script id="bookiebot-expense-report-data" type="application/json">${JSON.stringify(report)}</script><script type="module" src="/app.js"></script></body></html>`
+const reference=process.env.BOOKIEBOT_SWIPE_REFERENCE_SCRIPT?{js:fs.readFileSync(process.env.BOOKIEBOT_SWIPE_REFERENCE_SCRIPT,'utf8'),css:fs.readFileSync(process.env.BOOKIEBOT_SWIPE_REFERENCE_CSS,'utf8')}:null
+const withoutBurn=structuredClone(report);withoutBurn.burnRate=null;for(const view of Object.values(withoutBurn.modeViews))view.burnRate=null
+const html=(dark,before=false,noBurn=false)=>`<!doctype html><html data-theme="${dark?'dark':'light'}"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><style>${before?reference.css:css}</style></head><body><div id="bookiebot-expense-report-root"></div><script id="bookiebot-expense-report-data" type="application/json">${JSON.stringify(noBurn?withoutBurn:report)}</script><script type="module" src="/${before?"before":"app"}.js"></script></body></html>`
 const touch=async(page,selector,type,x,y=200)=>page.locator(selector).first().evaluate((node,{type,x,y})=>{
  const event=new Event(type,{bubbles:true,cancelable:true}),point={identifier:7,clientX:x,clientY:y}
  Object.defineProperties(event,{touches:{value:/end|cancel/.test(type)?[]:[point]},changedTouches:{value:[point]}})
@@ -23,30 +25,63 @@ const touch=async(page,selector,type,x,y=200)=>page.locator(selector).first().ev
 },{type,x,y})
 const trackX=page=>page.locator('.bb-chart-carousel-track').evaluate(el=>new DOMMatrixReadOnly(getComputedStyle(el).transform).m41)
 const settle=page=>page.locator('.bb-chart-carousel[data-settling="false"]').waitFor()
-const title=page=>page.locator('.bb-chart-carousel-title').innerText()
-const select=async(page,name)=>{await page.getByRole('button',{name:`Show ${name}`,exact:true}).click();await page.waitForFunction(name=>document.querySelector('.bb-chart-carousel-title')?.innerText.trim()===name,name);await settle(page)}
+const title=page=>page.locator('.bb-chart-carousel-slide[aria-hidden="false"] .bb-chart-carousel-title').innerText()
+const select=async(page,name)=>{await page.getByRole('button',{name:`Show ${name}`,exact:true}).click();await page.waitForFunction(name=>(document.querySelector('.bb-chart-carousel-slide[aria-hidden="false"] .bb-chart-carousel-title')??document.querySelector('.bb-chart-carousel-nav .bb-chart-carousel-title'))?.innerText.trim()===name,name);await settle(page)}
+const panels=['Category Mix','Burn Rate','Calendar','Bills & Utilities']
+const headingLayout=page=>page.evaluate(()=>{
+ const slide=document.querySelector('.bb-chart-carousel-slide[aria-hidden="false"]'),title=slide.querySelector('.bb-chart-carousel-title')??document.querySelector('.bb-chart-carousel-nav .bb-chart-carousel-title'),value=title.querySelector('.bb-fitted-amount-text')
+ const box=n=>{const r=n.getBoundingClientRect();return [r.x,r.y+scrollY,r.width,r.height]}
+ return {title:box(title),value:box(value),font:getComputedStyle(value).fontSize,dots:box(document.querySelector('.bb-chart-carousel-indicators')),content:box(slide.querySelector('.bb-card-content')),plot:box(slide.querySelector('.bb-chart-page-body')),next:box(document.querySelector('.bb-daily-section'))}
+})
+const sameLayout=(actual,expected)=>{for(const key of Object.keys(expected))if(Array.isArray(expected[key]))actual[key].forEach((n,i)=>assert.ok(Math.abs(n-expected[key][i])<1,JSON.stringify({key,actual,expected})));else assert.equal(actual[key],expected[key])}
 ;(async()=>{
  let cases=0,native=0
  for(const engineName of (process.env.BOOKIEBOT_SWIPE_ENGINE?[process.env.BOOKIEBOT_SWIPE_ENGINE]:['chromium','webkit'])){
  const browser=await engines[engineName].launch({headless:true})
  try{
- for(const width of (process.env.BOOKIEBOT_SWIPE_QUICK?[390]:[320,390,736]))for(const dark of (process.env.BOOKIEBOT_SWIPE_QUICK?[true]:[false,true])){
+ for(const width of (process.env.BOOKIEBOT_SWIPE_QUICK?[390]:[320,390,736,1280]))for(const dark of (process.env.BOOKIEBOT_SWIPE_QUICK?[true]:[false,true])){
   const page=await browser.newPage({viewport:{width,height:900},hasTouch:true,isMobile:width<700,colorScheme:dark?'dark':'light',reducedMotion:dark?'reduce':'no-preference'}),errors=[],traffic=[]
   page.setDefaultTimeout(10000);page.on('pageerror',e=>errors.push(e.message))
-  await page.route('**/*',async route=>{const url=new URL(route.request().url()),name=url.pathname.split('/').pop();if(name==='report')return route.fulfill({contentType:'text/html',headers:{'Content-Security-Policy':csp},body:html(dark)});if(name==='app.js')return route.fulfill({contentType:'application/javascript',body:js});if(/^category-mix-layout-[\w-]+\.js$/.test(name))return route.fulfill({contentType:'application/javascript',body:fs.readFileSync(path.join(assets,name),'utf8')});traffic.push(url.pathname);await route.abort()})
-  await page.goto('https://bookie.test/report');await select(page,'Category Mix')
+  await page.route('**/*',async route=>{const url=new URL(route.request().url()),name=url.pathname.split('/').pop();if(name==='report')return route.fulfill({contentType:'text/html',headers:{'Content-Security-Policy':csp},body:html(dark,url.searchParams.has('reference'),url.searchParams.has('noBurn'))});if(name==='before.js'&&reference)return route.fulfill({contentType:'application/javascript',body:reference.js});if(name==='app.js')return route.fulfill({contentType:'application/javascript',body:js});if(/^category-mix-layout-[\w-]+\.js$/.test(name))return route.fulfill({contentType:'application/javascript',body:fs.readFileSync(path.join(assets,name),'utf8')});traffic.push(url.pathname);await route.abort()})
+  const previous={}
+  if(reference){await page.goto('https://bookie.test/report?reference=1');for(const name of panels){await select(page,name);previous[name]=await headingLayout(page)}}
+  await page.goto('https://bookie.test/report')
+  for(const name of panels){
+   await select(page,name);const layout=await headingLayout(page)
+   assert.equal(await page.getByRole('heading',{name,exact:true}).count(),1,'Only the selected page exposes its heading')
+   assert.equal(await page.locator('.bb-chart-carousel-nav h2').count(),0,'Indicators stay outside the title track')
+   assert.equal(await page.locator('.bb-chart-carousel-nav [role="status"]').innerText(),name)
+   if(reference)sameLayout(layout,previous[name]);cases++
+  }
+  if(width===390)await page.locator('.bb-chart-carousel-band').screenshot({path:`/private/tmp/chart-title-${engineName}-${dark?'dark':'light'}.png`})
+  await select(page,'Category Mix')
   const stage=(await page.locator('.bb-chart-carousel-band').boundingBox()).height
-  for(const target of ['.bb-category-pie-center','#bb-chart-category .recharts-sector','.bb-contour-label rect','.bb-category-pie-host']){
+  for(const target of ['#bb-chart-category .bb-chart-carousel-heading','.bb-category-pie-center','#bb-chart-category .recharts-sector','.bb-contour-label rect','.bb-category-pie-host']){
    await select(page,'Category Mix')
    if(target.includes('contour')){if(await page.getByRole('button',{name:'Show category callouts',exact:true}).count())await page.getByRole('button',{name:'Show category callouts',exact:true}).tap();await page.locator('.bb-contour-callouts[data-ready="true"][data-visible="true"]').waitFor()}
-   const shown=await page.locator('.bb-category-pie-center').getAttribute('aria-pressed')
+   const shown=await page.locator('.bb-category-pie-center').getAttribute('aria-pressed'),origin=await headingLayout(page)
+   if(target.includes('heading'))await page.evaluate(()=>{
+    const slide=document.querySelector('#bb-chart-category'),heading=slide.querySelector('h2'),content=slide.querySelector('.bb-card-content'),dots=document.querySelector('.bb-chart-carousel-indicators')
+    window.__headingMotion={running:true,frames:[]};const sample=()=>{const state=window.__headingMotion;if(!state.running)return;state.frames.push({offset:heading.getBoundingClientRect().x-content.getBoundingClientRect().x,dots:dots.getBoundingClientRect().x});requestAnimationFrame(sample)};sample()
+   })
    assert.equal(await touch(page,target,'touchstart',300),false)
    for(const delta of [90,180,270]){assert.equal(await touch(page,target,'touchmove',300-delta),false);await page.waitForTimeout(25);assert.ok(Math.abs(await trackX(page)+delta)<1,JSON.stringify({message:'Drag follows the finger beyond the former 220px limit',target,delta,x:await trackX(page),viewport:await page.locator('.bb-chart-carousel').boundingBox(),dragging:await page.locator('.bb-chart-carousel').getAttribute('data-dragging'),motion:await page.locator('.bb-chart-carousel-track').evaluate(el=>({reduced:matchMedia('(prefers-reduced-motion: reduce)').matches,style:el.style.transform,animations:el.getAnimations().map(a=>({time:a.currentTime,duration:a.effect.getTiming().duration}))})),title:await title(page)}))}
+   const dragged=await headingLayout(page)
+   assert.ok(Math.abs(dragged.title[0]-origin.title[0]+270)<1,'The title travels the exact same distance as the graph')
+   assert.ok(Math.abs(dragged.content[0]-origin.content[0]+270)<1)
+   assert.deepEqual(dragged.dots,origin.dots,'The fixed indicators never follow the track')
+   assert.equal(dragged.font,origin.font,'Dragging cannot refit or restyle the title')
+   if(target.includes('heading')&&width===390)await page.locator('.bb-chart-carousel-band').screenshot({path:`/private/tmp/chart-title-drag-${engineName}-${dark?'dark':'light'}.png`})
    await touch(page,target,'touchend',30);assert.equal(await title(page),'Burn Rate',`Swiping from ${target} navigates`)
    await page.locator(target).first().dispatchEvent('click',{bubbles:true,cancelable:true,detail:1})
    assert.equal(await page.getByRole('dialog').count(),0,'A swipe cannot also inspect a category')
    assert.equal(await page.locator('.bb-category-pie-center').getAttribute('aria-pressed'),shown,'A swipe cannot toggle callouts')
-   await settle(page);assert.equal((await page.locator('.bb-chart-carousel-band').boundingBox()).height,stage);cases++
+   await settle(page)
+   if(target.includes('heading')){
+    const samples=await page.evaluate(()=>{window.__headingMotion.running=false;return window.__headingMotion.frames})
+    assert.ok(samples.length>=3);for(const frame of samples){assert.ok(Math.abs(frame.offset-samples[0].offset)<1,'Title and content stay coupled throughout drag and spring settlement');assert.ok(Math.abs(frame.dots-samples[0].dots)<1,'Indicators remain fixed on every sampled frame')}
+   }
+   assert.equal((await page.locator('.bb-chart-carousel-band').boundingBox()).height,stage);cases++
   }
   await select(page,'Category Mix')
   const host='.bb-category-pie-host'
@@ -77,15 +112,23 @@ const select=async(page,name)=>{await page.getByRole('button',{name:`Show ${name
   const center=page.locator('.bb-category-pie-center'),was=await center.getAttribute('aria-pressed');await center.tap();assert.notEqual(await center.getAttribute('aria-pressed'),was,'The next deliberate tap works immediately')
   await page.getByRole('button',{name:'Show Burn Rate',exact:true}).focus();await page.keyboard.press('Enter');await page.keyboard.press('ArrowRight');await settle(page);assert.equal(await title(page),'Calendar','Keyboard graph selection remains intact')
   if(engineName==='chromium'&&width===390){
+   await select(page,'Burn Rate');const heading=page.locator('#bb-chart-burn-rate .bb-chart-carousel-title');await heading.scrollIntoViewIfNeeded();const head=await heading.boundingBox(),headerTouch=await page.context().newCDPSession(page),headX=head.x+head.width/2,headY=head.y+head.height/2
+   await headerTouch.send('Input.dispatchTouchEvent',{type:'touchStart',touchPoints:[{x:headX,y:headY}]});for(let i=1;i<=6;i++){await headerTouch.send('Input.dispatchTouchEvent',{type:'touchMove',touchPoints:[{x:headX+(width-20-headX)*i/6,y:headY}]});await page.waitForTimeout(20)}await headerTouch.send('Input.dispatchTouchEvent',{type:'touchEnd',touchPoints:[]});await settle(page);assert.equal(await title(page),'Category Mix','Real touch swipes from the title use the page spring');await headerTouch.detach();native++
    await select(page,'Category Mix');await page.locator(host).scrollIntoViewIfNeeded();const cdp=await page.context().newCDPSession(page),box=await center.boundingBox(),startX=box.x+box.width/2,startY=Math.min(700,box.y+box.height/2)
    await cdp.send('Input.dispatchTouchEvent',{type:'touchStart',touchPoints:[{x:startX,y:startY}]});for(let i=1;i<=6;i++){await cdp.send('Input.dispatchTouchEvent',{type:'touchMove',touchPoints:[{x:startX+(20-startX)*i/6,y:startY}]});await page.waitForTimeout(20)}await cdp.send('Input.dispatchTouchEvent',{type:'touchEnd',touchPoints:[]});await settle(page);assert.equal(await title(page),'Burn Rate','Real touch swipes from the center button navigate');assert.equal(await page.getByRole('dialog').count(),0)
    await select(page,'Category Mix');await page.locator(host).scrollIntoViewIfNeeded();const b=await page.locator(host).boundingBox(),y=Math.min(650,b.y+b.height/2),beforeY=await page.evaluate(()=>scrollY)
    await cdp.send('Input.dispatchTouchEvent',{type:'touchStart',touchPoints:[{x:width/2,y}]});for(let i=1;i<=6;i++){await cdp.send('Input.dispatchTouchEvent',{type:'touchMove',touchPoints:[{x:width/2,y:y-150*i/6}]});await page.waitForTimeout(20)}await cdp.send('Input.dispatchTouchEvent',{type:'touchEnd',touchPoints:[]});await page.waitForTimeout(250);assert.ok(await page.evaluate(()=>scrollY)>beforeY+50,'Real vertical scrolling remains native');assert.equal(await title(page),'Category Mix');await cdp.detach();native+=2
   }
+  await page.goto('https://bookie.test/report?noBurn=1');await select(page,'Category Mix')
+  assert.equal(await page.locator('.bb-chart-carousel-dot').count(),3);assert.equal(await page.getByRole('button',{name:'Show Burn Rate',exact:true}).count(),0)
+  await select(page,'Bills & Utilities');const short=await headingLayout(page)
+  assert.ok(short.value[0]+short.value[2]<=short.title[0]+short.title[2]+1,'Three-indicator reports retain fitted headings')
+  if(width>362)assert.ok(short.title[0]+short.title[2]+8<=short.dots[0]+1)
+  cases++
   assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth),false);assert.deepEqual(errors,[]);assert.deepEqual(traffic,[]);cases+=10
   console.log(engineName,width,dark?'dark/reduced':'light','PASS');await page.close()
  }
  }finally{await browser.close()}
  }
- console.log(JSON.stringify({cases,native,result:'PASS: full-width swipe from background/center/slice/callout, rubber band, interruption/reverse/cancel, vertical intent, click isolation, controls, resize, reduced motion and keyboard'}))
+ console.log(JSON.stringify({cases,native,result:'PASS: unchanged heading/content layout, moving titles with fixed markers, full-width swipe from title/background/center/slice/callout, rubber band, interruption/reverse/cancel, vertical intent, click isolation, controls, resize, reduced motion and keyboard'}))
 })().catch(error=>{console.error(error);process.exit(1)})

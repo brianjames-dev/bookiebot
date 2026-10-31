@@ -1159,11 +1159,12 @@ button.bb-left-categories { cursor: pointer; }
 
 .bb-main > .bb-chart-carousel-band {
   --bb-chart-carousel-stage-height: clamp(540px, 64vh, 660px);
+  --bb-chart-carousel-heading-height: 64px;
   position: relative;
   width: 100%;
   min-width: 0;
   max-width: 100%;
-  height: var(--bb-chart-carousel-stage-height);
+  height: calc(var(--bb-chart-carousel-stage-height) + var(--bb-chart-carousel-heading-height));
   background: hsl(var(--card));
   color: hsl(var(--card-foreground));
   box-shadow: 0 0 0 100vmax hsl(var(--card));
@@ -1241,18 +1242,32 @@ button.bb-left-categories { cursor: pointer; }
 }
 
 .bb-chart-carousel-nav {
+  position: absolute;
+  inset: 0 0 auto;
+  z-index: 2;
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  flex-wrap: wrap;
-  gap: 0 8px;
+  justify-content: flex-end;
   width: 100%;
   min-width: 0;
-  min-height: 64px;
+  height: var(--bb-chart-carousel-heading-height);
   padding-top: 12px;
-  background: hsl(var(--card));
-  box-shadow: 0 0 0 100vmax hsl(var(--card));
-  clip-path: inset(0 -100vmax);
+  pointer-events: none;
+}
+
+.bb-chart-carousel-heading {
+  display: flex;
+  align-items: center;
+  flex: 0 0 var(--bb-chart-carousel-heading-height);
+  min-width: 0;
+  gap: 8px;
+  padding-top: 12px;
+  padding-inline: max(var(--bb-page-gutter), calc((100% - var(--bb-content-max)) / 2));
+}
+/* Reserve the stationary controls' space without moving them with the page. */
+.bb-chart-carousel-heading::after {
+  content: "";
+  flex: 0 0 calc(var(--bb-chart-indicator-count) * 44px);
 }
 
 .bb-chart-carousel-title {
@@ -1276,6 +1291,9 @@ button.bb-left-categories { cursor: pointer; }
   justify-content: center;
   gap: 0;
   min-width: 0;
+  pointer-events: auto;
+  /* Keep incoming titles from painting through the stationary markers. */
+  background: hsl(var(--card));
 }
 
 .bb-chart-carousel-dot {
@@ -1302,8 +1320,10 @@ button.bb-left-categories { cursor: pointer; }
   background: hsl(var(--primary));
 }
 @media (max-width: 362px) {
-  .bb-chart-carousel-title { flex: 0 0 100%; }
-  .bb-chart-carousel-indicators { margin-left: auto; }
+  .bb-main > .bb-chart-carousel-band { --bb-chart-carousel-heading-height: 91px; }
+  .bb-chart-carousel-heading { align-items: flex-start; padding-bottom: 44px; }
+  .bb-chart-carousel-heading::after { display: none; }
+  .bb-chart-carousel-nav { align-items: flex-end; }
 }
 
 .bb-tabs-list {

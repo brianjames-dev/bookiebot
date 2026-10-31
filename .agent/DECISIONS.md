@@ -1,5 +1,9 @@
 # Agent Decisions
 
+## 2026-10-30 - Slide Graph Titles with Their Pages
+
+Keep each Quiet header title inside its graph’s existing compositor track so drag, spring settlement, interruption and reduced-motion behavior are shared with the graph content. Keep the position indicators in one stationary overlay, reserving their existing title space and masking incoming text beneath them. Preserve the settled type, gutters, narrow-screen wrapping, graph-content height and total section placement. Inactive headings remain hidden/inert with their slides; one stationary live status announces the selected graph. No new animation controller, financial or persistence change. Native acceptance is checklist 207.
+
 ## 2026-10-30 - Implement Approved Compact Burn Rate Surroundings
 
 The user approved the refined Budget fraction draft. Use its static monthly Spent / Month limit fraction, 6px rail and signed Left caption without expansion; match Spent to the active spent bar color. Keep both upper labels above their amounts, the divider, Overview-style info glyph, 30px/20px amounts and selected 12px gaps/top inset. Limit the plot to 280px and reserve at least 104px below the footer while fitting the existing shared stage; shorter screens/category pressure can reduce plot height. The common carousel height remains until the other graph views are refined, following the recorded compactness direction.

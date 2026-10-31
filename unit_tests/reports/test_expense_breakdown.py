@@ -103,7 +103,7 @@ def test_top_chart_carousel_uses_one_fixed_full_bleed_surface_without_panel_card
     assert "background: hsl(var(--card));" in band_styles
     assert "box-shadow: 0 0 0 100vmax hsl(var(--card));" in band_styles
     assert "clip-path: inset(0 -100vmax);" in band_styles
-    assert "height: var(--bb-chart-carousel-stage-height);" in band_styles
+    assert "height: calc(var(--bb-chart-carousel-stage-height) + var(--bb-chart-carousel-heading-height));" in band_styles
     carousel_styles = styles.split(".bb-chart-carousel {", 2)[2].split("}", 1)[0]
     assert "width: var(--bb-chart-carousel-viewport-width);" in carousel_styles
     assert "margin-left: calc((100% - var(--bb-chart-carousel-viewport-width)) / 2);" in carousel_styles
@@ -211,7 +211,10 @@ def test_top_chart_navigation_names_each_panel_and_excludes_inactive_controls_fr
     assert "aria-label={panel.title}" in carousel
     assert "aria-hidden={index !== activeChartIndex}" in carousel
     assert 'inert={index !== activeChartIndex}' in carousel
-    assert '<h2 className="bb-chart-carousel-title" aria-live="polite">' in navigation
+    assert '<h2 className="bb-chart-carousel-title">' in carousel
+    assert '{panel.title}</FittedAmount>' in carousel
+    assert 'role="status" aria-live="polite"' in navigation
+    assert "<h2" not in navigation
     assert "{panels[activeIndex].title}" in navigation
     assert "ChartCarouselIndicators" in navigation
     assert 'aria-label="Previous chart"' not in navigation
