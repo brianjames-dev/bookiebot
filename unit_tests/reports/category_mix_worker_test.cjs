@@ -11,9 +11,11 @@ class Worker {
  reply(scene){this.onmessage({data:{scene}})}
 }
 const prepared=(data,width,height)=>({cx:width/2,cy:height/2,radius:109.5,inner:83.5,width,height,style:{inset:8},items:data,routes:null})
+const motion={exports:{},require:req};vm.runInNewContext(ts.transpileModule(fs.readFileSync('web/expense-report/src/category-mix-motion.tsx','utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2020,jsx:ts.JsxEmit.ReactJSX}}).outputText,motion)
 const runtime={exports:{},Worker,window,require:name=>{
  if(name==='react'||name==='react/jsx-runtime')return req(name)
  if(name.includes('?worker&url'))return {default:'/category-mix-layout-test.js'}
+ if(name==='./category-mix-motion')return motion.exports
  if(name==='./category-mix-layout')return {CONTOUR_STYLE:{labelSize:11,sidePadding:6,thickness:26},contourLabel:(_key,label)=>label,prepareContourScene:prepared}
  throw new Error(name)
 }}
@@ -60,6 +62,13 @@ try {
  assert.doesNotThrow(()=>last.reply({...last.scene,routes:[],curvedRoutes:[]}))
  act(()=>{tree=Renderer.create(React.createElement(Host,{data,size}))})
  assert.equal(workers.length,5,'A new chart/session must not retain the previous report cache')
+ act(()=>tree.update(React.createElement(Host,{data,size,shown:true})));flush()
+ assert.equal(tree.root.findByType('output').props.layout.calloutsReady,true)
+ act(()=>tree.update(React.createElement(Host,{data,size,shown:false})))
+ act(()=>tree.update(React.createElement(Host,{data,size,shown:true})))
+ assert.equal(tree.root.findByType('output').props.layout.calloutsReady,false,'Reversing a settled view must wait for the new ring morph before launching stems')
+ assert.equal(timers.size,1,'Only the latest ring settlement remains pending');flush()
+ assert.equal(tree.root.findByType('output').props.layout.calloutsReady,true)
 }finally{if(tree)act(()=>tree.unmount())}
 console.log('Refined flow reuses equivalent inputs, cancels stale workers, ignores late results, caches completed layouts and disposes on unmount')
 
@@ -74,7 +83,7 @@ assert.equal(equality.exports.equal(geometry,{...geometry,outerRadius:105}),fals
 
 const {CategoryContourCallouts}=runtime.exports
 const calls=[]
-const scene={width:390,height:396,style:{labelSize:12,calloutRadius:18},routes:[],curvedRoutes:[],items:[{id:'food',name:'Eating out',amountLabel:'$13 / 100%',x:20,y:25,width:110,height:34,padding:4,lineHeight:13,valueSize:12}]}
+const scene={cx:195,cy:198,width:390,height:396,style:{labelSize:12,calloutRadius:18},routes:[],curvedRoutes:[],items:[{id:'food',name:'Eating out',amountLabel:'$13 / 100%',x:20,y:25,width:110,height:34,padding:4,lineHeight:13,valueSize:12}]}
 try{
  act(()=>{tree=Renderer.create(React.createElement(CategoryContourCallouts,{scene,data,ready:true,visible:true,onInspect:item=>calls.push(item)}))})
  let card=tree.root.findByProps({role:'button'})

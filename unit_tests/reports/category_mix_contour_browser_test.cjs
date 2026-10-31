@@ -23,9 +23,43 @@ for(const view of Object.values(report.modeViews)) {
  view.categoryBalances={raw:{needs:351.54,wants:965.6,savings:0},remaining:{needs:351.54,wants:965.6,savings:0},deficits:{needs:0,wants:0,savings:0},transfers:[],totalOverspend:0}
  Object.assign(view.savingsInvesting,{cashSaved:1596.62,esppContribution:400,estimatedEsppContribution:0,combinedContributions:1996.62})
 }
+async function startMotionSamples(category){
+ await category.evaluate(el=>{
+  window.__categoryMotion={running:true,frames:[]}
+  const sample=()=>{
+   const state=window.__categoryMotion;if(!state.running)return
+   const path=el.querySelector('.recharts-sector'),d=path?.getAttribute('d')??'',move=d.match(/^M(-?[\d.]+),(-?[\d.]+)A/),arcs=[...d.matchAll(/A([\d.]+),/g)]
+   if(move&&arcs.length>=2){
+    const outer=+arcs[0][1],inner=+arcs[1][1],point=new DOMPoint(+move[1],+move[2]+outer).matrixTransform(path.getScreenCTM()),button=el.querySelector('.bb-category-pie-center'),box=button.getBoundingClientRect(),number=el.querySelector('.bb-category-used'),text=number.getBoundingClientRect(),style=getComputedStyle(button)
+    state.frames.push({x:box.x+box.width/2,y:box.y+box.height/2,ringX:point.x,ringY:point.y,outer,inner,height:box.height,numberHeight:text.height,numberCenter:text.y+text.height/2,font:parseFloat(getComputedStyle(number).fontSize),caption:parseFloat(style.fontSize),gap:parseFloat(style.gap),draw:[...el.querySelectorAll('.bb-contour-stem')].some(n=>{const d=parseFloat(getComputedStyle(n).strokeDashoffset);return d>0&&d<1}),pop:[...el.querySelectorAll('.bb-contour-label')].some(n=>{const a=+getComputedStyle(n).opacity;return a>0&&a<1})})
+   }
+   requestAnimationFrame(sample)
+  };sample()
+ })
+}
+async function checkMotionSamples(category){
+ const frames=await category.evaluate(()=>{window.__categoryMotion.running=false;return window.__categoryMotion.frames})
+ assert.ok(frames.length>12);assert.ok(new Set(frames.map(f=>Math.round(f.outer))).size>5,'The native ring visibly morphs through intermediate geometry')
+ for(const f of frames){
+  assert.ok(Math.hypot(f.x-f.ringX,f.y-f.ringY)<.8,JSON.stringify({message:'Center text follows the actual sector frame without jumping ahead or lagging',f}))
+  const mix=Math.max(0,Math.min(1,(f.outer-f.inner-26)/22)),number=24+6*mix,caption=11+mix,gap=4*mix
+  assert.ok(Math.abs(f.font-number)<.1&&Math.abs(f.caption-caption)<.1&&Math.abs(f.gap-gap)<.1,JSON.stringify(f))
+  assert.ok(Math.abs(f.numberHeight-number*1.1)<.2&&Math.abs(f.height-(number*1.1+caption*1.5+gap+16))<.2,JSON.stringify(f))
+  assert.ok(Math.abs(f.numberCenter-f.y+(caption*1.5+gap)/2)<.3,JSON.stringify({message:'The center number never pops within its changing box',f}))
+ }
+ assert.ok(frames.some(f=>f.draw),'Stems visibly draw out rather than appearing fully formed');assert.ok(frames.some(f=>f.pop),'Cards visibly expand from zero opacity')
+}
+async function checkCascade(category,reduced){
+ const launch=await category.locator('.bb-contour-callouts').evaluate(svg=>({window:+svg.dataset.cascadeWindow,cssClockFree:[...svg.querySelectorAll('.bb-contour-stem,.bb-contour-label')].every(n=>getComputedStyle(n).transitionProperty==='none'),stems:[...svg.querySelectorAll('.bb-contour-stem')].map(n=>({id:n.dataset.category,length:n.getAttribute('pathLength')})),motions:svg.getAnimations({subtree:true}).filter(a=>a.effect?.target?.matches('.bb-contour-stem,.bb-contour-label')).map(a=>({id:a.effect.target.dataset.category,stem:a.effect.target.classList.contains('bb-contour-stem'),delay:a.effect.getTiming().delay,duration:a.effect.getTiming().duration,frames:a.effect.getKeyframes()}))}))
+ assert.ok(launch.stems.every(s=>s.length==='1'));assert.ok(launch.cssClockFree,'No competing CSS transition clock, including the global reduced-motion duration')
+ if(reduced){assert.equal(launch.motions.length,0,JSON.stringify(launch));return}
+ const stems=launch.motions.filter(m=>m.stem),cards=launch.motions.filter(m=>!m.stem);assert.equal(stems.length,launch.stems.length);assert.equal(cards.length,stems.length)
+ const delays=stems.map(m=>m.delay);assert.equal(Math.min(...delays),0);assert.ok(Math.max(...delays)<=launch.window);if(stems.length>1)assert.equal(Math.max(...delays),launch.window)
+ for(const stem of stems){const card=cards.find(m=>m.id===stem.id);assert.ok(card.delay>stem.delay&&card.delay<stem.delay+stem.duration);assert.equal(parseFloat(stem.frames[0].strokeDashoffset),1);assert.equal(parseFloat(stem.frames.at(-1).strokeDashoffset),0)}
+}
 ;(async()=>{
  let count=0
- for(const engine of [chromium,webkit]) {
+ for(const engine of (process.env.BOOKIEBOT_CONTOUR_ENGINE==='chromium'?[chromium]:process.env.BOOKIEBOT_CONTOUR_ENGINE==='webkit'?[webkit]:[chromium,webkit])) {
   const browser=await engine.launch({headless:true})
   try {
    for(const width of ((process.env.BOOKIEBOT_CONTOUR_PREVIEW||process.env.BOOKIEBOT_CONTOUR_FINAL)?[390]:[320,390,1280]))for(const dark of (process.env.BOOKIEBOT_CONTOUR_PREVIEW?[true]:[false,true])) {
@@ -46,8 +80,8 @@ for(const view of Object.values(report.modeViews)) {
     const large=await category.evaluate(el=>{const host=el.querySelector('.bb-category-pie-host').getBoundingClientRect(),center=el.querySelector('.bb-category-pie-center').getBoundingClientRect(),radii=[...el.querySelector('.recharts-sector').getAttribute('d').matchAll(/A([\d.]+),/g)].map(match=>Number(match[1]));return {ring:el.querySelector('.recharts-pie').getBoundingClientRect().width,host:host.width,hostHeight:host.height,outer:radii[0],band:radii[0]-radii[1],offset:center.y+center.height/2-host.y-host.height/2,caption:getComputedStyle(el.querySelector('.bb-category-pie-center')).fontSize,gap:getComputedStyle(el.querySelector('.bb-category-pie-center')).gap,opacity:getComputedStyle(el.querySelector('.bb-contour-callouts')).opacity,font:getComputedStyle(el.querySelector('.bb-category-used')).fontSize}})
     assert.equal(large.opacity,'0','Callouts stay hidden until deliberately requested');assert.equal(large.font,'30px');assert.equal(large.caption,'12px');assert.equal(large.gap,'4px');assert.ok(Math.abs(large.band-48)<.01);assert.ok(Math.abs(large.outer-(Math.min(large.host,large.hostHeight)/2-36))<.2);assert.ok(Math.abs(large.offset+16)<.2,'Hidden ring retains the selected upward offset')
     await category.screenshot({path:`/private/tmp/category-ring-large-${engine.name()}-${width}-${dark?'dark':'light'}.png`})
+    if(!dark)await startMotionSamples(category)
     await category.getByRole('button',{name:'Show category callouts',exact:true}).click()
-    await category.locator('.bb-contour-callouts[data-ready="true"]').waitFor({timeout:120000})
     if(!dark){
      await page.waitForTimeout(100)
      const during=(await category.locator('.recharts-pie').boundingBox()).width
@@ -56,7 +90,19 @@ for(const view of Object.values(report.modeViews)) {
      await page.waitForTimeout(80)
      await category.getByRole('button',{name:'Show category callouts',exact:true}).click()
     }
-    await page.waitForTimeout(700)
+    await category.locator('.bb-contour-callouts[data-ready="true"]').waitFor({timeout:120000})
+    await checkCascade(category,dark)
+    await page.waitForTimeout(740)
+    if(!dark)await checkMotionSamples(category)
+    if(!dark){
+     await startMotionSamples(category)
+     await category.getByRole('button',{name:'Hide category callouts',exact:true}).click()
+     await page.waitForTimeout(90)
+     await category.getByRole('button',{name:'Show category callouts',exact:true}).click()
+     assert.equal(await category.locator('.bb-contour-callouts').getAttribute('data-ready'),'false','Reopening the last settled view cannot reuse readiness while the ring still morphs')
+     await category.locator('.bb-contour-callouts[data-ready="true"]').waitFor()
+     await checkCascade(category,false);await page.waitForTimeout(740);await checkMotionSamples(category)
+    }
     assert.ok((await category.locator('.recharts-pie').boundingBox()).width<large.ring,'The ring shrinks to make room for callouts')
     console.log(engine.name(),width,dark?'dark':'light','first-layout-ms',Date.now()-start)
     const originalHeight=(await page.locator('.bb-chart-carousel-band').boundingBox()).height

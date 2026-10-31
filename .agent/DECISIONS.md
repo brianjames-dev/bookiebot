@@ -1,5 +1,15 @@
 # Agent Decisions
 
+## 2026-10-30 - Synchronize Category Ring Text And Firework Callouts
+
+The center label takes its position, size and typography from the same interpolated geometry that paints the first native sector, including interrupted reversals. Give its line box an explicit interpolated height and retain one style owner after mount; separate CSS transitions or React target writes must not race the ring’s animation frame. Preserve both approved settled styles and the existing ring interpolation.
+
+Once the compact ring settles, launch each curved stem from the ring toward its card using normalized path length, then pop its card open with a small overshoot. Randomize pair ordering and timing on every reveal; the first-to-last launch window is the code constant `CATEGORY_CALLOUT_CASCADE_MS`, initially 240ms, as the user requested. Keep existing solved routes/cards mounted through exit, freeze visible styles before cancellation, and cancel delayed launches on reversal/unmount. Disable CSS transitions on stems/cards so the universal reduced-motion duration cannot introduce a second clock. Reduce Motion skips the cascade. Preserve geometry, category inspection, swipe arbitration, stage height and financial values. Native acceptance is checklist 209.
+
+## 2026-10-30 - Mask The Entire Moving Title Gutter
+
+Use a stationary two-layer alpha mask on the carousel viewport: a 16px header fade ending before the indicator marks, followed by transparency across the full remaining right gutter, plus a fully opaque layer below the heading. Keep the stationary controls outside that mask. Narrow screens retain the title-above-markers layout and fade at the title row’s right gutter. This replaces the limited opaque cover and preserves graph/popups, settled geometry and swipe physics. Native acceptance is checklist 208.
+
 ## 2026-10-30 - Slide Graph Titles with Their Pages
 
 Keep each Quiet header title inside its graph’s existing compositor track so drag, spring settlement, interruption and reduced-motion behavior are shared with the graph content. Keep the position indicators in one stationary overlay, reserving their existing title space and masking incoming text beneath them. Preserve the settled type, gutters, narrow-screen wrapping, graph-content height and total section placement. Inactive headings remain hidden/inert with their slides; one stationary live status announces the selected graph. No new animation controller, financial or persistence change. Native acceptance is checklist 207.

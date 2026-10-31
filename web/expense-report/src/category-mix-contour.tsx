@@ -1,4 +1,5 @@
-import { useEffect, useMemo, useRef, useState } from "react"
+import { useEffect, useMemo, useRef, useState, type CSSProperties } from "react"
+import { CATEGORY_CALLOUT_CASCADE_MS, useCategoryCalloutFireworks } from "./category-mix-motion"
 import layoutWorkerUrl from "./category-mix-layout.worker.ts?worker&url"
 import { CONTOUR_STYLE, contourLabel, prepareContourScene, type ContourScene } from "./category-mix-layout"
 import type { BreakdownItem } from "./types"
@@ -30,16 +31,19 @@ export function useCategoryContour(data: BreakdownItem[], size: {width: number; 
   const prepared = useMemo(() => prepareCategoryContour(data, width, height), [key])
   const [result, setResult] = useState<{key: string; scene: ContourScene} | null>(null)
   const cached = cache.get(key)
-  const [settledKey, setSettledKey] = useState(key)
+  // Each new target gets its own identity, including a reversal back to the
+  // last settled view. Its old readiness cannot launch stems during a new morph.
+  const motionTarget = useMemo(() => ({key, showCallouts}), [key, showCallouts])
+  const [settledTarget, setSettledTarget] = useState(motionTarget)
   useEffect(() => {
-    if (settledKey === key) return
+    if (settledTarget === motionTarget) return
     // Callouts describe final slice angles. Let the existing 520ms sector
     // morph finish before revealing them, including instant cache hits.
     const reduced = typeof window === "undefined" || window.matchMedia("(prefers-reduced-motion: reduce)").matches
-    if (reduced) { setSettledKey(key); return }
-    const timer = window.setTimeout(() => setSettledKey(key), 520)
+    if (reduced) { setSettledTarget(motionTarget); return }
+    const timer = window.setTimeout(() => setSettledTarget(motionTarget), 520)
     return () => window.clearTimeout(timer)
-  }, [key])
+  }, [motionTarget])
   useEffect(() => {
     if (cache.has(key) || !size.width || !size.height) return
     let active = true
@@ -69,21 +73,26 @@ export function useCategoryContour(data: BreakdownItem[], size: {width: number; 
     outerRadius: showCallouts ? scene.radius : radius,
     innerRadius: showCallouts ? scene.inner : Math.max(8, radius - 48),
     margin: {top: 0, right: 0, bottom: 0, left: 0}, containerPadding: scene.style.inset,
-    showLabels: false, contour: scene, contourKey: key, calloutsReady: settledKey === key,
-  }), [scene, key, settledKey, showCallouts])
+    showLabels: false, contour: scene, contourKey: key, calloutsReady: settledTarget === motionTarget,
+  }), [scene, key, settledTarget, motionTarget, showCallouts])
 }
 
 export function CategoryContourCallouts({scene, data, ready, visible, onInspect}: {scene: ContourScene; data: BreakdownItem[]; ready: boolean; visible: boolean; onInspect: (item: BreakdownItem) => void}) {
+  const ref = useRef<SVGSVGElement>(null)
+  const active = visible && ready && Boolean(scene.routes)
+  useCategoryCalloutFireworks(ref, active, JSON.stringify(scene.items.map(item => item.id)))
   const colors = new Map(data.map(item => [item.key, item.color]))
   return (
-    <svg className="bb-contour-callouts" viewBox={`0 0 ${scene.width} ${scene.height}`} width={scene.width} height={scene.height} aria-hidden={!visible || !ready} data-visible={visible} data-ready={ready && Boolean(scene.routes)}>
-      {ready ? scene.curvedRoutes?.map(route => <path key={route.id} className="bb-contour-stem" data-category={route.id} data-anchor={route.edge} d={route.d} stroke={colors.get(route.id)} />) : null}
-      {ready && scene.routes ? scene.items.map(item => {
+    <svg ref={ref} className="bb-contour-callouts" viewBox={`0 0 ${scene.width} ${scene.height}`} width={scene.width} height={scene.height} aria-hidden={!active} data-visible={visible} data-ready={ready && Boolean(scene.routes)} data-cascade-window={CATEGORY_CALLOUT_CASCADE_MS}>
+      {scene.curvedRoutes?.map(route => <path key={route.id} className="bb-contour-stem" pathLength={1} data-category={route.id} data-anchor={route.edge} d={route.d} stroke={colors.get(route.id)} />)}
+      {scene.routes ? scene.items.map(item => {
         const top = item.y - item.height / 2, x = item.x + item.width / 2
         const route = scene.routes?.find(route => route.id === item.id), end = route?.points[route.points.length - 1]
         const target = data.find(row => row.key === item.id)!
         const [amount, share] = item.amountLabel.split(" / ")
-        return <g key={item.id} className="bb-contour-label" data-category={item.id} role="button" tabIndex={visible ? 0 : -1}
+        const distance = Math.max(1, Math.hypot(scene.cx - x, scene.cy - item.y))
+        return <g key={item.id} className="bb-contour-label" data-category={item.id} role="button" tabIndex={active ? 0 : -1}
+          style={{ transformOrigin: `${x}px ${item.y}px`, "--bb-contour-from-x": `${(scene.cx - x) / distance * 10}px`, "--bb-contour-from-y": `${(scene.cy - item.y) / distance * 10}px` } as CSSProperties}
           aria-label={`Inspect ${target.label}, ${money.format(target.amount)}, ${percent.format(target.percentage)}% of ring`}
           onClick={() => onInspect(target)} onKeyDown={event => { if (event.key === "Enter" || event.key === " ") { event.preventDefault(); onInspect(target) } }}>
           <rect x={item.x} y={top} width={item.width} height={item.height} rx={Math.min(scene.style.calloutRadius, item.height / 2)} />

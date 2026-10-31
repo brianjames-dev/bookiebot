@@ -50,6 +50,7 @@ const runtime = {
   ChartTooltip: () => { tooltipMounts++; return null }, ChartTooltipContent: () => null,
   // Force each requested dataset through the production component. Its memo
   // comparison is tested separately and is unrelated to stale sector identity.
+ CategoryRingCenterSync:({children})=>children,
   areCategoryMixPieSurfacePropsEqual: () => false,
   PIE_METRIC_START_ANGLE: 0, PIE_METRIC_END_ANGLE: 360, PIE_METRIC_PADDING_ANGLE: 1,
 }

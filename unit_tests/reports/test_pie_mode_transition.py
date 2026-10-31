@@ -56,7 +56,7 @@ def test_original_chart_animations_reuse_shapes_on_animation_frames():
     )
 
 
-@pytest.mark.parametrize("script", ["category_mix_contour_test.cjs", "category_mix_worker_test.cjs", "category_mix_toggle_test.cjs"])
+@pytest.mark.parametrize("script", ["category_mix_contour_test.cjs", "category_mix_worker_test.cjs", "category_mix_toggle_test.cjs", "category_mix_motion_test.cjs"])
 def test_refined_flow_fits_live_category_rows_and_keeps_stems_separate(script):
     root = Path(__file__).resolve().parents[2]
     if not shutil.which("node") or not (root / "web/expense-report/node_modules/typescript").exists():

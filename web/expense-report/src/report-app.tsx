@@ -16,6 +16,7 @@ import { createPortal } from "react-dom"
 import { ChevronDown, X } from "lucide-react"
 import { Popover } from "konsta/react"
 import { useCategoryContour, CategoryContourCallouts } from "./category-mix-contour"
+import { categoryCenterStyle, CategoryRingCenterSync } from "./category-mix-motion"
 import { CONTOUR_PADDING_ANGLE } from "./category-mix-layout"
 import { burnRateBalance, burnRateTooltipOccluders, positionBurnRateTooltip } from "./burn-rate-tooltip"
 import { useChartSwipe } from "./chart-swipe"
@@ -1722,7 +1723,11 @@ const CategoryMixChart = memo(function CategoryMixChart({
   const ringData = [...chartData.filter(item => item.key !== "left"), ...chartData.filter(item => item.key === "left")]
   const [pieHostRef, pieHostSize] = useElementSize<HTMLDivElement>()
   const [showCallouts, setShowCallouts] = useState(false)
+  const centerRef = useRef<HTMLButtonElement>(null)
   const pieLayout = useExpensePieLayout(ringData, pieHostSize, showCallouts)
+  // After mounting, the painted sector owns these styles. A new React target
+  // must not overwrite the current label before the next native ring frame.
+  const initialCenterStyle = useRef(categoryCenterStyle(pieLayout)).current
   const spentTotal = filter === "all" ? allSpentTotal : amountRowsTotal(chartData.filter((item) => item.key !== "left" && !item.key.startsWith("coverage-")))
   const selectedBudget = (filter === "all" ? categoryBudgetTotal(categoryBudgets) : categoryBudgets[filter]) + ((filter === "all" || filter === "savings") ? espp ?? 0 : 0)
   // All still shows where income went, including cash savings and ESPP.
@@ -1757,9 +1762,9 @@ const CategoryMixChart = memo(function CategoryMixChart({
             showCallouts={showCallouts}
             onToggle={() => setShowCallouts(shown => !shown)}
           >
-            <CategoryMixPieSurface data={ringData} layout={pieLayout} onInspect={onInspect} />
+            <CategoryMixPieSurface data={ringData} layout={pieLayout} centerRef={centerRef} onInspect={onInspect} />
             <CategoryContourCallouts scene={pieLayout.contour} data={ringData} ready={pieLayout.calloutsReady} visible={showCallouts} onInspect={onInspect} />
-            <button type="button" className="bb-category-pie-center" aria-label={showCallouts ? "Hide category callouts" : "Show category callouts"} aria-pressed={showCallouts} onClick={() => setShowCallouts(shown => !shown)} style={{ left: pieLayout.cx, top: pieLayout.cy, width: pieLayout.innerRadius * 1.7 }} aria-live="polite">
+            <button ref={centerRef} type="button" className="bb-category-pie-center" aria-label={showCallouts ? "Hide category callouts" : "Show category callouts"} aria-pressed={showCallouts} onClick={() => setShowCallouts(shown => !shown)} style={ringData.some(item => item.amount > 0) ? initialCenterStyle : categoryCenterStyle(pieLayout)} aria-live="polite">
               <FittedAmount className="bb-category-used">{selectedBudget > 0 ? `${Number(usedPercent.toFixed(1))}%` : "—"}</FittedAmount>
               <span>{selectedBudget > 0 ? usedLabel : "no budget"}</span>
             </button>
@@ -1802,12 +1807,13 @@ function CategoryMixPieMotionHost({ hostRef, layout, showCallouts, onToggle, chi
 }
 
 type CategoryMixPieSurfaceProps = {
+  centerRef: RefObject<HTMLButtonElement | null>
   onInspect: (item: BreakdownItem) => void
   data: BreakdownItem[]
   layout: ExpensePieLayout
 }
 
-const CategoryMixPieSurface = memo(function CategoryMixPieSurface({ data, layout, onInspect }: CategoryMixPieSurfaceProps) {
+const CategoryMixPieSurface = memo(function CategoryMixPieSurface({ data, layout, centerRef, onInspect }: CategoryMixPieSurfaceProps) {
   const reducedMotion = useMediaQuery("(prefers-reduced-motion: reduce)")
   return (
     <div className="bb-category-pie-surface bb-chart-motion-surface" data-bb-pie-transition={reducedMotion ? "none" : "morph"}>
@@ -1828,8 +1834,9 @@ const CategoryMixPieSurface = memo(function CategoryMixPieSurface({ data, layout
               // synchronized. Their indices no longer describe the current rows.
               const item = data.find(row => row.key === sector.payload?.key)
               if (!item) return <StablePieSector {...shape} tabIndex={-1} aria-hidden="true" />
-              return <StablePieSector {...shape} tabIndex={0} role="button" aria-label={`Inspect ${item.label}, ${formatMoney(item.amount)}`}
+              const path = <StablePieSector {...shape} tabIndex={0} role="button" aria-label={`Inspect ${item.label}, ${formatMoney(item.amount)}`}
                 onClick={() => onInspect(item)} onKeyDown={(event) => { if (event.key === "Enter" || event.key === " ") { event.preventDefault(); onInspect(item) } }} />
+              return item.key === data[0]?.key ? <CategoryRingCenterSync geometry={shape} centerRef={centerRef}>{path}</CategoryRingCenterSync> : path
             }}
             cx={layout.cx}
             cy={layout.cy}
@@ -1860,7 +1867,7 @@ function areCategoryMixPieSurfacePropsEqual(
   previous: CategoryMixPieSurfaceProps,
   next: CategoryMixPieSurfaceProps,
 ) {
-  return previous.onInspect === next.onInspect && breakdownRowsEqual(previous.data, next.data) && expensePieLayoutsEqual(previous.layout, next.layout)
+  return previous.onInspect === next.onInspect && previous.centerRef === next.centerRef && breakdownRowsEqual(previous.data, next.data) && expensePieLayoutsEqual(previous.layout, next.layout)
 }
 
 function areCategoryMixChartPropsEqual(previous: CategoryMixChartProps, next: CategoryMixChartProps) {

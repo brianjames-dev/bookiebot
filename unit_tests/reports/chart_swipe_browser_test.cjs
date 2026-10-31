@@ -33,6 +33,31 @@ const headingLayout=page=>page.evaluate(()=>{
  const box=n=>{const r=n.getBoundingClientRect();return [r.x,r.y+scrollY,r.width,r.height]}
  return {title:box(title),value:box(value),font:getComputedStyle(value).fontSize,dots:box(document.querySelector('.bb-chart-carousel-indicators')),content:box(slide.querySelector('.bb-card-content')),plot:box(slide.querySelector('.bb-chart-page-body')),next:box(document.querySelector('.bb-daily-section'))}
 })
+async function checkTitleMask(page,width,dark){
+ const viewport=page.locator('.bb-chart-carousel')
+ const geometry=await viewport.evaluate((el,{dark,width})=>{
+  const box=el.getBoundingClientRect(),dots=document.querySelector('.bb-chart-carousel-indicators').getBoundingClientRect(),heading=el.querySelector('.bb-chart-carousel-heading'),gutter=parseFloat(getComputedStyle(heading).paddingRight),edge=width<=362?box.width-gutter:dots.left-box.left+8
+  const background=getComputedStyle(el.closest('.bb-chart-carousel-band')).backgroundColor.match(/[\d.]+/g).slice(0,3).map(Number)
+  const probe=document.createElement('div');probe.dataset.headingMaskProbe='';probe.style.cssText=`position:absolute;inset:0;z-index:20;pointer-events:none;background:${dark?'white':'black'}`
+  const previous={position:el.style.position,visibility:document.querySelector('.bb-chart-carousel-nav').style.visibility};el.style.position='relative';document.querySelector('.bb-chart-carousel-nav').style.visibility='hidden';el.append(probe)
+  return {edge,background,ink:dark?255:0,headingHeight:heading.getBoundingClientRect().height,previous}
+ },{dark,width})
+ let pixels
+ try{
+  const png=await viewport.screenshot()
+  pixels=await page.evaluate(async({png,bodyY})=>{
+   const bitmap=new Image();bitmap.src=`data:image/png;base64,${png}`;await bitmap.decode()
+   const canvas=document.createElement('canvas');canvas.width=bitmap.width;canvas.height=bitmap.height;const context=canvas.getContext('2d');context.drawImage(bitmap,0,0)
+   const row=y=>{const rgba=context.getImageData(0,y,bitmap.width,1).data;return Array.from({length:bitmap.width},(_,x)=>Array.from(rgba.slice(x*4,x*4+3)))}
+   return {header:row(24),body:row(bodyY)}
+  },{png:png.toString('base64'),bodyY:Math.round(geometry.headingHeight)+20})
+ }finally{await viewport.evaluate((el,previous)=>{el.querySelector('[data-heading-mask-probe]').remove();el.style.position=previous.position;document.querySelector('.bb-chart-carousel-nav').style.visibility=previous.visibility},geometry.previous)}
+ const background=geometry.background.reduce((sum,n)=>sum+n,0)/3,alpha=(row,x)=>{const pixel=row[Math.max(0,Math.min(row.length-1,Math.round(x)))],mean=pixel.reduce((sum,n)=>sum+n,0)/3;return(mean-background)/(geometry.ink-background)}
+ const fade=[geometry.edge-18,geometry.edge-12,geometry.edge-8,geometry.edge-4,geometry.edge+2].map(x=>alpha(pixels.header,x))
+ assert.ok(fade[0]>.98&&fade[1]>.55&&fade[1]<.9&&fade[2]>.3&&fade[2]<.7&&fade[3]>.08&&fade[3]<.4&&Math.abs(fade[4])<.025,JSON.stringify({message:'Heading opacity fades smoothly to zero before the markers',geometry,fade}))
+ assert.ok(pixels.header.slice(Math.ceil(geometry.edge)+1).every((_,x)=>Math.abs(alpha(pixels.header,Math.ceil(geometry.edge)+1+x))<.025),'The entire right gutter hides incoming titles')
+ assert.ok(pixels.body.every((_,x)=>alpha(pixels.body,x)>.98),'The graph below the heading remains completely unmasked')
+}
 const sameLayout=(actual,expected)=>{for(const key of Object.keys(expected))if(Array.isArray(expected[key]))actual[key].forEach((n,i)=>assert.ok(Math.abs(n-expected[key][i])<1,JSON.stringify({key,actual,expected})));else assert.equal(actual[key],expected[key])}
 ;(async()=>{
  let cases=0,native=0
@@ -55,6 +80,7 @@ const sameLayout=(actual,expected)=>{for(const key of Object.keys(expected))if(A
   }
   if(width===390)await page.locator('.bb-chart-carousel-band').screenshot({path:`/private/tmp/chart-title-${engineName}-${dark?'dark':'light'}.png`})
   await select(page,'Category Mix')
+  await checkTitleMask(page,width,dark);cases++
   const stage=(await page.locator('.bb-chart-carousel-band').boundingBox()).height
   for(const target of ['#bb-chart-category .bb-chart-carousel-heading','.bb-category-pie-center','#bb-chart-category .recharts-sector','.bb-contour-label rect','.bb-category-pie-host']){
    await select(page,'Category Mix')

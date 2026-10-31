@@ -1174,6 +1174,8 @@ button.bb-left-categories { cursor: pointer; }
 .bb-chart-carousel {
   --bb-chart-carousel-gap: 16px;
   --bb-chart-carousel-viewport-width: calc(100vw - var(--bb-viewport-scrollbar-width, 0px));
+  --bb-chart-carousel-gutter: max(var(--bb-page-gutter), calc((var(--bb-chart-carousel-viewport-width) - var(--bb-content-max)) / 2));
+  --bb-chart-title-mask-edge: calc(100% - var(--bb-chart-carousel-gutter) - var(--bb-chart-indicator-count) * 44px + 8px);
   width: var(--bb-chart-carousel-viewport-width);
   height: 100%;
   min-width: 0;
@@ -1184,6 +1186,16 @@ button.bb-left-categories { cursor: pointer; }
   overscroll-behavior-x: contain;
   overscroll-behavior-y: auto;
   touch-action: pan-y;
+  /* The stationary header mask covers the full right gutter. Its second layer
+     leaves every pixel below the heading visible, including chart popups. */
+  -webkit-mask-image: linear-gradient(to right, #000 calc(var(--bb-chart-title-mask-edge) - 16px), transparent var(--bb-chart-title-mask-edge)), linear-gradient(#000, #000);
+  mask-image: linear-gradient(to right, #000 calc(var(--bb-chart-title-mask-edge) - 16px), transparent var(--bb-chart-title-mask-edge)), linear-gradient(#000, #000);
+  -webkit-mask-size: 100% var(--bb-chart-carousel-heading-height), 100% calc(100% - var(--bb-chart-carousel-heading-height));
+  mask-size: 100% var(--bb-chart-carousel-heading-height), 100% calc(100% - var(--bb-chart-carousel-heading-height));
+  -webkit-mask-position: 0 0, 0 var(--bb-chart-carousel-heading-height);
+  mask-position: 0 0, 0 var(--bb-chart-carousel-heading-height);
+  -webkit-mask-repeat: no-repeat;
+  mask-repeat: no-repeat;
 }
 
 .bb-chart-carousel-track {
@@ -1262,7 +1274,7 @@ button.bb-left-categories { cursor: pointer; }
   min-width: 0;
   gap: 8px;
   padding-top: 12px;
-  padding-inline: max(var(--bb-page-gutter), calc((100% - var(--bb-content-max)) / 2));
+  padding-inline: var(--bb-chart-carousel-gutter);
 }
 /* Reserve the stationary controls' space without moving them with the page. */
 .bb-chart-carousel-heading::after {
@@ -1292,8 +1304,6 @@ button.bb-left-categories { cursor: pointer; }
   gap: 0;
   min-width: 0;
   pointer-events: auto;
-  /* Keep incoming titles from painting through the stationary markers. */
-  background: hsl(var(--card));
 }
 
 .bb-chart-carousel-dot {
@@ -1321,6 +1331,7 @@ button.bb-left-categories { cursor: pointer; }
 }
 @media (max-width: 362px) {
   .bb-main > .bb-chart-carousel-band { --bb-chart-carousel-heading-height: 91px; }
+  .bb-chart-carousel { --bb-chart-title-mask-edge: calc(100% - var(--bb-chart-carousel-gutter)); }
   .bb-chart-carousel-heading { align-items: flex-start; padding-bottom: 44px; }
   .bb-chart-carousel-heading::after { display: none; }
   .bb-chart-carousel-nav { align-items: flex-end; }
@@ -1678,9 +1689,9 @@ button.bb-left-categories { cursor: pointer; }
   font-family: inherit;
   cursor: pointer;
   transform: translate(-50%, -50%);
-  transition: left 520ms ease-out, top 520ms ease-out, width 520ms ease-out, gap 520ms ease-out, font-size 520ms ease-out;
+  /* Position, dimensions and type share the sector's native animation frame. */
 }
-.bb-category-used { color: hsl(var(--foreground)); font-size: 24px; font-weight: 500; line-height: 1.1; letter-spacing: -.04em; font-variant-numeric: tabular-nums; }
+.bb-category-used { color: hsl(var(--foreground)); font-size: var(--bb-category-center-number-size, 24px); font-weight: 500; line-height: 1.1; letter-spacing: -.04em; font-variant-numeric: tabular-nums; }
 
 
 
@@ -3344,14 +3355,16 @@ button:focus-visible, summary:focus-visible {
 /* Refined flow retains its chart stage and former footer height until the layout is redesigned. */
 .bb-category-mix-page { row-gap: 0; grid-template-rows: auto minmax(0, 1fr) 42px; }
 .bb-category-mix-page .bb-category-chart-layout { max-width: none; width: calc(100% + 2 * var(--bb-chart-page-gutter)); margin-inline: calc(-1 * var(--bb-chart-page-gutter)); }
-.bb-contour-callouts { position: absolute; inset: 0; width: 100%; height: 100%; overflow: visible; pointer-events: none; opacity: 0; visibility: hidden; transition: opacity 220ms ease-out, visibility 0s 220ms; }
-.bb-contour-callouts[data-visible="true"][data-ready="true"] { opacity: 1; visibility: visible; transition-delay: 180ms; }
+.bb-contour-callouts { position: absolute; inset: 0; width: 100%; height: 100%; overflow: visible; pointer-events: none; opacity: 0; visibility: hidden; transition: opacity 160ms ease-out, visibility 0s 160ms; }
+.bb-contour-callouts[data-visible="true"][data-ready="true"] { opacity: 1; visibility: visible; transition-delay: 0s; }
 .bb-contour-callouts[data-visible="true"][data-ready="true"] .bb-contour-label { pointer-events: auto; }
 .bb-category-pie-center:focus-visible { outline: 2px solid hsl(var(--primary)); outline-offset: 4px; border-radius: 12px; }
-.bb-category-pie-host[data-callouts="false"] .bb-category-used { font-size: 30px; }
-.bb-category-pie-host[data-callouts="false"] .bb-category-pie-center { font-size: 12px; gap: 4px; }
-.bb-category-pie-host .bb-category-used { transition: font-size 520ms ease-out; }
-.bb-contour-stem { fill: none; stroke-width: 1.2px; stroke-linecap: round; opacity: .65; }
+/* WAAPI owns these frames; the universal Reduce Motion duration must not
+   create even a second, 0.01ms CSS transition when final styles are assigned. */
+.bb-contour-stem, .bb-contour-label { transition: none !important; }
+.bb-contour-stem { fill: none; stroke-width: 1.2px; stroke-linecap: round; stroke-dasharray: 1; stroke-dashoffset: 1; opacity: 0; }
+.bb-contour-label { opacity: 0; transform-box: view-box; transform: translate(var(--bb-contour-from-x, 0px), var(--bb-contour-from-y, 0px)) scale(.01); }
+.bb-contour-label:focus-visible { opacity: 1 !important; transform: none !important; }
 .bb-contour-label rect { fill: color-mix(in srgb, hsl(var(--foreground)) 5%, hsl(var(--card))); }
 .bb-contour-label:focus-visible rect { stroke: hsl(var(--primary)); stroke-width: 1px; }
 .bb-contour-name { font-weight: 400; }
