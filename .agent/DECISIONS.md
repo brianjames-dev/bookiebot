@@ -1,5 +1,11 @@
 # Agent Decisions
 
+## 2026-10-30 - Refine Burn Rate Budget Fraction Without Expansion
+
+The user chose Budget fraction for the permanent compact monthly footer, with no expansion. Color the **Spent** label to match the spent segment of the bar. Retain the Budget fraction upper divider/two-column styling, but put **Available today** above its amount and **Saving** above its per-day amount. Match the actual Overview metric info glyph (`ⓘ`, 12px, opacity .7) rather than the larger bespoke circle.
+
+The next deliverable is a rough draft, including a restyled Available today explanation with a clear reading hierarchy; this is not yet a production implementation request. The draft groups allowance/spending through the selected date, the resulting pace room and counted categories. Exact explanation copy and styling remain reviewable. This supersedes the previous Burn Rate expanding-footer proposal only; keep the general Category Mix spacing/shorter-shared-stage direction and the accepted native line/popup behavior.
+
 ## 2026-10-30 - Compact Shared Graph Sections Gradually
 
 The user accepted Burn Rate’s popup placement and lifecycle from `0933f1a` (checklist 203). Preserve that behavior while refining the surrounding summary/footer. Explore a simple monthly balance graphic by default that expands on tap into the existing detailed Month limit / Spent / Left graphic, plus a more compact upper summary.
