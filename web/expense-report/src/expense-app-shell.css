@@ -42,10 +42,13 @@
 /* Equal CSS tracks own all resting geometry, including during resize. No
    ResizeObserver measures or rewrites the lens on each animation frame. */
 .bb-app-shell .bb-navigation-pane { --bb-glass-origin-y: 1; --bb-nav-lens-width: calc((100% - var(--bb-nav-padding) * 2) / var(--bb-nav-count) + var(--bb-nav-inset) * 2); --bb-nav-finger-left: clamp(var(--bb-nav-inset), calc(var(--bb-glass-x) - var(--bb-nav-lens-width) / 2), calc(100% - var(--bb-nav-lens-width) - var(--bb-nav-inset))); --bb-nav-padding: 10px; --bb-nav-inset: 5px; --bb-navigation-spring: cubic-bezier(.22, 1, .36, 1); --bb-control-icon-size: 27px; display: flex; align-items: center; width: 100%; height: 100%; padding-inline: var(--bb-nav-padding); pointer-events: auto; transform-origin: center bottom; }
-.bb-app-shell .bb-navigation-selection { position: absolute; z-index: 0; left: var(--bb-nav-lens-left, calc(var(--bb-nav-padding) - var(--bb-nav-inset) + (100% - var(--bb-nav-padding) * 2) * var(--bb-nav-position))); top: var(--bb-nav-inset); bottom: var(--bb-nav-inset); width: var(--bb-nav-lens-width); height: auto; border: 0; border-radius: 999px; background: none; transform: none; transition: left 420ms var(--bb-navigation-spring), width 420ms cubic-bezier(.22, 1, .36, 1), top 420ms cubic-bezier(.22, 1, .36, 1), bottom 420ms cubic-bezier(.22, 1, .36, 1); }
+/* A full-width carrier makes transform percentages relative to the pane. Keep
+   travel off layout, separate from the lens size and the glass's held scale. */
+.bb-app-shell .bb-navigation-cursor { position: absolute; inset: 0; z-index: 0; pointer-events: none; will-change: transform; transform: translate3d(var(--bb-nav-lens-left, calc(var(--bb-nav-padding) - var(--bb-nav-inset) + (100% - var(--bb-nav-padding) * 2) * var(--bb-nav-position))), 0, 0); transition: transform 420ms var(--bb-navigation-spring); }
+.bb-app-shell .bb-navigation-selection { position: absolute; z-index: 0; left: 0; top: var(--bb-nav-inset); bottom: var(--bb-nav-inset); width: var(--bb-nav-lens-width); height: auto; border: 0; border-radius: 999px; background: none; transform: none; transition: width 420ms cubic-bezier(.22, 1, .36, 1), top 420ms cubic-bezier(.22, 1, .36, 1), bottom 420ms cubic-bezier(.22, 1, .36, 1); }
 .bb-app-shell .bb-navigation-lens-surface { position: absolute; inset: 0; border-radius: inherit; background: var(--bb-glass-selection); transform-origin: center; transition: transform 220ms var(--bb-navigation-spring), background-color 180ms ease, box-shadow 180ms ease; }
 .bb-app-shell .bb-navigation-pane[data-nav-moving="true"] .bb-navigation-lens-surface { transform: scale(1.035, .985); }
-.bb-app-shell .bb-navigation-pane[data-glass-contact="true"] > .bb-navigation-selection { transition-duration: 40ms, 420ms, 420ms, 420ms; transition-timing-function: linear, cubic-bezier(.22, 1, .36, 1), cubic-bezier(.22, 1, .36, 1), cubic-bezier(.22, 1, .36, 1); }
+.bb-app-shell .bb-navigation-pane[data-glass-contact="true"] > .bb-navigation-cursor { transition-duration: 60ms; transition-timing-function: cubic-bezier(.2, .8, .2, 1); }
 .bb-app-shell .bb-navigation-pane[data-glass-contact="true"] .bb-navigation-lens-surface { transform: scale(1.025); background: rgb(0 0 0 / .12); box-shadow: inset 0 1px 1px rgb(255 255 255 / .55), 0 2px 8px rgb(0 0 0 / .08); }
 [data-theme="dark"] .bb-app-shell .bb-navigation-pane[data-glass-contact="true"] .bb-navigation-lens-surface { background: rgb(255 255 255 / .25); box-shadow: inset 0 1px 1px rgb(255 255 255 / .23), 0 2px 8px rgb(0 0 0 / .16); }
 .bb-app-shell .bb-navigation-link { position: relative; z-index: 1; flex: 1 1 0; width: 0; min-width: 44px; min-height: 44px; margin: 0; border: 0; background: transparent; padding: 5px; color: inherit; font: inherit; cursor: pointer; }
@@ -64,7 +67,7 @@
 @media (prefers-reduced-motion: reduce) {
   .bb-app-shell .bb-glass-control, .bb-app-shell .bb-glass-control::after, .bb-app-shell .bb-shell-icon .bb-glass-icon, .bb-app-shell .bb-glass-icon > span, .bb-app-shell .bb-shell-icon::before,
   .bb-app-shell .bb-bottom-navigation, .bb-app-shell .bb-bottom-navigation > div:last-child,
-  .bb-app-shell .bb-navigation-selection, .bb-app-shell .bb-navigation-lens-surface, .bb-app-shell .bb-navigation-link .bb-glass-icon { transition: none !important; }
+  .bb-app-shell .bb-navigation-cursor, .bb-app-shell .bb-navigation-selection, .bb-app-shell .bb-navigation-lens-surface, .bb-app-shell .bb-navigation-link .bb-glass-icon { transition: none !important; }
   .bb-app-shell .bb-glass-control { --bb-glass-scale: 1 !important; }
   .bb-app-shell .bb-glass-control, .bb-app-shell .bb-shell-icon .bb-glass-icon, .bb-app-shell .bb-navigation-lens-surface { transform: none !important; }
 }

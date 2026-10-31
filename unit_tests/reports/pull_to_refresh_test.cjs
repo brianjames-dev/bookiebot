@@ -66,6 +66,14 @@ const settle = async () => {await act(async()=>{await Promise.resolve();await Pr
 ;(async()=>{
   act(()=>{renderer=Renderer.create(fixture())})
   for(const name of ['touchstart','touchmove','touchend','touchcancel'])assert.equal(listeners.get(`document:${name}`).options.passive,true,'Touch observers never block native scrolling')
+  const toolbar=new Element({selector:'.bb-shell-header-actions'}),toolButton=new Element({tag:'button'}),toolIcon=new Element({tag:'svg'}),toolPath=new Element({tag:'path'})
+  toolButton.parentElement=toolbar;toolIcon.parentElement=toolButton;toolPath.parentElement=toolIcon
+  for(const target of [toolbar,toolButton,toolIcon,toolPath]) {
+    start({target});move({y:400,target:new Element()});scroll(100);scroll(0);move({y:500,target:new Element()})
+    assert.equal(phase(),'idle','A toolbar-origin drag stays excluded after leaving its button and reaching the page top')
+    assert.equal(renderer.root.findAllByProps({role:'progressbar'}).length,0);assert.equal(renderer.root.findByProps({className:'bb-pull-refresh'}).props['data-visible'],false)
+    await release({y:500});assert.equal(calls.length,0,'Holding/dragging a tool never refreshes the page')
+  }
   const button=new Element({tag:'button'}),buttonIcon=new Element({tag:'svg'});buttonIcon.parentElement=button
   for(const target of [button,buttonIcon,new Element({tag:'a'}),new Element({selector:'[role=tablist]'})]) {
     start({target});move({y:90});assert.equal(progress(),26,'Ordinary controls also show pull feedback')

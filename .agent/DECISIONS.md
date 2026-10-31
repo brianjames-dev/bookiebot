@@ -1,5 +1,11 @@
 # Agent Decisions
 
+## 2026-10-31 - Separate Pill Travel And Toolbar Gesture Ownership
+
+Move navigation selection travel onto a dedicated full-width `translate3d` carrier. Its percentages retain the pane coordinate system, while the pill keeps its own width/inset transitions and the glass keeps its accepted scale animation. This removes animated layout-position writes from selection travel. Rest/release still use the existing spring; held tracking uses a short eased transform transition. No resize observer, continuous JavaScript animation loop, dependency or page-scroll owner is introduced. Reduce Motion disables the carrier transition, while quick taps, release-only fill, cancel/guard behavior and accessible button semantics remain.
+
+Treat the fixed upper-right toolbar, including nested SVG/icon targets, as a refresh-excluded gesture origin just like the bottom navigation. A hold/drag that starts there stays excluded after leaving the tool or reaching the page top; do not prevent native scrolling or broadly exclude ordinary page buttons. A fresh content gesture remains eligible for the existing refresh interaction. This narrows the earlier ordinary-button allowance without changing refresh dispatch or financial behavior. Native acceptance is checklist 222.
+
 ## 2026-10-31 - Separate Quick Taps From Lifted Touch Illumination
 
 Replace the uniform warm wash with a neutral radial illumination shared by navigation and the two fixed tools. One `useGlassContact` lifecycle stores viewport distances from the fixed transform origin, coalesces input into one frame, and retains that origin during exit. CSS divides those distances by its registered animated scale, keeping the light and lens under a stationary finger throughout growth/retraction. A separately registered CSS percentage animates only the reveal radius, so the origin follows input without an interpolated recentering. Rounded background clipping confines the light to its own glass. CSS owns reveal, opacity, growth and icon transitions; no stationary-hold loop, ResizeObserver, page-scroll write or dependency is added.

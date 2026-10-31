@@ -18,7 +18,9 @@ function excludedTarget(target: EventTarget | null) {
   if (!(target instanceof Element)) return true
   // Native panning cancels clicks on ordinary buttons/links. Excluding those
   // surfaces made the indicator depend on where the same pull happened to start.
-  if (target.closest("input,textarea,select,[contenteditable=true],[role=slider],.bb-bottom-navigation")) return true
+  // Fixed glass controls own their complete hold/drag gesture, including travel
+  // outside the control. Exclude its origin rather than blocking native panning.
+  if (target.closest("input,textarea,select,[contenteditable=true],[role=slider],.bb-bottom-navigation,.bb-shell-header-actions")) return true
   // An inner scroller owns its own gesture, even when it has reached its edge.
   for (let element: Element | null = target; element && element !== document.body && element !== document.documentElement; element = element.parentElement) {
     const style = window.getComputedStyle(element)

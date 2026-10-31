@@ -230,6 +230,34 @@ async function checkIllumination(page, glass, near, far) {
       assert.ok(Math.max(...rapid.frames.map(f=>f.width))-Math.min(...rapid.frames.map(f=>f.width))<.25,'Rapid taps leave bar dimensions stable')
       assert.ok(new Set(rapid.frames.map(f=>Math.round(f.x))).size>6,'Rapid retargets retain intermediate CSS positions')
       assert.equal(rapid.sameNodes,true);await geometry(moving,'Transactions',false);cases++
+      // Dense input must paint monotonic travel in either direction, including
+      // while the held scale is changing. Moving the carrier never animates left.
+      const drag=await moving.evaluate(async()=>{
+        const pane=document.querySelector('.bb-navigation-pane'),cursor=pane.querySelector('.bb-navigation-cursor'),lens=pane.querySelector('.bb-navigation-selection'),capture=pane.setPointerCapture;pane.setPointerCapture=()=>{}
+        const r=pane.getBoundingClientRect(),y=r.y+r.height/2,from=r.x+55,to=r.right-55,frames=[]
+        const send=(type,x)=>pane.dispatchEvent(new PointerEvent(type,{bubbles:true,pointerId:92,pointerType:'touch',clientX:x,clientY:y}))
+        send('pointerdown',from)
+        for(const direction of [1,-1]) {
+          const start=performance.now()
+          while(performance.now()-start<500) {
+            await new Promise(requestAnimationFrame)
+            const t=Math.min(1,(performance.now()-start)/500),x=direction===1?from+(to-from)*t:to-(to-from)*t
+            send('pointermove',x)
+            frames.push({direction,t,x,center:lens.getBoundingClientRect().x+lens.getBoundingClientRect().width/2,left:getComputedStyle(lens).left,animations:cursor.getAnimations().map(a=>a.transitionProperty)})
+          }
+          await new Promise(resolve=>setTimeout(resolve,180))
+        }
+        send('pointercancel',from);pane.setPointerCapture=capture;return frames
+      })
+      for(const direction of [1,-1]) {
+        const samples=drag.filter(f=>f.direction===direction&&f.t>.2&&f.t<.95)
+        assert.ok(samples.length>=8,'Held travel paints a continuous sequence of real frames')
+        for(let i=1;i<samples.length;i++)assert.ok((samples[i].center-samples[i-1].center)*direction>=-.4,'The pill never jitters backwards during steady finger travel')
+        assert.ok(samples.every(s=>Math.abs(s.center-s.x)<25),'The pill stays close to dense finger input')
+      }
+      assert.ok(drag.every(f=>f.left==='0px'),'Travel leaves the pill layout position fixed')
+      assert.ok(drag.some(f=>f.animations.includes('transform')),'Travel uses the transform layer')
+      await moving.waitForTimeout(700);await geometry(moving,'Transactions',false);cases++
       // Held previews retain the committed icon, gently lift the bar and
       // normalize live finger tracking through that scale in both nav sizes.
       for(const compact of [false,true]) {

@@ -140,6 +140,35 @@ async function waitReady(page,label) {
         // A subthreshold release must keep the live viewport anchor until it
         // retracts above the page; never jump into the document/brand on release.
         await page.evaluate(()=>scrollTo(0,0))
+        for(const index of [0,1]) {
+          const before=requests.filter(r=>r.name==='/app/expenses/data').length
+          await page.locator('.bb-shell-header-actions button').nth(index).evaluate(async button=>{
+            const r=button.getBoundingClientRect(),x=r.x+r.width/2,y=r.y+r.height/2,origin=button.querySelector('svg path')||button
+            const send=(type,dy,target)=>{const touch={identifier:87,clientX:x,clientY:y+dy};const event=new Event(type,{bubbles:true});Object.assign(event,{touches:type==='touchend'?[]:[touch],changedTouches:[touch]});target.dispatchEvent(event)}
+            origin.dispatchEvent(new PointerEvent('pointerdown',{bubbles:true,pointerId:87,pointerType:'touch',button:0,clientX:x,clientY:y}))
+            send('touchstart',0,origin);await new Promise(resolve=>setTimeout(resolve,150))
+            for(const dy of [50,150,320]){send('touchmove',dy,document.body);await new Promise(requestAnimationFrame)}
+            send('touchend',320,document.body)
+            button.dispatchEvent(new PointerEvent('pointercancel',{bubbles:true,pointerId:87,pointerType:'touch'}))
+          })
+          await page.waitForTimeout(80)
+          assert.equal(await page.locator('.bb-pull-refresh').getAttribute('data-phase'),'idle','Dragging either held toolbar control cannot arm refresh even outside its origin')
+          assert.equal(await page.locator('.bb-pull-refresh').getAttribute('data-visible'),'false')
+          assert.equal(requests.filter(r=>r.name==='/app/expenses/data').length,before,'Excluded tool gestures make no refresh request')
+        }
+        if(engine===chromium&&width===320&&!dark) {
+          const cdp=await page.context().newCDPSession(page)
+          for(const index of [0,1]) {
+            const r=await page.locator('.bb-shell-header-actions button').nth(index).boundingBox(),x=r.x+r.width/2,y=r.y+r.height/2
+            const before=requests.filter(r=>r.name==='/app/expenses/data').length
+            await cdp.send('Input.dispatchTouchEvent',{type:'touchStart',touchPoints:[{x,y,id:89}]});await page.waitForTimeout(160)
+            for(let step=1;step<=12;step++){await cdp.send('Input.dispatchTouchEvent',{type:'touchMove',touchPoints:[{x,y:y+step*27,id:89}]});await page.waitForTimeout(16)}
+            await cdp.send('Input.dispatchTouchEvent',{type:'touchEnd',touchPoints:[]});await page.waitForTimeout(80)
+            assert.equal(await page.locator('.bb-pull-refresh').getAttribute('data-phase'),'idle','A real native tool hold/downward pan cannot start refresh')
+            assert.equal(requests.filter(r=>r.name==='/app/expenses/data').length,before)
+          }
+          await cdp.detach()
+        }
         await gesture(page,210,{finish:false});await page.waitForTimeout(60)
         const cancelBefore=await page.locator('.bb-pull-refresh').evaluate(n=>({top:n.getBoundingClientRect().top,position:getComputedStyle(n).position}))
         assert.equal(cancelBefore.position,'fixed')

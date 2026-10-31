@@ -104,7 +104,7 @@ export function AppNavigationBar({ active, current = active, compact, reconcilia
           event.stopPropagation()
         }
       }}>
-      <span className="bb-selection-indicator bb-navigation-selection" aria-hidden="true"><span className="bb-navigation-lens-surface" /></span>
+      <span className="bb-navigation-cursor" aria-hidden="true"><span className="bb-selection-indicator bb-navigation-selection"><span className="bb-navigation-lens-surface" /></span></span>
       {tabs.map(({ id }) => <TabbarLink key={id} component={NavigationButton} linkProps={{ type: "button", disabled }} className="bb-navigation-link"
         active={active === id} data-state={(preview ?? active) === id ? "active" : "inactive"} data-nav-screen={id}
         aria-label={screenTitles[id]} aria-current={current === id ? "page" : undefined}
