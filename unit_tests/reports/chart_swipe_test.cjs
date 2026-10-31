@@ -12,12 +12,13 @@ const runtime={exports:{},require:req,window:win,performance:{now:()=>now},Resiz
 vm.runInNewContext(ts.transpileModule(fs.readFileSync('web/expense-report/src/chart-swipe.ts','utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2020}}).outputText,runtime)
 const {useChartSwipe}=runtime.exports
 let tree
-function Harness({index=0,count=4}){renders++;const swipe=useChartSwipe({index,count,onSelect:next=>selections.push(next),onDragStart:()=>starts++,ignoreTarget:target=>target?.form});return React.createElement('div',{ref:swipe.viewportRef,onClickCapture:swipe.onClickCapture})}
+function Harness({index=0,count=4}){renders++;const swipe=useChartSwipe({index,count,onSelect:next=>selections.push(next),onDragStart:()=>starts++,ignoreTarget:target=>target?.form});return React.createElement('div',{ref:swipe.viewportRef,onClickCapture:swipe.onClickCapture,'data-indicator':swipe.indicatorIndex})}
 const mount=(index=0,count=4)=>act(()=>{if(tree)tree.unmount();tree=create(React.createElement(Harness,{index,count}),{createNodeMock:()=>viewport})})
 const update=(index,count=4)=>act(()=>tree.update(React.createElement(Harness,{index,count})))
 const event=(clientX=300,clientY=100,extra={})=>{const touch={clientX,clientY,identifier:1};return {target:viewport,touches:[touch],changedTouches:[touch],stopped:0,prevented:0,stopPropagation(){this.stopped++},preventDefault(){this.prevented++},...extra}}
 const fire=(name,x,y,extra)=>{const e=event(x,y,extra);act(()=>listeners.get(name).fn(e));return e}
 const click=detail=>{const e=event(0,0,{detail});act(()=>tree.root.findByType('div').props.onClickCapture(e));return e}
+const indicator=()=>tree.root.findByType('div').props['data-indicator']
 const scroll=left=>{viewport.scrollLeft=left;fire('scroll')}
 const flush=()=>act(()=>{for(const[id,fn]of [...timers]){timers.delete(id);fn()}})
 try{
@@ -27,7 +28,7 @@ try{
  fire('touchstart',300);for(let i=0;i<40;i++)fire('touchmove',290-i*5)
  assert.equal(writes.length,initialWrites,'Held touch never writes scrollLeft, transforms or an animation');assert.equal(renders,initialRenders);assert.equal(starts,1);assert.equal(datasetWrites-initialDatasetWrites,2,'Gesture state is written only once, never per touch sample')
  const moving=fire('touchmove',40);assert.equal(moving.stopped,1);assert.equal(moving.prevented,0,'Chart scrubbing is suppressed without canceling browser panning')
- scroll(275);fire('scrollend');assert.deepEqual(selections,[],'No intermediate page is published while the finger stays down')
+ scroll(202);assert.equal(indicator(),0);const beforeCrossing=renders;scroll(204);assert.equal(indicator(),1,'The indicator changes at the majority crossing while held');for(let x=205;x<275;x++)scroll(x);assert.equal(renders,beforeCrossing+1,'Native scroll samples only rerender at page crossings');scroll(180);assert.equal(indicator(),0,'Held reversals update immediately');scroll(275);assert.equal(indicator(),1);assert.equal(writes.length,initialWrites,'Indicator changes never drive native position');fire('scrollend');assert.deepEqual(selections,[],'No intermediate page is published while the finger stays down')
  fire('touchend',40,100,{touches:[]});assert.deepEqual(selections,[],'Release cannot implement its own threshold or velocity animation')
  scroll(406);fire('scrollend',0,0,{target:{}});assert.equal(selections.length,0,'Nested scrollers cannot finish the carousel');fire('scrollend');assert.deepEqual(selections,[1]);assert.equal(viewport.dataset.settling,'false');assert.equal(writes.length,initialWrites)
  update(1);scroll(406);flush();assert.equal(viewport.dataset.settling,'false','A final WebKit scroll delivered after scrollend must not strand the busy state');assert.equal(writes.length,initialWrites,'Publishing native selection cannot restart the browser scroll')
@@ -49,7 +50,7 @@ try{
  // Fallback observes idle only on browsers without scrollend, and waits for release.
  delete viewport.onscrollend;mount();const fallbackRenders=renders,fallbackWrites=writes.length
  fire('touchstart',300);fire('touchmove',40);scroll(336);flush();assert.equal(viewport.dataset.settling,'true')
- fire('touchend',40,100,{touches:[]});flush();assert.equal(selections.at(-1),1);assert.equal(viewport.dataset.settling,'false');assert.equal(renders,fallbackRenders);assert.equal(writes.length,fallbackWrites)
+ fire('touchend',40,100,{touches:[]});flush();assert.equal(selections.at(-1),1);assert.equal(viewport.dataset.settling,'false');assert.equal(renders,fallbackRenders+1,'Only the indicator crossing renders while waiting for native completion');assert.equal(writes.length,fallbackWrites)
  update(1);fire('wheel',0,0,{deltaX:100,deltaY:0});scroll(672);flush();assert.equal(selections.at(-1),2,'Horizontal trackpad scroll selects its native snapped page')
  scroll(700);assert.ok(timers.size);mount();assert.equal(timers.size,0,'Unmount cancels idle fallback timers')
 }finally{if(tree)act(()=>tree.unmount())}

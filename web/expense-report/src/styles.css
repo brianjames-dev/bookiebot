@@ -1323,7 +1323,7 @@ button.bb-left-categories { cursor: pointer; }
   height: 6px;
   border-radius: 8px;
   background: color-mix(in srgb, hsl(var(--muted-foreground)) 50%, hsl(var(--card)));
-  transition: width 240ms cubic-bezier(.2,.7,.2,1), background 240ms ease;
+  transition: width 120ms cubic-bezier(.2,.7,.2,1), background 120ms ease;
 }
 .bb-chart-carousel-dot[data-state="active"] > span {
   width: 24px;

@@ -6,7 +6,7 @@ global.IS_REACT_ACT_ENVIRONMENT = true
 const compile = source => ts.transpileModule(source, {compilerOptions: {module: ts.ModuleKind.CommonJS, jsx: ts.JsxEmit.ReactJSX, target: ts.ScriptTarget.ES2020}}).outputText
 const helper = {exports: {}, window: {innerWidth:390,innerHeight:900},NodeFilter:{SHOW_TEXT:4}}
 vm.runInNewContext(compile(fs.readFileSync('web/expense-report/src/burn-rate-tooltip.ts', 'utf8')), helper)
-const {burnRateBalance, burnRateTooltipPlacement, burnRateTooltipObstacles, burnRateTooltipOccluders, positionBurnRateTooltip} = helper.exports
+const {burnRateBalance, burnRateTooltipPlacement, burnRateTooltipSide, burnRateTooltipObstacles, burnRateTooltipOccluders, positionBurnRateTooltip} = helper.exports
 const plain = value => JSON.parse(JSON.stringify(value))
 for (const [spent, limit, expected] of [
   [40, 100, {used:40, left:60, over:false, empty:false, excess:0}],
@@ -108,11 +108,11 @@ const side=burnRateTooltipPlacement({x:8,y:20,width:1000,height:400},tooltip,[{x
 assert.ok(!intersects(side,besideNav),'Wide layouts may use safe space beside the actual floating bar')
 
 // Exercise the DOM adapter too: chart-local matrix, cached samples, direct placement.
-let reads=0, curve='initial', chartWidth=360
+let reads=0, curve='initial', chartWidth=360, chartLeft=16
 const matrix={a:1,b:0,c:0,d:1,e:0,f:0}
 const line={getCTM:()=>matrix,getAttribute:()=>curve,getTotalLength:()=>270,getPointAtLength:at=>{reads++;return {matrixTransform:m=>({x:60+at*m.a,y:35+at*.6+m.f})}}}
 const clip={x:{baseVal:{value:58}},y:{baseVal:{value:20}},width:{baseVal:{value:280}},height:{baseVal:{value:260}}}
-const chart={getBoundingClientRect:()=>({left:16,top:150,right:16+chartWidth,bottom:450,width:chartWidth,height:300}),querySelector:selector=>selector==='clipPath rect'?clip:line,querySelectorAll:()=>[]}
+const chart={getBoundingClientRect:()=>({left:chartLeft,top:150,right:chartLeft+chartWidth,bottom:450,width:chartWidth,height:300}),querySelector:selector=>selector==='clipPath rect'?clip:line,querySelectorAll:()=>[]}
 const footerRect={left:16,top:470,width:358,height:110}
 const section={texts:[{textContent:'  '},{textContent:'Month limit',rects:[footerRect]}],querySelectorAll:()=>[]}
 let selectedText, textReads=0
@@ -150,6 +150,56 @@ for(const selectedX of [90,94,98,102,106,110,114,118]){
  positionBurnRateTooltip(clean,node,selectedX)
  assert.equal(portal.style.transform,clean.style.transform,'Neighboring days cannot inherit a near-tied old anchor')
 }
+
+// Lock chart-local coordinates after at most one useful opposite-side move.
+let scrollPaints=0
+const scrollPortal={parentElement:{...portal.parentElement},style:new Proxy({},{set(object,key,value){if(key==='transform')scrollPaints++;object[key]=value;return true}}),dataset:{}}
+const scrollNode={offsetWidth:184,offsetHeight:102,dataset:{inspectedDay:'20'}}
+const readPosition=()=>{const [x,y]=scrollPortal.style.transform.match(/[-\d.]+/g).map(Number);return{x,y}}
+// Prevent the initial lower pocket, then move that occluder to the upper side.
+fixedElements=[{getBoundingClientRect:()=>({left:0,top:310,width:390,height:590})}]
+positionBurnRateTooltip(scrollPortal,scrollNode,180)
+const firstAnchor=readPosition(),firstSide=burnRateTooltipSide(firstAnchor,tooltip,equalFlat)
+assert.equal(firstSide,-1)
+fixedElements=[]
+positionBurnRateTooltip(scrollPortal,scrollNode,180)
+assert.deepEqual(readPosition(),firstAnchor,'A newly optimal pocket cannot move a still-readable card')
+helper.window.innerHeight=200;positionBurnRateTooltip(scrollPortal,scrollNode,180)
+assert.deepEqual(readPosition(),firstAnchor,'An offscreen selected node cannot trigger a viewport-chasing relocation')
+helper.window.innerHeight=900
+fixedElements=[{getBoundingClientRect:()=>({left:0,top:0,width:390,height:280})}]
+positionBurnRateTooltip(scrollPortal,scrollNode,180)
+const flippedAnchor=readPosition()
+assert.equal(burnRateTooltipSide(flippedAnchor,tooltip,equalFlat),1,'The one relocation crosses the actual trend line')
+assert.equal(scrollPortal.style.opacity,'')
+fixedElements=[{getBoundingClientRect:()=>({left:0,top:310,width:390,height:590})}]
+for(let i=0;i<8;i++)positionBurnRateTooltip(scrollPortal,scrollNode,180)
+assert.deepEqual(readPosition(),flippedAnchor,'Further navigation/viewport changes cannot keep repinning the card')
+assert.equal(scrollPaints,2,'One initial transform and one opposite-side transform; scrolling cannot repaint repeatedly')
+assert.equal(scrollPortal.style.opacity,'0','Fixed controls hide a locked anchor instead of repelling it')
+fixedElements=[];positionBurnRateTooltip(scrollPortal,scrollNode,180)
+assert.deepEqual(readPosition(),flippedAnchor);assert.equal(scrollPortal.style.opacity,'')
+helper.window.innerHeight=320
+positionBurnRateTooltip(scrollPortal,scrollNode,180)
+assert.deepEqual(readPosition(),flippedAnchor,'Viewport clipping does not reset the relocation budget')
+helper.window.innerHeight=900
+scrollNode.dataset.inspectedDay='21'
+positionBurnRateTooltip(scrollPortal,scrollNode,180)
+const freshScrollPortal={parentElement:{...portal.parentElement},style:{},dataset:{}}
+positionBurnRateTooltip(freshScrollPortal,{...scrollNode,dataset:{inspectedDay:'21'}},180)
+assert.equal(scrollPortal.style.transform,freshScrollPortal.style.transform,'A new selected day gets a fresh placement and budget')
+
+// During rotation the SVG width can settle before the native scroller's
+// horizontal alignment. The final alignment must receive a fresh fit.
+const alignmentPortal={parentElement:{...portal.parentElement},style:{},dataset:{}}
+const alignmentNode={offsetWidth:184,offsetHeight:102,dataset:{inspectedDay:'24'}}
+fixedElements=[{getBoundingClientRect:()=>({left:0,top:0,width:260,height:900})}]
+chartLeft=-54;positionBurnRateTooltip(alignmentPortal,alignmentNode,160)
+const localX=()=>Number(alignmentPortal.style.transform.match(/translate\(([-\d.]+)/)[1])
+assert.ok(localX()>182,'The temporary alignment exercises a formerly out-of-bounds cached anchor')
+chartLeft=16;positionBurnRateTooltip(alignmentPortal,alignmentNode,160)
+assert.ok(localX()+chartLeft+alignmentNode.offsetWidth<=382,'Settled carousel alignment refits the resized card inside the viewport')
+fixedElements=[]
 
 fixedElements=[{getBoundingClientRect:()=>({left:0,top:0,width:390,height:900})}]
 positionBurnRateTooltip(portal,node,160)
@@ -214,3 +264,20 @@ render(runtime.exports.Month,{burnRate:{...burn,spent:3100,remaining:-105.08},mo
 assert.ok(JSON.stringify(view.toJSON()).includes('-$105.08'),'Overspend stays signed in the monthly Left amount')
 act(()=>view.unmount())
 console.log('PASS: balance edge cases, day/month scopes, approved labels and shade, native line props, interior/exterior pockets, bounded readability, nearby node corners, fresh-day anchoring and geometry cache')
+
+// A native SVG may settle after its parent resize; wire the real geometry
+// callback without relying on an artificial follow-up scroll to repair it.
+let resizeObserver,geometryObserver,placements=0
+const observedChart={},observedHost={querySelector:()=>observedChart},observedNode={}
+runtime.ResizeObserver=class{constructor(callback){this.callback=callback;this.targets=[];resizeObserver=this}observe(target){this.targets.push(target)}disconnect(){this.disconnected=true}}
+runtime.MutationObserver=class{constructor(callback){this.callback=callback;geometryObserver=this}observe(target,options){this.target=target;this.options=options}disconnect(){this.disconnected=true}}
+const scrollListeners=new Set()
+runtime.window={addEventListener:(_,callback)=>scrollListeners.add(callback),removeEventListener:(_,callback)=>scrollListeners.delete(callback)}
+runtime.burnRateTooltipOccluders=()=>[]
+runtime.positionBurnRateTooltip=()=>placements++
+const observedPortal={parentElement:observedHost,closest:()=>null,ownerDocument:{}}
+act(()=>{view=create(React.createElement(runtime.exports.Tooltip,{active:true,payload:[{payload:point}],monthName:'Oct',portal:observedPortal}),{createNodeMock:element=>element.props.className==='bb-burn-node-tooltip'?observedNode:null})})
+assert.equal(placements,1);assert.ok(resizeObserver.targets.includes(observedChart))
+assert.equal(geometryObserver.target,observedChart);assert.ok(geometryObserver.options.attributeFilter.includes('d'));assert.ok(!geometryObserver.options.attributeFilter.includes('style'),'Portal style changes cannot form a placement loop')
+geometryObserver.callback();assert.equal(placements,2,'Final native SVG geometry is observed without another user scroll')
+act(()=>view.unmount());assert.ok(resizeObserver.disconnected&&geometryObserver.disconnected);assert.equal(scrollListeners.size,0)

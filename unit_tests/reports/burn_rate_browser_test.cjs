@@ -87,8 +87,9 @@ async function inspect(page){return page.locator('#bb-chart-burn-rate').evaluate
  for(const n of el.querySelectorAll('.recharts-cartesian-axis-tick-value'))obstacles.push({r:n.getBoundingClientRect(),label:n.textContent})
  const metricHits=obstacles.filter(({r})=>r.width&&r.height&&card.left<r.right+5&&card.right>r.left-5&&card.top<r.bottom+5&&card.bottom>r.top-5).map(n=>n.label)
  const fixedHits=[...document.querySelectorAll('.bb-bottom-navigation:not([hidden]) .bb-navigation-pane,.bb-shell-header-actions button')].filter(n=>{const r=n.getBoundingClientRect();return r.width&&r.height&&card.left<r.right+5&&card.right>r.left-5&&card.top<r.bottom+5&&card.bottom>r.top-5}).map(n=>n.className)
+ const curve=el.querySelector('.recharts-line-curve'),centerX=card.left+card.width/2;let lo=0,hi=curve.getTotalLength();for(let i=0;i<25;i++){const at=(lo+hi)/2,p=curve.getPointAtLength(at).matrixTransform(curve.getScreenCTM());if(p.x<centerX)lo=at;else hi=at}const curveY=curve.getPointAtLength((lo+hi)/2).matrixTransform(curve.getScreenCTM()).y,side=card.top+card.height/2<curveY?'above':'below'
  const anchor=dot?{x:dot.x+dot.width/2,y:dot.y+dot.height/2}:null,anchorDistance=anchor?Math.hypot(anchor.x-Math.max(card.left,Math.min(card.right,anchor.x)),anchor.y-Math.max(card.top,Math.min(card.bottom,anchor.y))):null
- return {cardSize:{width:t.offsetWidth,height:t.offsetHeight},panelBounds:el.querySelector('.bb-burn-rate-page').getBoundingClientRect().toJSON(),fixedHits,opacity:getComputedStyle(portal).opacity,anchor,anchorDistance,curveHits,metricHits,day:t.dataset.inspectedDay,text:t.innerText,header:t.querySelector('.bb-burn-mini-header').innerText,labels:t.querySelector('.bb-burn-pair-labels').innerText,values:t.querySelector('.bb-burn-pair-values').innerText,over:rail.dataset.over,fill:fill?{percent:parseFloat(fill.style.width),x:fill.getBoundingClientRect().x,color:getComputedStyle(fill).backgroundColor}:null,rail:rail.getBoundingClientRect().toJSON(),background:getComputedStyle(rail).backgroundColor,card:card.toJSON(),labelBottom:t.querySelector('.bb-burn-pair-labels').getBoundingClientRect().bottom,valueTop:t.querySelector('.bb-burn-pair-values').getBoundingClientRect().top,transform:getComputedStyle(wrapper).transform,transition:getComputedStyle(portal).transitionDuration,positioned:portal.dataset.positionedDay,plotRect,outsidePlot:card.bottom<=plotRect.top||card.top>=plotRect.bottom||card.right<=plotRect.left||card.left>=plotRect.right,hidesDot:dot?card.x<dot.right+6&&card.right>dot.x-6&&card.y<dot.bottom+6&&card.bottom>dot.y-6:false,shade:getComputedStyle(el.querySelector('.recharts-area-area')).fillOpacity,stage:document.querySelector('.bb-chart-carousel-band').getBoundingClientRect().height,plot:el.querySelector('.recharts-wrapper').getBoundingClientRect().height,details:!!el.querySelector('.bb-details-toggle'),overflow:document.documentElement.scrollWidth>innerWidth}
+ return {side,cardSize:{width:t.offsetWidth,height:t.offsetHeight},panelBounds:el.querySelector('.bb-burn-rate-page').getBoundingClientRect().toJSON(),fixedHits,opacity:getComputedStyle(portal).opacity,anchor,anchorDistance,curveHits,metricHits,day:t.dataset.inspectedDay,text:t.innerText,header:t.querySelector('.bb-burn-mini-header').innerText,labels:t.querySelector('.bb-burn-pair-labels').innerText,values:t.querySelector('.bb-burn-pair-values').innerText,over:rail.dataset.over,fill:fill?{percent:parseFloat(fill.style.width),x:fill.getBoundingClientRect().x,color:getComputedStyle(fill).backgroundColor}:null,rail:rail.getBoundingClientRect().toJSON(),background:getComputedStyle(rail).backgroundColor,card:card.toJSON(),labelBottom:t.querySelector('.bb-burn-pair-labels').getBoundingClientRect().bottom,valueTop:t.querySelector('.bb-burn-pair-values').getBoundingClientRect().top,transform:getComputedStyle(wrapper).transform,transition:getComputedStyle(portal).transitionDuration,local:portal.style.transform,positioned:portal.dataset.positionedDay,plotRect,outsidePlot:card.bottom<=plotRect.top||card.top>=plotRect.bottom||card.right<=plotRect.left||card.left>=plotRect.right,hidesDot:dot?card.x<dot.right+6&&card.right>dot.x-6&&card.y<dot.bottom+6&&card.bottom>dot.y-6:false,shade:getComputedStyle(el.querySelector('.recharts-area-area')).fillOpacity,stage:document.querySelector('.bb-chart-carousel-band').getBoundingClientRect().height,plot:el.querySelector('.recharts-wrapper').getBoundingClientRect().height,details:!!el.querySelector('.bb-details-toggle'),overflow:document.documentElement.scrollWidth>innerWidth}
  })}
 ;(async()=>{
  let checks=0,frames=0
@@ -105,7 +106,7 @@ async function inspect(page){return page.locator('#bb-chart-burn-rate').evaluate
    if(responses[url.pathname])return route.fulfill({json:responses[url.pathname]})
    if(url.pathname.includes('avatar'))return route.fulfill({contentType:'image/png',body:fs.readFileSync(path.join(root,'assets/avatars/avatar7.png'))})
   }unexpected.push(url.pathname);await route.abort()})
-  const open=async(scenario='regular',before=false)=>{await page.goto(`https://bookie.test/report?scenario=${scenario}${before?'&before=1':''}`);await page.getByRole('button',{name:'Show Burn Rate',exact:true}).click();await page.locator('#bb-chart-burn-rate').scrollIntoViewIfNeeded();await page.waitForTimeout(450)}
+  const open=async(scenario='regular',before=false)=>{await page.goto(`https://bookie.test/report?scenario=${scenario}${before?'&before=1':''}`);await page.getByRole('button',{name:'Show Burn Rate',exact:true}).click();await page.locator('#bb-chart-burn-rate').scrollIntoViewIfNeeded();await page.waitForFunction(()=>{const el=document.querySelector('.bb-chart-carousel');return el.dataset.settling==='false'&&Math.abs(el.scrollLeft-el.clientWidth-16)<1});await page.waitForTimeout(100)}
   if(shell){
    await open();checks=await checkCompactPresentation(page,width,engineName,checks)
    for(const crest of [6,14,22]){
@@ -122,9 +123,21 @@ async function inspect(page){return page.locator('#bb-chart-burn-rate').evaluate
      await page.waitForTimeout(100)
      const actual=await inspect(page);assert.equal(actual.opacity,'1',JSON.stringify(actual));assert.deepEqual(actual.fixedHits,[],JSON.stringify(actual));assert.equal(actual.hidesDot,false,JSON.stringify(actual));assert.equal(actual.curveHits,0,JSON.stringify(actual))
      assert.ok(actual.anchorDistance<=actual.card.height,JSON.stringify(actual));checks++
-     // The still-open card must follow the changing nav geometry without a tap.
-     await page.evaluate(compact=>scrollBy(0,compact?-35:65),compact);await page.waitForTimeout(450)
-     const moved=await inspect(page);assert.equal(moved.opacity,'1');assert.deepEqual(moved.fixedHits,[],JSON.stringify(moved));checks++
+     // A scroll may flip once across the curve, but must not keep seeking the
+     // viewport/nav edge. Opacity may hide a locked card beneath fixed controls.
+     await page.locator('.bb-burn-tooltip-portal').evaluate(portal=>{
+      window.__burnRedundantStyles=0
+      const observer=new MutationObserver(records=>{for(const record of records)if(record.oldValue===portal.getAttribute('style'))window.__burnRedundantStyles++})
+      observer.observe(portal,{attributes:true,attributeFilter:['style'],attributeOldValue:true});window.__burnStyleObserver=observer
+     })
+     let previous=actual.local,previousSide=actual.side,moves=0
+     for(const delta of [65,65,65,-65,-65,-65,65,-65]){
+      await page.evaluate(delta=>scrollBy(0,delta),delta);await page.waitForTimeout(45)
+      const moved=await inspect(page)
+      if(moved.local!==previous){moves++;assert.notEqual(moved.side,previousSide,'Scroll relocation must cross the actual trend line');assert.equal(moved.opacity,'1');assert.deepEqual(moved.fixedHits,[],JSON.stringify(moved));assert.equal(moved.hidesDot,false);assert.equal(moved.curveHits,0);assert.ok(moved.anchorDistance<=Math.max(32,moved.card.height/2)+1,JSON.stringify(moved))}
+      previous=moved.local;previousSide=moved.side
+     }
+     assert.ok(moves<=1,JSON.stringify({crest,chartTop,compact,moves}));assert.equal(await page.evaluate(()=>{window.__burnStyleObserver.disconnect();return window.__burnRedundantStyles}),0,'Scrolling cannot redundantly rewrite the same serialized anchor');checks++
     }
    }
    await open('multi-turn')
@@ -170,7 +183,7 @@ async function inspect(page){return page.locator('#bb-chart-burn-rate').evaluate
    await page.waitForTimeout(210);assert.equal(await page.locator('.bb-burn-node-tooltip').count(),0)
    await nativePoint(page,20,touch);await page.mouse.wheel(0,160);await page.waitForTimeout(100)
    assert.equal(await page.locator('.bb-burn-node-tooltip').count(),1,'Scrolling keeps the popup attached to its chart during the existing hold')
-   const scrolled=await inspect(page);assert.ok(scrolled.card.top>=0&&scrolled.card.bottom<=900,'Placement respects the visible viewport after scrolling')
+   const scrolled=await inspect(page);assert.equal(scrolled.positioned,scrolled.day,'Scrolling keeps the same inspection; it may leave the viewport naturally')
    await page.getByRole('button',{name:'Show Calendar',exact:true}).click();await page.waitForTimeout(450);assert.equal(await page.locator('.bb-burn-node-tooltip').count(),0)
    await page.getByRole('button',{name:'Show Burn Rate',exact:true}).click();await nativePoint(page,13,touch)
    await page.getByRole('button',{name:'Projected',exact:true}).click();await page.waitForTimeout(450);assert.equal(await page.locator('.bb-burn-node-tooltip').count(),0);checks+=7
@@ -221,7 +234,7 @@ async function inspect(page){return page.locator('#bb-chart-burn-rate').evaluate
    }
    assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth),false);checks++
   }
-  if(process.env.BOOKIEBOT_BURN_QUICK){await open();await nativePoint(page,13,touch);await page.setViewportSize({width:320,height:900});await page.waitForTimeout(350);const resized=await inspect(page);assert.ok(resized.card.x>=0&&resized.card.right<=320.1);assert.equal(resized.positioned,resized.day);await open();const chart=page.locator('#bb-chart-burn-rate .recharts-wrapper');await chart.locator('svg[tabindex="0"]').focus();await page.keyboard.press('ArrowRight');await page.waitForTimeout(100);assert.equal(await page.locator('.bb-burn-node-tooltip').count(),1,'Native chart keyboard activation remains available');checks+=2}
+  if(process.env.BOOKIEBOT_BURN_QUICK){await open();await nativePoint(page,13,touch);await page.setViewportSize({width:320,height:900});await page.waitForFunction(()=>{const el=document.querySelector('.bb-chart-carousel');return el.clientWidth===320&&el.dataset.settling==='false'&&Math.abs(el.scrollLeft-336)<1});await page.evaluate(()=>new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve))));const resized=await inspect(page);assert.ok(resized.card.x>=0&&resized.card.right<=320.1,JSON.stringify({engineName,resized}));assert.equal(resized.positioned,resized.day);await open();const chart=page.locator('#bb-chart-burn-rate .recharts-wrapper');await chart.locator('svg[tabindex="0"]').focus();const beforeKey=await page.locator('.bb-chart-carousel').evaluate(el=>({left:el.scrollLeft,state:{...el.dataset},active:document.activeElement?.outerHTML.slice(0,160)}));await page.keyboard.press('ArrowRight');await page.waitForTimeout(150);assert.equal(await page.locator('.bb-burn-node-tooltip').count(),1,JSON.stringify({message:'Native chart keyboard activation remains available',engineName,beforeKey,afterKey:await page.locator('.bb-chart-carousel').evaluate(el=>({left:el.scrollLeft,state:{...el.dataset},active:document.activeElement?.outerHTML.slice(0,160)}))}));checks+=2}
   if(width===390&&dark){
    for(const height of [500,360]){
     // Resize the loaded page instead of navigating while its geometry worker

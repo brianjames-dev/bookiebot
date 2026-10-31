@@ -2,7 +2,7 @@ const assert=require('node:assert/strict'),fs=require('node:fs'),path=require('n
 const req=createRequire(path.resolve('web/expense-report/package.json')),React=req('react'),{act,create}=req('react-test-renderer'),ts=req('typescript')
 global.IS_REACT_ACT_ENVIRONMENT=true
 const source=fs.readFileSync('web/expense-report/src/components/ui/chart.tsx','utf8'),file=ts.createSourceFile('chart.tsx',source,ts.ScriptTarget.Latest,true,ts.ScriptKind.TSX)
-const names=new Set(['ChartTooltip','ChartTooltipMotionFrame','ChartTooltipAutoDismissContent','chartTooltipSignature','ChartInteractionContext','ChartTooltipDismissContext','TOOLTIP_LAST_TRANSFORM_ATTRIBUTE','TOOLTIP_MOTION_READY_ATTRIBUTE','TOOLTIP_FADE_DURATION'])
+const names=new Set(['ChartTooltip','ChartTooltipMotionFrame','ChartTooltipAutoDismissContent','chartTooltipSignature','ChartInteractionContext','ChartTooltipDismissContext','TOOLTIP_LAST_TRANSFORM_ATTRIBUTE','TOOLTIP_MOTION_READY_ATTRIBUTE','TOOLTIP_FADE_DURATION','ChartContainer','ChartContext','ChartStyle'])
 const declarations=file.statements.filter(n=>ts.isFunctionDeclaration(n)?names.has(n.name?.text):ts.isVariableStatement(n)&&n.declarationList.declarations.some(d=>names.has(d.name.getText(file))))
 assert.equal(declarations.length,names.size)
 let now=0,serial=0;const timers=new Map()
@@ -14,7 +14,7 @@ class HTMLDivElement{constructor(){this.style={transform:'none'};this.attrs=new 
 // prop. The production adapter must render exactly one lifecycle/motion frame.
 const nativeTooltip=props=>React.cloneElement(props.content,props)
 const runtime={exports:{},require:req,React,window,HTMLDivElement,RechartsPrimitive:{Tooltip:nativeTooltip},cn:(...values)=>values.filter(Boolean).join(' ')}
-vm.runInNewContext(ts.transpileModule(declarations.map(n=>n.getText(file)).join('\n')+'\nexports.Chart=ChartTooltip;exports.Interaction=ChartInteractionContext;exports.Dismiss=ChartTooltipDismissContext',{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2020,jsx:ts.JsxEmit.ReactJSX}}).outputText,runtime)
+vm.runInNewContext(ts.transpileModule(declarations.map(n=>n.getText(file)).join('\n')+'\nexports.Chart=ChartTooltip;exports.Interaction=ChartInteractionContext;exports.Dismiss=ChartTooltipDismissContext;exports.Container=ChartContainer',{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2020,jsx:ts.JsxEmit.ReactJSX}}).outputText,runtime)
 const {Chart,Interaction,Dismiss}=runtime.exports,h=React.createElement,Leaf=({label})=>h('span',null,label)
 for(const fadeDuration of [180,360]){
  const wrapper=new HTMLDivElement();let revision=0,dismiss=0,label='Oct 13',active=true,view
@@ -36,3 +36,20 @@ for(const fadeDuration of [180,360]){
  revision++;update();assert.ok(view.toJSON());act(()=>view.unmount());assert.equal(timers.size,0,'Unmount clears hold, fade and entry timers')
 }
 console.log('PASS: five-second hold, synchronized default/custom exit duration, retained inactive payload, interrupted fade, dismissal and cleanup')
+
+// Native carousel dismissal must not suppress a later deliberate keyboard
+// inspection, or let the browser also move the horizontal scrolling viewport.
+let keyboardDismiss=0,keyboardView
+const keyboardRender=()=>h(Dismiss.Provider,{value:keyboardDismiss},h(runtime.exports.Container,{config:{}},h(Chart,{content:h(Leaf),active:true,label:'Oct 3',payload:[{value:3}],dismissDelay:5000})))
+act(()=>{keyboardView=create(keyboardRender())})
+keyboardDismiss++;act(()=>keyboardView.update(keyboardRender()));advance(180)
+const container=()=>keyboardView.root.find(n=>n.type==='div'&&n.props['data-chart'])
+const keyboardFrame=()=>keyboardView.root.findAll(n=>n.type==='div'&&n.props.className?.split(' ').includes('bb-chart-tooltip-frame'))
+assert.equal(keyboardFrame().length,0)
+const key=(key,surface=true)=>{const event={key,target:{matches:()=>surface},prevented:0,preventDefault(){this.prevented++}};act(()=>container().props.onKeyDownCapture(event));return event}
+assert.equal(key('ArrowRight',false).prevented,0);assert.equal(keyboardFrame().length,0,'Other controls cannot reopen a chart tooltip')
+assert.equal(key('ArrowRight').prevented,1);assert.equal(keyboardFrame().length,1,'A chart arrow reopens inspection after carousel dismissal')
+assert.equal(container().props['data-bb-chart-interaction-revision'],1)
+assert.equal(key('ArrowLeft').prevented,1);assert.equal(key('Enter').prevented,0,'Enter retains its native chart action')
+assert.equal(key('Tab').prevented,0);assert.equal(container().props['data-bb-chart-interaction-revision'],3)
+act(()=>keyboardView.unmount());assert.equal(timers.size,0)

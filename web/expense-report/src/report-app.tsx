@@ -878,7 +878,7 @@ const OverviewCharts = memo(function OverviewCharts({ report, activeReport, char
         >
           <ChartCarouselNavigation
             panels={chartPanels}
-            activeIndex={activeChartIndex}
+            activeIndex={Math.min(swipe.indicatorIndex, chartPanels.length - 1)}
             onSelect={switchChart}
           />
           <div
@@ -1542,6 +1542,12 @@ function BurnRateTooltipContent({
     const observer = new ResizeObserver(place)
     observer.observe(node)
     if (portal.parentElement) observer.observe(portal.parentElement)
+    const chart = portal.parentElement?.querySelector(".recharts-wrapper")
+    if (chart) observer.observe(chart)
+    // WebKit can finish native SVG layout after the container resize callback.
+    // Observe real geometry changes, never portal style writes or scroll y.
+    const geometryObserver = new MutationObserver(place)
+    if (chart) geometryObserver.observe(chart, { subtree: true, childList: true, attributes: true, attributeFilter: ["d", "width", "height", "viewBox", "transform"] })
     const page = portal.closest(".bb-burn-rate-page")
     if (page) observer.observe(page)
     for (const occluder of burnRateTooltipOccluders(portal.ownerDocument)) observer.observe(occluder)
@@ -1550,6 +1556,7 @@ function BurnRateTooltipContent({
     window.visualViewport?.addEventListener("scroll", place)
     return () => {
       observer.disconnect()
+      geometryObserver.disconnect()
       window.removeEventListener("scroll", place, true)
       window.visualViewport?.removeEventListener("resize", place)
       window.visualViewport?.removeEventListener("scroll", place)

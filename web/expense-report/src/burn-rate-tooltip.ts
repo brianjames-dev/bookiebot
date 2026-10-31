@@ -10,9 +10,18 @@ export function burnRateBalance(spent: number, limit: number) {
   return { used, left, over, empty: used + left === 0, excess: Math.min(1, Math.max(0, spent - limit) / Math.max(limit, 0.01)) }
 }
 
+// The side is relative to the actual curve at the card's center, rather than
+// a viewport quadrant or the selected node's y alone on a sloping trend.
+export function burnRateTooltipSide(point: Point, tooltip: { width: number; height: number }, samples: Point[]): -1 | 1 {
+  const center = { x: point.x + tooltip.width / 2, y: point.y + tooltip.height / 2 }
+  const nearest = samples.reduce<Point | undefined>((best, sample) =>
+    !best || Math.abs(sample.x - center.x) < Math.abs(best.x - center.x) ? sample : best, undefined)
+  return center.y < (nearest?.y ?? center.y) ? -1 : 1
+}
+
 export function burnRateTooltipPlacement(
   plot: Rect, tooltip: { width: number; height: number }, samples: Point[],
-  selectedX?: number, bounds: Rect = plot, previous?: Point, avoid: Obstacle[] = [],
+  selectedX?: number, bounds: Rect = plot, previous?: Point, avoid: Obstacle[] = [], requiredSide?: -1 | 1,
 ) {
   const { width, height } = tooltip
   const loX = bounds.x, loY = bounds.y
@@ -59,7 +68,8 @@ export function burnRateTooltipPlacement(
     return { x, y, hidesPoint, overlaps, obstruction, occlusion, preserved, score: occlusion + overlaps * 30 + readability + distance * 3 + cornerDistance * .5 + centerDistance * .08 }
   }
   const candidates = [...xs].flatMap(x => [...ys].map(y => score({ x, y })))
-  let pool = candidates
+  const opposite = requiredSide === undefined ? [] : candidates.filter(point => burnRateTooltipSide(point, tooltip, samples) === requiredSide)
+  let pool = opposite.length ? opposite : candidates
   // Fixed controls can hide the popup. Keep it clear of those, the node and the
   // curve, then balance proximity against other labels instead of fleeing to
   // a distant corner just to avoid a small amount of text.
@@ -76,7 +86,10 @@ export function burnRateTooltipPlacement(
 }
 
 const sampleCache = new WeakMap<SVGPathElement, { key: string; samples: Point[] }>()
-const placementCache = new WeakMap<HTMLElement, Point>()
+type Placement = { portal: HTMLElement; day: string | undefined; geometry: string; point: Point; flipped: boolean }
+// A mounted inspection owns its scroll budget. New nodes/days/layouts start
+// fresh; ordinary scrolling must not turn the card into a fixed viewport HUD.
+const placementCache = new WeakMap<HTMLElement, Placement>()
 
 export function burnRateTooltipOccluders(document: Document) {
   return [...document.querySelectorAll<HTMLElement>(".bb-bottom-navigation:not([hidden]) .bb-navigation-pane, .bb-shell-header-actions button")]
@@ -124,9 +137,9 @@ export function positionBurnRateTooltip(portal: HTMLElement, node: HTMLElement, 
   const right = Math.min(page.right - 8, (viewport?.offsetLeft ?? 0) + (viewport?.width ?? window.innerWidth) - 8)
   const bottom = Math.min(page.bottom - 8, (viewport?.offsetTop ?? 0) + (viewport?.height ?? window.innerHeight) - 8)
   const fixed = burnRateTooltipOccluders(host.ownerDocument).map(element => element.getBoundingClientRect())
-  const avoid: Obstacle[] = burnRateTooltipObstacles(pageElement, chart)
-    .map(rect => ({ x: rect.left - bounds.left, y: rect.top - bounds.top, width: rect.width, height: rect.height, preserve: rect.preserve }))
-  avoid.push(...fixed.map(rect => ({ x: rect.left - bounds.left, y: rect.top - bounds.top, width: rect.width, height: rect.height, occludes: true })))
+  const occluders: Obstacle[] = fixed.map(rect => ({ x: rect.left - bounds.left, y: rect.top - bounds.top, width: rect.width, height: rect.height, occludes: true }))
+  const obstacles = (): Obstacle[] => [...burnRateTooltipObstacles(pageElement, chart)
+    .map(rect => ({ x: rect.left - bounds.left, y: rect.top - bounds.top, width: rect.width, height: rect.height, preserve: rect.preserve })), ...occluders]
   const key = [path.getAttribute("d"), bounds.width, bounds.height, matrix.a, matrix.b, matrix.c, matrix.d, matrix.e, matrix.f].join("|")
   let cached = sampleCache.get(path)
   if (cached?.key !== key) {
@@ -138,19 +151,46 @@ export function positionBurnRateTooltip(portal: HTMLElement, node: HTMLElement, 
     cached = { key, samples }
     sampleCache.set(path, cached)
   }
-  const next = burnRateTooltipPlacement(
-    { x: clip.x.baseVal.value, y: clip.y.baseVal.value, width: clip.width.baseVal.value, height: clip.height.baseVal.value },
-    // Layout dimensions do not shrink while the exit frame scales/fades.
-    { width: node.offsetWidth, height: node.offsetHeight }, cached.samples, selectedX,
-    { x: left - bounds.left, y: top - bounds.top, width: right - left, height: bottom - top },
-    // Retain near ties only while inspecting the same node. A new selection
-    // starts at its own best anchor rather than inheriting the last pocket.
-    portal.dataset.positionedDay === node.dataset.inspectedDay ? placementCache.get(host) : undefined, avoid,
-  )
-  placementCache.set(host, next)
-  // If too little of the panel is visible to fit above/beside a fixed control,
-  // retain the content but don't paint a clipped card underneath that control.
-  portal.style.opacity = avoid.some(rect => rect.occludes && next.x < rect.x + rect.width + 6 && next.x + node.offsetWidth > rect.x - 6 && next.y < rect.y + rect.height + 6 && next.y + node.offsetHeight > rect.y - 6) ? "0" : ""
-  portal.style.transform = `translate(${next.x}px, ${next.y}px)`
-  portal.dataset.positionedDay = node.dataset.inspectedDay
+  const tooltip = { width: node.offsetWidth, height: node.offsetHeight }
+  const plot = { x: clip.x.baseVal.value, y: clip.y.baseVal.value, width: clip.width.baseVal.value, height: clip.height.baseVal.value }
+  const visible = { x: left - bounds.left, y: top - bounds.top, width: right - left, height: bottom - top }
+  // Horizontal alignment can settle after SVG resize. It is a real layout
+  // change; vertical document scrolling is deliberately absent from this key.
+  const geometry = `${key}|${bounds.left}|${tooltip.width}|${tooltip.height}`
+  const day = node.dataset.inspectedDay
+  let placement = placementCache.get(node)
+  let positionChanged = false
+  const occluded = (point: Point) => occluders.some(rect => point.x < rect.x + rect.width + 6 && point.x + tooltip.width > rect.x - 6 && point.y < rect.y + rect.height + 6 && point.y + tooltip.height > rect.y - 6)
+  const inside = (point: Point) => point.x >= visible.x && point.y >= visible.y && point.x + tooltip.width <= visible.x + visible.width && point.y + tooltip.height <= visible.y + visible.height
+  if (!placement || placement.portal !== portal || placement.day !== day || placement.geometry !== geometry) {
+    placement = { portal, day, geometry, point: burnRateTooltipPlacement(plot, tooltip, cached.samples, selectedX, visible, undefined, obstacles()), flipped: false }
+    placementCache.set(node, placement)
+    positionChanged = true
+  } else if (!placement.flipped && (!inside(placement.point) || occluded(placement.point))) {
+    const anchor = selectedX === undefined ? undefined : cached.samples.reduce<Point | undefined>((best, point) =>
+      !best || Math.abs(point.x - selectedX) < Math.abs(best.x - selectedX) ? point : best, undefined)
+    // No relocation may chase a node that has already scrolled out of view.
+    const nodeVisible = anchor && anchor.x >= visible.x && anchor.x <= visible.x + visible.width && anchor.y >= visible.y && anchor.y <= visible.y + visible.height
+      && !occluders.some(rect => anchor.x >= rect.x - 6 && anchor.x <= rect.x + rect.width + 6 && anchor.y >= rect.y - 6 && anchor.y <= rect.y + rect.height + 6)
+    if (nodeVisible) {
+      const side = burnRateTooltipSide(placement.point, tooltip, cached.samples)
+      const next = burnRateTooltipPlacement(plot, tooltip, cached.samples, selectedX, visible, undefined, obstacles(), side === -1 ? 1 : -1)
+      const distance = Math.hypot(anchor.x - Math.max(next.x, Math.min(next.x + tooltip.width, anchor.x)), anchor.y - Math.max(next.y, Math.min(next.y + tooltip.height, anchor.y)))
+      const coversNode = anchor.x > next.x - 12 && anchor.x < next.x + tooltip.width + 12 && anchor.y > next.y - 12 && anchor.y < next.y + tooltip.height + 12
+      const coversCurve = cached.samples.some(point => point.x > next.x - 8 && point.x < next.x + tooltip.width + 8 && point.y > next.y - 8 && point.y < next.y + tooltip.height + 8)
+      if (inside(next) && !occluded(next) && !coversNode && !coversCurve && distance <= Math.max(32, tooltip.height / 2) && burnRateTooltipSide(next, tooltip, cached.samples) !== side) {
+        placement.point = next
+        placement.flipped = true
+        positionChanged = true
+      }
+    }
+  }
+  // Once its one opposite-side move is used, keep this exact chart-local
+  // anchor. It scrolls away naturally; fixed controls can hide, never repel it.
+  const opacity = occluded(placement.point) ? "0" : ""
+  if (portal.style.opacity !== opacity) portal.style.opacity = opacity
+  // Do not compare serialized CSS floats: browser rounding can otherwise
+  // turn the same anchor into a redundant style write on every scroll event.
+  if (positionChanged) portal.style.transform = `translate(${placement.point.x}px, ${placement.point.y}px)`
+  if (portal.dataset.positionedDay !== day) portal.dataset.positionedDay = day
 }

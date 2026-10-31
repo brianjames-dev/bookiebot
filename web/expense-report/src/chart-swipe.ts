@@ -1,4 +1,4 @@
-import { useLayoutEffect, useRef, type MouseEvent } from "react"
+import { useLayoutEffect, useRef, useState, type MouseEvent } from "react"
 
 const GAP = 16
 const SCROLL_IDLE_MS = 160
@@ -14,6 +14,7 @@ export function useChartSwipe({ index, count, onSelect, onDragStart, ignoreTarge
   index: number; count: number; onSelect: (index: number) => void
   onDragStart: () => void; ignoreTarget: (target: EventTarget | null) => boolean
 }) {
+  const [indicatorIndex, setIndicatorIndex] = useState(index)
   const viewportRef = useRef<HTMLDivElement>(null)
   const options = useRef({ index, count, onSelect, onDragStart, ignoreTarget })
   const gesture = useRef<Gesture | null>(null)
@@ -27,11 +28,17 @@ export function useChartSwipe({ index, count, onSelect, onDragStart, ignoreTarge
     const media = window.matchMedia("(prefers-reduced-motion: reduce)")
     let size = viewport.clientWidth
     let selected = -1
+    let previewed = index
     let requested: number | null = null
     let touching = false
     let scrolling = false
     let idle: number | undefined
     const bounded = (next: number) => Math.max(0, Math.min(options.current.count - 1, next))
+    const preview = (next: number) => {
+      if (previewed === next) return
+      previewed = next
+      setIndicatorIndex(next)
+    }
     const clearIdle = () => { window.clearTimeout(idle); idle = undefined }
     const begin = () => {
       if (scrolling) return
@@ -55,6 +62,7 @@ export function useChartSwipe({ index, count, onSelect, onDragStart, ignoreTarge
       requested = null
       const next = bounded(Math.round(viewport.scrollLeft / (size + GAP)))
       selected = next
+      preview(next)
       if (next !== options.current.index) options.current.onSelect(next)
     }
     const scheduleIdle = () => {
@@ -64,11 +72,18 @@ export function useChartSwipe({ index, count, onSelect, onDragStart, ignoreTarge
       // snap timing or a per-frame React update.
       idle = window.setTimeout(finish, SCROLL_IDLE_MS)
     }
-    const scroll = () => { begin(); scheduleIdle() }
+    const scroll = () => {
+      begin()
+      // Change the dash at the majority crossing, even while the finger is
+      // down. This never commits selection or writes a native scroll offset.
+      if (requested === null && viewport.clientWidth === size) preview(bounded(Math.round(viewport.scrollLeft / (size + GAP))))
+      scheduleIdle()
+    }
     navigate.current = (next, immediate = false) => {
       next = bounded(next)
       if (next === selected && !immediate) return
       selected = next
+      preview(next)
       requested = next
       gesture.current = null
       touching = false
@@ -166,5 +181,5 @@ export function useChartSwipe({ index, count, onSelect, onDragStart, ignoreTarge
     event.preventDefault()
     event.stopPropagation()
   }
-  return { viewportRef, onClickCapture }
+  return { viewportRef, onClickCapture, indicatorIndex }
 }

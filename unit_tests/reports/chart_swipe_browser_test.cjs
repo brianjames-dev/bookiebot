@@ -94,6 +94,7 @@ const sameLayout=(actual,expected)=>{for(const key of Object.keys(expected))if(A
   }
   await select(page,'Category Mix');const viewport=page.locator('.bb-chart-carousel'),stage=(await page.locator('.bb-chart-carousel-band').boundingBox()).height
   const ownership=await viewport.evaluate(el=>({overflow:getComputedStyle(el).overflowX,snap:getComputedStyle(el).scrollSnapType,touch:getComputedStyle(el).touchAction,transform:getComputedStyle(el.firstElementChild).transform,animations:el.firstElementChild.getAnimations().length,scrollWidth:el.scrollWidth,width:el.clientWidth}))
+  const indicatorDuration=await page.locator('.bb-chart-carousel-dot > span').first().evaluate(el=>getComputedStyle(el).transitionDuration.split(',').map(parseFloat));assert.ok(indicatorDuration.every(duration=>duration<=.12),'Dash response must not trail the live page crossing with a long transition')
   assert.equal(ownership.overflow,'auto');assert.equal(ownership.snap,'x mandatory');assert.equal(ownership.touch,'auto');assert.equal(ownership.transform,'none');assert.equal(ownership.animations,0);assert.equal(ownership.scrollWidth,4*ownership.width+48);cases++
   await checkTitleMask(page,width,dark);cases++
   // Untrusted events cannot invoke native panning. Verify passive arbitration
@@ -105,6 +106,8 @@ const sameLayout=(actual,expected)=>{for(const key of Object.keys(expected))if(A
    assert.equal(await touch(page,target,'touchstart',300),false);assert.equal(await touch(page,target,'touchmove',30),false)
    assert.equal(await viewport.evaluate(el=>el.scrollLeft),0,'JS touch handlers never move the track')
    await viewport.evaluate(el=>{el.style.scrollSnapType='none';el.scrollTo({left:270,behavior:'instant'})})
+   await page.waitForFunction(index=>document.querySelectorAll('.bb-chart-carousel-dot')[index].dataset.state==='active',Math.round(270/(width+16)))
+   assert.equal(await title(page),'Category Mix','Only the indicator previews during a held drag; selection remains native')
    const dragged=await headingLayout(page)
    assert.ok(Math.abs(dragged.title[0]-origin.title[0]+270)<1);assert.ok(Math.abs(dragged.content[0]-origin.content[0]+270)<1)
    assert.deepEqual(dragged.dots,origin.dots);assert.equal(dragged.font,origin.font)
@@ -137,7 +140,7 @@ const sameLayout=(actual,expected)=>{for(const key of Object.keys(expected))if(A
   await snapped(page,2);cases++
   if(engineName==='chromium'&&width===390){
    const cdp=await page.context().newCDPSession(page)
-   await select(page,'Category Mix');await nativeDrag(page,cdp,host,-310,{startX:width-40});await snapped(page,1);native++
+   await select(page,'Category Mix');await nativeDrag(page,cdp,host,-310,{startX:width-40,hold:true});await page.waitForFunction(()=>document.querySelectorAll('.bb-chart-carousel-dot')[1].dataset.state==='active');assert.equal(await title(page),'Category Mix','The dash crosses to Burn Rate before the finger releases');await cdp.send('Input.dispatchTouchEvent',{type:'touchEnd',touchPoints:[]});await snapped(page,1);native++
    for(const target of ['#bb-chart-category .bb-chart-carousel-title','.bb-category-pie-center','#bb-chart-category .recharts-sector','.bb-contour-label rect','.bb-category-pie-host']){
     await select(page,'Category Mix')
     if(target.includes('contour')){if(await page.getByRole('button',{name:'Show category callouts',exact:true}).count())await page.getByRole('button',{name:'Show category callouts',exact:true}).tap();await page.waitForTimeout(800)}

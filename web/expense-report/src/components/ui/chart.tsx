@@ -81,6 +81,16 @@ function ChartContainer({
     setInteractionRevision((revision) => revision + 1)
   }, [dismissRevision])
 
+  const handleKeyDownCapture = React.useCallback((event: React.KeyboardEvent<HTMLDivElement>) => {
+    const target = event.target as Element | null
+    if (!target?.matches?.(".recharts-surface") || !["ArrowLeft", "ArrowRight", "Enter"].includes(event.key)) return
+    // Keyboard inspection is a fresh interaction, just like a deliberate tap.
+    // Let Recharts handle the key without also scrolling its native carousel.
+    if (event.key !== "Enter") event.preventDefault()
+    releasedDismissRevisionRef.current = dismissRevision
+    setInteractionRevision((revision) => revision + 1)
+  }, [dismissRevision])
+
   return (
     <ChartContext.Provider value={config}>
       <ChartInteractionContext.Provider value={interactionRevision}>
@@ -92,6 +102,7 @@ function ChartContainer({
           onMouseEnter={handleMouseEnter}
           onMouseMove={handleMouseMove}
           onPointerDownCapture={handlePointerDownCapture}
+          onKeyDownCapture={handleKeyDownCapture}
         >
           <ChartStyle id={resolvedId} config={config} />
           {children}
