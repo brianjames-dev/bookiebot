@@ -41,7 +41,7 @@ const bundlePromise=req('esbuild').build({stdin:{resolveDir:frontend,loader:'tsx
     })
     assert.ok(colors.grids.length>=2,name+' has dotted guides')
     assert.ok(colors.grids.every(stroke=>stroke===colors.grey),JSON.stringify({name,...colors}))
-    if(name==='burn'){assert.equal(colors.zero.stroke,colors.foreground,JSON.stringify(colors));assert.equal(colors.zero.opacity,'1');assert.notEqual(colors.zero.stroke,colors.grey)}
+    if(name==='burn'){assert.equal(colors.zero.stroke,colors.grey,JSON.stringify(colors));assert.equal(colors.zero.opacity,'1');assert.notEqual(colors.zero.stroke,colors.foreground)}
     cases++
    }
    assert.deepEqual(errors,[])
@@ -49,5 +49,5 @@ const bundlePromise=req('esbuild').build({stdin:{resolveDir:frontend,loader:'tsx
    await page.close()
   }}finally{await browser.close()}
  }
- console.log(cases+' Chromium/WebKit chart cases passed: grey horizontal/vertical grids and full-contrast Burn Rate zero baseline, both themes/mobile/desktop')
+ console.log(cases+' Chromium/WebKit chart cases passed: grey horizontal/vertical grids and matching Burn Rate zero baseline, both themes/mobile/desktop')
 })().catch(error=>{console.error(error);process.exitCode=1})
