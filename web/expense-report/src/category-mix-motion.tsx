@@ -1,7 +1,16 @@
-import { useLayoutEffect, type CSSProperties, type ReactNode, type RefObject } from "react"
+import { useLayoutEffect, useRef, type CSSProperties, type ReactNode, type RefObject } from "react"
 
 // Tune the maximum time between the first and last stem launch here.
 export const CATEGORY_CALLOUT_CASCADE_MS = 240
+export const CATEGORY_RING_DURATION_MS = 320
+export const CATEGORY_RING_REVEAL_MS = 200
+
+// A lightly underdamped settle: fast arrival, about 3% overshoot, exact endpoints.
+// Recharts owns this clock, including snapshots when a gesture reverses it.
+export function categoryRingSpring(t: number) {
+  if (t <= 0 || t >= 1) return Math.max(0, Math.min(1, t))
+  return 1 - Math.exp(-9 * t) * (Math.cos(8 * t) + 9 / 8 * Math.sin(8 * t))
+}
 
 type RingGeometry = { cx: number; cy: number; innerRadius: number; outerRadius: number }
 type CenterStyle = CSSProperties & { "--bb-category-center-number-size": string }
@@ -42,19 +51,23 @@ export function createCategoryCalloutCascade(ids: string[], windowMs = CATEGORY_
   return new Map(order.map((id, i) => [id, times[i]]))
 }
 
-export function useCategoryCalloutFireworks(ref: RefObject<SVGSVGElement | null>, active: boolean, identity: string) {
+export function useCategoryCalloutFireworks(ref: RefObject<SVGSVGElement | null>, active: boolean, identity: string, onExitComplete?: () => void) {
+  const cascade = useRef(new Map<string, number>())
   useLayoutEffect(() => {
     const svg = ref.current
     if (!svg) return
     const media = window.matchMedia("(prefers-reduced-motion: reduce)")
     const nodes = [...svg.querySelectorAll<SVGElement>(".bb-contour-stem, .bb-contour-label")]
-    const delay = active ? createCategoryCalloutCascade([...svg.querySelectorAll<SVGElement>(".bb-contour-label")].map(node => node.dataset.category!)) : new Map<string, number>()
+    if (active) cascade.current = createCategoryCalloutCascade([...svg.querySelectorAll<SVGElement>(".bb-contour-label")].map(node => node.dataset.category!))
+    const delay = cascade.current
     // Batch reads before writes. Cleanup freezes an interrupted animation into
     // inline styles, so reversing starts from the currently painted frame.
     const snapshots = nodes.map(node => {
       const style = getComputedStyle(node)
       return { opacity: style.opacity, transform: style.transform, strokeDashoffset: style.strokeDashoffset }
     })
+    const lastVisibleLaunch = Math.max(0, ...nodes.flatMap((node, i) => Number(snapshots[i].opacity) > 0 ? [delay.get(node.dataset.category!) ?? 0] : []))
+    svg.style.opacity = active || snapshots.some(frame => Number(frame.opacity) > 0) ? "1" : "0"
     const animations: { node: SVGElement; animation: Animation; stem: boolean }[] = []
     nodes.forEach((node, i) => {
       const stem = node.classList.contains("bb-contour-stem"), from = snapshots[i]
@@ -68,17 +81,31 @@ export function useCategoryCalloutFireworks(ref: RefObject<SVGSVGElement | null>
           { opacity: from.opacity, transform: Number(from.opacity) === 0 ? hidden : from.transform, offset: 0, easing: "cubic-bezier(.12,.8,.2,1)" },
           { opacity: 1, transform: "translate(0px, 0px) scale(1.055)", offset: .72, easing: "ease-out" },
           to,
+        ] : Number(from.opacity) > .95 ? [
+          { opacity: from.opacity, transform: from.transform, offset: 0, easing: "ease-out" },
+          { opacity: 1, transform: "translate(0px, 0px) scale(1.035)", offset: .16, easing: "cubic-bezier(.55,0,.9,.35)" },
+          to,
         ] : [{ opacity: from.opacity, transform: from.transform }, to]
       const animation = node.animate(frames, {
-        duration: active ? stem ? 170 : 320 : 160,
-        delay: active ? (delay.get(node.dataset.category!) ?? 0) + (stem ? 0 : 110) : 0,
-        easing: !active ? "ease-out" : stem ? "cubic-bezier(.12,.8,.2,1)" : "linear", fill: "both",
+        duration: stem ? 170 : active ? 320 : 200,
+        delay: active ? (delay.get(node.dataset.category!) ?? 0) + (stem ? 0 : 110)
+          : Math.max(0, lastVisibleLaunch - (delay.get(node.dataset.category!) ?? 0)) + (stem ? 60 : 0),
+        easing: stem ? active ? "cubic-bezier(.12,.8,.2,1)" : "cubic-bezier(.8,0,.88,.2)" : "linear", fill: "both",
       })
       animations.push({ node, animation, stem })
     })
     const finish = () => { if (media.matches) for (const { animation } of animations) animation.finish() }
     media.addEventListener("change", finish)
+    let disposed = false
+    // Keep the compact ring and SVG present until every visible pair retracts.
+    // Cancellation rejects finished; an interrupted exit must never grow the ring.
+    const complete = () => {
+      if (!active && !disposed) { svg.style.opacity = "0"; onExitComplete?.() }
+    }
+    if (animations.length) Promise.all(animations.map(({ animation }) => animation.finished)).then(complete, () => {})
+    else complete()
     return () => {
+      disposed = true
       const current = animations.map(({ node, stem }) => {
         if (!node.isConnected) return null
         const style = getComputedStyle(node)
@@ -87,5 +114,5 @@ export function useCategoryCalloutFireworks(ref: RefObject<SVGSVGElement | null>
       animations.forEach(({ node, animation }, i) => { if (current[i]) Object.assign(node.style, current[i]); animation.cancel() })
       media.removeEventListener("change", finish)
     }
-  }, [ref, active, identity])
+  }, [ref, active, identity, onExitComplete])
 }

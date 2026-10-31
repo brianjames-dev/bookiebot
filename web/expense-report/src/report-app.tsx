@@ -16,7 +16,7 @@ import { createPortal } from "react-dom"
 import { ChevronDown, X } from "lucide-react"
 import { Popover } from "konsta/react"
 import { useCategoryContour, CategoryContourCallouts } from "./category-mix-contour"
-import { categoryCenterStyle, CategoryRingCenterSync } from "./category-mix-motion"
+import { categoryCenterStyle, categoryRingSpring, CategoryRingCenterSync } from "./category-mix-motion"
 import { CONTOUR_PADDING_ANGLE } from "./category-mix-layout"
 import { burnRateBalance, burnRateTooltipOccluders, positionBurnRateTooltip } from "./burn-rate-tooltip"
 import { useChartSwipe } from "./chart-swipe"
@@ -1723,8 +1723,14 @@ const CategoryMixChart = memo(function CategoryMixChart({
   const ringData = [...chartData.filter(item => item.key !== "left"), ...chartData.filter(item => item.key === "left")]
   const [pieHostRef, pieHostSize] = useElementSize<HTMLDivElement>()
   const [showCallouts, setShowCallouts] = useState(false)
+  const [ringCompact, setRingCompact] = useState(false)
+  const finishCalloutExit = useCallback(() => setRingCompact(false), [])
+  const toggleCallouts = () => {
+    if (!showCallouts) setRingCompact(true)
+    setShowCallouts(shown => !shown)
+  }
   const centerRef = useRef<HTMLButtonElement>(null)
-  const pieLayout = useExpensePieLayout(ringData, pieHostSize, showCallouts)
+  const pieLayout = useExpensePieLayout(ringData, pieHostSize, ringCompact)
   // After mounting, the painted sector owns these styles. A new React target
   // must not overwrite the current label before the next native ring frame.
   const initialCenterStyle = useRef(categoryCenterStyle(pieLayout)).current
@@ -1760,11 +1766,11 @@ const CategoryMixChart = memo(function CategoryMixChart({
             hostRef={pieHostRef}
             layout={pieLayout}
             showCallouts={showCallouts}
-            onToggle={() => setShowCallouts(shown => !shown)}
+            onToggle={toggleCallouts}
           >
             <CategoryMixPieSurface data={ringData} layout={pieLayout} centerRef={centerRef} onInspect={onInspect} />
-            <CategoryContourCallouts scene={pieLayout.contour} data={ringData} ready={pieLayout.calloutsReady} visible={showCallouts} onInspect={onInspect} />
-            <button ref={centerRef} type="button" className="bb-category-pie-center" aria-label={showCallouts ? "Hide category callouts" : "Show category callouts"} aria-pressed={showCallouts} onClick={() => setShowCallouts(shown => !shown)} style={ringData.some(item => item.amount > 0) ? initialCenterStyle : categoryCenterStyle(pieLayout)} aria-live="polite">
+            <CategoryContourCallouts scene={pieLayout.contour} data={ringData} ready={pieLayout.calloutsReady} visible={showCallouts} onInspect={onInspect} onExitComplete={showCallouts ? undefined : finishCalloutExit} />
+            <button ref={centerRef} type="button" className="bb-category-pie-center" aria-label={showCallouts ? "Hide category callouts" : "Show category callouts"} aria-pressed={showCallouts} onClick={toggleCallouts} style={ringData.some(item => item.amount > 0) ? initialCenterStyle : categoryCenterStyle(pieLayout)} aria-live="polite">
               <FittedAmount className="bb-category-used">{selectedBudget > 0 ? `${Number(usedPercent.toFixed(1))}%` : "—"}</FittedAmount>
               <span>{selectedBudget > 0 ? usedLabel : "no budget"}</span>
             </button>
@@ -1848,8 +1854,8 @@ const CategoryMixPieSurface = memo(function CategoryMixPieSurface({ data, layout
             isAnimationActive={!reducedMotion}
             animationInterpolateFn={categoryRingAnimation}
             animationBegin={0}
-            animationDuration={520}
-            animationEasing="ease-out"
+            animationDuration={layout.animationDuration ?? 520}
+            animationEasing={layout.spring ? categoryRingSpring : "ease-out"}
             label={false}
             labelLine={false}
           >
@@ -2137,7 +2143,8 @@ type ExpensePieLayout = ReturnType<typeof useExpensePieLayout>
 function expensePieLayoutsEqual(previous: ExpensePieLayout, next: ExpensePieLayout) {
   // Worker completion changes callouts, not the sector animation target.
   return previous.cx === next.cx && previous.cy === next.cy &&
-    previous.innerRadius === next.innerRadius && previous.outerRadius === next.outerRadius
+    previous.innerRadius === next.innerRadius && previous.outerRadius === next.outerRadius &&
+    previous.spring === next.spring && previous.animationDuration === next.animationDuration
 }
 
 

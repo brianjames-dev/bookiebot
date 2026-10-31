@@ -1,8 +1,8 @@
 const assert=require('node:assert/strict'),fs=require('node:fs'),path=require('node:path'),vm=require('node:vm'),{createRequire}=require('node:module')
 const req=createRequire(path.resolve('web/expense-report/package.json')),ts=req('typescript'),React=req('react'),Renderer=req('react-test-renderer')
 global.IS_REACT_ACT_ENVIRONMENT=true
-const workers=[], timers=new Map();let serial=0
-const window={matchMedia:()=>({matches:false}),setTimeout(fn){const id=++serial;timers.set(id,fn);return id},clearTimeout(id){timers.delete(id)}}
+const workers=[], waits=[], timers=new Map();let serial=0
+const window={matchMedia:()=>({matches:false}),setTimeout(fn,ms){waits.push(ms);const id=++serial;timers.set(id,fn);return id},clearTimeout(id){timers.delete(id)}}
 const flush=()=>{const pending=[...timers.values()];timers.clear();act(()=>pending.forEach(fn=>fn()))}
 class Worker {
  constructor(url,options){this.url=url;this.options=options;this.stopped=0;workers.push(this)}
@@ -31,6 +31,7 @@ try {
  assert.equal(tree.root.findByType('output').props.layout.cy,182,'Hidden ring moves 16px above the plot center');
  act(()=>tree.update(React.createElement(Host,{data,size,shown:true})))
  assert.equal(tree.root.findByType('output').props.layout.outerRadius,109.5,'Showing callouts uses the compact Refined flow ring');
+ assert.equal(waits.at(-1),200,'A ring-only toggle hands off to stems before the spring tail finishes');assert.equal(tree.root.findByType('output').props.layout.animationDuration,320);assert.equal(tree.root.findByType('output').props.layout.spring,true)
  assert.match(workers[0].scene.items[0].amountLabel,/\$13 \/ 100%/,'Callouts include the ring percentage beside whole-dollar amounts');
  assert.equal(workers.length,1,'Toggling uses the same background worker, without restarting geometry');
  assert.equal(workers.length,1);assert.equal(workers[0].url,'/app/assets/category-mix-layout-test.js');assert.equal(workers[0].options.type,'module')
@@ -42,6 +43,7 @@ try {
  assert.ok(first.stopped,'A completed worker is disposed')
  act(()=>tree.update(React.createElement(Host,{data:[{...data[0],amount:25}],size})))
  assert.equal(tree.root.findByType('output').props.layout.calloutsReady,false,'Callouts wait for the existing sector morph')
+ assert.equal(waits.at(-1),520,'Changed financial rows retain the full original angle morph');assert.equal(tree.root.findByType('output').props.layout.animationDuration,520);assert.equal(tree.root.findByType('output').props.layout.spring,false)
  const second=workers[1]
  act(()=>tree.update(React.createElement(Host,{data:[{...data[0],key:'rent',label:'Rent',amount:800}],size})))
  const third=workers[2]
@@ -81,6 +83,8 @@ const geometry={cx:195,cy:178,innerRadius:84,outerRadius:110}
 assert.equal(equality.exports.equal({...geometry,contour:{routes:null}},{...geometry,contour:{routes:[{}]}}),true,'Worker completion must not restart the unchanged sector morph')
 assert.equal(equality.exports.equal(geometry,{...geometry,outerRadius:105}),false,'A real host resize still updates sector geometry')
 
+assert.equal(equality.exports.equal({...geometry,spring:true,animationDuration:320},{...geometry,spring:false,animationDuration:520}),false,'The surface updates its native clock when the motion kind changes')
+
 const {CategoryContourCallouts}=runtime.exports
 const calls=[]
 const scene={cx:195,cy:198,width:390,height:396,style:{labelSize:12,calloutRadius:18},routes:[],curvedRoutes:[],items:[{id:'food',name:'Eating out',amountLabel:'$13 / 100%',x:20,y:25,width:110,height:34,padding:4,lineHeight:13,valueSize:12}]}
@@ -88,6 +92,7 @@ try{
  act(()=>{tree=Renderer.create(React.createElement(CategoryContourCallouts,{scene,data,ready:true,visible:true,onInspect:item=>calls.push(item)}))})
  let card=tree.root.findByProps({role:'button'})
  assert.equal(card.props.tabIndex,0);assert.match(card.props['aria-label'],/Food.*100% of ring/)
+ let focused=0;card.props.onFocus({currentTarget:{getAnimations:()=>[{finish(){focused++}}]}});assert.equal(focused,1,'Keyboard focus resolves a delayed pop through its animation owner, without a competing CSS transform')
  card.props.onClick();assert.equal(calls.pop(),data[0],'A callout opens the exact same current category as its slice')
  for(const key of ['Enter',' ']){let prevented=false;card.props.onKeyDown({key,preventDefault(){prevented=true}});assert.ok(prevented);assert.equal(calls.pop(),data[0])}
  act(()=>tree.update(React.createElement(CategoryContourCallouts,{scene,data,ready:true,visible:false,onInspect:item=>calls.push(item)})))

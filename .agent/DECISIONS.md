@@ -1,5 +1,11 @@
 # Agent Decisions
 
+## 2026-10-31 - Faster Category Spring And Reverse Fireworks
+
+For geometry-only Category Mix toggles, keep the native Recharts interpolation owner but use a 320ms damped spring with about 3% overshoot. Start stems at 200ms, during the near-settled tail, instead of waiting 520ms. Preserve the existing 520ms ease-out for data/angle changes. The center label still reads the same painted geometry, including interrupted and overshoot frames.
+
+Save each reveal’s random pair delays and unwind their order on close. Cards briefly reverse their pop and contract; stems retract from the cards toward the ring. Skip unlaunched pairs, preserve partially painted frames on interruption, and keep the SVG/ring compact until all visible exit animations actually finish. A cancellable completion callback releases the ring’s native expansion; reopening cancels that callback and resumes immediately without another shrink. Remove the old parent fade so it cannot truncate retraction. Keyboard focus finishes a pending card pop through its animation owner instead of forcing opacity/transform with CSS, so focus cannot block exit. Keep the configurable 240ms cascade window, reduced-motion bypass, solved geometry, inspection, swipe arbitration, section height and financial values. Native acceptance is checklist 210; this refines 209’s timing/exit only. No Finance Ops or persistence change.
+
 ## 2026-10-30 - Synchronize Category Ring Text And Firework Callouts
 
 The center label takes its position, size and typography from the same interpolated geometry that paints the first native sector, including interrupted reversals. Give its line box an explicit interpolated height and retain one style owner after mount; separate CSS transitions or React target writes must not race the ring’s animation frame. Preserve both approved settled styles and the existing ring interpolation.

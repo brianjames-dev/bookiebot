@@ -1,5 +1,5 @@
-import { useEffect, useMemo, useRef, useState, type CSSProperties } from "react"
-import { CATEGORY_CALLOUT_CASCADE_MS, useCategoryCalloutFireworks } from "./category-mix-motion"
+import { useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties } from "react"
+import { CATEGORY_CALLOUT_CASCADE_MS, CATEGORY_RING_DURATION_MS, CATEGORY_RING_REVEAL_MS, useCategoryCalloutFireworks } from "./category-mix-motion"
 import layoutWorkerUrl from "./category-mix-layout.worker.ts?worker&url"
 import { CONTOUR_STYLE, contourLabel, prepareContourScene, type ContourScene } from "./category-mix-layout"
 import type { BreakdownItem } from "./types"
@@ -33,15 +33,17 @@ export function useCategoryContour(data: BreakdownItem[], size: {width: number; 
   const cached = cache.get(key)
   // Each new target gets its own identity, including a reversal back to the
   // last settled view. Its old readiness cannot launch stems during a new morph.
-  const motionTarget = useMemo(() => ({key, showCallouts}), [key, showCallouts])
+  const committedTarget = useRef({key, showCallouts})
+  const motionTarget = useMemo(() => ({key, showCallouts, spring: committedTarget.current.key === key && committedTarget.current.showCallouts !== showCallouts}), [key, showCallouts])
+  useLayoutEffect(() => { committedTarget.current = motionTarget }, [motionTarget])
   const [settledTarget, setSettledTarget] = useState(motionTarget)
   useEffect(() => {
     if (settledTarget === motionTarget) return
-    // Callouts describe final slice angles. Let the existing 520ms sector
-    // morph finish before revealing them, including instant cache hits.
+    // Geometry-only toggles arrive quickly and retain a small spring tail.
+    // Data/angle changes still need their original full 520ms settlement.
     const reduced = typeof window === "undefined" || window.matchMedia("(prefers-reduced-motion: reduce)").matches
     if (reduced) { setSettledTarget(motionTarget); return }
-    const timer = window.setTimeout(() => setSettledTarget(motionTarget), 520)
+    const timer = window.setTimeout(() => setSettledTarget(motionTarget), motionTarget.spring ? CATEGORY_RING_REVEAL_MS : 520)
     return () => window.clearTimeout(timer)
   }, [motionTarget])
   useEffect(() => {
@@ -74,13 +76,14 @@ export function useCategoryContour(data: BreakdownItem[], size: {width: number; 
     innerRadius: showCallouts ? scene.inner : Math.max(8, radius - 48),
     margin: {top: 0, right: 0, bottom: 0, left: 0}, containerPadding: scene.style.inset,
     showLabels: false, contour: scene, contourKey: key, calloutsReady: settledTarget === motionTarget,
+    spring: motionTarget.spring, animationDuration: motionTarget.spring ? CATEGORY_RING_DURATION_MS : 520,
   }), [scene, key, settledTarget, motionTarget, showCallouts])
 }
 
-export function CategoryContourCallouts({scene, data, ready, visible, onInspect}: {scene: ContourScene; data: BreakdownItem[]; ready: boolean; visible: boolean; onInspect: (item: BreakdownItem) => void}) {
+export function CategoryContourCallouts({scene, data, ready, visible, onInspect, onExitComplete}: {scene: ContourScene; data: BreakdownItem[]; ready: boolean; visible: boolean; onInspect: (item: BreakdownItem) => void; onExitComplete?: () => void}) {
   const ref = useRef<SVGSVGElement>(null)
   const active = visible && ready && Boolean(scene.routes)
-  useCategoryCalloutFireworks(ref, active, JSON.stringify(scene.items.map(item => item.id)))
+  useCategoryCalloutFireworks(ref, active, JSON.stringify(scene.items.map(item => item.id)), onExitComplete)
   const colors = new Map(data.map(item => [item.key, item.color]))
   return (
     <svg ref={ref} className="bb-contour-callouts" viewBox={`0 0 ${scene.width} ${scene.height}`} width={scene.width} height={scene.height} aria-hidden={!active} data-visible={visible} data-ready={ready && Boolean(scene.routes)} data-cascade-window={CATEGORY_CALLOUT_CASCADE_MS}>
@@ -94,6 +97,7 @@ export function CategoryContourCallouts({scene, data, ready, visible, onInspect}
         return <g key={item.id} className="bb-contour-label" data-category={item.id} role="button" tabIndex={active ? 0 : -1}
           style={{ transformOrigin: `${x}px ${item.y}px`, "--bb-contour-from-x": `${(scene.cx - x) / distance * 10}px`, "--bb-contour-from-y": `${(scene.cy - item.y) / distance * 10}px` } as CSSProperties}
           aria-label={`Inspect ${target.label}, ${money.format(target.amount)}, ${percent.format(target.percentage)}% of ring`}
+          onFocus={event => { event.currentTarget.getAnimations().forEach(animation => animation.finish()) }}
           onClick={() => onInspect(target)} onKeyDown={event => { if (event.key === "Enter" || event.key === " ") { event.preventDefault(); onInspect(target) } }}>
           <rect x={item.x} y={top} width={item.width} height={item.height} rx={Math.min(scene.style.calloutRadius, item.height / 2)} />
           <text className="bb-contour-name" textAnchor="middle" x={x} y={top + item.padding + scene.style.labelSize} fontSize={scene.style.labelSize} fill={item.id === "left" ? undefined : colors.get(item.id)}>{item.name}</text>

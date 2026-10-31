@@ -25,21 +25,21 @@ for(const view of Object.values(report.modeViews)) {
 }
 async function startMotionSamples(category){
  await category.evaluate(el=>{
-  window.__categoryMotion={running:true,frames:[]}
+  window.__categoryMotion={running:true,frames:[],start:null};el.querySelector('.bb-category-pie-center').addEventListener('click',()=>{window.__categoryMotion.start=performance.now()},{once:true})
   const sample=()=>{
    const state=window.__categoryMotion;if(!state.running)return
    const path=el.querySelector('.recharts-sector'),d=path?.getAttribute('d')??'',move=d.match(/^M(-?[\d.]+),(-?[\d.]+)A/),arcs=[...d.matchAll(/A([\d.]+),/g)]
    if(move&&arcs.length>=2){
     const outer=+arcs[0][1],inner=+arcs[1][1],point=new DOMPoint(+move[1],+move[2]+outer).matrixTransform(path.getScreenCTM()),button=el.querySelector('.bb-category-pie-center'),box=button.getBoundingClientRect(),number=el.querySelector('.bb-category-used'),text=number.getBoundingClientRect(),style=getComputedStyle(button)
-    state.frames.push({x:box.x+box.width/2,y:box.y+box.height/2,ringX:point.x,ringY:point.y,outer,inner,height:box.height,numberHeight:text.height,numberCenter:text.y+text.height/2,font:parseFloat(getComputedStyle(number).fontSize),caption:parseFloat(style.fontSize),gap:parseFloat(style.gap),draw:[...el.querySelectorAll('.bb-contour-stem')].some(n=>{const d=parseFloat(getComputedStyle(n).strokeDashoffset);return d>0&&d<1}),pop:[...el.querySelectorAll('.bb-contour-label')].some(n=>{const a=+getComputedStyle(n).opacity;return a>0&&a<1})})
+    state.frames.push({elapsed:state.start===null?null:performance.now()-state.start,paint:+getComputedStyle(el.querySelector('.bb-contour-callouts')).opacity,calloutAlpha:Math.max(0,...[...el.querySelectorAll('.bb-contour-stem,.bb-contour-label')].map(n=>+getComputedStyle(n).opacity)),x:box.x+box.width/2,y:box.y+box.height/2,ringX:point.x,ringY:point.y,outer,inner,height:box.height,numberHeight:text.height,numberCenter:text.y+text.height/2,font:parseFloat(getComputedStyle(number).fontSize),caption:parseFloat(style.fontSize),gap:parseFloat(style.gap),draw:[...el.querySelectorAll('.bb-contour-stem')].some(n=>{const d=parseFloat(getComputedStyle(n).strokeDashoffset);return d>0&&d<1}),pop:[...el.querySelectorAll('.bb-contour-label')].some(n=>{const a=+getComputedStyle(n).opacity;return a>0&&a<1})})
    }
    requestAnimationFrame(sample)
   };sample()
  })
 }
-async function checkMotionSamples(category){
+async function checkMotionSamples(category,morph=true){
  const frames=await category.evaluate(()=>{window.__categoryMotion.running=false;return window.__categoryMotion.frames})
- assert.ok(frames.length>12);assert.ok(new Set(frames.map(f=>Math.round(f.outer))).size>5,'The native ring visibly morphs through intermediate geometry')
+ assert.ok(frames.length>12);if(morph)assert.ok(new Set(frames.map(f=>Math.round(f.outer))).size>5,'The native ring visibly morphs through intermediate geometry')
  for(const f of frames){
   assert.ok(Math.hypot(f.x-f.ringX,f.y-f.ringY)<.8,JSON.stringify({message:'Center text follows the actual sector frame without jumping ahead or lagging',f}))
   const mix=Math.max(0,Math.min(1,(f.outer-f.inner-26)/22)),number=24+6*mix,caption=11+mix,gap=4*mix
@@ -47,15 +47,16 @@ async function checkMotionSamples(category){
   assert.ok(Math.abs(f.numberHeight-number*1.1)<.2&&Math.abs(f.height-(number*1.1+caption*1.5+gap+16))<.2,JSON.stringify(f))
   assert.ok(Math.abs(f.numberCenter-f.y+(caption*1.5+gap)/2)<.3,JSON.stringify({message:'The center number never pops within its changing box',f}))
  }
- assert.ok(frames.some(f=>f.draw),'Stems visibly draw out rather than appearing fully formed');assert.ok(frames.some(f=>f.pop),'Cards visibly expand from zero opacity')
+ assert.ok(frames.some(f=>f.draw),'Stems visibly draw out rather than appearing fully formed');assert.ok(frames.some(f=>f.pop),'Cards visibly expand from zero opacity');return frames
 }
-async function checkCascade(category,reduced){
+async function checkCascade(category,reduced,fresh=true){
  const launch=await category.locator('.bb-contour-callouts').evaluate(svg=>({window:+svg.dataset.cascadeWindow,cssClockFree:[...svg.querySelectorAll('.bb-contour-stem,.bb-contour-label')].every(n=>getComputedStyle(n).transitionProperty==='none'),stems:[...svg.querySelectorAll('.bb-contour-stem')].map(n=>({id:n.dataset.category,length:n.getAttribute('pathLength')})),motions:svg.getAnimations({subtree:true}).filter(a=>a.effect?.target?.matches('.bb-contour-stem,.bb-contour-label')).map(a=>({id:a.effect.target.dataset.category,stem:a.effect.target.classList.contains('bb-contour-stem'),delay:a.effect.getTiming().delay,duration:a.effect.getTiming().duration,frames:a.effect.getKeyframes()}))}))
  assert.ok(launch.stems.every(s=>s.length==='1'));assert.ok(launch.cssClockFree,'No competing CSS transition clock, including the global reduced-motion duration')
- if(reduced){assert.equal(launch.motions.length,0,JSON.stringify(launch));return}
+ if(reduced){assert.equal(launch.motions.length,0,JSON.stringify(launch));return launch}
  const stems=launch.motions.filter(m=>m.stem),cards=launch.motions.filter(m=>!m.stem);assert.equal(stems.length,launch.stems.length);assert.equal(cards.length,stems.length)
  const delays=stems.map(m=>m.delay);assert.equal(Math.min(...delays),0);assert.ok(Math.max(...delays)<=launch.window);if(stems.length>1)assert.equal(Math.max(...delays),launch.window)
- for(const stem of stems){const card=cards.find(m=>m.id===stem.id);assert.ok(card.delay>stem.delay&&card.delay<stem.delay+stem.duration);assert.equal(parseFloat(stem.frames[0].strokeDashoffset),1);assert.equal(parseFloat(stem.frames.at(-1).strokeDashoffset),0)}
+ for(const stem of stems){const card=cards.find(m=>m.id===stem.id);assert.ok(card.delay>stem.delay&&card.delay<stem.delay+stem.duration);if(fresh)assert.equal(parseFloat(stem.frames[0].strokeDashoffset),1);else assert.ok(parseFloat(stem.frames[0].strokeDashoffset)>=0&&parseFloat(stem.frames[0].strokeDashoffset)<=1);assert.equal(parseFloat(stem.frames.at(-1).strokeDashoffset),0)}
+ return launch
 }
 ;(async()=>{
  let count=0
@@ -63,7 +64,8 @@ async function checkCascade(category,reduced){
   const browser=await engine.launch({headless:true})
   try {
    for(const width of ((process.env.BOOKIEBOT_CONTOUR_PREVIEW||process.env.BOOKIEBOT_CONTOUR_FINAL)?[390]:[320,390,1280]))for(const dark of (process.env.BOOKIEBOT_CONTOUR_PREVIEW?[true]:[false,true])) {
-    const page=await browser.newPage({viewport:{width,height:900},hasTouch:true,colorScheme:dark?'dark':'light',reducedMotion:dark?'reduce':'no-preference'}),errors=[],unexpected=[]
+    const reduced=process.env.BOOKIEBOT_CONTOUR_MOTION==='normal'?false:dark
+    const page=await browser.newPage({viewport:{width,height:900},hasTouch:true,colorScheme:dark?'dark':'light',reducedMotion:reduced?'reduce':'no-preference'}),errors=[],unexpected=[]
     page.on('pageerror',error=>errors.push(error.message))
     await page.route('**/*',async route=>{
      const url=new URL(route.request().url()),name=url.pathname.split('/').pop()
@@ -80,37 +82,66 @@ async function checkCascade(category,reduced){
     const large=await category.evaluate(el=>{const host=el.querySelector('.bb-category-pie-host').getBoundingClientRect(),center=el.querySelector('.bb-category-pie-center').getBoundingClientRect(),radii=[...el.querySelector('.recharts-sector').getAttribute('d').matchAll(/A([\d.]+),/g)].map(match=>Number(match[1]));return {ring:el.querySelector('.recharts-pie').getBoundingClientRect().width,host:host.width,hostHeight:host.height,outer:radii[0],band:radii[0]-radii[1],offset:center.y+center.height/2-host.y-host.height/2,caption:getComputedStyle(el.querySelector('.bb-category-pie-center')).fontSize,gap:getComputedStyle(el.querySelector('.bb-category-pie-center')).gap,opacity:getComputedStyle(el.querySelector('.bb-contour-callouts')).opacity,font:getComputedStyle(el.querySelector('.bb-category-used')).fontSize}})
     assert.equal(large.opacity,'0','Callouts stay hidden until deliberately requested');assert.equal(large.font,'30px');assert.equal(large.caption,'12px');assert.equal(large.gap,'4px');assert.ok(Math.abs(large.band-48)<.01);assert.ok(Math.abs(large.outer-(Math.min(large.host,large.hostHeight)/2-36))<.2);assert.ok(Math.abs(large.offset+16)<.2,'Hidden ring retains the selected upward offset')
     await category.screenshot({path:`/private/tmp/category-ring-large-${engine.name()}-${width}-${dark?'dark':'light'}.png`})
-    if(!dark)await startMotionSamples(category)
-    await category.getByRole('button',{name:'Show category callouts',exact:true}).click()
-    if(!dark){
+    await category.locator('.bb-contour-label').first().waitFor({state:'attached',timeout:120000})
+    if(!reduced)await startMotionSamples(category)
+    await category.getByRole('button',{name:'Show category callouts',exact:true}).click({force:true})
+    if(!reduced){
      await page.waitForTimeout(100)
      const during=(await category.locator('.recharts-pie').boundingBox()).width
      assert.ok(during<large.ring&&during>150,'The ring visibly interpolates its radius instead of snapping')
-     await category.getByRole('button',{name:'Hide category callouts',exact:true}).click()
+     await category.getByRole('button',{name:'Hide category callouts',exact:true}).click({force:true})
      await page.waitForTimeout(80)
-     await category.getByRole('button',{name:'Show category callouts',exact:true}).click()
+     await category.getByRole('button',{name:'Show category callouts',exact:true}).click({force:true})
     }
     await category.locator('.bb-contour-callouts[data-ready="true"]').waitFor({timeout:120000})
-    await checkCascade(category,dark)
+    await checkCascade(category,reduced,false)
     await page.waitForTimeout(740)
-    if(!dark)await checkMotionSamples(category)
-    if(!dark){
+    if(!reduced)await checkMotionSamples(category)
+    if(!reduced){
      await startMotionSamples(category)
-     await category.getByRole('button',{name:'Hide category callouts',exact:true}).click()
+     await category.getByRole('button',{name:'Hide category callouts',exact:true}).click({force:true})
      await page.waitForTimeout(90)
-     await category.getByRole('button',{name:'Show category callouts',exact:true}).click()
-     assert.equal(await category.locator('.bb-contour-callouts').getAttribute('data-ready'),'false','Reopening the last settled view cannot reuse readiness while the ring still morphs')
+     await category.getByRole('button',{name:'Show category callouts',exact:true}).click({force:true})
+     assert.equal(await category.locator('.bb-contour-callouts').getAttribute('data-ready'),'true','Reopening during retraction resumes immediately while the ring remains compact')
      await category.locator('.bb-contour-callouts[data-ready="true"]').waitFor()
-     await checkCascade(category,false);await page.waitForTimeout(740);await checkMotionSamples(category)
+     const forward=await checkCascade(category,false,false);await page.waitForTimeout(740);await checkMotionSamples(category,false)
+     await startMotionSamples(category)
+     const compact=(await category.evaluate(el=>+el.querySelector('.recharts-sector').getAttribute('d').match(/A([\d.]+),/)[1]))
+     await category.locator('.bb-contour-label').first().focus()
+     await page.keyboard.press('Tab')
+     assert.equal(await category.locator('.bb-contour-label:focus-visible').count(),1)
+     await category.getByRole('button',{name:'Hide category callouts',exact:true}).evaluate(n=>n.click())
+     const reverse=await category.locator('.bb-contour-callouts').evaluate(svg=>({paint:getComputedStyle(svg).opacity,motions:svg.getAnimations({subtree:true}).filter(a=>a.effect?.target?.matches('.bb-contour-stem,.bb-contour-label')).map(a=>({id:a.effect.target.dataset.category,stem:a.effect.target.classList.contains('bb-contour-stem'),delay:a.effect.getTiming().delay,frames:a.effect.getKeyframes()}))}))
+     assert.equal(reverse.paint,'1','The SVG stays painted for the full reverse cascade')
+     assert.equal(reverse.motions.length,forward.motions.length)
+     for(const old of forward.motions.filter(m=>m.stem)){
+      const stem=reverse.motions.find(m=>m.id===old.id&&m.stem),card=reverse.motions.find(m=>m.id===old.id&&!m.stem)
+      assert.ok(Math.abs(card.delay-(forward.window-old.delay))<.005);assert.ok(Math.abs(stem.delay-card.delay-60)<.005)
+      assert.equal(parseFloat(stem.frames[0].strokeDashoffset),0);assert.equal(parseFloat(stem.frames.at(-1).strokeDashoffset),1)
+      assert.ok(card.frames[1].transform.includes('1.035')&&card.frames.at(-1).transform.includes('.01'))
+     }
+     await page.waitForFunction(()=>getComputedStyle(document.querySelector('#bb-chart-category .bb-contour-callouts')).opacity==='0')
+     await page.waitForTimeout(400)
+     const closeFrames=await checkMotionSamples(category)
+     assert.ok(closeFrames.some(f=>f.outer>large.outer+.15),'Expansion has a subtle spring overshoot too')
+     assert.ok(closeFrames.filter(f=>f.outer>compact+1).every(f=>f.calloutAlpha<.001&&f.paint===0),'The ring expands only after every stem/card has retracted')
+     assert.ok(Math.abs(closeFrames.at(-1).outer-large.outer)<.1)
+     await startMotionSamples(category)
+     await category.getByRole('button',{name:'Show category callouts',exact:true}).click({force:true})
+     await category.locator('.bb-contour-callouts[data-ready="true"]').waitFor()
+     await checkCascade(category,false);await page.waitForTimeout(740)
+     const opening=await checkMotionSamples(category),firstStem=opening.find(f=>f.draw)
+     assert.ok(firstStem&&firstStem.elapsed<350,JSON.stringify({message:'Warm ring reveal no longer waits 520ms before drawing stems',firstStem}))
+     assert.ok(Math.min(...opening.map(f=>f.outer))<compact-.15,'Shrinking retains its gentle spring tail')
     }
     assert.ok((await category.locator('.recharts-pie').boundingBox()).width<large.ring,'The ring shrinks to make room for callouts')
     console.log(engine.name(),width,dark?'dark':'light','first-layout-ms',Date.now()-start)
     const originalHeight=(await page.locator('.bb-chart-carousel-band').boundingBox()).height
     for(const filter of (process.env.BOOKIEBOT_CONTOUR_PREVIEW?['all']:['all','needs','wants','savings'])) {
      await category.getByRole('combobox',{name:'Category mix filter',exact:true}).selectOption(filter)
-     if(!dark&&filter!=='all')assert.equal(await category.locator('.bb-contour-callouts').getAttribute('data-ready'),'false','Final callouts stay hidden while sectors morph')
+     if(!reduced&&filter!=='all')assert.equal(await category.locator('.bb-contour-callouts').getAttribute('data-ready'),'false','Final callouts stay hidden while sectors morph')
      await category.locator('.bb-contour-callouts[data-ready="true"]').waitFor({timeout:120000})
-     await page.waitForTimeout(dark?50:700)
+     await page.waitForTimeout(reduced?50:700)
      const geometry=await category.evaluate(el=>{
       const svg=el.querySelector('.bb-contour-callouts'),host=el.querySelector('.bb-category-pie-host').getBoundingClientRect(),center=el.querySelector('.bb-category-pie-center').getBoundingClientRect(),labels=[...svg.querySelectorAll('.bb-contour-label')],paths=[...svg.querySelectorAll('.bb-contour-stem')]
       const boxes=labels.map(label=>({id:label.dataset.category,box:label.querySelector('rect').getBBox()}))
@@ -148,7 +179,7 @@ async function checkCascade(category,reduced){
     assert.equal(focus.outline,'none');assert.equal(focus.stroke,'none');assert.equal(focus.width,'0px','Touch/dialog focus cannot add a selection stroke')
     const hostBox=await category.locator('.bb-category-pie-host').boundingBox()
     await page.touchscreen.tap(hostBox.x+3,hostBox.y+3)
-    await page.waitForTimeout(700)
+    await page.waitForTimeout(950)
     assert.equal(await category.locator('.bb-category-pie-host').getAttribute('data-callouts'),'false','Tapping empty chart background hides the callouts')
     assert.ok(Math.abs((await category.locator('.recharts-pie').boundingBox()).width-large.ring)<1,'Hiding callouts restores the original full-size ring')
     await page.mouse.move(hostBox.x+3,hostBox.y+3);await page.mouse.down();await page.mouse.move(hostBox.x+3,hostBox.y+40,{steps:6});await page.mouse.up()

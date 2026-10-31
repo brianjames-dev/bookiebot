@@ -79,7 +79,7 @@ const runtime={exports:{},require:req,window:global.window,memo:React.memo,useSt
  CartesianGrid:props=>React.createElement(Recharts.CartesianGrid,{...props,zIndex:0}),
  XAxis:props=>React.createElement(Recharts.XAxis,{...props,zIndex:0}),YAxis:props=>React.createElement(Recharts.YAxis,{...props,zIndex:0}),
  Cell:Recharts.Cell,StablePieSector:ObservedSector,ChartTooltip:()=>null,ChartTooltipContent:()=>null,DailySpendingTooltipContent:()=>null,
- CategoryRingCenterSync:({children})=>children,
+ CategoryRingCenterSync:({children})=>children,categoryRingSpring:t=>t,
  areCategoryMixPieSurfacePropsEqual:()=>false,PIE_METRIC_START_ANGLE:0,PIE_METRIC_END_ANGLE:360,PIE_METRIC_PADDING_ANGLE:1}
 vm.runInNewContext(compiled,runtime)
 function advance(ms=16){now+=ms;const pending=[...frames.values()];frames.clear();Renderer.act(()=>pending.forEach(callback=>callback(now)))}
