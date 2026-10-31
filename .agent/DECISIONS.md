@@ -1,5 +1,11 @@
 # Agent Decisions
 
+## 2026-10-31 - Interpolate Active Graph Drags On The Compositor
+
+Keep the existing coalesced touch sampling and native vertical intent, but bridge each exact sampled track target with a 16ms linear transform animation. Read its presented position before retargeting, grabbing or releasing; cancel the previous owner, use backwards fill to prevent an initial target flash, and cancel queued frames on a fresh touch. Retain the accepted release velocity/spring, resistance, title mask, graph state and click arbitration. Reduce Motion bypasses the bridge; resize, cancellation, media changes and unmount release it. Cache the motion preference outside the hot path. No per-sample chart-tree rerender, fixed-rate timer or predicted finger position.
+
+Real-touch profiling found cached graph layers with zero repaints, but static frames between input samples. In comparable local Chromium runs on an approximately 120Hz frame clock, changed positions increased from 89/191 to 178/197 sampled frames with zero paints and the same four chart-subtree mutations. This is local evidence, not an iPhone frame-rate guarantee. [WebKit distinguishes accelerated animations from the page’s JavaScript update cadence](https://webkit.github.io/explainers/animation-frame-rate/); Safari, device and power policy still choose actual presentation frequency. Native acceptance is checklist 212. No financial or Finance Ops changes.
+
 ## 2026-10-31 - Callout Names And Invisible Focus Styling
 
 At the user’s request, display Needs subscriptions as **Subs (Needs)** in every callout alias/fallback, with existing font measurement and routing. Keep Wants subs and canonical transaction/category labels unchanged. Callout groups and their background rectangles must never paint a focus outline, shadow or selection stroke, including keyboard focus and touch/dialog restoration. Retain focusability, keyboard activation and pending-pop completion, plus the ring center’s focus treatment. This supersedes the visible callout focus border from earlier decisions; native acceptance is checklist 211. No financial or Finance Ops change.

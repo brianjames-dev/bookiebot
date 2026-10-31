@@ -33,6 +33,33 @@ const headingLayout=page=>page.evaluate(()=>{
  const box=n=>{const r=n.getBoundingClientRect();return [r.x,r.y+scrollY,r.width,r.height]}
  return {title:box(title),value:box(value),font:getComputedStyle(value).fontSize,dots:box(document.querySelector('.bb-chart-carousel-indicators')),content:box(slide.querySelector('.bb-card-content')),plot:box(slide.querySelector('.bb-chart-page-body')),next:box(document.querySelector('.bb-daily-section'))}
 })
+const finishDragSample=page=>page.locator('.bb-chart-carousel-track').evaluate(async track=>{
+ await new Promise(requestAnimationFrame)
+ await Promise.all(track.getAnimations().map(animation=>animation.finished.catch(()=>{})))
+})
+async function checkHeldDragInterpolation(page,dark){
+ await page.emulateMedia({reducedMotion:'no-preference'})
+ await page.evaluate(()=>new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve))))
+ const probe=await page.locator('.bb-chart-carousel').evaluate(async viewport=>{
+  const track=viewport.querySelector('.bb-chart-carousel-track'),read=()=>new DOMMatrixReadOnly(getComputedStyle(track).transform).m41
+  const frame=()=>new Promise(requestAnimationFrame),send=(type,x)=>{const event=new Event(type,{bubbles:true,cancelable:true}),point={identifier:19,clientX:x,clientY:200};Object.defineProperties(event,{touches:{value:/end|cancel/.test(type)?[]:[point]},changedTouches:{value:[point]}});viewport.dispatchEvent(event)}
+  const origin=read();send('touchstart',300);send('touchmove',240);await frame()
+  const first=track.getAnimations()[0];if(!first)throw new Error('Held drag must use an accelerated transform animation between input samples')
+  const timing=first.effect.getTiming(),firstFrames=first.effect.getKeyframes();first.pause();first.currentTime=timing.duration/2
+  const middle=read();send('touchmove',200);await frame()
+  const second=track.getAnimations()[0];if(!second)throw new Error('The next touch sample must retarget the compositor bridge')
+  const nextFrames=second.effect.getKeyframes(),from=new DOMMatrixReadOnly(nextFrames[0].transform).m41,to=new DOMMatrixReadOnly(nextFrames.at(-1).transform).m41
+  second.pause();second.currentTime=second.effect.getTiming().duration/2;const nextMiddle=read()
+  send('touchcancel',200)
+  return {origin,duration:timing.duration,fill:timing.fill,firstFrom:new DOMMatrixReadOnly(firstFrames[0].transform).m41,firstTo:new DOMMatrixReadOnly(firstFrames.at(-1).transform).m41,middle,from,to,nextMiddle,canceled:first.playState==='idle'&&second.playState==='idle'}
+ })
+ assert.ok(probe.duration>0&&probe.duration<=16);assert.equal(probe.fill,'both')
+ assert.ok(Math.abs(probe.firstFrom-probe.origin)<.1&&Math.abs(probe.firstTo-probe.origin+60)<.1)
+ assert.ok(Math.abs(probe.middle-probe.origin+30)<.2,'The browser presents an intermediate position while the finger stays down')
+ assert.ok(Math.abs(probe.from-probe.middle)<.2&&Math.abs(probe.to-probe.origin+100)<.2,'Retarget from the actual visible position toward the exact latest touch sample')
+ assert.ok(Math.abs(probe.nextMiddle-(probe.from+probe.to)/2)<.2);assert.ok(probe.canceled,'Cancellation releases both pending compositor bridges')
+ await settle(page);await page.emulateMedia({reducedMotion:dark?'reduce':'no-preference'})
+}
 async function checkTitleMask(page,width,dark){
  const viewport=page.locator('.bb-chart-carousel')
  const geometry=await viewport.evaluate((el,{dark,width})=>{
@@ -81,6 +108,7 @@ const sameLayout=(actual,expected)=>{for(const key of Object.keys(expected))if(A
   if(width===390)await page.locator('.bb-chart-carousel-band').screenshot({path:`/private/tmp/chart-title-${engineName}-${dark?'dark':'light'}.png`})
   await select(page,'Category Mix')
   await checkTitleMask(page,width,dark);cases++
+  await checkHeldDragInterpolation(page,dark);cases++
   const stage=(await page.locator('.bb-chart-carousel-band').boundingBox()).height
   for(const target of ['#bb-chart-category .bb-chart-carousel-heading','.bb-category-pie-center','#bb-chart-category .recharts-sector','.bb-contour-label rect','.bb-category-pie-host']){
    await select(page,'Category Mix')
@@ -91,7 +119,7 @@ const sameLayout=(actual,expected)=>{for(const key of Object.keys(expected))if(A
     window.__headingMotion={running:true,frames:[]};const sample=()=>{const state=window.__headingMotion;if(!state.running)return;state.frames.push({offset:heading.getBoundingClientRect().x-content.getBoundingClientRect().x,dots:dots.getBoundingClientRect().x});requestAnimationFrame(sample)};sample()
    })
    assert.equal(await touch(page,target,'touchstart',300),false)
-   for(const delta of [90,180,270]){assert.equal(await touch(page,target,'touchmove',300-delta),false);await page.waitForTimeout(25);assert.ok(Math.abs(await trackX(page)+delta)<1,JSON.stringify({message:'Drag follows the finger beyond the former 220px limit',target,delta,x:await trackX(page),viewport:await page.locator('.bb-chart-carousel').boundingBox(),dragging:await page.locator('.bb-chart-carousel').getAttribute('data-dragging'),motion:await page.locator('.bb-chart-carousel-track').evaluate(el=>({reduced:matchMedia('(prefers-reduced-motion: reduce)').matches,style:el.style.transform,animations:el.getAnimations().map(a=>({time:a.currentTime,duration:a.effect.getTiming().duration}))})),title:await title(page)}))}
+   for(const delta of [90,180,270]){assert.equal(await touch(page,target,'touchmove',300-delta),false);await finishDragSample(page);assert.ok(Math.abs(await trackX(page)+delta)<1,JSON.stringify({message:'Drag follows the finger beyond the former 220px limit',target,delta,x:await trackX(page),viewport:await page.locator('.bb-chart-carousel').boundingBox(),dragging:await page.locator('.bb-chart-carousel').getAttribute('data-dragging'),motion:await page.locator('.bb-chart-carousel-track').evaluate(el=>({reduced:matchMedia('(prefers-reduced-motion: reduce)').matches,style:el.style.transform,animations:el.getAnimations().map(a=>({time:a.currentTime,duration:a.effect.getTiming().duration}))})),title:await title(page)}))}
    const dragged=await headingLayout(page)
    assert.ok(Math.abs(dragged.title[0]-origin.title[0]+270)<1,'The title travels the exact same distance as the graph')
    assert.ok(Math.abs(dragged.content[0]-origin.content[0]+270)<1)
@@ -111,22 +139,22 @@ const sameLayout=(actual,expected)=>{for(const key of Object.keys(expected))if(A
   }
   await select(page,'Category Mix')
   const host='.bb-category-pie-host'
-  await touch(page,host,'touchstart',100);await touch(page,host,'touchmove',200);await page.waitForTimeout(25);const edge1=await trackX(page)
-  await touch(page,host,'touchmove',300);await page.waitForTimeout(25);assert.ok(await trackX(page)>edge1,'The edge resists progressively without hitting a stop');await touch(page,host,'touchend',300);await settle(page);assert.equal(await trackX(page),0)
+  await touch(page,host,'touchstart',100);await touch(page,host,'touchmove',200);await finishDragSample(page);const edge1=await trackX(page)
+  await touch(page,host,'touchmove',300);await finishDragSample(page);assert.ok(await trackX(page)>edge1,'The edge resists progressively without hitting a stop');await touch(page,host,'touchend',300);await settle(page);assert.equal(await trackX(page),0)
   await touch(page,host,'touchstart',250);await touch(page,host,'touchmove',230,330);await touch(page,host,'touchmove',30,350);await touch(page,host,'touchend',30,350);await settle(page);assert.equal(await title(page),'Category Mix','Vertical intent cannot turn into a graph swipe')
-  await touch(page,host,'touchstart',250);await touch(page,host,'touchmove',90);await page.waitForTimeout(25);await touch(page,host,'touchcancel',90);await settle(page);assert.equal(await title(page),'Category Mix');assert.equal(await trackX(page),0)
-  await touch(page,host,'touchstart',250);await touch(page,host,'touchmove',90);await page.waitForTimeout(25)
+  await touch(page,host,'touchstart',250);await touch(page,host,'touchmove',90);await finishDragSample(page);await touch(page,host,'touchcancel',90);await settle(page);assert.equal(await title(page),'Category Mix');assert.equal(await trackX(page),0)
+  await touch(page,host,'touchstart',250);await touch(page,host,'touchmove',90);await finishDragSample(page)
   const multi=await page.locator(host).evaluate(el=>{const event=new Event('touchstart',{bubbles:true,cancelable:true});Object.defineProperty(event,'touches',{value:[{identifier:7,clientX:90,clientY:200},{identifier:8,clientX:140,clientY:200}]});el.dispatchEvent(event);return event.defaultPrevented})
   assert.equal(multi,false);await settle(page);assert.equal(await trackX(page),0,'A second finger cannot leave the track stranded between pages')
   const filter='.bb-category-mix-filter select'
   await touch(page,filter,'touchstart',250);await touch(page,filter,'touchmove',20);await touch(page,filter,'touchend',20);assert.equal(await title(page),'Category Mix','The native chooser keeps its own interaction')
   // Interrupt an in-flight page animation and drag from its visible position.
   await page.emulateMedia({reducedMotion:'no-preference'})
-  await touch(page,host,'touchstart',280);await touch(page,host,'touchmove',100);await page.waitForTimeout(25);await touch(page,host,'touchend',100)
+  await touch(page,host,'touchstart',280);await touch(page,host,'touchmove',100);await finishDragSample(page);await touch(page,host,'touchend',100)
   await page.waitForTimeout(50)
   const frozen=await page.locator('.bb-chart-carousel').evaluate(el=>{const track=el.querySelector('.bb-chart-carousel-track'),stamp=performance.now(),before=new DOMMatrixReadOnly(getComputedStyle(track).transform).m41,e=new Event('touchstart',{bubbles:true,cancelable:true});Object.defineProperties(e,{touches:{value:[{identifier:7,clientX:100,clientY:200}]}});el.dispatchEvent(e);return{before,after:new DOMMatrixReadOnly(getComputedStyle(track).transform).m41,style:track.style.transform,animations:track.getAnimations().length,elapsed:performance.now()-stamp}})
-  assert.ok(Math.abs(frozen.before-frozen.after)<1+frozen.elapsed*Math.max(3,(width+16)*.01),JSON.stringify({message:'Regrab only advances by the elapsed animation time',frozen}));await page.waitForTimeout(25);const paused=await trackX(page);assert.ok(Math.abs(paused-Number(frozen.style.match(/translate3d\(([-\d.]+)/)[1]))<1,'The next painted frame stays at the captured position')
-  await touch(page,'.bb-chart-carousel','touchmove',125);await page.waitForTimeout(25);assert.ok(Math.abs(await trackX(page)-paused-25)<1,'Regrab follows the finger without restarting at the old page')
+  assert.ok(Math.abs(frozen.before-frozen.after)<1+frozen.elapsed*Math.max(3,(width+16)*.01),JSON.stringify({message:'Regrab only advances by the elapsed animation time',frozen}));await finishDragSample(page);const paused=await trackX(page);assert.ok(Math.abs(paused-Number(frozen.style.match(/translate3d\(([-\d.]+)/)[1]))<1,'The next painted frame stays at the captured position')
+  await touch(page,'.bb-chart-carousel','touchmove',125);await finishDragSample(page);assert.ok(Math.abs(await trackX(page)-paused-25)<1,'Regrab follows the finger without restarting at the old page')
   await touch(page,'.bb-chart-carousel','touchcancel',125);await settle(page);assert.equal(await title(page),'Burn Rate')
   await select(page,'Category Mix')
   await touch(page,host,'touchstart',280);await touch(page,host,'touchmove',60);await page.waitForTimeout(20);await touch(page,host,'touchend',60);await page.waitForTimeout(40)

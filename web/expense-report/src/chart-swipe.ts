@@ -1,6 +1,7 @@
 import { useLayoutEffect, useRef, type MouseEvent, type TouchEvent } from "react"
 
 const GAP = 16
+export const CHART_DRAG_BLEND_MS = 16
 type Sample = { x: number; time: number }
 type Gesture = {
   id: number; x: number; y: number; origin: number; width: number
@@ -67,6 +68,8 @@ export function useChartSwipe({ index, count, onSelect, onDragStart, ignoreTarge
   useLayoutEffect(() => { options.current = { index, count, onSelect, onDragStart, ignoreTarget } })
   const gesture = useRef<Gesture | null>(null)
   const animation = useRef<Animation | null>(null)
+  const dragAnimation = useRef<Animation | null>(null)
+  const reducedMotion = useRef(false)
   const frame = useRef<number | null>(null)
   const pendingX = useRef(0)
   const targetIndex = useRef<number | null>(null)
@@ -75,11 +78,30 @@ export function useChartSwipe({ index, count, onSelect, onDragStart, ignoreTarge
   const dragging = (value: boolean) => { if (viewportRef.current) viewportRef.current.dataset.dragging = String(value) }
   const stopFrame = () => { if (frame.current !== null) window.cancelAnimationFrame(frame.current); frame.current = null }
   const stopAnimation = () => { animation.current?.cancel(); animation.current = null; if (viewportRef.current) viewportRef.current.dataset.settling = "false" }
+  const stopDragAnimation = () => { dragAnimation.current?.cancel(); dragAnimation.current = null }
   const paint = (x: number) => { if (trackRef.current) trackRef.current.style.transform = `translate3d(${x}px, 0, 0)` }
+  const paintDrag = (x: number) => {
+    const track = trackRef.current
+    if (!track) return
+    const from = visibleX(track, x)
+    stopDragAnimation()
+    paint(x)
+    if (reducedMotion.current || Math.abs(from - x) < 0.1) return
+    // Touch/JS updates may arrive slower than the display. A tiny accelerated
+    // bridge fills those gaps without a timer, prediction or React render.
+    // Backwards fill prevents the target flashing before the first frame.
+    const motion = track.animate([
+      { transform: `translate3d(${from}px, 0, 0)` },
+      { transform: `translate3d(${x}px, 0, 0)` },
+    ], { duration: CHART_DRAG_BLEND_MS, easing: "linear", fill: "both" })
+    dragAnimation.current = motion
+    motion.onfinish = () => { if (dragAnimation.current === motion) stopDragAnimation() }
+  }
   const settle = (next: number, velocity = 0, immediate = false) => {
     stopFrame()
     const track = trackRef.current, to = -next * (width() + GAP)
     const from = visibleX(track, to)
+    stopDragAnimation()
     stopAnimation()
     dragging(false)
     targetIndex.current = next
@@ -110,9 +132,10 @@ export function useChartSwipe({ index, count, onSelect, onDragStart, ignoreTarge
     const observer = new ResizeObserver(resize)
     if (viewport) observer.observe(viewport)
     const media = window.matchMedia("(prefers-reduced-motion: reduce)")
-    const reduce = () => { if (media.matches) settle(options.current.index, 0, true) }
+    reducedMotion.current = media.matches
+    const reduce = () => { reducedMotion.current = media.matches; if (media.matches) settle(options.current.index, 0, true) }
     media.addEventListener("change", reduce)
-    return () => { observer.disconnect(); media.removeEventListener("change", reduce); stopFrame(); stopAnimation() }
+    return () => { observer.disconnect(); media.removeEventListener("change", reduce); stopFrame(); stopDragAnimation(); stopAnimation() }
   }, [])
 
   const onTouchStartCapture = (event: TouchEvent<HTMLDivElement>) => {
@@ -128,6 +151,8 @@ export function useChartSwipe({ index, count, onSelect, onDragStart, ignoreTarge
     }
     const touch = event.touches[0], now = performance.now(), size = width()
     const origin = visibleX(trackRef.current, -options.current.index * (size + GAP))
+    stopFrame()
+    stopDragAnimation()
     stopAnimation()
     paint(origin)
     gesture.current = { id: touch.identifier, x: touch.clientX, y: touch.clientY, origin, width: size, axis: "pending", moved: false, samples: [{ x: touch.clientX, time: now }] }
@@ -161,7 +186,7 @@ export function useChartSwipe({ index, count, onSelect, onDragStart, ignoreTarge
     event.stopPropagation()
     const { index: active, count: total } = options.current
     pendingX.current = -active * (current.width + GAP) + chartDragOffset(current.origin + active * (current.width + GAP) + dx, current.width, active, total)
-    if (frame.current === null) frame.current = window.requestAnimationFrame(() => { frame.current = null; paint(pendingX.current) })
+    if (frame.current === null) frame.current = window.requestAnimationFrame(() => { frame.current = null; paintDrag(pendingX.current) })
   }
   const finish = (event: TouchEvent<HTMLDivElement>, canceled: boolean) => {
     const current = gesture.current

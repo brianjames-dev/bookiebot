@@ -10,7 +10,7 @@ const x=()=>Number(track.style.transform?.match(/translate3d\(([-\d.]+)/)?.[1]??
 const win={get innerWidth(){return size},matchMedia:()=>media,getComputedStyle:()=>({transform:`matrix(1,0,0,1,${track.motionX??x()},0)`}),requestAnimationFrame:fn=>{frames.set(++serial,fn);return serial},cancelAnimationFrame:id=>frames.delete(id)}
 const runtime={exports:{},require:req,window:win,performance:{now:()=>now},ResizeObserver:class{constructor(fn){this.fn=fn;observers.push(this)}observe(){}disconnect(){this.disconnected=true}}}
 vm.runInNewContext(ts.transpileModule(fs.readFileSync('web/expense-report/src/chart-swipe.ts','utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2020}}).outputText,runtime)
-const {chartDragOffset,chartReleaseIndex,chartReleaseVelocity,chartSpring,useChartSwipe}=runtime.exports
+const {chartDragOffset,chartReleaseIndex,chartReleaseVelocity,chartSpring,useChartSwipe,CHART_DRAG_BLEND_MS}=runtime.exports
 for(const width of [320,390,1280]){
  for(const offset of [-300,-220,0,220,300])if(Math.abs(offset)<=width+16)assert.equal(chartDragOffset(offset,width,1,4),offset,'Interior drag follows the finger without the old 220px stop')
  const edges=[20,80,160,300,600].map(d=>chartDragOffset(d,width,0,4));assert.ok(edges.every((v,i)=>v>0&&(!i||v>edges[i-1])),'Rubber band keeps moving progressively at the edge')
@@ -37,7 +37,7 @@ const flush=()=>{for(const [id,fn]of [...frames]){frames.delete(id);fn()}}
 try{
  mount(0);const initialRenders=renders
  fire('onTouchStartCapture',350);now=20;fire('onTouchMoveCapture',250);now=40;fire('onTouchMoveCapture',150);now=60;fire('onTouchMoveCapture',50)
- assert.equal(frames.size,1,'Moves coalesce into one compositor write');flush();assert.equal(x(),-300);assert.equal(renders,initialRenders,'Dragging cannot rerender the graph tree');assert.equal(viewport.dataset.dragging,'true');assert.equal(starts,1)
+ assert.equal(frames.size,1,'Moves coalesce into one compositor write');flush();const bridge=motions.at(-1);assert.equal(bridge.options.duration,CHART_DRAG_BLEND_MS);assert.ok(CHART_DRAG_BLEND_MS<=16);assert.equal(bridge.options.fill,'both','The pending animation cannot flash its final target before its first frame');assert.equal(bridge.options.easing,'linear');assert.equal(bridge.keyframes[0].transform,'translate3d(0px, 0, 0)');assert.equal(x(),-300);assert.equal(renders,initialRenders,'Dragging cannot rerender the graph tree');assert.equal(viewport.dataset.dragging,'true');assert.equal(starts,1)
  now=200;fire('onTouchEndCapture',50);assert.deepEqual(selections,[1]);assert.equal(x(),-406);assert.equal(motions.at(-1).keyframes[0].transform,'translate3d(-300px, 0, 0)')
  const before=motions.length;act(()=>tree.update(React.createElement(Harness,{index:0})));assert.equal(x(),-406,'An unrelated render with the previous selection cannot rewind the pending release');assert.equal(motions.length,before);act(()=>tree.update(React.createElement(Harness,{index:1})));assert.equal(motions.length,before,'Selection does not restart the same settling animation')
  track.motionX=-350;fire('onTouchStartCapture',150);assert.equal(x(),-350,'Regrab begins at the visible spring position');now+=20;fire('onTouchMoveCapture',180);flush();assert.equal(x(),-320)
@@ -52,6 +52,18 @@ try{
  fire('onTouchStartCapture',250);now+=20;fire('onTouchMoveCapture',80);flush();fire('onTouchStartCapture',80,100,{touches:[{},{}]});assert.equal(viewport.dataset.dragging,'false');assert.equal(frames.size,0);assert.equal(x(),0,'A second-finger touchstart cannot strand the track mid-page');assert.deepEqual(selections,[]);
  mount(2);size=320;act(()=>observers.at(-1).fn());assert.equal(x(),-672,'Resize stays on the selected page without the old stride');assert.equal(frames.size,0)
  reduced=true;act(()=>{for(const listener of mediaListeners)listener()});const motionCount=motions.length;fire('onTouchStartCapture',250);now+=20;fire('onTouchMoveCapture',60);flush();fire('onTouchEndCapture',60);assert.equal(motions.length,motionCount,'Reduced motion settles immediately')
+ // Simulate another sample arriving while a high-refresh compositor is between
+ // keyframes. Retarget and release must start at that presented position.
+ reduced=false;size=390;mount(1);now+=200
+ fire('onTouchStartCapture',300);now+=16;fire('onTouchMoveCapture',200);flush();const firstBridge=motions.at(-1)
+ track.motionX=-455;now+=8.333;fire('onTouchMoveCapture',180);flush();const replacement=motions.at(-1)
+ assert.equal(firstBridge.canceled,true);assert.equal(replacement.keyframes[0].transform,'translate3d(-455px, 0, 0)');assert.equal(replacement.keyframes[1].transform,'translate3d(-526px, 0, 0)','The latest sample stays the exact target; no prediction or accumulated drift')
+ track.motionX=-480;now+=8.333;fire('onTouchEndCapture',180)
+ assert.ok(replacement.canceled);assert.equal(motions.at(-1).keyframes[0].transform,'translate3d(-480px, 0, 0)','Release uses the visible bridge frame rather than jumping to the sampled target')
+ mount(0);fire('onTouchStartCapture',300);fire('onTouchMoveCapture',200);assert.equal(frames.size,1)
+ fire('onTouchStartCapture',250);assert.equal(frames.size,0,'A fresh touch cancels a queued frame from the previous gesture');flush();assert.equal(x(),0)
+ fire('onTouchMoveCapture',150);flush();const pendingBridge=motions.at(-1)
+ reduced=true;act(()=>{for(const listener of mediaListeners)listener()});assert.ok(pendingBridge.canceled,'Turning Reduce Motion on cancels a held-drag bridge');assert.equal(x(),0)
 }finally{if(tree)act(()=>tree.unmount())}
 assert.equal(frames.size,0);assert.equal(mediaListeners.size,0);assert.ok(observers.every(o=>o.disconnected));assert.ok(motions.every(m=>m.canceled),'Unmount releases compositor animations')
-console.log('PASS: full-width drag, rubber band, velocity spring, interruption, coalesced writes without renders, vertical lock, tap arbitration, controls, multi-touch, resize and cleanup')
+console.log('PASS: full-width drag, rubber band, velocity spring, interruption, compositor-interpolated held drag, coalesced writes without renders, presented-frame retarget/release, vertical lock, tap arbitration, controls, multi-touch, resize and cleanup')
