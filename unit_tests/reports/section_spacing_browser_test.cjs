@@ -58,10 +58,10 @@ const closeEnough=(actual,reference,message)=>assert.ok(Math.abs(actual-referenc
         })
         await page.goto('https://bookie.test/app/expenses')
         await page.locator('.bb-highlights-section').waitFor()
-        await page.getByRole('button',{name:'Show Category Mix',exact:true}).click()
+        await page.getByRole('button',{name:'Show Burn Rate',exact:true}).click()
         await page.waitForTimeout(350)
-        const reference=await gap(page,'.bb-chart-carousel-band','#bb-chart-category .bb-details-toggle')
-        const measured={engine:engine.name(),width,dark,categories:reference,daily:await gap(page,'.bb-daily-section',dailyButton),largest:await gap(page,'.bb-highlights-section',insightButton)}
+        const reference=await gap(page,'.bb-chart-carousel-band','#bb-chart-burn-rate .bb-burn-month-panel')
+        const measured={engine:engine.name(),width,dark,balance:reference,daily:await gap(page,'.bb-daily-section',dailyButton),largest:await gap(page,'.bb-highlights-section',insightButton)}
         if(!measureOnly) {
           closeEnough(reference,Math.min(32,Math.max(16,width*.03))+2,'Keep the approved Categories spacing')
           closeEnough(measured.daily,reference,'Daily Transactions footer')
@@ -82,9 +82,9 @@ const closeEnough=(actual,reference,message)=>assert.ok(Math.abs(actual-referenc
           closeEnough(await gap(page,'.bb-daily-section',dailyButton),reference,'Recollapsed Transactions footer')
           for(const [title,id] of [['Burn Rate','burn-rate'],['Calendar','calendar'],['Bills & Utilities','bills']]) {
             await page.getByRole('button',{name:`Show ${title}`,exact:true}).click();await page.waitForTimeout(350)
-            const control=`#bb-chart-${id} .bb-chart-page-footer .bb-details-toggle`
+            const control=id==='burn-rate'?'#bb-chart-burn-rate .bb-burn-month-panel':`#bb-chart-${id} .bb-chart-page-footer .bb-details-toggle`
             closeEnough(await gap(page,'.bb-chart-carousel-band',control),reference,`${title} Details footer`)
-            if(id!=='calendar') {
+            if(id==='bills') {
               await page.locator(control).click();await page.waitForTimeout(350)
               assert.equal(await page.locator(control).getAttribute('aria-expanded'),'true')
               await page.locator(control).click();await page.waitForTimeout(350)
@@ -92,9 +92,9 @@ const closeEnough=(actual,reference,message)=>assert.ok(Math.abs(actual-referenc
             }
           }
           await page.getByRole('button',{name:'Show Category Mix',exact:true}).click();await page.waitForTimeout(350)
-          await page.getByRole('button',{name:'Categories',exact:true}).click()
-          await page.getByRole('dialog').waitFor()
-          await page.keyboard.press('Escape');await page.waitForTimeout(350)
+          assert.equal(await page.getByRole('button',{name:'Categories',exact:true}).count(),0,'Category inspection now lives on slices and callouts')
+          const reserved=await page.locator('.bb-category-mix-page').evaluate(el=>getComputedStyle(el).gridTemplateRows.split(' ').at(-1))
+          assert.equal(reserved,'42px','Category Mix retains its approved former-footer space')
           if(width===390&&dark)await page.screenshot({path:`/tmp/bookiebot-overview-spacing-${engine.name()}.png`,fullPage:true})
         }
         await page.getByRole('navigation',{name:'Main navigation'}).getByRole('button',{name:'Savings',exact:true}).click()

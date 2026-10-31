@@ -674,21 +674,6 @@ button.bb-left-categories { cursor: pointer; }
   transform: translateY(0);
 }
 
-.bb-burn-rate-pill {
-  border-left: 2px solid hsl(var(--success));
-  color: hsl(var(--success));
-  flex: 0 0 auto;
-  font-size: 14px;
-  font-weight: 500;
-  padding: 4px 10px;
-  white-space: nowrap;
-}
-
-.bb-burn-rate-pill-danger {
-  border-color: hsl(var(--destructive));
-  color: hsl(var(--destructive));
-}
-
 .bb-daily-spending-content {
   display: grid;
   gap: 0;
@@ -1625,7 +1610,6 @@ button.bb-left-categories { cursor: pointer; }
 }
 
 .bb-panel-head > .bb-badge,
-.bb-panel-head > .bb-burn-rate-pill,
 .bb-panel-head > .bb-burn-rate-actions {
   margin-left: auto;
 }
@@ -2223,24 +2207,63 @@ button.bb-left-categories { cursor: pointer; }
   overscroll-behavior: contain;
 }
 
-/* Let all five pace metrics contribute their height while the graph contracts. */
-.bb-burn-rate-page { row-gap: 8px; }
-.bb-chart-carousel .bb-burn-rate-page .bb-details-content-inner {
-  max-height: none;
-  overflow: hidden;
+/* Burn Rate keeps its balance visible inside the existing shared stage. */
+.bb-burn-rate-page {
+  container-type: inline-size;
+  row-gap: 14px;
+  --bb-burn-spent: color-mix(in srgb, hsl(var(--destructive)) 72%, hsl(var(--card)));
+  --bb-burn-over-base: color-mix(in srgb, hsl(var(--destructive)) 26%, hsl(var(--card)));
 }
-.bb-burn-rate-page .bb-stat-list {
-  grid-template-columns: repeat(5, minmax(0, 1fr));
-  gap: 12px;
-}
-.bb-burn-rate-page .bb-stat-row {
-  grid-template-columns: minmax(0, 1fr);
-  align-content: start;
-  gap: 4px;
-  padding: 0;
-  border: 0;
-}
-.bb-burn-rate-page .bb-stat-row strong { white-space: nowrap; }
+.bb-burn-rate-page .bb-burn-rate-primary { gap: 12px; }
+.bb-burn-rate-page .bb-chart-page-footer { padding-bottom: 2px; }
+.bb-burn-rate-page .bb-burn-rate-value { font-size: min(32px, 10.8cqw); }
+.bb-burn-rate-page .bb-chart-kicker { font-size: 11px; letter-spacing: .07em; text-transform: uppercase; }
+.bb-burn-rate-page .bb-burn-rate-note { margin-top: 5px; font-size: 12px; }
+.bb-burn-rate-pace { display: grid; text-align: right; font-size: 12px; }
+.bb-burn-rate-pace > span { color: hsl(var(--muted-foreground)); }
+.bb-burn-rate-pace strong { font-size: 17px; font-weight: 500; letter-spacing: -.02em; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.bb-burn-month-panel { padding: 12px 14px; border-radius: 16px; background: hsl(var(--foreground) / .035); }
+.bb-burn-limit-row { display: flex; align-items: baseline; justify-content: space-between; flex-wrap: wrap; gap: 2px 8px; margin-bottom: 9px; color: hsl(var(--muted-foreground)); font-size: 11px; }
+.bb-burn-limit-inline { display: flex; align-items: baseline; gap: 5px; }
+.bb-burn-limit-inline strong { color: hsl(var(--foreground)); font-size: 13px; font-weight: 500; white-space: nowrap; }
+.bb-burn-balance-rail { position: relative; display: flex; gap: 3px; height: 8px; border-radius: 4px; }
+.bb-burn-used, .bb-burn-remainder { display: block; min-width: 0; border-radius: inherit; }
+.bb-burn-used { background: var(--bb-burn-spent); }
+.bb-burn-remainder { background: hsl(var(--success)); }
+.bb-burn-balance-rail[data-empty="true"] { background: hsl(var(--muted-foreground) / .15); }
+.bb-burn-balance-rail[data-over="true"] { display: block; overflow: hidden; background: var(--bb-burn-over-base); }
+.bb-burn-overfill { position: absolute; inset: 0 auto 0 0; border-radius: inherit; background: hsl(var(--destructive)); }
+.bb-burn-month-values { display: flex; justify-content: space-between; gap: 12px; margin-top: 8px; }
+.bb-burn-month-values > div:last-child { text-align: right; }
+.bb-burn-month-values strong { display: block; margin-top: 1px; font-size: min(19px, 6.5cqw); font-weight: 500; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.bb-burn-legend { display: flex; align-items: center; gap: 5px; color: hsl(var(--muted-foreground)); font-size: 12px; }
+.bb-burn-month-values > div:last-child .bb-burn-legend { justify-content: flex-end; }
+.bb-burn-legend::before { content: ""; width: 6px; height: 6px; border-radius: 50%; background: var(--bb-burn-spent); }
+.bb-burn-legend-left::before { background: hsl(var(--success)); }
+.bb-burn-tooltip-portal { position: absolute; top: 0; left: 0; z-index: 5; width: max-content; max-width: 100%; pointer-events: none; opacity: 0; transition: none !important; }
+.bb-burn-tooltip-portal[data-positioned-day] { opacity: 1; }
+/* Native Recharts interaction/payload and shared hold/dismiss remain intact.
+   Only the owned portal moves; never animate a second wrapper transform. */
+.bb-burn-tooltip-portal .recharts-tooltip-wrapper { position: static !important; transform: none !important; transition: none !important; pointer-events: none; }
+.bb-burn-tooltip-portal .bb-chart-tooltip-frame { transform: none; transition: opacity 140ms ease-out; }
+.bb-burn-node-tooltip { container-type: inline-size; width: 184px; max-width: calc(100cqw - 104px); padding: 9px; border: 1px solid hsl(var(--border)); border-radius: 12px; background: hsl(var(--card)); color: hsl(var(--foreground)); box-shadow: 0 5px 18px hsl(var(--background) / .38); font-size: 11px; font-variant-numeric: tabular-nums; white-space: normal; }
+.bb-burn-node-tooltip strong { font-weight: 500; white-space: nowrap; }
+.bb-burn-mini-header { display: flex; align-items: baseline; justify-content: space-between; flex-wrap: wrap; gap: 0 6px; color: hsl(var(--muted-foreground)); }
+.bb-burn-mini-header > span:last-child { white-space: nowrap; }
+.bb-burn-mini-header strong { color: hsl(var(--foreground)); }
+.bb-burn-day-pace { display: flex; align-items: baseline; gap: 4px; margin-top: 2px; }
+.bb-burn-day-pace strong { font-size: min(18px, 12.5cqw); line-height: 1.2; letter-spacing: -.025em; }
+.bb-burn-day-bar { margin-top: 6px; padding-top: 7px; border-top: 1px solid hsl(var(--border)); }
+.bb-burn-pair { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; }
+.bb-burn-pair > :last-child { text-align: right; }
+.bb-burn-pair-labels > span { display: flex; align-items: center; gap: 4px; color: hsl(var(--muted-foreground)); }
+.bb-burn-pair-values { font-size: 12px; }
+.bb-burn-key { flex: none; display: inline-block; width: 6px; height: 6px; border-radius: 1px; }
+.bb-burn-key-spent { background: var(--bb-burn-spent); }
+.bb-burn-key-limit { background: hsl(var(--success)); }
+.bb-burn-node-tooltip[data-over="true"] .bb-burn-key-spent { background: hsl(var(--destructive)); }
+.bb-burn-node-tooltip[data-over="true"] .bb-burn-key-limit { background: var(--bb-burn-over-base); }
+.bb-burn-day-bar .bb-burn-balance-rail { height: 6px; gap: 2px; margin: 4px 0; border-radius: 3px; }
 
 .bb-modal-details {
   display: grid;
@@ -3046,9 +3069,6 @@ button:focus-visible, summary:focus-visible {
     gap: 8px;
   }
 
-  .bb-burn-rate-value {
-    font-size: 24px;
-  }
 
   .bb-metric-label,
   .bb-metric-note {
@@ -3100,7 +3120,6 @@ button:focus-visible, summary:focus-visible {
 }
 
 @media (max-width: 640px) {
-  .bb-burn-rate-page .bb-stat-list { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px 12px; }
   .bb-metrics-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); padding: 0; margin-bottom: 20px; }
   .bb-metrics-grid > .bb-metric-card:nth-child(-n+2) { padding-bottom: 30px; }
   .bb-metric-card:nth-child(odd) { border-left: 0; }

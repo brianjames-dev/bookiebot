@@ -141,9 +141,9 @@ def test_top_chart_details_percent_and_calendar_markers_keep_stage_stable():
     assert '<ModalDetails summary="Details"' in source.split("function CalendarAnalyticsPanel", 1)[1].split(
         "function CalendarChangingValue", 1
     )[0]
-    assert '<DetailsPanel summary="Details" collapseKey={collapseKey}>' in source.split(
-        "function BurnRateChart", 1
-    )[1].split("function burnRateDailyPaceLabel", 1)[0]
+    burn_source = source.split("function BurnRateChart", 1)[1].split("function burnRateDailyPaceLabel", 1)[0]
+    assert "<DetailsPanel" not in burn_source
+    assert "<BurnRateMonthBalance" in burn_source
     assert '<DetailsPanel summary="Details" collapseKey={collapseKey}>' in source.split(
         "function BillsUtilitiesPanel", 1
     )[1].split("function BillsUtilitiesChart", 1)[0]
@@ -184,8 +184,9 @@ def test_top_chart_pages_share_regions_lock_modals_and_show_complete_details():
     assert "const hasMore = !showAll && items.length > visibleItems.length" in source
     assert ".bb-details-dialog-body" in styles
     assert "overflow: auto;" in styles
-    burn_details = styles.split(".bb-chart-carousel .bb-burn-rate-page .bb-details-content-inner {", 1)[1].split("}", 1)[0]
-    assert "max-height: none" in burn_details
+    assert ".bb-burn-month-panel {" in styles
+    assert "<BurnRateMonthBalance" in source
+    assert "grid-template-rows: auto minmax(0, 1fr) auto;" in styles
 
 
 def test_top_chart_navigation_names_each_panel_and_excludes_inactive_controls_from_focus():

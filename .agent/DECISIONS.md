@@ -1,5 +1,11 @@
 # Agent Decisions
 
+## 2026-10-30 - Integrate Approved Burn Rate Split Labels
+
+Replace only Burn Rate's Details disclosure with the approved always-visible monthly Limit / Spent / Left split rail. Keep its Food + Shopping + Wants subscriptions calculation, category-coverage notices, exact cents and signed remaining amount. The upper balance/daily-pace header and subtle zero-baseline area use the existing variance line, axes and red-above/green-below semantics. Keep the shared carousel stage and other graphs' controls intact.
+
+The compact day popup has date/day spending first, pace difference, Spent/Limit labels above its rail and cumulative amounts below. Its limit is allowance through that day; the footer's limit remains the whole month's. Under allowance, show rounded spending/remainder segments. Over allowance, show a muted full track with excess filling from the left, capped at 100% excess; labels retain exact amounts. Position a native Recharts tooltip through one owned chart-local portal, synchronously before paint, minimizing line overlap and avoiding the selected node. Cache native path samples and retain near-tied corners; never animate competing wrapper transforms. Preserve native touch/mouse/keyboard selection and shared hold/fade and dismissal. Native acceptance is checklist 198. No financial calculation, storage or Finance Ops backlog changes.
+
 ## 2026-10-30 - Apply Selected Category Mix State Styling
 
 Apply the selected paired-draft values: shared graph title 28px, Category Mix amount 28px, no added gap above the amount row or budget, and the native category chooser vertically centered beside the amount. Hidden ring: 36px edge inset, 48px band, 30px percentage, 12px caption, 4px center gap and a 16px upward offset, clamped inside the plot. Shown ring: 219px diameter limit, 26px band, 24px percentage, 11px caption and zero center gap. Callouts: 11px names/amounts, 6px minimum spacing, 8px edge inset, 65% stems, 10px bend, 18px corners, 6px side padding and 36px contour stagger. Keep matched names, whole dollars / muted percentages, noon/clockwise direction, exact transaction inspection and the existing stage/former-footer height.

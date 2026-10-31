@@ -17,14 +17,17 @@ import { createPortal } from "react-dom"
 import { ChevronDown } from "lucide-react"
 import { useCategoryContour, CategoryContourCallouts } from "./category-mix-contour"
 import { CONTOUR_PADDING_ANGLE } from "./category-mix-layout"
+import { burnRateBalance, positionBurnRateTooltip } from "./burn-rate-tooltip"
 import { categoryRingAnimation, stableBarAnimation, stableBarShape, StablePieSector, type AnimatedPieSector } from "./chart-animation"
 import { ReportScreen, useAppNavigation } from "./app-navigation"
 import { ReportBrand, ReportHeader } from "./report-header"
 import {
+  Area,
   Bar,
   BarChart,
   CartesianGrid,
   Cell,
+  ComposedChart,
   Line,
   LineChart,
   Pie,
@@ -760,7 +763,7 @@ const OverviewCharts = memo(function OverviewCharts({ report, activeReport, char
               <MemoizedBurnRateChart
                 burnRate={activeReport.burnRate}
                 categoryBalances={activeReport.categoryBalances}
-                collapseKey={chartCollapseKey}
+                month={report.month}
               />
             ),
           },
@@ -1220,12 +1223,15 @@ function ThemeToggle({ theme, onToggle }: { theme: ThemeMode; onToggle: () => vo
 function BurnRateChart({
   burnRate,
   categoryBalances,
-  collapseKey,
+  month,
 }: {
   burnRate: BurnRate
   categoryBalances: CategoryBalances
-  collapseKey: number
+  month: number
 }) {
+  const [tooltipPortal, setTooltipPortal] = useState<HTMLDivElement | null>(null)
+  const touch = useMediaQuery("(pointer: coarse)")
+  const monthName = new Intl.DateTimeFormat("en-US", { month: "short", timeZone: "UTC" }).format(new Date(Date.UTC(2026, month - 1, 1)))
   const isOver = burnRate.status === "over"
   const isNotStarted = burnRate.status === "not_started"
   const statusLabel = isNotStarted ? "Not started" : isOver ? "Over pace" : "Available today"
@@ -1252,8 +1258,9 @@ function BurnRateChart({
             </div>
           </div>
           <div className="bb-burn-rate-actions">
-            <div className={isOver ? "bb-burn-rate-pill bb-burn-rate-pill-danger" : "bb-burn-rate-pill"}>
-              {dailyDifference}
+            <div className={`bb-burn-rate-pace ${burnRate.dailyDifference > 0 ? "bb-negative" : "bb-positive"}`} aria-label={dailyDifference}>
+              <span>{isNotStarted ? "No daily pace yet" : burnRate.dailyDifference > 0 ? "Overspending" : burnRate.dailyDifference < 0 ? "Saving" : "On pace"}</span>
+              {!isNotStarted && <strong>{formatMoney(Math.abs(burnRate.dailyDifference))}/day</strong>}
             </div>
           </div>
         </div>
@@ -1264,7 +1271,7 @@ function BurnRateChart({
         className="bb-chart-box bb-chart-box-wide bb-chart-page-body"
       >
         <ResponsiveContainer width="100%" height="100%">
-          <LineChart data={chartSeries} margin={{ top: 20, right: 22, left: 0, bottom: 8 }}>
+          <ComposedChart data={chartSeries} margin={{ top: 20, right: 22, left: 0, bottom: 8 }}>
             <defs>
               <linearGradient id="burn-rate-variance-gradient" x1="0" y1="0" x2="0" y2="1">
                 {gradientStops.map((stop, index) => (
@@ -1275,8 +1282,9 @@ function BurnRateChart({
             <CartesianGrid vertical={false} strokeDasharray="3 3" />
             <XAxis dataKey="label" tickLine={false} axisLine={false} interval="preserveStartEnd" />
             <YAxis domain={yAxisDomain} tickFormatter={(value) => `$${value}`} tickLine={false} axisLine={false} width={58} />
+            <Area type="monotone" dataKey="variance" baseValue={0} stroke="none" fill={lineColor} fillOpacity={0.1} tooltipType="none" activeDot={false} connectNulls={false} isAnimationActive={false} />
             <ReferenceLine y={0} stroke="hsl(var(--foreground))" strokeOpacity={0.45} strokeWidth={1.5} />
-            <ChartTooltip content={<BurnRateTooltipContent />} />
+            {tooltipPortal && <ChartTooltip portal={tooltipPortal} trigger={touch ? "click" : "hover"} isAnimationActive={false} content={<BurnRateTooltipContent monthName={monthName} portal={tooltipPortal} />} />}
             <Line
               type="monotone"
               dataKey="variance"
@@ -1288,26 +1296,44 @@ function BurnRateChart({
               dot={false}
               activeDot={renderBurnRateActiveDot}
               connectNulls={false}
-              // The disclosure already animates this chart's measured height.
-              // A second point interpolation lags behind that moving viewport.
+              // Follow the measured viewport without a second interpolation.
               isAnimationActive={false}
             />
-          </LineChart>
+          </ComposedChart>
         </ResponsiveContainer>
+        <div ref={setTooltipPortal} className="bb-burn-tooltip-portal" />
       </ChartContainer>
       <div className="bb-chart-page-footer">
-        <DetailsPanel summary="Details" collapseKey={collapseKey}>
-          <StatList
-            rows={[
-              ["Limit", formatMoney(burnRate.budget)],
-              ["Spent", formatMoney(burnRate.spent)],
-              ["Left", formatMoney(burnRate.remaining)],
-              ["Allowed/day", formatMoney(burnRate.allowedDailyAverage)],
-              ["Actual/day", formatMoney(burnRate.actualDailyAverage)],
-            ]}
-          />
-        </DetailsPanel>
+        <BurnRateMonthBalance burnRate={burnRate} monthName={monthName} />
       </div>
+    </div>
+  )
+}
+
+function BurnRateMonthBalance({ burnRate, monthName }: { burnRate: BurnRate; monthName: string }) {
+  const balance = burnRateBalance(burnRate.spent, burnRate.budget)
+  return (
+    <div className="bb-burn-month-panel">
+      <div className="bb-burn-limit-row">
+        <span>{burnRate.elapsedDays ? `Through ${monthName} ${burnRate.elapsedDays}` : "Month not started"}</span>
+        <span className="bb-burn-limit-inline">Month limit <strong>{formatMoney(burnRate.budget)}</strong></span>
+      </div>
+      <BurnRateBalanceRail balance={balance} />
+      <div className="bb-burn-month-values">
+        <div><span className="bb-burn-legend">Spent</span><strong>{formatMoney(burnRate.spent)}</strong></div>
+        <div><span className="bb-burn-legend bb-burn-legend-left">Left</span><strong className={burnRate.remaining < 0 ? "bb-negative" : undefined}>{formatMoney(burnRate.remaining)}</strong></div>
+      </div>
+    </div>
+  )
+}
+
+function BurnRateBalanceRail({ balance }: { balance: ReturnType<typeof burnRateBalance> }) {
+  return (
+    <div className="bb-burn-balance-rail" data-over={balance.over} data-empty={balance.empty} aria-hidden="true">
+      {balance.over ? <span className="bb-burn-overfill" style={{ width: `${balance.excess * 100}%` }} /> : <>
+        {balance.used > 0 && <span className="bb-burn-used" style={{ flex: balance.used }} />}
+        {balance.left > 0 && <span className="bb-burn-remainder" style={{ flex: balance.left }} />}
+      </>}
     </div>
   )
 }
@@ -1433,41 +1459,55 @@ type BurnRateTooltipPayload = {
 function BurnRateTooltipContent({
   active,
   payload,
+  coordinate,
+  monthName,
+  portal,
 }: {
   active?: boolean
   payload?: BurnRateTooltipPayload[]
+  coordinate?: { x?: number; y?: number }
+  monthName: string
+  portal: HTMLDivElement
 }) {
   const point = payload?.find((item) => item.payload?.variance !== null && item.payload?.variance !== undefined)?.payload
+  const nodeRef = useRef<HTMLDivElement>(null)
+  useLayoutEffect(() => {
+    const node = nodeRef.current
+    if (!active || !point || !node) return
+    // One owner positions the portal before paint. No competing native transform
+    // or React state update can briefly paint this day's content at the old node.
+    const place = () => positionBurnRateTooltip(portal, node, coordinate?.x)
+    place()
+    const observer = new ResizeObserver(place)
+    observer.observe(node)
+    if (portal.parentElement) observer.observe(portal.parentElement)
+    return () => observer.disconnect()
+  }, [active, point, coordinate?.x, portal])
   if (!active || !point || point.variance === null) {
     return null
   }
 
   const isOver = point.variance > 0
-  const label = isOver ? "Over pace" : "Under pace"
-  const color = burnRatePointColor(point.variance)
+  const balance = burnRateBalance(point.actualSpend ?? 0, point.expectedSpend)
 
   return (
-    <div className="bb-chart-tooltip bb-touch-tooltip-content">
-      <div className="bb-chart-tooltip-title">Day {point.label}</div>
-      <div className="bb-chart-tooltip-row">
-        <span className="bb-chart-tooltip-dot" style={{ background: color }} />
-        <span>{label}</span>
-        <strong>{formatMoney(point.variance)}</strong>
+    <div ref={nodeRef} className="bb-burn-node-tooltip" data-over={isOver} data-inspected-day={point.day} role="tooltip" aria-label={`${monthName} ${point.day} spending details`}>
+      <div className="bb-burn-mini-header">
+        <span>{monthName} {point.day}</span>
+        <span><strong>{formatMoney(point.dailySpend)}</strong> spent</span>
       </div>
-      <div className="bb-chart-tooltip-row">
-        <span />
-        <span>Day spent</span>
-        <strong>{formatMoney(point.dailySpend)}</strong>
+      <div className={`bb-burn-day-pace ${isOver ? "bb-negative" : "bb-positive"}`}>
+        <strong>{formatMoney(Math.abs(point.variance))}</strong><span>{point.variance === 0 ? "on pace" : isOver ? "over pace" : "under pace"}</span>
       </div>
-      <div className="bb-chart-tooltip-row">
-        <span />
-        <span>Total Spent</span>
-        <strong>{formatMoney(point.actualSpend)}</strong>
-      </div>
-      <div className="bb-chart-tooltip-row">
-        <span />
-        <span>Limit</span>
-        <strong>{formatMoney(point.expectedSpend)}</strong>
+      <div className="bb-burn-day-bar" aria-label={`Spending and limit through ${monthName} ${point.day}`}>
+        <div className="bb-burn-pair bb-burn-pair-labels">
+          <span><i className="bb-burn-key bb-burn-key-spent" aria-hidden="true" />Spent</span>
+          <span><i className="bb-burn-key bb-burn-key-limit" aria-hidden="true" />Limit</span>
+        </div>
+        <BurnRateBalanceRail balance={balance} />
+        <div className="bb-burn-pair bb-burn-pair-values">
+          <strong>{formatMoney(point.actualSpend)}</strong><strong>{formatMoney(point.expectedSpend)}</strong>
+        </div>
       </div>
     </div>
   )
