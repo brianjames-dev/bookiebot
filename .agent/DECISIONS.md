@@ -1,5 +1,11 @@
 # Agent Decisions
 
+## 2026-10-31 - Reference Glass Navigation And Continuous Selection Motion
+
+Use the supplied Instagram/Apple reference for the web navigation: a neutral translucent capsule with a fine lit rim, evenly spaced white/dark icons and a broad gray selection with a concentric 5px expanded / 4px compact inset. Keep the filled/outline icons, accessible names and native button semantics. This is a CSS recreation within the existing Konsta shell, not a native UIKit Liquid Glass renderer. [Apple’s Liquid Glass interaction guidance](https://developer.apple.com/videos/play/wwdc2025/219/) informs the restrained elastic settle and Reduce Motion treatment.
+
+Disable Konsta’s competing whole-bar hover/touch scale. The selection lens follows coalesced pointer samples through one animation frame without React updates per pixel, then uses an interruptible CSS spring on release/tab changes. Selection commits once on release; cancellation, disabled/guarded routing and Settings return retain their prior behavior. Percentage anchoring lets the lens follow the bar’s animated width without repeatedly chasing stale pixel coordinates. Preserve the existing passive direction thresholds: scroll down contracts the bar; scroll up or return to the page top expands it. Width, height, padding and glyph size ease together; reversal continues from the painted size. Reduce Motion removes elasticity; Reduce Transparency uses a solid surface. Material is confined to the bar, without a backdrop scrim. Timers, pointer frames and media listeners are cleaned up. Accepted thumbnail behavior and financial flows are unchanged. Physical acceptance is checklist 218.
+
 ## 2026-10-31 - Fade At The Viewport Edge And Use Icon-Only Navigation
 
 Keep popup placement and painting separate: the existing initial fit and one optional nearby opposite-side move still account for actual floating controls, but control overlap never fades the locked anchor. It may pass underneath the nav/header while scrolling. Only within 8px of the actual visual viewport’s top/bottom edge starts the existing 360ms scroll fade; 24px stays fully painted. The five-second dismissal latch remains authoritative, so this visibility change cannot revive expired content. No viewport-following movement or new scroll owner is introduced.

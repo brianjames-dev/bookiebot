@@ -3,6 +3,7 @@ import { Glass, Tabbar, TabbarLink } from "konsta/react"
 import { ClipboardCheck, House, PiggyBank, ReceiptText, Users } from "lucide-react"
 import { fitNavigationSelection, screenTitles, type MainScreen } from "./app-navigation"
 import { useSlidingSelection } from "./components/ui/motion"
+import { useNavigationLens } from "./navigation-lens"
 
 const screens = [
   { id: "overview", Icon: House }, { id: "transactions", Icon: ReceiptText },
@@ -51,7 +52,11 @@ function selectionBounds(button: HTMLElement) {
       content: { width: stack.width / scaleX, height: stack.height / scaleY },
     }
   })
-  return fitNavigationSelection(tabs, buttons.indexOf(button), { width: frame.width / scaleX, height: frame.height / scaleY })
+  const bounds = fitNavigationSelection(tabs, buttons.indexOf(button), { width: frame.width / scaleX, height: frame.height / scaleY })
+  // Percentage anchoring follows the bar's animated width in the same paint.
+  // Repeated pixel targets would restart the slide and lag behind the icon.
+  pane.style.setProperty("--bb-nav-selection-center", `${(bounds.x + bounds.width / 2) / (frame.width / scaleX) * 100}%`)
+  return bounds
 }
 
 export function AppNavigationBar({ active, current = active, compact, reconciliationVisible, hidden, disabled = false, onSelect }: {
@@ -65,6 +70,7 @@ export function AppNavigationBar({ active, current = active, compact, reconcilia
 }) {
   const [preview, setPreview] = useState<MainScreen | null>(null)
   const paneRef = useSlidingSelection(preview ?? active, selectionBounds)
+  const lens = useNavigationLens(paneRef, preview ?? active)
   const pointer = useRef<{ id: number; x: number; selected: MainScreen | null } | null>(null)
   const suppressClick = useRef(false)
   const tabs = reconciliationVisible ? screens : screens.slice(0, 4)
@@ -75,7 +81,10 @@ export function AppNavigationBar({ active, current = active, compact, reconcilia
     const button = [...buttons].find(button => clientX < button.getBoundingClientRect().right) ?? buttons[buttons.length - 1]
     return button.dataset.navScreen as MainScreen
   }
-  const finishPointer = () => { pointer.current = null; setPreview(null) }
+  const finishPointer = () => {
+    if (!pointer.current) return
+    pointer.current = null; setPreview(null); lens.release()
+  }
   const startPointer = (event: PointerEvent<HTMLElement>) => {
     suppressClick.current = false
     if (disabled) return
@@ -84,17 +93,19 @@ export function AppNavigationBar({ active, current = active, compact, reconcilia
     const selected = (target?.dataset.navScreen as MainScreen | undefined) ?? screenAt(event.clientX)
     pointer.current = { id: event.pointerId, x: event.clientX, selected }
     setPreview(selected)
+    lens.move(event.clientX)
     event.currentTarget.setPointerCapture(event.pointerId)
   }
 
   return <Tabbar top component="nav" icons className="bb-bottom-navigation" aria-label="Main navigation"
     data-compact={compact} data-tab-count={tabs.length} hidden={hidden}>
-    <Glass ref={paneRef} className="bb-navigation-pane bb-sliding-selection"
+    <Glass ref={paneRef} highlight={false} className="bb-navigation-pane bb-sliding-selection"
       onPointerDown={startPointer}
       onPointerMove={event => {
         const current = pointer.current
         if (!current || current.id !== event.pointerId || current.x === event.clientX) return
         current.x = event.clientX; current.selected = screenAt(event.clientX)
+        lens.move(event.clientX)
         setPreview(current.selected)
       }}
       onPointerUp={event => {
@@ -115,7 +126,7 @@ export function AppNavigationBar({ active, current = active, compact, reconcilia
           event.stopPropagation()
         }
       }}>
-      <span className="bb-selection-indicator bb-navigation-selection" aria-hidden="true" />
+      <span className="bb-selection-indicator bb-navigation-selection" aria-hidden="true"><span className="bb-navigation-lens-surface" /></span>
       {tabs.map(({ id }) => <TabbarLink key={id} component={NavigationButton} linkProps={{ type: "button", disabled }} className="bb-navigation-link"
         active={(preview ?? active) === id} data-state={(preview ?? active) === id ? "active" : "inactive"} data-nav-screen={id}
         aria-label={screenTitles[id]} aria-current={current === id ? "page" : undefined}

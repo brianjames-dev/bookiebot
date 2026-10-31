@@ -10,10 +10,13 @@ const { chromium, webkit } = process.env.BOOKIEBOT_PLAYWRIGHT_MODULE
   ? require(process.env.BOOKIEBOT_PLAYWRIGHT_MODULE) : req('playwright')
 const css = fs.readFileSync(path.join(root, 'src/bookiebot/reports/assets/expense-report-app.css'), 'utf8')
 const bundle = req('esbuild').buildSync({ stdin: { resolveDir: frontend, loader: 'tsx', contents: `
-  import React, {useState} from 'react'; import {createRoot} from 'react-dom/client';
+  import React, {useState,useRef,useEffect} from 'react'; import {createRoot} from 'react-dom/client';
   import {KonstaProvider} from 'konsta/react'; import {AppNavigationBar} from './src/app-navigation-bar';
+  import {nextScrollNavigation} from './src/app-navigation';
   function Fixture() {
     const [config,setConfig]=useState({active:'overview',compact:false,count:5});
+    const scrollState=useRef({lastY:0,travel:0,compact:false});
+    useEffect(()=>{const scroll=()=>{if(!window.scrollNav)return;const next=nextScrollNavigation(scrollState.current,scrollY,document.documentElement.scrollHeight-innerHeight);scrollState.current=next;setConfig(current=>({...current,compact:next.compact}));};window.addEventListener('scroll',scroll,{passive:true});return()=>window.removeEventListener('scroll',scroll);},[]);
     window.configure=changes=>setConfig(current=>({...current,...changes}));
     return <KonstaProvider theme="ios" dark={window.dark}><div className="bb-app-shell">
       <AppNavigationBar active={config.active} current={config.settings ? null : config.active} compact={config.compact} reconciliationVisible={config.count===5}
@@ -34,25 +37,28 @@ async function geometry(page, label, compact) {
       bubble: rect(host.querySelector('.bb-navigation-selection')),
       icon: rect(selected.querySelector('svg')),
       variants: [...host.querySelectorAll('button')].map(n=>({state:n.dataset.state,variant:n.querySelector('svg').dataset.variant,fill:getComputedStyle(n.querySelector('svg')).fill,stroke:getComputedStyle(n.querySelector('svg')).stroke,text:n.innerText})),
+      ink: getComputedStyle(host).color, iconColors: [...host.querySelectorAll('button svg')].map(n=>getComputedStyle(n).color),
       pane: rect(host), stacks: [...host.querySelectorAll('button > span')].map(rect),
+      anchor:host.style.getPropertyValue('--bb-nav-selection-center'),lensLeft:getComputedStyle(host.querySelector('.bb-navigation-selection')).left,
       targets: [...host.querySelectorAll('button')].map(rect),
       overflow: document.documentElement.scrollWidth > innerWidth,
     }
   })
   assert.equal(result.selected, label)
   const { button, bubble, icon } = result
-  const close = (a, b, message) => assert.ok(Math.abs(a - b) <= 0.25, `${message}: ${a} vs ${b}`)
+  const close = (a, b, message) => assert.ok(Math.abs(a - b) <= 0.25, `${message}: ${a} vs ${b}; ${JSON.stringify(result)}`)
   close(bubble.x + bubble.width / 2, button.x + button.width / 2, 'Bubble must center on the actual selected button')
   close(bubble.y + bubble.height / 2, button.y + button.height / 2, 'Vertical centering')
   close(bubble.x + bubble.width / 2, icon.x + icon.width / 2, 'Icon must center in the bubble')
+  assert.ok(result.iconColors.every(color=>color===result.ink),'Selected and outline glyphs use the same neutral ink as the reference')
   const contents = [icon]
   for(const item of result.variants){assert.equal(item.text,'','No visible nav labels in either size');assert.equal(item.variant,item.state==='active'?'filled':'outline');if(item.state==='active')assert.notEqual(item.fill,'none','Selected icons paint a solid silhouette');else{assert.equal(item.fill,'none');assert.notEqual(item.stroke,'none','Inactive icons retain their outline')}}
   const centers=result.targets.map(r=>r.x+r.width/2),spacing=centers[1]-centers[0]
   result.targets.forEach(r=>close(r.width,result.targets[0].width,'Equal-width navigation targets'))
   for(let i=2;i<centers.length;i++)close(centers[i]-centers[i-1],spacing,'Icons must be equally spaced')
-  const widestStack = Math.max(...result.stacks.map(stack => stack.width))
-  const tallestStack = Math.max(...result.stacks.map(stack => stack.height))
-  assert.ok(bubble.width <= widestStack + 13 && bubble.height <= tallestStack + 13, 'One shared size fits every icon')
+  const rim=compact?4:5
+  close(bubble.height,result.pane.height-rim*2,'Selection has concentric vertical glass inset')
+  close(bubble.width,button.width+rim*2,'Broad capsule spans the tab track rather than only its icon')
   assert.ok(bubble.x >= result.pane.x + 1 && bubble.right <= result.pane.right - 1, 'Edge capsules stay inside the glass')
   for (const content of contents) {
     assert.ok(content.x >= bubble.x + 1 && content.right <= bubble.right - 1, `Bubble must enclose ${label} horizontally`)
@@ -137,14 +143,62 @@ async function fixture(browser, width, dark, reducedMotion = 'reduce') {
         await page.close()
       }
       const moving = await fixture(browser, 390, true, 'no-preference')
+      await moving.evaluate(()=>window.configure({active:'transactions'}));await moving.waitForTimeout(700)
+      await moving.evaluate(() => {
+        window.scrollNav=true;document.body.style.minHeight='2000px'
+        window.__compactFrames=[];window.__sampleCompact=true
+        const sample=()=>{if(!window.__sampleCompact)return;const pane=document.querySelector('.bb-navigation-pane'),lens=pane.querySelector('.bb-navigation-selection').getBoundingClientRect(),button=pane.querySelector('button[data-state="active"]').getBoundingClientRect(),r=pane.getBoundingClientRect();window.__compactFrames.push({width:r.width,height:r.height,error:Math.abs(lens.x+lens.width/2-button.x-button.width/2)});requestAnimationFrame(sample)};sample()
+      })
       for (const compact of [true, false]) {
-        await moving.evaluate(compact => window.configure({ active: 'transactions', compact }), compact)
+        await moving.evaluate(compact => window.scrollTo(0,compact?160:20),compact)
+        await moving.locator(`.bb-bottom-navigation[data-compact="${compact}"]`).waitFor()
         await moving.waitForTimeout(600)
         await geometry(moving, 'Transactions', compact)
       }
+      // Reversing before the shrink finishes must continue from its painted
+      // size, and every icon/selection must remain aligned throughout.
+      await moving.evaluate(()=>window.scrollTo(0,200));await moving.waitForTimeout(100)
+      await moving.evaluate(()=>window.scrollTo(0,100));await moving.waitForTimeout(600)
+      await geometry(moving,'Transactions',false)
+      const compactFrames=await moving.evaluate(()=>{window.__sampleCompact=false;return window.__compactFrames})
+      assert.ok(Math.max(...compactFrames.map(f=>f.error))<1.2,'The selected capsule stays with its icon while shrinking, expanding and reversing')
+      assert.ok(new Set(compactFrames.map(f=>Math.round(f.height*10))).size>=6,'Bar shrink and expansion paint intermediate sizes')
       await moving.setViewportSize({ width: 320, height: 700 })
       await moving.waitForTimeout(600)
       await geometry(moving, 'Transactions', false)
+      // Real animation frames must travel continuously and retarget from the
+      // visible lens, with a small elastic settle instead of a jump/crossfade.
+      await moving.evaluate(()=>window.configure({active:'overview'}));await moving.waitForTimeout(700)
+      await moving.evaluate(()=>{
+        window.__navFrames=[];window.__sampleNav=true
+        const sample=()=>{if(!window.__sampleNav)return;const pane=document.querySelector('.bb-navigation-pane'),lens=pane.querySelector('.bb-navigation-selection'),surface=pane.querySelector('.bb-navigation-lens-surface'),r=lens.getBoundingClientRect();window.__navFrames.push({x:r.x,width:r.width,paintWidth:surface.getBoundingClientRect().width});requestAnimationFrame(sample)};sample()
+      })
+      const resting=await moving.locator('.bb-navigation-selection').boundingBox()
+      await moving.getByRole('button',{name:'Reconcile',exact:true}).click();await moving.waitForTimeout(110)
+      const beforeRetarget=await moving.locator('.bb-navigation-selection').boundingBox()
+      assert.ok(beforeRetarget.x>resting.x+5,'The lens actually slides across intervening tabs')
+      await moving.getByRole('button',{name:'Transactions',exact:true}).click();await moving.waitForTimeout(700)
+      await geometry(moving,'Transactions',false)
+      const frames=await moving.evaluate(()=>{window.__sampleNav=false;return window.__navFrames})
+      assert.ok(new Set(frames.map(f=>Math.round(f.x*10))).size>=6,'The browser paints intermediate positions')
+      assert.ok(frames.some(f=>f.paintWidth>f.width*1.015),'The lens gently deforms in transit')
+      const surface=await moving.locator('.bb-navigation-lens-surface').boundingBox(),settled=await moving.locator('.bb-navigation-selection').boundingBox()
+      assert.ok(Math.abs(surface.width-settled.width)<.25,'The settled material relaxes completely');cases++
+      // A live finger can move the lens within one tab, not only at tab edges.
+      // WebKit's synthetic pointer uses the same handlers; Chromium's native
+      // pointer capture/drag/cancel coverage above remains in place.
+      const pane=moving.locator('.bb-navigation-pane'),button=await moving.getByRole('button',{name:'Transactions',exact:true}).boundingBox(),x=button.x+button.width/2,y=button.y+button.height/2
+      await pane.evaluate((el,{x,y})=>{window.__capturePointer=el.setPointerCapture;el.setPointerCapture=()=>{};el.dispatchEvent(new PointerEvent('pointerdown',{bubbles:true,pointerId:81,pointerType:'touch',clientX:x,clientY:y}))},{x,y})
+      await moving.waitForTimeout(100)
+      const selections=await moving.evaluate(()=>window.selections.length)
+      await pane.evaluate((el,{x,y})=>el.dispatchEvent(new PointerEvent('pointermove',{bubbles:true,pointerId:81,pointerType:'touch',clientX:x+12,clientY:y})),{x,y})
+      await moving.waitForTimeout(120)
+      const following=await moving.locator('.bb-navigation-selection').boundingBox()
+      assert.ok(Math.abs(following.x+following.width/2-x-12)<1,'The lens follows the finger continuously within one tab')
+      assert.equal(await moving.evaluate(()=>window.selections.length),selections,'Preview cannot navigate before release')
+      await pane.evaluate((el,{x,y})=>{el.dispatchEvent(new PointerEvent('pointercancel',{bubbles:true,pointerId:81,pointerType:'touch',clientX:x+12,clientY:y}));el.setPointerCapture=window.__capturePointer},{x,y})
+      await moving.waitForTimeout(700);await geometry(moving,'Transactions',false)
+      assert.equal(await moving.evaluate(()=>window.selections.length),selections,'Cancellation springs back without navigation');cases++
       if (process.env.BOOKIEBOT_NAV_SCREENSHOT) await moving.screenshot({ path: process.env.BOOKIEBOT_NAV_SCREENSHOT, clip: { x: 0, y: 610, width: 320, height: 90 } })
       await moving.close()
     } finally { await browser.close() }
