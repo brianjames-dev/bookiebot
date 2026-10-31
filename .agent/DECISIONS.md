@@ -1,5 +1,9 @@
 # Agent Decisions
 
+## 2026-10-31 - Callout Names And Invisible Focus Styling
+
+At the user’s request, display Needs subscriptions as **Subs (Needs)** in every callout alias/fallback, with existing font measurement and routing. Keep Wants subs and canonical transaction/category labels unchanged. Callout groups and their background rectangles must never paint a focus outline, shadow or selection stroke, including keyboard focus and touch/dialog restoration. Retain focusability, keyboard activation and pending-pop completion, plus the ring center’s focus treatment. This supersedes the visible callout focus border from earlier decisions; native acceptance is checklist 211. No financial or Finance Ops change.
+
 ## 2026-10-31 - Faster Category Spring And Reverse Fireworks
 
 For geometry-only Category Mix toggles, keep the native Recharts interpolation owner but use a 320ms damped spring with about 3% overshoot. Start stems at 200ms, during the near-settled tail, instead of waiting 520ms. Preserve the existing 520ms ease-out for data/angle changes. The center label still reads the same painted geometry, including interrupted and overshoot frames.

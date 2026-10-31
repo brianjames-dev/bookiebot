@@ -23,6 +23,10 @@ for(const view of Object.values(report.modeViews)) {
  view.categoryBalances={raw:{needs:351.54,wants:965.6,savings:0},remaining:{needs:351.54,wants:965.6,savings:0},deficits:{needs:0,wants:0,savings:0},transfers:[],totalOverspend:0}
  Object.assign(view.savingsInvesting,{cashSaved:1596.62,esppContribution:400,estimatedEsppContribution:0,combinedContributions:1996.62})
 }
+async function checkCalloutFocus(card){
+ const styles=await card.evaluate(el=>[el,el.querySelector('rect')].map(node=>{const style=getComputedStyle(node);return {outline:style.outlineStyle,shadow:style.boxShadow,stroke:style.stroke,width:style.strokeWidth}}))
+ for(const style of styles){assert.equal(style.outline,'none');assert.equal(style.shadow,'none');assert.equal(style.stroke,'none');assert.equal(style.width,'0px','Callout focus must never draw an outline or border, including keyboard and dialog restoration')}
+}
 async function startMotionSamples(category){
  await category.evaluate(el=>{
   window.__categoryMotion={running:true,frames:[],start:null};el.querySelector('.bb-category-pie-center').addEventListener('click',()=>{window.__categoryMotion.start=performance.now()},{once:true})
@@ -110,6 +114,7 @@ async function checkCascade(category,reduced,fresh=true){
      await category.locator('.bb-contour-label').first().focus()
      await page.keyboard.press('Tab')
      assert.equal(await category.locator('.bb-contour-label:focus-visible').count(),1)
+     await checkCalloutFocus(category.locator('.bb-contour-label:focus-visible'))
      await category.getByRole('button',{name:'Hide category callouts',exact:true}).evaluate(n=>n.click())
      const reverse=await category.locator('.bb-contour-callouts').evaluate(svg=>({paint:getComputedStyle(svg).opacity,motions:svg.getAnimations({subtree:true}).filter(a=>a.effect?.target?.matches('.bb-contour-stem,.bb-contour-label')).map(a=>({id:a.effect.target.dataset.category,stem:a.effect.target.classList.contains('bb-contour-stem'),delay:a.effect.getTiming().delay,frames:a.effect.getKeyframes()}))}))
      assert.equal(reverse.paint,'1','The SVG stays painted for the full reverse cascade')
@@ -155,7 +160,7 @@ async function checkCascade(category,reduced,fresh=true){
      for(const key of ['curved','fits','dimmed','whole','centered','matched','textFits','captionFits'])assert.equal(geometry[key],true,JSON.stringify({engine:engine.name(),width,filter,key,geometry}))
      assert.equal(geometry.overlap,false,JSON.stringify(geometry));assert.equal(geometry.intrusion,null,JSON.stringify(geometry));assert.ok(geometry.minSeparation>=1.4,JSON.stringify(geometry));assert.equal(geometry.overflow,false)
      assert.ok(Math.abs(geometry.hostCenter-width/2)<1,'The labeled ring stays centered in the page');assert.equal(geometry.percentFont,'24px');assert.equal(geometry.captionFont,'11px');assert.equal(geometry.captionGap,'0px');assert.equal(geometry.headerFont,'28px');assert.equal(geometry.titleFont,'28px');assert.ok(geometry.align<1,'Category selector is centered beside the amount');assert.ok(geometry.nameFont.every(font=>font==='11px'));assert.equal((await page.locator('.bb-chart-carousel-band').boundingBox()).height,originalHeight)
-     if(filter==='all'){if(width===390)assert.ok(geometry.ringWidth<=221&&geometry.ringWidth>150,'The compact ring fits the percentage callouts');assert.equal(geometry.paths,12);assert.ok(geometry.names.includes('Other needs'));assert.ok(geometry.names.includes('Bills & utils'));assert.ok(geometry.names.includes('Needs subs'));assert.ok(geometry.names.includes('Wants subs'))}
+     if(filter==='all'){if(width===390)assert.ok(geometry.ringWidth<=221&&geometry.ringWidth>150,'The compact ring fits the percentage callouts');assert.equal(geometry.paths,12);assert.ok(geometry.names.includes('Other needs'));assert.ok(geometry.names.includes('Bills & utils'));assert.ok(geometry.names.includes('Subs (Needs)'));assert.ok(geometry.names.includes('Wants subs'))}
      count++
     }
     await category.getByRole('combobox',{name:'Category mix filter',exact:true}).selectOption('all')
@@ -164,9 +169,11 @@ async function checkCascade(category,reduced,fresh=true){
     assert.equal(await category.locator('.bb-chart-page-footer').count(),0,'No redundant footer/details modal remains')
     const foodCard=category.locator('.bb-contour-label[data-category="food"]')
     assert.match(await foodCard.textContent(),/\$1,329 \/ 13\.3%/,'Amounts include the same percentage as the Categories list')
-    await foodCard.click();await page.getByRole('dialog').waitFor()
+    await foodCard.tap();await page.getByRole('dialog').waitFor()
     assert.match(await page.getByRole('dialog').innerText(),/Food/)
     await page.keyboard.press('Escape');await page.waitForTimeout(350)
+    assert.equal(await foodCard.evaluate(el=>{el.focus();return document.activeElement===el}),true)
+    await checkCalloutFocus(foodCard)
     const foodSlice=category.locator('.recharts-sector[aria-label="Inspect Food, $1,329.32"]')
     await foodSlice.hover();await page.waitForTimeout(150)
     assert.equal(await category.locator('.recharts-tooltip-wrapper').count(),0,'Slice hover cannot spawn the old thumbnail tooltip')

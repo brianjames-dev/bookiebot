@@ -14,9 +14,10 @@ const raw = [['rent','Rent',2500],['bills','Bills & Utilities',380],['needs-subs
 const measure = (text, size) => text.length * size * .56
 function input(rows, width) { const size=11; return rows.map(([id,label,amount])=>{const name=contourLabel(id,label),amountLabel=new Intl.NumberFormat('en-US',{style:'currency',currency:'USD',maximumFractionDigits:0}).format(amount)+' / '+new Intl.NumberFormat('en-US',{maximumFractionDigits:1}).format(amount/rows.reduce((sum,row)=>sum+Math.max(0,row[2]),0)*100)+'%';return {id,name,amount,amountLabel,width:Math.ceil(Math.max(measure(name,size),measure(amountLabel,size))+12)}}) }
 assert.equal(CONTOUR_STYLE.diameter,219);assert.equal(CONTOUR_STYLE.thickness,26);assert.equal(CONTOUR_STYLE.labelSize,11);assert.equal(CONTOUR_STYLE.labelGap,6);assert.equal(CONTOUR_STYLE.inset,8);assert.equal(CONTOUR_STYLE.drift,36)
-assert.equal(contourLabel('needs-subscriptions','Subscriptions (Needs)'),'Needs subs')
+assert.equal(contourLabel('needs-subscriptions','Subscriptions (Needs)'),'Subs (Needs)')
+assert.equal(contourLabel('needs_subscriptions','Recurring costs'),'Subs (Needs)')
 assert.equal(contourLabel('wants-subscriptions','Subscriptions (Wants)'),'Wants subs')
-assert.equal(contourLabel('static_bills_subscriptions_needs','Static Bills & Subscriptions'),'Needs subs')
+assert.equal(contourLabel('static_bills_subscriptions_needs','Static Bills & Subscriptions'),'Subs (Needs)')
 assert.equal(contourLabel('need','Need transactions'),'Other needs')
 assert.equal(contourLabel('bills','Bills & Utilities'),'Bills & utils')
 function validate(scene) {

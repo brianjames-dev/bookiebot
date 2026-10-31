@@ -3365,7 +3365,17 @@ button:focus-visible, summary:focus-visible {
 .bb-contour-label { opacity: 0; transform-box: view-box; transform: translate(var(--bb-contour-from-x, 0px), var(--bb-contour-from-y, 0px)) scale(.01); }
 /* Focus finishes a pending card pop; it must not override the exit's frames. */
 .bb-contour-label rect { fill: color-mix(in srgb, hsl(var(--foreground)) 5%, hsl(var(--card))); }
-.bb-contour-label:focus-visible rect { stroke: hsl(var(--primary)); stroke-width: 1px; }
+/* Callout focus stays functional without painting a selection outline. */
+.bb-category-chart-box svg .bb-contour-label,
+.bb-category-chart-box svg .bb-contour-label:focus,
+.bb-category-chart-box svg .bb-contour-label:focus-visible,
+.bb-contour-label rect {
+  outline: none !important;
+  box-shadow: none !important;
+  stroke: none !important;
+  stroke-width: 0 !important;
+  -webkit-tap-highlight-color: transparent;
+}
 .bb-contour-name { font-weight: 400; }
 .bb-contour-name:not([fill]) { fill: hsl(var(--muted-foreground)); }
 .bb-contour-amount { fill: hsl(var(--foreground)); font-weight: 500; font-variant-numeric: tabular-nums; }

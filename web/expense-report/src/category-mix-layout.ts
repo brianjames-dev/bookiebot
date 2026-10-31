@@ -101,11 +101,11 @@ export type ContourScene = {
 export const CONTOUR_STYLE: ContourStyle = { diameter: 219, thickness: 26, centerSize: 24, labelSize: 11, labelGap: 6, inset: 8, stemOpacity: .65, bend: 10, calloutRadius: 18, sidePadding: 6, drift: 36 };
 export const CONTOUR_PADDING_ANGLE = .7;
 export function contourLabel(key: string, label: string): string {
-    const names: Record<string, string> = { need: "Other needs", need_expenses: "Other needs", bills_utilities: "Bills & utils", needs: "Other needs", grocery: "Groceries", bills: "Bills & utils", utilities: "Bills & utils", needs_subscriptions: "Needs subs", wants_subscriptions: "Wants subs", food: "Eating out", espp: "SpaceX ESPP" };
+    const names: Record<string, string> = { need: "Other needs", need_expenses: "Other needs", bills_utilities: "Bills & utils", needs: "Other needs", grocery: "Groceries", bills: "Bills & utils", utilities: "Bills & utils", needs_subscriptions: "Subs (Needs)", wants_subscriptions: "Wants subs", food: "Eating out", espp: "SpaceX ESPP" };
     if (key.startsWith("coverage-"))
         return label.replace(" overspend coverage", " coverage");
     if (/subscriptions/i.test(label))
-        return /needs/i.test(key + " " + label) ? "Needs subs" : "Wants subs";
+        return /needs/i.test(key + " " + label) ? "Subs (Needs)" : "Wants subs";
     return names[key] ?? label;
 }
 const probe = createContourPathProbe();
