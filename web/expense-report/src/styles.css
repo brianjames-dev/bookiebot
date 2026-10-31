@@ -1932,6 +1932,10 @@ button.bb-left-categories { cursor: pointer; }
   -webkit-tap-highlight-color: transparent;
 }
 
+.bb-chart-container .recharts-cartesian-grid line {
+  stroke: hsl(var(--muted-foreground));
+}
+
 .bb-chart-container .recharts-wrapper,
 .bb-chart-container .recharts-surface,
 .bb-chart-container svg,

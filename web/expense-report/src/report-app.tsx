@@ -1229,7 +1229,7 @@ function BurnRateChart({
             <XAxis dataKey="label" tickLine={false} axisLine={false} interval="preserveStartEnd" />
             <YAxis domain={yAxisDomain} tickFormatter={(value) => `$${value}`} tickLine={false} axisLine={false} width={58} />
             <Area type="monotone" dataKey="variance" baseValue={0} stroke="none" fill={lineColor} fillOpacity={0.1} tooltipType="none" activeDot={false} connectNulls={false} isAnimationActive={false} />
-            <ReferenceLine y={0} stroke="hsl(var(--foreground))" strokeOpacity={0.45} strokeWidth={1.5} />
+            <ReferenceLine y={0} stroke="hsl(var(--foreground))" strokeOpacity={1} strokeWidth={1.5} />
             {tooltipPortal && <ChartTooltip portal={tooltipPortal} trigger={touch ? "click" : "hover"} isAnimationActive={false} fadeDuration={360} content={<BurnRateTooltipContent monthName={monthName} portal={tooltipPortal} />} />}
             <Line
               type="monotone"

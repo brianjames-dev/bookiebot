@@ -257,6 +257,9 @@ const area=view.root.findByType(runtime.Area),lineView=view.root.findByType(runt
 assert.equal(area.props.baseValue,0);assert.equal(area.props.fillOpacity,.1);assert.equal(area.props.isAnimationActive,false)
 assert.equal(lineView.props.strokeWidth,3);assert.equal(lineView.props.isAnimationActive,false)
 assert.equal(lineView.props.stroke,'url(#burn-rate-variance-gradient)')
+const zeroLine=view.root.findByType(runtime.ReferenceLine)
+assert.equal(zeroLine.props.y,0);assert.equal(zeroLine.props.stroke,'hsl(var(--foreground))')
+assert.equal(zeroLine.props.strokeOpacity,1,'The zero baseline uses full-contrast foreground rather than fading to grey')
 
 const pace=view.root.findByProps({className:'bb-burn-rate-pace bb-positive'})
 assert.equal(pace.children[0].type,'span');assert.equal(pace.children[0].children[0],'Saving')
