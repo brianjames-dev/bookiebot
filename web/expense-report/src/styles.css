@@ -2228,9 +2228,11 @@ button.bb-left-categories { cursor: pointer; }
 .bb-burn-tooltip-portal .recharts-tooltip-wrapper { position: static !important; transform: none !important; transition: none !important; pointer-events: none; }
 .bb-burn-tooltip-portal .bb-chart-tooltip-frame { transform: translateY(0) scale(1); transition-property: opacity, transform; transition-duration: var(--bb-tooltip-fade-duration) !important; transition-timing-function: cubic-bezier(.4, 0, .2, 1); }
 .bb-burn-tooltip-portal .bb-chart-tooltip-frame-entering,
+.bb-burn-tooltip-portal[data-scroll-hidden="true"] .bb-chart-tooltip-frame,
 .bb-burn-tooltip-portal .bb-chart-tooltip-frame-dismissing { opacity: 0; transform: translateY(3px) scale(.97); }
 @media (prefers-reduced-motion: reduce) {
-  .bb-burn-tooltip-portal .bb-chart-tooltip-frame { transform: none; }
+  .bb-burn-tooltip-portal .bb-chart-tooltip-frame,
+  .bb-burn-tooltip-portal[data-scroll-hidden="true"] .bb-chart-tooltip-frame { transform: none; }
 }
 .bb-burn-node-tooltip { container-type: inline-size; width: 184px; max-width: calc(100cqw - 104px); padding: 9px; border: 1px solid hsl(var(--border)); border-radius: 12px; background: hsl(var(--card)); color: hsl(var(--foreground)); box-shadow: 0 5px 18px hsl(var(--background) / .38); font-size: 11px; font-variant-numeric: tabular-nums; white-space: normal; }
 .bb-burn-node-tooltip strong { font-weight: 500; white-space: nowrap; }

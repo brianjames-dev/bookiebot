@@ -96,7 +96,7 @@ async function inspect(page){return page.locator('#bb-chart-burn-rate').evaluate
  for(const engineName of (process.env.BOOKIEBOT_BURN_ENGINE?[process.env.BOOKIEBOT_BURN_ENGINE]:['chromium','webkit'])){
  const browser=await engines[engineName].launch({headless:true})
  try{
- for(const width of (process.env.BOOKIEBOT_BURN_QUICK?[390]:[320,390,1280]))for(const dark of (process.env.BOOKIEBOT_BURN_QUICK&&!shell?[true]:[false,true])){
+ for(const width of (process.env.BOOKIEBOT_BURN_WIDTHS?process.env.BOOKIEBOT_BURN_WIDTHS.split(',').map(Number):process.env.BOOKIEBOT_BURN_QUICK?[390]:[320,390,1280]))for(const dark of (process.env.BOOKIEBOT_BURN_QUICK&&!shell?[true]:[false,true])){
   const touch=width<700,page=await browser.newPage({viewport:{width,height:900},hasTouch:touch,colorScheme:dark?'dark':'light',reducedMotion:dark?'reduce':'no-preference'}),errors=[],unexpected=[]
   page.setDefaultTimeout(8000);page.on('pageerror',e=>errors.push(e.message))
   await page.route('**/*',async route=>{const url=new URL(route.request().url()),name=url.pathname.split('/').pop();if(url.pathname==='/report')return route.fulfill({contentType:'text/html',headers:{'Content-Security-Policy':csp},body:html(reportFor(url.searchParams.get('scenario')||'regular'),dark,url.searchParams.has('before'))});if(name==='app.js')return route.fulfill({contentType:'application/javascript',body:js});if(name==='before.js'&&process.env.BOOKIEBOT_BURN_REFERENCE_SCRIPT)return route.fulfill({contentType:'application/javascript',body:fs.readFileSync(process.env.BOOKIEBOT_BURN_REFERENCE_SCRIPT,'utf8')});if(/^category-mix-layout-[\w-]+\.js$/.test(name))return route.fulfill({contentType:'application/javascript',body:fs.readFileSync(path.join(assets,name),'utf8')});if(shell){
@@ -109,6 +109,38 @@ async function inspect(page){return page.locator('#bb-chart-burn-rate').evaluate
   const open=async(scenario='regular',before=false)=>{await page.goto(`https://bookie.test/report?scenario=${scenario}${before?'&before=1':''}`);await page.getByRole('button',{name:'Show Burn Rate',exact:true}).click();await page.locator('#bb-chart-burn-rate').scrollIntoViewIfNeeded();await page.waitForFunction(()=>{const el=document.querySelector('.bb-chart-carousel');return el.dataset.settling==='false'&&Math.abs(el.scrollLeft-el.clientWidth-16)<1});await page.waitForTimeout(100)}
   if(shell){
    await open();checks=await checkCompactPresentation(page,width,engineName,checks)
+   // Require a real scroll-driven flip, not merely 'zero or one'. Both sides
+   // of a flat native trend are available as the card approaches a screen edge.
+   await open('plateau')
+   await page.locator('#bb-chart-burn-rate .recharts-wrapper').evaluate(el=>scrollTo(0,scrollY+el.getBoundingClientRect().top-340))
+   await page.waitForTimeout(400);await nativePoint(page,13,touch)
+   const initial=await inspect(page),direction=initial.side==='above'?1:-1
+   let flipped
+   for(let i=0;i<18;i++) {
+    await page.evaluate(delta=>scrollBy(0,delta),direction*24);await page.waitForTimeout(30)
+    const now=await inspect(page)
+    if(now.local!==initial.local){flipped=now;break}
+   }
+   assert.ok(flipped,JSON.stringify({message:'Scrolling must actually use the allowed opposite-side move',engineName,dark,initial,current:await inspect(page)}))
+   assert.notEqual(flipped.side,initial.side);assert.equal(flipped.hidesDot,false);assert.equal(flipped.curveHits,0);assert.deepEqual(flipped.fixedHits,[])
+   assert.ok(flipped.anchorDistance<=Math.max(32,flipped.card.height/2)+1,JSON.stringify(flipped));checks++
+   // After spending the move, fade before the viewport edge without chasing it.
+   await page.evaluate(delta=>scrollBy(0,delta),flipped.card.top-24)
+   await page.waitForFunction(()=>document.querySelector('.bb-burn-tooltip-portal').dataset.scrollHidden==='true')
+   const exit=await page.locator('.bb-burn-tooltip-portal').evaluate(async portal=>{
+    const frames=[],start=performance.now()
+    while(performance.now()-start<420){await new Promise(requestAnimationFrame);frames.push({opacity:Number(getComputedStyle(portal.querySelector('.bb-chart-tooltip-frame')).opacity),local:portal.style.transform,frameTransform:getComputedStyle(portal.querySelector('.bb-chart-tooltip-frame')).transform})}
+    return frames
+   })
+   assert.ok(exit.some(f=>f.opacity>0&&f.opacity<1),JSON.stringify(exit));assert.equal(exit.at(-1).opacity,0)
+   if(dark)assert.ok(exit.every(f=>f.frameTransform==='none'),'Reduced motion scroll exit fades without scaling')
+   assert.ok(exit.every(f=>f.local===flipped.local),'Exit animation must never move the chart-local anchor');checks++
+   await page.evaluate(()=>scrollBy(0,-200));await page.waitForTimeout(400)
+   assert.equal(await page.locator('.bb-burn-tooltip-portal').getAttribute('data-scroll-hidden'),'false')
+   assert.equal((await inspect(page)).local,flipped.local,'Scrolling back can reveal the retained card without another relocation');checks++
+   if(process.env.BOOKIEBOT_BURN_SCROLL_ONLY){
+    assert.deepEqual(errors,[]);assert.deepEqual(unexpected,[]);console.log(engineName,width,'scroll flip/fade',dark?'dark':'light','PASS');await page.close();continue
+   }
    for(const crest of [6,14,22]){
     await open(`crest-${crest}`)
     for(const chartTop of [260,560])for(const compact of [false,true]){

@@ -13,6 +13,7 @@ html.bb-pull-refresh-enabled { overscroll-behavior-y: contain; }
 .bb-pull-refresh-space[data-released="true"] > .bb-pull-refresh { animation: bb-pull-release 320ms var(--bb-motion-ease) both; }
 .bb-pull-refresh[data-visible="true"] { transform: translate(-50%, calc(var(--bb-pull-distance) / 2 - 32px)); opacity: 1; }
 .bb-pull-refresh[data-phase="pulling"], .bb-pull-refresh[data-phase="armed"] { position: fixed; top: max(10px, env(safe-area-inset-top, 0px)); transition: opacity 100ms; }
+.bb-pull-refresh[data-phase="canceling"] { position: fixed; top: max(10px, env(safe-area-inset-top, 0px)); transform: translate(-50%, -64px); }
 .bb-pull-refresh-button { position: relative; display: grid; place-items: center; width: 64px; height: 64px; border: 0; border-radius: 50%; padding: 6px; background: transparent; color: hsl(var(--primary)); cursor: pointer; pointer-events: auto; touch-action: manipulation; }
 .bb-pull-refresh-button svg { width: 52px; height: 52px; fill: none; stroke: currentColor; stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; }
 .bb-pull-disc { position: relative; display: block; width: 52px; height: 52px; border-radius: 50%; background: hsl(var(--primary) / .045); transform: scale(var(--bb-pull-scale, 1)); transition: transform 240ms var(--bb-motion-ease), background 220ms; }

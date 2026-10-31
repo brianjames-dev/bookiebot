@@ -7,7 +7,7 @@ import "./pull-to-refresh.css"
 export const PULL_REFRESH_THRESHOLD = 72
 const PULL_REFRESH_HOLD = 64
 export function pullRefreshDistance(travel: number) { return Math.min(96, Math.max(0, travel) / 3.75) }
-type Phase = "idle" | "pulling" | "armed" | "refreshing" | "done" | "settling" | "error"
+type Phase = "idle" | "pulling" | "armed" | "canceling" | "refreshing" | "done" | "settling" | "error"
 type Gesture = { x: number; y: number; lastY: number; scrollY: number; identifier: number; captured: boolean }
 
 function pageIsBlocked() {
@@ -39,6 +39,14 @@ export function PullToRefresh({ screen, blocked = false }: { screen: AppScreen; 
   state.current = { screen, blocked }
   const available = !blocked && registry.available(screen)
   const reset = () => { window.clearTimeout(timer.current); gesture.current = null; pulled.current = 0; setDistance(0); if (!running.current) setPhase("idle") }
+  const cancelPull = () => {
+    if (running.current || pulled.current <= 0) { reset(); return }
+    // Keep the live indicator's viewport anchor until it has faded above the
+    // page. Switching straight to the idle document anchor causes a visible jump.
+    window.clearTimeout(timer.current); gesture.current = null; pulled.current = 0
+    setDistance(0); setPhase("canceling")
+    timer.current = window.setTimeout(() => setPhase("idle"), window.matchMedia?.("(prefers-reduced-motion: reduce)").matches ? 0 : 400)
+  }
   const refresh = async () => {
     const selected = state.current.screen
     if (running.current || state.current.blocked || pageIsBlocked() || !registry.available(selected)) return
@@ -61,7 +69,7 @@ export function PullToRefresh({ screen, blocked = false }: { screen: AppScreen; 
       timer.current = window.setTimeout(reset, window.matchMedia?.("(prefers-reduced-motion: reduce)").matches ? 0 : 500)
     }, success ? 900 : 4000)
   }
-  const actions = useRef({ reset, refresh }); actions.current = { reset, refresh }
+  const actions = useRef({ reset, refresh, cancelPull }); actions.current = { reset, refresh, cancelPull }
 
   useEffect(() => {
     mounted.current = true
@@ -126,9 +134,9 @@ export function PullToRefresh({ screen, blocked = false }: { screen: AppScreen; 
       // Recheck the release position: retreating below the threshold cancels.
       const distance = gesture.current.captured ? pullRefreshDistance(release.clientY - gesture.current.y) : 0
       if (distance >= PULL_REFRESH_THRESHOLD && window.scrollY <= 1) void actions.current.refresh()
-      else actions.current.reset()
+      else actions.current.cancelPull()
     }
-    const cancel = () => { if (gesture.current) actions.current.reset() }
+    const cancel = () => { if (gesture.current) actions.current.cancelPull() }
     document.addEventListener("touchstart", start, { passive: true })
     document.addEventListener("touchmove", move, { passive: true })
     document.addEventListener("touchend", end, { passive: true })
@@ -159,7 +167,11 @@ export function PullToRefresh({ screen, blocked = false }: { screen: AppScreen; 
       // must not discard that native gesture before its first movement.
       window.clearTimeout(timer.current); setPhase("idle")
     }}>
-    <div className="bb-pull-refresh" data-phase={phase} data-visible={visible} data-blocked={blocked} style={{
+    <div className="bb-pull-refresh" data-phase={phase} data-visible={visible} data-blocked={blocked}
+      onTransitionEnd={event => {
+        if (phase !== "canceling" || event.target !== event.currentTarget || event.propertyName !== "opacity") return
+        window.clearTimeout(timer.current); setPhase("idle")
+      }} style={{
       "--bb-pull-distance": `${visible ? Math.min(distance, PULL_REFRESH_THRESHOLD) : 0}px`,
       "--bb-pull-scale": tracking ? .72 + .36 * ratio : 1,
       "--bb-release-overscroll": `${releaseOverscroll}px`,

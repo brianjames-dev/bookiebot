@@ -84,6 +84,20 @@ const settle = async () => {await act(async()=>{await Promise.resolve();await Pr
   const smallScale=renderer.root.findByProps({className:'bb-pull-refresh'}).props.style['--bb-pull-scale']
   move({y:150});assert.ok(renderer.root.findByProps({className:'bb-pull-refresh'}).props.style['--bb-pull-scale']>smallScale,'The icon grows with finger travel')
   await release({y:90}); assert.equal(calls.length,0,'Short pull cancels')
+  assert.equal(phase(),'canceling','A canceled pull retains its live anchor through retraction')
+  assert.equal(renderer.root.findByProps({className:'bb-pull-refresh-space'}).props.style.height,0,'Canceling never inserts a loading gap')
+  assert.equal(renderer.root.findByProps({className:'bb-pull-refresh'}).props['data-visible'],false)
+  for(const y of [-32,-16,0]) {
+    scroll(y);assert.equal(phase(),'canceling');assert.equal(frames.size,0,'Canceled native rebound never schedules layout/position updates')
+  }
+  const cancelIndicator=renderer.root.findByProps({className:'bb-pull-refresh'}),cancelTarget={}
+  start()
+  act(()=>cancelIndicator.props.onTransitionEnd({target:cancelTarget,currentTarget:cancelTarget,propertyName:'opacity'}))
+  assert.equal(phase(),'idle');assert.equal(timers.size,0)
+  move({y:90});assert.equal(progress(),26,'Finishing cancellation cannot discard a new native gesture')
+  await release({y:90})
+  act(()=>{for(const [id,timer] of [...timers])if(timer.delay===400){timers.delete(id);timer.callback()}})
+  assert.equal(phase(),'idle','Canceled pulls clean up without transition events too')
   start(); move({y:290}); assert.equal(phase(),'armed'); assert.equal(progress(),100)
   move({y:100}); await release({y:100}); assert.equal(calls.length,0,'Retreat below threshold cancels')
   start({target:buttonIcon}); const captured=move({y:290}); assert.equal(captured.defaultPrevented,false)

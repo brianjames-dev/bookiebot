@@ -151,6 +151,27 @@ for(const selectedX of [90,94,98,102,106,110,114,118]){
  assert.equal(portal.style.transform,clean.style.transform,'Neighboring days cannot inherit a near-tied old anchor')
 }
 
+// Revealing a much closer opposite pocket is useful even while the old
+// placement remains fully readable; waiting for occlusion misses this case.
+curve='reveal-slope'
+line.getPointAtLength=at=>({matrixTransform:()=>({x:60+at,y:40+at*2/3})})
+helper.window.visualViewport={offsetLeft:0,offsetTop:190,width:390,height:900}
+const revealPortal={parentElement:{...portal.parentElement},style:{},dataset:{}}
+const revealNode={offsetWidth:184,offsetHeight:102,dataset:{inspectedDay:'8'}}
+const revealPosition=()=>{const [x,y]=revealPortal.style.transform.match(/[-\d.]+/g).map(Number);return{x,y}}
+positionBurnRateTooltip(revealPortal,revealNode,75)
+const beforeReveal=revealPosition(),revealSamples=Array.from({length:91},(_,i)=>({x:60+i*3,y:40+i*2}))
+assert.equal(burnRateTooltipSide(beforeReveal,tooltip,revealSamples),1)
+assert.ok(beforeReveal.y>=136,'The clipped upper pocket initially needs a more distant lower anchor')
+helper.window.visualViewport.offsetTop=0
+positionBurnRateTooltip(revealPortal,revealNode,75)
+assert.equal(burnRateTooltipSide(revealPosition(),tooltip,revealSamples),-1,'Newly revealed upper space uses the one opposite-side move')
+assert.ok(Math.abs(revealPosition().y+102-50)<=16,'The revealed card attaches closely to its selected node')
+assert.equal(revealPortal.dataset.scrollHidden,'false','The still-readable card does not need to disappear before moving')
+delete helper.window.visualViewport
+curve='flat'
+line.getPointAtLength=at=>({matrixTransform:()=>({x:60+at,y:150})})
+
 // Lock chart-local coordinates after at most one useful opposite-side move.
 let scrollPaints=0
 const scrollPortal={parentElement:{...portal.parentElement},style:new Proxy({},{set(object,key,value){if(key==='transform')scrollPaints++;object[key]=value;return true}}),dataset:{}}
@@ -167,18 +188,18 @@ assert.deepEqual(readPosition(),firstAnchor,'A newly optimal pocket cannot move 
 helper.window.innerHeight=200;positionBurnRateTooltip(scrollPortal,scrollNode,180)
 assert.deepEqual(readPosition(),firstAnchor,'An offscreen selected node cannot trigger a viewport-chasing relocation')
 helper.window.innerHeight=900
-fixedElements=[{getBoundingClientRect:()=>({left:0,top:0,width:390,height:280})}]
+fixedElements=[{getBoundingClientRect:()=>({left:0,top:0,width:390,height:firstAnchor.y+150-20})}]
 positionBurnRateTooltip(scrollPortal,scrollNode,180)
 const flippedAnchor=readPosition()
-assert.equal(burnRateTooltipSide(flippedAnchor,tooltip,equalFlat),1,'The one relocation crosses the actual trend line')
-assert.equal(scrollPortal.style.opacity,'')
+assert.equal(burnRateTooltipSide(flippedAnchor,tooltip,equalFlat),1,'The one relocation crosses the actual trend line before controls cover the old card')
+assert.equal(scrollPortal.dataset.scrollHidden,'false')
 fixedElements=[{getBoundingClientRect:()=>({left:0,top:310,width:390,height:590})}]
 for(let i=0;i<8;i++)positionBurnRateTooltip(scrollPortal,scrollNode,180)
 assert.deepEqual(readPosition(),flippedAnchor,'Further navigation/viewport changes cannot keep repinning the card')
 assert.equal(scrollPaints,2,'One initial transform and one opposite-side transform; scrolling cannot repaint repeatedly')
-assert.equal(scrollPortal.style.opacity,'0','Fixed controls hide a locked anchor instead of repelling it')
+assert.equal(scrollPortal.dataset.scrollHidden,'true','Fixed controls start the CSS exit instead of repelling the locked card')
 fixedElements=[];positionBurnRateTooltip(scrollPortal,scrollNode,180)
-assert.deepEqual(readPosition(),flippedAnchor);assert.equal(scrollPortal.style.opacity,'')
+assert.deepEqual(readPosition(),flippedAnchor);assert.equal(scrollPortal.dataset.scrollHidden,'false')
 helper.window.innerHeight=320
 positionBurnRateTooltip(scrollPortal,scrollNode,180)
 assert.deepEqual(readPosition(),flippedAnchor,'Viewport clipping does not reset the relocation budget')
@@ -203,9 +224,9 @@ fixedElements=[]
 
 fixedElements=[{getBoundingClientRect:()=>({left:0,top:0,width:390,height:900})}]
 positionBurnRateTooltip(portal,node,160)
-assert.equal(portal.style.opacity,'0','Do not paint a card under fixed controls when no visible placement fits')
+assert.equal(portal.dataset.scrollHidden,'true','Do not paint a card under fixed controls when no visible placement fits')
 fixedElements=[];positionBurnRateTooltip(portal,node,160)
-assert.equal(portal.style.opacity,'','Recover as soon as the floating control is no longer covering the panel')
+assert.equal(portal.dataset.scrollHidden,'false','Recover as soon as the floating control is no longer covering the panel')
 
 const source=fs.readFileSync('web/expense-report/src/report-app.tsx','utf8')
 const file=ts.createSourceFile('app.tsx',source,ts.ScriptTarget.Latest,true,ts.ScriptKind.TSX)

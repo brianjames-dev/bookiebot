@@ -119,6 +119,26 @@ async function waitReady(page,label) {
           await page.waitForTimeout(350)
           await page.screenshot({path:`/tmp/bookiebot-header-${engine.name()}.png`})
         }
+        // A subthreshold release must keep the live viewport anchor until it
+        // retracts above the page; never jump into the document/brand on release.
+        await page.evaluate(()=>scrollTo(0,0))
+        await gesture(page,210,{finish:false});await page.waitForTimeout(60)
+        const cancelBefore=await page.locator('.bb-pull-refresh').evaluate(n=>({top:n.getBoundingClientRect().top,position:getComputedStyle(n).position}))
+        assert.equal(cancelBefore.position,'fixed')
+        await gesture(page,210,{begin:false})
+        const canceled=await page.locator('.bb-pull-refresh').evaluate(async node=>{
+          const samples=[],start=performance.now()
+          while(performance.now()-start<460){await new Promise(requestAnimationFrame);const r=node.getBoundingClientRect();samples.push({phase:node.dataset.phase,top:r.top,position:getComputedStyle(node).position,opacity:Number(getComputedStyle(node).opacity),gap:document.querySelector('.bb-pull-refresh-space').getBoundingClientRect().height})}
+          return samples
+        })
+        if(!dark){
+          const moving=canceled.filter(s=>s.phase==='canceling')
+          assert.ok(moving.length>=3,JSON.stringify(canceled))
+          assert.ok(moving.some(s=>s.opacity>0&&s.opacity<1),'Cancellation visibly fades instead of teleporting')
+          assert.ok(moving.every(s=>s.position==='fixed'&&s.top<=cancelBefore.top+.5&&s.gap===0),JSON.stringify({cancelBefore,moving}))
+          for(let i=1;i<moving.length;i++)assert.ok(moving[i].top<=moving[i-1].top+.1,'Canceled glyph moves only up, never down over the content')
+        }
+        assert.equal(canceled.at(-1).phase,'idle');cases++
         for(const [label,path] of Object.entries(screens)) {
           await (label==='Settings' ? page.getByRole('button',{name:label,exact:true}) : page.getByRole('navigation',{name:'Main navigation'}).getByRole('button',{name:label,exact:true})).click()
           await page.evaluate(()=>window.scrollTo(0,0));await waitReady(page,label)

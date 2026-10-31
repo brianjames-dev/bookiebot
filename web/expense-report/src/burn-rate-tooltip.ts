@@ -22,6 +22,7 @@ export function burnRateTooltipSide(point: Point, tooltip: { width: number; heig
 export function burnRateTooltipPlacement(
   plot: Rect, tooltip: { width: number; height: number }, samples: Point[],
   selectedX?: number, bounds: Rect = plot, previous?: Point, avoid: Obstacle[] = [], requiredSide?: -1 | 1,
+  maxAnchorDistance = Infinity,
 ) {
   const { width, height } = tooltip
   const loX = bounds.x, loY = bounds.y
@@ -65,10 +66,10 @@ export function burnRateTooltipPlacement(
     // send a nearby card to the opposite end of the chart.
     const area = Math.max(1, width * height)
     const readability = Math.min(1, obstruction / area) * 50 + Math.min(1, preserved / area) * 50
-    return { x, y, hidesPoint, overlaps, obstruction, occlusion, preserved, score: occlusion + overlaps * 30 + readability + distance * 3 + cornerDistance * .5 + centerDistance * .08 }
+    return { x, y, distance, hidesPoint, overlaps, obstruction, occlusion, preserved, score: occlusion + overlaps * 30 + readability + distance * 3 + cornerDistance * .5 + centerDistance * .08 }
   }
   const candidates = [...xs].flatMap(x => [...ys].map(y => score({ x, y })))
-  const opposite = requiredSide === undefined ? [] : candidates.filter(point => burnRateTooltipSide(point, tooltip, samples) === requiredSide)
+  const opposite = requiredSide === undefined ? [] : candidates.filter(point => point.distance <= maxAnchorDistance && burnRateTooltipSide(point, tooltip, samples) === requiredSide)
   let pool = opposite.length ? opposite : candidates
   // Fixed controls can hide the popup. Keep it clear of those, the node and the
   // curve, then balance proximity against other labels instead of fleeing to
@@ -86,7 +87,8 @@ export function burnRateTooltipPlacement(
 }
 
 const sampleCache = new WeakMap<SVGPathElement, { key: string; samples: Point[] }>()
-type Placement = { portal: HTMLElement; day: string | undefined; geometry: string; point: Point; flipped: boolean }
+type Placement = { portal: HTMLElement; day: string | undefined; geometry: string; point: Point; flipped: boolean; view: string; clearance: number; hidden: boolean }
+const SCROLL_CLEARANCE = 32
 // A mounted inspection owns its scroll budget. New nodes/days/layouts start
 // fresh; ordinary scrolling must not turn the card into a fixed viewport HUD.
 const placementCache = new WeakMap<HTMLElement, Placement>()
@@ -162,33 +164,52 @@ export function positionBurnRateTooltip(portal: HTMLElement, node: HTMLElement, 
   let positionChanged = false
   const occluded = (point: Point) => occluders.some(rect => point.x < rect.x + rect.width + 6 && point.x + tooltip.width > rect.x - 6 && point.y < rect.y + rect.height + 6 && point.y + tooltip.height > rect.y - 6)
   const inside = (point: Point) => point.x >= visible.x && point.y >= visible.y && point.x + tooltip.width <= visible.x + visible.width && point.y + tooltip.height <= visible.y + visible.height
+  // Page edges move with the card. Only the viewport/floating controls can
+  // approach it during scrolling; begin the exit before they actually cover it.
+  const clearance = (point: Point) => Math.min(
+    bounds.top + point.y - (viewport?.offsetTop ?? 0) - 8,
+    (viewport?.offsetTop ?? 0) + (viewport?.height ?? window.innerHeight) - bounds.top - point.y - tooltip.height - 8,
+    ...occluders.map(rect => Math.max(rect.x - point.x - tooltip.width, point.x - rect.x - rect.width, rect.y - point.y - tooltip.height, point.y - rect.y - rect.height) - 6),
+  )
+  const view = [visible.x, visible.y, visible.width, visible.height, ...occluders.flatMap(rect => [rect.x, rect.y, rect.width, rect.height])].join("|")
+  const anchor = selectedX === undefined ? undefined : cached.samples.reduce<Point | undefined>((best, point) =>
+    !best || Math.abs(point.x - selectedX) < Math.abs(best.x - selectedX) ? point : best, undefined)
+  const distance = (point: Point) => anchor ? Math.hypot(anchor.x - Math.max(point.x, Math.min(point.x + tooltip.width, anchor.x)), anchor.y - Math.max(point.y, Math.min(point.y + tooltip.height, anchor.y))) : Infinity
   if (!placement || placement.portal !== portal || placement.day !== day || placement.geometry !== geometry) {
-    placement = { portal, day, geometry, point: burnRateTooltipPlacement(plot, tooltip, cached.samples, selectedX, visible, undefined, obstacles()), flipped: false }
+    const point = burnRateTooltipPlacement(plot, tooltip, cached.samples, selectedX, visible, undefined, obstacles())
+    placement = { portal, day, geometry, point, flipped: false, view, clearance: clearance(point), hidden: !inside(point) || occluded(point) }
     placementCache.set(node, placement)
     positionChanged = true
-  } else if (!placement.flipped && (!inside(placement.point) || occluded(placement.point))) {
-    const anchor = selectedX === undefined ? undefined : cached.samples.reduce<Point | undefined>((best, point) =>
-      !best || Math.abs(point.x - selectedX) < Math.abs(best.x - selectedX) ? point : best, undefined)
+  } else if (placement.view !== view) {
+    const remaining = clearance(placement.point)
+    const approaching = remaining < SCROLL_CLEARANCE && remaining < placement.clearance
     // No relocation may chase a node that has already scrolled out of view.
     const nodeVisible = anchor && anchor.x >= visible.x && anchor.x <= visible.x + visible.width && anchor.y >= visible.y && anchor.y <= visible.y + visible.height
       && !occluders.some(rect => anchor.x >= rect.x - 6 && anchor.x <= rect.x + rect.width + 6 && anchor.y >= rect.y - 6 && anchor.y <= rect.y + rect.height + 6)
-    if (nodeVisible) {
+    if (!placement.flipped && nodeVisible && (approaching || placement.hidden || distance(placement.point) > 24)) {
       const side = burnRateTooltipSide(placement.point, tooltip, cached.samples)
-      const next = burnRateTooltipPlacement(plot, tooltip, cached.samples, selectedX, visible, undefined, obstacles(), side === -1 ? 1 : -1)
-      const distance = Math.hypot(anchor.x - Math.max(next.x, Math.min(next.x + tooltip.width, anchor.x)), anchor.y - Math.max(next.y, Math.min(next.y + tooltip.height, anchor.y)))
+      const maxDistance = Math.max(32, tooltip.height / 2)
+      // Search nearby candidates themselves, rather than rejecting a distant
+      // winner after it has displaced a perfectly useful nearby opposite pocket.
+      const next = burnRateTooltipPlacement(plot, tooltip, cached.samples, selectedX, visible, undefined, obstacles(), side === -1 ? 1 : -1, maxDistance)
       const coversNode = anchor.x > next.x - 12 && anchor.x < next.x + tooltip.width + 12 && anchor.y > next.y - 12 && anchor.y < next.y + tooltip.height + 12
       const coversCurve = cached.samples.some(point => point.x > next.x - 8 && point.x < next.x + tooltip.width + 8 && point.y > next.y - 8 && point.y < next.y + tooltip.height + 8)
-      if (inside(next) && !occluded(next) && !coversNode && !coversCurve && distance <= Math.max(32, tooltip.height / 2) && burnRateTooltipSide(next, tooltip, cached.samples) !== side) {
+      if ((approaching || placement.hidden || distance(next) + 24 < distance(placement.point)) && inside(next) && !occluded(next) && !coversNode && !coversCurve && distance(next) <= maxDistance && burnRateTooltipSide(next, tooltip, cached.samples) !== side) {
         placement.point = next
         placement.flipped = true
         positionChanged = true
       }
     }
+    const current = clearance(placement.point)
+    if (positionChanged || current >= SCROLL_CLEARANCE) placement.hidden = false
+    else if (approaching || current < 0) placement.hidden = true
+    placement.clearance = current
+    placement.view = view
   }
   // Once its one opposite-side move is used, keep this exact chart-local
   // anchor. It scrolls away naturally; fixed controls can hide, never repel it.
-  const opacity = occluded(placement.point) ? "0" : ""
-  if (portal.style.opacity !== opacity) portal.style.opacity = opacity
+  const hidden = String(placement.hidden)
+  if (portal.dataset.scrollHidden !== hidden) portal.dataset.scrollHidden = hidden
   // Do not compare serialized CSS floats: browser rounding can otherwise
   // turn the same anchor into a redundant style write on every scroll event.
   if (positionChanged) portal.style.transform = `translate(${placement.point.x}px, ${placement.point.y}px)`
