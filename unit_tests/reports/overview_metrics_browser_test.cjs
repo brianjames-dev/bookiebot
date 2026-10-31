@@ -88,6 +88,9 @@ async function checkQuietHeader(page, width, reduced) {
   assert.equal(await nav.getByRole('heading').innerText(),'Burn Rate','Keyboard arrows change the graph')
   await page.keyboard.press('ArrowLeft')
   assert.equal(await nav.getByRole('heading').innerText(),'Category Mix')
+  // These are settled-page navigation checks; interrupted dragging is exercised
+  // separately by chart_swipe_browser_test.cjs.
+  await page.locator('.bb-chart-carousel[data-settling="false"]').waitFor()
   // Use complete native event shapes; observers must leave vertical panning uncanceled.
   const touch = async (type,x,y,selector='.bb-chart-carousel') => page.locator(selector).evaluate((target,{type,x,y})=>{
     const event=new Event(type,{bubbles:true,cancelable:true}),point={clientX:x,clientY:y}
@@ -97,8 +100,10 @@ async function checkQuietHeader(page, width, reduced) {
   },{type,x,y})
   for (const [type,x,y] of [['touchstart',240,120],['touchmove',235,280],['touchend',235,280]]) assert.equal(await touch(type,x,y),false)
   assert.equal(await nav.getByRole('heading').innerText(),'Category Mix','Vertical movement does not select another chart')
+  await page.locator('.bb-chart-carousel[data-settling="false"]').waitFor()
   for (const [type,x,y] of [['touchstart',240,120],['touchmove',35,124],['touchend',35,124]]) assert.equal(await touch(type,x,y),false)
   assert.equal(await nav.getByRole('heading').innerText(),'Burn Rate','Horizontal swipe selects the next graph')
+  await page.locator('.bb-chart-carousel[data-settling="false"]').waitFor()
   for (const [type,x,y] of [['touchstart',35,124],['touchmove',240,120],['touchend',240,120]]) assert.equal(await touch(type,x,y),false)
   assert.equal(await nav.getByRole('heading').innerText(),'Category Mix')
   for (const [type,x,y] of [['touchstart',240,120],['touchmove',35,124],['touchend',35,124]]) await touch(type,x,y,'.bb-category-mix-filter select')

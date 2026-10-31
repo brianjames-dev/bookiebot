@@ -11,13 +11,13 @@ import {
   type CSSProperties,
   type ReactNode,
   type RefObject,
-  type TouchEvent,
 } from "react"
 import { createPortal } from "react-dom"
 import { ChevronDown } from "lucide-react"
 import { useCategoryContour, CategoryContourCallouts } from "./category-mix-contour"
 import { CONTOUR_PADDING_ANGLE } from "./category-mix-layout"
 import { burnRateBalance, positionBurnRateTooltip } from "./burn-rate-tooltip"
+import { useChartSwipe } from "./chart-swipe"
 import { categoryRingAnimation, stableBarAnimation, stableBarShape, StablePieSector, type AnimatedPieSector } from "./chart-animation"
 import { ReportScreen, useAppNavigation } from "./app-navigation"
 import { ReportBrand, ReportHeader } from "./report-header"
@@ -222,7 +222,6 @@ type CalendarFilter = "all" | "subscription"
 type DailySpendingFilter = "all" | "needs" | "wants"
 type CategoryMixFilter = "all" | BudgetCategoryKey
 
-const CHART_CAROUSEL_GAP = 16
 const CATEGORY_MIX_FILTERS: Array<{ value: CategoryMixFilter; label: string }> = [
   { value: "all", label: "All" },
   { value: "needs", label: "Needs" },
@@ -256,14 +255,6 @@ const CATEGORY_CHART_COLORS: Record<string, string> = {
   gas: "hsl(var(--category-gas))",
   food: "hsl(var(--category-food))",
   shopping: "hsl(var(--category-shopping))",
-}
-
-type ChartTouchState = {
-  startX: number
-  startY: number
-  deltaX: number
-  deltaY: number
-  dragging: boolean
 }
 
 type ReportView = ReportModeView
@@ -713,8 +704,6 @@ const OverviewCharts = memo(function OverviewCharts({ report, activeReport, char
   const navigation = useAppNavigation()
   const [categoryMixFilter, setCategoryMixFilter] = useState<CategoryMixFilter>("all")
   const [calendarFilter, setCalendarFilter] = useState<CalendarFilter>("all")
-  const [chartTouch, setChartTouch] = useState<ChartTouchState | null>(null)
-  const chartGestureRef = useRef<ChartTouchState | null>(null)
   const tooltipCooldownTimeoutRef = useRef<number | null>(null)
   const [chartTooltipCooldown, setChartTooltipCooldown] = useState(false)
   const [localCollapseKey, setLocalCollapseKey] = useState(0)
@@ -851,10 +840,6 @@ const OverviewCharts = memo(function OverviewCharts({ report, activeReport, char
     }
   }
 
-  const moveChart = (direction: -1 | 1) => {
-    switchChart(activeChartIndex + direction)
-  }
-
   useEffect(() => {
     const request = navigation?.sourceRequest ?? sourceRequest
     if (!request || (navigation && request.section === "reimbursements")) return
@@ -866,68 +851,8 @@ const OverviewCharts = memo(function OverviewCharts({ report, activeReport, char
     return () => window.clearTimeout(timer)
   }, [navigation?.sourceRequest?.id, navigation?.screen, sourceRequest?.id])
 
-  const handleChartTouchStart = (event: TouchEvent<HTMLDivElement>) => {
-    if (isInteractiveTouchTarget(event.target)) {
-      return
-    }
-    const touch = event.touches[0]
-    if (!touch) {
-      return
-    }
-    chartGestureRef.current = { startX: touch.clientX, startY: touch.clientY, deltaX: 0, deltaY: 0, dragging: false }
-  }
-
-  const handleChartTouchMove = (event: TouchEvent<HTMLDivElement>) => {
-    const touch = event.touches[0]
-    const gesture = chartGestureRef.current
-    if (!touch || gesture === null) {
-      return
-    }
-    const deltaX = touch.clientX - gesture.startX
-    const deltaY = touch.clientY - gesture.startY
-    const dragging = Math.abs(deltaX) > 18 && Math.abs(deltaX) > Math.abs(deltaY) * 1.35
-    const nextGesture = { ...gesture, deltaX, deltaY, dragging: gesture.dragging || dragging }
-    chartGestureRef.current = nextGesture
-    if (nextGesture.dragging) {
-      setChartTouch(nextGesture)
-    }
-  }
-
-  const handleChartTouchEnd = (event: TouchEvent<HTMLDivElement>) => {
-    const touch = chartGestureRef.current
-    chartGestureRef.current = null
-    if (touch === null) {
-      return
-    }
-    const endX = event.changedTouches[0]?.clientX
-    const endY = event.changedTouches[0]?.clientY
-    setChartTouch(null)
-    if (endX === undefined) {
-      return
-    }
-    const deltaX = endX - touch.startX
-    const deltaY = endY === undefined ? touch.deltaY : endY - touch.startY
-    const threshold = Math.min(120, Math.max(68, window.innerWidth * 0.22))
-    if (Math.abs(deltaX) < threshold || Math.abs(deltaX) < Math.abs(deltaY) * 1.35) {
-      return
-    }
-    if ((deltaX < 0 && activeChartIndex >= chartPanels.length - 1) || (deltaX > 0 && activeChartIndex <= 0)) {
-      return
-    }
-    moveChart(deltaX < 0 ? 1 : -1)
-  }
-
-  const handleChartTouchCancel = () => {
-    chartGestureRef.current = null
-    setChartTouch(null)
-  }
-  const edgeDragFactor =
-    (activeChartIndex === 0 && (chartTouch?.deltaX ?? 0) > 0) ||
-    (activeChartIndex === chartPanels.length - 1 && (chartTouch?.deltaX ?? 0) < 0)
-      ? 0.25
-      : 1
-  const swipeOffset = chartTouch?.dragging ? clamp(chartTouch.deltaX * edgeDragFactor, -220, 220) : 0
-  const carouselTransform = `translate3d(calc(${-activeChartIndex * 100}% - ${activeChartIndex * CHART_CAROUSEL_GAP}px + ${swipeOffset}px), 0, 0)`
+  const swipe = useChartSwipe({ index: activeChartIndex, count: chartPanels.length,
+    onSelect: switchChart, onDragStart: dismissChartTooltips, ignoreTarget: isInteractiveTouchTarget })
 
   return <>
         <ChartCarouselNavigation
@@ -943,16 +868,18 @@ const OverviewCharts = memo(function OverviewCharts({ report, activeReport, char
         >
           <div
             className="bb-chart-carousel"
-            data-dragging={chartTouch?.dragging ? "true" : "false"}
+            ref={swipe.viewportRef}
+            data-dragging="false"
             data-tooltip-cooldown={chartTooltipCooldown ? "true" : "false"}
-            onTouchStart={handleChartTouchStart}
-            onTouchMove={handleChartTouchMove}
-            onTouchEnd={handleChartTouchEnd}
-            onTouchCancel={handleChartTouchCancel}
+            onTouchStartCapture={swipe.onTouchStartCapture}
+            onTouchMoveCapture={swipe.onTouchMoveCapture}
+            onTouchEndCapture={swipe.onTouchEndCapture}
+            onTouchCancelCapture={swipe.onTouchCancelCapture}
+            onClickCapture={swipe.onClickCapture}
           >
             <div
-              className={chartTouch?.dragging ? "bb-chart-carousel-track bb-chart-carousel-track-dragging" : "bb-chart-carousel-track"}
-              style={{ transform: carouselTransform }}
+              ref={swipe.trackRef}
+              className="bb-chart-carousel-track"
             >
               {chartPanels.map((panel, index) => (
                 <div
@@ -1084,7 +1011,11 @@ function ActivityDetails({entries, total, note, colors}: {entries:ReportActivity
 }
 
 function isInteractiveTouchTarget(target: EventTarget | null) {
-  return target instanceof Element && Boolean(target.closest("button, a, input, select, textarea, summary, [role='button'], [role='tab']"))
+  if (!(target instanceof Element)) return false
+  if (target.closest("a, input, select, textarea, summary, dialog, [role='dialog']")) return true
+  const control = target.closest("button, [role='button'], [role='tab']")
+  // Plot buttons still tap normally, but can also begin a graph swipe.
+  return Boolean(control && !control.closest(".bb-chart-page-body"))
 }
 
 function ChartCarouselNavigation({

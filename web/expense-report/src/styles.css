@@ -1271,19 +1271,19 @@ button.bb-left-categories { cursor: pointer; }
 }
 
 .bb-chart-carousel-track {
+  /* The compositor spring owns movement, including reduced-motion settlement.
+     Override the global reduced-motion duration so it cannot create a second
+     implicit transform transition with a stale WebKit presentation value. */
+  transition: none !important;
   display: flex;
   align-items: stretch;
   gap: var(--bb-chart-carousel-gap);
   height: 100%;
   min-width: 0;
   width: 100%;
-  transition: transform 280ms cubic-bezier(0.16, 1, 0.3, 1);
   will-change: transform;
 }
 
-.bb-chart-carousel-track-dragging {
-  transition: none;
-}
 
 .bb-chart-carousel-slide {
   display: flex;

@@ -1,0 +1,11 @@
+from pathlib import Path
+import subprocess
+
+import pytest
+
+
+def test_chart_swipe_physics_lifecycle_and_tap_arbitration():
+    root = Path(__file__).resolve().parents[2]
+    if not (root / "web/expense-report/node_modules/typescript").exists():
+        pytest.skip("Install frontend dependencies to execute gesture checks")
+    subprocess.run(["node", "unit_tests/reports/chart_swipe_test.cjs"], cwd=root, check=True, capture_output=True, text=True)

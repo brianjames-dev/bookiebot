@@ -1,5 +1,11 @@
 # Agent Decisions
 
+## 2026-10-30 - Continuous Graph Swipes And Plot Tap Arbitration
+
+Keep the clipped, transformed graph viewport so Safari cannot focus-scroll it sideways. Remove the 220px drag cap and per-move React state: coalesce direct track writes into animation frames, follow the finger through the full neighboring page and apply continuous rubber-band resistance only at the bounds. Settle with a critically damped compositor spring seeded by recent release velocity; re-grabbing starts from the visible presentation position. Only committed selection changes can retarget settlement; resize, cancellation, multi-touch, reduced motion and unmount stop pending motion safely. Disable CSS transform transitions explicitly, including the global reduced-motion rule, so there is one position owner. Keep graph selection/persistence, page size and chart data unchanged.
+
+Allow graph swipes to start on plot controls, including Category Mix center, slices and callouts. Keep form controls, links, dialogs and controls outside plots independent. Lock vertical intent early without canceling touch events; claimed horizontal moves do not scrub the child chart. Suppress only the trailing pointer click after movement, preserving keyboard activation and the next deliberate tap. Thus a swipe cannot also toggle callouts or open transactions. Preserve all other graph presentation and finance scopes. Native acceptance is checklist 199; no data, storage or Finance Ops changes.
+
 ## 2026-10-30 - Integrate Approved Burn Rate Split Labels
 
 Replace only Burn Rate's Details disclosure with the approved always-visible monthly Limit / Spent / Left split rail. Keep its Food + Shopping + Wants subscriptions calculation, category-coverage notices, exact cents and signed remaining amount. The upper balance/daily-pace header and subtle zero-baseline area use the existing variance line, axes and red-above/green-below semantics. Keep the shared carousel stage and other graphs' controls intact.

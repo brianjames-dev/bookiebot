@@ -1127,7 +1127,7 @@ def test_report_payload_tracks_merchant_occurrences_by_location_count():
     assert "bb-hidden-list-panel" in html
     assert "bb-chart-carousel-indicators" in html
     assert "bb-chart-carousel-track" in html
-    assert "bb-chart-carousel-track-dragging" in html
+    assert "data-dragging" in html
     assert "No need expenses found" not in html
 
 

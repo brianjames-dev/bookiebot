@@ -20,9 +20,11 @@ const compiled = ts.transpileModule(declarations.map(node => node.getText(file))
 const counts = {}, timers = new Map(); let serial = 0
 const count = key => { counts[key] = (counts[key] || 0) + 1 }
 const Navigation = React.createContext(null)
-const window = {innerWidth:390,matchMedia:()=>({matches:false}),
+const window = {innerWidth:390,matchMedia:()=>({matches:false,addEventListener(){},removeEventListener(){}}),
   setTimeout(callback, delay) { const id=++serial;timers.set(id,{callback,delay});return id }, clearTimeout(id) {timers.delete(id)},
 }
+window.requestAnimationFrame=callback=>window.setTimeout(callback,16)
+window.cancelAnimationFrame=id=>window.clearTimeout(id)
 const sourceTargets = []
 const document = {querySelector:selector=>({focus(){},scrollIntoView(){sourceTargets.push(selector)}})}
 const passthrough = ({children}) => h(React.Fragment,null,children)
@@ -70,6 +72,9 @@ for(const name of ['Card','CardHeader','CardTitle','CardContent','ReportScreen',
 for(const name of ['MetricCard','RemainingCategoryBars','SavingsMetricCard','ReportBrand','ReportHeader','ThemeToggle','SharedReimbursementsCard','ReimbursementLedger','Investments','SavingsGoals','ReportQuestions','PhoneNotifications','ActivityDetails','MetricExplanationDetails','TopExpensesTable','MerchantOccurrencesTable'])runtime[name]=leaf(name)
 runtime.ModalDetails=passthrough
 runtime.generatedTimeLabel=()=>''
+const swipeRuntime={exports:{},require:req,window,performance:{now:()=>0},ResizeObserver:class{observe(){} disconnect(){}}}
+vm.runInNewContext(ts.transpileModule(fs.readFileSync('web/expense-report/src/chart-swipe.ts','utf8'),{compilerOptions:{target:ts.ScriptTarget.ES2020,module:ts.ModuleKind.CommonJS}}).outputText,swipeRuntime)
+runtime.useChartSwipe=swipeRuntime.exports.useChartSwipe
 vm.runInNewContext(compiled,runtime)
 const App=runtime.exports.ExpenseReportApp
 const activity=[{day:1,date:'10/1/2026',category:'Food',item:'Lunch',amount:12},{day:1,date:'10/1/2026',category:'Shopping',item:'Shirt',amount:30},{day:1,date:'10/1/2026',category:'Grocery',item:'Groceries',amount:20}]
@@ -140,10 +145,10 @@ act(()=>nav.props.onSelect(0))
 assert.equal(renderer.root.findByType(ChartCarouselNavigation).props.activeIndex,0)
 assert.equal(renderer.root.findByType(CategoryMixChartLeaf).props.filter,'wants','Changing graph preserves its local filter')
 let carousel=renderer.root.findByProps({className:'bb-chart-carousel'})
-act(()=>carousel.props.onTouchStart({target:{},touches:[{clientX:250,clientY:100}]}))
-act(()=>carousel.props.onTouchMove({touches:[{clientX:40,clientY:104}]}))
-assert.equal(renderer.root.findByProps({className:'bb-chart-carousel'}).props['data-dragging'],'true')
-act(()=>renderer.root.findByProps({className:'bb-chart-carousel'}).props.onTouchEnd({changedTouches:[{clientX:40,clientY:104}]}))
+act(()=>carousel.props.onTouchStartCapture({target:{},touches:[{clientX:250,clientY:100}]}))
+act(()=>carousel.props.onTouchMoveCapture({stopPropagation(){},touches:[{clientX:40,clientY:104}]}))
+assert.equal(renderer.root.findByType(ChartCarouselNavigation).props.activeIndex,0,'Dragging does not select/re-render the destination early')
+act(()=>renderer.root.findByProps({className:'bb-chart-carousel'}).props.onTouchEndCapture({stopPropagation(){},changedTouches:[{clientX:40,clientY:104}]}))
 assert.equal(renderer.root.findByType(ChartCarouselNavigation).props.activeIndex,1,'Horizontal swipes still select the next chart')
 assert.equal(renderer.root.findByType(CategoryMixChartLeaf).props.filter,'wants')
 act(()=>renderer.unmount())
