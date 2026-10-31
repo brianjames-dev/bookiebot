@@ -1,5 +1,11 @@
 # Agent Decisions
 
+## 2026-10-30 - Follow Burn Rate Peaks And Clear Floating Navigation
+
+Measure header/footer text with DOM ranges, preserving wrapped line boxes instead of treating full-width section boxes as occupied. Protect actual controls, rails, legend graphics and axis tick text. After fixed-control, selected-node and curve clearance, balance proximity against supporting text overlap rather than rejecting every text overlap before considering distance. This lets a high-node popup use nearby header whitespace instead of moving to a distant low corner. Near-tie retention cannot preserve worse occlusion or control/curve clearance. This refines 201's ordering; geometry remains independent of dates and specific curves.
+
+Treat the visible navigation pane and fixed header buttons as hard occluders, using their actual measured rectangles rather than a hardcoded bottom inset. Observe their resizing along with existing panel/viewport/scroll updates, retaining usable side space on wide screens. If no placement avoids fixed controls, keep the lifecycle/content but suppress painting until a readable placement returns. Keep the one synchronous position owner, carousel clipping, shared stage, native input and five-second / 360ms exit. Native acceptance is checklist 202; no finance calculations, persistence or Finance Ops changes.
+
 ## 2026-10-30 - Use Clear Burn Rate Plot Pockets
 
 Prioritize the selected node and actual native trend line rather than minimizing overlap with the entire plotting rectangle. Search interior and exterior positions, protect measured summary/footer and axis-label rectangles, then prefer nearby clear placements. A spatial grid plus exact anchor/plot/obstacle edges discovers pockets between bends without date-, value- or screenshot-specific placement. Retain near ties only when curve and metric clearance are no worse; an old outside anchor cannot mask totals when a better pocket is available. If space is insufficient, retain a bounded least-obstructive fallback.

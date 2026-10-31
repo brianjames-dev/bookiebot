@@ -4,9 +4,9 @@ const req = createRequire(path.resolve('web/expense-report/package.json'))
 const ts = req('typescript'), React = req('react'), {act, create} = req('react-test-renderer')
 global.IS_REACT_ACT_ENVIRONMENT = true
 const compile = source => ts.transpileModule(source, {compilerOptions: {module: ts.ModuleKind.CommonJS, jsx: ts.JsxEmit.ReactJSX, target: ts.ScriptTarget.ES2020}}).outputText
-const helper = {exports: {}, window: {innerWidth:390,innerHeight:900}}
+const helper = {exports: {}, window: {innerWidth:390,innerHeight:900},NodeFilter:{SHOW_TEXT:4}}
 vm.runInNewContext(compile(fs.readFileSync('web/expense-report/src/burn-rate-tooltip.ts', 'utf8')), helper)
-const {burnRateBalance, burnRateTooltipPlacement, positionBurnRateTooltip} = helper.exports
+const {burnRateBalance, burnRateTooltipPlacement, burnRateTooltipObstacles, burnRateTooltipOccluders, positionBurnRateTooltip} = helper.exports
 const plain = value => JSON.parse(JSON.stringify(value))
 for (const [spent, limit, expected] of [
   [40, 100, {used:40, left:60, over:false, empty:false, excess:0}],
@@ -60,14 +60,46 @@ assert.equal(hits(moved,[centerPoint],12),0,'Retained anchors cannot cover the s
 const cramped=burnRateTooltipPlacement(shortPlot,tooltip,dense,165,{x:50,y:20,width:184,height:102})
 assert.ok(Number.isFinite(cramped.x)&&Number.isFinite(cramped.y),'Impossible geometry still has a bounded fallback')
 
+// Proximity must track peaks, even when nearby text is denser than a distant
+// empty corner. Start with a low selection to catch retained-bottom anchors.
+for(const peak of [105,190,280]){
+ const curve=Array.from({length:140},(_,i)=>({x:58+i*2,y:250-220*Math.exp(-Math.pow((58+i*2-peak)/45,2))}))
+ const labels=[{x:16,y:-110,width:130,height:40},{x:260,y:-75,width:80,height:35},{x:16,y:-32,width:175,height:15},{x:8,y:320,width:340,height:80}]
+ const low=burnRateTooltipPlacement(plot,tooltip,curve,58,surrounding,undefined,labels)
+ const high=burnRateTooltipPlacement(plot,tooltip,curve,peak,surrounding,low,labels)
+ const node=curve.reduce((a,b)=>Math.abs(a.x-peak)<Math.abs(b.x-peak)?a:b)
+ const distance=Math.hypot(node.x-Math.max(high.x,Math.min(high.x+184,node.x)),node.y-Math.max(high.y,Math.min(high.y+102,node.y)))
+ assert.equal(hits(high,curve),0)
+ assert.ok(distance<102,JSON.stringify({peak,high,node,distance}))
+}
+// A fixed floating control is a hard occluder, including a retained placement.
+for(const nav of [{x:8,y:230,width:340,height:60,occludes:true},{x:100,y:250,width:160,height:44,occludes:true}]){
+ const placed=burnRateTooltipPlacement(plot,tooltip,flat,165,surrounding,{x:100,y:240},[nav])
+ assert.ok(!intersects(placed,nav),'Expanded/compact navigation cannot hide the card')
+}
+const besideNav={x:350,y:250,width:300,height:70,occludes:true}
+const side=burnRateTooltipPlacement({x:8,y:20,width:1000,height:400},tooltip,[{x:700,y:270}],700,{x:8,y:20,width:1000,height:400},undefined,[besideNav])
+assert.ok(!intersects(side,besideNav),'Wide layouts may use safe space beside the actual floating bar')
+
 // Exercise the DOM adapter too: chart-local matrix, cached samples, direct placement.
 let reads=0, curve='initial', chartWidth=360
 const matrix={a:1,b:0,c:0,d:1,e:0,f:0}
 const line={getCTM:()=>matrix,getAttribute:()=>curve,getTotalLength:()=>270,getPointAtLength:at=>{reads++;return {matrixTransform:m=>({x:60+at*m.a,y:35+at*.6+m.f})}}}
 const clip={x:{baseVal:{value:58}},y:{baseVal:{value:20}},width:{baseVal:{value:280}},height:{baseVal:{value:260}}}
 const chart={getBoundingClientRect:()=>({left:16,top:150,right:16+chartWidth,bottom:450,width:chartWidth,height:300}),querySelector:selector=>selector==='clipPath rect'?clip:line,querySelectorAll:()=>[]}
-const page={getBoundingClientRect:()=>({left:0,top:16,right:390,bottom:590}),querySelectorAll:()=>[{getBoundingClientRect:()=>({left:16,top:470,width:358,height:110})}]}
-const portal={parentElement:{querySelector:()=>chart,closest:()=>page},style:{},dataset:{}}
+const footerRect={left:16,top:470,width:358,height:110}
+const section={texts:[{textContent:'  '},{textContent:'Month limit',rects:[footerRect]}],querySelectorAll:()=>[]}
+let selectedText, textReads=0
+let fixedElements=[]
+const document={querySelectorAll:selector=>{assert.ok(selector.includes('.bb-navigation-pane'));return fixedElements},createRange:()=>({selectNodeContents:n=>selectedText=n,getClientRects:()=>{textReads++;return selectedText.rects}}),createTreeWalker:section=>{const nodes=[...section.texts];return {nextNode:()=>nodes.shift()??null}}}
+const page={getBoundingClientRect:()=>({left:0,top:16,right:390,bottom:590}),ownerDocument:document,querySelectorAll:()=>[section]}
+assert.deepEqual(plain(burnRateTooltipObstacles(page,chart)),[footerRect],'Use the text bounds rather than the full section box')
+assert.equal(textReads,1,'Whitespace is not an obstacle')
+const wrapped={textContent:'Two lines',rects:[{left:0,top:0,width:50,height:15},{left:0,top:15,width:30,height:15}]}
+section.texts=[wrapped]
+assert.equal(burnRateTooltipObstacles(page,chart).length,2,'Protect each painted line without filling unused row space')
+section.texts=[{textContent:'Month limit',rects:[footerRect]}]
+const portal={parentElement:{ownerDocument:document,querySelector:()=>chart,closest:()=>page},style:{},dataset:{}}
 const node={offsetWidth:184,offsetHeight:102,dataset:{inspectedDay:'13'}}
 positionBurnRateTooltip(portal,node,150)
 assert.match(portal.style.transform,/^translate\(-?[\d.]+px, -?[\d.]+px\)$/)
@@ -77,6 +109,12 @@ node.dataset.inspectedDay='14';positionBurnRateTooltip(portal,node,160)
 assert.equal(reads,cachedReads,'Changing day does not resample unchanged line geometry')
 assert.equal(portal.dataset.positionedDay,'14')
 for(const change of [()=>curve='new',()=>chartWidth=390,()=>matrix.f=5]){const before=reads;change();positionBurnRateTooltip(portal,node,160);assert.ok(reads>before)}
+
+fixedElements=[{getBoundingClientRect:()=>({left:0,top:0,width:390,height:900})}]
+positionBurnRateTooltip(portal,node,160)
+assert.equal(portal.style.opacity,'0','Do not paint a card under fixed controls when no visible placement fits')
+fixedElements=[];positionBurnRateTooltip(portal,node,160)
+assert.equal(portal.style.opacity,'','Recover as soon as the floating control is no longer covering the panel')
 
 const source=fs.readFileSync('web/expense-report/src/report-app.tsx','utf8')
 const file=ts.createSourceFile('app.tsx',source,ts.ScriptTarget.Latest,true,ts.ScriptKind.TSX)

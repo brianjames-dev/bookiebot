@@ -16,7 +16,7 @@ import { createPortal } from "react-dom"
 import { ChevronDown } from "lucide-react"
 import { useCategoryContour, CategoryContourCallouts } from "./category-mix-contour"
 import { CONTOUR_PADDING_ANGLE } from "./category-mix-layout"
-import { burnRateBalance, positionBurnRateTooltip } from "./burn-rate-tooltip"
+import { burnRateBalance, burnRateTooltipOccluders, positionBurnRateTooltip } from "./burn-rate-tooltip"
 import { useChartSwipe } from "./chart-swipe"
 import { categoryRingAnimation, stableBarAnimation, stableBarShape, StablePieSector, type AnimatedPieSector } from "./chart-animation"
 import { ReportScreen, useAppNavigation } from "./app-navigation"
@@ -1414,6 +1414,7 @@ function BurnRateTooltipContent({
     if (portal.parentElement) observer.observe(portal.parentElement)
     const page = portal.closest(".bb-burn-rate-page")
     if (page) observer.observe(page)
+    for (const occluder of burnRateTooltipOccluders(portal.ownerDocument)) observer.observe(occluder)
     window.addEventListener("scroll", place, { passive: true, capture: true })
     window.visualViewport?.addEventListener("resize", place)
     window.visualViewport?.addEventListener("scroll", place)

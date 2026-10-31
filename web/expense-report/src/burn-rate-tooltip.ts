@@ -1,5 +1,6 @@
 type Point = { x: number; y: number }
 type Rect = Point & { width: number; height: number }
+type Obstacle = Rect & { occludes?: boolean; preserve?: boolean }
 
 // Keep signed financial amounts in the labels; only visual lengths are clamped.
 export function burnRateBalance(spent: number, limit: number) {
@@ -11,7 +12,7 @@ export function burnRateBalance(spent: number, limit: number) {
 
 export function burnRateTooltipPlacement(
   plot: Rect, tooltip: { width: number; height: number }, samples: Point[],
-  selectedX?: number, bounds: Rect = plot, previous?: Point, avoid: Rect[] = [],
+  selectedX?: number, bounds: Rect = plot, previous?: Point, avoid: Obstacle[] = [],
 ) {
   const { width, height } = tooltip
   const loX = bounds.x, loY = bounds.y
@@ -37,31 +38,68 @@ export function burnRateTooltipPlacement(
     const hidesPoint = anchor.x > x - 12 && anchor.x < x + width + 12 && anchor.y > y - 12 && anchor.y < y + height + 12
     let overlaps = 0
     for (const p of samples) if (p.x > x - 8 && p.x < x + width + 8 && p.y > y - 8 && p.y < y + height + 8) overlaps++
-    const obstruction = avoid.reduce((area, rect) => area
-      + Math.max(0, Math.min(x + width, rect.x + rect.width + 6) - Math.max(x, rect.x - 6))
-      * Math.max(0, Math.min(y + height, rect.y + rect.height + 6) - Math.max(y, rect.y - 6)), 0)
+    let obstruction = 0, occlusion = 0, preserved = 0
+    for (const rect of avoid) {
+      const area = Math.max(0, Math.min(x + width, rect.x + rect.width + 6) - Math.max(x, rect.x - 6))
+        * Math.max(0, Math.min(y + height, rect.y + rect.height + 6) - Math.max(y, rect.y - 6))
+      if (rect.occludes) occlusion += area
+      else obstruction += area
+      if (rect.preserve) preserved += area
+    }
     const distance = Math.hypot(anchor.x - Math.max(x, Math.min(x + width, anchor.x)), anchor.y - Math.max(y, Math.min(y + height, anchor.y)))
     const centerDistance = Math.hypot(anchor.x - x - width / 2, anchor.y - y - height / 2)
-    return { x, y, hidesPoint, overlaps, obstruction, score: overlaps * 30 + obstruction * .1 + distance + centerDistance * .12 }
+    return { x, y, hidesPoint, overlaps, obstruction, occlusion, preserved, score: occlusion + overlaps * 30 + obstruction * .015 + distance * 2 + centerDistance * .12 }
   }
   const candidates = [...xs].flatMap(x => [...ys].map(y => score({ x, y })))
   let pool = candidates
-  // Prefer a clear node, a clear curve, then clear metrics/axes. Once those are
-  // safe, nearby empty plot space is just as useful as space above or below it.
-  for (const clear of [(p: typeof candidates[number]) => !p.hidesPoint,
-    (p: typeof candidates[number]) => !p.overlaps, (p: typeof candidates[number]) => !p.obstruction]) {
+  // Fixed controls can hide the popup. Keep it clear of those, the node and the
+  // curve, then balance proximity against other labels instead of fleeing to
+  // a distant corner just to avoid a small amount of text.
+  for (const clear of [(p: typeof candidates[number]) => !p.occlusion,
+    (p: typeof candidates[number]) => !p.hidesPoint, (p: typeof candidates[number]) => !p.overlaps,
+    (p: typeof candidates[number]) => !p.preserved]) {
     const safe = pool.filter(clear)
     if (safe.length) pool = safe
   }
   let best = pool.reduce((a, b) => a.score <= b.score ? a : b)
   const retained = previous && score({ x: clampX(previous.x), y: clampY(previous.y) })
   // Do not retain an outside anchor that obscures metrics when a pocket opens.
-  if (retained && !retained.hidesPoint && retained.overlaps <= best.overlaps && retained.obstruction <= best.obstruction && retained.score <= best.score + 12) best = retained
+  if (retained && retained.occlusion <= best.occlusion && !retained.hidesPoint && retained.overlaps <= best.overlaps && retained.preserved <= best.preserved && retained.obstruction <= best.obstruction && retained.score <= best.score + 12) best = retained
   return { x: best.x, y: best.y }
 }
 
 const sampleCache = new WeakMap<SVGPathElement, { key: string; samples: Point[] }>()
 const placementCache = new WeakMap<HTMLElement, Point>()
+
+export function burnRateTooltipOccluders(document: Document) {
+  return [...document.querySelectorAll<HTMLElement>(".bb-bottom-navigation:not([hidden]) .bb-navigation-pane, .bb-shell-header-actions button")]
+    .filter(element => element.getBoundingClientRect().width && element.getBoundingClientRect().height)
+}
+
+export function burnRateTooltipObstacles(page: HTMLElement | null, chart: HTMLElement) {
+  const rects: (Pick<DOMRect, "left" | "top" | "width" | "height"> & { preserve?: boolean })[] = []
+  const protect = (element: Element) => {
+    const { left, top, width, height } = element.getBoundingClientRect()
+    rects.push({ left, top, width, height, preserve: true })
+  }
+  if (page) {
+    const document = page.ownerDocument
+    const range = document.createRange()
+    for (const section of page.querySelectorAll(".bb-chart-page-header, .bb-chart-page-footer")) {
+      // Block only painted text, not the empty area of a full-width grid row.
+      const texts = document.createTreeWalker(section, NodeFilter.SHOW_TEXT)
+      let text: Node | null
+      while ((text = texts.nextNode())) {
+        if (!text.textContent?.trim()) continue
+        range.selectNodeContents(text)
+        rects.push(...range.getClientRects())
+      }
+      for (const graphic of section.querySelectorAll("button, .bb-burn-balance-rail, .bb-burn-legend, .bb-category-pressure-track")) protect(graphic)
+    }
+  }
+  for (const tick of chart.querySelectorAll(".recharts-cartesian-axis-tick-value")) protect(tick)
+  return rects.filter(rect => rect.width && rect.height)
+}
 
 export function positionBurnRateTooltip(portal: HTMLElement, node: HTMLElement, selectedX?: number) {
   const host = portal.parentElement
@@ -78,11 +116,10 @@ export function positionBurnRateTooltip(portal: HTMLElement, node: HTMLElement, 
   const top = Math.max(page.top + 8, (viewport?.offsetTop ?? 0) + 8)
   const right = Math.min(page.right - 8, (viewport?.offsetLeft ?? 0) + (viewport?.width ?? window.innerWidth) - 8)
   const bottom = Math.min(page.bottom - 8, (viewport?.offsetTop ?? 0) + (viewport?.height ?? window.innerHeight) - 8)
-  const avoid = [
-    ...(pageElement?.querySelectorAll(".bb-chart-page-header, .bb-chart-page-footer") ?? []),
-    ...chart.querySelectorAll(".recharts-xAxis, .recharts-yAxis"),
-  ].map(element => element.getBoundingClientRect()).filter(rect => rect.width && rect.height)
-    .map(rect => ({ x: rect.left - bounds.left, y: rect.top - bounds.top, width: rect.width, height: rect.height }))
+  const fixed = burnRateTooltipOccluders(host.ownerDocument).map(element => element.getBoundingClientRect())
+  const avoid: Obstacle[] = burnRateTooltipObstacles(pageElement, chart)
+    .map(rect => ({ x: rect.left - bounds.left, y: rect.top - bounds.top, width: rect.width, height: rect.height, preserve: rect.preserve }))
+  avoid.push(...fixed.map(rect => ({ x: rect.left - bounds.left, y: rect.top - bounds.top, width: rect.width, height: rect.height, occludes: true })))
   const key = [path.getAttribute("d"), bounds.width, bounds.height, matrix.a, matrix.b, matrix.c, matrix.d, matrix.e, matrix.f].join("|")
   let cached = sampleCache.get(path)
   if (cached?.key !== key) {
@@ -101,6 +138,9 @@ export function positionBurnRateTooltip(portal: HTMLElement, node: HTMLElement, 
     { x: left - bounds.left, y: top - bounds.top, width: right - left, height: bottom - top }, placementCache.get(host), avoid,
   )
   placementCache.set(host, next)
+  // If too little of the panel is visible to fit above/beside a fixed control,
+  // retain the content but don't paint a clipped card underneath that control.
+  portal.style.opacity = avoid.some(rect => rect.occludes && next.x < rect.x + rect.width + 6 && next.x + node.offsetWidth > rect.x - 6 && next.y < rect.y + rect.height + 6 && next.y + node.offsetHeight > rect.y - 6) ? "0" : ""
   portal.style.transform = `translate(${next.x}px, ${next.y}px)`
   portal.dataset.positionedDay = node.dataset.inspectedDay
 }
