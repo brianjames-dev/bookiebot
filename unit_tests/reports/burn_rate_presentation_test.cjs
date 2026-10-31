@@ -197,7 +197,15 @@ fixedElements=[{getBoundingClientRect:()=>({left:0,top:310,width:390,height:590}
 for(let i=0;i<8;i++)positionBurnRateTooltip(scrollPortal,scrollNode,180)
 assert.deepEqual(readPosition(),flippedAnchor,'Further navigation/viewport changes cannot keep repinning the card')
 assert.equal(scrollPaints,2,'One initial transform and one opposite-side transform; scrolling cannot repaint repeatedly')
-assert.equal(scrollPortal.dataset.scrollHidden,'true','Fixed controls start the CSS exit instead of repelling the locked card')
+assert.equal(scrollPortal.dataset.scrollHidden,'false','A locked card stays painted underneath navigation instead of fading or repinning')
+helper.window.innerHeight=150+flippedAnchor.y+scrollNode.offsetHeight+24
+positionBurnRateTooltip(scrollPortal,scrollNode,180)
+assert.equal(scrollPortal.dataset.scrollHidden,'false','24px from the physical viewport edge is still fully visible')
+helper.window.innerHeight=150+flippedAnchor.y+scrollNode.offsetHeight+7
+positionBurnRateTooltip(scrollPortal,scrollNode,180)
+assert.equal(scrollPortal.dataset.scrollHidden,'true','Only within 8px of the ultimate viewport edge starts the scroll exit')
+assert.deepEqual(readPosition(),flippedAnchor,'Late fade must never chase the viewport edge')
+helper.window.innerHeight=900
 fixedElements=[];positionBurnRateTooltip(scrollPortal,scrollNode,180)
 assert.deepEqual(readPosition(),flippedAnchor);assert.equal(scrollPortal.dataset.scrollHidden,'false')
 helper.window.innerHeight=320
@@ -224,7 +232,7 @@ fixedElements=[]
 
 fixedElements=[{getBoundingClientRect:()=>({left:0,top:0,width:390,height:900})}]
 positionBurnRateTooltip(portal,node,160)
-assert.equal(portal.dataset.scrollHidden,'true','Do not paint a card under fixed controls when no visible placement fits')
+assert.equal(portal.dataset.scrollHidden,'false','Fixed controls never suppress painting away from the viewport edge')
 fixedElements=[];positionBurnRateTooltip(portal,node,160)
 assert.equal(portal.dataset.scrollHidden,'false','Recover as soon as the floating control is no longer covering the panel')
 

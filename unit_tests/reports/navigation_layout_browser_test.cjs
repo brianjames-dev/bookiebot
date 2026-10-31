@@ -32,7 +32,8 @@ async function geometry(page, label, compact) {
     return {
       selected: selected.getAttribute('aria-label'), button: rect(selected),
       bubble: rect(host.querySelector('.bb-navigation-selection')),
-      icon: rect(selected.querySelector('svg')), label: rect(selected.firstElementChild.lastElementChild),
+      icon: rect(selected.querySelector('svg')),
+      variants: [...host.querySelectorAll('button')].map(n=>({state:n.dataset.state,variant:n.querySelector('svg').dataset.variant,fill:getComputedStyle(n.querySelector('svg')).fill,stroke:getComputedStyle(n.querySelector('svg')).stroke,text:n.innerText})),
       pane: rect(host), stacks: [...host.querySelectorAll('button > span')].map(rect),
       targets: [...host.querySelectorAll('button')].map(rect),
       overflow: document.documentElement.scrollWidth > innerWidth,
@@ -44,10 +45,14 @@ async function geometry(page, label, compact) {
   close(bubble.x + bubble.width / 2, button.x + button.width / 2, 'Bubble must center on the actual selected button')
   close(bubble.y + bubble.height / 2, button.y + button.height / 2, 'Vertical centering')
   close(bubble.x + bubble.width / 2, icon.x + icon.width / 2, 'Icon must center in the bubble')
-  const contents = compact ? [icon] : [icon, result.label]
+  const contents = [icon]
+  for(const item of result.variants){assert.equal(item.text,'','No visible nav labels in either size');assert.equal(item.variant,item.state==='active'?'filled':'outline');if(item.state==='active')assert.notEqual(item.fill,'none','Selected icons paint a solid silhouette');else{assert.equal(item.fill,'none');assert.notEqual(item.stroke,'none','Inactive icons retain their outline')}}
+  const centers=result.targets.map(r=>r.x+r.width/2),spacing=centers[1]-centers[0]
+  result.targets.forEach(r=>close(r.width,result.targets[0].width,'Equal-width navigation targets'))
+  for(let i=2;i<centers.length;i++)close(centers[i]-centers[i-1],spacing,'Icons must be equally spaced')
   const widestStack = Math.max(...result.stacks.map(stack => stack.width))
   const tallestStack = Math.max(...result.stacks.map(stack => stack.height))
-  assert.ok(bubble.width <= widestStack + 13 && bubble.height <= tallestStack + 13, 'One shared size fits the largest icon/label stack')
+  assert.ok(bubble.width <= widestStack + 13 && bubble.height <= tallestStack + 13, 'One shared size fits every icon')
   assert.ok(bubble.x >= result.pane.x + 1 && bubble.right <= result.pane.right - 1, 'Edge capsules stay inside the glass')
   for (const content of contents) {
     assert.ok(content.x >= bubble.x + 1 && content.right <= bubble.right - 1, `Bubble must enclose ${label} horizontally`)
@@ -88,7 +93,7 @@ async function fixture(browser, width, dark, reducedMotion = 'reduce') {
           }
           cases++
         }
-        // Native touch must select once, including near unequal button edges.
+        // Native touch must select once, including near equal-width target edges.
         await page.evaluate(() => window.configure({ count: 5, compact: false }))
         await geometry(page, 'Reconcile', false)
         const transaction = await page.getByRole('button', { name: 'Transactions', exact: true }).boundingBox()

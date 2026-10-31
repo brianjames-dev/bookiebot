@@ -150,6 +150,9 @@ async function inspect(page){return page.locator('#bb-chart-burn-rate').evaluate
    // Require a real scroll-driven flip, not merely 'zero or one'. Both sides
    // of a flat native trend are available as the card approaches a screen edge.
    await open('plateau')
+   // Give the short fixture enough document above the plot to actually move
+   // its locked upper pocket behind the bottom nav without hitting scrollY=0.
+   await page.evaluate(()=>{const spacer=document.createElement('div');spacer.style.height='420px';document.querySelector('.bb-chart-carousel-band').before(spacer)})
    await page.locator('#bb-chart-burn-rate .recharts-wrapper').evaluate(el=>scrollTo(0,scrollY+el.getBoundingClientRect().top-340))
    await page.waitForTimeout(400);await nativePoint(page,13,touch)
    const initial=await inspect(page),direction=initial.side==='above'?1:-1
@@ -162,8 +165,20 @@ async function inspect(page){return page.locator('#bb-chart-burn-rate').evaluate
    assert.ok(flipped,JSON.stringify({message:'Scrolling must actually use the allowed opposite-side move',engineName,dark,initial,current:await inspect(page)}))
    assert.notEqual(flipped.side,initial.side);assert.equal(flipped.hidesDot,false);assert.equal(flipped.curveHits,0);assert.deepEqual(flipped.fixedHits,[])
    assert.ok(flipped.anchorDistance<=Math.max(32,flipped.card.height/2)+1,JSON.stringify(flipped));checks++
-   // After spending the move, fade before the viewport edge without chasing it.
-   await page.evaluate(delta=>scrollBy(0,delta),flipped.card.top-24)
+   // A spent anchor may pass underneath the nav without any early fade.
+   const nav=await page.locator('.bb-navigation-pane').boundingBox()
+   await page.evaluate(delta=>scrollBy(0,delta),flipped.card.bottom-nav.y-32)
+   await page.waitForTimeout(450)
+   const underNav=await inspect(page)
+   assert.ok(underNav.fixedHits.some(name=>name.includes('bb-navigation-pane')),JSON.stringify({underNav,flipped,nav,navAfter:await page.locator('.bb-navigation-pane').boundingBox(),scroll:await page.evaluate(()=>scrollY)}))
+   assert.equal(await page.locator('.bb-burn-tooltip-portal').getAttribute('data-scroll-hidden'),'false')
+   assert.equal(await page.locator('.bb-burn-tooltip-portal .bb-chart-tooltip-frame').evaluate(n=>Number(getComputedStyle(n).opacity)),1,'Passing under nav remains opaque')
+   assert.equal(underNav.local,flipped.local);checks++
+   // 24px still stays painted; only the final 8px begins the viewport exit.
+   await page.evaluate(delta=>scrollBy(0,delta),underNav.card.top-24);await page.waitForTimeout(60)
+   assert.equal(await page.locator('.bb-burn-tooltip-portal').getAttribute('data-scroll-hidden'),'false')
+   const near=await inspect(page)
+   await page.evaluate(delta=>scrollBy(0,delta),near.card.top-7)
    await page.waitForFunction(()=>document.querySelector('.bb-burn-tooltip-portal').dataset.scrollHidden==='true')
    const exit=await page.locator('.bb-burn-tooltip-portal').evaluate(async portal=>{
     const frames=[],start=performance.now()

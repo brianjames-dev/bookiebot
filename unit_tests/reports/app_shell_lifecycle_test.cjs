@@ -123,6 +123,11 @@ async function main() {
   assert.deepEqual(toolPanes.map(pane => pane.findAllByType('button').map(node => node.props['aria-label'])), [['Ask BookieBot'], ['Settings']])
   const navigationBar = tree.root.findByType('nav')
   assert.equal(navigationBar.children.length, 1, 'Floating navigation renders only its pane container, without an under-bar blur or gradient')
+  for(const node of navigationBar.findAll(n=>n.type==='button'&&n.props['data-nav-screen'])) {
+    assert.ok(node.props['aria-label'],'Icon-only tabs retain their accessible name')
+    assert.equal(node.findByType('svg').props['data-variant'],node.props['data-nav-screen']==='overview'?'filled':'outline')
+    assert.ok(node.findAllByType('span').every(n=>n.children.every(child=>typeof child!=='string')),'Nav renders no visible text labels')
+  }
   const askTrigger = button(tree, 'Ask BookieBot')
   assert.equal(askTrigger.props['aria-haspopup'], 'dialog')
   assert.equal(askTrigger.props['aria-expanded'], false)

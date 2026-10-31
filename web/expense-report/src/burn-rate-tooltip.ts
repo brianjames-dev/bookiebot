@@ -89,6 +89,7 @@ export function burnRateTooltipPlacement(
 const sampleCache = new WeakMap<SVGPathElement, { key: string; samples: Point[] }>()
 type Placement = { portal: HTMLElement; day: string | undefined; geometry: string; point: Point; flipped: boolean; view: string; clearance: number; hidden: boolean }
 const SCROLL_CLEARANCE = 32
+const FADE_EDGE_DISTANCE = 8
 // A mounted inspection owns its scroll budget. New nodes/days/layouts start
 // fresh; ordinary scrolling must not turn the card into a fixed viewport HUD.
 const placementCache = new WeakMap<HTMLElement, Placement>()
@@ -164,12 +165,18 @@ export function positionBurnRateTooltip(portal: HTMLElement, node: HTMLElement, 
   let positionChanged = false
   const occluded = (point: Point) => occluders.some(rect => point.x < rect.x + rect.width + 6 && point.x + tooltip.width > rect.x - 6 && point.y < rect.y + rect.height + 6 && point.y + tooltip.height > rect.y - 6)
   const inside = (point: Point) => point.x >= visible.x && point.y >= visible.y && point.x + tooltip.width <= visible.x + visible.width && point.y + tooltip.height <= visible.y + visible.height
-  // Page edges move with the card. Only the viewport/floating controls can
-  // approach it during scrolling; begin the exit before they actually cover it.
+  // Page edges move with the card. This clearance selects its one optional
+  // move; the separate fade threshold ignores floating-control overlap.
   const clearance = (point: Point) => Math.min(
     bounds.top + point.y - (viewport?.offsetTop ?? 0) - 8,
     (viewport?.offsetTop ?? 0) + (viewport?.height ?? window.innerHeight) - bounds.top - point.y - tooltip.height - 8,
     ...occluders.map(rect => Math.max(rect.x - point.x - tooltip.width, point.x - rect.x - rect.width, rect.y - point.y - tooltip.height, point.y - rect.y - rect.height) - 6),
+  )
+  // Placement still accounts for floating controls. Painting may pass beneath
+  // them: only the ultimate viewport edge starts the scroll-driven fade.
+  const edgeDistance = (point: Point) => Math.min(
+    bounds.top + point.y - (viewport?.offsetTop ?? 0),
+    (viewport?.offsetTop ?? 0) + (viewport?.height ?? window.innerHeight) - bounds.top - point.y - tooltip.height,
   )
   const view = [visible.x, visible.y, visible.width, visible.height, ...occluders.flatMap(rect => [rect.x, rect.y, rect.width, rect.height])].join("|")
   const anchor = selectedX === undefined ? undefined : cached.samples.reduce<Point | undefined>((best, point) =>
@@ -177,7 +184,7 @@ export function positionBurnRateTooltip(portal: HTMLElement, node: HTMLElement, 
   const distance = (point: Point) => anchor ? Math.hypot(anchor.x - Math.max(point.x, Math.min(point.x + tooltip.width, anchor.x)), anchor.y - Math.max(point.y, Math.min(point.y + tooltip.height, anchor.y))) : Infinity
   if (!placement || placement.portal !== portal || placement.day !== day || placement.geometry !== geometry) {
     const point = burnRateTooltipPlacement(plot, tooltip, cached.samples, selectedX, visible, undefined, obstacles())
-    placement = { portal, day, geometry, point, flipped: false, view, clearance: clearance(point), hidden: !inside(point) || occluded(point) }
+    placement = { portal, day, geometry, point, flipped: false, view, clearance: clearance(point), hidden: edgeDistance(point) <= FADE_EDGE_DISTANCE }
     placementCache.set(node, placement)
     positionChanged = true
   } else if (placement.view !== view) {
@@ -201,13 +208,12 @@ export function positionBurnRateTooltip(portal: HTMLElement, node: HTMLElement, 
       }
     }
     const current = clearance(placement.point)
-    if (positionChanged || current >= SCROLL_CLEARANCE) placement.hidden = false
-    else if (approaching || current < 0) placement.hidden = true
+    placement.hidden = edgeDistance(placement.point) <= FADE_EDGE_DISTANCE
     placement.clearance = current
     placement.view = view
   }
   // Once its one opposite-side move is used, keep this exact chart-local
-  // anchor. It scrolls away naturally; fixed controls can hide, never repel it.
+  // anchor. It passes beneath fixed controls and fades only at the screen edge.
   const hidden = String(placement.hidden)
   if (portal.dataset.scrollHidden !== hidden) portal.dataset.scrollHidden = hidden
   // Do not compare serialized CSS floats: browser rounding can otherwise
