@@ -13,7 +13,8 @@ import {
   type RefObject,
 } from "react"
 import { createPortal } from "react-dom"
-import { ChevronDown } from "lucide-react"
+import { ChevronDown, X } from "lucide-react"
+import { Popover } from "konsta/react"
 import { useCategoryContour, CategoryContourCallouts } from "./category-mix-contour"
 import { CONTOUR_PADDING_ANGLE } from "./category-mix-layout"
 import { burnRateBalance, burnRateTooltipOccluders, positionBurnRateTooltip } from "./burn-rate-tooltip"
@@ -753,6 +754,7 @@ const OverviewCharts = memo(function OverviewCharts({ report, activeReport, char
                 burnRate={activeReport.burnRate}
                 categoryBalances={activeReport.categoryBalances}
                 month={report.month}
+                collapseKey={chartCollapseKey}
               />
             ),
           },
@@ -1155,10 +1157,12 @@ function BurnRateChart({
   burnRate,
   categoryBalances,
   month,
+  collapseKey = 0,
 }: {
   burnRate: BurnRate
   categoryBalances: CategoryBalances
   month: number
+  collapseKey?: number
 }) {
   const [tooltipPortal, setTooltipPortal] = useState<HTMLDivElement | null>(null)
   const touch = useMediaQuery("(pointer: coarse)")
@@ -1177,22 +1181,22 @@ function BurnRateChart({
   return (
     <div className="bb-chart-stack bb-chart-page bb-burn-rate-page">
       <div className="bb-panel-head bb-burn-rate-summary bb-chart-page-header">
-        <div className="bb-burn-rate-primary">
+        <div className="bb-burn-rate-primary" data-not-started={isNotStarted}>
           <div>
             <div className="bb-title-with-accessory">
               <div className="bb-chart-kicker">{statusLabel}</div>
-              <BurnRateInfoButton />
+              <BurnRateInfoButton burnRate={burnRate} monthName={monthName} collapseKey={collapseKey} />
             </div>
             <div className={isOver ? "bb-burn-rate-value bb-negative" : "bb-burn-rate-value bb-positive"}>{differenceLabel}</div>
-            <div className="bb-burn-rate-note">
-              {burnRate.elapsedDays} of {burnRate.daysInMonth} days counted
-            </div>
           </div>
           <div className="bb-burn-rate-actions">
             <div className={`bb-burn-rate-pace ${burnRate.dailyDifference > 0 ? "bb-negative" : "bb-positive"}`} aria-label={dailyDifference}>
               <span>{isNotStarted ? "No daily pace yet" : burnRate.dailyDifference > 0 ? "Overspending" : burnRate.dailyDifference < 0 ? "Saving" : "On pace"}</span>
               {!isNotStarted && <strong>{formatMoney(Math.abs(burnRate.dailyDifference))}/day</strong>}
             </div>
+          </div>
+          <div className="bb-burn-rate-note">
+            {burnRate.elapsedDays} of {burnRate.daysInMonth} days counted
           </div>
         </div>
         {categoryPressure ? <CategoryMixPressureBar pressure={categoryPressure} /> : null}
@@ -1244,15 +1248,15 @@ function BurnRateChart({
 function BurnRateMonthBalance({ burnRate, monthName }: { burnRate: BurnRate; monthName: string }) {
   const balance = burnRateBalance(burnRate.spent, burnRate.budget)
   return (
-    <div className="bb-burn-month-panel">
-      <div className="bb-burn-limit-row">
-        <span>{burnRate.elapsedDays ? `Through ${monthName} ${burnRate.elapsedDays}` : "Month not started"}</span>
-        <span className="bb-burn-limit-inline">Month limit <strong>{formatMoney(burnRate.budget)}</strong></span>
+    <div className="bb-burn-month-panel" data-over={balance.over} role="img"
+      aria-label={`${burnRate.elapsedDays ? `Through ${monthName} ${burnRate.elapsedDays}` : "Month not started"}. Spent ${formatMoney(burnRate.spent)} of the ${formatMoney(burnRate.budget)} month limit. ${formatMoney(burnRate.remaining)} left.`}>
+      <div className="bb-burn-fraction">
+        <strong>{formatMoney(burnRate.spent)}</strong><span>/ {formatMoney(burnRate.budget)}</span>
       </div>
       <BurnRateBalanceRail balance={balance} />
       <div className="bb-burn-month-values">
-        <div><span className="bb-burn-legend">Spent</span><strong>{formatMoney(burnRate.spent)}</strong></div>
-        <div><span className="bb-burn-legend bb-burn-legend-left">Left</span><strong className={burnRate.remaining < 0 ? "bb-negative" : undefined}>{formatMoney(burnRate.remaining)}</strong></div>
+        <span><span className="bb-burn-spent-label">Spent</span> / Month limit</span>
+        <span className={burnRate.remaining < 0 ? "bb-negative" : "bb-positive"}>{formatMoney(burnRate.remaining)} left</span>
       </div>
     </div>
   )
@@ -1282,15 +1286,130 @@ function burnRateDailyPaceLabel(burnRate: BurnRate) {
   return "On pace"
 }
 
-function BurnRateInfoButton() {
-  return (
-    <button type="button" className="bb-burn-rate-info" aria-label="What burn rate means">
-      <span aria-hidden="true">i</span>
-      <span className="bb-burn-rate-info-tooltip" role="tooltip">
-        Tracks Food + Shopping + Wants subscriptions against your Wants limit after cross-category coverage. Available today is what you can spend now and stay on pace.
-      </span>
+function BurnRateInfoButton({ burnRate, monthName, collapseKey }: { burnRate: BurnRate; monthName: string; collapseKey: number }) {
+  const [open, setOpen] = useState(false)
+  const id = useId()
+  const trigger = useRef<HTMLButtonElement>(null)
+  const popover = useRef<HTMLDivElement>(null)
+  const panel = useRef<HTMLDivElement>(null)
+  const dismissChartTooltips = useChartTooltipDismiss()
+  const title = burnRate.status === "not_started" ? "Not started" : burnRate.status === "over" ? "Over pace" : "Available today"
+  const close = (restoreFocus = false) => {
+    setOpen(false)
+    if (restoreFocus) trigger.current?.focus({ preventScroll: true })
+  }
+
+  useEffect(() => setOpen(false), [burnRate, monthName, collapseKey])
+  useLayoutEffect(() => {
+    if (!open) return
+    const contain = () => {
+      const element = popover.current
+      const anchor = trigger.current?.getBoundingClientRect()
+      if (!element || !anchor) return
+      const summary = trigger.current?.closest(".bb-burn-rate-primary")?.getBoundingClientRect() ?? anchor
+      const viewport = window.visualViewport
+      const leftEdge = (viewport?.offsetLeft ?? 0) + 16
+      let topEdge = (viewport?.offsetTop ?? 0) + 16
+      const rightEdge = leftEdge + (viewport?.width ?? window.innerWidth) - 32
+      let bottomEdge = topEdge + (viewport?.height ?? window.innerHeight) - 32
+      element.style.maxWidth = `${Math.max(1, rightEdge - leftEdge)}px`
+      const left = Math.max(leftEdge, Math.min(summary.left, rightEdge - element.offsetWidth))
+      for (const control of burnRateTooltipOccluders(element.ownerDocument)) {
+        const rect = control.getBoundingClientRect()
+        if (rect.right <= left || rect.left >= left + element.offsetWidth) continue
+        if (rect.top >= anchor.bottom) bottomEdge = Math.min(bottomEdge, rect.top - 8)
+        else if (rect.bottom <= anchor.top) topEdge = Math.max(topEdge, rect.bottom + 8)
+      }
+      element.style.setProperty("--bb-burn-info-max-height", `${Math.max(1, bottomEdge - topEdge - 2)}px`)
+      const above = summary.bottom + 8 + element.offsetHeight > bottomEdge
+      const top = above ? anchor.top - element.offsetHeight - 8 : summary.bottom + 8
+      element.style.setProperty("--bb-burn-info-left", `${left}px`)
+      element.style.setProperty("--bb-burn-info-top", `${Math.max(topEdge, Math.min(top, bottomEdge - element.offsetHeight))}px`)
+      element.style.setProperty("--bb-burn-info-origin", above ? "center bottom" : "center top")
+    }
+    contain()
+    const observer = new ResizeObserver(contain)
+    if (popover.current) observer.observe(popover.current)
+    window.addEventListener("resize", contain)
+    window.visualViewport?.addEventListener("resize", contain)
+    window.visualViewport?.addEventListener("scroll", contain)
+    return () => {
+      observer.disconnect()
+      window.removeEventListener("resize", contain)
+      window.visualViewport?.removeEventListener("resize", contain)
+      window.visualViewport?.removeEventListener("scroll", contain)
+    }
+  }, [open])
+  useEffect(() => {
+    if (!open) return
+    const outside = (event: PointerEvent | FocusEvent) => {
+      if (!(event.target instanceof Node) || panel.current?.contains(event.target) || trigger.current?.contains(event.target)) return
+      // Safari may focus an ancestor before delivering a tapped close button.
+      if (event.type === "focusin" && trigger.current && event.target.contains(trigger.current)) return
+      close()
+    }
+    const escape = (event: KeyboardEvent) => {
+      if (event.key !== "Escape") return
+      event.preventDefault()
+      close(true)
+    }
+    const scroll = (event: Event) => {
+      if (!(event.target instanceof Node && panel.current?.contains(event.target))) close()
+    }
+    const screenChange = () => close()
+    const frame = requestAnimationFrame(() => panel.current?.querySelector<HTMLButtonElement>("button")?.focus({ preventScroll: true }))
+    document.addEventListener("pointerdown", outside)
+    document.addEventListener("focusin", outside)
+    document.addEventListener("keydown", escape)
+    document.addEventListener("scroll", scroll, true)
+    window.addEventListener("bookiebot:screen-change", screenChange)
+    return () => {
+      cancelAnimationFrame(frame)
+      document.removeEventListener("pointerdown", outside)
+      document.removeEventListener("focusin", outside)
+      document.removeEventListener("keydown", escape)
+      document.removeEventListener("scroll", scroll, true)
+      window.removeEventListener("bookiebot:screen-change", screenChange)
+    }
+  }, [open])
+
+  return <>
+    <button ref={trigger} type="button" className="bb-burn-rate-info" aria-label={`Explain ${title}`} aria-haspopup="dialog"
+      aria-expanded={open} aria-controls={id} onClick={() => { if (!open) dismissChartTooltips(); setOpen(value => !value) }}>
+      <span aria-hidden="true">ⓘ</span>
     </button>
-  )
+    {typeof document !== "undefined" && createPortal(
+      <Popover ref={popover} className="bb-burn-info-popover" opened={open} target={trigger} backdrop={false}
+        role="dialog" aria-label={title} aria-hidden={!open} id={id} inert={!open}>
+        <div ref={panel} className="bb-burn-info-panel">
+          <BurnRateInfoContent burnRate={burnRate} monthName={monthName} onClose={() => close(true)} />
+        </div>
+      </Popover>, document.body)}
+  </>
+}
+
+function BurnRateInfoContent({ burnRate, monthName, onClose }: { burnRate: BurnRate; monthName: string; onClose: () => void }) {
+  const isNotStarted = burnRate.status === "not_started"
+  const isOver = burnRate.status === "over"
+  const title = isNotStarted ? "Not started" : isOver ? "Over pace" : "Available today"
+  const date = isNotStarted ? "" : ` through ${monthName} ${burnRate.elapsedDays}`
+  return <>
+    <div className="bb-burn-info-head">
+      <h3>{title}</h3>
+      <button type="button" className="bb-burn-info-close" aria-label="Close spending pace explanation" onClick={onClose}><X size={16} aria-hidden="true" /></button>
+    </div>
+    <p className="bb-burn-info-lede">{isNotStarted ? "Your spending pace starts with the first day of this month." : isOver ? "Spending above the allowance so far." : "Room to spend while staying on pace."}</p>
+    <dl className="bb-burn-info-calculation">
+      <div><dt>Allowance{date}</dt><dd>{formatMoney(burnRate.expectedSpend)}</dd></div>
+      <div><dt>Spent{date}</dt><dd>{formatMoney(burnRate.spent)}</dd></div>
+      <div className="bb-burn-info-answer"><dt>{title}</dt><dd className={isNotStarted ? undefined : isOver ? "bb-negative" : "bb-positive"}>{isNotStarted ? "No elapsed days" : formatMoney(Math.abs(burnRate.totalDifference))}</dd></div>
+    </dl>
+    <div className="bb-burn-info-scope">
+      <span>Counts toward pace</span>
+      <p>Food · Shopping · Wants subscriptions</p>
+      <small>Allowance reflects category coverage.</small>
+    </div>
+  </>
 }
 
 function amountRowsTotal(rows: AmountRow[]) {

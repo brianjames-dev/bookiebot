@@ -60,7 +60,8 @@ const closeEnough=(actual,reference,message)=>assert.ok(Math.abs(actual-referenc
         await page.locator('.bb-highlights-section').waitFor()
         await page.getByRole('button',{name:'Show Burn Rate',exact:true}).click()
         await page.waitForTimeout(350)
-        const reference=await gap(page,'.bb-chart-carousel-band','#bb-chart-burn-rate .bb-burn-month-panel')
+        const reference=await gap(page,'.bb-daily-section',dailyButton)
+        assert.ok(await gap(page,'.bb-chart-carousel-band','#bb-chart-burn-rate .bb-burn-month-panel')>=103,'Burn Rate retains its selected bottom breathing room')
         const measured={engine:engine.name(),width,dark,balance:reference,daily:await gap(page,'.bb-daily-section',dailyButton),largest:await gap(page,'.bb-highlights-section',insightButton)}
         if(!measureOnly) {
           closeEnough(reference,Math.min(32,Math.max(16,width*.03))+2,'Keep the approved Categories spacing')
@@ -83,7 +84,8 @@ const closeEnough=(actual,reference,message)=>assert.ok(Math.abs(actual-referenc
           for(const [title,id] of [['Burn Rate','burn-rate'],['Calendar','calendar'],['Bills & Utilities','bills']]) {
             await page.getByRole('button',{name:`Show ${title}`,exact:true}).click();await page.waitForTimeout(350)
             const control=id==='burn-rate'?'#bb-chart-burn-rate .bb-burn-month-panel':`#bb-chart-${id} .bb-chart-page-footer .bb-details-toggle`
-            closeEnough(await gap(page,'.bb-chart-carousel-band',control),reference,`${title} Details footer`)
+            if(id==='burn-rate')assert.ok(await gap(page,'.bb-chart-carousel-band',control)>=103,'The static compact balance has breathing room')
+            else closeEnough(await gap(page,'.bb-chart-carousel-band',control),reference,`${title} Details footer`)
             if(id==='bills') {
               await page.locator(control).click();await page.waitForTimeout(350)
               assert.equal(await page.locator(control).getAttribute('aria-expanded'),'true')

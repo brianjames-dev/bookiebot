@@ -159,25 +159,43 @@ assert.equal(portal.style.opacity,'','Recover as soon as the floating control is
 
 const source=fs.readFileSync('web/expense-report/src/report-app.tsx','utf8')
 const file=ts.createSourceFile('app.tsx',source,ts.ScriptTarget.Latest,true,ts.ScriptKind.TSX)
-const names=new Set(['money','formatMoney','BurnRateChart','BurnRateMonthBalance','BurnRateBalanceRail','burnRateDailyPaceLabel','BurnRateTooltipContent','BurnRateInfoButton','burnRateGradientStops','burnRateYAxisDomain','burnRatePointColor','renderBurnRateActiveDot'])
+const names=new Set(['money','formatMoney','BurnRateChart','BurnRateMonthBalance','BurnRateBalanceRail','burnRateDailyPaceLabel','BurnRateTooltipContent','BurnRateInfoButton','BurnRateInfoContent','burnRateGradientStops','burnRateYAxisDomain','burnRatePointColor','renderBurnRateActiveDot'])
 const declarations=file.statements.filter(s=>ts.isFunctionDeclaration(s)?names.has(s.name?.text):ts.isVariableStatement(s)&&s.declarationList.declarations.some(d=>names.has(d.name.getText(file))))
 assert.equal(declarations.length,names.size)
 const surface=({children})=>React.createElement('div',null,children)
-const runtime={exports:{},require:req,useState:React.useState,useLayoutEffect:React.useLayoutEffect,useRef:React.useRef,useMediaQuery:()=>true,burnRateBalance,positionBurnRateTooltip,
+const runtime={exports:{},require:req,useState:React.useState,useEffect:React.useEffect,useId:React.useId,useLayoutEffect:React.useLayoutEffect,useRef:React.useRef,useChartTooltipDismiss:()=>()=>{},X:()=>null,useMediaQuery:()=>true,burnRateBalance,positionBurnRateTooltip,
   categoryMixPressure:()=>null,ChartContainer:surface,ResponsiveContainer:surface,ComposedChart:surface,Area:()=>null,CartesianGrid:()=>null,XAxis:()=>null,YAxis:()=>null,ReferenceLine:()=>null,Line:()=>null,ChartTooltip:()=>null}
-vm.runInNewContext(compile(declarations.map(n=>n.getText(file)).join('\n')+'\nexports.Chart=BurnRateChart;exports.Tooltip=BurnRateTooltipContent;exports.Month=BurnRateMonthBalance'),runtime)
+vm.runInNewContext(compile(declarations.map(n=>n.getText(file)).join('\n')+'\nexports.Chart=BurnRateChart;exports.Tooltip=BurnRateTooltipContent;exports.Month=BurnRateMonthBalance;exports.Info=BurnRateInfoContent'),runtime)
 let view
 const render=(Component,props)=>act(()=>{if(view)view.unmount();view=create(React.createElement(Component,props))})
 const point={day:13,label:'13',dailySpend:400,actualSpend:1460,expectedSpend:1255.93,variance:204.07}
-const burn={budget:2994.92,spent:2029.32,remaining:965.60,daysInMonth:31,elapsedDays:26,totalDifference:-482.55,dailyDifference:-18.56,status:'under',series:[point]}
+const burn={budget:2994.92,spent:2029.32,remaining:965.60,daysInMonth:31,elapsedDays:26,expectedSpend:2511.87,totalDifference:-482.55,dailyDifference:-18.56,status:'under',series:[point]}
 render(runtime.exports.Chart,{burnRate:burn,categoryBalances:{},month:10})
 let text=JSON.stringify(view.toJSON())
 for(const expected of ['Available today','$482.55','Saving','$18.56','Through Oct 26','Month limit','$2,994.92','$2,029.32','$965.60'])assert.ok(text.includes(expected),expected)
-for(const removed of ['Details','Allowed/day','Actual/day','bb-burn-rate-pill'])assert.ok(!text.includes(removed),removed)
+for(const removed of ['Details','Allowed/day','Actual/day','bb-burn-rate-pill','bb-burn-limit-row','bb-burn-legend'])assert.ok(!text.includes(removed),removed)
 const area=view.root.findByType(runtime.Area),lineView=view.root.findByType(runtime.Line)
 assert.equal(area.props.baseValue,0);assert.equal(area.props.fillOpacity,.1);assert.equal(area.props.isAnimationActive,false)
 assert.equal(lineView.props.strokeWidth,3);assert.equal(lineView.props.isAnimationActive,false)
 assert.equal(lineView.props.stroke,'url(#burn-rate-variance-gradient)')
+
+const pace=view.root.findByProps({className:'bb-burn-rate-pace bb-positive'})
+assert.equal(pace.children[0].type,'span');assert.equal(pace.children[0].children[0],'Saving')
+assert.equal(pace.children[1].type,'strong','Saving precedes its daily amount')
+const monthPanel=view.root.findByProps({className:'bb-burn-month-panel'})
+assert.equal(monthPanel.findAllByType('button').length,0,'The fraction footer has no expansion control')
+assert.equal(monthPanel.findByProps({className:'bb-burn-fraction'}).findByType('strong').children[0],'$2,029.32')
+assert.equal(monthPanel.findByProps({className:'bb-burn-spent-label'}).children[0],'Spent')
+assert.ok(text.includes(' left'))
+let closes=0
+render(runtime.exports.Info,{burnRate:burn,monthName:'Oct',onClose:()=>closes++})
+text=JSON.stringify(view.toJSON())
+for(const expected of ['Room to spend while staying on pace.','Allowance',' through Oct 26','$2,511.87','$2,029.32','$482.55','Food · Shopping · Wants subscriptions','Allowance reflects category coverage.'])assert.ok(text.includes(expected),expected)
+view.root.findByProps({'aria-label':'Close spending pace explanation'}).props.onClick();assert.equal(closes,1)
+render(runtime.exports.Info,{burnRate:{...burn,status:'over',spent:3100,totalDifference:588.13},monthName:'Feb',onClose:()=>{}})
+text=JSON.stringify(view.toJSON());for(const expected of ['Over pace','Spending above the allowance so far.','$588.13','bb-negative'])assert.ok(text.includes(expected),expected)
+render(runtime.exports.Info,{burnRate:{...burn,status:'not_started',elapsedDays:0,expectedSpend:0,spent:0,totalDifference:0},monthName:'Nov',onClose:()=>{}})
+text=JSON.stringify(view.toJSON());assert.ok(text.includes('No elapsed days'));assert.ok(!text.includes('through Nov 0'))
 
 render(runtime.exports.Tooltip,{active:true,payload:[{payload:point}],monthName:'Feb',portal:{}})
 text=JSON.stringify(view.toJSON())

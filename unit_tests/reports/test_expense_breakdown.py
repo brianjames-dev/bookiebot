@@ -232,7 +232,7 @@ def test_reimbursement_disclosures_preserve_complete_transaction_details():
         assert f"formatMoney(item.{field})" in details
 
 
-def test_top_chart_mobile_counts_control_order_and_burn_pill_alignment():
+def test_top_chart_mobile_counts_control_order_and_burn_summary_alignment():
     source = (Path(__file__).resolve().parents[2] / "web/expense-report/src/report-app.tsx").read_text()
     styles = (Path(__file__).resolve().parents[2] / "web/expense-report/src/styles.css").read_text()
     calendar_panel = source.split("function CalendarAnalyticsPanel", 1)[1].split("function CalendarChangingValue", 1)[0]
@@ -245,8 +245,8 @@ def test_top_chart_mobile_counts_control_order_and_burn_pill_alignment():
     assert ".bb-calendar-marker-count {" in mobile_styles
     assert "display: inline-flex;" in mobile_styles.split(".bb-calendar-marker-count {", 1)[1].split("}", 1)[0]
     assert ".bb-burn-rate-actions {" in styles
-    assert "margin-left: auto;" in styles.split(".bb-burn-rate-actions {", 1)[1].split("}", 1)[0]
-    assert "flex: 1 1 360px;" in styles.split(".bb-burn-rate-primary {", 1)[1].split("}", 1)[0]
+    assert "border-left: 1px solid" in styles.split("\n.bb-burn-rate-actions {", 1)[1].split("}", 1)[0]
+    assert "grid-template-columns: minmax(0, 1fr) auto;" in styles.split(".bb-burn-rate-primary {", 1)[1].split("}", 1)[0]
 
 
 def test_category_mix_counts_donor_transfers_as_effective_category_usage():
@@ -2004,8 +2004,8 @@ def test_report_frontend_calendar_largest_and_burn_rate_presentation_regressions
     assert "const largestEntries = useMemo(() => topEntries" in source
     assert 'entry.category.trim().toLowerCase() !== "rent"' in source
     assert 'categoryMixPressure("wants", categoryBalances, burnRate.spent)' in source
-    assert "Food + Shopping + Wants subscriptions" in source
-    assert "after cross-category coverage" in source
+    assert "Food · Shopping · Wants subscriptions" in source
+    assert "Allowance reflects category coverage." in source
     assert "<DailySpendingSection" in source
     assert 'aria-controls={detailsId}' in source
     assert '<ReportHeader month={appMonthControl ?? report.monthLabel}' in source

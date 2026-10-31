@@ -1,5 +1,11 @@
 # Agent Decisions
 
+## 2026-10-30 - Implement Approved Compact Burn Rate Surroundings
+
+The user approved the refined Budget fraction draft. Use its static monthly Spent / Month limit fraction, 6px rail and signed Left caption without expansion; match Spent to the active spent bar color. Keep both upper labels above their amounts, the divider, Overview-style info glyph, 30px/20px amounts and selected 12px gaps/top inset. Limit the plot to 280px and reserve at least 104px below the footer while fitting the existing shared stage; shorter screens/category pressure can reduce plot height. The common carousel height remains until the other graph views are refined, following the recorded compactness direction.
+
+The info explanation uses the displayed mode/month’s canonical Burn Rate expectedSpend, spent and totalDifference; handle over-pace and not-started states explicitly. Reuse the app’s portaled Konsta popover pattern with viewport/floating-control bounds, ordinary keyboard focus and close/outside/scroll/screen lifecycle. Opening it dismisses native chart inspections; graph/mode/report changes dismiss the explanation. Retain the approved day-popup algorithm/hold/fade, native line/gradient and category pressure. No financial calculation, persistence, mutation or Finance Ops change. Native acceptance is checklist 206; this supersedes 205’s draft-only status.
+
 ## 2026-10-30 - Refine Burn Rate Budget Fraction Without Expansion
 
 The user chose Budget fraction for the permanent compact monthly footer, with no expansion. Color the **Spent** label to match the spent segment of the bar. Retain the Budget fraction upper divider/two-column styling, but put **Available today** above its amount and **Saving** above its per-day amount. Match the actual Overview metric info glyph (`ⓘ`, 12px, opacity .7) rather than the larger bespoke circle.
