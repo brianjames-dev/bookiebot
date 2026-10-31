@@ -17,7 +17,7 @@ function reportFor(scenario='regular'){
  if(scenario==='over')daily[25]+=1200
  const budget=scenario==='zero'?0:2994.92,elapsedDays=scenario==='future'?0:scenario==='first-day'?1:26
  let actual=0
- const series=Array.from({length:31},(_,i)=>{const day=i+1,dailySpend=day<=elapsedDays?(scenario==='zero'?0:daily[i]):null;actual=round(actual+(dailySpend??0));const expectedSpend=round(budget*day/31);return {day,label:String(day),dailySpend,actualSpend:day<=elapsedDays?actual:null,expectedSpend,variance:day<=elapsedDays?round(actual-expectedSpend):null}})
+ const series=Array.from({length:31},(_,i)=>{const day=i+1,expectedSpend=round(budget*day/31),variance=scenario==='plateau'?200:scenario==='gentle-ramp'?200+day*2:scenario==='arch'?200+30*Math.sin(day/5):scenario==='dip'?(day<=2?-80*day:260+100*Math.sin(day/5)):null,dailySpend=day<=elapsedDays?(variance!==null?round(expectedSpend+variance-actual):scenario==='zero'?0:daily[i]):null;actual=round(actual+(dailySpend??0));return {day,label:String(day),dailySpend,actualSpend:day<=elapsedDays?actual:null,expectedSpend,variance:day<=elapsedDays?round(actual-expectedSpend):null}})
  const expectedSpend=round(budget*elapsedDays/31),diff=round(actual-expectedSpend)
  const burnRate={budget,spent:actual,remaining:round(budget-actual),daysInMonth:31,elapsedDays,expectedSpend,allowedDailyAverage:round(budget/31),actualDailyAverage:elapsedDays?round(actual/elapsedDays):0,dailyDifference:elapsedDays?round(diff/elapsedDays):0,totalDifference:diff,status:!elapsedDays?'not_started':diff>0?'over':'under',series}
  Object.assign(report,{year:2026,month:10,monthLabel:'October 2026',elapsedDays,burnRate})
@@ -41,8 +41,11 @@ async function graph(page){return page.locator('#bb-chart-burn-rate').evaluate(e
  return {samples,stops:[...el.querySelectorAll('linearGradient stop')].map(n=>[n.getAttribute('offset'),n.getAttribute('stop-color')])}
 })}
 async function inspect(page){return page.locator('#bb-chart-burn-rate').evaluate(el=>{
- const plotRect=el.querySelector('clipPath rect').getBoundingClientRect(),t=el.querySelector('.bb-burn-node-tooltip'),portal=el.querySelector('.bb-burn-tooltip-portal'),rail=t.querySelector('.bb-burn-balance-rail'),fill=rail.querySelector('.bb-burn-overfill'),card=t.getBoundingClientRect(),wrapper=portal.querySelector('.recharts-tooltip-wrapper'),dot=el.querySelector('.bb-burn-rate-active-dot')?.getBoundingClientRect()
- return {day:t.dataset.inspectedDay,text:t.innerText,header:t.querySelector('.bb-burn-mini-header').innerText,labels:t.querySelector('.bb-burn-pair-labels').innerText,values:t.querySelector('.bb-burn-pair-values').innerText,over:rail.dataset.over,fill:fill?{percent:parseFloat(fill.style.width),x:fill.getBoundingClientRect().x,color:getComputedStyle(fill).backgroundColor}:null,rail:rail.getBoundingClientRect().toJSON(),background:getComputedStyle(rail).backgroundColor,card:card.toJSON(),labelBottom:t.querySelector('.bb-burn-pair-labels').getBoundingClientRect().bottom,valueTop:t.querySelector('.bb-burn-pair-values').getBoundingClientRect().top,transform:getComputedStyle(wrapper).transform,transition:getComputedStyle(portal).transitionDuration,positioned:portal.dataset.positionedDay,plotRect:plotRect.toJSON(),outsidePlot:card.bottom<=plotRect.top||card.top>=plotRect.bottom||card.right<=plotRect.left||card.left>=plotRect.right,hidesDot:dot?card.x<dot.right+6&&card.right>dot.x-6&&card.y<dot.bottom+6&&card.bottom>dot.y-6:false,shade:getComputedStyle(el.querySelector('.recharts-area-area')).fillOpacity,stage:document.querySelector('.bb-chart-carousel-band').getBoundingClientRect().height,plot:el.querySelector('.recharts-wrapper').getBoundingClientRect().height,details:!!el.querySelector('.bb-details-toggle'),overflow:document.documentElement.scrollWidth>innerWidth}
+ const clip=el.querySelector('clipPath rect'),svg=el.querySelector('.recharts-surface'),a=new DOMPoint(clip.x.baseVal.value,clip.y.baseVal.value).matrixTransform(svg.getScreenCTM()),b=new DOMPoint(clip.x.baseVal.value+clip.width.baseVal.value,clip.y.baseVal.value+clip.height.baseVal.value).matrixTransform(svg.getScreenCTM()),plotRect={left:a.x,top:a.y,right:b.x,bottom:b.y},t=el.querySelector('.bb-burn-node-tooltip'),portal=el.querySelector('.bb-burn-tooltip-portal'),rail=t.querySelector('.bb-burn-balance-rail'),fill=rail.querySelector('.bb-burn-overfill'),card=t.getBoundingClientRect(),wrapper=portal.querySelector('.recharts-tooltip-wrapper'),dot=el.querySelector('.bb-burn-rate-active-dot')?.getBoundingClientRect()
+ const line=el.querySelector('.recharts-line-curve'),matrix=line.getScreenCTM();let curveHits=0
+ for(let at=0;at<=line.getTotalLength();at+=2){const p=line.getPointAtLength(at).matrixTransform(matrix);if(p.x>card.left-6&&p.x<card.right+6&&p.y>card.top-6&&p.y<card.bottom+6)curveHits++}
+ const metricHits=[...el.querySelectorAll('.bb-chart-page-header,.bb-chart-page-footer,.recharts-xAxis,.recharts-yAxis')].filter(n=>{const r=n.getBoundingClientRect();return r.width&&r.height&&card.left<r.right+5&&card.right>r.left-5&&card.top<r.bottom+5&&card.bottom>r.top-5}).map(n=>n.className.baseVal??n.className)
+ return {curveHits,metricHits,day:t.dataset.inspectedDay,text:t.innerText,header:t.querySelector('.bb-burn-mini-header').innerText,labels:t.querySelector('.bb-burn-pair-labels').innerText,values:t.querySelector('.bb-burn-pair-values').innerText,over:rail.dataset.over,fill:fill?{percent:parseFloat(fill.style.width),x:fill.getBoundingClientRect().x,color:getComputedStyle(fill).backgroundColor}:null,rail:rail.getBoundingClientRect().toJSON(),background:getComputedStyle(rail).backgroundColor,card:card.toJSON(),labelBottom:t.querySelector('.bb-burn-pair-labels').getBoundingClientRect().bottom,valueTop:t.querySelector('.bb-burn-pair-values').getBoundingClientRect().top,transform:getComputedStyle(wrapper).transform,transition:getComputedStyle(portal).transitionDuration,positioned:portal.dataset.positionedDay,plotRect,outsidePlot:card.bottom<=plotRect.top||card.top>=plotRect.bottom||card.right<=plotRect.left||card.left>=plotRect.right,hidesDot:dot?card.x<dot.right+6&&card.right>dot.x-6&&card.y<dot.bottom+6&&card.bottom>dot.y-6:false,shade:getComputedStyle(el.querySelector('.recharts-area-area')).fillOpacity,stage:document.querySelector('.bb-chart-carousel-band').getBoundingClientRect().height,plot:el.querySelector('.recharts-wrapper').getBoundingClientRect().height,details:!!el.querySelector('.bb-details-toggle'),overflow:document.documentElement.scrollWidth>innerWidth}
  })}
 ;(async()=>{
  let checks=0,frames=0
@@ -68,7 +71,7 @@ async function inspect(page){return page.locator('#bb-chart-burn-rate').evaluate
    assert.ok(!/Through|to date|Day spent|Total Spent/.test(actual.text));assert.ok(actual.labels.includes('Spent')&&actual.labels.includes('Limit'))
    assert.ok(actual.labelBottom<=actual.rail.top&&actual.valueTop>=actual.rail.bottom)
    assert.equal(actual.over,String(point.variance>0));if(point.variance>0){assert.ok(Math.abs(actual.fill.percent-Math.min(1,point.variance/point.expectedSpend)*100)<.001);assert.ok(Math.abs(actual.fill.x-actual.rail.x)<.1);assert.notEqual(actual.fill.color,actual.background)}else assert.equal(actual.fill,null)
-   assert.equal(actual.transform,'none');assert.equal(actual.transition,'0s');assert.equal(actual.positioned,String(day));assert.equal(actual.hidesDot,false,JSON.stringify(actual));assert.equal(actual.outsidePlot,true,JSON.stringify(actual));assert.equal(actual.shade,'0.1');assert.equal(actual.stage,stage);assert.equal(actual.details,false);assert.ok(actual.plot>170);assert.equal(actual.overflow,false);assert.ok(actual.card.x>=0&&actual.card.right<=width+.1,JSON.stringify(actual));checks++
+   assert.equal(actual.transform,'none');assert.equal(actual.transition,'0s');assert.equal(actual.positioned,String(day));assert.equal(actual.hidesDot,false,JSON.stringify(actual));assert.equal(actual.curveHits,0,JSON.stringify(actual));assert.equal(actual.shade,'0.1');assert.equal(actual.stage,stage);assert.equal(actual.details,false);assert.ok(actual.plot>170);assert.equal(actual.overflow,false);assert.ok(actual.card.x>=0&&actual.card.right<=width+.1,JSON.stringify(actual));checks++
   }
   await page.locator('#bb-chart-burn-rate').screenshot({path:`/private/tmp/burn-rate-shipped-${engineName}-${width}-${dark?'dark':'light'}.png`})
   const sampled=await page.evaluate(()=>window.__burnFrames);for(const frame of sampled){assert.equal(frame.day,frame.positioned,'No frame paints new content at the previous anchor');assert.equal(frame.transform,'none');assert.equal(frame.transition,'0s')}frames+=sampled.length
@@ -91,6 +94,18 @@ async function inspect(page){return page.locator('#bb-chart-burn-rate').evaluate
    await page.getByRole('button',{name:'Show Calendar',exact:true}).click();await page.waitForTimeout(450);assert.equal(await page.locator('.bb-burn-node-tooltip').count(),0)
    await page.getByRole('button',{name:'Show Burn Rate',exact:true}).click();await nativePoint(page,13,touch)
    await page.getByRole('button',{name:'Projected',exact:true}).click();await page.waitForTimeout(450);assert.equal(await page.locator('.bb-burn-node-tooltip').count(),0);checks+=7
+  }
+  // Several unrelated curve shapes must be able to use clear interior space
+  // without masking the line, summary numbers, axis labels or monthly totals.
+  for(const scenario of ['plateau','gentle-ramp','arch','dip']){
+   await open(scenario)
+   for(const day of (scenario==='dip'?[2,13,26]:[13])){
+    await nativePoint(page,day,touch);const actual=await inspect(page)
+    assert.equal(actual.hidesDot,false,JSON.stringify(actual));assert.equal(actual.curveHits,0,JSON.stringify(actual));assert.deepEqual(actual.metricHits,[],JSON.stringify(actual))
+    assert.equal(actual.outsidePlot,false,JSON.stringify({scenario,width,engineName,day,...actual}))
+    assert.equal(actual.overflow,false);checks++
+   }
+   if(width===390&&dark&&scenario==='dip')await page.locator('#bb-chart-burn-rate').screenshot({path:`/private/tmp/burn-rate-pocket-${engineName}.png`})
   }
   for(const scenario of ['surge','over','zero','first-day','future']){
    await open(scenario)
@@ -121,5 +136,5 @@ async function inspect(page){return page.locator('#bb-chart-burn-rate').evaluate
  }
  }finally{await browser.close()}
  }
- console.log(JSON.stringify({checks,frames,result:'PASS: native mouse/touch, exact day/month amounts, split labels, left overfill, outside-plot placement, synchronous anchors, progressive normal/reduced-motion exit, hold/dismiss/scroll anchoring/tab/mode lifecycle, zero/future and responsive layouts'}))
+ console.log(JSON.stringify({checks,frames,result:'PASS: native mouse/touch, exact day/month amounts, split labels, left overfill, interior/exterior pockets, clear curve/metrics/axes, synchronous anchors, progressive normal/reduced-motion exit, hold/dismiss/scroll anchoring/tab/mode lifecycle, zero/future and responsive layouts'}))
 })().catch(error=>{console.error(error);process.exit(1)})

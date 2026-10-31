@@ -1,5 +1,11 @@
 # Agent Decisions
 
+## 2026-10-30 - Use Clear Burn Rate Plot Pockets
+
+Prioritize the selected node and actual native trend line rather than minimizing overlap with the entire plotting rectangle. Search interior and exterior positions, protect measured summary/footer and axis-label rectangles, then prefer nearby clear placements. A spatial grid plus exact anchor/plot/obstacle edges discovers pockets between bends without date-, value- or screenshot-specific placement. Retain near ties only when curve and metric clearance are no worse; an old outside anchor cannot mask totals when a better pocket is available. If space is insufficient, retain a bounded least-obstructive fallback.
+
+This refines 200's exterior preference; keep its viewport/panel bounds, cached native path sampling, single synchronous position owner, carousel clipping and five-second hold / 360ms fade. No chart styling, finance calculations, data or Finance Ops change. Native acceptance is checklist 201.
+
 ## 2026-10-30 - Keep Burn Rate Inspection Clear Of The Plot
 
 Allow the native day popup to overflow the plotting rectangle into the surrounding chart panel, bounded by the panel/visual-viewport intersection. Prioritize selected-node clearance, then graph visibility and proximity; consider positions above/below the plot and around the node rather than four internal corners. Retain near ties without sacrificing clearance/visibility, keep cached chart-local path samples and one synchronous position owner, and remeasure on scroll/resize. Preserve carousel clipping, stage geometry, native interaction and financial scopes.

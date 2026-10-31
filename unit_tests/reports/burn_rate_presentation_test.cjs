@@ -24,36 +24,49 @@ for (const selectedX of [60, 165, 327]) {
   const p = burnRateTooltipPlacement(plot, tooltip, diagonal, selectedX)
   assert.ok(p.x >=58 && p.y >=20 && p.x+184<=338 && p.y+102<=280)
   const selected = diagonal.reduce((a,b)=>Math.abs(a.x-selectedX)<Math.abs(b.x-selectedX)?a:b)
-  assert.ok(!(selected.x>p.x-8 && selected.x<p.x+192 && selected.y>p.y-8 && selected.y<p.y+110), 'Prefer a corner away from the selected node')
+  assert.ok(!(selected.x>p.x-8 && selected.x<p.x+192 && selected.y>p.y-8 && selected.y<p.y+110), 'Keep the selected node clear')
 }
 const surrounding = {x:8,y:-120,width:340,height:530}
-for (const selectedX of [60, 165, 327]) {
-  const p = burnRateTooltipPlacement(plot, tooltip, diagonal, selectedX, surrounding)
-  assert.ok(p.y+tooltip.height<=plot.y || p.y>=plot.y+plot.height, 'Use surrounding space to leave the entire plot visible')
-  assert.ok(p.x>=8 && p.x+184<=348 && p.y>=-120 && p.y+102<=410)
-  assert.deepEqual(plain(burnRateTooltipPlacement(plot, tooltip, diagonal, selectedX, surrounding, p)),plain(p),'Repeated measurements keep the same anchor')
+const hits=(p,points,pad=8)=>points.filter(q=>q.x>p.x-pad&&q.x<p.x+tooltip.width+pad&&q.y>p.y-pad&&q.y<p.y+tooltip.height+pad).length
+const intersects=(p,r,pad=6)=>p.x<r.x+r.width+pad&&p.x+tooltip.width>r.x-pad&&p.y<r.y+r.height+pad&&p.y+tooltip.height>r.y-pad
+const metrics=[{x:8,y:-120,width:340,height:130},{x:8,y:300,width:340,height:110},{x:8,y:20,width:42,height:260},{x:50,y:280,width:288,height:20}]
+// Empty plot space is useful: prefer a nearby interior pocket over covering the
+// header, date ticks or monthly totals. Vary slope, direction and selected node.
+for(const kind of ['flat','rising','falling','arch']){
+ const points=Array.from({length:140},(_,i)=>({x:58+i*2,y:kind==='flat'?80:kind==='rising'?110-i*.4:kind==='falling'?50+i*.4:70+30*Math.sin(i/139*Math.PI)}))
+ for(const selectedX of [60,165,327]){
+  const p=burnRateTooltipPlacement(plot,tooltip,points,selectedX,surrounding,undefined,metrics)
+  assert.equal(hits(p,points),0,kind+' must leave the entire trend line clear')
+  assert.ok(!metrics.some(r=>intersects(p,r)),kind+' must leave summary metrics and axes clear when a pocket fits')
+  assert.ok(p.y>=plot.y&&p.y+tooltip.height<=plot.y+plot.height,'Use empty space within the plot instead of forcing overflow')
+  assert.deepEqual(plain(burnRateTooltipPlacement(plot,tooltip,points,selectedX,surrounding,p,metrics)),plain(p),'Repeated measurements keep the same clear anchor')
+ }
 }
-// A short plot has no safe internal corner. Overflow must clear its center node.
-const shortPlot={x:50,y:20,width:230,height:100}, center={x:165,y:70}
-const escaped=burnRateTooltipPlacement(shortPlot,tooltip,[center],165,{x:8,y:-100,width:300,height:360})
-assert.ok(escaped.y+102<=20 || escaped.y>=120)
-assert.ok(Math.abs(escaped.x+92-center.x)<=1,'Center near the selected node rather than a distant fixed corner')
-// Viewport intersections can rule out one outside edge; use the other instead.
-const below=burnRateTooltipPlacement(shortPlot,tooltip,[center],165,{x:8,y:20,width:300,height:250})
-assert.ok(below.y>=120)
-const above=burnRateTooltipPlacement(shortPlot,tooltip,[center],165,{x:8,y:-140,width:300,height:260})
-assert.ok(above.y+102<=20)
-// A retained anchor can never win over selected-node clearance.
-const moved=burnRateTooltipPlacement(shortPlot,tooltip,[center],165,surrounding,{x:60,y:20})
-assert.ok(moved.y+102<=20 || moved.y>=120)
+const flat=Array.from({length:140},(_,i)=>({x:58+i*2,y:80}))
+const reclaimed=burnRateTooltipPlacement(plot,tooltip,flat,165,surrounding,{x:70,y:300},metrics)
+assert.ok(!metrics.some(r=>intersects(reclaimed,r)),'A retained footer position cannot beat an available interior pocket')
+// Dense bends in a short plot require outside space. Neither top nor bottom is
+// hardcoded; restrict one side and verify the other can still be used.
+const shortPlot={x:50,y:20,width:230,height:100}
+const dense=Array.from({length:231},(_,i)=>({x:50+i,y:20+90*(1-Math.cos(i*Math.PI/10))/2}))
+for(const available of [surrounding,{x:8,y:20,width:300,height:250},{x:8,y:-140,width:300,height:260}]){
+ const p=burnRateTooltipPlacement(shortPlot,tooltip,dense,165,available)
+ assert.equal(hits(p,dense),0,'Keep outside positions available when the curve leaves no interior pocket')
+ assert.ok(p.y+102<=20||p.y>=120)
+}
+const centerPoint={x:165,y:70}
+const moved=burnRateTooltipPlacement(shortPlot,tooltip,[centerPoint],165,surrounding,{x:60,y:20})
+assert.equal(hits(moved,[centerPoint],12),0,'Retained anchors cannot cover the selected node')
+const cramped=burnRateTooltipPlacement(shortPlot,tooltip,dense,165,{x:50,y:20,width:184,height:102})
+assert.ok(Number.isFinite(cramped.x)&&Number.isFinite(cramped.y),'Impossible geometry still has a bounded fallback')
 
 // Exercise the DOM adapter too: chart-local matrix, cached samples, direct placement.
 let reads=0, curve='initial', chartWidth=360
 const matrix={a:1,b:0,c:0,d:1,e:0,f:0}
 const line={getCTM:()=>matrix,getAttribute:()=>curve,getTotalLength:()=>270,getPointAtLength:at=>{reads++;return {matrixTransform:m=>({x:60+at*m.a,y:35+at*.6+m.f})}}}
 const clip={x:{baseVal:{value:58}},y:{baseVal:{value:20}},width:{baseVal:{value:280}},height:{baseVal:{value:260}}}
-const chart={getBoundingClientRect:()=>({left:16,top:150,right:16+chartWidth,bottom:450,width:chartWidth,height:300}),querySelector:selector=>selector==='clipPath rect'?clip:line}
-const page={getBoundingClientRect:()=>({left:0,top:16,right:390,bottom:590})}
+const chart={getBoundingClientRect:()=>({left:16,top:150,right:16+chartWidth,bottom:450,width:chartWidth,height:300}),querySelector:selector=>selector==='clipPath rect'?clip:line,querySelectorAll:()=>[]}
+const page={getBoundingClientRect:()=>({left:0,top:16,right:390,bottom:590}),querySelectorAll:()=>[{getBoundingClientRect:()=>({left:16,top:470,width:358,height:110})}]}
 const portal={parentElement:{querySelector:()=>chart,closest:()=>page},style:{},dataset:{}}
 const node={offsetWidth:184,offsetHeight:102,dataset:{inspectedDay:'13'}}
 positionBurnRateTooltip(portal,node,150)
@@ -103,4 +116,4 @@ assert.equal(view.root.findByProps({className:'bb-burn-balance-rail'}).props['da
 render(runtime.exports.Month,{burnRate:{...burn,spent:3100,remaining:-105.08},monthName:'Feb'})
 assert.ok(JSON.stringify(view.toJSON()).includes('-$105.08'),'Overspend stays signed in the monthly Left amount')
 act(()=>view.unmount())
-console.log('PASS: balance edge cases, day/month scopes, approved labels and shade, native line props, stable chart-local placement and cache')
+console.log('PASS: balance edge cases, day/month scopes, approved labels and shade, native line props, interior/exterior pockets, protected metrics/axes, stable chart-local placement and cache')
