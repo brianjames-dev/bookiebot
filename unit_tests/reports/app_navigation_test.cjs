@@ -8,25 +8,7 @@ global.IS_REACT_ACT_ENVIRONMENT = true
 const output = req('esbuild').buildSync({entryPoints:['web/expense-report/src/app-navigation.tsx'],bundle:true,platform:'node',format:'cjs',write:false,external:['react','react/jsx-runtime']}).outputFiles[0].text
 const moduleObject = {exports:{}}
 vm.runInNewContext(output,{module:moduleObject,exports:moduleObject.exports,require:req})
-const {nextScrollNavigation,screenForReportSource,ReportScreen,AppNavigationContext,fitNavigationSelection} = moduleObject.exports
-// Reference proportions: a wide capsule and concentric 5px/4px glass rim.
-for (const [pane,tabs,expectedSize] of [
- [{width:346,height:60},Array.from({length:5},(_,i)=>({button:{x:10+65.2*i,y:8,width:65.2,height:44},content:{width:25,height:25}})),{width:75.2,height:50}],
- [{width:255,height:44},Array.from({length:5},(_,i)=>({button:{x:8+47.8*i,y:0,width:47.8,height:44},content:{width:23,height:23}})),{width:55.8,height:36}],
-]) {
- const bubbles=tabs.map((_,i)=>fitNavigationSelection(tabs,i,pane))
- bubbles.forEach((bubble,i)=>{
-  const {button,content}=tabs[i]
-  assert.equal(bubble.width,bubbles[0].width,'Selecting another tab must never resize the capsule')
-  assert.equal(bubble.height,bubbles[0].height)
-  assert.ok(Math.abs(bubble.x+bubble.width/2-button.x-button.width/2)<1e-8)
-  assert.equal(bubble.y+bubble.height/2,button.y+button.height/2)
-  assert.ok(bubble.width>content.width&&bubble.height>content.height,'The icon fits within the broad capsule')
-  assert.ok(bubble.x>=2&&bubble.x+bubble.width<=pane.width-2,'Edge capsules stay inside the glass')
- })
- assert.ok(Math.abs(bubbles[0].width-expectedSize.width)<1e-8)
- assert.equal(bubbles[0].height,expectedSize.height)
-}
+const {nextScrollNavigation,screenForReportSource,ReportScreen,AppNavigationContext} = moduleObject.exports
 let state={lastY:0,travel:0,compact:false}
 for(const y of [5,9,18,23]) state=nextScrollNavigation(state,y,1000)
 assert.equal(state.compact,false,'Tiny top-of-page movements leave full navigation visible')

@@ -4,6 +4,7 @@ import { useLayoutEffect, useRef, type RefObject } from "react"
 // they never move the page or publish a React update for every pixel of travel.
 export function useNavigationLens(ref: RefObject<HTMLDivElement | null>, value: string) {
   const controller = useRef<{ move: (x: number) => void; release: () => void } | null>(null)
+  const previous = useRef(value)
   useLayoutEffect(() => {
     const host = ref.current
     if (!host) return
@@ -13,20 +14,20 @@ export function useNavigationLens(ref: RefObject<HTMLDivElement | null>, value: 
       frame = 0
       if (pointerX === null) return
       const box = host.getBoundingClientRect(), computed = getComputedStyle(host)
-      const width = parseFloat(computed.getPropertyValue("--bb-selection-width"))
-      if (!width) return
       // The held bar gently lifts in viewport space; the lens is positioned in
       // its unscaled layout space so it stays directly beneath the finger.
       const scaleX = box.width / parseFloat(computed.width) || 1
-      const scaleY = box.height / parseFloat(computed.height) || 1
-      const inset = 4 + Math.max(0, Math.min(1, (box.height / scaleY - 44) / 16))
+      const inset = parseFloat(computed.getPropertyValue("--bb-nav-inset"))
+      const count = parseInt(computed.getPropertyValue("--bb-nav-count"), 10)
+      const width = (box.width / scaleX - 2 * parseFloat(computed.paddingLeft)) / count + 2 * inset
+      if (!Number.isFinite(width) || !width) return
       const x = Math.max(inset, Math.min(box.width / scaleX - width - inset, (pointerX - box.left) / scaleX - width / 2))
-      host.style.setProperty("--bb-nav-lens-center", `${x + width / 2}px`)
+      host.style.setProperty("--bb-nav-lens-left", `${x}px`)
     }
     const release = () => {
       pointerX = null; cancelAnimationFrame(frame); frame = 0
       host.dataset.navContact = "false"
-      host.style.removeProperty("--bb-nav-lens-center")
+      host.style.removeProperty("--bb-nav-lens-left")
     }
     controller.current = {
       move: x => {
@@ -44,8 +45,10 @@ export function useNavigationLens(ref: RefObject<HTMLDivElement | null>, value: 
     }
   }, [ref])
   useLayoutEffect(() => {
+    if (previous.current === value) return
+    previous.current = value
     const host = ref.current
-    if (!host || !host.dataset.selectionReady || window.matchMedia("(prefers-reduced-motion: reduce)").matches) return
+    if (!host || window.matchMedia("(prefers-reduced-motion: reduce)").matches) return
     host.dataset.navMoving = "true"
     const finish = () => { host.dataset.navMoving = "false" }
     const timer = window.setTimeout(finish, 460)

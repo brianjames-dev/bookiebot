@@ -5,14 +5,26 @@
 .bb-app-shell .bb-shell-masthead .bb-report-brand { min-width: 0; }
 .bb-app-shell .bb-shell-header-actions { position: fixed; z-index: 60; top: max(18px, env(safe-area-inset-top, 0px)); right: max(var(--bb-page-gutter), calc((100vw - var(--bb-content-max)) / 2), env(safe-area-inset-right, 0px)); width: 96px; height: 44px; margin: 0; padding: 0; pointer-events: none; }
 .bb-app-shell .bb-shell-toolbar-inner { width: 100%; height: 44px; padding: 0; gap: 8px; }
-.bb-app-shell .bb-shell-toolbar-pane { box-sizing: border-box; flex: 0 0 44px; width: 44px; padding: 0; color: hsl(var(--foreground)); pointer-events: auto; touch-action: manipulation; }
-.bb-app-shell .bb-shell-icon { appearance: none; flex: 0 0 44px; border: 0; padding: 0; background: transparent; color: hsl(var(--foreground)); border-radius: 50%; width: 44px; height: 44px; display: grid; place-items: center; cursor: pointer; -webkit-tap-highlight-color: transparent; transition: background-color var(--bb-motion-duration) var(--bb-motion-ease), color var(--bb-motion-duration) var(--bb-motion-ease); }
-.bb-shell-icon svg { width: 21px; height: 21px; }
-.bb-app-shell .bb-shell-icon[aria-current="page"], .bb-app-shell .bb-shell-icon[aria-expanded="true"] { background: hsl(var(--foreground) / .06); color: hsl(var(--primary)); }
+/* The navigation and fixed tools share one glass material and press response. */
+.bb-app-shell { --bb-glass-ink: rgb(22 24 27); --bb-glass-base: rgb(247 248 250 / .52); --bb-glass-held: rgb(232 222 216 / .72); --bb-glass-edge: rgb(255 255 255 / .36); --bb-glass-sheen: rgb(255 255 255 / .16); --bb-glass-selection: rgb(0 0 0 / .09); --bb-glass-shadow: 0 5px 20px rgb(0 0 0 / .12), inset 0 1px 1px rgb(255 255 255 / .72), inset 0 -1px 1px rgb(0 0 0 / .08); }
+[data-theme="dark"] .bb-app-shell { --bb-glass-ink: rgb(250 251 252); --bb-glass-base: rgb(12 15 19 / .48); --bb-glass-held: rgb(95 83 77 / .62); --bb-glass-edge: rgb(255 255 255 / .14); --bb-glass-sheen: rgb(255 255 255 / .03); --bb-glass-selection: rgb(255 255 255 / .18); --bb-glass-shadow: 0 5px 20px rgb(0 0 0 / .2), inset 0 1px 1px rgb(255 255 255 / .28), inset 0 -1px 1px rgb(255 255 255 / .08); }
+.bb-app-shell .bb-glass-control { position: relative; isolation: isolate; border: 0; border-radius: 999px; color: var(--bb-glass-ink); background: linear-gradient(180deg, var(--bb-glass-sheen), transparent), var(--bb-glass-base); backdrop-filter: blur(16px) saturate(1.45); -webkit-backdrop-filter: blur(16px) saturate(1.45); box-shadow: var(--bb-glass-shadow); transition: transform 240ms cubic-bezier(.22, 1, .36, 1), background-color 200ms ease-in-out, padding 420ms cubic-bezier(.22, 1, .36, 1); }
+.bb-app-shell .bb-glass-control::before { content: ""; position: absolute; inset: 0; z-index: 3; border: 1px solid var(--bb-glass-edge); border-radius: inherit; pointer-events: none; }
+.bb-app-shell .bb-glass-control[data-nav-contact="true"], .bb-app-shell .bb-glass-control:has(> .bb-shell-icon:active:not(:disabled)) { transform: scale(1.035); background-color: var(--bb-glass-held); }
+.bb-app-shell .bb-shell-toolbar-pane { box-sizing: border-box; flex: 0 0 44px; width: 44px; height: 44px; padding: 0; pointer-events: auto; touch-action: manipulation; }
+.bb-app-shell .bb-shell-icon { appearance: none; position: relative; z-index: 1; border: 0; padding: 0; background: transparent; color: inherit; border-radius: 50%; width: 44px; height: 44px; display: grid; place-items: center; cursor: pointer; -webkit-tap-highlight-color: transparent; }
+.bb-app-shell .bb-shell-icon::before { content: ""; position: absolute; inset: 4px; border-radius: inherit; background: var(--bb-glass-selection); opacity: 0; transition: opacity 180ms ease-in-out; }
+.bb-app-shell .bb-shell-icon[aria-current="page"]::before, .bb-app-shell .bb-shell-icon[aria-expanded="true"]::before { opacity: 1; }
 .bb-app-shell .bb-shell-icon:focus:not(:focus-visible) { outline: none; box-shadow: none; }
-.bb-app-shell .bb-shell-icon:focus-visible { outline: 2px solid hsl(var(--primary)); outline-offset: 1px; }
+.bb-app-shell .bb-shell-icon:focus-visible { outline: 2px solid currentColor; outline-offset: 1px; }
 .bb-app-shell .bb-shell-icon:disabled { opacity: .45; cursor: default; }
-@media (hover: hover) { .bb-app-shell .bb-shell-icon:hover:not(:disabled) { background: hsl(var(--foreground) / .06); color: hsl(var(--primary)); } }
+.bb-glass-icon { position: relative; display: block; width: var(--bb-control-icon-size, 24px); height: var(--bb-control-icon-size, 24px); pointer-events: none; }
+.bb-glass-icon > span { position: absolute; inset: 0; transition: opacity 180ms ease-in-out; }
+.bb-glass-icon svg { display: block; width: 100%; height: 100%; }
+.bb-glass-icon-outline { opacity: 1; }
+.bb-glass-icon-solid { opacity: 0; }
+.bb-glass-icon[data-selected="true"] > .bb-glass-icon-outline { opacity: 0; }
+.bb-glass-icon[data-selected="true"] > .bb-glass-icon-solid { opacity: 1; }
 .bb-app-shell .bb-report-screen { width: 100%; }
 .bb-app-shell .bb-report-content > .bb-main { gap: 0; }
 .bb-app-shell .bb-report-content { min-width: 0; }
@@ -21,45 +33,39 @@
 .bb-app-shell .bb-shell-shared > .bb-report-section, .bb-app-shell .bb-shell-savings > .bb-report-section { margin-top: 0; }
 .bb-app-shell .bb-bottom-navigation { position: fixed; z-index: 50; left: 50%; bottom: 0; width: min(460px, 100%); transform: translateX(-50%); padding-inline: 22px; padding-bottom: max(12px, env(safe-area-inset-bottom, 0px)); height: auto; pointer-events: none; transition: width 420ms cubic-bezier(.22, 1, .36, 1); }
 .bb-app-shell .bb-bottom-navigation > div:last-child { height: 60px; padding: 0; width: 100%; gap: 0; transition: height 420ms cubic-bezier(.22, 1, .36, 1); }
-/* Concentric resting capsules follow the supplied reference: 5px of glass rim,
-   neutral glyphs and a broad selection spanning slightly beyond one tab track. */
-.bb-app-shell .bb-navigation-pane { --bb-navigation-spring: cubic-bezier(.22, 1, .36, 1); display: flex; align-items: center; width: 100%; height: 100%; padding-inline: 10px; border: 0; border-radius: 999px; pointer-events: auto; color: rgb(22 24 27); transform-origin: center bottom; transition: padding 420ms cubic-bezier(.22, 1, .36, 1), transform 240ms cubic-bezier(.22, 1, .36, 1); background: linear-gradient(180deg, rgb(255 255 255 / .16), rgb(255 255 255 / .03)), rgb(247 248 250 / .52); backdrop-filter: blur(16px) saturate(1.45); -webkit-backdrop-filter: blur(16px) saturate(1.45); box-shadow: 0 5px 20px rgb(0 0 0 / .12), inset 0 1px 1px rgb(255 255 255 / .72), inset 0 -1px 1px rgb(0 0 0 / .08); }
-.bb-app-shell .bb-navigation-pane::before { content: ""; position: absolute; inset: 0; z-index: 3; border: 1px solid rgb(255 255 255 / .36); border-radius: inherit; pointer-events: none; }
-[data-theme="dark"] .bb-app-shell .bb-navigation-pane { color: rgb(250 251 252); background: linear-gradient(180deg, rgb(255 255 255 / .03), transparent), rgb(12 15 19 / .48); box-shadow: 0 5px 20px rgb(0 0 0 / .2), inset 0 1px 1px rgb(255 255 255 / .28), inset 0 -1px 1px rgb(255 255 255 / .08); }
-[data-theme="dark"] .bb-app-shell .bb-navigation-pane::before { border-color: rgb(255 255 255 / .14); }
-.bb-app-shell .bb-navigation-selection { left: var(--bb-nav-lens-center, var(--bb-nav-selection-center, 0%)); border: 0; border-radius: 999px; background: none; transform: translate3d(calc(var(--bb-selection-width, 0px) * -.5), 0, 0); }
-.bb-app-shell .bb-navigation-pane[data-selection-ready="true"] > .bb-navigation-selection { transition: left 420ms var(--bb-navigation-spring); }
-.bb-app-shell .bb-navigation-lens-surface { position: absolute; inset: 0; border-radius: inherit; background: rgb(0 0 0 / .09); transform-origin: center; transition: transform 220ms var(--bb-navigation-spring), background-color 180ms ease, box-shadow 180ms ease; }
-[data-theme="dark"] .bb-app-shell .bb-navigation-lens-surface { background: rgb(255 255 255 / .18); }
+/* Equal CSS tracks own all resting geometry, including during resize. No
+   ResizeObserver measures or rewrites the lens on each animation frame. */
+.bb-app-shell .bb-navigation-pane { --bb-nav-padding: 10px; --bb-nav-inset: 5px; --bb-navigation-spring: cubic-bezier(.22, 1, .36, 1); --bb-control-icon-size: 27px; display: flex; align-items: center; width: 100%; height: 100%; padding-inline: var(--bb-nav-padding); pointer-events: auto; transform-origin: center bottom; }
+.bb-app-shell .bb-navigation-selection { position: absolute; z-index: 0; left: var(--bb-nav-lens-left, calc(var(--bb-nav-padding) - var(--bb-nav-inset) + (100% - var(--bb-nav-padding) * 2) * var(--bb-nav-position))); top: var(--bb-nav-inset); bottom: var(--bb-nav-inset); width: calc((100% - var(--bb-nav-padding) * 2) / var(--bb-nav-count) + var(--bb-nav-inset) * 2); height: auto; border: 0; border-radius: 999px; background: none; transform: none; transition: left 420ms var(--bb-navigation-spring), width 420ms cubic-bezier(.22, 1, .36, 1), top 420ms cubic-bezier(.22, 1, .36, 1), bottom 420ms cubic-bezier(.22, 1, .36, 1); }
+.bb-app-shell .bb-navigation-lens-surface { position: absolute; inset: 0; border-radius: inherit; background: var(--bb-glass-selection); transform-origin: center; transition: transform 220ms var(--bb-navigation-spring), background-color 180ms ease, box-shadow 180ms ease; }
 .bb-app-shell .bb-navigation-pane[data-nav-moving="true"] .bb-navigation-lens-surface { transform: scale(1.035, .985); }
-.bb-app-shell .bb-navigation-pane[data-nav-contact="true"] { transform: scale(1.02); }
-.bb-app-shell .bb-navigation-pane[data-nav-contact="true"] > .bb-navigation-selection { transition: left 40ms linear; }
+.bb-app-shell .bb-navigation-pane[data-nav-contact="true"] > .bb-navigation-selection { transition-duration: 40ms, 420ms, 420ms, 420ms; transition-timing-function: linear, cubic-bezier(.22, 1, .36, 1), cubic-bezier(.22, 1, .36, 1), cubic-bezier(.22, 1, .36, 1); }
 .bb-app-shell .bb-navigation-pane[data-nav-contact="true"] .bb-navigation-lens-surface { transform: scale(1.025); background: rgb(0 0 0 / .12); box-shadow: inset 0 1px 1px rgb(255 255 255 / .55), 0 2px 8px rgb(0 0 0 / .08); }
-[data-theme="dark"] .bb-app-shell .bb-navigation-pane[data-nav-contact="true"] .bb-navigation-lens-surface { background: rgb(255 255 255 / .22); box-shadow: inset 0 1px 1px rgb(255 255 255 / .23), 0 2px 8px rgb(0 0 0 / .16); }
-.bb-app-shell .bb-navigation-pane .k-glass { color: inherit; }
-.bb-app-shell .bb-navigation-link { flex: 1 1 0; width: 0; min-width: 44px; min-height: 44px; margin: 0; border: 0; background: transparent; padding: 5px; color: inherit; font: inherit; cursor: pointer; }
+[data-theme="dark"] .bb-app-shell .bb-navigation-pane[data-nav-contact="true"] .bb-navigation-lens-surface { background: rgb(255 255 255 / .25); box-shadow: inset 0 1px 1px rgb(255 255 255 / .23), 0 2px 8px rgb(0 0 0 / .16); }
+.bb-app-shell .bb-navigation-link { position: relative; z-index: 1; flex: 1 1 0; width: 0; min-width: 44px; min-height: 44px; margin: 0; border: 0; background: transparent; padding: 5px; color: inherit; font: inherit; cursor: pointer; }
 .bb-app-shell .bb-navigation-link.k-tabbar-link-active { color: inherit; }
 .bb-app-shell .bb-navigation-link:active { opacity: 1; background: transparent; }
 .bb-app-shell .bb-navigation-link:disabled { opacity: .38; cursor: default; }
 .bb-app-shell .bb-navigation-link:focus-visible { outline: 2px solid currentColor; outline-offset: -5px; border-radius: 999px; }
 .bb-app-shell .bb-navigation-link > span { height: auto; padding: 0; gap: 0; color: inherit; }
-.bb-app-shell .bb-navigation-link .k-tabbar-link-icon, .bb-app-shell .bb-navigation-link svg { flex-shrink: 0; width: 27px; height: 27px; transition: width 420ms cubic-bezier(.22, 1, .36, 1), height 420ms cubic-bezier(.22, 1, .36, 1); }
+.bb-app-shell .bb-navigation-link .bb-glass-icon { transition: width 420ms cubic-bezier(.22, 1, .36, 1), height 420ms cubic-bezier(.22, 1, .36, 1); }
 .bb-app-shell .bb-bottom-navigation[data-compact="true"] { width: min(244px, 100%); }
 .bb-app-shell .bb-bottom-navigation[data-compact="true"][data-tab-count="5"] { width: min(299px, 100%); }
 .bb-app-shell .bb-bottom-navigation[data-compact="true"] > div:last-child { height: 44px; }
-.bb-app-shell .bb-bottom-navigation[data-compact="true"] .bb-navigation-pane { padding-inline: 8px; }
+.bb-app-shell .bb-bottom-navigation[data-compact="true"] .bb-navigation-pane { --bb-nav-padding: 8px; --bb-nav-inset: 4px; --bb-control-icon-size: 23px; }
 .bb-app-shell .bb-bottom-navigation[data-compact="true"] .bb-navigation-link { padding-top: 0; padding-bottom: 0; }
-.bb-app-shell .bb-bottom-navigation[data-compact="true"] .bb-navigation-link .k-tabbar-link-icon, .bb-app-shell .bb-bottom-navigation[data-compact="true"] .bb-navigation-link svg { width: 23px; height: 23px; }
 @supports (transition-timing-function: linear(0, 1)) { .bb-app-shell .bb-navigation-pane { --bb-navigation-spring: linear(0, 0.03846, 0.13042, 0.2486, 0.37445, 0.49604, 0.60638, 0.70197, 0.78173, 0.84611, 0.89651, 0.93474, 0.9628, 0.98264, 0.99603, 1.00451, 1.00939, 1.01171, 1.0123, 1.01178, 1.01063, 1.00917, 1.00762, 1.00613, 1.00478, 1.00361, 1.00264, 1.00186, 1.00125, 1.00078, 1.00044, 1.0002, 1.00004, 0.99994, 0.99988, 0.99986, 0.99985, 0.99986, 0.99987, 0.99989, 1); } }
 @media (prefers-reduced-motion: reduce) {
+  .bb-app-shell .bb-glass-control, .bb-app-shell .bb-glass-icon > span, .bb-app-shell .bb-shell-icon::before,
   .bb-app-shell .bb-bottom-navigation, .bb-app-shell .bb-bottom-navigation > div:last-child,
-  .bb-app-shell .bb-navigation-pane, .bb-app-shell .bb-navigation-pane > .bb-navigation-selection, .bb-app-shell .bb-navigation-lens-surface,
-  .bb-app-shell .bb-navigation-link .k-tabbar-link-icon, .bb-app-shell .bb-navigation-link svg { transition: none !important; }
-  .bb-app-shell .bb-navigation-pane, .bb-app-shell .bb-navigation-lens-surface { transform: none !important; }
+  .bb-app-shell .bb-navigation-selection, .bb-app-shell .bb-navigation-lens-surface, .bb-app-shell .bb-navigation-link .bb-glass-icon { transition: none !important; }
+  .bb-app-shell .bb-glass-control, .bb-app-shell .bb-navigation-lens-surface { transform: none !important; }
 }
 @media (prefers-reduced-transparency: reduce) {
-  .bb-app-shell .bb-navigation-pane { background: rgb(247 248 250); backdrop-filter: none; -webkit-backdrop-filter: none; }
-  [data-theme="dark"] .bb-app-shell .bb-navigation-pane { background: rgb(20 23 27); }
+  .bb-app-shell { --bb-glass-held: rgb(247 248 250); }
+  [data-theme="dark"] .bb-app-shell { --bb-glass-held: rgb(20 23 27); }
+  .bb-app-shell .bb-glass-control { background: rgb(247 248 250); backdrop-filter: none; -webkit-backdrop-filter: none; }
+  [data-theme="dark"] .bb-app-shell .bb-glass-control { background: rgb(20 23 27); }
 }
 .bb-app-shell .bb-shell-settings { --bb-settings-inset: clamp(12px, 3vw, 20px); max-width: 720px; padding-top: 4px; gap: 20px; }
 .bb-shell-settings > .bb-settings-section { width: auto; max-width: none; padding: 18px var(--bb-settings-inset); margin-inline: calc(-1 * var(--bb-settings-inset)); background: hsl(var(--card)); border-radius: 18px; }

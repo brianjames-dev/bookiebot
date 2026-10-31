@@ -1,9 +1,9 @@
-import { useRef, useState, type ComponentProps, type PointerEvent } from "react"
+import { useRef, useState, type ComponentProps, type CSSProperties, type PointerEvent } from "react"
 import { Glass, Tabbar, TabbarLink } from "konsta/react"
 import { ClipboardCheck, House, PiggyBank, ReceiptText, Users } from "lucide-react"
-import { fitNavigationSelection, screenTitles, type MainScreen } from "./app-navigation"
-import { useSlidingSelection } from "./components/ui/motion"
+import { screenTitles, type MainScreen } from "./app-navigation"
 import { useNavigationLens } from "./navigation-lens"
+import { GlassIcon } from "./glass-icon"
 
 const screens = [
   { id: "overview", Icon: House }, { id: "transactions", Icon: ReceiptText },
@@ -15,8 +15,7 @@ const screens = [
 // keep their details transparent over the glass rather than painting a backdrop.
 function NavigationIcon({ id, selected }: { id: MainScreen; selected: boolean }) {
   const Icon = screens.find(screen => screen.id === id)!.Icon
-  if (!selected) return <Icon size={25} strokeWidth={1.7} aria-hidden="true" data-variant="outline" />
-  return <svg width="25" height="25" viewBox="0 0 24 24" fill="currentColor" fillRule="evenodd" clipRule="evenodd" aria-hidden="true" data-variant="filled">
+  return <GlassIcon selected={selected} outline={<Icon strokeWidth={1.7} data-variant="outline" />} solid={<svg viewBox="0 0 24 24" fill="currentColor" fillRule="evenodd" clipRule="evenodd" data-variant="filled">
     {id === "overview" && <path d="M3 10a2 2 0 0 1 .709-1.528l7-6a2 2 0 0 1 2.582 0l7 6A2 2 0 0 1 21 10v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2zM10 13v8h4v-8z" />}
     {id === "transactions" && <path d="M4 3a1 1 0 0 1 1-1 1.3 1.3 0 0 1 .7.2l.933.6a1.3 1.3 0 0 0 1.4 0l.934-.6a1.3 1.3 0 0 1 1.4 0l.933.6a1.3 1.3 0 0 0 1.4 0l.933-.6a1.3 1.3 0 0 1 1.4 0l.934.6a1.3 1.3 0 0 0 1.4 0l.933-.6A1.3 1.3 0 0 1 19 2a1 1 0 0 1 1 1v18a1 1 0 0 1-1 1 1.3 1.3 0 0 1-.7-.2l-.933-.6a1.3 1.3 0 0 0-1.4 0l-.934.6a1.3 1.3 0 0 1-1.4 0l-.933-.6a1.3 1.3 0 0 0-1.4 0l-.933.6a1.3 1.3 0 0 1-1.4 0l-.934-.6a1.3 1.3 0 0 0-1.4 0l-.933.6a1.3 1.3 0 0 1-.7.2 1 1 0 0 1-1-1zM7.5 7.2v1.6h7V7.2zM7.5 11.2v1.6h9v-1.6zM7.5 15.2v1.6h6v-1.6z" />}
     {id === "shared" && <>
@@ -28,35 +27,12 @@ function NavigationIcon({ id, selected }: { id: MainScreen; selected: boolean })
       <path d="M2 8v1a2 2 0 0 0 2 2h1" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" />
     </>}
     {id === "reconcile" && <path d="M9 2h6a1 1 0 0 1 1 1v2H8V3a1 1 0 0 1 1-1M6 4h.5v1a1.5 1.5 0 0 0 1.5 1.5h8A1.5 1.5 0 0 0 17.5 5V4h.5a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2M8.4 13.4l2.6 2.6 4.6-4.6 1.1 1.1-5.7 5.7-3.7-3.7z" />}
-  </svg>
+  </svg>} />
 }
 
 // Keep native button semantics; Konsta otherwise assigns role="link".
 function NavigationButton(props: ComponentProps<"button">) {
   return <button {...props} role={undefined} />
-}
-
-function selectionBounds(button: HTMLElement) {
-  const pane = button.parentElement!
-  const frame = pane.getBoundingClientRect()
-  const style = getComputedStyle(pane)
-  // Preserve subpixel positions, normalizing Konsta's touch/hover scale.
-  const scaleX = frame.width / parseFloat(style.width) || 1
-  const scaleY = frame.height / parseFloat(style.height) || 1
-  const buttons = [...pane.querySelectorAll<HTMLElement>("button[data-nav-screen]")]
-  const tabs = buttons.map(target => {
-    const bounds = target.getBoundingClientRect()
-    const stack = target.firstElementChild!.getBoundingClientRect()
-    return {
-      button: { x: (bounds.x - frame.x) / scaleX, y: (bounds.y - frame.y) / scaleY, width: bounds.width / scaleX, height: bounds.height / scaleY },
-      content: { width: stack.width / scaleX, height: stack.height / scaleY },
-    }
-  })
-  const bounds = fitNavigationSelection(tabs, buttons.indexOf(button), { width: frame.width / scaleX, height: frame.height / scaleY })
-  // Percentage anchoring follows the bar's animated width in the same paint.
-  // Repeated pixel targets would restart the slide and lag behind the icon.
-  pane.style.setProperty("--bb-nav-selection-center", `${(bounds.x + bounds.width / 2) / (frame.width / scaleX) * 100}%`)
-  return bounds
 }
 
 export function AppNavigationBar({ active, current = active, compact, reconciliationVisible, hidden, disabled = false, onSelect }: {
@@ -69,7 +45,7 @@ export function AppNavigationBar({ active, current = active, compact, reconcilia
   onSelect: (screen: MainScreen) => void
 }) {
   const [preview, setPreview] = useState<MainScreen | null>(null)
-  const paneRef = useSlidingSelection(preview ?? active, selectionBounds)
+  const paneRef = useRef<HTMLDivElement>(null)
   const lens = useNavigationLens(paneRef, preview ?? active)
   const pointer = useRef<{ id: number; x: number; selected: MainScreen | null } | null>(null)
   const suppressClick = useRef(false)
@@ -99,7 +75,8 @@ export function AppNavigationBar({ active, current = active, compact, reconcilia
 
   return <Tabbar top component="nav" icons className="bb-bottom-navigation" aria-label="Main navigation"
     data-compact={compact} data-tab-count={tabs.length} hidden={hidden}>
-    <Glass ref={paneRef} highlight={false} className="bb-navigation-pane bb-sliding-selection"
+    <Glass ref={paneRef} highlight={false} className="bb-navigation-pane bb-glass-control"
+      style={{ "--bb-nav-count": tabs.length, "--bb-nav-position": Math.max(0, tabs.findIndex(tab => tab.id === (preview ?? active))) / tabs.length } as CSSProperties}
       onPointerDown={startPointer}
       onPointerMove={event => {
         const current = pointer.current

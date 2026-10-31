@@ -1,5 +1,11 @@
 # Agent Decisions
 
+## 2026-10-31 - Let CSS Own Navigation Resize And Share Glass Tools
+
+Remove the navigation’s use of the generic measured selection hook and its unused geometry helper. Equal CSS tracks derive resting lens width/position directly from tab count and preview index; CSS owns width, height, padding, inset and glyph transitions. No ResizeObserver or per-animation-frame inline geometry writes remain in the nav. Keep the passive direction detector and its accepted thresholds, but publish React compact state only when it actually changes. Retain native page/carousel scrolling. Live pointer positions still coalesce to one frame, normalize the held scale and clamp within the glass rim; release/cancel/guards retain their behavior. This supersedes 218’s measured percentage-anchor implementation.
+
+Keep outline and filled SVG layers mounted and crossfade their opacity over 180ms with ease-in-out, so rapid selection reversals start from the painted frame. Only accepted selection changes the fill; preview remains independent. Increase held lift from 1.02 to 1.035 over 240ms and tint the entire surface warm neutral while held, restoring it on release/cancel. Share material variables, lit rim, lift/tint and icon layers with the two fixed tools via `AppHeaderTools`; keep independent 44px targets, existing Ask/settings callbacks, refs, disabled/guard semantics and screen anchors. Header glyphs are 24px; nav retains 27px expanded / 23px compact. Disable Konsta’s competing glass hover scale for all three surfaces. Reduce Motion removes size/opacity animation; Reduce Transparency remains opaque even while held. Thumbnail, finances and Finance Ops are unchanged. Physical acceptance is checklist 220.
+
 ## 2026-10-31 - Commit Icon Fill On Release And Gently Lift Held Navigation
 
 Separate preview geometry from committed navigation: the lens follows the held pointer, but Konsta’s active state and solid icon follow the accepted `active` screen. A new destination remains outlined until release commits it; cancellation and rejected navigation retain the previous fill. Screen-reader current-page semantics remain committed as before. This supersedes 217’s preview-based fill rule.

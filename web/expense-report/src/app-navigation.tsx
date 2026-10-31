@@ -19,19 +19,6 @@ export interface AppNavigation {
 export const AppNavigationContext = createContext<AppNavigation | null>(null)
 export const useAppNavigation = () => useContext(AppNavigationContext)
 
-export interface NavigationBounds { x: number; y: number; width: number; height: number }
-type NavigationSize = Pick<NavigationBounds, "width" | "height">
-export function fitNavigationSelection(tabs: { button: NavigationBounds; content: NavigationSize }[], selected: number, pane: NavigationSize): NavigationBounds {
-  // A concentric capsule fills the tab track, with the same small glass rim
-  // around every selection. Share its dimensions across all four/five tabs.
-  const inset = 4 + Math.max(0, Math.min(1, (pane.height - 44) / 16))
-  const width = Math.min(Math.max(...tabs.map(tab => tab.button.width)) + inset * 2,
-    ...tabs.map(({ button }) => 2 * Math.min(button.x + button.width / 2, pane.width - button.x - button.width / 2) - inset * 2))
-  const height = pane.height - inset * 2
-  const { button } = tabs[selected]
-  return { x: button.x + (button.width - width) / 2, y: button.y + (button.height - height) / 2, width, height }
-}
-
 // Hidden panels remain mounted: their controls, charts and drafts keep identity.
 export function ReportScreen({ name, children }: { name: MainScreen; children: ReactNode }) {
   const navigation = useAppNavigation()

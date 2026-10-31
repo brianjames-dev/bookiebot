@@ -1,8 +1,8 @@
 import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from "react"
-import { Toolbar, ToolbarPane } from "konsta/react"
-import { ArrowLeft, MessageCircle, Settings } from "lucide-react"
+import { ArrowLeft } from "lucide-react"
 import { AppNavigationContext, nextScrollNavigation, screenForReportSource, screenTitles, type AppScreen, type MainScreen, type ScrollNavigationState } from "./app-navigation"
 import { AppNavigationBar } from "./app-navigation-bar"
+import { AppHeaderTools } from "./app-header-tools"
 import { ExpenseReportApp, useExpenseReportTheme } from "./report-app"
 import { useReportViewPreferences } from "./report-view-preferences"
 import { expenseReportIdentity } from "./expense-app-session"
@@ -135,9 +135,10 @@ function ExpenseAppShellContent({ report, ownerName = "BookieBot", controls, mon
     const readScroll = () => {
       frame = 0
       if (document.querySelector("dialog[open]") || document.documentElement.dataset.bbModalScrollLock === "true") return
-      const state = nextScrollNavigation(scrollState.current, window.scrollY, document.documentElement.scrollHeight - window.innerHeight)
+      const previous = scrollState.current
+      const state = nextScrollNavigation(previous, window.scrollY, document.documentElement.scrollHeight - window.innerHeight)
       scrollState.current = state
-      setCompact(state.compact)
+      if (previous.compact !== state.compact) setCompact(state.compact)
     }
     const scroll = () => { if (!frame) frame = requestAnimationFrame(readScroll) }
     const viewport = () => {
@@ -186,14 +187,9 @@ function ExpenseAppShellContent({ report, ownerName = "BookieBot", controls, mon
       <PullToRefresh screen={screen} blocked={!report || signingOut || askOpen || keyboardOpen || widgetGuideOpen} />
       <header className="bb-masthead bb-shell-masthead">
         <ReportBrand owner={owner} avatarUrl={avatarUrl} status={controls} statusHidden={!reportVisible} />
-        <Toolbar top className="bb-shell-header-actions" role="group" aria-label="BookieBot tools" innerClassName="bb-shell-toolbar-inner">
-          <ToolbarPane className="bb-shell-toolbar-pane">
-            <button ref={askTriggerRef} type="button" className="bb-shell-icon" aria-label="Ask BookieBot" aria-haspopup="dialog" aria-expanded={askOpen && monthlyReady} disabled={!report || !monthlyReady} onClick={() => setAskOpen(true)}><MessageCircle aria-hidden="true" /></button>
-          </ToolbarPane>
-          <ToolbarPane className="bb-shell-toolbar-pane">
-            <button type="button" className="bb-shell-icon" aria-label="Settings" disabled={!report} aria-current={screen === "settings" ? "page" : undefined} onClick={() => selectScreen(screen === "settings" && !widgetGuideOpen ? lastMain : "settings")}><Settings aria-hidden="true" /></button>
-          </ToolbarPane>
-        </Toolbar>
+        <AppHeaderTools askRef={askTriggerRef} askOpen={askOpen && monthlyReady} settingsOpen={screen === "settings"}
+          askDisabled={!report || !monthlyReady} settingsDisabled={!report} onAsk={() => setAskOpen(true)}
+          onSettings={() => selectScreen(screen === "settings" && !widgetGuideOpen ? lastMain : "settings")} />
       </header>
 
 

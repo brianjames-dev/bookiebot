@@ -118,14 +118,15 @@ async function main() {
   assert.equal(screen(tree), 'overview'); assert.equal(reads.goals, 1); assert.equal(reads.reimbursements, 1)
   const tools = tree.root.findAll(node => node.type === 'div' && node.props.role === 'group' && node.props['aria-label'] === 'BookieBot tools')[0]
   assert.ok(tools.props.className.includes('k-toolbar'), 'Persistent actions use the installed Konsta top Toolbar')
-  const toolPanes = tools.findAll(node => node.type === 'div' && node.props.className?.includes('k-toolbar-pane'))
+  const toolPanes = tools.findAll(node => node.type === 'div' && node.props.className?.includes('bb-shell-toolbar-pane'))
   assert.equal(toolPanes.length, 2, 'Chat and Settings have separate glass surfaces')
   assert.deepEqual(toolPanes.map(pane => pane.findAllByType('button').map(node => node.props['aria-label'])), [['Ask BookieBot'], ['Settings']])
   const navigationBar = tree.root.findByType('nav')
   assert.equal(navigationBar.children.length, 1, 'Floating navigation renders only its pane container, without an under-bar blur or gradient')
   for(const node of navigationBar.findAll(n=>n.type==='button'&&n.props['data-nav-screen'])) {
     assert.ok(node.props['aria-label'],'Icon-only tabs retain their accessible name')
-    assert.equal(node.findByType('svg').props['data-variant'],node.props['data-nav-screen']==='overview'?'filled':'outline')
+    assert.equal(node.findAll(n=>n.props.className==='bb-glass-icon')[0].props['data-selected'],node.props['data-nav-screen']==='overview')
+    assert.equal(node.findAllByType('svg').length,2,'Both silhouettes persist for reversible opacity transitions')
     assert.ok(node.findAllByType('span').every(n=>n.children.every(child=>typeof child!=='string')),'Nav renders no visible text labels')
   }
   const askTrigger = button(tree, 'Ask BookieBot')
