@@ -30,21 +30,27 @@ const surrounding = {x:8,y:-120,width:340,height:530}
 const hits=(p,points,pad=8)=>points.filter(q=>q.x>p.x-pad&&q.x<p.x+tooltip.width+pad&&q.y>p.y-pad&&q.y<p.y+tooltip.height+pad).length
 const intersects=(p,r,pad=6)=>p.x<r.x+r.width+pad&&p.x+tooltip.width>r.x-pad&&p.y<r.y+r.height+pad&&p.y+tooltip.height>r.y-pad
 const metrics=[{x:8,y:-120,width:340,height:130},{x:8,y:300,width:340,height:110},{x:8,y:20,width:42,height:260},{x:50,y:280,width:288,height:20}]
-// Empty plot space is useful: prefer a nearby interior pocket over covering the
-// header, date ticks or monthly totals. Vary slope, direction and selected node.
+// Vary slope, direction and selected node: keep the line clear and stay nearby
+// even when padded label boxes cover a whole header, axis or footer.
 for(const kind of ['flat','rising','falling','arch']){
  const points=Array.from({length:140},(_,i)=>({x:58+i*2,y:kind==='flat'?80:kind==='rising'?110-i*.4:kind==='falling'?50+i*.4:70+30*Math.sin(i/139*Math.PI)}))
  for(const selectedX of [60,165,327]){
   const p=burnRateTooltipPlacement(plot,tooltip,points,selectedX,surrounding,undefined,metrics)
   assert.equal(hits(p,points),0,kind+' must leave the entire trend line clear')
-  assert.ok(!metrics.some(r=>intersects(p,r)),kind+' must leave summary metrics and axes clear when a pocket fits')
-  assert.ok(p.y>=plot.y&&p.y+tooltip.height<=plot.y+plot.height,'Use empty space within the plot instead of forcing overflow')
+  const anchor=points.reduce((a,b)=>Math.abs(a.x-selectedX)<Math.abs(b.x-selectedX)?a:b)
+  const gap=Math.hypot(anchor.x-Math.max(p.x,Math.min(p.x+184,anchor.x)),anchor.y-Math.max(p.y,Math.min(p.y+102,anchor.y)))
+  assert.ok(gap<=32,JSON.stringify({kind,selectedX,p,anchor,gap}))
   assert.deepEqual(plain(burnRateTooltipPlacement(plot,tooltip,points,selectedX,surrounding,p,metrics)),plain(p),'Repeated measurements keep the same clear anchor')
  }
 }
 const flat=Array.from({length:140},(_,i)=>({x:58+i*2,y:80}))
 const reclaimed=burnRateTooltipPlacement(plot,tooltip,flat,165,surrounding,{x:70,y:300},metrics)
-assert.ok(!metrics.some(r=>intersects(reclaimed,r)),'A retained footer position cannot beat an available interior pocket')
+assert.ok(reclaimed.y<150,'A retained footer position cannot beat a nearby pocket')
+const equalFlat=Array.from({length:140},(_,i)=>({x:58+i*2,y:150}))
+const freeBelow=burnRateTooltipPlacement(plot,tooltip,equalFlat,200,surrounding,undefined,[{x:8,y:20,width:340,height:110}])
+assert.ok(freeBelow.y>=162,'Prefer readable labels when above and below are equally close')
+const freeAbove=burnRateTooltipPlacement(plot,tooltip,equalFlat,200,surrounding,undefined,[{x:8,y:170,width:340,height:120}])
+assert.ok(freeAbove.y+102<=138,'The same rule can choose the upper side without a fixed vertical bias')
 // Dense bends in a short plot require outside space. Neither top nor bottom is
 // hardcoded; restrict one side and verify the other can still be used.
 const shortPlot={x:50,y:20,width:230,height:100}
@@ -72,6 +78,26 @@ for(const peak of [105,190,280]){
  assert.equal(hits(high,curve),0)
  assert.ok(distance<102,JSON.stringify({peak,high,node,distance}))
 }
+// A multi-turn curve exercises trough -> shoulder -> peak -> trough selection.
+// Axis/rail preferences must not exile nearby cards to the opposite corner.
+const turns=[-.4,-.7,-1,.72,.94,1,.83,.86,.73,.71,.42,.24,.18,.05,-.18,-.3,-.56,-.48,.2,.06,.28,.31,.33,.55,.52,.16,.03,-.21,-.36,-.52]
+const turning=Array.from({length:581},(_,i)=>{const at=i/20,lo=Math.min(28,Math.floor(at)),value=turns[lo]+(turns[lo+1]-turns[lo])*(at-lo);return{x:58+280*i/580,y:150-value*110}})
+const tickBoxes=Array.from({length:15},(_,i)=>({x:52+i*20,y:283,width:12,height:14,preserve:true}))
+const rail={x:8,y:340,width:340,height:8,preserve:true}
+let prior
+for(const day of [3,11,6,17]){
+ const anchor=turning[(day-1)*20]
+ const p=burnRateTooltipPlacement(plot,tooltip,turning,anchor.x,surrounding,undefined,[...tickBoxes,rail])
+ const distance=Math.hypot(anchor.x-Math.max(p.x,Math.min(p.x+184,anchor.x)),anchor.y-Math.max(p.y,Math.min(p.y+102,anchor.y)))
+ assert.equal(hits(p,turning),0,JSON.stringify({day,p,anchor}))
+ assert.ok(distance<=32,JSON.stringify({day,p,anchor,distance}))
+ if(day===3||day===17)assert.ok(p.y>=anchor.y-51&&p.y+102>anchor.y+40,JSON.stringify({day,p,anchor}))
+ if(day===17)assert.ok(p.y>=anchor.y+8,'An open lower pocket keeps a trough card below its node')
+ if(day===6)assert.ok(Math.hypot(p.x-anchor.x,p.y+102-anchor.y)<=32,'A peak can attach at a nearby bottom-left corner')
+ if(prior&&day===6)assert.ok(Math.hypot(p.x-prior.x,p.y-prior.y)>20,'Different nodes get their own nearby anchor')
+ prior=p
+}
+
 // A fixed floating control is a hard occluder, including a retained placement.
 for(const nav of [{x:8,y:230,width:340,height:60,occludes:true},{x:100,y:250,width:160,height:44,occludes:true}]){
  const placed=burnRateTooltipPlacement(plot,tooltip,flat,165,surrounding,{x:100,y:240},[nav])
@@ -108,7 +134,22 @@ const cachedReads=reads
 node.dataset.inspectedDay='14';positionBurnRateTooltip(portal,node,160)
 assert.equal(reads,cachedReads,'Changing day does not resample unchanged line geometry')
 assert.equal(portal.dataset.positionedDay,'14')
+const freshPortal={parentElement:{...portal.parentElement},style:{},dataset:{}}
+positionBurnRateTooltip(freshPortal,node,160)
+assert.equal(portal.style.transform,freshPortal.style.transform,'A new day gets the same placement as a fresh inspection, without inheriting the previous day')
 for(const change of [()=>curve='new',()=>chartWidth=390,()=>matrix.f=5]){const before=reads;change();positionBurnRateTooltip(portal,node,160);assert.ok(reads>before)}
+
+// Neighboring dates can be near ties too. A clean host must choose the same
+// anchor as one with an older day cached; only same-day remeasurements retain it.
+curve='flat'
+line.getPointAtLength=at=>({matrixTransform:()=>({x:60+at,y:150})})
+for(const selectedX of [90,94,98,102,106,110,114,118]){
+ node.dataset.inspectedDay=String(selectedX)
+ positionBurnRateTooltip(portal,node,selectedX)
+ const clean={parentElement:{...portal.parentElement},style:{},dataset:{}}
+ positionBurnRateTooltip(clean,node,selectedX)
+ assert.equal(portal.style.transform,clean.style.transform,'Neighboring days cannot inherit a near-tied old anchor')
+}
 
 fixedElements=[{getBoundingClientRect:()=>({left:0,top:0,width:390,height:900})}]
 positionBurnRateTooltip(portal,node,160)
@@ -154,4 +195,4 @@ assert.equal(view.root.findByProps({className:'bb-burn-balance-rail'}).props['da
 render(runtime.exports.Month,{burnRate:{...burn,spent:3100,remaining:-105.08},monthName:'Feb'})
 assert.ok(JSON.stringify(view.toJSON()).includes('-$105.08'),'Overspend stays signed in the monthly Left amount')
 act(()=>view.unmount())
-console.log('PASS: balance edge cases, day/month scopes, approved labels and shade, native line props, interior/exterior pockets, protected metrics/axes, stable chart-local placement and cache')
+console.log('PASS: balance edge cases, day/month scopes, approved labels and shade, native line props, interior/exterior pockets, bounded readability, nearby node corners, fresh-day anchoring and geometry cache')

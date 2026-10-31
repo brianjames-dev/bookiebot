@@ -13,12 +13,13 @@ const csp=fs.readFileSync(path.join(root,'src/bookiebot/reports/phone_app.py'),'
 const shell=Boolean(process.env.BOOKIEBOT_BURN_SHELL)
 const money=n=>new Intl.NumberFormat('en-US',{style:'currency',currency:'USD'}).format(n),round=n=>Math.round(n*100)/100
 function reportFor(scenario='regular'){
+ const turns=[-.4,-.7,-1,.72,.94,1,.83,.86,.73,.71,.42,.24,.18,.05,-.18,-.3,-.56,-.48,.2,.06,.28,.31,.33,.55,.52,.16,.03,-.21,-.36,-.52]
  const report=structuredClone(fixture),daily=[40,45,70,250,200,20,250,0,0,0,65,20,400,0,0,0,0,50,40,230,0,0,50,60,100,139.32]
  if(scenario==='surge')daily[0]+=350
  if(scenario==='over')daily[25]+=1200
- const budget=scenario==='zero'?0:2994.92,elapsedDays=scenario==='future'?0:scenario==='first-day'?1:26
+ const budget=scenario==='zero'?0:2994.92,elapsedDays=scenario==='multi-turn'?30:scenario==='future'?0:scenario==='first-day'?1:26
  let actual=0
- const series=Array.from({length:31},(_,i)=>{const day=i+1,expectedSpend=round(budget*day/31),variance=scenario.startsWith('crest-')?-50+400*Math.exp(-Math.pow((day-Number(scenario.split('-')[1]))/4,2)):scenario==='plateau'?200:scenario==='gentle-ramp'?200+day*2:scenario==='arch'?200+30*Math.sin(day/5):scenario==='dip'?(day<=2?-80*day:260+100*Math.sin(day/5)):null,dailySpend=day<=elapsedDays?(variance!==null?round(expectedSpend+variance-actual):scenario==='zero'?0:daily[i]):null;actual=round(actual+(dailySpend??0));return {day,label:String(day),dailySpend,actualSpend:day<=elapsedDays?actual:null,expectedSpend,variance:day<=elapsedDays?round(actual-expectedSpend):null}})
+ const series=Array.from({length:31},(_,i)=>{const day=i+1,expectedSpend=round(budget*day/31),variance=scenario==='multi-turn'?40+260*turns[i]:scenario.startsWith('crest-')?-50+400*Math.exp(-Math.pow((day-Number(scenario.split('-')[1]))/4,2)):scenario==='plateau'?200:scenario==='gentle-ramp'?200+day*2:scenario==='arch'?200+30*Math.sin(day/5):scenario==='dip'?(day<=2?-80*day:260+100*Math.sin(day/5)):null,dailySpend=day<=elapsedDays?(variance!==null?round(expectedSpend+variance-actual):scenario==='zero'?0:daily[i]):null;actual=round(actual+(dailySpend??0));return {day,label:String(day),dailySpend,actualSpend:day<=elapsedDays?actual:null,expectedSpend,variance:day<=elapsedDays?round(actual-expectedSpend):null}})
  const expectedSpend=round(budget*elapsedDays/31),diff=round(actual-expectedSpend)
  const burnRate={budget,spent:actual,remaining:round(budget-actual),daysInMonth:31,elapsedDays,expectedSpend,allowedDailyAverage:round(budget/31),actualDailyAverage:elapsedDays?round(actual/elapsedDays):0,dailyDifference:elapsedDays?round(diff/elapsedDays):0,totalDifference:diff,status:!elapsedDays?'not_started':diff>0?'over':'under',series}
  Object.assign(report,{year:2026,month:10,monthLabel:'October 2026',elapsedDays,burnRate})
@@ -31,10 +32,27 @@ function reportFor(scenario='regular'){
 const html=(report,dark,before=false)=>`<!doctype html><html data-theme="${dark?'dark':'light'}"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><style>${before?fs.readFileSync(process.env.BOOKIEBOT_BURN_REFERENCE_CSS,'utf8'):css}</style></head><body><div id="bookiebot-expense-report-root"></div>${shell?`<script id="bookiebot-expense-app-config" type="application/json">${JSON.stringify({ownerName:"Brian",reportUrl:"/fixture-report",logoutUrl:"/app/logout"})}</script>`:""}<script id="bookiebot-expense-report-data" type="application/json">${JSON.stringify(report)}</script><script type="module" src="/${before?'before':'app'}.js"></script></body></html>`
 async function nativePoint(page,day,touch){
  const chart=page.locator('#bb-chart-burn-rate .recharts-wrapper')
- const position=await chart.evaluate((chart,day)=>{const line=chart.querySelector('.recharts-line-curve'),first=line.getPointAtLength(0),last=line.getPointAtLength(line.getTotalLength()),x=first.x+(last.x-first.x)*(day-1)/25;let lo=0,hi=line.getTotalLength();for(let n=0;n<30;n++){const mid=(lo+hi)/2;if(line.getPointAtLength(mid).x<x)lo=mid;else hi=mid}const p=line.getPointAtLength((lo+hi)/2);return{x:p.x,y:p.y}},day)
+ const position=await chart.evaluate((chart,day)=>{const line=chart.querySelector('.recharts-line-curve'),first=line.getPointAtLength(0),last=line.getPointAtLength(line.getTotalLength()),x=first.x+(last.x-first.x)*(day-1)/Math.max(1,Number(document.querySelector('.bb-burn-rate-note').textContent.match(/^\d+/)?.[0])-1);let lo=0,hi=line.getTotalLength();for(let n=0;n<30;n++){const mid=(lo+hi)/2;if(line.getPointAtLength(mid).x<x)lo=mid;else hi=mid}const p=line.getPointAtLength((lo+hi)/2);return{x:p.x,y:p.y}},day)
  if(touch)await chart.tap({position});else await chart.hover({position})
  await page.waitForFunction(day=>document.querySelector('.bb-burn-node-tooltip')?.dataset.inspectedDay===String(day),day)
  await page.waitForTimeout(70)
+}
+async function checkTurningNodes(page,touch,width,engineName,checks){
+ let last
+ for(const day of [3,11,6,17]){
+  await nativePoint(page,day,touch);const actual=await inspect(page)
+  assert.equal(actual.opacity,'1',JSON.stringify(actual));assert.deepEqual(actual.fixedHits,[],JSON.stringify(actual));assert.equal(actual.hidesDot,false,JSON.stringify(actual));assert.equal(actual.curveHits,0,JSON.stringify(actual))
+  // A 320px plot can be narrower than the card plus either clear curve side.
+  // Enforce tight attachment where it fits; retain curve clearance when cramped.
+  assert.ok(actual.anchorDistance<=(width<390?actual.card.height:32),JSON.stringify({day,...actual}))
+  if(day===3||day===17)assert.ok(actual.card.top>=actual.anchor.y-actual.card.height*.55&&actual.card.bottom>actual.anchor.y+actual.card.height*.4,JSON.stringify({day,...actual}))
+  if(day===17)assert.ok(actual.card.top>=actual.anchor.y+8,JSON.stringify({day,...actual}))
+  if(day===6&&width===390)assert.ok(Math.hypot(actual.card.left-actual.anchor.x,actual.card.bottom-actual.anchor.y)<=32,JSON.stringify({day,...actual}))
+  if(last&&day===6)assert.ok(Math.hypot(actual.card.x-last.card.x,actual.card.y-last.card.y)>20,'The peak must not inherit the shoulder anchor')
+  if(width===390)await page.locator('#bb-chart-burn-rate').screenshot({path:`/private/tmp/burn-rate-turn-${shell?'shell':'report'}-${engineName}-${day}.png`})
+  last=actual;checks++
+ }
+ return checks
 }
 async function graph(page){return page.locator('#bb-chart-burn-rate').evaluate(el=>{
  const line=el.querySelector('.recharts-line-curve'),rect=el.querySelector('clipPath rect'),samples=[]
@@ -78,7 +96,7 @@ async function inspect(page){return page.locator('#bb-chart-burn-rate').evaluate
      await page.evaluate(({y,compact})=>scrollTo(0,y+(compact?-60:60)),{y,compact});await page.waitForTimeout(80)
      await page.evaluate(y=>scrollTo(0,y),y);await page.waitForTimeout(400)
      assert.equal(await page.locator('.bb-bottom-navigation').getAttribute('data-compact'),String(compact))
-     const point=await page.locator('#bb-chart-burn-rate .recharts-wrapper').evaluate((el,day)=>{const line=el.querySelector('.recharts-line-curve'),matrix=line.getScreenCTM(),x=line.getPointAtLength(0).x+(line.getPointAtLength(line.getTotalLength()).x-line.getPointAtLength(0).x)*(day-1)/25;let lo=0,hi=line.getTotalLength();for(let n=0;n<30;n++){const mid=(lo+hi)/2;if(line.getPointAtLength(mid).x<x)lo=mid;else hi=mid}const p=line.getPointAtLength((lo+hi)/2).matrixTransform(matrix);return{x:p.x,y:p.y}},crest)
+     const point=await page.locator('#bb-chart-burn-rate .recharts-wrapper').evaluate((el,day)=>{const line=el.querySelector('.recharts-line-curve'),matrix=line.getScreenCTM(),x=line.getPointAtLength(0).x+(line.getPointAtLength(line.getTotalLength()).x-line.getPointAtLength(0).x)*(day-1)/Math.max(1,Number(document.querySelector('.bb-burn-rate-note').textContent.match(/^\d+/)?.[0])-1);let lo=0,hi=line.getTotalLength();for(let n=0;n<30;n++){const mid=(lo+hi)/2;if(line.getPointAtLength(mid).x<x)lo=mid;else hi=mid}const p=line.getPointAtLength((lo+hi)/2).matrixTransform(matrix);return{x:p.x,y:p.y}},crest)
      await page.touchscreen.tap(point.x,point.y)
      await page.waitForFunction(day=>document.querySelector('.bb-burn-node-tooltip')?.dataset.inspectedDay===String(day),crest)
      await page.waitForTimeout(100)
@@ -88,6 +106,12 @@ async function inspect(page){return page.locator('#bb-chart-burn-rate').evaluate
      await page.evaluate(compact=>scrollBy(0,compact?-35:65),compact);await page.waitForTimeout(450)
      const moved=await inspect(page);assert.equal(moved.opacity,'1');assert.deepEqual(moved.fixedHits,[],JSON.stringify(moved));checks++
     }
+   }
+   await open('multi-turn')
+   for(const top of [170,290]){
+    await page.locator('#bb-chart-burn-rate .recharts-wrapper').evaluate((el,top)=>scrollTo(0,scrollY+el.getBoundingClientRect().top-top),top)
+    await page.waitForTimeout(450)
+    checks=await checkTurningNodes(page,touch,width,engineName,checks)
    }
    await page.screenshot({path:`/private/tmp/burn-rate-nav-${engineName}-${dark?'dark':'light'}.png`})
    assert.deepEqual(errors,[]);assert.deepEqual(unexpected,[]);console.log(engineName,'shell',dark?'dark':'light','PASS');await page.close();continue
@@ -130,14 +154,14 @@ async function inspect(page){return page.locator('#bb-chart-burn-rate').evaluate
    await page.getByRole('button',{name:'Show Burn Rate',exact:true}).click();await nativePoint(page,13,touch)
    await page.getByRole('button',{name:'Projected',exact:true}).click();await page.waitForTimeout(450);assert.equal(await page.locator('.bb-burn-node-tooltip').count(),0);checks+=7
   }
-  // Several unrelated curve shapes must be able to use clear interior space
-  // without masking the line, summary numbers, axis labels or monthly totals.
+  // Unrelated curve shapes must keep the line clear in nearby interior/exterior
+  // pockets, with labels treated as readability preferences rather than walls.
   for(const scenario of ['plateau','gentle-ramp','arch','dip']){
    await open(scenario)
    for(const day of (scenario==='dip'?[2,13,26]:[13])){
     await nativePoint(page,day,touch);const actual=await inspect(page)
-    assert.equal(actual.hidesDot,false,JSON.stringify(actual));assert.equal(actual.curveHits,0,JSON.stringify(actual));assert.deepEqual(actual.metricHits,[],JSON.stringify(actual))
-    assert.equal(actual.outsidePlot,false,JSON.stringify({scenario,width,engineName,day,...actual}))
+    assert.equal(actual.hidesDot,false,JSON.stringify(actual));assert.equal(actual.curveHits,0,JSON.stringify(actual))
+    assert.ok(actual.anchorDistance<=actual.card.height,JSON.stringify({scenario,width,engineName,day,...actual}))
     assert.equal(actual.overflow,false);checks++
    }
    if(width===390&&dark&&scenario==='dip')await page.locator('#bb-chart-burn-rate').screenshot({path:`/private/tmp/burn-rate-pocket-${engineName}.png`})
@@ -152,6 +176,7 @@ async function inspect(page){return page.locator('#bb-chart-burn-rate').evaluate
    }
    if(width===390&&dark)await page.locator('#bb-chart-burn-rate').screenshot({path:`/private/tmp/burn-rate-crest-${crest}-${engineName}.png`})
   }
+  await open('multi-turn');checks=await checkTurningNodes(page,touch,width,engineName,checks)
   for(const scenario of ['surge','over','zero','first-day','future']){
    await open(scenario)
    const panel=page.locator('#bb-chart-burn-rate')
@@ -181,5 +206,5 @@ async function inspect(page){return page.locator('#bb-chart-burn-rate').evaluate
  }
  }finally{await browser.close()}
  }
- console.log(JSON.stringify({checks,frames,result:'PASS: native mouse/touch, exact day/month amounts, split labels, left overfill, interior/exterior pockets, clear curve/metrics/axes, synchronous anchors, progressive normal/reduced-motion exit, hold/dismiss/scroll anchoring/tab/mode lifecycle, zero/future and responsive layouts'}))
+ console.log(JSON.stringify({checks,frames,result:'PASS: native mouse/touch, exact day/month amounts, split labels, left overfill, interior/exterior pockets, clear curve/fixed controls, bounded readability, fresh node anchors, progressive normal/reduced-motion exit, hold/dismiss/scroll anchoring/tab/mode lifecycle, zero/future and responsive layouts'}))
 })().catch(error=>{console.error(error);process.exit(1)})

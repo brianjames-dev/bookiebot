@@ -1,5 +1,11 @@
 # Agent Decisions
 
+## 2026-10-30 - Balance Burn Rate Popups Around Each Node
+
+Make internal text, axes and rails bounded readability preferences after fixed-control, selected-node and trend-line clearance. Normalize overlap by popup area and cap its cost so padded/overlapping label boxes cannot exile a nearby popup to the opposite corner. Search exact side-centered positions as well as above/below and nearby pockets; favor a close edge/corner without prescribing a top or bottom quadrant. This lets a low-node popup cross date ticks or supporting footer text when that gives a substantially closer clear placement.
+
+Recalculate the best position for each newly inspected day. Retain near ties only while inspecting that same day during scroll/resize, so a shoulder’s position does not stick when a peak is selected. Keep actual floating-nav/header-button occlusion, cached chart-local curve sampling, one synchronous position owner, shared stage and five-second / 360ms lifecycle. This refines 202; native acceptance is checklist 203. No financial calculations, persistence or Finance Ops change.
+
 ## 2026-10-30 - Follow Burn Rate Peaks And Clear Floating Navigation
 
 Measure header/footer text with DOM ranges, preserving wrapped line boxes instead of treating full-width section boxes as occupied. Protect actual controls, rails, legend graphics and axis tick text. After fixed-control, selected-node and curve clearance, balance proximity against supporting text overlap rather than rejecting every text overlap before considering distance. This lets a high-node popup use nearby header whitespace instead of moving to a distant low corner. Near-tie retention cannot preserve worse occlusion or control/curve clearance. This refines 201's ordering; geometry remains independent of dates and specific curves.

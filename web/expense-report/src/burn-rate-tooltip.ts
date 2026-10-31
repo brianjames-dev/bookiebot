@@ -25,7 +25,7 @@ export function burnRateTooltipPlacement(
     !best || Math.abs(point.x - selectedX) < Math.abs(best.x - selectedX) ? point : best, undefined)
   const anchor = selected ?? { x: plot.x + plot.width / 2, y: plot.y + plot.height / 2 }
   const xs = new Set([anchor.x - width / 2, anchor.x - width - 14, anchor.x + 14, plot.x, plot.x + plot.width - width, loX, hiX].map(clampX))
-  const ys = new Set([plot.y - height - 10, plot.y + plot.height + 10, anchor.y - height - 14, anchor.y + 14, plot.y, plot.y + plot.height - height, loY, hiY].map(clampY))
+  const ys = new Set([plot.y - height - 10, plot.y + plot.height + 10, anchor.y - height - 14, anchor.y - height / 2, anchor.y + 14, plot.y, plot.y + plot.height - height, loY, hiY].map(clampY))
   // Search the available space, not only corners or positions outside the plot.
   // A bounded grid finds pockets between bends; exact edges retain snug fits.
   for (let x = loX; x < hiX; x += 20) xs.add(x)
@@ -48,7 +48,15 @@ export function burnRateTooltipPlacement(
     }
     const distance = Math.hypot(anchor.x - Math.max(x, Math.min(x + width, anchor.x)), anchor.y - Math.max(y, Math.min(y + height, anchor.y)))
     const centerDistance = Math.hypot(anchor.x - x - width / 2, anchor.y - y - height / 2)
-    return { x, y, hidesPoint, overlaps, obstruction, occlusion, preserved, score: occlusion + overlaps * 30 + obstruction * .015 + distance * 2 + centerDistance * .12 }
+    // Nearby corners make the attachment legible without forcing a quadrant.
+    // An edge remains available where viewport/curve clearance needs it.
+    const cornerDistance = Math.hypot(Math.min(Math.abs(anchor.x - x), Math.abs(anchor.x - x - width)), Math.min(Math.abs(anchor.y - y), Math.abs(anchor.y - y - height)))
+    // Label padding and overlapping text boxes can otherwise add hundreds of
+    // pixels of penalty. Readability is a bounded preference, not an excuse to
+    // send a nearby card to the opposite end of the chart.
+    const area = Math.max(1, width * height)
+    const readability = Math.min(1, obstruction / area) * 50 + Math.min(1, preserved / area) * 50
+    return { x, y, hidesPoint, overlaps, obstruction, occlusion, preserved, score: occlusion + overlaps * 30 + readability + distance * 3 + cornerDistance * .5 + centerDistance * .08 }
   }
   const candidates = [...xs].flatMap(x => [...ys].map(y => score({ x, y })))
   let pool = candidates
@@ -56,8 +64,7 @@ export function burnRateTooltipPlacement(
   // curve, then balance proximity against other labels instead of fleeing to
   // a distant corner just to avoid a small amount of text.
   for (const clear of [(p: typeof candidates[number]) => !p.occlusion,
-    (p: typeof candidates[number]) => !p.hidesPoint, (p: typeof candidates[number]) => !p.overlaps,
-    (p: typeof candidates[number]) => !p.preserved]) {
+    (p: typeof candidates[number]) => !p.hidesPoint, (p: typeof candidates[number]) => !p.overlaps]) {
     const safe = pool.filter(clear)
     if (safe.length) pool = safe
   }
@@ -135,7 +142,10 @@ export function positionBurnRateTooltip(portal: HTMLElement, node: HTMLElement, 
     { x: clip.x.baseVal.value, y: clip.y.baseVal.value, width: clip.width.baseVal.value, height: clip.height.baseVal.value },
     // Layout dimensions do not shrink while the exit frame scales/fades.
     { width: node.offsetWidth, height: node.offsetHeight }, cached.samples, selectedX,
-    { x: left - bounds.left, y: top - bounds.top, width: right - left, height: bottom - top }, placementCache.get(host), avoid,
+    { x: left - bounds.left, y: top - bounds.top, width: right - left, height: bottom - top },
+    // Retain near ties only while inspecting the same node. A new selection
+    // starts at its own best anchor rather than inheriting the last pocket.
+    portal.dataset.positionedDay === node.dataset.inspectedDay ? placementCache.get(host) : undefined, avoid,
   )
   placementCache.set(host, next)
   // If too little of the panel is visible to fit above/beside a fixed control,
