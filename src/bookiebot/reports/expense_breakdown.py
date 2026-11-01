@@ -190,6 +190,7 @@ class ExpenseBreakdownReport:
     need_expenses: list[PaymentItem] = field(default_factory=list)
     payments: list[PaymentItem] = field(default_factory=list)
     utility_history: list[UtilityHistoryItem] = field(default_factory=list)
+    bill_comparison_history: list[UtilityHistoryItem] = field(default_factory=list)
     subscriptions: list[SubscriptionItem] = field(default_factory=list)
     calendar_events: list[CalendarEvent] = field(default_factory=list)
     calendar_context: list[CalendarMonth] = field(default_factory=list)
@@ -642,6 +643,10 @@ def build_expense_breakdown_report(
         payments=payments,
         utility_history=utility_history,
         subscriptions=subscriptions,
+        bill_comparison_history=_utility_history_items(
+            budget_history, bill_schedule_rows, month,
+            groups=frozenset({"rent", "bills_utilities", "static_bills_subscriptions_needs"}),
+        ),
         calendar_events=calendar_events,
         calendar_context=_calendar_adjacent_months(
             month, subscriptions, bill_schedule_rows, budget_history,
@@ -2243,6 +2248,8 @@ def _utility_history_items(
     budget_history: tuple[BudgetHistoryRows, ...],
     bill_schedule_rows: list[list[str]],
     selected_month: BudgetMonth,
+    *,
+    groups: frozenset[str] = frozenset({"bills_utilities"}),
 ) -> list[UtilityHistoryItem]:
     history = sorted(
         (item for item in budget_history if item.month.year == selected_month.year and item.month.month <= selected_month.month),
@@ -2258,7 +2265,7 @@ def _utility_history_items(
         monthly_amounts = {
             _normalize_label(item.label): item
             for item in monthly_items
-            if item.group == "bills_utilities"
+            if item.group in groups
         }
         for key, item in monthly_amounts.items():
             by_label.setdefault(key, {"label": item.label, "amounts": {}})
@@ -2652,6 +2659,9 @@ def _report_client_payload(
             for item in report.calendar_context
         ],
         "utilityHistory": [_utility_history_payload(item) for item in report.utility_history],
+        # Presentation-only history: never substitute it for canonical utility
+        # totals or reuse today's subscription price in earlier months.
+        "billComparisonHistory": [_utility_history_payload(item) for item in report.bill_comparison_history],
         "sharedReimbursements": [_shared_reimbursement_payload(item) for item in report.shared_reimbursements],
         "subscriptionsNeeds": [
             _subscription_payload(item)
@@ -2808,6 +2818,7 @@ def _report_mode_view_from_payload(
         "burnRate": burn_rate,
         "calendarEvents": list(payload["calendarEvents"]),
         "utilityHistory": list(payload["utilityHistory"]),
+        "billComparisonHistory": list(payload.get("billComparisonHistory", payload["utilityHistory"])),
     }
     if savings_investing:
         view["savingsInvesting"] = savings_investing

@@ -61,7 +61,7 @@ const closeEnough=(actual,reference,message)=>assert.ok(Math.abs(actual-referenc
         await page.getByRole('button',{name:'Show Burn Rate',exact:true}).click()
         await page.waitForTimeout(350)
         const reference=await gap(page,'.bb-daily-section',dailyButton)
-        assert.ok(await gap(page,'.bb-chart-carousel-band','#bb-chart-burn-rate .bb-burn-month-panel')>=103,'Burn Rate retains its selected bottom breathing room')
+        assert.ok(await gap(page,'.bb-chart-carousel-band','#bb-chart-burn-rate .bb-burn-month-panel')>=23,'Burn Rate retains compact bottom breathing room')
         const measured={engine:engine.name(),width,dark,balance:reference,daily:await gap(page,'.bb-daily-section',dailyButton),largest:await gap(page,'.bb-highlights-section',insightButton)}
         if(!measureOnly) {
           closeEnough(reference,Math.min(32,Math.max(16,width*.03))+2,'Keep the approved Categories spacing')
@@ -81,22 +81,15 @@ const closeEnough=(actual,reference,message)=>assert.ok(Math.abs(actual-referenc
           closeEnough(await gap(page,'.bb-daily-section','.bb-daily-transactions'),reference,'Expanded daily content bottom')
           await page.locator(dailyButton).click();await page.waitForTimeout(350)
           closeEnough(await gap(page,'.bb-daily-section',dailyButton),reference,'Recollapsed Transactions footer')
-          for(const [title,id] of [['Burn Rate','burn-rate'],['Calendar','calendar'],['Bills & Utilities','bills']]) {
+          for(const title of ['Category Mix','Burn Rate','Calendar','Bills & Utilities']) {
             await page.getByRole('button',{name:`Show ${title}`,exact:true}).click();await page.waitForTimeout(350)
-            const control=id==='burn-rate'?'#bb-chart-burn-rate .bb-burn-month-panel':`#bb-chart-${id} .bb-chart-page-footer .bb-details-toggle`
-            if(id==='burn-rate')assert.ok(await gap(page,'.bb-chart-carousel-band',control)>=103,'The static compact balance has breathing room')
-            else closeEnough(await gap(page,'.bb-chart-carousel-band',control),reference,`${title} Details footer`)
-            if(id==='bills') {
-              await page.locator(control).click();await page.waitForTimeout(350)
-              assert.equal(await page.locator(control).getAttribute('aria-expanded'),'true')
-              await page.locator(control).click();await page.waitForTimeout(350)
-              closeEnough(await gap(page,'.bb-chart-carousel-band',control),reference,`${title} recollapsed footer`)
-            }
+            const pageRegion=page.locator('.bb-chart-carousel-slide[aria-hidden="false"] .bb-chart-page')
+            assert.equal(await pageRegion.evaluate(el=>parseFloat(getComputedStyle(el).paddingBottom)),24,`${title} shares the compact bottom gap`)
+            assert.equal(await pageRegion.locator('.bb-details-toggle').count(),0,`${title} integrates details into the chart`)
           }
           await page.getByRole('button',{name:'Show Category Mix',exact:true}).click();await page.waitForTimeout(350)
-          assert.equal(await page.getByRole('button',{name:'Categories',exact:true}).count(),0,'Category inspection now lives on slices and callouts')
-          const reserved=await page.locator('.bb-category-mix-page').evaluate(el=>getComputedStyle(el).gridTemplateRows.split(' ').at(-1))
-          assert.equal(reserved,'42px','Category Mix retains its approved former-footer space')
+          assert.equal(await page.getByRole('button',{name:'Categories',exact:true}).count(),0)
+          assert.equal(await page.locator('.bb-category-mix-page').evaluate(el=>getComputedStyle(el).gridTemplateRows.split(' ').length),2,'Remove the former empty footer row')
           if(width===390&&dark)await page.screenshot({path:`/tmp/bookiebot-overview-spacing-${engine.name()}.png`,fullPage:true})
         }
         await page.getByRole('navigation',{name:'Main navigation'}).getByRole('button',{name:'Savings',exact:true}).click()

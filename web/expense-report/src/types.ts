@@ -190,6 +190,7 @@ export interface ReportModeView {
   burnRate: BurnRate | null
   calendarEvents: CalendarEvent[]
   utilityHistory: UtilityHistoryItem[]
+  billComparisonHistory?: UtilityHistoryItem[]
 }
 
 export interface SavingsInvesting {
@@ -266,6 +267,7 @@ export interface ExpenseReportData {
   calendarContext?: CalendarMonth[]
   calendarEvents: CalendarEvent[]
   utilityHistory: UtilityHistoryItem[]
+  billComparisonHistory?: UtilityHistoryItem[]
   sharedReimbursements: SharedReimbursementItem[]
   openSharedReimbursements?: SharedReimbursementItem[]
   receivedSharedReimbursements?: SharedReimbursementItem[]

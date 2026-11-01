@@ -1,6 +1,6 @@
 import type { CalendarEvent, CalendarMonth } from './types'
 
-export const CALENDAR_LAYOUT = { iconSize: 26, overlap: .22, cutout: 1.5, monthCellHeight: 72, cellGap: 4, bottomGap: 104 } as const
+export const CALENDAR_LAYOUT = { iconSize: 26, overlap: .22, cutout: 1.5, monthCellHeight: 72, cellGap: 4, bottomGap: 24 } as const
 const dayMs = 86_400_000
 const shortMonth = new Intl.DateTimeFormat('en-US', { month: 'short', timeZone: 'UTC' })
 const pacific = new Intl.DateTimeFormat('en-US', { timeZone: 'America/Los_Angeles', year: 'numeric', month: 'numeric', day: 'numeric' })
