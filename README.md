@@ -92,6 +92,10 @@ Legacy `Fixed Monthly Income` and `Biweekly Income Source/Start` settings remain
 
 ### Payroll ESPP and cash savings
 
+Monthly tabs are prepared ahead of midnight, with separate previous-month closing
+and recoverable copies. See [Monthly budget readiness](docs/BUDGET_ROLLOVER.md)
+for Pacific scheduling, deployment, retry safety and annual configuration handoff.
+
 Brian's October 2026 budget and Template have a four-column ESPP enrollment table below **Main Income Source**: first eligible paycheck **10/23/2026**, optional inclusive last date, payroll source `xAI`, and enrollment rate **5%**. One dark blank row separates Main Income Source, ESPP enrollment, Income and Budget. Dates and the complete source label determine enrollment; earlier paychecks, bonuses, rewards and other income retain **20% ideal / 10% minimum cash savings**. Enrolled pay targets **20% total savings including ESPP**, with the remainder in cash and a **7.5% minimum cash** target. Hannah and unconfigured historical months keep their existing behavior.
 
 Continue logging the **amount deposited into checking**, with its actual date and source. In the existing fourth income column, **ESPP withheld**, enter the actual paystub deduction for each enrolled paycheck. The enrollment percentage describes payroll enrollment; a bank deposit cannot establish a gross-based deduction. For example, a $3,400 deposit plus $300 withheld means $3,700 full take-home, a $740 total savings goal, $440 ideal cash and $277.50 minimum cash for that paycheck. Expected Income Amount remains the expected **bank deposit after payroll deductions**. Historical deposits stay unchanged. A blank/invalid enrolled deduction produces an incomplete-data warning; enter 0 only when payroll withheld nothing.

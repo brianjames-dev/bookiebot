@@ -2,6 +2,10 @@ from pathlib import Path
 import subprocess
 
 
+def test_month_preparation_closing_and_retry_contracts():
+    subprocess.run(["node", "unit_tests/scripts/rollover_automation_test.cjs"], check=True, capture_output=True, text=True)
+
+
 SCRIPT_PATH = Path("scripts/google-apps-script/budget-system-automation.gs")
 
 

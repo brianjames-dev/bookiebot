@@ -60,6 +60,8 @@ const MONTH_NAMES = [
 ];
 
 const MONTH_TEMPLATE_SHEET_NAMES = ["Template"];
+const BUDGET_TIME_ZONE = "America/Los_Angeles";
+const BUDGET_PREPARE_DAYS = 7;
 
 const MONTH_LABEL_PLACEHOLDER = "Month";
 const MONTH_LABEL_SEARCH_ROWS = 10;
@@ -73,6 +75,7 @@ const PERSONAL_BUDGET_SNAPSHOT_LABELS = [
   },
   {
     label: "Static Bills & Subscriptions (Needs)",
+    aliases: ["Subscriptions (Needs)"],
     searchMode: "exact",
     targetColumnOffsetFromLabel: null,
   },
@@ -199,31 +202,157 @@ const INCOME_SETTING_LABELS = {
  * Safe to run repeatedly.
  */
 function budgetSystemRollover() {
+  return withBudgetRolloverLock(() => {
+    const today = new Date(), failures = [];
+    // Preparation cannot freeze the still-active month. Closing is independent,
+    // so a failed future copy does not prevent an already-closed month settling.
+    try { prepareBudgetMonthsAt(today); } catch (error) { failures.push(error); }
+    try { closePreviousBudgetMonthAt(today); } catch (error) { failures.push(error); }
+    if (failures.length) throw failures[0];
+  });
+}
+
+/** Evening retry/preparation entry point. Never snapshots any month. */
+function prepareBudgetMonths() {
+  return withBudgetRolloverLock(() => prepareBudgetMonthsAt(new Date()));
+}
+
+function withBudgetRolloverLock(work) {
+  const lock = LockService.getScriptLock();
+  if (!lock.tryLock(1000)) {
+    Logger.log("Another budget automation run is active; leaving its work untouched.");
+    return {status: "busy"};
+  }
+  try { return work(); } finally { lock.releaseLock(); }
+}
+
+function budgetMonthPeriod(date, offset = 0) {
+  const [year, month, day] = Utilities.formatDate(date, BUDGET_TIME_ZONE, "yyyy-MM-dd").split("-").map(Number);
+  const target = new Date(Date.UTC(year, month - 1 + offset, 1, 12));
+  const targetYear = target.getUTCFullYear(), targetMonth = target.getUTCMonth() + 1;
+  return {year: targetYear, month: targetMonth, name: MONTH_NAMES[targetMonth - 1],
+    key: `${targetYear}-${String(targetMonth).padStart(2, "0")}`, day,
+    daysInMonth: new Date(Date.UTC(year, month, 0)).getUTCDate()};
+}
+
+function prepareBudgetMonthsAt(today) {
   seedKnown2026ConfigIfMissing();
+  const current = budgetMonthPeriod(today), periods = [current], failures = [];
+  if (current.daysInMonth - current.day < BUDGET_PREPARE_DAYS) periods.push(budgetMonthPeriod(today, 1));
+  for (const period of periods) {
+    try { prepareBudgetMonthTabs(getOrCreateYearFiles(period.year), period); }
+    catch (error) { failures.push(error); }
+  }
+  if (failures.length) throw failures[0];
+}
 
-  const today = new Date();
-  const year = getYear(today);
-  const monthName = getMonthName(today);
+function prepareBudgetMonthTabs(config, period) {
+  prepareBudgetMonthTab(config.sharedExpensesId, config, period, null);
+  const failures = [];
+  for (const owner of ["brian", "hannah"]) {
+    try { prepareBudgetMonthTab(config[`${owner}BudgetId`], config, period, owner); }
+    catch (error) { failures.push(error); }
+  }
+  if (failures.length) throw failures[0];
+  Logger.log(`Budget month ${period.key} is prepared in all three workbooks.`);
+}
 
-  snapshotPreviousMonthPersonalBudgetOutputs(today);
+function prepareBudgetMonthTab(bookId, config, period, owner) {
+  const ss = SpreadsheetApp.openById(bookId), props = PropertiesService.getScriptProperties();
+  const key = `BUDGET_MONTH_PREP_V1_${period.key}_${bookId}`;
+  const raw = props.getProperty(key), pending = raw ? JSON.parse(raw) : null;
+  const published = ss.getSheetByName(period.name);
+  if (published) {
+    // The name becomes public only after configuration/validation. Never touch
+    // live transactions, formulas, settings overrides or row coordinates on retry.
+    if (pending && pending.sheetId && published.getSheetId() !== pending.sheetId) throw new Error(`Prepared month identity changed: ${period.key}`);
+    if (pending && pending.phase !== "ready") props.setProperty(key, JSON.stringify({...pending, phase: "ready"}));
+    return published;
+  }
+  if (pending?.phase === "ready") throw new Error(`Prepared month was removed or renamed: ${period.key}`);
+  const stageName = `_BookieBot Preparing ${period.key}`;
+  let sheet = ss.getSheetByName(stageName);
+  if (sheet && !pending) throw new Error(`Unclaimed preparation tab requires review: ${period.key}`);
+  if (pending?.sheetId && (!sheet || sheet.getSheetId() !== pending.sheetId)) throw new Error(`Preparation tab identity changed: ${period.key}`);
+  if (!pending) props.setProperty(key, JSON.stringify({phase: "creating", owner, bookId, month: period.key}));
+  if (!sheet) sheet = ss.insertSheet(stageName, {template: getMonthlyTemplateSheet(ss)});
+  sheet.hideSheet();
+  props.setProperty(key, JSON.stringify({phase: "configuring", owner, bookId, month: period.key, sheetId: sheet.getSheetId()}));
+  if (!setMonthLabel(sheet, period.name)) throw new Error(`Missing month label in preparation template: ${period.key}`);
+  if (owner) {
+    writePersonalBudgetIncomeSettings(sheet, resolvePersonalBudgetIncomeSettings(ss, period.name, false));
+    inheritPersonalBudgetIncomeSettings(ss, sheet, period.name);
+    const plan = resolvePersonalBudgetSavingsPlan(ss, period.name, false);
+    if (plan) writePersonalBudgetSavingsPlan(sheet, plan, period.year, false, period.name);
+    updatePersonalBudgetImportRanges(sheet, config.sharedExpensesId, period.name, owner);
+  }
+  SpreadsheetApp.flush();
+  validatePreparedBudgetMonthTab(sheet, config, period, owner);
+  // Flush and validate before publishing the canonical name. If the rename
+  // commits but its response is lost, the pinned sheet ID makes retry read-only.
+  sheet.showSheet();
+  sheet.setName(period.name);
+  props.setProperty(key, JSON.stringify({phase: "ready", owner, bookId, month: period.key, sheetId: sheet.getSheetId()}));
+  return sheet;
+}
 
-  const yearConfig = getOrCreateYearFiles(year);
+function validatePreparedBudgetMonthTab(sheet, config, period, owner) {
+  if (!findCellByAnyExactTextInTopLeft(sheet, [period.name])) throw new Error(`Prepared month label is missing: ${period.key}`);
+  if (!owner) {
+    if (sheet.getMaxColumns() < 40) throw new Error("Shared template is missing required expense columns.");
+    return;
+  }
+  if (!hasPersonalBudgetIncomeSettings(sheet) || !findPersonalBudgetIncomeLayout(sheet) || !findCellByExactText(sheet, "Monthly Income:")) throw new Error("Prepared personal income layout is incomplete.");
+  for (const rule of PERSONAL_BUDGET_IMPORT_RULES[owner]) {
+    const label = findCellByExactText(sheet, rule.label);
+    const expected = `=IMPORTRANGE("${buildSpreadsheetUrl(config.sharedExpensesId)}", "${buildSheetRangeReference(period.name, rule.sharedExpenseCell)}")`;
+    if (!label || label.offset(0, rule.targetColumnOffsetFromLabel).getFormula() !== expected) throw new Error(`Prepared import is incomplete: ${rule.label}`);
+    const displayed = label.offset(0, rule.targetColumnOffsetFromLabel).getDisplayValue().trim();
+    if (displayed.startsWith("#") || /^loading/i.test(displayed)) throw new Error(`Prepared import is still unavailable: ${rule.label}`);
+  }
+}
 
-  ensureMonthExistsInSharedExpenses(yearConfig.sharedExpensesId, monthName);
+/** Close only a prior calendar month; never called from advance preparation. */
+function closePreviousBudgetMonthAt(today) {
+  const period = budgetMonthPeriod(today, -1), config = getYearConfig(period.year);
+  if (!config) {
+    Logger.log(`No configured prior year for closing ${period.key}; no close recorded.`);
+    return;
+  }
+  const props = PropertiesService.getScriptProperties(), failures = [];
+  for (const owner of ["brian", "hannah"]) {
+    const bookId = config[`${owner}BudgetId`], key = `BUDGET_MONTH_CLOSED_V1_${period.key}_${bookId}`;
+    if (props.getProperty(key)) continue;
+    try {
+      const ss = SpreadsheetApp.openById(bookId);
+      if (!ss.getSheetByName(period.name)) {
+        Logger.log(`No existing ${owner} month ${period.key} to close; no close recorded.`);
+        continue;
+      }
+      snapshotPersonalBudgetMonthOutputs(bookId, period.name, owner, true);
+      SpreadsheetApp.flush();
+      // Per-cell freezing already skips static values. A partial/uncertain write
+      // resumes remaining formulas; mark the owner complete only after success.
+      props.setProperty(key, "closed");
+    } catch (error) { failures.push(error); }
+  }
+  if (failures.length) throw failures[0];
+}
 
-  ensureMonthExistsInPersonalBudget(
-    yearConfig.brianBudgetId,
-    yearConfig.sharedExpensesId,
-    monthName,
-    "brian",
-  );
-
-  ensureMonthExistsInPersonalBudget(
-    yearConfig.hannahBudgetId,
-    yearConfig.sharedExpensesId,
-    monthName,
-    "hannah",
-  );
+/** Install after deploying this source. Create replacements before removing old
+ * clocks, so an interrupted install cannot leave the project without a timer. */
+function installBudgetRolloverTriggers() {
+  return withBudgetRolloverLock(() => {
+    const handlers = ["prepareBudgetMonths", "budgetSystemRollover"];
+    const previous = ScriptApp.getProjectTriggers().filter(trigger => handlers.includes(trigger.getHandlerFunction()) && trigger.getEventType() === ScriptApp.EventType.CLOCK);
+    const created = [];
+    for (const [handler, hour] of [["prepareBudgetMonths", 20], ["budgetSystemRollover", 1]]) {
+      created.push(ScriptApp.newTrigger(handler).timeBased().atHour(hour).everyDays(1).inTimezone(BUDGET_TIME_ZONE).create());
+    }
+    previous.forEach(trigger => ScriptApp.deleteTrigger(trigger));
+    Logger.log("Installed Pacific evening preparation and overnight close/recovery timers.");
+    return created.map(trigger => trigger.getUniqueId());
+  });
 }
 
 /***********************
@@ -245,6 +374,7 @@ function setupBudgetSystemAutomation() {
   budgetSystemRollover();
   relinkCurrentYearPersonalBudgetFormulas();
   installCurrentYearBudgetEditTriggers();
+  installBudgetRolloverTriggers();
 
   Logger.log("Budget System automation setup complete.");
 }
@@ -335,8 +465,10 @@ function relinkCurrentYearPersonalBudgetFormulas() {
  * keep recalculating after the month closes.
  */
 function snapshotPreviousMonthOutputs() {
-  seedKnown2026ConfigIfMissing();
-  snapshotPreviousMonthPersonalBudgetOutputs(new Date());
+  return withBudgetRolloverLock(() => {
+    seedKnown2026ConfigIfMissing();
+    closePreviousBudgetMonthAt(new Date());
+  });
 }
 
 function snapshotPreviousMonthPersonalBudgetOutputs(today) {
@@ -369,6 +501,7 @@ function snapshotPersonalBudgetMonthOutputs(
   personalBudgetSpreadsheetId,
   monthName,
   ownerName,
+  strict = false,
 ) {
   const ss = SpreadsheetApp.openById(personalBudgetSpreadsheetId);
   const sheet = ss.getSheetByName(monthName);
@@ -383,7 +516,7 @@ function snapshotPersonalBudgetMonthOutputs(
   let snapshotCount = 0;
 
   PERSONAL_BUDGET_SNAPSHOT_LABELS.forEach(function (rule) {
-    if (snapshotPersonalBudgetFormulaOutput(sheet, rule)) {
+    if (snapshotPersonalBudgetFormulaOutput(sheet, rule, strict)) {
       snapshotCount += 1;
     }
   });
@@ -395,13 +528,14 @@ function snapshotPersonalBudgetMonthOutputs(
   return snapshotCount;
 }
 
-function snapshotPersonalBudgetFormulaOutput(sheet, rule) {
+function snapshotPersonalBudgetFormulaOutput(sheet, rule, strict = false) {
   const labelCell =
     rule.searchMode === "contains"
       ? findCellContainingText(sheet, rule.label)
-      : findCellByExactText(sheet, rule.label);
+      : [rule.label, ...(rule.aliases || [])].map(label => findCellByExactText(sheet, label)).find(Boolean);
 
   if (!labelCell) {
+    if (strict) throw new Error(`Missing closing label: ${rule.label}`);
     Logger.log(
       `Could not find snapshot label "${rule.label}" on sheet "${sheet.getName()}".`,
     );
@@ -462,6 +596,10 @@ function snapshotFormulaCellValue(cell, label) {
   const value = cell.getValue();
   const displayValue = cell.getDisplayValue();
 
+  if (value === "" || value === null || (typeof value === "string" && value.trim().startsWith("#")) || (typeof value === "number" && !Number.isFinite(value))) {
+    throw new Error(`Summary is not ready to close: ${label}`);
+  }
+
   cell.setValue(value);
 
   Logger.log(
@@ -489,38 +627,39 @@ function getOrCreateYearFiles(year) {
 }
 
 function createYearFilesFromTemplates(year) {
+  if (!Number.isInteger(year) || year < 2026 || year > 2100) throw new Error("Invalid budget year.");
   const budgetRootFolder = DriveApp.getFolderById(BUDGET_SYSTEM_FOLDER_ID);
   const yearFolder = getOrCreateChildFolder(budgetRootFolder, String(year));
-
-  const brianBudgetFile = DriveApp.getFileById(
-    TEMPLATE_IDS.brianBudget,
-  ).makeCopy(`Brian Budget ${year}`, yearFolder);
-
-  const hannahBudgetFile = DriveApp.getFileById(
-    TEMPLATE_IDS.hannahBudget,
-  ).makeCopy(`Hannah Budget ${year}`, yearFolder);
-
-  const sharedExpensesFile = DriveApp.getFileById(
-    TEMPLATE_IDS.sharedExpenses,
-  ).makeCopy(`Shared Expenses ${year}`, yearFolder);
-
-  const config = {
-    year: year,
-    brianBudgetId: brianBudgetFile.getId(),
-    hannahBudgetId: hannahBudgetFile.getId(),
-    sharedExpensesId: sharedExpensesFile.getId(),
-  };
-
-  initializeNewYearFiles(config);
-
+  const props = PropertiesService.getScriptProperties(), key = `BUDGET_YEAR_PREP_V1_${year}`;
+  let pending = JSON.parse(props.getProperty(key) || "null") || {year};
+  for (const [kind, title] of [["brianBudget", "Brian Budget"], ["hannahBudget", "Hannah Budget"], ["sharedExpenses", "Shared Expenses"]]) {
+    const idKey = `${kind}Id`, name = `${title} ${year}`;
+    if (pending[idKey]) continue;
+    const matches = yearFolder.getFilesByName(name), files = [];
+    while (matches.hasNext()) files.push(matches.next());
+    if (files.length > 1 || (files.length && pending.copying !== kind)) throw new Error(`Unclaimed or duplicate annual file requires review: ${name}`);
+    // Persist intent before copying. A lost makeCopy response is recovered by
+    // this exact name in this exact year folder, rather than copying it again.
+    pending.copying = kind;
+    props.setProperty(key, JSON.stringify(pending));
+    const file = files[0] || DriveApp.getFileById(TEMPLATE_IDS[kind]).makeCopy(name, yearFolder);
+    if (file.getMimeType() !== "application/vnd.google-apps.spreadsheet") throw new Error("Annual template is not a spreadsheet.");
+    pending[idKey] = file.getId();
+    delete pending.copying;
+    props.setProperty(key, JSON.stringify(pending));
+  }
+  const config = {year, brianBudgetId: pending.brianBudgetId, hannahBudgetId: pending.hannahBudgetId, sharedExpensesId: pending.sharedExpensesId};
+  initializeNewYearFiles(config, pending, key);
+  prepareBudgetMonthTabs(config, {year, month: 1, name: "January", key: `${year}-01`});
   installBudgetEditTriggersForYearConfig(config, year);
-
+  // getOrCreateYearFiles publishes YEAR_CONFIG only after every preceding step.
   return config;
 }
 
-function initializeNewYearFiles(config) {
+function initializeNewYearFiles(config, pending = null, pendingKey = null) {
   const previousConfig = getYearConfig(config.year - 1);
   for (const key of ["brianBudgetId", "hannahBudgetId"]) {
+    if (pending?.[`${key}Initialized`]) continue;
     const ss = SpreadsheetApp.openById(config[key]);
     const settings = previousConfig
       ? resolvePersonalBudgetIncomeSettings(SpreadsheetApp.openById(previousConfig[key]), "December", true)
@@ -530,7 +669,15 @@ function initializeNewYearFiles(config) {
       ? resolvePersonalBudgetSavingsPlan(SpreadsheetApp.openById(previousConfig[key]), "December", true)
       : readPersonalBudgetSavingsPlan(getMonthlyTemplateSheet(ss));
     if (priorSavings) writePersonalBudgetSavingsPlan(getMonthlyTemplateSheet(ss), priorSavings, config.year);
+    if (pending) {
+      SpreadsheetApp.flush();
+      pending[`${key}Initialized`] = true;
+      PropertiesService.getScriptProperties().setProperty(pendingKey, JSON.stringify(pending));
+    }
   }
+  // Legacy/manual callers retain their established initialization behavior.
+  // The checkpointed annual path publishes only validated staging tabs.
+  if (pending) return;
   ensureMonthExistsInSharedExpenses(config.sharedExpensesId, "January");
 
   ensureMonthExistsInPersonalBudget(
@@ -853,7 +1000,7 @@ function preflightPersonalBudgetSavingsPlan(sheet) {
   return {income, total, savings, budget, summary, label, amount};
 }
 
-function writePersonalBudgetSavingsPlan(sheet, plan, explicitYear, recordedWithholding = false) {
+function writePersonalBudgetSavingsPlan(sheet, plan, explicitYear, recordedWithholding = false, explicitMonthName = null) {
   preflightPersonalBudgetSavingsPlan(sheet);
   const year = Number(explicitYear || /\b(20\d{2})\b/.exec(sheet.getParent().getName())?.[1]);
   if (!year) throw new Error("Cannot determine the budget year.");
@@ -886,7 +1033,7 @@ function writePersonalBudgetSavingsPlan(sheet, plan, explicitYear, recordedWithh
     return `INDEX(${letter}:${letter},ROW(${headerRef})+1):INDEX(${letter}:${letter},ROW(${totalRef})-1)`;
   };
   const amounts=range(income.amountColumn), sources=range(income.sourceColumn), dates=range(income.dateColumn);
-  const month=Math.max(0,MONTH_NAMES.indexOf(sheet.getName()))+1;
+  const month=Math.max(0,MONTH_NAMES.indexOf(explicitMonthName || sheet.getName()))+1;
   const start=`DATE(${year},${month},1)`, end=`EOMONTH(${start},0)`;
   const received=`IFERROR(IF(ISNUMBER(${dates}),${dates},DATEVALUE(${dates})),0)`;
   const inline=inlineSavingsEnrollmentLayout(sheet);
@@ -1043,11 +1190,33 @@ function inheritPersonalBudgetIncomeSettings(ss, sheet, monthName) {
   const tab = previous.getName().replace(/'/g, "''");
   // References keep already-created future tabs in sync. Replacing a formula
   // with a value is an explicit override that later rollovers leave alone.
-  sheet.getRange("B5:E5").setFormulas([["B", "C", "D", "E"].map(column => {
+  const formulas = [["B", "C", "D", "E"].map(column => {
     const ref = `'${tab}'!${column}5`;
     const inherited = `IF(${ref}="","",${ref})`;
     return column === "D" || column === "E" ? `=IF($B$5='${tab}'!B5,${inherited},"")` : `=${inherited}`;
-  })]);
+  })];
+  // Sheets can defer validation errors until a later read. Commit inheritance
+  // without input validators, then restore them after the formulas calculate.
+  const range = sheet.getRange("B5:E5");
+  const validations = range.getDataValidations();
+  let writeError;
+  try {
+    range.clearDataValidations();
+    SpreadsheetApp.flush();
+    range.setFormulas(formulas);
+    SpreadsheetApp.flush();
+  } catch (error) {
+    writeError = error;
+    throw error;
+  } finally {
+    try {
+      range.setDataValidations(validations);
+      SpreadsheetApp.flush();
+    } catch (validationError) {
+      if (!writeError) throw validationError;
+      Logger.log(`Could not restore income settings validation on ${sheet.getName()}: ${validationError}`);
+    }
+  }
 }
 
 function shiftedPersonalBudgetAction(action, rowsAdded, firstRow = 4) {
@@ -1723,14 +1892,15 @@ function removeEditTriggersForSpreadsheet(
 
 function getYear(date) {
   return Number(
-    Utilities.formatDate(date, Session.getScriptTimeZone(), "yyyy"),
+    Utilities.formatDate(date, BUDGET_TIME_ZONE, "yyyy"),
   );
 }
 
 function getMonthName(date) {
-  return Utilities.formatDate(date, Session.getScriptTimeZone(), "MMMM");
+  return Utilities.formatDate(date, BUDGET_TIME_ZONE, "MMMM");
 }
 
 function getPreviousMonthDate(date) {
-  return new Date(date.getFullYear(), date.getMonth() - 1, 1);
+  const period = budgetMonthPeriod(date, -1);
+  return new Date(Date.UTC(period.year, period.month - 1, 1, 12));
 }

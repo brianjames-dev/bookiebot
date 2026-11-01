@@ -43,6 +43,8 @@ class Sheet {
       setFormula: value => range.setValue(value),
       clear: () => range.setValues(Array.from({length:height}, () => Array(width).fill(''))),
       setDataValidation: rule => { this.validations[a1] = rule; return range; },
+      getDataValidations: () => this.validations[a1] ?? [[{fixture:'existing validator'}]],
+      setDataValidations: rules => { this.validations[a1] = rules; return range; },
     };
     for (const name of ['clearDataValidations','setFontFamily','setFontSize','setVerticalAlignment','setHorizontalAlignment','setBorder','setBackground','setFontColor','setFontWeight','setNumberFormat','setNote','clearNote','setWrap']) range[name] = () => range;
     return range;
@@ -55,6 +57,7 @@ const book = sheets => {
   return result;
 };
 const ctx = vm.createContext({ console, SpreadsheetApp: {
+  flush() {},
   BorderStyle: { SOLID: 'solid' },
   newDataValidation() {
     const rule = {};
@@ -106,6 +109,14 @@ assert.ok(october.sheet.validations.C5.requireValueInList);
 assert.ok(october.sheet.formulas['B5:E5'][0][0].includes("'September'!B5"));
 assert.equal(october.sheet.getRange('C14').getValues()[0][0],automaticLoanFormula);
 assert.equal(october.sheet.getRange('D14').getValues()[0][0],automaticLoanIndicator);
+// Preserve the live workaround: formula inheritance must temporarily remove
+// validators, flush calculation, and restore them even on a failed write.
+const validationSteps=[],originalValidators=[[{kind:'date'}]];
+const rejectedRange={getDataValidations:()=>originalValidators,clearDataValidations:()=>validationSteps.push('clear'),
+  setFormulas:()=>{validationSteps.push('formula');throw Error('fixture formula rejected');},
+  setDataValidations:value=>{assert.equal(value,originalValidators);validationSteps.push('restore');}};
+assert.throws(()=>ctx.inheritPersonalBudgetIncomeSettings(ss,{getName:()=> 'October',getRange:()=>rejectedRange},'October'),/formula rejected/);
+assert.deepEqual(validationSteps,['clear','formula','restore']);
 september.getRange('D5').setValue(6500);
 assert.equal(ctx.readPersonalBudgetIncomeSettings(october.sheet).amount,6500);
 october.sheet.getRange('D5').setValue(7000);
@@ -197,6 +208,11 @@ const november = ctx.ensureMonthExistsInPersonalBudget('personal','shared','Nove
 assert.equal(ctx.readPersonalBudgetSavingsPlan(november.sheet).enrollments[0][2],'xAI');
 assert.equal(ctx.readPersonalBudgetSavingsPlan(november.sheet).enrollments[0][3],.05);
 assert.ok(november.sheet.rows.flat().some(value => typeof value === 'string' && value.includes('DATE(2026,11,1)')));
+// Staging has a non-month name; formulas still bind the intended target period.
+const staged = budgetSheet('_BookieBot Preparing 2026-11');
+staged.book=planBook;
+ctx.writePersonalBudgetSavingsPlan(staged,ctx.readPersonalBudgetSavingsPlan(enrolledOctober),2026,false,'November');
+assert.ok(staged.rows.flat().some(value => typeof value === 'string' && value.includes('DATE(2026,11,1)')));
 assert.equal(ctx.readPersonalBudgetSavingsPlan(planTemplate),null);
 assert.equal(ctx.readPersonalBudgetSavingsPlan(hannahNew.getSheetByName('Template')),null);
 const planAnnual = book({Template:budgetSheet('Template')});

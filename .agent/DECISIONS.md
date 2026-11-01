@@ -1,5 +1,29 @@
 # Agent Decisions
 
+## 2026-11-01 - Prepare Months Before Midnight And Close Separately
+
+The November outage was a readiness gap: app month selection changed at midnight,
+while the existing daily Apps Script rollover ran between 1–2 AM. Prepare the
+upcoming month during the last seven Pacific calendar days, with an 8–9 PM retry;
+retain the overnight entry point for recovery and separate prior-month closing.
+The user explicitly authorized implementation and live rollout after investigation.
+
+Configure and validate hidden deterministic staging tabs before publishing month
+names. Pin copy identities/phases in private Script Properties; retries must
+preserve published tabs, overrides and transaction coordinates. Serialize automation
+entry points with a script lock without claiming to lock separate bot/human writes.
+Track prior-month closing per owner after successful flush; resume unfrozen cells
+and refuse blank/error formula outputs. Checkpoint annual file IDs/initialization
+before publishing year configuration. Preserve the deployed income-validation
+workaround and all source/template art/data outside this workflow.
+
+This adds no provisioning to report GETs and no new financial calculations or
+transaction import. Income settings keep existing forward references; ESPP plans
+are copied when prepared and each published month retains its own overrides.
+Existing annual service-account sharing, app year-ID registration and IMPORTRANGE
+authorization remain an explicit operational handoff before January. See
+`docs/BUDGET_ROLLOVER.md` for state, recovery and acceptance.
+
 ## 2026-10-31 - Publish Approved Circle Artwork Without Reframing
 
 The user approved all 89 revised logo treatments. Promote the exact audited 256px

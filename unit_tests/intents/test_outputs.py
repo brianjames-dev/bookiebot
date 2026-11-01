@@ -1,6 +1,7 @@
 import asyncio
 import contextlib
 from dataclasses import dataclass
+from datetime import datetime
 from typing import Callable, Optional
 
 from openpyxl.utils import column_index_from_string
@@ -446,7 +447,21 @@ SCENARIOS = [
 ]
 
 
-def test_intent_scenarios(llm_client_factory):
+def test_intent_scenarios(llm_client_factory, monkeypatch):
+    from bookiebot.sheets.routing import now_pacific
+    from bookiebot.sheets import utils as sheet_utils
+    from unit_tests.support import fixture_loader
+
+    # This scenario's "yesterday" grocery is expected inside "this month".
+    # Anchor fixture construction and query time together so that contract also
+    # runs on the first day of a month and under UTC CI / Pacific development.
+    anchor = now_pacific().replace(day=15, hour=12, minute=0, second=0, microsecond=0)
+    class ScenarioClock(datetime):
+        @classmethod
+        def now(cls, tz=None):
+            return anchor.astimezone(tz) if tz is not None else anchor.replace(tzinfo=None)
+    monkeypatch.setattr(fixture_loader, "datetime", ScenarioClock)
+    monkeypatch.setattr(sheet_utils, "get_local_today", lambda: anchor)
     for case in SCENARIOS:
         repo = build_repo_from_fixture(case.sheet_fixture) if case.sheet_fixture else None
         llm_client = llm_client_factory(case.llm_fixture)
