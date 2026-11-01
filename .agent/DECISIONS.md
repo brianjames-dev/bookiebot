@@ -1,5 +1,29 @@
 # Agent Decisions
 
+## 2026-11-01 - Select Bill Comparisons And Shorten The Shared Stage
+
+Implement the approved lower ribbon: 32px pills, 9px side padding, 8px gaps,
+amounts, 30% dimmed lines and independent native horizontal overflow. Pill taps
+only highlight; the top-right dialog controls visibility with Cancel/Done.
+Persist selected IDs per owner/device, retaining empty and temporarily absent
+choices. New candidates stay off after first initialization. No sheet settings
+or financial state change.
+
+Expose recorded Rent/fixed-bill history separately as `billComparisonHistory`;
+never expand canonical `utilityHistory` or utility totals. Existing calendar
+subscriptions can be current-month-only candidates; never copy today's price
+backwards or chart a future estimate as recorded history. Month inspection
+retains exact values and positive prior-month averages without incorrectly
+attaching today's due date to historical points. Onboarding/manual bill entry
+remain future work.
+
+The user now authorizes removing excess space across all four graph pages.
+Use one `clamp(460px, 56vh, 580px)` body, unchanged 64px moving heading and 24px
+bottom padding. Drop Category Mix's empty 42px former-footer row, retain Burn
+Rate's 280px plot ceiling/accepted popup lifecycle, and constrain both Calendar
+modes equally. Preserve native page/ribbon gesture ownership and fixed markers.
+Manual acceptance is checklist 229; Finance Ops backlog is unchanged.
+
 ## 2026-11-01 - Prepare Months Before Midnight And Close Separately
 
 The November outage was a readiness gap: app month selection changed at midnight,

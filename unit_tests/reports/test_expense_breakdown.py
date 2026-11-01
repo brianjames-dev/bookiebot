@@ -142,7 +142,7 @@ def test_top_chart_details_percent_and_calendar_markers_keep_stage_stable():
     burn_source = source.split("function BurnRateChart", 1)[1].split("function burnRateDailyPaceLabel", 1)[0]
     assert "<DetailsPanel" not in burn_source
     assert "<BurnRateMonthBalance" in burn_source
-    assert '<DetailsPanel summary="Details" collapseKey={collapseKey}>' in source.split(
+    assert '<DetailsPanel summary="Details" collapseKey={collapseKey}>' not in source.split(
         "function BillsUtilitiesPanel", 1
     )[1].split("function BillsUtilitiesChart", 1)[0]
     assert 'aria-label={calendarEventDescription(item)}' in calendar_source
@@ -162,7 +162,7 @@ def test_top_chart_pages_share_regions_lock_modals_and_show_complete_details():
 
     assert source.count("bb-chart-page-header") >= 4
     assert source.count("bb-chart-page-body") >= 4
-    assert source.count("bb-chart-page-footer") == 2
+    assert source.count("bb-chart-page-footer") == 1
     assert "panel.titleAccessory" not in carousel_source
     assert "panel.headerControl" not in carousel_source
     assert "useModalPageScrollLock(open)" in source
@@ -570,7 +570,9 @@ def test_build_expense_breakdown_report_aggregates_shared_and_personal_data():
     assert "Current view" not in html
     assert "Show category callouts" in html
     assert "Bill details" not in html
-    assert "bb-bill-history-dot" in html
+    assert "bb-bill-swatch" in html
+    assert "bb-bill-ribbon" in html
+    assert "bb-bill-history-dot" not in html
     assert "bb-chart-carousel-slide" in html
     assert "bb-cf-day" in html
     assert "data-bb-pie-layout-motion" in html
@@ -670,7 +672,8 @@ def test_build_expense_breakdown_report_aggregates_shared_and_personal_data():
     assert "bb-bills-analytics" in html
     assert "bb-bills-analytics-head" in html
     assert "bb-bills-chart-box" in html
-    assert "bb-bill-history-list" in html
+    assert "bb-bill-history-list" not in html
+    assert "bb-bill-picker" in html
     assert "width:fit-content" in html
     assert "bb-card-title-row" in html
     assert "All Shared Expense Transactions" not in html

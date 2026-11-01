@@ -172,7 +172,7 @@ Daily Discord digests show a configured expected amount even before a payment is
 
 An owner can explicitly choose optional `tracking_mode=automatic` for a fixed recurring expense with a positive `expected_amount`. Brian chose this for Student Loan: the current-month and internal Template amount cells link to the schedule, with the existing checkmark/star status formula. That visual indicator reflects a nonzero budget amount; the schedule mode controls automation. The existing Student Loan row counts once under Needs/Static Bills & Subscriptions, without adding a duplicate subscription or requiring monthly payment entry. This is an automatic budget expense, not bank-payment verification. Status commands explain automatic mode, and manual loan logging cannot overwrite its formula. Reminders use the fixed scheduled amount within the normal seven-day window and omit false unrecorded-overdue notices. Blank/`manual` tracking mode preserves the existing behavior; reads never activate automatic mode or fill budget cells.
 
-The loan remains a Needs **bill**, displayed under **Static Bills & Subscriptions** and in Calendar’s day details, with Scheduled/Recorded amount provenance. It is excluded from the variable Bills & Utilities trend chart. Burn Rate counts Food, Shopping and Wants subscriptions only; a Needs bill affects its Wants allowance through the existing category coverage rules, never by becoming Wants spending. Both canonical modes, report details and widgets preserve fixed bill amounts alongside subscription totals.
+The loan remains a Needs **bill**, displayed under **Static Bills & Subscriptions** and in Calendar’s day details, with Scheduled/Recorded amount provenance. It can be explicitly enabled in the Bills & Utilities comparison picker; this presentation choice does not move it into utility totals. Burn Rate counts Food, Shopping and Wants subscriptions only; a Needs bill affects its Wants allowance through the existing category coverage rules, never by becoming Wants spending. Both canonical modes, report details and widgets preserve fixed bill amounts alongside subscription totals.
 
 ## Bank Integration And Confirmed Imports
 
@@ -240,6 +240,10 @@ Live builds run outside the Discord event loop. `BOOKIEBOT_REPORT_MAX_CONCURRENT
 ### Calendar and company logos
 
 The Calendar graph opens to this week and next week, with a full-month toggle, approved color company logos, a dollar-sign Income fallback, separate daily incoming/outgoing amounts and day dialogs. See [Calendar and company logos](docs/CALENDAR_AND_LOGOS.md) for layout settings, the curated local 89-logo catalog, coverage rules and the import workflow.
+
+### Bill comparisons and compact graphs
+
+Bills & Utilities uses a compact scrolling ribbon below its history graph. Tap a pill to highlight that bill, tap it again or All to restore the other lines, and inspect graph months for exact values/prior averages. The top-right button opens visibility switches; Done saves choices for that user on this device across months and reopening. Utilities start selected; other recorded bills and current subscriptions are opt-in. Historical bill data is separate from financial totals; subscription prices are never copied into earlier months. All four shared graph pages now use a shorter common stage and 24px bottom spacing. See [Bill comparison](docs/BILL_COMPARISON.md).
 
 ## Verification
 

@@ -6,11 +6,11 @@ The Calendar graph uses the approved **Under calendar** design. Its sliding titl
 - The round calendar control switches to the selected full month. Both views occupy the same grid height. No All/Subs filter, event count, or separate Details button.
 - The date range sits immediately above outgoing. Daily outgoing and incoming use separate coral/mint whole-dollar capsules; they are never netted. Exact cents and Scheduled/Recorded provenance remain in the shared day dialog.
 - Two-week cells show approved color company logos, type icons for unknown/failed logos (a dollar sign for Income), and a `+N` control for overflow. Full month retains combined-color dots. Tapping a date, total, dot, logo, or overflow opens its applicable events.
-- The legend sits below the grid. Keep generous bottom breathing room, consistent with Category Mix and Burn Rate, while future shared-graph work reduces unnecessary height.
+- The legend sits below the grid, with the shared 24px bottom gap used by Category Mix, Burn Rate and Bills & Utilities.
 
 ## Layout and motion
 
-Code settings live in `web/expense-report/src/calendar-model.ts`: 26px logos, 22% stack overlap, 1.5px separation, 72px target month cells, 4px cell gaps and 104px bottom space. Two-week row heights derive from the corresponding 4/5/6-row month. On shorter screens the existing shared chart stage constrains both views equally; logo capacity adjusts to the available cell height. Other graphs' heights do not change.
+Code settings live in `web/expense-report/src/calendar-model.ts`: 26px logos, 22% stack overlap, 1.5px separation, 72px target month cells, 4px cell gaps and 24px bottom space. Two-week row heights derive from the corresponding 4/5/6-row month. The shorter common stage (`clamp(460px, 56vh, 580px)` plus its unchanged 64px title row) constrains both views equally; logo capacity adjusts to the available cell height. Category Mix no longer reserves an empty former-footer row, and Burn Rate retains its 280px plot ceiling.
 
 A logo and its small type dot share one masked layer. The next card cuts both, with hard, genuinely transparent gaps rather than a painted border or gradient. The logo's own dot uses another hard transparent cutout. View switches animate shared dates from their previous positions for 380ms; rapid toggles cancel the previous animation and Reduce Motion switches immediately. Native chart swipes still own finger tracking.
 

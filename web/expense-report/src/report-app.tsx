@@ -13,7 +13,8 @@ import {
   type RefObject,
 } from "react"
 import { createPortal } from "react-dom"
-import { ChevronDown, X } from "lucide-react"
+import { ChevronDown, SlidersHorizontal, X } from "lucide-react"
+import { billLabelKey, comparisonItems, priorBillAverage, useBillSelection } from "./bill-comparison"
 import { Popover } from "konsta/react"
 import { useCategoryContour, CategoryContourCallouts } from "./category-mix-contour"
 import { categoryCenterStyle, categoryRingSpring, CategoryRingCenterSync } from "./category-mix-motion"
@@ -306,6 +307,7 @@ function buildReportView(report: ExpenseReportData, projected: boolean): ReportV
       : report.burnRate,
     calendarEvents: calendarEventsForMode(report.calendarEvents),
     utilityHistory: report.utilityHistory,
+    billComparisonHistory: report.billComparisonHistory,
   }
 }
 
@@ -786,7 +788,9 @@ const OverviewCharts = memo(function OverviewCharts({ report, activeReport, char
       title: "Bills & Utilities",
       content: (
         <MemoizedBillsUtilitiesPanel
-          items={activeReport.utilityHistory}
+          items={activeReport.billComparisonHistory?.length ? activeReport.billComparisonHistory : activeReport.utilityHistory}
+          utilities={activeReport.utilityHistory}
+          owner={report.ownerName}
           events={activeReport.calendarEvents}
           year={report.year}
           month={report.month}
@@ -1017,7 +1021,7 @@ function ActivityDetails({entries, total, note, colors}: {entries:ReportActivity
 
 function isInteractiveTouchTarget(target: EventTarget | null) {
   if (!(target instanceof Element)) return false
-  if (target.closest("a, input, select, textarea, summary, dialog, [role='dialog']")) return true
+  if (target.closest("a, input, select, textarea, summary, dialog, [role='dialog'], .bb-bill-ribbon")) return true
   const control = target.closest("button, [role='button'], [role='tab']")
   // Plot buttons still tap normally, but can also begin a graph swipe.
   return Boolean(control && !control.closest(".bb-chart-page-body"))
@@ -3235,6 +3239,8 @@ function CalendarAnalyticsPanel({ year, month, events, context, aliases, project
 
 function BillsUtilitiesPanel({
   items,
+  utilities = items,
+  owner = "",
   events,
   year,
   month,
@@ -3242,36 +3248,76 @@ function BillsUtilitiesPanel({
   collapseKey,
 }: {
   items: UtilityHistoryItem[]
+  utilities?: UtilityHistoryItem[]
+  owner?: string
   events: CalendarEvent[]
   year: number
   month: number
   projected: boolean
   collapseKey: number
 }) {
-  const billEvents = billsUtilitiesEvents(events)
-  const currentTotal = billsUtilitiesPanelTotal(items, billEvents, projected)
+  const choices = useMemo(() => comparisonItems(items, events, month, projected), [items, events, month, projected])
+  const defaultNames = new Set([...utilities.map(item => billLabelKey(item.label)), ...billsUtilitiesEvents(events).map(event => billLabelKey(event.label))])
+  const defaults = choices.filter(item => defaultNames.has(billLabelKey(item.label))).map(item => item.key)
+  const [selected, setSelected] = useBillSelection(owner, defaults)
+  const [highlighted, setHighlighted] = useState<string | null>(null)
+  const [pending, setPending] = useState<string[] | null>(null)
+  const [pickerCloseKey, setPickerCloseKey] = useState(0)
+  const [overflow, setOverflow] = useState({ left: false, right: false })
+  const ribbonRef = useRef<HTMLDivElement>(null)
+  const visible = choices.filter(item => selected.includes(item.key))
+  const focus = visible.some(item => item.key === highlighted) ? highlighted : null
+  const colors = Object.fromEntries(choices.map((item, index) => [item.key, chartColor(index)]))
+  const currentTotal = roundCurrency(visible.reduce((sum, item) => sum + item.currentAmount, 0))
+  const updateOverflow = () => {
+    const node = ribbonRef.current
+    if (!node) return
+    const left = node.scrollLeft > 4, right = node.scrollWidth - node.clientWidth - node.scrollLeft > 4
+    setOverflow(current => current.left === left && current.right === right ? current : { left, right })
+  }
+  useLayoutEffect(() => {
+    const node = ribbonRef.current
+    if (!node) return
+    updateOverflow()
+    const observer = new ResizeObserver(updateOverflow)
+    observer.observe(node)
+    return () => observer.disconnect()
+  }, [choices, selected])
+  const closePicker = () => setPickerCloseKey(current => current + 1)
 
   return (
     <div className="bb-bills-analytics bb-chart-page">
       <div className="bb-panel-head bb-bills-analytics-head bb-chart-page-header">
         <div>
-          <div className="bb-chart-kicker">Bills & Utilities</div>
-          <div className="bb-chart-total">{formatMoney(currentTotal)}</div>
-          <div className="bb-chart-mode-note">{projected ? "Projected" : "Current"}</div>
+          <div className="bb-category-summary-label"><span className="bb-chart-kicker">Selected bills</span><span className="bb-chart-mode-note">{projected ? "Projected" : "Current"}</span></div>
+          <FittedAmount className="bb-chart-total">{visible.length ? formatMoney(currentTotal) : "—"}</FittedAmount>
         </div>
-        <Badge variant="secondary">{items.length} tracked</Badge>
+        <div className="bb-bill-controls">
+          <button type="button" className="bb-bill-manage" aria-label="Manage visible bills" aria-haspopup="dialog" onClick={() => setPending([...selected])}><SlidersHorizontal aria-hidden="true" /><span>{visible.length} {visible.length === 1 ? "bill" : "bills"}</span></button>
+          <ModalDetails summary="Choose bills" title="Bills & utilities" triggerHidden selection={pending ? "bill-picker" : null} collapseKey={collapseKey + pickerCloseKey} onDismiss={() => setPending(null)}>
+            <div className="bb-bill-picker">
+              <p>{choices.filter(item => pending?.includes(item.key)).length} visible on graph</p>
+              {choices.length ? choices.map(item => <label className="bb-bill-option" key={item.key}>
+                <i className="bb-bill-swatch" style={{ background: colors[item.key] }} aria-hidden="true" />
+                <span>{item.label}<small>{item.history.some(point => point.month < month && point.amount !== null) ? "Recorded history" : "Current month only"}</small></span>
+                <strong>{formatMoney(item.currentAmount)}</strong>
+                <input type="checkbox" role="switch" aria-label={`Show ${item.label} on graph`} checked={pending?.includes(item.key) ?? false} onChange={event => setPending(current => event.target.checked ? [...(current ?? []), item.key] : (current ?? []).filter(key => key !== item.key))} />
+              </label>) : <p>No bills or subscriptions found for this month.</p>}
+              <div className="bb-bill-picker-actions"><button type="button" onClick={closePicker}>Cancel</button><button type="button" onClick={() => { if (pending) setSelected(pending); closePicker() }}>Done</button></div>
+            </div>
+          </ModalDetails>
+        </div>
       </div>
-      {!items.length ? (
-        <div className="bb-empty bb-chart-page-body">No bill history found.</div>
+      {!visible.length ? (
+        <div className="bb-empty bb-chart-page-body">{choices.length ? "Choose bills to compare." : "No bill history found."}</div>
       ) : (
-        <BillsUtilitiesChart items={items} billEvents={billEvents} year={year} month={month} />
+        <BillsUtilitiesChart items={visible} billEvents={events} year={year} month={month} highlighted={focus} colors={colors} />
       )}
-      <div className="bb-chart-page-footer">
-        {items.length ? (
-          <DetailsPanel summary="Details" collapseKey={collapseKey}>
-            <BillsUtilitiesSummary items={items} />
-          </DetailsPanel>
-        ) : null}
+      <div className="bb-bill-ribbon-shell" data-left={overflow.left} data-right={overflow.right}>
+        <div className="bb-bill-ribbon" ref={ribbonRef} onScroll={updateOverflow} aria-label="Bill highlight pills; scroll horizontally">
+          <button type="button" className="bb-bill-pill" aria-label="Highlight all visible bills" aria-pressed={!focus} onClick={() => setHighlighted(null)}>All</button>
+          {visible.map(item => <button type="button" className="bb-bill-pill" key={item.key} aria-label={`Highlight ${item.label} line`} aria-pressed={focus === item.key} onClick={() => setHighlighted(current => current === item.key ? null : item.key)}><span className="bb-bill-pill-name"><i className="bb-bill-swatch" style={{ background: colors[item.key] }} aria-hidden="true" />{item.label}</span><span className="bb-bill-pill-amount">{formatMoney(item.currentAmount)}</span></button>)}
+        </div>
       </div>
     </div>
   )
@@ -3282,31 +3328,39 @@ function BillsUtilitiesChart({
   billEvents,
   year,
   month,
+  highlighted = null,
+  colors,
 }: {
   items: UtilityHistoryItem[]
   billEvents: CalendarEvent[]
   year: number
   month: number
+  highlighted?: string | null
+  colors?: Record<string, string>
 }) {
   const rows = utilityHistoryChartRows(items)
   const eventByLabel = billEventByLabel(billEvents)
+  const focused = items.find(item => item.key === highlighted)
 
   return (
-    <ChartContainer config={utilityHistoryChartConfig(items)} className="bb-bills-chart-box bb-chart-page-body">
+    <ChartContainer config={Object.fromEntries(items.map((item, index) => [item.key, {label: item.label, color: colors?.[item.key] ?? chartColor(index)}]))} className="bb-bills-chart-box bb-chart-page-body">
+      {focused && !focused.history.some(point => point.amount !== null) && <span className="bb-bill-history-empty" role="status">No recorded history for {focused.label} yet.</span>}
       <ResponsiveContainer width="100%" height="100%">
         <LineChart data={rows} margin={{ top: 12, right: 20, left: 0, bottom: 6 }}>
           <CartesianGrid vertical={false} strokeDasharray="3 3" />
-          <XAxis dataKey="label" tickLine={false} axisLine={false} />
+          <XAxis dataKey="label" tickLine={false} axisLine={false} minTickGap={24} />
           <YAxis tickFormatter={(value) => `$${value}`} tickLine={false} axisLine={false} width={54} />
-          <ChartTooltip content={<BillsUtilitiesTooltipContent eventByLabel={eventByLabel} year={year} month={month} />} />
+          <ChartTooltip content={<BillsUtilitiesTooltipContent eventByLabel={eventByLabel} items={items} highlighted={highlighted} year={year} month={month} />} />
           {items.map((item, index) => (
             <Line
               key={item.key}
               type="monotone"
               dataKey={item.key}
               name={item.label}
-              stroke={chartColor(index)}
-              strokeWidth={2.5}
+              stroke={colors?.[item.key] ?? chartColor(index)}
+              className={highlighted && highlighted !== item.key ? "bb-bill-line-dim" : ""}
+              strokeWidth={highlighted === item.key ? 3.5 : 2.5}
+              strokeDasharray={index >= 5 ? "5 4" : undefined}
               connectNulls
               dot={{ r: 3 }}
               activeDot={{ r: 5 }}
@@ -3325,17 +3379,6 @@ function billsUtilitiesEvents(events: CalendarEvent[]) {
   return events.filter((item) => item.kind === "bill" && item.group === "bills_utilities")
 }
 
-function billsUtilitiesPanelTotal(items: UtilityHistoryItem[], events: CalendarEvent[], projected: boolean) {
-  if (events.length) {
-    return roundCurrency(
-      events
-        .filter((item) => projected || !item.projectedOnly)
-        .reduce((sum, item) => sum + item.amount, 0),
-    )
-  }
-  return roundCurrency(items.reduce((sum, item) => sum + item.currentAmount, 0))
-}
-
 function billEventByLabel(events: CalendarEvent[]) {
   return new Map(events.map((event) => [normalizeChartLabel(event.label), event]))
 }
@@ -3344,6 +3387,7 @@ type BillsUtilitiesTooltipPayload = {
   name?: string | number
   value?: string | number | null
   color?: string
+  dataKey?: string | number
   payload?: Record<string, string | number>
 }
 
@@ -3351,27 +3395,35 @@ function BillsUtilitiesTooltipContent({
   active,
   payload,
   eventByLabel,
+  items,
+  highlighted,
   year,
   month,
 }: {
   active?: boolean
   payload?: BillsUtilitiesTooltipPayload[]
   eventByLabel: Map<string, CalendarEvent>
+  items: UtilityHistoryItem[]
+  highlighted: string | null
   year: number
   month: number
 }) {
-  const rows = (payload ?? []).filter((item) => item.value !== null && item.value !== undefined)
+  const rows = (payload ?? []).filter((item) => item.value !== null && item.value !== undefined && (!highlighted || item.dataKey === highlighted))
   if (!active || !rows.length) {
     return null
   }
   const title = String(rows[0]?.payload?.label ?? "Bills")
+  const inspectedMonth = Number(rows[0]?.payload?.month ?? month)
+  const selectedBill = items.find(item => item.key === highlighted)
+  const average = selectedBill ? priorBillAverage(selectedBill, inspectedMonth) : null
+  const delta = average === null ? null : Number(rows[0]?.value) - average
 
   return (
     <div className="bb-chart-tooltip bb-touch-tooltip-content">
       <div className="bb-chart-tooltip-title">{title}</div>
       {rows.map((item, index) => {
         const name = String(item.name ?? "")
-        const event = eventByLabel.get(normalizeChartLabel(name))
+        const event = inspectedMonth === month ? eventByLabel.get(normalizeChartLabel(name)) : undefined
         return (
           <div className="bb-chart-tooltip-row" key={`${name}-${item.value}-${index}`}>
             <span className="bb-chart-tooltip-dot" style={{ background: item.color }} />
@@ -3383,6 +3435,7 @@ function BillsUtilitiesTooltipContent({
           </div>
         )
       })}
+      {average !== null && <div className="bb-bill-tooltip-average"><span>Prior average <strong>{formatMoney(average)}</strong></span><span className={delta! > 0 ? "bb-negative" : "bb-positive"}>{delta! > 0 ? "+" : ""}{formatMoney(delta!)} vs average</span></div>}
     </div>
   )
 }
@@ -3426,41 +3479,8 @@ function utilityHistoryChartRows(items: UtilityHistoryItem[]) {
     .map(([, row]) => row)
 }
 
-function utilityHistoryChartConfig(items: UtilityHistoryItem[]) {
-  return Object.fromEntries(
-    items.map((item, index) => [item.key, { label: item.label, color: chartColor(index) }]),
-  )
-}
-
 function chartColor(index: number) {
   return `hsl(var(--chart-${(index % 5) + 1}))`
-}
-
-function BillsUtilitiesSummary({ items }: { items: UtilityHistoryItem[] }) {
-  return (
-    <div className="bb-bill-history-list">
-      {items.map((item, index) => {
-        const color = chartColor(index)
-        const hasAverage = item.averageAmount > 0
-        const deltaClass = hasAverage && item.deltaAmount > 0 ? "bb-negative" : hasAverage && item.deltaAmount < 0 ? "bb-positive" : ""
-        return (
-          <div className="bb-bill-history-row" key={item.key}>
-            <span>
-              <strong className="bb-bill-history-name">
-                <span className="bb-bill-history-dot" style={{ background: color }} />
-                <span>{item.label}</span>
-              </strong>
-              <small>{hasAverage ? `Avg ${formatMoney(item.averageAmount)}` : "No prior average"}</small>
-            </span>
-            <span>
-              <strong>{formatMoney(item.currentAmount)}</strong>
-              <small className={deltaClass}>{hasAverage ? `${item.deltaAmount >= 0 ? "+" : ""}${formatMoney(item.deltaAmount)} vs avg` : "Current"}</small>
-            </span>
-          </div>
-        )
-      })}
-    </div>
-  )
 }
 
 type SubscriptionTone = "all" | "needs" | "wants"

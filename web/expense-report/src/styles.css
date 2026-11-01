@@ -1158,7 +1158,8 @@ button.bb-left-categories { cursor: pointer; }
 }
 
 .bb-main > .bb-chart-carousel-band {
-  --bb-chart-carousel-stage-height: clamp(540px, 64vh, 660px);
+  --bb-chart-carousel-stage-height: clamp(460px, 56vh, 580px);
+  --bb-chart-bottom-gap: 24px;
   --bb-chart-carousel-heading-height: 64px;
   position: relative;
   width: 100%;
@@ -1960,15 +1961,54 @@ button.bb-left-categories { cursor: pointer; }
   gap: 16px;
   height: 100%;
   min-height: 0;
+  padding-bottom: var(--bb-chart-bottom-gap, 24px);
 }
 
 .bb-bills-analytics-head {
   display: flex;
-  align-items: flex-start;
+  align-items: center;
   justify-content: space-between;
   gap: 14px;
   min-width: 0;
+  flex-wrap: nowrap;
 }
+
+.bb-bills-analytics-head > div:first-child { min-width: 0; }
+.bb-bills-analytics-head .bb-chart-total { font-size: 31px; line-height: 1.15; letter-spacing: -.035em; }
+.bb-bill-controls { flex: none; }
+.bb-bill-manage { display: flex; align-items: center; gap: 8px; min-height: 44px; padding: 0 13px; border: 1px solid hsl(var(--border)); border-radius: 24px; background: hsl(var(--foreground) / .045); color: hsl(var(--foreground)); font: inherit; font-size: 13px; cursor: pointer; }
+.bb-bill-manage svg { width: 15px; height: 15px; color: hsl(var(--muted-foreground)); }
+.bb-bill-ribbon-shell { position: relative; width: calc(100% + 2 * var(--bb-chart-page-gutter)); margin-inline: calc(-1 * var(--bb-chart-page-gutter)); min-width: 0; }
+.bb-bill-ribbon { display: flex; align-items: center; gap: 8px; width: 100%; overflow-x: auto; overflow-y: hidden; scrollbar-width: none; overscroll-behavior-x: contain; overscroll-behavior-y: auto; touch-action: auto; padding: 6px var(--bb-chart-page-gutter); }
+.bb-bill-ribbon::-webkit-scrollbar { display: none; }
+.bb-bill-ribbon-shell::before, .bb-bill-ribbon-shell::after { position: absolute; top: 0; bottom: 0; width: 22px; content: ""; pointer-events: none; z-index: 1; opacity: 0; transition: opacity 120ms ease; }
+.bb-bill-ribbon-shell::before { left: 0; background: linear-gradient(to right, hsl(var(--card)), transparent); }
+.bb-bill-ribbon-shell::after { right: 0; background: linear-gradient(to left, hsl(var(--card)), transparent); }
+.bb-bill-ribbon-shell[data-left="true"]::before, .bb-bill-ribbon-shell[data-right="true"]::after { opacity: 1; }
+.bb-bill-pill { position: relative; display: flex; align-items: center; justify-content: center; flex: none; gap: 5px; min-width: 44px; height: 32px; padding: 0 9px; border: 1px solid hsl(var(--border)); border-radius: 24px; background: hsl(var(--foreground) / .045); color: hsl(var(--foreground)); font: inherit; font-size: 12px; white-space: nowrap; cursor: pointer; transition: background 160ms ease, border-color 160ms ease; }
+.bb-bill-pill::after { content: ""; position: absolute; inset: -6px 0; }
+.bb-bill-pill[aria-pressed="true"] { background: hsl(var(--foreground) / .13); border-color: hsl(var(--muted-foreground) / .7); }
+.bb-bill-pill-name { display: flex; align-items: center; gap: 5px; }
+.bb-bill-swatch { display: block; flex: none; width: 8px; height: 3px; border-radius: 3px; }
+.bb-bill-pill-amount { color: hsl(var(--muted-foreground)); font-variant-numeric: tabular-nums; }
+.bb-bills-chart-box .recharts-line { transition: opacity 170ms ease; }
+.bb-bills-chart-box .bb-bill-line-dim { opacity: .3; }
+.bb-bill-history-empty { position: absolute; top: 12px; left: 58px; right: 20px; z-index: 1; color: hsl(var(--muted-foreground)); font-size: 12px; text-align: center; pointer-events: none; }
+.bb-bill-picker > p { margin: 0 0 12px; color: hsl(var(--muted-foreground)); font-size: 12px; }
+.bb-bill-option { display: flex; align-items: center; gap: 10px; min-height: 52px; padding: 8px 0; border-bottom: 1px solid hsl(var(--border)); cursor: pointer; }
+.bb-bill-option > span { display: grid; flex: 1; min-width: 0; font-size: 13px; overflow-wrap: anywhere; }
+.bb-bill-option small { font-size: 11px; color: hsl(var(--muted-foreground)); }
+.bb-bill-option strong { font-size: 13px; font-weight: 500; font-variant-numeric: tabular-nums; }
+.bb-bill-option input { appearance: none; position: relative; flex: none; width: 34px; height: 21px; margin: 0; border: 1px solid hsl(var(--border)); border-radius: 14px; background: hsl(var(--muted)); transition: background 160ms ease; cursor: pointer; }
+.bb-bill-option input::before { content: ""; display: block; position: absolute; top: 2px; left: 2px; width: 15px; height: 15px; border-radius: 50%; background: hsl(var(--muted-foreground)); transition: transform 160ms ease; }
+.bb-bill-option input:checked { background: hsl(var(--primary)); border-color: hsl(var(--primary)); }
+.bb-bill-option input:checked::before { transform: translateX(13px); background: hsl(var(--primary-foreground)); }
+.bb-bill-picker-actions { display: grid; grid-template-columns: 1fr 1.65fr; gap: 9px; position: sticky; bottom: 0; padding-top: 14px; background: hsl(var(--card)); }
+.bb-bill-picker-actions button { min-height: 44px; border: 1px solid hsl(var(--border)); border-radius: 16px; background: transparent; color: hsl(var(--foreground)); font: inherit; font-size: 13px; cursor: pointer; }
+.bb-bill-picker-actions button:last-child { border-color: transparent; background: hsl(var(--primary)); color: hsl(var(--primary-foreground)); }
+.bb-bill-tooltip-average { display: grid; gap: 4px; margin-top: 10px; padding-top: 10px; border-top: 1px solid hsl(var(--border)); font-size: 12px; }
+.bb-bill-tooltip-average > span:first-child { display: flex; justify-content: space-between; gap: 20px; }
+@media (prefers-reduced-motion: reduce) { .bb-bill-pill, .bb-bill-ribbon-shell::before, .bb-bill-ribbon-shell::after, .bb-bills-chart-box .recharts-line, .bb-bill-option input, .bb-bill-option input::before { transition: none; } }
 
 .bb-bills-chart-box {
   width: 100%;
@@ -1980,68 +2020,6 @@ button.bb-left-categories { cursor: pointer; }
 .bb-chart-carousel .bb-bills-chart-box {
   height: 100%;
   min-height: 0;
-}
-
-.bb-bill-history-list {
-  display: grid;
-  gap: 10px;
-}
-
-.bb-bill-history-row {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
-  align-items: center;
-  gap: 12px;
-  border-bottom: 1px solid hsl(var(--border));
-  padding-bottom: 10px;
-  font-size: 13px;
-}
-
-.bb-bill-history-row:last-child {
-  border-bottom: 0;
-  padding-bottom: 0;
-}
-
-.bb-bill-history-row > span {
-  display: grid;
-  gap: 3px;
-  min-width: 0;
-}
-
-.bb-bill-history-row > span:last-child {
-  justify-items: end;
-  text-align: right;
-}
-
-.bb-bill-history-row strong {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.bb-bill-history-name {
-  display: inline-flex;
-  align-items: center;
-  gap: 7px;
-  min-width: 0;
-}
-
-.bb-bill-history-name > span:last-child {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.bb-bill-history-dot {
-  flex: 0 0 auto;
-  width: 9px;
-  height: 9px;
-  border-radius: 999px;
-}
-
-.bb-bill-history-row small {
-  color: hsl(var(--muted-foreground));
-  font-size: 12px;
 }
 
 .bb-chart-side {
@@ -2164,7 +2142,7 @@ button.bb-left-categories { cursor: pointer; }
   align-content: start;
   row-gap: 12px;
   padding-top: 12px;
-  padding-bottom: 104px;
+  padding-bottom: var(--bb-chart-bottom-gap, 24px);
   --bb-burn-spent: color-mix(in srgb, hsl(var(--destructive)) 72%, hsl(var(--card)));
   --bb-burn-over-base: color-mix(in srgb, hsl(var(--destructive)) 26%, hsl(var(--card)));
 }
@@ -3359,7 +3337,7 @@ button:focus-visible, summary:focus-visible {
 @media (prefers-reduced-motion: reduce) { .bb-toolbar-button { transition: none; } }
 
 /* Refined flow retains its chart stage and former footer height until the layout is redesigned. */
-.bb-category-mix-page { row-gap: 0; grid-template-rows: auto minmax(0, 1fr) 42px; }
+.bb-category-mix-page { row-gap: 0; grid-template-rows: auto minmax(0, 1fr); padding-bottom: var(--bb-chart-bottom-gap, 24px); }
 .bb-category-mix-page .bb-category-chart-layout { max-width: none; width: calc(100% + 2 * var(--bb-chart-page-gutter)); margin-inline: calc(-1 * var(--bb-chart-page-gutter)); }
 .bb-contour-callouts { position: absolute; inset: 0; width: 100%; height: 100%; overflow: visible; pointer-events: none; opacity: 0; transition: none !important; }
 .bb-contour-callouts[data-visible="true"][data-ready="true"] .bb-contour-label { pointer-events: auto; }
