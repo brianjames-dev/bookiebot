@@ -31,6 +31,7 @@
         512
       ],
       "edgeChecks": [],
+      "paintedBounds": null,
       "rasterBelow2x": false
     },
     {
@@ -61,6 +62,7 @@
         454
       ],
       "edgeChecks": [],
+      "paintedBounds": null,
       "rasterBelow2x": false
     },
     {
@@ -94,6 +96,7 @@
         512
       ],
       "edgeChecks": [],
+      "paintedBounds": null,
       "rasterBelow2x": false
     },
     {
@@ -127,6 +130,7 @@
         512
       ],
       "edgeChecks": [],
+      "paintedBounds": null,
       "rasterBelow2x": false
     },
     {
@@ -157,6 +161,7 @@
         320
       ],
       "edgeChecks": [],
+      "paintedBounds": null,
       "rasterBelow2x": false
     },
     {
@@ -190,6 +195,7 @@
         415
       ],
       "edgeChecks": [],
+      "paintedBounds": null,
       "rasterBelow2x": false
     },
     {
@@ -220,6 +226,7 @@
         512
       ],
       "edgeChecks": [],
+      "paintedBounds": null,
       "rasterBelow2x": false
     },
     {
@@ -250,6 +257,7 @@
         512
       ],
       "edgeChecks": [],
+      "paintedBounds": null,
       "rasterBelow2x": false
     },
     {
@@ -280,6 +288,7 @@
         194
       ],
       "edgeChecks": [],
+      "paintedBounds": null,
       "rasterBelow2x": false
     },
     {
@@ -313,6 +322,7 @@
         510
       ],
       "edgeChecks": [],
+      "paintedBounds": null,
       "rasterBelow2x": false
     },
     {
@@ -346,6 +356,7 @@
         512
       ],
       "edgeChecks": [],
+      "paintedBounds": null,
       "rasterBelow2x": false
     },
     {
@@ -376,6 +387,7 @@
         512
       ],
       "edgeChecks": [],
+      "paintedBounds": null,
       "rasterBelow2x": false
     },
     {
@@ -406,6 +418,7 @@
         512
       ],
       "edgeChecks": [],
+      "paintedBounds": null,
       "rasterBelow2x": false
     },
     {
@@ -439,6 +452,7 @@
         512
       ],
       "edgeChecks": [],
+      "paintedBounds": null,
       "rasterBelow2x": false
     },
     {
@@ -472,6 +486,7 @@
         512
       ],
       "edgeChecks": [],
+      "paintedBounds": null,
       "rasterBelow2x": false
     },
     {
@@ -502,6 +517,7 @@
         511
       ],
       "edgeChecks": [],
+      "paintedBounds": null,
       "rasterBelow2x": false
     },
     {
@@ -532,6 +548,7 @@
         232
       ],
       "edgeChecks": [],
+      "paintedBounds": null,
       "rasterBelow2x": false
     },
     {
@@ -565,6 +582,7 @@
         512
       ],
       "edgeChecks": [],
+      "paintedBounds": null,
       "rasterBelow2x": false
     },
     {
@@ -598,6 +616,7 @@
         512
       ],
       "edgeChecks": [],
+      "paintedBounds": null,
       "rasterBelow2x": false
     },
     {
@@ -628,6 +647,7 @@
         506
       ],
       "edgeChecks": [],
+      "paintedBounds": null,
       "rasterBelow2x": false
     },
     {
@@ -658,6 +678,7 @@
         512
       ],
       "edgeChecks": [],
+      "paintedBounds": null,
       "rasterBelow2x": false
     },
     {
@@ -688,36 +709,46 @@
         396
       ],
       "edgeChecks": [],
+      "paintedBounds": null,
       "rasterBelow2x": false
     },
     {
       "id": "disney-plus",
       "name": "Disney+",
       "original": "src/bookiebot/reports/assets/company-logo-disney-plus-cdc480ea45b4fe48.svg",
-      "source": "src/bookiebot/reports/assets/company-logo-disney-plus-cdc480ea45b4fe48.svg",
+      "source": "docs/logo-review/sources/disney-plus-v2-mark.svg",
       "sourceUrl": "https://cdn.jsdelivr.net/gh/homarr-labs/dashboard-icons@83f32e08257b66fbd971ac8d7645f5b38d52e85d/svg/disney-plus.svg",
-      "sourceSha256": "cdc480ea45b4fe48c3503e118d763f959ec9affdb645c1a71467b24b108a15ee",
-      "method": "Original artwork · circle framing",
+      "sourceSha256": "42e13e78b338c281f68567126face684b848a5671bb4ea59be113e940ffde5dd",
+      "method": "Native wordmark · centered without tile padding",
       "ai": false,
-      "background": "#191c29",
-      "fill": 1,
+      "background": "#1a1d29",
+      "fill": 0.75,
       "trim": true,
       "originalSize": null,
       "review": "pending",
       "framing": "standalone-mark",
-      "asset": "assets/disney-plus-fdf5146e525a136e.png",
-      "sha256": "fdf5146e525a136edb368a4f91c85c59e9996199d285081be0d343fa6ee6efcc",
+      "renderVersion": 2,
+      "revision": 2,
+      "asset": "assets/disney-plus-1f294150455abc75.png",
+      "sha256": "1f294150455abc751f24ef8105248203810ecc6191364b8d12d754dcc11dc696",
       "sourceSize": [
         150,
         150
       ],
       "crop": [
-        0,
-        0,
-        512,
-        512
+        40,
+        190,
+        432,
+        183
       ],
       "edgeChecks": [],
+      "paintedBounds": {
+        "left": 32,
+        "top": 89,
+        "right": 223,
+        "bottom": 168,
+        "count": 3399
+      },
       "rasterBelow2x": false
     },
     {
@@ -751,6 +782,7 @@
         504
       ],
       "edgeChecks": [],
+      "paintedBounds": null,
       "rasterBelow2x": false
     },
     {
@@ -781,6 +813,7 @@
         478
       ],
       "edgeChecks": [],
+      "paintedBounds": null,
       "rasterBelow2x": false
     },
     {
@@ -814,6 +847,7 @@
         512
       ],
       "edgeChecks": [],
+      "paintedBounds": null,
       "rasterBelow2x": false
     },
     {
@@ -844,6 +878,7 @@
         512
       ],
       "edgeChecks": [],
+      "paintedBounds": null,
       "rasterBelow2x": false
     },
     {
@@ -874,6 +909,7 @@
         512
       ],
       "edgeChecks": [],
+      "paintedBounds": null,
       "rasterBelow2x": false
     },
     {
@@ -904,6 +940,7 @@
         412
       ],
       "edgeChecks": [],
+      "paintedBounds": null,
       "rasterBelow2x": false
     },
     {
@@ -937,6 +974,7 @@
         245
       ],
       "edgeChecks": [],
+      "paintedBounds": null,
       "rasterBelow2x": false
     },
     {
@@ -967,6 +1005,7 @@
         512
       ],
       "edgeChecks": [],
+      "paintedBounds": null,
       "rasterBelow2x": false
     },
     {
@@ -1000,6 +1039,7 @@
         503
       ],
       "edgeChecks": [],
+      "paintedBounds": null,
       "rasterBelow2x": false
     },
     {
@@ -1033,6 +1073,7 @@
         512
       ],
       "edgeChecks": [],
+      "paintedBounds": null,
       "rasterBelow2x": false
     },
     {
@@ -1066,6 +1107,7 @@
         208
       ],
       "edgeChecks": [],
+      "paintedBounds": null,
       "rasterBelow2x": false
     },
     {
@@ -1099,20 +1141,21 @@
         512
       ],
       "edgeChecks": [],
+      "paintedBounds": null,
       "rasterBelow2x": false
     },
     {
       "id": "github",
       "name": "GitHub",
       "original": "src/bookiebot/reports/assets/company-logo-github-cdfb82ff14c8c248.svg",
-      "source": "src/bookiebot/reports/assets/company-logo-github-cdfb82ff14c8c248.svg",
-      "sourceUrl": "https://cdn.jsdelivr.net/gh/homarr-labs/dashboard-icons@83f32e08257b66fbd971ac8d7645f5b38d52e85d/svg/github.svg",
-      "sourceSha256": "cdfb82ff14c8c2484eacba9d211d86cd0c993c933855cad2b03633414fa10ddb",
-      "method": "Original artwork · circle framing",
+      "source": "docs/logo-review/sources/github-v2-mark.svg",
+      "sourceUrl": "https://brand.github.com/GitHub_Logos.zip",
+      "sourceSha256": "ba04eee210babebc73befb40bafd3a2f5cf1d2280a3df13c6d89869112ba96db",
+      "method": "Official GitHub vector · smooth full circle",
       "ai": false,
       "background": "#ffffff",
       "fill": 1,
-      "trim": true,
+      "trim": false,
       "originalSize": null,
       "review": "pending",
       "framing": "native-circle",
@@ -1122,11 +1165,11 @@
             0.5,
             0.03125
           ],
-          "color": "#1b1f23",
+          "color": "#000000",
           "actual": [
-            27,
-            31,
-            35,
+            0,
+            0,
+            0,
             255
           ]
         },
@@ -1135,11 +1178,11 @@
             0.03125,
             0.5
           ],
-          "color": "#1b1f23",
+          "color": "#000000",
           "actual": [
-            27,
-            31,
-            35,
+            0,
+            0,
+            0,
             255
           ]
         },
@@ -1148,27 +1191,37 @@
             0.96875,
             0.5
           ],
-          "color": "#1b1f23",
+          "color": "#000000",
           "actual": [
-            27,
-            31,
-            35,
+            0,
+            0,
+            0,
             255
           ]
         }
       ],
-      "asset": "assets/github-a9f7813f638680b3.png",
-      "sha256": "a9f7813f638680b3bd101a8091f717f37f1b64948c97d1184b39f365875a51c6",
+      "renderVersion": 2,
+      "revision": 2,
+      "bleed": 0.02,
+      "asset": "assets/github-37b5ddac32539b8a.png",
+      "sha256": "37b5ddac32539b8a52b286157d04093cd281fde28551a8ad368ca43c1d57bd4c",
       "sourceSize": [
         150,
         150
       ],
       "crop": [
         0,
-        6,
+        0,
         512,
-        500
+        512
       ],
+      "paintedBounds": {
+        "left": 11,
+        "top": 11,
+        "right": 245,
+        "bottom": 241,
+        "count": 21972
+      },
       "rasterBelow2x": false
     },
     {
@@ -1199,6 +1252,7 @@
         458
       ],
       "edgeChecks": [],
+      "paintedBounds": null,
       "rasterBelow2x": false
     },
     {
@@ -1229,6 +1283,7 @@
         512
       ],
       "edgeChecks": [],
+      "paintedBounds": null,
       "rasterBelow2x": false
     },
     {
@@ -1259,6 +1314,7 @@
         170
       ],
       "edgeChecks": [],
+      "paintedBounds": null,
       "rasterBelow2x": false
     },
     {
@@ -1289,19 +1345,20 @@
         330
       ],
       "edgeChecks": [],
+      "paintedBounds": null,
       "rasterBelow2x": false
     },
     {
       "id": "liberty-mutual",
       "name": "Liberty Mutual",
       "original": "src/bookiebot/reports/assets/company-logo-liberty-mutual-4a2937466fb97ce6.png",
-      "source": "docs/logo-review/sources/liberty-mutual-mark.svg",
+      "source": "docs/logo-review/sources/liberty-mutual-v2-mark.svg",
       "sourceUrl": "https://www.libertymutual.com/",
-      "sourceSha256": "70def7679fab5fb3d286889bacae3476d8ec614b8eddf2a1d7d339b01c845086",
-      "method": "Original vector · circle framing",
+      "sourceSha256": "3006cf95794fa482ae2a08d0ae7c5f2d2f22a7b4d0ebf0b122d96e7ae1e7b0c3",
+      "method": "Clean native statue crop · centered",
       "ai": false,
       "background": "#ffd000",
-      "fill": 0.76,
+      "fill": 0.79,
       "trim": true,
       "originalSize": [
         32,
@@ -1309,19 +1366,32 @@
       ],
       "review": "pending",
       "framing": "standalone-mark",
-      "asset": "assets/liberty-mutual-3e989c1033678f89.png",
-      "sha256": "3e989c1033678f893f49ab274c2604ec4ae5e94ce1ec1a0ee1ef4ec6890bd7a9",
+      "renderVersion": 2,
+      "revision": 2,
+      "offset": [
+        0.053,
+        -0.02
+      ],
+      "asset": "assets/liberty-mutual-ab3d3a3e2cd6f90f.png",
+      "sha256": "ab3d3a3e2cd6f90f5d01753b0b18b81a01dd45bcdfe6ac21eb8d83dc0213be80",
       "sourceSize": [
-        124,
+        91,
         150
       ],
       "crop": [
-        44,
-        2,
-        424,
-        483
+        100,
+        3,
+        312,
+        482
       ],
       "edgeChecks": [],
+      "paintedBounds": {
+        "left": 76,
+        "top": 22,
+        "right": 206,
+        "bottom": 223,
+        "count": 9419
+      },
       "rasterBelow2x": false
     },
     {
@@ -1405,6 +1475,7 @@
         512,
         512
       ],
+      "paintedBounds": null,
       "rasterBelow2x": false
     },
     {
@@ -1438,6 +1509,7 @@
         512
       ],
       "edgeChecks": [],
+      "paintedBounds": null,
       "rasterBelow2x": false
     },
     {
@@ -1468,6 +1540,7 @@
         140
       ],
       "edgeChecks": [],
+      "paintedBounds": null,
       "rasterBelow2x": false
     },
     {
@@ -1498,6 +1571,7 @@
         512
       ],
       "edgeChecks": [],
+      "paintedBounds": null,
       "rasterBelow2x": false
     },
     {
@@ -1531,6 +1605,7 @@
         512
       ],
       "edgeChecks": [],
+      "paintedBounds": null,
       "rasterBelow2x": false
     },
     {
@@ -1561,36 +1636,90 @@
         512
       ],
       "edgeChecks": [],
+      "paintedBounds": null,
       "rasterBelow2x": false
     },
     {
       "id": "nordvpn",
       "name": "NordVPN",
       "original": "src/bookiebot/reports/assets/company-logo-nordvpn-77548d4543437429.svg",
-      "source": "src/bookiebot/reports/assets/company-logo-nordvpn-77548d4543437429.svg",
+      "source": "docs/logo-review/sources/nordvpn-v2-mark.svg",
       "sourceUrl": "https://cdn.jsdelivr.net/gh/homarr-labs/dashboard-icons@83f32e08257b66fbd971ac8d7645f5b38d52e85d/svg/nordvpn.svg",
-      "sourceSha256": "77548d4543437429217f34d9a7506e279cba920f376c5ee9ae84693c35c0aa24",
-      "method": "Original artwork · circle framing",
+      "sourceSha256": "935a32f58c5ceb7f0c5df9a9f04f6f2f9e381a43aa5b4ad6bed94a03b0ff8f0a",
+      "method": "Native vector · optically centered",
       "ai": false,
       "background": "#ffffff",
       "fill": 1,
-      "trim": true,
+      "trim": false,
       "originalSize": null,
       "review": "pending",
       "framing": "native-circle",
-      "asset": "assets/nordvpn-60fd85d2fa2ba359.png",
-      "sha256": "60fd85d2fa2ba3595f4304ec32ab966c4c14d988441cf6f9b9495b51112007a4",
+      "renderVersion": 2,
+      "revision": 2,
+      "offset": [
+        0,
+        0
+      ],
+      "edgeChecks": [
+        {
+          "point": [
+            0.5,
+            0.03125
+          ],
+          "color": "#4580ff",
+          "actual": [
+            69,
+            128,
+            255,
+            255
+          ]
+        },
+        {
+          "point": [
+            0.03125,
+            0.5
+          ],
+          "color": "#4580ff",
+          "actual": [
+            69,
+            128,
+            255,
+            255
+          ]
+        },
+        {
+          "point": [
+            0.96875,
+            0.5
+          ],
+          "color": "#4580ff",
+          "actual": [
+            69,
+            128,
+            255,
+            255
+          ]
+        }
+      ],
+      "asset": "assets/nordvpn-940008d40777980d.png",
+      "sha256": "940008d40777980d305ad14d68ea8d52f45c30f5689e9e0d840d4ff08e2cb5d1",
       "sourceSize": [
         150,
         150
       ],
       "crop": [
         0,
-        52,
+        0,
         512,
-        408
+        512
       ],
-      "edgeChecks": [],
+      "paintedBounds": {
+        "left": 11,
+        "top": 11,
+        "right": 245,
+        "bottom": 193,
+        "count": 23724
+      },
       "rasterBelow2x": false
     },
     {
@@ -1621,36 +1750,90 @@
         512
       ],
       "edgeChecks": [],
+      "paintedBounds": null,
       "rasterBelow2x": false
     },
     {
       "id": "paramount-plus",
       "name": "Paramount+",
       "original": "src/bookiebot/reports/assets/company-logo-paramount-plus-f99ea29c29229412.svg",
-      "source": "src/bookiebot/reports/assets/company-logo-paramount-plus-f99ea29c29229412.svg",
+      "source": "docs/logo-review/sources/paramount-plus-v2-mark.svg",
       "sourceUrl": "https://cdn.jsdelivr.net/gh/homarr-labs/dashboard-icons@83f32e08257b66fbd971ac8d7645f5b38d52e85d/svg/paramount-plus.svg",
-      "sourceSha256": "f99ea29c292294128d36f3f8fe06a4a96f0d5341de705bfab669e3f81784b179",
-      "method": "Original artwork · circle framing",
+      "sourceSha256": "eb59e3ae20b4005f1dac527c264b64e4bf1c36ae4c225857ebb500c625649362",
+      "method": "Native vector · optically centered",
       "ai": false,
       "background": "#ffffff",
       "fill": 1,
-      "trim": true,
+      "trim": false,
       "originalSize": null,
       "review": "pending",
       "framing": "native-circle",
-      "asset": "assets/paramount-plus-522e5210df7238ed.png",
-      "sha256": "522e5210df7238ed32d1f82f7d082a1406c3ee5020e6d546575a24e91fedb6ea",
+      "renderVersion": 2,
+      "revision": 2,
+      "offset": [
+        0,
+        0
+      ],
+      "edgeChecks": [
+        {
+          "point": [
+            0.5,
+            0.03125
+          ],
+          "color": "#0064ff",
+          "actual": [
+            0,
+            100,
+            255,
+            255
+          ]
+        },
+        {
+          "point": [
+            0.03125,
+            0.5
+          ],
+          "color": "#0064ff",
+          "actual": [
+            0,
+            100,
+            255,
+            255
+          ]
+        },
+        {
+          "point": [
+            0.96875,
+            0.5
+          ],
+          "color": "#0064ff",
+          "actual": [
+            0,
+            100,
+            255,
+            255
+          ]
+        }
+      ],
+      "asset": "assets/paramount-plus-3b7df761d2299731.png",
+      "sha256": "3b7df761d22997310bd2eaf5dc3cff70eac293dc08b78d242e751397ef85f82a",
       "sourceSize": [
         150,
         150
       ],
       "crop": [
         0,
-        52,
+        0,
         512,
-        408
+        512
       ],
-      "edgeChecks": [],
+      "paintedBounds": {
+        "left": 11,
+        "top": 11,
+        "right": 245,
+        "bottom": 203,
+        "count": 30520
+      },
       "rasterBelow2x": false
     },
     {
@@ -1681,6 +1864,7 @@
         512
       ],
       "edgeChecks": [],
+      "paintedBounds": null,
       "rasterBelow2x": false
     },
     {
@@ -1711,6 +1895,7 @@
         512
       ],
       "edgeChecks": [],
+      "paintedBounds": null,
       "rasterBelow2x": false
     },
     {
@@ -1744,6 +1929,7 @@
         512
       ],
       "edgeChecks": [],
+      "paintedBounds": null,
       "rasterBelow2x": false
     },
     {
@@ -1777,6 +1963,7 @@
         512
       ],
       "edgeChecks": [],
+      "paintedBounds": null,
       "rasterBelow2x": false
     },
     {
@@ -1807,6 +1994,7 @@
         390
       ],
       "edgeChecks": [],
+      "paintedBounds": null,
       "rasterBelow2x": false
     },
     {
@@ -1837,6 +2025,7 @@
         512
       ],
       "edgeChecks": [],
+      "paintedBounds": null,
       "rasterBelow2x": false
     },
     {
@@ -1870,6 +2059,7 @@
         510
       ],
       "edgeChecks": [],
+      "paintedBounds": null,
       "rasterBelow2x": false
     },
     {
@@ -1900,6 +2090,7 @@
         412
       ],
       "edgeChecks": [],
+      "paintedBounds": null,
       "rasterBelow2x": false
     },
     {
@@ -1909,10 +2100,10 @@
       "source": "docs/logo-review/sources/railway-mark.svg",
       "sourceUrl": "https://cdn.jsdelivr.net/gh/homarr-labs/dashboard-icons@83f32e08257b66fbd971ac8d7645f5b38d52e85d/svg/railway.svg",
       "sourceSha256": "4e37a4b20550b7988bcb26b9b4803748847576aaf270bf892203ab4b96783a84",
-      "method": "Native white mark · user-supplied dark reference",
+      "method": "Native white Railway mark · full circle",
       "ai": false,
       "background": "#13121c",
-      "fill": 0.68,
+      "fill": 1,
       "trim": false,
       "originalSize": null,
       "review": "pending",
@@ -1923,11 +2114,37 @@
             0.5,
             0.03125
           ],
-          "color": "#13121c",
+          "color": "#ffffff",
           "actual": [
-            19,
-            18,
-            28,
+            255,
+            255,
+            255,
+            255
+          ]
+        },
+        {
+          "point": [
+            0.96875,
+            0.5
+          ],
+          "color": "#ffffff",
+          "actual": [
+            255,
+            255,
+            255,
+            255
+          ]
+        },
+        {
+          "point": [
+            0.5,
+            0.96875
+          ],
+          "color": "#ffffff",
+          "actual": [
+            255,
+            255,
+            255,
             255
           ]
         },
@@ -1943,36 +2160,13 @@
             28,
             255
           ]
-        },
-        {
-          "point": [
-            0.96875,
-            0.5
-          ],
-          "color": "#13121c",
-          "actual": [
-            19,
-            18,
-            28,
-            255
-          ]
-        },
-        {
-          "point": [
-            0.5,
-            0.25
-          ],
-          "color": "#ffffff",
-          "actual": [
-            255,
-            255,
-            255,
-            255
-          ]
         }
       ],
-      "asset": "assets/railway-da912722e6ffa33d.png",
-      "sha256": "da912722e6ffa33d63645443c12048180dce2b178d7b5f3c1b1856e2781ca2f1",
+      "renderVersion": 2,
+      "revision": 2,
+      "bleed": 0.012,
+      "asset": "assets/railway-e90b60cbeb1ccea6.png",
+      "sha256": "e90b60cbeb1ccea6b0cdcb60b20c6fe6aaea61570a40eee0de7a1c45d481393b",
       "sourceSize": [
         150,
         150
@@ -1983,6 +2177,13 @@
         512,
         512
       ],
+      "paintedBounds": {
+        "left": 11,
+        "top": 11,
+        "right": 245,
+        "bottom": 245,
+        "count": 32517
+      },
       "rasterBelow2x": false
     },
     {
@@ -2016,6 +2217,7 @@
         512
       ],
       "edgeChecks": [],
+      "paintedBounds": null,
       "rasterBelow2x": false
     },
     {
@@ -2049,6 +2251,7 @@
         458
       ],
       "edgeChecks": [],
+      "paintedBounds": null,
       "rasterBelow2x": false
     },
     {
@@ -2082,6 +2285,7 @@
         512
       ],
       "edgeChecks": [],
+      "paintedBounds": null,
       "rasterBelow2x": false
     },
     {
@@ -2115,6 +2319,7 @@
         437
       ],
       "edgeChecks": [],
+      "paintedBounds": null,
       "rasterBelow2x": false
     },
     {
@@ -2148,6 +2353,7 @@
         485
       ],
       "edgeChecks": [],
+      "paintedBounds": null,
       "rasterBelow2x": false
     },
     {
@@ -2181,19 +2387,20 @@
         512
       ],
       "edgeChecks": [],
+      "paintedBounds": null,
       "rasterBelow2x": false
     },
     {
       "id": "sling",
       "name": "Sling TV",
       "original": "src/bookiebot/reports/assets/company-logo-sling-876ca40fda3f2b4e.ico",
-      "source": "src/bookiebot/reports/assets/company-logo-sling-876ca40fda3f2b4e.ico",
-      "sourceUrl": "https://www.sling.com/etc.clientlibs/sling-television/clientlibs/clientlib-global/resources/images/favicon.ico",
-      "sourceSha256": "876ca40fda3f2b4e0b536fdb397f87d90f5e7f07a3ca3fcb19831b121bd1a8e7",
-      "method": "Original artwork · circle framing",
+      "source": "docs/logo-review/sources/sling-original-v2.svg",
+      "sourceUrl": "https://www.sling.com/content/dam/sling-television/icons/logo-sling.svg",
+      "sourceSha256": "780bb774e35c3399c8332acb546f009e4393249cfcc6134e297367ba0c0da446",
+      "method": "Official vector wordmark · smooth blue/gold ring",
       "ai": false,
       "background": "#080f13",
-      "fill": 1,
+      "fill": 0.77,
       "trim": true,
       "originalSize": [
         128,
@@ -2201,19 +2408,35 @@
       ],
       "review": "pending",
       "framing": "standalone-mark",
-      "asset": "assets/sling-48c542a5c2b1f8a0.png",
-      "sha256": "48c542a5c2b1f8a0e8c7f0e577dee6bfc09b93e8896589818f00fcf983075d32",
+      "renderVersion": 2,
+      "revision": 2,
+      "ring": {
+        "width": 0.016,
+        "colors": [
+          "#12bde5",
+          "#f4d93e"
+        ]
+      },
+      "asset": "assets/sling-2248a814adfb1053.png",
+      "sha256": "2248a814adfb10532e668e1c0b4b39c18190b4189f75d588585862cdea2c9ef7",
       "sourceSize": [
-        128,
-        128
+        56,
+        32
       ],
       "crop": [
         0,
-        0,
-        512,
-        512
+        110,
+        510,
+        292
       ],
       "edgeChecks": [],
+      "paintedBounds": {
+        "left": 29,
+        "top": 71,
+        "right": 226,
+        "bottom": 184,
+        "count": 8294
+      },
       "rasterBelow2x": false
     },
     {
@@ -2247,6 +2470,7 @@
         512
       ],
       "edgeChecks": [],
+      "paintedBounds": null,
       "rasterBelow2x": false
     },
     {
@@ -2277,6 +2501,7 @@
         228
       ],
       "edgeChecks": [],
+      "paintedBounds": null,
       "rasterBelow2x": false
     },
     {
@@ -2310,6 +2535,7 @@
         512
       ],
       "edgeChecks": [],
+      "paintedBounds": null,
       "rasterBelow2x": false
     },
     {
@@ -2343,6 +2569,7 @@
         360
       ],
       "edgeChecks": [],
+      "paintedBounds": null,
       "rasterBelow2x": false
     },
     {
@@ -2373,6 +2600,7 @@
         506
       ],
       "edgeChecks": [],
+      "paintedBounds": null,
       "rasterBelow2x": false
     },
     {
@@ -2406,6 +2634,7 @@
         312
       ],
       "edgeChecks": [],
+      "paintedBounds": null,
       "rasterBelow2x": false
     },
     {
@@ -2415,16 +2644,19 @@
       "source": "src/bookiebot/reports/assets/company-logo-steam-a700d94f7bc87df5.svg",
       "sourceUrl": "https://cdn.jsdelivr.net/gh/homarr-labs/dashboard-icons@83f32e08257b66fbd971ac8d7645f5b38d52e85d/svg/steam.svg",
       "sourceSha256": "a700d94f7bc87df540938c9f0d8733ec27e9b76610b34073e5c7f43fd61ca402",
-      "method": "Original artwork · circle framing",
+      "method": "Native vector · dark edge backing",
       "ai": false,
-      "background": "#ffffff",
+      "background": "#101b2e",
       "fill": 1,
       "trim": true,
       "originalSize": null,
       "review": "pending",
       "framing": "native-circle",
-      "asset": "assets/steam-35648b7299c237b9.png",
-      "sha256": "35648b7299c237b9fd328d906e0c9dd4215eace66f766da4dd399671967ee185",
+      "renderVersion": 2,
+      "revision": 2,
+      "bleed": 0.012,
+      "asset": "assets/steam-c121b94740628999.png",
+      "sha256": "c121b94740628999175edac62cd4583b63ab5eb17393a729f3d919cba274e853",
       "sourceSize": [
         150,
         150
@@ -2436,6 +2668,13 @@
         512
       ],
       "edgeChecks": [],
+      "paintedBounds": {
+        "left": 11,
+        "top": 45,
+        "right": 245,
+        "bottom": 245,
+        "count": 29958
+      },
       "rasterBelow2x": false
     },
     {
@@ -2466,6 +2705,7 @@
         512
       ],
       "edgeChecks": [],
+      "paintedBounds": null,
       "rasterBelow2x": false
     },
     {
@@ -2496,6 +2736,7 @@
         480
       ],
       "edgeChecks": [],
+      "paintedBounds": null,
       "rasterBelow2x": false
     },
     {
@@ -2529,6 +2770,7 @@
         512
       ],
       "edgeChecks": [],
+      "paintedBounds": null,
       "rasterBelow2x": false
     },
     {
@@ -2559,6 +2801,7 @@
         342
       ],
       "edgeChecks": [],
+      "paintedBounds": null,
       "rasterBelow2x": false
     },
     {
@@ -2568,16 +2811,18 @@
       "source": "src/bookiebot/reports/assets/company-logo-todoist-973f89993d8c5c15.svg",
       "sourceUrl": "https://cdn.jsdelivr.net/gh/homarr-labs/dashboard-icons@83f32e08257b66fbd971ac8d7645f5b38d52e85d/svg/todoist.svg",
       "sourceSha256": "973f89993d8c5c154edb79410f4953077c22f1e94f5507f4ac1ea6c83380e543",
-      "method": "Original artwork · circle framing",
+      "method": "Native mark · red extended to circle edge",
       "ai": false,
-      "background": "#ffffff",
-      "fill": 0.82,
+      "background": "#e44332",
+      "fill": 0.9,
       "trim": true,
       "originalSize": null,
       "review": "pending",
-      "framing": "standalone-mark",
-      "asset": "assets/todoist-30e84d0ec658280b.png",
-      "sha256": "30e84d0ec658280b9f695611cb320c87b10e146321958b64ba704827312146d3",
+      "framing": "solid-tile",
+      "renderVersion": 2,
+      "revision": 2,
+      "asset": "assets/todoist-1edb4375028f71a8.png",
+      "sha256": "1edb4375028f71a812eb32628fccb785dcb6463797f0907149d5c09b70b86cce",
       "sourceSize": [
         800,
         800
@@ -2589,6 +2834,13 @@
         512
       ],
       "edgeChecks": [],
+      "paintedBounds": {
+        "left": 13,
+        "top": 56,
+        "right": 155,
+        "bottom": 198,
+        "count": 8035
+      },
       "rasterBelow2x": false
     },
     {
@@ -2622,6 +2874,7 @@
         440
       ],
       "edgeChecks": [],
+      "paintedBounds": null,
       "rasterBelow2x": false
     },
     {
@@ -2652,6 +2905,7 @@
         512
       ],
       "edgeChecks": [],
+      "paintedBounds": null,
       "rasterBelow2x": false
     },
     {
@@ -2685,6 +2939,7 @@
         512
       ],
       "edgeChecks": [],
+      "paintedBounds": null,
       "rasterBelow2x": false
     },
     {
@@ -2715,19 +2970,20 @@
         512
       ],
       "edgeChecks": [],
+      "paintedBounds": null,
       "rasterBelow2x": false
     },
     {
       "id": "waste-management",
       "name": "Waste Management",
       "original": "src/bookiebot/reports/assets/company-logo-waste-management-3f9b338e7e4f0e24.jpg",
-      "source": "src/bookiebot/reports/assets/company-logo-waste-management-3f9b338e7e4f0e24.jpg",
-      "sourceUrl": "https://www.wm.com/content/dam/wm/icons/favicon.ico",
-      "sourceSha256": "3f9b338e7e4f0e245a463bb0426ac4173c0603de9a84cf005ed5f7a829e6e3d8",
-      "method": "Original artwork · circle framing",
+      "source": "docs/logo-review/sources/waste-management-v2-mark.svg",
+      "sourceUrl": "https://www.wm.com/content/dam/wm/assets/op/brand/WM-Primary-Logo.svg",
+      "sourceSha256": "228c835ad3f8f8b3a13aa6056ce9ccd3207e9b0d596fb0132dfb1f736ab559a6",
+      "method": "Official WM primary vector · crisp original colors",
       "ai": false,
       "background": "#ffffff",
-      "fill": 0.82,
+      "fill": 0.86,
       "trim": true,
       "originalSize": [
         64,
@@ -2735,29 +2991,38 @@
       ],
       "review": "pending",
       "framing": "standalone-mark",
-      "asset": "assets/waste-management-67e10e186183e7ea.png",
-      "sha256": "67e10e186183e7ea091743e09015c15eb4e1ad21132896c933f0a01b963192e5",
+      "renderVersion": 2,
+      "revision": 2,
+      "asset": "assets/waste-management-9fabb1f052543cb6.png",
+      "sha256": "9fabb1f052543cb6a5f36c898a0bb92938fbbf769967c1754c1caf6cb2db8594",
       "sourceSize": [
-        64,
-        64
+        225,
+        150
       ],
       "crop": [
-        0,
-        0,
-        512,
-        512
+        21,
+        193,
+        470,
+        126
       ],
       "edgeChecks": [],
+      "paintedBounds": {
+        "left": 18,
+        "top": 98,
+        "right": 237,
+        "bottom": 157,
+        "count": 9802
+      },
       "rasterBelow2x": false
     },
     {
       "id": "xbox",
       "name": "Xbox",
       "original": "src/bookiebot/reports/assets/company-logo-xbox-f12d88f5a0fab740.svg",
-      "source": "src/bookiebot/reports/assets/company-logo-xbox-f12d88f5a0fab740.svg",
-      "sourceUrl": "https://cdn.jsdelivr.net/gh/homarr-labs/dashboard-icons@83f32e08257b66fbd971ac8d7645f5b38d52e85d/svg/xbox.svg",
-      "sourceSha256": "f12d88f5a0fab740b6dd53081531435c66fe5bdace51a9f4a22ef1aa54e7a539",
-      "method": "Original artwork · circle framing",
+      "source": "docs/logo-review/sources/xbox-official-v2.png",
+      "sourceUrl": "https://cms-assets.xboxservices.com/assets/bf/a7/bfa78b03-47f1-4113-94a0-0094e615a81a.svg?n=Favicon.svg",
+      "sourceSha256": "eaa4f917a26b1287845f40d2ed34517cf753db2ad1a1c3f56563bb4a9a956d92",
+      "method": "Official 2000px Xbox artwork · native source extraction",
       "ai": false,
       "background": "#ffffff",
       "fill": 1,
@@ -2765,11 +3030,14 @@
       "originalSize": null,
       "review": "pending",
       "framing": "native-circle",
-      "asset": "assets/xbox-b4e06387436e7c93.png",
-      "sha256": "b4e06387436e7c9359e9263e0d3c8b8811f67ef8e1fa8a0ab416408863f82ead",
+      "renderVersion": 2,
+      "revision": 2,
+      "bleed": 0.008,
+      "asset": "assets/xbox-6ef9662a5932443f.png",
+      "sha256": "6ef9662a5932443fd5232cf2401620826cb92a963cdff89e332b15572d16b687",
       "sourceSize": [
-        150,
-        150
+        2000,
+        2000
       ],
       "crop": [
         0,
@@ -2778,6 +3046,13 @@
         512
       ],
       "edgeChecks": [],
+      "paintedBounds": {
+        "left": 11,
+        "top": 11,
+        "right": 245,
+        "bottom": 245,
+        "count": 29595
+      },
       "rasterBelow2x": false
     },
     {
@@ -2811,36 +3086,46 @@
         512
       ],
       "edgeChecks": [],
+      "paintedBounds": null,
       "rasterBelow2x": false
     },
     {
       "id": "youtube",
-      "name": "YouTube",
+      "name": "YouTube Premium",
       "original": "src/bookiebot/reports/assets/company-logo-youtube-320ae220c53a6126.svg",
-      "source": "src/bookiebot/reports/assets/company-logo-youtube-320ae220c53a6126.svg",
-      "sourceUrl": "https://cdn.jsdelivr.net/gh/homarr-labs/dashboard-icons@83f32e08257b66fbd971ac8d7645f5b38d52e85d/svg/youtube.svg",
-      "sourceSha256": "320ae220c53a6126da81aaf6803d8c813837bcaa95f39dcf5f75932335746673",
-      "method": "Original artwork · circle framing",
-      "ai": false,
-      "background": "#ff0000",
-      "fill": 0.82,
-      "trim": true,
+      "source": "docs/logo-review/sources/youtube-premium-ai-v2.png",
+      "sourceUrl": "https://www.gstatic.com/youtube/img/promos/growth/53723e837c902a1ea814db4f77832f38a6bb3e101fb5933c4f85636a218bb70b_382x62.png",
+      "sourceSha256": "c3df862854759aa656781f677bebee178f05d33b9ee4106d5e09121cd8b92e87",
+      "method": "AI circle adaptation · official YouTube Premium reference",
+      "ai": true,
+      "background": "#ffffff",
+      "fill": 1,
+      "trim": false,
       "originalSize": null,
       "review": "pending",
       "framing": "solid-tile",
-      "asset": "assets/youtube-9e89851a4157a7e0.png",
-      "sha256": "9e89851a4157a7e0ccfb7480287d6c2646fa86da8f3a437a58c60802d0197b34",
+      "renderVersion": 2,
+      "revision": 2,
+      "asset": "assets/youtube-1b12a2bf6cb661e3.png",
+      "sha256": "1b12a2bf6cb661e33f2086a7777749a627f608fafbb5e090cc0dc1e77dc5e098",
       "sourceSize": [
-        214,
-        150
+        256,
+        256
       ],
       "crop": [
         0,
-        76,
+        0,
         512,
-        360
+        512
       ],
       "edgeChecks": [],
+      "paintedBounds": {
+        "left": 41,
+        "top": 49,
+        "right": 214,
+        "bottom": 208,
+        "count": 19571
+      },
       "rasterBelow2x": false
     },
     {
@@ -2871,6 +3156,7 @@
         512
       ],
       "edgeChecks": [],
+      "paintedBounds": null,
       "rasterBelow2x": false
     },
     {
@@ -2880,9 +3166,9 @@
       "source": "src/bookiebot/reports/assets/company-logo-youtube-tv-eed845163df4042c.png",
       "sourceUrl": "https://www.google.com/s2/favicons?domain=tv.youtube.com&sz=128",
       "sourceSha256": "eed845163df4042ca0fb83d7ac9fb078b674c4112eb2e007d1ab13ed3cfddb3c",
-      "method": "Original artwork · circle framing",
+      "method": "Original red rectangle · white circle restored",
       "ai": false,
-      "background": "#ff0000",
+      "background": "#ffffff",
       "fill": 0.82,
       "trim": true,
       "originalSize": [
@@ -2891,8 +3177,10 @@
       ],
       "review": "pending",
       "framing": "solid-tile",
-      "asset": "assets/youtube-tv-b9a5d0ecc56dd033.png",
-      "sha256": "b9a5d0ecc56dd0338b5554bc3e250f2009a6b4f75530ab0dea5e3412e4219018",
+      "renderVersion": 2,
+      "revision": 2,
+      "asset": "assets/youtube-tv-747f257bb1c68b9d.png",
+      "sha256": "747f257bb1c68b9d243359f6efe95281664cd42932e8a84a90b554b20e032197",
       "sourceSize": [
         128,
         128
@@ -2904,6 +3192,13 @@
         340
       ],
       "edgeChecks": [],
+      "paintedBounds": {
+        "left": 23,
+        "top": 54,
+        "right": 232,
+        "bottom": 201,
+        "count": 27687
+      },
       "rasterBelow2x": false
     },
     {
@@ -2934,6 +3229,7 @@
         512
       ],
       "edgeChecks": [],
+      "paintedBounds": null,
       "rasterBelow2x": false
     }
   ]

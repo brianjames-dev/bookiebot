@@ -81,6 +81,21 @@
       "referenceSha256": {
         "src/bookiebot/reports/assets/company-logo-farmers-2acf3b22b94997be.ico": "2acf3b22b94997beba2b13fe62209beca45a43dcdcaee750cba4c1752e6eabd3"
       }
+    },
+    {
+      "id": "youtube",
+      "references": [
+        "docs/logo-review/sources/youtube-premium-original-v2.png"
+      ],
+      "originalOutput": "youtube-premium-ai-v2.png",
+      "output": "docs/logo-review/sources/youtube-premium-ai-v2.png",
+      "transparent": false,
+      "prompt": "Use case: precise-object-edit. Asset type: YouTube Premium merchant logo adapted to a tiny 26px circular calendar badge. Reference image: the attached official YouTube Premium logo downloaded from YouTube's Premium landing page. Preserve its red rounded rectangular YouTube play mark, precise white play triangle, and black condensed Premium lettering. Re-layout only for a small circle: large red rectangular play mark centered in the upper half, and the exact text \"Premium\" centered underneath in the same clean condensed black brand lettering as the reference, with no extra text. The rectangle must retain its rounded corners and original proportions; it must not become a red full-circle logo. Use a flat pure white square background edge-to-edge, with a balanced composition entirely inside the central 80% circular safe area so later circular cropping does not cut the mark or lettering. Crisp, flat vector-like edges and correct spelling, suitable for small sizes. This is an adaptation of the supplied brand reference, not a redesign. No shadows, gradients, texture, glow, outline, decorative ring, mockup, additional badges or invented symbols. One square high-resolution icon.",
+      "outputSha256": "c3df862854759aa656781f677bebee178f05d33b9ee4106d5e09121cd8b92e87",
+      "originalOutputSha256": "cb70f8f6f542d4940a95da8781ea00e908a73b6c819a9c8fb56bdc022e504c7f",
+      "referenceSha256": {
+        "docs/logo-review/sources/youtube-premium-original-v2.png": "53723e837c902a1ea814db4f77832f38a6bb3e101fb5933c4f85636a218bb70b"
+      }
     }
   ]
 }

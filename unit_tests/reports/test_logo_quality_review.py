@@ -80,9 +80,36 @@ def test_native_sources_remain_inert_images_and_density_flags_are_honest():
 
 def test_exported_brand_edges_have_no_added_white_mat():
     by_id = {item['id']: item for item in read('audit.json')['items']}
-    for id in ['github', 'linkedin', 'railway']:
+    for id in ['github', 'linkedin', 'railway', 'nordvpn', 'paramount-plus']:
         assert len(by_id[id]['edgeChecks']) >= 3
         for check in by_id[id]['edgeChecks']:
             expected = bytes.fromhex(check['color'][1:])
             assert check['actual'][3] == 255
             assert all(abs(a-b) <= 4 for a, b in zip(check['actual'], expected))
+
+
+def test_flagged_revisions_keep_rendered_marks_visible_and_in_the_circle():
+    revised = {item['id']: item for item in read('audit.json')['items'] if item.get('revision') == 2}
+    assert set(revised) == {'github', 'liberty-mutual', 'disney-plus', 'nordvpn',
+                            'paramount-plus', 'railway', 'sling', 'steam', 'todoist',
+                            'xbox', 'waste-management', 'youtube', 'youtube-tv'}
+    for item in revised.values():
+        assert item['renderVersion'] == 2
+        box = item['paintedBounds']
+        assert box['count'] > 256 * 256 * .003
+        assert abs((box['left'] + box['right']) / 2 - 128) <= 256 * .23
+        assert abs((box['top'] + box['bottom']) / 2 - 128) <= 256 * .23
+    assert revised['youtube']['name'] == 'YouTube Premium'
+    assert revised['youtube-tv']['background'] == '#ffffff'
+    assert revised['youtube-tv']['source'] == revised['youtube-tv']['original']
+    assert revised['todoist']['background'] == '#e44332'
+    assert revised['railway']['fill'] == 1
+    assert all(check['color'] == '#ffffff' for check in revised['railway']['edgeChecks'][:3])
+    assert revised['waste-management']['source'].endswith('waste-management-v2-mark.svg')
+    # Their brand circles extend beyond the painted mountain silhouettes. Alpha
+    # trimming would center the shorter silhouette and leave the mark too low.
+    for id in ['nordvpn', 'paramount-plus']:
+        assert revised[id]['trim'] is False
+        assert revised[id]['offset'] == [0, 0]
+    xbox = (ROOT / revised['xbox']['source']).read_bytes()
+    assert struct.unpack('>II', xbox[16:24]) == (2000, 2000)

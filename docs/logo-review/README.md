@@ -19,6 +19,8 @@ their hashes, crop bounds and source resolution. All candidates await visual rev
    and its input/output hashes and full prompt in `ai-restorations.json`. This pass
    restores Aidvantage, Santa Rosa, American Water, Spectrum and Farmers. These are AI
    interpretations, not official replacement artwork or guaranteed exact tracing.
+   The second pass also adapts the official YouTube Premium reference into a
+   compact play-mark/Premium arrangement; its full prompt and lineage are recorded.
 4. Export circle candidates at 256px and inspect them at 26px and enlarged. The
    exporter checks complete catalog coverage, source hashes, decoding and empty
    alpha bounds. It flags raster sources below 52px (2× the displayed size); a
@@ -32,9 +34,9 @@ their hashes, crop bounds and source resolution. All candidates await visual rev
 The exact BaJ icon is copied from the user's portfolio's
 `public/favicon_io/favicon-baj-dark.png`, rather than its outdated angular SVG.
 Native round badges fill their circle; square badges extend their own background
-to every edge. GitHub and LinkedIn have exported-pixel border regressions. Railway
-uses its native white mark on the dark background shown in the user's reference,
-with no surrounding pale rim.
+to every edge. GitHub and LinkedIn have exported-pixel border regressions. Following
+the user's second-pass correction, Railway's white mark fills the complete circle;
+the dark reference color remains only in its native negative-space stripes.
 ChatGPT uses the clean native knot on a dark circle. No account/transaction names
 are sent to a third-party logo or AI service during app use.
 
@@ -52,7 +54,13 @@ python -m pytest unit_tests/reports/test_logo_quality_review.py
 The browser performs deterministic image decoding, alpha-bound measurement and
 format/size export, not AI generation. A source change deliberately fails its hash
 check until the reviewed recipe is updated. The generated gallery bundle contains
-96px before/after images suitable for embedding without runtime network requests.
+images suitable for embedding without runtime network requests. Revised candidates
+use lossless 156px PNG previews for the 52px inspection size at 3× phone density;
+original comparisons remain 96px. The renderer measures alpha bounds separately,
+then paints revised source vectors directly with a full-viewport transform. Avoid
+the nine-argument SVG source crop, whose intrinsic-coordinate behavior displaced
+marks in Chromium. Export checks reject empty/displaced marks and wrong circle
+edge colors, including NordVPN/Paramount's partial-circle center geometry.
 The original full AI outputs remain in the task's `work/logo-quality-review` area;
 the review sources retain normalized 256px exports and original-output hashes.
 
@@ -60,6 +68,7 @@ For manual acceptance, inspect every brand at calendar size; compare especially
 Railway, ChatGPT, Aidvantage, Santa Rosa, BaJ, the utility symbols, Canva and Farmers.
 Check complete silhouettes, optical balance, contrast, unintended white squares,
 tiny wordmarks and clipping. Flag any questionable AI likeness for another pass.
+For the 13 revised marks, also follow [the second-pass checklist](REVISIONS.md).
 
 Brand marks remain their owners' property. Source URLs are recorded per recipe.
 Native vector sources include pinned Dashboard Icons (the production catalog's

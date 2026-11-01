@@ -387,17 +387,19 @@
       "id": "disney-plus",
       "name": "Disney+",
       "original": "src/bookiebot/reports/assets/company-logo-disney-plus-cdc480ea45b4fe48.svg",
-      "source": "src/bookiebot/reports/assets/company-logo-disney-plus-cdc480ea45b4fe48.svg",
+      "source": "docs/logo-review/sources/disney-plus-v2-mark.svg",
       "sourceUrl": "https://cdn.jsdelivr.net/gh/homarr-labs/dashboard-icons@83f32e08257b66fbd971ac8d7645f5b38d52e85d/svg/disney-plus.svg",
-      "sourceSha256": "cdc480ea45b4fe48c3503e118d763f959ec9affdb645c1a71467b24b108a15ee",
-      "method": "Original artwork \u00b7 circle framing",
+      "sourceSha256": "42e13e78b338c281f68567126face684b848a5671bb4ea59be113e940ffde5dd",
+      "method": "Native wordmark \u00b7 centered without tile padding",
       "ai": false,
-      "background": "#191c29",
-      "fill": 1,
+      "background": "#1a1d29",
+      "fill": 0.75,
       "trim": true,
       "originalSize": null,
       "review": "pending",
-      "framing": "standalone-mark"
+      "framing": "standalone-mark",
+      "renderVersion": 2,
+      "revision": 2
     },
     {
       "id": "dominion-energy",
@@ -616,14 +618,14 @@
       "id": "github",
       "name": "GitHub",
       "original": "src/bookiebot/reports/assets/company-logo-github-cdfb82ff14c8c248.svg",
-      "source": "src/bookiebot/reports/assets/company-logo-github-cdfb82ff14c8c248.svg",
-      "sourceUrl": "https://cdn.jsdelivr.net/gh/homarr-labs/dashboard-icons@83f32e08257b66fbd971ac8d7645f5b38d52e85d/svg/github.svg",
-      "sourceSha256": "cdfb82ff14c8c2484eacba9d211d86cd0c993c933855cad2b03633414fa10ddb",
-      "method": "Original artwork \u00b7 circle framing",
+      "source": "docs/logo-review/sources/github-v2-mark.svg",
+      "sourceUrl": "https://brand.github.com/GitHub_Logos.zip",
+      "sourceSha256": "ba04eee210babebc73befb40bafd3a2f5cf1d2280a3df13c6d89869112ba96db",
+      "method": "Official GitHub vector \u00b7 smooth full circle",
       "ai": false,
       "background": "#ffffff",
       "fill": 1,
-      "trim": true,
+      "trim": false,
       "originalSize": null,
       "review": "pending",
       "framing": "native-circle",
@@ -633,23 +635,26 @@
             0.5,
             0.03125
           ],
-          "color": "#1b1f23"
+          "color": "#000000"
         },
         {
           "point": [
             0.03125,
             0.5
           ],
-          "color": "#1b1f23"
+          "color": "#000000"
         },
         {
           "point": [
             0.96875,
             0.5
           ],
-          "color": "#1b1f23"
+          "color": "#000000"
         }
-      ]
+      ],
+      "renderVersion": 2,
+      "revision": 2,
+      "bleed": 0.02
     },
     {
       "id": "google-drive",
@@ -719,20 +724,26 @@
       "id": "liberty-mutual",
       "name": "Liberty Mutual",
       "original": "src/bookiebot/reports/assets/company-logo-liberty-mutual-4a2937466fb97ce6.png",
-      "source": "docs/logo-review/sources/liberty-mutual-mark.svg",
+      "source": "docs/logo-review/sources/liberty-mutual-v2-mark.svg",
       "sourceUrl": "https://www.libertymutual.com/",
-      "sourceSha256": "70def7679fab5fb3d286889bacae3476d8ec614b8eddf2a1d7d339b01c845086",
-      "method": "Original vector \u00b7 circle framing",
+      "sourceSha256": "3006cf95794fa482ae2a08d0ae7c5f2d2f22a7b4d0ebf0b122d96e7ae1e7b0c3",
+      "method": "Clean native statue crop \u00b7 centered",
       "ai": false,
       "background": "#ffd000",
-      "fill": 0.76,
+      "fill": 0.79,
       "trim": true,
       "originalSize": [
         32,
         32
       ],
       "review": "pending",
-      "framing": "standalone-mark"
+      "framing": "standalone-mark",
+      "renderVersion": 2,
+      "revision": 2,
+      "offset": [
+        0.053,
+        -0.02
+      ]
     },
     {
       "id": "linkedin",
@@ -870,17 +881,46 @@
       "id": "nordvpn",
       "name": "NordVPN",
       "original": "src/bookiebot/reports/assets/company-logo-nordvpn-77548d4543437429.svg",
-      "source": "src/bookiebot/reports/assets/company-logo-nordvpn-77548d4543437429.svg",
+      "source": "docs/logo-review/sources/nordvpn-v2-mark.svg",
       "sourceUrl": "https://cdn.jsdelivr.net/gh/homarr-labs/dashboard-icons@83f32e08257b66fbd971ac8d7645f5b38d52e85d/svg/nordvpn.svg",
-      "sourceSha256": "77548d4543437429217f34d9a7506e279cba920f376c5ee9ae84693c35c0aa24",
-      "method": "Original artwork \u00b7 circle framing",
+      "sourceSha256": "935a32f58c5ceb7f0c5df9a9f04f6f2f9e381a43aa5b4ad6bed94a03b0ff8f0a",
+      "method": "Native vector \u00b7 optically centered",
       "ai": false,
       "background": "#ffffff",
       "fill": 1,
-      "trim": true,
+      "trim": false,
       "originalSize": null,
       "review": "pending",
-      "framing": "native-circle"
+      "framing": "native-circle",
+      "renderVersion": 2,
+      "revision": 2,
+      "offset": [
+        0,
+        0
+      ],
+      "edgeChecks": [
+        {
+          "point": [
+            0.5,
+            0.03125
+          ],
+          "color": "#4580ff"
+        },
+        {
+          "point": [
+            0.03125,
+            0.5
+          ],
+          "color": "#4580ff"
+        },
+        {
+          "point": [
+            0.96875,
+            0.5
+          ],
+          "color": "#4580ff"
+        }
+      ]
     },
     {
       "id": "notion",
@@ -902,17 +942,46 @@
       "id": "paramount-plus",
       "name": "Paramount+",
       "original": "src/bookiebot/reports/assets/company-logo-paramount-plus-f99ea29c29229412.svg",
-      "source": "src/bookiebot/reports/assets/company-logo-paramount-plus-f99ea29c29229412.svg",
+      "source": "docs/logo-review/sources/paramount-plus-v2-mark.svg",
       "sourceUrl": "https://cdn.jsdelivr.net/gh/homarr-labs/dashboard-icons@83f32e08257b66fbd971ac8d7645f5b38d52e85d/svg/paramount-plus.svg",
-      "sourceSha256": "f99ea29c292294128d36f3f8fe06a4a96f0d5341de705bfab669e3f81784b179",
-      "method": "Original artwork \u00b7 circle framing",
+      "sourceSha256": "eb59e3ae20b4005f1dac527c264b64e4bf1c36ae4c225857ebb500c625649362",
+      "method": "Native vector \u00b7 optically centered",
       "ai": false,
       "background": "#ffffff",
       "fill": 1,
-      "trim": true,
+      "trim": false,
       "originalSize": null,
       "review": "pending",
-      "framing": "native-circle"
+      "framing": "native-circle",
+      "renderVersion": 2,
+      "revision": 2,
+      "offset": [
+        0,
+        0
+      ],
+      "edgeChecks": [
+        {
+          "point": [
+            0.5,
+            0.03125
+          ],
+          "color": "#0064ff"
+        },
+        {
+          "point": [
+            0.03125,
+            0.5
+          ],
+          "color": "#0064ff"
+        },
+        {
+          "point": [
+            0.96875,
+            0.5
+          ],
+          "color": "#0064ff"
+        }
+      ]
     },
     {
       "id": "patreon",
@@ -1058,10 +1127,10 @@
       "source": "docs/logo-review/sources/railway-mark.svg",
       "sourceUrl": "https://cdn.jsdelivr.net/gh/homarr-labs/dashboard-icons@83f32e08257b66fbd971ac8d7645f5b38d52e85d/svg/railway.svg",
       "sourceSha256": "4e37a4b20550b7988bcb26b9b4803748847576aaf270bf892203ab4b96783a84",
-      "method": "Native white mark \u00b7 user-supplied dark reference",
+      "method": "Native white Railway mark \u00b7 full circle",
       "ai": false,
       "background": "#13121c",
-      "fill": 0.68,
+      "fill": 1,
       "trim": false,
       "originalSize": null,
       "review": "pending",
@@ -1072,7 +1141,21 @@
             0.5,
             0.03125
           ],
-          "color": "#13121c"
+          "color": "#ffffff"
+        },
+        {
+          "point": [
+            0.96875,
+            0.5
+          ],
+          "color": "#ffffff"
+        },
+        {
+          "point": [
+            0.5,
+            0.96875
+          ],
+          "color": "#ffffff"
         },
         {
           "point": [
@@ -1080,22 +1163,11 @@
             0.5
           ],
           "color": "#13121c"
-        },
-        {
-          "point": [
-            0.96875,
-            0.5
-          ],
-          "color": "#13121c"
-        },
-        {
-          "point": [
-            0.5,
-            0.25
-          ],
-          "color": "#ffffff"
         }
-      ]
+      ],
+      "renderVersion": 2,
+      "revision": 2,
+      "bleed": 0.012
     },
     {
       "id": "raycast",
@@ -1215,20 +1287,29 @@
       "id": "sling",
       "name": "Sling TV",
       "original": "src/bookiebot/reports/assets/company-logo-sling-876ca40fda3f2b4e.ico",
-      "source": "src/bookiebot/reports/assets/company-logo-sling-876ca40fda3f2b4e.ico",
-      "sourceUrl": "https://www.sling.com/etc.clientlibs/sling-television/clientlibs/clientlib-global/resources/images/favicon.ico",
-      "sourceSha256": "876ca40fda3f2b4e0b536fdb397f87d90f5e7f07a3ca3fcb19831b121bd1a8e7",
-      "method": "Original artwork \u00b7 circle framing",
+      "source": "docs/logo-review/sources/sling-original-v2.svg",
+      "sourceUrl": "https://www.sling.com/content/dam/sling-television/icons/logo-sling.svg",
+      "sourceSha256": "780bb774e35c3399c8332acb546f009e4393249cfcc6134e297367ba0c0da446",
+      "method": "Official vector wordmark \u00b7 smooth blue/gold ring",
       "ai": false,
       "background": "#080f13",
-      "fill": 1,
+      "fill": 0.77,
       "trim": true,
       "originalSize": [
         128,
         128
       ],
       "review": "pending",
-      "framing": "standalone-mark"
+      "framing": "standalone-mark",
+      "renderVersion": 2,
+      "revision": 2,
+      "ring": {
+        "width": 0.016,
+        "colors": [
+          "#12bde5",
+          "#f4d93e"
+        ]
+      }
     },
     {
       "id": "socalgas",
@@ -1345,14 +1426,17 @@
       "source": "src/bookiebot/reports/assets/company-logo-steam-a700d94f7bc87df5.svg",
       "sourceUrl": "https://cdn.jsdelivr.net/gh/homarr-labs/dashboard-icons@83f32e08257b66fbd971ac8d7645f5b38d52e85d/svg/steam.svg",
       "sourceSha256": "a700d94f7bc87df540938c9f0d8733ec27e9b76610b34073e5c7f43fd61ca402",
-      "method": "Original artwork \u00b7 circle framing",
+      "method": "Native vector \u00b7 dark edge backing",
       "ai": false,
-      "background": "#ffffff",
+      "background": "#101b2e",
       "fill": 1,
       "trim": true,
       "originalSize": null,
       "review": "pending",
-      "framing": "native-circle"
+      "framing": "native-circle",
+      "renderVersion": 2,
+      "revision": 2,
+      "bleed": 0.012
     },
     {
       "id": "strava",
@@ -1428,14 +1512,16 @@
       "source": "src/bookiebot/reports/assets/company-logo-todoist-973f89993d8c5c15.svg",
       "sourceUrl": "https://cdn.jsdelivr.net/gh/homarr-labs/dashboard-icons@83f32e08257b66fbd971ac8d7645f5b38d52e85d/svg/todoist.svg",
       "sourceSha256": "973f89993d8c5c154edb79410f4953077c22f1e94f5507f4ac1ea6c83380e543",
-      "method": "Original artwork \u00b7 circle framing",
+      "method": "Native mark \u00b7 red extended to circle edge",
       "ai": false,
-      "background": "#ffffff",
-      "fill": 0.82,
+      "background": "#e44332",
+      "fill": 0.9,
       "trim": true,
       "originalSize": null,
       "review": "pending",
-      "framing": "standalone-mark"
+      "framing": "solid-tile",
+      "renderVersion": 2,
+      "revision": 2
     },
     {
       "id": "travelers",
@@ -1511,36 +1597,41 @@
       "id": "waste-management",
       "name": "Waste Management",
       "original": "src/bookiebot/reports/assets/company-logo-waste-management-3f9b338e7e4f0e24.jpg",
-      "source": "src/bookiebot/reports/assets/company-logo-waste-management-3f9b338e7e4f0e24.jpg",
-      "sourceUrl": "https://www.wm.com/content/dam/wm/icons/favicon.ico",
-      "sourceSha256": "3f9b338e7e4f0e245a463bb0426ac4173c0603de9a84cf005ed5f7a829e6e3d8",
-      "method": "Original artwork \u00b7 circle framing",
+      "source": "docs/logo-review/sources/waste-management-v2-mark.svg",
+      "sourceUrl": "https://www.wm.com/content/dam/wm/assets/op/brand/WM-Primary-Logo.svg",
+      "sourceSha256": "228c835ad3f8f8b3a13aa6056ce9ccd3207e9b0d596fb0132dfb1f736ab559a6",
+      "method": "Official WM primary vector \u00b7 crisp original colors",
       "ai": false,
       "background": "#ffffff",
-      "fill": 0.82,
+      "fill": 0.86,
       "trim": true,
       "originalSize": [
         64,
         64
       ],
       "review": "pending",
-      "framing": "standalone-mark"
+      "framing": "standalone-mark",
+      "renderVersion": 2,
+      "revision": 2
     },
     {
       "id": "xbox",
       "name": "Xbox",
       "original": "src/bookiebot/reports/assets/company-logo-xbox-f12d88f5a0fab740.svg",
-      "source": "src/bookiebot/reports/assets/company-logo-xbox-f12d88f5a0fab740.svg",
-      "sourceUrl": "https://cdn.jsdelivr.net/gh/homarr-labs/dashboard-icons@83f32e08257b66fbd971ac8d7645f5b38d52e85d/svg/xbox.svg",
-      "sourceSha256": "f12d88f5a0fab740b6dd53081531435c66fe5bdace51a9f4a22ef1aa54e7a539",
-      "method": "Original artwork \u00b7 circle framing",
+      "source": "docs/logo-review/sources/xbox-official-v2.png",
+      "sourceUrl": "https://cms-assets.xboxservices.com/assets/bf/a7/bfa78b03-47f1-4113-94a0-0094e615a81a.svg?n=Favicon.svg",
+      "sourceSha256": "eaa4f917a26b1287845f40d2ed34517cf753db2ad1a1c3f56563bb4a9a956d92",
+      "method": "Official 2000px Xbox artwork \u00b7 native source extraction",
       "ai": false,
       "background": "#ffffff",
       "fill": 1,
       "trim": true,
       "originalSize": null,
       "review": "pending",
-      "framing": "native-circle"
+      "framing": "native-circle",
+      "renderVersion": 2,
+      "revision": 2,
+      "bleed": 0.008
     },
     {
       "id": "xfinity",
@@ -1563,19 +1654,21 @@
     },
     {
       "id": "youtube",
-      "name": "YouTube",
+      "name": "YouTube Premium",
       "original": "src/bookiebot/reports/assets/company-logo-youtube-320ae220c53a6126.svg",
-      "source": "src/bookiebot/reports/assets/company-logo-youtube-320ae220c53a6126.svg",
-      "sourceUrl": "https://cdn.jsdelivr.net/gh/homarr-labs/dashboard-icons@83f32e08257b66fbd971ac8d7645f5b38d52e85d/svg/youtube.svg",
-      "sourceSha256": "320ae220c53a6126da81aaf6803d8c813837bcaa95f39dcf5f75932335746673",
-      "method": "Original artwork \u00b7 circle framing",
-      "ai": false,
-      "background": "#ff0000",
-      "fill": 0.82,
-      "trim": true,
+      "source": "docs/logo-review/sources/youtube-premium-ai-v2.png",
+      "sourceUrl": "https://www.gstatic.com/youtube/img/promos/growth/53723e837c902a1ea814db4f77832f38a6bb3e101fb5933c4f85636a218bb70b_382x62.png",
+      "sourceSha256": "c3df862854759aa656781f677bebee178f05d33b9ee4106d5e09121cd8b92e87",
+      "method": "AI circle adaptation \u00b7 official YouTube Premium reference",
+      "ai": true,
+      "background": "#ffffff",
+      "fill": 1,
+      "trim": false,
       "originalSize": null,
       "review": "pending",
-      "framing": "solid-tile"
+      "framing": "solid-tile",
+      "renderVersion": 2,
+      "revision": 2
     },
     {
       "id": "youtube-music",
@@ -1600,9 +1693,9 @@
       "source": "src/bookiebot/reports/assets/company-logo-youtube-tv-eed845163df4042c.png",
       "sourceUrl": "https://www.google.com/s2/favicons?domain=tv.youtube.com&sz=128",
       "sourceSha256": "eed845163df4042ca0fb83d7ac9fb078b674c4112eb2e007d1ab13ed3cfddb3c",
-      "method": "Original artwork \u00b7 circle framing",
+      "method": "Original red rectangle \u00b7 white circle restored",
       "ai": false,
-      "background": "#ff0000",
+      "background": "#ffffff",
       "fill": 0.82,
       "trim": true,
       "originalSize": [
@@ -1610,7 +1703,9 @@
         128
       ],
       "review": "pending",
-      "framing": "solid-tile"
+      "framing": "solid-tile",
+      "renderVersion": 2,
+      "revision": 2
     },
     {
       "id": "zoom",
