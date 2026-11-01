@@ -1,8 +1,16 @@
 # Finance Operations Workstream
 
-Last updated: 2026-10-29
+Last updated: 2026-11-01
 
 ## Goal
+
+### Reimbursement reset-consent audit and saved-receipt recovery — 2026-11-01
+
+Audit/recovery complete; reset UX/authorization follow-up pending. A debtor-initiated household reset was undone by the original payer, who then confirmed a ten-expense receipt batch. Google read-quota failures left all ten projections pending despite correct saved receipts and zero debt. Every one of 50 allocations/55 events balances in cents. Private sheet/ledger copies passed the actual batch projector twice, including named anchors, both personal bill destinations, October sources and November counterpart rows. Replayed only the unchanged saved batch through the existing service, with exact allocation-version/receipt-count/amount guards. Independent production reads verify all ten reimbursed mirrors, correct personal bill shares and six unique counterpart expenses; no unfinished projection or pending payment report remains. Hashes of all payment events, reset groups and reset actions match the original baseline exactly. No new receipt, bank match, reset or transfer was created.
+
+**510 focused tests passed / 290 optional PostgreSQL skipped**; API fixtures required localhost outside the sandbox. Private baselines, replay script and verification screenshot remain outside Git. Runtime code/financial semantics are unchanged. Corrected `docs/REIMBURSEMENTS.md`: reset forgives debt without recording money; actual external repayments require receipt confirmation, and a saved pending projection must be retried rather than recorded again. Native read-only acceptance is STATUS checklist 230; the actual cash-transfer amount still needs external confirmation.
+
+Pending slice: prevent debtors from clearing another person's receivables. Require each affected creditor's approval for reset and redo, preserve append-only request/approval/reset history and stale-preview/idempotency guards, and keep receipt confirmation separate. Move write-off behind secondary management controls with destructive styling, clear effects and no "settled outside" suggestion. The current household reset/redo policy still permits either person; do not describe approval as shipped. Decide how mixed-direction debts, cancellation/expiry and existing reset history should participate before changing lifecycle/schema. STATUS is the priority source.
 
 ### Category Mix All matches Spent — 2026-10-29
 
