@@ -1,0 +1,2 @@
+# Preserve imported logo bytes and their recorded upstream SHA-256.
+src/bookiebot/reports/assets/company-logo-*.svg -whitespace

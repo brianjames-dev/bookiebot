@@ -132,27 +132,22 @@ def test_top_chart_details_percent_and_calendar_markers_keep_stage_stable():
     source = (Path(__file__).resolve().parents[2] / "web/expense-report/src/report-app.tsx").read_text()
     styles = (Path(__file__).resolve().parents[2] / "web/expense-report/src/styles.css").read_text()
     category_source = source.split("const CategoryMixChart = memo", 1)[1].split("type CategoryMixPieMotionHostProps", 1)[0]
-    calendar_source = source.split("function FinancialCalendar", 1)[1].split("function calendarEventKey", 1)[0]
+    calendar_source = (Path(__file__).resolve().parents[2] / "web/expense-report/src/cashflow-calendar.tsx").read_text()
 
     assert 'filter === "all" ? categoryBudgetTotal(categoryBudgets) : categoryBudgets[filter]' in category_source
     assert "filter !== \"all\" && selectedBudget > 0" not in category_source
     assert '<ModalDetails summary="Categories"' not in category_source
     assert "CategoryContourCallouts" in category_source
-    assert '<ModalDetails summary="Details"' in source.split("function CalendarAnalyticsPanel", 1)[1].split(
-        "function CalendarChangingValue", 1
-    )[0]
+    assert '<ModalDetails summary="Calendar day"' in source.split("function CalendarAnalyticsPanel", 1)[1].split("function BillsUtilitiesPanel", 1)[0]
     burn_source = source.split("function BurnRateChart", 1)[1].split("function burnRateDailyPaceLabel", 1)[0]
     assert "<DetailsPanel" not in burn_source
     assert "<BurnRateMonthBalance" in burn_source
     assert '<DetailsPanel summary="Details" collapseKey={collapseKey}>' in source.split(
         "function BillsUtilitiesPanel", 1
     )[1].split("function BillsUtilitiesChart", 1)[0]
-    assert "filteredEvents.length === 1" in calendar_source
-    assert "CalendarOverflowTooltip events={filteredEvents}" in calendar_source
-    assert 'className="bb-calendar-marker-count"' in calendar_source
-    assert "+{filteredEvents.length - 1}" in calendar_source
-    assert "visibleEventIndexes" not in calendar_source
-    assert "overflowGroups" not in calendar_source
+    assert 'aria-label={calendarEventDescription(item)}' in calendar_source
+    assert 'onClick={() => inspect(date, items)}' in calendar_source
+    assert 'Show all ${items.length} events' in calendar_source
     assert ".bb-details-dialog" in styles
     assert ".bb-chart-carousel .bb-details-content-inner" in styles
 
@@ -163,11 +158,11 @@ def test_top_chart_pages_share_regions_lock_modals_and_show_complete_details():
     carousel_source = source.split('<section\n          className="bb-chart-carousel-band"', 1)[1].split(
         "</section>", 1
     )[0]
-    calendar_panel = source.split("function CalendarAnalyticsPanel", 1)[1].split("function CalendarChangingValue", 1)[0]
+    calendar_panel = source.split("function CalendarAnalyticsPanel", 1)[1].split("function BillsUtilitiesPanel", 1)[0]
 
     assert source.count("bb-chart-page-header") >= 4
     assert source.count("bb-chart-page-body") >= 4
-    assert source.count("bb-chart-page-footer") == 3
+    assert source.count("bb-chart-page-footer") == 2
     assert "panel.titleAccessory" not in carousel_source
     assert "panel.headerControl" not in carousel_source
     assert "useModalPageScrollLock(open)" in source
@@ -179,7 +174,7 @@ def test_top_chart_pages_share_regions_lock_modals_and_show_complete_details():
     assert "onTouchMove={(event) => event.stopPropagation()}" in source
     assert "onTouchEnd={(event) => event.stopPropagation()}" in source
     assert "onTouchCancel={(event) => event.stopPropagation()}" in source
-    assert '<SubscriptionAllItemsGrid items={subscriptionItems} showAll />' in calendar_panel
+    assert '<CalendarDayDetails selection={selection}' in calendar_panel
     assert "const rows = showAll || expanded ? items : visibleItems" in source
     assert "const hasMore = !showAll && items.length > visibleItems.length" in source
     assert ".bb-details-dialog-body" in styles
@@ -238,15 +233,10 @@ def test_reimbursement_disclosures_preserve_complete_transaction_details():
 def test_top_chart_mobile_counts_control_order_and_burn_summary_alignment():
     source = (Path(__file__).resolve().parents[2] / "web/expense-report/src/report-app.tsx").read_text()
     styles = (Path(__file__).resolve().parents[2] / "web/expense-report/src/styles.css").read_text()
-    calendar_panel = source.split("function CalendarAnalyticsPanel", 1)[1].split("function CalendarChangingValue", 1)[0]
-    header_actions = calendar_panel.split('<div className="bb-chart-page-header-actions">', 1)[1].split("</div>", 1)[0]
-
-    assert header_actions.index('<Badge variant="secondary">') < header_actions.index("<CalendarFilterControl")
-    assert ".bb-calendar-marker-count {" in styles
-    assert "display: none;" in styles.split(".bb-calendar-marker-count {", 1)[1].split("}", 1)[0]
-    mobile_styles = styles.split("@media (max-width: 520px)", 1)[1]
-    assert ".bb-calendar-marker-count {" in mobile_styles
-    assert "display: inline-flex;" in mobile_styles.split(".bb-calendar-marker-count {", 1)[1].split("}", 1)[0]
+    calendar = (Path(__file__).resolve().parents[2] / "web/expense-report/src/cashflow-calendar.tsx").read_text()
+    assert 'bb-cf-view-toggle' in calendar
+    assert 'CalendarFilterControl' not in source
+    assert 'bb-cf-legend' in calendar
     assert ".bb-burn-rate-actions {" in styles
     assert "border-left: 1px solid" in styles.split("\n.bb-burn-rate-actions {", 1)[1].split("}", 1)[0]
     assert "grid-template-columns: minmax(0, 1fr) auto;" in styles.split(".bb-burn-rate-primary {", 1)[1].split("}", 1)[0]
@@ -582,11 +572,7 @@ def test_build_expense_breakdown_report_aggregates_shared_and_personal_data():
     assert "Bill details" not in html
     assert "bb-bill-history-dot" in html
     assert "bb-chart-carousel-slide" in html
-    assert "bb-calendar-day-today" in html
-    assert "data-bb-calendar-filter" in html
-    assert "data-bb-calendar-static-label" in html
-    assert "data-bb-calendar-changing-value" in html
-    assert "bb-calendar-marker-transition" in html
+    assert "bb-cf-day" in html
     assert "data-bb-pie-layout-motion" in html
     assert 'data-callouts' in html
     assert 'Show category callouts' in html
@@ -1998,12 +1984,10 @@ def test_report_frontend_keeps_expense_metrics_separate_from_saved_headlines():
 def test_report_frontend_calendar_largest_and_burn_rate_presentation_regressions():
     source = (Path(__file__).resolve().parents[2] / "web/expense-report/src/report-app.tsx").read_text()
 
-    assert 'value={`${totalEvents.length} total`}' in source
-    assert "const outflowTotal = totalEvents" in source
-    assert '.filter((item) => item.kind !== "income")' in source
-    assert '<CalendarChangingValue value={formatMoney(outflowTotal)} />' in source
-    assert 'data-bb-calendar-summary="outflow"' in source
-    assert '<div className="bb-subscription-total" data-bb-calendar-static-label="month">' in source
+    calendar = (Path(__file__).resolve().parents[2] / "web/expense-report/src/cashflow-calendar.tsx").read_text()
+    assert 'summary.outgoing' in calendar
+    assert "projected || !item.projectedOnly" in calendar
+    assert 'totalEvents.length' not in calendar
     assert "const largestEntries = useMemo(() => topEntries" in source
     assert 'entry.category.trim().toLowerCase() !== "rent"' in source
     assert 'categoryMixPressure("wants", categoryBalances, burnRate.spent)' in source

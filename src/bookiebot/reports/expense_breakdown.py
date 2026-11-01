@@ -119,6 +119,14 @@ class CalendarEvent:
     group: str
     projected_only: bool = False
     amount_estimated: bool = False
+    amount_unknown: bool = False
+
+
+@dataclass(frozen=True)
+class CalendarMonth:
+    month: BudgetMonth
+    events: list[CalendarEvent]
+    available: bool = True
 
 
 @dataclass(frozen=True)
@@ -184,6 +192,7 @@ class ExpenseBreakdownReport:
     utility_history: list[UtilityHistoryItem] = field(default_factory=list)
     subscriptions: list[SubscriptionItem] = field(default_factory=list)
     calendar_events: list[CalendarEvent] = field(default_factory=list)
+    calendar_context: list[CalendarMonth] = field(default_factory=list)
     income_entries: list[PaymentItem] = field(default_factory=list)
     income_projection_config: IncomeProjectionConfig = field(default_factory=IncomeProjectionConfig)
     income_projection_reference: PaymentItem | None = None
@@ -634,6 +643,10 @@ def build_expense_breakdown_report(
         utility_history=utility_history,
         subscriptions=subscriptions,
         calendar_events=calendar_events,
+        calendar_context=_calendar_adjacent_months(
+            month, subscriptions, bill_schedule_rows, budget_history,
+            income_projection_config, income_projection_reference, income_projection_receipts,
+        ),
         income_entries=income_entries,
         income_projection_config=income_projection_config,
         income_projection_reference=income_projection_reference,
@@ -1038,6 +1051,74 @@ def _calendar_events(
         )
     )
     return sorted(events, key=lambda item: (item.day, item.kind, item.label.lower()))
+
+
+def _calendar_adjacent_months(
+    selected: BudgetMonth,
+    subscriptions: list[SubscriptionItem],
+    bill_rows: list[list[str]],
+    history: tuple[BudgetHistoryRows, ...],
+    income_config: IncomeProjectionConfig,
+    income_reference: PaymentItem | None,
+    income_receipts: list[PaymentItem],
+) -> list[CalendarMonth]:
+    """Read-only context for a two-week grid, isolated from financial totals.
+
+    Reuse already-read historical rows. Future cells use explicit recurring
+    schedules, never copied actual payments or inferred utility averages.
+    Unknown bill amounts are represented honestly and excluded from sums.
+    """
+    from bookiebot.sheets.bills import list_bill_schedules
+
+    now = now_pacific()
+    result = []
+    for offset in (-1, 1):
+        serial = selected.year * 12 + selected.month - 1 + offset
+        year, zero_month = divmod(serial, 12)
+        month = BudgetMonth(year, zero_month + 1)
+        rows = next((item.rows for item in history if item.month == month), None)
+        future = (month.year, month.month) > (now.year, now.month)
+        if rows is not None:
+            entries, total = _income_entries(rows)
+            config = _income_projection_config_with_history(_income_projection_config(rows), history, month)
+            events = _calendar_events(
+                month=month, subscriptions=_current_month_subscription_items(subscriptions, month),
+                payments=_payment_items(rows, bill_rows, month), income_entries=entries, income_total=total,
+                income_projection_config=config,
+                income_projection_reference=_prior_month_paycheck_reference(history, month, config),
+                income_projection_receipts=income_receipts,
+                utility_history=_utility_history_items(history, bill_rows, month),
+                bill_schedule_rows=bill_rows, personal_rows=rows,
+            )
+        elif future:
+            events = _subscription_calendar_events(subscriptions, month, 0)
+            events.extend(_income_calendar_events([], 0, month, income_config, income_reference, income_receipts))
+        else:
+            # A missing historical worksheet is not an empty, zero-spending month.
+            result.append(CalendarMonth(month, [], available=False))
+            continue
+        if future:
+            # Complete the schedule even when a next-month worksheet exists but
+            # its actual/expected amount is blank. Never label that bill $0.
+            present = {_bill_subscription_identity(event.label) for event in events if event.kind != "income"}
+            bills = list_bill_schedules(bill_rows) if bill_rows else []
+            counts: dict[str, int] = defaultdict(int)
+            for bill in bills:
+                counts[_normalize_label(bill.source_label)] += 1
+            for bill in bills:
+                day = _bill_day_in_month(bill, month)
+                labels = {_bill_subscription_identity(bill.source_label), _bill_subscription_identity(bill.display_name)}
+                if day is None or labels & present:
+                    continue
+                known = bill.expected_amount is not None and counts[_normalize_label(bill.source_label)] == 1
+                amount = float(bill.expected_amount or 0) if known else 0.0
+                events.append(CalendarEvent(
+                    "bill", bill.display_name or bill.source_label or bill.bill_key, amount, day,
+                    _payment_group_for_label(_normalize_label(bill.source_label)) or "bills_utilities",
+                    projected_only=True, amount_estimated=known, amount_unknown=not known,
+                ))
+        result.append(CalendarMonth(month, sorted(events, key=lambda item: (item.day, item.kind, item.label.lower()))))
+    return result
 
 
 def _subscription_calendar_events(
@@ -2551,6 +2632,11 @@ def _report_client_payload(
         "dailyEntries": [_expense_entry_payload(entry) for entry in activity_entries],
         "needExpenses": [_payment_payload(item) for item in report.need_expenses],
         "calendarEvents": [_calendar_event_payload(item) for item in report.calendar_events],
+        "calendarContext": [
+            {"year": item.month.year, "month": item.month.month, "available": item.available,
+             "events": [_calendar_event_payload(event) for event in item.events]}
+            for item in report.calendar_context
+        ],
         "utilityHistory": [_utility_history_payload(item) for item in report.utility_history],
         "sharedReimbursements": [_shared_reimbursement_payload(item) for item in report.shared_reimbursements],
         "subscriptionsNeeds": [
@@ -3008,6 +3094,8 @@ def _calendar_event_payload(item: CalendarEvent) -> dict[str, Any]:
     }
     if item.amount_estimated:
         payload["amountEstimated"] = True
+    if item.amount_unknown:
+        payload["amountUnknown"] = True
     return payload
 
 

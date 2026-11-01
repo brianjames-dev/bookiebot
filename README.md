@@ -168,7 +168,7 @@ Daily Discord digests show a configured expected amount even before a payment is
 
 An owner can explicitly choose optional `tracking_mode=automatic` for a fixed recurring expense with a positive `expected_amount`. Brian chose this for Student Loan: the current-month and internal Template amount cells link to the schedule, with the existing checkmark/star status formula. That visual indicator reflects a nonzero budget amount; the schedule mode controls automation. The existing Student Loan row counts once under Needs/Static Bills & Subscriptions, without adding a duplicate subscription or requiring monthly payment entry. This is an automatic budget expense, not bank-payment verification. Status commands explain automatic mode, and manual loan logging cannot overwrite its formula. Reminders use the fixed scheduled amount within the normal seven-day window and omit false unrecorded-overdue notices. Blank/`manual` tracking mode preserves the existing behavior; reads never activate automatic mode or fill budget cells.
 
-The loan remains a Needs **bill**, displayed under **Static Bills & Subscriptions** and in Calendar’s fixed-bill details, with Scheduled/Recorded amount provenance. It is excluded from the variable Bills & Utilities trend chart. Burn Rate counts Food, Shopping and Wants subscriptions only; a Needs bill affects its Wants allowance through the existing category coverage rules, never by becoming Wants spending. Both canonical modes, report details and widgets preserve fixed bill amounts alongside subscription totals.
+The loan remains a Needs **bill**, displayed under **Static Bills & Subscriptions** and in Calendar’s day details, with Scheduled/Recorded amount provenance. It is excluded from the variable Bills & Utilities trend chart. Burn Rate counts Food, Shopping and Wants subscriptions only; a Needs bill affects its Wants allowance through the existing category coverage rules, never by becoming Wants spending. Both canonical modes, report details and widgets preserve fixed bill amounts alongside subscription totals.
 
 ## Bank Integration And Confirmed Imports
 
@@ -232,6 +232,10 @@ Phone sessions, savings goals, widget pairings/grants, and notification settings
 Live and saved expense reports require an unexpired signed report link. Direct filename links also need the token issued for that exact file. Responses are private and are not cached. If live refresh fails, a valid link can still show its saved snapshot.
 
 Live builds run outside the Discord event loop. `BOOKIEBOT_REPORT_MAX_CONCURRENT_BUILDS` defaults to `2` (supported range `1`–`8`); simultaneous requests for the same actor/month share work, while later refreshes read current sheet values. Fresh reports batch required tabs per workbook (one metadata read and one formatted values batch). Comparisons batch all available months of each requested year and retain their comparison inputs and canonical expense totals for both modes in bounded process memory for at most 60 seconds; month discovery uses the same short reuse window. Every regular refresh bypasses and invalidates these history reads. A 10-second handoff can also reuse the just-refreshed selected report. Failed reads are never cached, and old in-flight history cannot repopulate the cache after refresh. Sheets sockets have finite timeouts; source throttling gets explicit feedback and Retry-After rather than a misleading connection error. Report reads never create missing worksheets.
+
+### Calendar and company logos
+
+The Calendar graph opens to this week and next week, with a full-month toggle, original color company logos, separate daily incoming/outgoing amounts and day dialogs. See [Calendar and company logos](docs/CALENDAR_AND_LOGOS.md) for layout settings, the local 89-logo catalog, coverage rules and the import workflow.
 
 ## Verification
 

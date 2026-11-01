@@ -1,5 +1,13 @@
 # Agent Decisions
 
+## 2026-10-31 - Under Calendar And A Local Company Catalog
+
+Implement the approved Under calendar layout inside the existing sliding Calendar page: compact date/outgoing header, icon-only two-week/full-month control, equal grid height, overlapping color logos with hard transparent masks, separate incoming/outgoing capsules, full-month mixed dots and legend below. Use the existing native day dialog lifecycle for exact values and overflow; remove All/Subs, event counts and the separate Details trigger. Keep 104px bottom breathing room and retain the broader goal of reducing shared graph heights in future passes. Code defaults mirror the draft; cells shrink together when constrained by the existing shared stage, without resizing other graphs.
+
+Add read-only adjacent-month `calendarContext` from already-loaded history and explicit future schedules. Unknown future bill amounts stay unknown, missing historical data stays unavailable, and context never feeds financial totals or activity. Preserve the existing Current/Projected header inclusion rule and Scheduled/Recorded provenance. Do not infer next month's utility actuals from the selected month's payment.
+
+Bundle 89 reviewed, original-color logo/site-icon assets with explicit aliases, source notices and SHA-256 filenames. Serve only the narrow static image pattern under the existing same-origin CSP, load visible images lazily, and fall back to type icons on misses/errors. No runtime merchant lookup or outside request is allowed. Brian confirmed Santa Rosa City Water and Aidvantage; generic Water/Student Loan matching is scoped to his display profile. This is visual identification, never financial classification or account authorization.
+
 ## 2026-10-31 - Keep Navigation Chrome Independent Of Page Work
 
 Use a small session-local `AppNavigationStore` for the accepted screen/main-tab intent and compact flag. A memoized dock subscribes through `useSyncExternalStore`, with a stable shell selection callback. After the existing readiness/availability checks accept a release, publish chrome immediately and schedule page setters plus screen-change cleanup in `startTransition`. Page requests, report refreshes, draft/work-guard publications and lower-priority page commits cannot rerender or retarget the dock. Passive scroll compaction updates only the chrome store. This is transient presentation state, with no persistence, financial state or event-protocol changes.

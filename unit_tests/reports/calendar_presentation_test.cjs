@@ -11,11 +11,8 @@ const jsxRuntime = require("../../web/expense-report/node_modules/react/jsx-runt
 const source = fs.readFileSync("web/expense-report/src/report-app.tsx", "utf8")
 const file = ts.createSourceFile("report-app.tsx", source, ts.ScriptTarget.Latest, true, ts.ScriptKind.TSX)
 const names = new Set([
-  "money", "CATEGORY_CHART_COLORS", "CALENDAR_EVENT_STYLES", "WEEKDAY_LABELS", "SUBSCRIPTION_TONES", "PACIFIC_CALENDAR_DATE",
+  "money", "CATEGORY_CHART_COLORS", "SUBSCRIPTION_TONES", "PACIFIC_CALENDAR_DATE",
   "formatMoney", "dailyEntryDayLabel", "DailyEntriesTable", "compareDayGroups", "isCurrentCalendarDay",
-  "FinancialCalendar", "calendarEventsByDay", "calendarEventKey", "calendarEventStyle",
-  "calendarEventsStyle", "calendarEventLabel", "calendarEventKindLabel",
-  "CalendarEventTooltip", "CalendarOverflowTooltip",
 ])
 const declarations = file.statements.filter((statement) => {
   if (ts.isFunctionDeclaration(statement)) return names.has(statement.name?.text)
@@ -48,58 +45,6 @@ const palette = vm.runInContext("CATEGORY_CHART_COLORS", runtime)
 const subscriptionTones = vm.runInContext("SUBSCRIPTION_TONES", runtime)
 assert.equal(subscriptionTones.needs.color, palette.static_bills_subscriptions_needs)
 assert.equal(subscriptionTones.wants.color, palette.subscriptions_wants)
-const event = (group, kind = "subscription", extra = {}) => ({
-  kind, group, label: group, amount: 18.75, day: 6, projectedOnly: false, ...extra,
-})
-
-// Both actual and projected markers retain the Category Mix identity. Income
-// remains a distinct cashflow color because it is not an expense pie slice.
-for (const [group, kind] of [
-  ["rent", "bill"], ["bills_utilities", "bill"],
-  ["static_bills_subscriptions_needs", "subscription"], ["subscriptions_wants", "subscription"],
-]) {
-  for (const projectedOnly of [false, true]) {
-    const item = event(group, kind, { projectedOnly })
-    assert.equal(runtime.calendarEventStyle(item).color, palette[group])
-    const html = renderToStaticMarkup(runtime.FinancialCalendar({
-      year: 2026, month: 9, elapsedDays: 6, events: [item], filter: "all",
-    }))
-    assert.ok(html.includes(`color:${palette[group]}`))
-    assert.ok(html.includes(`border-color:${palette[group]}`))
-    assert.ok(html.includes(`bb-calendar-tooltip-category\" style=\"color:${palette[group]}`))
-    assert.ok(html.includes("$18.75"))
-  }
-}
-assert.equal(runtime.calendarEventStyle(event("income", "income")).color, "hsl(var(--success))")
-assert.equal(runtime.calendarEventStyle(event("legacy-utility", "bill")).color, palette.bills_utilities)
-assert.equal(runtime.calendarEventStyle(event("legacy-sub")).color, palette.static_bills_subscriptions_needs)
-
-// Same-category consolidation stays solid; mixed days show each distinct
-// category, and the tooltip preserves each payment with its own identity.
-const needs = event("static_bills_subscriptions_needs")
-const wants = event("subscriptions_wants")
-const income = event("income", "income")
-const same = runtime.calendarEventsStyle([needs, needs])
-assert.equal(same.color, palette.static_bills_subscriptions_needs)
-assert.equal(same.dotBackground, palette.static_bills_subscriptions_needs)
-const mixed = runtime.calendarEventsStyle([needs, wants, needs, income])
-assert.ok(mixed.dotBackground.startsWith("conic-gradient("))
-for (const color of [palette.static_bills_subscriptions_needs, palette.subscriptions_wants, "hsl(var(--success))"]) {
-  assert.equal(mixed.dotBackground.split(color).length - 1, 1)
-}
-const mixedHtml = renderToStaticMarkup(runtime.FinancialCalendar({
-  year: 2026, month: 9, elapsedDays: 6, events: [needs, wants, income], filter: "all",
-}))
-assert.ok(mixedHtml.includes(`background:${runtime.calendarEventsStyle([needs, wants, income]).dotBackground}`))
-assert.ok(mixedHtml.includes("3 events on day 6:"))
-assert.ok(mixedHtml.includes("$56.25"))
-assert.equal((mixedHtml.match(/bb-calendar-tooltip-category/g) || []).length, 3)
-const subsHtml = renderToStaticMarkup(runtime.FinancialCalendar({
-  year: 2026, month: 9, elapsedDays: 6, events: [needs, wants, income], filter: "subscription",
-}))
-assert.ok(subsHtml.includes("$37.50"))
-assert.ok(!subsHtml.includes("hsl(var(--success))"))
-
 // Browser-local date may already be tomorrow. Highlight the report's current
 // Pacific day only, including midnight, month/year rollover and DST boundaries.
 assert.equal(runtime.isCurrentCalendarDay(2026, 9, 6), true)
@@ -132,7 +77,7 @@ assert.ok(!daily(entries, 2025, 9).includes('aria-current="date"'))
 assert.ok(!daily([entries[1]]).includes('aria-current="date"'), "No invented entry if today has no spending")
 assert.ok(!daily([]).includes("<tr>"))
 assert.ok(!daily([{ ...entries[0], date: "" }]).includes('aria-current="date"'))
-console.log("Calendar category colors and Pacific-day highlight checks passed")
+console.log("Daily category colors and Pacific-day highlight checks passed")
 
 assert.equal(runtime.dailyEntryDayLabel({date:"2026-09-03"}), "3")
 assert.equal(runtime.dailyEntryDayLabel({date:"9/03/2026"}), "3")

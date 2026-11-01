@@ -19,6 +19,8 @@ import { useCategoryContour, CategoryContourCallouts } from "./category-mix-cont
 import { categoryCenterStyle, categoryRingSpring, CategoryRingCenterSync } from "./category-mix-motion"
 import { CONTOUR_PADDING_ANGLE } from "./category-mix-layout"
 import { burnRateBalance, burnRateTooltipOccluders, positionBurnRateTooltip } from "./burn-rate-tooltip"
+import { CashflowCalendar, CalendarDayDetails, type CalendarSelection } from "./cashflow-calendar"
+import "./cashflow-calendar.css"
 import { useChartSwipe } from "./chart-swipe"
 import { categoryRingAnimation, stableBarAnimation, stableBarShape, StablePieSector, type AnimatedPieSector } from "./chart-animation"
 import { ReportScreen, useAppNavigation } from "./app-navigation"
@@ -64,7 +66,7 @@ import type {
   BurnRatePoint,
   BudgetCategoryKey,
   CalendarEvent,
-  CalendarEventKind,
+  CalendarMonth,
   CategoryBalanceAmounts,
   CategoryBalances,
   ExpenseEntry,
@@ -220,7 +222,6 @@ type ChartPanel = {
   content: ReactNode
 }
 
-type CalendarFilter = "all" | "subscription"
 type DailySpendingFilter = "all" | "needs" | "wants"
 type CategoryMixFilter = "all" | BudgetCategoryKey
 
@@ -716,7 +717,6 @@ const OverviewCharts = memo(function OverviewCharts({ report, activeReport, char
 }) {
   const navigation = useAppNavigation()
   const [categoryMixFilter, setCategoryMixFilter] = useState<CategoryMixFilter>("all")
-  const [calendarFilter, setCalendarFilter] = useState<CalendarFilter>("all")
   const tooltipCooldownTimeoutRef = useRef<number | null>(null)
   const [chartTooltipCooldown, setChartTooltipCooldown] = useState(false)
   const [localCollapseKey, setLocalCollapseKey] = useState(0)
@@ -728,13 +728,6 @@ const OverviewCharts = memo(function OverviewCharts({ report, activeReport, char
     dismissChartTooltips()
     setCategoryMixFilter(nextFilter)
   }, [categoryMixFilter, dismissChartTooltips])
-  const switchCalendarFilter = useCallback((nextFilter: CalendarFilter) => {
-    if (nextFilter === calendarFilter) {
-      return
-    }
-    dismissChartTooltips()
-    setCalendarFilter(nextFilter)
-  }, [calendarFilter, dismissChartTooltips])
   const chartCollapseKey = collapseKey + localCollapseKey
   const chartPanels: ChartPanel[] = [
     {
@@ -779,14 +772,11 @@ const OverviewCharts = memo(function OverviewCharts({ report, activeReport, char
         <MemoizedCalendarAnalyticsPanel
           year={report.year}
           month={report.month}
-          monthLabel={report.monthLabel}
-          elapsedDays={report.elapsedDays}
+          key={`${report.year}-${report.month}`}
           events={activeReport.calendarEvents}
-          filter={calendarFilter}
-          onFilterChange={switchCalendarFilter}
+          context={report.calendarContext}
+          owner={report.ownerName}
           projected={projectionActive}
-          needs={report.subscriptionsNeeds}
-          wants={report.subscriptionsWants}
           collapseKey={chartCollapseKey}
         />
       ),
@@ -3223,381 +3213,24 @@ function compareDayLabels(left: string, right: string) {
   return left.localeCompare(right)
 }
 
-const CALENDAR_FILTERS: Array<{ value: CalendarFilter; label: string }> = [
-  { value: "all", label: "All" },
-  { value: "subscription", label: "Subs" },
-]
-
-const CALENDAR_EVENT_STYLES: Record<CalendarEventKind, { label: string; color: string; background: string }> = {
-  subscription: {
-    label: "Sub",
-    color: CATEGORY_CHART_COLORS.static_bills_subscriptions_needs,
-    background: "hsl(var(--category-subs-needs) / 0.1)",
-  },
-  bill: {
-    label: "Bill",
-    color: CATEGORY_CHART_COLORS.bills_utilities,
-    background: "hsl(var(--category-bills) / 0.1)",
-  },
-  income: {
-    label: "Income",
-    color: "hsl(var(--success))",
-    background: "hsl(var(--success) / 0.1)",
-  },
-}
-
-function CalendarFilterControl({
-  filter,
-  onFilterChange,
-}: {
-  filter: CalendarFilter
-  onFilterChange: (filter: CalendarFilter) => void
-}) {
-  return (
-    <SlidingSelection
-      value={filter}
-      className="bb-tabs-list bb-subscription-tone-control"
-      role="tablist"
-      aria-label="Calendar view"
-      data-bb-tooltip-dismiss-trigger="calendar"
-    >
-      {CALENDAR_FILTERS.map((item) => (
-        <button
-          type="button"
-          key={item.value}
-          className="bb-tabs-trigger"
-          data-state={filter === item.value ? "active" : "inactive"}
-          role="tab"
-          aria-selected={filter === item.value}
-          onClick={() => onFilterChange(item.value)}
-        >
-          {item.label}
-        </button>
-      ))}
-    </SlidingSelection>
-  )
-}
-
-function CalendarAnalyticsPanel({
-  year,
-  month,
-  monthLabel,
-  elapsedDays,
-  events,
-  filter,
-  onFilterChange,
-  projected,
-  needs,
-  wants,
-  collapseKey,
-}: {
+function CalendarAnalyticsPanel({ year, month, events, context, owner, projected, collapseKey }: {
   year: number
   month: number
-  monthLabel: string
-  elapsedDays: number
   events: CalendarEvent[]
-  filter: CalendarFilter
-  onFilterChange: (filter: CalendarFilter) => void
+  context?: CalendarMonth[]
+  owner: string
   projected: boolean
-  needs: SubscriptionItem[]
-  wants: SubscriptionItem[]
   collapseKey: number
 }) {
-  const visibleEvents = filter === "all" ? events : events.filter((item) => item.kind === filter)
-  const totalEvents = projected ? visibleEvents : visibleEvents.filter((item) => !item.projectedOnly)
-  const outflowTotal = totalEvents
-    .filter((item) => item.kind !== "income")
-    .reduce((sum, item) => sum + item.amount, 0)
-  const subscriptionItems = [...needs, ...wants]
-  const fixedBills = visibleEvents.filter((item) => item.kind === "bill" && item.group === "static_bills_subscriptions_needs")
-
-  return (
-    <div className="bb-subscription-analytics">
-      <div
-        className="bb-subscription-tab-content bb-cashflow-calendar-content"
-        data-state="active"
-        data-bb-calendar-filter={filter}
-      >
-        <div className="bb-subscription-panel bb-chart-page">
-          <div className="bb-panel-head bb-subscription-summary bb-chart-page-header">
-            <div>
-              <div className="bb-subscription-total" data-bb-calendar-static-label="month">
-                {monthOnlyLabel(monthLabel)}
-              </div>
-              <div className="bb-chart-mode-note" data-bb-calendar-summary="outflow">
-                <CalendarChangingValue value={formatMoney(outflowTotal)} />
-              </div>
-            </div>
-            <div className="bb-chart-page-header-actions">
-              <Badge variant="secondary">
-                <CalendarChangingValue value={`${totalEvents.length} total`} />
-              </Badge>
-              <CalendarFilterControl filter={filter} onFilterChange={onFilterChange} />
-            </div>
-          </div>
-          <div className="bb-chart-page-body">
-            <FinancialCalendar
-              year={year}
-              month={month}
-              elapsedDays={elapsedDays}
-              events={events}
-              filter={filter}
-            />
-          </div>
-          <div className="bb-chart-page-footer">
-            {subscriptionItems.length || fixedBills.length ? (
-              <ModalDetails summary="Details" title="Calendar details" collapseKey={collapseKey}>
-                <p className="bb-activity-footnote">Recurring schedules · these dates and amounts do not confirm bank posting.</p>
-                {fixedBills.length > 0 && <FixedBillItemsTable items={fixedBills} month={month} />}
-                {subscriptionItems.length > 0 && <SubscriptionAllItemsGrid items={subscriptionItems} showAll />}
-              </ModalDetails>
-            ) : null}
-          </div>
-        </div>
-      </div>
-    </div>
-  )
-}
-
-function CalendarChangingValue({ value }: { value: string }) {
-  const [currentValue, setCurrentValue] = useState(value)
-  const [previousValue, setPreviousValue] = useState<string | null>(null)
-  const transitionTimerRef = useRef<number | null>(null)
-
-  useEffect(() => {
-    if (value === currentValue) {
-      return
-    }
-    if (transitionTimerRef.current !== null) {
-      window.clearTimeout(transitionTimerRef.current)
-    }
-    setPreviousValue(currentValue)
-    setCurrentValue(value)
-    transitionTimerRef.current = window.setTimeout(() => {
-      setPreviousValue(null)
-      transitionTimerRef.current = null
-    }, 220)
-  }, [currentValue, value])
-
-  useEffect(() => () => {
-    if (transitionTimerRef.current !== null) {
-      window.clearTimeout(transitionTimerRef.current)
-    }
-  }, [])
-
-  return (
-    <span className="bb-calendar-changing-value" aria-live="polite" data-bb-calendar-changing-value>
-      {previousValue !== null ? (
-        <span className="bb-calendar-changing-value-out" aria-hidden="true">
-          {previousValue}
-        </span>
-      ) : null}
-      <span
-        className={previousValue !== null ? "bb-calendar-changing-value-in" : undefined}
-        aria-label={currentValue}
-      >
-        {currentValue}
-      </span>
-    </span>
-  )
-}
-
-function FinancialCalendar({
-  year,
-  month,
-  elapsedDays,
-  events,
-  filter,
-}: {
-  year: number
-  month: number
-  elapsedDays: number
-  events: CalendarEvent[]
-  filter: CalendarFilter
-}) {
-  const daysInMonth = new Date(year, month, 0).getDate()
-  const leadingBlankDays = new Date(year, month - 1, 1).getDay()
-  const cellCount = Math.ceil((leadingBlankDays + daysInMonth) / 7) * 7
-  const days = Array.from({ length: cellCount }, (_, index) => {
-    const day = index - leadingBlankDays + 1
-    return day >= 1 && day <= daysInMonth ? day : null
-  })
-  const eventsByDay = calendarEventsByDay(events)
-
-  return (
-    <div className="bb-subscription-calendar" aria-label="Cashflow calendar">
-      <div className="bb-calendar-head" aria-hidden="true">
-        {WEEKDAY_LABELS.map((label) => (
-          <span key={label}>{label}</span>
-        ))}
-      </div>
-      <div className="bb-calendar-grid">
-        {days.map((day, index) => {
-          const dayEvents = day === null ? [] : eventsByDay.get(day) ?? []
-          const filteredEvents = filter === "all"
-            ? dayEvents
-            : dayEvents.filter((event) => event.kind === "subscription")
-          const isToday = day !== null && isCurrentCalendarDay(year, month, day)
-          const hasHit = day !== null && day <= elapsedDays
-          const markerIsPending = !hasHit || filteredEvents.every((event) => event.projectedOnly)
-          return (
-            <div
-              key={`${day ?? "blank"}-${index}`}
-              className={[
-                "bb-calendar-day",
-                day === null ? "bb-calendar-day-muted" : "",
-                filteredEvents.length ? "bb-calendar-day-has-items" : "",
-                isToday ? "bb-calendar-day-today" : "",
-              ].filter(Boolean).join(" ")}
-              aria-hidden={day === null}
-            >
-              {day === null ? null : (
-                <>
-                  <div className="bb-calendar-day-number">{day}</div>
-                  <div className="bb-calendar-marker-stack">
-                    {filteredEvents.length === 1 ? (() => {
-                      const item = filteredEvents[0]
-                      const style = calendarEventStyle(item)
-                      return (
-                        <button
-                          type="button"
-                          key={calendarEventKey(item, 0)}
-                          className={[
-                            "bb-subscription-marker",
-                            "bb-calendar-marker-transition",
-                            markerIsPending ? "bb-subscription-marker-pending" : "",
-                          ].filter(Boolean).join(" ")}
-                          data-calendar-event-kind={item.kind}
-                          style={{
-                            color: style.color,
-                            backgroundColor: style.background,
-                            borderColor: style.color,
-                          }}
-                          aria-label={calendarEventLabel(item)}
-                        >
-                          <span className="bb-subscription-marker-dot" />
-                          <span className="bb-subscription-marker-name">{item.label}</span>
-                          <span className="bb-subscription-marker-amount">{formatMoney(item.amount)}</span>
-                          <CalendarEventTooltip event={item} />
-                        </button>
-                      )
-                    })() : filteredEvents.length > 1 ? (() => {
-                      const style = calendarEventsStyle(filteredEvents)
-                      const total = filteredEvents.reduce((sum, event) => sum + event.amount, 0)
-                      return (
-                        <button
-                          type="button"
-                          key={`events-${filter}-${day}`}
-                          className={[
-                            "bb-subscription-marker",
-                            "bb-subscription-marker-more",
-                            "bb-calendar-marker-transition",
-                            markerIsPending ? "bb-subscription-marker-pending" : "",
-                          ].filter(Boolean).join(" ")}
-                          style={{
-                            color: style.color,
-                            backgroundColor: style.background,
-                            borderColor: style.color,
-                          }}
-                          aria-label={`${filteredEvents.length} events on day ${day}: ${filteredEvents.map(calendarEventLabel).join("; ")}`}
-                        >
-                          <span className="bb-subscription-marker-dot" style={{ background: style.dotBackground }} />
-                          <span className="bb-calendar-marker-count" aria-hidden="true">
-                            +{filteredEvents.length - 1}
-                          </span>
-                          <span className="bb-subscription-marker-name">{filteredEvents.length} events</span>
-                          <span className="bb-subscription-marker-amount">{formatMoney(total)}</span>
-                          <CalendarOverflowTooltip events={filteredEvents} day={day} />
-                        </button>
-                      )
-                    })() : null}
-                  </div>
-                </>
-              )}
-            </div>
-          )
-        })}
-      </div>
-    </div>
-  )
-}
-
-function calendarEventKey(event: CalendarEvent, index: number) {
-  return [
-    event.kind,
-    event.group,
-    event.day,
-    event.label,
-    event.amount,
-    event.projectedOnly ? "projected" : "actual",
-    index,
-  ].join("-")
-}
-
-function calendarEventsByDay(events: CalendarEvent[]) {
-  const grouped = new Map<number, CalendarEvent[]>()
-  for (const event of events) {
-    grouped.set(event.day, [...(grouped.get(event.day) ?? []), event])
-  }
-  return grouped
-}
-
-function calendarEventStyle(event: CalendarEvent) {
-  const fallback = CALENDAR_EVENT_STYLES[event.kind]
-  const color = event.kind === "income" ? fallback.color : CATEGORY_CHART_COLORS[event.group] ?? fallback.color
-  return { ...fallback, color, background: `color-mix(in srgb, ${color} 10%, transparent)` }
-}
-
-function calendarEventsStyle(events: CalendarEvent[]) {
-  const colors = [...new Set(events.map((event) => calendarEventStyle(event).color))]
-  if (colors.length === 1) {
-    return { ...calendarEventStyle(events[0]), dotBackground: colors[0] }
-  }
-  // A consolidated day can contain several categories; its dot shows each one
-  // instead of assigning every payment the first event's category color.
-  return {
-    color: "hsl(var(--muted-foreground))",
-    background: "hsl(var(--muted-foreground) / 0.08)",
-    dotBackground: `conic-gradient(${colors.map((color, index) => `${color} ${index * 100 / colors.length}% ${(index + 1) * 100 / colors.length}%`).join(", ")})`,
-  }
-}
-
-function calendarEventLabel(event: CalendarEvent) {
-  return `${event.label} - ${calendarEventKindLabel(event)} - ${formatMoney(event.amount)} - ${calendarActivityStatus(event) === "scheduled" ? "Scheduled" : "Recorded"}`
-}
-
-function CalendarEventTooltip({ event }: { event: CalendarEvent }) {
-  return (
-    <span className="bb-subscription-tooltip" role="tooltip">
-      <strong className="bb-calendar-tooltip-category" style={{ color: calendarEventStyle(event).color }}>{event.label}</strong>
-      <span>{calendarEventKindLabel(event)} · {calendarActivityStatus(event) === "scheduled" ? "Scheduled" : "Recorded"}</span>
-      <span className="bb-subscription-tooltip-amount">{formatMoney(event.amount)}</span>
-    </span>
-  )
-}
-
-function CalendarOverflowTooltip({ events, day }: { events: CalendarEvent[]; day: number }) {
-  return (
-    <span className="bb-subscription-tooltip bb-subscription-tooltip-wide" role="tooltip">
-      <strong>More on day {day}</strong>
-      {events.map((event, index) => (
-        <span
-          key={`${event.kind}-${event.label}-${event.amount}-${index}`}
-          className="bb-calendar-tooltip-category"
-          style={{ color: calendarEventStyle(event).color }}
-        >
-          {event.label} - {calendarEventKindLabel(event)} - {formatMoney(event.amount)}
-        </span>
-      ))}
-    </span>
-  )
-}
-
-function calendarEventKindLabel(event: CalendarEvent) {
-  if (event.kind === "subscription") {
-    return event.group === "subscriptions_wants" ? "Want sub" : "Need sub"
-  }
-  return CALENDAR_EVENT_STYLES[event.kind].label
+  const [selection, setSelection] = useState<CalendarSelection | null>(null)
+  return <div className="bb-cashflow-panel">
+    <CashflowCalendar year={year} month={month} events={events} context={context} owner={owner}
+      projected={projected} onInspect={setSelection} />
+    <ModalDetails summary="Calendar day" title={selection?.title ?? "Calendar day"} selection={selection?.key ?? null}
+      collapseKey={collapseKey} triggerHidden onDismiss={() => setSelection(null)}>
+      {selection && <CalendarDayDetails selection={selection} owner={owner} />}
+    </ModalDetails>
+  </div>
 }
 
 function BillsUtilitiesPanel({
@@ -4090,27 +3723,6 @@ function SubscriptionAllItemsGrid({ items, showAll = false }: { items: Subscript
       <SubscriptionCompactTable title="Needs" items={needs} tone="needs" showAll={showAll} />
       <SubscriptionCompactTable title="Wants" items={wants} tone="wants" showAll={showAll} />
     </div>
-  )
-}
-
-function FixedBillItemsTable({ items, month }: { items: CalendarEvent[]; month: number }) {
-  return (
-    <section className="bb-subscription-compact-group" aria-label="Fixed bills">
-      <div className="bb-subscription-compact-heading">
-        <span style={{ color: CATEGORY_CHART_COLORS.static_bills_subscriptions_needs }}>Fixed bills</span>
-        <strong>{formatMoney(items.reduce((sum, item) => sum + item.amount, 0))}</strong>
-      </div>
-      <ol className="bb-activity-list">
-        {items.map((item, index) => <li key={calendarEventKey(item, index)}>
-          <div><strong>{item.label}</strong><span>{month}/{item.day} · scheduled date</span></div>
-          <div><strong>{formatMoney(item.amount)}</strong>
-            <small className={`bb-activity-status bb-activity-${calendarActivityStatus(item)}`}>
-              {calendarActivityStatus(item) === "scheduled" ? "Scheduled" : "Recorded"}
-            </small>
-          </div>
-        </li>)}
-      </ol>
-    </section>
   )
 }
 

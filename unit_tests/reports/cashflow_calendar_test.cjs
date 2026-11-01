@@ -1,0 +1,51 @@
+const assert = require('node:assert/strict'), fs = require('node:fs'), path = require('node:path'), vm = require('node:vm')
+const {createRequire} = require('node:module'), req = createRequire(path.resolve('web/expense-report/package.json'))
+const ts = req('typescript'), React = req('react'), {renderToStaticMarkup} = req('react-dom/server')
+const cache = new Map(), frozen = new Date('2026-10-31T20:00:00Z')
+class Clock extends Date { constructor(...args) { super(...(args.length ? args : [frozen])) } }
+function load(file) {
+ file=path.resolve('web/expense-report/src',file)
+ if(cache.has(file))return cache.get(file).exports
+ const module={exports:{}};cache.set(file,module)
+ const source=fs.readFileSync(file,'utf8'),compiled=ts.transpileModule(source,{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2020,jsx:ts.JsxEmit.ReactJSX,esModuleInterop:true}}).outputText
+ vm.runInNewContext(compiled,{module,exports:module.exports,Date:Clock,require:id=>id.startsWith('.') ? (id.endsWith('.json') ? JSON.parse(fs.readFileSync(path.resolve(path.dirname(file),id),'utf8')) : load(path.relative('web/expense-report/src',path.resolve(path.dirname(file),id+(id.endsWith('.tsx')?'':'.ts'))))) : req(id)},{filename:file})
+ return module.exports
+}
+const model=load('calendar-model.ts'),logos=load('company-logo.ts'),view=load('cashflow-calendar.tsx')
+assert.equal(model.dateKey(model.pacificToday(new Date('2027-01-01T07:59:59Z'))),'2026-12-31')
+assert.equal(model.dateKey(model.pacificToday(new Date('2027-01-01T08:00:00Z'))),'2027-01-01')
+for(const iso of ['2026-03-08T10:00:00Z','2026-11-01T09:00:00Z'])assert.equal(model.calendarDates(2026,10,'weeks',model.pacificToday(new Date(iso))).length,14)
+const weeks=model.calendarDates(2026,10,'weeks'), month=model.calendarDates(2026,10,'month')
+assert.equal(model.dateKey(weeks[0]),'2026-10-25');assert.equal(model.dateKey(weeks[13]),'2026-11-07');assert.equal(month.length,35)
+assert.equal(model.calendarRange(weeks,false,2026,10),'Oct 25 – Nov 7')
+assert.equal(model.calendarRange(month,true,2026,10),'Oct 1 – 31')
+for(const [year,m,rows] of [[2026,2,4],[2026,5,6],[2028,2,5]])assert.equal(model.calendarDates(year,m,'month').length,rows*7)
+const past=model.calendarDates(2026,8,'weeks');assert.equal(model.dateKey(past[0]),'2026-07-26')
+const event=(extra={})=>({kind:'subscription',label:'YouTube Premium',amount:18.75,day:31,group:'subscriptions_wants',projectedOnly:false,...extra})
+const outgoing=event(),income=event({kind:'income',label:'Payday',amount:3000}),unknown=event({kind:'bill',label:'Water',amount:0,amountUnknown:true})
+assert.deepEqual(JSON.parse(JSON.stringify(model.calendarTotals([outgoing,income,unknown]))),{incoming:3000,outgoing:18.75,unknown:true})
+assert.equal(model.calendarTotals([event({amount:.1}),event({amount:.2})]).outgoing,.3)
+assert.equal(model.eventsForDate(weeks[7],2026,10,[],[]).available,false,'Missing context is not zero activity')
+assert.equal(model.eventsForDate(weeks[7],2026,10,[],[{year:2026,month:11,available:true,events:[event({day:1})]}]).events.length,1)
+assert.equal(model.logoCapacity(186,true),5);assert.equal(model.logoCapacity(60,true),1)
+assert.equal(model.compactCalendarAmount(2500),'$2.5K');assert.equal(model.compactCalendarAmount(31.25),'$31')
+for(const [label,id] of [['YouTube Premium','youtube'],['ChatGPT Pro','chatgpt'],['iCloud Storage','icloud'],['PG&E','pge'],['MacroFactor','macrofactor'],['Slate Digital All Access','slate-digital'],['Raycast','raycast'],['Railway','railway'],['Recology','recology'],['Aidvantage','aidvantage']])assert.equal(logos.companyLogo(label,'Brian').id,id)
+assert.equal(logos.companyLogo('Student Loan','Brian').id,'aidvantage');assert.equal(logos.companyLogo('Water','Brian').id,'santa-rosa-water')
+for(const label of ['Water','Student Loan','Apple repair','YouTube scam','Unknown'])assert.equal(logos.companyLogo(label,'Hannah'),null,'No fuzzy or cross-owner merchant guesses')
+const catalog=JSON.parse(fs.readFileSync('web/expense-report/src/company-logos.json','utf8')),aliases=new Map()
+for(const item of catalog)for(const alias of item.aliases){const key=logos.companyIdentity(alias);assert.ok(!aliases.has(key)||aliases.get(key)===item.id,`Alias collision ${key}`);aliases.set(key,item.id)}
+const html=renderToStaticMarkup(React.createElement(view.CashflowCalendar,{year:2026,month:10,events:[outgoing,income,unknown,...Array.from({length:5},(_,i)=>event({label:'Unknown '+i}))],owner:'Brian',projected:false,onInspect(){}}))
+assert.ok(html.includes('Oct 25 – Nov 7'));assert.ok(html.includes('Show full month'));assert.ok(html.includes('aria-current="date"'))
+assert.ok(html.includes('−$113'));assert.ok(html.includes('+$3K'),'Separate flows, never net income against spending')
+assert.ok(html.includes('Show all 8 events'));assert.ok(html.includes('YouTube Premium · Subscription · $18.75 · Scheduled'))
+assert.ok(!html.includes('CalendarFilterControl'));assert.ok(!html.includes('20 total'))
+const details=renderToStaticMarkup(React.createElement(view.CalendarDayDetails,{selection:{key:'day',title:'Day',events:[outgoing,unknown,income]},owner:'Brian'}))
+assert.ok(details.includes('$18.75'));assert.ok(details.includes('Not entered'));assert.ok(details.includes('Scheduled dates do not confirm bank posting'))
+assert.ok(view.calendarEventDescription(unknown).includes('Amount not entered'))
+for (const [amountEstimated,status] of [[true,'Scheduled'],[false,'Recorded']]) {
+ const bill=event({kind:'bill',label:'Student Loan',group:'static_bills_subscriptions_needs',amount:59.96,amountEstimated,projectedOnly:true})
+ assert.ok(view.calendarEventDescription(bill).includes(status))
+ const html=renderToStaticMarkup(React.createElement(view.CalendarDayDetails,{selection:{key:'loan',title:'Loan',events:[bill]},owner:'Brian'}))
+ assert.ok(html.includes('Bill · '+status));assert.ok(html.includes('$59.96'));assert.ok(html.includes('Student Loan'))
+}
+console.log('Calendar range, recurrence context, totals, overflow, exact details and 89-logo alias checks passed')

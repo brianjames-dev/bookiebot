@@ -5,14 +5,11 @@ const { createRequire } = require('node:module')
 const path = require('node:path')
 const req = createRequire(path.resolve('web/expense-report/package.json'))
 const ts = req('typescript')
-const {renderToStaticMarkup} = req('react-dom/server')
 const names = new Set([
   'projectedBreakdown','projectedSubscriptionTotals','projectedBillTotals',
   'subscriptionDayInMonth','roundCurrency','amountRowsTotal',
   'dailyEntriesWithCalendarEvents','dailyCalendarEventBucket','billsUtilitiesEvents',
-  'money','formatMoney','CATEGORY_CHART_COLORS','CALENDAR_EVENT_STYLES',
-  'calendarEventLabel','calendarEventStyle','calendarEventKindLabel',
-  'calendarEventKey','CalendarEventTooltip','FixedBillItemsTable',
+  'money','formatMoney','CATEGORY_CHART_COLORS',
 ])
 const source = fs.readFileSync('web/expense-report/src/report-app.tsx','utf8')
 const file = ts.createSourceFile('report-app.tsx',source,ts.ScriptTarget.Latest,true,ts.ScriptKind.TSX)
@@ -61,17 +58,4 @@ const daily = runtime.dailyEntriesWithCalendarEvents([], [loan],9)[0]
 assert.equal(daily.category,'Static Bills & Subscriptions')
 assert.equal(daily.status,'scheduled')
 assert.equal(daily.person,'Need bill')
-assert.match(runtime.calendarEventLabel(loan),/Student Loan - Bill - \$59\.96 - Scheduled/)
-assert.match(runtime.calendarEventLabel(actual),/Bill - \$119\.92 - Recorded/)
-const palette = vm.runInContext('CATEGORY_CHART_COLORS',runtime)
-assert.equal(runtime.calendarEventStyle(loan).color,palette[staticKey])
-for (const [event,status] of [[loan,'Scheduled'],[actual,'Recorded']]) {
-  const tooltip = renderToStaticMarkup(runtime.CalendarEventTooltip({event}))
-  assert.ok(tooltip.includes(`Bill · ${status}`))
-  const details = renderToStaticMarkup(runtime.FixedBillItemsTable({items:[event],month:9}))
-  assert.ok(details.includes('aria-label="Fixed bills"'))
-  assert.ok(details.includes('9/12 · scheduled date'))
-  assert.ok(details.includes(status))
-  assert.ok(details.includes('Student Loan'))
-}
-console.log('Fixed-bill totals, category identity, scheduled provenance and calendar details passed')
+console.log('Fixed-bill totals, category identity and scheduled provenance passed; new day-dialog details are verified by cashflow_calendar_test.cjs')

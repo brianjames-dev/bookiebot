@@ -87,6 +87,14 @@ export interface CalendarEvent {
   group: string
   projectedOnly: boolean
   amountEstimated?: boolean
+  amountUnknown?: boolean
+}
+
+export interface CalendarMonth {
+  year: number
+  month: number
+  available: boolean
+  events: CalendarEvent[]
 }
 
 export interface IncomeProjection {
@@ -254,6 +262,7 @@ export interface ExpenseReportData {
   topEntries: ExpenseEntry[]
   dailyEntries: ExpenseEntry[]
   needExpenses: PaymentItem[]
+  calendarContext?: CalendarMonth[]
   calendarEvents: CalendarEvent[]
   utilityHistory: UtilityHistoryItem[]
   sharedReimbursements: SharedReimbursementItem[]

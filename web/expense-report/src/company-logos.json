@@ -1,0 +1,1138 @@
+[
+  {
+    "id": "1password",
+    "name": "1Password",
+    "aliases": [
+      "1Password"
+    ],
+    "source": "https://cdn.jsdelivr.net/gh/homarr-labs/dashboard-icons@83f32e08257b66fbd971ac8d7645f5b38d52e85d/svg/1password.svg",
+    "website": "https://github.com/homarr-labs/dashboard-icons",
+    "license": "Brand trademark; dashboard-icons upstream notices apply",
+    "asset": "company-logo-1password-3c4fb99b438b5bcd.svg",
+    "sha256": "3c4fb99b438b5bcd93bd198104b6311cf4786c413293894f3574602852551a7a"
+  },
+  {
+    "id": "adobe",
+    "name": "Adobe",
+    "aliases": [
+      "Adobe",
+      "Adobe Creative Cloud",
+      "Adobe Photography"
+    ],
+    "source": "https://cdn.jsdelivr.net/gh/homarr-labs/dashboard-icons@83f32e08257b66fbd971ac8d7645f5b38d52e85d/svg/adobe.svg",
+    "website": "https://github.com/homarr-labs/dashboard-icons",
+    "license": "Brand trademark; dashboard-icons upstream notices apply",
+    "asset": "company-logo-adobe-c27280899abed89c.svg",
+    "sha256": "c27280899abed89c01aac44352c050fc214030d26ab9bac7dd29a82ac5b968b6"
+  },
+  {
+    "id": "aidvantage",
+    "name": "Aidvantage",
+    "aliases": [
+      "Aidvantage"
+    ],
+    "source": "https://aidvantage.studentaid.gov/img/aidvantage-favicon.png",
+    "website": "https://aidvantage.studentaid.gov/",
+    "license": "Respective company trademark; official public site icon",
+    "asset": "company-logo-aidvantage-07c0a17dda8187c2.png",
+    "sha256": "07c0a17dda8187c228a36774b91657093dc99cd1c2c4765135b419d5bdb0fbdd"
+  },
+  {
+    "id": "allstate",
+    "name": "Allstate",
+    "aliases": [
+      "Allstate"
+    ],
+    "source": "https://www.google.com/s2/favicons?domain=www.allstate.com&sz=128",
+    "website": "https://www.allstate.com",
+    "license": "Respective company trademark; public favicon snapshot",
+    "asset": "company-logo-allstate-be20fd35e8db5c19.png",
+    "sha256": "be20fd35e8db5c19fcff99f395b5902b6dd0b9832bf1dc2c2703f36ae321a566"
+  },
+  {
+    "id": "amazon-prime",
+    "name": "Amazon Prime",
+    "aliases": [
+      "Amazon Prime",
+      "Prime Video",
+      "Amazon Prime Video"
+    ],
+    "source": "https://cdn.jsdelivr.net/gh/homarr-labs/dashboard-icons@83f32e08257b66fbd971ac8d7645f5b38d52e85d/svg/amazon-prime.svg",
+    "website": "https://github.com/homarr-labs/dashboard-icons",
+    "license": "Brand trademark; dashboard-icons upstream notices apply",
+    "asset": "company-logo-amazon-prime-0dce3142ffc60f58.svg",
+    "sha256": "0dce3142ffc60f58a539ac8fc72e25b66bee57d6238f525d40c41275994cf671"
+  },
+  {
+    "id": "american-water",
+    "name": "American Water",
+    "aliases": [
+      "American Water"
+    ],
+    "source": "https://www.google.com/s2/favicons?domain=www.amwater.com&sz=128",
+    "website": "https://www.amwater.com",
+    "license": "Respective company trademark; public favicon snapshot",
+    "asset": "company-logo-american-water-9644d7874c7c6fd0.png",
+    "sha256": "9644d7874c7c6fd079055bdcf02169884cc20d8c00c7ed356d154081b8003795"
+  },
+  {
+    "id": "apple",
+    "name": "Apple One",
+    "aliases": [
+      "Apple One",
+      "Apple Arcade",
+      "Apple Fitness+"
+    ],
+    "source": "https://cdn.jsdelivr.net/gh/homarr-labs/dashboard-icons@83f32e08257b66fbd971ac8d7645f5b38d52e85d/svg/apple.svg",
+    "website": "https://github.com/homarr-labs/dashboard-icons",
+    "license": "Brand trademark; dashboard-icons upstream notices apply",
+    "asset": "company-logo-apple-72ab034548d45f1b.svg",
+    "sha256": "72ab034548d45f1bfa327f97b9fb96f7931362a8296289b1512bbe44512df235"
+  },
+  {
+    "id": "apple-music",
+    "name": "Apple Music",
+    "aliases": [
+      "Apple Music"
+    ],
+    "source": "https://cdn.jsdelivr.net/gh/homarr-labs/dashboard-icons@83f32e08257b66fbd971ac8d7645f5b38d52e85d/svg/apple-music.svg",
+    "website": "https://github.com/homarr-labs/dashboard-icons",
+    "license": "Brand trademark; dashboard-icons upstream notices apply",
+    "asset": "company-logo-apple-music-e2ef7e7f0b608eed.svg",
+    "sha256": "e2ef7e7f0b608eedd0af93bce3ad0cf208628ec67650d9b16052c5bdc47dad69"
+  },
+  {
+    "id": "apple-tv-plus",
+    "name": "Apple TV+",
+    "aliases": [
+      "Apple TV Plus",
+      "Apple TV+"
+    ],
+    "source": "https://cdn.jsdelivr.net/gh/homarr-labs/dashboard-icons@83f32e08257b66fbd971ac8d7645f5b38d52e85d/svg/apple-tv-plus.svg",
+    "website": "https://github.com/homarr-labs/dashboard-icons",
+    "license": "Brand trademark; dashboard-icons upstream notices apply",
+    "asset": "company-logo-apple-tv-plus-dcfd56cfd5502524.svg",
+    "sha256": "dcfd56cfd5502524617588fbee79b05f3eeb5180135de5307bf035515d42b28c"
+  },
+  {
+    "id": "att",
+    "name": "AT&T",
+    "aliases": [
+      "AT&T",
+      "AT&T Wireless",
+      "AT&T Internet"
+    ],
+    "source": "https://www.att.com/favicon.ico",
+    "website": "https://www.att.com",
+    "license": "Respective company trademark; official public site icon",
+    "asset": "company-logo-att-c0c2c3d5d4acd6e9.ico",
+    "sha256": "c0c2c3d5d4acd6e9ad9a14984bc1f63e51b4e5069b1b6be17b1bb59965f0860e"
+  },
+  {
+    "id": "audible",
+    "name": "Audible",
+    "aliases": [
+      "Audible",
+      "Audible Premium Plus"
+    ],
+    "source": "https://m.media-amazon.com/images/G/01/seo/creative/Audible_Google_Favicon_192px.png",
+    "website": "https://www.audible.com",
+    "license": "Respective company trademark; official public site icon",
+    "asset": "company-logo-audible-8d459fb8035a99f7.png",
+    "sha256": "8d459fb8035a99f7104df1f40c50d30f66e0622e1969f020b5e81a0d3f97cf44"
+  },
+  {
+    "id": "backblaze",
+    "name": "Backblaze",
+    "aliases": [
+      "Backblaze"
+    ],
+    "source": "https://cdn.jsdelivr.net/gh/homarr-labs/dashboard-icons@83f32e08257b66fbd971ac8d7645f5b38d52e85d/svg/backblaze.svg",
+    "website": "https://github.com/homarr-labs/dashboard-icons",
+    "license": "Brand trademark; dashboard-icons upstream notices apply",
+    "asset": "company-logo-backblaze-ffd8ce8508b6a8fa.svg",
+    "sha256": "ffd8ce8508b6a8faa6be5ba8e470c1bd878d9b27fe7b8b0a0ef3f47ad9ffbf41"
+  },
+  {
+    "id": "bitwarden",
+    "name": "Bitwarden",
+    "aliases": [
+      "Bitwarden"
+    ],
+    "source": "https://cdn.jsdelivr.net/gh/homarr-labs/dashboard-icons@83f32e08257b66fbd971ac8d7645f5b38d52e85d/svg/bitwarden.svg",
+    "website": "https://github.com/homarr-labs/dashboard-icons",
+    "license": "Brand trademark; dashboard-icons upstream notices apply",
+    "asset": "company-logo-bitwarden-6fd26b78565e0a7f.svg",
+    "sha256": "6fd26b78565e0a7f416f8512de904d7f827fd02898b48e3eba94ae6f2b21f3e7"
+  },
+  {
+    "id": "brianjames",
+    "name": "brianjames.dev",
+    "aliases": [
+      "brianjames.dev"
+    ],
+    "source": "https://brianjames.dev/favicon_io/apple-touch-icon.png",
+    "website": "https://brianjames.dev",
+    "license": "Respective company trademark; official public site icon",
+    "asset": "company-logo-brianjames-9d729f8657b02a50.png",
+    "sha256": "9d729f8657b02a50247709742072e5a8096c3a3d04587e97b8a49771cb26e7ad"
+  },
+  {
+    "id": "canva",
+    "name": "Canva",
+    "aliases": [
+      "Canva",
+      "Canva Pro"
+    ],
+    "source": "https://www.canva.com/favicon.ico",
+    "website": "https://www.canva.com",
+    "license": "Respective company trademark; official public site icon",
+    "asset": "company-logo-canva-ec2fbad47e598fe0.ico",
+    "sha256": "ec2fbad47e598fe06c7a2b825224b3b1b8d8221f3002e6370e627d459ff0634a"
+  },
+  {
+    "id": "chatgpt",
+    "name": "ChatGPT",
+    "aliases": [
+      "ChatGPT",
+      "ChatGPT Pro",
+      "ChatGPT Plus",
+      "OpenAI"
+    ],
+    "source": "https://cdn.jsdelivr.net/gh/homarr-labs/dashboard-icons@83f32e08257b66fbd971ac8d7645f5b38d52e85d/svg/chatgpt.svg",
+    "website": "https://github.com/homarr-labs/dashboard-icons",
+    "license": "Brand trademark; dashboard-icons upstream notices apply",
+    "asset": "company-logo-chatgpt-5a8dad2864cc1c81.svg",
+    "sha256": "5a8dad2864cc1c8109ebae74bea447df2f30b978bdad56749247c406e1cb2227"
+  },
+  {
+    "id": "cloudflare",
+    "name": "Cloudflare",
+    "aliases": [
+      "Cloudflare"
+    ],
+    "source": "https://cdn.jsdelivr.net/gh/homarr-labs/dashboard-icons@83f32e08257b66fbd971ac8d7645f5b38d52e85d/svg/cloudflare.svg",
+    "website": "https://github.com/homarr-labs/dashboard-icons",
+    "license": "Brand trademark; dashboard-icons upstream notices apply",
+    "asset": "company-logo-cloudflare-8d1880046ed223ff.svg",
+    "sha256": "8d1880046ed223ffb4ca660d4f52cff986d6db310e25d87cd82eccd024b461f5"
+  },
+  {
+    "id": "con-edison",
+    "name": "Con Edison",
+    "aliases": [
+      "Con Edison",
+      "ConEd"
+    ],
+    "source": "https://edge-c-dcxprod-web-enfbhbfkb2fghhey.a03.azurefd.net/-/media/images/coned/common/ce-apple-touch-icon.png?rev=cd163ba4d9cf4a9ab611a91f86dcfb3d",
+    "website": "https://www.coned.com",
+    "license": "Respective company trademark; official public site icon",
+    "asset": "company-logo-con-edison-9a2540ec31b2f026.png",
+    "sha256": "9a2540ec31b2f02685387a0830700bd4cd3e0f0a19529e4e084e8347873f5f06"
+  },
+  {
+    "id": "cox",
+    "name": "Cox",
+    "aliases": [
+      "Cox",
+      "Cox Communications"
+    ],
+    "source": "https://www.cox.com/favicon.ico",
+    "website": "https://www.cox.com",
+    "license": "Respective company trademark; official public site icon",
+    "asset": "company-logo-cox-7506b6707d00a8c8.png",
+    "sha256": "7506b6707d00a8c8ecb5c5d56098452d885e0dde167ab9e77be7fd826a9b2c17"
+  },
+  {
+    "id": "crunchyroll",
+    "name": "Crunchyroll",
+    "aliases": [
+      "Crunchyroll"
+    ],
+    "source": "https://cdn.jsdelivr.net/gh/homarr-labs/dashboard-icons@83f32e08257b66fbd971ac8d7645f5b38d52e85d/svg/crunchyroll.svg",
+    "website": "https://github.com/homarr-labs/dashboard-icons",
+    "license": "Brand trademark; dashboard-icons upstream notices apply",
+    "asset": "company-logo-crunchyroll-d7dd384b0c01cb1c.svg",
+    "sha256": "d7dd384b0c01cb1c9b19b0e3ae499361551744e6208087335c4536b27bacc331"
+  },
+  {
+    "id": "deezer",
+    "name": "Deezer",
+    "aliases": [
+      "Deezer"
+    ],
+    "source": "https://cdn.jsdelivr.net/gh/homarr-labs/dashboard-icons@83f32e08257b66fbd971ac8d7645f5b38d52e85d/svg/deezer.svg",
+    "website": "https://github.com/homarr-labs/dashboard-icons",
+    "license": "Brand trademark; dashboard-icons upstream notices apply",
+    "asset": "company-logo-deezer-d049ddef421e3079.svg",
+    "sha256": "d049ddef421e3079d25d9e2c3e3a3064000082f8f54272adad8e550f41a4e5c1"
+  },
+  {
+    "id": "discord",
+    "name": "Discord",
+    "aliases": [
+      "Discord",
+      "Discord Nitro"
+    ],
+    "source": "https://cdn.jsdelivr.net/gh/homarr-labs/dashboard-icons@83f32e08257b66fbd971ac8d7645f5b38d52e85d/svg/discord.svg",
+    "website": "https://github.com/homarr-labs/dashboard-icons",
+    "license": "Brand trademark; dashboard-icons upstream notices apply",
+    "asset": "company-logo-discord-c04059c1d13d9923.svg",
+    "sha256": "c04059c1d13d99239ebd0b7df807e8c3d2f46439bd18a70c5fd3a0631bd7b310"
+  },
+  {
+    "id": "disney-plus",
+    "name": "Disney+",
+    "aliases": [
+      "Disney Plus",
+      "Disney+"
+    ],
+    "source": "https://cdn.jsdelivr.net/gh/homarr-labs/dashboard-icons@83f32e08257b66fbd971ac8d7645f5b38d52e85d/svg/disney-plus.svg",
+    "website": "https://github.com/homarr-labs/dashboard-icons",
+    "license": "Brand trademark; dashboard-icons upstream notices apply",
+    "asset": "company-logo-disney-plus-cdc480ea45b4fe48.svg",
+    "sha256": "cdc480ea45b4fe48c3503e118d763f959ec9affdb645c1a71467b24b108a15ee"
+  },
+  {
+    "id": "dominion-energy",
+    "name": "Dominion Energy",
+    "aliases": [
+      "Dominion Energy"
+    ],
+    "source": "https://www.dominionenergy.com/dom-favicon.ico",
+    "website": "https://www.dominionenergy.com",
+    "license": "Respective company trademark; official public site icon",
+    "asset": "company-logo-dominion-energy-790426d24aa40f6f.ico",
+    "sha256": "790426d24aa40f6f3ac5a22d7008e9ef8dbc311ceafbe961c14e92904bbfb03d"
+  },
+  {
+    "id": "dropbox",
+    "name": "Dropbox",
+    "aliases": [
+      "Dropbox"
+    ],
+    "source": "https://cdn.jsdelivr.net/gh/homarr-labs/dashboard-icons@83f32e08257b66fbd971ac8d7645f5b38d52e85d/svg/dropbox.svg",
+    "website": "https://github.com/homarr-labs/dashboard-icons",
+    "license": "Brand trademark; dashboard-icons upstream notices apply",
+    "asset": "company-logo-dropbox-16fd819b4f0deac2.svg",
+    "sha256": "16fd819b4f0deac21770d225828f8e0789492f9209a0984a850169776778a43f"
+  },
+  {
+    "id": "duke-energy",
+    "name": "Duke Energy",
+    "aliases": [
+      "Duke Energy"
+    ],
+    "source": "https://www.google.com/s2/favicons?domain=www.duke-energy.com&sz=128",
+    "website": "https://www.duke-energy.com",
+    "license": "Respective company trademark; public favicon snapshot",
+    "asset": "company-logo-duke-energy-39f953199e23fb2a.png",
+    "sha256": "39f953199e23fb2ab04083ca6e71b2ac84ae744ad6eaeb26982df19264690bb5"
+  },
+  {
+    "id": "duolingo",
+    "name": "Duolingo",
+    "aliases": [
+      "Duolingo",
+      "Super Duolingo",
+      "Duolingo Max"
+    ],
+    "source": "https://cdn.jsdelivr.net/gh/homarr-labs/dashboard-icons@83f32e08257b66fbd971ac8d7645f5b38d52e85d/svg/duolingo.svg",
+    "website": "https://github.com/homarr-labs/dashboard-icons",
+    "license": "Brand trademark; dashboard-icons upstream notices apply",
+    "asset": "company-logo-duolingo-0d0ff645903fac97.svg",
+    "sha256": "0d0ff645903fac97ef79d0fab4bc34798c29101bb9fd3a072c68075534fdfd9e"
+  },
+  {
+    "id": "evernote",
+    "name": "Evernote",
+    "aliases": [
+      "Evernote"
+    ],
+    "source": "https://cdn.jsdelivr.net/gh/homarr-labs/dashboard-icons@83f32e08257b66fbd971ac8d7645f5b38d52e85d/svg/evernote.svg",
+    "website": "https://github.com/homarr-labs/dashboard-icons",
+    "license": "Brand trademark; dashboard-icons upstream notices apply",
+    "asset": "company-logo-evernote-a16f8c3725181190.svg",
+    "sha256": "a16f8c37251811907647ef8b96071415ca585d4e71405f43715b293fc3e5cd43"
+  },
+  {
+    "id": "expressvpn",
+    "name": "ExpressVPN",
+    "aliases": [
+      "ExpressVPN"
+    ],
+    "source": "https://cdn.jsdelivr.net/gh/homarr-labs/dashboard-icons@83f32e08257b66fbd971ac8d7645f5b38d52e85d/svg/expressvpn.svg",
+    "website": "https://github.com/homarr-labs/dashboard-icons",
+    "license": "Brand trademark; dashboard-icons upstream notices apply",
+    "asset": "company-logo-expressvpn-fefa636b5db9dd04.svg",
+    "sha256": "fefa636b5db9dd044e314f107a07a8fcb5a0690696cb25206d976df02a89913b"
+  },
+  {
+    "id": "farmers",
+    "name": "Farmers Insurance",
+    "aliases": [
+      "Farmers Insurance"
+    ],
+    "source": "https://www.farmers.com/favicon.ico",
+    "website": "https://www.farmers.com",
+    "license": "Respective company trademark; official public site icon",
+    "asset": "company-logo-farmers-2acf3b22b94997be.ico",
+    "sha256": "2acf3b22b94997beba2b13fe62209beca45a43dcdcaee750cba4c1752e6eabd3"
+  },
+  {
+    "id": "figma",
+    "name": "Figma",
+    "aliases": [
+      "Figma"
+    ],
+    "source": "https://cdn.jsdelivr.net/gh/homarr-labs/dashboard-icons@83f32e08257b66fbd971ac8d7645f5b38d52e85d/svg/figma.svg",
+    "website": "https://github.com/homarr-labs/dashboard-icons",
+    "license": "Brand trademark; dashboard-icons upstream notices apply",
+    "asset": "company-logo-figma-59f327ef3ae14b09.svg",
+    "sha256": "59f327ef3ae14b09c1c96ed5696f890c92efde2a5e6e52779e0515166385b6b9"
+  },
+  {
+    "id": "fpl",
+    "name": "FPL",
+    "aliases": [
+      "FPL",
+      "Florida Power & Light"
+    ],
+    "source": "https://www.fpl.com/etc.clientlibs/fplgp/clientlibs/clientlib-base/resources/favicon.ico",
+    "website": "https://www.fpl.com",
+    "license": "Respective company trademark; official public site icon",
+    "asset": "company-logo-fpl-d88854cf7b58ccf4.ico",
+    "sha256": "d88854cf7b58ccf46f34301139b5b6c026ab538974d605d7c2d35944188d6eda"
+  },
+  {
+    "id": "frontier",
+    "name": "Frontier",
+    "aliases": [
+      "Frontier",
+      "Frontier Internet"
+    ],
+    "source": "https://frontier.com/frontier-com-marketing-assets/img/favicons/apple-touch-icon-iphone-retina.png",
+    "website": "https://frontier.com",
+    "license": "Respective company trademark; official public site icon",
+    "asset": "company-logo-frontier-91e01e879479c4c6.png",
+    "sha256": "91e01e879479c4c677b3737647748f3e38926aaf6d54b949ea5d46534858e26b"
+  },
+  {
+    "id": "fubo",
+    "name": "Fubo",
+    "aliases": [
+      "Fubo",
+      "FuboTV"
+    ],
+    "source": "https://assets-imgx.fubo.tv/favicons/favicon-32x32.png",
+    "website": "https://www.fubo.tv",
+    "license": "Respective company trademark; official public site icon",
+    "asset": "company-logo-fubo-2da251e8e9af02d7.png",
+    "sha256": "2da251e8e9af02d7a8e4a4bbdc9ae6883ee060ae8cf04930668674cbbf005140"
+  },
+  {
+    "id": "geico",
+    "name": "GEICO",
+    "aliases": [
+      "GEICO"
+    ],
+    "source": "https://www.geico.com/favicon.ico?aa55dd60d3f7931a",
+    "website": "https://www.geico.com",
+    "license": "Respective company trademark; official public site icon",
+    "asset": "company-logo-geico-bf4cb729c1f44daa.ico",
+    "sha256": "bf4cb729c1f44daa732954f0bf9e71b031b4d6c7f52e9dce52d48e9577f01e35"
+  },
+  {
+    "id": "github",
+    "name": "GitHub",
+    "aliases": [
+      "GitHub",
+      "GitHub Pro",
+      "GitHub Copilot"
+    ],
+    "source": "https://cdn.jsdelivr.net/gh/homarr-labs/dashboard-icons@83f32e08257b66fbd971ac8d7645f5b38d52e85d/svg/github.svg",
+    "website": "https://github.com/homarr-labs/dashboard-icons",
+    "license": "Brand trademark; dashboard-icons upstream notices apply",
+    "asset": "company-logo-github-cdfb82ff14c8c248.svg",
+    "sha256": "cdfb82ff14c8c2484eacba9d211d86cd0c993c933855cad2b03633414fa10ddb"
+  },
+  {
+    "id": "google-drive",
+    "name": "Google Drive",
+    "aliases": [
+      "Google Drive"
+    ],
+    "source": "https://cdn.jsdelivr.net/gh/homarr-labs/dashboard-icons@83f32e08257b66fbd971ac8d7645f5b38d52e85d/svg/google-drive.svg",
+    "website": "https://github.com/homarr-labs/dashboard-icons",
+    "license": "Brand trademark; dashboard-icons upstream notices apply",
+    "asset": "company-logo-google-drive-963477d7e4a0b0d8.svg",
+    "sha256": "963477d7e4a0b0d8865dd7aec8e27d8fd9c3a4b4f2e5b81f9df8581f9f2eca11"
+  },
+  {
+    "id": "google-one",
+    "name": "Google One",
+    "aliases": [
+      "Google One",
+      "Google Storage"
+    ],
+    "source": "https://cdn.jsdelivr.net/gh/homarr-labs/dashboard-icons@83f32e08257b66fbd971ac8d7645f5b38d52e85d/svg/google-one.svg",
+    "website": "https://github.com/homarr-labs/dashboard-icons",
+    "license": "Brand trademark; dashboard-icons upstream notices apply",
+    "asset": "company-logo-google-one-913e54467d24066d.svg",
+    "sha256": "913e54467d24066de0bbe34f6a00969223aba70e736316e1539c7f2ea3176afd"
+  },
+  {
+    "id": "hulu",
+    "name": "Hulu",
+    "aliases": [
+      "Hulu"
+    ],
+    "source": "https://cdn.jsdelivr.net/gh/homarr-labs/dashboard-icons@83f32e08257b66fbd971ac8d7645f5b38d52e85d/svg/hulu.svg",
+    "website": "https://github.com/homarr-labs/dashboard-icons",
+    "license": "Brand trademark; dashboard-icons upstream notices apply",
+    "asset": "company-logo-hulu-b1edb8d6ffa25fa0.svg",
+    "sha256": "b1edb8d6ffa25fa030d9dbba46f0f686e6873d3d35b5f4cddc73dc913823b7e1"
+  },
+  {
+    "id": "icloud",
+    "name": "iCloud",
+    "aliases": [
+      "iCloud",
+      "iCloud Storage",
+      "iCloud+",
+      "Apple iCloud"
+    ],
+    "source": "https://cdn.jsdelivr.net/gh/homarr-labs/dashboard-icons@83f32e08257b66fbd971ac8d7645f5b38d52e85d/svg/icloud.svg",
+    "website": "https://github.com/homarr-labs/dashboard-icons",
+    "license": "Brand trademark; dashboard-icons upstream notices apply",
+    "asset": "company-logo-icloud-6a2b940eb85b4304.svg",
+    "sha256": "6a2b940eb85b4304bae3062a623ad074b3681f4e844fd883c678b27feebaae82"
+  },
+  {
+    "id": "liberty-mutual",
+    "name": "Liberty Mutual",
+    "aliases": [
+      "Liberty Mutual"
+    ],
+    "source": "https://www.google.com/s2/favicons?domain=www.libertymutual.com&sz=128",
+    "website": "https://www.libertymutual.com",
+    "license": "Respective company trademark; public favicon snapshot",
+    "asset": "company-logo-liberty-mutual-4a2937466fb97ce6.png",
+    "sha256": "4a2937466fb97ce6cb8f2626a617b309f943348946d6c91a6c9833e9aeda4810"
+  },
+  {
+    "id": "linkedin",
+    "name": "LinkedIn",
+    "aliases": [
+      "LinkedIn Premium",
+      "LinkedIn"
+    ],
+    "source": "https://cdn.jsdelivr.net/gh/homarr-labs/dashboard-icons@83f32e08257b66fbd971ac8d7645f5b38d52e85d/svg/linkedin.svg",
+    "website": "https://github.com/homarr-labs/dashboard-icons",
+    "license": "Brand trademark; dashboard-icons upstream notices apply",
+    "asset": "company-logo-linkedin-67f08e714e9a8a06.svg",
+    "sha256": "67f08e714e9a8a06288f1d7adc7e9840c450c11f8af6fb1847425fc7f186ca1b"
+  },
+  {
+    "id": "macrofactor",
+    "name": "MacroFactor",
+    "aliases": [
+      "MacroFactor",
+      "MacroFactor Nutrition"
+    ],
+    "source": "https://macrofactor.com/wp-content/uploads/2025/09/cropped-MF_Avatar_Square_150ppi-192x192.png",
+    "website": "https://macrofactorapp.com",
+    "license": "Respective company trademark; official public site icon",
+    "asset": "company-logo-macrofactor-b3cb30f3c7f86473.png",
+    "sha256": "b3cb30f3c7f86473b5e521b762dc89901acd08f72ac46ec3fefcecaddae815f4"
+  },
+  {
+    "id": "max",
+    "name": "HBO Max",
+    "aliases": [
+      "Max",
+      "HBO",
+      "HBO Max"
+    ],
+    "source": "https://cdn.jsdelivr.net/gh/homarr-labs/dashboard-icons@83f32e08257b66fbd971ac8d7645f5b38d52e85d/svg/max.svg",
+    "website": "https://github.com/homarr-labs/dashboard-icons",
+    "license": "Brand trademark; dashboard-icons upstream notices apply",
+    "asset": "company-logo-max-e2361f44a6eb3baa.svg",
+    "sha256": "e2361f44a6eb3baaab9147a385d440a233d8dcf943dab9d076839d0e45125cce"
+  },
+  {
+    "id": "microsoft-365",
+    "name": "Microsoft 365",
+    "aliases": [
+      "Microsoft 365",
+      "Office 365"
+    ],
+    "source": "https://cdn.jsdelivr.net/gh/homarr-labs/dashboard-icons@83f32e08257b66fbd971ac8d7645f5b38d52e85d/svg/microsoft-365.svg",
+    "website": "https://github.com/homarr-labs/dashboard-icons",
+    "license": "Brand trademark; dashboard-icons upstream notices apply",
+    "asset": "company-logo-microsoft-365-40521c746de4fc44.svg",
+    "sha256": "40521c746de4fc4420c6e7ff8bd8fdb60ea2989e56974e6049fb452254ff437b"
+  },
+  {
+    "id": "national-grid",
+    "name": "National Grid",
+    "aliases": [
+      "National Grid"
+    ],
+    "source": "https://www.nationalgridus.com/assets/images/favicons/apple-touch-icon.png?v=OmJ605EadX",
+    "website": "https://www.nationalgridus.com",
+    "license": "Respective company trademark; official public site icon",
+    "asset": "company-logo-national-grid-6a580f531e1edf9e.png",
+    "sha256": "6a580f531e1edf9e8cf17422c833e754b391b3bd38bbe243f594ca90551ff6d8"
+  },
+  {
+    "id": "netflix",
+    "name": "Netflix",
+    "aliases": [
+      "Netflix"
+    ],
+    "source": "https://cdn.jsdelivr.net/gh/homarr-labs/dashboard-icons@83f32e08257b66fbd971ac8d7645f5b38d52e85d/svg/netflix.svg",
+    "website": "https://github.com/homarr-labs/dashboard-icons",
+    "license": "Brand trademark; dashboard-icons upstream notices apply",
+    "asset": "company-logo-netflix-2c1202dc7f5af0a3.svg",
+    "sha256": "2c1202dc7f5af0a3ae191185cc5724de1053bb6a5e7a96f2f492c03828ee265f"
+  },
+  {
+    "id": "nordvpn",
+    "name": "NordVPN",
+    "aliases": [
+      "NordVPN"
+    ],
+    "source": "https://cdn.jsdelivr.net/gh/homarr-labs/dashboard-icons@83f32e08257b66fbd971ac8d7645f5b38d52e85d/svg/nordvpn.svg",
+    "website": "https://github.com/homarr-labs/dashboard-icons",
+    "license": "Brand trademark; dashboard-icons upstream notices apply",
+    "asset": "company-logo-nordvpn-77548d4543437429.svg",
+    "sha256": "77548d4543437429217f34d9a7506e279cba920f376c5ee9ae84693c35c0aa24"
+  },
+  {
+    "id": "notion",
+    "name": "Notion",
+    "aliases": [
+      "Notion",
+      "Notion Plus"
+    ],
+    "source": "https://cdn.jsdelivr.net/gh/homarr-labs/dashboard-icons@83f32e08257b66fbd971ac8d7645f5b38d52e85d/svg/notion.svg",
+    "website": "https://github.com/homarr-labs/dashboard-icons",
+    "license": "Brand trademark; dashboard-icons upstream notices apply",
+    "asset": "company-logo-notion-b98fea4bc3f3259c.svg",
+    "sha256": "b98fea4bc3f3259c6907a40dae994c959c3240d7ee4b4afea144a555c638f6c2"
+  },
+  {
+    "id": "paramount-plus",
+    "name": "Paramount+",
+    "aliases": [
+      "Paramount Plus",
+      "Paramount+"
+    ],
+    "source": "https://cdn.jsdelivr.net/gh/homarr-labs/dashboard-icons@83f32e08257b66fbd971ac8d7645f5b38d52e85d/svg/paramount-plus.svg",
+    "website": "https://github.com/homarr-labs/dashboard-icons",
+    "license": "Brand trademark; dashboard-icons upstream notices apply",
+    "asset": "company-logo-paramount-plus-f99ea29c29229412.svg",
+    "sha256": "f99ea29c292294128d36f3f8fe06a4a96f0d5341de705bfab669e3f81784b179"
+  },
+  {
+    "id": "patreon",
+    "name": "Patreon",
+    "aliases": [
+      "Patreon"
+    ],
+    "source": "https://cdn.jsdelivr.net/gh/homarr-labs/dashboard-icons@83f32e08257b66fbd971ac8d7645f5b38d52e85d/svg/patreon.svg",
+    "website": "https://github.com/homarr-labs/dashboard-icons",
+    "license": "Brand trademark; dashboard-icons upstream notices apply",
+    "asset": "company-logo-patreon-6c568bd8b229ab15.svg",
+    "sha256": "6c568bd8b229ab155957b117f6c690d4249c9267ef8c790b5b53f6c1b55f67dd"
+  },
+  {
+    "id": "peacock",
+    "name": "Peacock",
+    "aliases": [
+      "Peacock",
+      "Peacock Premium"
+    ],
+    "source": "https://cdn.jsdelivr.net/gh/homarr-labs/dashboard-icons@83f32e08257b66fbd971ac8d7645f5b38d52e85d/svg/peacock.svg",
+    "website": "https://github.com/homarr-labs/dashboard-icons",
+    "license": "Brand trademark; dashboard-icons upstream notices apply",
+    "asset": "company-logo-peacock-3e25492d3da3a275.svg",
+    "sha256": "3e25492d3da3a2753c3eef6f0525d13a89de7e3ba42aecaf83c00f73c1919b89"
+  },
+  {
+    "id": "peloton",
+    "name": "Peloton",
+    "aliases": [
+      "Peloton"
+    ],
+    "source": "https://www.onepeloton.com/images/apple-touch-icon-192.png",
+    "website": "https://www.onepeloton.com",
+    "license": "Respective company trademark; official public site icon",
+    "asset": "company-logo-peloton-4e3cd5fd127a603e.png",
+    "sha256": "4e3cd5fd127a603e99cec9f715938acb086329cc8404c7c2a6eb1eebff4c48dd"
+  },
+  {
+    "id": "pge",
+    "name": "PG&E",
+    "aliases": [
+      "PG&E",
+      "PGE",
+      "Pacific Gas and Electric"
+    ],
+    "source": "https://www.pge.com/content/experience-fragments/pge/en/site/header/master/_jcr_content/root/header/image.coreimg.jpeg/1759521030312/pge-logo-95x100.jpeg",
+    "website": "https://www.pge.com",
+    "license": "Respective company trademark; official public site icon",
+    "asset": "company-logo-pge-1b6066340836864b.jpg",
+    "sha256": "1b6066340836864bb33e5fb9fbb2767535e70bd0b73c6b58fd05c2a178e253bf"
+  },
+  {
+    "id": "playstation",
+    "name": "PlayStation",
+    "aliases": [
+      "PlayStation Plus",
+      "PlayStation Network"
+    ],
+    "source": "https://cdn.jsdelivr.net/gh/homarr-labs/dashboard-icons@83f32e08257b66fbd971ac8d7645f5b38d52e85d/svg/playstation.svg",
+    "website": "https://github.com/homarr-labs/dashboard-icons",
+    "license": "Brand trademark; dashboard-icons upstream notices apply",
+    "asset": "company-logo-playstation-7e0e9f79bbc01cb1.svg",
+    "sha256": "7e0e9f79bbc01cb128cbc05f90c6199472f29babf48193bc8c7585ff65dd68cf"
+  },
+  {
+    "id": "plex",
+    "name": "Plex",
+    "aliases": [
+      "Plex",
+      "Plex Pass"
+    ],
+    "source": "https://cdn.jsdelivr.net/gh/homarr-labs/dashboard-icons@83f32e08257b66fbd971ac8d7645f5b38d52e85d/svg/plex.svg",
+    "website": "https://github.com/homarr-labs/dashboard-icons",
+    "license": "Brand trademark; dashboard-icons upstream notices apply",
+    "asset": "company-logo-plex-ae6e754dc2644c7a.svg",
+    "sha256": "ae6e754dc2644c7ad6b41853cdac75812ccaeed4c2f08fcd88d81e2f3ec01dba"
+  },
+  {
+    "id": "progressive",
+    "name": "Progressive",
+    "aliases": [
+      "Progressive"
+    ],
+    "source": "https://www.progressive.com/apple-touch-icon.png",
+    "website": "https://www.progressive.com",
+    "license": "Respective company trademark; official public site icon",
+    "asset": "company-logo-progressive-f2947c3535e6e0f3.png",
+    "sha256": "f2947c3535e6e0f3bcdbbac18cba8bcdc9f3dce990524e28540afacb6566ec18"
+  },
+  {
+    "id": "proton-mail",
+    "name": "Proton",
+    "aliases": [
+      "Proton",
+      "Proton Mail",
+      "Proton Unlimited"
+    ],
+    "source": "https://cdn.jsdelivr.net/gh/homarr-labs/dashboard-icons@83f32e08257b66fbd971ac8d7645f5b38d52e85d/svg/proton-mail.svg",
+    "website": "https://github.com/homarr-labs/dashboard-icons",
+    "license": "Brand trademark; dashboard-icons upstream notices apply",
+    "asset": "company-logo-proton-mail-2cf6f56e7ac141fc.svg",
+    "sha256": "2cf6f56e7ac141fcc13e7b3bc3dbf19542910acee86bdc52f5ba3ee92e195997"
+  },
+  {
+    "id": "railway",
+    "name": "Railway",
+    "aliases": [
+      "Railway"
+    ],
+    "source": "https://cdn.jsdelivr.net/gh/homarr-labs/dashboard-icons@83f32e08257b66fbd971ac8d7645f5b38d52e85d/svg/railway.svg",
+    "website": "https://github.com/homarr-labs/dashboard-icons",
+    "license": "Brand trademark; dashboard-icons upstream notices apply",
+    "asset": "company-logo-railway-c4b555ecd61236b7.svg",
+    "sha256": "c4b555ecd61236b762bba66aa4ca6c27ba92651e4c5b944dfd10d0709c699db6"
+  },
+  {
+    "id": "raycast",
+    "name": "Raycast",
+    "aliases": [
+      "Raycast",
+      "Raycast Pro"
+    ],
+    "source": "https://www.raycast.com/favicon-production.png",
+    "website": "https://www.raycast.com",
+    "license": "Respective company trademark; official public site icon",
+    "asset": "company-logo-raycast-dfb8e06943ab2ce3.png",
+    "sha256": "dfb8e06943ab2ce35278cda54b137137442d01094bbcf92d7d649a2d1e186043"
+  },
+  {
+    "id": "recology",
+    "name": "Recology",
+    "aliases": [
+      "Recology",
+      "Recology Sonoma Marin"
+    ],
+    "source": "https://www.google.com/s2/favicons?domain=recology.com&sz=128",
+    "website": "https://www.recology.com",
+    "license": "Respective company trademark; public favicon snapshot",
+    "asset": "company-logo-recology-fc64b0820af19b59.png",
+    "sha256": "fc64b0820af19b59a4fdc78eee2da31fbe62b9a2cf88af5579652b2d51b20ebc"
+  },
+  {
+    "id": "republic-services",
+    "name": "Republic Services",
+    "aliases": [
+      "Republic Services"
+    ],
+    "source": "https://www.republicservices.com/favicon.ico",
+    "website": "https://www.republicservices.com",
+    "license": "Respective company trademark; official public site icon",
+    "asset": "company-logo-republic-services-0924ff864d3b9812.png",
+    "sha256": "0924ff864d3b9812eb6b24aca97312b535ef65a2d3e6bdebbf7c7318a8fcde54"
+  },
+  {
+    "id": "santa-rosa-water",
+    "name": "Santa Rosa Water",
+    "aliases": [
+      "Santa Rosa Water",
+      "Santa Rosa City Water"
+    ],
+    "source": "https://www.google.com/s2/favicons?domain=srcity.org&sz=128",
+    "website": "https://myutilities.srcity.org/",
+    "license": "City of Santa Rosa public favicon snapshot",
+    "asset": "company-logo-santa-rosa-water-9e81a9c7e2bc563d.png",
+    "sha256": "9e81a9c7e2bc563d2fa89b608f4ce1cd27a5dbd64f04679b0eb118c18ea2dbde"
+  },
+  {
+    "id": "sdge",
+    "name": "SDG&E",
+    "aliases": [
+      "SDG&E",
+      "San Diego Gas and Electric"
+    ],
+    "source": "https://www.sdge.com/themes/custom/sdge/favicon.ico",
+    "website": "https://www.sdge.com",
+    "license": "Respective company trademark; official public site icon",
+    "asset": "company-logo-sdge-c5918a42c14557d2.ico",
+    "sha256": "c5918a42c14557d282d3457a2b24a1bf91d0a0498e76c103ab3d530918b8e882"
+  },
+  {
+    "id": "slate-digital",
+    "name": "Slate Digital",
+    "aliases": [
+      "Slate Digital",
+      "Slate Digital All Access",
+      "Slate Digital All Access Pass"
+    ],
+    "source": "https://www.google.com/s2/favicons?domain=slatedigital.com&sz=128",
+    "website": "https://slatedigital.com",
+    "license": "Respective company trademark; public favicon snapshot",
+    "asset": "company-logo-slate-digital-a6fb97fa98f9d114.png",
+    "sha256": "a6fb97fa98f9d114863d5246714c729bf8500c47bd624b0de790c4c6c9123461"
+  },
+  {
+    "id": "sling",
+    "name": "Sling TV",
+    "aliases": [
+      "Sling TV",
+      "Sling"
+    ],
+    "source": "https://www.sling.com/etc.clientlibs/sling-television/clientlibs/clientlib-global/resources/images/favicon.ico",
+    "website": "https://www.sling.com",
+    "license": "Respective company trademark; official public site icon",
+    "asset": "company-logo-sling-876ca40fda3f2b4e.ico",
+    "sha256": "876ca40fda3f2b4e0b536fdb397f87d90f5e7f07a3ca3fcb19831b121bd1a8e7"
+  },
+  {
+    "id": "socalgas",
+    "name": "SoCalGas",
+    "aliases": [
+      "SoCalGas",
+      "Southern California Gas"
+    ],
+    "source": "https://www.socalgas.com/sites/default/files/images/favicon.ico",
+    "website": "https://www.socalgas.com",
+    "license": "Respective company trademark; official public site icon",
+    "asset": "company-logo-socalgas-62e0217cdb675258.ico",
+    "sha256": "62e0217cdb675258aa686b4eb85ef67b6bf0e711a36a960df38545b6e3cf7853"
+  },
+  {
+    "id": "soundcloud",
+    "name": "SoundCloud",
+    "aliases": [
+      "SoundCloud",
+      "SoundCloud Go"
+    ],
+    "source": "https://cdn.jsdelivr.net/gh/homarr-labs/dashboard-icons@83f32e08257b66fbd971ac8d7645f5b38d52e85d/svg/soundcloud.svg",
+    "website": "https://github.com/homarr-labs/dashboard-icons",
+    "license": "Brand trademark; dashboard-icons upstream notices apply",
+    "asset": "company-logo-soundcloud-aee2e647d04f4885.svg",
+    "sha256": "aee2e647d04f4885fabe2760156f20c6da12ece0e6ca860ddf337331019169f7"
+  },
+  {
+    "id": "southern-california-edison",
+    "name": "Southern California Edison",
+    "aliases": [
+      "Southern California Edison",
+      "SCE"
+    ],
+    "source": "https://www.sce.com/themes/custom/sce_redesign/images/Logo-180.png",
+    "website": "https://www.sce.com",
+    "license": "Respective company trademark; official public site icon",
+    "asset": "company-logo-southern-california-edison-ed1b8b097b57338c.png",
+    "sha256": "ed1b8b097b57338c37bd3ac084b41c114bcb567fe4dc0cf65b9888e8ba64a346"
+  },
+  {
+    "id": "spectrum",
+    "name": "Spectrum",
+    "aliases": [
+      "Spectrum",
+      "Charter Spectrum"
+    ],
+    "source": "https://www.google.com/s2/favicons?domain=www.spectrum.com&sz=128",
+    "website": "https://www.spectrum.com",
+    "license": "Respective company trademark; public favicon snapshot",
+    "asset": "company-logo-spectrum-c5bb7cfa7e4f8b53.png",
+    "sha256": "c5bb7cfa7e4f8b538e07701d4675c9a5e4f0d33d63f2d6edbd4514afa0fb8aca"
+  },
+  {
+    "id": "spotify",
+    "name": "Spotify",
+    "aliases": [
+      "Spotify",
+      "Spotify Premium"
+    ],
+    "source": "https://cdn.jsdelivr.net/gh/homarr-labs/dashboard-icons@83f32e08257b66fbd971ac8d7645f5b38d52e85d/svg/spotify.svg",
+    "website": "https://github.com/homarr-labs/dashboard-icons",
+    "license": "Brand trademark; dashboard-icons upstream notices apply",
+    "asset": "company-logo-spotify-686990a9a97c3674.svg",
+    "sha256": "686990a9a97c36746eebfc7cfd1100ef29e07d8f9ada229ab00e34d4298a3dcb"
+  },
+  {
+    "id": "state-farm",
+    "name": "State Farm",
+    "aliases": [
+      "State Farm"
+    ],
+    "source": "https://www.statefarm.com/favicon.ico",
+    "website": "https://www.statefarm.com",
+    "license": "Respective company trademark; official public site icon",
+    "asset": "company-logo-state-farm-156a1d1dceb5f870.ico",
+    "sha256": "156a1d1dceb5f8705312cd80bcfc22053642d23f516fd2bc2740db8a1fe78012"
+  },
+  {
+    "id": "steam",
+    "name": "Steam",
+    "aliases": [
+      "Steam"
+    ],
+    "source": "https://cdn.jsdelivr.net/gh/homarr-labs/dashboard-icons@83f32e08257b66fbd971ac8d7645f5b38d52e85d/svg/steam.svg",
+    "website": "https://github.com/homarr-labs/dashboard-icons",
+    "license": "Brand trademark; dashboard-icons upstream notices apply",
+    "asset": "company-logo-steam-a700d94f7bc87df5.svg",
+    "sha256": "a700d94f7bc87df540938c9f0d8733ec27e9b76610b34073e5c7f43fd61ca402"
+  },
+  {
+    "id": "strava",
+    "name": "Strava",
+    "aliases": [
+      "Strava"
+    ],
+    "source": "https://cdn.jsdelivr.net/gh/homarr-labs/dashboard-icons@83f32e08257b66fbd971ac8d7645f5b38d52e85d/svg/strava.svg",
+    "website": "https://github.com/homarr-labs/dashboard-icons",
+    "license": "Brand trademark; dashboard-icons upstream notices apply",
+    "asset": "company-logo-strava-95b71387813efb28.svg",
+    "sha256": "95b71387813efb284c39da71247f32f207ff3c99d52093b75f60011d3baf2243"
+  },
+  {
+    "id": "surfshark",
+    "name": "Surfshark",
+    "aliases": [
+      "Surfshark"
+    ],
+    "source": "https://cdn.jsdelivr.net/gh/homarr-labs/dashboard-icons@83f32e08257b66fbd971ac8d7645f5b38d52e85d/svg/surfshark.svg",
+    "website": "https://github.com/homarr-labs/dashboard-icons",
+    "license": "Brand trademark; dashboard-icons upstream notices apply",
+    "asset": "company-logo-surfshark-d6da2bb0e3b7dd62.svg",
+    "sha256": "d6da2bb0e3b7dd62f1b72c53a2ec35856250cc5168ac5a2555b57982240f0ef8"
+  },
+  {
+    "id": "t-mobile",
+    "name": "T-Mobile",
+    "aliases": [
+      "T-Mobile",
+      "T-Mobile Internet",
+      "T-Mobile Wireless"
+    ],
+    "source": "https://www.google.com/s2/favicons?domain=www.t-mobile.com&sz=128",
+    "website": "https://www.t-mobile.com",
+    "license": "Respective company trademark; public favicon snapshot",
+    "asset": "company-logo-t-mobile-4a12b9d171b8b30c.png",
+    "sha256": "4a12b9d171b8b30c9f218c3bdc595178036c96dcc5d713dc6fa2cc30e35496a1"
+  },
+  {
+    "id": "tidal",
+    "name": "Tidal",
+    "aliases": [
+      "Tidal"
+    ],
+    "source": "https://cdn.jsdelivr.net/gh/homarr-labs/dashboard-icons@83f32e08257b66fbd971ac8d7645f5b38d52e85d/svg/tidal.svg",
+    "website": "https://github.com/homarr-labs/dashboard-icons",
+    "license": "Brand trademark; dashboard-icons upstream notices apply",
+    "asset": "company-logo-tidal-008e151b67ed08a3.svg",
+    "sha256": "008e151b67ed08a33335a99dacc9ce0fe440c56ee8154c0cef0ac8c28c722acd"
+  },
+  {
+    "id": "todoist",
+    "name": "Todoist",
+    "aliases": [
+      "Todoist"
+    ],
+    "source": "https://cdn.jsdelivr.net/gh/homarr-labs/dashboard-icons@83f32e08257b66fbd971ac8d7645f5b38d52e85d/svg/todoist.svg",
+    "website": "https://github.com/homarr-labs/dashboard-icons",
+    "license": "Brand trademark; dashboard-icons upstream notices apply",
+    "asset": "company-logo-todoist-973f89993d8c5c15.svg",
+    "sha256": "973f89993d8c5c154edb79410f4953077c22f1e94f5507f4ac1ea6c83380e543"
+  },
+  {
+    "id": "travelers",
+    "name": "Travelers Insurance",
+    "aliases": [
+      "Travelers Insurance",
+      "Travelers"
+    ],
+    "source": "https://www.travelers.com/favicon.ico",
+    "website": "https://www.travelers.com",
+    "license": "Respective company trademark; official public site icon",
+    "asset": "company-logo-travelers-507eb615635c7522.png",
+    "sha256": "507eb615635c75224c8a3223c2afec898ae893a5474386167cf374998633d8fb"
+  },
+  {
+    "id": "twitch",
+    "name": "Twitch",
+    "aliases": [
+      "Twitch",
+      "Twitch Turbo"
+    ],
+    "source": "https://cdn.jsdelivr.net/gh/homarr-labs/dashboard-icons@83f32e08257b66fbd971ac8d7645f5b38d52e85d/svg/twitch.svg",
+    "website": "https://github.com/homarr-labs/dashboard-icons",
+    "license": "Brand trademark; dashboard-icons upstream notices apply",
+    "asset": "company-logo-twitch-a8eb365147d606ec.svg",
+    "sha256": "a8eb365147d606ec498ea6e655e1e1397ee5c0bdbc096464d496e6f2f31a1c69"
+  },
+  {
+    "id": "usaa",
+    "name": "USAA",
+    "aliases": [
+      "USAA"
+    ],
+    "source": "https://www.google.com/s2/favicons?domain=www.usaa.com&sz=128",
+    "website": "https://www.usaa.com",
+    "license": "Respective company trademark; public favicon snapshot",
+    "asset": "company-logo-usaa-b8f0b5e0cb72f780.png",
+    "sha256": "b8f0b5e0cb72f78087b17f21ba3948e988badc95c4154ce3d3bb2f604af5caf1"
+  },
+  {
+    "id": "verizon",
+    "name": "Verizon",
+    "aliases": [
+      "Verizon",
+      "Verizon Wireless"
+    ],
+    "source": "https://cdn.jsdelivr.net/gh/homarr-labs/dashboard-icons@83f32e08257b66fbd971ac8d7645f5b38d52e85d/svg/verizon.svg",
+    "website": "https://github.com/homarr-labs/dashboard-icons",
+    "license": "Brand trademark; dashboard-icons upstream notices apply",
+    "asset": "company-logo-verizon-5d730aca98f9128d.svg",
+    "sha256": "5d730aca98f9128d87764e001b7b336d4d35e7a31e89525106091bb5d6f091d3"
+  },
+  {
+    "id": "waste-management",
+    "name": "Waste Management",
+    "aliases": [
+      "Waste Management",
+      "WM"
+    ],
+    "source": "https://www.wm.com/content/dam/wm/icons/favicon.ico",
+    "website": "https://www.wm.com",
+    "license": "Respective company trademark; official public site icon",
+    "asset": "company-logo-waste-management-3f9b338e7e4f0e24.jpg",
+    "sha256": "3f9b338e7e4f0e245a463bb0426ac4173c0603de9a84cf005ed5f7a829e6e3d8"
+  },
+  {
+    "id": "xbox",
+    "name": "Xbox",
+    "aliases": [
+      "Xbox Game Pass",
+      "Xbox Live",
+      "Xbox Game Pass Ultimate"
+    ],
+    "source": "https://cdn.jsdelivr.net/gh/homarr-labs/dashboard-icons@83f32e08257b66fbd971ac8d7645f5b38d52e85d/svg/xbox.svg",
+    "website": "https://github.com/homarr-labs/dashboard-icons",
+    "license": "Brand trademark; dashboard-icons upstream notices apply",
+    "asset": "company-logo-xbox-f12d88f5a0fab740.svg",
+    "sha256": "f12d88f5a0fab740b6dd53081531435c66fe5bdace51a9f4a22ef1aa54e7a539"
+  },
+  {
+    "id": "xfinity",
+    "name": "Xfinity",
+    "aliases": [
+      "Xfinity",
+      "Comcast",
+      "Comcast Xfinity"
+    ],
+    "source": "https://www.xfinity.com/favicon.ico",
+    "website": "https://www.xfinity.com",
+    "license": "Respective company trademark; official public site icon",
+    "asset": "company-logo-xfinity-aa050de8862f7eaa.ico",
+    "sha256": "aa050de8862f7eaa8ea290eb9612bf949d6a2c8a6ea60ce60df5af3697c89a7d"
+  },
+  {
+    "id": "youtube",
+    "name": "YouTube",
+    "aliases": [
+      "YouTube",
+      "YouTube Premium"
+    ],
+    "source": "https://cdn.jsdelivr.net/gh/homarr-labs/dashboard-icons@83f32e08257b66fbd971ac8d7645f5b38d52e85d/svg/youtube.svg",
+    "website": "https://github.com/homarr-labs/dashboard-icons",
+    "license": "Brand trademark; dashboard-icons upstream notices apply",
+    "asset": "company-logo-youtube-320ae220c53a6126.svg",
+    "sha256": "320ae220c53a6126da81aaf6803d8c813837bcaa95f39dcf5f75932335746673"
+  },
+  {
+    "id": "youtube-music",
+    "name": "YouTube Music",
+    "aliases": [
+      "YouTube Music",
+      "YouTube Music Premium"
+    ],
+    "source": "https://cdn.jsdelivr.net/gh/homarr-labs/dashboard-icons@83f32e08257b66fbd971ac8d7645f5b38d52e85d/svg/youtube-music.svg",
+    "website": "https://github.com/homarr-labs/dashboard-icons",
+    "license": "Brand trademark; dashboard-icons upstream notices apply",
+    "asset": "company-logo-youtube-music-3d92bd8506a96b56.svg",
+    "sha256": "3d92bd8506a96b566f1ca995096421072eddef097ac9d50b50eacb72d33d95e4"
+  },
+  {
+    "id": "youtube-tv",
+    "name": "YouTube TV",
+    "aliases": [
+      "YouTube TV"
+    ],
+    "source": "https://www.google.com/s2/favicons?domain=tv.youtube.com&sz=128",
+    "website": "https://github.com/homarr-labs/dashboard-icons",
+    "license": "Respective company trademark; public favicon snapshot",
+    "asset": "company-logo-youtube-tv-eed845163df4042c.png",
+    "sha256": "eed845163df4042ca0fb83d7ac9fb078b674c4112eb2e007d1ab13ed3cfddb3c"
+  },
+  {
+    "id": "zoom",
+    "name": "Zoom",
+    "aliases": [
+      "Zoom",
+      "Zoom Pro"
+    ],
+    "source": "https://cdn.jsdelivr.net/gh/homarr-labs/dashboard-icons@83f32e08257b66fbd971ac8d7645f5b38d52e85d/svg/zoom.svg",
+    "website": "https://github.com/homarr-labs/dashboard-icons",
+    "license": "Brand trademark; dashboard-icons upstream notices apply",
+    "asset": "company-logo-zoom-02a7a0b2028eb5ab.svg",
+    "sha256": "02a7a0b2028eb5ab7a9259ec0f9e59e8293244691b535aefdeb2b106023f760c"
+  }
+]

@@ -281,6 +281,11 @@ async def _asset(request: web.Request) -> web.StreamResponse:
     types = {"expense-report-app.js": "application/javascript", "expense-report-app.css": "text/css", "phone-setup.js": "application/javascript"}
     if re.fullmatch(r"category-mix-layout-[A-Za-z0-9_-]+\.js", name) and (_ASSETS / name).is_file():
         types[name] = "application/javascript"
+    logo = re.fullmatch(r"company-logo-[a-z0-9-]+-[a-f0-9]{16}\.(svg|png|jpg|ico)", name)
+    if logo and (_ASSETS / name).is_file():
+        content_type = {"svg": "image/svg+xml", "png": "image/png", "jpg": "image/jpeg", "ico": "image/x-icon"}[logo[1]]
+        return web.FileResponse(_ASSETS / name, headers={"Content-Type": content_type,
+            "Cache-Control": "public, max-age=31536000, immutable", "X-Content-Type-Options": "nosniff"})
     if name not in types:
         raise web.HTTPNotFound()
     return web.FileResponse(_ASSETS / name, headers={"Content-Type": types[name], "Cache-Control": "public, max-age=3600", "X-Content-Type-Options": "nosniff"})

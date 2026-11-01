@@ -125,7 +125,8 @@ const sameLayout=(actual,expected)=>{for(const key of Object.keys(expected))if(A
   const center=page.locator('.bb-category-pie-center'),was=await center.getAttribute('aria-pressed');await center.tap();assert.notEqual(await center.getAttribute('aria-pressed'),was);cases++
   await page.getByRole('button',{name:'Show Burn Rate',exact:true}).focus();await page.keyboard.press('Enter');await page.keyboard.press('ArrowRight');await settle(page);assert.equal(await title(page),'Calendar');cases++
   // Focus must not introduce the old second offset on the Calendar slide.
-  const calendarLeft=await viewport.evaluate(el=>el.scrollLeft),marker=page.locator('#bb-chart-calendar .bb-subscription-marker').first()
+  const calendarLeft=await viewport.evaluate(el=>el.scrollLeft),marker=page.locator('#bb-chart-calendar .bb-cf-date:not(:disabled)').first()
+  const calendarHeight=await page.locator('#bb-chart-calendar').evaluate(slide=>({page:slide.querySelector('.bb-cashflow-calendar').getBoundingClientRect().height,content:slide.querySelector('.bb-card-content').getBoundingClientRect().height}));assert.ok(Math.abs(calendarHeight.page-calendarHeight.content)<2,'Calendar occupies the complete shared stage '+JSON.stringify(calendarHeight));cases++
   assert.ok(await marker.count());await marker.focus();await page.waitForTimeout(200);assert.ok(Math.abs(await viewport.evaluate(el=>el.scrollLeft)-calendarLeft)<1);assert.equal(await viewport.evaluate(el=>el.scrollTop),0);cases++
   await select(page,'Burn Rate');await page.setViewportSize({width:width===320?390:320,height:900});await page.waitForTimeout(200);await snapped(page,1)
   await page.setViewportSize({width,height:900});await page.waitForTimeout(200);await snapped(page,1);cases++

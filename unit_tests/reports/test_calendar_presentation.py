@@ -52,14 +52,19 @@ def test_calendar_markers_constrain_amounts_and_size_counts_to_the_day_cell():
     assert "@container calendar-day (max-width: 32px)" in styles
 
 
-def test_compact_calendar_markers_keep_exact_event_information_accessible():
+def test_calendar_uses_day_dialog_instead_of_hover_only_details():
     source = (FRONTEND / "report-app.tsx").read_text()
-    calendar = source.split("function FinancialCalendar", 1)[1].split("function calendarEventKey", 1)[0]
+    panel = source.split("function CalendarAnalyticsPanel", 1)[1].split("function BillsUtilitiesPanel", 1)[0]
+    assert '<ModalDetails summary="Calendar day"' in panel
+    assert 'collapseKey={collapseKey}' in panel
+    assert '<CalendarDayDetails selection={selection}' in panel
+    assert 'CalendarFilterControl' not in source
 
-    assert "aria-label={calendarEventLabel(item)}" in calendar
-    assert 'filteredEvents.map(calendarEventLabel).join("; ")' in calendar
-    assert "<CalendarEventTooltip event={item} />" in calendar
-    assert "<CalendarOverflowTooltip events={filteredEvents} day={day} />" in calendar
+
+def test_two_week_calendar_model_and_logo_matching():
+    root = FRONTEND.parents[2]
+    subprocess.run(["node", "unit_tests/reports/cashflow_calendar_test.cjs"], cwd=root,
+                   check=True, capture_output=True, text=True)
 
 
 def test_daily_today_color_and_weight_override_the_button_reset():
