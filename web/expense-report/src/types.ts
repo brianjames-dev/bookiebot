@@ -262,6 +262,7 @@ export interface ExpenseReportData {
   topEntries: ExpenseEntry[]
   dailyEntries: ExpenseEntry[]
   needExpenses: PaymentItem[]
+  calendarLogoAliases?: Record<string, string>
   calendarContext?: CalendarMonth[]
   calendarEvents: CalendarEvent[]
   utilityHistory: UtilityHistoryItem[]

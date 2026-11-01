@@ -7,14 +7,11 @@ export function companyIdentity(value: string): string {
 const byId = new Map(catalog.map(item => [item.id, item]))
 const byAlias = new Map(catalog.flatMap(item => item.aliases.map(alias => [companyIdentity(alias), item] as const)))
 
-// Explicit, display-only owner preferences confirmed by Brian. Generic labels
-// never identify a provider globally or affect any financial classification.
-const ownerAliases: Record<string, Record<string, string>> = {
-  brian: { water: 'santa-rosa-water', 'student loan': 'aidvantage', 'student loan payment': 'aidvantage' },
-}
-export function companyLogo(label: string, owner: string) {
+// Confirmed provider assignments arrive with the authenticated report. Only
+// catalog IDs are accepted; an alias cannot introduce an outside image URL.
+export function companyLogo(label: string, aliases: Record<string, string> = {}) {
   const key = companyIdentity(label)
-  const scoped = ownerAliases[companyIdentity(owner)]?.[key]
+  const scoped = aliases[key]
   const item = scoped ? byId.get(scoped) : byAlias.get(key)
   return item ? { id: item.id, name: item.name, src: `/app/assets/${item.asset}` } : null
 }

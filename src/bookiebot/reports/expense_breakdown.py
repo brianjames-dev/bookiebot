@@ -2550,6 +2550,19 @@ def _escape(value: Any) -> str:
     return html.escape(str(value), quote=True)
 
 
+def _calendar_logo_aliases(actor_key: str) -> dict[str, str]:
+    """Provider assignments belong to the private, actor-bound report payload."""
+    from bookiebot.sheets.routing import UnknownDiscordUserError, get_user_config
+
+    try:
+        owner = get_user_config(actor_key).budget_owner_key
+    except UnknownDiscordUserError:
+        return {}
+    if owner == "brian":
+        return {"water": "santa-rosa-water", "student loan": "aidvantage", "student loan payment": "aidvantage"}
+    return {}
+
+
 def _report_client_payload(
     *,
     report: ExpenseBreakdownReport,
@@ -2632,6 +2645,7 @@ def _report_client_payload(
         "dailyEntries": [_expense_entry_payload(entry) for entry in activity_entries],
         "needExpenses": [_payment_payload(item) for item in report.need_expenses],
         "calendarEvents": [_calendar_event_payload(item) for item in report.calendar_events],
+        "calendarLogoAliases": _calendar_logo_aliases(report.actor_key),
         "calendarContext": [
             {"year": item.month.year, "month": item.month.month, "available": item.available,
              "events": [_calendar_event_payload(event) for event in item.events]}

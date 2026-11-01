@@ -775,7 +775,7 @@ const OverviewCharts = memo(function OverviewCharts({ report, activeReport, char
           key={`${report.year}-${report.month}`}
           events={activeReport.calendarEvents}
           context={report.calendarContext}
-          owner={report.ownerName}
+          aliases={report.calendarLogoAliases}
           projected={projectionActive}
           collapseKey={chartCollapseKey}
         />
@@ -3213,22 +3213,22 @@ function compareDayLabels(left: string, right: string) {
   return left.localeCompare(right)
 }
 
-function CalendarAnalyticsPanel({ year, month, events, context, owner, projected, collapseKey }: {
+function CalendarAnalyticsPanel({ year, month, events, context, aliases, projected, collapseKey }: {
   year: number
   month: number
   events: CalendarEvent[]
   context?: CalendarMonth[]
-  owner: string
+  aliases?: Record<string, string>
   projected: boolean
   collapseKey: number
 }) {
   const [selection, setSelection] = useState<CalendarSelection | null>(null)
   return <div className="bb-cashflow-panel">
-    <CashflowCalendar year={year} month={month} events={events} context={context} owner={owner}
+    <CashflowCalendar year={year} month={month} events={events} context={context} aliases={aliases}
       projected={projected} onInspect={setSelection} />
     <ModalDetails summary="Calendar day" title={selection?.title ?? "Calendar day"} selection={selection?.key ?? null}
       collapseKey={collapseKey} triggerHidden onDismiss={() => setSelection(null)}>
-      {selection && <CalendarDayDetails selection={selection} owner={owner} />}
+      {selection && <CalendarDayDetails selection={selection} aliases={aliases} />}
     </ModalDetails>
   </div>
 }

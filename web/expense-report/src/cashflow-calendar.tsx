@@ -19,8 +19,8 @@ function FallbackIcon({ event }: { event: CalendarEvent }) {
     : /pge|pg&e|electric|power|gas/.test(label) ? Zap : CreditCard
   return <Icon aria-hidden="true" />
 }
-export function CompanyMedallion({ event, owner }: { event: CalendarEvent; owner: string }) {
-  const logo = companyLogo(event.label, owner)
+export function CompanyMedallion({ event, aliases }: { event: CalendarEvent; aliases?: Record<string, string> }) {
+  const logo = companyLogo(event.label, aliases)
   const [loaded, setLoaded] = useState<string | null>(null)
   const [failed, setFailed] = useState<string | null>(null)
   const ready = Boolean(logo && loaded === logo.src && failed !== logo.src)
@@ -35,8 +35,8 @@ export function CompanyMedallion({ event, owner }: { event: CalendarEvent; owner
     </span>
   </span>
 }
-export function CashflowCalendar({ year, month, events, context = [], owner, projected, onInspect }: {
-  year: number; month: number; events: CalendarEvent[]; context?: CalendarMonth[]; owner: string; projected: boolean
+export function CashflowCalendar({ year, month, events, context = [], aliases, projected, onInspect }: {
+  year: number; month: number; events: CalendarEvent[]; context?: CalendarMonth[]; aliases?: Record<string, string>; projected: boolean
   onInspect: (selection: CalendarSelection) => void
 }) {
   const [mode, setMode] = useState<'weeks' | 'month'>('weeks')
@@ -111,7 +111,7 @@ export function CashflowCalendar({ year, month, events, context = [], owner, pro
               </button>
               {mode === 'weeks' ? <>
                 <div className="bb-cf-icons">{shown.map((item, index) => <button type="button" className="bb-cf-event" key={`${item.kind}-${item.label}-${index}`}
-                  aria-label={calendarEventDescription(item)} onClick={() => inspect(date, [item], `-${index}`)}><CompanyMedallion event={item} owner={owner} /></button>)}
+                  aria-label={calendarEventDescription(item)} onClick={() => inspect(date, [item], `-${index}`)}><CompanyMedallion event={item} aliases={aliases} /></button>)}
                   {overflow && <button type="button" className="bb-cf-event bb-cf-overflow" aria-label={`Show all ${items.length} events on ${dateLabel.format(date)}`} onClick={() => inspect(date, items)}>
                     <span className="bb-cf-medallion"><span className="bb-cf-medallion-layer"><span className="bb-cf-medallion-face">+{items.length - shown.length}</span></span></span>
                   </button>}
@@ -133,13 +133,13 @@ export function CashflowCalendar({ year, month, events, context = [], owner, pro
     <div className="bb-cf-legend" aria-label="Calendar legend">{(['bill', 'subscription', 'income'] as const).map(kind => <span key={kind}><i style={{ background: CALENDAR_COLORS[kind] }} />{kind === 'bill' ? 'Bills' : kind === 'subscription' ? 'Subs' : 'Income'}</span>)}</div>
   </section>
 }
-export function CalendarDayDetails({ selection, owner }: { selection: CalendarSelection; owner: string }) {
+export function CalendarDayDetails({ selection, aliases }: { selection: CalendarSelection; aliases?: Record<string, string> }) {
   const totals = calendarTotals(selection.events)
   return <div className="bb-cf-details">
     <div className="bb-cf-detail-totals"><span><small>Outgoing</small><strong>{money.format(totals.outgoing)}</strong></span>
       {totals.incoming > 0 && <span><small>Incoming</small><strong>{money.format(totals.incoming)}</strong></span>}</div>
     <ul>{selection.events.map((event, i) => <li key={`${event.kind}-${event.label}-${i}`}>
-      <CompanyMedallion event={event} owner={owner} /><span><strong>{event.label}</strong>
+      <CompanyMedallion event={event} aliases={aliases} /><span><strong>{event.label}</strong>
         <small>{event.kind === 'subscription' ? (event.group === 'subscriptions_wants' ? 'Subs (Wants)' : 'Subs (Needs)') : event.kind === 'income' ? 'Income' : 'Bill'} · {calendarActivityStatus(event) === 'scheduled' || event.amountUnknown ? 'Scheduled' : 'Recorded'}{event.amountEstimated ? ' · Estimated' : ''}</small></span>
       <b>{event.amountUnknown ? 'Not entered' : money.format(event.amount)}</b>
     </li>)}</ul>

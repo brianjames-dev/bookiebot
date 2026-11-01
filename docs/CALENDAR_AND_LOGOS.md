@@ -24,7 +24,7 @@ As before, schedules remain visible in both report modes. The header sums visibl
 
 ## Local logo catalog
 
-The initial catalog contains **89 images**, including Brian's ten named subscriptions, PG&E, Recology, Aidvantage, and the City of Santa Rosa, plus common streaming, software, internet, phone, insurance, electric, gas, water and waste providers. Names and aliases are reviewed explicitly; there is no fuzzy merchant matching. `Water` and `Student Loan` aliases are scoped to Brian's display profile, following his provider confirmation. They do not change sheet labels or financial categories.
+The initial catalog contains **89 images**, including Brian's ten named subscriptions, PG&E, Recology, Aidvantage, and the City of Santa Rosa, plus common streaming, software, internet, phone, insurance, electric, gas, water and waste providers. Names and aliases are reviewed explicitly; there is no fuzzy merchant matching. `Water` and `Student Loan` aliases are scoped to Brian's display profile, following his provider confirmation. Assignments arrive in the authenticated report payload and are not embedded in the public interface bundle. They do not change sheet labels or financial categories.
 
 `company-logo-sources.json` records reviewed source URLs. `src/company-logos.json` records the downloaded content hash, local filename and source/notice. Images use content-addressed filenames served by the narrow `/app/assets/company-logo-…` allowlist, with an immutable cache policy and same-origin CSP. The frontend fingerprint changes with catalog imports. Only visible logos load; unknown, ambiguous or failed images retain generic type icons. No transaction name is sent to a logo service at runtime.
 

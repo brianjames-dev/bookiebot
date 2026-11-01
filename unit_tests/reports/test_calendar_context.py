@@ -110,3 +110,17 @@ def test_calendar_context_cannot_change_either_financial_mode():
     assert with_context['calendarContext']
     for key in ('modeViews', 'metrics', 'categoryBalances', 'breakdown', 'burnRate', 'calendarEvents'):
         assert with_context[key] == without_context[key]
+
+
+def test_provider_assignments_follow_the_bound_actor_not_a_client_name():
+    from bookiebot.sheets.routing import DEFAULT_BRIAN_DISCORD_USER_IDS, DEFAULT_HANNAH_DISCORD_USER_IDS
+    aliases = report._calendar_logo_aliases(DEFAULT_BRIAN_DISCORD_USER_IDS[0])
+    assert aliases == {'water': 'santa-rosa-water', 'student loan': 'aidvantage', 'student loan payment': 'aidvantage'}
+    assert report._calendar_logo_aliases(DEFAULT_HANNAH_DISCORD_USER_IDS[0]) == {}
+    assert report._calendar_logo_aliases('unmapped-actor') == {}
+    from dataclasses import replace
+    from unit_tests.reports.test_income_projection import build, income_rows
+    selected = build(income_rows(('9/1/2026', 'Fixture income', '5000')))
+    assert report.expense_breakdown_client_payload(replace(selected, actor_key=DEFAULT_BRIAN_DISCORD_USER_IDS[0]))['calendarLogoAliases'] == aliases
+    spoofed_name = replace(selected, actor_key=DEFAULT_HANNAH_DISCORD_USER_IDS[0], owner_name='Brian')
+    assert report.expense_breakdown_client_payload(spoofed_name)['calendarLogoAliases'] == {}
