@@ -8,7 +8,7 @@ function load(file) {
  if(cache.has(file))return cache.get(file).exports
  const module={exports:{}};cache.set(file,module)
  const source=fs.readFileSync(file,'utf8'),compiled=ts.transpileModule(source,{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2020,jsx:ts.JsxEmit.ReactJSX,esModuleInterop:true}}).outputText
- vm.runInNewContext(compiled,{module,exports:module.exports,Date:Clock,require:id=>id.startsWith('.') ? (id.endsWith('.json') ? JSON.parse(fs.readFileSync(path.resolve(path.dirname(file),id),'utf8')) : load(path.relative('web/expense-report/src',path.resolve(path.dirname(file),id+(id.endsWith('.tsx')?'':'.ts'))))) : req(id)},{filename:file})
+ vm.runInNewContext(compiled,{module,exports:module.exports,Date:Clock,require:id=>id.startsWith('.') ? (id.endsWith('.json') ? JSON.parse(fs.readFileSync(path.resolve(path.dirname(file),id),'utf8')) : load([path.resolve(path.dirname(file),id),path.resolve(path.dirname(file),id+'.ts'),path.resolve(path.dirname(file),id+'.tsx')].find(fs.existsSync))) : req(id)},{filename:file})
  return module.exports
 }
 const model=load('calendar-model.ts'),logos=load('company-logo.ts'),view=load('cashflow-calendar.tsx')

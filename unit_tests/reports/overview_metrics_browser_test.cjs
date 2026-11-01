@@ -78,7 +78,7 @@ async function checkQuietHeader(page, width, reduced) {
     else assert.ok(layout.title.right+8<=layout.dots.left+1,JSON.stringify(layout))
     if (name==='Category Mix') assert.equal(layout.font,28,'Approved title size is retained where it fits')
     if (reduced) assert.ok(layout.buttons.every(button=>button.duration<=.001))
-    assert.equal(layout.touchAction,'pan-y','Chart gestures leave vertical panning native')
+    assert.equal(layout.touchAction,'auto','The carousel leaves both axes to native browser scrolling')
     assert.equal((await stage.boundingBox()).height,height,'Every graph uses the unchanged shared stage height')
     assert.equal(await page.locator('.bb-chart-carousel-slide:not([inert])').count(),1,'Only the visible chart exposes its controls')
   }
@@ -103,7 +103,7 @@ async function checkQuietHeader(page, width, reduced) {
   assert.equal(await page.locator('.bb-chart-carousel-slide[aria-hidden="false"] .bb-chart-carousel-title').innerText(),'Category Mix','Vertical movement does not select another chart')
   await page.locator('.bb-chart-carousel[data-settling="false"]').waitFor()
   for (const [type,x,y] of [['touchstart',240,120],['touchmove',35,124],['touchend',35,124]]) assert.equal(await touch(type,x,y),false)
-  assert.equal(await page.locator('.bb-chart-carousel-slide[aria-hidden="false"] .bb-chart-carousel-title').innerText(),'Burn Rate','Horizontal swipe selects the next graph')
+  assert.equal(await page.locator('.bb-chart-carousel-slide[aria-hidden="false"] .bb-chart-carousel-title').innerText(),'Category Mix','Synthetic touch events cannot replace native compositor scrolling; real gestures are covered by chart_swipe_browser_test.cjs')
   await page.locator('.bb-chart-carousel[data-settling="false"]').waitFor()
   for (const [type,x,y] of [['touchstart',35,124],['touchmove',240,120],['touchend',240,120]]) assert.equal(await touch(type,x,y),false)
   assert.equal(await page.locator('.bb-chart-carousel-slide[aria-hidden="false"] .bb-chart-carousel-title').innerText(),'Category Mix')

@@ -1,6 +1,7 @@
 import { useLayoutEffect, useRef, useState, type CSSProperties } from 'react'
 import { CalendarDays, Rows2, CreditCard, DollarSign, Droplets, GraduationCap, House, Repeat, ShieldCheck, Wifi, Zap } from 'lucide-react'
 import { companyLogo } from './company-logo'
+import { MetricAmount } from './amount-appearance'
 import { calendarActivityStatus } from './report-activity'
 import { CALENDAR_LAYOUT, CALENDAR_COLORS, calendarDates, calendarDot, calendarRange, calendarTotals, compactCalendarAmount, dateKey, eventsForDate, logoCapacity, pacificToday } from './calendar-model'
 import type { CalendarEvent, CalendarMonth } from './types'
@@ -87,7 +88,7 @@ export function CashflowCalendar({ year, month, events, context = [], aliases, p
     style={{ '--cf-icon': `${CALENDAR_LAYOUT.iconSize}px`, '--cf-overlap': CALENDAR_LAYOUT.overlap, '--cf-cutout': `${CALENDAR_LAYOUT.cutout}px`, '--cf-pitch': `${CALENDAR_LAYOUT.iconSize * (1 - CALENDAR_LAYOUT.overlap)}px`, '--cf-bottom-gap': `${CALENDAR_LAYOUT.bottomGap}px`, '--cf-rows': rows, '--cf-grid-target': `${rows * CALENDAR_LAYOUT.monthCellHeight + (rows - 1) * CALENDAR_LAYOUT.cellGap}px` } as CSSProperties}>
     <div className="bb-cf-header">
       <div><div className="bb-cf-range">{calendarRange(dates, mode === 'month', year, month)}</div>
-        <div className="bb-cf-summary" aria-live="polite"><strong>{money.format(summary.outgoing)}</strong><span>{unknown ? 'known outgoing' : 'outgoing'}</span></div></div>
+        <div className="bb-cf-summary" aria-live="polite"><MetricAmount className="bb-cf-outgoing" intrinsic>{money.format(summary.outgoing)}</MetricAmount><span>{unknown ? 'known outgoing' : 'outgoing'}</span></div></div>
       <button type="button" className="bb-cf-view-toggle" data-bb-tooltip-dismiss-trigger="calendar" onClick={toggle} aria-label={mode === 'weeks' ? 'Show full month' : 'Show this week and next week'} aria-pressed={mode === 'month'}>
         {mode === 'weeks' ? <CalendarDays aria-hidden="true" /> : <Rows2 aria-hidden="true" />}
       </button>

@@ -81,6 +81,7 @@ const runtime={exports:{},require:req,window:global.window,memo:React.memo,useSt
  Cell:Recharts.Cell,StablePieSector:ObservedSector,ChartTooltip:()=>null,ChartTooltipContent:()=>null,DailySpendingTooltipContent:()=>null,
  CategoryRingCenterSync:({children})=>children,categoryRingSpring:t=>t,
  areCategoryMixPieSurfacePropsEqual:()=>false,PIE_METRIC_START_ANGLE:0,PIE_METRIC_END_ANGLE:360,PIE_METRIC_PADDING_ANGLE:1}
+runtime.MetricAmount=({children,className})=>React.createElement('div',{className},children)
 vm.runInNewContext(compiled,runtime)
 function advance(ms=16){now+=ms;const pending=[...frames.values()];frames.clear();Renderer.act(()=>pending.forEach(callback=>callback(now)))}
 function settle(){for(let i=0;i<45;i++)advance()}

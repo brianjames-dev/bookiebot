@@ -47,6 +47,7 @@ import {
 import { Badge } from "./components/ui/badge"
 import { Card, CardContent, CardHeader, CardTitle } from "./components/ui/card"
 import { FittedAmount } from "./components/ui/fitted-amount"
+import { AmountAppearanceBoundary, MetricAmount } from "./amount-appearance"
 import { ReportMenu } from "./components/ui/report-menu"
 import { SavingsGoals } from "./savings-goals"
 import { Investments } from "./investments"
@@ -552,7 +553,7 @@ function useViewportScrollbarWidth() {
   }, [])
 }
 
-export function ExpenseReportApp({ report, appControls, appAvatarUrl, appSession, appMonthControl, appComparison, appUpdate, externalHeader = false }: {
+type ExpenseReportAppProps = {
   externalHeader?: boolean
   appUpdate?: ReactNode
   appMonthControl?: ReactNode
@@ -561,7 +562,11 @@ export function ExpenseReportApp({ report, appControls, appAvatarUrl, appSession
   appControls?: ReactNode
   appAvatarUrl?: string
   appSession?: { signOut: () => void; signingOut: boolean }
-}) {
+}
+export function ExpenseReportApp(props: ExpenseReportAppProps) {
+  return <AmountAppearanceBoundary owner={props.report.ownerName}><ExpenseReportBody {...props} /></AmountAppearanceBoundary>
+}
+function ExpenseReportBody({ report, appControls, appAvatarUrl, appSession, appMonthControl, appComparison, appUpdate, externalHeader = false }: ExpenseReportAppProps) {
   const navigation = useAppNavigation()
   const { theme, toggleTheme } = useExpenseReportTheme(!navigation)
   const [metricInspection, setMetricInspection] = useState<MetricInspection | null>(null)
@@ -1192,7 +1197,7 @@ function BurnRateChart({
               <div className="bb-chart-kicker">{statusLabel}</div>
               <BurnRateInfoButton burnRate={burnRate} monthName={monthName} collapseKey={collapseKey} />
             </div>
-            <div className={isOver ? "bb-burn-rate-value bb-negative" : "bb-burn-rate-value bb-positive"}>{differenceLabel}</div>
+            <MetricAmount className={isOver ? "bb-burn-rate-value bb-negative" : "bb-burn-rate-value bb-positive"}>{differenceLabel}</MetricAmount>
           </div>
           <div className="bb-burn-rate-actions">
             <div className={`bb-burn-rate-pace ${burnRate.dailyDifference > 0 ? "bb-negative" : "bb-positive"}`} aria-label={dailyDifference}>
@@ -1611,9 +1616,9 @@ function MetricCard({
         <div className="bb-metric-label">{onExplain ? <button type="button" className="bb-metric-explain" aria-label={`Explain ${label}`} onClick={onExplain}>{label}<span aria-hidden="true">ⓘ</span></button> : label}</div>
         {control}
       </div>
-      <FittedAmount className={negative ? "bb-metric-value bb-negative" : positive ? "bb-metric-value bb-positive" : "bb-metric-value"}>
+      <MetricAmount className={negative ? "bb-metric-value bb-negative" : positive ? "bb-metric-value bb-positive" : "bb-metric-value"}>
         {formatMoney(value)}
-      </FittedAmount>
+      </MetricAmount>
       {description ? <div className="bb-metric-note">{description}</div> : null}
       {children}
     </div>
@@ -1666,7 +1671,7 @@ function SavingsMetricCard({
   return (
     <div className="bb-metric-card bb-savings-metric-card">
       <div className="bb-metric-label">{onExplain ? <button type="button" className="bb-metric-explain" aria-label="Explain Saved" onClick={onExplain}>Saved<span aria-hidden="true">ⓘ</span></button> : "Saved"}</div>
-      <FittedAmount className={`bb-metric-value bb-savings-value bb-savings-value-${tone}`}>{formatMoney(value)}</FittedAmount>
+      <MetricAmount className={`bb-metric-value bb-savings-value bb-savings-value-${tone}`}>{formatMoney(value)}</MetricAmount>
       <SavingsProgress value={cash} minimum={minimum} ideal={ideal} />
     </div>
   )
@@ -1759,7 +1764,7 @@ const CategoryMixChart = memo(function CategoryMixChart({
             <span className="bb-chart-mode-note">{projected ? "Projected" : "Current"}</span>
         </div>
         <div className="bb-category-amount-row">
-          <FittedAmount className="bb-chart-total">{formatMoney(spentTotal)}</FittedAmount>
+          <MetricAmount className="bb-chart-total">{formatMoney(spentTotal)}</MetricAmount>
           <div className="bb-chart-page-header-actions">
             <CategoryMixFilterControl filter={filter} onFilterChange={onFilterChange} />
           </div>
@@ -2300,7 +2305,7 @@ function DailySpendingChart({
       <div className="bb-chart-side">
         <div>
           <div className="bb-chart-kicker">Total Spent</div>
-          <div className="bb-chart-total">{formatMoney(total)}</div>
+          <MetricAmount className="bb-chart-total">{formatMoney(total)}</MetricAmount>
         </div>
         <button type="button" className="bb-details-toggle" aria-expanded={detailsOpen} aria-controls={detailsId} onClick={onToggleDetails}>
           Transactions
@@ -3290,7 +3295,7 @@ function BillsUtilitiesPanel({
       <div className="bb-panel-head bb-bills-analytics-head bb-chart-page-header">
         <div>
           <div className="bb-category-summary-label"><span className="bb-chart-kicker">Selected bills</span><span className="bb-chart-mode-note">{projected ? "Projected" : "Current"}</span></div>
-          <FittedAmount className="bb-chart-total">{visible.length ? formatMoney(currentTotal) : "—"}</FittedAmount>
+          <MetricAmount className="bb-chart-total">{visible.length ? formatMoney(currentTotal) : "—"}</MetricAmount>
         </div>
         <div className="bb-bill-controls">
           <button type="button" className="bb-bill-manage" aria-label="Manage visible bills" aria-haspopup="dialog" onClick={() => setPending([...selected])}><SlidersHorizontal aria-hidden="true" /><span>{visible.length} {visible.length === 1 ? "bill" : "bills"}</span></button>

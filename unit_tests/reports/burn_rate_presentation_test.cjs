@@ -244,6 +244,7 @@ assert.equal(declarations.length,names.size)
 const surface=({children})=>React.createElement('div',null,children)
 const runtime={exports:{},require:req,useState:React.useState,useEffect:React.useEffect,useId:React.useId,useLayoutEffect:React.useLayoutEffect,useRef:React.useRef,useChartTooltipDismiss:()=>()=>{},X:()=>null,useMediaQuery:()=>true,burnRateBalance,positionBurnRateTooltip,
   categoryMixPressure:()=>null,ChartContainer:surface,ResponsiveContainer:surface,ComposedChart:surface,Area:()=>null,CartesianGrid:()=>null,XAxis:()=>null,YAxis:()=>null,ReferenceLine:()=>null,Line:()=>null,ChartTooltip:()=>null}
+runtime.MetricAmount=({children,className})=>React.createElement('div',{className},children)
 vm.runInNewContext(compile(declarations.map(n=>n.getText(file)).join('\n')+'\nexports.Chart=BurnRateChart;exports.Tooltip=BurnRateTooltipContent;exports.Month=BurnRateMonthBalance;exports.Info=BurnRateInfoContent'),runtime)
 let view
 const render=(Component,props)=>act(()=>{if(view)view.unmount();view=create(React.createElement(Component,props))})

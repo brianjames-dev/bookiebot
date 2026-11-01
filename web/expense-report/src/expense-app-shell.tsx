@@ -15,6 +15,7 @@ import { WidgetSettings } from "./widget-settings"
 import { WidgetSetupGuide } from "./widget-setup-guide"
 import { AskBookieBotPanel } from "./ask-bookiebot-panel"
 import { AppUpdatePrompt } from "./app-update-prompt"
+import { AmountAppearanceBoundary, AmountAppearanceSettings } from "./amount-appearance"
 import { useAppWorkGuard } from "./app-work-guard"
 import { ReconciliationScreen, useReconciliation } from "./reconciliation-screen"
 import { TransactionsScreen } from "./transactions-screen"
@@ -30,7 +31,7 @@ interface ExpenseAppShellProps {
   onRefresh?: () => Promise<boolean>; reportBusy?: boolean
 }
 export function ExpenseAppShell(props: ExpenseAppShellProps) {
-  return <PageRefreshProvider><ExpenseAppShellContent {...props} /></PageRefreshProvider>
+  return <AmountAppearanceBoundary owner={props.report?.ownerName ?? props.ownerName ?? ""} enabled={Boolean(props.report)}><PageRefreshProvider><ExpenseAppShellContent {...props} /></PageRefreshProvider></AmountAppearanceBoundary>
 }
 function ExpenseAppShellContent({ report, ownerName = "BookieBot", controls, monthControl, comparison, avatarUrl, initialVersion, signOut, signingOut, monthlyReady = true, questionMonth, onRefresh, reportBusy = false }: ExpenseAppShellProps) {
   const { theme, toggleTheme } = useExpenseReportTheme()
@@ -233,6 +234,7 @@ function ExpenseAppShellContent({ report, ownerName = "BookieBot", controls, mon
         {report && <><div className="bb-settings-heading"><button type="button" className="bb-settings-back" onClick={() => selectScreen(lastMain)}><ArrowLeft aria-hidden="true" />Back</button><h1>Settings</h1></div>
         <section className="bb-settings-section" aria-labelledby="bb-appearance-title"><h2 id="bb-appearance-title">Appearance</h2>
           <div className="bb-setting-row"><span>Dark mode</span><button type="button" className="bb-setting-switch" role="switch" aria-label="Dark mode" aria-checked={theme === "dark"} onClick={toggleTheme}><span /></button></div>
+          <AmountAppearanceSettings />
         </section>
         <div className="bb-settings-section bb-settings-notifications"><PhoneNotifications embedded /></div>
         <WidgetSettings ownerName={report.ownerName} defaultMode={preferences.mode} onOpenGuide={openWidgetGuide} />

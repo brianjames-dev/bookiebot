@@ -48,6 +48,7 @@ const runtime = {
   CartesianGrid: () => null, XAxis: () => null, YAxis: () => null, Bar: () => null,
   ChartTooltip: () => null, DailySpendingTooltipContent: () => null,
 }
+runtime.MetricAmount=({children,className})=>React.createElement('div',{className},children)
 vm.runInNewContext(compiled, runtime)
 const Section = runtime.exports.Section
 let chartRenders = 0
