@@ -52,7 +52,7 @@ Pick the next task from `.agent/STATUS.md` only. Treat `.agent/WORKSTREAM_FINANC
    - add new open questions or follow-up slices discovered during the task
 10. Update `.agent/DECISIONS.md` only for durable decisions that affect architecture, data shape, lifecycle semantics, or user workflow.
 11. Final response must summarize code changes, tests run, docs updated, and manual test steps.
-12. After completing and verifying requested changes, commit and push them to the current branch by default, unless the user asks otherwise. This is the user's standing preference as of 2026-09-05. Stage only the task's files, preserve unrelated work, and do not force-push.
+12. After completing and verifying requested changes, commit, push, and merge them into `main` by default, unless the user asks otherwise. This is the user's standing preference as of 2026-11-01 and supersedes the earlier commit/push-only preference. Create or update the task pull request, wait for required checks to pass, and merge without asking for another confirmation. Stage only the task's files, preserve unrelated work, and do not force-push.
 
 ### Completion Standard
 

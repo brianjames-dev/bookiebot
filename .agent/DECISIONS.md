@@ -1,5 +1,14 @@
 # Agent Decisions
 
+## 2026-11-01 - Merge Every Verified Change By Default
+
+The user explicitly requests merging after every change. Extend the standing
+commit/push preference to creating or updating the task PR and merging into
+`main` once required checks pass, without another confirmation. Preserve task
+scope, unrelated work and existing financial-action confirmation rules. Do not
+force-push or bypass failed checks. This authorizes the normal automatic app
+rollout caused by merging; live sheet/bank actions still need their own scope.
+
 ## 2026-11-01 - Keep Raised Cents Behind One Appearance Toggle
 
 Default Overview and graph dollar headlines to the approved raised cents: 50%
