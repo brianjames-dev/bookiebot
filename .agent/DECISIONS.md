@@ -1,5 +1,11 @@
 # Agent Decisions
 
+## 2026-10-31 - Offline Logo Restoration And Circle Review
+
+Separate logo source quality from calendar framing. Prefer sharper original art and native vector symbols, then use per-brand backplates/optical fill; restore genuinely weak raster marks with the built-in image tool and explicit original references. Keep versioned sources, SHA-256 lineage, full prompts and AI labels. Export/audit all 89 candidates offline at 256px and review at the actual 26px size in both themes; pixel density is a triage signal, not proof of faithful artwork. Native round badges fill the medallion; square badges extend their own background while keeping internal lettering safely inset. Follow the supplied Railway white-on-dark reference and protect its background plus GitHub/LinkedIn edges with export-time pixel checks.
+
+This pass produces review candidates and a repeatable authoring process, not a runtime AI/logo service or a change to production branding. The user requested a complete visual set to iterate on. Keep existing production assets and private provider assignments intact until the selected art/framing is applied in a follow-up. Never send transaction or account data to an outside service to resolve a logo during app use.
+
 ## 2026-10-31 - Under Calendar And A Local Company Catalog
 
 Implement the approved Under calendar layout inside the existing sliding Calendar page: compact date/outgoing header, icon-only two-week/full-month control, equal grid height, overlapping color logos with hard transparent masks, separate incoming/outgoing capsules, full-month mixed dots and legend below. Use the existing native day dialog lifecycle for exact values and overflow; remove All/Subs, event counts and the separate Details trigger. Keep 104px bottom breathing room and retain the broader goal of reducing shared graph heights in future passes. Code defaults mirror the draft; cells shrink together when constrained by the existing shared stage, without resizing other graphs.

@@ -1,0 +1,86 @@
+{
+  "tool": "built-in image_gen.imagegen",
+  "date": "2026-10-31",
+  "status": "review-candidates",
+  "export": "Original generated PNG retained separately; 256px PNG format/size export using browser canvas, without creative edits",
+  "items": [
+    {
+      "id": "aidvantage",
+      "references": [
+        "src/bookiebot/reports/assets/company-logo-aidvantage-07c0a17dda8187c2.png",
+        "docs/logo-review/sources/aidvantage-wordmark.png"
+      ],
+      "originalOutput": "aidvantage-ai-v1.png",
+      "output": "docs/logo-review/sources/aidvantage-ai-v1.png",
+      "transparent": false,
+      "prompt": "Use case: precise-object-edit. Asset type: high resolution merchant logo badge for a 26px circular calendar icon. Edit targets: first image is the actual 16px Aidvantage favicon; second image is the official high-resolution Aidvantage wordmark as supporting brand reference. Reconstruct ONLY the white V-shaped favicon mark from image 1 with exceptionally clean vector-like edges and faithful proportions, centered on the same solid indigo-purple background sampled from image 1. Fill the complete square background edge-to-edge so it can be circular-cropped later. Let the mark occupy approximately 66% of the width and 66% of the height, with balanced optical margins, no clipping. Preserve the exact brand identity and simple asymmetrical V shape; this is restoration, not a new logo. No wordmark, additional letters, text, border, ring, gradient, shadow, gloss, blur, texture, ornament, or mockup. Output a single flat, square, crisp 1024px icon.",
+      "outputSha256": "c6ede9e9bd50ee14ab1cd65249418df5c60400d4757ea2b19a30256644a7c7f3",
+      "originalOutputSha256": "2cdfc7b9f172ff976a0acb116877bd2834fbe182ea0243939cc121170672ae6c",
+      "referenceSha256": {
+        "src/bookiebot/reports/assets/company-logo-aidvantage-07c0a17dda8187c2.png": "07c0a17dda8187c228a36774b91657093dc99cd1c2c4765135b419d5bdb0fbdd",
+        "docs/logo-review/sources/aidvantage-wordmark.png": "d685a7e04ae3d447d94a516856c25a1c4469f0f12e0aae48ada6c14530fd6698"
+      }
+    },
+    {
+      "id": "santa-rosa-water",
+      "references": [
+        "src/bookiebot/reports/assets/company-logo-santa-rosa-water-9e81a9c7e2bc563d.png"
+      ],
+      "originalOutput": "santa-rosa-water-ai-v1.png",
+      "output": "docs/logo-review/sources/santa-rosa-water-ai-v1.png",
+      "transparent": true,
+      "prompt": "Use case: precise-object-edit. Asset type: high-resolution restored City of Santa Rosa rose logo for a small circular merchant icon. Edit target: the attached tiny official City of Santa Rosa favicon. Faithfully reconstruct the existing pink/dusty-rose botanical rose with its green leaves and stem, in the same upright orientation and proportions, but with clean, smooth vector-like edges. Keep a recognizable layered rose blossom and simple broad leaf shapes so it remains legible at 26px. Center the complete rose and leaves; use roughly 76% of the square canvas, with balanced empty margins. Preserve the muted pink/rose-red and olive-green identity of the reference. This is a faithful icon restoration, not a redesign. Output just the rose mark on a genuinely transparent background. No text, city name, border, ring, circle, gradient, blur, glow, texture, photographic rendering, ornamental detail, or mockup. Single square 1024px asset.",
+      "outputSha256": "86e8630032235afd9313c7d04eb78403f11a4b6c5af846134ef8b3801665fa90",
+      "originalOutputSha256": "04ef844d975290e7c28fd1c8b404b373c46fbc8502b6e3124a6f30cda0855bbe",
+      "referenceSha256": {
+        "src/bookiebot/reports/assets/company-logo-santa-rosa-water-9e81a9c7e2bc563d.png": "9e81a9c7e2bc563d2fa89b608f4ce1cd27a5dbd64f04679b0eb118c18ea2dbde"
+      }
+    },
+    {
+      "id": "american-water",
+      "references": [
+        "src/bookiebot/reports/assets/company-logo-american-water-9644d7874c7c6fd0.png"
+      ],
+      "originalOutput": "american-water-ai-v1.png",
+      "output": "docs/logo-review/sources/american-water-ai-v1.png",
+      "transparent": true,
+      "prompt": "Use case: precise-object-edit. Asset type: high-resolution restoration of an existing American Water utility favicon for a 26px circular calendar icon. Reference: the attached actual tiny official-site favicon, a five-point blue star with subtle blue shade facets. Reconstruct the exact simple upright five-point star silhouette with clean, crisp vector-like edges, faithful point angles and proportions, using the reference's dark and medium blues. Center the entire star on a genuinely transparent square canvas, occupying about 78% of the width and height with even safe margins. This is a faithful restoration of the existing brand mark, not a new logo. No wordmark, new symbols, water drops, lettering, white square, border, ring, shadow, glow, texture, blur, or mockup. Single high resolution square asset suitable for tiny circle use.",
+      "outputSha256": "d3935edf0632609924d99c5fafd14a4fa080893dcd28c692cb6f3474e07e1a10",
+      "originalOutputSha256": "70ca4bda8259983a4ee50fbbbae8de2858d81abeef23599a097c8f4384c9733e",
+      "referenceSha256": {
+        "src/bookiebot/reports/assets/company-logo-american-water-9644d7874c7c6fd0.png": "9644d7874c7c6fd079055bdcf02169884cc20d8c00c7ed356d154081b8003795"
+      }
+    },
+    {
+      "id": "spectrum",
+      "references": [
+        "src/bookiebot/reports/assets/company-logo-spectrum-c5bb7cfa7e4f8b53.png"
+      ],
+      "originalOutput": "spectrum-ai-v1.png",
+      "output": "docs/logo-review/sources/spectrum-ai-v1.png",
+      "transparent": true,
+      "prompt": "Use case: precise-object-edit. Restore the attached actual small Charter Spectrum favicon to a high-resolution clean icon, faithful to its existing simple blue right-pointing triangular arrow. Preserve the silhouette's proportions, upright orientation, point angle and flat medium corporate blue. Only this single simple right-pointing blue triangle, centered on a genuinely transparent square canvas and occupying 65% of its width and 78% of its height. This is restoration of the existing favicon mark, not a new logo. Sharp vector-like edges, flat solid color. No letters, text, gradient, white rectangle, border, circle, shadow, texture, gloss or mockup. One square 1024px asset.",
+      "outputSha256": "60cde81305c88f9687a41a416e2a7f329eeac52be757494baeedf5f2ab628a9e",
+      "originalOutputSha256": "1a00ff8e3971e4faa2b7b9785ed2b1738a04ad547c669bc761c7437efc768b80",
+      "referenceSha256": {
+        "src/bookiebot/reports/assets/company-logo-spectrum-c5bb7cfa7e4f8b53.png": "c5bb7cfa7e4f8b538e07701d4675c9a5e4f0d33d63f2d6edbd4514afa0fb8aca"
+      }
+    },
+    {
+      "id": "farmers",
+      "references": [
+        "src/bookiebot/reports/assets/company-logo-farmers-2acf3b22b94997be.ico"
+      ],
+      "originalOutput": "farmers-ai-v1.png",
+      "output": "docs/logo-review/sources/farmers-ai-v1.png",
+      "transparent": true,
+      "prompt": "Use case: precise-object-edit. Faithfully restore the attached existing Farmers Insurance favicon as a high-resolution, flat vector-like brand icon. Preserve the exact composition: a navy blue semicircular fan/sunrise silhouette with a thin white curved outer rim, white triangular sun rays cut into it, and a centered red pointed shield shape in front with a fine white separation. Keep the red center, deep navy blue and white of the original. Show the complete emblem with balanced margins on a genuinely transparent square canvas. Preserve its approximately 1.7:1 wide aspect ratio, centered within the square; do not stretch into a full circle. Simplify only pixel noise into clean, crisp edges, retaining the emblem's symmetry and identity. No lettering, wordmark, extra symbols, new rays, gradients, gloss, shadow, texture, blur or mockup. Single square high-resolution asset for a tiny circular calendar medallion.",
+      "referenceFormatConversion": "ICO to PNG for tool input; artwork unchanged",
+      "outputSha256": "4eda0c2d3a4f07822af6a7fae11c5717848442738a66db18ed70af070a381c8e",
+      "originalOutputSha256": "8ec937db902443e8fef8f60dd581854b2f57379c1a05bddf301e70ce652b2379",
+      "referenceSha256": {
+        "src/bookiebot/reports/assets/company-logo-farmers-2acf3b22b94997be.ico": "2acf3b22b94997beba2b13fe62209beca45a43dcdcaee750cba4c1752e6eabd3"
+      }
+    }
+  ]
+}

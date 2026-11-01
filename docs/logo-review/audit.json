@@ -1,0 +1,2940 @@
+{
+  "version": 1,
+  "status": "review-candidates",
+  "cssSize": 26,
+  "items": [
+    {
+      "id": "1password",
+      "name": "1Password",
+      "original": "src/bookiebot/reports/assets/company-logo-1password-3c4fb99b438b5bcd.svg",
+      "source": "src/bookiebot/reports/assets/company-logo-1password-3c4fb99b438b5bcd.svg",
+      "sourceUrl": "https://cdn.jsdelivr.net/gh/homarr-labs/dashboard-icons@83f32e08257b66fbd971ac8d7645f5b38d52e85d/svg/1password.svg",
+      "sourceSha256": "3c4fb99b438b5bcd93bd198104b6311cf4786c413293894f3574602852551a7a",
+      "method": "Original artwork · circle framing",
+      "ai": false,
+      "background": "#ffffff",
+      "fill": 1,
+      "trim": true,
+      "originalSize": null,
+      "review": "pending",
+      "framing": "native-circle",
+      "asset": "assets/1password-4463cab6e6e1008a.png",
+      "sha256": "4463cab6e6e1008a99bf73aeabb231c8a555666c300063260585941d99026785",
+      "sourceSize": [
+        150,
+        150
+      ],
+      "crop": [
+        0,
+        0,
+        512,
+        512
+      ],
+      "edgeChecks": [],
+      "rasterBelow2x": false
+    },
+    {
+      "id": "adobe",
+      "name": "Adobe",
+      "original": "src/bookiebot/reports/assets/company-logo-adobe-c27280899abed89c.svg",
+      "source": "src/bookiebot/reports/assets/company-logo-adobe-c27280899abed89c.svg",
+      "sourceUrl": "https://cdn.jsdelivr.net/gh/homarr-labs/dashboard-icons@83f32e08257b66fbd971ac8d7645f5b38d52e85d/svg/adobe.svg",
+      "sourceSha256": "c27280899abed89c01aac44352c050fc214030d26ab9bac7dd29a82ac5b968b6",
+      "method": "Original artwork · circle framing",
+      "ai": false,
+      "background": "#ffffff",
+      "fill": 0.82,
+      "trim": true,
+      "originalSize": null,
+      "review": "pending",
+      "framing": "standalone-mark",
+      "asset": "assets/adobe-64e14206fcbaf104.png",
+      "sha256": "64e14206fcbaf104db72f5207f89014d242419d6a85eac63b08791103f13b021",
+      "sourceSize": [
+        169,
+        150
+      ],
+      "crop": [
+        0,
+        29,
+        512,
+        454
+      ],
+      "edgeChecks": [],
+      "rasterBelow2x": false
+    },
+    {
+      "id": "aidvantage",
+      "name": "Aidvantage",
+      "original": "src/bookiebot/reports/assets/company-logo-aidvantage-07c0a17dda8187c2.png",
+      "source": "docs/logo-review/sources/aidvantage-ai-v1.png",
+      "sourceUrl": "https://aidvantage.studentaid.gov/img/aidvantage-favicon.png",
+      "sourceSha256": "c6ede9e9bd50ee14ab1cd65249418df5c60400d4757ea2b19a30256644a7c7f3",
+      "method": "AI restoration · review candidate",
+      "ai": true,
+      "background": "#453da5",
+      "fill": 1,
+      "trim": false,
+      "originalSize": [
+        16,
+        16
+      ],
+      "review": "pending",
+      "framing": "standalone-mark",
+      "asset": "assets/aidvantage-89479e125b7ae1b7.png",
+      "sha256": "89479e125b7ae1b73c0e1996ead12c65a20fe41786e75b782d3e04241a0a2c9e",
+      "sourceSize": [
+        256,
+        256
+      ],
+      "crop": [
+        0,
+        0,
+        512,
+        512
+      ],
+      "edgeChecks": [],
+      "rasterBelow2x": false
+    },
+    {
+      "id": "allstate",
+      "name": "Allstate",
+      "original": "src/bookiebot/reports/assets/company-logo-allstate-be20fd35e8db5c19.png",
+      "source": "src/bookiebot/reports/assets/company-logo-allstate-be20fd35e8db5c19.png",
+      "sourceUrl": "https://www.google.com/s2/favicons?domain=www.allstate.com&sz=128",
+      "sourceSha256": "be20fd35e8db5c19fcff99f395b5902b6dd0b9832bf1dc2c2703f36ae321a566",
+      "method": "Original artwork · circle framing",
+      "ai": false,
+      "background": "#ffffff",
+      "fill": 0.88,
+      "trim": true,
+      "originalSize": [
+        128,
+        128
+      ],
+      "review": "pending",
+      "framing": "standalone-mark",
+      "asset": "assets/allstate-8268f5a440c94834.png",
+      "sha256": "8268f5a440c948344dea9b2cb01f45b868e1a05dc58b8b8dba1603c022302923",
+      "sourceSize": [
+        128,
+        128
+      ],
+      "crop": [
+        0,
+        0,
+        512,
+        512
+      ],
+      "edgeChecks": [],
+      "rasterBelow2x": false
+    },
+    {
+      "id": "amazon-prime",
+      "name": "Amazon Prime",
+      "original": "src/bookiebot/reports/assets/company-logo-amazon-prime-0dce3142ffc60f58.svg",
+      "source": "src/bookiebot/reports/assets/company-logo-amazon-prime-0dce3142ffc60f58.svg",
+      "sourceUrl": "https://cdn.jsdelivr.net/gh/homarr-labs/dashboard-icons@83f32e08257b66fbd971ac8d7645f5b38d52e85d/svg/amazon-prime.svg",
+      "sourceSha256": "0dce3142ffc60f58a539ac8fc72e25b66bee57d6238f525d40c41275994cf671",
+      "method": "Original artwork · circle framing",
+      "ai": false,
+      "background": "#ffffff",
+      "fill": 0.82,
+      "trim": true,
+      "originalSize": null,
+      "review": "pending",
+      "framing": "standalone-mark",
+      "asset": "assets/amazon-prime-7ef9bb86652dc5a3.png",
+      "sha256": "7ef9bb86652dc5a3ef913e94acb176bb3bc183adf5454bf98d7ff03c05a82d12",
+      "sourceSize": [
+        240,
+        150
+      ],
+      "crop": [
+        0,
+        96,
+        512,
+        320
+      ],
+      "edgeChecks": [],
+      "rasterBelow2x": false
+    },
+    {
+      "id": "american-water",
+      "name": "American Water",
+      "original": "src/bookiebot/reports/assets/company-logo-american-water-9644d7874c7c6fd0.png",
+      "source": "docs/logo-review/sources/american-water-ai-v1.png",
+      "sourceUrl": "https://www.google.com/s2/favicons?domain=www.amwater.com&sz=128",
+      "sourceSha256": "d3935edf0632609924d99c5fafd14a4fa080893dcd28c692cb6f3474e07e1a10",
+      "method": "AI restoration · review candidate",
+      "ai": true,
+      "background": "#ffffff",
+      "fill": 0.84,
+      "trim": true,
+      "originalSize": [
+        16,
+        16
+      ],
+      "review": "pending",
+      "framing": "standalone-mark",
+      "asset": "assets/american-water-26ccbf2f13f73776.png",
+      "sha256": "26ccbf2f13f7377651a24fc824afe0db9859fc5b5548b890b165326ec64389cd",
+      "sourceSize": [
+        256,
+        256
+      ],
+      "crop": [
+        38,
+        50,
+        436,
+        415
+      ],
+      "edgeChecks": [],
+      "rasterBelow2x": false
+    },
+    {
+      "id": "apple",
+      "name": "Apple One",
+      "original": "src/bookiebot/reports/assets/company-logo-apple-72ab034548d45f1b.svg",
+      "source": "src/bookiebot/reports/assets/company-logo-apple-72ab034548d45f1b.svg",
+      "sourceUrl": "https://cdn.jsdelivr.net/gh/homarr-labs/dashboard-icons@83f32e08257b66fbd971ac8d7645f5b38d52e85d/svg/apple.svg",
+      "sourceSha256": "72ab034548d45f1bfa327f97b9fb96f7931362a8296289b1512bbe44512df235",
+      "method": "Original artwork · circle framing",
+      "ai": false,
+      "background": "#ffffff",
+      "fill": 0.82,
+      "trim": true,
+      "originalSize": null,
+      "review": "pending",
+      "framing": "standalone-mark",
+      "asset": "assets/apple-2e074ccd5199eb51.png",
+      "sha256": "2e074ccd5199eb51a9cf2c618ef77ad39c0af7e25d754112a759c7b1ba9d7327",
+      "sourceSize": [
+        122,
+        150
+      ],
+      "crop": [
+        48,
+        0,
+        416,
+        512
+      ],
+      "edgeChecks": [],
+      "rasterBelow2x": false
+    },
+    {
+      "id": "apple-music",
+      "name": "Apple Music",
+      "original": "src/bookiebot/reports/assets/company-logo-apple-music-e2ef7e7f0b608eed.svg",
+      "source": "src/bookiebot/reports/assets/company-logo-apple-music-e2ef7e7f0b608eed.svg",
+      "sourceUrl": "https://cdn.jsdelivr.net/gh/homarr-labs/dashboard-icons@83f32e08257b66fbd971ac8d7645f5b38d52e85d/svg/apple-music.svg",
+      "sourceSha256": "e2ef7e7f0b608eedd0af93bce3ad0cf208628ec67650d9b16052c5bdc47dad69",
+      "method": "Original artwork · circle framing",
+      "ai": false,
+      "background": "#fa3456",
+      "fill": 1,
+      "trim": true,
+      "originalSize": null,
+      "review": "pending",
+      "framing": "standalone-mark",
+      "asset": "assets/apple-music-73a80af73dcebe8b.png",
+      "sha256": "73a80af73dcebe8b3ae2bb4e547917637bfb892aa803bd56697b491a71ea2ae6",
+      "sourceSize": [
+        150,
+        150
+      ],
+      "crop": [
+        0,
+        0,
+        512,
+        512
+      ],
+      "edgeChecks": [],
+      "rasterBelow2x": false
+    },
+    {
+      "id": "apple-tv-plus",
+      "name": "Apple TV+",
+      "original": "src/bookiebot/reports/assets/company-logo-apple-tv-plus-dcfd56cfd5502524.svg",
+      "source": "src/bookiebot/reports/assets/company-logo-apple-tv-plus-dcfd56cfd5502524.svg",
+      "sourceUrl": "https://cdn.jsdelivr.net/gh/homarr-labs/dashboard-icons@83f32e08257b66fbd971ac8d7645f5b38d52e85d/svg/apple-tv-plus.svg",
+      "sourceSha256": "dcfd56cfd5502524617588fbee79b05f3eeb5180135de5307bf035515d42b28c",
+      "method": "Original artwork · circle framing",
+      "ai": false,
+      "background": "#ffffff",
+      "fill": 0.82,
+      "trim": true,
+      "originalSize": null,
+      "review": "pending",
+      "framing": "standalone-mark",
+      "asset": "assets/apple-tv-plus-d67af4fa8546a817.png",
+      "sha256": "d67af4fa8546a8176bd60caf7f1a8b4b8b86f664c5055ce13732a68b3961dcf3",
+      "sourceSize": [
+        300,
+        114
+      ],
+      "crop": [
+        0,
+        159,
+        512,
+        194
+      ],
+      "edgeChecks": [],
+      "rasterBelow2x": false
+    },
+    {
+      "id": "att",
+      "name": "AT&T",
+      "original": "src/bookiebot/reports/assets/company-logo-att-c0c2c3d5d4acd6e9.ico",
+      "source": "docs/logo-review/sources/att-mark.svg",
+      "sourceUrl": "https://cdn.jsdelivr.net/npm/simple-icons@16.0.0/icons/atandt.svg",
+      "sourceSha256": "12cb62050332443e631a75b4a8a3b27254b43c482f7bbe6ea73e4fc0d5478414",
+      "method": "Original vector · circle framing",
+      "ai": false,
+      "background": "#ffffff",
+      "fill": 1,
+      "trim": true,
+      "originalSize": [
+        48,
+        48
+      ],
+      "review": "pending",
+      "framing": "native-circle",
+      "asset": "assets/att-cb7162f3c934b152.png",
+      "sha256": "cb7162f3c934b152e8bec3bccb4d1d66e475a5fa10b8bf586d9d8e7b40bbf289",
+      "sourceSize": [
+        150,
+        150
+      ],
+      "crop": [
+        0,
+        1,
+        512,
+        510
+      ],
+      "edgeChecks": [],
+      "rasterBelow2x": false
+    },
+    {
+      "id": "audible",
+      "name": "Audible",
+      "original": "src/bookiebot/reports/assets/company-logo-audible-8d459fb8035a99f7.png",
+      "source": "src/bookiebot/reports/assets/company-logo-audible-8d459fb8035a99f7.png",
+      "sourceUrl": "https://m.media-amazon.com/images/G/01/seo/creative/Audible_Google_Favicon_192px.png",
+      "sourceSha256": "8d459fb8035a99f7104df1f40c50d30f66e0622e1969f020b5e81a0d3f97cf44",
+      "method": "Original artwork · circle framing",
+      "ai": false,
+      "background": "#ffa000",
+      "fill": 1,
+      "trim": true,
+      "originalSize": [
+        192,
+        192
+      ],
+      "review": "pending",
+      "framing": "solid-tile",
+      "asset": "assets/audible-9b649025a063f9b4.png",
+      "sha256": "9b649025a063f9b4f08b4a53967d923377b445c33757a85c13b2438d1e02ddbf",
+      "sourceSize": [
+        192,
+        192
+      ],
+      "crop": [
+        0,
+        0,
+        512,
+        512
+      ],
+      "edgeChecks": [],
+      "rasterBelow2x": false
+    },
+    {
+      "id": "backblaze",
+      "name": "Backblaze",
+      "original": "src/bookiebot/reports/assets/company-logo-backblaze-ffd8ce8508b6a8fa.svg",
+      "source": "src/bookiebot/reports/assets/company-logo-backblaze-ffd8ce8508b6a8fa.svg",
+      "sourceUrl": "https://cdn.jsdelivr.net/gh/homarr-labs/dashboard-icons@83f32e08257b66fbd971ac8d7645f5b38d52e85d/svg/backblaze.svg",
+      "sourceSha256": "ffd8ce8508b6a8faa6be5ba8e470c1bd878d9b27fe7b8b0a0ef3f47ad9ffbf41",
+      "method": "Original artwork · circle framing",
+      "ai": false,
+      "background": "#ee2038",
+      "fill": 1,
+      "trim": true,
+      "originalSize": null,
+      "review": "pending",
+      "framing": "native-circle",
+      "asset": "assets/backblaze-1a38dfaacd8e2206.png",
+      "sha256": "1a38dfaacd8e22065b61da7b38ceed6f7e6fadc9eb897f8c482780986330389f",
+      "sourceSize": [
+        150,
+        150
+      ],
+      "crop": [
+        0,
+        0,
+        512,
+        512
+      ],
+      "edgeChecks": [],
+      "rasterBelow2x": false
+    },
+    {
+      "id": "bitwarden",
+      "name": "Bitwarden",
+      "original": "src/bookiebot/reports/assets/company-logo-bitwarden-6fd26b78565e0a7f.svg",
+      "source": "src/bookiebot/reports/assets/company-logo-bitwarden-6fd26b78565e0a7f.svg",
+      "sourceUrl": "https://cdn.jsdelivr.net/gh/homarr-labs/dashboard-icons@83f32e08257b66fbd971ac8d7645f5b38d52e85d/svg/bitwarden.svg",
+      "sourceSha256": "6fd26b78565e0a7f416f8512de904d7f827fd02898b48e3eba94ae6f2b21f3e7",
+      "method": "Original artwork · circle framing",
+      "ai": false,
+      "background": "#175ddc",
+      "fill": 0.94,
+      "trim": true,
+      "originalSize": null,
+      "review": "pending",
+      "framing": "standalone-mark",
+      "asset": "assets/bitwarden-a61395cc2ce5a593.png",
+      "sha256": "a61395cc2ce5a5932a7504af5d2311be02248c325f326373d36eda445431527a",
+      "sourceSize": [
+        150,
+        150
+      ],
+      "crop": [
+        0,
+        0,
+        512,
+        512
+      ],
+      "edgeChecks": [],
+      "rasterBelow2x": false
+    },
+    {
+      "id": "brianjames",
+      "name": "brianjames.dev",
+      "original": "src/bookiebot/reports/assets/company-logo-brianjames-9d729f8657b02a50.png",
+      "source": "docs/logo-review/sources/brianjames-original.png",
+      "sourceUrl": "portfolio-website/public/favicon_io/favicon-baj-dark.png",
+      "sourceSha256": "39a6e472629dac3f014c0730e81e93064bb379f2e28b20103f8460954b0783fe",
+      "method": "Exact portfolio asset",
+      "ai": false,
+      "background": "#0f1711",
+      "fill": 1,
+      "trim": false,
+      "originalSize": [
+        180,
+        180
+      ],
+      "review": "pending",
+      "framing": "standalone-mark",
+      "asset": "assets/brianjames-e4bce980a901be0e.png",
+      "sha256": "e4bce980a901be0eb226d25262a87be1528dd3e3a6d4416beea49bfc94e640ce",
+      "sourceSize": [
+        512,
+        512
+      ],
+      "crop": [
+        0,
+        0,
+        512,
+        512
+      ],
+      "edgeChecks": [],
+      "rasterBelow2x": false
+    },
+    {
+      "id": "canva",
+      "name": "Canva",
+      "original": "src/bookiebot/reports/assets/company-logo-canva-ec2fbad47e598fe0.ico",
+      "source": "docs/logo-review/sources/canva-original.png",
+      "sourceUrl": "https://static.canva.com/domain-assets/canva/static/images/apple-touch-152x152-1.png",
+      "sourceSha256": "463fd84945744688eaf99fb9855c9da7645e926c9f21d0f26ec087461f6d5880",
+      "method": "Original high-resolution icon · circle framing",
+      "ai": false,
+      "background": "#7d2ae8",
+      "fill": 1,
+      "trim": true,
+      "originalSize": [
+        32,
+        32
+      ],
+      "review": "pending",
+      "framing": "standalone-mark",
+      "asset": "assets/canva-0a9aefde23ba54e8.png",
+      "sha256": "0a9aefde23ba54e883b429a50ccfdcd311f668330e6525f04dfa975f8f9cb77f",
+      "sourceSize": [
+        152,
+        152
+      ],
+      "crop": [
+        0,
+        0,
+        512,
+        512
+      ],
+      "edgeChecks": [],
+      "rasterBelow2x": false
+    },
+    {
+      "id": "chatgpt",
+      "name": "ChatGPT",
+      "original": "src/bookiebot/reports/assets/company-logo-chatgpt-5a8dad2864cc1c81.svg",
+      "source": "docs/logo-review/sources/chatgpt-mark.svg",
+      "sourceUrl": "https://cdn.jsdelivr.net/gh/gilbarbara/logos@d6960edc1b7309d392c76e40d3a320df7f9ff85d/logos/openai-icon.svg",
+      "sourceSha256": "8573dfcbde36a9f539b1fcfe6495422b236f516ffd2691fb7d3d21aa38e189a6",
+      "method": "Original vector · circle framing",
+      "ai": false,
+      "background": "#171717",
+      "fill": 0.73,
+      "trim": true,
+      "originalSize": null,
+      "review": "pending",
+      "framing": "standalone-mark",
+      "asset": "assets/chatgpt-c4ad7933876a4e6a.png",
+      "sha256": "c4ad7933876a4e6a588a1cafc54a9e4ed13c70c1b9865975831839938156860c",
+      "sourceSize": [
+        148,
+        150
+      ],
+      "crop": [
+        3,
+        0,
+        506,
+        511
+      ],
+      "edgeChecks": [],
+      "rasterBelow2x": false
+    },
+    {
+      "id": "cloudflare",
+      "name": "Cloudflare",
+      "original": "src/bookiebot/reports/assets/company-logo-cloudflare-8d1880046ed223ff.svg",
+      "source": "src/bookiebot/reports/assets/company-logo-cloudflare-8d1880046ed223ff.svg",
+      "sourceUrl": "https://cdn.jsdelivr.net/gh/homarr-labs/dashboard-icons@83f32e08257b66fbd971ac8d7645f5b38d52e85d/svg/cloudflare.svg",
+      "sourceSha256": "8d1880046ed223ffb4ca660d4f52cff986d6db310e25d87cd82eccd024b461f5",
+      "method": "Original artwork · circle framing",
+      "ai": false,
+      "background": "#ffffff",
+      "fill": 0.82,
+      "trim": true,
+      "originalSize": null,
+      "review": "pending",
+      "framing": "standalone-mark",
+      "asset": "assets/cloudflare-5062e71e95b3f975.png",
+      "sha256": "5062e71e95b3f975e6624a4b4cf13cae5c1db74d5f86a03e3cfdb485685d84e1",
+      "sourceSize": [
+        300,
+        136
+      ],
+      "crop": [
+        0,
+        140,
+        512,
+        232
+      ],
+      "edgeChecks": [],
+      "rasterBelow2x": false
+    },
+    {
+      "id": "con-edison",
+      "name": "Con Edison",
+      "original": "src/bookiebot/reports/assets/company-logo-con-edison-9a2540ec31b2f026.png",
+      "source": "src/bookiebot/reports/assets/company-logo-con-edison-9a2540ec31b2f026.png",
+      "sourceUrl": "https://edge-c-dcxprod-web-enfbhbfkb2fghhey.a03.azurefd.net/-/media/images/coned/common/ce-apple-touch-icon.png?rev=cd163ba4d9cf4a9ab611a91f86dcfb3d",
+      "sourceSha256": "9a2540ec31b2f02685387a0830700bd4cd3e0f0a19529e4e084e8347873f5f06",
+      "method": "Original artwork · circle framing",
+      "ai": false,
+      "background": "#ffffff",
+      "fill": 0.88,
+      "trim": true,
+      "originalSize": [
+        180,
+        180
+      ],
+      "review": "pending",
+      "framing": "standalone-mark",
+      "asset": "assets/con-edison-da66737b7062decd.png",
+      "sha256": "da66737b7062decd2b1f381edb25920ac763ce63962cd3ce11c75ac1a127123e",
+      "sourceSize": [
+        180,
+        180
+      ],
+      "crop": [
+        0,
+        0,
+        512,
+        512
+      ],
+      "edgeChecks": [],
+      "rasterBelow2x": false
+    },
+    {
+      "id": "cox",
+      "name": "Cox",
+      "original": "src/bookiebot/reports/assets/company-logo-cox-7506b6707d00a8c8.png",
+      "source": "src/bookiebot/reports/assets/company-logo-cox-7506b6707d00a8c8.png",
+      "sourceUrl": "https://www.cox.com/favicon.ico",
+      "sourceSha256": "7506b6707d00a8c8ecb5c5d56098452d885e0dde167ab9e77be7fd826a9b2c17",
+      "method": "Original artwork · circle framing",
+      "ai": false,
+      "background": "#ffffff",
+      "fill": 1,
+      "trim": true,
+      "originalSize": [
+        128,
+        128
+      ],
+      "review": "pending",
+      "framing": "native-circle",
+      "asset": "assets/cox-02f0393d5052d5cc.png",
+      "sha256": "02f0393d5052d5cce2d8132722a5f591b9c59ae098b55b3dbacc9dc2456c44d2",
+      "sourceSize": [
+        128,
+        128
+      ],
+      "crop": [
+        0,
+        0,
+        512,
+        512
+      ],
+      "edgeChecks": [],
+      "rasterBelow2x": false
+    },
+    {
+      "id": "crunchyroll",
+      "name": "Crunchyroll",
+      "original": "src/bookiebot/reports/assets/company-logo-crunchyroll-d7dd384b0c01cb1c.svg",
+      "source": "src/bookiebot/reports/assets/company-logo-crunchyroll-d7dd384b0c01cb1c.svg",
+      "sourceUrl": "https://cdn.jsdelivr.net/gh/homarr-labs/dashboard-icons@83f32e08257b66fbd971ac8d7645f5b38d52e85d/svg/crunchyroll.svg",
+      "sourceSha256": "d7dd384b0c01cb1c9b19b0e3ae499361551744e6208087335c4536b27bacc331",
+      "method": "Original artwork · circle framing",
+      "ai": false,
+      "background": "#ffffff",
+      "fill": 1,
+      "trim": true,
+      "originalSize": null,
+      "review": "pending",
+      "framing": "native-circle",
+      "asset": "assets/crunchyroll-9929ef7175c0dfcf.png",
+      "sha256": "9929ef7175c0dfcf6f4f0367132680cc6a9c7ae9a30bba091dc0b2af38ec7818",
+      "sourceSize": [
+        152,
+        150
+      ],
+      "crop": [
+        0,
+        3,
+        512,
+        506
+      ],
+      "edgeChecks": [],
+      "rasterBelow2x": false
+    },
+    {
+      "id": "deezer",
+      "name": "Deezer",
+      "original": "src/bookiebot/reports/assets/company-logo-deezer-d049ddef421e3079.svg",
+      "source": "src/bookiebot/reports/assets/company-logo-deezer-d049ddef421e3079.svg",
+      "sourceUrl": "https://cdn.jsdelivr.net/gh/homarr-labs/dashboard-icons@83f32e08257b66fbd971ac8d7645f5b38d52e85d/svg/deezer.svg",
+      "sourceSha256": "d049ddef421e3079d25d9e2c3e3a3064000082f8f54272adad8e550f41a4e5c1",
+      "method": "Original artwork · circle framing",
+      "ai": false,
+      "background": "#ffffff",
+      "fill": 0.82,
+      "trim": true,
+      "originalSize": null,
+      "review": "pending",
+      "framing": "standalone-mark",
+      "asset": "assets/deezer-66e6d84c75bbcb5e.png",
+      "sha256": "66e6d84c75bbcb5ecfaae95e156e94acce2ff1d62f36252d728bfbecca374695",
+      "sourceSize": [
+        150,
+        150
+      ],
+      "crop": [
+        0,
+        0,
+        512,
+        512
+      ],
+      "edgeChecks": [],
+      "rasterBelow2x": false
+    },
+    {
+      "id": "discord",
+      "name": "Discord",
+      "original": "src/bookiebot/reports/assets/company-logo-discord-c04059c1d13d9923.svg",
+      "source": "src/bookiebot/reports/assets/company-logo-discord-c04059c1d13d9923.svg",
+      "sourceUrl": "https://cdn.jsdelivr.net/gh/homarr-labs/dashboard-icons@83f32e08257b66fbd971ac8d7645f5b38d52e85d/svg/discord.svg",
+      "sourceSha256": "c04059c1d13d99239ebd0b7df807e8c3d2f46439bd18a70c5fd3a0631bd7b310",
+      "method": "Original artwork · circle framing",
+      "ai": false,
+      "background": "#ffffff",
+      "fill": 0.82,
+      "trim": true,
+      "originalSize": null,
+      "review": "pending",
+      "framing": "standalone-mark",
+      "asset": "assets/discord-b12e15168d83b829.png",
+      "sha256": "b12e15168d83b829d048455ea43b2e7a8b1003b9be7b1a78b07af8b723a20df4",
+      "sourceSize": [
+        194,
+        150
+      ],
+      "crop": [
+        0,
+        58,
+        512,
+        396
+      ],
+      "edgeChecks": [],
+      "rasterBelow2x": false
+    },
+    {
+      "id": "disney-plus",
+      "name": "Disney+",
+      "original": "src/bookiebot/reports/assets/company-logo-disney-plus-cdc480ea45b4fe48.svg",
+      "source": "src/bookiebot/reports/assets/company-logo-disney-plus-cdc480ea45b4fe48.svg",
+      "sourceUrl": "https://cdn.jsdelivr.net/gh/homarr-labs/dashboard-icons@83f32e08257b66fbd971ac8d7645f5b38d52e85d/svg/disney-plus.svg",
+      "sourceSha256": "cdc480ea45b4fe48c3503e118d763f959ec9affdb645c1a71467b24b108a15ee",
+      "method": "Original artwork · circle framing",
+      "ai": false,
+      "background": "#191c29",
+      "fill": 1,
+      "trim": true,
+      "originalSize": null,
+      "review": "pending",
+      "framing": "standalone-mark",
+      "asset": "assets/disney-plus-fdf5146e525a136e.png",
+      "sha256": "fdf5146e525a136edb368a4f91c85c59e9996199d285081be0d343fa6ee6efcc",
+      "sourceSize": [
+        150,
+        150
+      ],
+      "crop": [
+        0,
+        0,
+        512,
+        512
+      ],
+      "edgeChecks": [],
+      "rasterBelow2x": false
+    },
+    {
+      "id": "dominion-energy",
+      "name": "Dominion Energy",
+      "original": "src/bookiebot/reports/assets/company-logo-dominion-energy-790426d24aa40f6f.ico",
+      "source": "docs/logo-review/sources/dominion-energy-mark.svg",
+      "sourceUrl": "https://cdn-dominionenergy-prd-001.azureedge.net/-/media/project/dominionenergy/header/mobile-level2-logo.svg?rev=b6c54cf2090e45379992c1aaf9b170f1&la=en&hash=96D87DBF7BB42355581C2841E2269940",
+      "sourceSha256": "2cde0bcaf65bcef95a44e188c8e1a2d70c93e77bc42dcfa7d282c99ad67e0de1",
+      "method": "Original vector · circle framing",
+      "ai": false,
+      "background": "#ffffff",
+      "fill": 0.83,
+      "trim": true,
+      "originalSize": [
+        48,
+        48
+      ],
+      "review": "pending",
+      "framing": "standalone-mark",
+      "asset": "assets/dominion-energy-1a2bd2dbea7c5ff0.png",
+      "sha256": "1a2bd2dbea7c5ff0d690e2e351208cc6bd4481ededa806f05c2954c0075bddf9",
+      "sourceSize": [
+        127,
+        150
+      ],
+      "crop": [
+        39,
+        0,
+        434,
+        504
+      ],
+      "edgeChecks": [],
+      "rasterBelow2x": false
+    },
+    {
+      "id": "dropbox",
+      "name": "Dropbox",
+      "original": "src/bookiebot/reports/assets/company-logo-dropbox-16fd819b4f0deac2.svg",
+      "source": "src/bookiebot/reports/assets/company-logo-dropbox-16fd819b4f0deac2.svg",
+      "sourceUrl": "https://cdn.jsdelivr.net/gh/homarr-labs/dashboard-icons@83f32e08257b66fbd971ac8d7645f5b38d52e85d/svg/dropbox.svg",
+      "sourceSha256": "16fd819b4f0deac21770d225828f8e0789492f9209a0984a850169776778a43f",
+      "method": "Original artwork · circle framing",
+      "ai": false,
+      "background": "#ffffff",
+      "fill": 0.82,
+      "trim": true,
+      "originalSize": null,
+      "review": "pending",
+      "framing": "standalone-mark",
+      "asset": "assets/dropbox-bd9a9f592b957dd6.png",
+      "sha256": "bd9a9f592b957dd685a8fc37ceedfde98a36796e3278dff3b10a0749cde93ef4",
+      "sourceSize": [
+        161,
+        150
+      ],
+      "crop": [
+        0,
+        17,
+        512,
+        478
+      ],
+      "edgeChecks": [],
+      "rasterBelow2x": false
+    },
+    {
+      "id": "duke-energy",
+      "name": "Duke Energy",
+      "original": "src/bookiebot/reports/assets/company-logo-duke-energy-39f953199e23fb2a.png",
+      "source": "src/bookiebot/reports/assets/company-logo-duke-energy-39f953199e23fb2a.png",
+      "sourceUrl": "https://www.google.com/s2/favicons?domain=www.duke-energy.com&sz=128",
+      "sourceSha256": "39f953199e23fb2ab04083ca6e71b2ac84ae744ad6eaeb26982df19264690bb5",
+      "method": "Original artwork · circle framing",
+      "ai": false,
+      "background": "#ffffff",
+      "fill": 0.82,
+      "trim": true,
+      "originalSize": [
+        128,
+        128
+      ],
+      "review": "pending",
+      "framing": "standalone-mark",
+      "asset": "assets/duke-energy-d63be9f616b608a3.png",
+      "sha256": "d63be9f616b608a36f5e8f39074f968fd73bb4401247eec3e2bc6e7d6dbad63e",
+      "sourceSize": [
+        128,
+        128
+      ],
+      "crop": [
+        0,
+        0,
+        512,
+        512
+      ],
+      "edgeChecks": [],
+      "rasterBelow2x": false
+    },
+    {
+      "id": "duolingo",
+      "name": "Duolingo",
+      "original": "src/bookiebot/reports/assets/company-logo-duolingo-0d0ff645903fac97.svg",
+      "source": "src/bookiebot/reports/assets/company-logo-duolingo-0d0ff645903fac97.svg",
+      "sourceUrl": "https://cdn.jsdelivr.net/gh/homarr-labs/dashboard-icons@83f32e08257b66fbd971ac8d7645f5b38d52e85d/svg/duolingo.svg",
+      "sourceSha256": "0d0ff645903fac97ef79d0fab4bc34798c29101bb9fd3a072c68075534fdfd9e",
+      "method": "Original artwork · circle framing",
+      "ai": false,
+      "background": "#68cb00",
+      "fill": 1,
+      "trim": true,
+      "originalSize": null,
+      "review": "pending",
+      "framing": "standalone-mark",
+      "asset": "assets/duolingo-d7a0b9b2bfdd544d.png",
+      "sha256": "d7a0b9b2bfdd544de58f535427ea157332c5be115384b84b52da30630e9a1446",
+      "sourceSize": [
+        150,
+        150
+      ],
+      "crop": [
+        0,
+        0,
+        512,
+        512
+      ],
+      "edgeChecks": [],
+      "rasterBelow2x": false
+    },
+    {
+      "id": "evernote",
+      "name": "Evernote",
+      "original": "src/bookiebot/reports/assets/company-logo-evernote-a16f8c3725181190.svg",
+      "source": "src/bookiebot/reports/assets/company-logo-evernote-a16f8c3725181190.svg",
+      "sourceUrl": "https://cdn.jsdelivr.net/gh/homarr-labs/dashboard-icons@83f32e08257b66fbd971ac8d7645f5b38d52e85d/svg/evernote.svg",
+      "sourceSha256": "a16f8c37251811907647ef8b96071415ca585d4e71405f43715b293fc3e5cd43",
+      "method": "Original artwork · circle framing",
+      "ai": false,
+      "background": "#ffffff",
+      "fill": 0.82,
+      "trim": true,
+      "originalSize": null,
+      "review": "pending",
+      "framing": "standalone-mark",
+      "asset": "assets/evernote-d11cf580eb5b81a2.png",
+      "sha256": "d11cf580eb5b81a2c1db83b5533d741f66565fbe3d866685cd8932e7273fcea5",
+      "sourceSize": [
+        128,
+        150
+      ],
+      "crop": [
+        37,
+        0,
+        438,
+        512
+      ],
+      "edgeChecks": [],
+      "rasterBelow2x": false
+    },
+    {
+      "id": "expressvpn",
+      "name": "ExpressVPN",
+      "original": "src/bookiebot/reports/assets/company-logo-expressvpn-fefa636b5db9dd04.svg",
+      "source": "src/bookiebot/reports/assets/company-logo-expressvpn-fefa636b5db9dd04.svg",
+      "sourceUrl": "https://cdn.jsdelivr.net/gh/homarr-labs/dashboard-icons@83f32e08257b66fbd971ac8d7645f5b38d52e85d/svg/expressvpn.svg",
+      "sourceSha256": "fefa636b5db9dd044e314f107a07a8fcb5a0690696cb25206d976df02a89913b",
+      "method": "Original artwork · circle framing",
+      "ai": false,
+      "background": "#ffffff",
+      "fill": 0.82,
+      "trim": true,
+      "originalSize": null,
+      "review": "pending",
+      "framing": "standalone-mark",
+      "asset": "assets/expressvpn-c80d868ef819ebfe.png",
+      "sha256": "c80d868ef819ebfee4e64004304f3552ac223764d711a476da106c6e89f0445d",
+      "sourceSize": [
+        150,
+        150
+      ],
+      "crop": [
+        0,
+        50,
+        512,
+        412
+      ],
+      "edgeChecks": [],
+      "rasterBelow2x": false
+    },
+    {
+      "id": "farmers",
+      "name": "Farmers Insurance",
+      "original": "src/bookiebot/reports/assets/company-logo-farmers-2acf3b22b94997be.ico",
+      "source": "docs/logo-review/sources/farmers-ai-v1.png",
+      "sourceUrl": "https://www.farmers.com/favicon.ico",
+      "sourceSha256": "4eda0c2d3a4f07822af6a7fae11c5717848442738a66db18ed70af070a381c8e",
+      "method": "AI restoration · review candidate",
+      "ai": true,
+      "background": "#ffffff",
+      "fill": 0.86,
+      "trim": true,
+      "originalSize": [
+        48,
+        48
+      ],
+      "review": "pending",
+      "framing": "standalone-mark",
+      "asset": "assets/farmers-f2133bd4bbce44fe.png",
+      "sha256": "f2133bd4bbce44fea0d90076cb5a29fc156ce72ca5b2b85ff04a5c6091686751",
+      "sourceSize": [
+        256,
+        256
+      ],
+      "crop": [
+        28,
+        142,
+        456,
+        245
+      ],
+      "edgeChecks": [],
+      "rasterBelow2x": false
+    },
+    {
+      "id": "figma",
+      "name": "Figma",
+      "original": "src/bookiebot/reports/assets/company-logo-figma-59f327ef3ae14b09.svg",
+      "source": "src/bookiebot/reports/assets/company-logo-figma-59f327ef3ae14b09.svg",
+      "sourceUrl": "https://cdn.jsdelivr.net/gh/homarr-labs/dashboard-icons@83f32e08257b66fbd971ac8d7645f5b38d52e85d/svg/figma.svg",
+      "sourceSha256": "59f327ef3ae14b09c1c96ed5696f890c92efde2a5e6e52779e0515166385b6b9",
+      "method": "Original artwork · circle framing",
+      "ai": false,
+      "background": "#ffffff",
+      "fill": 0.82,
+      "trim": true,
+      "originalSize": null,
+      "review": "pending",
+      "framing": "standalone-mark",
+      "asset": "assets/figma-98fb5bedd2bc9e3b.png",
+      "sha256": "98fb5bedd2bc9e3bbb989971c294541d23faeefbdc15c4d2ac9e3258b1424f9e",
+      "sourceSize": [
+        100,
+        150
+      ],
+      "crop": [
+        85,
+        0,
+        342,
+        512
+      ],
+      "edgeChecks": [],
+      "rasterBelow2x": false
+    },
+    {
+      "id": "fpl",
+      "name": "FPL",
+      "original": "src/bookiebot/reports/assets/company-logo-fpl-d88854cf7b58ccf4.ico",
+      "source": "docs/logo-review/sources/fpl-mark.svg",
+      "sourceUrl": "https://newsroom.fpl.com/images/logo.svg",
+      "sourceSha256": "6853e36d25b2fadeae284fd9432011369d29363d2c5e2c84bb66758b57a4ca88",
+      "method": "Original vector · circle framing",
+      "ai": false,
+      "background": "#ffffff",
+      "fill": 1,
+      "trim": true,
+      "originalSize": [
+        16,
+        16
+      ],
+      "review": "pending",
+      "framing": "native-circle",
+      "asset": "assets/fpl-8efa03a6caa68b28.png",
+      "sha256": "8efa03a6caa68b28bd10b07e2c74aa67c6bfd55c8dc122ee37ed2a9d9f7ce770",
+      "sourceSize": [
+        150,
+        150
+      ],
+      "crop": [
+        0,
+        0,
+        508,
+        503
+      ],
+      "edgeChecks": [],
+      "rasterBelow2x": false
+    },
+    {
+      "id": "frontier",
+      "name": "Frontier",
+      "original": "src/bookiebot/reports/assets/company-logo-frontier-91e01e879479c4c6.png",
+      "source": "src/bookiebot/reports/assets/company-logo-frontier-91e01e879479c4c6.png",
+      "sourceUrl": "https://frontier.com/frontier-com-marketing-assets/img/favicons/apple-touch-icon-iphone-retina.png",
+      "sourceSha256": "91e01e879479c4c677b3737647748f3e38926aaf6d54b949ea5d46534858e26b",
+      "method": "Original artwork · circle framing",
+      "ai": false,
+      "background": "#ffffff",
+      "fill": 1,
+      "trim": true,
+      "originalSize": [
+        167,
+        167
+      ],
+      "review": "pending",
+      "framing": "native-circle",
+      "asset": "assets/frontier-8aeabdc52e597de1.png",
+      "sha256": "8aeabdc52e597de18a584b05edd6ab5c9c8c66b59154d84c014d053731462f5c",
+      "sourceSize": [
+        167,
+        167
+      ],
+      "crop": [
+        0,
+        0,
+        512,
+        512
+      ],
+      "edgeChecks": [],
+      "rasterBelow2x": false
+    },
+    {
+      "id": "fubo",
+      "name": "Fubo",
+      "original": "src/bookiebot/reports/assets/company-logo-fubo-2da251e8e9af02d7.png",
+      "source": "docs/logo-review/sources/fubo-mark.svg",
+      "sourceUrl": "https://cdn.jsdelivr.net/npm/simple-icons@16.0.0/icons/fubo.svg",
+      "sourceSha256": "a660a8fccb270d994bfc2b2536c3c4ce214e236f10a067e957442cff45224a09",
+      "method": "Original vector · circle framing",
+      "ai": false,
+      "background": "#f4511e",
+      "fill": 0.82,
+      "trim": true,
+      "originalSize": [
+        32,
+        32
+      ],
+      "review": "pending",
+      "framing": "standalone-mark",
+      "asset": "assets/fubo-36541aa4283e1097.png",
+      "sha256": "36541aa4283e1097f5a889ec00f7796c97430f1d62d5560ad908b218a7a08243",
+      "sourceSize": [
+        150,
+        150
+      ],
+      "crop": [
+        0,
+        152,
+        512,
+        208
+      ],
+      "edgeChecks": [],
+      "rasterBelow2x": false
+    },
+    {
+      "id": "geico",
+      "name": "GEICO",
+      "original": "src/bookiebot/reports/assets/company-logo-geico-bf4cb729c1f44daa.ico",
+      "source": "src/bookiebot/reports/assets/company-logo-geico-bf4cb729c1f44daa.ico",
+      "sourceUrl": "https://www.geico.com/favicon.ico?aa55dd60d3f7931a",
+      "sourceSha256": "bf4cb729c1f44daa732954f0bf9e71b031b4d6c7f52e9dce52d48e9577f01e35",
+      "method": "Original artwork · circle framing",
+      "ai": false,
+      "background": "#1e53aa",
+      "fill": 1,
+      "trim": true,
+      "originalSize": [
+        64,
+        64
+      ],
+      "review": "pending",
+      "framing": "standalone-mark",
+      "asset": "assets/geico-87891b7fa055319c.png",
+      "sha256": "87891b7fa055319cb2f162168bd10f62f6953e6fd5fe58569d88442b0cb20b9e",
+      "sourceSize": [
+        64,
+        64
+      ],
+      "crop": [
+        0,
+        0,
+        512,
+        512
+      ],
+      "edgeChecks": [],
+      "rasterBelow2x": false
+    },
+    {
+      "id": "github",
+      "name": "GitHub",
+      "original": "src/bookiebot/reports/assets/company-logo-github-cdfb82ff14c8c248.svg",
+      "source": "src/bookiebot/reports/assets/company-logo-github-cdfb82ff14c8c248.svg",
+      "sourceUrl": "https://cdn.jsdelivr.net/gh/homarr-labs/dashboard-icons@83f32e08257b66fbd971ac8d7645f5b38d52e85d/svg/github.svg",
+      "sourceSha256": "cdfb82ff14c8c2484eacba9d211d86cd0c993c933855cad2b03633414fa10ddb",
+      "method": "Original artwork · circle framing",
+      "ai": false,
+      "background": "#ffffff",
+      "fill": 1,
+      "trim": true,
+      "originalSize": null,
+      "review": "pending",
+      "framing": "native-circle",
+      "edgeChecks": [
+        {
+          "point": [
+            0.5,
+            0.03125
+          ],
+          "color": "#1b1f23",
+          "actual": [
+            27,
+            31,
+            35,
+            255
+          ]
+        },
+        {
+          "point": [
+            0.03125,
+            0.5
+          ],
+          "color": "#1b1f23",
+          "actual": [
+            27,
+            31,
+            35,
+            255
+          ]
+        },
+        {
+          "point": [
+            0.96875,
+            0.5
+          ],
+          "color": "#1b1f23",
+          "actual": [
+            27,
+            31,
+            35,
+            255
+          ]
+        }
+      ],
+      "asset": "assets/github-a9f7813f638680b3.png",
+      "sha256": "a9f7813f638680b3bd101a8091f717f37f1b64948c97d1184b39f365875a51c6",
+      "sourceSize": [
+        150,
+        150
+      ],
+      "crop": [
+        0,
+        6,
+        512,
+        500
+      ],
+      "rasterBelow2x": false
+    },
+    {
+      "id": "google-drive",
+      "name": "Google Drive",
+      "original": "src/bookiebot/reports/assets/company-logo-google-drive-963477d7e4a0b0d8.svg",
+      "source": "src/bookiebot/reports/assets/company-logo-google-drive-963477d7e4a0b0d8.svg",
+      "sourceUrl": "https://cdn.jsdelivr.net/gh/homarr-labs/dashboard-icons@83f32e08257b66fbd971ac8d7645f5b38d52e85d/svg/google-drive.svg",
+      "sourceSha256": "963477d7e4a0b0d8865dd7aec8e27d8fd9c3a4b4f2e5b81f9df8581f9f2eca11",
+      "method": "Original artwork · circle framing",
+      "ai": false,
+      "background": "#ffffff",
+      "fill": 0.82,
+      "trim": true,
+      "originalSize": null,
+      "review": "pending",
+      "framing": "standalone-mark",
+      "asset": "assets/google-drive-1a7252922a49af7f.png",
+      "sha256": "1a7252922a49af7f20e66a465a52090a7c59c68c4f4c3f9662fd9598dfadce32",
+      "sourceSize": [
+        150,
+        150
+      ],
+      "crop": [
+        0,
+        27,
+        512,
+        458
+      ],
+      "edgeChecks": [],
+      "rasterBelow2x": false
+    },
+    {
+      "id": "google-one",
+      "name": "Google One",
+      "original": "src/bookiebot/reports/assets/company-logo-google-one-913e54467d24066d.svg",
+      "source": "src/bookiebot/reports/assets/company-logo-google-one-913e54467d24066d.svg",
+      "sourceUrl": "https://cdn.jsdelivr.net/gh/homarr-labs/dashboard-icons@83f32e08257b66fbd971ac8d7645f5b38d52e85d/svg/google-one.svg",
+      "sourceSha256": "913e54467d24066de0bbe34f6a00969223aba70e736316e1539c7f2ea3176afd",
+      "method": "Original artwork · circle framing",
+      "ai": false,
+      "background": "#ffffff",
+      "fill": 0.82,
+      "trim": true,
+      "originalSize": null,
+      "review": "pending",
+      "framing": "standalone-mark",
+      "asset": "assets/google-one-623eaad854293b97.png",
+      "sha256": "623eaad854293b978c2abe3beeca763d068db4236a58ae62ecfb19f740d348e8",
+      "sourceSize": [
+        87,
+        176
+      ],
+      "crop": [
+        129,
+        0,
+        254,
+        512
+      ],
+      "edgeChecks": [],
+      "rasterBelow2x": false
+    },
+    {
+      "id": "hulu",
+      "name": "Hulu",
+      "original": "src/bookiebot/reports/assets/company-logo-hulu-b1edb8d6ffa25fa0.svg",
+      "source": "src/bookiebot/reports/assets/company-logo-hulu-b1edb8d6ffa25fa0.svg",
+      "sourceUrl": "https://cdn.jsdelivr.net/gh/homarr-labs/dashboard-icons@83f32e08257b66fbd971ac8d7645f5b38d52e85d/svg/hulu.svg",
+      "sourceSha256": "b1edb8d6ffa25fa030d9dbba46f0f686e6873d3d35b5f4cddc73dc913823b7e1",
+      "method": "Original artwork · circle framing",
+      "ai": false,
+      "background": "#ffffff",
+      "fill": 0.82,
+      "trim": true,
+      "originalSize": null,
+      "review": "pending",
+      "framing": "standalone-mark",
+      "asset": "assets/hulu-b0e37e1e5a599405.png",
+      "sha256": "b0e37e1e5a599405a7792a22cdd48df5397dcdee085418c8cc998c4f2b119a84",
+      "sourceSize": [
+        300,
+        99
+      ],
+      "crop": [
+        0,
+        171,
+        512,
+        170
+      ],
+      "edgeChecks": [],
+      "rasterBelow2x": false
+    },
+    {
+      "id": "icloud",
+      "name": "iCloud",
+      "original": "src/bookiebot/reports/assets/company-logo-icloud-6a2b940eb85b4304.svg",
+      "source": "src/bookiebot/reports/assets/company-logo-icloud-6a2b940eb85b4304.svg",
+      "sourceUrl": "https://cdn.jsdelivr.net/gh/homarr-labs/dashboard-icons@83f32e08257b66fbd971ac8d7645f5b38d52e85d/svg/icloud.svg",
+      "sourceSha256": "6a2b940eb85b4304bae3062a623ad074b3681f4e844fd883c678b27feebaae82",
+      "method": "Original artwork · circle framing",
+      "ai": false,
+      "background": "#ffffff",
+      "fill": 0.82,
+      "trim": true,
+      "originalSize": null,
+      "review": "pending",
+      "framing": "standalone-mark",
+      "asset": "assets/icloud-f7cf1ff3a6300231.png",
+      "sha256": "f7cf1ff3a6300231605600543a0f0fffa5ed2b9168d87af9cb4924619349d148",
+      "sourceSize": [
+        233,
+        150
+      ],
+      "crop": [
+        0,
+        91,
+        512,
+        330
+      ],
+      "edgeChecks": [],
+      "rasterBelow2x": false
+    },
+    {
+      "id": "liberty-mutual",
+      "name": "Liberty Mutual",
+      "original": "src/bookiebot/reports/assets/company-logo-liberty-mutual-4a2937466fb97ce6.png",
+      "source": "docs/logo-review/sources/liberty-mutual-mark.svg",
+      "sourceUrl": "https://www.libertymutual.com/",
+      "sourceSha256": "70def7679fab5fb3d286889bacae3476d8ec614b8eddf2a1d7d339b01c845086",
+      "method": "Original vector · circle framing",
+      "ai": false,
+      "background": "#ffd000",
+      "fill": 0.76,
+      "trim": true,
+      "originalSize": [
+        32,
+        32
+      ],
+      "review": "pending",
+      "framing": "standalone-mark",
+      "asset": "assets/liberty-mutual-3e989c1033678f89.png",
+      "sha256": "3e989c1033678f893f49ab274c2604ec4ae5e94ce1ec1a0ee1ef4ec6890bd7a9",
+      "sourceSize": [
+        124,
+        150
+      ],
+      "crop": [
+        44,
+        2,
+        424,
+        483
+      ],
+      "edgeChecks": [],
+      "rasterBelow2x": false
+    },
+    {
+      "id": "linkedin",
+      "name": "LinkedIn",
+      "original": "src/bookiebot/reports/assets/company-logo-linkedin-67f08e714e9a8a06.svg",
+      "source": "src/bookiebot/reports/assets/company-logo-linkedin-67f08e714e9a8a06.svg",
+      "sourceUrl": "https://cdn.jsdelivr.net/gh/homarr-labs/dashboard-icons@83f32e08257b66fbd971ac8d7645f5b38d52e85d/svg/linkedin.svg",
+      "sourceSha256": "67f08e714e9a8a06288f1d7adc7e9840c450c11f8af6fb1847425fc7f186ca1b",
+      "method": "Original artwork · circle framing",
+      "ai": false,
+      "background": "#007ebb",
+      "fill": 0.88,
+      "trim": true,
+      "originalSize": null,
+      "review": "pending",
+      "framing": "solid-tile",
+      "edgeChecks": [
+        {
+          "point": [
+            0.5,
+            0.03125
+          ],
+          "color": "#007ebb",
+          "actual": [
+            0,
+            126,
+            187,
+            255
+          ]
+        },
+        {
+          "point": [
+            0.03125,
+            0.5
+          ],
+          "color": "#007ebb",
+          "actual": [
+            0,
+            126,
+            187,
+            255
+          ]
+        },
+        {
+          "point": [
+            0.96875,
+            0.5
+          ],
+          "color": "#007ebb",
+          "actual": [
+            0,
+            126,
+            187,
+            255
+          ]
+        },
+        {
+          "point": [
+            0.5,
+            0.96875
+          ],
+          "color": "#007ebb",
+          "actual": [
+            0,
+            126,
+            187,
+            255
+          ]
+        }
+      ],
+      "asset": "assets/linkedin-29dbb38dd34b4298.png",
+      "sha256": "29dbb38dd34b42985e0808e09af6803e994e9ebf3c5c65f3011c0415e3f61777",
+      "sourceSize": [
+        150,
+        150
+      ],
+      "crop": [
+        0,
+        0,
+        512,
+        512
+      ],
+      "rasterBelow2x": false
+    },
+    {
+      "id": "macrofactor",
+      "name": "MacroFactor",
+      "original": "src/bookiebot/reports/assets/company-logo-macrofactor-b3cb30f3c7f86473.png",
+      "source": "src/bookiebot/reports/assets/company-logo-macrofactor-b3cb30f3c7f86473.png",
+      "sourceUrl": "https://macrofactor.com/wp-content/uploads/2025/09/cropped-MF_Avatar_Square_150ppi-192x192.png",
+      "sourceSha256": "b3cb30f3c7f86473b5e521b762dc89901acd08f72ac46ec3fefcecaddae815f4",
+      "method": "Original artwork · circle framing",
+      "ai": false,
+      "background": "#000000",
+      "fill": 0.82,
+      "trim": true,
+      "originalSize": [
+        192,
+        192
+      ],
+      "review": "pending",
+      "framing": "standalone-mark",
+      "asset": "assets/macrofactor-b8eb22746823410c.png",
+      "sha256": "b8eb22746823410c977142e158dcfc7aa1594beec212cbab615f61d05b598013",
+      "sourceSize": [
+        192,
+        192
+      ],
+      "crop": [
+        0,
+        0,
+        512,
+        512
+      ],
+      "edgeChecks": [],
+      "rasterBelow2x": false
+    },
+    {
+      "id": "max",
+      "name": "HBO Max",
+      "original": "src/bookiebot/reports/assets/company-logo-max-e2361f44a6eb3baa.svg",
+      "source": "src/bookiebot/reports/assets/company-logo-max-e2361f44a6eb3baa.svg",
+      "sourceUrl": "https://cdn.jsdelivr.net/gh/homarr-labs/dashboard-icons@83f32e08257b66fbd971ac8d7645f5b38d52e85d/svg/max.svg",
+      "sourceSha256": "e2361f44a6eb3baaab9147a385d440a233d8dcf943dab9d076839d0e45125cce",
+      "method": "Original artwork · circle framing",
+      "ai": false,
+      "background": "#ffffff",
+      "fill": 0.82,
+      "trim": true,
+      "originalSize": null,
+      "review": "pending",
+      "framing": "standalone-mark",
+      "asset": "assets/max-b601085f9deabb0c.png",
+      "sha256": "b601085f9deabb0c3d1ef8c795c0df8a8cd1593533ac1160c3d38eab8ba2ae30",
+      "sourceSize": [
+        300,
+        82
+      ],
+      "crop": [
+        0,
+        186,
+        512,
+        140
+      ],
+      "edgeChecks": [],
+      "rasterBelow2x": false
+    },
+    {
+      "id": "microsoft-365",
+      "name": "Microsoft 365",
+      "original": "src/bookiebot/reports/assets/company-logo-microsoft-365-40521c746de4fc44.svg",
+      "source": "src/bookiebot/reports/assets/company-logo-microsoft-365-40521c746de4fc44.svg",
+      "sourceUrl": "https://cdn.jsdelivr.net/gh/homarr-labs/dashboard-icons@83f32e08257b66fbd971ac8d7645f5b38d52e85d/svg/microsoft-365.svg",
+      "sourceSha256": "40521c746de4fc4420c6e7ff8bd8fdb60ea2989e56974e6049fb452254ff437b",
+      "method": "Original artwork · circle framing",
+      "ai": false,
+      "background": "#ffffff",
+      "fill": 0.82,
+      "trim": true,
+      "originalSize": null,
+      "review": "pending",
+      "framing": "standalone-mark",
+      "asset": "assets/microsoft-365-09a0f5397a74c0c3.png",
+      "sha256": "09a0f5397a74c0c392d7f766d8b659fae346541137357ca07273066b814bf8b0",
+      "sourceSize": [
+        136,
+        150
+      ],
+      "crop": [
+        24,
+        0,
+        464,
+        512
+      ],
+      "edgeChecks": [],
+      "rasterBelow2x": false
+    },
+    {
+      "id": "national-grid",
+      "name": "National Grid",
+      "original": "src/bookiebot/reports/assets/company-logo-national-grid-6a580f531e1edf9e.png",
+      "source": "src/bookiebot/reports/assets/company-logo-national-grid-6a580f531e1edf9e.png",
+      "sourceUrl": "https://www.nationalgridus.com/assets/images/favicons/apple-touch-icon.png?v=OmJ605EadX",
+      "sourceSha256": "6a580f531e1edf9e8cf17422c833e754b391b3bd38bbe243f594ca90551ff6d8",
+      "method": "Original artwork · circle framing",
+      "ai": false,
+      "background": "#00148c",
+      "fill": 1,
+      "trim": true,
+      "originalSize": [
+        180,
+        180
+      ],
+      "review": "pending",
+      "framing": "solid-tile",
+      "asset": "assets/national-grid-a8170259323d6029.png",
+      "sha256": "a8170259323d60297e95646c5241fcc65544f829b57a47e6bdf5c110095502d4",
+      "sourceSize": [
+        180,
+        180
+      ],
+      "crop": [
+        0,
+        0,
+        512,
+        512
+      ],
+      "edgeChecks": [],
+      "rasterBelow2x": false
+    },
+    {
+      "id": "netflix",
+      "name": "Netflix",
+      "original": "src/bookiebot/reports/assets/company-logo-netflix-2c1202dc7f5af0a3.svg",
+      "source": "src/bookiebot/reports/assets/company-logo-netflix-2c1202dc7f5af0a3.svg",
+      "sourceUrl": "https://cdn.jsdelivr.net/gh/homarr-labs/dashboard-icons@83f32e08257b66fbd971ac8d7645f5b38d52e85d/svg/netflix.svg",
+      "sourceSha256": "2c1202dc7f5af0a3ae191185cc5724de1053bb6a5e7a96f2f492c03828ee265f",
+      "method": "Original artwork · circle framing",
+      "ai": false,
+      "background": "#000000",
+      "fill": 0.76,
+      "trim": true,
+      "originalSize": null,
+      "review": "pending",
+      "framing": "solid-tile",
+      "asset": "assets/netflix-4a318aed131701d4.png",
+      "sha256": "4a318aed131701d4de4c52f24b2617b309e984969e8efcee5ef256194c53cf26",
+      "sourceSize": [
+        83,
+        150
+      ],
+      "crop": [
+        114,
+        0,
+        284,
+        512
+      ],
+      "edgeChecks": [],
+      "rasterBelow2x": false
+    },
+    {
+      "id": "nordvpn",
+      "name": "NordVPN",
+      "original": "src/bookiebot/reports/assets/company-logo-nordvpn-77548d4543437429.svg",
+      "source": "src/bookiebot/reports/assets/company-logo-nordvpn-77548d4543437429.svg",
+      "sourceUrl": "https://cdn.jsdelivr.net/gh/homarr-labs/dashboard-icons@83f32e08257b66fbd971ac8d7645f5b38d52e85d/svg/nordvpn.svg",
+      "sourceSha256": "77548d4543437429217f34d9a7506e279cba920f376c5ee9ae84693c35c0aa24",
+      "method": "Original artwork · circle framing",
+      "ai": false,
+      "background": "#ffffff",
+      "fill": 1,
+      "trim": true,
+      "originalSize": null,
+      "review": "pending",
+      "framing": "native-circle",
+      "asset": "assets/nordvpn-60fd85d2fa2ba359.png",
+      "sha256": "60fd85d2fa2ba3595f4304ec32ab966c4c14d988441cf6f9b9495b51112007a4",
+      "sourceSize": [
+        150,
+        150
+      ],
+      "crop": [
+        0,
+        52,
+        512,
+        408
+      ],
+      "edgeChecks": [],
+      "rasterBelow2x": false
+    },
+    {
+      "id": "notion",
+      "name": "Notion",
+      "original": "src/bookiebot/reports/assets/company-logo-notion-b98fea4bc3f3259c.svg",
+      "source": "src/bookiebot/reports/assets/company-logo-notion-b98fea4bc3f3259c.svg",
+      "sourceUrl": "https://cdn.jsdelivr.net/gh/homarr-labs/dashboard-icons@83f32e08257b66fbd971ac8d7645f5b38d52e85d/svg/notion.svg",
+      "sourceSha256": "b98fea4bc3f3259c6907a40dae994c959c3240d7ee4b4afea144a555c638f6c2",
+      "method": "Original artwork · circle framing",
+      "ai": false,
+      "background": "#ffffff",
+      "fill": 0.82,
+      "trim": true,
+      "originalSize": null,
+      "review": "pending",
+      "framing": "standalone-mark",
+      "asset": "assets/notion-d766a8a72d4a1d21.png",
+      "sha256": "d766a8a72d4a1d21b7068d0ed18d3c4a32ec6d467e5b983ed47c729cdbc67a02",
+      "sourceSize": [
+        150,
+        150
+      ],
+      "crop": [
+        11,
+        0,
+        491,
+        512
+      ],
+      "edgeChecks": [],
+      "rasterBelow2x": false
+    },
+    {
+      "id": "paramount-plus",
+      "name": "Paramount+",
+      "original": "src/bookiebot/reports/assets/company-logo-paramount-plus-f99ea29c29229412.svg",
+      "source": "src/bookiebot/reports/assets/company-logo-paramount-plus-f99ea29c29229412.svg",
+      "sourceUrl": "https://cdn.jsdelivr.net/gh/homarr-labs/dashboard-icons@83f32e08257b66fbd971ac8d7645f5b38d52e85d/svg/paramount-plus.svg",
+      "sourceSha256": "f99ea29c292294128d36f3f8fe06a4a96f0d5341de705bfab669e3f81784b179",
+      "method": "Original artwork · circle framing",
+      "ai": false,
+      "background": "#ffffff",
+      "fill": 1,
+      "trim": true,
+      "originalSize": null,
+      "review": "pending",
+      "framing": "native-circle",
+      "asset": "assets/paramount-plus-522e5210df7238ed.png",
+      "sha256": "522e5210df7238ed32d1f82f7d082a1406c3ee5020e6d546575a24e91fedb6ea",
+      "sourceSize": [
+        150,
+        150
+      ],
+      "crop": [
+        0,
+        52,
+        512,
+        408
+      ],
+      "edgeChecks": [],
+      "rasterBelow2x": false
+    },
+    {
+      "id": "patreon",
+      "name": "Patreon",
+      "original": "src/bookiebot/reports/assets/company-logo-patreon-6c568bd8b229ab15.svg",
+      "source": "src/bookiebot/reports/assets/company-logo-patreon-6c568bd8b229ab15.svg",
+      "sourceUrl": "https://cdn.jsdelivr.net/gh/homarr-labs/dashboard-icons@83f32e08257b66fbd971ac8d7645f5b38d52e85d/svg/patreon.svg",
+      "sourceSha256": "6c568bd8b229ab155957b117f6c690d4249c9267ef8c790b5b53f6c1b55f67dd",
+      "method": "Original artwork · circle framing",
+      "ai": false,
+      "background": "#ffffff",
+      "fill": 0.82,
+      "trim": true,
+      "originalSize": null,
+      "review": "pending",
+      "framing": "standalone-mark",
+      "asset": "assets/patreon-47cfdf2d85fca9a6.png",
+      "sha256": "47cfdf2d85fca9a68297c52baa527917d6aafd4d1bc96c464f743c381fef1cbc",
+      "sourceSize": [
+        137,
+        150
+      ],
+      "crop": [
+        22,
+        0,
+        468,
+        512
+      ],
+      "edgeChecks": [],
+      "rasterBelow2x": false
+    },
+    {
+      "id": "peacock",
+      "name": "Peacock",
+      "original": "src/bookiebot/reports/assets/company-logo-peacock-3e25492d3da3a275.svg",
+      "source": "src/bookiebot/reports/assets/company-logo-peacock-3e25492d3da3a275.svg",
+      "sourceUrl": "https://cdn.jsdelivr.net/gh/homarr-labs/dashboard-icons@83f32e08257b66fbd971ac8d7645f5b38d52e85d/svg/peacock.svg",
+      "sourceSha256": "3e25492d3da3a2753c3eef6f0525d13a89de7e3ba42aecaf83c00f73c1919b89",
+      "method": "Original artwork · circle framing",
+      "ai": false,
+      "background": "#ffffff",
+      "fill": 0.82,
+      "trim": true,
+      "originalSize": null,
+      "review": "pending",
+      "framing": "standalone-mark",
+      "asset": "assets/peacock-b970a86f2be4c2ba.png",
+      "sha256": "b970a86f2be4c2baa39ca07efedf3c8fa3c41c26d1a864ffd767dd661bf0428a",
+      "sourceSize": [
+        118,
+        150
+      ],
+      "crop": [
+        54,
+        0,
+        404,
+        512
+      ],
+      "edgeChecks": [],
+      "rasterBelow2x": false
+    },
+    {
+      "id": "peloton",
+      "name": "Peloton",
+      "original": "src/bookiebot/reports/assets/company-logo-peloton-4e3cd5fd127a603e.png",
+      "source": "src/bookiebot/reports/assets/company-logo-peloton-4e3cd5fd127a603e.png",
+      "sourceUrl": "https://www.onepeloton.com/images/apple-touch-icon-192.png",
+      "sourceSha256": "4e3cd5fd127a603e99cec9f715938acb086329cc8404c7c2a6eb1eebff4c48dd",
+      "method": "Original artwork · circle framing",
+      "ai": false,
+      "background": "#ffffff",
+      "fill": 0.82,
+      "trim": true,
+      "originalSize": [
+        192,
+        192
+      ],
+      "review": "pending",
+      "framing": "standalone-mark",
+      "asset": "assets/peloton-f08b6df19ca56e00.png",
+      "sha256": "f08b6df19ca56e00aedef62fd8345a061e09a605c85a726022ae0b733d883ffe",
+      "sourceSize": [
+        192,
+        192
+      ],
+      "crop": [
+        0,
+        0,
+        512,
+        512
+      ],
+      "edgeChecks": [],
+      "rasterBelow2x": false
+    },
+    {
+      "id": "pge",
+      "name": "PG&E",
+      "original": "src/bookiebot/reports/assets/company-logo-pge-1b6066340836864b.jpg",
+      "source": "src/bookiebot/reports/assets/company-logo-pge-1b6066340836864b.jpg",
+      "sourceUrl": "https://www.pge.com/content/experience-fragments/pge/en/site/header/master/_jcr_content/root/header/image.coreimg.jpeg/1759521030312/pge-logo-95x100.jpeg",
+      "sourceSha256": "1b6066340836864bb33e5fb9fbb2767535e70bd0b73c6b58fd05c2a178e253bf",
+      "method": "Original artwork · circle framing",
+      "ai": false,
+      "background": "#00a5d8",
+      "fill": 0.68,
+      "trim": true,
+      "originalSize": [
+        95,
+        100
+      ],
+      "review": "pending",
+      "framing": "standalone-mark",
+      "asset": "assets/pge-50f203cf0ab8750d.png",
+      "sha256": "50f203cf0ab8750d19607b9fdc73508eb360538ff2e66580735619256af19767",
+      "sourceSize": [
+        95,
+        100
+      ],
+      "crop": [
+        13,
+        0,
+        486,
+        512
+      ],
+      "edgeChecks": [],
+      "rasterBelow2x": false
+    },
+    {
+      "id": "playstation",
+      "name": "PlayStation",
+      "original": "src/bookiebot/reports/assets/company-logo-playstation-7e0e9f79bbc01cb1.svg",
+      "source": "src/bookiebot/reports/assets/company-logo-playstation-7e0e9f79bbc01cb1.svg",
+      "sourceUrl": "https://cdn.jsdelivr.net/gh/homarr-labs/dashboard-icons@83f32e08257b66fbd971ac8d7645f5b38d52e85d/svg/playstation.svg",
+      "sourceSha256": "7e0e9f79bbc01cb128cbc05f90c6199472f29babf48193bc8c7585ff65dd68cf",
+      "method": "Original artwork · circle framing",
+      "ai": false,
+      "background": "#ffffff",
+      "fill": 0.82,
+      "trim": true,
+      "originalSize": null,
+      "review": "pending",
+      "framing": "standalone-mark",
+      "asset": "assets/playstation-23df6d45be9b7f8d.png",
+      "sha256": "23df6d45be9b7f8d7986424f65efdcfcb8626b28bed3af4aac64715e84782da5",
+      "sourceSize": [
+        197,
+        150
+      ],
+      "crop": [
+        0,
+        61,
+        512,
+        390
+      ],
+      "edgeChecks": [],
+      "rasterBelow2x": false
+    },
+    {
+      "id": "plex",
+      "name": "Plex",
+      "original": "src/bookiebot/reports/assets/company-logo-plex-ae6e754dc2644c7a.svg",
+      "source": "src/bookiebot/reports/assets/company-logo-plex-ae6e754dc2644c7a.svg",
+      "sourceUrl": "https://cdn.jsdelivr.net/gh/homarr-labs/dashboard-icons@83f32e08257b66fbd971ac8d7645f5b38d52e85d/svg/plex.svg",
+      "sourceSha256": "ae6e754dc2644c7ad6b41853cdac75812ccaeed4c2f08fcd88d81e2f3ec01dba",
+      "method": "Original artwork · circle framing",
+      "ai": false,
+      "background": "#25282b",
+      "fill": 1,
+      "trim": true,
+      "originalSize": null,
+      "review": "pending",
+      "framing": "standalone-mark",
+      "asset": "assets/plex-ff24c8f12aebf372.png",
+      "sha256": "ff24c8f12aebf372890fe7c244b1e16c21c7915cf2f47416c77c4d6a59ebcf4d",
+      "sourceSize": [
+        150,
+        150
+      ],
+      "crop": [
+        0,
+        0,
+        512,
+        512
+      ],
+      "edgeChecks": [],
+      "rasterBelow2x": false
+    },
+    {
+      "id": "progressive",
+      "name": "Progressive",
+      "original": "src/bookiebot/reports/assets/company-logo-progressive-f2947c3535e6e0f3.png",
+      "source": "src/bookiebot/reports/assets/company-logo-progressive-f2947c3535e6e0f3.png",
+      "sourceUrl": "https://www.progressive.com/apple-touch-icon.png",
+      "sourceSha256": "f2947c3535e6e0f3bcdbbac18cba8bcdc9f3dce990524e28540afacb6566ec18",
+      "method": "Original artwork · circle framing",
+      "ai": false,
+      "background": "#0077b3",
+      "fill": 1,
+      "trim": true,
+      "originalSize": [
+        181,
+        180
+      ],
+      "review": "pending",
+      "framing": "solid-tile",
+      "asset": "assets/progressive-770286cb9bfd1c60.png",
+      "sha256": "770286cb9bfd1c60ad078ea7717b2c5ebfb464a0833370119eeb7e52fdad61c5",
+      "sourceSize": [
+        181,
+        180
+      ],
+      "crop": [
+        0,
+        1,
+        512,
+        510
+      ],
+      "edgeChecks": [],
+      "rasterBelow2x": false
+    },
+    {
+      "id": "proton-mail",
+      "name": "Proton",
+      "original": "src/bookiebot/reports/assets/company-logo-proton-mail-2cf6f56e7ac141fc.svg",
+      "source": "src/bookiebot/reports/assets/company-logo-proton-mail-2cf6f56e7ac141fc.svg",
+      "sourceUrl": "https://cdn.jsdelivr.net/gh/homarr-labs/dashboard-icons@83f32e08257b66fbd971ac8d7645f5b38d52e85d/svg/proton-mail.svg",
+      "sourceSha256": "2cf6f56e7ac141fcc13e7b3bc3dbf19542910acee86bdc52f5ba3ee92e195997",
+      "method": "Original artwork · circle framing",
+      "ai": false,
+      "background": "#ffffff",
+      "fill": 0.82,
+      "trim": true,
+      "originalSize": null,
+      "review": "pending",
+      "framing": "standalone-mark",
+      "asset": "assets/proton-mail-5d296f1d39b8218d.png",
+      "sha256": "5d296f1d39b8218d3b57b7722554dd17020de6b56bec8738e09cc3cb8a7c11fc",
+      "sourceSize": [
+        979,
+        785
+      ],
+      "crop": [
+        0,
+        50,
+        512,
+        412
+      ],
+      "edgeChecks": [],
+      "rasterBelow2x": false
+    },
+    {
+      "id": "railway",
+      "name": "Railway",
+      "original": "src/bookiebot/reports/assets/company-logo-railway-c4b555ecd61236b7.svg",
+      "source": "docs/logo-review/sources/railway-mark.svg",
+      "sourceUrl": "https://cdn.jsdelivr.net/gh/homarr-labs/dashboard-icons@83f32e08257b66fbd971ac8d7645f5b38d52e85d/svg/railway.svg",
+      "sourceSha256": "4e37a4b20550b7988bcb26b9b4803748847576aaf270bf892203ab4b96783a84",
+      "method": "Native white mark · user-supplied dark reference",
+      "ai": false,
+      "background": "#13121c",
+      "fill": 0.68,
+      "trim": false,
+      "originalSize": null,
+      "review": "pending",
+      "framing": "solid-tile",
+      "edgeChecks": [
+        {
+          "point": [
+            0.5,
+            0.03125
+          ],
+          "color": "#13121c",
+          "actual": [
+            19,
+            18,
+            28,
+            255
+          ]
+        },
+        {
+          "point": [
+            0.03125,
+            0.5
+          ],
+          "color": "#13121c",
+          "actual": [
+            19,
+            18,
+            28,
+            255
+          ]
+        },
+        {
+          "point": [
+            0.96875,
+            0.5
+          ],
+          "color": "#13121c",
+          "actual": [
+            19,
+            18,
+            28,
+            255
+          ]
+        },
+        {
+          "point": [
+            0.5,
+            0.25
+          ],
+          "color": "#ffffff",
+          "actual": [
+            255,
+            255,
+            255,
+            255
+          ]
+        }
+      ],
+      "asset": "assets/railway-da912722e6ffa33d.png",
+      "sha256": "da912722e6ffa33d63645443c12048180dce2b178d7b5f3c1b1856e2781ca2f1",
+      "sourceSize": [
+        150,
+        150
+      ],
+      "crop": [
+        0,
+        0,
+        512,
+        512
+      ],
+      "rasterBelow2x": false
+    },
+    {
+      "id": "raycast",
+      "name": "Raycast",
+      "original": "src/bookiebot/reports/assets/company-logo-raycast-dfb8e06943ab2ce3.png",
+      "source": "src/bookiebot/reports/assets/company-logo-raycast-dfb8e06943ab2ce3.png",
+      "sourceUrl": "https://www.raycast.com/favicon-production.png",
+      "sourceSha256": "dfb8e06943ab2ce35278cda54b137137442d01094bbcf92d7d649a2d1e186043",
+      "method": "Original artwork · circle framing",
+      "ai": false,
+      "background": "#151515",
+      "fill": 1,
+      "trim": true,
+      "originalSize": [
+        1024,
+        1024
+      ],
+      "review": "pending",
+      "framing": "solid-tile",
+      "asset": "assets/raycast-a51bb09684913de4.png",
+      "sha256": "a51bb09684913de4d9bd2d0cc547e1c90a178ce5f8d1b6b8edfdb34b320f0f87",
+      "sourceSize": [
+        1024,
+        1024
+      ],
+      "crop": [
+        0,
+        0,
+        512,
+        512
+      ],
+      "edgeChecks": [],
+      "rasterBelow2x": false
+    },
+    {
+      "id": "recology",
+      "name": "Recology",
+      "original": "src/bookiebot/reports/assets/company-logo-recology-fc64b0820af19b59.png",
+      "source": "src/bookiebot/reports/assets/company-logo-recology-fc64b0820af19b59.png",
+      "sourceUrl": "https://www.google.com/s2/favicons?domain=recology.com&sz=128",
+      "sourceSha256": "fc64b0820af19b59a4fdc78eee2da31fbe62b9a2cf88af5579652b2d51b20ebc",
+      "method": "Original artwork · circle framing",
+      "ai": false,
+      "background": "#ffffff",
+      "fill": 0.82,
+      "trim": true,
+      "originalSize": [
+        128,
+        128
+      ],
+      "review": "pending",
+      "framing": "standalone-mark",
+      "asset": "assets/recology-d6ee8d4ec6d5d7d6.png",
+      "sha256": "d6ee8d4ec6d5d7d6a86b1f9b1cf83597df75b1788a1808be50bfc75c815da2cf",
+      "sourceSize": [
+        128,
+        128
+      ],
+      "crop": [
+        0,
+        27,
+        512,
+        458
+      ],
+      "edgeChecks": [],
+      "rasterBelow2x": false
+    },
+    {
+      "id": "republic-services",
+      "name": "Republic Services",
+      "original": "src/bookiebot/reports/assets/company-logo-republic-services-0924ff864d3b9812.png",
+      "source": "src/bookiebot/reports/assets/company-logo-republic-services-0924ff864d3b9812.png",
+      "sourceUrl": "https://www.republicservices.com/favicon.ico",
+      "sourceSha256": "0924ff864d3b9812eb6b24aca97312b535ef65a2d3e6bdebbf7c7318a8fcde54",
+      "method": "Original artwork · circle framing",
+      "ai": false,
+      "background": "#ffffff",
+      "fill": 0.87,
+      "trim": true,
+      "originalSize": [
+        57,
+        57
+      ],
+      "review": "pending",
+      "framing": "standalone-mark",
+      "asset": "assets/republic-services-63637e04a5fe5754.png",
+      "sha256": "63637e04a5fe5754e9b79407efda697b3733155e1c438aa7d4a6de6424fcf19e",
+      "sourceSize": [
+        57,
+        57
+      ],
+      "crop": [
+        0,
+        0,
+        512,
+        512
+      ],
+      "edgeChecks": [],
+      "rasterBelow2x": false
+    },
+    {
+      "id": "santa-rosa-water",
+      "name": "Santa Rosa Water",
+      "original": "src/bookiebot/reports/assets/company-logo-santa-rosa-water-9e81a9c7e2bc563d.png",
+      "source": "docs/logo-review/sources/santa-rosa-water-ai-v1.png",
+      "sourceUrl": "https://www.google.com/s2/favicons?domain=srcity.org&sz=128",
+      "sourceSha256": "86e8630032235afd9313c7d04eb78403f11a4b6c5af846134ef8b3801665fa90",
+      "method": "AI restoration · review candidate",
+      "ai": true,
+      "background": "#ffffff",
+      "fill": 0.94,
+      "trim": true,
+      "originalSize": [
+        16,
+        16
+      ],
+      "review": "pending",
+      "framing": "standalone-mark",
+      "asset": "assets/santa-rosa-water-bc29b931c66f0af9.png",
+      "sha256": "bc29b931c66f0af9cd13fcd2f819b35cb2ad243e8b3bd302ca49c176a1110d90",
+      "sourceSize": [
+        256,
+        256
+      ],
+      "crop": [
+        88,
+        42,
+        337,
+        437
+      ],
+      "edgeChecks": [],
+      "rasterBelow2x": false
+    },
+    {
+      "id": "sdge",
+      "name": "SDG&E",
+      "original": "src/bookiebot/reports/assets/company-logo-sdge-c5918a42c14557d2.ico",
+      "source": "docs/logo-review/sources/sdge-mark.svg",
+      "sourceUrl": "https://www.sdge.com/sites/default/files/logo_r.svg",
+      "sourceSha256": "207a56985491f433362b687db24d55438dd0323d608e78ccb2d14111b8808651",
+      "method": "Original vector · circle framing",
+      "ai": false,
+      "background": "#ffffff",
+      "fill": 1,
+      "trim": true,
+      "originalSize": [
+        16,
+        16
+      ],
+      "review": "pending",
+      "framing": "native-circle",
+      "asset": "assets/sdge-5d20c2d0c552aea8.png",
+      "sha256": "5d20c2d0c552aea85ca3bced92746c59c8abb341f090a3eb43d73db069bcb399",
+      "sourceSize": [
+        150,
+        150
+      ],
+      "crop": [
+        14,
+        13,
+        484,
+        485
+      ],
+      "edgeChecks": [],
+      "rasterBelow2x": false
+    },
+    {
+      "id": "slate-digital",
+      "name": "Slate Digital",
+      "original": "src/bookiebot/reports/assets/company-logo-slate-digital-a6fb97fa98f9d114.png",
+      "source": "src/bookiebot/reports/assets/company-logo-slate-digital-a6fb97fa98f9d114.png",
+      "sourceUrl": "https://www.google.com/s2/favicons?domain=slatedigital.com&sz=128",
+      "sourceSha256": "a6fb97fa98f9d114863d5246714c729bf8500c47bd624b0de790c4c6c9123461",
+      "method": "Original artwork · circle framing",
+      "ai": false,
+      "background": "#000000",
+      "fill": 0.86,
+      "trim": true,
+      "originalSize": [
+        128,
+        128
+      ],
+      "review": "pending",
+      "framing": "standalone-mark",
+      "asset": "assets/slate-digital-27783d1dc474e093.png",
+      "sha256": "27783d1dc474e09317ec0d46148972ab5d8986e735727fc8e1243e4bf1b706c7",
+      "sourceSize": [
+        128,
+        128
+      ],
+      "crop": [
+        0,
+        0,
+        512,
+        512
+      ],
+      "edgeChecks": [],
+      "rasterBelow2x": false
+    },
+    {
+      "id": "sling",
+      "name": "Sling TV",
+      "original": "src/bookiebot/reports/assets/company-logo-sling-876ca40fda3f2b4e.ico",
+      "source": "src/bookiebot/reports/assets/company-logo-sling-876ca40fda3f2b4e.ico",
+      "sourceUrl": "https://www.sling.com/etc.clientlibs/sling-television/clientlibs/clientlib-global/resources/images/favicon.ico",
+      "sourceSha256": "876ca40fda3f2b4e0b536fdb397f87d90f5e7f07a3ca3fcb19831b121bd1a8e7",
+      "method": "Original artwork · circle framing",
+      "ai": false,
+      "background": "#080f13",
+      "fill": 1,
+      "trim": true,
+      "originalSize": [
+        128,
+        128
+      ],
+      "review": "pending",
+      "framing": "standalone-mark",
+      "asset": "assets/sling-48c542a5c2b1f8a0.png",
+      "sha256": "48c542a5c2b1f8a0e8c7f0e577dee6bfc09b93e8896589818f00fcf983075d32",
+      "sourceSize": [
+        128,
+        128
+      ],
+      "crop": [
+        0,
+        0,
+        512,
+        512
+      ],
+      "edgeChecks": [],
+      "rasterBelow2x": false
+    },
+    {
+      "id": "socalgas",
+      "name": "SoCalGas",
+      "original": "src/bookiebot/reports/assets/company-logo-socalgas-62e0217cdb675258.ico",
+      "source": "docs/logo-review/sources/socalgas-mark.svg",
+      "sourceUrl": "https://www.socalgas.com/sites/default/files/images/logo/scg-logo-white.svg",
+      "sourceSha256": "cca4f9209a518b638ee9c65bfad70ceb1198b7cb88792c2466ff11619a47fcd2",
+      "method": "Original vector · circle framing",
+      "ai": false,
+      "background": "#005a9c",
+      "fill": 0.75,
+      "trim": true,
+      "originalSize": [
+        16,
+        16
+      ],
+      "review": "pending",
+      "framing": "standalone-mark",
+      "asset": "assets/socalgas-7569b1ee20be16dc.png",
+      "sha256": "7569b1ee20be16dc97eb523e7172b05872611ef0598174e65b6541582a61f0b9",
+      "sourceSize": [
+        82,
+        150
+      ],
+      "crop": [
+        116,
+        0,
+        280,
+        512
+      ],
+      "edgeChecks": [],
+      "rasterBelow2x": false
+    },
+    {
+      "id": "soundcloud",
+      "name": "SoundCloud",
+      "original": "src/bookiebot/reports/assets/company-logo-soundcloud-aee2e647d04f4885.svg",
+      "source": "src/bookiebot/reports/assets/company-logo-soundcloud-aee2e647d04f4885.svg",
+      "sourceUrl": "https://cdn.jsdelivr.net/gh/homarr-labs/dashboard-icons@83f32e08257b66fbd971ac8d7645f5b38d52e85d/svg/soundcloud.svg",
+      "sourceSha256": "aee2e647d04f4885fabe2760156f20c6da12ece0e6ca860ddf337331019169f7",
+      "method": "Original artwork · circle framing",
+      "ai": false,
+      "background": "#ffffff",
+      "fill": 0.82,
+      "trim": true,
+      "originalSize": null,
+      "review": "pending",
+      "framing": "standalone-mark",
+      "asset": "assets/soundcloud-49c7dbefe9f72b0f.png",
+      "sha256": "49c7dbefe9f72b0f7aaa354ea4f22efd1135198b8e284d44c8a82a3838249d5c",
+      "sourceSize": [
+        300,
+        134
+      ],
+      "crop": [
+        0,
+        142,
+        512,
+        228
+      ],
+      "edgeChecks": [],
+      "rasterBelow2x": false
+    },
+    {
+      "id": "southern-california-edison",
+      "name": "Southern California Edison",
+      "original": "src/bookiebot/reports/assets/company-logo-southern-california-edison-ed1b8b097b57338c.png",
+      "source": "src/bookiebot/reports/assets/company-logo-southern-california-edison-ed1b8b097b57338c.png",
+      "sourceUrl": "https://www.sce.com/themes/custom/sce_redesign/images/Logo-180.png",
+      "sourceSha256": "ed1b8b097b57338c37bd3ac084b41c114bcb567fe4dc0cf65b9888e8ba64a346",
+      "method": "Original artwork · circle framing",
+      "ai": false,
+      "background": "#ffffff",
+      "fill": 0.88,
+      "trim": true,
+      "originalSize": [
+        180,
+        180
+      ],
+      "review": "pending",
+      "framing": "standalone-mark",
+      "asset": "assets/southern-california-edison-ae1f5636383f66c6.png",
+      "sha256": "ae1f5636383f66c6881be132be1e42d2c9534532d933006c590f5dbd804e8d0a",
+      "sourceSize": [
+        180,
+        180
+      ],
+      "crop": [
+        0,
+        0,
+        512,
+        512
+      ],
+      "edgeChecks": [],
+      "rasterBelow2x": false
+    },
+    {
+      "id": "spectrum",
+      "name": "Spectrum",
+      "original": "src/bookiebot/reports/assets/company-logo-spectrum-c5bb7cfa7e4f8b53.png",
+      "source": "docs/logo-review/sources/spectrum-ai-v1.png",
+      "sourceUrl": "https://www.google.com/s2/favicons?domain=www.spectrum.com&sz=128",
+      "sourceSha256": "60cde81305c88f9687a41a416e2a7f329eeac52be757494baeedf5f2ab628a9e",
+      "method": "AI restoration · review candidate",
+      "ai": true,
+      "background": "#ffffff",
+      "fill": 0.88,
+      "trim": true,
+      "originalSize": [
+        32,
+        32
+      ],
+      "review": "pending",
+      "framing": "standalone-mark",
+      "asset": "assets/spectrum-59bca6b07bc4e1be.png",
+      "sha256": "59bca6b07bc4e1beced3571e0767df7be11b06878186f6ac875df945227c80cb",
+      "sourceSize": [
+        256,
+        256
+      ],
+      "crop": [
+        134,
+        80,
+        254,
+        360
+      ],
+      "edgeChecks": [],
+      "rasterBelow2x": false
+    },
+    {
+      "id": "spotify",
+      "name": "Spotify",
+      "original": "src/bookiebot/reports/assets/company-logo-spotify-686990a9a97c3674.svg",
+      "source": "src/bookiebot/reports/assets/company-logo-spotify-686990a9a97c3674.svg",
+      "sourceUrl": "https://cdn.jsdelivr.net/gh/homarr-labs/dashboard-icons@83f32e08257b66fbd971ac8d7645f5b38d52e85d/svg/spotify.svg",
+      "sourceSha256": "686990a9a97c36746eebfc7cfd1100ef29e07d8f9ada229ab00e34d4298a3dcb",
+      "method": "Original artwork · circle framing",
+      "ai": false,
+      "background": "#ffffff",
+      "fill": 1,
+      "trim": true,
+      "originalSize": null,
+      "review": "pending",
+      "framing": "native-circle",
+      "asset": "assets/spotify-68f0c1767ea2fb76.png",
+      "sha256": "68f0c1767ea2fb765befee52568268cd9807e46ee61db72212b2027d86740a1e",
+      "sourceSize": [
+        227,
+        227
+      ],
+      "crop": [
+        3,
+        3,
+        506,
+        506
+      ],
+      "edgeChecks": [],
+      "rasterBelow2x": false
+    },
+    {
+      "id": "state-farm",
+      "name": "State Farm",
+      "original": "src/bookiebot/reports/assets/company-logo-state-farm-156a1d1dceb5f870.ico",
+      "source": "src/bookiebot/reports/assets/company-logo-state-farm-156a1d1dceb5f870.ico",
+      "sourceUrl": "https://www.statefarm.com/favicon.ico",
+      "sourceSha256": "156a1d1dceb5f8705312cd80bcfc22053642d23f516fd2bc2740db8a1fe78012",
+      "method": "Original artwork · circle framing",
+      "ai": false,
+      "background": "#ffffff",
+      "fill": 0.82,
+      "trim": true,
+      "originalSize": [
+        128,
+        128
+      ],
+      "review": "pending",
+      "framing": "standalone-mark",
+      "asset": "assets/state-farm-b590f921898f9821.png",
+      "sha256": "b590f921898f9821080d53e3b84ab374a453ac6fd5ef42de97b282ca41a75b81",
+      "sourceSize": [
+        128,
+        128
+      ],
+      "crop": [
+        0,
+        90,
+        512,
+        312
+      ],
+      "edgeChecks": [],
+      "rasterBelow2x": false
+    },
+    {
+      "id": "steam",
+      "name": "Steam",
+      "original": "src/bookiebot/reports/assets/company-logo-steam-a700d94f7bc87df5.svg",
+      "source": "src/bookiebot/reports/assets/company-logo-steam-a700d94f7bc87df5.svg",
+      "sourceUrl": "https://cdn.jsdelivr.net/gh/homarr-labs/dashboard-icons@83f32e08257b66fbd971ac8d7645f5b38d52e85d/svg/steam.svg",
+      "sourceSha256": "a700d94f7bc87df540938c9f0d8733ec27e9b76610b34073e5c7f43fd61ca402",
+      "method": "Original artwork · circle framing",
+      "ai": false,
+      "background": "#ffffff",
+      "fill": 1,
+      "trim": true,
+      "originalSize": null,
+      "review": "pending",
+      "framing": "native-circle",
+      "asset": "assets/steam-35648b7299c237b9.png",
+      "sha256": "35648b7299c237b9fd328d906e0c9dd4215eace66f766da4dd399671967ee185",
+      "sourceSize": [
+        150,
+        150
+      ],
+      "crop": [
+        0,
+        0,
+        512,
+        512
+      ],
+      "edgeChecks": [],
+      "rasterBelow2x": false
+    },
+    {
+      "id": "strava",
+      "name": "Strava",
+      "original": "src/bookiebot/reports/assets/company-logo-strava-95b71387813efb28.svg",
+      "source": "src/bookiebot/reports/assets/company-logo-strava-95b71387813efb28.svg",
+      "sourceUrl": "https://cdn.jsdelivr.net/gh/homarr-labs/dashboard-icons@83f32e08257b66fbd971ac8d7645f5b38d52e85d/svg/strava.svg",
+      "sourceSha256": "95b71387813efb284c39da71247f32f207ff3c99d52093b75f60011d3baf2243",
+      "method": "Original artwork · circle framing",
+      "ai": false,
+      "background": "#ffffff",
+      "fill": 0.82,
+      "trim": true,
+      "originalSize": null,
+      "review": "pending",
+      "framing": "standalone-mark",
+      "asset": "assets/strava-f52c9aa83b509ff6.png",
+      "sha256": "f52c9aa83b509ff6cded179ba35bb59e9418a330ae3584899edd451ab2a9c050",
+      "sourceSize": [
+        108,
+        150
+      ],
+      "crop": [
+        72,
+        0,
+        368,
+        512
+      ],
+      "edgeChecks": [],
+      "rasterBelow2x": false
+    },
+    {
+      "id": "surfshark",
+      "name": "Surfshark",
+      "original": "src/bookiebot/reports/assets/company-logo-surfshark-d6da2bb0e3b7dd62.svg",
+      "source": "src/bookiebot/reports/assets/company-logo-surfshark-d6da2bb0e3b7dd62.svg",
+      "sourceUrl": "https://cdn.jsdelivr.net/gh/homarr-labs/dashboard-icons@83f32e08257b66fbd971ac8d7645f5b38d52e85d/svg/surfshark.svg",
+      "sourceSha256": "d6da2bb0e3b7dd62f1b72c53a2ec35856250cc5168ac5a2555b57982240f0ef8",
+      "method": "Original artwork · circle framing",
+      "ai": false,
+      "background": "#ffffff",
+      "fill": 0.82,
+      "trim": true,
+      "originalSize": null,
+      "review": "pending",
+      "framing": "standalone-mark",
+      "asset": "assets/surfshark-b4727e24812c7298.png",
+      "sha256": "b4727e24812c729870be1a40a44e27856b5c3b052daac4632fdf9feb56be6155",
+      "sourceSize": [
+        150,
+        150
+      ],
+      "crop": [
+        62,
+        16,
+        388,
+        480
+      ],
+      "edgeChecks": [],
+      "rasterBelow2x": false
+    },
+    {
+      "id": "t-mobile",
+      "name": "T-Mobile",
+      "original": "src/bookiebot/reports/assets/company-logo-t-mobile-4a12b9d171b8b30c.png",
+      "source": "docs/logo-review/sources/t-mobile-original.svg",
+      "sourceUrl": "https://www.t-mobile.com/content/dam/t-mobile/ntm/branding/logos/corporate/tmo-logo-v4.svg",
+      "sourceSha256": "35c7dab49ed926b15da52e696311911e95d9a3a44ccfea0896b61e25eabefaa0",
+      "method": "Original vector · circle framing",
+      "ai": false,
+      "background": "#e20074",
+      "fill": 1,
+      "trim": true,
+      "originalSize": [
+        32,
+        32
+      ],
+      "review": "pending",
+      "framing": "standalone-mark",
+      "asset": "assets/t-mobile-458c5a66112a1805.png",
+      "sha256": "458c5a66112a180542c053de00b1b13f01eecf10a5aa1c982a3e3e9ce3ba1da5",
+      "sourceSize": [
+        52,
+        52
+      ],
+      "crop": [
+        0,
+        0,
+        512,
+        512
+      ],
+      "edgeChecks": [],
+      "rasterBelow2x": false
+    },
+    {
+      "id": "tidal",
+      "name": "Tidal",
+      "original": "src/bookiebot/reports/assets/company-logo-tidal-008e151b67ed08a3.svg",
+      "source": "src/bookiebot/reports/assets/company-logo-tidal-008e151b67ed08a3.svg",
+      "sourceUrl": "https://cdn.jsdelivr.net/gh/homarr-labs/dashboard-icons@83f32e08257b66fbd971ac8d7645f5b38d52e85d/svg/tidal.svg",
+      "sourceSha256": "008e151b67ed08a33335a99dacc9ce0fe440c56ee8154c0cef0ac8c28c722acd",
+      "method": "Original artwork · circle framing",
+      "ai": false,
+      "background": "#ffffff",
+      "fill": 0.82,
+      "trim": true,
+      "originalSize": null,
+      "review": "pending",
+      "framing": "standalone-mark",
+      "asset": "assets/tidal-d4d199c15719bc03.png",
+      "sha256": "d4d199c15719bc035ae141ff41c10237dec931ffd3c7179af3b88d434755a2dd",
+      "sourceSize": [
+        225,
+        150
+      ],
+      "crop": [
+        0,
+        85,
+        512,
+        342
+      ],
+      "edgeChecks": [],
+      "rasterBelow2x": false
+    },
+    {
+      "id": "todoist",
+      "name": "Todoist",
+      "original": "src/bookiebot/reports/assets/company-logo-todoist-973f89993d8c5c15.svg",
+      "source": "src/bookiebot/reports/assets/company-logo-todoist-973f89993d8c5c15.svg",
+      "sourceUrl": "https://cdn.jsdelivr.net/gh/homarr-labs/dashboard-icons@83f32e08257b66fbd971ac8d7645f5b38d52e85d/svg/todoist.svg",
+      "sourceSha256": "973f89993d8c5c154edb79410f4953077c22f1e94f5507f4ac1ea6c83380e543",
+      "method": "Original artwork · circle framing",
+      "ai": false,
+      "background": "#ffffff",
+      "fill": 0.82,
+      "trim": true,
+      "originalSize": null,
+      "review": "pending",
+      "framing": "standalone-mark",
+      "asset": "assets/todoist-30e84d0ec658280b.png",
+      "sha256": "30e84d0ec658280b9f695611cb320c87b10e146321958b64ba704827312146d3",
+      "sourceSize": [
+        800,
+        800
+      ],
+      "crop": [
+        0,
+        0,
+        512,
+        512
+      ],
+      "edgeChecks": [],
+      "rasterBelow2x": false
+    },
+    {
+      "id": "travelers",
+      "name": "Travelers Insurance",
+      "original": "src/bookiebot/reports/assets/company-logo-travelers-507eb615635c7522.png",
+      "source": "docs/logo-review/sources/travelers-mark.svg",
+      "sourceUrl": "https://www.travelers.com/ClientResources/tds-icons/assets/icons/logos/svg/trv-logo-2color-small.svg",
+      "sourceSha256": "26e60afbf068c47cc23003530833cf4459f8d910d020697f15e0027ffb0dfa76",
+      "method": "Original vector · circle framing",
+      "ai": false,
+      "background": "#ffffff",
+      "fill": 0.8,
+      "trim": true,
+      "originalSize": [
+        48,
+        48
+      ],
+      "review": "pending",
+      "framing": "standalone-mark",
+      "asset": "assets/travelers-35c8edc4c7edfe70.png",
+      "sha256": "35c8edc4c7edfe701f5068a34773b8838eab0a2a8f7d65877ca1a850b6fc1bce",
+      "sourceSize": [
+        175,
+        150
+      ],
+      "crop": [
+        14,
+        36,
+        498,
+        440
+      ],
+      "edgeChecks": [],
+      "rasterBelow2x": false
+    },
+    {
+      "id": "twitch",
+      "name": "Twitch",
+      "original": "src/bookiebot/reports/assets/company-logo-twitch-a8eb365147d606ec.svg",
+      "source": "src/bookiebot/reports/assets/company-logo-twitch-a8eb365147d606ec.svg",
+      "sourceUrl": "https://cdn.jsdelivr.net/gh/homarr-labs/dashboard-icons@83f32e08257b66fbd971ac8d7645f5b38d52e85d/svg/twitch.svg",
+      "sourceSha256": "a8eb365147d606ec498ea6e655e1e1397ee5c0bdbc096464d496e6f2f31a1c69",
+      "method": "Original artwork · circle framing",
+      "ai": false,
+      "background": "#ffffff",
+      "fill": 0.82,
+      "trim": true,
+      "originalSize": null,
+      "review": "pending",
+      "framing": "standalone-mark",
+      "asset": "assets/twitch-19060bc6504763bb.png",
+      "sha256": "19060bc6504763bb0fb9e5be7a6e64b1e09bebc5b382d155ab466b7ccb433b87",
+      "sourceSize": [
+        132,
+        150
+      ],
+      "crop": [
+        31,
+        0,
+        450,
+        512
+      ],
+      "edgeChecks": [],
+      "rasterBelow2x": false
+    },
+    {
+      "id": "usaa",
+      "name": "USAA",
+      "original": "src/bookiebot/reports/assets/company-logo-usaa-b8f0b5e0cb72f780.png",
+      "source": "src/bookiebot/reports/assets/company-logo-usaa-b8f0b5e0cb72f780.png",
+      "sourceUrl": "https://www.google.com/s2/favicons?domain=www.usaa.com&sz=128",
+      "sourceSha256": "b8f0b5e0cb72f78087b17f21ba3948e988badc95c4154ce3d3bb2f604af5caf1",
+      "method": "Original artwork · circle framing",
+      "ai": false,
+      "background": "#12395b",
+      "fill": 1,
+      "trim": true,
+      "originalSize": [
+        128,
+        128
+      ],
+      "review": "pending",
+      "framing": "solid-tile",
+      "asset": "assets/usaa-61435393039854af.png",
+      "sha256": "61435393039854af80b06d671364506966f7720007281aae8fe1212416f47867",
+      "sourceSize": [
+        128,
+        128
+      ],
+      "crop": [
+        0,
+        0,
+        512,
+        512
+      ],
+      "edgeChecks": [],
+      "rasterBelow2x": false
+    },
+    {
+      "id": "verizon",
+      "name": "Verizon",
+      "original": "src/bookiebot/reports/assets/company-logo-verizon-5d730aca98f9128d.svg",
+      "source": "src/bookiebot/reports/assets/company-logo-verizon-5d730aca98f9128d.svg",
+      "sourceUrl": "https://cdn.jsdelivr.net/gh/homarr-labs/dashboard-icons@83f32e08257b66fbd971ac8d7645f5b38d52e85d/svg/verizon.svg",
+      "sourceSha256": "5d730aca98f9128d87764e001b7b336d4d35e7a31e89525106091bb5d6f091d3",
+      "method": "Original artwork · circle framing",
+      "ai": false,
+      "background": "#ffffff",
+      "fill": 0.82,
+      "trim": true,
+      "originalSize": null,
+      "review": "pending",
+      "framing": "standalone-mark",
+      "asset": "assets/verizon-25c80d68ec39840b.png",
+      "sha256": "25c80d68ec39840b1fdfdab01b7df6f9717f2378a5458ac77ede61ee9d30caf5",
+      "sourceSize": [
+        123,
+        150
+      ],
+      "crop": [
+        46,
+        0,
+        420,
+        512
+      ],
+      "edgeChecks": [],
+      "rasterBelow2x": false
+    },
+    {
+      "id": "waste-management",
+      "name": "Waste Management",
+      "original": "src/bookiebot/reports/assets/company-logo-waste-management-3f9b338e7e4f0e24.jpg",
+      "source": "src/bookiebot/reports/assets/company-logo-waste-management-3f9b338e7e4f0e24.jpg",
+      "sourceUrl": "https://www.wm.com/content/dam/wm/icons/favicon.ico",
+      "sourceSha256": "3f9b338e7e4f0e245a463bb0426ac4173c0603de9a84cf005ed5f7a829e6e3d8",
+      "method": "Original artwork · circle framing",
+      "ai": false,
+      "background": "#ffffff",
+      "fill": 0.82,
+      "trim": true,
+      "originalSize": [
+        64,
+        64
+      ],
+      "review": "pending",
+      "framing": "standalone-mark",
+      "asset": "assets/waste-management-67e10e186183e7ea.png",
+      "sha256": "67e10e186183e7ea091743e09015c15eb4e1ad21132896c933f0a01b963192e5",
+      "sourceSize": [
+        64,
+        64
+      ],
+      "crop": [
+        0,
+        0,
+        512,
+        512
+      ],
+      "edgeChecks": [],
+      "rasterBelow2x": false
+    },
+    {
+      "id": "xbox",
+      "name": "Xbox",
+      "original": "src/bookiebot/reports/assets/company-logo-xbox-f12d88f5a0fab740.svg",
+      "source": "src/bookiebot/reports/assets/company-logo-xbox-f12d88f5a0fab740.svg",
+      "sourceUrl": "https://cdn.jsdelivr.net/gh/homarr-labs/dashboard-icons@83f32e08257b66fbd971ac8d7645f5b38d52e85d/svg/xbox.svg",
+      "sourceSha256": "f12d88f5a0fab740b6dd53081531435c66fe5bdace51a9f4a22ef1aa54e7a539",
+      "method": "Original artwork · circle framing",
+      "ai": false,
+      "background": "#ffffff",
+      "fill": 1,
+      "trim": true,
+      "originalSize": null,
+      "review": "pending",
+      "framing": "native-circle",
+      "asset": "assets/xbox-b4e06387436e7c93.png",
+      "sha256": "b4e06387436e7c9359e9263e0d3c8b8811f67ef8e1fa8a0ab416408863f82ead",
+      "sourceSize": [
+        150,
+        150
+      ],
+      "crop": [
+        0,
+        0,
+        512,
+        512
+      ],
+      "edgeChecks": [],
+      "rasterBelow2x": false
+    },
+    {
+      "id": "xfinity",
+      "name": "Xfinity",
+      "original": "src/bookiebot/reports/assets/company-logo-xfinity-aa050de8862f7eaa.ico",
+      "source": "src/bookiebot/reports/assets/company-logo-xfinity-aa050de8862f7eaa.ico",
+      "sourceUrl": "https://www.xfinity.com/favicon.ico",
+      "sourceSha256": "aa050de8862f7eaa8ea290eb9612bf949d6a2c8a6ea60ce60df5af3697c89a7d",
+      "method": "Original artwork · circle framing",
+      "ai": false,
+      "background": "#000000",
+      "fill": 0.86,
+      "trim": true,
+      "originalSize": [
+        64,
+        64
+      ],
+      "review": "pending",
+      "framing": "standalone-mark",
+      "asset": "assets/xfinity-91c15f5ede14fb17.png",
+      "sha256": "91c15f5ede14fb176382042a4740b3d44c0bd0f8bc7cc6be09efea34b0ebf620",
+      "sourceSize": [
+        64,
+        64
+      ],
+      "crop": [
+        0,
+        0,
+        512,
+        512
+      ],
+      "edgeChecks": [],
+      "rasterBelow2x": false
+    },
+    {
+      "id": "youtube",
+      "name": "YouTube",
+      "original": "src/bookiebot/reports/assets/company-logo-youtube-320ae220c53a6126.svg",
+      "source": "src/bookiebot/reports/assets/company-logo-youtube-320ae220c53a6126.svg",
+      "sourceUrl": "https://cdn.jsdelivr.net/gh/homarr-labs/dashboard-icons@83f32e08257b66fbd971ac8d7645f5b38d52e85d/svg/youtube.svg",
+      "sourceSha256": "320ae220c53a6126da81aaf6803d8c813837bcaa95f39dcf5f75932335746673",
+      "method": "Original artwork · circle framing",
+      "ai": false,
+      "background": "#ff0000",
+      "fill": 0.82,
+      "trim": true,
+      "originalSize": null,
+      "review": "pending",
+      "framing": "solid-tile",
+      "asset": "assets/youtube-9e89851a4157a7e0.png",
+      "sha256": "9e89851a4157a7e0ccfb7480287d6c2646fa86da8f3a437a58c60802d0197b34",
+      "sourceSize": [
+        214,
+        150
+      ],
+      "crop": [
+        0,
+        76,
+        512,
+        360
+      ],
+      "edgeChecks": [],
+      "rasterBelow2x": false
+    },
+    {
+      "id": "youtube-music",
+      "name": "YouTube Music",
+      "original": "src/bookiebot/reports/assets/company-logo-youtube-music-3d92bd8506a96b56.svg",
+      "source": "src/bookiebot/reports/assets/company-logo-youtube-music-3d92bd8506a96b56.svg",
+      "sourceUrl": "https://cdn.jsdelivr.net/gh/homarr-labs/dashboard-icons@83f32e08257b66fbd971ac8d7645f5b38d52e85d/svg/youtube-music.svg",
+      "sourceSha256": "3d92bd8506a96b566f1ca995096421072eddef097ac9d50b50eacb72d33d95e4",
+      "method": "Original artwork · circle framing",
+      "ai": false,
+      "background": "#ff0000",
+      "fill": 1,
+      "trim": true,
+      "originalSize": null,
+      "review": "pending",
+      "framing": "native-circle",
+      "asset": "assets/youtube-music-9744ecab81dafdf5.png",
+      "sha256": "9744ecab81dafdf5a231e4e56071fc59fa14ea9a532c19609dcc7255d19bce70",
+      "sourceSize": [
+        150,
+        150
+      ],
+      "crop": [
+        0,
+        0,
+        512,
+        512
+      ],
+      "edgeChecks": [],
+      "rasterBelow2x": false
+    },
+    {
+      "id": "youtube-tv",
+      "name": "YouTube TV",
+      "original": "src/bookiebot/reports/assets/company-logo-youtube-tv-eed845163df4042c.png",
+      "source": "src/bookiebot/reports/assets/company-logo-youtube-tv-eed845163df4042c.png",
+      "sourceUrl": "https://www.google.com/s2/favicons?domain=tv.youtube.com&sz=128",
+      "sourceSha256": "eed845163df4042ca0fb83d7ac9fb078b674c4112eb2e007d1ab13ed3cfddb3c",
+      "method": "Original artwork · circle framing",
+      "ai": false,
+      "background": "#ff0000",
+      "fill": 0.82,
+      "trim": true,
+      "originalSize": [
+        128,
+        128
+      ],
+      "review": "pending",
+      "framing": "solid-tile",
+      "asset": "assets/youtube-tv-b9a5d0ecc56dd033.png",
+      "sha256": "b9a5d0ecc56dd0338b5554bc3e250f2009a6b4f75530ab0dea5e3412e4219018",
+      "sourceSize": [
+        128,
+        128
+      ],
+      "crop": [
+        15,
+        86,
+        482,
+        340
+      ],
+      "edgeChecks": [],
+      "rasterBelow2x": false
+    },
+    {
+      "id": "zoom",
+      "name": "Zoom",
+      "original": "src/bookiebot/reports/assets/company-logo-zoom-02a7a0b2028eb5ab.svg",
+      "source": "src/bookiebot/reports/assets/company-logo-zoom-02a7a0b2028eb5ab.svg",
+      "sourceUrl": "https://cdn.jsdelivr.net/gh/homarr-labs/dashboard-icons@83f32e08257b66fbd971ac8d7645f5b38d52e85d/svg/zoom.svg",
+      "sourceSha256": "02a7a0b2028eb5ab7a9259ec0f9e59e8293244691b535aefdeb2b106023f760c",
+      "method": "Original artwork · circle framing",
+      "ai": false,
+      "background": "#2196f3",
+      "fill": 1,
+      "trim": true,
+      "originalSize": null,
+      "review": "pending",
+      "framing": "solid-tile",
+      "asset": "assets/zoom-4b9b5c1b2a937a4d.png",
+      "sha256": "4b9b5c1b2a937a4d36f07465a5de0fe035ea8d54a9073d6ff91c06d718e0fc6a",
+      "sourceSize": [
+        150,
+        150
+      ],
+      "crop": [
+        0,
+        0,
+        512,
+        512
+      ],
+      "edgeChecks": [],
+      "rasterBelow2x": false
+    }
+  ]
+}

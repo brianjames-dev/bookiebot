@@ -40,4 +40,9 @@ Coverage research used [Nielsen's streaming coverage](https://www.nielsen.com/ne
 
 ## Manual acceptance
 
+The follow-up [small-circle quality review](logo-review/README.md) contains an
+offline audit/export workflow and proposed circle treatments for all 89 logos,
+including sharper original sources and five labeled AI restorations. These are
+review candidates; the production catalog described above remains unchanged.
+
 On a phone, open Calendar and check the current-week date range, colored logos, separate incoming/outgoing pills, and the legend/bottom spacing. Open a busy day using `+N`, inspect exact amounts, close it, then swipe to Burn Rate. Toggle full month repeatedly; the section height and scroll position should stay stable, mixed dots should remain, and no tap should fire after a swipe. Check Current/Projected, a historical month, a month/year boundary, both themes, Reduce Motion, and an unknown company. Confirm Water/Aidvantage provider icons for Brian without assigning those providers to another user's generic bills.
