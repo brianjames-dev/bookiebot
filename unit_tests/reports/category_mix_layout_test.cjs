@@ -4,17 +4,18 @@ const ts=req('typescript'),React=req('react'),Renderer=req('react-test-renderer'
 global.IS_REACT_ACT_ENVIRONMENT=true
 const source=fs.readFileSync('web/expense-report/src/report-app.tsx','utf8')
 const ast=ts.createSourceFile('report-app.tsx',source,ts.ScriptTarget.Latest,true,ts.ScriptKind.TSX)
-const names=new Set(['CategoryMixFilterControl','CATEGORY_MIX_FILTERS','PIE_METRIC_START_ANGLE','PIE_METRIC_END_ANGLE'])
+const names=new Set(['CategoryFilterControl','CategoryMixFilterControl','DailySpendingFilterControl','DAILY_SPENDING_FILTERS','CATEGORY_MIX_FILTERS','PIE_METRIC_START_ANGLE','PIE_METRIC_END_ANGLE'])
 const declarations=ast.statements.filter(node=>ts.isFunctionDeclaration(node)?names.has(node.name?.text):ts.isVariableStatement(node)&&node.declarationList.declarations.some(item=>names.has(item.name.getText(ast))))
 assert.equal(declarations.length,names.size)
 const runtime={exports:{},require:req,useState:React.useState,useMediaQuery:()=>true,pieMetricLabelDeltas:()=>({}),ChevronDown:props=>React.createElement('svg',props)}
-vm.runInNewContext(ts.transpileModule(declarations.map(node=>node.getText(ast)).join('\n')+'\nexports.Filter=CategoryMixFilterControl;exports.angles=[PIE_METRIC_START_ANGLE,PIE_METRIC_END_ANGLE]',{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2020,jsx:ts.JsxEmit.ReactJSX}}).outputText,runtime)
+vm.runInNewContext(ts.transpileModule(declarations.map(node=>node.getText(ast)).join('\n')+'\nexports.Filter=CategoryMixFilterControl;exports.DailyFilter=DailySpendingFilterControl;exports.angles=[PIE_METRIC_START_ANGLE,PIE_METRIC_END_ANGLE]',{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2020,jsx:ts.JsxEmit.ReactJSX}}).outputText,runtime)
 assert.deepEqual(Array.from(runtime.exports.angles),[90,-270],'The ring starts at noon and sweeps clockwise')
 let tree;const selected=[]
 try{
  Renderer.act(()=>{tree=Renderer.create(React.createElement(runtime.exports.Filter,{filter:'all',onFilterChange:value=>selected.push(value)}))})
  let select=tree.root.findByType('select')
  assert.equal(select.props['aria-label'],'Category mix filter')
+ assert.equal(tree.root.findByProps({className:'bb-category-mix-filter'}).props['data-bb-tooltip-dismiss-trigger'],'category-mix')
  assert.equal(select.props.value,'all')
  assert.equal(tree.root.findByProps({className:'bb-category-filter-label'}).children.join(''),'All')
  assert.equal(tree.root.findByProps({className:'bb-category-filter-label'}).props['aria-hidden'],'true','Intrinsic width label is hidden from assistive technology')
@@ -38,4 +39,16 @@ try{
  assert.equal(tree.root.findByProps({className:'bb-category-filter-label'}).children.join(''),'All','Returning to All releases the extra width')
  assert.equal(tree.root.findByType('svg').props['aria-hidden'],'true')
 }finally{if(tree)Renderer.act(()=>tree.unmount())}
+Renderer.act(()=>{tree=Renderer.create(React.createElement(runtime.exports.DailyFilter,{filter:'all',onFilterChange:value=>selected.push(value)}))})
+try {
+ const select=tree.root.findByType('select')
+ assert.equal(select.props['aria-label'],'Daily spending filter')
+ assert.deepEqual(tree.root.findAllByType('option').map(option=>[option.props.value,option.children.join('')]),[['all','All'],['needs','Needs'],['wants','Wants']])
+ assert.equal(tree.root.findByProps({className:'bb-category-mix-filter'}).props['data-bb-tooltip-dismiss-trigger'],'daily-spending')
+ selected.length=0
+ for(const value of ['needs','wants','all'])Renderer.act(()=>select.props.onChange({target:{value}}))
+ assert.deepEqual(selected,['needs','wants','all'])
+ Renderer.act(()=>tree.update(React.createElement(runtime.exports.DailyFilter,{filter:'needs',onFilterChange:()=>{}})))
+ assert.equal(tree.root.findByProps({className:'bb-category-filter-label'}).children.join(''),'Needs')
+} finally {Renderer.act(()=>tree.unmount())}
 console.log('Category Mix uses a controlled native scope selector and retains keyboard/touch behavior and clockwise ring direction.')

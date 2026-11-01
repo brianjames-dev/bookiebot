@@ -1,5 +1,18 @@
 # Agent Decisions
 
+## 2026-11-01 - Match Daily Spending Controls To Category Mix
+
+Reuse one native, content-sized category dropdown for Category Mix and Daily
+Spending, retaining their distinct accessible labels, tooltip-dismiss scope and
+existing options. Daily remains All/Needs/Wants; Category Mix retains Savings.
+Use the existing pointer/keyboard focus behavior and padded chevron.
+Group Total Spent and a 44px Transactions pill in one row, centered on the
+fitted integer amount even when the font shrinks. Its chevron reflects the
+existing disclosure state; full lists, Type filtering and calculations stay
+unchanged. Keep the summary at the graph's bottom on desktop and below it on
+mobile, retaining existing section/disclosure bottom spacing. No persistence
+or financial data flow changes.
+
 ## 2026-11-01 - Merge Every Verified Change By Default
 
 The user explicitly requests merging after every change. Extend the standing

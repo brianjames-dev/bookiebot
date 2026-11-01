@@ -48,6 +48,7 @@ const runtime = {
   CartesianGrid: () => null, XAxis: () => null, YAxis: () => null, Bar: () => null,
   ChartTooltip: () => null, DailySpendingTooltipContent: () => null,
 }
+runtime.ChevronDown=props=>React.createElement('svg',props)
 runtime.MetricAmount=({children,className})=>React.createElement('div',{className},children)
 vm.runInNewContext(compiled, runtime)
 const Section = runtime.exports.Section
@@ -64,7 +65,7 @@ let props = { entries, year: 2026, month: 10, filter: "all", data: [{ label: "1"
   total: 903, categoryColors: { Food: "red", Shopping: "blue" }, onInspectDay: (...args) => inspections.push(args) }
 let renderer
 act(() => { renderer = create(React.createElement(Section, props)) })
-const toggle = () => renderer.root.findByProps({ className: "bb-details-toggle" })
+const toggle = () => renderer.root.findByProps({ className: "bb-details-toggle bb-daily-transactions-toggle" })
 const disclosure = () => renderer.root.findByProps({ className: "bb-details-content" })
 const select = () => renderer.root.findByType("select")
 const table = () => renderer.root.findByType(runtime.DailyEntriesTable)
@@ -72,7 +73,11 @@ const changeCategory = value => act(() => { select().props.onChange({ target: { 
 const update = changes => { props = { ...props, ...changes }; act(() => renderer.update(React.createElement(Section, props))) }
 const text = () => JSON.stringify(renderer.toJSON())
 
-assert.equal(toggle().props.children, "Transactions")
+assert.equal(toggle().findByType('span').children.join(''), "Transactions")
+assert.equal(toggle().findByType('svg').props['aria-hidden'], 'true')
+const amountRow=renderer.root.findByProps({className:'bb-daily-amount-row'})
+assert.equal(amountRow.children[0].type,runtime.MetricAmount,'Total amount and Transactions share the same row')
+assert.equal(amountRow.findByType('button'),toggle())
 assert.equal(toggle().props["aria-expanded"], false)
 assert.equal(renderer.root.findAllByType(runtime.DailyEntriesTable).length, 0, "Closed transaction rows are not mounted")
 assert.equal(disclosure().props.inert, true)

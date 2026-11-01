@@ -942,7 +942,7 @@ const DailySpendingCard = memo(function DailySpendingCard({ report, calendarEven
   return (
         <Card className="bb-report-section bb-daily-section">
           <CardHeader>
-            <div className="bb-card-title-row bb-inline-toggle-row">
+            <div className="bb-card-title-row bb-daily-heading">
               <CardTitle>Daily Spending</CardTitle>
               <DailySpendingFilterControl filter={dailySpendingFilter} onFilterChange={switchDailySpendingFilter} />
             </div>
@@ -1049,21 +1049,23 @@ function ChartCarouselNavigation({
   )
 }
 
-function CategoryMixFilterControl({
-  filter,
-  onFilterChange,
+function CategoryFilterControl<Filter extends string>({
+  filter, onFilterChange, filters, label, dismissTrigger,
 }: {
-  filter: CategoryMixFilter
-  onFilterChange: (filter: CategoryMixFilter) => void
+  filter: Filter
+  onFilterChange: (filter: Filter) => void
+  filters: Array<{ value: Filter; label: string }>
+  label: string
+  dismissTrigger: string
 }) {
   const [pointerFocus, setPointerFocus] = useState(false)
   return (
-    <div className="bb-category-mix-filter" data-bb-tooltip-dismiss-trigger="category-mix" data-pointer-focus={pointerFocus ? "true" : undefined}>
-      <span className="bb-category-filter-label" aria-hidden="true">{CATEGORY_MIX_FILTERS.find(item => item.value === filter)?.label}</span>
-      <select aria-label="Category mix filter" value={filter}
+    <div className="bb-category-mix-filter" data-bb-tooltip-dismiss-trigger={dismissTrigger} data-pointer-focus={pointerFocus ? "true" : undefined}>
+      <span className="bb-category-filter-label" aria-hidden="true">{filters.find(item => item.value === filter)?.label}</span>
+      <select aria-label={label} value={filter}
         onPointerDown={() => setPointerFocus(true)} onKeyDown={() => setPointerFocus(false)} onBlur={() => setPointerFocus(false)}
-        onChange={(event) => onFilterChange(event.target.value as CategoryMixFilter)}>
-        {CATEGORY_MIX_FILTERS.map((item) => (
+        onChange={(event) => onFilterChange(event.target.value as Filter)}>
+        {filters.map((item) => (
           <option key={item.value} value={item.value}>{item.label}</option>
         ))}
       </select>
@@ -1072,36 +1074,18 @@ function CategoryMixFilterControl({
   )
 }
 
-function DailySpendingFilterControl({
-  filter,
-  onFilterChange,
-}: {
+function CategoryMixFilterControl({ filter, onFilterChange }: {
+  filter: CategoryMixFilter
+  onFilterChange: (filter: CategoryMixFilter) => void
+}) {
+  return <CategoryFilterControl filter={filter} onFilterChange={onFilterChange} filters={CATEGORY_MIX_FILTERS} label="Category mix filter" dismissTrigger="category-mix" />
+}
+
+function DailySpendingFilterControl({ filter, onFilterChange }: {
   filter: DailySpendingFilter
   onFilterChange: (filter: DailySpendingFilter) => void
 }) {
-  return (
-    <SlidingSelection
-      value={filter}
-      className="bb-tabs-list bb-daily-spending-filter"
-      role="tablist"
-      aria-label="Daily spending filter"
-      data-bb-tooltip-dismiss-trigger="daily-spending"
-    >
-      {DAILY_SPENDING_FILTERS.map((item) => (
-        <button
-          type="button"
-          key={item.value}
-          className="bb-tabs-trigger"
-          data-state={filter === item.value ? "active" : "inactive"}
-          role="tab"
-          aria-selected={filter === item.value}
-          onClick={() => onFilterChange(item.value)}
-        >
-          {item.label}
-        </button>
-      ))}
-    </SlidingSelection>
-  )
+  return <CategoryFilterControl filter={filter} onFilterChange={onFilterChange} filters={DAILY_SPENDING_FILTERS} label="Daily spending filter" dismissTrigger="daily-spending" />
 }
 
 function ChartCarouselIndicators({
@@ -2302,14 +2286,14 @@ function DailySpendingChart({
           </ResponsiveContainer>
         </div>
       </ChartContainer>
-      <div className="bb-chart-side">
-        <div>
-          <div className="bb-chart-kicker">Total Spent</div>
+      <div className="bb-chart-side bb-daily-summary">
+        <div className="bb-chart-kicker">Total Spent</div>
+        <div className="bb-daily-amount-row">
           <MetricAmount className="bb-chart-total">{formatMoney(total)}</MetricAmount>
+          <button type="button" className="bb-details-toggle bb-daily-transactions-toggle" aria-expanded={detailsOpen} aria-controls={detailsId} onClick={onToggleDetails}>
+            <span>Transactions</span><ChevronDown aria-hidden="true" />
+          </button>
         </div>
-        <button type="button" className="bb-details-toggle" aria-expanded={detailsOpen} aria-controls={detailsId} onClick={onToggleDetails}>
-          Transactions
-        </button>
       </div>
     </div>
   )
