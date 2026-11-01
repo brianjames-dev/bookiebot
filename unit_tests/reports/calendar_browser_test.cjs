@@ -5,12 +5,12 @@ const {chromium,webkit}=process.env.BOOKIEBOT_PLAYWRIGHT_MODULE?require(process.
 const css=fs.readFileSync(path.join(root,'src/bookiebot/reports/assets/expense-report-app.css'),'utf8')
 const catalog=JSON.parse(fs.readFileSync(path.join(frontend,'src/company-logos.json'),'utf8'))
 const bundlePromise=req('esbuild').build({stdin:{resolveDir:frontend,loader:'tsx',contents:`
- import React from 'react';import {createRoot} from 'react-dom/client';import {CalendarAnalyticsPanel} from './src/report-app';
+ import React from 'react';import {createRoot} from 'react-dom/client';import {CalendarAnalyticsPanel} from './src/report-app';import {CompanyMedallion} from './src/cashflow-calendar';import catalog from './src/company-logos.json';
  const e=(label,kind,amount,day,extra={})=>({label,kind,amount,day,group:kind==='bill'?'bills_utilities':kind==='income'?'income':'subscriptions_wants',projectedOnly:false,...extra});
- function Fixture(){const [month,setMonth]=React.useState(10),[year,setYear]=React.useState(2026),[revision,setRevision]=React.useState(0),[projected,setProjected]=React.useState(true);window.calendarFixture={setMonth,setYear,setRevision,setProjected};
+ function Fixture(){const [month,setMonth]=React.useState(10),[year,setYear]=React.useState(2026),[revision,setRevision]=React.useState(0),[projected,setProjected]=React.useState(true),[showCatalog,setShowCatalog]=React.useState(false);window.calendarFixture={setMonth,setYear,setRevision,setProjected,setShowCatalog};
  const events=[e('YouTube Premium','subscription',18.75,31),e('Income','income',3800,31),e('Unknown vendor','subscription',9.99,31),e('PG&E','bill',80.99,31),e('Slate Digital All Access','subscription',14.99,31),e('MacroFactor','subscription',12.99,31),e('Water','bill',0,31,{amountUnknown:true}),e('Raycast','subscription',10,1),e('ChatGPT Pro','subscription',200,1)];
  const context=[{year:2026,month:11,available:true,events:[e('Rent','bill',1500,1,{projectedOnly:true,amountEstimated:true}),e('Recology','bill',68.14,6,{projectedOnly:true}),e('Aidvantage','bill',90,6,{projectedOnly:true}),e('Water','bill',0,5,{projectedOnly:true,amountUnknown:true})]}];
- return <div className="fixture-frame"><div className="fixture-title">Calendar<span>••━•</span></div><div className="fixture-stage"><CalendarAnalyticsPanel key={year+'-'+month} year={year} month={month} aliases={{water:'santa-rosa-water','student loan':'aidvantage'}} events={events} context={context} projected={projected} collapseKey={revision}/></div></div>}
+ return showCatalog ? <section className="fixture-catalog" style={{display:'grid',gridTemplateColumns:'repeat(auto-fill,minmax(82px,1fr))',gap:16,padding:16}}>{catalog.map(item=><div key={item.id} data-company={item.id} style={{display:'grid',justifyItems:'center',gap:6,fontSize:11,textAlign:'center'}}><CompanyMedallion event={e(item.aliases[0],'subscription',10,1)}/>{item.name}</div>)}</section> : <div className="fixture-frame"><div className="fixture-title">Calendar<span>••━•</span></div><div className="fixture-stage"><CalendarAnalyticsPanel key={year+'-'+month} year={year} month={month} aliases={{water:'santa-rosa-water','student loan':'aidvantage'}} events={events} context={context} projected={projected} collapseKey={revision}/></div></div>}
  createRoot(document.getElementById('root')).render(<Fixture/>);
 `},plugins:[{name:'calendar-test-exports',setup(build){build.onResolve({filter:/\?worker&url$/},args=>({path:args.path,namespace:'unused-worker'}));build.onLoad({filter:/.*/,namespace:'unused-worker'},()=>({contents:'export default "/unused-worker.js"',loader:'js'}));build.onLoad({filter:/\/report-app\.tsx$/},args=>({contents:fs.readFileSync(args.path,'utf8')+'\nexport {CalendarAnalyticsPanel};',loader:'tsx',resolveDir:path.dirname(args.path)}))}}],bundle:true,format:'iife',outfile:'calendar-fixture.js',write:false,define:{'process.env.NODE_ENV':'"production"'}}).then(result=>result.outputFiles.find(file=>file.path.endsWith('.js')).text)
 ;(async()=>{
@@ -41,6 +41,7 @@ const bundlePromise=req('esbuild').build({stdin:{resolveDir:frontend,loader:'tsx
    assert.equal(await page.locator('.bb-cf-details li').count(),7)
    assert.ok((await page.locator('.bb-cf-details').textContent()).includes('$18.75'))
    assert.ok((await page.locator('.bb-cf-details').textContent()).includes('Not entered'))
+   assert.equal(await page.locator('.bb-cf-details .lucide-dollar-sign').count(),1,'Income fallback uses a dollar sign in the shared day dialog')
    await page.keyboard.press('Escape');await page.waitForFunction(()=>!document.querySelector('dialog')?.open)
    await page.getByRole('button',{name:'Show full month',exact:true}).click();await page.waitForTimeout(430)
    const full=await geometry()
@@ -59,8 +60,10 @@ const bundlePromise=req('esbuild').build({stdin:{resolveDir:frontend,loader:'tsx
    assert.equal(await page.locator('.bb-cashflow-calendar').getAttribute('data-mode'),'weeks')
    assert.ok(Math.abs((await geometry()).grid.height-weeks.grid.height)<1,'Rapid reversals retain stage geometry')
    // Failed logo downloads retain visible generic type icons.
-   await page.locator('.bb-cf-logo').first().evaluate(img=>img.dispatchEvent(new Event('error')))
-   await page.waitForTimeout(30)
+   const failed=page.locator('.bb-cf-medallion:has(.bb-cf-logo)').first()
+   await failed.locator('img').evaluate(img=>img.dispatchEvent(new Event('error')))
+   await page.waitForFunction(()=>document.querySelector('.bb-cf-medallion[data-prepared-circle="true"][data-logo-ready="false"]:not(:has(img))'))
+   assert.equal(await page.locator('.bb-cf-medallion[data-prepared-circle="true"][data-logo-ready="false"]:not(:has(img)) > .bb-cf-medallion-layer > .bb-cf-medallion-face > svg').evaluate(el=>getComputedStyle(el).visibility),'visible','Failed images keep the type fallback')
    assert.deepEqual(errors,[])
    await page.emulateMedia({reducedMotion:'reduce'})
    for(const [year,month,count] of [[2026,2,28],[2026,5,42],[2028,2,35]]){
@@ -70,6 +73,19 @@ const bundlePromise=req('esbuild').build({stdin:{resolveDir:frontend,loader:'tsx
     const g=await geometry();assert.ok(g.width<=width);assert.ok(g.days.every(d=>d.scroll<=d.height+1),'4/5/6 week month cells fit')
    }
    if(width===390){await page.evaluate(()=>{window.calendarFixture.setYear(2026);window.calendarFixture.setMonth(10)});await page.waitForTimeout(50);await page.locator('.fixture-frame').screenshot({path:'/private/tmp/bookiebot-calendar-'+engine.name()+'-'+(dark?'dark':'light')+'.png'})}
+   // Exercise the actual medallion renderer with every approved file, not just
+   // standalone review thumbnails. No universal inset/backplate may return.
+   await page.evaluate(()=>window.calendarFixture.setShowCatalog(true))
+   await page.locator('.fixture-catalog').waitFor()
+   await page.locator('.fixture-catalog img').evaluateAll(images=>images.forEach(img=>img.loading='eager'))
+   await page.waitForFunction(()=>document.querySelectorAll('.fixture-catalog [data-logo-ready="true"]').length===89)
+   await page.waitForTimeout(200)
+   const faces=await page.locator('.fixture-catalog .bb-cf-medallion').evaluateAll(items=>items.map(item=>{const face=item.querySelector('.bb-cf-medallion-face'),image=item.querySelector('img'),f=face.getBoundingClientRect(),i=image.getBoundingClientRect();return {prepared:item.dataset.preparedCircle,background:getComputedStyle(face).backgroundColor,mask:getComputedStyle(face).maskImage,width:i.width,height:i.height,faceWidth:f.width,offsetX:i.x-f.x,offsetY:i.y-f.y,naturalWidth:image.naturalWidth}}))
+   const invalid=faces.filter(f=>f.prepared!=='true'||f.background!=='rgba(0, 0, 0, 0)'||f.naturalWidth!==256||Math.abs(f.width-f.faceWidth)>=.1||f.width!==f.height||Math.abs(f.offsetX)>=.1||Math.abs(f.offsetY)>=.1||f.mask==='none')
+   assert.deepEqual(invalid,[],'Prepared circles fill the face and retain the transparent type-dot gap')
+   assert.ok((await page.locator('.fixture-catalog').textContent()).includes('YouTube Premium'))
+   if(width===390)await page.locator('.fixture-catalog').screenshot({path:'/private/tmp/bookiebot-approved-logos-'+engine.name()+'-'+(dark?'dark':'light')+'.png'})
+   assert.deepEqual(errors,[])
    cases++;await page.close()
   }}finally{await browser.close()}
  }

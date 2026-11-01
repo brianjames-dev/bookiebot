@@ -1,5 +1,5 @@
 import { useLayoutEffect, useRef, useState, type CSSProperties } from 'react'
-import { CalendarDays, Rows2, CreditCard, Droplets, GraduationCap, House, Repeat, ShieldCheck, Wallet, Wifi, Zap } from 'lucide-react'
+import { CalendarDays, Rows2, CreditCard, DollarSign, Droplets, GraduationCap, House, Repeat, ShieldCheck, Wifi, Zap } from 'lucide-react'
 import { companyLogo } from './company-logo'
 import { calendarActivityStatus } from './report-activity'
 import { CALENDAR_LAYOUT, CALENDAR_COLORS, calendarDates, calendarDot, calendarRange, calendarTotals, compactCalendarAmount, dateKey, eventsForDate, logoCapacity, pacificToday } from './calendar-model'
@@ -13,7 +13,7 @@ export function calendarEventDescription(event: CalendarEvent): string {
 }
 function FallbackIcon({ event }: { event: CalendarEvent }) {
   const label = event.label.toLowerCase()
-  const Icon = event.kind === 'income' ? Wallet : event.kind === 'subscription' ? Repeat
+  const Icon = event.kind === 'income' ? DollarSign : event.kind === 'subscription' ? Repeat
     : /water/.test(label) ? Droplets : /loan/.test(label) ? GraduationCap : /rent/.test(label) ? House
     : /internet|xfinity|spectrum|phone/.test(label) ? Wifi : /insurance/.test(label) ? ShieldCheck
     : /pge|pg&e|electric|power|gas/.test(label) ? Zap : CreditCard
@@ -24,7 +24,7 @@ export function CompanyMedallion({ event, aliases }: { event: CalendarEvent; ali
   const [loaded, setLoaded] = useState<string | null>(null)
   const [failed, setFailed] = useState<string | null>(null)
   const ready = Boolean(logo && loaded === logo.src && failed !== logo.src)
-  return <span className="bb-cf-medallion" data-logo-ready={ready} style={{ '--cf-event': CALENDAR_COLORS[event.kind] } as CSSProperties}>
+  return <span className="bb-cf-medallion" data-logo-ready={ready} data-prepared-circle={logo?.preparedCircle || undefined} style={{ '--cf-event': CALENDAR_COLORS[event.kind] } as CSSProperties}>
     <span className="bb-cf-medallion-layer">
       <span className="bb-cf-medallion-face">
         <FallbackIcon event={event} />

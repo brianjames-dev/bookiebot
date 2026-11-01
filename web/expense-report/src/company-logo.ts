@@ -13,5 +13,5 @@ export function companyLogo(label: string, aliases: Record<string, string> = {})
   const key = companyIdentity(label)
   const scoped = aliases[key]
   const item = scoped ? byId.get(scoped) : byAlias.get(key)
-  return item ? { id: item.id, name: item.name, src: `/app/assets/${item.asset}` } : null
+  return item ? { id: item.id, name: item.name, preparedCircle: item.preparedCircle, src: `/app/assets/${item.asset}` } : null
 }

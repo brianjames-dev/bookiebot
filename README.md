@@ -235,7 +235,7 @@ Live builds run outside the Discord event loop. `BOOKIEBOT_REPORT_MAX_CONCURRENT
 
 ### Calendar and company logos
 
-The Calendar graph opens to this week and next week, with a full-month toggle, original color company logos, separate daily incoming/outgoing amounts and day dialogs. See [Calendar and company logos](docs/CALENDAR_AND_LOGOS.md) for layout settings, the local 89-logo catalog, coverage rules and the import workflow.
+The Calendar graph opens to this week and next week, with a full-month toggle, approved color company logos, a dollar-sign Income fallback, separate daily incoming/outgoing amounts and day dialogs. See [Calendar and company logos](docs/CALENDAR_AND_LOGOS.md) for layout settings, the curated local 89-logo catalog, coverage rules and the import workflow.
 
 ## Verification
 

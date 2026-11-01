@@ -1,10 +1,12 @@
 # Small-circle logo quality review
 
-This is an offline authoring and review process for all 89 calendar logos. It does
-not change the running app, its catalog, provider aliases or financial data.
+This is an offline authoring and review process for all 89 calendar logos. The
+user approved the complete revised set on 2026-10-31; the app now uses these exact
+circle exports. Authoring/export alone never changes the production catalog.
 `recipes.json` preserves each original, selected source, SHA-256, circle background,
 optical fill and restoration method. `audit.json` records the generated candidates,
-their hashes, crop bounds and source resolution. All candidates await visual review.
+their hashes, crop bounds and source resolution. Original art and prior candidates
+remain available for comparison and rollback.
 
 ## Process
 
@@ -28,8 +30,8 @@ their hashes, crop bounds and source resolution. All candidates await visual rev
    upscaling by itself does not count as a restored source.
 5. Review with the interactive gallery. Record requested changes by catalog ID,
    retain prior versions, and revise individual recipes. Do not use the source
-   importer to overwrite a curated reconstruction. A later implementation can
-   promote selected content-addressed assets and framing together into the app.
+   importer to overwrite a curated reconstruction. Once the complete audit is
+   approved, promote content-addressed assets and framing together into the app.
 
 The exact BaJ icon is copied from the user's portfolio's
 `public/favicon_io/favicon-baj-dark.png`, rather than its outdated angular SVG.
@@ -50,6 +52,15 @@ python scripts/prepare_company_logo_marks.py
 BOOKIEBOT_PLAYWRIGHT_MODULE=/path/to/playwright node scripts/build_company_logo_review.cjs /tmp/company-logo-review-bundle.json
 python -m pytest unit_tests/reports/test_logo_quality_review.py
 ```
+
+Rebuilding resets the audit to `review-candidates`, requiring a fresh visual
+approval before publication. After approval, mark the audit and item reviews
+`approved`, then run `python scripts/update_company_logos.py --promote-reviewed`.
+Promotion validates all 89 hashes/dimensions before writing any catalog change.
+The app's `preparedCircle` flag displays the already-framed PNG edge to edge,
+without applying the old padding or pale backplate a second time. Routine imports
+preserve these pinned images while allowing explicit alias edits; a damaged pinned
+file stops the import instead of silently replacing it with an upstream favicon.
 
 The browser performs deterministic image decoding, alpha-bound measurement and
 format/size export, not AI generation. A source change deliberately fails its hash

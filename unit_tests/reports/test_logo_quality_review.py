@@ -1,9 +1,10 @@
-"""Integrity of curated candidates, without changing the production logo catalog."""
+"""Approved circle art stays pinned from review through production and imports."""
 import hashlib
 import importlib.util
 import json
 from pathlib import Path
 import struct
+import pytest
 
 ROOT = Path(__file__).resolve().parents[2]
 REVIEW = ROOT / 'docs/logo-review'
@@ -13,7 +14,7 @@ def read(name):
     return json.loads((REVIEW / name).read_text())
 
 
-def test_review_covers_every_logo_and_retains_the_production_original():
+def test_review_covers_every_logo_and_retains_its_original():
     original = json.loads((ROOT / 'web/expense-report/src/company-logos.json').read_text())
     recipes = read('recipes.json')
     audit = read('audit.json')
@@ -21,14 +22,82 @@ def test_review_covers_every_logo_and_retains_the_production_original():
     assert len(recipes['items']) == len(expected) == 89
     assert {item['id'] for item in recipes['items']} == expected
     assert {item['id'] for item in audit['items']} == expected
-    by_id = {item['id']: item for item in original}
     for item in recipes['items']:
-        assert item['original'] == 'src/bookiebot/reports/assets/' + by_id[item['id']]['asset']
-        assert item['review'] == 'pending'
+        assert (ROOT / item['original']).is_file()
+        assert item['review'] == 'approved'
         assert .5 <= item['fill'] <= 1
         assert len(item['background']) == 7
         data = (ROOT / item['source']).read_bytes()
         assert hashlib.sha256(data).hexdigest() == item['sourceSha256']
+
+
+def importer_module():
+    spec = importlib.util.spec_from_file_location('import_logos', ROOT / 'scripts/update_company_logos.py')
+    importer = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(importer)
+    return importer
+
+
+def test_production_uses_the_exact_approved_circles():
+    catalog = json.loads((ROOT / 'web/expense-report/src/company-logos.json').read_text())
+    audit = read('audit.json')
+    assert audit['status'] == 'approved'
+    by_id = {item['id']: item for item in audit['items']}
+    for item in catalog:
+        reviewed = by_id[item['id']]
+        assert item['preparedCircle'] is True
+        assert item['curation'] == 'docs/logo-review/audit.json'
+        assert item['name'] == reviewed['name']
+        assert item['sha256'] == reviewed['sha256']
+        assert (ROOT / 'src/bookiebot/reports/assets' / item['asset']).read_bytes() == (REVIEW / reviewed['asset']).read_bytes()
+
+
+def test_routine_import_keeps_curated_art_without_a_network_request(monkeypatch):
+    importer = importer_module()
+    monkeypatch.setattr(importer.urllib.request, 'urlopen', lambda *args, **kwargs: pytest.fail('Curated art must not be fetched again'))
+    catalog = json.loads(importer.CATALOG.read_text())
+    sources = {item['id']: item for item in json.loads(importer.SOURCES.read_text())['sources']}
+    for item in catalog:
+        entry = {**sources[item['id']], 'aliases': [*item['aliases'], 'Extra explicit alias']}
+        result, error = importer.refresh(entry, item)
+        assert error == '' and result['asset'] == item['asset']
+        assert result['preparedCircle'] and result['sha256'] == item['sha256']
+        assert result['aliases'] == entry['aliases']
+
+
+def test_damaged_curated_image_fails_instead_of_fetching_a_raw_favicon(monkeypatch, tmp_path):
+    importer = importer_module()
+    monkeypatch.setattr(importer, 'ASSETS', tmp_path)
+    item = json.loads(importer.CATALOG.read_text())[0]
+    (tmp_path / item['asset']).write_bytes(b'broken image')
+    monkeypatch.setattr(importer, 'fetch', lambda *args: pytest.fail('Do not undo the reviewed artwork'))
+    with pytest.raises(ValueError, match='Invalid prepared circle'):
+        importer.refresh(item, item)
+
+
+def test_new_uncurated_entries_still_use_the_original_importer(monkeypatch):
+    importer = importer_module()
+    entry = {'id': 'new-logo', 'source': 'https://example.com/logo.png'}
+    monkeypatch.setattr(importer, 'fetch', lambda value: (value, 'new image'))
+    assert importer.refresh(entry, None) == (entry, 'new image')
+
+
+def test_unapproved_or_tampered_review_cannot_publish_a_partial_catalog(monkeypatch, tmp_path):
+    importer = importer_module()
+    audit = read('audit.json')
+    review = tmp_path / 'review'
+    review.mkdir()
+    monkeypatch.setattr(importer, 'REVIEW', review)
+    catalog = tmp_path / 'catalog.json'
+    catalog.write_text('unchanged')
+    monkeypatch.setattr(importer, 'CATALOG', catalog)
+    for status in ('review-candidates', 'approved'):
+        audit['status'] = status
+        audit['items'][0]['asset'] = '../not-a-reviewed-image.png'
+        (review / 'audit.json').write_text(json.dumps(audit))
+        with pytest.raises(ValueError):
+            importer.promote_reviewed()
+        assert catalog.read_text() == 'unchanged'
 
 
 def test_every_candidate_is_a_small_content_addressed_256px_png():

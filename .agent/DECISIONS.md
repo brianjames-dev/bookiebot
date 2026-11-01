@@ -1,5 +1,22 @@
 # Agent Decisions
 
+## 2026-10-31 - Publish Approved Circle Artwork Without Reframing
+
+The user approved all 89 revised logo treatments. Promote the exact audited 256px
+PNGs with content-addressed filenames and a `preparedCircle` catalog marker. Render
+them edge to edge in the existing medallion, retaining the transparent stack/type
+dot masks and unknown/failed-logo fallbacks. Income's fallback is a dollar sign.
+Keep original art, source URLs, restoration prompts and review hashes; the catalog's
+curation reference identifies the selected source and AI adaptations in the audit.
+YouTube's display name becomes YouTube Premium without changing transaction labels.
+
+Routine imports validate and preserve prepared images without fetching raw
+favicons; alias edits still apply. An explicit approved-audit promotion is required
+to replace curated artwork, and re-exporting invalidates audit approval. A damaged
+pinned image fails the import rather than silently undoing its treatment. Runtime
+logo resolution stays local and exact; private provider assignments, financial
+calculations, calendar geometry and gestures do not change.
+
 ## 2026-10-31 - Offline Logo Restoration And Circle Review
 
 Separate logo source quality from calendar framing. Prefer sharper original art and native vector symbols, then use per-brand backplates/optical fill; restore genuinely weak raster marks with the built-in image tool and explicit original references. Keep versioned sources, SHA-256 lineage, full prompts and AI labels. Export/audit all 89 candidates offline at 256px and review at the actual 26px size in both themes; pixel density is a triage signal, not proof of faithful artwork. Native round badges fill the medallion; square badges extend their own background while keeping internal lettering safely inset. Follow the supplied Railway white-on-dark reference and protect its background plus GitHub/LinkedIn edges with export-time pixel checks.

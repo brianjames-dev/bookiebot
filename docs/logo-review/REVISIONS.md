@@ -1,7 +1,8 @@
 # Second logo review — 2026-10-31
 
-All 13 user-flagged entries are revised in the gallery. The other 76 candidates,
-production assets, provider matching and financial data are unchanged. Previous
+All 13 user-flagged entries were revised in the gallery and approved, together
+with the other 76, on 2026-10-31. These exact exports are now promoted into the app.
+Provider matching and financial data are unchanged. Previous
 review assets remain available through their content-addressed filenames/Git.
 
 | Logo | Correction / manual acceptance |

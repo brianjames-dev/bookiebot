@@ -1,5 +1,7 @@
 import asyncio
 from datetime import datetime
+import json
+from pathlib import Path
 from types import SimpleNamespace
 from urllib.parse import urlsplit
 
@@ -241,14 +243,15 @@ async def test_asset_allowlist_manifest_and_existing_rotating_avatar(phone):
     assert avatar.status == 200 and avatar.headers["Content-Type"].startswith("image/")
     assert (await phone.client.get("/app/assets/phone-setup.js")).status == 200
     assert (await phone.client.get("/app/assets/not-public.py")).status == 404
-    logos = list(phone_app._ASSETS.glob("company-logo-*.svg"))
-    assert logos
-    logo = await phone.client.get(f"/app/assets/{logos[0].name}")
+    catalog = json.loads((Path(__file__).resolve().parents[2] / "web/expense-report/src/company-logos.json").read_text())
+    prepared = next(item for item in catalog if item.get("preparedCircle"))
+    logo_path = phone_app._ASSETS / prepared["asset"]
+    logo = await phone.client.get(f"/app/assets/{logo_path.name}")
     assert logo.status == 200
-    assert logo.headers["Content-Type"].startswith("image/svg+xml")
+    assert logo.headers["Content-Type"].startswith("image/png")
     assert "immutable" in logo.headers["Cache-Control"]
     assert logo.headers["X-Content-Type-Options"] == "nosniff"
-    assert await logo.read() == logos[0].read_bytes()
+    assert await logo.read() == logo_path.read_bytes()
     assert (await phone.client.get("/app/assets/company-logo-missing-0000000000000000.svg")).status == 404
     assert (await phone.client.get("/app/assets/company-logo-invalid.svg")).status == 404
 

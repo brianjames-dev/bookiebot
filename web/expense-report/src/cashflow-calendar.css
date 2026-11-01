@@ -33,6 +33,8 @@
 .bb-cf-medallion[data-logo-ready="true"] > .bb-cf-medallion-layer > .bb-cf-medallion-face { background:#e2e6e3; -webkit-mask-image:radial-gradient(circle at calc(100% - 3px) calc(100% - 3px),transparent 4px,black 4px); mask-image:radial-gradient(circle at calc(100% - 3px) calc(100% - 3px),transparent 4px,black 4px); }
 .bb-cf-medallion[data-logo-ready="true"] .bb-cf-medallion-face > svg { visibility:hidden; }
 .bb-cf-logo { position:absolute; left:16%; top:16%; width:68%; height:68%; object-fit:contain; opacity:0; }
+.bb-cf-medallion[data-prepared-circle="true"][data-logo-ready="true"] > .bb-cf-medallion-layer > .bb-cf-medallion-face { background:transparent; }
+.bb-cf-medallion[data-prepared-circle="true"] .bb-cf-logo { left:0; top:0; width:100%; height:100%; }
 .bb-cf-medallion[data-logo-ready="true"] .bb-cf-logo { opacity:1; }
 .bb-cf-kind-dot { position:absolute; display:none; right:1px; bottom:1px; width:6px; height:6px; border-radius:50%; background:var(--cf-event); }
 .bb-cf-medallion[data-logo-ready="true"] .bb-cf-kind-dot { display:block; }

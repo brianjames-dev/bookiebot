@@ -5,7 +5,7 @@ The Calendar graph uses the approved **Under calendar** design. Its sliding titl
 - Default: the current Pacific week (Sunday–Saturday) and next week. For a historical report, start with the week containing that month's first day.
 - The round calendar control switches to the selected full month. Both views occupy the same grid height. No All/Subs filter, event count, or separate Details button.
 - The date range sits immediately above outgoing. Daily outgoing and incoming use separate coral/mint whole-dollar capsules; they are never netted. Exact cents and Scheduled/Recorded provenance remain in the shared day dialog.
-- Two-week cells show original color company logos, type icons for unknown/failed logos, and a `+N` control for overflow. Full month retains combined-color dots. Tapping a date, total, dot, logo, or overflow opens its applicable events.
+- Two-week cells show approved color company logos, type icons for unknown/failed logos (a dollar sign for Income), and a `+N` control for overflow. Full month retains combined-color dots. Tapping a date, total, dot, logo, or overflow opens its applicable events.
 - The legend sits below the grid. Keep generous bottom breathing room, consistent with Category Mix and Burn Rate, while future shared-graph work reduces unnecessary height.
 
 ## Layout and motion
@@ -26,25 +26,25 @@ As before, schedules remain visible in both report modes. The header sums visibl
 
 The initial catalog contains **89 images**, including Brian's ten named subscriptions, PG&E, Recology, Aidvantage, and the City of Santa Rosa, plus common streaming, software, internet, phone, insurance, electric, gas, water and waste providers. Names and aliases are reviewed explicitly; there is no fuzzy merchant matching. `Water` and `Student Loan` aliases are scoped to Brian's display profile, following his provider confirmation. Assignments arrive in the authenticated report payload and are not embedded in the public interface bundle. They do not change sheet labels or financial categories.
 
-`company-logo-sources.json` records reviewed source URLs. `src/company-logos.json` records the downloaded content hash, local filename and source/notice. Images use content-addressed filenames served by the narrow `/app/assets/company-logo-…` allowlist, with an immutable cache policy and same-origin CSP. The frontend fingerprint changes with catalog imports. Only visible logos load; unknown, ambiguous or failed images retain generic type icons. No transaction name is sent to a logo service at runtime.
+`company-logo-sources.json` records the original reviewed download URLs. `src/company-logos.json` records the current content hash, local filename and original source/notice. Its `curation` reference points to the approved audit, which records the selected upgraded source, optical framing, restoration method and full source/output hashes. All 89 approved exports are 256px PNGs with `preparedCircle: true`; they fill the medallion without an additional inset or universal backplate. The exact BaJ asset, revised 13 brands and YouTube Premium adaptation match the approved gallery. Images use content-addressed filenames served by the narrow `/app/assets/company-logo-…` allowlist, with an immutable cache policy and same-origin CSP. The frontend fingerprint changes with catalog imports. Only visible logos load; unknown, ambiguous or failed images retain generic type icons. No transaction name is sent to a logo service at runtime.
 
 To extend the catalog:
 
 1. Add exact aliases and a reviewed HTTPS asset URL to `web/expense-report/company-logo-sources.json`. Prefer a pinned original-color SVG or an official square site icon. A public favicon snapshot is a secondary source when direct downloads fail.
-2. Run `python scripts/update_company_logos.py` from the repository root. The importer bounds downloads, rejects active/external SVG content and HTML responses, records SHA-256, and preserves an already-reviewed local image if its source fails.
-3. Review the images visually, run the catalog/model and HTTP asset tests, then typecheck/build and commit the generated assets and catalog together. Remove obsolete content-addressed files only when no catalog references them.
+2. Run `python scripts/update_company_logos.py` from the repository root. For new entries, the importer bounds downloads, rejects active/external SVG content and HTML responses, records SHA-256, and preserves a previous local image if its source fails. Existing prepared circles are hash-checked and retained without a remote fetch, including their curated framing; explicit alias edits still apply.
+3. Follow the [offline quality workflow](logo-review/README.md) to improve artwork/framing. Re-exporting resets approval. After visual approval, run `python scripts/update_company_logos.py --promote-reviewed` to validate and publish the complete audit without network requests. Run catalog/model/HTTP/browser checks, typecheck/build and commit generated assets with the catalog. Retain originals referenced by the review recipes.
 
-Brand marks remain their owners' property. The Dashboard Icons portion is pinned to commit `83f32e08257b66fbd971ac8d7645f5b38d52e85d`; its Apache-2.0 notice is in `docs/licenses/dashboard-icons.txt`. Per-image sources are retained in the catalog. Other entries are public company/city site icons or public favicon snapshots; no mark was redrawn or recolored.
+Brand marks remain their owners' property. The Dashboard Icons portion is pinned to commit `83f32e08257b66fbd971ac8d7645f5b38d52e85d`; its Apache-2.0 notice is in `docs/licenses/dashboard-icons.txt`. Selected-source notices and adaptations are documented in the review audit. Five weak marks use labeled AI restorations and YouTube Premium uses an approved AI circle adaptation; these are interpretations, not official replacement artwork. Their complete prompts and input/output hashes remain in `docs/logo-review/ai-restorations.json`.
 
 Coverage research used [Nielsen's streaming coverage](https://www.nielsen.com/news-center/2026/tv-viewing-cools-off-in-nielsens-august-gauge-reports-as-sports-take-a-breather-and-school-resumes/), [J.D. Power's ISP study](https://www.jdpower.com/business/press-releases/2025-us-residential-internet-service-provider-satisfaction-study), [EIA utility data](https://www.eia.gov/electricity/data/eia861/), and [NAIC market-share reports](https://content.naic.org/research_actuarial_dept.htm). These are coverage guides, not an exhaustive company directory or a ranking of the logos bundled here.
 
 ## Manual acceptance
 
-The follow-up [small-circle quality review](logo-review/README.md) contains an
-offline audit/export workflow and proposed circle treatments for all 89 logos,
-including sharper original sources, five labeled AI restorations and a labeled
-YouTube Premium circle adaptation. The second-pass checklist records all 13 user
-corrections. These are
-review candidates; the production catalog described above remains unchanged.
+The approved [small-circle quality review](logo-review/README.md) contains the
+offline audit/export workflow, exact promoted treatments and all 13 corrections.
+Inspect GitHub/Steam edges, full-circle Railway/Todoist/LinkedIn, the centered
+Liberty/Disney/NordVPN/Paramount marks, Xbox/WM detail, YouTube Premium and the
+rectangular YouTube TV mark. Check the dollar-sign Income fallback in cells and
+day dialogs, plus generic bill/subscription fallbacks on unknown or failed logos.
 
 On a phone, open Calendar and check the current-week date range, colored logos, separate incoming/outgoing pills, and the legend/bottom spacing. Open a busy day using `+N`, inspect exact amounts, close it, then swipe to Burn Rate. Toggle full month repeatedly; the section height and scroll position should stay stable, mixed dots should remain, and no tap should fire after a swipe. Check Current/Projected, a historical month, a month/year boundary, both themes, Reduce Motion, and an unknown company. Confirm Water/Aidvantage provider icons for Brian without assigning those providers to another user's generic bills.
