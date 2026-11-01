@@ -10,8 +10,11 @@ The user explicitly authorized implementation and live rollout after investigati
 
 Configure and validate hidden deterministic staging tabs before publishing month
 names. Pin copy identities/phases in private Script Properties; retries must
-preserve published tabs, overrides and transaction coordinates. Serialize automation
-entry points with a script lock without claiming to lock separate bot/human writes.
+preserve published tabs, overrides and transaction coordinates.
+Personal tabs require a month heading; the shared ledger instead requires its
+actual category/date/amount/person column headers, since it has no month heading.
+Serialize automation entry points with a script lock without claiming to lock
+separate bot/human writes.
 Track prior-month closing per owner after successful flush; resume unfrozen cells
 and refuse blank/error formula outputs. Checkpoint annual file IDs/initialization
 before publishing year configuration. Preserve the deployed income-validation

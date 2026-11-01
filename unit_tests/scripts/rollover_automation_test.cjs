@@ -28,7 +28,14 @@ function fixture(iso='2026-10-31T20:00:00Z') {
       getName:()=>s.name,getParent:()=>book,getSheetId:()=>s.id,getMaxColumns:()=>personal?26:40,
       hideSheet:()=>{s.hidden=true;},showSheet:()=>{s.hidden=false;},
       setName:newName=>{book.sheets.delete(s.name);s.name=newName;book.sheets.set(newName,s);if(state.failRename){state.failRename=false;throw Error('lost rename response');}},
-      getRange:(row,column)=>s.cell([...rows].find(([,value])=>value===row)[0]+':'+(column-1)),
+      getRange:(row,column,numRows,numColumns)=>{
+        if(numRows===2&&numColumns===40){assert.equal(row,1);assert.equal(column,1);return {getDisplayValues:()=>{
+          const headers=[Array(40).fill(''),Array(40).fill('')];
+          for(const [col,name,amount,person] of [[1,'GROCERY',2,4],[8,'GAS',9,10],[14,'FOOD',16,18],[22,'SHOPPING',24,26],[30,'NEEDS',32,34]]){headers[0][col-1]=name;headers[1][col-1]='Date';headers[1][amount-1]='Amount';headers[1][person-1]='Person';}
+          if(s.badHeaders)headers[1][31]='';return headers;
+        }};}
+        return s.cell([...rows].find(([,value])=>value===row)[0]+':'+(column-1));
+      },
       cell:key=>{const [label,offset='0']=key.split(':');if(!rows.has(label))rows.set(label,rows.size+1);if(!cells.has(key))cells.set(key,{formula:'',value:0,writes:0});const data=cells.get(key);return {
         getFormula:()=>data.formula,getValue:()=>data.value,getDisplayValue:()=>String(data.value),getSheet:()=>s,getA1Notation:()=>key,
         getRow:()=>rows.get(label),getColumn:()=>1+Number(offset),offset:(_dy,dx)=>s.cell(label+':'+(Number(offset)+dx)),setFormula:value=>{data.formula=value;state.writes.push([s.name,key,value]);},
@@ -37,7 +44,7 @@ function fixture(iso='2026-10-31T20:00:00Z') {
   }
   // Layout/calculation writers have their own real-grid integration suite.
   // Here they model the boundaries needed to test publication and recovery.
-  ctx.setMonthLabel=(s,name)=>{s.label=name;return true;};
+  ctx.setMonthLabel=(s,name)=>{if(!s.personal)return false;s.label=name;return true;};
   ctx.findCellByAnyExactTextInTopLeft=(s,names)=>names.includes(s.label)?s.cell('label'):null;
   ctx.findCellByExactText=(s,label)=>label==='Monthly Income:'||label==='Burn Rate'||label==='Static Bills & Subscriptions (Needs)'||label==='Subscriptions (Wants)'||s.personal?s.cell(label):null;
   ctx.findCellContainingText=ctx.findCellByExactText;
@@ -60,6 +67,16 @@ for(const [iso,key,day] of [['2026-11-01T06:59:59Z','2026-10',31],['2026-11-01T0
 }
 assert.equal(fixture().ctx.budgetMonthPeriod(new Date('2028-02-29T20:00Z')).daysInMonth,29);
 assert.equal(fixture().ctx.budgetMonthPeriod(new Date('2026-12-31T20:00Z'),1).key,'2027-01');
+// The live shared ledger has category/field headers, not a month heading. It
+// still requires the actual column layout; missing personal headings fail.
+{
+ const {ctx,state,config}=fixture(),period=ctx.budgetMonthPeriod(new Date('2026-11-01T20:00Z'));
+ const shared=ctx.prepareBudgetMonthTab('shared',config,period,null);
+ assert.equal(shared.label,undefined);assert.equal(shared.name,'November');
+ shared.badHeaders=true;assert.throws(()=>ctx.validatePreparedBudgetMonthTab(shared,config,period,null),/Shared template headers.*NEEDS/);
+ const b=state.books.get('brian'),personal=b.insertSheet('_BookieBot Preparing 2026-11',{template:b.getSheetByName('Template')});
+ assert.throws(()=>ctx.validatePreparedBudgetMonthTab(personal,config,period,'brian'),/month label/);
+}
 {
  const {ctx,state}=fixture();ctx.closePreviousBudgetMonthAt(new Date('2026-01-01T08:00Z'));ctx.closePreviousBudgetMonthAt(new Date('2026-11-01T07:00Z'));
  assert.ok(![...state.props.keys()].some(key=>key.startsWith('BUDGET_MONTH_CLOSED_')),'Unavailable history is never recorded as a completed close');

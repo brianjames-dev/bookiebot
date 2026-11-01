@@ -278,7 +278,9 @@ function prepareBudgetMonthTab(bookId, config, period, owner) {
   if (!sheet) sheet = ss.insertSheet(stageName, {template: getMonthlyTemplateSheet(ss)});
   sheet.hideSheet();
   props.setProperty(key, JSON.stringify({phase: "configuring", owner, bookId, month: period.key, sheetId: sheet.getSheetId()}));
-  if (!setMonthLabel(sheet, period.name)) throw new Error(`Missing month label in preparation template: ${period.key}`);
+  // Personal budgets have a month heading; the shared ledger starts directly
+  // with category headers and may have no month label at all.
+  if (!setMonthLabel(sheet, period.name) && owner) throw new Error(`Missing month label in preparation template: ${period.key}`);
   if (owner) {
     writePersonalBudgetIncomeSettings(sheet, resolvePersonalBudgetIncomeSettings(ss, period.name, false));
     inheritPersonalBudgetIncomeSettings(ss, sheet, period.name);
@@ -297,11 +299,15 @@ function prepareBudgetMonthTab(bookId, config, period, owner) {
 }
 
 function validatePreparedBudgetMonthTab(sheet, config, period, owner) {
-  if (!findCellByAnyExactTextInTopLeft(sheet, [period.name])) throw new Error(`Prepared month label is missing: ${period.key}`);
   if (!owner) {
     if (sheet.getMaxColumns() < 40) throw new Error("Shared template is missing required expense columns.");
+    const headers = sheet.getRange(1, 1, 2, 40).getDisplayValues();
+    for (const [column, category, amountColumn, personColumn] of [[1, "GROCERY", 2, 4], [8, "GAS", 9, 10], [14, "FOOD", 16, 18], [22, "SHOPPING", 24, 26], [30, "NEEDS", 32, 34]]) {
+      if (headers[0][column - 1] !== category || headers[1][column - 1] !== "Date" || headers[1][amountColumn - 1] !== "Amount" || headers[1][personColumn - 1] !== "Person") throw new Error(`Shared template headers are incomplete: ${category}`);
+    }
     return;
   }
+  if (!findCellByAnyExactTextInTopLeft(sheet, [period.name])) throw new Error(`Prepared month label is missing: ${period.key}`);
   if (!hasPersonalBudgetIncomeSettings(sheet) || !findPersonalBudgetIncomeLayout(sheet) || !findCellByExactText(sheet, "Monthly Income:")) throw new Error("Prepared personal income layout is incomplete.");
   for (const rule of PERSONAL_BUDGET_IMPORT_RULES[owner]) {
     const label = findCellByExactText(sheet, rule.label);

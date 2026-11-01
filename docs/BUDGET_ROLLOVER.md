@@ -30,6 +30,8 @@ separate operations.
 - Each copy uses a deterministic `_BookieBot Preparing YYYY-MM` name and is hidden.
   Script Properties pin its workbook/month/owner and sheet ID. Configuration,
   flush and validation finish before its canonical month name is published.
+  Shared ledgers are validated by their category/date/amount/person column
+  headers; only personal budgets require a visible month heading.
   Failed imports stay staged rather than appearing as zero spending.
 - Lost insert or rename responses resume the same copy. Missing/replaced pinned
   tabs and unclaimed staging tabs require review rather than being overwritten.
