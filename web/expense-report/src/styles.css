@@ -609,11 +609,26 @@ button.bb-left-categories { cursor: pointer; }
    no empty row or grid gap below its Transactions button. */
 .bb-daily-spending-content > .bb-details-content > .bb-details-content-inner { padding-top: 0; }
 .bb-daily-spending-content .bb-daily-transactions { padding-top: 20px; }
-.bb-daily-section .bb-chart-side { align-content: space-between; }
-
-.bb-daily-spending-filter {
-  margin-left: auto;
+.bb-daily-heading { gap: 8px; }
+.bb-daily-heading .bb-card-title { white-space: nowrap; }
+.bb-daily-heading .bb-category-mix-filter { flex: 0 0 auto; }
+.bb-chart-side.bb-daily-summary { display: flex; flex-direction: column; justify-content: flex-end; gap: 0; }
+.bb-daily-amount-row { display: flex; align-items: center; gap: 12px; margin-top: 4px; min-width: 0; }
+.bb-daily-amount-row > .bb-chart-total { display: flex; align-items: center; flex: 1 1 0; min-width: 0; margin-top: 0; }
+.bb-daily-transactions-toggle.bb-details-toggle {
+  align-self: center;
+  min-height: 44px;
+  gap: 8px;
+  border-radius: 24px;
+  padding: 8px 12px;
+  background: hsl(var(--primary) / .08);
+  color: hsl(var(--foreground));
+  font-weight: 400;
 }
+.bb-daily-transactions-toggle svg { width: 16px; height: 16px; flex: none; color: hsl(var(--muted-foreground)); transition: transform 180ms ease; }
+.bb-daily-transactions-toggle[aria-expanded="true"] svg { transform: rotate(180deg); }
+@media (min-width: 861px) { .bb-daily-section .bb-chart-layout { grid-template-columns: minmax(360px, 1fr) minmax(300px, .4fr); } }
+@media (max-width: 350px) { .bb-daily-heading .bb-card-title { font-size: 26px; } }
 
 .bb-daily-transactions {
   display: grid;
