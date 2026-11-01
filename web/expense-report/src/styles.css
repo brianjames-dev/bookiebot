@@ -409,6 +409,7 @@ summary {
   min-width: 0;
   max-width: 100%;
   height: 1lh;
+  transition: none !important;
 }
 
 .bb-fitted-amount-measure-box {
@@ -429,6 +430,16 @@ summary {
   font-size: calc(1em * var(--bb-amount-fit, 1));
   letter-spacing: -0.055em;
   vertical-align: baseline;
+  /* Fitting must measure final glyphs synchronously. The universal Reduce
+     Motion rule otherwise starts a 0.01ms font transition on every probe. */
+  transition: none !important;
+}
+
+.bb-amount-integer, .bb-amount-fraction { display: inline-block; transition: none !important; }
+.bb-amount-fraction {
+  line-height: 1;
+  letter-spacing: -.025em;
+  transform: translateY(calc(-1 * var(--bb-cents-shift, 0px)));
 }
 
 .bb-metric-note {

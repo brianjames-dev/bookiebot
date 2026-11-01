@@ -47,7 +47,7 @@ const bundlePromise=req('esbuild').build({stdin:{resolveDir:frontend,loader:'tsx
    const full=await geometry()
    assert.equal(await page.locator('.bb-cf-range').textContent(),'Oct 1 – 31')
    assert.equal(await page.locator('.bb-cf-day').count(),35)
-   assert.ok(Math.abs(full.grid.height-weeks.grid.height)<1,'Month and weeks occupy the same height')
+   assert.ok(Math.abs(full.grid.height-weeks.grid.height)<1,'Month and weeks occupy the same height '+JSON.stringify({weeks,full}))
    assert.equal(await page.locator('.bb-cf-icons').count(),0)
    assert.ok(await page.locator('.bb-cf-combined').count()>0)
    await page.locator('[data-date="2026-10-31"] .bb-cf-combined-hit').click();await page.locator('dialog[open]').waitFor()

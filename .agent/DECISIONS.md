@@ -1,5 +1,30 @@
 # Agent Decisions
 
+## 2026-11-01 - Keep Raised Cents Behind One Appearance Toggle
+
+Default Overview and graph dollar headlines to the approved raised cents: 50%
+size and 55% emphasis, with the smaller decimal point. Align the numeral ink
+tops using the actual fitted font metrics; a fixed pixel lift drifts as amounts
+shrink or fonts/viewport sizes change. Reuse the existing amount fitter and its
+bounded resize/font lifecycle, with identical styled measuring/visible copies.
+Keep original formatted strings, signs, exact cents and unavailable values.
+Disable CSS transitions inside the fitter, including the universal Reduce Motion
+rule's 0.01ms transition, so synchronous measurements see final font sizes.
+Calendar's compact flex-row amount owns an independent measured natural width
+to prevent fitting from repeatedly reducing its own available space. Coalesce
+ResizeObserver refits into one animation frame, outside observer delivery, so
+this preferred-width update cannot cause WebKit resize-notification loops.
+Keep the first layout fit synchronous and cancel pending work on unmount.
+
+At the user's request, Settings → Appearance exposes only one Raised cents
+switch, on by default; off restores original full-size cents. Keep the approved
+size/emphasis fixed in code, with no sliders, style selector or preview.
+Persist only a versioned boolean per owner/device in localStorage, with safe
+defaults for invalid/unavailable storage and immediate shared-context updates.
+Month/report remounts must not reset the choice; owner changes must not inherit
+another user's setting. No financial values, sheet writes, server preference
+storage or navigation/graph motion changes are introduced.
+
 ## 2026-11-01 - Select Bill Comparisons And Shorten The Shared Stage
 
 Implement the approved lower ribbon: 32px pills, 9px side padding, 8px gaps,

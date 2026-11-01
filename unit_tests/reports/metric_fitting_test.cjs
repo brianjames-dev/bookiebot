@@ -8,7 +8,7 @@ const compiled = ts.transpileModule(source, {
   compilerOptions: { target: ts.ScriptTarget.ES2020, module: ts.ModuleKind.CommonJS, jsx: ts.JsxEmit.ReactJSX },
 }).outputText;
 
-function mount(text, available, natural, rounding = 0) {
+function mount(text, available, natural, rounding = 0, appearance, intrinsic = false) {
   const refs = [];
   const effects = [];
   const windowEvents = new Map();
@@ -18,6 +18,10 @@ function mount(text, available, natural, rounding = 0) {
   let fontReady;
   let disconnected = false;
   let writes = 0;
+  let alignments = 0;
+  const frames = new Map();
+  let nextFrame = 0;
+  const flushFrames = () => { const pending = [...frames.values()]; frames.clear(); pending.forEach(callback => callback()); };
   const values = new Map();
   const container = {
     clientWidth: available,
@@ -46,6 +50,7 @@ function mount(text, available, natural, rounding = 0) {
         jsx: (type, props) => ({ type, props }),
         jsxs: (type, props) => ({ type, props }),
       };
+      if (id === "../../amount-typography") return { decimalAmountParts: () => null, alignAmountFraction() { alignments++; } };
       throw new Error(`Unexpected import ${id}`);
     },
     ResizeObserver: class {
@@ -53,6 +58,8 @@ function mount(text, available, natural, rounding = 0) {
       observe(target) { observed.push(target); }
       disconnect() { disconnected = true; }
     },
+    requestAnimationFrame: callback => { frames.set(++nextFrame, callback); return nextFrame; },
+    cancelAnimationFrame: id => frames.delete(id),
     window: {
       addEventListener: (event, listener) => windowEvents.set(event, listener),
       removeEventListener: (event) => windowEvents.delete(event),
@@ -66,7 +73,7 @@ function mount(text, available, natural, rounding = 0) {
     },
   };
   vm.runInNewContext(compiled, context);
-  const tree = module.exports.FittedAmount({ children: text, className: "bb-metric-value" });
+  const tree = module.exports.FittedAmount({ children: text, className: "bb-metric-value", appearance, intrinsic });
   refs[0].current = container;
   refs[1].current = measurement;
   refs[2].current = visible;
@@ -76,10 +83,14 @@ function mount(text, available, natural, rounding = 0) {
     natural: () => natural,
     renderedWidth: () => visible.getBoundingClientRect().width,
     setNatural: (width) => { natural = width; },
-    observe: () => observerCallback(),
+    observe: () => { observerCallback(); flushFrames(); },
+    notifyResize: () => observerCallback(),
+    flushFrames,
+    pendingFrames: () => frames.size,
     fontsReady: () => fontReady(),
     scale: () => Number(values.get("--bb-amount-fit")),
     writes: () => writes,
+    alignments: () => alignments,
     disconnected: () => disconnected,
   };
 }
@@ -139,4 +150,22 @@ assert.equal(fitted.fontEvents.size, 0);
 const writes = fitted.writes();
 fitted.fontsReady();
 assert.equal(fitted.writes(), writes, "late font resolution does not touch an unmounted value");
+const hidden = mount("$7,473.86", 0, 170, 0, {size: 50, emphasis: 55});
+assert.equal(hidden.alignments(), 1, "A hidden page receives its new digit lift before it can become visible");
+hidden.container.clientWidth = 180;
+hidden.observe();
+assert.ok(hidden.alignments() > 1, "Revealing the page also accounts for its fitted font size");
+hidden.cleanup();
+const compact = mount("$123.45", 140, 120.5, 0, {size: 50, emphasis: 55}, true);
+assert.equal(compact.container.style.width, "122px", "Compact amounts retain an independent natural width instead of shrinking their flex row repeatedly");
+const compactWrites = compact.writes();compact.observe();assert.equal(compact.writes(), compactWrites);
+compact.setNatural(150.5);
+compact.notifyResize();compact.notifyResize();
+assert.equal(compact.pendingFrames(), 1, "Resize notifications share one frame");
+assert.equal(compact.container.style.width, "122px", "Observer delivery never writes its own observed width");
+compact.flushFrames();
+assert.equal(compact.container.style.width, "152px");
+compact.notifyResize();
+compact.cleanup();
+assert.equal(compact.pendingFrames(), 0, "Unmount cancels the scheduled resize fit");
 console.log("Metric amount fitting checks passed.");

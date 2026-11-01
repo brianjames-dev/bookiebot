@@ -22,6 +22,7 @@ const compiled = ts.transpileModule(declarations.map(node => node.getText(file))
   compilerOptions: { target: ts.ScriptTarget.ES2020, module: ts.ModuleKind.CommonJS, jsx: ts.JsxEmit.ReactJSX },
 }).outputText
 const runtime = { exports: {}, require: req, FittedAmount: ({children, ...props}) => React.createElement("div", props, children) }
+runtime.MetricAmount = runtime.FittedAmount
 vm.runInNewContext(compiled, runtime)
 const { Details, Card } = runtime.exports
 

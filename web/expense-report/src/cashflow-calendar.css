@@ -3,9 +3,10 @@
    Short screens scale cells to the existing shared chart stage. */
 .bb-cashflow-calendar.bb-chart-page { display:grid; grid-template-rows:auto minmax(0,1fr) auto; gap:14px; padding-bottom:var(--bb-chart-bottom-gap,var(--cf-bottom-gap,24px)); --cf-outgoing:#d58e7b; }
 .bb-cf-header { display:flex; align-items:center; justify-content:space-between; gap:10px; min-width:0; }
+.bb-cf-header > div:first-child { flex:1; min-width:0; }
 .bb-cf-range { color:hsl(var(--foreground)); font-size:16px; line-height:1.25; font-weight:500; letter-spacing:-.015em; }
 .bb-cf-summary { display:flex; align-items:baseline; gap:8px; margin-top:2px; white-space:nowrap; }
-.bb-cf-summary strong { font-size:28px; font-weight:500; line-height:1.15; letter-spacing:-.035em; font-variant-numeric:tabular-nums; }
+.bb-cf-outgoing { flex:0 1 auto; max-width:calc(100% - 90px); font-size:28px; font-weight:500; line-height:1.15; letter-spacing:-.035em; font-variant-numeric:tabular-nums; }
 .bb-cf-summary > span { font-size:12px; color:hsl(var(--muted-foreground)); }
 .bb-cf-view-toggle { display:grid; place-items:center; flex:none; width:44px; height:44px; padding:0; border:1px solid hsl(var(--border)); border-radius:50%; background:hsl(var(--foreground) / .045); color:hsl(var(--foreground)); cursor:pointer; transition:background 180ms ease,transform 180ms ease; }
 .bb-cf-view-toggle svg { width:19px; height:19px; stroke-width:1.65; }
@@ -60,5 +61,5 @@
 .bb-cf-details li strong { font-size:14px; font-weight:500; overflow-wrap:anywhere; }
 .bb-cf-details li small,.bb-cf-details p { color:hsl(var(--muted-foreground)); font-size:12px; line-height:1.5; }
 .bb-cf-details li b { flex:none; font-size:14px; font-weight:500; font-variant-numeric:tabular-nums; }
-@media (max-width:350px) { .bb-cf-summary { gap:5px; } .bb-cf-summary strong { font-size:26px; } .bb-cf-summary > span { font-size:10px; } .bb-cf-day-totals { font-size:10px; } }
+@media (max-width:350px) { .bb-cf-summary { gap:5px; } .bb-cf-outgoing { font-size:26px; } .bb-cf-summary > span { font-size:10px; } .bb-cf-day-totals { font-size:10px; } }
 @media (prefers-reduced-motion:reduce) { .bb-cf-view-toggle { transition:none; } }

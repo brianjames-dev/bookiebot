@@ -10,7 +10,7 @@ const h = React.createElement
 global.IS_REACT_ACT_ENVIRONMENT = true
 const source = fs.readFileSync(process.argv[2] || 'web/expense-report/src/report-app.tsx', 'utf8')
 const file = ts.createSourceFile('report-app.tsx', source, ts.ScriptTarget.Latest, true, ts.ScriptKind.TSX)
-const names = new Set(['reportSpentTotal', 'ExpenseReportApp', 'OverviewCharts', 'DailySpendingCard', 'ExpenseInsightsCard',
+const names = new Set(['reportSpentTotal', 'ExpenseReportApp', 'ExpenseReportBody', 'OverviewCharts', 'DailySpendingCard', 'ExpenseInsightsCard',
   'MemoizedBurnRateChart', 'MemoizedCalendarAnalyticsPanel', 'MemoizedBillsUtilitiesPanel', 'MemoizedExpenseInsightsCard'])
 const declarations = file.statements.filter(node => ts.isFunctionDeclaration(node) ? names.has(node.name?.text)
   : ts.isVariableStatement(node) && node.declarationList.declarations.some(item => names.has(item.name.getText(file))))
@@ -72,6 +72,7 @@ for(const name of ['Card','CardHeader','CardTitle','CardContent','ReportScreen',
 for(const name of ['MetricCard','RemainingCategoryBars','SavingsMetricCard','ReportBrand','ReportHeader','ThemeToggle','SharedReimbursementsCard','ReimbursementLedger','Investments','SavingsGoals','ReportQuestions','PhoneNotifications','ActivityDetails','MetricExplanationDetails','TopExpensesTable','MerchantOccurrencesTable'])runtime[name]=leaf(name)
 runtime.ModalDetails=passthrough
 runtime.FittedAmount=passthrough
+runtime.AmountAppearanceBoundary=passthrough
 runtime.generatedTimeLabel=()=>''
 const swipeRuntime={exports:{},require:req,window,performance:{now:()=>0},ResizeObserver:class{observe(){} disconnect(){}}}
 vm.runInNewContext(ts.transpileModule(fs.readFileSync('web/expense-report/src/chart-swipe.ts','utf8'),{compilerOptions:{target:ts.ScriptTarget.ES2020,module:ts.ModuleKind.CommonJS}}).outputText,swipeRuntime)

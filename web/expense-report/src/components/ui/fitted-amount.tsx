@@ -1,7 +1,8 @@
 import { useLayoutEffect, useRef } from "react"
+import { alignAmountFraction, decimalAmountParts, type AmountAppearance } from "../../amount-typography"
 
 /** Keep the complete amount on one line at the largest size its column permits. */
-export function FittedAmount({ children, className }: { children: string; className: string }) {
+export function FittedAmount({ children, className, appearance, intrinsic = false }: { children: string; className: string; appearance?: Readonly<AmountAppearance>; intrinsic?: boolean }) {
   const containerRef = useRef<HTMLDivElement | null>(null)
   const measurementRef = useRef<HTMLSpanElement | null>(null)
   const textRef = useRef<HTMLSpanElement | null>(null)
@@ -12,6 +13,7 @@ export function FittedAmount({ children, className }: { children: string; classN
     const text = textRef.current
     if (!container || !measurement || !text) return
     let disposed = false
+    let resizeFrame = 0
     let lastAvailable = -1
     let lastNatural = -1
 
@@ -24,8 +26,17 @@ export function FittedAmount({ children, className }: { children: string; classN
 
     const fit = () => {
       if (disposed) return
-      const available = container.clientWidth
+      // Settings can change while this headline's page is hidden. Update the
+      // lift now, before its first reveal, even when no width can be fitted yet.
+      if (appearance) alignAmountFraction(text)
       const natural = measurement.getBoundingClientRect().width
+      if (intrinsic && natural > 0) {
+        // Give compact flex-row amounts an independent preferred width. Using
+        // the shrinking painted text as their width would remove 1px per fit.
+        const width = `${Math.ceil(natural) + 1}px`
+        if (container.style.width !== width) container.style.width = width
+      }
+      const available = container.clientWidth
       if (available <= 0 || natural <= 0) return
       if (available === lastAvailable && natural === lastNatural) return
       lastAvailable = available
@@ -53,12 +64,15 @@ export function FittedAmount({ children, className }: { children: string; classN
           applyScale(low)
         }
       }
+      if (appearance) alignAmountFraction(text)
     }
 
     fit()
-    const observer = typeof ResizeObserver === "undefined" ? null : new ResizeObserver(fit)
-    // Only the visible child changes size. Both observed boxes retain their
-    // independent dimensions, preventing ResizeObserver feedback loops.
+    // Keep resize writes outside observer delivery: intrinsic flex amounts can
+    // change their own preferred width as the viewport changes.
+    const observer = typeof ResizeObserver === "undefined" ? null : new ResizeObserver(() => {
+      if (!resizeFrame) resizeFrame = requestAnimationFrame(() => { resizeFrame = 0; fit() })
+    })
     observer?.observe(container)
     observer?.observe(measurement)
     window.addEventListener("resize", fit)
@@ -67,18 +81,22 @@ export function FittedAmount({ children, className }: { children: string; classN
 
     return () => {
       disposed = true
+      cancelAnimationFrame(resizeFrame)
       observer?.disconnect()
       window.removeEventListener("resize", fit)
       document.fonts?.removeEventListener("loadingdone", fit)
     }
-  }, [children])
+  }, [children, appearance?.size, appearance?.emphasis, intrinsic])
+
+  const parts = appearance ? decimalAmountParts(children) : null
+  const content = parts ? <><span className="bb-amount-integer">{parts.integer}</span><span className="bb-amount-fraction" style={{fontSize: `${appearance!.size}%`, opacity: appearance!.emphasis / 100}}>{parts.fraction}</span></> : children
 
   return (
     <div ref={containerRef} className={`${className} bb-fitted-amount`}>
       <span className="bb-fitted-amount-measure-box" aria-hidden="true">
-        <span ref={measurementRef} className="bb-fitted-amount-measure">{children}</span>
+        <span ref={measurementRef} className="bb-fitted-amount-measure">{content}</span>
       </span>
-      <span ref={textRef} className="bb-fitted-amount-text">{children}</span>
+      <span ref={textRef} className="bb-fitted-amount-text">{content}</span>
     </div>
   )
 }
