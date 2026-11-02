@@ -2,6 +2,8 @@
 
 Last updated: 2026-11-02
 
+Amazon smile candidate (2026-11-02): prepared the user's supplied white smile-only artwork on its orange field as a 256px circular review candidate, without the Amazon wordmark. Exact source, hashes, independent intake and reproducible framing are in `docs/logo-review/batches/2026-11-02-amazon-smile`. The previous ten candidates and Amazon Prime remain unchanged; runtime logos await approval. Verification: **36 focused / 2,843 full tests passed**, **557 optional PostgreSQL skipped**, clean Pyright and **14 Chromium/WebKit gallery cases**. Source/output hashes, full circle geometry and unchanged active/runtime artwork verified; candidate visually inspected at 256px.
+
 Logo Studio first refinement (2026-11-02): imported the user's ten ready flags and all nine supplied image references. Prepared native-artwork circle candidates for PG&E, Peacock, Spotify, State Farm, USPS, Walmart, Trader Joe's, Whole Foods, Safeway and Panda Express; no AI recreation was necessary. The user's follow-up removes Whole Foods' white outer rim with a full-bleed green circle and white lettering; retain its first candidate in history. Source/candidate hashes and reproducible framing live in `docs/logo-review/batches/2026-11-02-first-refinement`. App catalogs/assets remain unchanged pending exact candidate approvals. Candidate handoffs now carry the saved batch reference, preserve history, discard stale restored approvals and clear pending autosaves on explicit submission. Verification: **36 focused / 2,843 full tests passed**, **557 optional PostgreSQL skipped**, clean Pyright, valid skill metadata and **14 Chromium/WebKit gallery cases** at 320/390/736px in both themes. Inspected the actual Whole Foods Current/Candidate phone comparison with no horizontal overflow.
 
 Logo Studio process (2026-11-02): the user chose process setup before additions. Added a versioned reusable skill and offline inventory/intake/candidate/approval/publication-plan tooling, plus one mobile gallery of all 247 existing logos with actual framing, notes, HTTPS references, new-merchant requests and explicit follow-up submission. Flags await chat intake by default; readiness permits refinement. Candidate/source/raw AI output hashes and full prompts persist; exact latest approval and unchanged active artwork are required for a read-only publication plan. No runtime logos, matching, categories or financial data changed. Verification: **31 focused / 2,838 full tests passed**, **557 optional PostgreSQL skipped**, clean Pyright, valid skill metadata and **14 Chromium/WebKit gallery cases** at 320/390/736px in both themes. The final wrapped mobile gallery was visually inspected. The user accepted native circle-gap checklist 237.
@@ -356,7 +358,7 @@ All eight September 6 audit batches are implemented and verified locally. Each b
 
 ## On Deck
 
-First: user review of the ten first-refinement Logo Studio candidates, including the revised full-bleed Whole Foods circle. Tap to compare Current/Candidate, select Approve candidate for desired versions and Send review decisions; carry the saved batchRef into the next turn. No runtime logo changes until exact approval. Manual steps are in `docs/logo-review/README.md`. Native circle-gap checklist 237 is accepted by the user.
+First: user review of the ten first-refinement Logo Studio candidates and the separate Amazon smile candidate. Whole Foods is full bleed; Amazon uses only the supplied white smile on orange. Tap to compare Current/Candidate, select Approve candidate for desired versions and Send review decisions; carry each saved batchRef into the next turn. No runtime logo changes until exact approval. Manual steps are in `docs/logo-review/README.md`. Native circle-gap checklist 237 is accepted by the user.
 
 First: native acceptance of the single Raised cents switch following PR #106’s automatic merge/rollout (checklist 230). Default on; off restores full-size cents. Preserve owner/device persistence, exact strings, fitting and the existing compact graph geometry. Existing native acceptance follows below.
 
@@ -511,6 +513,8 @@ Student-loan activation is complete. Verify the deployed fixed-bill display and 
 27. Explore clarifying questions before logging when BookieBot is uncertain instead of guessing or silently failing.
 
 ## Completed 2026-11-02
+
+- Amazon smile review: retained the exact supplied image and created a smile-only circular candidate, isolated from the previous ten-item batch. Recorded source/output hashes and deterministic export instructions; runtime assets, aliases and Amazon Prime remain unchanged pending approval. Status and review guide updated; Finance Ops backlog unchanged.
 
 - First logo refinement batch: ten reviewed native-artwork candidates, nine retained supplied sources and one existing Panda Express vector. Preserve the initial Whole Foods white-rim version and its replacement without that rim. Added immutable source/candidate/history and full-bleed edge regressions; fixed candidate handoff to continue the existing batch, stale approval restoration and pending autosave flushing. Runtime catalogs/assets and Finance Ops backlog unchanged; user candidate review remains on deck.
 

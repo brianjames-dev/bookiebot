@@ -1,0 +1,11 @@
+{
+  "version": 1,
+  "method": "native supplied artwork / deterministic circle framing",
+  "sourceSha256": "5817e47dce01f1c544d7837a8898a03853a11e3c5a35d2375b0930a5e85db088",
+  "sha256": "5a3b7d020fc8bdad96e7ce83226c1bb46773f9ad7e68dedae0324b630cd6ea87",
+  "size": [
+    256,
+    256
+  ],
+  "framing": "Complete supplied image clipped to circle; preserve white smile and orange background"
+}

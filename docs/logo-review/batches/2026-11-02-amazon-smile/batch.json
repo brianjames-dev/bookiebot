@@ -1,0 +1,56 @@
+{
+  "kind": "bookiebot-logo-batch",
+  "version": 1,
+  "snapshotId": "11f6086157be9a7a418f55f4906e488b206402a6c940f16d1d905b1dae7464c7",
+  "createdAt": "2026-11-02T20:11:36.259981+00:00",
+  "items": [
+    {
+      "key": "merchant:amazon",
+      "kind": "merchant",
+      "id": "amazon",
+      "name": "Amazon",
+      "expectedRevision": "03e17412fdc82591cd5218a01eb26d12a7d76b0884f818a7985d838e1b74b3ad",
+      "current": {
+        "key": "merchant:amazon",
+        "kind": "merchant",
+        "id": "amazon",
+        "name": "Amazon",
+        "group": "General stores",
+        "aliases": [
+          "Amazon",
+          "Amazon.com",
+          "AMZN Mktp US",
+          "Amazon Marketplace"
+        ],
+        "asset": "src/bookiebot/reports/assets/company-logo-merchant-amazon-ec401e732753cdc5.svg",
+        "sha256": "ec401e732753cdc53ffe77e28b201409be53fc5447947689db3c36524951bb49",
+        "revision": "03e17412fdc82591cd5218a01eb26d12a7d76b0884f818a7985d838e1b74b3ad",
+        "background": "#ff9400",
+        "inset": 7,
+        "sourceUrl": "https://commons.wikimedia.org/wiki/File:Amazon_logo.svg"
+      },
+      "notes": "Use only the smile mark in the supplied reference: white smile on orange, without the Amazon wordmark.",
+      "referenceUrls": [
+        "https://static.vecteezy.com/system/resources/previews/014/018/560/non_2x/amazon-smile-logo-on-transparent-background-free-vector.jpg"
+      ],
+      "references": [],
+      "candidates": [
+        {
+          "sha256": "5a3b7d020fc8bdad96e7ce83226c1bb46773f9ad7e68dedae0324b630cd6ea87",
+          "asset": "candidates/merchant-amazon-5a3b7d020fc8bdad.png",
+          "source": {
+            "path": "references/merchant-amazon-5817e47dce01f1c5.jpg",
+            "sha256": "5817e47dce01f1c544d7837a8898a03853a11e3c5a35d2375b0930a5e85db088"
+          },
+          "sourceUrl": "https://static.vecteezy.com/system/resources/previews/014/018/560/non_2x/amazon-smile-logo-on-transparent-background-free-vector.jpg",
+          "method": "reframe",
+          "tool": "original artwork / deterministic framing",
+          "prompt": "",
+          "generatedOutput": null,
+          "createdAt": "2026-11-02T20:11:57.590743+00:00"
+        }
+      ],
+      "status": "candidate-review"
+    }
+  ]
+}
