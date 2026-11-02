@@ -115,7 +115,8 @@
     "id": "starbucks",
     "name": "Starbucks",
     "aliases": [
-      "Starbucks"
+      "Starbucks",
+      "Starbucks Coffee Company"
     ],
     "asset": "company-logo-merchant-starbucks-e8a397a07e93c0a4.svg",
     "background": "#ffffff",
@@ -461,9 +462,9 @@
     "aliases": [
       "USPS"
     ],
-    "asset": "company-logo-merchant-usps-a38dc7d740123c28.svg",
+    "asset": "company-logo-merchant-usps-565b2978786c5442.png",
     "background": "#ffffff",
-    "inset": 7
+    "inset": 0
   },
   {
     "id": "dhl",
@@ -495,9 +496,9 @@
       "AMZN Mktp US",
       "Amazon Marketplace"
     ],
-    "asset": "company-logo-merchant-amazon-ec401e732753cdc5.svg",
-    "background": "#ff9400",
-    "inset": 7
+    "asset": "company-logo-merchant-amazon-5a3b7d020fc8bdad.png",
+    "background": "#f47025",
+    "inset": 0
   },
   {
     "id": "walmart",
@@ -508,9 +509,9 @@
       "Walmart Supercenter",
       "Walmart gas"
     ],
-    "asset": "company-logo-merchant-walmart-c1e12ba4f8a11a41.svg",
-    "background": "#ffffff",
-    "inset": 3
+    "asset": "company-logo-merchant-walmart-0f2f06cef4ab7d3c.png",
+    "background": "#0153e3",
+    "inset": 0
   },
   {
     "id": "trader-joes",
@@ -520,9 +521,9 @@
       "Trader Joe's",
       "Trader Joes"
     ],
-    "asset": "company-logo-merchant-trader-joes-503e83d3207938d2.svg",
-    "background": "#fffaf0",
-    "inset": 3
+    "asset": "company-logo-merchant-trader-joes-f97e72dd46e5d30e.png",
+    "background": "#cd0e2d",
+    "inset": 0
   },
   {
     "id": "whole-foods",
@@ -531,8 +532,8 @@
       "Whole Foods",
       "Whole Foods Market"
     ],
-    "asset": "company-logo-merchant-whole-foods-d548ef550b066f1c.svg",
-    "background": "#ffffff",
+    "asset": "company-logo-merchant-whole-foods-000cf9fe7f128aed.png",
+    "background": "#006f44",
     "inset": 0
   },
   {
@@ -589,9 +590,9 @@
       "Safeway Fuel",
       "Safeway fuel station"
     ],
-    "asset": "company-logo-merchant-safeway-85938b09a89cdbd4.svg",
+    "asset": "company-logo-merchant-safeway-b2dad9ba0601efd0.png",
     "background": "#ffffff",
-    "inset": 4
+    "inset": 0
   },
   {
     "id": "raley-s",
@@ -1668,9 +1669,9 @@
     "aliases": [
       "Panda Express"
     ],
-    "asset": "company-logo-merchant-panda-express-dd57da67b81d91e1.svg",
+    "asset": "company-logo-merchant-panda-express-9be10ad32406fd77.png",
     "background": "#ffffff",
-    "inset": 4
+    "inset": 0
   },
   {
     "id": "wingstop",

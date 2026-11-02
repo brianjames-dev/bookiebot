@@ -13,6 +13,14 @@ assert.equal(transactionMerchant(input({location:'Unknown shop',item:'Apple'})),
 assert.equal(transactionMerchant(input({location:'Unknown shop',item:'Netflix'})),null)
 assert.equal(transactionMerchant(input({location:'Apple pie'})),null)
 assert.equal(transactionMerchant(input({location:'https://target.com'})),null)
+for(const location of ['Starbucks Coffee Company','  STARBUCKS Coffee Company  ','Starbucks Coffee Company store #123']){
+ const entry=input({category:'Food',location,item:'Coffee'})
+ const merchant=transactionMerchant(entry)
+ assert.equal(merchant?.id,'starbucks',location)
+ assert.equal(transactionText(entry,merchant).primary,'Starbucks')
+}
+assert.equal(transactionMerchant(input({location:'Unknown cafe',item:'Starbucks Coffee Company'})),null)
+assert.equal(transactionMerchant(input({location:'Starbucks Coffee Company gift card reseller'})),null)
 assert.equal(transactionMerchant(input({item:'Amazon'})).id,'amazon')
 assert.equal(transactionMerchant(input({item:'Amazon Prime'})).id,'amazon-prime')
 assert.equal(transactionMerchant(input({item:'Water'}),{water:'santa-rosa-water'}).id,'santa-rosa-water')

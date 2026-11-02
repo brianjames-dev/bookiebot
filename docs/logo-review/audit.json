@@ -1871,32 +1871,77 @@
       "id": "peacock",
       "name": "Peacock",
       "original": "src/bookiebot/reports/assets/company-logo-peacock-3e25492d3da3a275.svg",
-      "source": "src/bookiebot/reports/assets/company-logo-peacock-3e25492d3da3a275.svg",
-      "sourceUrl": "https://cdn.jsdelivr.net/gh/homarr-labs/dashboard-icons@83f32e08257b66fbd971ac8d7645f5b38d52e85d/svg/peacock.svg",
-      "sourceSha256": "3e25492d3da3a2753c3eef6f0525d13a89de7e3ba42aecaf83c00f73c1919b89",
-      "method": "Original artwork · circle framing",
+      "source": "docs/logo-review/batches/2026-11-02-first-refinement/candidates/company-peacock-703eb524d597f9cd.png",
+      "sourceUrl": "https://1000logos.net/wp-content/uploads/2023/09/Peacock-Emblem.png",
+      "sourceSha256": "703eb524d597f9cd7cb8258a767e4746e6889207d364b66af8371766b35befe4",
+      "method": "Original artwork · reviewed Logo Studio circle",
       "ai": false,
       "background": "#ffffff",
-      "fill": 0.82,
-      "trim": true,
-      "originalSize": null,
+      "fill": 1,
+      "trim": false,
+      "originalSize": [
+        256,
+        256
+      ],
       "review": "approved",
-      "framing": "standalone-mark",
-      "asset": "assets/peacock-b970a86f2be4c2ba.png",
-      "sha256": "b970a86f2be4c2baa39ca07efedf3c8fa3c41c26d1a864ffd767dd661bf0428a",
+      "framing": "native-circle",
+      "asset": "assets/peacock-703eb524d597f9cd.png",
+      "sha256": "703eb524d597f9cd7cb8258a767e4746e6889207d364b66af8371766b35befe4",
       "sourceSize": [
-        118,
-        150
+        256,
+        256
       ],
       "crop": [
-        54,
         0,
-        404,
-        512
+        0,
+        256,
+        256
       ],
       "edgeChecks": [],
       "paintedBounds": null,
-      "rasterBelow2x": false
+      "rasterBelow2x": false,
+      "studioReview": {
+        "batch": "docs/logo-review/batches/2026-11-02-first-refinement/batch.json",
+        "candidateSha256": "703eb524d597f9cd7cb8258a767e4746e6889207d364b66af8371766b35befe4",
+        "source": "docs/logo-review/batches/2026-11-02-first-refinement/references/company-peacock-c4fbe6ea59351fe4.png",
+        "sourceSha256": "c4fbe6ea59351fe4a7e1da5ebda08a462cbf3bb2cb6cb8305a577341da103347",
+        "sourceUrl": "https://1000logos.net/wp-content/uploads/2023/09/Peacock-Emblem.png",
+        "method": "reframe",
+        "rendering": "docs/logo-review/batches/2026-11-02-first-refinement/rendering.json"
+      },
+      "previousVersions": [
+        {
+          "id": "peacock",
+          "name": "Peacock",
+          "original": "src/bookiebot/reports/assets/company-logo-peacock-3e25492d3da3a275.svg",
+          "source": "src/bookiebot/reports/assets/company-logo-peacock-3e25492d3da3a275.svg",
+          "sourceUrl": "https://cdn.jsdelivr.net/gh/homarr-labs/dashboard-icons@83f32e08257b66fbd971ac8d7645f5b38d52e85d/svg/peacock.svg",
+          "sourceSha256": "3e25492d3da3a2753c3eef6f0525d13a89de7e3ba42aecaf83c00f73c1919b89",
+          "method": "Original artwork · circle framing",
+          "ai": false,
+          "background": "#ffffff",
+          "fill": 0.82,
+          "trim": true,
+          "originalSize": null,
+          "review": "approved",
+          "framing": "standalone-mark",
+          "asset": "assets/peacock-b970a86f2be4c2ba.png",
+          "sha256": "b970a86f2be4c2baa39ca07efedf3c8fa3c41c26d1a864ffd767dd661bf0428a",
+          "sourceSize": [
+            118,
+            150
+          ],
+          "crop": [
+            54,
+            0,
+            404,
+            512
+          ],
+          "edgeChecks": [],
+          "paintedBounds": null,
+          "rasterBelow2x": false
+        }
+      ]
     },
     {
       "id": "peloton",
@@ -1936,35 +1981,80 @@
       "id": "pge",
       "name": "PG&E",
       "original": "src/bookiebot/reports/assets/company-logo-pge-1b6066340836864b.jpg",
-      "source": "src/bookiebot/reports/assets/company-logo-pge-1b6066340836864b.jpg",
-      "sourceUrl": "https://www.pge.com/content/experience-fragments/pge/en/site/header/master/_jcr_content/root/header/image.coreimg.jpeg/1759521030312/pge-logo-95x100.jpeg",
-      "sourceSha256": "1b6066340836864bb33e5fb9fbb2767535e70bd0b73c6b58fd05c2a178e253bf",
-      "method": "Original artwork · circle framing",
+      "source": "docs/logo-review/batches/2026-11-02-first-refinement/candidates/company-pge-0964da2c337441ca.png",
+      "sourceUrl": "https://static.toss.im/png-icons/securities/icn-sec-fill-PCG.png",
+      "sourceSha256": "0964da2c337441ca47f522fa9b61c9549cb93513c31eb8d75747c4d57920b6ff",
+      "method": "Original artwork · reviewed Logo Studio circle",
       "ai": false,
-      "background": "#00a5d8",
-      "fill": 0.68,
-      "trim": true,
+      "background": "#0089c4",
+      "fill": 1,
+      "trim": false,
       "originalSize": [
-        95,
-        100
+        256,
+        256
       ],
       "review": "approved",
-      "framing": "standalone-mark",
-      "asset": "assets/pge-50f203cf0ab8750d.png",
-      "sha256": "50f203cf0ab8750d19607b9fdc73508eb360538ff2e66580735619256af19767",
+      "framing": "native-circle",
+      "asset": "assets/pge-0964da2c337441ca.png",
+      "sha256": "0964da2c337441ca47f522fa9b61c9549cb93513c31eb8d75747c4d57920b6ff",
       "sourceSize": [
-        95,
-        100
+        256,
+        256
       ],
       "crop": [
-        13,
         0,
-        486,
-        512
+        0,
+        256,
+        256
       ],
       "edgeChecks": [],
       "paintedBounds": null,
-      "rasterBelow2x": false
+      "rasterBelow2x": false,
+      "studioReview": {
+        "batch": "docs/logo-review/batches/2026-11-02-first-refinement/batch.json",
+        "candidateSha256": "0964da2c337441ca47f522fa9b61c9549cb93513c31eb8d75747c4d57920b6ff",
+        "source": "docs/logo-review/batches/2026-11-02-first-refinement/references/company-pge-82f3338868653b14.png",
+        "sourceSha256": "82f3338868653b1472fc26b8d0f57f966b3ad6ebe15e00d0de96b84518a83895",
+        "sourceUrl": "https://static.toss.im/png-icons/securities/icn-sec-fill-PCG.png",
+        "method": "reframe",
+        "rendering": "docs/logo-review/batches/2026-11-02-first-refinement/rendering.json"
+      },
+      "previousVersions": [
+        {
+          "id": "pge",
+          "name": "PG&E",
+          "original": "src/bookiebot/reports/assets/company-logo-pge-1b6066340836864b.jpg",
+          "source": "src/bookiebot/reports/assets/company-logo-pge-1b6066340836864b.jpg",
+          "sourceUrl": "https://www.pge.com/content/experience-fragments/pge/en/site/header/master/_jcr_content/root/header/image.coreimg.jpeg/1759521030312/pge-logo-95x100.jpeg",
+          "sourceSha256": "1b6066340836864bb33e5fb9fbb2767535e70bd0b73c6b58fd05c2a178e253bf",
+          "method": "Original artwork · circle framing",
+          "ai": false,
+          "background": "#00a5d8",
+          "fill": 0.68,
+          "trim": true,
+          "originalSize": [
+            95,
+            100
+          ],
+          "review": "approved",
+          "framing": "standalone-mark",
+          "asset": "assets/pge-50f203cf0ab8750d.png",
+          "sha256": "50f203cf0ab8750d19607b9fdc73508eb360538ff2e66580735619256af19767",
+          "sourceSize": [
+            95,
+            100
+          ],
+          "crop": [
+            13,
+            0,
+            486,
+            512
+          ],
+          "edgeChecks": [],
+          "paintedBounds": null,
+          "rasterBelow2x": false
+        }
+      ]
     },
     {
       "id": "playstation",
@@ -2576,66 +2666,156 @@
       "id": "spotify",
       "name": "Spotify",
       "original": "src/bookiebot/reports/assets/company-logo-spotify-686990a9a97c3674.svg",
-      "source": "src/bookiebot/reports/assets/company-logo-spotify-686990a9a97c3674.svg",
-      "sourceUrl": "https://cdn.jsdelivr.net/gh/homarr-labs/dashboard-icons@83f32e08257b66fbd971ac8d7645f5b38d52e85d/svg/spotify.svg",
-      "sourceSha256": "686990a9a97c36746eebfc7cfd1100ef29e07d8f9ada229ab00e34d4298a3dcb",
-      "method": "Original artwork · circle framing",
+      "source": "docs/logo-review/batches/2026-11-02-first-refinement/candidates/company-spotify-689c29a8409b5ba0.png",
+      "sourceUrl": "https://thumb.wikimedia.org/wikipedia/commons/thumb/8/84/Spotify_icon.svg/1280px-Spotify_icon.svg.png?utm_source=commons.wikimedia.org&utm_campaign=index&utm_content=thumbnail",
+      "sourceSha256": "689c29a8409b5ba07c0411e19429f658dce7143486d32fdc048b3ddf21ff0993",
+      "method": "Original artwork · reviewed Logo Studio circle",
       "ai": false,
-      "background": "#ffffff",
+      "background": "#18d860",
       "fill": 1,
-      "trim": true,
-      "originalSize": null,
+      "trim": false,
+      "originalSize": [
+        256,
+        256
+      ],
       "review": "approved",
       "framing": "native-circle",
-      "asset": "assets/spotify-68f0c1767ea2fb76.png",
-      "sha256": "68f0c1767ea2fb765befee52568268cd9807e46ee61db72212b2027d86740a1e",
+      "asset": "assets/spotify-689c29a8409b5ba0.png",
+      "sha256": "689c29a8409b5ba07c0411e19429f658dce7143486d32fdc048b3ddf21ff0993",
       "sourceSize": [
-        227,
-        227
+        256,
+        256
       ],
       "crop": [
-        3,
-        3,
-        506,
-        506
+        0,
+        0,
+        256,
+        256
       ],
       "edgeChecks": [],
       "paintedBounds": null,
-      "rasterBelow2x": false
+      "rasterBelow2x": false,
+      "studioReview": {
+        "batch": "docs/logo-review/batches/2026-11-02-first-refinement/batch.json",
+        "candidateSha256": "689c29a8409b5ba07c0411e19429f658dce7143486d32fdc048b3ddf21ff0993",
+        "source": "docs/logo-review/batches/2026-11-02-first-refinement/references/company-spotify-f803bde3cca6ceaf.png",
+        "sourceSha256": "f803bde3cca6ceaf280d45bc470377994adc983cb4e411ec0e602a8ac821ca3f",
+        "sourceUrl": "https://thumb.wikimedia.org/wikipedia/commons/thumb/8/84/Spotify_icon.svg/1280px-Spotify_icon.svg.png?utm_source=commons.wikimedia.org&utm_campaign=index&utm_content=thumbnail",
+        "method": "reframe",
+        "rendering": "docs/logo-review/batches/2026-11-02-first-refinement/rendering.json"
+      },
+      "previousVersions": [
+        {
+          "id": "spotify",
+          "name": "Spotify",
+          "original": "src/bookiebot/reports/assets/company-logo-spotify-686990a9a97c3674.svg",
+          "source": "src/bookiebot/reports/assets/company-logo-spotify-686990a9a97c3674.svg",
+          "sourceUrl": "https://cdn.jsdelivr.net/gh/homarr-labs/dashboard-icons@83f32e08257b66fbd971ac8d7645f5b38d52e85d/svg/spotify.svg",
+          "sourceSha256": "686990a9a97c36746eebfc7cfd1100ef29e07d8f9ada229ab00e34d4298a3dcb",
+          "method": "Original artwork · circle framing",
+          "ai": false,
+          "background": "#ffffff",
+          "fill": 1,
+          "trim": true,
+          "originalSize": null,
+          "review": "approved",
+          "framing": "native-circle",
+          "asset": "assets/spotify-68f0c1767ea2fb76.png",
+          "sha256": "68f0c1767ea2fb765befee52568268cd9807e46ee61db72212b2027d86740a1e",
+          "sourceSize": [
+            227,
+            227
+          ],
+          "crop": [
+            3,
+            3,
+            506,
+            506
+          ],
+          "edgeChecks": [],
+          "paintedBounds": null,
+          "rasterBelow2x": false
+        }
+      ]
     },
     {
       "id": "state-farm",
       "name": "State Farm",
       "original": "src/bookiebot/reports/assets/company-logo-state-farm-156a1d1dceb5f870.ico",
-      "source": "src/bookiebot/reports/assets/company-logo-state-farm-156a1d1dceb5f870.ico",
-      "sourceUrl": "https://www.statefarm.com/favicon.ico",
-      "sourceSha256": "156a1d1dceb5f8705312cd80bcfc22053642d23f516fd2bc2740db8a1fe78012",
-      "method": "Original artwork · circle framing",
+      "source": "docs/logo-review/batches/2026-11-02-first-refinement/candidates/company-state-farm-4d4c3fa7e7bc0b13.png",
+      "sourceUrl": "https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcSumjr2DErC83lMEUaXE4wx9gEgg42gB8ITtLJhripGBQ&s=10",
+      "sourceSha256": "4d4c3fa7e7bc0b13211f860cc595dbe4f5fb2ad03eea9a000e7ee2d0dbcd946f",
+      "method": "Original artwork · reviewed Logo Studio circle",
       "ai": false,
       "background": "#ffffff",
-      "fill": 0.82,
-      "trim": true,
+      "fill": 1,
+      "trim": false,
       "originalSize": [
-        128,
-        128
+        256,
+        256
       ],
       "review": "approved",
-      "framing": "standalone-mark",
-      "asset": "assets/state-farm-b590f921898f9821.png",
-      "sha256": "b590f921898f9821080d53e3b84ab374a453ac6fd5ef42de97b282ca41a75b81",
+      "framing": "native-circle",
+      "asset": "assets/state-farm-4d4c3fa7e7bc0b13.png",
+      "sha256": "4d4c3fa7e7bc0b13211f860cc595dbe4f5fb2ad03eea9a000e7ee2d0dbcd946f",
       "sourceSize": [
-        128,
-        128
+        256,
+        256
       ],
       "crop": [
         0,
-        90,
-        512,
-        312
+        0,
+        256,
+        256
       ],
       "edgeChecks": [],
       "paintedBounds": null,
-      "rasterBelow2x": false
+      "rasterBelow2x": false,
+      "studioReview": {
+        "batch": "docs/logo-review/batches/2026-11-02-first-refinement/batch.json",
+        "candidateSha256": "4d4c3fa7e7bc0b13211f860cc595dbe4f5fb2ad03eea9a000e7ee2d0dbcd946f",
+        "source": "docs/logo-review/batches/2026-11-02-first-refinement/references/company-state-farm-14ae7b02e47e865f.png",
+        "sourceSha256": "14ae7b02e47e865fe4a451fdf2038faf8b4ecc701b3ad2bcec4ba5ec0e05f977",
+        "sourceUrl": "https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcSumjr2DErC83lMEUaXE4wx9gEgg42gB8ITtLJhripGBQ&s=10",
+        "method": "reframe",
+        "rendering": "docs/logo-review/batches/2026-11-02-first-refinement/rendering.json"
+      },
+      "previousVersions": [
+        {
+          "id": "state-farm",
+          "name": "State Farm",
+          "original": "src/bookiebot/reports/assets/company-logo-state-farm-156a1d1dceb5f870.ico",
+          "source": "src/bookiebot/reports/assets/company-logo-state-farm-156a1d1dceb5f870.ico",
+          "sourceUrl": "https://www.statefarm.com/favicon.ico",
+          "sourceSha256": "156a1d1dceb5f8705312cd80bcfc22053642d23f516fd2bc2740db8a1fe78012",
+          "method": "Original artwork · circle framing",
+          "ai": false,
+          "background": "#ffffff",
+          "fill": 0.82,
+          "trim": true,
+          "originalSize": [
+            128,
+            128
+          ],
+          "review": "approved",
+          "framing": "standalone-mark",
+          "asset": "assets/state-farm-b590f921898f9821.png",
+          "sha256": "b590f921898f9821080d53e3b84ab374a453ac6fd5ef42de97b282ca41a75b81",
+          "sourceSize": [
+            128,
+            128
+          ],
+          "crop": [
+            0,
+            90,
+            512,
+            312
+          ],
+          "edgeChecks": [],
+          "paintedBounds": null,
+          "rasterBelow2x": false
+        }
+      ]
     },
     {
       "id": "steam",

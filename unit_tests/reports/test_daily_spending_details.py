@@ -64,7 +64,8 @@ def test_approved_merchant_art_is_local_content_addressed_and_inert():
                     assert not re.search(r'url\(\s*[\"\']?(?!#)', value, re.I)
                 if node.tag.split('}')[-1].lower() == 'style':
                     assert not re.search(r'@import|url\(\s*[\"\']?(?!#)', node.text or '', re.I)
-        assert item['source'] and item['review'] == 'approved-2026-11-01'
+        reviewed = {'amazon', 'usps', 'walmart', 'trader-joes', 'whole-foods', 'safeway', 'panda-express'}
+        assert item['source'] and item['review'] == ('approved-2026-11-02' if item['id'] in reviewed else 'approved-2026-11-01')
         assert re.fullmatch(r'#[a-fA-F0-9]{6}', item['background'])
         assert 0 <= item['inset'] <= 10
         for alias in item['aliases']:

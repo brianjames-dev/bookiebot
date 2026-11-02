@@ -1,5 +1,11 @@
 # Agent Decisions
 
+## 2026-11-02 - Publish The Settled Logo Refinements And Retain Exact Alias Matching
+
+The user expects the revised logos to be live after accepting the refinements in chat. Resolve that instruction to the exact latest hashes of the ten-item batch and separate Amazon smile; record the chat context, previous assets and published candidate bytes in `docs/logo-review/publications/2026-11-02-reviewed-logos.json`. Candidate approval does not require repeating the review through a gallery button when chat already authorizes applying the settled versions. Retain all original/candidate/source history and the existing hash/active-art checks. Prepared merchant circles use zero inset and their own background; approved company audit/recipe/runtime pins move together.
+
+Add `Starbucks Coffee Company` as an explicit alias for Starbucks in both runtime and provenance catalogs. Continue normalized exact matching and optional trailing store/location numbers, with location authoritative and item fallback only for a blank location. No fuzzy/substring guesses, new dependency, provider reassignment, recategorization or financial mutation.
+
 ## 2026-11-02 - Review logos through explicit intake and exact candidate approval
 
 Keep Logo Studio as a reusable agent skill with offline tooling, separate from app runtime and financial data. Combine the existing company and merchant catalogs in one namespaced inventory; preserve actual framing and all matching/category behavior. Flags default to needing input so the user can supply notes or better artwork in chat. Only explicit readiness authorizes refinement. Prefer official high-fidelity assets and deterministic framing; use AI selectively, retaining original inputs, unmodified generated outputs, full prompts and all hashes.

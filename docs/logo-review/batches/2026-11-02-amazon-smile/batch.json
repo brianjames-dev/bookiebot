@@ -50,7 +50,9 @@
           "createdAt": "2026-11-02T20:11:57.590743+00:00"
         }
       ],
-      "status": "candidate-review"
+      "status": "approved",
+      "approvedSha256": "5a3b7d020fc8bdad96e7ce83226c1bb46773f9ad7e68dedae0324b630cd6ea87",
+      "approvedAt": "2026-11-02T21:09:05.917521+00:00"
     }
   ]
 }
