@@ -67,8 +67,14 @@ Bars retain the existing exact-day inspection dialog.
 
 Merchant identity reuses approved service/provider aliases, then the 158 reviewed
 merchant marks. Matching uses explicit normalized names and optional trailing
-store/location numbers; locations take precedence over product names. Amazon and
-Amazon Prime stay distinct. Runtime images are local content-addressed assets;
+store/location numbers. Normalize Unicode, case, punctuation and spacing; no
+fuzzy, substring or typo matching is used. Locations take precedence, with item
+names checked only when the location is blank. `Starbucks Coffee Company` is an
+explicit alias for Starbucks; `Starbucks Coffee Company store #123` also matches.
+An unrelated shop selling a Starbucks product cannot borrow its logo. Amazon and
+Amazon Prime stay distinct. The latest eleven reviewed circle refinements are
+published with their exact candidate hashes, including full-bleed Whole Foods
+and the smile-only Amazon. Runtime images are local content-addressed assets;
 Calendar artwork/catalogs/import workflows are unchanged. No recategorization,
 sheet/bank writes, remote requests or extra settings are introduced.
 
@@ -90,5 +96,8 @@ pixels, category order, status alignment, themes, cents and responsive layout.
 `transaction_fallback_colors_browser_test.cjs` compares computed glyph/disc
 colors directly with the production Category Mix palette, including aliases,
 both themes, live theme switching, failed images and moving persistent circles.
+`transaction_logo_publication_browser_test.cjs` checks all eleven published marks
+in actual Daily Spending/Calendar components, the Starbucks alias/display name,
+zero extra padding and persistent image identity during expansion/collapse.
 All browser checks use synthetic data and blocked external requests. Native acceptance is checklist
 238 in `.agent/STATUS.md`; physical-device appearance still needs phone review.

@@ -1,0 +1,241 @@
+{
+  "kind": "bookiebot-logo-publication",
+  "version": 1,
+  "approval": {
+    "date": "2026-11-02",
+    "channel": "chat",
+    "context": "The user accepted the refinements while iterating Whole Foods and Amazon, then explicitly reported that the updated icons were missing from the app. Publish the latest reviewed versions; resolve this instruction to the exact candidate hashes below."
+  },
+  "changes": [
+    {
+      "key": "company:pge",
+      "batch": "docs/logo-review/batches/2026-11-02-first-refinement/batch.json",
+      "candidate": "docs/logo-review/batches/2026-11-02-first-refinement/candidates/company-pge-0964da2c337441ca.png",
+      "sha256": "0964da2c337441ca47f522fa9b61c9549cb93513c31eb8d75747c4d57920b6ff",
+      "asset": "src/bookiebot/reports/assets/company-logo-pge-0964da2c337441ca.png",
+      "previous": {
+        "id": "pge",
+        "name": "PG&E",
+        "aliases": [
+          "PG&E",
+          "PGE",
+          "Pacific Gas and Electric"
+        ],
+        "source": "https://www.pge.com/content/experience-fragments/pge/en/site/header/master/_jcr_content/root/header/image.coreimg.jpeg/1759521030312/pge-logo-95x100.jpeg",
+        "website": "https://www.pge.com",
+        "license": "Respective company trademark; official public site icon",
+        "asset": "company-logo-pge-50f203cf0ab8750d.png",
+        "sha256": "50f203cf0ab8750d19607b9fdc73508eb360538ff2e66580735619256af19767",
+        "preparedCircle": true,
+        "curation": "docs/logo-review/audit.json"
+      },
+      "background": "#0089c4"
+    },
+    {
+      "key": "company:peacock",
+      "batch": "docs/logo-review/batches/2026-11-02-first-refinement/batch.json",
+      "candidate": "docs/logo-review/batches/2026-11-02-first-refinement/candidates/company-peacock-703eb524d597f9cd.png",
+      "sha256": "703eb524d597f9cd7cb8258a767e4746e6889207d364b66af8371766b35befe4",
+      "asset": "src/bookiebot/reports/assets/company-logo-peacock-703eb524d597f9cd.png",
+      "previous": {
+        "id": "peacock",
+        "name": "Peacock",
+        "aliases": [
+          "Peacock",
+          "Peacock Premium"
+        ],
+        "source": "https://cdn.jsdelivr.net/gh/homarr-labs/dashboard-icons@83f32e08257b66fbd971ac8d7645f5b38d52e85d/svg/peacock.svg",
+        "website": "https://github.com/homarr-labs/dashboard-icons",
+        "license": "Brand trademark; dashboard-icons upstream notices apply",
+        "asset": "company-logo-peacock-b970a86f2be4c2ba.png",
+        "sha256": "b970a86f2be4c2baa39ca07efedf3c8fa3c41c26d1a864ffd767dd661bf0428a",
+        "preparedCircle": true,
+        "curation": "docs/logo-review/audit.json"
+      },
+      "background": "#ffffff"
+    },
+    {
+      "key": "company:spotify",
+      "batch": "docs/logo-review/batches/2026-11-02-first-refinement/batch.json",
+      "candidate": "docs/logo-review/batches/2026-11-02-first-refinement/candidates/company-spotify-689c29a8409b5ba0.png",
+      "sha256": "689c29a8409b5ba07c0411e19429f658dce7143486d32fdc048b3ddf21ff0993",
+      "asset": "src/bookiebot/reports/assets/company-logo-spotify-689c29a8409b5ba0.png",
+      "previous": {
+        "id": "spotify",
+        "name": "Spotify",
+        "aliases": [
+          "Spotify",
+          "Spotify Premium"
+        ],
+        "source": "https://cdn.jsdelivr.net/gh/homarr-labs/dashboard-icons@83f32e08257b66fbd971ac8d7645f5b38d52e85d/svg/spotify.svg",
+        "website": "https://github.com/homarr-labs/dashboard-icons",
+        "license": "Brand trademark; dashboard-icons upstream notices apply",
+        "asset": "company-logo-spotify-68f0c1767ea2fb76.png",
+        "sha256": "68f0c1767ea2fb765befee52568268cd9807e46ee61db72212b2027d86740a1e",
+        "preparedCircle": true,
+        "curation": "docs/logo-review/audit.json"
+      },
+      "background": "#18d860"
+    },
+    {
+      "key": "company:state-farm",
+      "batch": "docs/logo-review/batches/2026-11-02-first-refinement/batch.json",
+      "candidate": "docs/logo-review/batches/2026-11-02-first-refinement/candidates/company-state-farm-4d4c3fa7e7bc0b13.png",
+      "sha256": "4d4c3fa7e7bc0b13211f860cc595dbe4f5fb2ad03eea9a000e7ee2d0dbcd946f",
+      "asset": "src/bookiebot/reports/assets/company-logo-state-farm-4d4c3fa7e7bc0b13.png",
+      "previous": {
+        "id": "state-farm",
+        "name": "State Farm",
+        "aliases": [
+          "State Farm"
+        ],
+        "source": "https://www.statefarm.com/favicon.ico",
+        "website": "https://www.statefarm.com",
+        "license": "Respective company trademark; official public site icon",
+        "asset": "company-logo-state-farm-b590f921898f9821.png",
+        "sha256": "b590f921898f9821080d53e3b84ab374a453ac6fd5ef42de97b282ca41a75b81",
+        "preparedCircle": true,
+        "curation": "docs/logo-review/audit.json"
+      },
+      "background": "#ffffff"
+    },
+    {
+      "key": "merchant:usps",
+      "batch": "docs/logo-review/batches/2026-11-02-first-refinement/batch.json",
+      "candidate": "docs/logo-review/batches/2026-11-02-first-refinement/candidates/merchant-usps-565b2978786c5442.png",
+      "sha256": "565b2978786c54422b1779d109d6ab5c04117555b7d7879553511fe5c49ff9dd",
+      "asset": "src/bookiebot/reports/assets/company-logo-merchant-usps-565b2978786c5442.png",
+      "previous": {
+        "id": "usps",
+        "name": "USPS",
+        "aliases": [
+          "USPS"
+        ],
+        "asset": "company-logo-merchant-usps-a38dc7d740123c28.svg",
+        "background": "#ffffff",
+        "inset": 7
+      },
+      "background": "#ffffff"
+    },
+    {
+      "key": "merchant:walmart",
+      "batch": "docs/logo-review/batches/2026-11-02-first-refinement/batch.json",
+      "candidate": "docs/logo-review/batches/2026-11-02-first-refinement/candidates/merchant-walmart-0f2f06cef4ab7d3c.png",
+      "sha256": "0f2f06cef4ab7d3c62cfd5b383989aa89325b109c04fe3e6a33f2147b1b7ae82",
+      "asset": "src/bookiebot/reports/assets/company-logo-merchant-walmart-0f2f06cef4ab7d3c.png",
+      "previous": {
+        "id": "walmart",
+        "name": "Walmart",
+        "aliases": [
+          "Walmart",
+          "Wal-Mart",
+          "Walmart Supercenter",
+          "Walmart gas"
+        ],
+        "asset": "company-logo-merchant-walmart-c1e12ba4f8a11a41.svg",
+        "background": "#ffffff",
+        "inset": 3
+      },
+      "background": "#0153e3"
+    },
+    {
+      "key": "merchant:trader-joes",
+      "batch": "docs/logo-review/batches/2026-11-02-first-refinement/batch.json",
+      "candidate": "docs/logo-review/batches/2026-11-02-first-refinement/candidates/merchant-trader-joes-f97e72dd46e5d30e.png",
+      "sha256": "f97e72dd46e5d30efec6f8fa4debf699cda8693042aef3561e80c3944fbfc2e7",
+      "asset": "src/bookiebot/reports/assets/company-logo-merchant-trader-joes-f97e72dd46e5d30e.png",
+      "previous": {
+        "id": "trader-joes",
+        "name": "Trader Joe’s",
+        "aliases": [
+          "Trader Joe’s",
+          "Trader Joe's",
+          "Trader Joes"
+        ],
+        "asset": "company-logo-merchant-trader-joes-503e83d3207938d2.svg",
+        "background": "#fffaf0",
+        "inset": 3
+      },
+      "background": "#cd0e2d"
+    },
+    {
+      "key": "merchant:whole-foods",
+      "batch": "docs/logo-review/batches/2026-11-02-first-refinement/batch.json",
+      "candidate": "docs/logo-review/batches/2026-11-02-first-refinement/candidates/merchant-whole-foods-000cf9fe7f128aed.png",
+      "sha256": "000cf9fe7f128aeda25f92275c27568ad350e133434b8a9ccdc8b1dd233968fa",
+      "asset": "src/bookiebot/reports/assets/company-logo-merchant-whole-foods-000cf9fe7f128aed.png",
+      "previous": {
+        "id": "whole-foods",
+        "name": "Whole Foods",
+        "aliases": [
+          "Whole Foods",
+          "Whole Foods Market"
+        ],
+        "asset": "company-logo-merchant-whole-foods-d548ef550b066f1c.svg",
+        "background": "#ffffff",
+        "inset": 0
+      },
+      "background": "#006f44"
+    },
+    {
+      "key": "merchant:safeway",
+      "batch": "docs/logo-review/batches/2026-11-02-first-refinement/batch.json",
+      "candidate": "docs/logo-review/batches/2026-11-02-first-refinement/candidates/merchant-safeway-b2dad9ba0601efd0.png",
+      "sha256": "b2dad9ba0601efd0acbd8b449f14cf84e55eb1c3089f89e62be3b6b6ef0acc6f",
+      "asset": "src/bookiebot/reports/assets/company-logo-merchant-safeway-b2dad9ba0601efd0.png",
+      "previous": {
+        "id": "safeway",
+        "name": "Safeway",
+        "aliases": [
+          "Safeway",
+          "Safeway gas",
+          "Safeway Fuel",
+          "Safeway fuel station"
+        ],
+        "asset": "company-logo-merchant-safeway-85938b09a89cdbd4.svg",
+        "background": "#ffffff",
+        "inset": 4
+      },
+      "background": "#ffffff"
+    },
+    {
+      "key": "merchant:panda-express",
+      "batch": "docs/logo-review/batches/2026-11-02-first-refinement/batch.json",
+      "candidate": "docs/logo-review/batches/2026-11-02-first-refinement/candidates/merchant-panda-express-9be10ad32406fd77.png",
+      "sha256": "9be10ad32406fd7796bbf55c559b65d1dbafd681076092206a6ab7015848fcb4",
+      "asset": "src/bookiebot/reports/assets/company-logo-merchant-panda-express-9be10ad32406fd77.png",
+      "previous": {
+        "id": "panda-express",
+        "name": "Panda Express",
+        "aliases": [
+          "Panda Express"
+        ],
+        "asset": "company-logo-merchant-panda-express-dd57da67b81d91e1.svg",
+        "background": "#ffffff",
+        "inset": 4
+      },
+      "background": "#ffffff"
+    },
+    {
+      "key": "merchant:amazon",
+      "batch": "docs/logo-review/batches/2026-11-02-amazon-smile/batch.json",
+      "candidate": "docs/logo-review/batches/2026-11-02-amazon-smile/candidates/merchant-amazon-5a3b7d020fc8bdad.png",
+      "sha256": "5a3b7d020fc8bdad96e7ce83226c1bb46773f9ad7e68dedae0324b630cd6ea87",
+      "asset": "src/bookiebot/reports/assets/company-logo-merchant-amazon-5a3b7d020fc8bdad.png",
+      "previous": {
+        "id": "amazon",
+        "name": "Amazon",
+        "aliases": [
+          "Amazon",
+          "Amazon.com",
+          "AMZN Mktp US",
+          "Amazon Marketplace"
+        ],
+        "asset": "company-logo-merchant-amazon-ec401e732753cdc5.svg",
+        "background": "#ff9400",
+        "inset": 7
+      },
+      "background": "#f47025"
+    }
+  ]
+}

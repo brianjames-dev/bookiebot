@@ -756,11 +756,11 @@
       "Peacock",
       "Peacock Premium"
     ],
-    "source": "https://cdn.jsdelivr.net/gh/homarr-labs/dashboard-icons@83f32e08257b66fbd971ac8d7645f5b38d52e85d/svg/peacock.svg",
+    "source": "https://1000logos.net/wp-content/uploads/2023/09/Peacock-Emblem.png",
     "website": "https://github.com/homarr-labs/dashboard-icons",
     "license": "Brand trademark; dashboard-icons upstream notices apply",
-    "asset": "company-logo-peacock-b970a86f2be4c2ba.png",
-    "sha256": "b970a86f2be4c2baa39ca07efedf3c8fa3c41c26d1a864ffd767dd661bf0428a",
+    "asset": "company-logo-peacock-703eb524d597f9cd.png",
+    "sha256": "703eb524d597f9cd7cb8258a767e4746e6889207d364b66af8371766b35befe4",
     "preparedCircle": true,
     "curation": "docs/logo-review/audit.json"
   },
@@ -786,11 +786,11 @@
       "PGE",
       "Pacific Gas and Electric"
     ],
-    "source": "https://www.pge.com/content/experience-fragments/pge/en/site/header/master/_jcr_content/root/header/image.coreimg.jpeg/1759521030312/pge-logo-95x100.jpeg",
+    "source": "https://static.toss.im/png-icons/securities/icn-sec-fill-PCG.png",
     "website": "https://www.pge.com",
     "license": "Respective company trademark; official public site icon",
-    "asset": "company-logo-pge-50f203cf0ab8750d.png",
-    "sha256": "50f203cf0ab8750d19607b9fdc73508eb360538ff2e66580735619256af19767",
+    "asset": "company-logo-pge-0964da2c337441ca.png",
+    "sha256": "0964da2c337441ca47f522fa9b61c9549cb93513c31eb8d75747c4d57920b6ff",
     "preparedCircle": true,
     "curation": "docs/logo-review/audit.json"
   },
@@ -1040,11 +1040,11 @@
       "Spotify",
       "Spotify Premium"
     ],
-    "source": "https://cdn.jsdelivr.net/gh/homarr-labs/dashboard-icons@83f32e08257b66fbd971ac8d7645f5b38d52e85d/svg/spotify.svg",
+    "source": "https://thumb.wikimedia.org/wikipedia/commons/thumb/8/84/Spotify_icon.svg/1280px-Spotify_icon.svg.png?utm_source=commons.wikimedia.org&utm_campaign=index&utm_content=thumbnail",
     "website": "https://github.com/homarr-labs/dashboard-icons",
     "license": "Brand trademark; dashboard-icons upstream notices apply",
-    "asset": "company-logo-spotify-68f0c1767ea2fb76.png",
-    "sha256": "68f0c1767ea2fb765befee52568268cd9807e46ee61db72212b2027d86740a1e",
+    "asset": "company-logo-spotify-689c29a8409b5ba0.png",
+    "sha256": "689c29a8409b5ba07c0411e19429f658dce7143486d32fdc048b3ddf21ff0993",
     "preparedCircle": true,
     "curation": "docs/logo-review/audit.json"
   },
@@ -1054,11 +1054,11 @@
     "aliases": [
       "State Farm"
     ],
-    "source": "https://www.statefarm.com/favicon.ico",
+    "source": "https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcSumjr2DErC83lMEUaXE4wx9gEgg42gB8ITtLJhripGBQ&s=10",
     "website": "https://www.statefarm.com",
     "license": "Respective company trademark; official public site icon",
-    "asset": "company-logo-state-farm-b590f921898f9821.png",
-    "sha256": "b590f921898f9821080d53e3b84ab374a453ac6fd5ef42de97b282ca41a75b81",
+    "asset": "company-logo-state-farm-4d4c3fa7e7bc0b13.png",
+    "sha256": "4d4c3fa7e7bc0b13211f860cc595dbe4f5fb2ad03eea9a000e7ee2d0dbcd946f",
     "preparedCircle": true,
     "curation": "docs/logo-review/audit.json"
   },

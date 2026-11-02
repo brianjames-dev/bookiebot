@@ -185,7 +185,8 @@
       "id": "starbucks",
       "name": "Starbucks",
       "aliases": [
-        "Starbucks"
+        "Starbucks",
+        "Starbucks Coffee Company"
       ],
       "group": "Fast food & coffee",
       "asset": "company-logo-merchant-starbucks-e8a397a07e93c0a4.svg",
@@ -736,14 +737,42 @@
         "USPS"
       ],
       "group": "Shipping",
-      "asset": "company-logo-merchant-usps-a38dc7d740123c28.svg",
+      "asset": "company-logo-merchant-usps-565b2978786c5442.png",
       "background": "#ffffff",
-      "inset": 7,
-      "source": "https://www.usps.com",
-      "package": "simple-icons@16.5.0",
-      "upstream": "https://cdn.jsdelivr.net/npm/simple-icons@16.5.0/icons/usps.svg",
-      "sha256": "a38dc7d740123c280461552c5f661e9abea2ba49077c7e43c43bb021d688993e",
-      "review": "approved-2026-11-01"
+      "inset": 0,
+      "source": "https://1000logos.net/wp-content/uploads/2020/09/USPS-Logo.jpg",
+      "package": "Logo Studio · native artwork",
+      "upstream": "https://1000logos.net/wp-content/uploads/2020/09/USPS-Logo.jpg",
+      "sha256": "565b2978786c54422b1779d109d6ab5c04117555b7d7879553511fe5c49ff9dd",
+      "review": "approved-2026-11-02",
+      "previousVersions": [
+        {
+          "id": "usps",
+          "name": "USPS",
+          "aliases": [
+            "USPS"
+          ],
+          "group": "Shipping",
+          "asset": "company-logo-merchant-usps-a38dc7d740123c28.svg",
+          "background": "#ffffff",
+          "inset": 7,
+          "source": "https://www.usps.com",
+          "package": "simple-icons@16.5.0",
+          "upstream": "https://cdn.jsdelivr.net/npm/simple-icons@16.5.0/icons/usps.svg",
+          "sha256": "a38dc7d740123c280461552c5f661e9abea2ba49077c7e43c43bb021d688993e",
+          "review": "approved-2026-11-01",
+          "previousVersions": []
+        }
+      ],
+      "studioReview": {
+        "batch": "docs/logo-review/batches/2026-11-02-first-refinement/batch.json",
+        "candidateSha256": "565b2978786c54422b1779d109d6ab5c04117555b7d7879553511fe5c49ff9dd",
+        "source": "docs/logo-review/batches/2026-11-02-first-refinement/references/merchant-usps-6ee5fd5b64ea6e37.jpg",
+        "sourceSha256": "6ee5fd5b64ea6e374bb2810dc6df18cdc72ad86215c27082af13642b939c17c2",
+        "sourceUrl": "https://1000logos.net/wp-content/uploads/2020/09/USPS-Logo.jpg",
+        "method": "reframe",
+        "rendering": "docs/logo-review/batches/2026-11-02-first-refinement/rendering.json"
+      }
     },
     {
       "id": "dhl",
@@ -789,14 +818,47 @@
         "Amazon Marketplace"
       ],
       "group": "General stores",
-      "asset": "company-logo-merchant-amazon-ec401e732753cdc5.svg",
-      "background": "#ff9400",
-      "inset": 7,
-      "source": "https://commons.wikimedia.org/wiki/File:Amazon_logo.svg",
-      "sha256": "ec401e732753cdc53ffe77e28b201409be53fc5447947689db3c36524951bb49",
+      "asset": "company-logo-merchant-amazon-5a3b7d020fc8bdad.png",
+      "background": "#f47025",
+      "inset": 0,
+      "source": "https://static.vecteezy.com/system/resources/previews/014/018/560/non_2x/amazon-smile-logo-on-transparent-background-free-vector.jpg",
+      "sha256": "5a3b7d020fc8bdad96e7ce83226c1bb46773f9ad7e68dedae0324b630cd6ea87",
       "adaptation": "Original full wordmark in white; orange circle matching user reference.",
       "referenceReview": "2026-11-01-user-corrections",
-      "review": "approved-2026-11-01"
+      "review": "approved-2026-11-02",
+      "previousVersions": [
+        {
+          "id": "amazon",
+          "name": "Amazon",
+          "aliases": [
+            "Amazon",
+            "Amazon.com",
+            "AMZN Mktp US",
+            "Amazon Marketplace"
+          ],
+          "group": "General stores",
+          "asset": "company-logo-merchant-amazon-ec401e732753cdc5.svg",
+          "background": "#ff9400",
+          "inset": 7,
+          "source": "https://commons.wikimedia.org/wiki/File:Amazon_logo.svg",
+          "sha256": "ec401e732753cdc53ffe77e28b201409be53fc5447947689db3c36524951bb49",
+          "adaptation": "Original full wordmark in white; orange circle matching user reference.",
+          "referenceReview": "2026-11-01-user-corrections",
+          "review": "approved-2026-11-01",
+          "previousVersions": []
+        }
+      ],
+      "upstream": "https://static.vecteezy.com/system/resources/previews/014/018/560/non_2x/amazon-smile-logo-on-transparent-background-free-vector.jpg",
+      "package": "Logo Studio · native artwork",
+      "studioReview": {
+        "batch": "docs/logo-review/batches/2026-11-02-amazon-smile/batch.json",
+        "candidateSha256": "5a3b7d020fc8bdad96e7ce83226c1bb46773f9ad7e68dedae0324b630cd6ea87",
+        "source": "docs/logo-review/batches/2026-11-02-amazon-smile/references/merchant-amazon-5817e47dce01f1c5.jpg",
+        "sourceSha256": "5817e47dce01f1c544d7837a8898a03853a11e3c5a35d2375b0930a5e85db088",
+        "sourceUrl": "https://static.vecteezy.com/system/resources/previews/014/018/560/non_2x/amazon-smile-logo-on-transparent-background-free-vector.jpg",
+        "method": "reframe",
+        "rendering": "docs/logo-review/batches/2026-11-02-amazon-smile/rendering.json"
+      }
     },
     {
       "id": "walmart",
@@ -808,15 +870,47 @@
         "Walmart gas"
       ],
       "group": "General stores",
-      "asset": "company-logo-merchant-walmart-c1e12ba4f8a11a41.svg",
-      "background": "#ffffff",
-      "inset": 3,
-      "source": "https://github.com/simple-icons/simple-icons/tree/11.15.0/icons/walmart.svg",
-      "package": "simple-icons@11.15.0",
-      "upstream": "https://cdn.jsdelivr.net/npm/simple-icons@11.15.0/icons/walmart.svg",
+      "asset": "company-logo-merchant-walmart-0f2f06cef4ab7d3c.png",
+      "background": "#0153e3",
+      "inset": 0,
+      "source": "https://www.allrecipes.com/thmb/V0uJ5-OXuEY2ozGrx16E-QOw53I=/1500x0/filters:no_upscale():max_bytes(150000):strip_icc()/ar-new-walmart-logo-spark-blue-4x3-05716be5a80a49858b751defdd5c3705.jpg",
+      "package": "Logo Studio · native artwork",
+      "upstream": "https://www.allrecipes.com/thmb/V0uJ5-OXuEY2ozGrx16E-QOw53I=/1500x0/filters:no_upscale():max_bytes(150000):strip_icc()/ar-new-walmart-logo-spark-blue-4x3-05716be5a80a49858b751defdd5c3705.jpg",
       "fill": "0071CE",
-      "sha256": "c1e12ba4f8a11a419e957fee26a9e41901019658a54c2507687ce46c8d92f432",
-      "review": "approved-2026-11-01"
+      "sha256": "0f2f06cef4ab7d3c62cfd5b383989aa89325b109c04fe3e6a33f2147b1b7ae82",
+      "review": "approved-2026-11-02",
+      "previousVersions": [
+        {
+          "id": "walmart",
+          "name": "Walmart",
+          "aliases": [
+            "Walmart",
+            "Wal-Mart",
+            "Walmart Supercenter",
+            "Walmart gas"
+          ],
+          "group": "General stores",
+          "asset": "company-logo-merchant-walmart-c1e12ba4f8a11a41.svg",
+          "background": "#ffffff",
+          "inset": 3,
+          "source": "https://github.com/simple-icons/simple-icons/tree/11.15.0/icons/walmart.svg",
+          "package": "simple-icons@11.15.0",
+          "upstream": "https://cdn.jsdelivr.net/npm/simple-icons@11.15.0/icons/walmart.svg",
+          "fill": "0071CE",
+          "sha256": "c1e12ba4f8a11a419e957fee26a9e41901019658a54c2507687ce46c8d92f432",
+          "review": "approved-2026-11-01",
+          "previousVersions": []
+        }
+      ],
+      "studioReview": {
+        "batch": "docs/logo-review/batches/2026-11-02-first-refinement/batch.json",
+        "candidateSha256": "0f2f06cef4ab7d3c62cfd5b383989aa89325b109c04fe3e6a33f2147b1b7ae82",
+        "source": "docs/logo-review/batches/2026-11-02-first-refinement/references/merchant-walmart-3f556fb6c344a9e4.jpg",
+        "sourceSha256": "3f556fb6c344a9e49eb04ce63bddb14dd91ecb826beffbaf8f5de64ca60cd259",
+        "sourceUrl": "https://www.allrecipes.com/thmb/V0uJ5-OXuEY2ozGrx16E-QOw53I=/1500x0/filters:no_upscale():max_bytes(150000):strip_icc()/ar-new-walmart-logo-spark-blue-4x3-05716be5a80a49858b751defdd5c3705.jpg",
+        "method": "reframe",
+        "rendering": "docs/logo-review/batches/2026-11-02-first-refinement/rendering.json"
+      }
     },
     {
       "id": "trader-joes",
@@ -827,13 +921,43 @@
         "Trader Joes"
       ],
       "group": "Groceries",
-      "asset": "company-logo-merchant-trader-joes-503e83d3207938d2.svg",
-      "background": "#fffaf0",
-      "inset": 3,
-      "source": "https://commons.wikimedia.org/wiki/File:Trader_Joes_Logo.svg",
-      "upstream": "https://upload.wikimedia.org/wikipedia/commons/d/d1/Trader_Joes_Logo.svg",
-      "sha256": "503e83d3207938d283c565f96f2bdfa09fac55a8184b5624d72d735d205edb6a",
-      "review": "approved-2026-11-01"
+      "asset": "company-logo-merchant-trader-joes-f97e72dd46e5d30e.png",
+      "background": "#cd0e2d",
+      "inset": 0,
+      "source": "https://1792exchange.com/wp-content/uploads/2026/03/company-trader-joes-logo.jpg",
+      "upstream": "https://1792exchange.com/wp-content/uploads/2026/03/company-trader-joes-logo.jpg",
+      "sha256": "f97e72dd46e5d30efec6f8fa4debf699cda8693042aef3561e80c3944fbfc2e7",
+      "review": "approved-2026-11-02",
+      "previousVersions": [
+        {
+          "id": "trader-joes",
+          "name": "Trader Joe’s",
+          "aliases": [
+            "Trader Joe’s",
+            "Trader Joe's",
+            "Trader Joes"
+          ],
+          "group": "Groceries",
+          "asset": "company-logo-merchant-trader-joes-503e83d3207938d2.svg",
+          "background": "#fffaf0",
+          "inset": 3,
+          "source": "https://commons.wikimedia.org/wiki/File:Trader_Joes_Logo.svg",
+          "upstream": "https://upload.wikimedia.org/wikipedia/commons/d/d1/Trader_Joes_Logo.svg",
+          "sha256": "503e83d3207938d283c565f96f2bdfa09fac55a8184b5624d72d735d205edb6a",
+          "review": "approved-2026-11-01",
+          "previousVersions": []
+        }
+      ],
+      "package": "Logo Studio · native artwork",
+      "studioReview": {
+        "batch": "docs/logo-review/batches/2026-11-02-first-refinement/batch.json",
+        "candidateSha256": "f97e72dd46e5d30efec6f8fa4debf699cda8693042aef3561e80c3944fbfc2e7",
+        "source": "docs/logo-review/batches/2026-11-02-first-refinement/references/merchant-trader-joes-b949368110f17c47.jpg",
+        "sourceSha256": "b949368110f17c47341515144b04ca9882bf9b9004c03dbd5f0644ad169b2af3",
+        "sourceUrl": "https://1792exchange.com/wp-content/uploads/2026/03/company-trader-joes-logo.jpg",
+        "method": "reframe",
+        "rendering": "docs/logo-review/batches/2026-11-02-first-refinement/rendering.json"
+      }
     },
     {
       "id": "whole-foods",
@@ -843,13 +967,42 @@
         "Whole Foods Market"
       ],
       "group": "Groceries",
-      "asset": "company-logo-merchant-whole-foods-d548ef550b066f1c.svg",
-      "background": "#ffffff",
+      "asset": "company-logo-merchant-whole-foods-000cf9fe7f128aed.png",
+      "background": "#006f44",
       "inset": 0,
-      "source": "https://commons.wikimedia.org/wiki/File:Whole_Foods_Market_201x_logo.svg",
-      "upstream": "https://upload.wikimedia.org/wikipedia/commons/a/a2/Whole_Foods_Market_201x_logo.svg",
-      "sha256": "d548ef550b066f1caea51efc632d626aed0bf0ea2506f8d295ea33a01d5b034e",
-      "review": "approved-2026-11-01"
+      "source": "https://thumb.wikimedia.org/wikipedia/commons/thumb/a/a2/Whole_Foods_Market_201x_logo.svg/3840px-Whole_Foods_Market_201x_logo.svg.png?utm_source=commons.wikimedia.org&utm_campaign=index&utm_content=thumbnail",
+      "upstream": "https://thumb.wikimedia.org/wikipedia/commons/thumb/a/a2/Whole_Foods_Market_201x_logo.svg/3840px-Whole_Foods_Market_201x_logo.svg.png?utm_source=commons.wikimedia.org&utm_campaign=index&utm_content=thumbnail",
+      "sha256": "000cf9fe7f128aeda25f92275c27568ad350e133434b8a9ccdc8b1dd233968fa",
+      "review": "approved-2026-11-02",
+      "previousVersions": [
+        {
+          "id": "whole-foods",
+          "name": "Whole Foods",
+          "aliases": [
+            "Whole Foods",
+            "Whole Foods Market"
+          ],
+          "group": "Groceries",
+          "asset": "company-logo-merchant-whole-foods-d548ef550b066f1c.svg",
+          "background": "#ffffff",
+          "inset": 0,
+          "source": "https://commons.wikimedia.org/wiki/File:Whole_Foods_Market_201x_logo.svg",
+          "upstream": "https://upload.wikimedia.org/wikipedia/commons/a/a2/Whole_Foods_Market_201x_logo.svg",
+          "sha256": "d548ef550b066f1caea51efc632d626aed0bf0ea2506f8d295ea33a01d5b034e",
+          "review": "approved-2026-11-01",
+          "previousVersions": []
+        }
+      ],
+      "package": "Logo Studio · native artwork",
+      "studioReview": {
+        "batch": "docs/logo-review/batches/2026-11-02-first-refinement/batch.json",
+        "candidateSha256": "000cf9fe7f128aeda25f92275c27568ad350e133434b8a9ccdc8b1dd233968fa",
+        "source": "docs/logo-review/batches/2026-11-02-first-refinement/references/merchant-whole-foods-65d2ef50b33cf9c7.png",
+        "sourceSha256": "65d2ef50b33cf9c7e92bb252054170486acf6e6555de3af0d8f3eac490e2763e",
+        "sourceUrl": "https://thumb.wikimedia.org/wikipedia/commons/thumb/a/a2/Whole_Foods_Market_201x_logo.svg/3840px-Whole_Foods_Market_201x_logo.svg.png?utm_source=commons.wikimedia.org&utm_campaign=index&utm_content=thumbnail",
+        "method": "reframe",
+        "rendering": "docs/logo-review/batches/2026-11-02-first-refinement/rendering.json"
+      }
     },
     {
       "id": "chevron",
@@ -927,15 +1080,49 @@
       ],
       "group": "Groceries",
       "background": "#ffffff",
-      "inset": 4,
+      "inset": 0,
       "originalSha256": "6d945a7c4c0da74c754a01fcf2fa59443310d1507437bf30ee9f099c1f463b0d",
-      "upstream": "https://upload.wikimedia.org/wikipedia/commons/c/ce/Safeway_Logo.svg",
-      "source": "https://commons.wikimedia.org/wiki/File:Safeway_Logo.svg",
-      "asset": "company-logo-merchant-safeway-85938b09a89cdbd4.svg",
-      "sha256": "85938b09a89cdbd4eb9e10752c7a9d3a9399cb08d4e9e891d45939633476575a",
+      "upstream": "https://1000logos.net/wp-content/uploads/2025/01/Safeway-Emblem.png",
+      "source": "https://1000logos.net/wp-content/uploads/2025/01/Safeway-Emblem.png",
+      "asset": "company-logo-merchant-safeway-b2dad9ba0601efd0.png",
+      "sha256": "b2dad9ba0601efd0acbd8b449f14cf84e55eb1c3089f89e62be3b6b6ef0acc6f",
       "addedIn": "merchant-expansion-2026-11-01",
-      "review": "approved-2026-11-01",
-      "optimization": "svgo@3.3.2; native geometry, 4-digit precision; remove unused definitions"
+      "review": "approved-2026-11-02",
+      "optimization": "svgo@3.3.2; native geometry, 4-digit precision; remove unused definitions",
+      "previousVersions": [
+        {
+          "id": "safeway",
+          "name": "Safeway",
+          "aliases": [
+            "Safeway",
+            "Safeway gas",
+            "Safeway Fuel",
+            "Safeway fuel station"
+          ],
+          "group": "Groceries",
+          "background": "#ffffff",
+          "inset": 4,
+          "originalSha256": "6d945a7c4c0da74c754a01fcf2fa59443310d1507437bf30ee9f099c1f463b0d",
+          "upstream": "https://upload.wikimedia.org/wikipedia/commons/c/ce/Safeway_Logo.svg",
+          "source": "https://commons.wikimedia.org/wiki/File:Safeway_Logo.svg",
+          "asset": "company-logo-merchant-safeway-85938b09a89cdbd4.svg",
+          "sha256": "85938b09a89cdbd4eb9e10752c7a9d3a9399cb08d4e9e891d45939633476575a",
+          "addedIn": "merchant-expansion-2026-11-01",
+          "review": "approved-2026-11-01",
+          "optimization": "svgo@3.3.2; native geometry, 4-digit precision; remove unused definitions",
+          "previousVersions": []
+        }
+      ],
+      "package": "Logo Studio · native artwork",
+      "studioReview": {
+        "batch": "docs/logo-review/batches/2026-11-02-first-refinement/batch.json",
+        "candidateSha256": "b2dad9ba0601efd0acbd8b449f14cf84e55eb1c3089f89e62be3b6b6ef0acc6f",
+        "source": "docs/logo-review/batches/2026-11-02-first-refinement/references/merchant-safeway-93776f049fa7c37e.png",
+        "sourceSha256": "93776f049fa7c37eb8a6aeb310afdeebf21278592cb8e26c7a429e718867c586",
+        "sourceUrl": "https://1000logos.net/wp-content/uploads/2025/01/Safeway-Emblem.png",
+        "method": "reframe",
+        "rendering": "docs/logo-review/batches/2026-11-02-first-refinement/rendering.json"
+      }
     },
     {
       "id": "raley-s",
@@ -2781,15 +2968,46 @@
       ],
       "group": "Fast food & coffee",
       "background": "#ffffff",
-      "inset": 4,
-      "upstream": "https://upload.wikimedia.org/wikipedia/en/8/85/Panda_Express_logo.svg?utm_source=en.wikipedia.org&utm_campaign=imageinfo&utm_content=original",
+      "inset": 0,
+      "upstream": "https://en.wikipedia.org/wiki/File:Panda_Express_logo.svg",
       "source": "https://en.wikipedia.org/wiki/File:Panda_Express_logo.svg",
       "originalSha256": "ae894971219c8fda56dda80886fc763f31a817dd78606943841cd2e5d76cf179",
-      "asset": "company-logo-merchant-panda-express-dd57da67b81d91e1.svg",
-      "sha256": "dd57da67b81d91e16f96e70e04b37d876850f8077d655a74b5879898f798fe6a",
+      "asset": "company-logo-merchant-panda-express-9be10ad32406fd77.png",
+      "sha256": "9be10ad32406fd7796bbf55c559b65d1dbafd681076092206a6ab7015848fcb4",
       "addedIn": "merchant-expansion-2026-11-01",
-      "review": "approved-2026-11-01",
-      "optimization": "svgo@3.3.2; native geometry, 4-digit precision; remove unused definitions"
+      "review": "approved-2026-11-02",
+      "optimization": "svgo@3.3.2; native geometry, 4-digit precision; remove unused definitions",
+      "previousVersions": [
+        {
+          "id": "panda-express",
+          "name": "Panda Express",
+          "aliases": [
+            "Panda Express"
+          ],
+          "group": "Fast food & coffee",
+          "background": "#ffffff",
+          "inset": 4,
+          "upstream": "https://upload.wikimedia.org/wikipedia/en/8/85/Panda_Express_logo.svg?utm_source=en.wikipedia.org&utm_campaign=imageinfo&utm_content=original",
+          "source": "https://en.wikipedia.org/wiki/File:Panda_Express_logo.svg",
+          "originalSha256": "ae894971219c8fda56dda80886fc763f31a817dd78606943841cd2e5d76cf179",
+          "asset": "company-logo-merchant-panda-express-dd57da67b81d91e1.svg",
+          "sha256": "dd57da67b81d91e16f96e70e04b37d876850f8077d655a74b5879898f798fe6a",
+          "addedIn": "merchant-expansion-2026-11-01",
+          "review": "approved-2026-11-01",
+          "optimization": "svgo@3.3.2; native geometry, 4-digit precision; remove unused definitions",
+          "previousVersions": []
+        }
+      ],
+      "package": "Logo Studio · native artwork",
+      "studioReview": {
+        "batch": "docs/logo-review/batches/2026-11-02-first-refinement/batch.json",
+        "candidateSha256": "9be10ad32406fd7796bbf55c559b65d1dbafd681076092206a6ab7015848fcb4",
+        "source": "docs/logo-review/batches/2026-11-02-first-refinement/references/merchant-panda-express-dd57da67b81d91e1.svg",
+        "sourceSha256": "dd57da67b81d91e16f96e70e04b37d876850f8077d655a74b5879898f798fe6a",
+        "sourceUrl": "https://en.wikipedia.org/wiki/File:Panda_Express_logo.svg",
+        "method": "reframe",
+        "rendering": "docs/logo-review/batches/2026-11-02-first-refinement/rendering.json"
+      }
     },
     {
       "id": "wingstop",

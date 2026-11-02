@@ -49,7 +49,9 @@
           "createdAt": "2026-11-02T19:43:07.890856+00:00"
         }
       ],
-      "status": "candidate-review"
+      "status": "approved",
+      "approvedSha256": "0964da2c337441ca47f522fa9b61c9549cb93513c31eb8d75747c4d57920b6ff",
+      "approvedAt": "2026-11-02T21:09:04.913090+00:00"
     },
     {
       "key": "company:peacock",
@@ -95,7 +97,9 @@
           "createdAt": "2026-11-02T19:43:07.959157+00:00"
         }
       ],
-      "status": "candidate-review"
+      "status": "approved",
+      "approvedSha256": "703eb524d597f9cd7cb8258a767e4746e6889207d364b66af8371766b35befe4",
+      "approvedAt": "2026-11-02T21:09:04.985151+00:00"
     },
     {
       "key": "company:spotify",
@@ -141,7 +145,9 @@
           "createdAt": "2026-11-02T19:43:08.021144+00:00"
         }
       ],
-      "status": "candidate-review"
+      "status": "approved",
+      "approvedSha256": "689c29a8409b5ba07c0411e19429f658dce7143486d32fdc048b3ddf21ff0993",
+      "approvedAt": "2026-11-02T21:09:05.058067+00:00"
     },
     {
       "key": "company:state-farm",
@@ -186,7 +192,9 @@
           "createdAt": "2026-11-02T19:43:08.081428+00:00"
         }
       ],
-      "status": "candidate-review"
+      "status": "approved",
+      "approvedSha256": "4d4c3fa7e7bc0b13211f860cc595dbe4f5fb2ad03eea9a000e7ee2d0dbcd946f",
+      "approvedAt": "2026-11-02T21:09:05.128742+00:00"
     },
     {
       "key": "merchant:usps",
@@ -231,7 +239,9 @@
           "createdAt": "2026-11-02T19:43:08.142179+00:00"
         }
       ],
-      "status": "candidate-review"
+      "status": "approved",
+      "approvedSha256": "565b2978786c54422b1779d109d6ab5c04117555b7d7879553511fe5c49ff9dd",
+      "approvedAt": "2026-11-02T21:09:05.202132+00:00"
     },
     {
       "key": "merchant:walmart",
@@ -279,7 +289,9 @@
           "createdAt": "2026-11-02T19:43:08.202829+00:00"
         }
       ],
-      "status": "candidate-review"
+      "status": "approved",
+      "approvedSha256": "0f2f06cef4ab7d3c62cfd5b383989aa89325b109c04fe3e6a33f2147b1b7ae82",
+      "approvedAt": "2026-11-02T21:09:05.273109+00:00"
     },
     {
       "key": "merchant:trader-joes",
@@ -326,7 +338,9 @@
           "createdAt": "2026-11-02T19:43:08.262754+00:00"
         }
       ],
-      "status": "candidate-review"
+      "status": "approved",
+      "approvedSha256": "f97e72dd46e5d30efec6f8fa4debf699cda8693042aef3561e80c3944fbfc2e7",
+      "approvedAt": "2026-11-02T21:09:05.344634+00:00"
     },
     {
       "key": "merchant:whole-foods",
@@ -386,7 +400,9 @@
           "createdAt": "2026-11-02T19:45:03.388092+00:00"
         }
       ],
-      "status": "candidate-review"
+      "status": "approved",
+      "approvedSha256": "000cf9fe7f128aeda25f92275c27568ad350e133434b8a9ccdc8b1dd233968fa",
+      "approvedAt": "2026-11-02T21:09:05.415061+00:00"
     },
     {
       "key": "merchant:safeway",
@@ -434,7 +450,9 @@
           "createdAt": "2026-11-02T19:43:08.381668+00:00"
         }
       ],
-      "status": "candidate-review"
+      "status": "approved",
+      "approvedSha256": "b2dad9ba0601efd0acbd8b449f14cf84e55eb1c3089f89e62be3b6b6ef0acc6f",
+      "approvedAt": "2026-11-02T21:09:05.485753+00:00"
     },
     {
       "key": "merchant:panda-express",
@@ -477,7 +495,9 @@
           "createdAt": "2026-11-02T19:43:08.442769+00:00"
         }
       ],
-      "status": "candidate-review"
+      "status": "approved",
+      "approvedSha256": "9be10ad32406fd7796bbf55c559b65d1dbafd681076092206a6ab7015848fcb4",
+      "approvedAt": "2026-11-02T21:09:05.556567+00:00"
     }
   ]
 }
