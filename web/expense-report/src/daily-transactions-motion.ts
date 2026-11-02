@@ -202,7 +202,7 @@ export function createDailyDayMotion(section: HTMLElement, initialOpen: boolean)
       const flight = controller.flights.get(i) || flyer(controller, i, count);
       flight.ghost.dataset.entry = String(i);
       controller.flights.set(i, flight);
-      const frames = times.map((time, frame) => {
+      const frames: Keyframe[] = times.map((time, frame) => {
         const point = poses[frame][i];
         return { offset: time / total, transform: `translate3d(${point.x}px, ${point.y}px, 0) scale(${point.scale})`, opacity: point.opacity };
       });
@@ -212,6 +212,12 @@ export function createDailyDayMotion(section: HTMLElement, initialOpen: boolean)
         flight.ghost.style.opacity = String(end.opacity)
         snapshot.copy.forEach(({ element }) => { element.style.opacity = open ? '1' : '0' })
         return
+      }
+      // Visible previews stay opaque. A redundant 1→1 opacity effect changes
+      // compositing as their nested clips start moving and can flash on iOS.
+      if (frames.every(frame => frame.opacity === frames[0].opacity)) {
+        flight.ghost.style.opacity = String(frames[0].opacity)
+        frames.forEach(frame => { delete frame.opacity })
       }
       const moving = animate(controller, flight.ghost, frames, { duration: total, easing: 'linear' });
       if (flight.selfHole) {

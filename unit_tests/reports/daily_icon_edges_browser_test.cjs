@@ -1,4 +1,4 @@
-// Pixel regressions for moving circle edges and the last collapse frame.
+// Pixel regressions for the opening handoff, moving edges and last collapse frame.
 // The frozen-SVG case emulates the reported renderer leaving mask geometry at
 // its starting paint; desktop engines do not reproduce every native iOS bug.
 const assert=require('node:assert/strict'),fs=require('node:fs'),path=require('node:path'),{createRequire}=require('node:module'),{execFileSync}=require('node:child_process')
@@ -12,11 +12,21 @@ const bundle=req('esbuild').buildSync({stdin:{resolveDir:frontend,loader:'tsx',c
 `},bundle:true,write:false,format:'iife',define:{'process.env.NODE_ENV':'"production"'}}).outputFiles[0].text
 async function seek(page,time){await page.evaluate(async time=>{const animations=document.querySelector('.bb-daily-day-group').getAnimations({subtree:true});for(const a of animations)a.pause();await Promise.all(animations.map(a=>a.ready.catch(()=>{})));for(const a of animations)a.currentTime=Math.min(time,a.effect.getComputedTiming().endTime);await new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve)))},time)}
 async function resume(page){await page.evaluate(()=>{for(const a of document.querySelector('.bb-daily-day-group').getAnimations({subtree:true}))if(a.currentTime<a.effect.getComputedTiming().endTime)a.play()});await page.waitForFunction(()=>document.querySelector('.bb-daily-day-group').dataset.moving==='false')}
+async function startExpansion(page,header){
+ const beforeWillChange=await page.locator('.bb-daily-bead').evaluateAll(nodes=>nodes.map(n=>getComputedStyle(n).willChange))
+ await header.click()
+ const handoff=await page.locator('.bb-daily-bead').evaluateAll(nodes=>({willChange:nodes.map(n=>getComputedStyle(n).willChange),redundantOpacity:nodes.flatMap(n=>n.getAnimations().filter(a=>{const frames=a.effect.getKeyframes();return frames.some(f=>'opacity' in f)&&frames.every(f=>Number(f.opacity)===1)})).length}))
+ assert.equal(handoff.redundantOpacity,0,'Opaque preview icons must not acquire an opacity effect when motion starts')
+ assert.deepEqual(handoff.willChange,beforeWillChange,'Starting motion must not change icon layer hints')
+}
 async function inspectEdges(page,file){
- const points=await page.locator('.bb-daily-bead').evaluateAll(nodes=>nodes.map((n,index)=>{
-  const r=n.getBoundingClientRect(),p={x:r.left+3,y:r.top+14},reference=document.querySelectorAll('[data-reference]')[index].getBoundingClientRect()
-  const clear=nodes.slice(0,index).every(prior=>{const b=prior.getBoundingClientRect(),dot=prior.querySelector('.bb-daily-preview-dot');if(Math.hypot(p.x-b.left-b.width/2,p.y-b.top-b.height/2)<=b.width/2+2.2)return false;if(dot&&getComputedStyle(dot).display!=='none'){const d=dot.getBoundingClientRect();if(d.width&&Math.hypot(p.x-d.left-d.width/2,p.y-d.top-d.height/2)<=d.width/2+2.2)return false}return true})
-  return{...p,clear,reference:{x:reference.left+3,y:reference.top+14}}
+ const points=await page.locator('.bb-daily-bead').evaluateAll(nodes=>nodes.flatMap((n,index)=>{
+  const r=n.getBoundingClientRect(),reference=document.querySelectorAll('[data-reference]')[index].getBoundingClientRect()
+  return [[3,14],[14,3],[25,14],[14,25],[7,7],[21,7],[7,21],[21,21],[14,14]].map(([x,y])=>{
+   const p={x:r.left+x,y:r.top+y}
+   const clear=nodes.slice(0,index).every(prior=>{const b=prior.getBoundingClientRect(),dot=prior.querySelector('.bb-daily-preview-dot');if(Math.hypot(p.x-b.left-b.width/2,p.y-b.top-b.height/2)<=b.width/2+2.8)return false;if(dot&&getComputedStyle(dot).display!=='none'){const d=dot.getBoundingClientRect();if(d.width&&Math.hypot(p.x-d.left-d.width/2,p.y-d.top-d.height/2)<=d.width/2+2.8)return false}return true})
+   return{...p,clear,reference:{x:reference.left+x,y:reference.top+y}}
+  })
  }))
  await page.screenshot({path:file})
  return JSON.parse(execFileSync(process.env.BOOKIEBOT_TEST_PYTHON||'python',['-c',`from PIL import Image
@@ -26,7 +36,10 @@ for p in points:
  if not p['clear']: continue
  def color(v): return im.getpixel((round(v['x']*3),round(v['y']*3)))
  actual,expected=color(p),color(p['reference'])
- assert max(abs(a-b) for a,b in zip(actual,expected))<=5, {'actual':actual,'expected':expected,'point':p}
+ # Compare flat reference pixels; glyph-edge antialiasing varies with subpixels.
+ rx,ry=round(p['reference']['x']*3),round(p['reference']['y']*3)
+ if any(max(abs(a-b) for a,b in zip(im.getpixel((rx+dx,ry+dy)),expected))>2 for dx in [-2,0,2] for dy in [-2,0,2]): continue
+ assert max(abs(a-b) for a,b in zip(actual,expected))<=8, {'actual':actual,'expected':expected,'point':p}
  checked+=1
 assert checked>0
 print(json.dumps({'checked':checked}))`,file,JSON.stringify(points)],{encoding:'utf8'}))
@@ -46,8 +59,8 @@ print(json.dumps({'checked':checked}))`,file,JSON.stringify(points)],{encoding:'
  // Unclipped copies are pixel references, not part of the production component.
  await page.locator('.bb-daily-bead').evaluateAll(nodes=>nodes.forEach((n,index)=>{const ref=n.querySelector('.bb-transaction-icon').cloneNode(true);ref.dataset.reference='true';Object.assign(ref.style,{position:'fixed',left:`${18+index*38}px`,top:'760px'});document.body.append(ref)}))
  const header=page.locator('.bb-daily-day-header'),prefix=`/private/tmp/daily-icon-edges-${engine.name()}-${dark}-${frozen}`
- await header.click();let samples=0
- for(const time of[250,400,520]){await seek(page,time);samples+=(await inspectEdges(page,`${prefix}-open-${time}.png`)).checked}
+ await startExpansion(page,header);let samples=0
+ for(const time of[0,8,16,32,48,64,96,128,192,250,400,520]){await seek(page,time);samples+=(await inspectEdges(page,`${prefix}-open-${time}.png`)).checked}
  await resume(page);await header.click()
  for(const time of[80,160]){await seek(page,time);samples+=(await inspectEdges(page,`${prefix}-close-${time}.png`)).checked}
  await seek(page,643.99);await header.screenshot({path:`${prefix}-before.png`});await resume(page);await header.screenshot({path:`${prefix}-after.png`})
@@ -58,6 +71,7 @@ assert a.size==b.size
 mean=sum(ImageStat.Stat(ImageChops.difference(a,b)).mean)/3
 assert mean<0.25,mean
 print(json.dumps({'meanPixelDifference':mean}))`,`${prefix}-before.png`,`${prefix}-after.png`],{encoding:'utf8'}))
+ for(let repeat=0;repeat<2;repeat++){await startExpansion(page,header);await seek(page,48);samples+=(await inspectEdges(page,`${prefix}-repeat-${repeat}-48.png`)).checked;await resume(page);await header.click();await resume(page)}
  assert.deepEqual(errors,[]);console.log(JSON.stringify({engine:engine.name(),dark,frozen,samples,...landing}));cases++;await page.close()
  }}finally{await browser.close()}}
  console.log(`${cases} mobile pixel-edge / collapse-landing cases passed`)

@@ -649,7 +649,6 @@ button.bb-left-categories { cursor: pointer; }
 .bb-daily-icon-layer { position: absolute; inset: 0; z-index: 3; pointer-events: none; visibility: hidden; }
 .bb-daily-day-group[data-motion-ready="true"] .bb-daily-icon-layer { visibility: visible; }
 .bb-daily-bead { display: block; position: absolute; left: 0; top: 0; width: 28px; height: 28px; transform-origin: 0 0; pointer-events: none; }
-.bb-daily-day-group[data-moving="true"] .bb-daily-bead { will-change: transform, opacity; }
 .bb-daily-clip, .bb-daily-bead-paint, .bb-daily-bead-body { display: block; position: absolute; inset: 0; }
 .bb-daily-bead-body:not(:has([data-ready="true"])) { clip-path: none !important; }
 .bb-daily-preview-dot { position: absolute; right: 0; bottom: 0; display: none; width: 6px; height: 6px; border-radius: 50%; transform-origin: center; background: var(--bb-preview-category); }
