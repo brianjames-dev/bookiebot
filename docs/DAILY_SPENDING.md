@@ -35,6 +35,12 @@ Small badge holes still shrink directly with their badge. Separate clip layers
 intersect so overlapping circle/badge holes cannot refill each other. Category dots shrink on departure
 and return on collection; logos remain opaque without crossfading duplicate skins
 or swapping image elements at landing. Unknown/failed logos use category fallbacks.
+Every fallback glyph uses its Category Mix color with a 12% tint of that color
+behind it, in both themes. Utilities use blue; static bills and Needs
+subscriptions use purple. Income uses the success color, while cash Savings and
+ESPP retain their separate chart colors. The same 28px circle keeps this styling
+while loading, after an image failure, and throughout opening/closing; loaded
+merchant artwork keeps its original colors.
 Constant icon opacity is written directly rather than animated; only actual
 overflow fades get opacity keyframes. Motion does not toggle `will-change` on
 the clipped icon surfaces, avoiding redundant compositing changes at startup.
@@ -80,6 +86,9 @@ unchanged lower-icon paint positions are checked throughout motion; native iOS
 behavior still requires phone acceptance. The shipped-bundle
 `daily_spending_controls_browser_test.cjs` covers scopes, controls, transparent-gap
 pixels, category order, status alignment, themes, cents and responsive layout.
-`section_spacing_browser_test.cjs` checks overall bottom spacing. Browser checks
-use synthetic data and blocked external requests. Native acceptance is checklist
-237 in `.agent/STATUS.md`; physical-device smoothness still needs phone review.
+`section_spacing_browser_test.cjs` checks overall bottom spacing.
+`transaction_fallback_colors_browser_test.cjs` compares computed glyph/disc
+colors directly with the production Category Mix palette, including aliases,
+both themes, live theme switching, failed images and moving persistent circles.
+All browser checks use synthetic data and blocked external requests. Native acceptance is checklist
+238 in `.agent/STATUS.md`; physical-device appearance still needs phone review.

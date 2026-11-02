@@ -681,9 +681,17 @@ button.bb-left-categories { cursor: pointer; }
 .bb-transaction-icon[data-ready="true"] > img { opacity: 1; }
 .bb-transaction-icon[data-ready="true"] .bb-transaction-fallback { visibility: hidden; }
 .bb-transaction-icon[data-token="rent"] { color: hsl(var(--category-rent)); background: hsl(var(--category-rent) / .12); }
+.bb-transaction-icon[data-token="grocery"] { color: hsl(var(--category-grocery)); background: hsl(var(--category-grocery) / .12); }
+.bb-transaction-icon[data-token="gas"] { color: hsl(var(--category-gas)); background: hsl(var(--category-gas) / .12); }
+.bb-transaction-icon[data-token="food"] { color: hsl(var(--category-food)); background: hsl(var(--category-food) / .12); }
+.bb-transaction-icon[data-token="shopping"] { color: hsl(var(--category-shopping)); background: hsl(var(--category-shopping) / .12); }
 .bb-transaction-icon[data-token="need"] { color: hsl(var(--category-need)); background: hsl(var(--category-need) / .12); }
-.bb-transaction-icon[data-token="bills"], .bb-transaction-icon[data-token="subs-needs"] { color: hsl(var(--category-subs-needs)); background: hsl(var(--category-subs-needs) / .12); }
+.bb-transaction-icon[data-token="bills"] { color: hsl(var(--category-bills)); background: hsl(var(--category-bills) / .12); }
+.bb-transaction-icon[data-token="subs-needs"] { color: hsl(var(--category-subs-needs)); background: hsl(var(--category-subs-needs) / .12); }
 .bb-transaction-icon[data-token="subs-wants"] { color: hsl(var(--category-subs-wants)); background: hsl(var(--category-subs-wants) / .12); }
+.bb-transaction-icon[data-token="income"] { color: hsl(var(--success)); background: hsl(var(--success) / .12); }
+.bb-transaction-icon[data-token="savings"] { color: hsl(var(--chart-5)); background: hsl(var(--chart-5) / .12); }
+.bb-transaction-icon[data-token="espp"] { color: hsl(var(--chart-4)); background: hsl(var(--chart-4) / .12); }
 @container (max-width: 380px) {
   .bb-daily-amount-row { position: relative; min-height: 46px; box-sizing: content-box; padding-bottom: 0; transition: padding-bottom 280ms var(--bb-daily-ease); }
   .bb-daily-amount-row > .bb-chart-total { flex: none; width: calc(100% - 144px); }

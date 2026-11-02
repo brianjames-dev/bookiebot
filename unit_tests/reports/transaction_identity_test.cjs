@@ -23,6 +23,8 @@ assert.equal(transactionCategory(input({category:'Static Bills & Subscriptions',
 assert.equal(transactionCategory(input({category:'Static Bills & Subscriptions',kind:'subscription'})).icon,'repeat')
 assert.equal(transactionCategory(input({category:'Static Bills & Subscriptions',person:'Want sub'})).icon,'repeat')
 assert.equal(transactionCategory(input({category:'Mortgage'})).label,'Mortgage')
+for(const [category,token]of[['Rent','rent'],['Mortgage','rent'],['Groceries','grocery'],['Grocery','grocery'],['Gas','gas'],['Fuel','gas'],['Food','food'],['Dining','food'],['Shopping','shopping'],['Other needs','need'],['Need Expenses','need'],['Bills & Utilities','bills'],['Static Bills & Subscriptions','subs-needs'],['Subs (Needs)','subs-needs'],['Subs (Wants)','subs-wants'],['Income','income'],['Savings','savings'],['Saved','savings'],['ESPP','espp'],['SpaceX ESPP','espp']])assert.equal(transactionCategory(input({category})).token,token,category)
+assert.equal(transactionCategory(input({category:'Static Bills & Subscriptions',item:'Student Loans',kind:'bill'})).icon,'graduation')
 const grocery=input({category:'Groceries',location:'Whole Foods',item:'Weekly groceries'})
 assert.equal(transactionText(grocery,transactionMerchant(grocery)).item,'Weekly groceries')
 assert.equal(transactionText({...grocery,item:'Groceries'},transactionMerchant(grocery)).item,null)
