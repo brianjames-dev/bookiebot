@@ -1,5 +1,24 @@
 # Agent Decisions
 
+## 2026-11-02 - Move Rigid Circle Gaps With Their Upper Icons
+
+The user confirms PR #112 did not remove the expansion flash and identifies the
+separation gap sweeping over the lower circle. Replace large animated path
+geometry with a fixed 16px-radius hole (14px icon + 2px gap). Translate its window
+from the same upper/lower poses as the icons and counter-translate its child so
+the lower icon paint stays in place. Clamp wholly outside holes to tangent
+positions, keeping the fixed clipping plane bounded. Only intersections whose
+swept bounds touch the icon get moving layers, avoiding the long-day compositing
+cost of distant neighbors. Large circle paths never morph; small badge holes retain their direct shrinking geometry.
+
+This supersedes the large-circle path interpolation in the earlier direct-clip
+decision. A 32ms delayed-shape simulation makes the old pipeline cut into exposed
+icon pixels; the rigid windows pass that same case, along with geometry checks
+for upper-circle alignment and unchanged lower paint. This is a controlled clock
+mismatch, not physical iOS reproduction. Preserve true transparent gaps, one
+persistent image per expense, timing, layering, reversals, reduced motion and
+browser-owned interpolation; no per-frame JS, stored settings or financial change.
+
 ## 2026-11-02 - Animate Daily Cutouts On Their Paint Owners
 
 Replace referenced SVG masks and animated circle cx/cy/r with constant-topology
