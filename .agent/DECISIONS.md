@@ -1,5 +1,29 @@
 # Agent Decisions
 
+## 2026-11-01 - Publish Quiet Indent Daily Transactions
+
+Implement the approved Daily Spending draft with independent expandable days,
+newest first and undated last. Header taps expand inline; bar inspection retains
+its existing dialog and scope. Keep the outer list and days initially closed,
+retain the current session Type choice across close/reopen, and reset Type on
+month/scope changes. Sort by display category only, preserving source order
+within a category, amounts, canonical scopes and status provenance. Show the
+logged item beside Category Mix-colored labels and Scheduled only for scheduled
+amounts. Share the source chart colors in the Needs/Wants legend.
+
+The footer pill becomes the existing native category selector and close action;
+focus follows the replacement control. Memoize the original plot separately so
+list controls and day expansion cannot restart its animation or recompute axes.
+Retain shared disclosure motion/inert handling and responsive bottom spacing.
+
+Publish the 158 approved merchant marks as local content-addressed assets, with
+source/hash/review provenance separate from the lean runtime catalog. Reuse the
+89 approved bill/subscription circles and authenticated provider aliases first.
+Match only explicit normalized merchant names and trailing store/location numbers;
+a location takes precedence over product descriptions. No fuzzy matches, remote
+runtime images, merchant-based recategorization, financial writes, new settings,
+or Finance Ops lifecycle changes. Logo and category fallback slots stay 28px.
+
 ## 2026-11-01 - Match Daily Spending Controls To Category Mix
 
 Reuse one native, content-sized category dropdown for Category Mix and Daily

@@ -61,7 +61,7 @@ for(const [optimized,original,first,second,layouts] of [
 
 const source=fs.readFileSync('web/expense-report/src/report-app.tsx','utf8')
 const file=ts.createSourceFile('report-app.tsx',source,ts.ScriptTarget.Latest,true,ts.ScriptKind.TSX)
-const names=new Set(['money','formatMoney','useMediaQuery','CategoryMixPieSurface','DailySpendingChart',
+const names=new Set(['money','formatMoney','useMediaQuery','CategoryMixPieSurface','DailySpendingChart','DailySpendingPlot','MemoizedDailySpendingPlot',
   'NEEDS_BAR_COLOR','WANTS_BAR_COLOR','DAILY_SPENDING_BAR_RADIUS','DAILY_SPENDING_GRID_COLOR','DAILY_SPENDING_BOUNDARY_COLOR',
   'dailySpendingAxis','dailySpendingBreakAmount','dailySpendingChartRows','dailySpendingVisualAmount','dailySpendingActualAmount',
   'dailySpendingAxisTickLabel','dailySpendingYAxisDomain','dailySpendingYAxisTicks','dailySpendingTickRange','dailySpendingCursorFill'])

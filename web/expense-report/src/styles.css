@@ -600,85 +600,70 @@ button.bb-left-categories { cursor: pointer; }
   color: hsl(var(--destructive));
 }
 
-.bb-daily-spending-content {
-  display: grid;
-  gap: 0;
-}
-
-/* Put disclosure spacing inside the animated region so a closed list leaves
-   no empty row or grid gap below its Transactions button. */
+.bb-daily-spending-content { display: grid; gap: 0; container-type: inline-size; }
 .bb-daily-spending-content > .bb-details-content > .bb-details-content-inner { padding-top: 0; }
-.bb-daily-spending-content .bb-daily-transactions { padding-top: 20px; }
+.bb-daily-transactions { min-width: 0; padding-top: 20px; }
 .bb-daily-heading { gap: 8px; }
 .bb-daily-heading .bb-card-title { white-space: nowrap; }
 .bb-daily-heading .bb-category-mix-filter { flex: 0 0 auto; }
+.bb-daily-plot { min-width: 0; }
+.bb-daily-legend { display: flex; align-items: center; justify-content: center; flex-wrap: wrap; gap: 8px 20px; list-style: none; margin: 0; padding: 16px 0; color: hsl(var(--muted-foreground)); font-size: 12px; line-height: 1.4; }
+.bb-daily-legend > li { display: inline-flex; align-items: center; gap: 6px; }
+.bb-daily-legend > li > span { display: block; flex: none; width: 7px; height: 7px; border-radius: 50%; }
 .bb-chart-side.bb-daily-summary { display: flex; flex-direction: column; justify-content: flex-end; gap: 0; }
 .bb-daily-amount-row { display: flex; align-items: center; gap: 12px; margin-top: 4px; min-width: 0; }
 .bb-daily-amount-row > .bb-chart-total { display: flex; align-items: center; flex: 1 1 0; min-width: 0; margin-top: 0; }
-.bb-daily-transactions-toggle.bb-details-toggle {
-  align-self: center;
-  min-height: 44px;
-  gap: 8px;
-  border-radius: 24px;
-  padding: 8px 12px;
-  background: hsl(var(--primary) / .08);
-  color: hsl(var(--foreground));
-  font-weight: 400;
+.bb-daily-morph-control { display: flex; min-width: 0; max-width: 100%; margin-left: auto; }
+.bb-daily-transactions-toggle.bb-details-toggle { align-self: center; min-height: 44px; gap: 8px; border-radius: 24px; padding: 8px 13px; background: transparent; color: hsl(var(--foreground)); font-size: 14px; font-weight: 400; white-space: nowrap; }
+.bb-daily-transactions-toggle svg { width: 16px; height: 16px; flex: none; color: hsl(var(--muted-foreground)); }
+.bb-daily-active-filter { display: flex; align-items: center; max-width: 190px; min-width: 0; border: 1px solid hsl(var(--border)); border-radius: 24px; background: hsl(var(--card)); }
+.bb-daily-active-filter .bb-category-mix-filter { min-width: 0; }
+.bb-daily-active-filter .bb-category-mix-filter select { border: 0; background: transparent; border-radius: 24px; }
+.bb-daily-active-filter .bb-category-filter-label { overflow: hidden; text-overflow: ellipsis; }
+.bb-daily-transactions-close { position: relative; display: grid; place-items: center; flex: none; width: 44px; height: 44px; border: 0; border-radius: 24px; background: transparent; color: hsl(var(--muted-foreground)); }
+.bb-daily-transactions-close::before { content: ""; position: absolute; left: 0; top: 13px; bottom: 13px; width: 1px; background: hsl(var(--border)); }
+.bb-daily-transactions-close > svg { width: 16px; height: 16px; }
+.bb-daily-day-group { min-width: 0; border-bottom: 1px solid hsl(var(--border)); }
+.bb-daily-day-header { display: flex; align-items: center; gap: 6px; width: 100%; min-height: 64px; padding: 10px 0; border: 0; background: transparent; color: hsl(var(--foreground)); font: inherit; text-align: left; }
+.bb-daily-day-date { display: flex; align-items: center; gap: 6px; min-width: 0; }
+.bb-daily-day-header[data-undated="true"] .bb-daily-day { font-size: 16px; letter-spacing: 0; }
+.bb-daily-date-copy { display: flex; flex-wrap: wrap; align-items: baseline; gap: 2px 4px; }
+.bb-daily-date-copy strong { font-size: 13px; line-height: 1.35; font-weight: 500; }
+.bb-daily-day-count { display: inline-flex; align-items: baseline; gap: 5px; white-space: nowrap; color: hsl(var(--muted-foreground)); font-size: 11px; line-height: 1.35; }
+.bb-daily-day-total { margin-left: auto; white-space: nowrap; font-size: 15px; font-weight: 500; font-variant-numeric: tabular-nums; }
+.bb-daily-day-header > svg { flex: none; width: 16px; height: 16px; color: hsl(var(--muted-foreground)); transition: transform 240ms ease; }
+.bb-daily-day-header[aria-expanded="true"] > svg { transform: rotate(180deg); }
+.bb-daily-day-entries { margin: 0 0 10px 4px; padding: 2px 0 6px 12px; border-left: 1px solid hsl(var(--border)); }
+.bb-daily-day-group > .bb-details-content > .bb-details-content-inner { padding-top: 0; }
+.bb-daily-transaction { display: grid; grid-template-columns: 28px minmax(0, 1fr) auto; column-gap: 8px; row-gap: 2px; align-items: start; padding: 6px 0; min-height: 44px; box-sizing: border-box; }
+.bb-daily-transaction + .bb-daily-transaction { border-top: 1px solid hsl(var(--border) / .55); }
+.bb-daily-transaction-name { grid-column: 2; grid-row: 1; align-self: center; min-width: 0; overflow-wrap: anywhere; font-size: 13px; line-height: 1.3; font-weight: 500; }
+.bb-daily-transaction-money { grid-column: 3; grid-row: 1; align-self: center; white-space: nowrap; font-size: 13px; line-height: 1.3; font-weight: 500; font-variant-numeric: tabular-nums; }
+.bb-daily-transaction-meta { grid-column: 2 / -1; grid-row: 2; display: flex; flex-wrap: wrap; align-items: baseline; gap: 0 5px; min-width: 0; color: hsl(var(--muted-foreground)); font-size: 11px; line-height: 1.35; }
+.bb-daily-transaction-category { font-weight: 500; }
+.bb-daily-transaction-item { overflow-wrap: anywhere; }
+.bb-daily-transaction[data-scheduled="true"] .bb-daily-transaction-meta { grid-column: 2; }
+.bb-daily-transaction-status { grid-column: 3; grid-row: 2; justify-self: end; margin: 0; padding: 0; color: hsl(var(--primary)); font-size: 11px; line-height: 1.35; white-space: nowrap; }
+.bb-transaction-icon { position: relative; display: grid; place-items: center; grid-column: 1; grid-row: 1 / span 2; align-self: center; width: 28px; min-width: 28px; max-width: 28px; height: 28px; min-height: 28px; max-height: 28px; box-sizing: border-box; overflow: hidden; border-radius: 50%; background: hsl(var(--muted)); color: hsl(var(--muted-foreground)); }
+.bb-transaction-fallback { display: grid; place-items: center; width: 100%; height: 100%; }
+.bb-transaction-fallback > svg { width: 64%; height: 64%; }
+.bb-transaction-icon > img { position: absolute; inset: 0; width: 100%; height: 100%; box-sizing: border-box; padding: var(--bb-merchant-inset); background: var(--bb-merchant-bg); object-fit: contain; opacity: 0; }
+.bb-transaction-icon[data-ready="true"] > img { opacity: 1; }
+.bb-transaction-icon[data-ready="true"] .bb-transaction-fallback { visibility: hidden; }
+.bb-transaction-icon[data-token="rent"] { color: hsl(var(--category-rent)); background: hsl(var(--category-rent) / .12); }
+.bb-transaction-icon[data-token="need"] { color: hsl(var(--category-need)); background: hsl(var(--category-need) / .12); }
+.bb-transaction-icon[data-token="bills"], .bb-transaction-icon[data-token="subs-needs"] { color: hsl(var(--category-subs-needs)); background: hsl(var(--category-subs-needs) / .12); }
+.bb-transaction-icon[data-token="subs-wants"] { color: hsl(var(--category-subs-wants)); background: hsl(var(--category-subs-wants) / .12); }
+@container (max-width: 380px) {
+  .bb-daily-amount-row[data-open="true"] { flex-wrap: wrap; }
+  .bb-daily-amount-row[data-open="true"] .bb-daily-morph-control { width: 100%; }
+  .bb-daily-active-filter { width: 100%; max-width: none; }
+  .bb-daily-active-filter .bb-category-mix-filter { flex: 1 1 auto; }
 }
-.bb-daily-transactions-toggle svg { width: 16px; height: 16px; flex: none; color: hsl(var(--muted-foreground)); transition: transform 180ms ease; }
-.bb-daily-transactions-toggle[aria-expanded="true"] svg { transform: rotate(180deg); }
 @media (min-width: 861px) { .bb-daily-section .bb-chart-layout { grid-template-columns: minmax(360px, 1fr) minmax(300px, .4fr); } }
+@media (max-width: 860px) { .bb-chart-side.bb-daily-summary { border-top: 1px solid hsl(var(--border)); padding-top: 18px; } }
 @media (max-width: 350px) { .bb-daily-heading .bb-card-title { font-size: 26px; } }
-
-.bb-daily-transactions {
-  display: grid;
-  gap: 16px;
-  min-width: 0;
-}
-
-.bb-daily-entry-filter {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  min-width: 0;
-  color: hsl(var(--muted-foreground));
-  font-size: 14px;
-}
-
-.bb-daily-entry-select {
-  position: relative;
-  min-width: 0;
-  flex: 0 1 280px;
-}
-
-.bb-daily-entry-select svg {
-  position: absolute;
-  right: 12px;
-  top: 50%;
-  width: 16px;
-  height: 16px;
-  transform: translateY(-50%);
-  pointer-events: none;
-}
-
-.bb-daily-entry-filter select {
-  appearance: none;
-  min-width: 0;
-  width: 100%;
-  min-height: 44px;
-  padding: 8px 36px 8px 12px;
-  border: 1px solid hsl(var(--border));
-  border-radius: var(--radius);
-  background: hsl(var(--card));
-  color: hsl(var(--foreground));
-  font: inherit;
-  font-size: 16px;
-}
-
-.bb-daily-entry-filter select:focus-visible {
-  outline: 2px solid hsl(var(--ring));
-  outline-offset: 2px;
-}
+@media (prefers-reduced-motion: reduce) { .bb-daily-day-header > svg { transition: none; } }
 
 .bb-daily-spending-content .recharts-cartesian-grid-horizontal .bb-daily-spending-grid {
   stroke: hsl(var(--muted-foreground));
@@ -2638,12 +2623,15 @@ tr:last-child td {
   border: 0;
   color: inherit;
   font: inherit;
-  cursor: pointer;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  min-width: 28px;
+  flex: none;
+  min-width: 24px;
   min-height: 28px;
+  font-size: 24px;
+  letter-spacing: -.04em;
+  line-height: 1.15;
 }
 
 .bb-daily-day-today {
@@ -2653,30 +2641,7 @@ tr:last-child td {
   font-weight: 750;
 }
 
-.bb-transaction-list {
-  display: grid;
-  gap: 6px;
-  min-width: 0;
-}
 
-.bb-transaction-list span {
-  color: hsl(var(--muted-foreground));
-}
-
-.bb-transaction-category {
-  font-weight: 650;
-}
-
-.bb-transaction-category::before {
-  content: "";
-  display: inline-block;
-  width: 9px;
-  height: 9px;
-  margin-right: 6px;
-  border-radius: 1px;
-  background: currentColor;
-  vertical-align: 0.03em;
-}
 
 
 /* Report structure: one ledger, with rules separating its working sections. */

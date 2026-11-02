@@ -15,7 +15,7 @@ const source = fs.readFileSync("web/expense-report/src/report-app.tsx", "utf8")
 const file = ts.createSourceFile("report-app.tsx", source, ts.ScriptTarget.Latest, true, ts.ScriptKind.TSX)
 const names = new Set([
   "money", "formatMoney", "DailySpendingSection", "DailySpendingChart", "MemoizedDailySpendingChart", "DailyEntriesTable",
-  "compareDayGroups", "dailyEntryDayLabel", "isCurrentCalendarDay", "PACIFIC_CALENDAR_DATE",
+  "DailySpendingPlot", "MemoizedDailySpendingPlot", "CategoryFilterControl", "compareDayGroups", "dailyEntryDayLabel", "isCurrentCalendarDay", "PACIFIC_CALENDAR_DATE",
   "NEEDS_BAR_COLOR", "WANTS_BAR_COLOR", "DAILY_SPENDING_BAR_RADIUS", "DAILY_SPENDING_GRID_COLOR", "DAILY_SPENDING_BOUNDARY_COLOR",
   "dailySpendingAxis", "dailySpendingBreakAmount", "dailySpendingChartRows", "dailySpendingVisualAmount",
   "dailySpendingActualAmount", "dailySpendingAxisTickLabel", "dailySpendingYAxisDomain", "dailySpendingYAxisTicks",
@@ -41,13 +41,14 @@ const compiled = ts.transpileModule(activityDay + "\n" + declarations.map(node =
 const chartSurface = ({ children }) => React.createElement("div", null, children)
 const runtime = {
   exports: {}, require: req, useState: React.useState, useEffect: React.useEffect, useId: React.useId,
-  memo: React.memo, useMemo: React.useMemo, useCallback: React.useCallback,
+  useRef: React.useRef, DailyTransactionDays: require("./load_frontend_module.cjs")("daily-transactions.tsx").DailyTransactionDays, memo: React.memo, useMemo: React.useMemo, useCallback: React.useCallback,
   CollapsibleContent: motionRuntime.exports.CollapsibleContent,
   useMediaQuery: () => true, stableBarAnimation: undefined, stableBarShape: undefined,
   ChartContainer: chartSurface, ResponsiveContainer: chartSurface, BarChart: chartSurface,
   CartesianGrid: () => null, XAxis: () => null, YAxis: () => null, Bar: () => null,
   ChartTooltip: () => null, DailySpendingTooltipContent: () => null,
 }
+runtime.X=props=>React.createElement('svg',props)
 runtime.ChevronDown=props=>React.createElement('svg',props)
 runtime.MetricAmount=({children,className})=>React.createElement('div',{className},children)
 vm.runInNewContext(compiled, runtime)
@@ -66,7 +67,7 @@ let props = { entries, year: 2026, month: 10, filter: "all", data: [{ label: "1"
 let renderer
 act(() => { renderer = create(React.createElement(Section, props)) })
 const toggle = () => renderer.root.findByProps({ className: "bb-details-toggle bb-daily-transactions-toggle" })
-const disclosure = () => renderer.root.findByProps({ className: "bb-details-content" })
+const disclosure = () => renderer.root.findAllByProps({ className: "bb-details-content" })[0]
 const select = () => renderer.root.findByType("select")
 const table = () => renderer.root.findByType(runtime.DailyEntriesTable)
 const changeCategory = value => act(() => { select().props.onChange({ target: { value } }) })
@@ -83,28 +84,33 @@ assert.equal(renderer.root.findAllByType(runtime.DailyEntriesTable).length, 0, "
 assert.equal(disclosure().props.inert, true)
 assert.equal(toggle().props["aria-controls"], disclosure().props.id)
 act(() => toggle().props.onClick())
-assert.equal(toggle().props["aria-expanded"], true)
+assert.equal(renderer.root.findByProps({ "aria-label": "Close transactions" }).props["aria-expanded"], true)
 assert.equal(disclosure().props.inert, false)
 assert.equal(table().props.entries.length, 42, "Details includes every entry without truncation")
+const days = () => renderer.root.findAllByProps({ className: "bb-daily-day-header" })
+assert.equal(days().length, 11, "Every day and the undated group remains")
+assert.equal(days().at(-1).findByProps({className:"bb-daily-day"}).children.join(""), "No date")
+act(() => days().at(-1).props.onClick())
 assert.ok(text().includes("Purchase 41"), "Undated transactions remain in the full list")
-assert.ok(text().includes("Scheduled") && text().includes("Recorded"))
+act(() => days().at(-2).props.onClick())
+act(() => days().find(day => day.findByProps({className:"bb-daily-day"}).children.join("") === "1").props.onClick())
+assert.ok(text().includes("Scheduled") && !text().includes("Recorded"))
 for (const label of ["Tracked days", "Avg/day", "Days counted", "Highest day"]) assert.ok(!text().includes(label))
 assert.deepEqual(select().findAllByType("option").map(option => option.props.children), ["All types", "Food", "Shopping"])
-assert.equal(renderer.root.findByType("label").props.htmlFor, select().props.id)
+assert.equal(select().props["aria-label"], "Transaction type")
 
 const chartRendersBeforeTypeChange = chartRenders
 changeCategory("Shopping")
 assert.equal(chartRenders, chartRendersBeforeTypeChange, "A list type filter cannot rebuild or restart the chart")
 assert.equal(table().props.entries.length, 21)
 assert.ok(table().props.entries.every(entry => entry.category === "Shopping"))
-assert.ok(!text().includes("Purchase 0\"") && text().includes("Purchase 1\""))
+assert.ok(!text().includes("Purchase 0\""))
 assert.ok(text().includes("$68.00"), "Day 2 totals only its selected-category transactions")
 assert.equal(renderer.root.findByProps({ className: "bb-chart-total" }).props.children, "$903.00", "Type filters leave chart totals unchanged")
-act(() => table().props.onInspectDay("2"))
-assert.deepEqual(inspections.pop(), ["2", "Shopping"], "Day inspection retains the selected type")
-act(() => renderer.root.findByType(runtime.DailySpendingChart).props.onInspectDay("1"))
+assert.ok(days().every(day => day.props["aria-controls"]), "Day headers expand their own content")
+act(() => renderer.root.findByType(runtime.DailySpendingPlot).props.onInspectDay("1"))
 assert.deepEqual(inspections.pop(), ["1"], "The chart keeps its full daily inspection")
-act(() => toggle().props.onClick())
+act(() => renderer.root.findByProps({ "aria-label": "Close transactions" }).props.onClick())
 assert.equal(disclosure().props.inert, true)
 act(() => toggle().props.onClick())
 assert.equal(select().props.value, "Shopping", "Collapse/reopen retains the filter")

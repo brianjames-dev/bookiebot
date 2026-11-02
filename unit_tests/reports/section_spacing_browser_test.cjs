@@ -77,9 +77,9 @@ const closeEnough=(actual,reference,message)=>assert.ok(Math.abs(actual-referenc
           await page.locator(insightButton).click();await page.waitForTimeout(350)
           closeEnough(await gap(page,'.bb-highlights-section',insightButton),reference,'Expanded Most Frequent footer')
           await page.locator(dailyButton).click();await page.waitForTimeout(350)
-          assert.equal(await page.locator('.bb-daily-transactions tbody tr').count(),12,'Transactions still reveals the full list')
+          assert.equal(await page.locator('.bb-daily-transactions .bb-daily-day-group').count(),12,'Transactions still reveals the full list')
           closeEnough(await gap(page,'.bb-daily-section','.bb-daily-transactions'),reference,'Expanded daily content bottom')
-          await page.locator(dailyButton).click();await page.waitForTimeout(350)
+          await page.getByRole('button',{name:'Close transactions',exact:true}).click();await page.waitForTimeout(350)
           closeEnough(await gap(page,'.bb-daily-section',dailyButton),reference,'Recollapsed Transactions footer')
           for(const title of ['Category Mix','Burn Rate','Calendar','Bills & Utilities']) {
             await page.getByRole('button',{name:`Show ${title}`,exact:true}).click();await page.waitForTimeout(350)

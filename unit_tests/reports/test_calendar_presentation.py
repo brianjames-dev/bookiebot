@@ -69,13 +69,13 @@ def test_two_week_calendar_model_and_logo_matching():
 
 def test_daily_today_color_and_weight_override_the_button_reset():
     styles = (FRONTEND / "styles.css").read_text()
-    base = styles.split(".bb-daily-day {", 1)[1].split("}", 1)[0]
+    base = styles.split("\n.bb-daily-day {", 1)[1].split("}", 1)[0]
     today = styles.split(".bb-daily-day-today {", 1)[1].split("}", 1)[0]
 
     # A later same-specificity reset previously replaced the contrasting date
     # color with inherited pale text, and also undid its bold weight.
-    assert styles.count(".bb-daily-day {") == 1
-    assert styles.index(".bb-daily-day {") < styles.index(".bb-daily-day-today {")
+    assert styles.count("\n.bb-daily-day {") == 1
+    assert styles.index("\n.bb-daily-day {") < styles.index(".bb-daily-day-today {")
     assert "color: inherit;" in base and "font: inherit;" in base
     assert "background: hsl(var(--primary));" in today
     assert "color: hsl(var(--primary-foreground));" in today
