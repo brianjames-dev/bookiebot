@@ -16,6 +16,7 @@ for(const view of Object.values(report.modeViews)){
 }
 const assets=path.join(root,'src/bookiebot/reports/assets'),css=fs.readFileSync(path.join(assets,'expense-report-app.css'),'utf8'),js=fs.readFileSync(path.join(assets,'expense-report-app.js'),'utf8')
 const html=dark=>`<!doctype html><html data-theme="${dark?'dark':'light'}"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><style>${css}</style></head><body><div id="bookiebot-expense-report-root"></div><script>localStorage.setItem('bookiebot-expense-report-theme','${dark?'dark':'light'}')</script><script id="bookiebot-expense-report-data" type="application/json">${JSON.stringify(report)}</script><script type="module" src="/app.js"></script></body></html>`
+async function settle(section){await section.evaluate(async el=>{await Promise.allSettled(el.getAnimations({subtree:true}).map(animation=>animation.finished))})}
 async function closedLayout(section){return section.evaluate(section=>{
  const rect=el=>{const r=el.getBoundingClientRect();return {left:r.left,right:r.right,top:r.top,bottom:r.bottom,width:r.width,height:r.height,center:r.top+r.height/2}}
  const dropdown=section.querySelector('select[aria-label="Daily spending filter"]'),title=section.querySelector('h2'),button=section.querySelector('.bb-daily-transactions-toggle'),row=section.querySelector('.bb-daily-amount-row'),amount=row.querySelector('.bb-fitted-amount-text'),integer=amount.querySelector('.bb-amount-integer')||amount,reference=document.querySelector('select[aria-label="Category mix filter"]')
@@ -41,6 +42,7 @@ async function closedLayout(section){return section.evaluate(section=>{
   const stage=await page.locator('.bb-chart-carousel-band').evaluate(el=>el.getBoundingClientRect().height)
   for(const [scope,total,days]of[['needs','$301.00',2],['wants','$205.49',3],['all','$506.49',3]]){
    await filter.selectOption(scope);await page.waitForFunction(total=>document.querySelector('.bb-daily-amount-row .bb-fitted-amount-text').textContent===total,total)
+   await settle(section)
    const m=await closedLayout(section)
    assert.equal(m.overflow,false,JSON.stringify(m));assert.deepEqual(m.styles[0],m.styles[1]);assert.equal(m.radius,'24px');assert.ok(m.dropdown.height>=44&&m.button.height>=44)
    assert.ok(m.title.right+7<=m.dropdown.left,JSON.stringify(m));assert.ok(Math.abs(m.title.center-m.dropdown.center)<1,JSON.stringify(m))
@@ -61,6 +63,14 @@ async function closedLayout(section){return section.evaluate(section=>{
    await close.focus();await page.keyboard.press('Space');assert.equal(await button.getAttribute('aria-expanded'),'false');assert.equal(await button.evaluate(el=>el===document.activeElement),true)
   }
   assert.equal(await page.locator('.bb-chart-carousel-band').evaluate(el=>el.getBoundingClientRect().height),stage)
+  const morph=await section.evaluate(async section=>{
+   const carrier=section.querySelector('.bb-daily-morph-control'),row=section.querySelector('.bb-daily-amount-row'),trigger=section.querySelector('.bb-daily-transactions-toggle'),close=section.querySelector('.bb-daily-transactions-close'),select=section.querySelector('[aria-label="Transaction type"]'),frames=[];let done=false;const start=performance.now()
+   const tick=t=>{const c=carrier.getBoundingClientRect(),r=row.getBoundingClientRect();frames.push({t:t-start,width:c.width,y:c.top-r.top,right:c.right-r.right});if(t-start<600)requestAnimationFrame(tick);else done=true};requestAnimationFrame(tick)
+   trigger.click();await new Promise(r=>setTimeout(r,80));close.click();await new Promise(r=>setTimeout(r,60));trigger.click();await new Promise(r=>setTimeout(r,60));close.click();while(!done)await new Promise(r=>setTimeout(r,10));return{frames,same:carrier===section.querySelector('.bb-daily-morph-control')&&trigger===section.querySelector('.bb-daily-transactions-toggle')&&select===section.querySelector('[aria-label="Transaction type"]')}
+  })
+  assert.equal(morph.same,true,'Micro taps retain the same controls')
+  for(const frame of morph.frames)assert.ok(Math.abs(frame.right)<1,'Capsule stays anchored during rapid reversals')
+  if(!dark){assert.ok(new Set(morph.frames.map(frame=>Math.round(frame.width))).size>4,'Capsule width interpolates');if(width<=390)assert.ok(new Set(morph.frames.map(frame=>Math.round(frame.y))).size>4,'Wrapping follows a continuous slide')}
   await button.click()
   const headers=section.locator('.bb-daily-day-header'),type=section.getByRole('combobox',{name:'Transaction type',exact:true}),close=section.getByRole('button',{name:'Close transactions',exact:true})
   assert.deepEqual(await headers.locator('.bb-daily-day').allTextContents(),['8','5','No date'])
@@ -73,6 +83,10 @@ async function closedLayout(section){return section.evaluate(section=>{
   const groups=section.locator('.bb-daily-day-group'),busy=groups.nth(1)
   assert.deepEqual(await busy.locator('.bb-daily-transaction').evaluateAll(rows=>rows.map(el=>el.dataset.category)),['Food','Food','Gas','Groceries','Groceries','Shopping'])
   assert.deepEqual(await busy.locator('.bb-daily-transaction-name').allTextContents(),['Chipotle','Corner café','Chevron','Whole Foods','Neighborhood market','Target'])
+  assert.deepEqual(await headers.locator('.bb-daily-preview-item').evaluateAll(items=>items.map(item=>item.parentElement.children.length)),[2,2,3,3,3,1])
+  assert.equal(await busy.locator('.bb-daily-preview-more').textContent(),'+4')
+  assert.equal(await busy.locator('.bb-daily-preview').getAttribute('role'),'img')
+  await settle(section)
   const geometry=await section.evaluate(el=>{
    const rect=n=>n.getBoundingClientRect(),rows=[...el.querySelectorAll('.bb-daily-transaction')],rail=el.querySelector('.bb-daily-day-entries')
    return {overflow:document.documentElement.scrollWidth>innerWidth,rail:parseFloat(getComputedStyle(rail).borderLeftWidth),icons:rows.map(row=>{const r=rect(row.querySelector('.bb-transaction-icon'));return[r.width,r.height]}),scheduled:rows.filter(row=>row.dataset.scheduled==='true').map(row=>({meta:rect(row.querySelector('.bb-daily-transaction-meta')).top,status:rect(row.querySelector('.bb-daily-transaction-status')).top,name:rect(row.querySelector('.bb-daily-transaction-name')).top,amount:rect(row.querySelector('.bb-daily-transaction-money')).top})),widths:[rect(el.querySelector('.bb-daily-active-filter')).width,rect(el.querySelector('.bb-daily-amount-row')).width]}
@@ -84,6 +98,11 @@ async function closedLayout(section){return section.evaluate(section=>{
   if(width<=390)assert.ok(Math.abs(geometry.widths[0]-geometry.widths[1])<1)
   await busy.locator('.bb-daily-day-entries').scrollIntoViewIfNeeded()
   await page.waitForFunction(()=>[...document.querySelectorAll('.bb-daily-day-entries img')].every(img=>img.complete&&img.naturalWidth>0))
+  if(width===390){
+   const preview=headers.first().locator('.bb-daily-preview'),file=`/private/tmp/bookiebot-preview-gap-${engine.name()}-${dark}.png`
+   await preview.evaluate(el=>{el.style.background='#234c63'});await preview.screenshot({path:file});await preview.evaluate(el=>{el.style.removeProperty('background')})
+   execFileSync(process.env.BOOKIEBOT_TEST_PYTHON||'python',['-c',"from PIL import Image; import sys; im=Image.open(sys.argv[1]).convert('RGB'); assert im.getpixel((15,12)) == (35,76,99), im.getpixel((15,12))",file])
+  }
   if(width===390&&dark){await page.waitForTimeout(350);await section.screenshot({path:`/private/tmp/bookiebot-daily-quiet-${engine.name()}.png`})}
   await type.selectOption('Shopping');assert.equal(await amount.textContent(),'$506.49');assert.equal(await section.locator('.bb-daily-day-group').count(),2);assert.equal(await section.locator('.bb-daily-transaction').count(),2)
   await close.click();await button.click();assert.equal(await type.inputValue(),'Shopping','Collapse retains list filter')

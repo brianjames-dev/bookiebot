@@ -5,14 +5,14 @@ Current/Projected selection, All/Needs/Wants scopes and financial totals retain
 their existing definitions. Needs/Wants legend dots share the actual bar colors.
 
 The closed Transactions pill sits beside Total Spent. Opening it replaces the
-pill with the shared native **All types** selector and an X inside one capsule.
+pill with the shared native **All types** selector and an X inside one capsule. Both control surfaces stay mounted; CSS interpolates width, crossfade, and the phone layout’s downward slide/space instead of snapping between layouts. Inactive controls are inert and hidden from accessibility.
 At narrow widths the capsule fills the next row. Keyboard focus follows the
 replacement control. Type affects only entries and day totals, never the graph
 or Total Spent. Closing/reopening retains Type; changing month/scope resets it.
 
 Days start closed and expand independently with the shared disclosure motion.
-They appear newest first, with undated entries last. Headers show the numeric
-date, weekday, inline entry count and exact day total. Expanded rows sit inside
+They appear newest first, with undated entries last. After first opening, panels retain their rows and decoded images while remaining inert when closed. Reopening the outer list also preserves open days; a month change resets the day panels. Headers show the numeric
+date, weekday, horizontal icon preview and exact day total. Up to two expense icons are followed by **+N** for the remaining entries, for a maximum of three circles. One/two-entry days show only their actual icons. Preview order matches the category-sorted expanded rows; Type and Current/Projected scopes remain authoritative. Screen readers retain the full transaction count. Expanded rows sit inside
 a thin left rail, sorted alphabetically by display category while preserving
 source order within each category. Duplicate transactions are retained.
 
@@ -21,9 +21,9 @@ item name without repeating identical text. Person names and Recorded badges
 are omitted. Scheduled appears only when the canonical source says scheduled;
 a future due date does not turn a recorded bill into an estimate. The category
 and Scheduled status occupy the same secondary grid row. Long items can wrap.
-Bars continue to open the existing exact-day inspection dialog.
+Preview circles use Calendar’s hard transparent gap masks rotated horizontally and the Category Mix color for each small logo dot. The full rows retain 28px circles; header previews use 24px circles. Bars continue to open the existing exact-day inspection dialog.
 
-Merchant artwork and fallback circles are both 28px. `transaction-identity.ts`
+Merchant artwork and fallback circles share the same size in each context. `transaction-identity.ts`
 uses the existing approved service circles/provider aliases, then the reviewed
 158-mark merchant catalog. Names match exactly after case/punctuation/spacing
 normalization, with optional trailing `#123`, `store 123` or `location #123`.
@@ -44,3 +44,15 @@ cover day ordering, all entries, filter isolation, status alignment, equal icon
 sizes, colors, keyboard focus, themes, cents settings and responsive layout.
 `section_spacing_browser_test.cjs` checks the complete page's bottom spacing.
 Native acceptance steps are in `.agent/STATUS.md`, checklist 232.
+
+The performance pass memoizes sorting with one shared collator, date/total
+formatting, previews, row bodies and the outer list element. Closed days do not
+build row components until needed; repeat toggles reuse the same DOM and image
+state. Scoped 280ms CSS height transitions use a gentler easing without a second
+whole-panel opacity animation; scroll anchoring is disabled inside this region.
+The generic disclosure component and other pages’ motion stay unchanged.
+`daily_transactions_motion_browser_test.cjs` samples real component frames on a
+120-entry day, checks monotonic/intermediate heights and interruption continuity,
+and verifies row/image DOM retention. Full-app checks cover micro taps, continuous
+capsule width/position, transparent gap pixels, keyboard and Reduce Motion. These
+checks verify behavior in Chromium/WebKit; physical-device frame rates vary.
