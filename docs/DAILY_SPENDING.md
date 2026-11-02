@@ -30,6 +30,9 @@ not used, avoiding frozen cutouts during native icon motion. Separate clip layer
 intersect so overlapping circle/badge holes cannot refill each other. Category dots shrink on departure
 and return on collection; logos remain opaque without crossfading duplicate skins
 or swapping image elements at landing. Unknown/failed logos use category fallbacks.
+Constant icon opacity is written directly rather than animated; only actual
+overflow fades get opacity keyframes. Motion does not toggle `will-change` on
+the clipped icon surfaces, avoiding redundant compositing changes at startup.
 
 `web/expense-report/src/daily-transactions-motion.ts` keeps travel at 500ms with
 36ms staggering, a 34px curve and a subtle spring. The cascade is capped at 216ms
@@ -63,11 +66,12 @@ Verification includes focused React/identity tests, pinned asset/hash checks,
 reversal continuity, image identity, keyboard/resize/reduced-motion/cleanup, and
 `daily_transactions_motion_browser_test.cjs` for a 120-entry day.
 `daily_icon_edges_browser_test.cjs` samples moving fallback/logo edge pixels on
-high-density mobile surfaces, compares the last collapse frame with rest, and
-emulates frozen SVG geometry. The old SVG implementation fails that emulated
+high-density mobile surfaces from 0ms onward, verifies initial/repeat opening
+without redundant opacity effects or layer-hint changes, compares the last
+collapse frame with rest, and emulates frozen SVG geometry. The old SVG implementation fails that emulated
 case; native iOS behavior still requires the phone acceptance steps. The shipped-bundle
 `daily_spending_controls_browser_test.cjs` covers scopes, controls, transparent-gap
 pixels, category order, status alignment, themes, cents and responsive layout.
 `section_spacing_browser_test.cjs` checks overall bottom spacing. Browser checks
 use synthetic data and blocked external requests. Native acceptance is checklist
-235 in `.agent/STATUS.md`; physical-device smoothness still needs phone review.
+236 in `.agent/STATUS.md`; physical-device smoothness still needs phone review.
