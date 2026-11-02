@@ -56,6 +56,8 @@ import { ReportQuestions } from "./report-questions"
 import { SharedReimbursementsCard } from "./shared-reimbursements"
 import { ReimbursementLedger } from "./reimbursement-ledger"
 import { reportActivity, activitySummary, activityDay, activityMatchesCategory, calendarActivityCategory, calendarActivityStatus, type ReportActivity } from "./report-activity"
+import { DailyTransactionDays } from "./daily-transactions"
+import type { DailyTransaction } from "./transaction-identity"
 import type { MetricExplanation } from "./types"
 import { useReportViewPreferences, type PreferredChart } from "./report-view-preferences"
 import { ChartContainer, ChartTooltip, ChartTooltipContent, ChartTooltipDismissProvider, useChartTooltipDismiss } from "./components/ui/chart"
@@ -955,6 +957,7 @@ const DailySpendingCard = memo(function DailySpendingCard({ report, calendarEven
               filter={dailySpendingFilter}
               entries={dailyTableEntries}
               categoryColors={categoryColors}
+              aliases={report.calendarLogoAliases}
               year={report.year}
               month={report.month}
             />
@@ -2164,16 +2167,18 @@ type DailySpendingAxis = {
   ticks: number[]
 }
 
-type DailyEntryDisplayRow = ExpenseEntry & { status?: "recorded" | "scheduled" }
+type DailyEntryDisplayRow = DailyTransaction
 
+const MemoizedDailySpendingPlot = memo(DailySpendingPlot)
 const MemoizedDailySpendingChart = memo(DailySpendingChart)
 
-function DailySpendingSection({ data, total, filter, entries, categoryColors, year, month, onInspectDay }: {
+function DailySpendingSection({ data, total, filter, entries, categoryColors, aliases, year, month, onInspectDay }: {
   data: DailySpendingRow[]
   total: number
   filter: DailySpendingFilter
   entries: DailyEntryDisplayRow[]
   categoryColors: Record<string, string>
+  aliases?: Record<string, string>
   year: number
   month: number
   onInspectDay: (day: string, category?: string) => void
@@ -2181,45 +2186,43 @@ function DailySpendingSection({ data, total, filter, entries, categoryColors, ye
   const [open, setOpen] = useState(false)
   const [category, setCategory] = useState("")
   const detailsId = useId()
-  const filterId = useId()
+  const controlsRef = useRef<HTMLDivElement>(null)
+  const restoreControlFocus = useRef(false)
   const categories = useMemo(() => Array.from(new Set(entries.map(entry => entry.category))).sort((left, right) => left.localeCompare(right)), [entries])
   const selectedCategory = categories.includes(category) ? category : ""
   const filteredEntries = useMemo(() => selectedCategory ? entries.filter(entry => entry.category === selectedCategory) : entries, [entries, selectedCategory])
-  const toggleDetails = useCallback(() => setOpen(current => !current), [])
+  const toggleDetails = useCallback(() => { restoreControlFocus.current = true; setOpen(current => !current) }, [])
 
   useEffect(() => { setCategory("") }, [year, month, filter])
+  useEffect(() => {
+    if (!restoreControlFocus.current) return
+    controlsRef.current?.querySelector<HTMLElement>(open ? 'select' : 'button')?.focus({ preventScroll: true })
+    restoreControlFocus.current = false
+  }, [open])
+
+  const controls = <div className="bb-daily-morph-control" ref={controlsRef}>
+    {open ? <div className="bb-daily-active-filter">
+      <CategoryFilterControl filter={selectedCategory} onFilterChange={setCategory}
+        filters={[{ value: "", label: "All types" }, ...categories.map(value => ({ value, label: value }))]}
+        label="Transaction type" dismissTrigger="daily-transactions" />
+      <button type="button" className="bb-daily-transactions-close" aria-label="Close transactions" aria-controls={detailsId} aria-expanded={true} onClick={toggleDetails}><X aria-hidden="true" /></button>
+    </div> : <button type="button" className="bb-details-toggle bb-daily-transactions-toggle" aria-expanded={false} aria-controls={detailsId} onClick={toggleDetails}>
+      <span>Transactions</span><ChevronDown aria-hidden="true" />
+    </button>}
+  </div>
 
   return <>
     <MemoizedDailySpendingChart data={data} total={total} filter={filter} onInspectDay={onInspectDay}
-      detailsOpen={open} detailsId={detailsId} onToggleDetails={toggleDetails} />
+      detailsOpen={open} detailsId={detailsId} onToggleDetails={toggleDetails} transactionControl={controls} />
     <CollapsibleContent open={open} id={detailsId} lazy>
       <div className="bb-daily-transactions">
-        <div className="bb-daily-entry-filter">
-          <label htmlFor={filterId}>Type</label>
-          <div className="bb-daily-entry-select">
-            <select id={filterId} value={selectedCategory} onChange={event => setCategory(event.target.value)}>
-              <option value="">All types</option>
-              {categories.map(value => <option key={value} value={value}>{value}</option>)}
-            </select>
-            <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="m6 9 6 6 6-6" /></svg>
-          </div>
-        </div>
-        <DailyEntriesTable entries={filteredEntries} categoryColors={categoryColors} year={year} month={month}
-          onInspectDay={day => onInspectDay(day, selectedCategory)} />
+        <DailyEntriesTable entries={filteredEntries} categoryColors={categoryColors} aliases={aliases} year={year} month={month} />
       </div>
     </CollapsibleContent>
   </>
 }
 
-function DailySpendingChart({
-  data,
-  total,
-  filter,
-  detailsOpen,
-  detailsId,
-  onToggleDetails,
-  onInspectDay,
-}: {
+function DailySpendingChart({ data, total, filter, detailsOpen, detailsId, onToggleDetails, onInspectDay, transactionControl }: {
   onInspectDay: (day: string) => void
   data: DailySpendingRow[]
   total: number
@@ -2227,14 +2230,27 @@ function DailySpendingChart({
   detailsOpen: boolean
   detailsId: string
   onToggleDetails: () => void
+  transactionControl?: ReactNode
 }) {
+  return <div className="bb-chart-layout">
+    <MemoizedDailySpendingPlot data={data} filter={filter} onInspectDay={onInspectDay} />
+    <div className="bb-chart-side bb-daily-summary">
+      <div className="bb-chart-kicker">Total Spent</div>
+      <div className="bb-daily-amount-row" data-open={detailsOpen}>
+        <MetricAmount className="bb-chart-total">{formatMoney(total)}</MetricAmount>
+        {transactionControl ?? <button type="button" className="bb-details-toggle bb-daily-transactions-toggle" aria-expanded={detailsOpen} aria-controls={detailsId} onClick={onToggleDetails}><span>Transactions</span><ChevronDown aria-hidden="true" /></button>}
+      </div>
+    </div>
+  </div>
+}
+
+function DailySpendingPlot({ data, filter, onInspectDay }: { data: DailySpendingRow[]; filter: DailySpendingFilter; onInspectDay: (day: string) => void }) {
   const axis = dailySpendingAxis(data)
   const chartData = dailySpendingChartRows(data, axis)
   const reducedMotion = useMediaQuery("(prefers-reduced-motion: reduce)")
   const showStackedBars = filter === "all"
   const singleBarColor = filter === "needs" ? NEEDS_BAR_COLOR : filter === "wants" ? WANTS_BAR_COLOR : "hsl(var(--chart-1))"
-  return (
-    <div className="bb-chart-layout">
+  return <div className="bb-daily-plot">
       <ChartContainer
         config={
           showStackedBars
@@ -2286,17 +2302,11 @@ function DailySpendingChart({
           </ResponsiveContainer>
         </div>
       </ChartContainer>
-      <div className="bb-chart-side bb-daily-summary">
-        <div className="bb-chart-kicker">Total Spent</div>
-        <div className="bb-daily-amount-row">
-          <MetricAmount className="bb-chart-total">{formatMoney(total)}</MetricAmount>
-          <button type="button" className="bb-details-toggle bb-daily-transactions-toggle" aria-expanded={detailsOpen} aria-controls={detailsId} onClick={onToggleDetails}>
-            <span>Transactions</span><ChevronDown aria-hidden="true" />
-          </button>
-        </div>
-      </div>
-    </div>
-  )
+    <ul className="bb-daily-legend" aria-label="Daily spending legend">
+      {filter !== "wants" && <li><span style={{ background: NEEDS_BAR_COLOR }} aria-hidden="true" />Needs</li>}
+      {filter !== "needs" && <li><span style={{ background: WANTS_BAR_COLOR }} aria-hidden="true" />Wants</li>}
+    </ul>
+  </div>
 }
 
 function dailySpendingAxis(data: DailySpendingRow[]): DailySpendingAxis {
@@ -3010,78 +3020,30 @@ function MerchantOccurrencesTable({ rows }: { rows: OccurrenceRow[] }) {
   )
 }
 
-function DailyEntriesTable({ entries, categoryColors, year, month, onInspectDay }: {
-  onInspectDay?: (day: string) => void
+function DailyEntriesTable({ entries, categoryColors, aliases, year, month }: {
   entries: DailyEntryDisplayRow[]
   categoryColors: Record<string, string>
+  aliases?: Record<string, string>
   year: number
   month: number
 }) {
-  if (!entries.length) {
-    return <div className="bb-empty">No transactions found.</div>
-  }
-
+  if (!entries.length) return <div className="bb-empty">No transactions found.</div>
   const grouped = new Map<string, DailyEntryDisplayRow[]>()
   for (const entry of entries) {
     const day = dailyEntryDayLabel(entry, year, month) ?? "No date"
-    grouped.set(day, [...(grouped.get(day) || []), entry])
+    const group = grouped.get(day)
+    if (group) group.push(entry)
+    else grouped.set(day, [entry])
   }
-
-  return (
-    <div className="bb-table-wrap">
-      <table>
-        <thead>
-          <tr>
-            <th>Day</th>
-            <th>Total</th>
-            <th>Transactions</th>
-          </tr>
-        </thead>
-        <tbody>
-          {Array.from(grouped.entries()).sort(compareDayGroups).map(([day, dayEntries]) => {
-            const total = dayEntries.reduce((sum, entry) => sum + entry.amount, 0)
-            const isToday = isCurrentCalendarDay(year, month, Number(day))
-            return (
-              <tr key={day}>
-                <td>
-                  <button type="button" onClick={() => onInspectDay?.(day)}
-                    className={isToday ? "bb-daily-day bb-daily-day-today" : "bb-daily-day"}
-                    aria-current={isToday ? "date" : undefined}
-                    aria-label={isToday ? `${day}, today` : `Inspect day ${day}`}
-                    title={isToday ? "Today" : undefined}
-                  >
-                    {day}
-                  </button>
-                </td>
-                <td className="bb-amount">{formatMoney(total)}</td>
-                <td>
-                  <div className="bb-transaction-list">
-                    {dayEntries.map((entry, index) => (
-                      <div key={`${entry.category}-${entry.amount}-${index}`}>
-                        <strong className="bb-transaction-category" style={{ color: categoryColors[entry.category] }}>
-                          {entry.category}
-                        </strong>{" "}
-                        {entry.item || entry.location || "Transaction"} - {formatMoney(entry.amount)}
-                        <span> ({entry.person})</span>
-                        {entry.status && <small className={`bb-activity-status bb-activity-${entry.status}`}>{entry.status === "scheduled" ? "Scheduled" : "Recorded"}</small>}
-                      </div>
-                    ))}
-                  </div>
-                </td>
-              </tr>
-            )
-          })}
-        </tbody>
-      </table>
-    </div>
-  )
+  return <DailyTransactionDays groups={Array.from(grouped.entries()).sort(compareDayGroups).map(([day, dayEntries]) => ({ day, entries: dayEntries, today: isCurrentCalendarDay(year, month, Number(day)) }))}
+    categoryColors={categoryColors} aliases={aliases} year={year} month={month} />
 }
 
 function compareDayGroups([left]: [string, DailyEntryDisplayRow[]], [right]: [string, DailyEntryDisplayRow[]]) {
   const leftNumber = Number(left)
   const rightNumber = Number(right)
   if (Number.isFinite(leftNumber) && Number.isFinite(rightNumber)) {
-    return leftNumber - rightNumber
+    return rightNumber - leftNumber
   }
   if (Number.isFinite(leftNumber)) {
     return -1
@@ -3115,6 +3077,7 @@ function dailyEntriesWithCalendarEvents(
       return {
         date: `${month}/${event.day}`,
         status: calendarActivityStatus(event),
+        kind: event.kind,
         category: calendarActivityCategory(event),
         amount: event.amount,
         person: event.kind === "bill" ? "Need bill" : bucket === "wants" ? "Want sub" : "Need sub",

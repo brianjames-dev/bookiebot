@@ -34,6 +34,7 @@ class Clock extends Date {
 }
 const runtime = vm.createContext({
   Date: Clock,
+  DailyTransactionDays: require("./load_frontend_module.cjs")("daily-transactions.tsx").DailyTransactionDays,
   exports: {},
   require: (id) => {
     assert.equal(id, "react/jsx-runtime")
@@ -67,11 +68,11 @@ const daily = (items = entries, year = 2026, month = 9) => renderToStaticMarkup(
 }))
 const dailyHtml = daily()
 assert.equal((dailyHtml.match(/aria-current="date"/g) || []).length, 1)
-assert.ok(dailyHtml.includes('aria-label="6, today" title="Today">6</button>'))
-assert.ok(dailyHtml.includes('aria-label="Inspect day 7"'))
+assert.ok(dailyHtml.includes('aria-current="date" title="Today"'))
+assert.ok(dailyHtml.includes('aria-expanded="false" aria-controls='))
 assert.ok(dailyHtml.includes("$60.00"))
 assert.ok(dailyHtml.includes("$70.00"))
-assert.equal((dailyHtml.match(/<tr>/g) || []).length, 3, "No synthetic spending rows")
+assert.equal((dailyHtml.match(/class="bb-daily-day-group"/g) || []).length, 2, "No synthetic spending days")
 assert.ok(!daily(entries, 2026, 8).includes('aria-current="date"'))
 assert.ok(!daily(entries, 2025, 9).includes('aria-current="date"'))
 assert.ok(!daily([entries[1]]).includes('aria-current="date"'), "No invented entry if today has no spending")
@@ -82,7 +83,7 @@ console.log("Daily category colors and Pacific-day highlight checks passed")
 assert.equal(runtime.dailyEntryDayLabel({date:"2026-09-03"}), "3")
 assert.equal(runtime.dailyEntryDayLabel({date:"9/03/2026"}), "3")
 assert.equal(runtime.dailyEntryDayLabel({date:""}), null)
-assert.equal((daily([{...entries[0],date:"2026-09-03"},{...entries[1],date:"9/3/2026"}]).match(/<tr>/g)||[]).length,2)
+assert.equal((daily([{...entries[0],date:"2026-09-03"},{...entries[1],date:"9/3/2026"}]).match(/class="bb-daily-day-group"/g)||[]).length,1)
 
 assert.equal(runtime.dailyEntryDayLabel({date:"2/30/2026"}), null)
 assert.equal(runtime.dailyEntryDayLabel({date:"2026-09-03"},2026,8), null)

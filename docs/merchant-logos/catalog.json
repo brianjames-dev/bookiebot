@@ -1,0 +1,2868 @@
+{
+  "status": "approved",
+  "reviewDate": "2026-11-01",
+  "license": "Respective company trademarks; sources and upstream packages recorded per mark. No affiliation implied.",
+  "logos": [
+    {
+      "id": "aldinord",
+      "name": "Aldi Nord",
+      "aliases": [
+        "ALDI Nord"
+      ],
+      "group": "Groceries",
+      "asset": "company-logo-merchant-aldinord-5871b646a553c74a.svg",
+      "background": "#ffffff",
+      "inset": 7,
+      "source": "https://commons.wikimedia.org/wiki/File:Aldi_Nord_201x_logo.svg",
+      "package": "simple-icons@16.5.0",
+      "upstream": "https://cdn.jsdelivr.net/npm/simple-icons@16.5.0/icons/aldinord.svg",
+      "sha256": "5871b646a553c74a46a09d39dd95e7aa28e7baa92c265a1aa7a490ffd236b046",
+      "review": "approved-2026-11-01"
+    },
+    {
+      "id": "aldisud",
+      "name": "Aldi Süd",
+      "aliases": [
+        "ALDI",
+        "ALDI Süd"
+      ],
+      "group": "Groceries",
+      "asset": "company-logo-merchant-aldisud-baab43b749300bed.svg",
+      "background": "#ffffff",
+      "inset": 7,
+      "source": "https://www.aldi-sued.de",
+      "package": "simple-icons@16.5.0",
+      "upstream": "https://cdn.jsdelivr.net/npm/simple-icons@16.5.0/icons/aldisud.svg",
+      "sha256": "baab43b749300bed4b9920d654f2f90f6d29196c9b8cc71c511cd04697e5c484",
+      "review": "approved-2026-11-01"
+    },
+    {
+      "id": "lidl",
+      "name": "Lidl",
+      "aliases": [
+        "Lidl"
+      ],
+      "group": "Groceries",
+      "asset": "company-logo-merchant-lidl-41bd332b82577848.svg",
+      "background": "#ffffff",
+      "inset": 7,
+      "source": "https://www.lidl.de",
+      "package": "simple-icons@16.5.0",
+      "upstream": "https://cdn.jsdelivr.net/npm/simple-icons@16.5.0/icons/lidl.svg",
+      "sha256": "41bd332b825778485277525bc0a878dd3454fc1189c1110851dc2f0c8497f3a9",
+      "review": "approved-2026-11-01"
+    },
+    {
+      "id": "instacart",
+      "name": "Instacart",
+      "aliases": [
+        "Instacart"
+      ],
+      "group": "Groceries",
+      "asset": "company-logo-merchant-instacart-2e731af892aad8e4.svg",
+      "background": "#ffffff",
+      "inset": 7,
+      "source": "https://www.instacart.com/press",
+      "package": "simple-icons@16.5.0",
+      "upstream": "https://cdn.jsdelivr.net/npm/simple-icons@16.5.0/icons/instacart.svg",
+      "sha256": "2e731af892aad8e4cdb5a53fa658eb80176bb4c22485625deeaf55af14be9baf",
+      "review": "approved-2026-11-01"
+    },
+    {
+      "id": "carrefour",
+      "name": "Carrefour",
+      "aliases": [
+        "Carrefour"
+      ],
+      "group": "Groceries",
+      "asset": "company-logo-merchant-carrefour-5e2c36ae5bc236a3.svg",
+      "background": "#ffffff",
+      "inset": 7,
+      "source": "https://en.wikipedia.org/wiki/File:Carrefour_logo_no_tag.svg",
+      "package": "simple-icons@16.5.0",
+      "upstream": "https://cdn.jsdelivr.net/npm/simple-icons@16.5.0/icons/carrefour.svg",
+      "sha256": "5e2c36ae5bc236a35377ccd8eb2439c3591ced6d231caca9e6c59bfb21c95b89",
+      "review": "approved-2026-11-01"
+    },
+    {
+      "id": "tesco",
+      "name": "Tesco",
+      "aliases": [
+        "Tesco"
+      ],
+      "group": "Groceries",
+      "asset": "company-logo-merchant-tesco-523e4d5d376f8430.svg",
+      "background": "#ffffff",
+      "inset": 7,
+      "source": "https://www.tesco.com",
+      "package": "simple-icons@16.5.0",
+      "upstream": "https://cdn.jsdelivr.net/npm/simple-icons@16.5.0/icons/tesco.svg",
+      "sha256": "523e4d5d376f8430c7e33cc2521fabbe12b83f82e008afa017242a5a4138d5c0",
+      "review": "approved-2026-11-01"
+    },
+    {
+      "id": "asda",
+      "name": "ASDA",
+      "aliases": [
+        "ASDA"
+      ],
+      "group": "Groceries",
+      "asset": "company-logo-merchant-asda-892da0a0bb922260.svg",
+      "background": "#ffffff",
+      "inset": 7,
+      "source": "https://www.asda.com",
+      "package": "simple-icons@16.5.0",
+      "upstream": "https://cdn.jsdelivr.net/npm/simple-icons@16.5.0/icons/asda.svg",
+      "sha256": "892da0a0bb9222603bc31da7434c4c6a09c747957300d885dfe4eb0999d23bbf",
+      "review": "approved-2026-11-01"
+    },
+    {
+      "id": "rewe",
+      "name": "REWE",
+      "aliases": [
+        "REWE"
+      ],
+      "group": "Groceries",
+      "asset": "company-logo-merchant-rewe-a1ccaa5c11ee97f5.svg",
+      "background": "#ffffff",
+      "inset": 7,
+      "source": "https://www.rewe.de",
+      "package": "simple-icons@16.5.0",
+      "upstream": "https://cdn.jsdelivr.net/npm/simple-icons@16.5.0/icons/rewe.svg",
+      "sha256": "a1ccaa5c11ee97f52e08004ff75acc35151cb7adb19d2dd727c77d1818770a0c",
+      "review": "approved-2026-11-01"
+    },
+    {
+      "id": "mcdonalds",
+      "name": "McDonald's",
+      "aliases": [
+        "McDonald's",
+        "McDonalds"
+      ],
+      "group": "Fast food & coffee",
+      "asset": "company-logo-merchant-mcdonalds-4d8c4362f7ec6eed.svg",
+      "background": "#db0007",
+      "inset": 8,
+      "source": "https://www.mcdonalds.com/gb/en-gb/newsroom.html",
+      "package": "simple-icons@16.5.0",
+      "upstream": "https://cdn.jsdelivr.net/npm/simple-icons@16.5.0/icons/mcdonalds.svg",
+      "sha256": "4d8c4362f7ec6eeda6f3d0092ffd750b350939a29206773be5d195bad8f83ae2",
+      "review": "approved-2026-11-01"
+    },
+    {
+      "id": "burgerking",
+      "name": "Burger King",
+      "aliases": [
+        "Burger King"
+      ],
+      "group": "Fast food & coffee",
+      "asset": "company-logo-merchant-burgerking-ac22ecc1c3cc9f90.svg",
+      "background": "#ffffff",
+      "inset": 7,
+      "source": "https://www.bk.com",
+      "package": "simple-icons@16.5.0",
+      "upstream": "https://cdn.jsdelivr.net/npm/simple-icons@16.5.0/icons/burgerking.svg",
+      "sha256": "ac22ecc1c3cc9f90c45717eaaa819787c3709cc2ff02d37de6d1af6d017c3709",
+      "review": "approved-2026-11-01"
+    },
+    {
+      "id": "tacobell",
+      "name": "Taco Bell",
+      "aliases": [
+        "Taco Bell"
+      ],
+      "group": "Fast food & coffee",
+      "asset": "company-logo-merchant-tacobell-2efd69221b0e07c1.svg",
+      "background": "#ffffff",
+      "inset": 7,
+      "source": "https://www.tacobell.com",
+      "package": "simple-icons@16.5.0",
+      "upstream": "https://cdn.jsdelivr.net/npm/simple-icons@16.5.0/icons/tacobell.svg",
+      "sha256": "2efd69221b0e07c14fabef7799623a697051debc56f02b1281fae1be40e6797a",
+      "review": "approved-2026-11-01"
+    },
+    {
+      "id": "starbucks",
+      "name": "Starbucks",
+      "aliases": [
+        "Starbucks"
+      ],
+      "group": "Fast food & coffee",
+      "asset": "company-logo-merchant-starbucks-e8a397a07e93c0a4.svg",
+      "background": "#ffffff",
+      "inset": 0,
+      "source": "https://starbucks.com",
+      "package": "simple-icons@16.5.0",
+      "upstream": "https://cdn.jsdelivr.net/npm/simple-icons@16.5.0/icons/starbucks.svg",
+      "sha256": "e8a397a07e93c0a4167c84707e4b6a825b3ec652cb6e7a0d463f3bdb95269a85",
+      "review": "approved-2026-11-01"
+    },
+    {
+      "id": "kfc",
+      "name": "KFC",
+      "aliases": [
+        "KFC"
+      ],
+      "group": "Fast food & coffee",
+      "asset": "company-logo-merchant-kfc-1bf88da1c178143e.svg",
+      "background": "#ffffff",
+      "inset": 7,
+      "source": "https://global.kfc.com/asset-library/",
+      "package": "simple-icons@16.5.0",
+      "upstream": "https://cdn.jsdelivr.net/npm/simple-icons@16.5.0/icons/kfc.svg",
+      "sha256": "1bf88da1c178143e6ffd30231f12c18099f650c2ac18c9c71b7047cffc367697",
+      "review": "approved-2026-11-01"
+    },
+    {
+      "id": "ubereats",
+      "name": "Uber Eats",
+      "aliases": [
+        "Uber Eats"
+      ],
+      "group": "Fast food & coffee",
+      "asset": "company-logo-merchant-ubereats-b0e0cbe54184ebb7.svg",
+      "background": "#ffffff",
+      "inset": 7,
+      "source": "https://assets.uber.com/d/k4nuxdZ8MC7E/logos/collection/150",
+      "package": "simple-icons@16.5.0",
+      "upstream": "https://cdn.jsdelivr.net/npm/simple-icons@16.5.0/icons/ubereats.svg",
+      "sha256": "b0e0cbe54184ebb7a714e110d4aaaa2d648a35e5671c995549703d0132749ca8",
+      "review": "approved-2026-11-01"
+    },
+    {
+      "id": "doordash",
+      "name": "DoorDash",
+      "aliases": [
+        "DoorDash"
+      ],
+      "group": "Fast food & coffee",
+      "asset": "company-logo-merchant-doordash-e20dcdb67abbdbde.svg",
+      "background": "#ffffff",
+      "inset": 7,
+      "source": "https://www.doordash.com/about/",
+      "package": "simple-icons@16.5.0",
+      "upstream": "https://cdn.jsdelivr.net/npm/simple-icons@16.5.0/icons/doordash.svg",
+      "sha256": "e20dcdb67abbdbdebf0506e05fefce874b5b9bbdf1e37fd4f7437241d86fe524",
+      "review": "approved-2026-11-01"
+    },
+    {
+      "id": "deliveroo",
+      "name": "Deliveroo",
+      "aliases": [
+        "Deliveroo"
+      ],
+      "group": "Fast food & coffee",
+      "asset": "company-logo-merchant-deliveroo-66c646a52fcdd871.svg",
+      "background": "#ffffff",
+      "inset": 7,
+      "source": "https://deliveroo.com",
+      "package": "simple-icons@16.5.0",
+      "upstream": "https://cdn.jsdelivr.net/npm/simple-icons@16.5.0/icons/deliveroo.svg",
+      "sha256": "66c646a52fcdd871300cb5419f0305eba1af577cdf111d61a1bbc1e77ee8e36a",
+      "review": "approved-2026-11-01"
+    },
+    {
+      "id": "target",
+      "name": "Target",
+      "aliases": [
+        "Target",
+        "Target store"
+      ],
+      "group": "General stores",
+      "asset": "company-logo-merchant-target-511fdc936522719f.svg",
+      "background": "#ffffff",
+      "inset": 0,
+      "source": "https://www.target.com",
+      "package": "simple-icons@16.5.0",
+      "upstream": "https://cdn.jsdelivr.net/npm/simple-icons@16.5.0/icons/target.svg",
+      "sha256": "511fdc936522719f761d7042f88d20239b3077976c09afc426f0ba0f6a2c6fae",
+      "review": "approved-2026-11-01"
+    },
+    {
+      "id": "ikea",
+      "name": "IKEA",
+      "aliases": [
+        "IKEA"
+      ],
+      "group": "General stores",
+      "asset": "company-logo-merchant-ikea-3c87b16786036f20.svg",
+      "background": "#ffda1a",
+      "inset": 4,
+      "source": "https://www.ikea.com",
+      "package": "simple-icons@16.5.0",
+      "upstream": "https://cdn.jsdelivr.net/npm/simple-icons@16.5.0/icons/ikea.svg",
+      "sha256": "3c87b16786036f20b7fd7fd40e94647576fb5ac9b78382836073aa6b66d7a4fd",
+      "review": "approved-2026-11-01"
+    },
+    {
+      "id": "nike",
+      "name": "Nike",
+      "aliases": [
+        "Nike"
+      ],
+      "group": "General stores",
+      "asset": "company-logo-merchant-nike-bafb08923ddd2d4c.svg",
+      "background": "#ffffff",
+      "inset": 7,
+      "source": "https://www.nike.com",
+      "package": "simple-icons@16.5.0",
+      "upstream": "https://cdn.jsdelivr.net/npm/simple-icons@16.5.0/icons/nike.svg",
+      "sha256": "bafb08923ddd2d4ca56d49c191fb0b4533046e0300ae3165acf12f7874b9de8c",
+      "review": "approved-2026-11-01"
+    },
+    {
+      "id": "adidas",
+      "name": "Adidas",
+      "aliases": [
+        "Adidas"
+      ],
+      "group": "General stores",
+      "asset": "company-logo-merchant-adidas-360ad2feb672d470.svg",
+      "background": "#ffffff",
+      "inset": 7,
+      "source": "https://www.adidas.com",
+      "package": "simple-icons@16.5.0",
+      "upstream": "https://cdn.jsdelivr.net/npm/simple-icons@16.5.0/icons/adidas.svg",
+      "sha256": "360ad2feb672d4704d2ec6ca27a396668904602ff654dff6ca2bd9bf3bc4c677",
+      "review": "approved-2026-11-01"
+    },
+    {
+      "id": "etsy",
+      "name": "Etsy",
+      "aliases": [
+        "Etsy"
+      ],
+      "group": "General stores",
+      "asset": "company-logo-merchant-etsy-1871eb705d39d14f.svg",
+      "background": "#ffffff",
+      "inset": 7,
+      "source": "https://www.etsy.com/uk/press",
+      "package": "simple-icons@16.5.0",
+      "upstream": "https://cdn.jsdelivr.net/npm/simple-icons@16.5.0/icons/etsy.svg",
+      "sha256": "1871eb705d39d14f72fe71e0cac23fea7ebb05ab01870214d5ebf3eaba9a2d70",
+      "review": "approved-2026-11-01"
+    },
+    {
+      "id": "ebay",
+      "name": "eBay",
+      "aliases": [
+        "eBay"
+      ],
+      "group": "General stores",
+      "asset": "company-logo-merchant-ebay-4f7e56c62a82e464.svg",
+      "background": "#ffffff",
+      "inset": 7,
+      "source": "https://go.developer.ebay.com/logos",
+      "package": "simple-icons@16.5.0",
+      "upstream": "https://cdn.jsdelivr.net/npm/simple-icons@16.5.0/icons/ebay.svg",
+      "sha256": "4f7e56c62a82e464de70b405e09eb7bc9d5c2036aef069acfcfae9f3efcf53fa",
+      "review": "approved-2026-11-01"
+    },
+    {
+      "id": "handm",
+      "name": "H&M",
+      "aliases": [
+        "H&M",
+        "H and M"
+      ],
+      "group": "General stores",
+      "asset": "company-logo-merchant-handm-d912ba3b66c494b9.svg",
+      "background": "#ffffff",
+      "inset": 7,
+      "source": "https://www2.hm.com/en_gb/index.html",
+      "package": "simple-icons@16.5.0",
+      "upstream": "https://cdn.jsdelivr.net/npm/simple-icons@16.5.0/icons/handm.svg",
+      "sha256": "d912ba3b66c494b9ce71a9dd8a3fc78603160618c524903a6190bed9cb2a9201",
+      "review": "approved-2026-11-01"
+    },
+    {
+      "id": "uniqlo",
+      "name": "Uniqlo",
+      "aliases": [
+        "Uniqlo"
+      ],
+      "group": "General stores",
+      "asset": "company-logo-merchant-uniqlo-85432a91a2001050.svg",
+      "background": "#ffffff",
+      "inset": 7,
+      "source": "https://www.uniqlo.com",
+      "package": "simple-icons@16.5.0",
+      "upstream": "https://cdn.jsdelivr.net/npm/simple-icons@16.5.0/icons/uniqlo.svg",
+      "sha256": "85432a91a2001050c423b6649f13b5bb5779833dcdfe4c4a893e681f2f1906d2",
+      "review": "approved-2026-11-01"
+    },
+    {
+      "id": "puma",
+      "name": "Puma",
+      "aliases": [
+        "Puma"
+      ],
+      "group": "General stores",
+      "asset": "company-logo-merchant-puma-9c7c03af3b191935.svg",
+      "background": "#ffffff",
+      "inset": 7,
+      "source": "https://us.puma.com",
+      "package": "simple-icons@16.5.0",
+      "upstream": "https://cdn.jsdelivr.net/npm/simple-icons@16.5.0/icons/puma.svg",
+      "sha256": "9c7c03af3b1919351f5a5e43ca9f98dd3f2cb6dd6ca8dce3512cc850ad962420",
+      "review": "approved-2026-11-01"
+    },
+    {
+      "id": "newbalance",
+      "name": "New Balance",
+      "aliases": [
+        "New Balance"
+      ],
+      "group": "General stores",
+      "asset": "company-logo-merchant-newbalance-b56a1ea12db89503.svg",
+      "background": "#ffffff",
+      "inset": 7,
+      "source": "https://www.newbalance.com",
+      "package": "simple-icons@16.5.0",
+      "upstream": "https://cdn.jsdelivr.net/npm/simple-icons@16.5.0/icons/newbalance.svg",
+      "sha256": "b56a1ea12db895038f4fe0450d9cd163b1b6f2c7bdfe37ac4bb0e5b630122e56",
+      "review": "approved-2026-11-01"
+    },
+    {
+      "id": "underarmour",
+      "name": "Under Armour",
+      "aliases": [
+        "Under Armour"
+      ],
+      "group": "General stores",
+      "asset": "company-logo-merchant-underarmour-72281bd9303768af.svg",
+      "background": "#ffffff",
+      "inset": 7,
+      "source": "https://www.underarmour.com/en-us",
+      "package": "simple-icons@16.5.0",
+      "upstream": "https://cdn.jsdelivr.net/npm/simple-icons@16.5.0/icons/underarmour.svg",
+      "sha256": "72281bd9303768af49a44d258feee1d3f89ff376654c3386cfb39a218933da3f",
+      "review": "approved-2026-11-01"
+    },
+    {
+      "id": "zara",
+      "name": "Zara",
+      "aliases": [
+        "Zara"
+      ],
+      "group": "General stores",
+      "asset": "company-logo-merchant-zara-7a2db869f3860f6b.svg",
+      "background": "#ffffff",
+      "inset": 7,
+      "source": "https://www.zara.com",
+      "package": "simple-icons@16.5.0",
+      "upstream": "https://cdn.jsdelivr.net/npm/simple-icons@16.5.0/icons/zara.svg",
+      "sha256": "7a2db869f3860f6ba8fb05af857caf22ff3e2e967d4595c7a61265b13a5b14b1",
+      "review": "approved-2026-11-01"
+    },
+    {
+      "id": "aliexpress",
+      "name": "AliExpress",
+      "aliases": [
+        "AliExpress"
+      ],
+      "group": "General stores",
+      "asset": "company-logo-merchant-aliexpress-cbe0d1e22542fe70.svg",
+      "background": "#ffffff",
+      "inset": 7,
+      "source": "https://www.alibabagroup.com/en/ir/reports",
+      "package": "simple-icons@16.5.0",
+      "upstream": "https://cdn.jsdelivr.net/npm/simple-icons@16.5.0/icons/aliexpress.svg",
+      "sha256": "cbe0d1e22542fe70487c5d02889cf3f1c4050473f9f2ebdbdc16b0efc0dd19d7",
+      "review": "approved-2026-11-01"
+    },
+    {
+      "id": "wish",
+      "name": "Wish",
+      "aliases": [
+        "Wish"
+      ],
+      "group": "General stores",
+      "asset": "company-logo-merchant-wish-22ea3c573ee39670.svg",
+      "background": "#ffffff",
+      "inset": 7,
+      "source": "https://wish.com",
+      "package": "simple-icons@16.5.0",
+      "upstream": "https://cdn.jsdelivr.net/npm/simple-icons@16.5.0/icons/wish.svg",
+      "sha256": "22ea3c573ee39670d6c4e3df8ee9a685881f78db487699b50ce1e6b58e20e780",
+      "review": "approved-2026-11-01"
+    },
+    {
+      "id": "samsung",
+      "name": "Samsung",
+      "aliases": [
+        "Samsung"
+      ],
+      "group": "General stores",
+      "asset": "company-logo-merchant-samsung-f187e2e69fcdc4f1.svg",
+      "background": "#ffffff",
+      "inset": 3,
+      "source": "https://www.samsung.com/us/about-us/brand-identity/logo/",
+      "package": "simple-icons@16.5.0",
+      "upstream": "https://cdn.jsdelivr.net/npm/simple-icons@16.5.0/icons/samsung.svg",
+      "sha256": "f187e2e69fcdc4f119707652bcd97a1516d796442d7790e8d7a129f771c1e36e",
+      "review": "approved-2026-11-01"
+    },
+    {
+      "id": "shell",
+      "name": "Shell",
+      "aliases": [
+        "Shell",
+        "Shell gas"
+      ],
+      "group": "Gas stations",
+      "asset": "company-logo-merchant-shell-cb024c31adf023ef.svg",
+      "background": "#ffffff",
+      "inset": 6,
+      "source": "https://en.wikipedia.org/wiki/File:Shell_logo.svg",
+      "sha256": "cb024c31adf023ef0a00907b907229139e2ca4eb98c5f4743a0e8695227f9772",
+      "adaptation": "Native red/yellow artwork with original geometry.",
+      "referenceReview": "2026-11-01-user-corrections",
+      "review": "approved-2026-11-01"
+    },
+    {
+      "id": "uber",
+      "name": "Uber",
+      "aliases": [
+        "Uber"
+      ],
+      "group": "Travel & transport",
+      "asset": "company-logo-merchant-uber-29eaa0ec30571c06.svg",
+      "background": "#ffffff",
+      "inset": 7,
+      "source": "https://assets.uber.com/d/k4nuxdZ8MC7E/logos/collection/151",
+      "package": "simple-icons@16.5.0",
+      "upstream": "https://cdn.jsdelivr.net/npm/simple-icons@16.5.0/icons/uber.svg",
+      "sha256": "29eaa0ec30571c0694e7e42ab34816adb5955e414248c240b2b82dee3d8b75ca",
+      "review": "approved-2026-11-01"
+    },
+    {
+      "id": "lyft",
+      "name": "Lyft",
+      "aliases": [
+        "Lyft"
+      ],
+      "group": "Travel & transport",
+      "asset": "company-logo-merchant-lyft-5c700a0a8447613d.svg",
+      "background": "#ffffff",
+      "inset": 7,
+      "source": "https://www.lyft.com/press",
+      "package": "simple-icons@16.5.0",
+      "upstream": "https://cdn.jsdelivr.net/npm/simple-icons@16.5.0/icons/lyft.svg",
+      "sha256": "5c700a0a8447613d0517f6671c4cfd10679ca4d32b1c6a67da0b62b2c87a945f",
+      "review": "approved-2026-11-01"
+    },
+    {
+      "id": "airbnb",
+      "name": "Airbnb",
+      "aliases": [
+        "Airbnb"
+      ],
+      "group": "Travel & transport",
+      "asset": "company-logo-merchant-airbnb-730875628a7f14b9.svg",
+      "background": "#ffffff",
+      "inset": 7,
+      "source": "https://www.airbnb.com",
+      "package": "simple-icons@16.5.0",
+      "upstream": "https://cdn.jsdelivr.net/npm/simple-icons@16.5.0/icons/airbnb.svg",
+      "sha256": "730875628a7f14b9682469d0a1da3a66397029c3e46b43540e3d3de5af11b2dd",
+      "review": "approved-2026-11-01"
+    },
+    {
+      "id": "marriott",
+      "name": "Marriott",
+      "aliases": [
+        "Marriott"
+      ],
+      "group": "Travel & transport",
+      "asset": "company-logo-merchant-marriott-d8e5f2d0c6110434.svg",
+      "background": "#ffffff",
+      "inset": 7,
+      "source": "https://marriott-hotels.marriott.com",
+      "package": "simple-icons@16.5.0",
+      "upstream": "https://cdn.jsdelivr.net/npm/simple-icons@16.5.0/icons/marriott.svg",
+      "sha256": "d8e5f2d0c6110434cc4f601ceda87b54b368720dec394adfde9aa80ee541c1d5",
+      "review": "approved-2026-11-01"
+    },
+    {
+      "id": "hilton",
+      "name": "Hilton",
+      "aliases": [
+        "Hilton"
+      ],
+      "group": "Travel & transport",
+      "asset": "company-logo-merchant-hilton-330c02529b1afb68.svg",
+      "background": "#ffffff",
+      "inset": 3,
+      "source": "https://www.hilton.com",
+      "package": "simple-icons@16.5.0",
+      "upstream": "https://cdn.jsdelivr.net/npm/simple-icons@16.5.0/icons/hilton.svg",
+      "sha256": "330c02529b1afb68eef0102336c0aeced4fb7b710f710478ca70fb0d026a1500",
+      "review": "approved-2026-11-01"
+    },
+    {
+      "id": "delta",
+      "name": "Delta",
+      "aliases": [
+        "Delta"
+      ],
+      "group": "Travel & transport",
+      "asset": "company-logo-merchant-delta-6d02d9e343ef1046.svg",
+      "background": "#ffffff",
+      "inset": 3,
+      "source": "https://news.delta.com/delta-air-lines-logos-brand-guidelines",
+      "package": "simple-icons@16.5.0",
+      "upstream": "https://cdn.jsdelivr.net/npm/simple-icons@16.5.0/icons/delta.svg",
+      "sha256": "6d02d9e343ef104672dcc54853033b20c894281dbedbcb34b94997cbd0daf74a",
+      "review": "approved-2026-11-01"
+    },
+    {
+      "id": "unitedairlines",
+      "name": "United Airlines",
+      "aliases": [
+        "United Airlines"
+      ],
+      "group": "Travel & transport",
+      "asset": "company-logo-merchant-unitedairlines-88bc9677345c5b6e.svg",
+      "background": "#ffffff",
+      "inset": 7,
+      "source": "https://www.united.com",
+      "package": "simple-icons@16.5.0",
+      "upstream": "https://cdn.jsdelivr.net/npm/simple-icons@16.5.0/icons/unitedairlines.svg",
+      "sha256": "88bc9677345c5b6e19db9f2cd2369f03d26c241c02d103ebe77f996df5df81bf",
+      "review": "approved-2026-11-01"
+    },
+    {
+      "id": "southwestairlines",
+      "name": "Southwest Airlines",
+      "aliases": [
+        "Southwest",
+        "Southwest Airlines"
+      ],
+      "group": "Travel & transport",
+      "asset": "company-logo-merchant-southwestairlines-ce7a3812696a54e5.svg",
+      "background": "#ffffff",
+      "inset": 6,
+      "source": "https://commons.wikimedia.org/wiki/File:Southwest_Airlines_logo_2014.svg",
+      "sha256": "ce7a3812696a54e5015df579deb149fb6b200bc5642ec7d1254040636ca7868c",
+      "adaptation": "Original full-color heart only; original paths and gradients retained; light outline matching reference.",
+      "referenceReview": "2026-11-01-user-corrections",
+      "review": "approved-2026-11-01"
+    },
+    {
+      "id": "bookingdotcom",
+      "name": "Booking.com",
+      "aliases": [
+        "Booking.com"
+      ],
+      "group": "Travel & transport",
+      "asset": "company-logo-merchant-bookingdotcom-a17e2305c35e85a5.png",
+      "background": "#003a9a",
+      "inset": 0,
+      "source": "user-provided Booking.com reference",
+      "sha256": "a17e2305c35e85a537029ef3eaf44413535cc177912a75ef62784938aba3c57b",
+      "adaptation": "User artwork preserved byte-for-byte with no exterior padding.",
+      "referenceReview": "2026-11-01-user-corrections",
+      "review": "approved-2026-11-01"
+    },
+    {
+      "id": "expedia",
+      "name": "Expedia",
+      "aliases": [
+        "Expedia"
+      ],
+      "group": "Travel & transport",
+      "asset": "company-logo-merchant-expedia-a83ff3e3aa86e6da.svg",
+      "background": "#ffffff",
+      "inset": 7,
+      "source": "https://brandfolder.com/portals/brand-expedia",
+      "package": "simple-icons@16.5.0",
+      "upstream": "https://cdn.jsdelivr.net/npm/simple-icons@16.5.0/icons/expedia.svg",
+      "sha256": "a83ff3e3aa86e6da776829e4457ef9abb077f2a2ebb4f7dd134d6f63651faa87",
+      "review": "approved-2026-11-01"
+    },
+    {
+      "id": "tripadvisor",
+      "name": "Tripadvisor",
+      "aliases": [
+        "Tripadvisor"
+      ],
+      "group": "Travel & transport",
+      "asset": "company-logo-merchant-tripadvisor-c45f380331a1213d.svg",
+      "background": "#ffffff",
+      "inset": 7,
+      "source": "https://tripadvisor.mediaroom.com/logo-guidelines",
+      "package": "simple-icons@16.5.0",
+      "upstream": "https://cdn.jsdelivr.net/npm/simple-icons@16.5.0/icons/tripadvisor.svg",
+      "sha256": "c45f380331a1213dec6565c75adc26a6d61d1bd8833a416f04e960c35dd87102",
+      "review": "approved-2026-11-01"
+    },
+    {
+      "id": "fedex",
+      "name": "FedEx",
+      "aliases": [
+        "FedEx"
+      ],
+      "group": "Shipping",
+      "asset": "company-logo-merchant-fedex-fe9f8efbe1648b6e.svg",
+      "background": "#ffffff",
+      "inset": 7,
+      "source": "https://newsroom.fedex.com",
+      "package": "simple-icons@16.5.0",
+      "upstream": "https://cdn.jsdelivr.net/npm/simple-icons@16.5.0/icons/fedex.svg",
+      "sha256": "fe9f8efbe1648b6e113bf8c4c3424e406ed54f1b55e52e0fc05b8308e2e9dde4",
+      "review": "approved-2026-11-01"
+    },
+    {
+      "id": "ups",
+      "name": "UPS",
+      "aliases": [
+        "UPS"
+      ],
+      "group": "Shipping",
+      "asset": "company-logo-merchant-ups-580e99311274c347.svg",
+      "background": "#ffffff",
+      "inset": 6,
+      "source": "https://commons.wikimedia.org/wiki/File:United_Parcel_Service_logo_2014.svg",
+      "sha256": "580e99311274c34782ded6873e72b5b958cf7ce698f071bd597aef40eecc1902",
+      "adaptation": "Full-color brown/gold shield; original geometry retained.",
+      "referenceReview": "2026-11-01-user-corrections",
+      "review": "approved-2026-11-01"
+    },
+    {
+      "id": "usps",
+      "name": "USPS",
+      "aliases": [
+        "USPS"
+      ],
+      "group": "Shipping",
+      "asset": "company-logo-merchant-usps-a38dc7d740123c28.svg",
+      "background": "#ffffff",
+      "inset": 7,
+      "source": "https://www.usps.com",
+      "package": "simple-icons@16.5.0",
+      "upstream": "https://cdn.jsdelivr.net/npm/simple-icons@16.5.0/icons/usps.svg",
+      "sha256": "a38dc7d740123c280461552c5f661e9abea2ba49077c7e43c43bb021d688993e",
+      "review": "approved-2026-11-01"
+    },
+    {
+      "id": "dhl",
+      "name": "DHL",
+      "aliases": [
+        "DHL"
+      ],
+      "group": "Shipping",
+      "asset": "company-logo-merchant-dhl-dc8038665792a80a.svg",
+      "background": "#ffffff",
+      "inset": 3,
+      "source": "https://www.dpdhl-brands.com/dhl/en/guides/design-basics/logo-and-claim.html",
+      "package": "simple-icons@16.5.0",
+      "upstream": "https://cdn.jsdelivr.net/npm/simple-icons@16.5.0/icons/dhl.svg",
+      "sha256": "dc8038665792a80ab968dc08fdc505b4a97d7d34bfa41c53e22c344c795e2873",
+      "review": "approved-2026-11-01"
+    },
+    {
+      "id": "grubhub",
+      "name": "Grubhub",
+      "aliases": [
+        "Grubhub",
+        "Grub Hub"
+      ],
+      "group": "Fast food & coffee",
+      "asset": "company-logo-merchant-grubhub-64c5257b826ad061.svg",
+      "background": "#ffffff",
+      "inset": 3,
+      "source": "https://github.com/simple-icons/simple-icons/tree/11.15.0/icons/grubhub.svg",
+      "package": "simple-icons@11.15.0",
+      "upstream": "https://cdn.jsdelivr.net/npm/simple-icons@11.15.0/icons/grubhub.svg",
+      "fill": "F63440",
+      "sha256": "64c5257b826ad061cdcd32423dadfbebfe2e057202fef6d9eac56939dd16120d",
+      "review": "approved-2026-11-01"
+    },
+    {
+      "id": "amazon",
+      "name": "Amazon",
+      "aliases": [
+        "Amazon",
+        "Amazon.com",
+        "AMZN Mktp US",
+        "Amazon Marketplace"
+      ],
+      "group": "General stores",
+      "asset": "company-logo-merchant-amazon-ec401e732753cdc5.svg",
+      "background": "#ff9400",
+      "inset": 7,
+      "source": "https://commons.wikimedia.org/wiki/File:Amazon_logo.svg",
+      "sha256": "ec401e732753cdc53ffe77e28b201409be53fc5447947689db3c36524951bb49",
+      "adaptation": "Original full wordmark in white; orange circle matching user reference.",
+      "referenceReview": "2026-11-01-user-corrections",
+      "review": "approved-2026-11-01"
+    },
+    {
+      "id": "walmart",
+      "name": "Walmart",
+      "aliases": [
+        "Walmart",
+        "Wal-Mart",
+        "Walmart Supercenter",
+        "Walmart gas"
+      ],
+      "group": "General stores",
+      "asset": "company-logo-merchant-walmart-c1e12ba4f8a11a41.svg",
+      "background": "#ffffff",
+      "inset": 3,
+      "source": "https://github.com/simple-icons/simple-icons/tree/11.15.0/icons/walmart.svg",
+      "package": "simple-icons@11.15.0",
+      "upstream": "https://cdn.jsdelivr.net/npm/simple-icons@11.15.0/icons/walmart.svg",
+      "fill": "0071CE",
+      "sha256": "c1e12ba4f8a11a419e957fee26a9e41901019658a54c2507687ce46c8d92f432",
+      "review": "approved-2026-11-01"
+    },
+    {
+      "id": "trader-joes",
+      "name": "Trader Joe’s",
+      "aliases": [
+        "Trader Joe’s",
+        "Trader Joe's",
+        "Trader Joes"
+      ],
+      "group": "Groceries",
+      "asset": "company-logo-merchant-trader-joes-503e83d3207938d2.svg",
+      "background": "#fffaf0",
+      "inset": 3,
+      "source": "https://commons.wikimedia.org/wiki/File:Trader_Joes_Logo.svg",
+      "upstream": "https://upload.wikimedia.org/wikipedia/commons/d/d1/Trader_Joes_Logo.svg",
+      "sha256": "503e83d3207938d283c565f96f2bdfa09fac55a8184b5624d72d735d205edb6a",
+      "review": "approved-2026-11-01"
+    },
+    {
+      "id": "whole-foods",
+      "name": "Whole Foods",
+      "aliases": [
+        "Whole Foods",
+        "Whole Foods Market"
+      ],
+      "group": "Groceries",
+      "asset": "company-logo-merchant-whole-foods-d548ef550b066f1c.svg",
+      "background": "#ffffff",
+      "inset": 0,
+      "source": "https://commons.wikimedia.org/wiki/File:Whole_Foods_Market_201x_logo.svg",
+      "upstream": "https://upload.wikimedia.org/wikipedia/commons/a/a2/Whole_Foods_Market_201x_logo.svg",
+      "sha256": "d548ef550b066f1caea51efc632d626aed0bf0ea2506f8d295ea33a01d5b034e",
+      "review": "approved-2026-11-01"
+    },
+    {
+      "id": "chevron",
+      "name": "Chevron",
+      "aliases": [
+        "Chevron"
+      ],
+      "group": "Gas stations",
+      "asset": "company-logo-merchant-chevron-9493eafb2e48bf90.svg",
+      "background": "#ffffff",
+      "inset": 7,
+      "source": "https://commons.wikimedia.org/wiki/File:Chevron_Logo.svg",
+      "upstream": "https://upload.wikimedia.org/wikipedia/commons/8/86/Chevron_Logo.svg",
+      "sha256": "9493eafb2e48bf909a88c744006d8c37e4973d1bad8abcde2db306f92d7adffc",
+      "review": "approved-2026-11-01"
+    },
+    {
+      "id": "home-depot",
+      "name": "Home Depot",
+      "aliases": [
+        "Home Depot",
+        "The Home Depot"
+      ],
+      "group": "General stores",
+      "asset": "company-logo-merchant-home-depot-72dc07b8739d9c1d.svg",
+      "background": "#f96302",
+      "inset": 4,
+      "source": "https://commons.wikimedia.org/wiki/File:The_Home_Depot_logo.svg",
+      "upstream": "https://upload.wikimedia.org/wikipedia/commons/f/f6/The_Home_Depot_logo.svg",
+      "sha256": "72dc07b8739d9c1dc287a5b53cd1e8beb7fe78c11919942d88e9927dc07d77e9",
+      "review": "approved-2026-11-01"
+    },
+    {
+      "id": "costco",
+      "name": "Costco",
+      "aliases": [
+        "Costco",
+        "Costco Wholesale",
+        "Costco gas",
+        "Costco gasoline"
+      ],
+      "group": "General stores",
+      "asset": "company-logo-merchant-costco-9c769076aaad8c2c.svg",
+      "background": "#ffffff",
+      "inset": 4,
+      "source": "https://commons.wikimedia.org/wiki/File:Costco_Wholesale_logo_2010-10-26.svg",
+      "upstream": "https://upload.wikimedia.org/wikipedia/commons/5/59/Costco_Wholesale_logo_2010-10-26.svg",
+      "sha256": "9c769076aaad8c2cf16a888dee9326df7e67c4cf350fab0574209366e1fb61ac",
+      "review": "approved-2026-11-01"
+    },
+    {
+      "id": "chipotle",
+      "name": "Chipotle",
+      "aliases": [
+        "Chipotle",
+        "Chipotle Mexican Grill"
+      ],
+      "group": "Fast food & coffee",
+      "asset": "company-logo-merchant-chipotle-e4bd47f46d31e3c9.svg",
+      "background": "#a81612",
+      "inset": 0,
+      "source": "https://www.chipotle.com/",
+      "upstream": "https://www.chipotle.com/content/experience-fragments/chipotle/us/en/xf-header/master/_jcr_content/root/container_712714414/image_411084835.coreimg.svg/1689182077517/cmg-medallion-logo.svg",
+      "sha256": "e4bd47f46d31e3c98533c8ed2c172bd5996e1699f780c35749f661f907fe183c",
+      "review": "approved-2026-11-01"
+    },
+    {
+      "id": "safeway",
+      "name": "Safeway",
+      "aliases": [
+        "Safeway",
+        "Safeway gas",
+        "Safeway Fuel",
+        "Safeway fuel station"
+      ],
+      "group": "Groceries",
+      "background": "#ffffff",
+      "inset": 4,
+      "originalSha256": "6d945a7c4c0da74c754a01fcf2fa59443310d1507437bf30ee9f099c1f463b0d",
+      "upstream": "https://upload.wikimedia.org/wikipedia/commons/c/ce/Safeway_Logo.svg",
+      "source": "https://commons.wikimedia.org/wiki/File:Safeway_Logo.svg",
+      "asset": "company-logo-merchant-safeway-85938b09a89cdbd4.svg",
+      "sha256": "85938b09a89cdbd4eb9e10752c7a9d3a9399cb08d4e9e891d45939633476575a",
+      "addedIn": "merchant-expansion-2026-11-01",
+      "review": "approved-2026-11-01",
+      "optimization": "svgo@3.3.2; native geometry, 4-digit precision; remove unused definitions"
+    },
+    {
+      "id": "raley-s",
+      "name": "Raley’s",
+      "aliases": [
+        "Raley’s",
+        "Raley's",
+        "Raleys"
+      ],
+      "group": "Groceries",
+      "background": "#ffffff",
+      "inset": 4,
+      "originalSha256": "2f7443a4943eb6669e0ca335a3f061962d703578f82eede881bb3dd11b42f4ce",
+      "upstream": "https://upload.wikimedia.org/wikipedia/commons/9/9a/Raleys_logo.svg",
+      "source": "https://commons.wikimedia.org/wiki/File:Raleys_logo.svg",
+      "asset": "company-logo-merchant-raley-s-974e90d00f7d74cb.svg",
+      "sha256": "974e90d00f7d74cb062d87e51b2a4b1203b3f8f3796744912498aaacfcacdbe1",
+      "addedIn": "merchant-expansion-2026-11-01",
+      "review": "approved-2026-11-01",
+      "optimization": "svgo@3.3.2; native geometry, 4-digit precision; remove unused definitions"
+    },
+    {
+      "id": "lucky",
+      "name": "Lucky",
+      "aliases": [
+        "Lucky",
+        "Lucky Stores",
+        "Lucky Supermarket"
+      ],
+      "group": "Groceries",
+      "background": "#ffffff",
+      "inset": 4,
+      "originalSha256": "f3f51519e29dba1b47dcc9fe038fe1b1949c247cff4605b4e55b102ce894233f",
+      "upstream": "https://upload.wikimedia.org/wikipedia/commons/5/58/Lucky_Stores_logo.svg",
+      "source": "https://commons.wikimedia.org/wiki/File:Lucky_Stores_logo.svg",
+      "asset": "company-logo-merchant-lucky-6fddcad7c6d57b39.svg",
+      "sha256": "6fddcad7c6d57b3918340bc64d2cbdb15056e6d4c44d20787224a5c25fe1c92d",
+      "addedIn": "merchant-expansion-2026-11-01",
+      "review": "approved-2026-11-01",
+      "optimization": "svgo@3.3.2; native geometry, 4-digit precision; remove unused definitions"
+    },
+    {
+      "id": "h-e-b",
+      "name": "H-E-B",
+      "aliases": [
+        "H-E-B",
+        "HEB"
+      ],
+      "group": "Groceries",
+      "background": "#ffffff",
+      "inset": 4,
+      "originalSha256": "f917b8a333cab5c09898161d192be5a4a11fc63c1fc6466f87b4d136d2242972",
+      "upstream": "https://upload.wikimedia.org/wikipedia/commons/b/b1/HEB_logo.svg",
+      "source": "https://commons.wikimedia.org/wiki/File:HEB_logo.svg",
+      "asset": "company-logo-merchant-h-e-b-99e39d881090cec1.svg",
+      "sha256": "99e39d881090cec1033c43110506bfe0cadcc723a383ef3b8baa0e85c69c0c41",
+      "addedIn": "merchant-expansion-2026-11-01",
+      "review": "approved-2026-11-01",
+      "optimization": "svgo@3.3.2; native geometry, 4-digit precision; remove unused definitions"
+    },
+    {
+      "id": "ralphs",
+      "name": "Ralphs",
+      "aliases": [
+        "Ralphs"
+      ],
+      "group": "Groceries",
+      "background": "#ffffff",
+      "inset": 4,
+      "originalSha256": "2c7eb4a535d28dbff7f70243e909e2ad1b40f0e1e6e5d7f63fcb48baa5ea2cd0",
+      "upstream": "https://upload.wikimedia.org/wikipedia/commons/9/96/Ralphs.svg",
+      "source": "https://commons.wikimedia.org/wiki/File:Ralphs.svg",
+      "asset": "company-logo-merchant-ralphs-907338af30435f9d.svg",
+      "sha256": "907338af30435f9d044a61dffa4eeb3a85dcb52fb6734a79c7faf57ae9293794",
+      "addedIn": "merchant-expansion-2026-11-01",
+      "review": "approved-2026-11-01",
+      "optimization": "svgo@3.3.2; native geometry, 4-digit precision; remove unused definitions"
+    },
+    {
+      "id": "food-4-less",
+      "name": "Food 4 Less",
+      "aliases": [
+        "Food 4 Less",
+        "Food4Less"
+      ],
+      "group": "Groceries",
+      "background": "#ffffff",
+      "inset": 4,
+      "originalSha256": "354a26af7150dd2a218648f1a351ec0e588b50edc3077bdc18ab0372e6990a2a",
+      "upstream": "https://upload.wikimedia.org/wikipedia/commons/7/75/Food4Less_logo.svg",
+      "source": "https://commons.wikimedia.org/wiki/File:Food4Less_logo.svg",
+      "asset": "company-logo-merchant-food-4-less-72b5c3c24bfe4187.svg",
+      "sha256": "72b5c3c24bfe41872731a406c34fc94ad6364b512bf85c31669bb6dc0e687d06",
+      "addedIn": "merchant-expansion-2026-11-01",
+      "review": "approved-2026-11-01",
+      "optimization": "svgo@3.3.2; native geometry, 4-digit precision; remove unused definitions"
+    },
+    {
+      "id": "macy-s",
+      "name": "Macy’s",
+      "aliases": [
+        "Macy’s",
+        "Macy's",
+        "Macys"
+      ],
+      "group": "General stores",
+      "background": "#ffffff",
+      "inset": 4,
+      "originalSha256": "072edf9b68712d39e1edf027b419aa6729d5dbe45e3f7dff19a2a9036935191f",
+      "upstream": "https://upload.wikimedia.org/wikipedia/commons/a/a6/Macy%27s_logo.svg",
+      "source": "https://commons.wikimedia.org/wiki/File:Macy%27s_logo.svg",
+      "asset": "company-logo-merchant-macy-s-c12efe01dd06232d.svg",
+      "sha256": "c12efe01dd06232d3dfa20745085f17a90f5be6183a3e06438147269f71abaac",
+      "addedIn": "merchant-expansion-2026-11-01",
+      "review": "approved-2026-11-01",
+      "optimization": "svgo@3.3.2; native geometry, 4-digit precision; remove unused definitions"
+    },
+    {
+      "id": "grocery-outlet",
+      "name": "Grocery Outlet",
+      "aliases": [
+        "Grocery Outlet",
+        "Grocery Outlet Bargain Market"
+      ],
+      "group": "Groceries",
+      "background": "#ffffff",
+      "inset": 4,
+      "upstream": "https://upload.wikimedia.org/wikipedia/commons/7/79/Grocery_Outlet_logo.svg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=original",
+      "source": "https://commons.wikimedia.org/wiki/File:Grocery_Outlet_logo.svg",
+      "originalSha256": "cdde0e5d09d33a68152f109cf1ed470d437cb3b0476a15969787e14f230c73e0",
+      "asset": "company-logo-merchant-grocery-outlet-c01ed8af3f2518f6.svg",
+      "sha256": "c01ed8af3f2518f634ace30c65809cbb49c42aab69ae75665fc0103d4cf1abde",
+      "addedIn": "merchant-expansion-2026-11-01",
+      "review": "approved-2026-11-01",
+      "optimization": "svgo@3.3.2; native geometry, 4-digit precision; remove unused definitions"
+    },
+    {
+      "id": "foodmaxx",
+      "name": "FoodMaxx",
+      "aliases": [
+        "FoodMaxx",
+        "Food Maxx"
+      ],
+      "group": "Groceries",
+      "background": "#ffffff",
+      "inset": 4,
+      "upstream": "https://upload.wikimedia.org/wikipedia/commons/6/64/FoodMaxx_logo.svg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=original",
+      "source": "https://commons.wikimedia.org/wiki/File:FoodMaxx_logo.svg",
+      "originalSha256": "a8e87847422e9f3c83175da5ac9f38258858fddfd0eff262c416750d503569c4",
+      "asset": "company-logo-merchant-foodmaxx-e265c11c54b7e299.svg",
+      "sha256": "e265c11c54b7e299f7b83f52c3e5c9989c6a7c4034cd5f6029fcee9ec95cce56",
+      "addedIn": "merchant-expansion-2026-11-01",
+      "review": "approved-2026-11-01",
+      "optimization": "svgo@3.3.2; native geometry, 4-digit precision; remove unused definitions"
+    },
+    {
+      "id": "smart-final",
+      "name": "Smart & Final",
+      "aliases": [
+        "Smart & Final",
+        "Smart and Final",
+        "Smart & Final Extra"
+      ],
+      "group": "Groceries",
+      "background": "#ffffff",
+      "inset": 4,
+      "upstream": "https://upload.wikimedia.org/wikipedia/commons/b/bf/Smart%26Final_logo.svg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=original",
+      "source": "https://commons.wikimedia.org/wiki/File:Smart%26Final_logo.svg",
+      "originalSha256": "f698d1ea0026a70994b8ecbe800c8a6ab93af9e1185c3f44abed9ca5b1c9e25d",
+      "asset": "company-logo-merchant-smart-final-0596fc9122ad6066.svg",
+      "sha256": "0596fc9122ad6066de905f711f2c6259f0b3cda3074d0ce4851db015c91e8c90",
+      "addedIn": "merchant-expansion-2026-11-01",
+      "review": "approved-2026-11-01",
+      "optimization": "svgo@3.3.2; native geometry, 4-digit precision; remove unused definitions"
+    },
+    {
+      "id": "winco",
+      "name": "WinCo",
+      "aliases": [
+        "WinCo",
+        "WinCo Foods"
+      ],
+      "group": "Groceries",
+      "background": "#ffffff",
+      "inset": 4,
+      "upstream": "https://upload.wikimedia.org/wikipedia/commons/6/62/WinCo_Foods_Logo.svg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=original",
+      "source": "https://commons.wikimedia.org/wiki/File:WinCo_Foods_Logo.svg",
+      "originalSha256": "507504170c05c8f063aac56ef6c21edff2f23ca9728425e5a91704d882ac2e31",
+      "asset": "company-logo-merchant-winco-a69f576a3b6a27ef.svg",
+      "sha256": "a69f576a3b6a27ef7310ce1e80d2581f41322d1109cc67d8eeb7361debf90b66",
+      "addedIn": "merchant-expansion-2026-11-01",
+      "review": "approved-2026-11-01",
+      "optimization": "svgo@3.3.2; native geometry, 4-digit precision; remove unused definitions"
+    },
+    {
+      "id": "nugget-markets",
+      "name": "Nugget Markets",
+      "aliases": [
+        "Nugget Markets",
+        "Nugget Market"
+      ],
+      "group": "Groceries",
+      "background": "#ffffff",
+      "inset": 4,
+      "upstream": "https://upload.wikimedia.org/wikipedia/commons/f/f0/Nugget_Markets_logo.svg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=original",
+      "source": "https://commons.wikimedia.org/wiki/File:Nugget_Markets_logo.svg",
+      "originalSha256": "fc8c6da442d2bbfad9731bbe355aaad074f1202a117d2e517bdf1548e739751d",
+      "asset": "company-logo-merchant-nugget-markets-dcb2c550169515ab.svg",
+      "sha256": "dcb2c550169515abc4a65d79c41488f2691e44d12320e816e897940bcfbf212f",
+      "addedIn": "merchant-expansion-2026-11-01",
+      "review": "approved-2026-11-01",
+      "optimization": "svgo@3.3.2; native geometry, 4-digit precision; remove unused definitions"
+    },
+    {
+      "id": "publix",
+      "name": "Publix",
+      "aliases": [
+        "Publix",
+        "Publix Super Market"
+      ],
+      "group": "Groceries",
+      "background": "#ffffff",
+      "inset": 4,
+      "upstream": "https://upload.wikimedia.org/wikipedia/commons/9/95/Publix_Logo.svg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=original",
+      "source": "https://commons.wikimedia.org/wiki/File:Publix_Logo.svg",
+      "originalSha256": "e1a0f0863b2d8dfcb10a4a7233ce9e8f206a74ae147b4d56b5777d19381fe113",
+      "asset": "company-logo-merchant-publix-3f95ae939457559d.svg",
+      "sha256": "3f95ae939457559d24a7baa2918c10dc7a2309e90f60bda9085dc2ec2879e791",
+      "addedIn": "merchant-expansion-2026-11-01",
+      "review": "approved-2026-11-01",
+      "optimization": "svgo@3.3.2; native geometry, 4-digit precision; remove unused definitions"
+    },
+    {
+      "id": "wegmans",
+      "name": "Wegmans",
+      "aliases": [
+        "Wegmans"
+      ],
+      "group": "Groceries",
+      "background": "#ffffff",
+      "inset": 4,
+      "upstream": "https://upload.wikimedia.org/wikipedia/commons/d/de/WegmansLogo.svg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=original",
+      "source": "https://commons.wikimedia.org/wiki/File:WegmansLogo.svg",
+      "originalSha256": "4d47810db602ffed1042fa2ca3d84d4687fb4f0fe35c6871ba8885bb43436de4",
+      "asset": "company-logo-merchant-wegmans-cc8b573678019ff2.svg",
+      "sha256": "cc8b573678019ff2de42fb6a0f4a52890190c38144215d7c3ffba0f21801ad6f",
+      "addedIn": "merchant-expansion-2026-11-01",
+      "review": "approved-2026-11-01",
+      "optimization": "svgo@3.3.2; native geometry, 4-digit precision; remove unused definitions"
+    },
+    {
+      "id": "meijer",
+      "name": "Meijer",
+      "aliases": [
+        "Meijer"
+      ],
+      "group": "Groceries",
+      "background": "#ffffff",
+      "inset": 4,
+      "upstream": "https://upload.wikimedia.org/wikipedia/commons/a/a3/Meijer_logo.svg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=original",
+      "source": "https://commons.wikimedia.org/wiki/File:Meijer_logo.svg",
+      "originalSha256": "f643715273724a09145b68d9bd9f24cf91d3fa389c622768422c454e926e7d54",
+      "asset": "company-logo-merchant-meijer-e18564fd4251801a.svg",
+      "sha256": "e18564fd4251801a105950055a47344868634210b7d92c88e4a2dce1485471ec",
+      "addedIn": "merchant-expansion-2026-11-01",
+      "review": "approved-2026-11-01",
+      "optimization": "svgo@3.3.2; native geometry, 4-digit precision; remove unused definitions"
+    },
+    {
+      "id": "hy-vee",
+      "name": "Hy-Vee",
+      "aliases": [
+        "Hy-Vee",
+        "Hy Vee"
+      ],
+      "group": "Groceries",
+      "background": "#ffffff",
+      "inset": 4,
+      "upstream": "https://upload.wikimedia.org/wikipedia/commons/f/fd/Hy-Vee_logo.svg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=original",
+      "source": "https://commons.wikimedia.org/wiki/File:Hy-Vee_logo.svg",
+      "originalSha256": "07f90ca1b7a5f723cee7a88ce9ee603e5fb6f16c16cb661d3f6e0b7bf07aa6cb",
+      "asset": "company-logo-merchant-hy-vee-3094e6bf49b43fae.svg",
+      "sha256": "3094e6bf49b43fae790512998fd534963ed8e3aa037524714820d7652730462a",
+      "addedIn": "merchant-expansion-2026-11-01",
+      "review": "approved-2026-11-01",
+      "optimization": "svgo@3.3.2; native geometry, 4-digit precision; remove unused definitions"
+    },
+    {
+      "id": "vons",
+      "name": "Vons",
+      "aliases": [
+        "Vons"
+      ],
+      "group": "Groceries",
+      "background": "#ffffff",
+      "inset": 4,
+      "upstream": "https://upload.wikimedia.org/wikipedia/commons/0/0e/Vons_logo.svg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=original",
+      "source": "https://commons.wikimedia.org/wiki/File:Vons_logo.svg",
+      "originalSha256": "73a8fdf3b0876cac70cfbb5a8821ad5706058d1e4be65606de374c4d36cdeb41",
+      "asset": "company-logo-merchant-vons-e40b948bbd18cb95.svg",
+      "sha256": "e40b948bbd18cb959ee856d476ba5b6ca4558483c2392490ad654575a426b35f",
+      "addedIn": "merchant-expansion-2026-11-01",
+      "review": "approved-2026-11-01",
+      "optimization": "svgo@3.3.2; native geometry, 4-digit precision; remove unused definitions"
+    },
+    {
+      "id": "fred-meyer",
+      "name": "Fred Meyer",
+      "aliases": [
+        "Fred Meyer"
+      ],
+      "group": "Groceries",
+      "background": "#ffffff",
+      "inset": 4,
+      "upstream": "https://upload.wikimedia.org/wikipedia/commons/5/58/Fred_Meyer_logo_%282021%29.svg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=original",
+      "source": "https://commons.wikimedia.org/wiki/File:Fred_Meyer_logo_(2021).svg",
+      "originalSha256": "b69bee54b461f7491890f30cd0ab719ac346d745c386d4dea6d11f18ff4a0600",
+      "asset": "company-logo-merchant-fred-meyer-868e07919a461778.svg",
+      "sha256": "868e07919a461778b3c8489594f46f924820ff7f14fb7e696afcd78a93386947",
+      "addedIn": "merchant-expansion-2026-11-01",
+      "review": "approved-2026-11-01",
+      "optimization": "svgo@3.3.2; native geometry, 4-digit precision; remove unused definitions"
+    },
+    {
+      "id": "fry-s",
+      "name": "Fry’s",
+      "aliases": [
+        "Fry’s",
+        "Fry's",
+        "Frys Food",
+        "Fry's Food"
+      ],
+      "group": "Groceries",
+      "background": "#ffffff",
+      "inset": 4,
+      "upstream": "https://upload.wikimedia.org/wikipedia/commons/1/1b/Fry%27s_Logo.svg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=original",
+      "source": "https://commons.wikimedia.org/wiki/File:Fry%27s_Logo.svg",
+      "originalSha256": "1f15b878406a3dd9886ff009701bf71855b514e3b42930331fda43313586ecfd",
+      "asset": "company-logo-merchant-fry-s-43349a40a9579f22.svg",
+      "sha256": "43349a40a9579f224e784b57e6031754d090baf8755bb035d9e52fce49a0f37b",
+      "addedIn": "merchant-expansion-2026-11-01",
+      "review": "approved-2026-11-01",
+      "optimization": "svgo@3.3.2; native geometry, 4-digit precision; remove unused definitions"
+    },
+    {
+      "id": "king-soopers",
+      "name": "King Soopers",
+      "aliases": [
+        "King Soopers"
+      ],
+      "group": "Groceries",
+      "background": "#ffffff",
+      "inset": 4,
+      "upstream": "https://upload.wikimedia.org/wikipedia/commons/c/ca/King_Soopers_logo.svg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=original",
+      "source": "https://commons.wikimedia.org/wiki/File:King_Soopers_logo.svg",
+      "originalSha256": "419969791fd234b7a3fe7cbf670266aab91891a0fe87b225d22223d27b178ee4",
+      "asset": "company-logo-merchant-king-soopers-3e3c1549beb32fab.svg",
+      "sha256": "3e3c1549beb32fab88d23aae049ad75762bf854ee47cfd2c956d753fc9b6c791",
+      "addedIn": "merchant-expansion-2026-11-01",
+      "review": "approved-2026-11-01",
+      "optimization": "svgo@3.3.2; native geometry, 4-digit precision; remove unused definitions"
+    },
+    {
+      "id": "giant-eagle",
+      "name": "Giant Eagle",
+      "aliases": [
+        "Giant Eagle"
+      ],
+      "group": "Groceries",
+      "background": "#ffffff",
+      "inset": 4,
+      "upstream": "https://upload.wikimedia.org/wikipedia/commons/f/fc/GiantEagle.svg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=original",
+      "source": "https://commons.wikimedia.org/wiki/File:GiantEagle.svg",
+      "originalSha256": "aa183547c301a7aca236a191f832b6727d8851a83034db5349c8536d4f8b4b60",
+      "asset": "company-logo-merchant-giant-eagle-de1988a27f88a30b.svg",
+      "sha256": "de1988a27f88a30b8c641ecd8c355b1b0f06e06bfb82017d3bc29d1ce5f7e381",
+      "addedIn": "merchant-expansion-2026-11-01",
+      "review": "approved-2026-11-01",
+      "optimization": "svgo@3.3.2; native geometry, 4-digit precision; remove unused definitions"
+    },
+    {
+      "id": "jewel-osco",
+      "name": "Jewel-Osco",
+      "aliases": [
+        "Jewel-Osco",
+        "Jewel Osco"
+      ],
+      "group": "Groceries",
+      "background": "#ffffff",
+      "inset": 4,
+      "upstream": "https://upload.wikimedia.org/wikipedia/commons/e/ea/Jewel-Osco_logo.svg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=original",
+      "source": "https://commons.wikimedia.org/wiki/File:Jewel-Osco_logo.svg",
+      "originalSha256": "f4bfb94889227f48dff28d2268ca37256f0a265c8c584c3fce79acb6bb1e55e4",
+      "asset": "company-logo-merchant-jewel-osco-80f8a9327431f6d6.svg",
+      "sha256": "80f8a9327431f6d664bbe45d588e732c5708f8c8b973ef602daf0e636ce20314",
+      "addedIn": "merchant-expansion-2026-11-01",
+      "review": "approved-2026-11-01",
+      "optimization": "svgo@3.3.2; native geometry, 4-digit precision; remove unused definitions"
+    },
+    {
+      "id": "stop-shop",
+      "name": "Stop & Shop",
+      "aliases": [
+        "Stop & Shop",
+        "Stop and Shop"
+      ],
+      "group": "Groceries",
+      "background": "#ffffff",
+      "inset": 4,
+      "upstream": "https://upload.wikimedia.org/wikipedia/commons/c/cc/Stop_%26_Shop_2018_logo.svg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=original",
+      "source": "https://commons.wikimedia.org/wiki/File:Stop_%26_Shop_2018_logo.svg",
+      "originalSha256": "4653797b65949fbfbdd91c2a85001c2a23bfddccf5d286effe91d74631d8a1f8",
+      "asset": "company-logo-merchant-stop-shop-22e83d328051015c.svg",
+      "sha256": "22e83d328051015ce02eaa11773d63beeae5b50c4cda594b3be3ee11854060a0",
+      "addedIn": "merchant-expansion-2026-11-01",
+      "review": "approved-2026-11-01",
+      "optimization": "svgo@3.3.2; native geometry, 4-digit precision; remove unused definitions"
+    },
+    {
+      "id": "the-fresh-market",
+      "name": "The Fresh Market",
+      "aliases": [
+        "The Fresh Market"
+      ],
+      "group": "Groceries",
+      "background": "#ffffff",
+      "inset": 4,
+      "upstream": "https://upload.wikimedia.org/wikipedia/commons/d/d0/The_Fresh_Market_logo.svg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=original",
+      "source": "https://commons.wikimedia.org/wiki/File:The_Fresh_Market_logo.svg",
+      "originalSha256": "cefd3f5e199cd124ea23cc55da239935824f08af8e1a2504bf7fe103e2964821",
+      "asset": "company-logo-merchant-the-fresh-market-392f2695694f8b98.svg",
+      "sha256": "392f2695694f8b98ad97b4a01b859ce1c1f40d1fd2915cef67a95a2c141faac5",
+      "addedIn": "merchant-expansion-2026-11-01",
+      "review": "approved-2026-11-01",
+      "optimization": "svgo@3.3.2; native geometry, 4-digit precision; remove unused definitions"
+    },
+    {
+      "id": "sam-s-club",
+      "name": "Sam’s Club",
+      "aliases": [
+        "Sam’s Club",
+        "Sam's Club",
+        "Sams Club",
+        "Sam's Club gas",
+        "Sams Club gas",
+        "Sam’s Club fuel"
+      ],
+      "group": "Groceries",
+      "background": "#ffffff",
+      "inset": 4,
+      "upstream": "https://upload.wikimedia.org/wikipedia/commons/d/d1/Sam%27s_Club_Logo_2020.svg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=original",
+      "source": "https://commons.wikimedia.org/wiki/File:Sam%27s_Club_Logo_2020.svg",
+      "originalSha256": "dbd1e6f6e0608d89ae11c7775dfb70119a1b5e75000c6cfe801ad1aae363d3df",
+      "asset": "company-logo-merchant-sam-s-club-c6b487847135e78f.svg",
+      "sha256": "c6b487847135e78f908f989ba9b302f7d3bcd328bcf50dbb3310c5fa83d208ec",
+      "addedIn": "merchant-expansion-2026-11-01",
+      "review": "approved-2026-11-01",
+      "optimization": "svgo@3.3.2; native geometry, 4-digit precision; remove unused definitions"
+    },
+    {
+      "id": "bj-s-wholesale",
+      "name": "BJ’s Wholesale",
+      "aliases": [
+        "BJ’s Wholesale",
+        "BJ's Wholesale",
+        "BJ's Wholesale Club",
+        "BJs Wholesale",
+        "BJs gas",
+        "BJ's gas"
+      ],
+      "group": "Groceries",
+      "background": "#ffffff",
+      "inset": 4,
+      "upstream": "https://upload.wikimedia.org/wikipedia/commons/4/48/BJs_Wholesale_Club_Logo.svg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=original",
+      "source": "https://commons.wikimedia.org/wiki/File:BJs_Wholesale_Club_Logo.svg",
+      "originalSha256": "ac0fc957036c8b1ed02672623536c8135a86aa0403e271e155b30e3ac0c13def",
+      "asset": "company-logo-merchant-bj-s-wholesale-7ae53be1b570871e.svg",
+      "sha256": "7ae53be1b570871ec0d67acfcea36c726bad1f3f39b349beb83c4afc51145cce",
+      "addedIn": "merchant-expansion-2026-11-01",
+      "review": "approved-2026-11-01",
+      "optimization": "svgo@3.3.2; native geometry, 4-digit precision; remove unused definitions"
+    },
+    {
+      "id": "save-a-lot",
+      "name": "Save A Lot",
+      "aliases": [
+        "Save A Lot",
+        "Save-A-Lot"
+      ],
+      "group": "Groceries",
+      "background": "#ffffff",
+      "inset": 4,
+      "upstream": "https://upload.wikimedia.org/wikipedia/commons/7/7a/Save_A_Lot_logo.svg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=original",
+      "source": "https://commons.wikimedia.org/wiki/File:Save_A_Lot_logo.svg",
+      "originalSha256": "de4dc3ce828477abd6484498482e6fc0efb212004d6d9abafa3cacc050696df9",
+      "asset": "company-logo-merchant-save-a-lot-f8a0e6f228c6604e.svg",
+      "sha256": "f8a0e6f228c6604e6aa4b8504e7b7c21863c65b5dca7dde1a7644e5fe3fc0882",
+      "addedIn": "merchant-expansion-2026-11-01",
+      "review": "approved-2026-11-01",
+      "optimization": "svgo@3.3.2; native geometry, 4-digit precision; remove unused definitions"
+    },
+    {
+      "id": "weis-markets",
+      "name": "Weis Markets",
+      "aliases": [
+        "Weis Markets"
+      ],
+      "group": "Groceries",
+      "background": "#ffffff",
+      "inset": 4,
+      "upstream": "https://upload.wikimedia.org/wikipedia/commons/f/f3/Weis_Markets_logo.svg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=original",
+      "source": "https://commons.wikimedia.org/wiki/File:Weis_Markets_logo.svg",
+      "originalSha256": "eb02b91f56bf93f74f5bb3615ec72f150d0b26a9c23b5a3ef0e2c3a16b7f15e9",
+      "asset": "company-logo-merchant-weis-markets-d9029efff94e9986.svg",
+      "sha256": "d9029efff94e9986a48b96ac9bb5d5c92502bb8d25f3ed56be3b79ffc4351705",
+      "addedIn": "merchant-expansion-2026-11-01",
+      "review": "approved-2026-11-01",
+      "optimization": "svgo@3.3.2; native geometry, 4-digit precision; remove unused definitions"
+    },
+    {
+      "id": "76",
+      "name": "76",
+      "aliases": [
+        "76",
+        "Union 76",
+        "76 gas"
+      ],
+      "group": "Gas stations",
+      "background": "#ffffff",
+      "inset": 0,
+      "upstream": "https://upload.wikimedia.org/wikipedia/commons/5/5a/76_Orange_Logo.svg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=original",
+      "source": "https://commons.wikimedia.org/wiki/File:76_Orange_Logo.svg",
+      "originalSha256": "2d0ba549141fbbe5b940a47680adf6f7693640484c0198164a7bd3112beebf27",
+      "asset": "company-logo-merchant-76-b0be97cf09fd26e9.svg",
+      "sha256": "b0be97cf09fd26e9781d6254dbd13dc4d76458017b81a4f028002c97f2954a60",
+      "addedIn": "merchant-expansion-2026-11-01",
+      "review": "approved-2026-11-01",
+      "optimization": "svgo@3.3.2; native geometry, 4-digit precision; remove unused definitions"
+    },
+    {
+      "id": "arco",
+      "name": "ARCO",
+      "aliases": [
+        "ARCO",
+        "ARCO gas"
+      ],
+      "group": "Gas stations",
+      "background": "#ffffff",
+      "inset": 4,
+      "upstream": "https://upload.wikimedia.org/wikipedia/commons/e/ec/ARCO.svg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=original",
+      "source": "https://commons.wikimedia.org/wiki/File:ARCO.svg",
+      "originalSha256": "a67e1dec0dabcb18b3b36da61e67617ccae3c36859fd3c603b417a60abd97756",
+      "asset": "company-logo-merchant-arco-c3571b59c0c3c136.svg",
+      "sha256": "c3571b59c0c3c13642f406e16da28eaaf4037f84ce1c09d882529da21a732865",
+      "addedIn": "merchant-expansion-2026-11-01",
+      "review": "approved-2026-11-01",
+      "optimization": "svgo@3.3.2; native geometry, 4-digit precision; remove unused definitions"
+    },
+    {
+      "id": "exxon",
+      "name": "Exxon",
+      "aliases": [
+        "Exxon",
+        "Exxon gas"
+      ],
+      "group": "Gas stations",
+      "background": "#ffffff",
+      "inset": 4,
+      "upstream": "https://upload.wikimedia.org/wikipedia/commons/f/fd/Exxon_logo_2016.svg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=original",
+      "source": "https://commons.wikimedia.org/wiki/File:Exxon_logo_2016.svg",
+      "originalSha256": "f882eb60e78b7e4e9be947aa47500f185db6f232f8f6bc13e47b9a70e95971b6",
+      "asset": "company-logo-merchant-exxon-6b5ffc23a9a4aa5f.svg",
+      "sha256": "6b5ffc23a9a4aa5fcb067601fac3a61acedb9b2aa9fedee0f360f3cda7ca0826",
+      "addedIn": "merchant-expansion-2026-11-01",
+      "review": "approved-2026-11-01",
+      "optimization": "svgo@3.3.2; native geometry, 4-digit precision; remove unused definitions"
+    },
+    {
+      "id": "mobil",
+      "name": "Mobil",
+      "aliases": [
+        "Mobil",
+        "Mobil gas"
+      ],
+      "group": "Gas stations",
+      "background": "#ffffff",
+      "inset": 4,
+      "upstream": "https://upload.wikimedia.org/wikipedia/commons/7/70/Mobil-logo.svg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=original",
+      "source": "https://commons.wikimedia.org/wiki/File:Mobil-logo.svg",
+      "originalSha256": "5e68c4eb99365b347831263c154a9287d984138c206f97138bbd681809718276",
+      "asset": "company-logo-merchant-mobil-75891324a28740f1.svg",
+      "sha256": "75891324a28740f12e66e37f63687742f3cd36d725e0a7e3f3f20fea51aef15a",
+      "addedIn": "merchant-expansion-2026-11-01",
+      "review": "approved-2026-11-01",
+      "optimization": "svgo@3.3.2; native geometry, 4-digit precision; remove unused definitions"
+    },
+    {
+      "id": "texaco",
+      "name": "Texaco",
+      "aliases": [
+        "Texaco",
+        "Texaco gas"
+      ],
+      "group": "Gas stations",
+      "background": "#ffffff",
+      "inset": 4,
+      "upstream": "https://upload.wikimedia.org/wikipedia/commons/8/8f/Texaco_logo.svg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=original",
+      "source": "https://commons.wikimedia.org/wiki/File:Texaco_logo.svg",
+      "originalSha256": "2a6a8fe2f09758a31414f32972c7fcea9ebda09423d89e6adb57bb2fc4be9b27",
+      "asset": "company-logo-merchant-texaco-a1fc3248eb55b923.svg",
+      "sha256": "a1fc3248eb55b9232dc012b813a509bd42abf624faffe3bd0321a2003bd8c8c2",
+      "addedIn": "merchant-expansion-2026-11-01",
+      "review": "approved-2026-11-01",
+      "optimization": "svgo@3.3.2; native geometry, 4-digit precision; remove unused definitions"
+    },
+    {
+      "id": "sunoco",
+      "name": "Sunoco",
+      "aliases": [
+        "Sunoco",
+        "Sunoco gas"
+      ],
+      "group": "Gas stations",
+      "background": "#ffffff",
+      "inset": 4,
+      "upstream": "https://upload.wikimedia.org/wikipedia/commons/8/8f/Sunoco_1999_logo.svg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=original",
+      "source": "https://commons.wikimedia.org/wiki/File:Sunoco_1999_logo.svg",
+      "originalSha256": "5bb0c2c1ef4d97ad00900abf4251683d284ab598365354907cf111c02e150e32",
+      "asset": "company-logo-merchant-sunoco-60bf24e2bbe02a22.svg",
+      "sha256": "60bf24e2bbe02a22ea1602fa043c1117b9dd510fb94f061829ccfddf7be2e54e",
+      "addedIn": "merchant-expansion-2026-11-01",
+      "review": "approved-2026-11-01",
+      "optimization": "svgo@3.3.2; native geometry, 4-digit precision; remove unused definitions"
+    },
+    {
+      "id": "phillips-66",
+      "name": "Phillips 66",
+      "aliases": [
+        "Phillips 66",
+        "Phillips66"
+      ],
+      "group": "Gas stations",
+      "background": "#ffffff",
+      "inset": 4,
+      "upstream": "https://upload.wikimedia.org/wikipedia/commons/6/6d/Phillips_66_logo.svg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=original",
+      "source": "https://commons.wikimedia.org/wiki/File:Phillips_66_logo.svg",
+      "originalSha256": "dc91d7e9469f64394962acd0dbd5d29874e3c0bc00804f496b442d67ef5a9c5c",
+      "asset": "company-logo-merchant-phillips-66-a579cafed870b23a.svg",
+      "sha256": "a579cafed870b23aa1389c91073616101cfd7d78c3a9123c24d99ad501e9ecfa",
+      "addedIn": "merchant-expansion-2026-11-01",
+      "review": "approved-2026-11-01",
+      "optimization": "svgo@3.3.2; native geometry, 4-digit precision; remove unused definitions"
+    },
+    {
+      "id": "conoco",
+      "name": "Conoco",
+      "aliases": [
+        "Conoco",
+        "Conoco gas"
+      ],
+      "group": "Gas stations",
+      "background": "#ffffff",
+      "inset": 4,
+      "upstream": "https://upload.wikimedia.org/wikipedia/commons/1/11/Conoco_logo.svg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=original",
+      "source": "https://commons.wikimedia.org/wiki/File:Conoco_logo.svg",
+      "originalSha256": "1c2e1dc3e7c2108960eeb891f17d94780cf647120b8b8911ac58ec5376eeb99a",
+      "asset": "company-logo-merchant-conoco-c63e487ab9afe78a.svg",
+      "sha256": "c63e487ab9afe78a3980367815dca161111c8c832391401c2e621047c70475f4",
+      "addedIn": "merchant-expansion-2026-11-01",
+      "review": "approved-2026-11-01",
+      "optimization": "svgo@3.3.2; native geometry, 4-digit precision; remove unused definitions"
+    },
+    {
+      "id": "citgo",
+      "name": "CITGO",
+      "aliases": [
+        "CITGO",
+        "Citgo gas"
+      ],
+      "group": "Gas stations",
+      "background": "#ffffff",
+      "inset": 4,
+      "upstream": "https://upload.wikimedia.org/wikipedia/commons/f/f8/Citgo_logo.svg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=original",
+      "source": "https://commons.wikimedia.org/wiki/File:Citgo_logo.svg",
+      "originalSha256": "dd6222b5cf62526c07fdfde35563a5504e3fa637a09d84dbf546ba6e38a5b999",
+      "asset": "company-logo-merchant-citgo-82071e9a6a9621c4.svg",
+      "sha256": "82071e9a6a9621c4c4c0c008ae9a185bff19e5b126b26a2888945156abc3aab7",
+      "addedIn": "merchant-expansion-2026-11-01",
+      "review": "approved-2026-11-01",
+      "optimization": "svgo@3.3.2; native geometry, 4-digit precision; remove unused definitions"
+    },
+    {
+      "id": "marathon",
+      "name": "Marathon",
+      "aliases": [
+        "Marathon",
+        "Marathon gas",
+        "Marathon Petroleum"
+      ],
+      "group": "Gas stations",
+      "background": "#ffffff",
+      "inset": 4,
+      "upstream": "https://upload.wikimedia.org/wikipedia/commons/2/24/Marathon_Petroleum_logo_2022.svg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=original",
+      "source": "https://commons.wikimedia.org/wiki/File:Marathon_Petroleum_logo_2022.svg",
+      "originalSha256": "fba976af45f2c24990a5e0ca46f45dcb7034e3ee656ddd3e15dce96ff01fd8ee",
+      "asset": "company-logo-merchant-marathon-640b728d446b52fa.svg",
+      "sha256": "640b728d446b52faf183469fe26a175cf070c2bc640a1018c4ee7b3653950a20",
+      "addedIn": "merchant-expansion-2026-11-01",
+      "review": "approved-2026-11-01",
+      "optimization": "svgo@3.3.2; native geometry, 4-digit precision; remove unused definitions"
+    },
+    {
+      "id": "7-eleven",
+      "name": "7-Eleven",
+      "aliases": [
+        "7-Eleven",
+        "7 Eleven",
+        "7Eleven"
+      ],
+      "group": "Gas stations",
+      "background": "#ffffff",
+      "inset": 4,
+      "upstream": "https://upload.wikimedia.org/wikipedia/commons/4/40/7-eleven_logo.svg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=original",
+      "source": "https://commons.wikimedia.org/wiki/File:7-eleven_logo.svg",
+      "originalSha256": "73afaaf71535251cbb57e5c97c146a7861f2ecf40149211f0b9fb2925c9bf5ad",
+      "asset": "company-logo-merchant-7-eleven-2696fb9fd35ae97a.svg",
+      "sha256": "2696fb9fd35ae97ade4451d94172237dbd580561ff2ae166e21e5462e929df27",
+      "addedIn": "merchant-expansion-2026-11-01",
+      "review": "approved-2026-11-01",
+      "optimization": "svgo@3.3.2; native geometry, 4-digit precision; remove unused definitions"
+    },
+    {
+      "id": "casey-s",
+      "name": "Casey’s",
+      "aliases": [
+        "Casey’s",
+        "Casey's",
+        "Caseys",
+        "Casey's General Store"
+      ],
+      "group": "Gas stations",
+      "background": "#ffffff",
+      "inset": 4,
+      "upstream": "https://upload.wikimedia.org/wikipedia/commons/c/c8/Casey%27s_logo.svg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=original",
+      "source": "https://commons.wikimedia.org/wiki/File:Casey%27s_logo.svg",
+      "originalSha256": "d79cf703222d5cde1eea02675909f20ba82fbac46aa9c5052d736138b872dce8",
+      "asset": "company-logo-merchant-casey-s-91360eb1cd7be2d1.svg",
+      "sha256": "91360eb1cd7be2d11634270dece1a937ac995bbb0fd4bf48857faac4b6a894df",
+      "addedIn": "merchant-expansion-2026-11-01",
+      "review": "approved-2026-11-01",
+      "optimization": "svgo@3.3.2; native geometry, 4-digit precision; remove unused definitions"
+    },
+    {
+      "id": "circle-k",
+      "name": "Circle K",
+      "aliases": [
+        "Circle K",
+        "CircleK"
+      ],
+      "group": "Gas stations",
+      "background": "#ffffff",
+      "inset": 4,
+      "upstream": "https://upload.wikimedia.org/wikipedia/commons/7/7e/Circle_K_logo_2015.svg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=original",
+      "source": "https://commons.wikimedia.org/wiki/File:Circle_K_logo_2015.svg",
+      "originalSha256": "b62634efe58ea064a58c2ae04ac686b4960bcb9b7c5cac78ece508586047b44b",
+      "asset": "company-logo-merchant-circle-k-1e61fb816fae4afc.svg",
+      "sha256": "1e61fb816fae4afc3cd3ee0622baf6bcf085e38d2b35e177787f6f95b6a1ba64",
+      "addedIn": "merchant-expansion-2026-11-01",
+      "review": "approved-2026-11-01",
+      "optimization": "svgo@3.3.2; native geometry, 4-digit precision; remove unused definitions"
+    },
+    {
+      "id": "sheetz",
+      "name": "Sheetz",
+      "aliases": [
+        "Sheetz"
+      ],
+      "group": "Gas stations",
+      "background": "#ffffff",
+      "inset": 4,
+      "upstream": "https://upload.wikimedia.org/wikipedia/commons/0/02/Sheetz_logo.svg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=original",
+      "source": "https://commons.wikimedia.org/wiki/File:Sheetz_logo.svg",
+      "originalSha256": "2c648e637e4c2bfb0aa35f38d3c4e7dc0ba5d4559caaecab904c6a295ac4f75b",
+      "asset": "company-logo-merchant-sheetz-774e74d49b65e776.svg",
+      "sha256": "774e74d49b65e776a4274d5921dc3df570f07673d71bf3c9a8c08b6f9409aebd",
+      "addedIn": "merchant-expansion-2026-11-01",
+      "review": "approved-2026-11-01",
+      "optimization": "svgo@3.3.2; native geometry, 4-digit precision; remove unused definitions"
+    },
+    {
+      "id": "speedway",
+      "name": "Speedway",
+      "aliases": [
+        "Speedway",
+        "Speedway gas"
+      ],
+      "group": "Gas stations",
+      "background": "#ffffff",
+      "inset": 4,
+      "upstream": "https://upload.wikimedia.org/wikipedia/commons/f/ff/Speedway_LLC_logo.svg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=original",
+      "source": "https://commons.wikimedia.org/wiki/File:Speedway_LLC_logo.svg",
+      "originalSha256": "309a5f8a0922d2671150d9e8c4b3200f15ea298ac674fe0c607b2c5c9674f579",
+      "asset": "company-logo-merchant-speedway-de389d384eb4a634.svg",
+      "sha256": "de389d384eb4a6347bbbd9fae80d8598ce85af124883aa971bc4c3865f80c774",
+      "addedIn": "merchant-expansion-2026-11-01",
+      "review": "approved-2026-11-01",
+      "optimization": "svgo@3.3.2; native geometry, 4-digit precision; remove unused definitions"
+    },
+    {
+      "id": "in-n-out",
+      "name": "In-N-Out",
+      "aliases": [
+        "In-N-Out",
+        "In N Out",
+        "In-N-Out Burger"
+      ],
+      "group": "Fast food & coffee",
+      "background": "#ffffff",
+      "inset": 4,
+      "upstream": "https://upload.wikimedia.org/wikipedia/commons/8/8c/InNOut_2021_logo.svg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=original",
+      "source": "https://commons.wikimedia.org/wiki/File:InNOut_2021_logo.svg",
+      "originalSha256": "6d72e7d9a9127886b0c5a6395d6867e8b4a6499b4ca42b89c0f5735f01511f72",
+      "asset": "company-logo-merchant-in-n-out-71aef5413caff248.svg",
+      "sha256": "71aef5413caff248bff15e5fee1d0001e074d9bd0720e12681da53b99d991b40",
+      "addedIn": "merchant-expansion-2026-11-01",
+      "review": "approved-2026-11-01",
+      "optimization": "svgo@3.3.2; native geometry, 4-digit precision; remove unused definitions"
+    },
+    {
+      "id": "chick-fil-a",
+      "name": "Chick-fil-A",
+      "aliases": [
+        "Chick-fil-A",
+        "Chick Fil A",
+        "Chickfila"
+      ],
+      "group": "Fast food & coffee",
+      "background": "#ffffff",
+      "inset": 4,
+      "upstream": "https://upload.wikimedia.org/wikipedia/commons/0/02/Chick-fil-A_Logo.svg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=original",
+      "source": "https://commons.wikimedia.org/wiki/File:Chick-fil-A_Logo.svg",
+      "originalSha256": "6f121f1ed267dec2c5843cba1870974dd539396d5e91f1920b721cbe97573354",
+      "asset": "company-logo-merchant-chick-fil-a-0c22a8e7be811629.svg",
+      "sha256": "0c22a8e7be811629f8f75767cf8283086119124e9426a9abad456c928176b30a",
+      "addedIn": "merchant-expansion-2026-11-01",
+      "review": "approved-2026-11-01",
+      "optimization": "svgo@3.3.2; native geometry, 4-digit precision; remove unused definitions"
+    },
+    {
+      "id": "wendy-s",
+      "name": "Wendy’s",
+      "aliases": [
+        "Wendy’s",
+        "Wendy's",
+        "Wendys"
+      ],
+      "group": "Fast food & coffee",
+      "background": "#ffffff",
+      "inset": 4,
+      "upstream": "https://upload.wikimedia.org/wikipedia/commons/6/66/Wendy%27s_logo_2012.svg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=original",
+      "source": "https://commons.wikimedia.org/wiki/File:Wendy%27s_logo_2012.svg",
+      "originalSha256": "cc80be578e443689f5b84dd9be6e6ef0771bb424cc956860243a179ad5aa97de",
+      "asset": "company-logo-merchant-wendy-s-e967f279cfb5bdec.svg",
+      "sha256": "e967f279cfb5bdecb452b206a8f960d4c5d8ec2f87bb311510db113f3adf9fca",
+      "addedIn": "merchant-expansion-2026-11-01",
+      "review": "approved-2026-11-01",
+      "optimization": "svgo@3.3.2; native geometry, 4-digit precision; remove unused definitions"
+    },
+    {
+      "id": "jack-in-the-box",
+      "name": "Jack in the Box",
+      "aliases": [
+        "Jack in the Box"
+      ],
+      "group": "Fast food & coffee",
+      "background": "#ffffff",
+      "inset": 4,
+      "upstream": "https://upload.wikimedia.org/wikipedia/commons/6/6e/Jack_in_the_Box_2009_logo.svg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=original",
+      "source": "https://commons.wikimedia.org/wiki/File:Jack_in_the_Box_2009_logo.svg",
+      "originalSha256": "e1985001696fa8e4644e5891bf5bd62a5f67c4053e3f71f1c9d5d72f6b32dfac",
+      "asset": "company-logo-merchant-jack-in-the-box-b76b31392df7db97.svg",
+      "sha256": "b76b31392df7db97b4f5233d4a01c2b7c1dc6044f2268d5d16f5c59d9866748b",
+      "addedIn": "merchant-expansion-2026-11-01",
+      "review": "approved-2026-11-01",
+      "optimization": "svgo@3.3.2; native geometry, 4-digit precision; remove unused definitions"
+    },
+    {
+      "id": "subway",
+      "name": "Subway",
+      "aliases": [
+        "Subway"
+      ],
+      "group": "Fast food & coffee",
+      "background": "#ffffff",
+      "inset": 4,
+      "upstream": "https://upload.wikimedia.org/wikipedia/commons/5/5c/Subway_2016_logo.svg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=original",
+      "source": "https://commons.wikimedia.org/wiki/File:Subway_2016_logo.svg",
+      "originalSha256": "780dfa5b7e140183276a8cd691ede33fbedda90d62577fdedd54e6e2647742a8",
+      "asset": "company-logo-merchant-subway-6495f02e1b66570e.svg",
+      "sha256": "6495f02e1b66570e5134bb9ef36298b03cc534b51abb66e203ccdf6b06cfc859",
+      "addedIn": "merchant-expansion-2026-11-01",
+      "review": "approved-2026-11-01",
+      "optimization": "svgo@3.3.2; native geometry, 4-digit precision; remove unused definitions"
+    },
+    {
+      "id": "dunkin",
+      "name": "Dunkin’",
+      "aliases": [
+        "Dunkin’",
+        "Dunkin",
+        "Dunkin'",
+        "Dunkin Donuts"
+      ],
+      "group": "Fast food & coffee",
+      "background": "#ffffff",
+      "inset": 4,
+      "upstream": "https://upload.wikimedia.org/wikipedia/commons/1/14/Dunkin%27_2022.svg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=original",
+      "source": "https://commons.wikimedia.org/wiki/File:Dunkin%27_2022.svg",
+      "originalSha256": "c4d73934bd0f5ffbaf9922795896ab48f323b6edc40e5263fc1f13e40b3420d2",
+      "asset": "company-logo-merchant-dunkin-8a812437781138b2.svg",
+      "sha256": "8a812437781138b24679ccd82b1536ef3000107aeb0c8a0c4f1ad3c692ad0ed6",
+      "addedIn": "merchant-expansion-2026-11-01",
+      "review": "approved-2026-11-01",
+      "optimization": "svgo@3.3.2; native geometry, 4-digit precision; remove unused definitions"
+    },
+    {
+      "id": "arby-s",
+      "name": "Arby’s",
+      "aliases": [
+        "Arby’s",
+        "Arby's",
+        "Arbys"
+      ],
+      "group": "Fast food & coffee",
+      "background": "#ffffff",
+      "inset": 4,
+      "upstream": "https://upload.wikimedia.org/wikipedia/commons/f/f4/Arby%27s_logo.svg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=original",
+      "source": "https://commons.wikimedia.org/wiki/File:Arby%27s_logo.svg",
+      "originalSha256": "1b727c671899d17712e3b0e9a64bb082d8f5ebc48ca9ed69e64972050b29b8a9",
+      "asset": "company-logo-merchant-arby-s-b73df46b4afb3a81.svg",
+      "sha256": "b73df46b4afb3a818d43d9bf492739eb2261fbb82f4c42684806278da3be2b39",
+      "addedIn": "merchant-expansion-2026-11-01",
+      "review": "approved-2026-11-01",
+      "optimization": "svgo@3.3.2; native geometry, 4-digit precision; remove unused definitions"
+    },
+    {
+      "id": "carl-s-jr",
+      "name": "Carl’s Jr.",
+      "aliases": [
+        "Carl’s Jr.",
+        "Carl's Jr",
+        "Carls Jr",
+        "Carl's Jr."
+      ],
+      "group": "Fast food & coffee",
+      "background": "#ffffff",
+      "inset": 4,
+      "upstream": "https://upload.wikimedia.org/wikipedia/commons/b/b5/Carl%27s_Jr_logo.svg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=original",
+      "source": "https://commons.wikimedia.org/wiki/File:Carl%27s_Jr_logo.svg",
+      "originalSha256": "717e85b24f217422d66f825a941f48e7789bd359c4e7e3daff53f32b66343725",
+      "asset": "company-logo-merchant-carl-s-jr-ac0b7df46ee5440b.svg",
+      "sha256": "ac0b7df46ee5440bfec9304cd9bb4e52745b619fe22752c7b9c5481a019cb7d9",
+      "addedIn": "merchant-expansion-2026-11-01",
+      "review": "approved-2026-11-01",
+      "optimization": "svgo@3.3.2; native geometry, 4-digit precision; remove unused definitions"
+    },
+    {
+      "id": "five-guys",
+      "name": "Five Guys",
+      "aliases": [
+        "Five Guys"
+      ],
+      "group": "Fast food & coffee",
+      "background": "#ffffff",
+      "inset": 4,
+      "upstream": "https://upload.wikimedia.org/wikipedia/commons/8/80/Five_Guys_logo.svg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=original",
+      "source": "https://commons.wikimedia.org/wiki/File:Five_Guys_logo.svg",
+      "originalSha256": "c28adbc843a1bf08490f6742548e5659897abe22cce29e07ffcd2d0c8c09a510",
+      "asset": "company-logo-merchant-five-guys-551df34bbd29ccbc.svg",
+      "sha256": "551df34bbd29ccbc7bfce873d3a0fa992fd1518ddced6f13192c9c67fea3cfd9",
+      "addedIn": "merchant-expansion-2026-11-01",
+      "review": "approved-2026-11-01",
+      "optimization": "svgo@3.3.2; native geometry, 4-digit precision; remove unused definitions"
+    },
+    {
+      "id": "jersey-mike-s",
+      "name": "Jersey Mike’s",
+      "aliases": [
+        "Jersey Mike’s",
+        "Jersey Mike's",
+        "Jersey Mikes",
+        "Jersey Mike's Subs"
+      ],
+      "group": "Fast food & coffee",
+      "background": "#ffffff",
+      "inset": 4,
+      "upstream": "https://upload.wikimedia.org/wikipedia/commons/9/91/Jersey_Mike%27s_logo.svg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=original",
+      "source": "https://commons.wikimedia.org/wiki/File:Jersey_Mike%27s_logo.svg",
+      "originalSha256": "3c67216775d8c2d68adf43b167a7a8df3099a42b3ffaf73daa9fca295b395eff",
+      "asset": "company-logo-merchant-jersey-mike-s-ba21c0c6dbf17b6d.svg",
+      "sha256": "ba21c0c6dbf17b6d4ad60a1195b523c104e056d01a7281761dcd1c3642d80e49",
+      "addedIn": "merchant-expansion-2026-11-01",
+      "review": "approved-2026-11-01",
+      "optimization": "svgo@3.3.2; native geometry, 4-digit precision; remove unused definitions"
+    },
+    {
+      "id": "shake-shack",
+      "name": "Shake Shack",
+      "aliases": [
+        "Shake Shack"
+      ],
+      "group": "Fast food & coffee",
+      "background": "#ffffff",
+      "inset": 4,
+      "upstream": "https://upload.wikimedia.org/wikipedia/commons/9/96/Shake_Shack_logo.svg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=original",
+      "source": "https://commons.wikimedia.org/wiki/File:Shake_Shack_logo.svg",
+      "originalSha256": "8ba47cd0ccece4e1c38cbe600a420b60ae828451831f9f2a8cd1f86f937c1b6a",
+      "asset": "company-logo-merchant-shake-shack-23c88cd6111fa5d5.svg",
+      "sha256": "23c88cd6111fa5d5e7b95167749a6febb21aa6c69e6035f01ef6f0de0795414c",
+      "addedIn": "merchant-expansion-2026-11-01",
+      "review": "approved-2026-11-01",
+      "optimization": "svgo@3.3.2; native geometry, 4-digit precision; remove unused definitions"
+    },
+    {
+      "id": "sonic",
+      "name": "Sonic",
+      "aliases": [
+        "Sonic",
+        "Sonic Drive-In"
+      ],
+      "group": "Fast food & coffee",
+      "background": "#ffffff",
+      "inset": 4,
+      "upstream": "https://upload.wikimedia.org/wikipedia/commons/f/ff/SONIC_New_Logo_2020.svg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=original",
+      "source": "https://commons.wikimedia.org/wiki/File:SONIC_New_Logo_2020.svg",
+      "originalSha256": "68ca2b5851cfd6084b2664a8d730fe9683d9905bc7645a63a1e8dba2b87f03e5",
+      "asset": "company-logo-merchant-sonic-dc9853920176eef7.svg",
+      "sha256": "dc9853920176eef7be65a3cf4bd73afc599945eb4be985fcc49cc1fc0ff9eec9",
+      "addedIn": "merchant-expansion-2026-11-01",
+      "review": "approved-2026-11-01",
+      "optimization": "svgo@3.3.2; native geometry, 4-digit precision; remove unused definitions"
+    },
+    {
+      "id": "culver-s",
+      "name": "Culver’s",
+      "aliases": [
+        "Culver’s",
+        "Culver's",
+        "Culvers"
+      ],
+      "group": "Fast food & coffee",
+      "background": "#ffffff",
+      "inset": 4,
+      "upstream": "https://upload.wikimedia.org/wikipedia/commons/c/cc/Culver%27s_logo.svg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=original",
+      "source": "https://commons.wikimedia.org/wiki/File:Culver%27s_logo.svg",
+      "originalSha256": "965fbd7b3b3860d4537bf2261beb77b8900ce9380552c7786e46cbb81262229a",
+      "asset": "company-logo-merchant-culver-s-f7cb9031879997d9.svg",
+      "sha256": "f7cb9031879997d990d8fc5c20bb40504fdf1722ccc33aecd579d55963b2be05",
+      "addedIn": "merchant-expansion-2026-11-01",
+      "review": "approved-2026-11-01",
+      "optimization": "svgo@3.3.2; native geometry, 4-digit precision; remove unused definitions"
+    },
+    {
+      "id": "raising-cane-s",
+      "name": "Raising Cane’s",
+      "aliases": [
+        "Raising Cane’s",
+        "Raising Cane's",
+        "Raising Canes"
+      ],
+      "group": "Fast food & coffee",
+      "background": "#ffffff",
+      "inset": 4,
+      "upstream": "https://upload.wikimedia.org/wikipedia/commons/9/98/Raising_Cane%27s_Chicken_Fingers_logo.svg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=original",
+      "source": "https://commons.wikimedia.org/wiki/File:Raising_Cane%27s_Chicken_Fingers_logo.svg",
+      "originalSha256": "f9580d1d5eb537c4fddc387e1dbf4c4e3ad0d6d4391484387d835e274fba7a44",
+      "asset": "company-logo-merchant-raising-cane-s-9bce2ddd7335b29e.svg",
+      "sha256": "9bce2ddd7335b29e5dc11a9f2cd3dac1e3b6bcd525116a33e592143bae6b6c8e",
+      "addedIn": "merchant-expansion-2026-11-01",
+      "review": "approved-2026-11-01",
+      "optimization": "svgo@3.3.2; native geometry, 4-digit precision; remove unused definitions"
+    },
+    {
+      "id": "popeyes",
+      "name": "Popeyes",
+      "aliases": [
+        "Popeyes",
+        "Popeyes Louisiana Kitchen"
+      ],
+      "group": "Fast food & coffee",
+      "background": "#ffffff",
+      "inset": 4,
+      "upstream": "https://upload.wikimedia.org/wikipedia/commons/7/73/Popeyes_logo.svg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=original",
+      "source": "https://commons.wikimedia.org/wiki/File:Popeyes_logo.svg",
+      "originalSha256": "48fb78d93826b994220f89af05cfe38825efd793def23418e50ed52c348e320f",
+      "asset": "company-logo-merchant-popeyes-70a4320b60c8979a.svg",
+      "sha256": "70a4320b60c8979af9ac88a933299d6bc69c2d1252eac76253e5917868225276",
+      "addedIn": "merchant-expansion-2026-11-01",
+      "review": "approved-2026-11-01",
+      "optimization": "svgo@3.3.2; native geometry, 4-digit precision; remove unused definitions"
+    },
+    {
+      "id": "qdoba",
+      "name": "Qdoba",
+      "aliases": [
+        "Qdoba",
+        "Qdoba Mexican Eats"
+      ],
+      "group": "Fast food & coffee",
+      "background": "#ffffff",
+      "inset": 4,
+      "upstream": "https://upload.wikimedia.org/wikipedia/commons/9/9c/Qdoba_Logo.svg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=original",
+      "source": "https://commons.wikimedia.org/wiki/File:Qdoba_Logo.svg",
+      "originalSha256": "a8bcd7bc2438403c7dfaca5070fe452bfb0e1f17ec7ee84b85bf1fd815d2a7b7",
+      "asset": "company-logo-merchant-qdoba-627d8269d46edb4b.svg",
+      "sha256": "627d8269d46edb4b4a95103ba3386b951ac08ffd5778de6843f10f0b18064a39",
+      "addedIn": "merchant-expansion-2026-11-01",
+      "review": "approved-2026-11-01",
+      "optimization": "svgo@3.3.2; native geometry, 4-digit precision; remove unused definitions"
+    },
+    {
+      "id": "cinnabon",
+      "name": "Cinnabon",
+      "aliases": [
+        "Cinnabon"
+      ],
+      "group": "Fast food & coffee",
+      "background": "#ffffff",
+      "inset": 4,
+      "upstream": "https://upload.wikimedia.org/wikipedia/commons/6/6f/Cinnabon_logo.svg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=original",
+      "source": "https://commons.wikimedia.org/wiki/File:Cinnabon_logo.svg",
+      "originalSha256": "c2de71faa005c5317ebd7fde549501bf9f5b00f0cf558d28e7dc1108b6d3b356",
+      "asset": "company-logo-merchant-cinnabon-b49464063e396552.svg",
+      "sha256": "b49464063e39655287342c850988a7fa1a88fe9327d5db462794ef0a5725bba4",
+      "addedIn": "merchant-expansion-2026-11-01",
+      "review": "approved-2026-11-01",
+      "optimization": "svgo@3.3.2; native geometry, 4-digit precision; remove unused definitions"
+    },
+    {
+      "id": "crumbl",
+      "name": "Crumbl",
+      "aliases": [
+        "Crumbl",
+        "Crumbl Cookies"
+      ],
+      "group": "Fast food & coffee",
+      "background": "#ffffff",
+      "inset": 4,
+      "upstream": "https://upload.wikimedia.org/wikipedia/commons/7/72/Crumbl_logo_updated.svg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=original",
+      "source": "https://commons.wikimedia.org/wiki/File:Crumbl_logo_updated.svg",
+      "originalSha256": "256eba8fd86cd73741872e1993c258fc1242c2a3d050341f465b3eb13f899fbe",
+      "asset": "company-logo-merchant-crumbl-23aaee41ceafec3a.svg",
+      "sha256": "23aaee41ceafec3a9e6176fbeb80fec9ff2b9a031ae7d260f2c5afc164a16d8c",
+      "addedIn": "merchant-expansion-2026-11-01",
+      "review": "approved-2026-11-01",
+      "optimization": "svgo@3.3.2; native geometry, 4-digit precision; remove unused definitions"
+    },
+    {
+      "id": "tim-hortons",
+      "name": "Tim Hortons",
+      "aliases": [
+        "Tim Hortons"
+      ],
+      "group": "Fast food & coffee",
+      "background": "#ffffff",
+      "inset": 4,
+      "upstream": "https://upload.wikimedia.org/wikipedia/commons/b/be/Tim_Hortons_Logo.svg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=original",
+      "source": "https://commons.wikimedia.org/wiki/File:Tim_Hortons_Logo.svg",
+      "originalSha256": "6aa05d30f62b850578af1ec5606c1bcbb76c2a89b76e1c2228ab0f81a5586a5a",
+      "asset": "company-logo-merchant-tim-hortons-e518a41c61d60c40.svg",
+      "sha256": "e518a41c61d60c404530a52fcd46f11b1024539722685ef656b9c1baf66ef057",
+      "addedIn": "merchant-expansion-2026-11-01",
+      "review": "approved-2026-11-01",
+      "optimization": "svgo@3.3.2; native geometry, 4-digit precision; remove unused definitions"
+    },
+    {
+      "id": "tropical-smoothie-cafe",
+      "name": "Tropical Smoothie Cafe",
+      "aliases": [
+        "Tropical Smoothie Cafe"
+      ],
+      "group": "Fast food & coffee",
+      "background": "#ffffff",
+      "inset": 4,
+      "upstream": "https://upload.wikimedia.org/wikipedia/commons/d/d4/Tropical_Smoothie_Cafe_logo.svg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=original",
+      "source": "https://commons.wikimedia.org/wiki/File:Tropical_Smoothie_Cafe_logo.svg",
+      "originalSha256": "b0a76388217cfaa44f4f952e8f93f6b9247a115fd9699bc53b780a46360801bc",
+      "asset": "company-logo-merchant-tropical-smoothie-cafe-1ad444001a4fedf3.svg",
+      "sha256": "1ad444001a4fedf3ee8ea3a12f360121d39cf32de45c51918efac68e2707ddb4",
+      "addedIn": "merchant-expansion-2026-11-01",
+      "review": "approved-2026-11-01",
+      "optimization": "svgo@3.3.2; native geometry, 4-digit precision; remove unused definitions"
+    },
+    {
+      "id": "domino-s",
+      "name": "Domino’s",
+      "aliases": [
+        "Domino’s",
+        "Domino's",
+        "Dominos",
+        "Domino's Pizza"
+      ],
+      "group": "Fast food & coffee",
+      "background": "#ffffff",
+      "inset": 4,
+      "upstream": "https://upload.wikimedia.org/wikipedia/commons/3/3e/Domino%27s_pizza_logo.svg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=original",
+      "source": "https://commons.wikimedia.org/wiki/File:Domino%27s_pizza_logo.svg",
+      "originalSha256": "6f5cb9a740811149b090032d8c899f096ae46e5c41173590ef623f6f5865bd79",
+      "asset": "company-logo-merchant-domino-s-d10312514bb7e2fe.svg",
+      "sha256": "d10312514bb7e2fe70611db6afb2644f5e066ba021514c959795c4b3e0a955e1",
+      "addedIn": "merchant-expansion-2026-11-01",
+      "review": "approved-2026-11-01",
+      "optimization": "svgo@3.3.2; native geometry, 4-digit precision; remove unused definitions"
+    },
+    {
+      "id": "pizza-hut",
+      "name": "Pizza Hut",
+      "aliases": [
+        "Pizza Hut"
+      ],
+      "group": "Fast food & coffee",
+      "background": "#ffffff",
+      "inset": 4,
+      "upstream": "https://upload.wikimedia.org/wikipedia/commons/1/14/Pizza_Hut_%282019%29.svg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=original",
+      "source": "https://commons.wikimedia.org/wiki/File:Pizza_Hut_(2019).svg",
+      "originalSha256": "e7eeb5316c2a79acc90dac4ee1fb44af50c171819f3758684f361d936dd85163",
+      "asset": "company-logo-merchant-pizza-hut-3219458988d3cbf0.svg",
+      "sha256": "3219458988d3cbf0ec815c87c12eafbe8cc46fa201f25eb3788c0c7ac7c100ef",
+      "addedIn": "merchant-expansion-2026-11-01",
+      "review": "approved-2026-11-01",
+      "optimization": "svgo@3.3.2; native geometry, 4-digit precision; remove unused definitions"
+    },
+    {
+      "id": "papa-johns",
+      "name": "Papa Johns",
+      "aliases": [
+        "Papa Johns",
+        "Papa John's",
+        "Papa Johns Pizza"
+      ],
+      "group": "Fast food & coffee",
+      "background": "#ffffff",
+      "inset": 4,
+      "upstream": "https://upload.wikimedia.org/wikipedia/commons/9/92/Papa_Johns_logo.svg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=original",
+      "source": "https://commons.wikimedia.org/wiki/File:Papa_Johns_logo.svg",
+      "originalSha256": "b7d3c861677d06c45016dfb5987a314af174d15320580b13a374a61fdae6a267",
+      "asset": "company-logo-merchant-papa-johns-636d4bb27ccf656d.svg",
+      "sha256": "636d4bb27ccf656d96ac535f6df78475aae0497a989dfc7a8856585ad5b042dc",
+      "addedIn": "merchant-expansion-2026-11-01",
+      "review": "approved-2026-11-01",
+      "optimization": "svgo@3.3.2; native geometry, 4-digit precision; remove unused definitions"
+    },
+    {
+      "id": "papa-murphy-s",
+      "name": "Papa Murphy’s",
+      "aliases": [
+        "Papa Murphy’s",
+        "Papa Murphy's",
+        "Papa Murphys"
+      ],
+      "group": "Fast food & coffee",
+      "background": "#ffffff",
+      "inset": 4,
+      "upstream": "https://upload.wikimedia.org/wikipedia/commons/9/91/Papa_Murphy%27s_logo.svg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=original",
+      "source": "https://commons.wikimedia.org/wiki/File:Papa_Murphy%27s_logo.svg",
+      "originalSha256": "ca4c60f152ca0d3913f6182c2769ad69583feb8f17c96f9ef31d95686ca5bf45",
+      "asset": "company-logo-merchant-papa-murphy-s-6a7c9786642bc51b.svg",
+      "sha256": "6a7c9786642bc51bb77bc5cb336da82155c963b24316354ef1b392095c368fe5",
+      "addedIn": "merchant-expansion-2026-11-01",
+      "review": "approved-2026-11-01",
+      "optimization": "svgo@3.3.2; native geometry, 4-digit precision; remove unused definitions"
+    },
+    {
+      "id": "peet-s-coffee",
+      "name": "Peet’s Coffee",
+      "aliases": [
+        "Peet’s Coffee",
+        "Peet's Coffee",
+        "Peets Coffee",
+        "Peet's"
+      ],
+      "group": "Fast food & coffee",
+      "background": "#ffffff",
+      "inset": 4,
+      "upstream": "https://upload.wikimedia.org/wikipedia/commons/d/d3/Peet%27s_Coffee_logo.svg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=original",
+      "source": "https://commons.wikimedia.org/wiki/File:Peet%27s_Coffee_logo.svg",
+      "originalSha256": "c1a93b0e393db90dba21e39e29c4b34c73cdb2ca41cdabd655751938208b5ecb",
+      "asset": "company-logo-merchant-peet-s-coffee-e2130b972040ba84.svg",
+      "sha256": "e2130b972040ba847c6470b97e665a4db5aa72b429d5a5b17acc50e5d2147c09",
+      "addedIn": "merchant-expansion-2026-11-01",
+      "review": "approved-2026-11-01",
+      "optimization": "svgo@3.3.2; native geometry, 4-digit precision; remove unused definitions"
+    },
+    {
+      "id": "best-buy",
+      "name": "Best Buy",
+      "aliases": [
+        "Best Buy",
+        "BestBuy"
+      ],
+      "group": "General stores",
+      "background": "#ffffff",
+      "inset": 5,
+      "upstream": "https://upload.wikimedia.org/wikipedia/commons/c/c4/Best_Buy_logo_2018.svg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=original",
+      "source": "https://commons.wikimedia.org/wiki/File:Best_Buy_logo_2018.svg",
+      "originalSha256": "df518f5f1cacbeb2439de84afe4d9f651666c58ccfa40303eb024f1c5a961f01",
+      "asset": "company-logo-merchant-best-buy-93a954f0e658c43e.svg",
+      "sha256": "93a954f0e658c43ec6b1c51c445c280a9fe161f0527a127080761d4f789e707b",
+      "addedIn": "merchant-expansion-2026-11-01",
+      "review": "approved-2026-11-01",
+      "optimization": "svgo@3.3.2; native geometry, 4-digit precision; remove unused definitions"
+    },
+    {
+      "id": "world-market",
+      "name": "World Market",
+      "aliases": [
+        "World Market",
+        "Cost Plus World Market",
+        "Cost Plus"
+      ],
+      "group": "General stores",
+      "background": "#fff8eb",
+      "inset": 3,
+      "upstream": "https://upload.wikimedia.org/wikipedia/commons/8/82/World_Market_logo.png?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=original",
+      "source": "https://commons.wikimedia.org/wiki/File:World_Market_logo.png",
+      "originalSha256": "f79784e5924a7cf0602220121ba83d88ce2ce105ab9e9b71cdaa855f5b8d100f",
+      "asset": "company-logo-merchant-world-market-f79784e5924a7cf0.png",
+      "sha256": "f79784e5924a7cf0602220121ba83d88ce2ce105ab9e9b71cdaa855f5b8d100f",
+      "addedIn": "merchant-expansion-2026-11-01",
+      "review": "approved-2026-11-01"
+    },
+    {
+      "id": "lowe-s",
+      "name": "Lowe’s",
+      "aliases": [
+        "Lowe’s",
+        "Lowe's",
+        "Lowes",
+        "Lowe's Home Improvement"
+      ],
+      "group": "General stores",
+      "background": "#ffffff",
+      "inset": 4,
+      "upstream": "https://upload.wikimedia.org/wikipedia/commons/2/2c/Lowes_Companies_Logo.svg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=original",
+      "source": "https://commons.wikimedia.org/wiki/File:Lowes_Companies_Logo.svg",
+      "originalSha256": "4dda90a5e4ff558f436c2b0007c5335e4bfaf34d0790aa6f9ed3aa954e00c3e0",
+      "asset": "company-logo-merchant-lowe-s-a080212b39ddd1ae.svg",
+      "sha256": "a080212b39ddd1ae2f03662c8df2470c796e4b0e51260605d5f88cc4e4d12787",
+      "addedIn": "merchant-expansion-2026-11-01",
+      "review": "approved-2026-11-01",
+      "optimization": "svgo@3.3.2; native geometry, 4-digit precision; remove unused definitions"
+    },
+    {
+      "id": "ace-hardware",
+      "name": "Ace Hardware",
+      "aliases": [
+        "Ace Hardware"
+      ],
+      "group": "General stores",
+      "background": "#ffffff",
+      "inset": 4,
+      "upstream": "https://upload.wikimedia.org/wikipedia/commons/a/ad/Ace_Hardware_Logo.svg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=original",
+      "source": "https://commons.wikimedia.org/wiki/File:Ace_Hardware_Logo.svg",
+      "originalSha256": "6a928408edbc4c055b79ffd1ae8bfc74f2987b01c9c4f821f64631e293833b0e",
+      "asset": "company-logo-merchant-ace-hardware-142f94cc18508f09.svg",
+      "sha256": "142f94cc18508f09298ae04d292b133eeefe1d467a3d28ffa3f245b6ecaa9839",
+      "addedIn": "merchant-expansion-2026-11-01",
+      "review": "approved-2026-11-01",
+      "optimization": "svgo@3.3.2; native geometry, 4-digit precision; remove unused definitions"
+    },
+    {
+      "id": "michaels",
+      "name": "Michaels",
+      "aliases": [
+        "Michaels"
+      ],
+      "group": "General stores",
+      "background": "#ffffff",
+      "inset": 4,
+      "upstream": "https://upload.wikimedia.org/wikipedia/commons/9/95/Michaels_logo.svg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=original",
+      "source": "https://commons.wikimedia.org/wiki/File:Michaels_logo.svg",
+      "originalSha256": "c57394bf6b839bfa75f999415ef437f5d88d00990bcb27e9a4a0681692a95bb3",
+      "asset": "company-logo-merchant-michaels-d7d01232bdf2a807.svg",
+      "sha256": "d7d01232bdf2a8075040b8e915877cf6d494df224aacde44359b219ee3e0af7e",
+      "addedIn": "merchant-expansion-2026-11-01",
+      "review": "approved-2026-11-01",
+      "optimization": "svgo@3.3.2; native geometry, 4-digit precision; remove unused definitions"
+    },
+    {
+      "id": "hobby-lobby",
+      "name": "Hobby Lobby",
+      "aliases": [
+        "Hobby Lobby"
+      ],
+      "group": "General stores",
+      "background": "#ffffff",
+      "inset": 4,
+      "upstream": "https://upload.wikimedia.org/wikipedia/commons/4/4c/Hobby_Lobby_logo.svg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=original",
+      "source": "https://commons.wikimedia.org/wiki/File:Hobby_Lobby_logo.svg",
+      "originalSha256": "b7ae15bfea955be6fb822632077664fba7fa94aef01a9096d3d625d0584b2708",
+      "asset": "company-logo-merchant-hobby-lobby-a155b51d89faeccc.svg",
+      "sha256": "a155b51d89faeccc98b35dee06f8b2255239ffbaf460e34b324ddbb133080bf9",
+      "addedIn": "merchant-expansion-2026-11-01",
+      "review": "approved-2026-11-01",
+      "optimization": "svgo@3.3.2; native geometry, 4-digit precision; remove unused definitions"
+    },
+    {
+      "id": "cvs",
+      "name": "CVS",
+      "aliases": [
+        "CVS",
+        "CVS Pharmacy"
+      ],
+      "group": "General stores",
+      "background": "#ffffff",
+      "inset": 4,
+      "upstream": "https://upload.wikimedia.org/wikipedia/commons/0/0b/CVS_Pharmacy_Logo.svg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=original",
+      "source": "https://commons.wikimedia.org/wiki/File:CVS_Pharmacy_Logo.svg",
+      "originalSha256": "6a6d8e12c32d71800fda8202bef4599adf82b2d0276ac6a982975e5bb346d577",
+      "asset": "company-logo-merchant-cvs-00f1f34aa253030a.svg",
+      "sha256": "00f1f34aa253030a224765d5039f0d38d9d941c8cd0a39a8baa29d858f898b47",
+      "addedIn": "merchant-expansion-2026-11-01",
+      "review": "approved-2026-11-01",
+      "optimization": "svgo@3.3.2; native geometry, 4-digit precision; remove unused definitions"
+    },
+    {
+      "id": "walgreens",
+      "name": "Walgreens",
+      "aliases": [
+        "Walgreens"
+      ],
+      "group": "General stores",
+      "background": "#ffffff",
+      "inset": 4,
+      "upstream": "https://upload.wikimedia.org/wikipedia/commons/6/67/Walgreens_2020_initial_W_logo.svg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=original",
+      "source": "https://commons.wikimedia.org/wiki/File:Walgreens_2020_initial_W_logo.svg",
+      "originalSha256": "cc9b18ffd62fa2ed0098a4187e436227dbef87d2ea53ec9377b1df8e85c5e1b5",
+      "asset": "company-logo-merchant-walgreens-bd7018f2285d0cf0.svg",
+      "sha256": "bd7018f2285d0cf0f1e501bd33f51579eba7affbe62cd9a1b741a862493aaf6b",
+      "addedIn": "merchant-expansion-2026-11-01",
+      "review": "approved-2026-11-01",
+      "optimization": "svgo@3.3.2; native geometry, 4-digit precision; remove unused definitions"
+    },
+    {
+      "id": "dollar-general",
+      "name": "Dollar General",
+      "aliases": [
+        "Dollar General"
+      ],
+      "group": "General stores",
+      "background": "#ffffff",
+      "inset": 4,
+      "upstream": "https://upload.wikimedia.org/wikipedia/commons/0/05/Dollar_General_logo.svg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=original",
+      "source": "https://commons.wikimedia.org/wiki/File:Dollar_General_logo.svg",
+      "originalSha256": "559fd597980a1cdcff9668d9ee923a33f1b427cc415463e6fb0c368fdb7aeb0b",
+      "asset": "company-logo-merchant-dollar-general-f10add8673e88821.svg",
+      "sha256": "f10add8673e888218ab0b54f0014b186618a26cc0029f0d3ae575845f4c7a096",
+      "addedIn": "merchant-expansion-2026-11-01",
+      "review": "approved-2026-11-01",
+      "optimization": "svgo@3.3.2; native geometry, 4-digit precision; remove unused definitions"
+    },
+    {
+      "id": "dollar-tree",
+      "name": "Dollar Tree",
+      "aliases": [
+        "Dollar Tree"
+      ],
+      "group": "General stores",
+      "background": "#ffffff",
+      "inset": 4,
+      "upstream": "https://upload.wikimedia.org/wikipedia/commons/c/c2/Dollar_Tree_logo.svg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=original",
+      "source": "https://commons.wikimedia.org/wiki/File:Dollar_Tree_logo.svg",
+      "originalSha256": "4adc39a60daac53547b4d6ec47ec8a55f94d4e2dd68507cf15fcb3370d8ad0ed",
+      "asset": "company-logo-merchant-dollar-tree-0450608d08d5e567.svg",
+      "sha256": "0450608d08d5e5670cd4041393a27187c3edca641284700ad24b911a98213f1b",
+      "addedIn": "merchant-expansion-2026-11-01",
+      "review": "approved-2026-11-01",
+      "optimization": "svgo@3.3.2; native geometry, 4-digit precision; remove unused definitions"
+    },
+    {
+      "id": "five-below",
+      "name": "Five Below",
+      "aliases": [
+        "Five Below"
+      ],
+      "group": "General stores",
+      "background": "#ffffff",
+      "inset": 4,
+      "upstream": "https://upload.wikimedia.org/wikipedia/commons/a/ad/Five_Below_logo.svg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=original",
+      "source": "https://commons.wikimedia.org/wiki/File:Five_Below_logo.svg",
+      "originalSha256": "d5b713a69b17755204b3c4b9b7ee6ac5f6047b18a0eb6a34f74b52fc210f3173",
+      "asset": "company-logo-merchant-five-below-eac28a0d27ddf792.svg",
+      "sha256": "eac28a0d27ddf792cabaf094e1cc8aca27abc274df639923a71c2ef67eb5be71",
+      "addedIn": "merchant-expansion-2026-11-01",
+      "review": "approved-2026-11-01",
+      "optimization": "svgo@3.3.2; native geometry, 4-digit precision; remove unused definitions"
+    },
+    {
+      "id": "tj-maxx",
+      "name": "TJ Maxx",
+      "aliases": [
+        "TJ Maxx",
+        "TJMaxx",
+        "T.J. Maxx"
+      ],
+      "group": "General stores",
+      "background": "#ffffff",
+      "inset": 4,
+      "upstream": "https://upload.wikimedia.org/wikipedia/commons/1/17/TJ_Maxx_Logo.svg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=original",
+      "source": "https://commons.wikimedia.org/wiki/File:TJ_Maxx_Logo.svg",
+      "originalSha256": "f1b8f95a505f2447bfa8e72ef097999cf977ead32f49e26dab62175d1a5674c5",
+      "asset": "company-logo-merchant-tj-maxx-392a47b18690e5c1.svg",
+      "sha256": "392a47b18690e5c17150e7f6970b335340a29e9b71ecf4fb8f32c18cbac1fa3e",
+      "addedIn": "merchant-expansion-2026-11-01",
+      "review": "approved-2026-11-01",
+      "optimization": "svgo@3.3.2; native geometry, 4-digit precision; remove unused definitions"
+    },
+    {
+      "id": "marshalls",
+      "name": "Marshalls",
+      "aliases": [
+        "Marshalls"
+      ],
+      "group": "General stores",
+      "background": "#ffffff",
+      "inset": 4,
+      "upstream": "https://upload.wikimedia.org/wikipedia/commons/8/8b/Marshalls_Logo.svg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=original",
+      "source": "https://commons.wikimedia.org/wiki/File:Marshalls_Logo.svg",
+      "originalSha256": "d94019ecf3a7f406a275cc0d94d0c34499f2dade514550706fd5f5437506dd54",
+      "asset": "company-logo-merchant-marshalls-095359cecdee76b3.svg",
+      "sha256": "095359cecdee76b3f0c49ac9ce582c8b83db8dc87d3702eaf1f1b57d92e8ffc2",
+      "addedIn": "merchant-expansion-2026-11-01",
+      "review": "approved-2026-11-01",
+      "optimization": "svgo@3.3.2; native geometry, 4-digit precision; remove unused definitions"
+    },
+    {
+      "id": "burlington",
+      "name": "Burlington",
+      "aliases": [
+        "Burlington",
+        "Burlington Coat Factory"
+      ],
+      "group": "General stores",
+      "background": "#ffffff",
+      "inset": 4,
+      "upstream": "https://upload.wikimedia.org/wikipedia/commons/5/54/Burlington_Stores_logo.svg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=original",
+      "source": "https://commons.wikimedia.org/wiki/File:Burlington_Stores_logo.svg",
+      "originalSha256": "a3f878fdbc8c5623d172ff70dffb79efc236ad3350282167752f57297a885f57",
+      "asset": "company-logo-merchant-burlington-01fcd8610f4b8995.svg",
+      "sha256": "01fcd8610f4b899534eed2eecb17e10f64508d63913bed1b28f5b78d67a59537",
+      "addedIn": "merchant-expansion-2026-11-01",
+      "review": "approved-2026-11-01",
+      "optimization": "svgo@3.3.2; native geometry, 4-digit precision; remove unused definitions"
+    },
+    {
+      "id": "kohl-s",
+      "name": "Kohl’s",
+      "aliases": [
+        "Kohl’s",
+        "Kohl's",
+        "Kohls"
+      ],
+      "group": "General stores",
+      "background": "#ffffff",
+      "inset": 4,
+      "upstream": "https://upload.wikimedia.org/wikipedia/commons/6/60/Kohl%27s_logo.svg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=original",
+      "source": "https://commons.wikimedia.org/wiki/File:Kohl%27s_logo.svg",
+      "originalSha256": "d97cc77a40b8440e97d48ac0eeb9bc58e93a77c3a3a042f9032b0aea6b2d006b",
+      "asset": "company-logo-merchant-kohl-s-9f2ca2622f374465.svg",
+      "sha256": "9f2ca2622f3744652e6c48b9960d00c5c632726e5e912c3dee0815172e1fce52",
+      "addedIn": "merchant-expansion-2026-11-01",
+      "review": "approved-2026-11-01",
+      "optimization": "svgo@3.3.2; native geometry, 4-digit precision; remove unused definitions"
+    },
+    {
+      "id": "nordstrom",
+      "name": "Nordstrom",
+      "aliases": [
+        "Nordstrom"
+      ],
+      "group": "General stores",
+      "background": "#ffffff",
+      "inset": 4,
+      "upstream": "https://upload.wikimedia.org/wikipedia/commons/8/81/Nordstrom_Logo_2019.svg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=original",
+      "source": "https://commons.wikimedia.org/wiki/File:Nordstrom_Logo_2019.svg",
+      "originalSha256": "bc2ad649e52943366da2a5a38f99625b1b71b01f7e553b39706a4d12dfe1578c",
+      "asset": "company-logo-merchant-nordstrom-d0c687ba2ddf2e60.svg",
+      "sha256": "d0c687ba2ddf2e60b8b19acc366db49315d3ba4540c06089e548a27f3951d4ec",
+      "addedIn": "merchant-expansion-2026-11-01",
+      "review": "approved-2026-11-01",
+      "optimization": "svgo@3.3.2; native geometry, 4-digit precision; remove unused definitions"
+    },
+    {
+      "id": "nordstrom-rack",
+      "name": "Nordstrom Rack",
+      "aliases": [
+        "Nordstrom Rack"
+      ],
+      "group": "General stores",
+      "background": "#ffffff",
+      "inset": 4,
+      "upstream": "https://upload.wikimedia.org/wikipedia/commons/9/9e/Nordstrom_Rack_logo_2023.svg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=original",
+      "source": "https://commons.wikimedia.org/wiki/File:Nordstrom_Rack_logo_2023.svg",
+      "originalSha256": "b4be94f900b80caf6faa664ac7f36cc7693fe5c39d0500ecd04db3af13f2112c",
+      "asset": "company-logo-merchant-nordstrom-rack-0eccccb846ee1151.svg",
+      "sha256": "0eccccb846ee115157dfe12dce728c1ddf8333171fa8027080a1df0d778c009a",
+      "addedIn": "merchant-expansion-2026-11-01",
+      "review": "approved-2026-11-01",
+      "optimization": "svgo@3.3.2; native geometry, 4-digit precision; remove unused definitions"
+    },
+    {
+      "id": "jcpenney",
+      "name": "JCPenney",
+      "aliases": [
+        "JCPenney",
+        "J C Penney",
+        "JC Penney"
+      ],
+      "group": "General stores",
+      "background": "#ffffff",
+      "inset": 4,
+      "upstream": "https://upload.wikimedia.org/wikipedia/commons/6/61/JCPenney_logo_%282019%29.svg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=original",
+      "source": "https://commons.wikimedia.org/wiki/File:JCPenney_logo_(2019).svg",
+      "originalSha256": "beb88ed2088248aecb23c278c7a4ccbcdb91a468fd34ff336eb1af70414c3424",
+      "asset": "company-logo-merchant-jcpenney-370bdce74bcc21b7.svg",
+      "sha256": "370bdce74bcc21b7fcabc34b3089d62fe41b34df88f3e72cef8005c78ed89a4d",
+      "addedIn": "merchant-expansion-2026-11-01",
+      "review": "approved-2026-11-01",
+      "optimization": "svgo@3.3.2; native geometry, 4-digit precision; remove unused definitions"
+    },
+    {
+      "id": "ulta-beauty",
+      "name": "Ulta Beauty",
+      "aliases": [
+        "Ulta Beauty",
+        "Ulta"
+      ],
+      "group": "General stores",
+      "background": "#ffffff",
+      "inset": 4,
+      "upstream": "https://upload.wikimedia.org/wikipedia/commons/9/9e/Ulta_Beauty_logo.svg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=original",
+      "source": "https://commons.wikimedia.org/wiki/File:Ulta_Beauty_logo.svg",
+      "originalSha256": "c9be94848c986b6e5ada2d9dd376030f5df43c3c7925aec58fba78dea433a205",
+      "asset": "company-logo-merchant-ulta-beauty-10820dc34674ff7c.svg",
+      "sha256": "10820dc34674ff7c0a0c9bfc63aebe6d9bb5177bbb247c25c59309e50aaf148b",
+      "addedIn": "merchant-expansion-2026-11-01",
+      "review": "approved-2026-11-01",
+      "optimization": "svgo@3.3.2; native geometry, 4-digit precision; remove unused definitions"
+    },
+    {
+      "id": "petco",
+      "name": "Petco",
+      "aliases": [
+        "Petco"
+      ],
+      "group": "General stores",
+      "background": "#ffffff",
+      "inset": 4,
+      "upstream": "https://upload.wikimedia.org/wikipedia/commons/a/af/Petco_Logo.svg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=original",
+      "source": "https://commons.wikimedia.org/wiki/File:Petco_Logo.svg",
+      "originalSha256": "0d66eb507b4d6c10fc466cc77a663e5813e97c6a8b9f677cb920ad44b2734296",
+      "asset": "company-logo-merchant-petco-e9e14d69337cd32c.svg",
+      "sha256": "e9e14d69337cd32cdeff2ff6eee965ed5449da54107bebc9e828404d32d21524",
+      "addedIn": "merchant-expansion-2026-11-01",
+      "review": "approved-2026-11-01",
+      "optimization": "svgo@3.3.2; native geometry, 4-digit precision; remove unused definitions"
+    },
+    {
+      "id": "chewy",
+      "name": "Chewy",
+      "aliases": [
+        "Chewy",
+        "Chewy.com"
+      ],
+      "group": "General stores",
+      "background": "#ffffff",
+      "inset": 4,
+      "upstream": "https://upload.wikimedia.org/wikipedia/commons/6/63/Chewy_pet_food_logo.svg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=original",
+      "source": "https://commons.wikimedia.org/wiki/File:Chewy_pet_food_logo.svg",
+      "originalSha256": "0229949893a7c24d1fe3c2c7cbd60fb64c5358fde4dbb4a179f09a4d53bc81a2",
+      "asset": "company-logo-merchant-chewy-3ac28cc8c07faa14.svg",
+      "sha256": "3ac28cc8c07faa14b9c0316d5816a58784aebd7b09607660aa78749c87cd15de",
+      "addedIn": "merchant-expansion-2026-11-01",
+      "review": "approved-2026-11-01",
+      "optimization": "svgo@3.3.2; native geometry, 4-digit precision; remove unused definitions"
+    },
+    {
+      "id": "barnes-noble",
+      "name": "Barnes & Noble",
+      "aliases": [
+        "Barnes & Noble",
+        "Barnes and Noble"
+      ],
+      "group": "General stores",
+      "background": "#ffffff",
+      "inset": 4,
+      "upstream": "https://upload.wikimedia.org/wikipedia/commons/2/2c/Barnes_%26_Noble_logo_%282021%29.svg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=original",
+      "source": "https://commons.wikimedia.org/wiki/File:Barnes_%26_Noble_logo_(2021).svg",
+      "originalSha256": "54166fa9b45f658d223e38eb4991d8af28456755742cca8f67966c48e2c6333c",
+      "asset": "company-logo-merchant-barnes-noble-b78c7443ae9a67d2.svg",
+      "sha256": "b78c7443ae9a67d211472fad45e22e6369a539da40a140041d54bcacc2cc9d1b",
+      "addedIn": "merchant-expansion-2026-11-01",
+      "review": "approved-2026-11-01",
+      "optimization": "svgo@3.3.2; native geometry, 4-digit precision; remove unused definitions"
+    },
+    {
+      "id": "staples",
+      "name": "Staples",
+      "aliases": [
+        "Staples"
+      ],
+      "group": "General stores",
+      "background": "#ffffff",
+      "inset": 4,
+      "upstream": "https://upload.wikimedia.org/wikipedia/commons/4/45/Staples_2019.svg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=original",
+      "source": "https://commons.wikimedia.org/wiki/File:Staples_2019.svg",
+      "originalSha256": "c556e3da18cce9d7c9bbda88332156bc96d8e2d1b390e5e656098684d3fcc3ee",
+      "asset": "company-logo-merchant-staples-440e774437f550cc.svg",
+      "sha256": "440e774437f550cc414416785b6566cd925433011e9f2defd49b529c20fbab3f",
+      "addedIn": "merchant-expansion-2026-11-01",
+      "review": "approved-2026-11-01",
+      "optimization": "svgo@3.3.2; native geometry, 4-digit precision; remove unused definitions"
+    },
+    {
+      "id": "o-reilly-auto-parts",
+      "name": "O’Reilly Auto Parts",
+      "aliases": [
+        "O’Reilly Auto Parts",
+        "O'Reilly Auto Parts",
+        "OReilly Auto Parts"
+      ],
+      "group": "General stores",
+      "background": "#ffffff",
+      "inset": 4,
+      "upstream": "https://upload.wikimedia.org/wikipedia/commons/a/a5/O%27Reilly_Auto_Parts_Logo.svg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=original",
+      "source": "https://commons.wikimedia.org/wiki/File:O%27Reilly_Auto_Parts_Logo.svg",
+      "originalSha256": "298dd6801193cba1fdc25e9dbf274cbec70ff8a218769f126f416122369c14a1",
+      "asset": "company-logo-merchant-o-reilly-auto-parts-401cbc08d7ae88a1.svg",
+      "sha256": "401cbc08d7ae88a161f28ca62b14ae995fda53fd522e102808d6027ff79cf361",
+      "addedIn": "merchant-expansion-2026-11-01",
+      "review": "approved-2026-11-01",
+      "optimization": "svgo@3.3.2; native geometry, 4-digit precision; remove unused definitions"
+    },
+    {
+      "id": "petsmart",
+      "name": "PetSmart",
+      "aliases": [
+        "PetSmart",
+        "Pet Smart"
+      ],
+      "group": "General stores",
+      "background": "#ffffff",
+      "inset": 4,
+      "upstream": "https://upload.wikimedia.org/wikipedia/commons/0/01/PetSmart.svg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=original",
+      "source": "https://commons.wikimedia.org/wiki/File:PetSmart.svg",
+      "originalSha256": "cbc879ac43c7923027d05501357ce7da0a30bcf46954fd06ad5b762758e0260c",
+      "asset": "company-logo-merchant-petsmart-94557634c6211f95.svg",
+      "sha256": "94557634c6211f95b80008c1d15d6b7f9c4b8f9efe07b097ad5ed9b45d2b7485",
+      "addedIn": "merchant-expansion-2026-11-01",
+      "review": "approved-2026-11-01",
+      "optimization": "svgo@3.3.2; native geometry, 4-digit precision; remove unused definitions"
+    },
+    {
+      "id": "sephora",
+      "name": "Sephora",
+      "aliases": [
+        "Sephora"
+      ],
+      "group": "General stores",
+      "background": "#ffffff",
+      "inset": 4,
+      "upstream": "https://upload.wikimedia.org/wikipedia/commons/2/21/Sephora_logo.svg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=original",
+      "source": "https://commons.wikimedia.org/wiki/File:Sephora_logo.svg",
+      "originalSha256": "26315778f8a273a9f1d05c98a18b2f7f89327dab9eb71111d39d8af30127d8ef",
+      "asset": "company-logo-merchant-sephora-b6248eb3d6e5b05f.svg",
+      "sha256": "b6248eb3d6e5b05fca71611be7f93d562b12901f74c50f6a1e8b5278cc7c95b3",
+      "addedIn": "merchant-expansion-2026-11-01",
+      "review": "approved-2026-11-01",
+      "optimization": "svgo@3.3.2; native geometry, 4-digit precision; remove unused definitions"
+    },
+    {
+      "id": "bp",
+      "name": "BP",
+      "aliases": [
+        "BP",
+        "British Petroleum",
+        "BP gas"
+      ],
+      "group": "Gas stations",
+      "background": "#ffffff",
+      "inset": 4,
+      "upstream": "https://upload.wikimedia.org/wikipedia/en/d/d2/BP_Helios_logo.svg?utm_source=en.wikipedia.org&utm_campaign=imageinfo&utm_content=original",
+      "source": "https://en.wikipedia.org/wiki/File:BP_Helios_logo.svg",
+      "originalSha256": "0d3a892399068bbdba4a9b707fc0df03cebf0ca24d632ee6ae7f11eea21b52b9",
+      "asset": "company-logo-merchant-bp-9dad127421af0a14.svg",
+      "sha256": "9dad127421af0a14172ee55627e2c06f24ebe5593510428812c16f29dabfcd7f",
+      "addedIn": "merchant-expansion-2026-11-01",
+      "review": "approved-2026-11-01",
+      "optimization": "svgo@3.3.2; native geometry, 4-digit precision; remove unused definitions"
+    },
+    {
+      "id": "wawa",
+      "name": "Wawa",
+      "aliases": [
+        "Wawa"
+      ],
+      "group": "Gas stations",
+      "background": "#ffffff",
+      "inset": 4,
+      "upstream": "https://upload.wikimedia.org/wikipedia/en/2/23/Wawa_logo.svg?utm_source=en.wikipedia.org&utm_campaign=imageinfo&utm_content=original",
+      "source": "https://en.wikipedia.org/wiki/File:Wawa_logo.svg",
+      "originalSha256": "8056cadbc45dc79a7ae2740d5b45bc22477dc613737e597081dffac5407fa975",
+      "asset": "company-logo-merchant-wawa-ca88e6273dfadcb5.svg",
+      "sha256": "ca88e6273dfadcb5a3b90fe3463b5e73436683d22c4bb78f45e414ce6add0ee7",
+      "addedIn": "merchant-expansion-2026-11-01",
+      "review": "approved-2026-11-01",
+      "optimization": "svgo@3.3.2; native geometry, 4-digit precision; remove unused definitions"
+    },
+    {
+      "id": "sinclair",
+      "name": "Sinclair",
+      "aliases": [
+        "Sinclair",
+        "Sinclair Oil"
+      ],
+      "group": "Gas stations",
+      "background": "#ffffff",
+      "inset": 4,
+      "upstream": "https://upload.wikimedia.org/wikipedia/en/a/a7/Sinclair_Oil_logo.svg?utm_source=en.wikipedia.org&utm_campaign=imageinfo&utm_content=original",
+      "source": "https://en.wikipedia.org/wiki/File:Sinclair_Oil_logo.svg",
+      "originalSha256": "dd4bf78ddd11a7d97f5d87172a26d30134542027c824e24724e5a6d2b4b01b99",
+      "asset": "company-logo-merchant-sinclair-31fbe7c76af23129.svg",
+      "sha256": "31fbe7c76af23129bd86ef2fb1e7f0cd081c3b6db482de7ba73a0215d79d377d",
+      "addedIn": "merchant-expansion-2026-11-01",
+      "review": "approved-2026-11-01",
+      "optimization": "svgo@3.3.2; native geometry, 4-digit precision; remove unused definitions"
+    },
+    {
+      "id": "panda-express",
+      "name": "Panda Express",
+      "aliases": [
+        "Panda Express"
+      ],
+      "group": "Fast food & coffee",
+      "background": "#ffffff",
+      "inset": 4,
+      "upstream": "https://upload.wikimedia.org/wikipedia/en/8/85/Panda_Express_logo.svg?utm_source=en.wikipedia.org&utm_campaign=imageinfo&utm_content=original",
+      "source": "https://en.wikipedia.org/wiki/File:Panda_Express_logo.svg",
+      "originalSha256": "ae894971219c8fda56dda80886fc763f31a817dd78606943841cd2e5d76cf179",
+      "asset": "company-logo-merchant-panda-express-dd57da67b81d91e1.svg",
+      "sha256": "dd57da67b81d91e16f96e70e04b37d876850f8077d655a74b5879898f798fe6a",
+      "addedIn": "merchant-expansion-2026-11-01",
+      "review": "approved-2026-11-01",
+      "optimization": "svgo@3.3.2; native geometry, 4-digit precision; remove unused definitions"
+    },
+    {
+      "id": "wingstop",
+      "name": "Wingstop",
+      "aliases": [
+        "Wingstop"
+      ],
+      "group": "Fast food & coffee",
+      "background": "#ffffff",
+      "inset": 4,
+      "upstream": "https://upload.wikimedia.org/wikipedia/en/0/0f/Wingstop_logo.svg?utm_source=en.wikipedia.org&utm_campaign=imageinfo&utm_content=original",
+      "source": "https://en.wikipedia.org/wiki/File:Wingstop_logo.svg",
+      "originalSha256": "240fa2750b538250d87f6f502b263ba863e01b6f7a776b19db59149ae5ec9276",
+      "asset": "company-logo-merchant-wingstop-36b97fd75ddebe47.svg",
+      "sha256": "36b97fd75ddebe478f8dc38d13cdaeed319ca529b6475bb62f8a81a57f7a4581",
+      "addedIn": "merchant-expansion-2026-11-01",
+      "review": "approved-2026-11-01",
+      "optimization": "svgo@3.3.2; native geometry, 4-digit precision; remove unused definitions"
+    },
+    {
+      "id": "rei",
+      "name": "REI",
+      "aliases": [
+        "REI",
+        "REI Co-op",
+        "Recreational Equipment Inc"
+      ],
+      "group": "General stores",
+      "background": "#ffffff",
+      "inset": 5,
+      "upstream": "https://upload.wikimedia.org/wikipedia/en/9/9b/REI_logo.svg?utm_source=en.wikipedia.org&utm_campaign=imageinfo&utm_content=original",
+      "source": "https://en.wikipedia.org/wiki/File:REI_logo.svg",
+      "originalSha256": "0d2829091b38f53a7fdae19ed35a3ff2562c1bc3212c98332103e49cf2f8117c",
+      "asset": "company-logo-merchant-rei-ff63311059336afc.svg",
+      "sha256": "ff63311059336afc140db5fe775ad447cac26f2588ca0ff765ea040a48291347",
+      "addedIn": "merchant-expansion-2026-11-01",
+      "review": "approved-2026-11-01",
+      "optimization": "svgo@3.3.2; native geometry, 4-digit precision; remove unused definitions"
+    },
+    {
+      "id": "autozone",
+      "name": "AutoZone",
+      "aliases": [
+        "AutoZone",
+        "Auto Zone"
+      ],
+      "group": "General stores",
+      "background": "#ffffff",
+      "inset": 4,
+      "upstream": "https://upload.wikimedia.org/wikipedia/en/f/fc/AutoZone_logo.svg?utm_source=en.wikipedia.org&utm_campaign=imageinfo&utm_content=original",
+      "source": "https://en.wikipedia.org/wiki/File:AutoZone_logo.svg",
+      "originalSha256": "8a153296ae1170e5cef702306916ec5c3cd31f7245c1c0a95ed77c19166783c4",
+      "asset": "company-logo-merchant-autozone-a6efca13aa81be7c.svg",
+      "sha256": "a6efca13aa81be7c127851345fd29ebe97543d3ff12b0ff151c1375fcd3f9564",
+      "addedIn": "merchant-expansion-2026-11-01",
+      "review": "approved-2026-11-01",
+      "optimization": "svgo@3.3.2; native geometry, 4-digit precision; remove unused definitions"
+    },
+    {
+      "id": "kroger",
+      "name": "Kroger",
+      "aliases": [
+        "Kroger",
+        "Kroger gas"
+      ],
+      "group": "Groceries",
+      "asset": "company-logo-merchant-kroger-2204dd1bb885a8af.svg",
+      "background": "#ffffff",
+      "inset": 3,
+      "sha256": "2204dd1bb885a8af5f180ce40064312089952faec4701e2e3bdee9c6dfa00e89",
+      "addedIn": "merchant-expansion-2026-11-01",
+      "review": "approved-2026-11-01",
+      "source": "https://github.com/GLINCKER/thesvg/blob/ea47400094ad2849240546826a54a10ff833e64c/public/icons/kroger/wordmark.svg"
+    }
+  ]
+}

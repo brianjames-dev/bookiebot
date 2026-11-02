@@ -1,0 +1,1719 @@
+[
+  {
+    "id": "aldinord",
+    "name": "Aldi Nord",
+    "aliases": [
+      "ALDI Nord"
+    ],
+    "asset": "company-logo-merchant-aldinord-5871b646a553c74a.svg",
+    "background": "#ffffff",
+    "inset": 7
+  },
+  {
+    "id": "aldisud",
+    "name": "Aldi Süd",
+    "aliases": [
+      "ALDI",
+      "ALDI Süd"
+    ],
+    "asset": "company-logo-merchant-aldisud-baab43b749300bed.svg",
+    "background": "#ffffff",
+    "inset": 7
+  },
+  {
+    "id": "lidl",
+    "name": "Lidl",
+    "aliases": [
+      "Lidl"
+    ],
+    "asset": "company-logo-merchant-lidl-41bd332b82577848.svg",
+    "background": "#ffffff",
+    "inset": 7
+  },
+  {
+    "id": "instacart",
+    "name": "Instacart",
+    "aliases": [
+      "Instacart"
+    ],
+    "asset": "company-logo-merchant-instacart-2e731af892aad8e4.svg",
+    "background": "#ffffff",
+    "inset": 7
+  },
+  {
+    "id": "carrefour",
+    "name": "Carrefour",
+    "aliases": [
+      "Carrefour"
+    ],
+    "asset": "company-logo-merchant-carrefour-5e2c36ae5bc236a3.svg",
+    "background": "#ffffff",
+    "inset": 7
+  },
+  {
+    "id": "tesco",
+    "name": "Tesco",
+    "aliases": [
+      "Tesco"
+    ],
+    "asset": "company-logo-merchant-tesco-523e4d5d376f8430.svg",
+    "background": "#ffffff",
+    "inset": 7
+  },
+  {
+    "id": "asda",
+    "name": "ASDA",
+    "aliases": [
+      "ASDA"
+    ],
+    "asset": "company-logo-merchant-asda-892da0a0bb922260.svg",
+    "background": "#ffffff",
+    "inset": 7
+  },
+  {
+    "id": "rewe",
+    "name": "REWE",
+    "aliases": [
+      "REWE"
+    ],
+    "asset": "company-logo-merchant-rewe-a1ccaa5c11ee97f5.svg",
+    "background": "#ffffff",
+    "inset": 7
+  },
+  {
+    "id": "mcdonalds",
+    "name": "McDonald's",
+    "aliases": [
+      "McDonald's",
+      "McDonalds"
+    ],
+    "asset": "company-logo-merchant-mcdonalds-4d8c4362f7ec6eed.svg",
+    "background": "#db0007",
+    "inset": 8
+  },
+  {
+    "id": "burgerking",
+    "name": "Burger King",
+    "aliases": [
+      "Burger King"
+    ],
+    "asset": "company-logo-merchant-burgerking-ac22ecc1c3cc9f90.svg",
+    "background": "#ffffff",
+    "inset": 7
+  },
+  {
+    "id": "tacobell",
+    "name": "Taco Bell",
+    "aliases": [
+      "Taco Bell"
+    ],
+    "asset": "company-logo-merchant-tacobell-2efd69221b0e07c1.svg",
+    "background": "#ffffff",
+    "inset": 7
+  },
+  {
+    "id": "starbucks",
+    "name": "Starbucks",
+    "aliases": [
+      "Starbucks"
+    ],
+    "asset": "company-logo-merchant-starbucks-e8a397a07e93c0a4.svg",
+    "background": "#ffffff",
+    "inset": 0
+  },
+  {
+    "id": "kfc",
+    "name": "KFC",
+    "aliases": [
+      "KFC"
+    ],
+    "asset": "company-logo-merchant-kfc-1bf88da1c178143e.svg",
+    "background": "#ffffff",
+    "inset": 7
+  },
+  {
+    "id": "ubereats",
+    "name": "Uber Eats",
+    "aliases": [
+      "Uber Eats"
+    ],
+    "asset": "company-logo-merchant-ubereats-b0e0cbe54184ebb7.svg",
+    "background": "#ffffff",
+    "inset": 7
+  },
+  {
+    "id": "doordash",
+    "name": "DoorDash",
+    "aliases": [
+      "DoorDash"
+    ],
+    "asset": "company-logo-merchant-doordash-e20dcdb67abbdbde.svg",
+    "background": "#ffffff",
+    "inset": 7
+  },
+  {
+    "id": "deliveroo",
+    "name": "Deliveroo",
+    "aliases": [
+      "Deliveroo"
+    ],
+    "asset": "company-logo-merchant-deliveroo-66c646a52fcdd871.svg",
+    "background": "#ffffff",
+    "inset": 7
+  },
+  {
+    "id": "target",
+    "name": "Target",
+    "aliases": [
+      "Target",
+      "Target store"
+    ],
+    "asset": "company-logo-merchant-target-511fdc936522719f.svg",
+    "background": "#ffffff",
+    "inset": 0
+  },
+  {
+    "id": "ikea",
+    "name": "IKEA",
+    "aliases": [
+      "IKEA"
+    ],
+    "asset": "company-logo-merchant-ikea-3c87b16786036f20.svg",
+    "background": "#ffda1a",
+    "inset": 4
+  },
+  {
+    "id": "nike",
+    "name": "Nike",
+    "aliases": [
+      "Nike"
+    ],
+    "asset": "company-logo-merchant-nike-bafb08923ddd2d4c.svg",
+    "background": "#ffffff",
+    "inset": 7
+  },
+  {
+    "id": "adidas",
+    "name": "Adidas",
+    "aliases": [
+      "Adidas"
+    ],
+    "asset": "company-logo-merchant-adidas-360ad2feb672d470.svg",
+    "background": "#ffffff",
+    "inset": 7
+  },
+  {
+    "id": "etsy",
+    "name": "Etsy",
+    "aliases": [
+      "Etsy"
+    ],
+    "asset": "company-logo-merchant-etsy-1871eb705d39d14f.svg",
+    "background": "#ffffff",
+    "inset": 7
+  },
+  {
+    "id": "ebay",
+    "name": "eBay",
+    "aliases": [
+      "eBay"
+    ],
+    "asset": "company-logo-merchant-ebay-4f7e56c62a82e464.svg",
+    "background": "#ffffff",
+    "inset": 7
+  },
+  {
+    "id": "handm",
+    "name": "H&M",
+    "aliases": [
+      "H&M",
+      "H and M"
+    ],
+    "asset": "company-logo-merchant-handm-d912ba3b66c494b9.svg",
+    "background": "#ffffff",
+    "inset": 7
+  },
+  {
+    "id": "uniqlo",
+    "name": "Uniqlo",
+    "aliases": [
+      "Uniqlo"
+    ],
+    "asset": "company-logo-merchant-uniqlo-85432a91a2001050.svg",
+    "background": "#ffffff",
+    "inset": 7
+  },
+  {
+    "id": "puma",
+    "name": "Puma",
+    "aliases": [
+      "Puma"
+    ],
+    "asset": "company-logo-merchant-puma-9c7c03af3b191935.svg",
+    "background": "#ffffff",
+    "inset": 7
+  },
+  {
+    "id": "newbalance",
+    "name": "New Balance",
+    "aliases": [
+      "New Balance"
+    ],
+    "asset": "company-logo-merchant-newbalance-b56a1ea12db89503.svg",
+    "background": "#ffffff",
+    "inset": 7
+  },
+  {
+    "id": "underarmour",
+    "name": "Under Armour",
+    "aliases": [
+      "Under Armour"
+    ],
+    "asset": "company-logo-merchant-underarmour-72281bd9303768af.svg",
+    "background": "#ffffff",
+    "inset": 7
+  },
+  {
+    "id": "zara",
+    "name": "Zara",
+    "aliases": [
+      "Zara"
+    ],
+    "asset": "company-logo-merchant-zara-7a2db869f3860f6b.svg",
+    "background": "#ffffff",
+    "inset": 7
+  },
+  {
+    "id": "aliexpress",
+    "name": "AliExpress",
+    "aliases": [
+      "AliExpress"
+    ],
+    "asset": "company-logo-merchant-aliexpress-cbe0d1e22542fe70.svg",
+    "background": "#ffffff",
+    "inset": 7
+  },
+  {
+    "id": "wish",
+    "name": "Wish",
+    "aliases": [
+      "Wish"
+    ],
+    "asset": "company-logo-merchant-wish-22ea3c573ee39670.svg",
+    "background": "#ffffff",
+    "inset": 7
+  },
+  {
+    "id": "samsung",
+    "name": "Samsung",
+    "aliases": [
+      "Samsung"
+    ],
+    "asset": "company-logo-merchant-samsung-f187e2e69fcdc4f1.svg",
+    "background": "#ffffff",
+    "inset": 3
+  },
+  {
+    "id": "shell",
+    "name": "Shell",
+    "aliases": [
+      "Shell",
+      "Shell gas"
+    ],
+    "asset": "company-logo-merchant-shell-cb024c31adf023ef.svg",
+    "background": "#ffffff",
+    "inset": 6
+  },
+  {
+    "id": "uber",
+    "name": "Uber",
+    "aliases": [
+      "Uber"
+    ],
+    "asset": "company-logo-merchant-uber-29eaa0ec30571c06.svg",
+    "background": "#ffffff",
+    "inset": 7
+  },
+  {
+    "id": "lyft",
+    "name": "Lyft",
+    "aliases": [
+      "Lyft"
+    ],
+    "asset": "company-logo-merchant-lyft-5c700a0a8447613d.svg",
+    "background": "#ffffff",
+    "inset": 7
+  },
+  {
+    "id": "airbnb",
+    "name": "Airbnb",
+    "aliases": [
+      "Airbnb"
+    ],
+    "asset": "company-logo-merchant-airbnb-730875628a7f14b9.svg",
+    "background": "#ffffff",
+    "inset": 7
+  },
+  {
+    "id": "marriott",
+    "name": "Marriott",
+    "aliases": [
+      "Marriott"
+    ],
+    "asset": "company-logo-merchant-marriott-d8e5f2d0c6110434.svg",
+    "background": "#ffffff",
+    "inset": 7
+  },
+  {
+    "id": "hilton",
+    "name": "Hilton",
+    "aliases": [
+      "Hilton"
+    ],
+    "asset": "company-logo-merchant-hilton-330c02529b1afb68.svg",
+    "background": "#ffffff",
+    "inset": 3
+  },
+  {
+    "id": "delta",
+    "name": "Delta",
+    "aliases": [
+      "Delta"
+    ],
+    "asset": "company-logo-merchant-delta-6d02d9e343ef1046.svg",
+    "background": "#ffffff",
+    "inset": 3
+  },
+  {
+    "id": "unitedairlines",
+    "name": "United Airlines",
+    "aliases": [
+      "United Airlines"
+    ],
+    "asset": "company-logo-merchant-unitedairlines-88bc9677345c5b6e.svg",
+    "background": "#ffffff",
+    "inset": 7
+  },
+  {
+    "id": "southwestairlines",
+    "name": "Southwest Airlines",
+    "aliases": [
+      "Southwest",
+      "Southwest Airlines"
+    ],
+    "asset": "company-logo-merchant-southwestairlines-ce7a3812696a54e5.svg",
+    "background": "#ffffff",
+    "inset": 6
+  },
+  {
+    "id": "bookingdotcom",
+    "name": "Booking.com",
+    "aliases": [
+      "Booking.com"
+    ],
+    "asset": "company-logo-merchant-bookingdotcom-a17e2305c35e85a5.png",
+    "background": "#003a9a",
+    "inset": 0
+  },
+  {
+    "id": "expedia",
+    "name": "Expedia",
+    "aliases": [
+      "Expedia"
+    ],
+    "asset": "company-logo-merchant-expedia-a83ff3e3aa86e6da.svg",
+    "background": "#ffffff",
+    "inset": 7
+  },
+  {
+    "id": "tripadvisor",
+    "name": "Tripadvisor",
+    "aliases": [
+      "Tripadvisor"
+    ],
+    "asset": "company-logo-merchant-tripadvisor-c45f380331a1213d.svg",
+    "background": "#ffffff",
+    "inset": 7
+  },
+  {
+    "id": "fedex",
+    "name": "FedEx",
+    "aliases": [
+      "FedEx"
+    ],
+    "asset": "company-logo-merchant-fedex-fe9f8efbe1648b6e.svg",
+    "background": "#ffffff",
+    "inset": 7
+  },
+  {
+    "id": "ups",
+    "name": "UPS",
+    "aliases": [
+      "UPS"
+    ],
+    "asset": "company-logo-merchant-ups-580e99311274c347.svg",
+    "background": "#ffffff",
+    "inset": 6
+  },
+  {
+    "id": "usps",
+    "name": "USPS",
+    "aliases": [
+      "USPS"
+    ],
+    "asset": "company-logo-merchant-usps-a38dc7d740123c28.svg",
+    "background": "#ffffff",
+    "inset": 7
+  },
+  {
+    "id": "dhl",
+    "name": "DHL",
+    "aliases": [
+      "DHL"
+    ],
+    "asset": "company-logo-merchant-dhl-dc8038665792a80a.svg",
+    "background": "#ffffff",
+    "inset": 3
+  },
+  {
+    "id": "grubhub",
+    "name": "Grubhub",
+    "aliases": [
+      "Grubhub",
+      "Grub Hub"
+    ],
+    "asset": "company-logo-merchant-grubhub-64c5257b826ad061.svg",
+    "background": "#ffffff",
+    "inset": 3
+  },
+  {
+    "id": "amazon",
+    "name": "Amazon",
+    "aliases": [
+      "Amazon",
+      "Amazon.com",
+      "AMZN Mktp US",
+      "Amazon Marketplace"
+    ],
+    "asset": "company-logo-merchant-amazon-ec401e732753cdc5.svg",
+    "background": "#ff9400",
+    "inset": 7
+  },
+  {
+    "id": "walmart",
+    "name": "Walmart",
+    "aliases": [
+      "Walmart",
+      "Wal-Mart",
+      "Walmart Supercenter",
+      "Walmart gas"
+    ],
+    "asset": "company-logo-merchant-walmart-c1e12ba4f8a11a41.svg",
+    "background": "#ffffff",
+    "inset": 3
+  },
+  {
+    "id": "trader-joes",
+    "name": "Trader Joe’s",
+    "aliases": [
+      "Trader Joe’s",
+      "Trader Joe's",
+      "Trader Joes"
+    ],
+    "asset": "company-logo-merchant-trader-joes-503e83d3207938d2.svg",
+    "background": "#fffaf0",
+    "inset": 3
+  },
+  {
+    "id": "whole-foods",
+    "name": "Whole Foods",
+    "aliases": [
+      "Whole Foods",
+      "Whole Foods Market"
+    ],
+    "asset": "company-logo-merchant-whole-foods-d548ef550b066f1c.svg",
+    "background": "#ffffff",
+    "inset": 0
+  },
+  {
+    "id": "chevron",
+    "name": "Chevron",
+    "aliases": [
+      "Chevron"
+    ],
+    "asset": "company-logo-merchant-chevron-9493eafb2e48bf90.svg",
+    "background": "#ffffff",
+    "inset": 7
+  },
+  {
+    "id": "home-depot",
+    "name": "Home Depot",
+    "aliases": [
+      "Home Depot",
+      "The Home Depot"
+    ],
+    "asset": "company-logo-merchant-home-depot-72dc07b8739d9c1d.svg",
+    "background": "#f96302",
+    "inset": 4
+  },
+  {
+    "id": "costco",
+    "name": "Costco",
+    "aliases": [
+      "Costco",
+      "Costco Wholesale",
+      "Costco gas",
+      "Costco gasoline"
+    ],
+    "asset": "company-logo-merchant-costco-9c769076aaad8c2c.svg",
+    "background": "#ffffff",
+    "inset": 4
+  },
+  {
+    "id": "chipotle",
+    "name": "Chipotle",
+    "aliases": [
+      "Chipotle",
+      "Chipotle Mexican Grill"
+    ],
+    "asset": "company-logo-merchant-chipotle-e4bd47f46d31e3c9.svg",
+    "background": "#a81612",
+    "inset": 0
+  },
+  {
+    "id": "safeway",
+    "name": "Safeway",
+    "aliases": [
+      "Safeway",
+      "Safeway gas",
+      "Safeway Fuel",
+      "Safeway fuel station"
+    ],
+    "asset": "company-logo-merchant-safeway-85938b09a89cdbd4.svg",
+    "background": "#ffffff",
+    "inset": 4
+  },
+  {
+    "id": "raley-s",
+    "name": "Raley’s",
+    "aliases": [
+      "Raley’s",
+      "Raley's",
+      "Raleys"
+    ],
+    "asset": "company-logo-merchant-raley-s-974e90d00f7d74cb.svg",
+    "background": "#ffffff",
+    "inset": 4
+  },
+  {
+    "id": "lucky",
+    "name": "Lucky",
+    "aliases": [
+      "Lucky",
+      "Lucky Stores",
+      "Lucky Supermarket"
+    ],
+    "asset": "company-logo-merchant-lucky-6fddcad7c6d57b39.svg",
+    "background": "#ffffff",
+    "inset": 4
+  },
+  {
+    "id": "h-e-b",
+    "name": "H-E-B",
+    "aliases": [
+      "H-E-B",
+      "HEB"
+    ],
+    "asset": "company-logo-merchant-h-e-b-99e39d881090cec1.svg",
+    "background": "#ffffff",
+    "inset": 4
+  },
+  {
+    "id": "ralphs",
+    "name": "Ralphs",
+    "aliases": [
+      "Ralphs"
+    ],
+    "asset": "company-logo-merchant-ralphs-907338af30435f9d.svg",
+    "background": "#ffffff",
+    "inset": 4
+  },
+  {
+    "id": "food-4-less",
+    "name": "Food 4 Less",
+    "aliases": [
+      "Food 4 Less",
+      "Food4Less"
+    ],
+    "asset": "company-logo-merchant-food-4-less-72b5c3c24bfe4187.svg",
+    "background": "#ffffff",
+    "inset": 4
+  },
+  {
+    "id": "macy-s",
+    "name": "Macy’s",
+    "aliases": [
+      "Macy’s",
+      "Macy's",
+      "Macys"
+    ],
+    "asset": "company-logo-merchant-macy-s-c12efe01dd06232d.svg",
+    "background": "#ffffff",
+    "inset": 4
+  },
+  {
+    "id": "grocery-outlet",
+    "name": "Grocery Outlet",
+    "aliases": [
+      "Grocery Outlet",
+      "Grocery Outlet Bargain Market"
+    ],
+    "asset": "company-logo-merchant-grocery-outlet-c01ed8af3f2518f6.svg",
+    "background": "#ffffff",
+    "inset": 4
+  },
+  {
+    "id": "foodmaxx",
+    "name": "FoodMaxx",
+    "aliases": [
+      "FoodMaxx",
+      "Food Maxx"
+    ],
+    "asset": "company-logo-merchant-foodmaxx-e265c11c54b7e299.svg",
+    "background": "#ffffff",
+    "inset": 4
+  },
+  {
+    "id": "smart-final",
+    "name": "Smart & Final",
+    "aliases": [
+      "Smart & Final",
+      "Smart and Final",
+      "Smart & Final Extra"
+    ],
+    "asset": "company-logo-merchant-smart-final-0596fc9122ad6066.svg",
+    "background": "#ffffff",
+    "inset": 4
+  },
+  {
+    "id": "winco",
+    "name": "WinCo",
+    "aliases": [
+      "WinCo",
+      "WinCo Foods"
+    ],
+    "asset": "company-logo-merchant-winco-a69f576a3b6a27ef.svg",
+    "background": "#ffffff",
+    "inset": 4
+  },
+  {
+    "id": "nugget-markets",
+    "name": "Nugget Markets",
+    "aliases": [
+      "Nugget Markets",
+      "Nugget Market"
+    ],
+    "asset": "company-logo-merchant-nugget-markets-dcb2c550169515ab.svg",
+    "background": "#ffffff",
+    "inset": 4
+  },
+  {
+    "id": "publix",
+    "name": "Publix",
+    "aliases": [
+      "Publix",
+      "Publix Super Market"
+    ],
+    "asset": "company-logo-merchant-publix-3f95ae939457559d.svg",
+    "background": "#ffffff",
+    "inset": 4
+  },
+  {
+    "id": "wegmans",
+    "name": "Wegmans",
+    "aliases": [
+      "Wegmans"
+    ],
+    "asset": "company-logo-merchant-wegmans-cc8b573678019ff2.svg",
+    "background": "#ffffff",
+    "inset": 4
+  },
+  {
+    "id": "meijer",
+    "name": "Meijer",
+    "aliases": [
+      "Meijer"
+    ],
+    "asset": "company-logo-merchant-meijer-e18564fd4251801a.svg",
+    "background": "#ffffff",
+    "inset": 4
+  },
+  {
+    "id": "hy-vee",
+    "name": "Hy-Vee",
+    "aliases": [
+      "Hy-Vee",
+      "Hy Vee"
+    ],
+    "asset": "company-logo-merchant-hy-vee-3094e6bf49b43fae.svg",
+    "background": "#ffffff",
+    "inset": 4
+  },
+  {
+    "id": "vons",
+    "name": "Vons",
+    "aliases": [
+      "Vons"
+    ],
+    "asset": "company-logo-merchant-vons-e40b948bbd18cb95.svg",
+    "background": "#ffffff",
+    "inset": 4
+  },
+  {
+    "id": "fred-meyer",
+    "name": "Fred Meyer",
+    "aliases": [
+      "Fred Meyer"
+    ],
+    "asset": "company-logo-merchant-fred-meyer-868e07919a461778.svg",
+    "background": "#ffffff",
+    "inset": 4
+  },
+  {
+    "id": "fry-s",
+    "name": "Fry’s",
+    "aliases": [
+      "Fry’s",
+      "Fry's",
+      "Frys Food",
+      "Fry's Food"
+    ],
+    "asset": "company-logo-merchant-fry-s-43349a40a9579f22.svg",
+    "background": "#ffffff",
+    "inset": 4
+  },
+  {
+    "id": "king-soopers",
+    "name": "King Soopers",
+    "aliases": [
+      "King Soopers"
+    ],
+    "asset": "company-logo-merchant-king-soopers-3e3c1549beb32fab.svg",
+    "background": "#ffffff",
+    "inset": 4
+  },
+  {
+    "id": "giant-eagle",
+    "name": "Giant Eagle",
+    "aliases": [
+      "Giant Eagle"
+    ],
+    "asset": "company-logo-merchant-giant-eagle-de1988a27f88a30b.svg",
+    "background": "#ffffff",
+    "inset": 4
+  },
+  {
+    "id": "jewel-osco",
+    "name": "Jewel-Osco",
+    "aliases": [
+      "Jewel-Osco",
+      "Jewel Osco"
+    ],
+    "asset": "company-logo-merchant-jewel-osco-80f8a9327431f6d6.svg",
+    "background": "#ffffff",
+    "inset": 4
+  },
+  {
+    "id": "stop-shop",
+    "name": "Stop & Shop",
+    "aliases": [
+      "Stop & Shop",
+      "Stop and Shop"
+    ],
+    "asset": "company-logo-merchant-stop-shop-22e83d328051015c.svg",
+    "background": "#ffffff",
+    "inset": 4
+  },
+  {
+    "id": "the-fresh-market",
+    "name": "The Fresh Market",
+    "aliases": [
+      "The Fresh Market"
+    ],
+    "asset": "company-logo-merchant-the-fresh-market-392f2695694f8b98.svg",
+    "background": "#ffffff",
+    "inset": 4
+  },
+  {
+    "id": "sam-s-club",
+    "name": "Sam’s Club",
+    "aliases": [
+      "Sam’s Club",
+      "Sam's Club",
+      "Sams Club",
+      "Sam's Club gas",
+      "Sams Club gas",
+      "Sam’s Club fuel"
+    ],
+    "asset": "company-logo-merchant-sam-s-club-c6b487847135e78f.svg",
+    "background": "#ffffff",
+    "inset": 4
+  },
+  {
+    "id": "bj-s-wholesale",
+    "name": "BJ’s Wholesale",
+    "aliases": [
+      "BJ’s Wholesale",
+      "BJ's Wholesale",
+      "BJ's Wholesale Club",
+      "BJs Wholesale",
+      "BJs gas",
+      "BJ's gas"
+    ],
+    "asset": "company-logo-merchant-bj-s-wholesale-7ae53be1b570871e.svg",
+    "background": "#ffffff",
+    "inset": 4
+  },
+  {
+    "id": "save-a-lot",
+    "name": "Save A Lot",
+    "aliases": [
+      "Save A Lot",
+      "Save-A-Lot"
+    ],
+    "asset": "company-logo-merchant-save-a-lot-f8a0e6f228c6604e.svg",
+    "background": "#ffffff",
+    "inset": 4
+  },
+  {
+    "id": "weis-markets",
+    "name": "Weis Markets",
+    "aliases": [
+      "Weis Markets"
+    ],
+    "asset": "company-logo-merchant-weis-markets-d9029efff94e9986.svg",
+    "background": "#ffffff",
+    "inset": 4
+  },
+  {
+    "id": "76",
+    "name": "76",
+    "aliases": [
+      "76",
+      "Union 76",
+      "76 gas"
+    ],
+    "asset": "company-logo-merchant-76-b0be97cf09fd26e9.svg",
+    "background": "#ffffff",
+    "inset": 0
+  },
+  {
+    "id": "arco",
+    "name": "ARCO",
+    "aliases": [
+      "ARCO",
+      "ARCO gas"
+    ],
+    "asset": "company-logo-merchant-arco-c3571b59c0c3c136.svg",
+    "background": "#ffffff",
+    "inset": 4
+  },
+  {
+    "id": "exxon",
+    "name": "Exxon",
+    "aliases": [
+      "Exxon",
+      "Exxon gas"
+    ],
+    "asset": "company-logo-merchant-exxon-6b5ffc23a9a4aa5f.svg",
+    "background": "#ffffff",
+    "inset": 4
+  },
+  {
+    "id": "mobil",
+    "name": "Mobil",
+    "aliases": [
+      "Mobil",
+      "Mobil gas"
+    ],
+    "asset": "company-logo-merchant-mobil-75891324a28740f1.svg",
+    "background": "#ffffff",
+    "inset": 4
+  },
+  {
+    "id": "texaco",
+    "name": "Texaco",
+    "aliases": [
+      "Texaco",
+      "Texaco gas"
+    ],
+    "asset": "company-logo-merchant-texaco-a1fc3248eb55b923.svg",
+    "background": "#ffffff",
+    "inset": 4
+  },
+  {
+    "id": "sunoco",
+    "name": "Sunoco",
+    "aliases": [
+      "Sunoco",
+      "Sunoco gas"
+    ],
+    "asset": "company-logo-merchant-sunoco-60bf24e2bbe02a22.svg",
+    "background": "#ffffff",
+    "inset": 4
+  },
+  {
+    "id": "phillips-66",
+    "name": "Phillips 66",
+    "aliases": [
+      "Phillips 66",
+      "Phillips66"
+    ],
+    "asset": "company-logo-merchant-phillips-66-a579cafed870b23a.svg",
+    "background": "#ffffff",
+    "inset": 4
+  },
+  {
+    "id": "conoco",
+    "name": "Conoco",
+    "aliases": [
+      "Conoco",
+      "Conoco gas"
+    ],
+    "asset": "company-logo-merchant-conoco-c63e487ab9afe78a.svg",
+    "background": "#ffffff",
+    "inset": 4
+  },
+  {
+    "id": "citgo",
+    "name": "CITGO",
+    "aliases": [
+      "CITGO",
+      "Citgo gas"
+    ],
+    "asset": "company-logo-merchant-citgo-82071e9a6a9621c4.svg",
+    "background": "#ffffff",
+    "inset": 4
+  },
+  {
+    "id": "marathon",
+    "name": "Marathon",
+    "aliases": [
+      "Marathon",
+      "Marathon gas",
+      "Marathon Petroleum"
+    ],
+    "asset": "company-logo-merchant-marathon-640b728d446b52fa.svg",
+    "background": "#ffffff",
+    "inset": 4
+  },
+  {
+    "id": "7-eleven",
+    "name": "7-Eleven",
+    "aliases": [
+      "7-Eleven",
+      "7 Eleven",
+      "7Eleven"
+    ],
+    "asset": "company-logo-merchant-7-eleven-2696fb9fd35ae97a.svg",
+    "background": "#ffffff",
+    "inset": 4
+  },
+  {
+    "id": "casey-s",
+    "name": "Casey’s",
+    "aliases": [
+      "Casey’s",
+      "Casey's",
+      "Caseys",
+      "Casey's General Store"
+    ],
+    "asset": "company-logo-merchant-casey-s-91360eb1cd7be2d1.svg",
+    "background": "#ffffff",
+    "inset": 4
+  },
+  {
+    "id": "circle-k",
+    "name": "Circle K",
+    "aliases": [
+      "Circle K",
+      "CircleK"
+    ],
+    "asset": "company-logo-merchant-circle-k-1e61fb816fae4afc.svg",
+    "background": "#ffffff",
+    "inset": 4
+  },
+  {
+    "id": "sheetz",
+    "name": "Sheetz",
+    "aliases": [
+      "Sheetz"
+    ],
+    "asset": "company-logo-merchant-sheetz-774e74d49b65e776.svg",
+    "background": "#ffffff",
+    "inset": 4
+  },
+  {
+    "id": "speedway",
+    "name": "Speedway",
+    "aliases": [
+      "Speedway",
+      "Speedway gas"
+    ],
+    "asset": "company-logo-merchant-speedway-de389d384eb4a634.svg",
+    "background": "#ffffff",
+    "inset": 4
+  },
+  {
+    "id": "in-n-out",
+    "name": "In-N-Out",
+    "aliases": [
+      "In-N-Out",
+      "In N Out",
+      "In-N-Out Burger"
+    ],
+    "asset": "company-logo-merchant-in-n-out-71aef5413caff248.svg",
+    "background": "#ffffff",
+    "inset": 4
+  },
+  {
+    "id": "chick-fil-a",
+    "name": "Chick-fil-A",
+    "aliases": [
+      "Chick-fil-A",
+      "Chick Fil A",
+      "Chickfila"
+    ],
+    "asset": "company-logo-merchant-chick-fil-a-0c22a8e7be811629.svg",
+    "background": "#ffffff",
+    "inset": 4
+  },
+  {
+    "id": "wendy-s",
+    "name": "Wendy’s",
+    "aliases": [
+      "Wendy’s",
+      "Wendy's",
+      "Wendys"
+    ],
+    "asset": "company-logo-merchant-wendy-s-e967f279cfb5bdec.svg",
+    "background": "#ffffff",
+    "inset": 4
+  },
+  {
+    "id": "jack-in-the-box",
+    "name": "Jack in the Box",
+    "aliases": [
+      "Jack in the Box"
+    ],
+    "asset": "company-logo-merchant-jack-in-the-box-b76b31392df7db97.svg",
+    "background": "#ffffff",
+    "inset": 4
+  },
+  {
+    "id": "subway",
+    "name": "Subway",
+    "aliases": [
+      "Subway"
+    ],
+    "asset": "company-logo-merchant-subway-6495f02e1b66570e.svg",
+    "background": "#ffffff",
+    "inset": 4
+  },
+  {
+    "id": "dunkin",
+    "name": "Dunkin’",
+    "aliases": [
+      "Dunkin’",
+      "Dunkin",
+      "Dunkin'",
+      "Dunkin Donuts"
+    ],
+    "asset": "company-logo-merchant-dunkin-8a812437781138b2.svg",
+    "background": "#ffffff",
+    "inset": 4
+  },
+  {
+    "id": "arby-s",
+    "name": "Arby’s",
+    "aliases": [
+      "Arby’s",
+      "Arby's",
+      "Arbys"
+    ],
+    "asset": "company-logo-merchant-arby-s-b73df46b4afb3a81.svg",
+    "background": "#ffffff",
+    "inset": 4
+  },
+  {
+    "id": "carl-s-jr",
+    "name": "Carl’s Jr.",
+    "aliases": [
+      "Carl’s Jr.",
+      "Carl's Jr",
+      "Carls Jr",
+      "Carl's Jr."
+    ],
+    "asset": "company-logo-merchant-carl-s-jr-ac0b7df46ee5440b.svg",
+    "background": "#ffffff",
+    "inset": 4
+  },
+  {
+    "id": "five-guys",
+    "name": "Five Guys",
+    "aliases": [
+      "Five Guys"
+    ],
+    "asset": "company-logo-merchant-five-guys-551df34bbd29ccbc.svg",
+    "background": "#ffffff",
+    "inset": 4
+  },
+  {
+    "id": "jersey-mike-s",
+    "name": "Jersey Mike’s",
+    "aliases": [
+      "Jersey Mike’s",
+      "Jersey Mike's",
+      "Jersey Mikes",
+      "Jersey Mike's Subs"
+    ],
+    "asset": "company-logo-merchant-jersey-mike-s-ba21c0c6dbf17b6d.svg",
+    "background": "#ffffff",
+    "inset": 4
+  },
+  {
+    "id": "shake-shack",
+    "name": "Shake Shack",
+    "aliases": [
+      "Shake Shack"
+    ],
+    "asset": "company-logo-merchant-shake-shack-23c88cd6111fa5d5.svg",
+    "background": "#ffffff",
+    "inset": 4
+  },
+  {
+    "id": "sonic",
+    "name": "Sonic",
+    "aliases": [
+      "Sonic",
+      "Sonic Drive-In"
+    ],
+    "asset": "company-logo-merchant-sonic-dc9853920176eef7.svg",
+    "background": "#ffffff",
+    "inset": 4
+  },
+  {
+    "id": "culver-s",
+    "name": "Culver’s",
+    "aliases": [
+      "Culver’s",
+      "Culver's",
+      "Culvers"
+    ],
+    "asset": "company-logo-merchant-culver-s-f7cb9031879997d9.svg",
+    "background": "#ffffff",
+    "inset": 4
+  },
+  {
+    "id": "raising-cane-s",
+    "name": "Raising Cane’s",
+    "aliases": [
+      "Raising Cane’s",
+      "Raising Cane's",
+      "Raising Canes"
+    ],
+    "asset": "company-logo-merchant-raising-cane-s-9bce2ddd7335b29e.svg",
+    "background": "#ffffff",
+    "inset": 4
+  },
+  {
+    "id": "popeyes",
+    "name": "Popeyes",
+    "aliases": [
+      "Popeyes",
+      "Popeyes Louisiana Kitchen"
+    ],
+    "asset": "company-logo-merchant-popeyes-70a4320b60c8979a.svg",
+    "background": "#ffffff",
+    "inset": 4
+  },
+  {
+    "id": "qdoba",
+    "name": "Qdoba",
+    "aliases": [
+      "Qdoba",
+      "Qdoba Mexican Eats"
+    ],
+    "asset": "company-logo-merchant-qdoba-627d8269d46edb4b.svg",
+    "background": "#ffffff",
+    "inset": 4
+  },
+  {
+    "id": "cinnabon",
+    "name": "Cinnabon",
+    "aliases": [
+      "Cinnabon"
+    ],
+    "asset": "company-logo-merchant-cinnabon-b49464063e396552.svg",
+    "background": "#ffffff",
+    "inset": 4
+  },
+  {
+    "id": "crumbl",
+    "name": "Crumbl",
+    "aliases": [
+      "Crumbl",
+      "Crumbl Cookies"
+    ],
+    "asset": "company-logo-merchant-crumbl-23aaee41ceafec3a.svg",
+    "background": "#ffffff",
+    "inset": 4
+  },
+  {
+    "id": "tim-hortons",
+    "name": "Tim Hortons",
+    "aliases": [
+      "Tim Hortons"
+    ],
+    "asset": "company-logo-merchant-tim-hortons-e518a41c61d60c40.svg",
+    "background": "#ffffff",
+    "inset": 4
+  },
+  {
+    "id": "tropical-smoothie-cafe",
+    "name": "Tropical Smoothie Cafe",
+    "aliases": [
+      "Tropical Smoothie Cafe"
+    ],
+    "asset": "company-logo-merchant-tropical-smoothie-cafe-1ad444001a4fedf3.svg",
+    "background": "#ffffff",
+    "inset": 4
+  },
+  {
+    "id": "domino-s",
+    "name": "Domino’s",
+    "aliases": [
+      "Domino’s",
+      "Domino's",
+      "Dominos",
+      "Domino's Pizza"
+    ],
+    "asset": "company-logo-merchant-domino-s-d10312514bb7e2fe.svg",
+    "background": "#ffffff",
+    "inset": 4
+  },
+  {
+    "id": "pizza-hut",
+    "name": "Pizza Hut",
+    "aliases": [
+      "Pizza Hut"
+    ],
+    "asset": "company-logo-merchant-pizza-hut-3219458988d3cbf0.svg",
+    "background": "#ffffff",
+    "inset": 4
+  },
+  {
+    "id": "papa-johns",
+    "name": "Papa Johns",
+    "aliases": [
+      "Papa Johns",
+      "Papa John's",
+      "Papa Johns Pizza"
+    ],
+    "asset": "company-logo-merchant-papa-johns-636d4bb27ccf656d.svg",
+    "background": "#ffffff",
+    "inset": 4
+  },
+  {
+    "id": "papa-murphy-s",
+    "name": "Papa Murphy’s",
+    "aliases": [
+      "Papa Murphy’s",
+      "Papa Murphy's",
+      "Papa Murphys"
+    ],
+    "asset": "company-logo-merchant-papa-murphy-s-6a7c9786642bc51b.svg",
+    "background": "#ffffff",
+    "inset": 4
+  },
+  {
+    "id": "peet-s-coffee",
+    "name": "Peet’s Coffee",
+    "aliases": [
+      "Peet’s Coffee",
+      "Peet's Coffee",
+      "Peets Coffee",
+      "Peet's"
+    ],
+    "asset": "company-logo-merchant-peet-s-coffee-e2130b972040ba84.svg",
+    "background": "#ffffff",
+    "inset": 4
+  },
+  {
+    "id": "best-buy",
+    "name": "Best Buy",
+    "aliases": [
+      "Best Buy",
+      "BestBuy"
+    ],
+    "asset": "company-logo-merchant-best-buy-93a954f0e658c43e.svg",
+    "background": "#ffffff",
+    "inset": 5
+  },
+  {
+    "id": "world-market",
+    "name": "World Market",
+    "aliases": [
+      "World Market",
+      "Cost Plus World Market",
+      "Cost Plus"
+    ],
+    "asset": "company-logo-merchant-world-market-f79784e5924a7cf0.png",
+    "background": "#fff8eb",
+    "inset": 3
+  },
+  {
+    "id": "lowe-s",
+    "name": "Lowe’s",
+    "aliases": [
+      "Lowe’s",
+      "Lowe's",
+      "Lowes",
+      "Lowe's Home Improvement"
+    ],
+    "asset": "company-logo-merchant-lowe-s-a080212b39ddd1ae.svg",
+    "background": "#ffffff",
+    "inset": 4
+  },
+  {
+    "id": "ace-hardware",
+    "name": "Ace Hardware",
+    "aliases": [
+      "Ace Hardware"
+    ],
+    "asset": "company-logo-merchant-ace-hardware-142f94cc18508f09.svg",
+    "background": "#ffffff",
+    "inset": 4
+  },
+  {
+    "id": "michaels",
+    "name": "Michaels",
+    "aliases": [
+      "Michaels"
+    ],
+    "asset": "company-logo-merchant-michaels-d7d01232bdf2a807.svg",
+    "background": "#ffffff",
+    "inset": 4
+  },
+  {
+    "id": "hobby-lobby",
+    "name": "Hobby Lobby",
+    "aliases": [
+      "Hobby Lobby"
+    ],
+    "asset": "company-logo-merchant-hobby-lobby-a155b51d89faeccc.svg",
+    "background": "#ffffff",
+    "inset": 4
+  },
+  {
+    "id": "cvs",
+    "name": "CVS",
+    "aliases": [
+      "CVS",
+      "CVS Pharmacy"
+    ],
+    "asset": "company-logo-merchant-cvs-00f1f34aa253030a.svg",
+    "background": "#ffffff",
+    "inset": 4
+  },
+  {
+    "id": "walgreens",
+    "name": "Walgreens",
+    "aliases": [
+      "Walgreens"
+    ],
+    "asset": "company-logo-merchant-walgreens-bd7018f2285d0cf0.svg",
+    "background": "#ffffff",
+    "inset": 4
+  },
+  {
+    "id": "dollar-general",
+    "name": "Dollar General",
+    "aliases": [
+      "Dollar General"
+    ],
+    "asset": "company-logo-merchant-dollar-general-f10add8673e88821.svg",
+    "background": "#ffffff",
+    "inset": 4
+  },
+  {
+    "id": "dollar-tree",
+    "name": "Dollar Tree",
+    "aliases": [
+      "Dollar Tree"
+    ],
+    "asset": "company-logo-merchant-dollar-tree-0450608d08d5e567.svg",
+    "background": "#ffffff",
+    "inset": 4
+  },
+  {
+    "id": "five-below",
+    "name": "Five Below",
+    "aliases": [
+      "Five Below"
+    ],
+    "asset": "company-logo-merchant-five-below-eac28a0d27ddf792.svg",
+    "background": "#ffffff",
+    "inset": 4
+  },
+  {
+    "id": "tj-maxx",
+    "name": "TJ Maxx",
+    "aliases": [
+      "TJ Maxx",
+      "TJMaxx",
+      "T.J. Maxx"
+    ],
+    "asset": "company-logo-merchant-tj-maxx-392a47b18690e5c1.svg",
+    "background": "#ffffff",
+    "inset": 4
+  },
+  {
+    "id": "marshalls",
+    "name": "Marshalls",
+    "aliases": [
+      "Marshalls"
+    ],
+    "asset": "company-logo-merchant-marshalls-095359cecdee76b3.svg",
+    "background": "#ffffff",
+    "inset": 4
+  },
+  {
+    "id": "burlington",
+    "name": "Burlington",
+    "aliases": [
+      "Burlington",
+      "Burlington Coat Factory"
+    ],
+    "asset": "company-logo-merchant-burlington-01fcd8610f4b8995.svg",
+    "background": "#ffffff",
+    "inset": 4
+  },
+  {
+    "id": "kohl-s",
+    "name": "Kohl’s",
+    "aliases": [
+      "Kohl’s",
+      "Kohl's",
+      "Kohls"
+    ],
+    "asset": "company-logo-merchant-kohl-s-9f2ca2622f374465.svg",
+    "background": "#ffffff",
+    "inset": 4
+  },
+  {
+    "id": "nordstrom",
+    "name": "Nordstrom",
+    "aliases": [
+      "Nordstrom"
+    ],
+    "asset": "company-logo-merchant-nordstrom-d0c687ba2ddf2e60.svg",
+    "background": "#ffffff",
+    "inset": 4
+  },
+  {
+    "id": "nordstrom-rack",
+    "name": "Nordstrom Rack",
+    "aliases": [
+      "Nordstrom Rack"
+    ],
+    "asset": "company-logo-merchant-nordstrom-rack-0eccccb846ee1151.svg",
+    "background": "#ffffff",
+    "inset": 4
+  },
+  {
+    "id": "jcpenney",
+    "name": "JCPenney",
+    "aliases": [
+      "JCPenney",
+      "J C Penney",
+      "JC Penney"
+    ],
+    "asset": "company-logo-merchant-jcpenney-370bdce74bcc21b7.svg",
+    "background": "#ffffff",
+    "inset": 4
+  },
+  {
+    "id": "ulta-beauty",
+    "name": "Ulta Beauty",
+    "aliases": [
+      "Ulta Beauty",
+      "Ulta"
+    ],
+    "asset": "company-logo-merchant-ulta-beauty-10820dc34674ff7c.svg",
+    "background": "#ffffff",
+    "inset": 4
+  },
+  {
+    "id": "petco",
+    "name": "Petco",
+    "aliases": [
+      "Petco"
+    ],
+    "asset": "company-logo-merchant-petco-e9e14d69337cd32c.svg",
+    "background": "#ffffff",
+    "inset": 4
+  },
+  {
+    "id": "chewy",
+    "name": "Chewy",
+    "aliases": [
+      "Chewy",
+      "Chewy.com"
+    ],
+    "asset": "company-logo-merchant-chewy-3ac28cc8c07faa14.svg",
+    "background": "#ffffff",
+    "inset": 4
+  },
+  {
+    "id": "barnes-noble",
+    "name": "Barnes & Noble",
+    "aliases": [
+      "Barnes & Noble",
+      "Barnes and Noble"
+    ],
+    "asset": "company-logo-merchant-barnes-noble-b78c7443ae9a67d2.svg",
+    "background": "#ffffff",
+    "inset": 4
+  },
+  {
+    "id": "staples",
+    "name": "Staples",
+    "aliases": [
+      "Staples"
+    ],
+    "asset": "company-logo-merchant-staples-440e774437f550cc.svg",
+    "background": "#ffffff",
+    "inset": 4
+  },
+  {
+    "id": "o-reilly-auto-parts",
+    "name": "O’Reilly Auto Parts",
+    "aliases": [
+      "O’Reilly Auto Parts",
+      "O'Reilly Auto Parts",
+      "OReilly Auto Parts"
+    ],
+    "asset": "company-logo-merchant-o-reilly-auto-parts-401cbc08d7ae88a1.svg",
+    "background": "#ffffff",
+    "inset": 4
+  },
+  {
+    "id": "petsmart",
+    "name": "PetSmart",
+    "aliases": [
+      "PetSmart",
+      "Pet Smart"
+    ],
+    "asset": "company-logo-merchant-petsmart-94557634c6211f95.svg",
+    "background": "#ffffff",
+    "inset": 4
+  },
+  {
+    "id": "sephora",
+    "name": "Sephora",
+    "aliases": [
+      "Sephora"
+    ],
+    "asset": "company-logo-merchant-sephora-b6248eb3d6e5b05f.svg",
+    "background": "#ffffff",
+    "inset": 4
+  },
+  {
+    "id": "bp",
+    "name": "BP",
+    "aliases": [
+      "BP",
+      "British Petroleum",
+      "BP gas"
+    ],
+    "asset": "company-logo-merchant-bp-9dad127421af0a14.svg",
+    "background": "#ffffff",
+    "inset": 4
+  },
+  {
+    "id": "wawa",
+    "name": "Wawa",
+    "aliases": [
+      "Wawa"
+    ],
+    "asset": "company-logo-merchant-wawa-ca88e6273dfadcb5.svg",
+    "background": "#ffffff",
+    "inset": 4
+  },
+  {
+    "id": "sinclair",
+    "name": "Sinclair",
+    "aliases": [
+      "Sinclair",
+      "Sinclair Oil"
+    ],
+    "asset": "company-logo-merchant-sinclair-31fbe7c76af23129.svg",
+    "background": "#ffffff",
+    "inset": 4
+  },
+  {
+    "id": "panda-express",
+    "name": "Panda Express",
+    "aliases": [
+      "Panda Express"
+    ],
+    "asset": "company-logo-merchant-panda-express-dd57da67b81d91e1.svg",
+    "background": "#ffffff",
+    "inset": 4
+  },
+  {
+    "id": "wingstop",
+    "name": "Wingstop",
+    "aliases": [
+      "Wingstop"
+    ],
+    "asset": "company-logo-merchant-wingstop-36b97fd75ddebe47.svg",
+    "background": "#ffffff",
+    "inset": 4
+  },
+  {
+    "id": "rei",
+    "name": "REI",
+    "aliases": [
+      "REI",
+      "REI Co-op",
+      "Recreational Equipment Inc"
+    ],
+    "asset": "company-logo-merchant-rei-ff63311059336afc.svg",
+    "background": "#ffffff",
+    "inset": 5
+  },
+  {
+    "id": "autozone",
+    "name": "AutoZone",
+    "aliases": [
+      "AutoZone",
+      "Auto Zone"
+    ],
+    "asset": "company-logo-merchant-autozone-a6efca13aa81be7c.svg",
+    "background": "#ffffff",
+    "inset": 4
+  },
+  {
+    "id": "kroger",
+    "name": "Kroger",
+    "aliases": [
+      "Kroger",
+      "Kroger gas"
+    ],
+    "asset": "company-logo-merchant-kroger-2204dd1bb885a8af.svg",
+    "background": "#ffffff",
+    "inset": 3
+  }
+]

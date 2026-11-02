@@ -275,7 +275,7 @@ def test_daily_spending_includes_bills_and_compresses_strong_outliers():
 def test_category_pie_and_daily_transaction_labels_share_one_color_mapping():
     source = (Path(__file__).resolve().parents[2] / "web/expense-report/src/report-app.tsx").read_text()
     app = source.split("export function ExpenseReportApp", 1)[1].split("function isInteractiveTouchTarget", 1)[0]
-    daily_table = source.split("function DailyEntriesTable", 1)[1].split("function compareDayGroups", 1)[0]
+    daily_table = (Path(__file__).resolve().parents[2] / "web/expense-report/src/daily-transactions.tsx").read_text()
 
     assert "color: CATEGORY_CHART_COLORS[item.key] ?? item.color" in app
     assert "Object.fromEntries(chartBreakdown.map((item) => [item.label, item.color]))" in app
@@ -615,14 +615,14 @@ def test_build_expense_breakdown_report_aggregates_shared_and_personal_data():
     assert "bb-theme-toggle-moon" in html
     assert "bb-table-row-divider" in html
     assert "Highest day" not in html
-    assert "bb-daily-entry-filter" in html
+    assert "bb-daily-active-filter" in html
     assert "All types" in html
     assert "Days counted" not in html
     assert "Daily Spending" in html
     assert "bb-daily-spending-grid" in html
     assert "bb-daily-spending-x-axis-label" in html
     assert "Income left" in html
-    assert "Need Expenses" not in html
+    assert all(item["label"] != "Need Expenses" for item in payload["breakdown"])
     assert "Need" in html
     assert "Rent" in html
     assert any(item["label"] == "Bills & Utilities" for item in payload["breakdown"])
